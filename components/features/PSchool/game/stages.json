@@ -1,0 +1,47 @@
+{
+  "stages": {
+    "1": {
+      "title": "基本の攻撃",
+      "background": "grass",
+      "backgroundImage": "/p_school/assets/battle-seen01.jpeg",
+      "enemy": {
+        "name": "森の精霊",
+        "texture": "/p_school/assets/serirei01.png",
+        "hp": 25,
+        "tint": null
+      },
+      "availableBlocks": ["attack_basic", "wait"],
+      "startMessage": "ステージ1「基本の攻撃」が始まりました！森の精霊と対決します！"
+    },
+    "2": {
+      "title": "回復の魔法",
+      "background": "labo",
+      "enemy": {
+        "name": "ポイズンモス",
+        "texture": "/p_school/assets/chemical.png",
+        "hp": 40,
+        "tint": null
+      },
+      "availableBlocks": ["attack_basic", "heal_magic", "wait"],
+      "startMessage": "ステージ2「回復の魔法」！HPに気をつけて戦いましょう。"
+    },
+    "13": {
+      "title": "初めての関数",
+      "background": "armory",
+      "backgroundImage": "/p_school/assets/armory.jpg",
+      "enemy": {
+        "name": "双子剣士",
+        "texture": "/p_school/assets/mirrorknight.png",
+        "hp": 140,
+        "tint": 13358847,
+        "scaleWidth": 250
+      },
+      "availableBlocks": ["custom_function_placeholder", "attack_basic", "heal_magic", "wait"],
+      "startMessage": "ステージ13「初めての関数」！双子剣士は連携攻撃をしてきます。",
+      "specialMechanics": {
+        "type": "twin_guard",
+        "comboGoal": 3
+      }
+    }
+  }
+}

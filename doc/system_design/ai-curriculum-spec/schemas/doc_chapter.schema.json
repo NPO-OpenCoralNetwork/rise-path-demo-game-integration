@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "doc-chapter.schema.json",
+  "title": "DocChapter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "subtitle", "readingTime", "sections"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "$ref": "#/$defs/localizedText" },
+    "subtitle": { "$ref": "#/$defs/localizedText" },
+    "readingTime": { "$ref": "#/$defs/localizedText" },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/docSection" }
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "jp"],
+      "properties": {
+        "en": { "type": "string", "minLength": 1 },
+        "jp": { "type": "string", "minLength": 1 }
+      }
+    },
+    "localizedOrString": {
+      "anyOf": [
+        { "$ref": "#/$defs/localizedText" },
+        { "type": "string", "minLength": 1 }
+      ]
+    },
+    "docSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "content"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "$ref": "#/$defs/localizedText" },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/docBlock" }
+        }
+      }
+    },
+    "docBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/textBlock" },
+        { "$ref": "#/$defs/imageBlock" },
+        { "$ref": "#/$defs/codeBlock" },
+        { "$ref": "#/$defs/listBlock" },
+        { "$ref": "#/$defs/calloutBlock" },
+        { "$ref": "#/$defs/mermaidBlock" },
+        { "$ref": "#/$defs/tableBlock" },
+        { "$ref": "#/$defs/mindmapBlock" }
+      ]
+    },
+    "textBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "$ref": "#/$defs/localizedOrString" },
+        "style": { "type": "string", "enum": ["normal", "lead", "quote"] }
+      }
+    },
+    "imageBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "src", "alt"],
+      "properties": {
+        "type": { "const": "image" },
+        "src": { "type": "string", "minLength": 1 },
+        "alt": { "type": "string", "minLength": 1 },
+        "caption": { "$ref": "#/$defs/localizedOrString" },
+        "layout": { "type": "string", "enum": ["full", "float-right"] }
+      }
+    },
+    "codeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "code", "language"],
+      "properties": {
+        "type": { "const": "code" },
+        "code": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "filename": { "type": "string", "minLength": 1 },
+        "highlightLines": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "listBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "items"],
+      "properties": {
+        "type": { "const": "list" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/localizedOrString" }
+        },
+        "style": { "type": "string", "enum": ["bullet", "number", "check"] }
+      }
+    },
+    "calloutBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "variant"],
+      "properties": {
+        "type": { "const": "callout" },
+        "title": { "$ref": "#/$defs/localizedOrString" },
+        "text": { "$ref": "#/$defs/localizedOrString" },
+        "variant": { "type": "string", "enum": ["info", "warning", "tip", "success"] }
+      }
+    },
+    "mermaidBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "chart"],
+      "properties": {
+        "type": { "const": "mermaid" },
+        "chart": { "type": "string", "minLength": 1 },
+        "caption": { "$ref": "#/$defs/localizedOrString" }
+      }
+    },
+    "tableBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "headers", "rows"],
+      "properties": {
+        "type": { "const": "table" },
+        "headers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/localizedOrString" }
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/localizedOrString" }
+          }
+        }
+      }
+    },
+    "mindmapBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "root"],
+      "properties": {
+        "type": { "const": "mindmap" },
+        "root": { "$ref": "#/$defs/mindmapNode" }
+      }
+    },
+    "mindmapNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "$ref": "#/$defs/localizedOrString" },
+        "details": { "$ref": "#/$defs/localizedOrString" },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/mindmapNode" }
+        }
+      }
+    }
+  }
+}

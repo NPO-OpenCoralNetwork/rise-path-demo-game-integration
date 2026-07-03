@@ -1,0 +1,98 @@
+# Phase 19: Learner semantic memory (Memanto + Moorcheh + Ollama) overlay.
+# Separate from nexloom-gce personal Memanto (2005nk-work). Learner agents: rp-user-{uuid}.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
+#     --env-file stack.env --profile full --profile memory up -d
+#
+# First-time Ollama models (on VM):
+#   docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
+#     --env-file stack.env exec ollama ollama pull nomic-embed-text
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    profiles:
+      - memory
+      - full
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 15s
+      retries: 8
+      start_period: 60s
+
+  moorcheh:
+    image: moorcheh/server:v0.1.3@sha256:9e74f8b291b363d137b3893c5184a646a38ac4bcb164a15fd1a2a617f7ef1eeb
+    restart: unless-stopped
+    user: "65532:65532"
+    profiles:
+      - memory
+      - full
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      EMBEDDING_PROVIDER: ollama
+      EMBEDDING_MODEL: ${MOORCHEH_EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_BASE_URL: http://ollama:11434
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${MOORCHEH_EMBEDDING_MODEL:-nomic-embed-text}
+      LLM_PROVIDER: ollama
+      LLM_MODEL: ${MOORCHEH_LLM_MODEL:-qwen2.5:0.5b}
+      LLM_BASE_URL: http://ollama:11434
+      DATA_FILE: /app/data/moorcheh_data_store.json
+      NAMESPACE_REGISTRY_FILE: /app/data/namespace_registry.json
+      FILE_REGISTRY_FILE: /app/data/file_registry.json
+      ALLOWED_UPLOAD_PATHS: /uploads
+    volumes:
+      - risepath_moorcheh_data:/app/data
+      - risepath_moorcheh_uploads:/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  memanto:
+    image: risepath-memanto:0.2.3
+    build:
+      context: .
+      dockerfile: Dockerfile.memanto
+    restart: unless-stopped
+    user: "1001:1001"
+    profiles:
+      - memory
+      - full
+    depends_on:
+      moorcheh:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MEMANTO_API_PORT:-8100}:8000"
+    environment:
+      MEMANTO_BACKEND: on-prem
+      MOORCHEH_ONPREM_URL: http://moorcheh:8080
+      MOORCHEH_ONPREM_TIMEOUT: "300"
+      MEMANTO_SECRET_KEY: ${MEMANTO_SECRET_KEY:?set MEMANTO_SECRET_KEY in stack.env}
+      HOST: 0.0.0.0
+      PORT: "8000"
+      LOG_LEVEL: INFO
+    volumes:
+      - risepath_memanto_data:/home/memanto/.memanto
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+volumes:
+  ollama_data:
+  risepath_moorcheh_data:
+  risepath_moorcheh_uploads:
+  risepath_memanto_data:

@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rise-path.local/schemas/personalized_generation_kit.schema.json",
+  "title": "Personalized Generation Kit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "portal_id",
+    "template_id",
+    "locale",
+    "schema_version",
+    "policy_version",
+    "required_slots",
+    "optional_slots",
+    "question_order",
+    "constraints",
+    "output_schema",
+    "content_blueprint",
+    "save_defaults",
+    "personalization"
+  ],
+  "properties": {
+    "portal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "template_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "locale": {
+      "type": "string",
+      "minLength": 2
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "required_slots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "optional_slots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "question_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "min_duration_weeks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_duration_weeks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_modules": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_lessons_per_module": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "type",
+        "required",
+        "module_required",
+        "lesson_required"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "module_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lesson_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lesson_recommended": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "content_blueprint": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "ui_template_id"
+      ],
+      "properties": {
+        "ui_template_id": {
+          "type": "string"
+        },
+        "reference_curricula": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "writing_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lesson_template": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "save_defaults": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "is_public",
+        "ui_template_id"
+      ],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "is_public": {
+          "type": "boolean"
+        },
+        "ui_template_id": {
+          "type": "string"
+        }
+      }
+    },
+    "personalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported_diagnosis",
+        "raw_profile_schema",
+        "derived_profile_schema",
+        "personalization_axes",
+        "adaptation_rules",
+        "quality_rubric"
+      ],
+      "properties": {
+        "supported_diagnosis": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "big_five",
+              "learning_style",
+              "motivation",
+              "lifestyle",
+              "declared_preferences"
+            ]
+          }
+        },
+        "raw_profile_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_slots",
+            "optional_slots",
+            "field_definitions"
+          ],
+          "properties": {
+            "required_slots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "optional_slots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "field_definitions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "big_five",
+                "learning_style",
+                "motivation",
+                "lifestyle",
+                "declared_preferences"
+              ],
+              "properties": {
+                "big_five": {
+                  "$ref": "#/$defs/profileFieldDefinition"
+                },
+                "learning_style": {
+                  "$ref": "#/$defs/profileFieldDefinition"
+                },
+                "motivation": {
+                  "$ref": "#/$defs/profileFieldDefinition"
+                },
+                "lifestyle": {
+                  "$ref": "#/$defs/profileFieldDefinition"
+                },
+                "declared_preferences": {
+                  "$ref": "#/$defs/profileFieldDefinition"
+                }
+              }
+            }
+          }
+        },
+        "derived_profile_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_fields",
+            "field_definitions"
+          ],
+          "properties": {
+            "required_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "field_definitions": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/profileFieldDefinition"
+              }
+            }
+          }
+        },
+        "personalization_axes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "credential_orientation",
+            "problem_solving_orientation",
+            "example_first_preference",
+            "structure_need",
+            "reassurance_need",
+            "practice_intensity",
+            "pace_preference",
+            "social_learning_preference",
+            "feedback_style"
+          ],
+          "properties": {
+            "credential_orientation": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "problem_solving_orientation": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "example_first_preference": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "structure_need": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "reassurance_need": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "practice_intensity": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "pace_preference": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "social_learning_preference": {
+              "$ref": "#/$defs/axisDefinition"
+            },
+            "feedback_style": {
+              "$ref": "#/$defs/axisDefinition"
+            }
+          }
+        },
+        "adaptation_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "axis",
+              "when",
+              "adapts"
+            ],
+            "properties": {
+              "axis": {
+                "type": "string"
+              },
+              "when": {
+                "type": "string"
+              },
+              "adapts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "derived_learning_profile": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "generation_rules": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "quality_rubric": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lesson_min_sections",
+            "lesson_required_blocks",
+            "lesson_min_explanation_chars",
+            "lesson_min_practice_items",
+            "require_cautions"
+          ],
+          "properties": {
+            "lesson_min_sections": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lesson_required_blocks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lesson_min_explanation_chars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lesson_min_practice_items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "require_cautions": {
+              "type": "boolean"
+            },
+            "require_checklist_when_credential_orientation_high": {
+              "type": "boolean"
+            },
+            "require_quiz_or_case_when_problem_solving_high": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profileFieldDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "description"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "axisDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "description"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_priority": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

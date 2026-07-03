@@ -1,0 +1,182 @@
+# Rise Path dedicated VM stack (db + api + mcp + kokoro-tts + hermes)
+# Hermes: nousresearch/hermes-agent — run scripts/init-hermes-profile.sh before first up.
+#
+#   cp stack.env.example stack.env && chmod 600 stack.env
+#   docker compose --env-file stack.env up -d --build
+#   docker compose exec api npm run db:migrate
+
+name: risepath
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      # Tailscale peers reach 100.x:5432. Do NOT open this port in GCP VPC firewall.
+      - "5432:5432"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/risepath-vm/Dockerfile
+      target: api
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+    restart: unless-stopped
+    env_file:
+      - path: stack.env
+        required: false
+    environment:
+      DATABASE_URL_PHASE1: ${DATABASE_URL_PHASE1}
+      PORT: ${PORT:-3006}
+      NODE_ENV: ${NODE_ENV:-production}
+      VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      HERMES_API_URL: ${HERMES_API_URL:-http://hermes:8642}
+      HERMES_API_KEY: ${HERMES_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
+      KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}
+      KOKORO_TTS_DEFAULT_VOICE_EN: ${KOKORO_TTS_DEFAULT_VOICE_EN:-af_bella}
+      MEMANTO_ENABLED: ${MEMANTO_ENABLED:-false}
+      MEMANTO_API_URL: ${MEMANTO_API_URL:-http://memanto:8000}
+      MEMANTO_SECRET_KEY: ${MEMANTO_SECRET_KEY:-}
+      MEMANTO_SESSION_DURATION_HOURS: ${MEMANTO_SESSION_DURATION_HOURS:-24}
+      MEMANTO_RECALL_LIMIT: ${MEMANTO_RECALL_LIMIT:-8}
+      MEMANTO_MIN_CONFIDENCE_WRITE: ${MEMANTO_MIN_CONFIDENCE_WRITE:-0.7}
+    ports:
+      - "3006:3006"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3006/api/v2/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  kokoro-tts:
+    profiles:
+      - tts
+      - full
+    build:
+      context: ../kokoro-tts
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8880:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  mcp:
+    build:
+      context: ../..
+      dockerfile: deploy/risepath-vm/Dockerfile
+      target: mcp
+    restart: unless-stopped
+    env_file:
+      - path: stack.env
+        required: false
+    environment:
+      DATABASE_URL_PHASE1: ${DATABASE_URL_PHASE1}
+      NODE_ENV: ${NODE_ENV:-production}
+      VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      MCP_SSE_PORT: ${MCP_SSE_PORT:-3100}
+      RISE_PATH_MCP_PROFILE: ${RISE_PATH_MCP_PROFILE:-admin}
+      PHASE1_USER_ID: ${PHASE1_USER_ID:-00000000-0000-0000-0000-000000000001}
+      RISE_PATH_BRIDGE_TOKEN: ${RISE_PATH_BRIDGE_TOKEN:-}
+      KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
+      KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}
+      KOKORO_TTS_DEFAULT_VOICE_EN: ${KOKORO_TTS_DEFAULT_VOICE_EN:-af_bella}
+      MEMANTO_ENABLED: ${MEMANTO_ENABLED:-false}
+      MEMANTO_API_URL: ${MEMANTO_API_URL:-http://memanto:8000}
+      MEMANTO_SECRET_KEY: ${MEMANTO_SECRET_KEY:-}
+      MEMANTO_SESSION_DURATION_HOURS: ${MEMANTO_SESSION_DURATION_HOURS:-24}
+      MEMANTO_RECALL_LIMIT: ${MEMANTO_RECALL_LIMIT:-8}
+      MEMANTO_MIN_CONFIDENCE_WRITE: ${MEMANTO_MIN_CONFIDENCE_WRITE:-0.7}
+    ports:
+      - "3100:3100"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    restart: unless-stopped
+    profiles:
+      - full
+    volumes:
+      - ./hermes-data:/opt/data
+      - ../../skills:/opt/risepath/skills:ro
+    environment:
+      HERMES_UID: ${HERMES_UID:-1000}
+      HERMES_GID: ${HERMES_GID:-1000}
+      API_SERVER_ENABLED: "true"
+      API_SERVER_HOST: "0.0.0.0"
+      API_SERVER_PORT: ${API_SERVER_PORT:-8642}
+      API_SERVER_KEY: ${HERMES_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DATABASE_URL_PHASE1: ${DATABASE_URL_PHASE1}
+      RISE_PATH_BRIDGE_TOKEN: ${RISE_PATH_BRIDGE_TOKEN:-}
+    ports:
+      - "${API_SERVER_PORT:-8642}:8642"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8642/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    depends_on:
+      mcp:
+        condition: service_healthy
+    command: ["gateway", "run"]
+
+volumes:
+  pgdata:

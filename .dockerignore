@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+.git
+.env.local
+*.local
+.DS_Store
+.claude
+ai-personal-insights-pro/node_modules
+sample
+# Large offline corpora — not needed in api/mcp runtime images
+data/curricula/blender/blender_manual_v500_en.html
+public/data/audio
+deploy/risepath-vm/hermes-data
+.grok

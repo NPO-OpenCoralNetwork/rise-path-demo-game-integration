@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tts-bundle.schema.json",
+  "title": "TtsOutput",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tts_bundle"],
+      "properties": {
+        "tts_bundle": { "$ref": "#/$defs/ttsBundle" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dialogue_audio"],
+      "properties": {
+        "dialogue_audio": { "$ref": "#/$defs/dialogue_audio" }
+      }
+    }
+  ],
+  "$defs": {
+    "ttsBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "language", "lang_code", "voice_id", "slides", "slide_timeline_sec"],
+      "properties": {
+        "engine": {
+          "type": "string",
+          "const": "kokoro-82m-onnx"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["ja", "en"]
+        },
+        "lang_code": {
+          "type": "string",
+          "description": "Kokoro misaki lang_code. ja -> j, en -> a (American) or b (British).",
+          "enum": ["j", "a", "b", "z", "e", "f", "h", "i", "p"]
+        },
+        "voice_id": {
+          "type": "string",
+          "description": "Kokoro voice ID (e.g. jf_alpha, af_bella). See VOICES.md.",
+          "pattern": "^(af_|am_|bf_|bm_|jf_|jm_|zf_|zm_|ef_|em_|ff_|hf_|hm_|if_|im_|pf_|pm_)[a-z0-9_]+$"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.0,
+          "default": 1.0
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["wav", "mp3"],
+          "default": "mp3"
+        },
+        "slides": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ttsSlide" }
+        },
+        "slide_timeline_sec": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "ttsSlide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slide_id", "tts_script", "estimated_sec"],
+      "properties": {
+        "slide_id": { "type": "string", "minLength": 1 },
+        "tts_script": { "type": "string", "minLength": 1 },
+        "estimated_sec": { "type": "integer", "minimum": 1 },
+        "voice_id": {
+          "type": "string",
+          "description": "Per-slide voice override for dialogue blocks",
+          "pattern": "^(af_|am_|bf_|bm_|jf_|jm_|zf_|zm_|ef_|em_|ff_|hf_|hm_|if_|im_|pf_|pm_)[a-z0-9_]+$"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.0
+        }
+      }
+    },
+    "dialogue_audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "lines", "output_format"],
+      "properties": {
+        "engine": {
+          "type": "string",
+          "const": "kokoro-82m-onnx"
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/dialogueLine" }
+        },
+        "pause_ms_between_lines": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 400
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["wav", "mp3"],
+          "default": "mp3"
+        }
+      }
+    },
+    "dialogueLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speaker", "voice_id", "text"],
+      "properties": {
+        "speaker": { "type": "string", "minLength": 1 },
+        "voice_id": {
+          "type": "string",
+          "pattern": "^(af_|am_|bf_|bm_|jf_|jm_|zf_|zm_|ef_|em_|ff_|hf_|hm_|if_|im_|pf_|pm_)[a-z0-9_]+$"
+        },
+        "text": { "type": "string", "minLength": 1 },
+        "speed": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.0
+        }
+      }
+    }
+  }
+}

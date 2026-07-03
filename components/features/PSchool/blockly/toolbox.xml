@@ -1,0 +1,79 @@
+<xml>
+  <!-- 基本アクション（全ステージ共通） -->
+  <category name="基本アクション" id="basic_actions"
+            colour="#e61919" secondaryColour="#ec5050" tertiaryColour="#af1313">
+    <block type="attack_basic"></block>
+  </category>
+
+  <!-- 詠唱動作（ステージ3-20） -->
+  <category name="詠唱動作" id="incantation"
+            colour="#19e5e6" secondaryColour="#50ebec" tertiaryColour="#13aeaf">
+    <block type="wave_left_hand"></block>
+    <block type="wave_right_hand"></block>
+  </category>
+
+  <!-- 魔法（ステージ3-20） -->
+  <category name="魔法" id="magic"
+            colour="#7f19e6" secondaryColour="#9e50ec" tertiaryColour="#6113af">
+    <block type="cast_magic"></block>
+    <block type="cast_magic_value"></block>
+    <block type="heal_magic"></block>
+
+    
+    
+    <!-- 変換と強化（魔法詠唱ブロック内で使用） -->
+    <block type="convert_attack">
+      <value name="INPUT">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+    <block type="enhance_attack">
+      <value name="INPUT">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+  </category>
+
+  <!-- 制御（ステージ8-20） -->
+  <category name="制御" id="control"
+            colour="#7f19e6" secondaryColour="#9e50ec" tertiaryColour="#6113af">
+    <block type="repeat_2x"></block>
+    <block type="repeat_3x"></block>
+    <block type="if_condition"></block>
+    <block type="text_equals">
+      <value name="A">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+      <value name="B">
+        <shadow type="text">
+          <field name="TEXT"></field>
+        </shadow>
+      </value>
+    </block>
+  </category>
+
+  <!-- システム変数（全ステージ共通） -->
+  <category name="システム変数" id="system_variables"
+            colour="#FFA500" secondaryColour="#FFB833" tertiaryColour="#CC8400">
+    <label text="敵の情報" web-class="boldtext"></label>
+    
+    <!-- 敵の技名を取得 -->
+    <block type="custom_variable_get">
+      <field name="VAR_NAME">敵の技名</field>
+    </block>
+  </category>
+
+  <!-- Functions -->
+  <category name="Functions" id="functions"
+            colour="#4B86FF" secondaryColour="#6C9CFF" tertiaryColour="#2E61C9">
+    <block type="custom_function_placeholder"></block>
+  </category>
+
+
+</xml>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1920" height="140" fill="url(#accent)"/>
+  <text x="96" y="95" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="40" fill="#ffffff" font-weight="700">変数とメモリ管理</text>
+  <text x="96" y="128" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="20" fill="#e0e7ff">Pythonのデータ処理の仕組み</text>
+  <rect x="80" y="200" width="1760" height="780" rx="28" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="140" y="310" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="46" fill="#0f172a" font-weight="700">変数はラベル</text>
+  <text x="140" y="360" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="24" fill="#64748b">値ではなくオブジェクトへの参照</text>
+  <g font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="28" fill="#0f172a">
+    <circle cx="160" cy="442" r="6" fill="#7c3aed"/>
+    <text x="180" y="450" font-size="28" fill="#0f172a">変数は「箱」ではなく「名前（ラベル）」</text>
+    <circle cx="160" cy="502" r="6" fill="#7c3aed"/>
+    <text x="180" y="510" font-size="28" fill="#0f172a">同じオブジェクトを複数の名前が参照できる</text>
+    <circle cx="160" cy="562" r="6" fill="#7c3aed"/>
+    <text x="180" y="570" font-size="28" fill="#0f172a">可変オブジェクトは参照元すべてに影響する</text>
+  </g>
+  <g>
+      <rect x="1100" y="360" width="180" height="80" rx="16" fill="#eef2ff" stroke="#c7d2fe"/>
+      <text x="1160" y="410" font-size="24" fill="#4338ca" font-weight="700">x</text>
+      <rect x="1100" y="470" width="180" height="80" rx="16" fill="#eef2ff" stroke="#c7d2fe"/>
+      <text x="1160" y="520" font-size="24" fill="#4338ca" font-weight="700">y</text>
+      <circle cx="1540" cy="450" r="80" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/>
+      <text x="1488" y="455" font-size="22" fill="#92400e" font-weight="700">Object: 10</text>
+      <line x1="1285" y1="400" x2="1450" y2="430" stroke="#7c3aed" stroke-width="4"/>
+      <line x1="1285" y1="510" x2="1450" y2="470" stroke="#7c3aed" stroke-width="4"/>
+      <polygon points="1450,430 1440,420 1470,428" fill="#7c3aed"/>
+      <polygon points="1450,470 1440,460 1470,468" fill="#7c3aed"/>
+    </g>
+</svg>

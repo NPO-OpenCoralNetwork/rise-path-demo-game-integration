@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "rise-path-learning": {
+      "command": "node",
+      "args": [
+        "/Users/2005nk/Works/personal/rise-path-demo-game-integration/mcp-server/index.js",
+        "--profile",
+        "admin"
+      ]
+    },
+    "miro-mcp": {
+      "command": "node",
+      "args": [
+        "/Users/2005nk/Works/personal/rise-path-demo-game-integration/scripts/miro_mcp_wrapper.js"
+      ]
+    }
+  }
+}

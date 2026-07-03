@@ -1,0 +1,8 @@
+# Rise Path MCP — Grok project-scoped stdio (wrapper loads .env.local)
+# Memanto tunnel: npm run tunnel:memanto
+# Refresh after edits: /mcps → r
+
+[mcp_servers.rise-path]
+command = "/Users/2005nk/Works/personal/rise-path-demo-game-integration/scripts/run-grok-mcp.sh"
+enabled = true
+startup_timeout_sec = 30

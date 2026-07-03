@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+.env
+.env.local
+.env.bak
+.env.local.bak
+public/uploads/
+public/audio/cache/*.mp3
+public/audio/cache/*.meta.json
+!public/audio/cache/.gitkeep
+*.pdf
+
+# Local debug scripts (never commit — load secrets from .env)
+debug_*.js
+test_db_user.js
+test_mcp_client.js
+serena_mcp_config.json.bak
+.playwright-mcp/
+
+# Sub-project dependencies and build artifacts
+p_school/node_modules
+sample/**/node_modules
+sample/**/dist
+sample/**/.venv
+sample/**/__pycache__test_mcp_client.js
+.vercel

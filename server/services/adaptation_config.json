@@ -1,0 +1,135 @@
+{
+  "version": "2026-05-01",
+  "description": "学習適応シグナルの閾値設定。config-driven ルールエンジン。",
+  "min_entries_for_analysis": 3,
+  "default_window": 10,
+  "rules": [
+    {
+      "id": "pace_down",
+      "conditions": [
+        { "field": "struggled_streak", "op": ">=", "value": 2 }
+      ],
+      "priority": "high",
+      "group": "conservative",
+      "overrides": { "pace_preference": "steady_small_steps" },
+      "user_message": "最近少し難しく感じているようですね。ペースを少しゆっくりにしました。"
+    },
+    {
+      "id": "encourage",
+      "conditions": [
+        { "field": "avg_confidence", "op": "<", "value": 2.5 }
+      ],
+      "priority": "high",
+      "group": "conservative",
+      "overrides": { "reassurance_need": "high", "feedback_style": "coach_gentle" },
+      "user_message": "自信がつくまで、もう少し丁寧に進めましょう。"
+    },
+    {
+      "id": "review_needed",
+      "conditions": [
+        { "field": "confidence_trend", "op": "==", "value": "declining" },
+        { "field": "total_entries", "op": ">=", "value": 5 }
+      ],
+      "priority": "medium",
+      "group": "conservative",
+      "overrides": { "practice_intensity": "light" },
+      "user_message": "前のレッスンの復習を挟むといいかもしれません。"
+    },
+    {
+      "id": "simplify",
+      "conditions": [
+        { "field": "time_trend", "op": "==", "value": "increasing" },
+        { "field": "avg_time_spent_min", "op": ">", "value": 45 }
+      ],
+      "priority": "medium",
+      "group": "conservative",
+      "overrides": {},
+      "user_message": "1回の学習が長くなっています。小さく区切って進めましょう。"
+    },
+    {
+      "id": "engagement_drop",
+      "conditions": [
+        { "field": "lessons_without_learned", "op": ">=", "value": 3 }
+      ],
+      "priority": "low",
+      "group": "neutral",
+      "overrides": {},
+      "user_message": "振り返りを書くと、学びが定着しやすくなりますよ。"
+    },
+    {
+      "id": "level_up",
+      "conditions": [
+        { "field": "mood_great_good_pct", "op": ">", "value": 0.8 },
+        { "field": "avg_confidence", "op": ">", "value": 4 }
+      ],
+      "priority": "medium",
+      "group": "progressive",
+      "overrides": { "structure_need": "low", "practice_intensity": "heavy" },
+      "user_message": "順調です！少しチャレンジングな内容に進みましょう。"
+    }
+  ],
+  "life_habit_rules": [
+    {
+      "id": "sleep_focus_drop",
+      "conditions": [
+        { "field": "sleep_under_6h_days_pct", "op": ">", "value": 0.4 },
+        { "field": "avg_focus", "op": "<", "value": 3.0 },
+        { "field": "focus_delta_sleep_threshold", "op": ">", "value": 0.3 }
+      ],
+      "priority": "high",
+      "group": "conservative",
+      "advice": {
+        "title": "睡眠と集中度の関係が見えています",
+        "action": "今週は22:30以降の新規学習を避け、復習中心にしましょう",
+        "evidence_template": "睡眠6h未満の日は集中度が平均{{focus_delta_sleep_threshold}}下がっています（7h以上との差）",
+        "difficulty": "easy"
+      }
+    },
+    {
+      "id": "exercise_mood_boost",
+      "conditions": [
+        { "field": "exercise_days", "op": ">=", "value": 3 },
+        { "field": "exercise_mood_great_good_pct", "op": ">", "value": 0.6 }
+      ],
+      "priority": "medium",
+      "group": "progressive",
+      "advice": {
+        "title": "運動した日は気分が良い傾向",
+        "action": "運動日は新規学習、非運動日は復習中心に分けると続けやすいです",
+        "evidence_template": "運動日の good/great 率は {{exercise_mood_great_good_pct_pct}}% です",
+        "difficulty": "easy"
+      }
+    },
+    {
+      "id": "low_sleep_streak",
+      "conditions": [
+        { "field": "sleep_under_7h_days_pct", "op": ">", "value": 0.5 },
+        { "field": "avg_sleep_hours", "op": "<", "value": 6.5 }
+      ],
+      "priority": "medium",
+      "group": "conservative",
+      "advice": {
+        "title": "睡眠時間が足りない日が続いています",
+        "action": "今週は学習セッションを15分短くし、就寝前の画面時間を減らしてみましょう",
+        "evidence_template": "平均睡眠 {{avg_sleep_hours}}h、7h未満の日が {{sleep_under_7h_days_pct_pct}}%",
+        "difficulty": "easy"
+      }
+    },
+    {
+      "id": "late_meal_focus",
+      "conditions": [
+        { "field": "late_meal_rate", "op": ">", "value": 0.3 },
+        { "field": "avg_focus", "op": "<", "value": 3.5 }
+      ],
+      "priority": "low",
+      "group": "conservative",
+      "advice": {
+        "title": "夜遅い食事と集中度",
+        "action": "夜の学習は軽い復習タスクに寄せ、夕食は21時前を目安に",
+        "evidence_template": "遅い夕食の記録が {{late_meal_rate_pct}}%、平均集中度 {{avg_focus}}",
+        "difficulty": "easy"
+      }
+    }
+  ],
+  "conflict_resolution": "conservative_wins"
+}

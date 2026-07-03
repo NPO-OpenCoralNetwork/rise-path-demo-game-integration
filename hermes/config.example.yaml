@@ -1,0 +1,67 @@
+# Rise Path — Hermes Agent profile configuration (example)
+#
+# Copy to: ~/.hermes/profiles/rise-path/config.yaml
+# Replace ${RISE_PATH_ROOT} with the absolute path to this repository.
+#
+# Setup:
+#   hermes profile create rise-path
+#   hermes model                    # OpenRouter or Nous Portal
+#   cp hermes/config.example.yaml ~/.hermes/profiles/rise-path/config.yaml
+#   # Edit paths and env vars
+#   hermes gateway
+
+# --- Model (set via `hermes model` or override here) ---
+# model:
+#   provider: openrouter
+#   default: google/gemini-2.5-flash
+
+# --- Skills: point at Rise Path repo ---
+skills:
+  external_dirs:
+    - ${RISE_PATH_ROOT}/skills
+
+# --- MCP: Rise Path learning platform ---
+mcp_servers:
+  rise_path:
+    # Development: stdio (Hermes spawns MCP as subprocess)
+    command: "node"
+    args:
+      - "${RISE_PATH_ROOT}/mcp-server/index.js"
+    env:
+      DATABASE_URL_PHASE1: "${DATABASE_URL_PHASE1}"
+      PHASE1_USER_ID: "${PHASE1_USER_ID}"
+      # Optional: Hermes may inject per-request session key for multi-user stdio.
+      # Express also writes rp:user:{uuid} bindings to agent_session_binding (migration 007).
+      RISE_PATH_ACTIVE_SESSION_KEY: "${RISE_PATH_ACTIVE_SESSION_KEY}"
+    # Production alternative (comment out command/args, uncomment url):
+    # url: "https://mcp.rise-path.example.com/sse"
+    # headers:
+    #   Authorization: "Bearer ${RISE_PATH_BRIDGE_TOKEN}"
+    # auth: oauth
+    enabled: true
+    timeout: 120
+    connect_timeout: 60
+    tools:
+      include:
+        - learner-personal-context
+        - learner-memory-recall
+        - learner-memory-remember
+        - daily-life-chat-context
+        - daily-life-analysis
+        - daily-life-advice
+        - learner-adaptation-signals
+        - journal-recent
+        - journal-log
+        - learner-state-get
+        - get-generation-kit
+        - validate-intake
+        - save-curriculum-draft
+        - rag-search
+      resources: true
+      prompts: false
+
+# --- Persona (optional; layered on Hermes core prompt) ---
+# instructions: |
+#   You are Lumina (ルミナ), the Rise Path learning coach.
+#   Default language: Japanese. Match the learner's Big5 profile tone when known.
+#   Use MCP tools for data; never invent learner metrics.

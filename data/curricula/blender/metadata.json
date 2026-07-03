@@ -1,0 +1,19 @@
+{
+  "id": "blender-manual-v500-en",
+  "title": "Blender Manual 5.0.0 (English)",
+  "version": "5.0.0",
+  "language": "en",
+  "source": "Blender Foundation",
+  "file": "blender_manual_v500_en.html",
+  "description": "Official Blender Manual HTML export (v5.0.0). Use for RAG/reference when generating Blender curricula.",
+  "tags": ["blender", "3d", "manual", "reference", "html"],
+  "license": "CC BY-SA 4.0 (per Blender Manual)",
+  "ingest": {
+    "type": "html",
+    "segment": {
+      "maxChars": 1200,
+      "overlap": 120
+    },
+    "notes": "Extract text by sections/paragraphs; preserve headings for context."
+  }
+}

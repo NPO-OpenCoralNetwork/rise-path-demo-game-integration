@@ -1,0 +1,7 @@
+{
+  "name": "Rise Path",
+  "description": "Master English with AI. Interactive lessons, real-time grammar correction, and conversation practice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

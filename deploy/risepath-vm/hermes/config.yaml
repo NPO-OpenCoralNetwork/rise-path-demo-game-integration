@@ -1,0 +1,36 @@
+# Rise Path — Hermes production profile (risepath-vm Compose)
+# Mount into Hermes container or copy to VM Hermes profile directory.
+# Secrets: deploy/risepath-vm/stack.env (API_SERVER_KEY, OPENROUTER_API_KEY, RISE_PATH_BRIDGE_TOKEN)
+
+# Uses default profile inside nousresearch/hermes-agent container.
+skills:
+  external_dirs:
+    - /opt/risepath/skills
+
+mcp_servers:
+  rise_path:
+    url: "http://mcp:3100/sse"
+    headers:
+      Authorization: "Bearer ${RISE_PATH_BRIDGE_TOKEN}"
+    enabled: true
+    timeout: 120
+    connect_timeout: 60
+    tools:
+      include:
+        - learner-personal-context
+        - learner-memory-recall
+        - learner-memory-remember
+        - daily-life-chat-context
+        - daily-life-analysis
+        - daily-life-advice
+        - learner-adaptation-signals
+        - journal-recent
+        - journal-log
+        - learner-state-get
+        - get-generation-kit
+        - validate-intake
+        - save-curriculum-draft
+        - rag-search
+        - request-tts
+      resources: true
+      prompts: false

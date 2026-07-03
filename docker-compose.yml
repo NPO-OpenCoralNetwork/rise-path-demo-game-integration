@@ -1,0 +1,44 @@
+# Local dev stack: db + app only.
+# Migrations are NOT applied via docker-entrypoint-initdb.d — use schema_migrations tracking:
+#   docker compose up -d
+#   docker compose exec app npm run db:migrate
+# If you previously used initdb mount, reset volume once: docker compose down -v
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: risepath_app
+      POSTGRES_PASSWORD: risepath_dev
+      POSTGRES_DB: risepath
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U risepath_app"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+    ports:
+      - "3006:3006"
+    environment:
+      DATABASE_URL_PHASE1: postgresql://risepath_app:risepath_dev@db:5432/risepath
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NODE_ENV: production
+      PORT: 3006
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

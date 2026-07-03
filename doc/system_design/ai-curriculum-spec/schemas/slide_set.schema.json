@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slide-set.schema.json",
+  "title": "SlideSet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slides"],
+  "properties": {
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/slide" }
+    }
+  },
+  "$defs": {
+    "slide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "bullets"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "bullets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "speechScript": { "type": "string", "minLength": 1 },
+        "timing": { "type": "string", "minLength": 1 },
+        "visualStyle": { "type": "string", "minLength": 1 },
+        "motionCue": { "type": "string", "minLength": 1 },
+        "accentIcon": { "type": "string", "minLength": 1 },
+        "layoutHint": { "type": "string", "minLength": 1 },
+        "imagePrompt": { "type": "string", "minLength": 1 },
+        "highlightBox": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

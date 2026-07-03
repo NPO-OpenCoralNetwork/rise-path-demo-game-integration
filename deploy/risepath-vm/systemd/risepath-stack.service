@@ -1,0 +1,15 @@
+[Unit]
+Description=Rise Path Docker Compose (db + api + mcp)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/risepath/deploy/risepath-vm
+ExecStart=/usr/bin/docker compose --env-file stack.env up -d
+ExecStop=/usr/bin/docker compose --env-file stack.env stop
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blender Install Setup (Sample)</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --accent: #38bdf8;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Trebuchet MS", "Gill Sans", "Arial", sans-serif;
+        background: radial-gradient(circle at top, #1e293b, #0f172a 70%);
+        color: var(--text);
+      }
+      header {
+        padding: 48px 24px 20px;
+        text-align: center;
+      }
+      header h1 {
+        margin: 0 0 12px;
+        font-size: 2.4rem;
+        letter-spacing: 0.04em;
+      }
+      header p {
+        margin: 0 auto;
+        max-width: 640px;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+        display: grid;
+        gap: 20px;
+      }
+      .card {
+        background: rgba(17, 24, 39, 0.9);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        border-radius: 20px;
+        padding: 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+      .step-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+      .card p {
+        color: var(--text);
+        line-height: 1.6;
+      }
+      figure {
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+      img {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: #0b1220;
+      }
+      figcaption {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .meta {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .placeholder {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        border-radius: 16px;
+        border: 1px dashed rgba(148, 163, 184, 0.4);
+      }
+      .placeholder-box {
+        width: 100%;
+        height: 160px;
+        border-radius: 12px;
+        background: rgba(148, 163, 184, 0.15);
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      @media (max-width: 840px) {
+        .card {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Blender Install Setup</h1>
+      <p>A lightweight sample page generated from Blender manual images and metadata.</p>
+    </header>
+    <main>
+      
+        <section class="card">
+          <div class="step">
+            <div class="step-title">Step 1: Download Blender</div>
+            <p>Visit the official Blender site and download the latest stable installer for your OS.</p>
+          </div>
+          
+          <figure>
+            <img src="/data/curricula/blender/_images_test/1-getting-started_about_introduction_postprocessing.jpg" alt="A rendered image being post-processed." />
+            <figcaption>A rendered image being post-processed.</figcaption>
+            <div class="meta">About Blender / Key Features</div>
+          </figure>
+        
+        </section>
+      
+
+        <section class="card">
+          <div class="step">
+            <div class="step-title">Step 2: Run the Installer</div>
+            <p>Follow the installer prompts and keep the default options for a clean setup.</p>
+          </div>
+          
+          <figure>
+            <img src="/data/curricula/blender/_images_test/2-about_contribute_install_windows_installer.png" alt="The option must be enabled so you can build the manual with the make script." />
+            <figcaption>The option must be enabled so you can build the manual with the make script.</figcaption>
+            <div class="meta">Installation on Windows / Installing Python</div>
+          </figure>
+        
+        </section>
+      
+
+        <section class="card">
+          <div class="step">
+            <div class="step-title">Step 3: Set Language Preferences</div>
+            <p>Open Preferences, then choose your UI language and save the settings.</p>
+          </div>
+          
+          <figure>
+            <img src="/data/curricula/blender/_images_test/3-interface_controls_templates_color-picker_circle-hsl.png" alt="Circle HSL." />
+            <figcaption>Circle HSL.</figcaption>
+            <div class="meta">Interface / Editors</div>
+          </figure>
+        
+        </section>
+      
+    </main>
+  </body>
+</html>

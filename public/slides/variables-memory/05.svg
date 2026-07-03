@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1920" height="140" fill="url(#accent)"/>
+  <text x="96" y="95" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="40" fill="#ffffff" font-weight="700">変数とメモリ管理</text>
+  <text x="96" y="128" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="20" fill="#e0e7ff">Pythonのデータ処理の仕組み</text>
+  <rect x="80" y="200" width="1760" height="780" rx="28" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="140" y="310" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="46" fill="#0f172a" font-weight="700">ガーベジコレクション</text>
+  <text x="140" y="360" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="24" fill="#64748b">参照が0になったら解放</text>
+  <g font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif" font-size="28" fill="#0f172a">
+    <circle cx="160" cy="442" r="6" fill="#7c3aed"/>
+    <text x="180" y="450" font-size="28" fill="#0f172a">参照カウントが0で自動解放</text>
+    <circle cx="160" cy="502" r="6" fill="#7c3aed"/>
+    <text x="180" y="510" font-size="28" fill="#0f172a">循環参照はGCが検出して回収</text>
+    <circle cx="160" cy="562" r="6" fill="#7c3aed"/>
+    <text x="180" y="570" font-size="28" fill="#0f172a">長寿命参照は解放を遅らせる</text>
+  </g>
+  <g>
+      <rect x="1080" y="360" width="260" height="90" rx="14" fill="#f1f5f9" stroke="#94a3b8"/>
+      <text x="1105" y="415" font-size="22" fill="#334155" font-weight="700">Ref Count: 1</text>
+      <rect x="1080" y="480" width="260" height="90" rx="14" fill="#f1f5f9" stroke="#94a3b8"/>
+      <text x="1105" y="535" font-size="22" fill="#334155" font-weight="700">Ref Count: 0</text>
+      <circle cx="1500" cy="500" r="80" fill="#dcfce7" stroke="#22c55e" stroke-width="4"/>
+      <text x="1460" y="505" font-size="22" fill="#166534" font-weight="700">Free</text>
+      <line x1="1345" y1="525" x2="1420" y2="515" stroke="#22c55e" stroke-width="4"/>
+      <polygon points="1420,515 1410,505 1440,510" fill="#22c55e"/>
+    </g>
+</svg>

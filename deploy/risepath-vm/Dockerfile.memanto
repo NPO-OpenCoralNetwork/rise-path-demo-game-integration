@@ -1,0 +1,12 @@
+# Memanto API with on-prem Moorcheh support (Phase 19).
+# PyPI memanto 0.2.3 — same pin as nexloom-gce overlay.
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN pip install --no-cache-dir "memanto==0.2.3" "moorcheh-client"
+RUN useradd -m --shell /bin/false --uid 1001 memanto
+USER memanto
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')" || exit 1
+CMD ["uvicorn", "memanto.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

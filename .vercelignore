@@ -1,0 +1,13 @@
+node_modules
+.git
+dist
+.grok
+sample
+p_school
+deploy/risepath-vm/hermes-data
+data/curricula/blender/blender_manual_v500_en.html
+public/uploads
+*.pdf
+.env.local
+.env
+.env.*

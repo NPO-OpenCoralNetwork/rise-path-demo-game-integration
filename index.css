@@ -1,0 +1,487 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-serif: "Playfair Display", serif;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Dashboard animation utilities */
+:root {
+  --dashboard-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes dashboardFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes dashboardGlow {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes dashboardPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dashboardProgress {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--progress);
+  }
+}
+
+@keyframes levelDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+@keyframes levelBurst {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes levelPop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes levelGlow {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes levelToastGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+  45% {
+    box-shadow: 0 0 32px rgba(251, 191, 36, 0.35), 0 0 60px rgba(99, 102, 241, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+}
+
+@keyframes levelConfetti {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.9) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--x), var(--y), 0) scale(0.6) rotate(140deg);
+  }
+}
+
+.dashboard-fade {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: dashboardFadeUp 0.8s var(--dashboard-ease) forwards;
+}
+
+.dashboard-fade-float {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: dashboardFadeUp 0.8s var(--dashboard-ease) forwards,
+    dashboardFloat 8s ease-in-out infinite;
+}
+
+.dashboard-glow {
+  animation: dashboardGlow 6s ease-in-out infinite;
+}
+
+.dashboard-pop {
+  opacity: 0;
+  animation: dashboardPop 0.5s var(--dashboard-ease) forwards;
+}
+
+.dashboard-progress {
+  width: var(--progress);
+  animation: dashboardProgress 0.9s var(--dashboard-ease) forwards;
+}
+
+.level-notify-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px white;
+  animation: levelDotPulse 1.6s ease-in-out infinite;
+}
+
+.level-pill-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.level-burst {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid rgba(251, 191, 36, 0.6);
+  opacity: 0;
+  animation: levelBurst 0.9s ease-out forwards;
+  pointer-events: none;
+}
+
+.level-burst-second {
+  animation-delay: 0.15s;
+}
+
+.level-up-pop {
+  animation: levelPop 0.6s var(--dashboard-ease);
+}
+
+.level-up-flare {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.45), rgba(99, 102, 241, 0.2), rgba(255, 255, 255, 0));
+  animation: levelGlow 0.9s ease-out;
+  pointer-events: none;
+}
+
+.level-toast-glow {
+  animation: levelToastGlow 0.9s ease-out;
+}
+
+/* AI diagnosis sample styles */
+.glass-panel {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #60a5fa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes radarGrow {
+  0% {
+    transform: scale(0.15);
+    opacity: 0.15;
+  }
+  70% {
+    transform: scale(1.04);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.radar-grow {
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+  animation: radarGrow 1.1s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.level-toast-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.level-confetti {
+  position: absolute;
+  top: 18px;
+  left: 28px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 4px;
+  background: hsl(var(--hue) 85% 60%);
+  opacity: 0;
+}
+
+.level-toast-confetti-active .level-confetti {
+  animation: levelConfetti 0.8s ease-out forwards;
+  animation-delay: var(--delay);
+}
+
+.level-toast-bar {
+  transition: width 0.9s var(--dashboard-ease);
+}
+
+@keyframes pageTransition {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.page-transition {
+  animation: pageTransition 0.5s var(--dashboard-ease);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.55s var(--dashboard-ease);
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.55s var(--dashboard-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-in-right,
+  .slide-in-left {
+    animation: none;
+  }
+}
+
+@keyframes portalCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes portalShimmer {
+  0% {
+    opacity: 0;
+    background-position: 0% 50%;
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    background-position: 100% 50%;
+  }
+}
+
+.portal-card-animate,
+.course-card-animate {
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  animation: portalCardIn 0.6s var(--dashboard-ease) forwards;
+}
+
+.portal-card-shimmer,
+.course-card-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.14), rgba(56, 189, 248, 0.18), rgba(129, 140, 248, 0.1));
+  background-size: 200% 100%;
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: portalShimmer 1.8s ease-in-out forwards;
+}
+
+@keyframes pathCardPulse {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.08);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 16px 32px rgba(79, 70, 229, 0.16);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.08);
+  }
+}
+
+@keyframes pathCardSweep {
+  0% {
+    opacity: 0;
+    background-position: 0% 50%;
+  }
+  35% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    background-position: 100% 50%;
+  }
+}
+
+.path-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.path-card-glow {
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.25), rgba(56, 189, 248, 0.15), rgba(167, 139, 250, 0.2));
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.path-card:hover .path-card-glow {
+  opacity: 0.2;
+}
+
+.path-card-active {
+  animation: pathCardPulse 0.5s var(--dashboard-ease);
+}
+
+.path-card-active .path-card-glow {
+  animation: pathCardSweep 0.6s ease;
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-fade,
+  .dashboard-fade-float,
+  .dashboard-glow,
+  .dashboard-pop,
+  .level-up-pop,
+  .level-toast-glow,
+  .page-transition,
+  .portal-card-animate,
+  .course-card-animate,
+  .path-card-active {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .portal-card-shimmer,
+  .course-card-shimmer,
+  .path-card-glow,
+  .level-notify-dot,
+  .level-burst,
+  .level-toast-confetti {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+
+  .dashboard-progress {
+    animation: none !important;
+    width: var(--progress) !important;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rise-path-learning": {
+      "command": "node",
+      "args": ["/Volumes/space/dev/test-rise-path/rise-path-main-clean/mcp-server/index.js"],
+      "env": {
+        "DATABASE_URL_PHASE1": "YOUR_DATABASE_URL_HERE"
+      }
+    }
+  }
+}
