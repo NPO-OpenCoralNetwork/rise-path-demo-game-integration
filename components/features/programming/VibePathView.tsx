@@ -249,15 +249,15 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
             }));  return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-600 pb-20">
       {/* Hero Section */}
-      <div className="relative h-[300px] w-full overflow-hidden">
+      <div className="relative min-h-[300px] w-full overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1629654297299-c8506221ca97?auto=format&fit=crop&q=80&w=1600"
           alt="Vibe Coding Hero"
-          className="w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-purple-900/60 backdrop-blur-[2px]"></div>
 
-        <div className="absolute inset-0 flex flex-col justify-center max-w-5xl mx-auto px-6">
+        <div className="relative min-h-[300px] flex flex-col justify-center max-w-5xl mx-auto px-6 max-md:pt-8 max-md:pb-14">
           <div className="flex justify-between items-start w-full mb-2">
             <button
               onClick={onBack}
