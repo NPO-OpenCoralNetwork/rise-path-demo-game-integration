@@ -32,6 +32,7 @@ import {
 import { validateGenerationKit } from '../services/schemaValidator.js';
 import { validateJournalEntry, buildJournalSummary } from '../services/journalService.js';
 import { getAdaptationSignals } from '../../tools/core/journal.js';
+import { writeCurriculumVersion } from '../../tools/core/curriculum.js';
 
 const router = express.Router();
 
@@ -353,70 +354,31 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
         // Phase 7: ensurePhase1User removed — JWT users exist in auth.users
         await client.query('BEGIN');
 
-        let curriculumId = requestedCurriculumId;
-        let nextVersion = 1;
-
-        if (curriculumId) {
+        if (requestedCurriculumId) {
             const existing = await client.query(
                 'select id from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
-                [curriculumId, req.userId]
+                [requestedCurriculumId, req.userId]
             );
             if (!existing.rowCount) {
                 await client.query('ROLLBACK');
                 return res.status(404).json({ error: 'Curriculum not found' });
             }
-
-            const versionResult = await client.query(
-                'select coalesce(max(version), 0) + 1 as next_version from curriculum_versions where curriculum_id = CAST($1 AS uuid)',
-                [curriculumId]
-            );
-            nextVersion = Number(versionResult.rows[0]?.next_version || 1);
-        } else {
-            const created = await client.query(
-                `insert into curricula (user_id, title, description, ui_template_id)
-                 values (CAST($1 AS uuid), $2, $3, $4)
-                 returning id`,
-                [req.userId, title, description, uiTemplateId]
-            );
-            curriculumId = created.rows[0].id;
         }
-        contentJson.curriculum_id = curriculumId;
 
-        const versionResult = await client.query(
-            `insert into curriculum_versions
-                (curriculum_id, version, status, content_json, requirements, roadmap, ui_hints, created_by)
-             values (CAST($1 AS uuid), $2, 'draft', $3, $4, $5, $6, CAST($7 AS uuid))
-             returning id, status, created_at`,
-            [
-                curriculumId,
-                nextVersion,
-                JSON.stringify(contentJson),
-                JSON.stringify(intakeValidation.normalized_intake),
-                JSON.stringify(roadmap),
-                JSON.stringify(uiHints),
-                req.userId,
-            ]
-        );
-
-        const curriculumVersionId = versionResult.rows[0].id;
-
-        await client.query(
-            `update curricula
-             set title = $1,
-                 description = $2,
-                 current_version_id = CAST($3 AS uuid),
-                 total_lessons = $4,
-                 ui_template_id = $5
-             where id = CAST($6 AS uuid)`,
-            [
-                title,
-                description,
-                curriculumVersionId,
-                curriculumValidation.lesson_count,
-                uiTemplateId,
-                curriculumId,
-            ]
-        );
+        // Shared version writer (also used by /ai/generate and the MCP save/lesson tools).
+        const saved = await writeCurriculumVersion(client, {
+            curriculumId: requestedCurriculumId,
+            userId: req.userId,
+            title,
+            description,
+            uiTemplateId,
+            content: (id) => ({ ...contentJson, curriculum_id: id }),
+            requirements: intakeValidation.normalized_intake,
+            roadmap,
+            uiHints,
+            totalLessons: curriculumValidation.lesson_count,
+        });
+        const { curriculumId, curriculumVersionId } = saved;
 
         await client.query('COMMIT');
 
@@ -433,8 +395,8 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
             curriculum_id: curriculumId,
             curriculum_version_id: curriculumVersionId,
             ui_template_id: uiTemplateId,
-            status: versionResult.rows[0].status,
-            saved_at: versionResult.rows[0].created_at,
+            status: saved.status,
+            saved_at: saved.createdAt,
         });
     } catch (error) {
         await client.query('ROLLBACK');

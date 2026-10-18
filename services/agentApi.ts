@@ -1,8 +1,14 @@
 import { apiFetch, isApiAvailable } from './apiClient';
+import type { TutorChatContext } from './tutorBridge';
 
 export type AgentUiLanguage = 'en' | 'jp';
 
-export interface AgentChatContext {
+/**
+ * Chat `context`. Journal views send the date range; the tutor (openTutor → FloatingChatbot) adds
+ * mode, lesson, anchor and learner, which buildLessonContextLines() in
+ * server/services/hermesAgentService.js turns into the lesson context for the agent.
+ */
+export interface AgentChatContext extends TutorChatContext {
   from?: string;
   to?: string;
   timezone?: string;

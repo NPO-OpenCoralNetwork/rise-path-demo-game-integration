@@ -12,7 +12,7 @@
  */
 import express from 'express';
 import { getPool } from '../db.js';
-import { getKit } from '../../tools/core/curriculum.js';
+import { getKit, writeCurriculumVersion } from '../../tools/core/curriculum.js';
 import {
   getCachedKit,
   generateRequirements,
@@ -22,59 +22,53 @@ import {
 
 const router = express.Router();
 
+/** curricula.ui_template_id column default (server/migrations/001_core_curriculum.sql). */
+const DEFAULT_UI_TEMPLATE_ID = 'vibe_coding';
+
+const countLessons = (curriculum) =>
+  (Array.isArray(curriculum?.modules) ? curriculum.modules : [])
+    .reduce((sum, m) => sum + (Array.isArray(m?.lessons) ? m.lessons.length : 0), 0);
+
 /**
  * Store a generated curriculum as the next draft version and point the curriculum at it.
+ * Uses the shared writer (tools/core/curriculum.js writeCurriculumVersion), so content lands in
+ * curriculum_versions.content_json, which the reader loads via current_version_id.
+ * `curricula.curriculum_data` does not exist.
  * Status 'draft' (not 'draft_<stage>') keeps it out of the in-progress list below.
+ *
+ * @param {import('pg').Pool} pool
+ * @param {{ curriculumId: string, userId: string, curriculum: any, intake?: any, modules?: any }} params
+ * @returns {Promise<string>} the new curriculum_versions.id
  */
-async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules }) {
+export async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const owned = await client.query(
-      'SELECT id FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
+      'SELECT id, title, ui_template_id FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
       [curriculumId, userId]
     );
     if (!owned.rowCount) throw new Error('Draft not found');
+    const existing = owned.rows[0] || {};
 
-    const next = await client.query(
-      'SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM curriculum_versions WHERE curriculum_id = CAST($1 AS uuid)',
-      [curriculumId]
-    );
-    const version = await client.query(
-      `INSERT INTO curriculum_versions
-         (curriculum_id, version, status, content_json, requirements, roadmap, created_by)
-       VALUES (CAST($1 AS uuid), $2, 'draft', $3, $4, $5, CAST($6 AS uuid))
-       RETURNING id`,
-      [
-        curriculumId,
-        Number(next.rows[0]?.next_version || 1),
-        JSON.stringify(curriculum),
-        JSON.stringify(intake ?? null),
-        JSON.stringify(modules ?? null),
-        userId,
-      ]
-    );
-    const lessonCount = (curriculum.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
+    const saved = await writeCurriculumVersion(client, {
+      curriculumId,
+      userId,
+      title: curriculum.title?.jp || curriculum.title?.en || existing.title || null,
+      description: curriculum.description?.jp || curriculum.description?.en || '',
+      uiTemplateId: existing.ui_template_id || DEFAULT_UI_TEMPLATE_ID,
+      content: curriculum,
+      requirements: intake ?? null,
+      roadmap: modules ?? null,
+      totalLessons: countLessons(curriculum),
+    });
     await client.query(
-      `UPDATE curricula SET
-         status = 'draft',
-         current_version_id = CAST($1 AS uuid),
-         title = COALESCE($2, title),
-         description = $3,
-         total_lessons = $4,
-         updated_at = NOW()
-       WHERE id = CAST($5 AS uuid) AND user_id = CAST($6 AS uuid)`,
-      [
-        version.rows[0].id,
-        curriculum.title?.jp || curriculum.title?.en || null,
-        curriculum.description?.jp || curriculum.description?.en || '',
-        lessonCount,
-        curriculumId,
-        userId,
-      ]
+      `UPDATE curricula SET status = 'draft', updated_at = NOW()
+       WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid)`,
+      [curriculumId, userId]
     );
     await client.query('COMMIT');
-    return version.rows[0].id;
+    return saved.curriculumVersionId;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -213,9 +207,8 @@ router.post('/generate', async (req, res) => {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
       }
 
-      // Save as a draft version (curriculum_versions.content_json, which the reader loads via
-      // current_version_id). `curricula.curriculum_data` does not exist. Generated content is
-      // never published automatically; a person publishes it after review.
+      // Save as a draft version (see saveDraftVersion). Generated content is never published
+      // automatically; a person publishes it after review.
       await saveDraftVersion(pool, {
         curriculumId: curriculum_id,
         userId,
