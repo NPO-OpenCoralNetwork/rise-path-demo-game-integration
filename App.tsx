@@ -184,6 +184,8 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/vibe')) return ViewState.PROGRAMMING_VIBE;
     if (path.startsWith('/unity')) return ViewState.UNITY_AI_GAME_DEV;
     if (path === '/library') return ViewState.LIBRARY;
+    // Lesson reader (default theme; the shell switches to the rail via isLessonPath).
+    if (path.startsWith('/learn/') || path.startsWith('/preview/')) return ViewState.LESSON;
     return ViewState.DASHBOARD;
   };
 
