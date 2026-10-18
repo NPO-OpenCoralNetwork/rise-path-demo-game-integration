@@ -1,0 +1,203 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch8",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第8章｜デプロイして“世界に出す”",
+    "en": "Chapter 8 | Deployment: Taking it to the World"
+  },
+  "subtitle": {
+    "jp": "VercelとRenderを使ってアプリを公開し、世界中の人が使える状態にする。",
+    "en": "Releasing your app using Vercel and Render. Making it available to everyone."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 30,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "8-1",
+      "title": {
+        "jp": "8-1. フロントエンドをVercelで公開",
+        "en": "8-1. Frontend Deployment with Vercel"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "Reactアプリの公開において、Vercelはデファクトスタンダードです。GitHubと連携させるだけで、コードをpushするたびに自動でサイトが更新されます。",
+            "en": "Vercel is the gold standard for deploying React apps. It connects directly to GitHub and updates your site automatically every time you push."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "list",
+          "style": "number",
+          "items": [
+            {
+              "jp": "GitHubからリポジトリをインポートする",
+              "en": "Import project from GitHub"
+            },
+            {
+              "jp": "環境変数を設定する（VITE_SUPABASE_URLなど）",
+              "en": "Set Environment Variables (VITE_SUPABASE_URL, etc.)"
+            },
+            {
+              "jp": "「Deploy」ボタンを押す",
+              "en": "Click \"Deploy\""
+            }
+          ]
+        },
+        {
+          "id": "s1-b3",
+          "type": "callout",
+          "variant": "warning",
+          "title": {
+            "jp": "環境変数の設定",
+            "en": "Environment Variables"
+          },
+          "md": {
+            "jp": "`.env` に書いた値をVercelのダッシュボードにも入力するのを忘れないでください。これを忘れると、公開したアプリがSupabaseと通信できません。",
+            "en": "Do not forget to copy your `.env` values to the Vercel dashboard. Without these, your app cannot talk to Supabase."
+          }
+        }
+      ]
+    },
+    {
+      "id": "8-2",
+      "title": {
+        "jp": "8-2. バックエンドをRenderで公開",
+        "en": "8-2. Backend Deployment with Render"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "独自のNode.jsサーバーを構築した場合、Renderが有力な選択肢になります。自動SSL対応やスケーリングも管理してくれます。",
+            "en": "If you built a custom Node.js server, Render is an excellent choice. It handles automatic SSL and scaling."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "graph LR\n    GitHub -- Trigger --> Vercel[Frontend: Vercel]\n    GitHub -- Trigger --> Render[Backend: Render]\n    Vercel -- API Request --> Render\n    Render -- SQL Query --> Supabase[(Database: Supabase)]",
+          "caption": {
+            "jp": "本番環境の構成図",
+            "en": "The Production Architecture"
+          },
+          "alt": {
+            "jp": "本番環境の構成図",
+            "en": "The Production Architecture"
+          }
+        }
+      ]
+    },
+    {
+      "id": "8-3",
+      "title": {
+        "jp": "8-3. 無料枠の制限と考え方",
+        "en": "8-3. Free Tier Limits"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "ほとんどの個人プロジェクトは無料で運営可能ですが、制限を知っておく必要があります。",
+            "en": "Most hobby projects can run for free, but know the limitations."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "起動時間",
+                "en": "Spin-up Time"
+              },
+              "md": {
+                "jp": "Renderの無料枠は一定時間アクセスがないと「眠り」ます。最初のアクセスには30秒ほどかかります。",
+                "en": "Render free tier \"sleeps\" after inactivity. First request takes ~30s."
+              }
+            },
+            {
+              "term": {
+                "jp": "通信量",
+                "en": "Bandwidth"
+              },
+              "md": {
+                "jp": "Vercelには月間転送量制限（通常100GB）がありますが、MVPレベルなら十分です。",
+                "en": "Vercel has a monthly limit (usually 100GB), which is plenty for MVPs."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8-4",
+      "title": {
+        "jp": "8-4. 公開後に確認すべきチェックリスト",
+        "en": "8-4. Post-Launch Checklist"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "list",
+          "style": "check",
+          "items": [
+            {
+              "jp": "スマホ実機で正しく表示されるか？",
+              "en": "Does the site open on mobile?"
+            },
+            {
+              "jp": "Supabaseとの通信（ログイン、データ保存）は動いているか？",
+              "en": "Is the Supabase connection working?"
+            },
+            {
+              "jp": "ブラウザのコンソール（F12）に赤いエラーが出ていないか？",
+              "en": "Are there any \"Console Errors\" in F12?"
+            }
+          ]
+        },
+        {
+          "id": "s4-b2",
+          "type": "markdown",
+          "md": {
+            "jp": "デプロイは終わりではなく、始まりです。公開されることで、実際のユーザーが実際のバグを見つけてくれます。それが次の章「デバッグ」に繋がります。",
+            "en": "Deployment is the start, not the end. Once it is live, real users will find real bugs. That leads us to the next chapter: Debugging."
+          }
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter8.ts",
+      "export": "VIBE_CHAPTER_8_DATA",
+      "counts": {
+        "sections": 4,
+        "blocks": 9,
+        "tableRows": 0,
+        "quizQuestions": 0,
+        "text": 4,
+        "list": 3,
+        "callout": 1,
+        "mermaid": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "risepath.course/v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "risepath.course/v1"
+    },
+    "id": {
+      "description": "Course slug; also the folder name under content/courses/.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "world": {
+      "description": "Accent world of the reader (data-world).",
+      "type": "string",
+      "enum": [
+        "vibe",
+        "art",
+        "unity",
+        "ai",
+        "sonic",
+        "pschool",
+        "blender",
+        "web"
+      ]
+    },
+    "title": {
+      "$ref": "#/$defs/LText"
+    },
+    "subtitle": {
+      "$ref": "#/$defs/LText"
+    },
+    "description": {
+      "$ref": "#/$defs/Md"
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ]
+    },
+    "locale": {
+      "$ref": "#/$defs/Locale"
+    },
+    "locales": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Locale"
+      }
+    },
+    "modules": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Module"
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/GlossaryEntry"
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Source"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "world",
+    "title",
+    "locale",
+    "modules"
+  ],
+  "additionalProperties": false,
+  "description": "A Rise Path course (risepath.course/v1).",
+  "$defs": {
+    "LText": {
+      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "jp": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            },
+            "fr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Md": {
+      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "jp": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            },
+            "fr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Locale": {
+      "type": "string",
+      "enum": [
+        "jp",
+        "en",
+        "fr"
+      ],
+      "description": "Content locale key. \"jp\" is Japanese (BCP-47 \"ja\")."
+    },
+    "Module": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "summary": {
+          "$ref": "#/$defs/Md"
+        },
+        "lessons": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LessonRef"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "lessons"
+      ],
+      "additionalProperties": false,
+      "description": "An ordered group of lessons."
+    },
+    "LessonRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "estMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "next": {
+          "$ref": "#/$defs/LessonLink"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false,
+      "description": "A lesson entry in a course module; the lesson file is lessons/<id>.lesson.json."
+    },
+    "LessonLink": {
+      "type": "object",
+      "properties": {
+        "lessonId": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "courseId": {
+          "description": "Defaults to the same course.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        }
+      },
+      "required": [
+        "lessonId"
+      ],
+      "additionalProperties": false,
+      "description": "Reference to another lesson."
+    },
+    "GlossaryEntry": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "$ref": "#/$defs/LText"
+        },
+        "md": {
+          "$ref": "#/$defs/Md"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "term",
+        "md"
+      ],
+      "additionalProperties": false,
+      "description": "A course or lesson glossary term, referenced inline as [[term]]."
+    },
+    "Source": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "checkedAt": {
+          "description": "ISO date the source was last checked.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false,
+      "description": "A reference that blocks can cite."
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration.",
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string"
+        },
+        "skill": {
+          "type": "string"
+        },
+        "skillVersion": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "description": "ISO timestamp.",
+          "type": "string"
+        },
+        "reviewedBy": {
+          "type": "string"
+        },
+        "migratedFrom": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "description": "Repo-relative path of the legacy file.",
+              "type": "string",
+              "minLength": 1
+            },
+            "export": {
+              "type": "string"
+            },
+            "quizSource": {
+              "type": "string"
+            },
+            "quizExport": {
+              "type": "string"
+            },
+            "counts": {
+              "description": "Block/table counts of the legacy source.",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "required": [
+            "source"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "author"
+      ],
+      "additionalProperties": false,
+      "description": "Authorship record."
+    }
+  }
+}

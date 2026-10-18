@@ -1,0 +1,243 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch7",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第7章｜Supabaseでデータを持たせる",
+    "en": "Chapter 7 | Data Persistence with Supabase"
+  },
+  "subtitle": {
+    "jp": "アプリに「脳（データベース）」と「門番（認証）」を追加する。",
+    "en": "Adding a \"Brain\" (Database) and \"Gatekeeper\" (Auth) to your application."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 25,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "7-1",
+      "title": {
+        "jp": "7-1. Supabaseとは何か",
+        "en": "7-1. What is Supabase?"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "Supabaseは、Firebaseのオープンソース代替として人気のBaaSです。**PostgreSQL** をベースにしたバックエンド機能（データベース、認証、ストレージ、リアルタイム通信）を一式提供してくれます。",
+            "en": "Supabase is an open-source alternative to Firebase. It provides a full backend suite (Database, Auth, Storage, Realtime) based on **PostgreSQL**."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "リレーショナルDB",
+                "en": "Relational DB"
+              },
+              "md": {
+                "jp": "Firebase (NoSQL) と違い、SQLを使うため、構造化されたデータの扱いに長けています。",
+                "en": "Unlike Firebase (NoSQL), it uses SQL, which is great for structured data."
+              }
+            },
+            {
+              "term": {
+                "jp": "API自動生成",
+                "en": "Instant API"
+              },
+              "md": {
+                "jp": "テーブルを作ると、自動的にAPIが生えてきます。バックエンドのコードを書く必要が激減します。",
+                "en": "It automatically generates APIs from your table schema."
+              }
+            },
+            {
+              "term": {
+                "jp": "生成AIサポート",
+                "en": "Generative AI Support"
+              },
+              "md": {
+                "jp": "ベクトル検索機能が標準搭載されており、AIアプリ開発との相性が抜群です。",
+                "en": "It has built-in Vector capabilities for AI apps."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7-2",
+      "title": {
+        "jp": "7-2. Auth・DB・Storageの役割",
+        "en": "7-2. The Three Pillars: Auth, DB, Storage"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "Web開発で最も面倒な3つの要素を、Supabaseは劇的に簡単にします。",
+            "en": "Supabase simplifies the three hardest parts of web development."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "table",
+          "columns": [
+            {
+              "jp": "機能",
+              "en": "Feature"
+            },
+            {
+              "jp": "役割",
+              "en": "Role"
+            }
+          ],
+          "rows": [
+            [
+              {
+                "jp": "Auth (認証)",
+                "en": "Authentication"
+              },
+              {
+                "jp": "ログイン・サインアップ機能。Googleログインやメールリンク認証も一瞬で実装可能。",
+                "en": "Handles Login/Sign-up. Supports Google, GitHub, and Magic Links."
+              }
+            ],
+            [
+              {
+                "jp": "Database (DB)",
+                "en": "Database"
+              },
+              {
+                "jp": "ユーザーデータの保存場所。Todoリスト、プロフィール、チャットログなど。",
+                "en": "Stores user data (Todo items, Profiles, Chat logs)."
+              }
+            ],
+            [
+              {
+                "jp": "Storage (倉庫)",
+                "en": "Storage"
+              },
+              {
+                "jp": "プロフィール画像やアップロードされた写真など、巨大なファイルの保存場所。",
+                "en": "Stores large files like Profile Pictures and Uploaded Images."
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7-3",
+      "title": {
+        "jp": "7-3. APIキーと環境変数の考え方",
+        "en": "7-3. API Keys and Environment Variables"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "フロントエンドからSupabaseに接続するには「鍵（APIキー）」が必要です。しかし、その置き場所には注意が必要です。",
+            "en": "To connect your Frontend to Supabase, you need \"Keys\". But be careful where you put them."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "code",
+          "lang": "bash",
+          "filename": ".env.local",
+          "code": "VITE_SUPABASE_URL=https://your-project.supabase.co\nVITE_SUPABASE_ANON_KEY=your_supabase_anon_key_placeholder"
+        },
+        {
+          "id": "s3-b3",
+          "type": "callout",
+          "variant": "warning",
+          "title": {
+            "jp": "安全第一",
+            "en": "Safety First"
+          },
+          "md": {
+            "jp": "`.tsx` ファイルの中にキーを直接書かないでください（ハードコーディング禁止）。必ず `.env` ファイルを使い、`.env` を `.gitignore` に追加して、GitHubに秘密情報が漏れるのを防ぎましょう。",
+            "en": "Never hardcode keys in your `.tsx` files. Always use `.env` files and add `.env` to your `.gitignore` to prevent leaking secrets to GitHub."
+          }
+        }
+      ]
+    },
+    {
+      "id": "7-4",
+      "title": {
+        "jp": "7-4. Supabase × AIで詰まりやすいポイント",
+        "en": "7-4. Supabase × AI Workflow"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "AIはSQLを書くのが得意ですが、正しい文脈を与える必要があります。",
+            "en": "AI is great at writing SQL, but you need to give it the right context."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "sequenceDiagram\n    participant You\n    participant AI\n    participant Supabase\n    You->>AI: \"Create a table for Todos\"\n    AI->>You: \"Here is the SQL code\"\n    You->>Supabase: Run SQL in SQL Editor\n    Supabase-->>You: Table Created!\n    You->>AI: \"Now write React code to fetch Todos\"",
+          "caption": {
+            "jp": "開発フロー",
+            "en": "The Workflow"
+          },
+          "alt": {
+            "jp": "開発フロー",
+            "en": "The Workflow"
+          }
+        },
+        {
+          "id": "s4-b3",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "RLS（行レベルセキュリティ）",
+            "en": "RLS (Row Level Security)"
+          },
+          "md": {
+            "jp": "Supabaseのテーブルはデフォルトで非公開です。「RLSポリシー」を設定しないと、データを取得できません。AIに「ユーザーが自分のデータだけを見れるRLSポリシーを書いて」と頼みましょう。",
+            "en": "By default, Supabase tables are private. You must enable \"RLS Policies\" to let users see their own data. Ask AI: \"Write an RLS policy that allows users to select only their own todos.\""
+          }
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter7.ts",
+      "export": "VIBE_CHAPTER_7_DATA",
+      "counts": {
+        "sections": 4,
+        "blocks": 10,
+        "tableRows": 3,
+        "quizQuestions": 0,
+        "text": 4,
+        "list": 1,
+        "table": 1,
+        "code": 1,
+        "callout": 2,
+        "mermaid": 1
+      }
+    }
+  }
+}
