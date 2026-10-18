@@ -34,6 +34,9 @@ RUN npm ci --omit=dev --ignore-scripts
 # Copy server code
 COPY server.js ./
 COPY server/ ./server/
+COPY tools/ ./tools/
+COPY shared/ ./shared/
+COPY content/ ./content/
 COPY scripts/ ./scripts/
 COPY public/ ./public/
 
