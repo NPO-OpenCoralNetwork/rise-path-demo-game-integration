@@ -3,6 +3,7 @@
  *
  * Wraps curriculumGenerationKit.js for MCP/Express dual use.
  * Three tools: get-generation-kit, validate-intake, save-curriculum-draft
+ * writeCurriculumVersion is also the DB path of the lesson-upsert-draft tool (tools/core/lessons.js).
  */
 import { getPool, PHASE1_USER_ID } from '../../server/db.js';
 import { classifyDbError } from './dbErrors.js';
@@ -16,6 +17,10 @@ import {
     buildRoadmapSummary,
     normalizeIntake,
 } from '../../server/services/curriculumGenerationKit.js';
+import {
+    adaptCurriculumDraftForSave,
+    resolveCurriculumUiTemplate,
+} from '../../server/services/chatgptCurriculumAdapter.js';
 
 import { getAdaptationSignals } from './journal.js';
 import { getAnalysis } from './lifeJournal.js';
@@ -186,8 +191,86 @@ export function validateIntake({ portalId, templateId, locale, learningMode, int
 }
 
 /**
+ * Write a draft version of a curriculum inside the caller's transaction: create the
+ * curricula row when curriculumId is empty, insert curriculum_versions (status 'draft',
+ * content in content_json) and point curricula.current_version_id at it.
+ * Same write path as POST /api/v2/ai/curriculum-drafts (server/routes/chatgptCurriculum.js).
+ * The caller checks ownership of an existing curriculumId before calling.
+ *
+ * @param {import('pg').PoolClient} client - connection with an open transaction
+ * @param {Object} params
+ * @param {string} [params.curriculumId] - existing curriculum to add a version to
+ * @param {string} params.userId
+ * @param {string} params.title
+ * @param {string} [params.description]
+ * @param {string} params.uiTemplateId
+ * @param {object|Function} params.content - content_json, or (curriculumId) => content_json
+ * @param {object} [params.requirements]
+ * @param {object} [params.roadmap]
+ * @param {object} [params.uiHints]
+ * @param {number} [params.totalLessons]
+ * @param {string} [params.modelUsed]
+ * @returns {Promise<{ curriculumId: string, curriculumVersionId: string, version: number, status: string, createdAt: string }>}
+ */
+export async function writeCurriculumVersion(client, {
+    curriculumId, userId, title, description = '', uiTemplateId, content,
+    requirements = null, roadmap = null, uiHints = null, totalLessons = 0, modelUsed = null,
+}) {
+    let id = curriculumId;
+    let version = 1;
+
+    if (id) {
+        const versionResult = await client.query(
+            'select coalesce(max(version), 0) + 1 as next_version from curriculum_versions where curriculum_id = CAST($1 AS uuid)',
+            [id]
+        );
+        version = Number(versionResult.rows[0]?.next_version || 1);
+    } else {
+        const created = await client.query(
+            `insert into curricula (user_id, title, description, ui_template_id)
+             values (CAST($1 AS uuid), $2, $3, $4)
+             returning id`,
+            [userId, title, description, uiTemplateId]
+        );
+        id = created.rows[0].id;
+    }
+
+    const contentJson = typeof content === 'function' ? content(id) : content;
+    const toJson = (value) => (value == null ? null : JSON.stringify(value));
+    const inserted = await client.query(
+        `insert into curriculum_versions
+            (curriculum_id, version, status, content_json, requirements, roadmap, ui_hints, created_by)
+         values (CAST($1 AS uuid), $2, 'draft', $3, $4, $5, $6, CAST($7 AS uuid))
+         returning id, status, created_at`,
+        [id, version, JSON.stringify(contentJson), toJson(requirements), toJson(roadmap), toJson(uiHints), userId]
+    );
+    const row = inserted.rows[0];
+
+    await client.query(
+        `update curricula
+         set title = $1,
+             description = $2,
+             current_version_id = CAST($3 AS uuid),
+             total_lessons = $4,
+             ui_template_id = $5,
+             model_used = coalesce($6, model_used)
+         where id = CAST($7 AS uuid)`,
+        [title, description, row.id, totalLessons, uiTemplateId, modelUsed || null, id]
+    );
+
+    return {
+        curriculumId: id,
+        curriculumVersionId: row.id,
+        version,
+        status: row.status,
+        createdAt: row.created_at,
+    };
+}
+
+/**
  * Validate and save a curriculum draft to the database.
  * Performs structural validation + quality rubric check before persisting.
+ * Each save adds a draft row to curriculum_versions (content_json) and makes it current.
  *
  * @param {Object} params
  * @param {string} params.portalId
@@ -207,6 +290,7 @@ export async function saveDraft({
     if (!pool) return { error: 'DB not configured', error_type: 'db_connection' };
 
     const effectiveUserId = userId || PHASE1_USER_ID;
+    let client = null;
 
     try {
         // 1. Get kit for validation context
@@ -232,63 +316,92 @@ export async function saveDraft({
         const title = buildCurriculumTitle({ intake, curriculum, portalId });
         const description = buildCurriculumDescription({ intake, curriculum });
         const roadmap = buildRoadmapSummary({ curriculum: draftValidation.normalized_curriculum });
-
-        // 5. Save to database
         const normalizedIntake = normalizeIntake(intake);
-        const curriculumData = {
-            ...draftValidation.normalized_curriculum,
-            schema_version: kit.schema_version,
-            policy_version: policyVersion || kit.policy_version,
-        };
+        const meta = generationMeta || {};
+        const resolvedPolicyVersion = policyVersion || kit.policy_version;
+        const uiTemplateId = resolveCurriculumUiTemplate(kit.template_id);
+
+        // 5. Save to database (reader-ready content in curriculum_versions.content_json)
+        client = await pool.connect();
+        await client.query('BEGIN');
 
         if (curriculumId) {
-            // Update existing
-            const updateResult = await pool.query(
-                `UPDATE curricula SET
-                    title = $1, description = $2, intake = $3, curriculum_data = $4,
-                    generation_meta = $5, status = 'draft', updated_at = NOW()
-                 WHERE id = CAST($6 AS uuid) AND user_id = CAST($7 AS uuid)`,
-                [title, description, JSON.stringify(normalizedIntake),
-                 JSON.stringify(curriculumData), JSON.stringify(generationMeta || {}),
-                 curriculumId, effectiveUserId]
+            const existing = await client.query(
+                'select id from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) for update',
+                [curriculumId, effectiveUserId]
             );
-
-            if (!updateResult.rowCount) {
+            if (!existing.rowCount) {
+                await client.query('ROLLBACK');
                 return {
                     error: `Curriculum ${curriculumId} not found or not owned by user`,
                     error_type: 'not_found',
                 };
             }
-
-            return {
-                curriculum_id: curriculumId,
-                action: 'updated',
-                title,
-                lesson_count: draftValidation.lesson_count,
-                roadmap,
-                quality_warnings: qualityResult.quality_warnings,
-            };
-        } else {
-            // Insert new
-            const result = await pool.query(
-                `INSERT INTO curricula (user_id, title, description, intake, curriculum_data, generation_meta, status)
-                 VALUES (CAST($1 AS uuid), $2, $3, $4, $5, $6, 'draft')
-                 RETURNING id, created_at`,
-                [effectiveUserId, title, description, JSON.stringify(normalizedIntake),
-                 JSON.stringify(curriculumData), JSON.stringify(generationMeta || {})]
-            );
-
-            return {
-                curriculum_id: result.rows[0].id,
-                action: 'created',
-                title,
-                lesson_count: draftValidation.lesson_count,
-                roadmap,
-                quality_warnings: qualityResult.quality_warnings,
-                created_at: result.rows[0].created_at,
-            };
         }
+
+        const saved = await writeCurriculumVersion(client, {
+            curriculumId,
+            userId: effectiveUserId,
+            title,
+            description,
+            uiTemplateId,
+            content: (id) => ({
+                ...adaptCurriculumDraftForSave({
+                    curriculum: draftValidation.normalized_curriculum,
+                    curriculumId: id,
+                    templateId: kit.template_id,
+                    title,
+                    description,
+                    learningMode: kit.learning_mode,
+                    explanationStyle: null,
+                }),
+                _meta: {
+                    schema_version: kit.schema_version,
+                    policy_version: resolvedPolicyVersion,
+                    portal_id: kit.portal_id,
+                    template_id: kit.template_id,
+                    ui_template_id: uiTemplateId,
+                    locale: kit.locale,
+                    generation_meta: meta,
+                    saved_at: new Date().toISOString(),
+                    learning_mode: kit.learning_mode,
+                    source_curriculum: draftValidation.normalized_curriculum,
+                    source: 'mcp',
+                },
+            }),
+            requirements: normalizedIntake,
+            roadmap,
+            uiHints: {
+                template_id: kit.template_id,
+                ui_template_id: uiTemplateId,
+                policy_version: resolvedPolicyVersion,
+                portal_id: kit.portal_id,
+                locale: kit.locale,
+                save_defaults: kit.save_defaults,
+                generation_meta: meta,
+            },
+            totalLessons: draftValidation.lesson_count,
+            modelUsed: typeof meta.model === 'string' ? meta.model : null,
+        });
+
+        await client.query('COMMIT');
+
+        return {
+            curriculum_id: saved.curriculumId,
+            curriculum_version_id: saved.curriculumVersionId,
+            version: saved.version,
+            status: saved.status,
+            action: curriculumId ? 'updated' : 'created',
+            title,
+            lesson_count: draftValidation.lesson_count,
+            roadmap,
+            quality_warnings: qualityResult.quality_warnings,
+            created_at: saved.createdAt,
+        };
     } catch (err) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
         return classifyDbError(err, 'saveDraft');
+    } finally {
+        client?.release();
     }
 }
