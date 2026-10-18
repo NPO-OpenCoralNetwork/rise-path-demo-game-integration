@@ -2,6 +2,7 @@ import { Course, GeneratedCourse } from '../types';
 import { isVibeCodingCurriculum, mapVibeCodingToGeneratedCourse } from './vibeCodingAdapter';
 import { getCourseProgress } from './progressService';
 import { AIDJ_DEMO_DATA } from './aidjDemoData';
+import { apiFetch } from './apiClient';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v2';
 const USE_DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'; // Set VITE_DEMO_MODE=false for production
@@ -2748,6 +2749,11 @@ export const saveGeneratedCourse = async (course: GeneratedCourse): Promise<void
 
 // --- V2 AI Chat & Decision ---
 
+// /ai/generate and /ai/drafts require auth in strict mode, so they go through apiFetch (Bearer
+// token). Errors carry the HTTP status so CourseGeneratorView can tell 401 from 503/504.
+const aiHttpError = (message: string, status: number): Error =>
+  Object.assign(new Error(message), { status });
+
 export const sendAiChat = async (message: string, sessionId?: string, attachments: any[] = []) => {
   if (USE_DEMO_MODE) {
     selectDemoByPrompt(message);
@@ -2786,9 +2792,8 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const response = await fetch(`${API_BASE}/ai/generate`, {
+    const response = await apiFetch('/ai/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, session_id: sessionId, stage: 'requirements', attachments }),
       signal: controller.signal,
     });
@@ -2796,14 +2801,14 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || '日次生成上限に達しました');
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status);
     }
     if (response.status === 503 || response.status === 504) {
-      throw new Error('AI が一時的に利用できません。しばらくしてから再試行してください。');
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Chat failed.');
+      throw aiHttpError(err.error || 'Chat failed.', response.status);
     }
     return await response.json();
   } catch (e: any) {
@@ -2893,9 +2898,8 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const response = await fetch(`${API_BASE}/ai/generate`, {
+    const response = await apiFetch('/ai/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: sessionId,
         curriculum_id: curriculumId,
@@ -2909,14 +2913,14 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || '日次生成上限に達しました');
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status);
     }
     if (response.status === 503 || response.status === 504) {
-      throw new Error('AI が一時的に利用できません。しばらくしてから再試行してください。');
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Decision failed.');
+      throw aiHttpError(err.error || 'Decision failed.', response.status);
     }
     return await response.json();
   } catch (e: any) {
@@ -2932,7 +2936,7 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
 export const fetchAiDrafts = async (): Promise<{drafts: {id: string, title: string, status: string, intake_json: any, modules_json: any, updated_at: string}[]}> => {
   if (USE_DEMO_MODE) return { drafts: [] };
   try {
-    const response = await fetch(`${API_BASE}/ai/drafts`);
+    const response = await apiFetch('/ai/drafts');
     if (!response.ok) return { drafts: [] };
     return await response.json();
   } catch {
