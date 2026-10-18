@@ -1,28 +1,138 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/typography.css";
 @plugin "tailwindcss-animate";
 @plugin "@tailwindcss/typography";
 
+/*
+ * dark: utilities follow [data-theme] instead of the OS setting. Only a
+ * [data-theme="system"] subtree reacts to prefers-color-scheme; the app as a
+ * whole stays light until it opts in.
+ */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme="system"], [data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
+
+/* Static tokens. Names are documented in doc/design/design-system.md. */
 @theme {
-  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --font-serif: "Newsreader", "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans JP", monospace;
+
+  /* New radius names. rounded-sm/md/lg/xl keep Tailwind's defaults. */
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-hero: 20px;
+
+  --container-measure: 40em;
+  --container-form: 640px;
+  --container-read: 720px;
+  --container-page: 1200px;
+  --container-wide: 1440px;
+
+  --ease-rise: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-body {
-  font-family: "Inter", sans-serif;
+/* Theme-aware tokens: resolved where used, so [data-theme] / [data-world] subtrees work. */
+@theme inline {
+  --font-ud: var(--rp-font-ud);
+
+  --color-canvas: var(--rp-canvas);
+  --color-surface: var(--rp-surface);
+  --color-sunken: var(--rp-sunken);
+  --color-raised: var(--rp-raised);
+  --color-overlay: var(--rp-overlay);
+  --color-line: var(--rp-border);
+  --color-line-strong: var(--rp-border-strong);
+  --color-fg: var(--rp-fg);
+  --color-fg-2: var(--rp-fg-2);
+  --color-fg-3: var(--rp-fg-3);
+  --color-muted: var(--rp-fg-3);
+  --color-primary: var(--rp-primary);
+  --color-primary-hover: var(--rp-primary-hover);
+  --color-on-primary: var(--rp-on-primary);
+  --color-primary-soft: var(--rp-primary-soft);
+  --color-primary-text: var(--rp-primary-text);
+  --color-sun: var(--rp-sun);
+  --color-sun-soft: var(--rp-sun-soft);
+  --color-sun-text: var(--rp-sun-text);
+  --color-success: var(--rp-success);
+  --color-danger: var(--rp-danger);
+  --color-info: var(--rp-info);
+  --color-focus: var(--rp-focus);
+
+  /* text-world / bg-world use the AA "-text" value; the bright accent is world-accent. */
+  --color-world: var(--world-accent-text, var(--rp-primary-text));
+  --color-world-accent: var(--world-accent, var(--rp-primary));
+  --color-world-soft: var(--world-accent-soft, var(--rp-primary-soft));
+  --color-on-world: var(--world-on-accent, var(--rp-on-primary));
+
+  --shadow-1: var(--rp-shadow-1);
+  --shadow-2: var(--rp-shadow-2);
+  --shadow-3: var(--rp-shadow-3);
+
+  --text-display: 2.5rem;
+  --text-display--line-height: var(--rp-leading-display);
+  --text-display--font-weight: 700;
+  --text-h1: 1.875rem;
+  --text-h1--line-height: var(--rp-leading-h1);
+  --text-h1--font-weight: 700;
+  --text-h2: 1.375rem;
+  --text-h2--line-height: var(--rp-leading-h2);
+  --text-h2--font-weight: 700;
+  --text-h3: 1.125rem;
+  --text-h3--line-height: var(--rp-leading-h3);
+  --text-h3--font-weight: 600;
+  --text-body-lg: 1.0625rem;
+  --text-body-lg--line-height: var(--rp-leading-body-lg);
+  --text-body: 0.9375rem;
+  --text-body--line-height: var(--rp-leading-body);
+  --text-small: 0.8125rem;
+  --text-small--line-height: var(--rp-leading-small);
+  --text-caption: 0.75rem;
+  --text-caption--line-height: var(--rp-leading-caption);
+  --text-caption--font-weight: 500;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+@layer base {
+  body {
+    background-color: var(--rp-canvas);
+    color: var(--rp-fg);
+    font-family: var(--font-sans);
+  }
+
+  /*
+   * One focus ring for every focusable element. An outline (not the
+   * box-shadow --rp-ring) so shadow-* / ring-* utilities on the same element
+   * cannot hide it; elements that opt out with outline-none must draw their own.
+   */
+  :focus-visible {
+    outline: 2px solid var(--rp-focus);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rp-scroll-thumb);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--rp-scroll-thumb-hover);
+  }
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -35,7 +145,7 @@ body {
 
 /* Dashboard animation utilities */
 :root {
-  --dashboard-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dashboard-ease: var(--rp-ease);
 }
 
 @keyframes dashboardFadeUp {
@@ -298,16 +408,16 @@ body {
 @keyframes pageTransition {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .page-transition {
-  animation: pageTransition 0.5s var(--dashboard-ease);
+  animation: pageTransition var(--rp-duration-slow) var(--rp-ease);
 }
 
 @keyframes slideInRight {
