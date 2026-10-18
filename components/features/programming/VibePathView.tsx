@@ -4,7 +4,14 @@ import {
   Sparkles, Monitor, Brain, Terminal, Zap, Globe, MessageSquare,
   ArrowRight, Calendar, User
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { ViewState } from '../../../types';
+import { getLastLesson, readLessonSummary } from '../../lesson/progressStore';
+
+/** The chapters live in content/courses/vibe-coding as lessons vibe-ch0 … vibe-ch11. */
+const VIBE_COURSE = 'vibe-coding';
+const DONE_STATES = new Set(['read', 'checked', 'mastered']);
+type ChapterStatus = 'completed' | 'current' | 'available' | 'locked';
 
 interface VibePathViewProps {
   onBack: () => void;
@@ -212,41 +219,18 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
 
             // Map static data to translated content
 
-            const chapters = t.chapters.map((ch, idx) => ({
-
-              ...ch,
-
-              status: idx <= 10 ? 'completed' : (idx === 11 ? 'current' : 'locked'), 
-
-              view: [
-
-                ViewState.VIBE_CHAPTER_0,
-
-                ViewState.VIBE_CHAPTER_1,
-
-                ViewState.VIBE_CHAPTER_2,
-
-                ViewState.VIBE_CHAPTER_3,
-
-                ViewState.VIBE_CHAPTER_4,
-
-                ViewState.VIBE_CHAPTER_5,
-
-                ViewState.VIBE_CHAPTER_6,
-
-                ViewState.VIBE_CHAPTER_7,
-
-                ViewState.VIBE_CHAPTER_8,
-
-                ViewState.VIBE_CHAPTER_9,
-
-                ViewState.VIBE_CHAPTER_10,
-
-                ViewState.VIBE_CHAPTER_11
-
-              ][idx] || null
-
-            }));  return (
+            // Status comes from the learner's saved progress (no more hard-coded "done" chapters):
+            // done once read, "current" for the lesson read last (else chapter 0).
+            const lastLesson = getLastLesson();
+            const resumeId = lastLesson?.courseSlug === VIBE_COURSE ? lastLesson.lessonId : `vibe-ch0`;
+            const chapters = t.chapters.map((ch, idx) => {
+              const lessonId = `vibe-ch${idx}`;
+              const summary = readLessonSummary(VIBE_COURSE, lessonId);
+              const done = Boolean(summary && DONE_STATES.has(summary.state));
+              const status = (done ? 'completed' : lessonId === resumeId ? 'current' : 'available') as ChapterStatus;
+              return { ...ch, status, href: `/learn/${VIBE_COURSE}/${lessonId}` };
+            });
+  return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-600 pb-20">
       {/* Hero Section */}
       <div className="relative min-h-[300px] w-full overflow-hidden">
@@ -360,18 +344,20 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
                             ${chapter.status === 'completed' ? 'border-purple-500 text-purple-500' : ''}
                             ${chapter.status === 'current' ? 'border-purple-500 text-purple-500 shadow-[0_0_0_4px_rgba(168,85,247,0.15)] scale-110' : ''}
                             ${chapter.status === 'locked' ? 'border-slate-200 text-slate-300' : ''}
+                            ${chapter.status === 'available' ? 'border-line text-fg-3' : ''}
                         `}>
                   {chapter.status === 'completed' && <CheckCircle2 size={24} className="fill-purple-50" />}
                   {chapter.status === 'current' && <div className="w-4 h-4 bg-purple-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>}
                   {chapter.status === 'locked' && <Lock size={20} />}
+                  {chapter.status === 'available' && <span className="text-small font-bold tabular">{index}</span>}
                 </div>
 
                 {/* Content Card */}
                 <div className={`flex-1 transition-all duration-300 ${chapter.status === 'current' ? 'transform -translate-y-1' : 'opacity-80 hover:opacity-100'}`}>
-                  <div
-                    onClick={() => chapter.status !== 'locked' && chapter.view && onNavigate(chapter.view)}
+                  <Link
+                    to={chapter.href}
                     className={`
-                                    group/card rounded-2xl border overflow-hidden transition-all duration-300 flex flex-col md:flex-row h-full md:h-40
+                                    group/card rounded-2xl border overflow-hidden transition-all duration-300 flex flex-col md:flex-row h-full md:h-40 no-underline
                                     ${chapter.status === 'current'
                         ? 'bg-white border-purple-200/80 shadow-xl shadow-purple-100/40 cursor-pointer hover:border-purple-300 hover:shadow-purple-100/60'
                         : 'bg-white border-slate-100 shadow-sm hover:shadow-lg hover:border-purple-100'}
@@ -428,7 +414,7 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
                         )}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 </div>
               </div>
             ))}

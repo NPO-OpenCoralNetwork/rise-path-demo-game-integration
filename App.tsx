@@ -70,19 +70,8 @@ import {
   HtmlCssPartTwoView,
   WebInspectorView,
   VibePrologueView,
-  VibeChapterZeroView,
-  VibeChapterOneView,
-  VibeChapterTwoView,
-  VibeChapterThreeView,
-  VibeChapterFourView,
-  VibeChapterFiveView,
-  VibeChapterSixView,
-  VibeChapterSevenView,
-  VibeChapterEightView,
-  VibeChapterNineView,
-  VibeChapterTenView,
-  VibeChapterElevenView,
   VibePathView,
+  LearnRoute,
   UnityPathView,
   UnityChapterView,
   ArtMuseumView,
@@ -265,11 +254,6 @@ const AppContent: React.FC = () => {
     navigate('/', { replace: true });
   };
 
-  // Vibe Chapter Navigation Helper
-  const navigateToVibeChapter = (chapter: string) => {
-    navigate(`/vibe/${chapter}`);
-  };
-
   return (
     <>
       {authLoading ? (
@@ -361,18 +345,15 @@ const AppContent: React.FC = () => {
               {/* Vibe Coding */}
               <Route path="/vibe" element={<VibePathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
               <Route path="/vibe/prologue" element={<VibePrologueView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-0" element={<VibeChapterZeroView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-1" element={<VibeChapterOneView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-2" element={<VibeChapterTwoView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-3" element={<VibeChapterThreeView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-4" element={<VibeChapterFourView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-5" element={<VibeChapterFiveView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-6" element={<VibeChapterSixView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-7" element={<VibeChapterSevenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-8" element={<VibeChapterEightView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-9" element={<VibeChapterNineView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-10" element={<VibeChapterTenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-11" element={<VibeChapterElevenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
+              {/* The 12 Vibe chapters now render in the lesson reader. */}
+              <Route path="/vibe/:chapter" element={<VibeChapterRedirect />} />
+
+              {/* Lesson reader (risepath.lesson/v1) */}
+              <Route path="/learn/:courseSlug" element={<LearnRoute />} />
+              <Route path="/learn/:courseSlug/:lessonId" element={<LearnRoute />} />
+              {import.meta.env.DEV && (
+                <Route path="/preview/:courseSlug/:lessonId" element={<LearnRoute mode="preview" />} />
+              )}
 
               {/* Unity */}
               <Route path="/unity" element={<UnityPathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
@@ -415,6 +396,15 @@ const AppContent: React.FC = () => {
 };
 
 // --- Inline Wrappers for less common dynamic routes ---
+
+/** Old chapter URLs (/vibe/chapter-N) → the lesson reader. Unknown slugs go to the path page. */
+const VibeChapterRedirect: React.FC = () => {
+  const { chapter = '' } = useParams<{ chapter: string }>();
+  const match = /^chapter-(\d{1,2})$/.exec(chapter);
+  const n = match ? Number(match[1]) : NaN;
+  if (!Number.isInteger(n) || n < 0 || n > 11) return <Navigate to="/vibe" replace />;
+  return <Navigate to={`/learn/vibe-coding/vibe-ch${n}`} replace />;
+};
 
 const AICharacterDetailViewWrapper: React.FC<{ onNavigate: (v: ViewState) => void }> = ({ onNavigate }) => {
   const { characterId } = useParams<{ characterId: string }>();
