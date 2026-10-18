@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import {
-    User, LogOut, RotateCcw, Bell, Settings
+    User, LogOut, RotateCcw, Bell, Settings, ShieldCheck
 } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
-import { getGeminiApiKeyInfo, hasGeminiApiKey } from '../../../services/geminiApiKey';
+import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
 import { getTotalXp, getLevel, getStreak } from '../../../services/gamificationService';
 
 interface ProfilePassportProps {
@@ -17,49 +16,54 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
     const { language } = useLanguage();
     const { user: authUser, logout } = useAuth();
     const [isFlipped, setIsFlipped] = useState(false);
-    const [apiKeyInfo, setApiKeyInfo] = useState(getGeminiApiKeyInfo());
+    const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
+    const [llmStatusFailed, setLlmStatusFailed] = useState(false);
     const copy = {
         en: {
             studentId: 'Student ID',
             identitySubtitle: 'Manage your identity and credentials.',
-            apiKeyTitle: 'Gemini API Key',
-            apiKeyActive: 'Active',
-            apiKeyMissing: 'Missing',
-            apiKeyManage: 'Manage in Settings',
-            apiKeySourceEnv: 'Source: Environment',
-            apiKeySourceLocal: 'Source: Browser storage',
-            apiKeySourceNone: 'Source: Not set',
-            apiKeyEnvHint: 'Environment key is active. Local key is ignored.',
+            aiTitle: 'AI features',
+            aiBody: 'AI runs securely on the server. No API key is needed.',
+            aiChecking: 'Checking',
+            aiLive: 'Active',
+            aiDemo: 'Demo',
+            aiOff: 'Off',
+            aiUnreachable: 'Offline',
+            aiDetails: 'View AI status',
         },
         jp: {
             studentId: '学生証',
             identitySubtitle: '身分情報と資格を管理します。',
-            apiKeyTitle: 'Gemini APIキー',
-            apiKeyActive: '設定済み',
-            apiKeyMissing: '未設定',
-            apiKeyManage: '設定で管理',
-            apiKeySourceEnv: '設定元: 環境変数',
-            apiKeySourceLocal: '設定元: ブラウザ保存',
-            apiKeySourceNone: '設定元: 未設定',
-            apiKeyEnvHint: '環境変数のキーが優先されます。',
+            aiTitle: 'AI 機能',
+            aiBody: 'AI はサーバーで安全に実行されています。API キーは不要です。',
+            aiChecking: '確認中',
+            aiLive: '利用可能',
+            aiDemo: 'デモ',
+            aiOff: '未設定',
+            aiUnreachable: '接続不可',
+            aiDetails: 'AI の状態を見る',
         }
     } as const;
     const t = copy[language];
-    const location = useLocation();
 
     useEffect(() => {
-        setApiKeyInfo(getGeminiApiKeyInfo());
-    }, [location.key]);
+        clearLegacyBrowserKey();
+        const controller = new AbortController();
+        getLlmStatus(controller.signal)
+            .then(setLlmStatus)
+            .catch(() => { if (!controller.signal.aborted) setLlmStatusFailed(true); });
+        return () => controller.abort();
+    }, []);
 
-    const maskedKey = apiKeyInfo.key
-        ? `${apiKeyInfo.key.slice(0, 4)}••••${apiKeyInfo.key.slice(-4)}`
-        : '—';
-
-    const apiKeySourceLabel = apiKeyInfo.source === 'env'
-        ? t.apiKeySourceEnv
-        : apiKeyInfo.source === 'local'
-        ? t.apiKeySourceLocal
-        : t.apiKeySourceNone;
+    const aiAvailability = summarizeLlmStatus(llmStatus, llmStatusFailed);
+    const aiProvider = aiAvailability === 'live' ? primaryProviderLabel(llmStatus) : null;
+    const aiBadge = {
+        checking: t.aiChecking,
+        live: t.aiLive,
+        demo: t.aiDemo,
+        off: t.aiOff,
+        unreachable: t.aiUnreachable,
+    }[aiAvailability];
 
     const user = {
         name: authUser?.name || 'Guest Explorer',
@@ -206,27 +210,24 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                     </div>
                                 </div>
 
-                                {/* API Key summary — manage in Settings (Phase 17-C) */}
+                                {/* AI status — models run on the server; no key in the browser (WP-08) */}
                                 <div className="bg-slate-800/30 rounded-xl p-3 border border-white/5 space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t.apiKeyTitle}</label>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasGeminiApiKey() ? 'text-emerald-400 bg-emerald-400/10' : 'text-amber-300 bg-amber-300/10'}`}>
-                                            {hasGeminiApiKey() ? t.apiKeyActive : t.apiKeyMissing}
+                                    <div className="flex justify-between items-center gap-2">
+                                        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-300">
+                                            <ShieldCheck size={14} className="text-emerald-400" aria-hidden="true" />
+                                            {t.aiTitle}
+                                        </span>
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${aiAvailability === 'live' ? 'text-emerald-300 bg-emerald-400/10' : 'text-amber-200 bg-amber-300/10'}`}>
+                                            {aiProvider ? `${aiBadge} · ${aiProvider}` : aiBadge}
                                         </span>
                                     </div>
-                                    <p className="text-[9px] text-slate-500">{apiKeySourceLabel}</p>
-                                    <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10 text-xs">
-                                        <span className="font-mono text-slate-400 truncate flex-1">{maskedKey}</span>
-                                    </div>
-                                    {apiKeyInfo.source === 'env' && (
-                                        <p className="text-[9px] text-amber-300">{t.apiKeyEnvHint}</p>
-                                    )}
+                                    <p className="text-xs text-slate-300">{t.aiBody}</p>
                                     <button
                                         type="button"
                                         onClick={() => onNavigate(ViewState.SETTINGS_API_KEY)}
-                                        className="w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 px-2 py-2 rounded text-white transition-colors"
+                                        className="w-full text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-2 rounded text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                                     >
-                                        {t.apiKeyManage}
+                                        {t.aiDetails}
                                     </button>
                                 </div>
 

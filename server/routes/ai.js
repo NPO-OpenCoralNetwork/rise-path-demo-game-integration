@@ -5,6 +5,10 @@
  *   Stage flow: requirements → roadmap → curriculum
  *
  * Replaces the deprecated LangGraph endpoints.
+ *
+ * Auth: server.js mounts requireAuth on /ai/generate and /ai/drafts, so req.userId is the
+ * authenticated user (or the dev fallback user outside strict mode).
+ * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
  */
 import express from 'express';
 import { getPool } from '../db.js';
@@ -17,6 +21,67 @@ import {
 } from '../services/aiGenerator.js';
 
 const router = express.Router();
+
+/**
+ * Store a generated curriculum as the next draft version and point the curriculum at it.
+ * Status 'draft' (not 'draft_<stage>') keeps it out of the in-progress list below.
+ */
+async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const owned = await client.query(
+      'SELECT id FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
+      [curriculumId, userId]
+    );
+    if (!owned.rowCount) throw new Error('Draft not found');
+
+    const next = await client.query(
+      'SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM curriculum_versions WHERE curriculum_id = CAST($1 AS uuid)',
+      [curriculumId]
+    );
+    const version = await client.query(
+      `INSERT INTO curriculum_versions
+         (curriculum_id, version, status, content_json, requirements, roadmap, created_by)
+       VALUES (CAST($1 AS uuid), $2, 'draft', $3, $4, $5, CAST($6 AS uuid))
+       RETURNING id`,
+      [
+        curriculumId,
+        Number(next.rows[0]?.next_version || 1),
+        JSON.stringify(curriculum),
+        JSON.stringify(intake ?? null),
+        JSON.stringify(modules ?? null),
+        userId,
+      ]
+    );
+    const lessonCount = (curriculum.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
+    await client.query(
+      `UPDATE curricula SET
+         status = 'draft',
+         current_version_id = CAST($1 AS uuid),
+         title = COALESCE($2, title),
+         description = $3,
+         total_lessons = $4,
+         updated_at = NOW()
+       WHERE id = CAST($5 AS uuid) AND user_id = CAST($6 AS uuid)`,
+      [
+        version.rows[0].id,
+        curriculum.title?.jp || curriculum.title?.en || null,
+        curriculum.description?.jp || curriculum.description?.en || '',
+        lessonCount,
+        curriculumId,
+        userId,
+      ]
+    );
+    await client.query('COMMIT');
+    return version.rows[0].id;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 // --- Daily generation limit ---
 const DAILY_LIMIT = parseInt(process.env.AI_DAILY_LIMIT || '5', 10);
@@ -41,8 +106,8 @@ router.post('/generate', async (req, res) => {
 
   const { message, session_id, curriculum_id, stage, decision, attachments } = req.body;
 
-  // Resolve user (dev-fallback)
-  const userId = req.user?.id || process.env.PHASE1_USER_ID || '00000000-0000-0000-0000-000000000001';
+  const userId = req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   try {
     // --- Cost limit check ---
@@ -148,28 +213,21 @@ router.post('/generate', async (req, res) => {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
       }
 
-      // Save final curriculum
-      await pool.query(
-        `UPDATE curricula SET 
-           status = 'published', 
-           curriculum_data = $1, 
-           title = COALESCE($2, title),
-           description = $3,
-           updated_at = NOW() 
-         WHERE id = $4 AND user_id = CAST($5 AS uuid)`,
-        [
-          JSON.stringify(result.curriculum),
-          result.curriculum.title?.jp || result.curriculum.title?.en,
-          result.curriculum.description?.jp || result.curriculum.description?.en || '',
-          curriculum_id,
-          userId,
-        ]
-      );
+      // Save as a draft version (curriculum_versions.content_json, which the reader loads via
+      // current_version_id). `curricula.curriculum_data` does not exist. Generated content is
+      // never published automatically; a person publishes it after review.
+      await saveDraftVersion(pool, {
+        curriculumId: curriculum_id,
+        userId,
+        curriculum: result.curriculum,
+        intake,
+        modules,
+      });
 
       return res.json({
         session_id,
         curriculum_id,
-        message: `カリキュラムが完成しました！🎉\n\n**${result.curriculum.title?.jp || result.curriculum.title?.en || '新しいコース'}** がライブラリに追加されました。`,
+        message: `カリキュラムが完成しました！🎉\n\n**${result.curriculum.title?.jp || result.curriculum.title?.en || '新しいコース'}** を下書きとしてライブラリに保存しました。`,
         pending_approval: 'none',
         status: 'approved',
         agent_logs: [
@@ -263,7 +321,7 @@ router.post('/generate', async (req, res) => {
       return res.status(504).json({ error: '生成がタイムアウトしました。再試行してください' });
     }
 
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -272,7 +330,8 @@ router.get('/drafts', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
 
-  const userId = req.user?.id || process.env.PHASE1_USER_ID || '00000000-0000-0000-0000-000000000001';
+  const userId = req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   try {
     const result = await pool.query(
@@ -286,7 +345,7 @@ router.get('/drafts', async (req, res) => {
     return res.json({ drafts: result.rows });
   } catch (err) {
     console.error('[AI Drafts] Error:', err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Failed to load drafts' });
   }
 });
 

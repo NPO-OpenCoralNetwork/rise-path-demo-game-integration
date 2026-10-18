@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, Globe, Headphones, Key, MessageCircle, Shield, User } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Bell, Globe, Headphones, MessageCircle, Shield, Sparkles, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useUserRole } from '../../../hooks/useUserRole';
 import { checkTtsAvailable, getDisplayName, loadTtsPreferences } from '../../../services/ttsPreferencesService';
-import { hasGeminiApiKey } from '../../../services/geminiApiKey';
+import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
 import SettingsSection from './SettingsSection';
 import SettingsRow from './SettingsRow';
 
@@ -16,13 +16,13 @@ interface SettingsViewProps {
 
 const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     const navigate = useNavigate();
-    const location = useLocation();
     const { language, selectedLanguage, setLanguage } = useLanguage();
     const { setTheme } = useTheme();
     const { isAdmin } = useUserRole();
     const [voiceLabel, setVoiceLabel] = useState('');
     const [ttsStatus, setTtsStatus] = useState<'ok' | 'unavailable' | 'loading'>('loading');
-    const [apiKeyStatus, setApiKeyStatus] = useState<'ok' | 'missing'>('missing');
+    const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
+    const [llmStatusFailed, setLlmStatusFailed] = useState(false);
 
     useEffect(() => { setTheme('default'); }, [setTheme]);
 
@@ -43,8 +43,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     }, [language]);
 
     useEffect(() => {
-        setApiKeyStatus(hasGeminiApiKey() ? 'ok' : 'missing');
-    }, [location.key]);
+        clearLegacyBrowserKey();
+        const controller = new AbortController();
+        getLlmStatus(controller.signal)
+            .then(setLlmStatus)
+            .catch(() => { if (!controller.signal.aborted) setLlmStatusFailed(true); });
+        return () => controller.abort();
+    }, []);
 
     const copy = {
         en: {
@@ -65,9 +70,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             languageHint: 'Tap to switch display language',
             profile: 'Edit Profile',
             notifications: 'Notifications',
-            apiKey: 'API Key',
-            apiKeyActive: 'Configured',
-            apiKeyMissing: 'Not set',
+            ai: 'AI features',
+            aiChecking: 'Checking…',
+            aiLive: (provider: string | null) => `Runs securely on the server${provider ? ` · ${provider}` : ''}`,
+            aiDemo: 'Demo mode · sample answers',
+            aiOff: 'Not configured on this server',
+            aiUnreachable: 'Server unreachable',
             dialogueVoices: 'Dialogue voices',
             dialogueVoicesHint: 'Map speakers to narration voices',
             privacy: 'Privacy',
@@ -91,9 +99,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             languageHint: 'タップして表示言語を切り替え',
             profile: 'プロフィール編集',
             notifications: '通知',
-            apiKey: 'APIキー',
-            apiKeyActive: '設定済み',
-            apiKeyMissing: '未設定',
+            ai: 'AI 機能',
+            aiChecking: '確認中…',
+            aiLive: (provider: string | null) => `サーバーで安全に実行中${provider ? `・${provider}` : ''}`,
+            aiDemo: 'デモモード・サンプル回答',
+            aiOff: 'このサーバーでは未設定',
+            aiUnreachable: 'サーバーに接続できません',
             dialogueVoices: '対話の話者マッピング',
             dialogueVoicesHint: '話者ごとにナレーション声を割り当て',
             privacy: 'プライバシー',
@@ -110,6 +121,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             onNavigate(ViewState.PROFILE);
         }
     };
+
+    const aiAvailability = summarizeLlmStatus(llmStatus, llmStatusFailed);
+    const aiSubtext = aiAvailability === 'live'
+        ? t.aiLive(primaryProviderLabel(llmStatus))
+        : aiAvailability === 'demo'
+        ? t.aiDemo
+        : aiAvailability === 'off'
+        ? t.aiOff
+        : aiAvailability === 'unreachable'
+        ? t.aiUnreachable
+        : t.aiChecking;
 
     const voiceSubtext = ttsStatus === 'loading'
         ? t.voiceLoading
@@ -182,9 +204,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
 
                     <SettingsSection title={t.advanced}>
                         <SettingsRow
-                            icon={<Key size={20} />}
-                            label={t.apiKey}
-                            subtext={apiKeyStatus === 'ok' ? t.apiKeyActive : t.apiKeyMissing}
+                            icon={<Sparkles size={20} />}
+                            label={t.ai}
+                            subtext={aiSubtext}
                             onClick={() => onNavigate(ViewState.SETTINGS_API_KEY)}
                         />
                         <SettingsRow

@@ -17,6 +17,7 @@ import agentRoutes from './server/routes/agent.js';
 import contentRoutes from './server/routes/content.js';
 import userRoutes from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
+import { createLlmRouter } from './server/routes/llm.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
@@ -97,7 +98,13 @@ const aiLimiter = rateLimit({
 
 // --- Mount V2 Routes ---
 app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
-app.use('/api/v2/ai', aiLimiter, aiRoutes);             // deprecated (410 Gone) + AI rate limit
+// LLM gateway: mounted before the blanket /api/v2 auth below so guests are not 401'd in strict
+// mode; optionalAuth sets req.userId when a token is present; the AI limiter covers its POSTs.
+app.use('/api/v2/llm', optionalAuth, createLlmRouter({ limiter: aiLimiter }));
+// Course generator (ai.js) requires auth. Scoped to its own paths: chatgptCurriculumRoutes also
+// serves /api/v2/ai/* (generation-kit, curriculum-drafts…) with bridge-token auth further down.
+app.use(['/api/v2/ai/generate', '/api/v2/ai/drafts'], requireAuth);
+app.use('/api/v2/ai', aiLimiter, aiRoutes);              // AI rate limit (keyed by req.userId once authed)
 app.use('/api/v2/image', requireAuth, aiLimiter);        // AI rate limit for image generation
 app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
 app.use('/api/v2', chatgptCurriculumRoutes);             // uses own Bridge/JWT auth (§4.6)
@@ -216,6 +223,7 @@ jobWorker.start();
 app.listen(PORT, () => {
     console.log(`Rise Path Server running on http://localhost:${PORT}`);
     console.log(`- V2 AI Routes: /api/v2/ai`);
+    console.log(`- V2 LLM Gateway: /api/v2/llm`);
     console.log(`- V2 Content Routes: /api/v2`);
     console.log(`- V2 User Routes: /api/v2/user`);
     console.log(`- Environment: ${process.env.NODE_ENV || 'development'}`);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getLessonForCourse } from '../../services/curriculumData';
-import { analyzeWriting } from '../../services/geminiService';
+import { analyzeWriting, toLlmLocale } from '../../services/llmApi';
 import { addLearningEvent } from '../../services/progressService';
+import { useLanguage } from '../../context/LanguageContext';
 import { AnalysisResult } from '../../types';
 import {
   X, ChevronRight, Check, RefreshCw, PenTool, Sparkles, ArrowRight, Mic, StopCircle, Volume2, MessageSquare
@@ -19,15 +20,38 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
   const [draft, setDraft] = useState('');
   const [refinedDraft, setRefinedDraft] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysisError, setAnalysisError] = useState(false);
+  const { language } = useLanguage();
+
+  const copy = {
+    en: {
+      analysisFailed: 'We could not analyze your text right now. Your draft is saved here; please try again in a moment.',
+    },
+    jp: {
+      analysisFailed: '今は文章を分析できませんでした。下書きはそのまま残っています。少し待ってからもう一度お試しください。',
+    },
+  } as const;
+  const t = copy[language];
 
   const lesson = getLessonForCourse(courseId || '');
 
   const handleAnalyze = async () => {
     setStep('ANALYZING');
-    const result = await analyzeWriting(draft, lesson.rubric);
-    setAnalysis(result);
-    setRefinedDraft(result.refinedVersion);
-    setStep('FEEDBACK');
+    setAnalysisError(false);
+    try {
+      const result = await analyzeWriting(draft, lesson.rubric, {
+        locale: toLlmLocale(language),
+        lessonTitle: lesson.title,
+        goal: lesson.goal,
+      });
+      setAnalysis(result);
+      setRefinedDraft(result.refinedVersion);
+      setStep('FEEDBACK');
+    } catch (error) {
+      console.error('Writing analysis failed:', error);
+      setAnalysisError(true);
+      setStep('DRAFT');
+    }
   };
 
   const handleStartRoleplay = () => {
@@ -99,6 +123,12 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
           {draft.length} chars
         </div>
       </div>
+
+      {analysisError && (
+        <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t.analysisFailed}
+        </p>
+      )}
 
       <div className="mt-6 flex justify-end">
         <button 
