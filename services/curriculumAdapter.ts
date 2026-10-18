@@ -22,6 +22,9 @@ interface LegacyDocBlock {
     content?: string;
     items?: string[];
     language?: string;
+    style?: string;
+    listStyle?: string;
+    ordered?: boolean;
 }
 
 interface LegacyQuizItem {
@@ -158,6 +161,10 @@ export const normalizeLocalizedText = (
     };
 };
 
+// Generators mark ordered lists with style/listStyle 'number' (or ordered: true); keep the numbering.
+const toListStyle = (block: { style?: string; listStyle?: string; ordered?: boolean }): 'bullet' | 'number' =>
+    block.ordered || block.style === 'number' || block.listStyle === 'number' ? 'number' : 'bullet';
+
 /**
  * Convert legacy doc_block to LocalizedDocBlock
  */
@@ -184,7 +191,7 @@ const convertDocBlock = (block: LegacyDocBlock, index: number): LocalizedDocBloc
             return {
                 type: 'list',
                 items: block.items.map(item => normalizeLocalizedText(item)),
-                style: 'bullet'
+                style: toListStyle(block)
             };
 
         default:
@@ -437,15 +444,6 @@ export const convertToGeneratedCurriculumV2 = (
     curriculum: any,
     curriculumId?: string
 ): GeneratedCurriculumV2 => {
-    console.log('[curriculumAdapter] Converting to V2:', {
-        hasChapters: Array.isArray(curriculum.chapters),
-        hasModules: Array.isArray(curriculum.modules),
-        chaptersCount: curriculum.chapters?.length,
-        modulesCount: curriculum.modules?.length,
-        uiTemplateId: curriculum.ui_template_id,
-        firstModuleHasLessons: curriculum.modules?.[0]?.lessons?.length > 0
-    });
-
     // Check if we have the new doc_chapter format (modules with lessons that have sections)
     const hasNewModulesFormat = Array.isArray(curriculum.modules) &&
         curriculum.modules.length > 0 &&
@@ -453,12 +451,9 @@ export const convertToGeneratedCurriculumV2 = (
 
     if (hasNewModulesFormat) {
         // New format: use modules directly
-        console.log('[curriculumAdapter] Using new modules format');
         const modules: GeneratedModule[] = curriculum.modules.map((module: any) =>
             convertModuleToGeneratedModule(module)
         );
-
-        console.log('[curriculumAdapter] Converted modules:', modules.length);
 
         // Extract personalization from _meta if present
         const meta = curriculum._meta || {};
@@ -484,7 +479,6 @@ export const convertToGeneratedCurriculumV2 = (
     }
 
     // Legacy format: use chapters
-    console.log('[curriculumAdapter] Using legacy chapters format');
     const sourceData = curriculum.chapters || [];
 
     // Convert chapters to GeneratedModule format
@@ -500,8 +494,6 @@ export const convertToGeneratedCurriculumV2 = (
             return convertModuleToGeneratedModule(item);
         }
     });
-
-    console.log('[curriculumAdapter] Converted modules:', modules.length);
 
     return {
         curriculum_id: curriculumId || curriculum.id || curriculum.curriculum_id || crypto.randomUUID(),
@@ -611,7 +603,7 @@ const convertAnyBlock = (block: any, index: number): LocalizedDocBlock | null =>
         return {
             type: 'list',
             items: items.map((item: any) => normalizeLocalizedText(typeof item === 'string' ? item : item.text || '')),
-            style: 'bullet'
+            style: toListStyle(block)
         };
     }
 

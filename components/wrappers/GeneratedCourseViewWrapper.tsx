@@ -4,18 +4,40 @@ import { fetchGeneratedCourseById } from '../../services/curriculumApi';
 import GeneratedCourseView from '../features/ai/GeneratedCourseView';
 import type { ResumeCardData } from '../features/ai/GeneratedCourseView';
 import { GeneratedCourse } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
+
+const copy = {
+  en: {
+    loading: 'Loading course...',
+    noCourseId: 'No course ID provided',
+    loadFailed: 'Failed to load course',
+    notFound: 'Course not found',
+    notFoundBody: "The course you're looking for doesn't exist or couldn't be loaded.",
+    backToCourses: 'Back to Courses',
+  },
+  jp: {
+    loading: 'コースを読み込み中...',
+    noCourseId: 'コースIDが指定されていません',
+    loadFailed: 'コースを読み込めませんでした',
+    notFound: 'コースが見つかりません',
+    notFoundBody: 'お探しのコースは存在しないか、読み込めませんでした。',
+    backToCourses: 'コース一覧に戻る',
+  },
+} as const;
 
 const GeneratedCourseViewWrapper: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const t = copy[language];
   const [course, setCourse] = useState<GeneratedCourse | null>(null);
   const [resumeCard, setResumeCard] = useState<ResumeCardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<'noCourseId' | 'loadFailed' | null>(null);
 
   useEffect(() => {
     if (!courseId) {
-      setError("No course ID provided");
+      setError('noCourseId');
       setLoading(false);
       return;
     }
@@ -24,14 +46,8 @@ const GeneratedCourseViewWrapper: React.FC = () => {
     localStorage.setItem('active_curriculum_id', courseId);
 
     fetchGeneratedCourseById(courseId)
-      .then((data) => {
-        console.log("[CourseWrapper] Course data fetched:", data);
-        setCourse(data);
-      })
-      .catch((err) => {
-        console.error("[CourseWrapper] Failed to load course:", err);
-        setError("Failed to load course");
-      })
+      .then((data) => setCourse(data))
+      .catch(() => setError('loadFailed'))
       .finally(() => setLoading(false));
 
     // Fetch resume card (best-effort)
@@ -47,7 +63,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 font-medium">Loading course...</p>
+          <p className="text-slate-500 font-medium">{t.loading}</p>
         </div>
       </div>
     );
@@ -56,15 +72,16 @@ const GeneratedCourseViewWrapper: React.FC = () => {
   // Error state
   if (error || !course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center max-w-md">
-          <h2 className="text-2xl font-bold text-red-500 mb-4">{error || "Course not found"}</h2>
-          <p className="text-slate-500 mb-6">The course you're looking for doesn't exist or couldn't be loaded.</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="text-center max-w-md" role="alert">
+          <h2 className="text-2xl font-bold text-danger mb-4">{error ? t[error] : t.notFound}</h2>
+          <p className="text-slate-500 mb-6">{t.notFoundBody}</p>
           <button
+            type="button"
             onClick={() => navigate('/courses')}
             className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all"
           >
-            Back to Courses
+            {t.backToCourses}
           </button>
         </div>
       </div>

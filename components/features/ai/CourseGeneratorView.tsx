@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Sparkles, Zap, BrainCircuit, Loader2, Brain, CheckCircle, ArrowRight, Send, Infinity, User, Bot, RefreshCw, ThumbsUp, ThumbsDown, Paperclip, X as CloseIcon, Palette } from 'lucide-react';
+import { ArrowLeft, Sparkles, Zap, BrainCircuit, Loader2, Brain, CheckCircle, ArrowRight, Send, Infinity, User, Bot, RefreshCw, ThumbsUp, ThumbsDown, Paperclip, X as CloseIcon, Palette, LogIn, CloudOff, BookOpen } from 'lucide-react';
 import { GeneratedCourse, ViewState, Message } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
 import { sendAiChat, sendAiDecision, fetchGeneratedCourseById, uploadFile, fetchAiDrafts } from '../../../services/curriculumApi';
 import { addLearningEvent } from '../../../services/progressService';
 import ReactMarkdown from 'react-markdown';
+
+type AiFailure = 'auth' | 'unavailable' | 'other';
+
+// The API client throws plain Errors. Prefer an attached HTTP status; otherwise match the messages
+// produced today for 401 (requireAuth on the server) and 503/504 (curriculumApi's own wording).
+const classifyAiError = (err: unknown): AiFailure => {
+  const status = (err as { status?: unknown } | null)?.status;
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 503 || status === 504) return 'unavailable';
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  if (/authentication required|invalid or expired token|unauthori[sz]ed|\b401\b|ログイン/i.test(message)) return 'auth';
+  if (/一時的に利用できません|temporarily unavailable|not configured|service unavailable|\b50[34]\b/i.test(message)) return 'unavailable';
+  return 'other';
+};
 
 interface CourseGeneratorViewProps {
   onBack: () => void;
@@ -15,10 +30,13 @@ interface CourseGeneratorViewProps {
 
 const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCourseGenerated, onNavigate }) => {
   const { language } = useLanguage();
-  const [modelType, setModelType] = useState<'standard' | 'pro' | 'gemini-2.5-flash' | 'gemini-2.5-pro'>('gemini-2.5-flash');
+  const { user, logout } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeLogs, setActiveLogs] = useState<{agent: string, message: string, status?: string}[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Set when the generation API answers 401 (login required) or 503/504 (AI not available).
+  const [aiBlocked, setAiBlocked] = useState<'auth' | 'unavailable' | null>(null);
+  const lastAttemptRef = useRef('');
   
   // V2 Flow State
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -53,6 +71,26 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       demoPromptArt: 'I want to study art history systematically',
       demoPromptUnity: 'I want to master Unity game development with AI',
       demoCta: 'Start demo',
+      demoLabelPython: 'Intro to Python',
+      demoLabelArt: 'Art history',
+      demoLabelUnity: 'Unity dev',
+      missingSession: 'This planning session was lost. Please reset the chat.',
+      moduleLabel: 'Module',
+      attachFile: 'Attach a file',
+      removeFile: 'Remove attached file',
+      send: 'Send',
+      dismiss: 'Dismiss',
+      stepsTitle: 'Planning steps',
+      steps: { requirements: 'Requirements', roadmap: 'Roadmap', curriculum: 'Curriculum' },
+      authTitle: 'Sign in to generate a curriculum',
+      authBody: 'You can keep reading lessons as a guest, but creating a new curriculum needs an account.',
+      authBodyExpired: 'Your sign-in has expired. Sign in again to continue planning a curriculum.',
+      authAction: 'Sign in',
+      authActionAgain: 'Sign in again',
+      unavailableTitle: 'AI generation is unavailable right now',
+      unavailableBody: 'The AI service could not be reached. Your conversation is kept, so you can try again in a few minutes. The ready-made courses are available meanwhile.',
+      retry: 'Try again',
+      browseCourses: 'Browse courses',
     },
     jp: {
       initialMessage: 'こんにちは！AIコンシェルジュです。学びたいテーマを教えていただくか、資料をアップロードして開始しましょう。',
@@ -76,7 +114,27 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       demoPromptPython: 'AI開発のためのPython入門を学びたい',
       demoPromptArt: '美術史の変遷について体系的に学びたい',
       demoPromptUnity: 'AIを活用したUnityゲーム開発をマスターしたい',
-      demoCta: 'デモを開始'
+      demoCta: 'デモを開始',
+      demoLabelPython: 'Python 入門',
+      demoLabelArt: '美術史',
+      demoLabelUnity: 'Unity開発',
+      missingSession: '作成中のセッション情報が見つかりません。チャットをリセットしてください。',
+      moduleLabel: 'モジュール',
+      attachFile: 'ファイルを添付',
+      removeFile: '添付ファイルを外す',
+      send: '送信',
+      dismiss: '閉じる',
+      stepsTitle: '作成の流れ',
+      steps: { requirements: '要件定義', roadmap: 'ロードマップ', curriculum: 'カリキュラム' },
+      authTitle: 'カリキュラムの生成にはログインが必要です',
+      authBody: 'ゲストのままでも教材は読めますが、新しいカリキュラムを作るにはアカウントが必要です。',
+      authBodyExpired: 'ログインの有効期限が切れました。もう一度ログインすると、カリキュラムの作成を続けられます。',
+      authAction: 'ログインする',
+      authActionAgain: 'もう一度ログイン',
+      unavailableTitle: '現在、AIによる生成を利用できません',
+      unavailableBody: 'AIサービスに接続できませんでした。会話はそのまま残っているので、数分後にもう一度お試しください。その間も公開中のコースは読めます。',
+      retry: 'もう一度試す',
+      browseCourses: 'コースを見る',
     }
   } as const;
 
@@ -158,7 +216,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isGenerating, pendingApproval]);
+  }, [messages, isGenerating, pendingApproval, error, aiBlocked]);
 
   const handleSendMessage = async (text?: string) => {
     const msgText = text || inputValue;
@@ -178,6 +236,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     setIsGenerating(true);
     setActiveLogs([]); 
     setError(null);
+    setAiBlocked(null);
+    lastAttemptRef.current = msgText;
 
     try {
         let attachments: any[] = [];
@@ -197,27 +257,31 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         await handleApiResponse(response);
 
     } catch (err) {
-        console.error("Chat failed:", err);
-        setError(t.errorChat);
-        setIsGenerating(false);
+        handleAiFailure(err);
     }
+  };
+
+  const handleAiFailure = (err: unknown) => {
+    const failure = classifyAiError(err);
+    if (failure === 'other') setError(t.errorChat);
+    else setAiBlocked(failure);
+    setIsGenerating(false);
   };
 
   const handleApprove = async () => {
     if (!curriculumId || !sessionId || !pendingApproval) {
-        setError(`Missing session state. Please reset chat.`);
+        setError(t.missingSession);
         return;
     }
     
     setIsGenerating(true);
     setActiveLogs([]); 
+    setAiBlocked(null);
     try {
         const response = await sendAiDecision(curriculumId, sessionId, pendingApproval, 'approved');
         await handleApiResponse(response);
     } catch (err) {
-        console.error("Approval Error:", err);
-        setError(t.errorChat);
-        setIsGenerating(false);
+        handleAiFailure(err);
     }
   };
 
@@ -286,7 +350,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
 
     return (
       <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 shadow-sm">
-        <div className="text-[11px] uppercase tracking-[0.3em] text-indigo-500 font-bold mb-1">Module</div>
+        <div className="eyebrow text-indigo-600 mb-1">{t.moduleLabel}</div>
         <div className="text-sm font-semibold text-slate-800">{normalized}</div>
       </div>
     );
@@ -409,9 +473,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {[
-                                        { id: 'python', prompt: t.demoPromptPython, icon: <Zap size={18} />, color: 'border-blue-500 text-blue-600', label: 'Python 入門' },
-                                        { id: 'art', prompt: t.demoPromptArt, icon: <Palette size={18} />, color: 'border-orange-500 text-orange-600', label: '美術史' },
-                                        { id: 'unity', prompt: t.demoPromptUnity, icon: <Brain size={18} />, color: 'border-indigo-500 text-indigo-600', label: 'Unity開発' }
+                                        { id: 'python', prompt: t.demoPromptPython, icon: <Zap size={18} aria-hidden="true" />, color: 'border-blue-500 text-blue-600', label: t.demoLabelPython },
+                                        { id: 'art', prompt: t.demoPromptArt, icon: <Palette size={18} aria-hidden="true" />, color: 'border-orange-500 text-orange-600', label: t.demoLabelArt },
+                                        { id: 'unity', prompt: t.demoPromptUnity, icon: <Brain size={18} aria-hidden="true" />, color: 'border-indigo-500 text-indigo-600', label: t.demoLabelUnity }
                                     ].map((demo) => (
                                         <button
                                             key={demo.id}
@@ -432,17 +496,6 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                         </div>
                     )}
 
-                    {/* Error Banner */}
-                    {error && (
-                        <div className="mx-0 sm:mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                            <CloseIcon className="text-red-500 shrink-0" size={20} />
-                            <p className="text-xs font-bold text-red-600">{error}</p>
-                            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-                                <CloseIcon size={16} />
-                            </button>
-                        </div>
-                    )}
-                    
                     {messages.map((msg) => {
                         const text = msg.text || '';
                         const isRoadmapMessage = msg.role === 'model' && /(ロードマップ案|学習ロードマップ|Roadmap)/i.test(text);
@@ -584,6 +637,72 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             </div>
                         </div>
                     )})}
+
+                    {/* Error Banner */}
+                    {error && (
+                        <div role="alert" className="mx-0 sm:mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                            <CloseIcon className="text-red-500 shrink-0" size={20} aria-hidden="true" />
+                            <p className="text-xs font-bold text-red-600">{error}</p>
+                            <button type="button" aria-label={t.dismiss} onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">
+                                <CloseIcon size={16} aria-hidden="true" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Login required / AI unavailable */}
+                    {aiBlocked && (
+                        <div role="alert" className="mx-0 sm:mx-6 mb-4 rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-sm animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-start gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${aiBlocked === 'auth' ? 'bg-primary-soft text-primary-text' : 'bg-sunken text-fg-2'}`}>
+                                    {aiBlocked === 'auth' ? <LogIn size={20} aria-hidden="true" /> : <CloudOff size={20} aria-hidden="true" />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h2 className="text-base font-bold text-fg mb-1">
+                                        {aiBlocked === 'auth' ? t.authTitle : t.unavailableTitle}
+                                    </h2>
+                                    <p className="text-sm text-fg-2 leading-relaxed">
+                                        {aiBlocked === 'auth'
+                                            ? (user && !user.isGuest ? t.authBodyExpired : t.authBody)
+                                            : t.unavailableBody}
+                                    </p>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        {aiBlocked === 'auth' ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => { void logout(); }}
+                                                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary-hover transition-colors"
+                                            >
+                                                <LogIn size={16} aria-hidden="true" />
+                                                {user && !user.isGuest ? t.authActionAgain : t.authAction}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAiBlocked(null);
+                                                    setInputValue(lastAttemptRef.current);
+                                                }}
+                                                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary-hover transition-colors"
+                                            >
+                                                <RefreshCw size={16} aria-hidden="true" />
+                                                {t.retry}
+                                            </button>
+                                        )}
+                                        {onNavigate && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onNavigate(ViewState.COURSES)}
+                                                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-bold text-fg-2 hover:bg-sunken transition-colors"
+                                            >
+                                                <BookOpen size={16} aria-hidden="true" />
+                                                {t.browseCourses}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     
                     {!isGenerating && pendingApproval && pendingApproval !== 'none' && (
                         <div className="mx-0 sm:mx-6 mb-6 animate-in fade-in zoom-in duration-300">
@@ -658,8 +777,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                         <div className="mb-3 flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl w-fit animate-in fade-in slide-in-from-bottom-1">
                             <Paperclip size={14} className="text-indigo-500" />
                             <span className="text-xs font-bold text-indigo-700 truncate max-w-[200px]">{selectedFile.name}</span>
-                            <button onClick={() => setSelectedFile(null)} className="text-indigo-400 hover:text-indigo-600 transition-colors">
-                                <CloseIcon size={14} />
+                            <button type="button" aria-label={t.removeFile} onClick={() => setSelectedFile(null)} className="text-indigo-500 hover:text-indigo-700 transition-colors">
+                                <CloseIcon size={14} aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -671,11 +790,13 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                         />
                         <button 
+                            type="button"
+                            aria-label={t.attachFile}
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={isGenerating}
+                            disabled={isGenerating || aiBlocked === 'auth'}
                             className="p-3 sm:p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all disabled:opacity-50"
                         >
-                            <Paperclip size={20} />
+                            <Paperclip size={20} aria-hidden="true" />
                         </button>
                         <input 
                             type="text"
@@ -683,43 +804,56 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                             placeholder={pendingApproval && pendingApproval !== 'none' ? t.revisePlaceholder : t.inputPlaceholder}
-                            disabled={isGenerating}
+                            aria-label={pendingApproval && pendingApproval !== 'none' ? t.revisePlaceholder : t.inputPlaceholder}
+                            disabled={isGenerating || aiBlocked === 'auth'}
                             className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 text-sm focus:outline-none focus:border-indigo-500 transition-all pr-14 disabled:bg-slate-100 disabled:text-slate-400"
                         />
                         <button 
+                            type="button"
+                            aria-label={t.send}
                             onClick={() => handleSendMessage()}
-                            disabled={(!inputValue.trim() && !selectedFile) || isGenerating}
-                            className="absolute right-2 top-2 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 transition-all"
+                            disabled={(!inputValue.trim() && !selectedFile) || isGenerating || aiBlocked === 'auth'}
+                            className="absolute right-2 top-2 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-500 transition-all"
                         >
-                            <Send size={20} />
+                            <Send size={20} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="w-full md:w-80 border-l border-slate-100 p-6 sm:p-8 space-y-8 bg-slate-50/50">
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Current Engine</h4>
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="text-indigo-600"><Zap size={14} /></div>
-                            <span className="text-xs font-bold text-slate-700 uppercase">{modelType.replace('gemini-', '')}</span>
-                        </div>
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    </div>
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-100 p-4 sm:p-6 md:p-8 space-y-8 bg-slate-50/50">
+                <div className="hidden md:block space-y-3">
+                    <h4 className="eyebrow text-fg-3">{t.stepsTitle}</h4>
+                    <ol className="space-y-2">
+                        {(['requirements', 'roadmap', 'curriculum'] as const).map((step, index) => {
+                            const isCurrent = pendingApproval === step;
+                            return (
+                                <li
+                                    key={step}
+                                    aria-current={isCurrent ? 'step' : undefined}
+                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-sm ${isCurrent ? 'border-indigo-200 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-200 bg-white text-fg-2'}`}
+                                >
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-fg-2'}`}>{index + 1}</span>
+                                    {t.steps[step]}
+                                </li>
+                            );
+                        })}
+                    </ol>
                 </div>
 
-                <div className="mt-auto pt-10 text-center">
+                <div className="md:mt-auto md:pt-10 text-center">
                     <button 
+                        type="button"
                         onClick={() => {
                             setMessages([{ id: 'reset', role: 'model', text: t.resetMessage, timestamp: new Date() }]);
                             setSessionId(null);
                             setCurriculumId(null);
                             setPendingApproval(null);
+                            setAiBlocked(null);
                         }}
-                        className="text-slate-400 hover:text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mx-auto transition-colors"
+                        className="text-fg-3 hover:text-indigo-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mx-auto transition-colors"
                     >
-                        <RefreshCw size={12} /> {t.resetChat}
+                        <RefreshCw size={12} aria-hidden="true" /> {t.resetChat}
                     </button>
                 </div>
             </div>
