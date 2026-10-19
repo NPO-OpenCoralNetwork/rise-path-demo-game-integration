@@ -1,70 +1,49 @@
 {
   "lessonId": "vibe-ch2",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
+  "lessonHash": "sha256:09186fc0e87a2e68",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "lessonHash": "sha256:09186fc0e87a2e68",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "bb56d49",
-    "changed": [],
-    "changedShare": 0,
-    "fullReviewRequired": false,
-    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "The new q8 option c feedback uses です・ます and natural Japanese with no pressure phrases: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 It now points to the correct action (option d) instead of the vague 「空いている見出しを自分で埋めます」. The rest of the prose is unchanged.",
-      "blockIds": [
-        "q8"
-      ],
-      "carriedOver": true
+      "score": 4,
+      "evidence": "Every learner-facing string uses です・ます and has no pressure phrases. The text reads like a teacher talking, for example 「最初から完璧でなくてかまいません。作って試しながら直します。」 (s3-b1). 目的, 機能, 1枚企画書 and the screen names 「今月の残り画面」「食費の入力画面」 stay the same across the text, the diagram s2-b4, the prompt expect s2-b3 and the glossary. The awkward spots are minor (q1 feedback b, q8 option a) and are listed in niceToHave."
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The changed q8 option c feedback has 2 short sentences, within the wrong-option feedback limit.",
-      "blockIds": [
-        "q8"
-      ],
-      "carriedOver": true
+      "score": 4,
+      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. Each segment has at most 2 new terms (2-2: 目的 and 機能; 2-3: MVP and MoSCoW). Every section breaks its text with a table, steps, a diagram or an inline check. Feedback is at most 2 sentences throughout."
     },
     {
       "id": "prior",
-      "score": 4,
-      "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.",
-      "blockIds": [
-        "q4",
-        "q8",
-        "s3-defs"
-      ],
-      "carriedOver": true
+      "score": 3,
+      "evidence": "Prerequisites are stated, and the lesson recalls Chapter 0 (s1-b1, 「ビジョン（vision）」) and Chapter 1 (ex-data, 「第1章で学んだデータベース」). Terms are defined before use, PRD is spelled out, and the definitions match the glossary. One abbreviation is not spelled out on first use: q7 option c writes 「SNS（ソーシャルメディア）」 rather than giving the full name (see mustFix). That keeps this at 3."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The changed q8 option c feedback has both jp and en, and they mean the same thing: 「いまは画面名と項目名を決めれば十分です。」 / \"For now, deciding the screen names and field names is enough.\" The other strings and diagram labels are unchanged and localized.",
-      "blockIds": [
-        "q8"
-      ],
-      "carriedOver": true
+      "evidence": "Every string has both jp and en, including the diagram code, alt text, description, table cells, prompt vars and flashcards. The English reads naturally and means the same as the Japanese. Cross-references match the UI and course: 「期待される結果」 and \"What a good answer looks like\" match the PromptBlock labels, and summary-next names the practice lesson by the title it has in course.json."
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "q8 explanation: 「名前だけで十分です。」→「画面名と項目名だけで十分です。」 (en: \"Names alone are enough.\" → \"Screen names and field names are enough.\")",
-    "q8 options a–c (en): use \"sections\" for the plan headings — \"Fill in the screen-flow and data sections, right down to the language and file layout\"; \"Leave the screen-flow and data sections blank, since the AI fills them in\"; \"Fill the screen-flow and data sections with every edge case and condition\"",
-    "q8 option d: 「画面名と保存する項目名だけを」→「画面名と扱うデータの項目名だけを」",
-    "Carried over: glossary (機能) 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
-    "Carried over: ex-review / card-plan 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」",
-    "Carried over: q7 option c 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
-    "Carried over: ex-goal 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」",
-    "Carried over: s5-b2 rows[0][1] (with ex-moscow expect and s2-b3 expect) 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」"
+  "mustFix": [
+    {
+      "criterion": "prior",
+      "blockId": "check-quiz",
+      "issue": "(d) Abbreviations must be spelled out on first use (style-guide §2). In q7 option c, the first use of SNS gives 「SNS（ソーシャルメディア）」. That is a katakana paraphrase, not the full name, and the katakana word has no English next to it.",
+      "fix": "In q7 option c (jp): 「記録と通知、写真での種類判定、SNS（ソーシャルメディア）への投稿」→「記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿」. Option d 「SNSへの投稿と、水やりした日の記録」 stays as it is (second use)."
+    }
   ],
-  "average": 3.5,
-  "verdict": "pass",
-  "summary": "Verification round against bb56d49. review-scope.mjs reported 0 of 30 blocks changed (exit 0). Publishing moved the lesson from drafts/ to lessons/ but did not change its content. lessons:lint --strict found 0 errors and 0 warnings. The previous review had no open mustFix items, so there are no resolved entries. All four criteria it scored (voice 3, load 3, prior 4, a11y_l10n 4) are carried over unchanged. Gate note: the previous review has no lessonHash, so check-review.mjs needs --allow-legacy."
+  "niceToHave": [
+    "check-quiz: In q8 option a, 「使う言語」 can be read as the display language (Japanese or English) rather than a programming language. The feedback's 「使う技術」 resolves this, but only after the learner has answered — 「画面の流れとデータの欄に、使う言語やファイルの分け方まで書く」→「画面の流れとデータの欄に、使うプログラミング言語やファイルの分け方まで書く」",
+    "check-quiz: The q8 prompt calls the section 「扱うデータの欄」, but options a, b and c shorten it to 「データの欄」. The meaning is clear, but matching the heading name helps the learner — 「画面の流れとデータの欄」→「画面の流れと扱うデータの欄」 (options a, b, c)",
+    "s1-check: In q1 feedback b, 「AIの答えが先に来ます」 is slightly abstract and a little stiff — 「目的を一言そえても、提案を頼むとAIの答えが先に来ます。」→「目的を一言そえても、提案を頼むと、自分の考えより先にAIの答えが並びます。」",
+    "s2-check: The q2 hint shortens the goal pattern to 「誰が、どうなれる」. Matching the 「・」 notation of the definition makes the link to it clearer — 「「誰が、どうなれる」が残るもの」→「「誰が・どうなれる」が残るもの」",
+    "s3-steps: ex-review expect says 「6つの項目」, while the prompt s2-b3 right below it says 「6つの見出し」. Using the same word helps the learner see they are the same six — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」",
+    "s3-check: Factual doubt, please verify. The q4 explanation says the Claude Code best-practices page holds that a useful spec states what is out of scope. If the cited page (cc-best-practices) does not say this explicitly, soften it — rephrase it to what the page actually says, or remove the sentence (both locales).",
+    "lesson: Objective o3 shows 「MoSCoW」 and 「MVP」 before 2-3 defines them. This is acceptable in an objective statement, but a short gloss would help the learner reading objectives first — 「機能の候補をMoSCoWで分け」→「機能の候補を優先順位の分け方（MoSCoW）で分け」"
+  ],
+  "verdict": "revise",
+  "summary": "The Japanese reads naturally and warmly throughout, and the English matches it closely. Terms, screen names and the six plan headings stay consistent across the text, diagram, prompts and glossary, and the lesson is within every budget. The only blocking fix is spelling out SNS on its first use in q7 option c (「SNS（Social Networking Service）」)."
 }

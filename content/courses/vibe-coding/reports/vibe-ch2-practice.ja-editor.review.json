@@ -1,77 +1,79 @@
 {
   "lessonId": "vibe-ch2-practice",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
+  "lessonHash": "sha256:7dfd5355b05405d5",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "lessonHash": "sha256:7dfd5355b05405d5",
-  "verifies": {
-    "reviewedRevision": "dcb3095",
-    "changed": [],
-    "changedShare": 0,
-    "fullReviewRequired": false,
-    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json"
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "Re-scored. The pq2 options in check-quiz are now parallel. The rewritten pq1 in practice-check uses the same dictionary-form ending in every option (「〜残す」「〜移す」「〜残す」「〜消す」). Its feedback names the misconception and then gives the rule, in 2 sentences or fewer. A few colloquial or stiff spots in unchanged text are still there (「知れる」, 「勝手に」), so the score stays at 3.",
+      "score": 4,
+      "evidence": "The text is consistently in です・ます and warm, with no pressure phrases; steps and feedback read like a tutor sitting beside you (p-interview troubleshoot 「コードはまだ不要です。質問だけしてください」, pq1 feedback). Only a few small stiff spots remain (pq1 hint, pq5 explanation), and they are niceToHave.",
       "blockIds": [
+        "practice-steps",
         "practice-check",
-        "check-quiz",
-        "practice-prompt-plan",
-        "practice-steps-plan"
-      ],
-      "carriedOver": true
+        "practice-plan-check"
+      ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict is clean. Every paragraph has 3 sentences or fewer, and the practice is split into three sections, each with its request placed right after the step that uses it (practice-steps → practice-prompt-interview, practice-steps-sort → practice-prompt).",
+      "evidence": "lessons:lint --strict is clean, so every sentence and paragraph is within budget. Each practice section breaks into steps, prompt blocks, a checklist or an inline quiz, so there is no run of text-only screens.",
       "blockIds": [
-        "practice",
-        "practice-sort",
-        "practice-plan"
-      ],
-      "carriedOver": true
+        "practice-steps-sort",
+        "practice-steps-plan",
+        "practice-checklist"
+      ]
     },
     {
       "id": "prior",
-      "score": 4,
-      "evidence": "The lesson adds no new terms. 壁打ち, MoSCoW and 1枚企画書 are linked with [[…]] and match the glossary, and practice-recap restates the four MoSCoW groups before they are used. The same names are used in the text, the model plan and the practice-flow labels (イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧).",
+      "score": 3,
+      "evidence": "The prerequisite chapter is stated, and practice-recap recalls MoSCoW before it is used. 壁打ち is defined at first use in p-interview and matches the glossary. However, summary-next uses the abbreviation 「VS Code」 for the first time in the course so far without spelling it out.",
       "blockIds": [
         "practice-recap",
-        "practice-flow",
-        "practice-prompt-plan"
-      ],
-      "carriedOver": true
+        "practice-steps",
+        "summary-next"
+      ]
     },
     {
       "id": "a11y_l10n",
-      "score": 4,
-      "evidence": "Re-scored because practice-check and check-quiz changed. jp and en say the same thing in the new pq1 prompt, options, feedback and explanation, and in the rewritten pq2 options. The rest of the lesson stays complete in both locales, including the diagram labels and alt text.",
+      "score": 3,
+      "evidence": "Both locales are complete, including the diagram labels, alt text and description. The prompt-block label 「期待される結果」/\"What a good answer looks like\" quoted in practice-tip matches the UI in PromptBlock.tsx. One English option in pq1 (「keep adding items as a Must」) can be read differently from the jp text.",
       "blockIds": [
-        "practice-check",
-        "check-quiz",
-        "practice-flow"
-      ],
-      "carriedOver": true
+        "practice-flow",
+        "practice-tip",
+        "practice-check"
+      ]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "practice-check (pq1 a, en): 'keep adding items as a Must' can be read as 'keep adding more items'; quote the feature name instead — 'Move only the sorting to Should; keep adding items as a Must'→'Move only the sorting to Should; keep \"add items\" as a Must'",
-    "practice-check (pq1 explanation, en): 'so that moves to Should' has a vague referent — 'The goal can be met without sorting, so that moves to Should.'→'The goal can be met without sorting, so sorting moves to Should.'",
-    "practice-prompt-plan: 「知れる」 is colloquial; a neutral form suits a var hint better — 「例：幹事が参加人数を早く知れる出欠確認アプリ」→「例：参加人数がすぐわかる出欠確認アプリ」",
-    "practice-steps-plan (p-plan hint): 「勝手に」 sounds like blame — 「AIが勝手に埋めた項目があれば」→「自分が決めていない項目をAIが埋めていたら」",
-    "glossary: the definition endings are inconsistent — 「…自分の考えを言葉にしていくこと。」→「…自分の考えを言葉にしていくことです。」, 「…を1枚に並べた文書。」→「…を1枚に並べた文書です。」",
-    "check-quiz (pq3, en): the same JP label 「レシピの表示」 is rendered two ways in one prompt — 'The Musts are \"recipe list\" and \"show a recipe\"'→'The Musts are \"recipe list\" and \"recipe view\"'",
-    "summary-ask (en): 'with … with me' repeats — 'Go through my one-page plan with the checklist with me'→'Go through my one-page plan against the checklist with me'",
-    "check-quiz (pq2 explanation): the subject and the predicate are far apart — 「ただ、つけ忘れると次に見る前回の記録が残らないので、重要なShouldです。」→「ただ、つけ忘れると、次に見る前回の記録が残りません。だから重要なShouldです。」"
+  "mustFix": [
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "practice-check",
+      "issue": "(a) meaning: pq1 option a en \"Move only the sorting to Should; keep adding items as a Must\" can be read as 'continue adding items as Musts'. The jp 「品物の追加はMustに残す」 means keep the feature 'add items' under Must, and this is the correct answer, so the ambiguity matters.",
+      "fix": "pq1 option a en: 「Move only the sorting to Should; keep adding items as a Must」→「Move only the sorting to Should; keep \"add items\" as a Must」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "summary-next",
+      "issue": "(d) rule, style-guide §2 (略語は初出で正式名を書きます): 「VS Code」 appears here for the first time (it does not occur in ch0–ch2) and is not spelled out.",
+      "fix": "jp: 「第3章では、AIと開発するためのVS Codeを準備します。」→「第3章では、AIと開発するためのVS Code（Visual Studio Code）を準備します。」; en: 「In Chapter 3 you'll set up VS Code for building with an AI.」→「In Chapter 3 you'll set up VS Code (Visual Studio Code) for building with an AI.」"
+    }
   ],
-  "average": 3.75,
-  "verdict": "pass",
-  "summary": "Verification round under the updated gate rules. review-scope.mjs --since dcb3095 exited 0: 0 of 20 blocks changed (0%), and sections and objectives are unchanged. The previous review (c961471) recorded no lessonHash, so the check ran without --expect-hash. Publishing from drafts/ to lessons/ changed no content. The previous review had no mustFix and no unresolved entries, so nothing is left to verify. All four scores it gave (voice 3, load 4, prior 4, a11y_l10n 4) are carried over unchanged. lessons:lint --strict is clean (0 errors, 0 warnings). The earlier niceToHave suggestions are still open and do not block."
+  "niceToHave": [
+    "practice-check: the pq1 hint has two を-clauses in a row and reads stiffly — 「指摘を受け入れるかどうかを、何を物差しにして決めるか考えましょう。」→「指摘を受け入れるかどうかを決める物差しは何か、考えましょう。」",
+    "practice-plan-check: the goal in pq5 is already one sentence, so 「1文に直して」 is slightly off; name the checklist form instead — 「目的を1文に直してから、ほかの項目も見直します。」→「目的を「誰が・どんな場面で・どうなれる」の1文に直してから、ほかの項目も見直します。」",
+    "check-quiz: in pq3 en the same thing is called both \"show a recipe\" (Must) and \"recipe view\" (flow), while jp uses 「レシピの表示」 for both — 「the screen flow is \"recipe list → recipe view\"」→「the screen flow is \"recipe list → show a recipe\"」",
+    "practice-plan-check: pq5 option a en drops 「やらないことの」, which tells the learner where the item sits — 「Delete \"look up sorting rules\" from the plan」→「Delete \"look up sorting rules\" from what we won't build」",
+    "hook-b1: the en comparison is slightly off (an organizer cannot follow the 'steps as an app') — 「follows the same steps as Chapter 2's budget app」→「follows the same steps as the budget app in Chapter 2」",
+    "lesson (objectives o3 en): 'beyond the Musts too' is awkward — 「with MoSCoW, beyond the Musts too, and judge」→「with MoSCoW, including the groups other than Must, and judge」",
+    "glossary: the definition endings are mixed; 壁打ち and 1枚企画書 end in a noun 「…こと。」「…文書。」, while MoSCoW uses です・ます — 「自分の考えを言葉にしていくこと。」→「自分の考えを言葉にしていくことです。」, 「…やらないことを1枚に並べた文書。」→「…やらないことを1枚に並べた文書です。」",
+    "practice-flow: style-guide §4 asks for one sentence near a figure that says what it shows; the diagram follows practice-tip without an introduction. Consider adding a lead line before it, e.g. 「下の図は、上の企画書例のMustと画面の流れをつないだものです。」",
+    "lesson (title jp): 「第2章 演習｜…」 has a half-width space, while the other chapter titles use 「第N章｜…」 with no space; check this against the course's naming for practice lessons — 「第2章 演習｜」→「第2章演習｜」 if the course has no convention for it.",
+    "check-quiz: pq4 option c en 'keep it from the AI' suggests hiding something, while jp 「AIには渡さない」 means not handing it over — 「Rewrite the whole plan yourself and keep it from the AI」→「Rewrite the whole plan yourself without the AI」"
+  ],
+  "average": 3.5,
+  "verdict": "revise",
+  "summary": "The Japanese is natural, warm and within every budget. Terms are consistent across the steps, prompt titles, diagram labels and checklist, and the prompt-block label quoted in practice-tip matches the UI. Two fixes remain before the lesson passes: make the ambiguous English correct option in pq1 (practice-check) unambiguous, and spell out VS Code (Visual Studio Code) at its first use in summary-next."
 }

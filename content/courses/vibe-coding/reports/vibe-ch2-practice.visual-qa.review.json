@@ -1,49 +1,52 @@
 {
   "lessonId": "vibe-ch2-practice",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
+  "lessonHash": "sha256:7dfd5355b05405d5",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 4,
-      "evidence": "Every screen at both widths shows a structural element: steps with expected results, prompt cards with highlighted fill-in fields, the MoSCoW callout, the practice-flow diagram, the practice-checklist and the quizzes. textOnlyScreens is empty for desktop-jp, mobile-jp and desktop-en. The 4-node flowchart TD (practice-flow) is readable at 390 px (mobile-jp-11/12). Its labels are Japanese in JP (desktop-jp-07/08) and English in EN (desktop-en-08), and it has a Figure 1 caption and a 図の説明を読む link.",
+      "score": 3,
+      "evidence": "The one figure (practice-flow, flowchart TD) renders cleanly at 390 px and 1440 px. Its JP labels (イベントの作成（幹事）→…→参加人数の一覧（幹事）) and EN labels are readable and in the right language, and it has a caption and a 図の説明を読む / Describe the figure in words toggle (mobile-jp-11/12, desktop-en-08). On mobile the four stacked boxes fill a whole screen with wide side margins (mobile-jp-11), which works but is not dense.",
       "blockIds": [
         "practice-flow",
         "practice-checklist",
         "practice-steps",
-        "practice-prompt-plan"
+        "practice-prompt"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "There are no walls of text. The longest prose run is the three short paragraphs of practice-task (mobile-jp-03, desktop-jp-02), and a steps block follows them right away. Desktop JP has a median of 36 chars per line (target 30–40) and desktop EN has 69 (target 60–75). The page alternates steps, prompt, quiz and checklist through to the summary (desktop-jp-11, mobile-jp-16/17).",
+      "evidence": "No screen is text-only (textOnlyScreens empty in all three shots). The page alternates steps with expected-result boxes, prompt cards, the checklist and quizzes, so no screen holds a wall of prose (mobile-jp-03 to -16). Desktop JP lines average 36 chars per line (target 30–40) and EN 69 (target 60–75).",
       "blockIds": [
         "practice-task",
         "practice-steps-sort",
+        "practice-steps-plan",
         "check-quiz"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "pq1 (mobile-jp-06, desktop-jp-04, desktop-en-04), pq2 (mobile-jp-13, desktop-jp-09, desktop-en-10) and the three check-quiz questions (mobile-jp-14..16, desktop-jp-09..11, desktop-en-10/11) are fully localized. JP shows no stray English beyond Must/Should/Could/Won't and MoSCoW, and EN shows no leftover Japanese. Nothing is clipped, and the 答える buttons sit clear of the mobile bottom bar once the page scrolls (mobile-jp-07, mobile-jp-14, mobile-jp-16). metrics.json shows no overflowX, console, mermaid, unknown-block or broken-image errors.",
+      "evidence": "The EN screenshots contain no leftover Japanese: prompt vars show 'goal', 'my sorting' and 'app name', the diagram labels are English, and the glossary chips read Talking it through / MoSCoW / One-page plan (desktop-en-05, -07, -08). Nothing is hidden under the mobile top or bottom bars, the quiz option boxes are large tap targets, and the diagram has alt text plus a text description.",
       "blockIds": [
-        "practice-check",
-        "check-quiz"
+        "practice-flow",
+        "practice-prompt-plan",
+        "summary-cards"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Not visible in the captures: feedback and explanation text for pq1, pq2 and check-quiz. The screenshots show only the unanswered state. An answered-state capture would cover them.",
-    "practice-flow: on desktop the 4-node TD diagram sits in a wide card that is mostly empty (desktop-jp-07/08, desktop-en-08). Keep TD for mobile.",
-    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch device should get a tap hint instead.",
-    "reader: on desktop the right column is empty beside the long quiz screens (desktop-jp-10/11)."
+    "hook-predict: on desktop JP the question wraps with a lone 「う？」 on the second line (desktop-jp-01). A slightly shorter prompt, e.g. 「幹事が機能を分け直すとき、AIの借り方として最も合うのはどれでしょう？」, would fit on one line at 680 px.",
+    "practice-prompt-interview: on mobile the line breaks inside 「1つず／つしてください」 (mobile-jp-05). This is acceptable for prompt text, but 「質問は1つずつしてください。」 as its own line would read better.",
+    "practice-flow: on mobile the diagram takes a full screen (mobile-jp-11). It is optional, but shorter labels with the role on the same line, e.g. 「イベント作成（幹事）」, would make the boxes less tall.",
+    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch device should say タップ instead.",
+    "reader: the left table of contents on desktop JP breaks 「演習3：1枚企画書にまと／めて直す」 mid-word (desktop-jp-06). Wrapping at phrase boundaries (word-break: auto-phrase) would avoid this."
   ],
-  "average": 4,
   "verdict": "pass",
-  "summary": "lessonHash is left out because I was not given it and have no shell to run review-scope.mjs --hash or --since dcb3095. For the same reason I could not get the verifies line or the changed list, or read c961471:…visual-qa.review.json through git. I used the working-tree copy only as a reference. It has an empty mustFix, so nothing needed resolving. Instead of a verify round I did a full check of every mobile-jp and desktop-jp screen and of the desktop-en screens that hold the figure and the questions. The author should re-run this review with the hash and scope, because check-review.mjs will refuse it without lessonHash. The published lesson renders cleanly in all three captures. There are no hard failures, no text-only screens, and line lengths are within target, so there are no must-fix items."
+  "summary": "lessonHash sha256:7dfd5355b05405d5 matches metrics.json. There are no hard failures: no sideways overflow, console errors, mermaid errors, unknown blocks or broken images. Mobile, desktop JP and desktop EN all render cleanly. Steps, prompt cards, the TD flow diagram, the checklist and the quizzes break the page into readable chunks, and the EN version is fully localized. Nothing needs to be fixed; the remaining points are cosmetic line breaks and two reader-level tweaks."
 }
