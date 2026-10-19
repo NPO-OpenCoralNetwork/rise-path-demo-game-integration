@@ -274,6 +274,30 @@ describe('subagents (.claude/agents/*.md)', () => {
       assert.doesNotMatch(text, MODEL_ID);
     });
   }
+
+  it('ja-editor blocks only on the five error classes; preferences go to niceToHave with replacement text', () => {
+    const { body } = parseFrontmatter(read('.claude/agents/ja-editor.md'));
+    const mustFix = body.slice(body.indexOf('## mustFix'), body.indexOf('## niceToHave'));
+    assert.ok(mustFix.length > 0, 'has a mustFix section before the niceToHave section');
+    for (const tag of ['(a) meaning', '(b) locale', '(c) grammar', '(d) rule', '(e) naming']) {
+      assert.ok(mustFix.includes(`**${tag}**`), `mustFix defines ${tag}`);
+    }
+    assert.match(mustFix, /Start `issue` with\s+the class tag/);
+    assert.match(mustFix, /lessons:lint --strict/);
+    assert.match(mustFix, /style-guide\.ja\.md/);
+    const nice = body.slice(body.indexOf('## niceToHave'), body.indexOf('## Scores'));
+    for (const preference of ['Rhythm', 'smoother', 'word-choice', 'register']) assert.ok(nice.includes(preference), `niceToHave covers ${preference}`);
+    assert.match(nice, /「旧」→「新」/);
+    // Honest scores: moving a finding to niceToHave never raises its criterion.
+    assert.match(body, /Do not raise a score because its findings are now `niceToHave`/);
+  });
+
+  it('pedagogy-reviewer defines mustFix strictly and leaves wording preferences to niceToHave', () => {
+    const { body } = parseFrontmatter(read('.claude/agents/pedagogy-reviewer.md'));
+    assert.match(body, /`mustFix` item[\s\S]*every criterion below 3, every factual error/);
+    assert.match(body, /break\s+of the lesson contract/);
+    assert.match(body, /wording preferences[\s\S]*`niceToHave`/);
+  });
 });
 
 describe('rules and instruction files', () => {

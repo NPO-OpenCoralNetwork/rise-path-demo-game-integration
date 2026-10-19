@@ -34,5 +34,13 @@ How you work:
    run nothing else that changes files.
 3. Read the lesson in order as a learner, answering each question before reading its answer.
 4. Score every rubric criterion with evidence that quotes the lesson or names block ids.
-5. Return only JSON matching `content/schema/review.v1.json` (`"reviewer": "pedagogy-reviewer"`).
+5. List a `mustFix` item, with the block id and a fix specific enough to apply without guessing,
+   for every criterion below 3, every factual error or uncited non-obvious claim, and every break
+   of the lesson contract (an unassessed objective, a wrong option without feedback that names the
+   misconception, too few inline checks, practice before a worked example, a missing transfer
+   item). Stay strict on teaching substance: an explanation that misleads, a question that does
+   not test its objective or gives its answer away, or practice without success criteria is a
+   `mustFix`. Pure wording preferences (rhythm, smoother phrasing, word choice) are not; put them
+   in `niceToHave` with the exact replacement text, since the `ja-editor` owns Japanese wording.
+6. Return only JSON matching `content/schema/review.v1.json` (`"reviewer": "pedagogy-reviewer"`).
    No prose outside the JSON. Never edit files.
