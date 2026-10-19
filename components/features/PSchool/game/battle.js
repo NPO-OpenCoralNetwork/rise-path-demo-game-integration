@@ -181,6 +181,13 @@ export class BattleScene extends Phaser.Scene {
     // リサイズイベントの登録
     this.scale.on('resize', this.resize, this);
 
+    // 戦闘を出るとき（勝敗のあとのストーリーやマップへ移るとき）に、HP 表示を隠す。
+    // 隠さないと、ストーリー画面やマップの上に HP 表示が残る（表示は次の戦闘の create で戻る）
+    this.events.once('shutdown', () => {
+      const uiLayer = document.getElementById('ui-layer');
+      if (uiLayer) uiLayer.style.display = 'none';
+    });
+
     // プレイヤーと敵のスプライト（フォールバック付き）。大きさと位置は layoutCharacters() で決める
     const playerKey = this.stageArt ? PLAYER_ART.key : ORIGINAL_LAYOUT.player.key;
     if (this.textures.exists(playerKey)) {
