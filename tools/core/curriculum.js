@@ -196,6 +196,10 @@ export function validateIntake({ portalId, templateId, locale, learningMode, int
  * content in content_json) and point curricula.current_version_id at it.
  * Same write path as POST /api/v2/ai/curriculum-drafts (server/routes/chatgptCurriculum.js).
  * The caller checks ownership of an existing curriculumId before calling.
+ * For an existing curriculumId this locks the curricula row (FOR UPDATE) before it reads
+ * max(version), so concurrent saves of one curriculum queue up instead of picking the same
+ * number and failing on UNIQUE (curriculum_id, version). Every caller runs inside BEGIN/COMMIT,
+ * which the lock needs to last until the insert is committed.
  *
  * @param {import('pg').PoolClient} client - connection with an open transaction
  * @param {Object} params
@@ -220,6 +224,12 @@ export async function writeCurriculumVersion(client, {
     let version = 1;
 
     if (id) {
+        // A no-op when the caller already locked the row for its ownership check.
+        const locked = await client.query(
+            'select id from curricula where id = CAST($1 AS uuid) for update',
+            [id]
+        );
+        if (!locked.rowCount) throw new Error(`Curriculum ${id} not found`);
         const versionResult = await client.query(
             'select coalesce(max(version), 0) + 1 as next_version from curriculum_versions where curriculum_id = CAST($1 AS uuid)',
             [id]

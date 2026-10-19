@@ -356,7 +356,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
 
         if (requestedCurriculumId) {
             const existing = await client.query(
-                'select id from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
+                'select id from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) for update',
                 [requestedCurriculumId, req.userId]
             );
             if (!existing.rowCount) {

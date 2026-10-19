@@ -14,6 +14,10 @@ import express from 'express';
 import { getPool } from '../db.js';
 import { getKit, writeCurriculumVersion } from '../../tools/core/curriculum.js';
 import {
+  adaptCurriculumDraftForSave,
+  resolveCurriculumUiTemplate,
+} from '../services/chatgptCurriculumAdapter.js';
+import {
   getCachedKit,
   generateRequirements,
   generateRoadmap,
@@ -22,12 +26,142 @@ import {
 
 const router = express.Router();
 
-/** curricula.ui_template_id column default (server/migrations/001_core_curriculum.sql). */
-const DEFAULT_UI_TEMPLATE_ID = 'vibe_coding';
+/** The reader template the generation prompt (aiPrompts.js buildCurriculumPrompt) targets. */
+const GENERATED_TEMPLATE_ID = 'doc_chapter';
+
+const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const countLessons = (curriculum) =>
-  (Array.isArray(curriculum?.modules) ? curriculum.modules : [])
-    .reduce((sum, m) => sum + (Array.isArray(m?.lessons) ? m.lessons.length : 0), 0);
+  asArray(curriculum?.modules).reduce((sum, m) => sum + asArray(m?.lessons).length, 0);
+
+const trimmed = (value) => (typeof value === 'string' ? value.trim() : '');
+
+/** Locale keys the model uses for localized text; `ja` is accepted as an alias of `jp`. */
+const JP_KEYS = ['jp', 'ja'];
+
+/**
+ * `{ jp, en }` as the model writes localized text: a flat object of strings with a non-empty
+ * `jp`, `ja` or `en`. Extra locale keys (`ko`, …) are allowed; objects holding non-string
+ * values (sections, blocks) are not text.
+ */
+const isLocalizedText = (value) => {
+  const record = asObject(value);
+  const values = Object.values(record);
+  return values.length > 0
+    && values.every((item) => item == null || typeof item === 'string')
+    && Boolean([...JP_KEYS, 'en'].some((key) => trimmed(record[key])));
+};
+
+const jpOf = (value) => JP_KEYS.map((key) => trimmed(value[key])).find(Boolean) || '';
+
+/** Plain text from a string or `{ jp, en }`, Japanese first; '' when there is none. */
+const pickText = (value) => {
+  if (typeof value === 'string') return value.trim();
+  return isLocalizedText(value) ? jpOf(value) || trimmed(value.en) : '';
+};
+
+const toLocalized = (value) => ({
+  jp: jpOf(value) || trimmed(value.en),
+  en: trimmed(value.en) || jpOf(value),
+});
+
+/** Replace every `{ jp, en }` with its plain text, for the adapter, which reads strings only. */
+const flattenLocalized = (value) => {
+  if (Array.isArray(value)) return value.map(flattenLocalized);
+  if (!value || typeof value !== 'object') return value;
+  if (isLocalizedText(value)) return pickText(value);
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, flattenLocalized(item)]));
+};
+
+/**
+ * The first source field (in the adapter's own order) that has text, as `{ jp, en }` when the
+ * model wrote it localized; undefined when that field is plain text or none has text, so the
+ * adapter's value stands.
+ */
+const localizedFrom = (source, keys) => {
+  const key = keys.find((k) => pickText(source[k]));
+  return key && isLocalizedText(source[key]) ? toLocalized(source[key]) : undefined;
+};
+
+/** Fields the reader (services/curriculumAdapter.ts) reads that the adapter does not rebuild. */
+const PASSTHROUGH_KEYS = ['quiz', 'nexloom', 'worlds', 'integration', 'metadata'];
+const passthrough = (source) => Object.fromEntries(
+  PASSTHROUGH_KEYS.filter((key) => source[key] !== undefined).map((key) => [key, source[key]])
+);
+
+/** The model's own sections, each with an id unique within the lesson. */
+const withUniqueSectionIds = (sections) => {
+  const seen = new Set();
+  return sections.map((section, index) => {
+    const base = trimmed(section.id) || `section-${index + 1}`;
+    let id = base;
+    for (let n = 2; seen.has(id); n += 1) id = `${base}-${n}`;
+    seen.add(id);
+    return { ...section, id };
+  });
+};
+
+const defined = (entries) => Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== undefined));
+
+/**
+ * Turn generateCurriculum output into the reader's doc_chapter content_json, through the same
+ * adapter as the ChatGPT and MCP draft saves (adaptCurriculumDraftForSave): module_id,
+ * lesson_id, sections built from the lesson fields, curriculum_id and ui_template_id.
+ * The model writes `{ jp, en }` text and often whole `sections`; the adapter reads plain strings
+ * and rebuilds sections, so it gets a flattened copy, and the bilingual text, the model's own
+ * sections and the fields the reader reads as-is (quiz, nexloom, worlds, integration,
+ * metadata) are put back over its output.
+ */
+export function adaptGeneratedCurriculum({ curriculum, curriculumId, title, description, learningMode = null }) {
+  const source = asObject(curriculum);
+  const adapted = adaptCurriculumDraftForSave({
+    curriculum: flattenLocalized(source),
+    curriculumId,
+    templateId: GENERATED_TEMPLATE_ID,
+    title,
+    description,
+    learningMode,
+    explanationStyle: null,
+  });
+  const sourceModules = asArray(source.modules);
+
+  return {
+    ...passthrough(source),
+    ...adapted,
+    ...defined({
+      title: localizedFrom(source, ['title']),
+      description: localizedFrom(source, ['summary', 'description']),
+    }),
+    modules: adapted.modules.map((module, mi) => {
+      const sourceModule = asObject(sourceModules[mi]);
+      const sourceLessons = asArray(sourceModule.lessons);
+      return {
+        ...module,
+        ...defined({
+          title: localizedFrom(sourceModule, ['title']),
+          objective: localizedFrom(sourceModule, ['goal', 'objective']),
+        }),
+        lessons: module.lessons.map((lesson, li) => {
+          const sourceLesson = asObject(sourceLessons[li]);
+          const sections = asArray(sourceLesson.sections).filter((s) => s && typeof s === 'object');
+          return {
+            ...passthrough(sourceLesson),
+            ...lesson,
+            ...defined({
+              title: localizedFrom(sourceLesson, ['title']),
+              // The adapter derives subtitle from summary → objective → description.
+              subtitle: localizedFrom(sourceLesson, pickText(sourceLesson.subtitle)
+                ? ['subtitle']
+                : ['summary', 'objective', 'description']),
+            }),
+            ...(sections.length > 0 && { sections: withUniqueSectionIds(sections) }),
+          };
+        }),
+      };
+    }),
+  };
+}
 
 /**
  * Store a generated curriculum as the next draft version and point the curriculum at it.
@@ -37,30 +171,44 @@ const countLessons = (curriculum) =>
  * Status 'draft' (not 'draft_<stage>') keeps it out of the in-progress list below.
  *
  * @param {import('pg').Pool} pool
- * @param {{ curriculumId: string, userId: string, curriculum: any, intake?: any, modules?: any }} params
+ * @param {{ curriculumId: string, userId: string, curriculum: any, intake?: any, modules?: any, learningMode?: string }} params
  * @returns {Promise<string>} the new curriculum_versions.id
  */
-export async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules }) {
+export async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules, learningMode }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const owned = await client.query(
-      'SELECT id, title, ui_template_id FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
+      'SELECT id, title, description FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
       [curriculumId, userId]
     );
     if (!owned.rowCount) throw new Error('Draft not found');
     const existing = owned.rows[0] || {};
 
+    // The model writes description as a string or { jp, en }; keep the stored one when it has none.
+    const title = pickText(curriculum?.title) || existing.title || null;
+    const description = pickText(curriculum?.description) || pickText(curriculum?.summary) || existing.description || null;
+    const content = {
+      ...adaptGeneratedCurriculum({ curriculum, curriculumId, title, description, learningMode }),
+      _meta: {
+        source: 'ai_generate',
+        template_id: GENERATED_TEMPLATE_ID,
+        learning_mode: learningMode || null,
+        saved_at: new Date().toISOString(),
+        source_curriculum: curriculum,
+      },
+    };
+
     const saved = await writeCurriculumVersion(client, {
       curriculumId,
       userId,
-      title: curriculum.title?.jp || curriculum.title?.en || existing.title || null,
-      description: curriculum.description?.jp || curriculum.description?.en || '',
-      uiTemplateId: existing.ui_template_id || DEFAULT_UI_TEMPLATE_ID,
-      content: curriculum,
+      title,
+      description,
+      uiTemplateId: resolveCurriculumUiTemplate(GENERATED_TEMPLATE_ID),
+      content,
       requirements: intake ?? null,
       roadmap: modules ?? null,
-      totalLessons: countLessons(curriculum),
+      totalLessons: countLessons(content),
     });
     await client.query(
       `UPDATE curricula SET status = 'draft', updated_at = NOW()
@@ -215,12 +363,13 @@ router.post('/generate', async (req, res) => {
         curriculum: result.curriculum,
         intake,
         modules,
+        learningMode: kit?.learning_mode,
       });
 
       return res.json({
         session_id,
         curriculum_id,
-        message: `カリキュラムが完成しました！🎉\n\n**${result.curriculum.title?.jp || result.curriculum.title?.en || '新しいコース'}** を下書きとしてライブラリに保存しました。`,
+        message: `カリキュラムが完成しました！🎉\n\n**${pickText(result.curriculum.title) || '新しいコース'}** を下書きとしてライブラリに保存しました。`,
         pending_approval: 'none',
         status: 'approved',
         agent_logs: [
