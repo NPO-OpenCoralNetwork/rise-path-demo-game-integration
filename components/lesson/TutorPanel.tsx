@@ -65,6 +65,7 @@ const copy = {
     source: (n: string) => `Source §${n}`,
     sourceLabel: (n: string, title: string) => `Show the source in the text: section ${n}, ${title}`,
     demo: 'Demo answer (no AI key on the server)',
+    truncated: 'The answer stopped at the length limit. Ask for the rest if you need it.',
     errors: {
       unavailable: 'The AI tutor is not available right now. The lesson and the glossary still work.',
       rate_limited: 'Too many questions in a short time. Wait a moment, then try again.',
@@ -123,6 +124,7 @@ const copy = {
     source: (n: string) => `根拠 §${n}`,
     sourceLabel: (n: string, title: string) => `根拠の §${n}「${title}」を本文で表示`,
     demo: 'デモ応答（AIキー未設定）',
+    truncated: '回答は長さの上限でここまでになりました。続きが必要なら聞いてください。',
     errors: {
       unavailable: 'AI先生は今は使えません。本文と用語集はそのまま使えます。',
       rate_limited: '短い時間に質問が続きました。少し待ってから、もう一度お試しください。',
@@ -661,6 +663,10 @@ function TurnView({ turn, text, sourceChip, onRetry }: {
           {text.thinking}
         </p>
       ) : null}
+
+      {turn.truncated && turn.status === 'done' && (
+        <p className="mt-1 text-caption text-fg-3">{text.truncated}</p>
+      )}
 
       {turn.status === 'error' && (
         <div className="mt-2 rounded-control border border-line bg-surface p-3 text-small text-fg-2">

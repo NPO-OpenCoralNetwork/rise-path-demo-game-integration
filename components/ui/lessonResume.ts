@@ -94,10 +94,15 @@ export type CourseTotals = {
   pct: number;
 };
 
-/** Totals for a track card. `summary` is usually progressStore.readLessonSummary. */
+/**
+ * Totals for a track card. `summary` is usually progressStore.readLessonSummary, which reads
+ * what the reader saved under the course's folder name (its courseSlug, the key getCourse()
+ * takes). Pass that slug; it defaults to course.id, which lessons:validate keeps equal to it.
+ */
 export function courseTotals(
   course: Course,
   summary: (courseSlug: string, lessonId: string) => ProgressSummary | null,
+  courseSlug: string = course.id,
 ): CourseTotals {
   const refs = course.modules.flatMap((module) => module.lessons);
   let minutes = 0;
@@ -105,7 +110,7 @@ export function courseTotals(
   let pctSum = 0;
   for (const ref of refs) {
     minutes += typeof ref.estMinutes === 'number' && ref.estMinutes > 0 ? ref.estMinutes : 0;
-    const saved = summary(course.id, ref.id);
+    const saved = summary(courseSlug, ref.id);
     if (saved) {
       started += 1;
       pctSum += saved.pct;

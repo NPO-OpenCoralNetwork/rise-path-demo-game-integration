@@ -34,7 +34,7 @@ import { Outline } from './Outline';
 import { MarginPanel, type MarginAnchor } from './MarginPanel';
 import { ReaderSheet } from './ReaderSheet';
 import { TutorPanel, type TutorLayout } from './TutorPanel';
-import { useTutorStream } from './useTutorStream';
+import { lessonLearnerState, useTutorStream, type LiveLearnerFn } from './useTutorStream';
 import ReaderSettings, { useReaderSettings } from './ReaderSettings';
 import './reader.css';
 
@@ -355,7 +355,15 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
 
   // The inline tutor (WP-11). Lesson requests from openTutor() land here; the floating chat
   // ignores them on lesson routes.
-  const tutor = useTutorStream({ locale: toLlmLocale(language), stream: streamTutor });
+  // Quiz state for each tutor turn comes from the answers in memory (not localStorage), so a
+  // reveal is seen even when storage is unavailable.
+  const answersRef = useRef(progress.progress.answers);
+  answersRef.current = progress.progress.answers;
+  const tutorLearnerState = useCallback<LiveLearnerFn>(
+    (anchor, questionId) => lessonLearnerState(lesson, answersRef.current, anchor, questionId),
+    [lesson],
+  );
+  const tutor = useTutorStream({ locale: toLlmLocale(language), stream: streamTutor, learnerState: tutorLearnerState });
   const { ask: tutorAsk, dismiss: tutorDismiss } = tutor;
   const tutorLayout: TutorLayout = marginShown ? 'margin' : desktop ? 'drawer' : 'sheet';
   const tutorLayoutRef = useRef(tutorLayout);

@@ -131,11 +131,8 @@ export async function validateFile(file) {
     const lessonsDir = path.join(path.dirname(file), 'lessons');
     const names = await fs.readdir(lessonsDir).catch(() => /** @type {string[]} */ ([]));
     const lessonIds = names.filter((n) => n.endsWith('.lesson.json')).map((n) => n.replace(/\.lesson\.json$/, ''));
-    const result = validateCourse(json, { lessonIds });
-    const errors = [...result.errors];
-    const slug = path.basename(path.dirname(file));
-    if (result.course && result.course.id !== slug) errors.push({ path: 'id', message: `Course id "${result.course.id}" must match its folder "${slug}".` });
-    return { file: rel, kind, ok: errors.length === 0, errors, course: result.course };
+    const result = validateCourse(json, { lessonIds, folder: path.basename(path.dirname(file)) });
+    return { file: rel, kind, ok: result.ok, errors: result.errors, course: result.course };
   }
 
   const course = await courseFor(file);

@@ -34,8 +34,13 @@ export type TutorAnchor = {
 };
 
 export type TutorLearnerState = {
+  /** Real submissions on the block (on `questionId` when set). */
   attemptsOnBlock?: number;
   chosenOptionId?: string;
+  /** The quiz question this state describes (the "why?" button); absent for the whole block. */
+  questionId?: string;
+  /** The answer is on screen (a correct pick, a second miss or "show answer"); for a whole block, every question's. */
+  answerShown?: boolean;
 };
 
 export type AskTutorDetail = {
@@ -113,10 +118,14 @@ function normalizeLearner(raw: unknown): TutorLearnerState | undefined {
     ? Math.min(attempts as number, 1000)
     : undefined;
   const chosenOptionId = str(raw.chosenOptionId, 200);
-  if (attemptsOnBlock === undefined && !chosenOptionId) return undefined;
+  const questionId = str(raw.questionId, 200);
+  const answerShown = raw.answerShown === true;
+  if (attemptsOnBlock === undefined && !chosenOptionId && !answerShown) return undefined;
   return {
     ...(attemptsOnBlock !== undefined ? { attemptsOnBlock } : {}),
     ...(chosenOptionId ? { chosenOptionId } : {}),
+    ...(questionId ? { questionId } : {}),
+    ...(answerShown ? { answerShown } : {}),
   };
 }
 

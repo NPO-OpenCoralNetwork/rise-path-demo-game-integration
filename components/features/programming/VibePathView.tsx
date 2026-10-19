@@ -103,7 +103,7 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, language }) => {
       });
       return { id: module.id, title: title.value, lang: title.lang, lessons };
     });
-    const totals = courseTotals(course, readLessonSummary);
+    const totals = courseTotals(course, readLessonSummary, VIBE_COURSE);
     const resumeHref = `/learn/${VIBE_COURSE}/${lastId ?? entries[0]?.ref.id ?? ''}`;
     return { modules, totals, resumeHref, resumed: Boolean(lastId) };
   }, [course, locale, fallback]);

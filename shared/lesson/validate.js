@@ -6,7 +6,7 @@
  * Semantic checks: ids unique across the lesson, quiz answers point at option ids,
  * objectiveId exists (and is set when the lesson has objectives), every declared locale is
  * present in localized texts, diagrams have code and alt text, table rows match the columns,
- * cite ids exist, next.lessonId exists in the course.
+ * cite ids exist, next.lessonId exists in the course, a course id matches its folder name.
  *
  * @typedef {import('./schema.js').Lesson} Lesson
  * @typedef {import('./schema.js').Course} Course
@@ -270,10 +270,12 @@ export function validateLesson(json, options = {}) {
 
 /**
  * Validates a course document. Pass `lessonIds` (ids of the lesson files on disk) to check
- * that every listed lesson has a file and every file is listed.
+ * that every listed lesson has a file and every file is listed, and `folder` (the name of the
+ * content/courses/<folder>/ directory) to check that the course id matches it: routes and saved
+ * progress use the folder name, lesson links and tutor requests use the id.
  *
  * @param {unknown} json
- * @param {{ lessonIds?: string[] }} [options]
+ * @param {{ lessonIds?: string[], folder?: string }} [options]
  * @returns {{ ok: boolean, errors: ValidationError[], course: Course | null }}
  */
 export function validateCourse(json, options = {}) {
@@ -282,6 +284,10 @@ export function validateCourse(json, options = {}) {
   const course = parsed.data;
   /** @type {ValidationError[]} */
   const errors = [];
+
+  if (options.folder !== undefined && course.id !== options.folder) {
+    errors.push({ path: 'id', message: `Course id "${course.id}" must match its folder "${options.folder}" (progress is saved under the folder name).` });
+  }
 
   /** @type {Map<string, string>} */
   const moduleIds = new Map();

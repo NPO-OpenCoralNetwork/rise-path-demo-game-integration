@@ -128,6 +128,8 @@ export interface TutorDone extends TutorMeta {
   provider: string;
   model: string;
   text: string;
+  /** The reply hit the output limit after `text`: a partial answer, not an error. */
+  truncated?: boolean;
 }
 
 const clip = (value: string | undefined, max: number) => (value && value.length > max ? value.slice(0, max) : value);

@@ -7,6 +7,7 @@ import type {
   TutorMode,
   TutorRequest as BridgeTutorRequest,
 } from '../../services/tutorBridge';
+import { answerKey, type AnswerRecord } from './progressStore.ts';
 
 /**
  * State for the inline AI tutor (WP-11, PLAN §5.7).
@@ -16,7 +17,9 @@ import type {
  * helpers below stay importable from node tests). Follow-ups resend the anchor, so every turn
  * stays grounded in the excerpt, plus the finished turns as history.
  *
- * Socratic mode: on a check (quiz) the tutor gives hints until the learner has tried twice.
+ * Socratic mode: on a check (quiz) the tutor gives hints until the learner has tried twice or
+ * the answer is on screen. Learner state comes from the reader's answers at the time of each
+ * turn (or the request when the reader has none), never from an earlier request.
  */
 
 export type StreamTutorFn = (
@@ -46,6 +49,8 @@ export type TutorTurn = {
   demo?: boolean;
   /** The learner typed this question (not a chip or a ✦ preset). */
   typed?: boolean;
+  /** The answer hit the length limit: `text` is what arrived, shown as a normal answer. */
+  truncated?: boolean;
 };
 
 export type TutorThread = {
@@ -66,16 +71,120 @@ export const TUTOR_MESSAGE_MAX = 2000;
 export const TUTOR_HISTORY_MAX = 12;
 const HISTORY_CONTENT_MAX = 4000;
 
+/** Attempts after which the tutor explains a check (the gateway's resolveTutorMode agrees). */
+const SOCRATIC_ATTEMPTS = 2;
+
 /**
  * Socratic while the learner has tried a check fewer than two times (PLAN §5.7); explain once
- * they have tried twice. Without learner state, checks are socratic and the rest follows `mode`.
+ * they have tried twice or the answer is on screen (`answerShown`). Without learner state,
+ * checks are socratic, as on the server, and the rest follows `mode`.
  */
 export function resolveClientMode(detail: { mode?: TutorMode; anchor?: Pick<TutorAnchor, 'blockType'>; learner?: TutorLearnerState }): TutorMode {
+  if (detail.learner?.answerShown) return 'explain';
   const attempts = detail.learner?.attemptsOnBlock;
-  if (attempts !== undefined) return attempts < 2 ? 'socratic' : 'explain';
+  if (attempts !== undefined) return attempts < SOCRATIC_ATTEMPTS ? 'socratic' : 'explain';
   const blockType = detail.anchor?.blockType?.toLowerCase();
   if (blockType && CHECK_BLOCK_TYPES.has(blockType)) return 'socratic';
   return detail.mode ?? 'explain';
+}
+
+/**
+ * One question's state: its real attempts, the last option chosen, and whether its answer is on
+ * screen (a correct pick, a second miss or "show answer").
+ */
+function questionState(record: AnswerRecord | undefined, questionId: string): TutorLearnerState {
+  if (!record) return { attemptsOnBlock: 0, questionId };
+  const shown = Boolean(record.revealed || record.correct || record.attempts >= SOCRATIC_ATTEMPTS);
+  return {
+    attemptsOnBlock: record.attempts,
+    ...(record.chosen[0] ? { chosenOptionId: record.chosen[0] } : {}),
+    questionId,
+    ...(shown ? { answerShown: true } : {}),
+  };
+}
+
+/**
+ * Learner state for a quiz block from the reader's answers (keyed `<blockId>/<questionId>`).
+ * - With `questionId` (the quiz "why?" button is about one question): that question's state.
+ * - Otherwise the whole block, since the excerpt lists every question: the answer counts as shown
+ *   only when every question's answer is, and attempts are the fewest on any question
+ *   (unanswered ones count 0), so the tutor keeps hinting while any question is still open.
+ * Undefined when the block has no such question.
+ */
+export function blockLearnerState(
+  answers: Readonly<Record<string, AnswerRecord>>,
+  blockId: string,
+  questionIds: readonly string[],
+  questionId?: string,
+): TutorLearnerState | undefined {
+  if (questionId) return questionIds.includes(questionId) ? questionState(answers[answerKey(blockId, questionId)], questionId) : undefined;
+  const states = questionIds.map((id) => questionState(answers[answerKey(blockId, id)], id));
+  if (states.length <= 1) return states[0];
+  return {
+    attemptsOnBlock: Math.min(...states.map((state) => state.attemptsOnBlock ?? 0)),
+    ...(states.every((state) => state.answerShown) ? { answerShown: true } : {}),
+  };
+}
+
+type LessonBlocks = { sections: ReadonlyArray<{ blocks: ReadonlyArray<{ id: string; type: string; questions?: ReadonlyArray<{ id: string }> }> }> };
+
+/**
+ * Learner state for a quiz anchor from the reader's lesson and in-memory answers (see
+ * blockLearnerState); undefined for any other block. LessonReader passes this to the hook, so no
+ * turn depends on what reached localStorage or on which key the progress is stored under.
+ */
+export function lessonLearnerState(
+  lesson: LessonBlocks,
+  answers: Readonly<Record<string, AnswerRecord>>,
+  anchor: Pick<TutorAnchor, 'blockId'> | undefined,
+  questionId?: string,
+): TutorLearnerState | undefined {
+  if (!anchor) return undefined;
+  for (const section of lesson.sections) {
+    const block = section.blocks.find((b) => b.id === anchor.blockId);
+    if (!block) continue;
+    return block.type === 'quiz' ? blockLearnerState(answers, block.id, (block.questions ?? []).map((q) => q.id), questionId) : undefined;
+  }
+  return undefined;
+}
+
+/** The reader's learner state for an anchor (and optionally one question) right now. */
+export type LiveLearnerFn = (anchor: TutorAnchor | undefined, questionId: string | undefined) => TutorLearnerState | undefined;
+
+const noLiveState: LiveLearnerFn = () => undefined;
+
+const sameLearner = (a: TutorLearnerState | undefined, b: TutorLearnerState | undefined) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * The thread for a new ask(): the request's lesson and anchor (else the thread's); learner state
+ * from the reader now, for the question the request names (the "why?" button) or the whole block,
+ * else the request's own; never the thread's earlier state. The mode follows from them.
+ */
+export function threadForAsk(existing: TutorThread | undefined, request: BridgeTutorRequest, live: LiveLearnerFn = noLiveState): TutorThread {
+  const { lesson, anchor, learner, mode } = request.tutor;
+  const nextLesson = lesson ?? existing?.lesson;
+  const nextAnchor = anchor ?? existing?.anchor;
+  const nextLearner = live(nextAnchor, learner?.questionId) ?? learner;
+  return {
+    key: threadKey(lesson?.lessonId, anchor),
+    turns: existing?.turns ?? [],
+    lesson: nextLesson,
+    anchor: nextAnchor,
+    learner: nextLearner,
+    context: request.legacyContext ?? existing?.context,
+    mode: resolveClientMode({ mode, anchor: nextAnchor, learner: nextLearner }),
+  };
+}
+
+/**
+ * Before a follow-up or retry: the reader's answers now (for the same question, or the block)
+ * replace the thread's learner state, so an answer shown since the last turn moves it to explain.
+ */
+export function refreshThread(thread: TutorThread, live: LiveLearnerFn = noLiveState): TutorThread {
+  const learner = live(thread.anchor, thread.learner?.questionId);
+  if (!learner || sameLearner(learner, thread.learner)) return thread;
+  return { ...thread, learner, mode: resolveClientMode({ mode: thread.mode, anchor: thread.anchor, learner }) };
 }
 
 export function threadKey(lessonId: string | undefined, anchor: Pick<TutorAnchor, 'blockId'> | undefined): string {
@@ -127,6 +236,22 @@ export function classifyTutorError(error: unknown): TutorErrorKind {
   if (['no_provider', 'provider_unavailable', 'auth'].includes(type) || status === 503 || status === 401 || status === 403) return 'unavailable';
   if (err.name === 'TypeError') return 'network';
   return 'failed';
+}
+
+/**
+ * The answer turn once its stream ended. A reply cut at the length limit (`done.truncated`)
+ * keeps the text that arrived and is a normal answer, flagged for a short note, not an error.
+ */
+export function finishedTurn(turn: TutorTurn, done: TutorDone): TutorTurn {
+  return {
+    ...turn,
+    text: done.text || turn.text,
+    status: 'done',
+    mode: done.mode ?? turn.mode,
+    grounding: done.grounding ?? turn.grounding ?? null,
+    demo: done.provider === 'mock',
+    ...(done.truncated ? { truncated: true } : {}),
+  };
 }
 
 // --- Flashcards ("カードにする") ----------------------------------------------------------
@@ -271,7 +396,12 @@ const patchTurn = (thread: TutorThread, id: string, patch: (turn: TutorTurn) => 
   turns: thread.turns.map((turn) => (turn.id === id ? patch(turn) : turn)),
 });
 
-export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: StreamTutorFn }): TutorStreamApi {
+export function useTutorStream({ locale, stream, learnerState }: {
+  locale: LlmLocale;
+  stream: StreamTutorFn;
+  /** The reader's learner state for a check anchor right now (see lessonLearnerState). */
+  learnerState?: LiveLearnerFn;
+}): TutorStreamApi {
   const threads = useRef(new Map<string, TutorThread>());
   const activeKey = useRef<string | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -284,6 +414,8 @@ export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: 
   localeRef.current = locale;
   const streamRef = useRef(stream);
   streamRef.current = stream;
+  const liveRef = useRef<LiveLearnerFn>(learnerState ?? noLiveState);
+  liveRef.current = learnerState ?? noLiveState;
 
   const update = useCallback((key: string, fn: (t: TutorThread) => TutorThread) => {
     const current = threads.current.get(key);
@@ -294,9 +426,12 @@ export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: 
   }, []);
 
   const run = useCallback(async (key: string, message: string, typed = false) => {
-    const base = threads.current.get(key);
+    const stored = threads.current.get(key);
     const text = message.trim().slice(0, TUTOR_MESSAGE_MAX);
-    if (!base || !text) return;
+    if (!stored || !text) return;
+    // The learner may have retried or revealed the check since the last turn.
+    const base = refreshThread(stored, liveRef.current);
+    if (base !== stored) threads.current.set(key, base);
     controller.current?.abort();
     const own = new AbortController();
     controller.current = own;
@@ -319,14 +454,7 @@ export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: 
         onMeta: (meta) => update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, mode: meta.mode, grounding: meta.grounding }))),
         onDelta: (delta) => update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, text: turn.text + delta }))),
       });
-      update(key, (t) => patchTurn(t, answerId, (turn) => ({
-        ...turn,
-        text: done.text || turn.text,
-        status: 'done',
-        mode: done.mode ?? turn.mode,
-        grounding: done.grounding ?? turn.grounding ?? null,
-        demo: done.provider === 'mock',
-      })));
+      update(key, (t) => patchTurn(t, answerId, (turn) => finishedTurn(turn, done)));
     } catch (error) {
       if (own.signal.aborted) {
         update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, status: 'stopped' })));
@@ -344,7 +472,7 @@ export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: 
   const ask = useCallback((request: BridgeTutorRequest) => {
     const typed = nextTyped.current;
     nextTyped.current = false;
-    const { lesson, anchor, learner } = request.tutor;
+    const { lesson, anchor } = request.tutor;
     const key = threadKey(lesson?.lessonId, anchor);
     const existing = threads.current.get(key);
     // A double press on ✦ while the same question is still streaming: just show the thread.
@@ -354,15 +482,7 @@ export function useTutorStream({ locale, stream }: { locale: LlmLocale; stream: 
       setThread(existing);
       return;
     }
-    const base: TutorThread = {
-      key,
-      turns: existing?.turns ?? [],
-      lesson: lesson ?? existing?.lesson,
-      anchor: anchor ?? existing?.anchor,
-      learner: learner ?? existing?.learner,
-      context: request.legacyContext ?? existing?.context,
-      mode: resolveClientMode({ ...request.tutor, learner: learner ?? existing?.learner }),
-    };
+    const base = threadForAsk(existing, request, liveRef.current);
     threads.current.set(key, base);
     activeKey.current = key;
     setThread(base);

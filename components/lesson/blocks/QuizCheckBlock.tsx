@@ -285,7 +285,7 @@ function QuestionView({
                   // learner.chosenOptionId. ("1. " would be stripped as a list marker.)
                   excerpt: plainText(`${t(question.prompt)} ${question.options.map((o, i) => `(${i + 1}) [${o.id}] ${t(o.md)}`).join(' ')}`),
                   mode: 'socratic',
-                  learner: { attemptsOnBlock: record?.attempts ?? 1, chosenOptionId: record?.chosen[0] },
+                  learner: { attemptsOnBlock: record?.attempts ?? 1, chosenOptionId: record?.chosen[0], questionId: question.id },
                 })}
               >
                 <Sparkles size={14} aria-hidden="true" />{text.askWhy}

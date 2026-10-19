@@ -103,8 +103,12 @@ export function buildTutorPrompt(body, resolved) {
 
   const learnerLines = body.learner
     ? [
-      body.learner.attemptsOnBlock !== undefined ? `attempts on this block: ${body.learner.attemptsOnBlock}` : '',
+      body.learner.questionId ? `question: ${body.learner.questionId}` : '',
+      body.learner.attemptsOnBlock !== undefined
+        ? `attempts ${body.learner.questionId ? 'on this question' : 'on this block'}: ${body.learner.attemptsOnBlock}`
+        : '',
       body.learner.chosenOptionId ? `last chosen option: ${body.learner.chosenOptionId}` : '',
+      body.learner.answerShown ? 'the correct answer is already shown to the learner' : '',
     ].filter(Boolean).join('\n')
     : '';
 

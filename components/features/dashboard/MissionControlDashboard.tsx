@@ -4,7 +4,7 @@ import { ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
-import { getCourse, getLessonEntry, listCourses, loadLesson } from '../../../content';
+import { getCourse, getLessonEntry, loadLesson } from '../../../content';
 import { getLastLesson, readLessonSummary, readProgress } from '../../lesson/progressStore';
 import { minutesLeft, resolveLText, type ContentLocale } from '../../lesson/model';
 import type { Course, Lesson } from '../../../shared/lesson/schema.js';
@@ -403,12 +403,15 @@ const COVER_STYLE: React.CSSProperties = {
 
 // --- Tracks --------------------------------------------------------------------------------
 
+const VIBE_COURSE_SLUG = 'vibe-coding';
+
 const TrackSection: React.FC = () => {
   const { language } = useLanguage();
   const t = copy[language];
 
-  const vibeCourse = useMemo(() => listCourses().find((c) => c.id === 'vibe-coding') ?? null, []);
-  const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary) : null), [vibeCourse]);
+  // Progress is saved under the course folder name (the slug getCourse takes), not course.id.
+  const vibeCourse = useMemo(() => getCourse(VIBE_COURSE_SLUG) ?? null, []);
+  const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null), [vibeCourse]);
   const tracks = {
     vibe: trackCopy('vibe', language, vibeCourse),
     unity: trackCopy('unity', language),

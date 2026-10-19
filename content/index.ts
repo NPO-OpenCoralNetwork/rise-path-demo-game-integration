@@ -29,6 +29,10 @@ for (const [path, json] of Object.entries(courseFiles)) {
   const match = COURSE_PATH.exec(path);
   if (!match || !json || typeof json !== 'object') continue;
   const course = json as Course;
+  // Progress and routes use the folder name; lessons:validate requires course.id to equal it.
+  if (import.meta.env.DEV && course.id !== match[1]) {
+    console.warn(`[content] courses/${match[1]}/course.json has id "${course.id}"; it must equal the folder name.`);
+  }
   courses.set(match[1], course);
 }
 

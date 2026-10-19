@@ -102,6 +102,11 @@ export const TutorRequest = z.object({
   learner: z.object({
     attemptsOnBlock: z.number().int().min(0).max(1000).optional(),
     chosenOptionId: z.string().max(200).optional(),
+    // The quiz question the state describes ("why?" button); absent for the whole block.
+    questionId: z.string().max(200).optional(),
+    // The answer is on screen (correct pick, second miss or "show answer"); for a whole block,
+    // every question's. The client sends it so a reveal needs no fake attempt count.
+    answerShown: z.boolean().optional(),
   }).optional(),
   // Optional extras outside the §9.1 contract.
   history: z.array(z.object({
@@ -113,8 +118,8 @@ export const TutorRequest = z.object({
 });
 
 /**
- * Socratic when asked for, and always on assessment blocks until the learner has tried twice,
- * so the tutor never gives away a quiz answer early.
+ * Socratic when asked for, and always on assessment blocks until the learner has tried twice or
+ * the answer is already on screen, so the tutor never gives away a quiz answer early.
  * @param {z.infer<typeof TutorRequest>} body
  * @returns {'explain'|'socratic'}
  */
@@ -122,7 +127,7 @@ export function resolveTutorMode(body) {
   if (body.mode === 'socratic') return 'socratic';
   const blockType = body.anchor?.blockType?.toLowerCase();
   const attempts = body.learner?.attemptsOnBlock ?? 0;
-  if (blockType && ASSESSMENT_BLOCK_TYPES.has(blockType) && attempts < 2) return 'socratic';
+  if (blockType && ASSESSMENT_BLOCK_TYPES.has(blockType) && attempts < 2 && !body.learner?.answerShown) return 'socratic';
   return 'explain';
 }
 
