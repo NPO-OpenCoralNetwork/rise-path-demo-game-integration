@@ -47,8 +47,7 @@ import './reader.css';
  *
  * AI tutor (WP-11): openTutor() requests that carry `lesson` stream into TutorPanel, a card at
  * the top of the margin at ≥1280px, a right drawer at 1024–1279px and a bottom sheet below
- * (also a drawer in focus mode, which hides the margin). The margin's glossary card stays in
- * MarginPanel; its old tutor card is hidden.
+ * (also a drawer in focus mode, which hides the margin). The glossary card is MarginPanel.
  */
 
 const copy = {
@@ -116,12 +115,6 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/**
- * MarginPanel still renders the WP-04 tutor card (it handed questions to the chat panel);
- * TutorPanel replaces it, so it is hidden here and the glossary card stays.
- */
-const HIDE_OLD_TUTOR_CARD = 'contents [&_.rp-tutor-card]:hidden';
-
 const isTyping = (target: EventTarget | null) => {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -185,7 +178,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const outlineReturnRef = useRef<HTMLElement | null>(null);
 
   const { container, scrollToElement, scrollToTop } = useScrollContainer(rootRef);
-  const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition, recordLastLesson });
+  const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition, recordLastLesson, courseTitle: course.title });
   const initialProgress = useRef(progress.progress);
 
   const sections = useMemo(() => sectionByBlock(lesson), [lesson]);
@@ -605,9 +598,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
             <div className="rp-col-sticky">
               <div className="rp-margin-stack">
                 {tutorLayout === 'margin' && <TutorPanel {...tutorProps} />}
-                <div className={HIDE_OLD_TUTOR_CARD}>
-                  <MarginPanel {...marginProps} />
-                </div>
+                <MarginPanel {...marginProps} />
               </div>
             </div>
           </aside>
@@ -698,9 +689,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
         scope={scope}
         returnFocusRef={sideReturnRef}
       >
-        <div className={HIDE_OLD_TUTOR_CARD}>
-          <MarginPanel {...marginProps} onDone={() => setSideOpen(false)} />
-        </div>
+        <MarginPanel {...marginProps} onDone={() => setSideOpen(false)} />
       </ReaderSheet>
 
       {tutorLayout !== 'margin' && <TutorPanel {...tutorProps} />}

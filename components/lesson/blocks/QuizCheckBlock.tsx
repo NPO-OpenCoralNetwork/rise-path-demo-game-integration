@@ -281,7 +281,9 @@ function QuestionView({
                   message: text.askWhyMessage,
                   block,
                   section: reader.lesson.sections.find((s) => s.id === sectionId),
-                  excerpt: plainText(`${t(question.prompt)}\n${question.options.map((o, i) => `${i + 1}. ${t(o.md)}`).join('\n')}`),
+                  // "(1) [a] …": the number on screen plus the option id, so the tutor can match
+                  // learner.chosenOptionId. ("1. " would be stripped as a list marker.)
+                  excerpt: plainText(`${t(question.prompt)} ${question.options.map((o, i) => `(${i + 1}) [${o.id}] ${t(o.md)}`).join(' ')}`),
                   mode: 'socratic',
                   learner: { attemptsOnBlock: record?.attempts ?? 1, chosenOptionId: record?.chosen[0] },
                 })}

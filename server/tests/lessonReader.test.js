@@ -33,6 +33,7 @@ import {
   glossaryItems,
   lessonPct,
   lessonState,
+  lessonStateEvents,
   linkGlossaryTerms,
   minutesLeft,
   plainText,
@@ -270,6 +271,16 @@ describe('reader model', () => {
     assert.equal(minutesLeft(20, 0), 20);
     assert.equal(minutesLeft(20, 99), 1);
     assert.equal(minutesLeft(20, 100), 0);
+  });
+
+  it('turns learner-caused state changes into lesson_start / lesson_complete events', () => {
+    assert.deepEqual(lessonStateEvents('not_started', 'in_progress'), ['lesson_start']);
+    assert.deepEqual(lessonStateEvents('in_progress', 'in_progress'), []);
+    assert.deepEqual(lessonStateEvents('in_progress', 'read'), ['lesson_complete']);
+    assert.deepEqual(lessonStateEvents('not_started', 'read'), ['lesson_start', 'lesson_complete']);
+    // Already done: answering the exam later (checked → mastered) is not a second completion.
+    assert.deepEqual(lessonStateEvents('read', 'checked'), []);
+    assert.deepEqual(lessonStateEvents('checked', 'mastered'), []);
   });
 });
 

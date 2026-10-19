@@ -46,6 +46,8 @@ describe('tutor prompt: stable instructions', () => {
         assert.match(TUTOR_SYSTEM, /one guiding question/);
         assert.match(TUTOR_SYSTEM, /Do not include the answer/);
         assert.match(TUTOR_SYSTEM, /if you cannot tell which option they chose, do not guess/);
+        // QuizCheckBlock's "なぜ?" excerpt lists options as "(1) [a] …".
+        assert.match(TUTOR_SYSTEM, /"\(number\) \[id\] text"/);
     });
 
     it('declares every tag as data, not instructions', () => {

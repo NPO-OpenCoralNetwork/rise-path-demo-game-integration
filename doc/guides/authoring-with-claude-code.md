@@ -71,8 +71,8 @@ Tools: `lesson-schema-get`, `lesson-validate`, `lesson-get`, `lesson-upsert-draf
 `lesson-preview-url`; resource `rp://schema/lesson/v1`; prompt `author-lesson`. They are exposed in
 the `curriculum-builder` and `admin` profiles.
 
-- **Claude Desktop**: start from `mcp-server/claude_desktop_config.example.json`; set the absolute
-  path to `mcp-server/index.js` and add `"--profile", "curriculum-builder"`.
+- **Claude Desktop**: start from `mcp-server/claude_desktop_config.example.json` (it already passes
+  `"--profile", "curriculum-builder"`) and replace `/path/to/rise-path` with the repository's path.
 - **Codex**: reads `AGENTS.md`; add `[mcp_servers.rise-path-learning]` with `command = "node"` and
   `args = ["/path/to/rise-path/mcp-server/index.js", "--profile", "curriculum-builder"]` to
   `~/.codex/config.toml`.

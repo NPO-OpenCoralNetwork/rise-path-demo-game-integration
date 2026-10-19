@@ -97,6 +97,22 @@ export function lessonState(lesson: Lesson, progress: LessonProgress): LessonSta
   return questions.length && firstTry / questions.length >= 0.8 ? 'mastered' : 'checked';
 }
 
+/** States that count as a finished lesson (course maps and learning events). */
+export const LESSON_DONE_STATES: ReadonlySet<LessonState> = new Set<LessonState>(['read', 'checked', 'mastered']);
+
+export type LessonEventType = 'lesson_start' | 'lesson_complete';
+
+/**
+ * Learning events (dashboard streak and XP, profile history) for a state change the learner
+ * caused: the first activity starts the lesson, and reaching a done state completes it.
+ */
+export function lessonStateEvents(before: LessonState, after: LessonState): LessonEventType[] {
+  const events: LessonEventType[] = [];
+  if (before === 'not_started' && after !== 'not_started') events.push('lesson_start');
+  if (!LESSON_DONE_STATES.has(before) && LESSON_DONE_STATES.has(after)) events.push('lesson_complete');
+  return events;
+}
+
 export type SectionStatus = 'todo' | 'current' | 'done' | 'attention';
 
 /**

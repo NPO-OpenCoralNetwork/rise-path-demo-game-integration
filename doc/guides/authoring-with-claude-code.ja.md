@@ -258,7 +258,7 @@ npm run lessons:mcp-smoke
 ### Claude Desktop
 
 `mcp-server/claude_desktop_config.example.json` を見本に、Claude Desktop の
-`claude_desktop_config.json` に追加します。見本のパスは古い環境のものなので、必ず書き換えます。
+`claude_desktop_config.json` に追加します。見本の `/path/to/rise-path` は、必ず実際のパスに書き換えます。
 
 ```json
 {

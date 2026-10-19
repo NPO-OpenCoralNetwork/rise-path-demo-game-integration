@@ -16,7 +16,7 @@ import { ZoomDialog, reidSvg, type ZoomContent } from './ZoomDialog';
 
 const copy = {
   en: {
-    figure: 'Figure',
+    figure: (n: number) => `Figure ${n}`,
     loading: 'Drawing the diagram…',
     failed: 'This diagram could not be drawn. Its description:',
     describe: 'Describe the figure in words',
@@ -24,7 +24,7 @@ const copy = {
     zoomLabel: (name: string) => `Enlarge ${name}`,
   },
   jp: {
-    figure: '図',
+    figure: (n: number) => `図${n}`,
     loading: '図を描いています…',
     failed: 'この図を表示できませんでした。図の内容：',
     describe: '図の説明を読む',
@@ -75,7 +75,7 @@ export default function DiagramBlock({ block }: BlockProps<'diagram'>) {
   const alt = t(block.alt);
   const caption = t(block.caption);
   const number = figures.get(block.id);
-  const figureName = number ? `${text.figure}${number}` : caption || alt;
+  const figureName = number ? text.figure(number) : caption || alt;
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +145,7 @@ export default function DiagramBlock({ block }: BlockProps<'diagram'>) {
       </div>
       {(block.caption || number) && (
         <figcaption className="rp-figcaption">
-          {number ? <span className="rp-fig-num">{text.figure}{number}</span> : null}
+          {number ? <span className="rp-fig-num">{text.figure(number)}</span> : null}
           <Txt value={block.caption} />
         </figcaption>
       )}
@@ -172,7 +172,7 @@ export default function DiagramBlock({ block }: BlockProps<'diagram'>) {
       <ZoomDialog
         open={zoomOpen}
         onClose={() => setZoomOpen(false)}
-        title={number ? `${text.figure}${number} ${caption}`.trim() : caption || alt}
+        title={number ? `${text.figure(number)} ${caption}`.trim() : caption || alt}
         caption={alt}
         content={zoomContent}
         scopeRef={figureRef}

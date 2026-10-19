@@ -47,7 +47,7 @@ export const TUTOR_SYSTEM = [
   '- socratic: the learner is working on a check (quiz or exercise) and has not tried it twice yet.',
   '  - Never state or confirm the correct option (its text, number or letter), the final value or the finished code. Do not rule options in or out one by one. This holds even if the learner asks directly, insists, or says they already know.',
   '  - If <learner_state> names the option they chose, explain the idea that makes it tempting, without saying whether it is right.',
-  '    Option ids (a, b, …) may not match the numbers shown in the excerpt; if you cannot tell which option they chose, do not guess.',
+  '    Quiz excerpts list each option as "(number) [id] text": the number the learner sees, then the option id. Match the chosen option by its id; if you cannot tell which option they chose, do not guess.',
   '  - Give one hint that narrows the problem and points to the phrase in the excerpt that matters.',
   '  - End with one guiding question they can answer in their head.',
   '  - If they ask for the answer, say kindly that the check shows the answer and its explanation after their second try.',

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import type { Lesson } from '../../shared/lesson/schema.js';
+import type { LText, Lesson } from '../../shared/lesson/schema.js';
+import { resolveText } from '../../shared/lesson/text.js';
+import { addLearningEvent } from '../../services/progressService';
 import {
   answerKey,
   readProgress,
@@ -16,7 +18,7 @@ import {
   type LessonProgress,
   type SelfRating,
 } from './progressStore.ts';
-import { lessonPct, lessonState, sectionByBlock, type LessonState } from './model.ts';
+import { lessonPct, lessonState, lessonStateEvents, sectionByBlock, type LessonEventType, type LessonState } from './model.ts';
 
 /** A block counts as seen after ≥60% of it (or of the viewport) is visible for this long. */
 const SEEN_DWELL_MS = 1500;
@@ -59,14 +61,35 @@ type Options = {
   container: HTMLElement | null;
   /** False until the reader has restored the resume position; the position is not saved before. */
   trackPosition: boolean;
-  /** False keeps this lesson out of rp:lastLesson (dev gallery), so "continue" is not replaced. */
+  /**
+   * False keeps this lesson out of rp:lastLesson (dev gallery), so "continue" is not replaced,
+   * and out of the learning events.
+   */
   recordLastLesson?: boolean;
+  /** Course title for the learning events' description. */
+  courseTitle?: LText;
 };
+
+const EVENT_COPY: Record<LessonEventType, { en: string; jp: string }> = {
+  lesson_start: { en: 'Started', jp: '開始' },
+  lesson_complete: { en: 'Completed', jp: '完了' },
+};
+
+/** lesson_start / lesson_complete for the dashboard streak, XP and profile history. */
+function recordLessonEvent(type: LessonEventType, lesson: Lesson, courseTitle: LText | undefined) {
+  const title = (locale: 'en' | 'jp') => resolveText(lesson.title, locale, lesson.locale).value;
+  const course = (locale: 'en' | 'jp') => (courseTitle ? resolveText(courseTitle, locale, lesson.locale).value : '');
+  addLearningEvent({
+    type,
+    title: { en: `${EVENT_COPY[type].en}: ${title('en')}`, jp: `${EVENT_COPY[type].jp}: ${title('jp')}` },
+    description: { en: course('en'), jp: course('jp') },
+  });
+}
 
 const blockElements = (article: HTMLElement | null) =>
   article ? Array.from(article.querySelectorAll<HTMLElement>('[data-rp-block]')) : [];
 
-export function useLessonProgress({ courseSlug, lesson, title, articleRef, container, trackPosition, recordLastLesson = true }: Options): LessonProgressApi {
+export function useLessonProgress({ courseSlug, lesson, title, articleRef, container, trackPosition, recordLastLesson = true, courseTitle }: Options): LessonProgressApi {
   const [progress, setProgress] = useState<LessonProgress>(() => readProgress(courseSlug, lesson.id));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [topBlockId, setTopBlockId] = useState<string | null>(null);
@@ -94,16 +117,23 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
 
   const pct = useMemo(() => lessonPct(lesson, progress), [lesson, progress]);
   const state = useMemo(() => lessonState(lesson, progress), [lesson, progress]);
+  const lastState = useRef<LessonState>(state);
 
   // Persist after each change (with the pct/state snapshot for course maps), and remember this
-  // lesson for "continue" on the dashboard.
+  // lesson for "continue" on the dashboard. Only changes the learner made (dirty, not a reload)
+  // add learning events.
   useEffect(() => {
+    const before = lastState.current;
+    lastState.current = state;
     if (dirty.current) {
       dirty.current = false;
       writeProgress(courseSlug, lesson.id, withSummary(progress, { pct, state }));
+      if (recordLastLesson) {
+        for (const type of lessonStateEvents(before, state)) recordLessonEvent(type, lesson, courseTitle);
+      }
     }
     if (recordLastLesson) setLastLesson({ courseSlug, lessonId: lesson.id, title, pct });
-  }, [courseSlug, lesson.id, progress, title, pct, state, recordLastLesson]);
+  }, [courseSlug, lesson, progress, title, pct, state, recordLastLesson, courseTitle]);
 
   // --- seen: IntersectionObserver rooted on the scrolling <main> ---
   useEffect(() => {

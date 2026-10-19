@@ -8,13 +8,13 @@ import { ZoomDialog, type ZoomContent } from './ZoomDialog';
 
 const copy = {
   en: {
-    figure: 'Figure',
+    figure: (n: number) => `Figure ${n}`,
     missing: 'The image could not be loaded.',
     zoomLabel: (name: string) => `Enlarge ${name}`,
     image: 'image',
   },
   jp: {
-    figure: '図',
+    figure: (n: number) => `図${n}`,
     missing: '画像を読み込めませんでした。',
     zoomLabel: (name: string) => `${name}を拡大して見る`,
     image: '画像',
@@ -40,7 +40,7 @@ export default function ImageBlock({ block }: BlockProps<'image'>) {
   const alt = block.decorative ? '' : t(block.alt);
   const caption = t(block.caption);
   const src = SAFE_SRC.test(block.src) ? block.src : '';
-  const figureName = number ? `${text.figure}${number}` : caption || text.image;
+  const figureName = number ? text.figure(number) : caption || text.image;
   const zoomable = Boolean(src && !failed && !block.decorative);
   const zoomContent = useMemo<ZoomContent | null>(
     () => (zoomable ? { kind: 'image', src, alt, width: natural || 800 } : null),
@@ -69,7 +69,7 @@ export default function ImageBlock({ block }: BlockProps<'image'>) {
       </div>
       {(block.caption || number) && !block.decorative && (
         <figcaption className="rp-figcaption">
-          {number ? <span className="rp-fig-num">{text.figure}{number}</span> : null}
+          {number ? <span className="rp-fig-num">{text.figure(number)}</span> : null}
           <Txt value={block.caption} />
         </figcaption>
       )}
@@ -90,7 +90,7 @@ export default function ImageBlock({ block }: BlockProps<'image'>) {
       <ZoomDialog
         open={zoomOpen}
         onClose={() => setZoomOpen(false)}
-        title={number ? `${text.figure}${number} ${caption}`.trim() : caption || alt}
+        title={number ? `${text.figure(number)} ${caption}`.trim() : caption || alt}
         caption={alt}
         content={zoomContent}
         scopeRef={figureRef}
