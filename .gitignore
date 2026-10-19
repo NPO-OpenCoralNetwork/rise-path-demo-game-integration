@@ -47,3 +47,6 @@ sample/**/dist
 sample/**/.venv
 sample/**/__pycache__test_mcp_client.js
 .vercel
+
+# Lesson preview screenshots and metrics (npm run lessons:preview)
+.artifacts/

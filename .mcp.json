@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "rise-path-learning": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp-server/index.js"],
+      "env": {
+        "RISE_PATH_MCP_PROFILE": "curriculum-builder",
+        "RP_LESSON_STORE": "fs"
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lessons:validate *)",
+      "Bash(npm run -s lessons:validate *)",
+      "Bash(npm run lessons:lint *)",
+      "Bash(npm run -s lessons:lint *)",
+      "Bash(npm run lessons:catalog *)",
+      "Bash(npm run -s lessons:catalog *)",
+      "Bash(npm run lessons:preview *)",
+      "Bash(npm run lessons:mcp-smoke *)",
+      "Bash(node .claude/skills/review-lesson/scripts/check-review.mjs *)",
+      "Skill(review-lesson *)",
+      "Edit(/content/courses/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.bak)",
+      "Read(./.env.local.bak)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/validate-lesson.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

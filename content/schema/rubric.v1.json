@@ -1,0 +1,210 @@
+{
+  "id": "rubric.v1",
+  "title": {
+    "jp": "Rise Path 教材ルーブリック v1",
+    "en": "Rise Path lesson rubric v1"
+  },
+  "description": "Judgement criteria for one risepath.lesson/v1 lesson. Used by the pedagogy-reviewer, ja-editor and visual-qa subagents, by `claude -p --json-schema content/schema/review.v1.json`, and by any other LLM judge. The JSON file content/schema/rubric.v1.json is the hand-written source; .claude/skills/author-lesson/references/rubric.md is generated from it.",
+  "scale": {
+    "min": 0,
+    "max": 4,
+    "levels": {
+      "4": { "jp": "模範的。他の教材のお手本にできる", "en": "Exemplary; could be used to teach other authors" },
+      "3": { "jp": "契約を満たしている（合格ライン）", "en": "Meets the lesson contract (pass line)" },
+      "2": { "jp": "部分的。学習者がつまずく欠けがある", "en": "Partial; a gap a learner will trip over" },
+      "1": { "jp": "ほぼ欠けている", "en": "Mostly missing" },
+      "0": { "jp": "欠けている、または学習を妨げる", "en": "Missing, or harms learning" }
+    }
+  },
+  "pass": {
+    "minEach": 3,
+    "minMean": 3.3,
+    "noMustFix": true,
+    "rule": "Every criterion scores 3 or more, the mean is 3.3 or more, and no must-fix item is open. When several reviewers score the same criterion, the lowest score counts."
+  },
+  "notApplicable": "Never skip a criterion. When a lesson rightly omits something (no diagram because nothing is spatial or procedural), score it as you would a correct choice (3–4) and say why in the evidence.",
+  "criteria": [
+    {
+      "id": "align",
+      "title": { "jp": "目標と確認の対応", "en": "Alignment" },
+      "question": {
+        "jp": "2〜4 個の観察できる目標（Bloom の動詞）があり、すべてが確認問題で評価されているか",
+        "en": "Are there 2–4 observable objectives (Bloom verbs), each assessed by at least one question?"
+      },
+      "anchors": {
+        "4": { "jp": "全目標に objectiveId 付きの問題が 2 問以上あり、うち 1 問は応用", "en": "Every objective has 2+ questions with objectiveId, at least one at apply level" },
+        "3": { "jp": "全目標に 1 問以上の問題がある。目標は「〜できる」で書かれている", "en": "Every objective has at least one question; objectives are can-do statements" },
+        "2": { "jp": "評価されない目標がある、または目標が「理解する」など観察できない", "en": "An objective is never assessed, or objectives are unobservable (\"understand\")" }
+      },
+      "lint": ["objectives-count", "objective-unassessed"]
+    },
+    {
+      "id": "hook",
+      "title": { "jp": "導入", "en": "Hook" },
+      "question": {
+        "jp": "最初のセクションが、学習者が解けるようになる具体的な課題と、採点しない予想問題で始まるか",
+        "en": "Does the first section pose a concrete problem the learner will solve, with an ungraded prediction question?"
+      },
+      "anchors": {
+        "4": { "jp": "3 文以内の具体的な場面と predict 問題。雑学や統計の前置きがない", "en": "A concrete scenario in 3 sentences or fewer plus a predict quiz; no trivia or statistics" },
+        "3": { "jp": "課題と予想問題があり、目標につながっている", "en": "A problem and a prediction question that lead to the objectives" },
+        "2": { "jp": "導入が雑学・宣伝・一般論で、目標とつながらない", "en": "The opening is trivia, promotion or generic talk unrelated to the objectives" }
+      },
+      "lint": ["hook-missing"]
+    },
+    {
+      "id": "prior",
+      "title": { "jp": "既有知識と用語の準備", "en": "Prior knowledge" },
+      "question": {
+        "jp": "前提を明示し、新しい用語を使う前に定義しているか（事前学習の原則）",
+        "en": "Are prerequisites stated and every new term defined before it is used (pre-training)?"
+      },
+      "anchors": {
+        "4": { "jp": "前提と既習事項の想起があり、用語は初出で定義され glossary と一致", "en": "Prerequisites and a recall of earlier lessons; every term defined at first use and matching the glossary" },
+        "3": { "jp": "用語は使う前に定義され、前提が書かれている", "en": "Terms are defined before use and prerequisites are stated" },
+        "2": { "jp": "定義前に使われる用語がある、または前提がない", "en": "A term is used before it is defined, or prerequisites are missing" }
+      },
+      "lint": []
+    },
+    {
+      "id": "load",
+      "title": { "jp": "認知負荷", "en": "Cognitive load" },
+      "question": {
+        "jp": "1 セクション 1 つの考え、短い段落、セグメントごとの新出用語 3 つまで、を守っているか",
+        "en": "One idea per section, short paragraphs, at most 3 new terms per segment?"
+      },
+      "anchors": {
+        "4": { "jp": "すべての予算内。各画面に見出し・図・問題のいずれかがある", "en": "Everything within budget; every screen has a heading, figure or check" },
+        "3": { "jp": "分量の上限を守り、テキストだけの画面が続かない", "en": "Length budgets respected; no run of text-only screens" },
+        "2": { "jp": "長い段落や詰め込みのセクションがあり、読み続けるのがつらい", "en": "Long paragraphs or overloaded sections make it tiring to read" }
+      },
+      "lint": ["paragraph-length", "sentence-length", "list-length", "table-columns", "callout-count", "code-length", "steps-length"]
+    },
+    {
+      "id": "worked",
+      "title": { "jp": "例題", "en": "Worked example" },
+      "question": {
+        "jp": "演習の前に、目的ラベル付きの例題（3〜6 ステップ）があるか",
+        "en": "Is there a worked example (3–6 steps with subgoal labels) before independent practice?"
+      },
+      "anchors": {
+        "4": { "jp": "完全な例題 → 一部を空けた例題 → 自力の演習、と足場を外していく", "en": "Full example, then a faded one, then independent practice" },
+        "3": { "jp": "演習の前に、理由つきの手順を見せる例題がある", "en": "A worked example with the why of each step comes before practice" },
+        "2": { "jp": "いきなり演習、または手順だけで理由がない", "en": "Practice comes first, or steps are shown without reasons" }
+      },
+      "lint": ["steps-expect"]
+    },
+    {
+      "id": "active",
+      "title": { "jp": "能動的な確認", "en": "Active retrieval" },
+      "question": {
+        "jp": "2 セクションに 1 回以上の inline 確認があり、想起や応用を求めているか",
+        "en": "Is there an inline check at least every 2 sections that asks for recall or application, not recognition?"
+      },
+      "anchors": {
+        "4": { "jp": "確認問題が応用・分析を含み、選択肢ごとの解説がある", "en": "Checks include apply/analyze items, with feedback on every option" },
+        "3": { "jp": "密度を満たし、問題は直前の文の言い換えではない", "en": "Density met; questions are not a rewording of the sentence just read" },
+        "2": { "jp": "確認が少ない、または本文の丸写しで答えられる", "en": "Too few checks, or answerable by matching words in the text" }
+      },
+      "lint": ["inline-quiz-density", "quiz-feedback"]
+    },
+    {
+      "id": "miscon",
+      "title": { "jp": "誤解への対処", "en": "Misconceptions" },
+      "question": {
+        "jp": "よくある誤解を 1〜3 個取り上げ、誤答の選択肢が実在する誤解に対応しているか",
+        "en": "Are 1–3 likely misconceptions named and corrected, and does each wrong option encode a real one?"
+      },
+      "anchors": {
+        "4": { "jp": "誤解ごとに理由つきの訂正があり、誤答の解説が 2 文以内で誤解を正す", "en": "Each misconception is corrected with a reason; wrong-option feedback fixes it in 2 sentences or fewer" },
+        "3": { "jp": "主な誤解が扱われ、誤答の解説がある", "en": "The main misconception is addressed and wrong options have feedback" },
+        "2": { "jp": "誤答の選択肢がでたらめ、または誤解に触れない", "en": "Distractors are random, or misconceptions are ignored" }
+      },
+      "lint": ["quiz-feedback", "feedback-length"]
+    },
+    {
+      "id": "visual",
+      "title": { "jp": "図の質", "en": "Visuals" },
+      "question": {
+        "jp": "構造・手順・比較を示す図だけがあり、キャプションと代替テキストがあるか。装飾はないか",
+        "en": "Do visuals show structure, process or comparison only, with caption and alt text, and no decoration?"
+      },
+      "anchors": {
+        "4": { "jp": "図のラベルが本文の用語と一致し、12 ノード以内、キャプションが要点を述べる", "en": "Labels match the text's terms, 12 nodes or fewer, the caption states the takeaway" },
+        "3": { "jp": "必要な図があり、キャプションと alt がある。装飾画像はない", "en": "Needed visuals exist with caption and alt; no decorative images" },
+        "2": { "jp": "図が飾り、読めない、ラベルが英語のまま、または必要な図がない", "en": "A visual is decorative, unreadable, mislabelled, or a needed one is missing" }
+      },
+      "lint": ["diagram-caption", "image-decorative"]
+    },
+    {
+      "id": "practice",
+      "title": { "jp": "演習", "en": "Practice" },
+      "question": {
+        "jp": "実際の場面に近い課題があり、段階的なヒントと成功の基準（模範解答）があるか",
+        "en": "Is there an authentic task with a hint ladder and success criteria or a model answer?"
+      },
+      "anchors": {
+        "4": { "jp": "転移を求める課題、3 段階のヒント、模範解答、自己チェック", "en": "A transfer task, 3 levels of hints, a model answer and a self-check" },
+        "3": { "jp": "手を動かす課題と、期待する結果（expect）がある", "en": "A hands-on task with the expected result stated" },
+        "2": { "jp": "演習がない、または何ができたら成功か分からない", "en": "No practice, or no way to tell success" }
+      },
+      "lint": ["steps-expect", "code-should-be-prompt"]
+    },
+    {
+      "id": "meta",
+      "title": { "jp": "振り返り・まとめ", "en": "Metacognition" },
+      "question": {
+        "jp": "まとめ（3〜5 点）、振り返りの問い、次の一歩、復習カード（4〜8 枚）があるか",
+        "en": "Are there a summary (3–5 points), a reflection prompt, a next step and 4–8 flashcards?"
+      },
+      "anchors": {
+        "4": { "jp": "4 つすべてがあり、まとめは確認問題の後に置かれている", "en": "All four, with the summary placed after the recap questions" },
+        "3": { "jp": "まとめと復習カードがあり、次の一歩が分かる", "en": "Summary and flashcards exist and the next step is clear" },
+        "2": { "jp": "まとめや復習カードがない、または本文の繰り返しだけ", "en": "Summary or flashcards missing, or just repeat the text" }
+      },
+      "lint": ["summary-missing", "summary-points", "flashcards-count"]
+    },
+    {
+      "id": "accuracy",
+      "title": { "jp": "正確さ", "en": "Accuracy" },
+      "question": {
+        "jp": "事実・手順・コードが正しく、自明でない主張に出典（cite）があり、ツールのバージョンが明示されているか",
+        "en": "Are facts, steps and code correct, non-obvious claims cited, and tool versions pinned?"
+      },
+      "anchors": {
+        "4": { "jp": "すべての主張がたどれ、コードはそのまま動き、バージョンが固定されている", "en": "Every claim is traceable, code runs as written, versions are pinned" },
+        "3": { "jp": "誤りがなく、重要な主張に出典がある", "en": "No errors; key claims are cited" },
+        "2": { "jp": "誤り、根拠のない数字、架空の URL や機能がある", "en": "An error, an unsupported number, or an invented URL or feature" }
+      },
+      "lint": ["code-filename"]
+    },
+    {
+      "id": "voice",
+      "title": { "jp": "日本語の文体", "en": "Voice" },
+      "question": {
+        "jp": "です・ます調で温かく、圧をかけず、用語が一貫し、自然な日本語か",
+        "en": "Is the Japanese natural, polite (desu/masu), warm, non-pressuring and consistent in terms?"
+      },
+      "anchors": {
+        "4": { "jp": "よい先生が隣で話しているように読める。翻訳調がない", "en": "Reads like a good teacher beside you; nothing sounds translated" },
+        "3": { "jp": "文体ルールを守り、禁止表現がない", "en": "Style rules followed; no banned phrases" },
+        "2": { "jp": "「簡単です」などの圧、硬い翻訳調、用語の揺れがある", "en": "Pressure phrases, stiff translated tone, or inconsistent terms" }
+      },
+      "lint": ["banned-phrase", "sentence-length"]
+    },
+    {
+      "id": "a11y_l10n",
+      "title": { "jp": "アクセシビリティと多言語", "en": "Accessibility and localization" },
+      "question": {
+        "jp": "宣言したロケールがすべて揃い、画像に文字を埋め込まず、alt とリンク文が具体的か",
+        "en": "Are all declared locales complete, no text baked into images, alt text and link text descriptive?"
+      },
+      "anchors": {
+        "4": { "jp": "全ロケールが同じ内容で自然。図のラベルも各言語にある", "en": "Every locale is complete and natural, diagram labels included" },
+        "3": { "jp": "ロケールの欠けがなく、alt とリンク文がある", "en": "No missing locale; alt and link text present" },
+        "2": { "jp": "訳抜け、英語のままの図、「こちら」リンク、alt の欠けがある", "en": "Untranslated text, English-only diagrams, \"click here\" links or missing alt" }
+      },
+      "lint": ["locale-plain-string"]
+    }
+  ]
+}
