@@ -13,7 +13,7 @@ chapter (`data/curricula/vibe_coding/chapter2.ts`, export `VIBE_CHAPTER_2_DATA`;
 - o1 (bloom: apply): ぼんやりしたアイデアを、AIに質問してもらう依頼文に書き換え、壁打ちに使える / Rewrite a vague idea as a request for the AI to interview you, and use it to talk the idea through. (Review round 3: 「依頼文（壁打ち）に書き換えて使える」 made the request look like it is called 壁打ち.)
 - o2 (bloom: analyze): アイデアの中から「目的」と「機能」を見分け、機能の奥にある目的を聞き出せる / Tell goals from features and dig out the goal behind a feature.
 - o3 (bloom: evaluate): 機能の候補をMoSCoW（Must / Should / Could / Won't）で分け、最初の版（MVP）に入れる範囲を判断できる / Sort candidate features with MoSCoW and judge what goes into the first version (MVP). (Review round 1: 「選んで理由を言える」→「判断できる」, the verb the graded items test.)
-- o4 (bloom: create): 目的・使う人・機能の優先順位・画面の流れ・扱うデータ・やらないことを1枚にまとめた企画書を、AIと作って直せる / Build and revise a one-page plan with an AI.
+- o4 (bloom: evaluate since round 4; was create): 目的から「やらないこと」までの1枚企画書を読み返し、直すところと直し方を判断できる / Review a one-page plan, from the goal to what you won't build, and judge what to fix and how. (Round 4: the create-level task, building your own plan, moved to `vibe-ch2-practice`, which keeps o4 at create. The graded o4 items here, q4/q8/q10/q9, are analyze/evaluate.)
 
 ## 範囲 / Scope
 - 扱う / in: 壁打ち（AIに質問してもらう）、目的と機能の区別（「なぜ？」と聞き返す）、MVP と MoSCoW、1枚企画書（PRD の小さな版）の項目、画面の流れとデータを言葉で書くこと、企画書を AI に渡して直すこと。
@@ -25,7 +25,7 @@ chapter (`data/curricula/vibe_coding/chapter2.ts`, export `VIBE_CHAPTER_2_DATA`;
   4. 「目的と機能の混同」—「グラフがほしい」は手段。「月の途中で食費の使いすぎに気づける」が目的。
 
 ## 形式 / Format
-- 所要時間 / minutes: 30（読む 約6分 + 問題11問 約7分 + 演習 約15分）。course.json の estMinutes と同じ。
+- 所要時間 / minutes: 18 since round 4（読む 約8分 + 問題11問 約7分 + 依頼文を試す 約3分）。The practice (about 15 minutes) moved to `vibe-ch2-practice` (20 minutes). `course.json` still says 30 until the owner updates it.
 - 難易度 / level: beginner
 - ロケール / locales: jp → en
 - 演習の題材 / practice task idea: 自分の作りたいアプリ（思いつかなければ「サークルの出欠確認アプリ」）で、AIと1枚企画書を作る。依頼文は `prompt` ブロック（`{{変数}}` 付き）、模範解答は `expect` に入れる。
@@ -52,10 +52,10 @@ chapter (`data/curricula/vibe_coding/chapter2.ts`, export `VIBE_CHAPTER_2_DATA`;
 | `2-1` | concept | 2-1. 「作って」の前に「質問して」 | コードを頼む前に、AIに質問してもらい考えを言葉にする（壁打ち） | markdown lead (ch0 recall), callout analogy, definitions (壁打ち), markdown (why, cite), prompt (interview, `{{作りたいアプリ}}`), quiz inline | `q1` → o1 (apply, new context: 散歩記録アプリ) |
 | `2-2` | concept | 2-2. 「作りたい」を目的と機能に分ける | 機能は手段。「なぜ？」と聞き返して目的を1文にする | markdown, definitions (目的・機能), table (機能 → 奥の目的), markdown (目的の型), quiz inline | `q2` → o2 (analyze, new context: 習い事の送迎当番; round 1 moved it off the practice topic) |
 | `2-5` (kept id; shown 3rd) | concept | 2-3. 最初に作る範囲を決める | 目的を確かめられる最小の版から作り、やらないことを決める | markdown lead, definitions (MVP・MoSCoW, cite), table MoSCoW × 家計簿 (cite), callout tip (Must の見分け方), quiz inline | `q3` → o3 (evaluate, new context: 読書記録) |
-| `2-3` (kept id; shown 4th) | example | 2-4. 1枚企画書にまとめる | 決めたことを1枚に並べ、AIに渡して読み返す | markdown, definitions (1枚企画書), steps worked example (6 steps, 家計簿), diagram 画面の流れ, prompt (plan, model plan in `expect`), quiz inline | `q4` → o4 (Won't を空にすると？) |
-| `practice` | practice | 演習：自分のアイデアで1枚企画書を作る | 例題と同じ手順を自分の題材で（足場を外す） | markdown (task, time), steps (6, hint + troubleshoot; round 2 added `p-ideas`), prompt (learner's own MoSCoW sort reviewed by the AI, model answer in `expect`), checklist (6 criteria) | — |
+| `2-3` (kept id; shown 4th) | example | 2-4. 1枚企画書にまとめる | 決めたことを1枚に並べ、AIに渡して読み返す | markdown (`s3-b1`, now also the lead-in to the example; `s3-intro` merged into it in round 4), definitions (1枚企画書), steps worked example (6 steps, 家計簿), diagram 画面の流れ, prompt (plan, model plan in `expect`), quiz inline | `q4` → o4 (Won't を空にすると？) |
+| ~~`practice`~~ | — | moved in round 4 to `drafts/vibe-ch2-practice.lesson.json` (ids kept) | — | `summary-next` points to it by title | — |
 | `check` | check | 理解度チェック | 全目標の確認、転移問題を含む | quiz exam (6) | `q5` → o1 (transfer: 料理教室), `q6` → o2, `q7` → o3 (transfer: 水やり記録), `q8` → o4, `q10` → o4 (flawed plan → revise; transfer: 英単語アプリ), `q9` → o4 (試して直す, evaluate) |
-| `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next: ch3/ch4), flashcards (6), askTutor | — |
+| `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next: the practice lesson, ch4), flashcards (6), askTutor | — |
 
 Contract check: hook ≤ 3 sentences + predict; 4 segments, each with an inline quiz (density 4/5 content sections);
 ≤ 3 new terms per segment (2-1: 壁打ち / 2-2: 目的・機能 / 2-5: MVP・MoSCoW / 2-3: 1枚企画書); worked example
@@ -186,3 +186,79 @@ Layout changes from visual QA:
 Other edits: 分かる → わかる (7×, matches ch1 and the style guide). One sentence was added to `s1-b5`
 (「機能より先に、誰の何のためのアプリかを聞いてもらいます。」, pedagogy niceToHave for prior/q1). The hedge on q4 d is
 aligned with the other options. An EN comma was added in `s5-defs`. No id was added, removed or renamed.
+
+## Review round 4
+
+Reviewers (confirmation round): `pedagogy-reviewer` (mean 3.31, revise, 2 must-fix: load 2, worked 3), `ja-editor`
+(mean 3.25, revise, 4 must-fix) and `visual-qa` (mean 3.33, pass, no must-fix). Gate before fixes:
+`check-review.mjs` → **REVISE** (load 2; merged mean 3.15).
+
+What was flagged and what changed:
+
+| # | Reviewer / criterion / block | Flagged | Change |
+|---|---|---|---|
+| A | pedagogy / load / lesson | Body about 3,620 JP characters against 2,400 and estMinutes 30 against 8–20, deferred for three rounds | The whole `practice` section moved, ids kept, to the new draft `drafts/vibe-ch2-practice.lesson.json` (brief `briefs/vibe-ch2-practice.md`). `summary-next` now points to it by title (text only). `s3-intro` merged into `s3-b1`; `s3-steps` tightened (ex-goal, ex-ideas, ex-moscow, ex-screens, ex-data, ex-review); `s3-defs` PRD gloss shortened; smaller trims in `hook-b1`, `s1-b1`, `s1-b2`, `s1-b5`, `summary-next`. estMinutes 30 → 18. o4 restated at evaluate (the create task moved with the practice). |
+| B | pedagogy / worked / `s3-steps` | The plan stores a monthly budget that no Must lets the user enter; the club-app model answer has no Must to create an event | Budget entry folded into the existing Must 「今月の予算の設定と残り金額の表示」 / "set this month's budget and show the money left" in `s5-b2`, `ex-moscow.expect`, `s2-b3.expect`, the practice prompt's `自分の分け方` hint, and `s2-b4` (node B 「今月の残り画面<br>予算の設定・使った額・残り」, alt, description). In the practice draft, 「イベントの作成」 is a Must in the club-app sort and the first screen of its flow. |
+| C | ja-editor / voice, a11y_l10n | 「分かれば」 ×2 (q6 option b feedback and explanation); hook-predict option b 「足りない」; `s2-b4` description label | わかれば ×2; 「足りなかったのは性能ではなく、目的の情報です。」 (EN "What was missing was the goal…"); description 「今月の残り画面で予算を設定し、支出を入力して保存すると、今月の残り画面に戻ります。残り金額は新しい額になります。」 |
+| D1 | pedagogy / active, miscon | q5 distractor repeats the hook; strawmen q6 d, q8 c, q9 c; q1 b | q5 d → misconception 2 (「いったん止めて、ほしい機能を細かく並べた依頼文を送り直す」); q6 d → offering your own fix before asking (「予定の管理なら、カレンダーより一覧のほうがよくない？」); q8 c → 「思いつく例外や細かい条件を、すべて書き足しておく」; q9 c → 「最初の版は捨てて、新しい企画書を一から書き直す」; q1 b → a goal-flavoured request for suggestions (「散歩を習慣にしたいので、役立つ機能を提案してください。」) + feedback + explanation. |
+| D2 | pedagogy + ja-editor / prior, accuracy / q4 | Unexplained 「Claude Codeの公式ガイド」; option d beyond the source | Neutral attribution 「AIツールの開発元のガイドでも、役に立つ仕様書（…）の特徴に、範囲外を書くことが挙げられています。」 (cite unchanged). Option d now says only what the source and explanation support: 「どこまで作るかを、AIが推測で決めることになる」 / "How far to go is left to the AI's guesswork". |
+| D3 | ja-editor / a11y_l10n | EN 通知 two ways; "rota"; `s2-table` row 2 | EN "reminder" everywhere (s2-b1, s2-defs, q2 b and its feedback); "rota" → "schedule"/"duty"; 「入力を忘れて記録が抜けるのを防げる」. |
+| D4 | visual-qa / visual / `s5-b2` | 3-column table wraps mid-word at 390 px | 意味 column is now 必須 / 重要 / あるとよい / 今回やらない (≤ 6 characters, measured in the browser: every 意味 cell is one line at 390 px). Should/Could explanation moved into the `s5-b3` callout (「果たせるならMustではなく、重要ならShould、あるとよい程度ならCouldにします。」). The Won't gloss in `card-moscow` and the glossary is aligned to 「今回やらない」. The Must example cell is longer now (B) and wraps to 4 lines at 390 px. |
+
+Exam check after the split: no exam or inline item referred to the practice. q8 (review before handing over), q10
+(flawed plan → revise) and q9 (update the plan after using it) assess the restated o4 (evaluate) and still make sense
+without the practice; o1–o3 items are unchanged in what they test.
+
+Body length (one-off script over block texts, JP characters without whitespace; quizzes and the copyable prompt
+templates excluded, as the reviewer's ~3,620 did):
+
+| measure | before round 4 | after |
+|---|---|---|
+| body (markdown, callouts, definitions, table cells, steps, summary points, diagram description) | 3,623 | **2,361** |
+| body + prompt model answers and var hints | 4,587 | 2,713 |
+| all non-quiz JP text (titles, captions, alt, prompt templates, flashcards, askTutor included) | 5,807 | 3,649 |
+| section 2-3 (id `2-3`) body / all | 881 / 1,489 | 731 / 1,332 (−150 / −157) |
+| estMinutes | 30 | 18 (contract formula: 3,649 / 450 + 11 × 40 s ≈ 15.4, plus time to try the two prompts) |
+
+**Owner decision needed:** the split only works for learners once the owner lists `vibe-ch2-practice` in `course.json`
+(module `m2`, after `vibe-ch2`, estMinutes 20) and changes `vibe-ch2`'s estMinutes there from 30 to 18. Until then
+`summary-next` names a lesson the course outline does not show, and the reader's "next lesson" card still points to
+ch3. If the owner rejects the split, move the section back and record a length waiver here instead.
+
+After fixes: `lessons:validate` 0 errors and `lessons:lint --strict` 0 warnings for both drafts; `lessons:validate --drafts`
+clean; `lessons:preview` clean for both (no overflow, console or diagram errors). The saved review JSON still describes
+the pre-fix draft, so the gate needs a fresh review round.
+
+## Review round 5 (workflow review round 1)
+
+Reviewers: `pedagogy-reviewer` (mean 3.31, revise, 3 must-fix), `ja-editor` (mean 3.75, revise, 5 must-fix),
+`visual-qa` (revise, 1 must-fix). Gate before fixes: `check-review.mjs` → **REVISE**, exit 1 (every criterion ≥ 3,
+merged mean 3.23 < 3.3, 9 open must-fix).
+
+| # | Reviewer / criterion / block | Flagged | Change |
+|---|---|---|---|
+| A | pedagogy / active / `s1-check` | Both o1 keys are the only option with 質問 | q1 a → 「入れたい機能について、私に質問を1つずつしてください。」 + the given feedback (JP/EN); answer d kept. |
+| B | pedagogy / active / `check-quiz` | q5 reuses the hook's distractors | q5 c → 「いったん止めて、会員登録と決済が必要かを質問してもらう」 + the given feedback; answer a kept. |
+| C | pedagogy / accuracy / `s5-b3` | What the first version holds; q3 a / q8 b feedback contradicted s5-b3 | `s5-b3` rewritten as given (Must → first version; Should/Could → added after the Musts; Won't → not this time, next-version candidate). The 「（重要）」「（あるとよい）」 glosses are left out of the callout because the table right above now shows them, and the body budget is tight. q3 a 「…ShouldかCouldに入れ、Mustができてから考えます。」; q8 b 「…将来ほしくなりそうな機能は、Won'tに書いておきます。」 EN updated. |
+| D | visual-qa / visual / `s5-b2` | 3-column table breaks words at 390 px | Two columns: 分類 (Must/Should/Could/Won't) and 意味：家計簿の例 (「必須：支出の入力、…」). A first try with the meaning in the 分類 cell broke 「Could（あると/よい）」 at 390 px, so the meaning moved to the wide column. Checked in `pages/mobile-jp-09.png`. |
+| E | ja-editor / voice, load | hook-b1 tense, six plain-form step expects, ex-data 「第1章の」, s3-b1 ambiguity, q2 の-chain | All five applied as given (`ex-review.expect` became two sentences). |
+
+niceToHave applied: q2 a → a feature phrased as a goal (「保護者が、当番表をアプリでいつでも見られる」) with
+feedback that names the hidden means; q2 prompt 「最も適切なのは」 and hint (「手段を外しても…が残るもの」); `ex-goal` now
+says why (「目的の1文は、あとの手順の物差しになります。」); `ex-moscow` presents three Musts as this lesson's rule of
+thumb; `ex-ideas.expect` lists 家族との共有; q4 explanation reworded (source re-checked 2026-10-19: "The most useful
+specs are self-contained: they name the files and interfaces involved, state what is out of scope, …"); q9 d (「最初の版は
+小さすぎたので、ShouldとCouldもまとめて作ってもらう」) and q10 b (「ランキングをMustから外し、企画書からも消しておく」) now
+carry beliefs learners hold; s1-check explanation 「誰の、どんな」; summary-next EN; `s2-b3` prompt 「Must・Should・Could」.
+
+Trimmed to stay within the body budget: the last sentence of `s1-b5` (the 壁打ち definition says the same), the
+second sentence of `s2-why` (the table caption says it), and the 「第2章 演習｜」 prefix of the practice title in
+`summary-next`.
+
+Not applied: trimming `s2-b3.expect` (it is the finished page of the worked example and is not body text);
+「ビジョン（vision）」 (ch0 introduces ビジョン; body budget); summary points in です・ます (the exemplar ch1 uses plain
+form for summary points); renumbering ids; reader-level items (flashcard 「タップでめくる」); `course.json` (owner).
+
+Body (same method as round 4): 2,361 → **2,389** (≤ 2,400). estMinutes 18. After fixes: `lessons:validate` 0 errors,
+`lessons:lint --strict` 0 warnings, `lessons:preview` OK (no overflow, console or diagram errors; desktop-jp median
+37 chars/line, desktop-en 71). The saved review JSON describes the pre-fix draft; the gate needs a fresh round.

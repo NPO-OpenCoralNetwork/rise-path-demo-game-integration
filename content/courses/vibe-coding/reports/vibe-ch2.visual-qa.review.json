@@ -6,31 +6,28 @@
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The two tables (s2-table, s5-b2) and the 3-node flowchart (s2-b4, 図1) render cleanly and are readable at 390 px and on desktop, with JP labels in JP and EN labels in EN. One weak spot: on mobile the 3-column MoSCoW table s5-b2 squeezes cells into 3-line wraps such as 「目的を果たせ/ない」「成り/立つ」「やらな/い」 (pages/mobile-jp-09.png, mobile-jp-10.png).",
-      "blockIds": ["s2-table", "s5-b2", "s2-b4"]
+      "score": 4,
+      "evidence": "The screen-flow diagram (s2-b4) uses flowchart TD, has 3 nodes and short labels, and stays readable at 390 px and in the EN version (desktop-en-10). The two 2-column tables (s2-table, s5-b2) and the term definition blocks (s1-defs, s2-defs, s5-defs, s3-defs) fit at 390 px with no clipping (mobile-jp-07, mobile-jp-09)."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty for all three shots. Each screen mixes short paragraphs with a definitions card, callout, table, steps, prompt or quiz. There are no walls of text and no large empty gaps, and an inline check (確認しよう 1/4 to 4/4) closes each section.",
-      "blockIds": ["s1-check", "s2-check", "s5-check", "s3-check", "s3-steps"]
+      "evidence": "No screen is text-only in any of the three runs. Paragraphs are short and broken up by a callout, a table, a prompt or a check about every half screen. Desktop JP is a median 37 chars per line (target 30-40) and EN is a median 71 (target 60-75)."
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The EN screenshots contain no Japanese, and the JP screenshots contain no untranslated English beyond intended terms (MoSCoW, MVP, Must/Won't). Nothing sits under the top or bottom bars, and contrast is good. Desktop JP is 37 characters per line (median, target 30–40), but some lines reach 44. Desktop EN is 70 (median, target 60–75), with a maximum of 79.",
-      "blockIds": ["summary-cards"]
+      "score": 4,
+      "evidence": "No Japanese is left in the EN screenshots: diagram labels, table headers, prompts and quiz options are all in English (desktop-en-04, -06, -10, -11). The JP screenshots have no stray English beyond the intended terms (MoSCoW, MVP, Must/Should/Could/Won't). The figure has a 'describe in words' toggle, contrast looks fine, and nothing is hidden under the 56 px top bar or the 60 px bottom bar on mobile."
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s5-b2: on mobile, the 3-column MoSCoW table wraps the 意味 and 家計簿の例 cells into narrow 3-line stacks with breaks inside words (「目的を果たせ/ない」「この版では作ら/ない」), see pages/mobile-jp-09.png and pages/mobile-jp-10.png. Shorten the 意味 cells to about 6 characters (必須 / 重要 / あるとよい / 今回はやらない) and move the explanation into s5-defs or the s5-b3 callout. Another option is to drop the 意味 column and keep 分類 + 家計簿の例 only.",
-    "reader: the flashcard hint reads 「クリックまたはスペースキーでめくる」 on the 390 px mobile view (pages/mobile-jp-28.png). Use 「タップしてめくる」 on touch devices.",
-    "reader: the next-lesson card title shows 「開発環境コックピット（VSCode）」 while the lesson body writes 「VS Code」 (pages/mobile-jp-30.png, desktop-jp-20.png). Align the spelling in course.json when the owner next edits it.",
-    "reader: section numbers on screen are positional, so section id 2-5 shows as 「2-3」 and id 2-3 shows as 「2-4」. Learners don't see this, but reviewers matching ids to screenshots should know."
+    "q9 (check-quiz, question 5 of 6) wraps a single 「う？」 onto its own line on desktop JP (desktop-jp-13). Shortening the stem, for example by cutting 「直し方として、」, would avoid the orphaned character.",
+    "desktop-en lines reach 78 chars at most, a little over the 75 target, though the median of 71 is fine. Optional: tighten the longest EN paragraph in s5-b1 / hook-b1 if a reflow is wanted.",
+    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (mobile-jp-23). On a touch device it should say tap (タップでめくる).",
+    "reader: on mobile the prompt block's 'Claude Codeで使う' button sits next to コピー and stays visible; worth checking that it does something useful on a phone."
   ],
-  "average": 3.33,
+  "average": 4,
   "verdict": "pass",
-  "summary": "Hard checks are clean: no overflow, no console or mermaid errors, no unknown blocks, no broken images. The lesson keeps a steady visual rhythm on mobile and desktop, and both locales are fully translated. The table, diagram and quizzes all read well. The only visual weakness is the cramped 3-column MoSCoW table s5-b2 at 390 px. Shortening its 意味 column would remove the awkward mid-word wraps."
+  "summary": "The hard-failure checks in metrics.json are all clean: no sideways overflow, no console, Mermaid or image errors, no unknown blocks and no text-only screens. Tables, the TD screen-flow diagram and the prompts are readable at 390 px, and the EN version is fully localized. Nothing has to be fixed; the only lesson-side polish is the orphaned 「う？」 in the q9 stem on desktop JP."
 }

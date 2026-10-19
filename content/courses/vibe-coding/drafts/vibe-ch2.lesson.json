@@ -13,7 +13,7 @@
   "locale": "jp",
   "locales": ["jp", "en"],
   "level": "beginner",
-  "estMinutes": 30,
+  "estMinutes": 18,
   "prerequisites": [
     { "jp": "第0章｜この時代の前提を共有する", "en": "Chapter 0 | Sharing the Premise" },
     { "jp": "第1章｜人間が理解すべき最低ライン", "en": "Chapter 1 | Minimum Viable Knowledge" }
@@ -46,10 +46,10 @@
     {
       "id": "o4",
       "text": {
-        "jp": "目的から「やらないこと」までをまとめた1枚企画書を、AIと作って直せる",
-        "en": "Build a one-page plan with an AI, from the goal to what you won't build, and revise it"
+        "jp": "目的から「やらないこと」までの1枚企画書を読み返し、直すところと直し方を判断できる",
+        "en": "Review a one-page plan, from the goal to what you won't build, and judge what to fix and how"
       },
-      "bloom": "create"
+      "bloom": "evaluate"
     }
   ],
   "sections": [
@@ -66,8 +66,8 @@
           "type": "markdown",
           "style": "lead",
           "md": {
-            "jp": "AIに「家計簿アプリを作って」と頼むと、グラフや分類が並んだ画面がすぐにできました。でも、ほしかったのは「月の途中で食費の使いすぎに気づける」ことでした。どこから直せばよいのか、わからなくなってしまいました。\n\n最初の依頼には、何が足りなかったのでしょうか。読み進める前に、まず予想してみましょう。",
-            "en": "You ask an AI to \"build a household budget app\", and a screen full of charts and categories appears in seconds. But what you wanted was to notice, halfway through the month, that you were overspending on food. Now you can't tell where to start fixing it.\n\nWhat was missing from that first request? Make a guess before you read on."
+            "jp": "AIに「家計簿アプリを作って」と頼んだら、グラフや分類が並んだ画面がすぐにできました。でも、ほしかったのは「月の途中で食費の使いすぎに気づける」ことでした。どこから直せばよいのか、わからなくなってしまいました。\n\n最初の依頼には、何が足りなかったのでしょうか。まず予想してみましょう。",
+            "en": "You ask an AI to \"build a household budget app\", and a screen full of charts and categories appears in seconds. But what you wanted was to notice, halfway through the month, that you were overspending on food. Now you can't tell where to start fixing it.\n\nWhat was missing from that first request? Make a guess first."
           }
         },
         {
@@ -96,8 +96,8 @@
                   "id": "b",
                   "md": { "jp": "より新しく、性能の高いAIを選んで頼むこと", "en": "Choosing a newer, more powerful AI for the job" },
                   "feedback": {
-                    "jp": "AIを替えても、自分の困りごとは伝わりません。足りないのは性能ではなく、目的の情報です。",
-                    "en": "A different AI still doesn't know your problem. What's missing is the goal, not more power."
+                    "jp": "AIを替えても、自分の困りごとは伝わりません。足りなかったのは性能ではなく、目的の情報です。",
+                    "en": "A different AI still wouldn't know your problem. What was missing was the goal, not more power."
                   }
                 },
                 {
@@ -138,8 +138,8 @@
           "type": "markdown",
           "style": "lead",
           "md": {
-            "jp": "第0章で、人間の仕事は「ビジョンを示すこと」や「正しいかを判断すること」だと確認しました。AIはコードを書くだけでなく、「何を作るか」を一緒に考える相手にもなります。",
-            "en": "In Chapter 0 we saw that the human's job includes setting the vision and judging whether the result is right. An AI can do more than write code: it can also help you think through what to build."
+            "jp": "第0章で、人間の仕事は「ビジョン（vision）を示すこと」や「正しいかを判断すること」だと確認しました。AIは、「何を作るか」を一緒に考える相手にもなります。",
+            "en": "In Chapter 0 we saw that the human's job includes setting the vision and judging whether the result is right. An AI can also help you think through what to build."
           }
         },
         {
@@ -148,8 +148,8 @@
           "variant": "analogy",
           "title": { "jp": "たとえるなら", "en": "Think of it like this" },
           "md": {
-            "jp": "いきなり「コードを書いて」と頼むのは、大工さんに「とりあえず建て始めて」と頼むようなものです。先に「誰が住む、どんな家か」を話し合う必要があります。大工さんがAI、家がこれから作るアプリです。",
-            "en": "Asking for code straight away is like telling a builder, \"Just start building.\" First you need to talk about who will live there and what kind of house it is. The builder is the AI; the house is the app you're about to build."
+            "jp": "いきなり「コードを書いて」と頼むのは、大工さんに「とりあえず建て始めて」と頼むようなものです。先に「誰が住む、どんな家か」を話し合います。大工さんがAI、家がアプリです。",
+            "en": "Asking for code straight away is like telling a builder, \"Just start building.\" First you talk about who will live there and what kind of house it is. The builder is the AI; the house is the app."
           }
         },
         {
@@ -170,8 +170,8 @@
           "type": "markdown",
           "cite": ["cc-best-practices"],
           "md": {
-            "jp": "AIは意図をある程度推測できますが、頭の中までは読めません。いきなりコードを書かせると、違う問題を解くアプリができてしまうことがあります。\n\nそこで、AIに「質問してください」と頼みます。機能より先に、誰の何のためのアプリかを聞いてもらいます。答えを出してもらうのではなく、考えを引き出してもらうと、作りたいものがはっきりします。",
-            "en": "An AI can guess your intent to some degree, but it can't read your mind. If you let it jump straight to coding, it may build an app that solves the wrong problem.\n\nSo ask the AI to ask you questions: whose app it is and what it's for, before any features. When it draws your thinking out instead of handing you answers, what you want to build becomes clear."
+            "jp": "AIは意図をある程度推測できますが、頭の中までは読めません。いきなりコードを書かせると、違う問題を解くアプリができてしまうことがあります。\n\nそこで、AIに「質問してください」と頼み、機能より先に、誰の何のためのアプリかを聞いてもらいます。下の依頼文を自分のアイデアで試し、「期待される結果」と比べましょう。",
+            "en": "An AI can guess your intent to some degree, but it can't read your mind. If you let it jump straight to coding, it may build an app that solves the wrong problem.\n\nSo ask the AI to ask you questions: whose app it is and what it's for, before any features. Try the request below with your own idea, and compare what you get with \"What a good answer looks like\"."
           }
         },
         {
@@ -209,23 +209,23 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "散歩記録アプリのコードを、最後まで全部書いてください。",
-                    "en": "Write all the code for the walk-tracking app, start to finish."
+                    "jp": "入れたい機能について、私に質問を1つずつしてください。",
+                    "en": "Ask me about the features I want, one question at a time."
                   },
                   "feedback": {
-                    "jp": "いきなり全部を頼むと、AIは困りごとを知らないまま作ります。まず質問してもらい、目的をはっきりさせます。",
-                    "en": "If you ask for everything at once, the AI builds without knowing your problem. Have it ask questions first so the goal becomes clear."
+                    "jp": "機能について聞いてもらうと、目的が決まらないまま機能が並びます。先に、誰の何のためのアプリかを質問してもらいます。",
+                    "en": "Asking about features gets you a list of features before the goal is set. Have it ask whose app it is and what it's for first."
                   }
                 },
                 {
                   "id": "b",
                   "md": {
-                    "jp": "入れたい機能について、私に質問を1つずつしてください。",
-                    "en": "Ask me one question at a time about the features I want."
+                    "jp": "散歩を習慣にしたいので、役立つ機能を提案してください。",
+                    "en": "I want to make walks a habit, so please suggest useful features."
                   },
                   "feedback": {
-                    "jp": "機能の質問から始めると、何のためのアプリかが決まらないまま進みます。先に「誰の何のためか」を聞いてもらうと、機能も選べます。",
-                    "en": "Starting with questions about features leaves open what the app is for. Have it ask whose problem it solves first, and then you can choose features."
+                    "jp": "目的を一言そえても、提案を頼むとAIの答えが先に来ます。先に質問してもらうと、誰のどんな困りごとかがはっきりします。",
+                    "en": "Even with a goal attached, asking for suggestions puts the AI's answers first. Have it ask you questions first, and whose problem it is becomes clear."
                   }
                 },
                 {
@@ -249,8 +249,8 @@
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "壁打ちでは、答えより先に質問を頼みます。機能ではなく目的について聞いてもらうと、誰の・どんな困りごとを解決したいのかが言葉になります。",
-                "en": "When you talk it through, you ask for questions before answers. Questions about the goal rather than the features help you put into words whose problem you want to solve and what it is."
+                "jp": "壁打ちでは、答えより先に質問を頼みます。提案より先に目的について聞いてもらうと、誰の、どんな困りごとを解決したいのかが言葉になります。",
+                "en": "When you talk it through, you ask for questions before answers. Questions about the goal, before any suggestions, help you put into words whose problem you want to solve and what it is."
               },
               "hint": {
                 "jp": "それぞれ、何を決めるための依頼なのかに注目しましょう。",
@@ -277,7 +277,7 @@
           "style": "lead",
           "md": {
             "jp": "アイデアは「グラフがほしい」「通知がほしい」のように、アプリへの注文の形で浮かびがちです。でも、それを並べるだけでは、どれが本当に必要かを決められません。",
-            "en": "Ideas tend to arrive as orders for the app: \"I want a chart\", \"I want notifications\". But a list like that can't tell you which ones you really need."
+            "en": "Ideas tend to arrive as orders for the app: \"I want a chart\", \"I want reminders\". But a list like that can't tell you which ones you really need."
           }
         },
         {
@@ -295,7 +295,7 @@
               "term": { "jp": "機能", "en": "Feature" },
               "md": {
                 "jp": "目的を果たすための手段。入力欄や画面、通知など、アプリが「すること」です。",
-                "en": "A means of reaching the goal: an input field, a screen, a notification. Something the app does."
+                "en": "A means of reaching the goal: an input field, a screen, a reminder. Something the app does."
               }
             }
           ]
@@ -304,8 +304,8 @@
           "id": "s2-why",
           "type": "markdown",
           "md": {
-            "jp": "ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。下の表は、家計簿アプリで機能の奥にある目的を聞き出した例です。",
-            "en": "When someone names a [[feature]], ask back once: \"Why do you want that?\" The table below shows the goals found behind features in the budget app example."
+            "jp": "ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。",
+            "en": "When someone names a [[feature]], ask back once: \"Why do you want that?\""
           }
         },
         {
@@ -326,7 +326,7 @@
             ],
             [
               { "jp": "毎晩の通知", "en": "A nightly reminder" },
-              { "jp": "入力忘れによる記録の抜けを防げる", "en": "No gaps in the record from forgetting to log" }
+              { "jp": "入力を忘れて記録が抜けるのを防げる", "en": "No gaps in the record when I forget to log" }
             ],
             [
               { "jp": "レシートの読み取り", "en": "Receipt scanning" },
@@ -351,30 +351,30 @@
               "id": "q2",
               "kind": "single",
               "prompt": {
-                "jp": "子どもの習い事の送迎当番アプリの企画メモです。「目的」として書かれているのはどれでしょう？",
-                "en": "Here are planning notes for an app that organizes the parents' pick-up rota for a kids' class. Which one is written as a goal?"
+                "jp": "子どもの習い事で、送迎当番を決めるアプリの企画メモです。「目的」として最も適切なのはどれでしょう？",
+                "en": "Here are planning notes for an app that assigns parents' pick-up duty for a kids' class. Which one works best as a goal?"
               },
               "options": [
                 {
                   "id": "a",
                   "md": {
-                    "jp": "当番の交代を、ボタン1つで申し込めるようにする",
-                    "en": "Let parents request a rota swap with a single button"
+                    "jp": "保護者が、当番表をアプリでいつでも見られる",
+                    "en": "Parents can see the duty roster in the app any time"
                   },
                   "feedback": {
-                    "jp": "これはアプリが「すること」なので機能です。なぜボタン1つにしたいのかを聞くと、目的が見えてきます。",
-                    "en": "That is something the app does, so it's a feature. Ask why it should be one button, and the goal comes into view."
+                    "jp": "「見られる」の形でも、中身はアプリで表を見せるという手段、つまり機能です。見られると何がうれしいのかを聞くと、目的が見えてきます。",
+                    "en": "It's phrased as an outcome, but what it describes is a means (showing a table in the app), so it's a feature. Ask what seeing it would do for them, and the goal comes into view."
                   }
                 },
                 {
                   "id": "b",
                   "md": {
                     "jp": "当番の前日に、担当になった保護者へ通知を送る",
-                    "en": "Send a notification to the parent on duty the day before"
+                    "en": "Send a reminder to the parent on duty the day before"
                   },
                   "feedback": {
                     "jp": "通知は目的を果たすための手段、つまり機能です。何のために通知するのかが目的にあたります。",
-                    "en": "A notification is a means to the goal, in other words a feature. What the notification is for is the goal."
+                    "en": "A reminder is a means to the goal, in other words a feature. What the reminder is for is the goal."
                   }
                 },
                 {
@@ -388,7 +388,7 @@
                   "id": "d",
                   "md": {
                     "jp": "当番の記録を、アプリのデータベースに自動で保存する",
-                    "en": "Save rota records to the app's database automatically"
+                    "en": "Save duty records to the app's database automatically"
                   },
                   "feedback": {
                     "jp": "保存はアプリの中の仕組みで、目的ではありません。保存した結果で、誰がどうなれるかを考えます。",
@@ -402,8 +402,8 @@
                 "en": "A goal says who, in what situation, can do what. Parents knowing their duty days early enough to keep the time free becomes the yardstick for choosing the other features."
               },
               "hint": {
-                "jp": "「誰が、どうなれる」が書かれているものを探しましょう。",
-                "en": "Look for the one that says who ends up able to do what."
+                "jp": "アプリや通知などの手段を外しても、「誰が、どうなれる」が残るものを探しましょう。",
+                "en": "Look for the one that still says who ends up able to do what once you take out the means, such as the app or a reminder."
               },
               "objectiveId": "o2",
               "bloom": "analyze"
@@ -460,29 +460,24 @@
           },
           "columns": [
             { "jp": "分類", "en": "Group" },
-            { "jp": "意味", "en": "Meaning" },
-            { "jp": "家計簿の例", "en": "Budget app example" }
+            { "jp": "意味：家計簿の例", "en": "Meaning: budget app example" }
           ],
           "rows": [
             [
               { "jp": "Must", "en": "Must" },
-              { "jp": "必須：ないと目的を果たせない", "en": "Essential: the goal can't be met without it" },
-              { "jp": "支出の入力、今月の残り金額の表示", "en": "Logging an expense; showing the money left this month" }
+              { "jp": "必須：支出の入力、今月の予算の設定と残り金額の表示", "en": "Essential: logging an expense; setting this month's budget and showing the money left" }
             ],
             [
               { "jp": "Should", "en": "Should" },
-              { "jp": "重要：なくても最初の版は成り立つ", "en": "Important: the first version still works without it" },
-              { "jp": "入力忘れを知らせる通知", "en": "A reminder when you forget to log" }
+              { "jp": "重要：入力忘れを知らせる通知", "en": "Important: a reminder when you forget to log" }
             ],
             [
               { "jp": "Could", "en": "Could" },
-              { "jp": "あるとよい：優先度は低い", "en": "Nice to have: lower priority" },
-              { "jp": "食費の推移のグラフ", "en": "A chart of food spending over time" }
+              { "jp": "あるとよい：食費の推移のグラフ", "en": "Nice to have: a chart of food spending over time" }
             ],
             [
               { "jp": "Won't", "en": "Won't" },
-              { "jp": "今回はやらない：この版では作らない", "en": "Not this time: agreed not to build in this version" },
-              { "jp": "レシートの読み取り、家族との共有", "en": "Receipt scanning; sharing with family" }
+              { "jp": "今回やらない：レシートの読み取り、家族との共有", "en": "Not this time: receipt scanning; sharing with family" }
             ]
           ]
         },
@@ -492,8 +487,8 @@
           "variant": "tip",
           "title": { "jp": "Mustに迷ったら", "en": "Not sure if it's a Must?" },
           "md": {
-            "jp": "「これがなくても、目的は果たせる？」と自分に聞きます。果たせるなら、それはMustではありません。Won'tは捨てた機能ではなく、次の版の候補として残しておくものです。",
-            "en": "Ask yourself: \"Could the goal still be met without this?\" If it could, it isn't a Must. A Won't isn't thrown away; it stays on the list as a candidate for the next version."
+            "jp": "「これがなくても、目的は果たせる？」と聞きます。答えが「果たせない」になる機能だけをMustにします。このレッスンでは、最初の版をMustだけで作ります。ShouldとCouldはそのあとに足す候補です。Won'tは今回作らず、次の版の候補として残します。",
+            "en": "Ask, \"Could the goal still be met without this?\" Only the features the goal can't do without become Musts. In this lesson, the first version is built from the Musts alone; Shoulds and Coulds are candidates to add after that. A Won't is not built this time and stays on as a candidate for the next version."
           }
         },
         {
@@ -516,8 +511,8 @@
                     "en": "Scanning a barcode to fill in the book title automatically"
                   },
                   "feedback": {
-                    "jp": "便利ですが、書名は手で入力しても目的は果たせます。ShouldかCouldに入れ、次の版で考えます。",
-                    "en": "Handy, but typing the title by hand still meets the goal. Put it under Should or Could and consider it for the next version."
+                    "jp": "便利ですが、書名は手で入力しても目的は果たせます。ShouldかCouldに入れ、Mustができてから考えます。",
+                    "en": "Handy, but typing the title by hand still meets the goal. Put it under Should or Could and come back to it once the Musts work."
                   }
                 },
                 {
@@ -553,7 +548,7 @@
               "answer": ["b"],
               "explanation": {
                 "jp": "Mustは「これがないと目的を果たせない」機能だけです。感想を残して読み返せなければ、このアプリの目的は果たせません。",
-                "en": "A Must is only a feature without which the goal can't be met. If you can't save and reread your thoughts, this app fails at its goal."
+                "en": "Only features the goal can't do without are Musts. If you can't save and reread your thoughts, this app fails at its goal."
               },
               "hint": {
                 "jp": "それぞれ「これがなくても、目的は果たせる？」と聞いてみましょう。",
@@ -579,8 +574,8 @@
           "type": "markdown",
           "style": "lead",
           "md": {
-            "jp": "決めた目的と機能の優先順位に、画面の流れと扱うデータを足して、1枚にまとめます。AIに作業を頼むときも、この1枚を渡せば同じ前提で話せます。\n\n企画書は、最初から完璧でなくてかまいません。作って試しながら直していきます。",
-            "en": "Take the goal and the feature priorities you decided on, add the screen flow and the data the app handles, and put it all on one page. Later, when you hand work to an AI, this page means you both start from the same assumptions.\n\nIt doesn't have to be perfect at first. You revise it as you build and try things."
+            "jp": "目的と機能の優先順位に、画面の流れと扱うデータを足して、1枚にまとめます。この1枚を渡せば、AIと同じ前提で話せます。\n\n最初から完璧でなくてかまいません。作って試しながら直します。家計簿アプリの例で見てみましょう。",
+            "en": "Take the goal and the feature priorities, add the screen flow and the data the app handles, and put it all on one page. Hand this page to an AI, and you both start from the same assumptions.\n\nIt doesn't have to be perfect at first; you revise it as you build and try things. Let's walk through the budget app example."
           }
         },
         {
@@ -590,19 +585,11 @@
             {
               "term": { "jp": "1枚企画書", "en": "One-page plan" },
               "md": {
-                "jp": "目的・使う人・機能の優先順位・画面の流れ・扱うデータ・やらないことを、1枚に並べた文書。チームで使うPRD（Product Requirements Document、製品の要件をまとめた文書）の小さな版です。",
+                "jp": "目的・使う人・機能の優先順位・画面の流れ・扱うデータ・やらないことを、1枚に並べた文書。製品の要件をまとめるPRD（Product Requirements Document）の小さな版です。",
                 "en": "A single page listing the goal, the users, feature priorities, the screen flow, the data handled and what you won't build. It's a small version of the PRD (Product Requirements Document) that teams use to write down a product's requirements."
               }
             }
           ]
-        },
-        {
-          "id": "s3-intro",
-          "type": "markdown",
-          "md": {
-            "jp": "家計簿アプリの例で、作る流れを見てみましょう。演習でも、ほぼ同じ流れをたどります。",
-            "en": "Let's walk through the budget app example. You'll follow almost the same flow in the practice."
-          }
         },
         {
           "id": "s3-steps",
@@ -612,11 +599,11 @@
               "id": "ex-goal",
               "title": { "jp": "目的を1文にする", "en": "Put the goal in one sentence" },
               "md": {
-                "jp": "2-1の依頼文で壁打ちします。たとえば「いつ困りますか？」と聞かれたら、「月末に、食費を使いすぎたと気づきます」と答えます。目的は、このあと機能を選ぶ物差しになります。",
-                "en": "Talk it through with the AI using the request from 2-1. For example, if it asks \"When do you run into the problem?\", you might answer, \"At the end of the month, when I find I've overspent on food.\" The goal becomes your yardstick for choosing features next."
+                "jp": "2-1の依頼文で壁打ちします。「いつ困りますか？」には「月末に、食費を使いすぎたと気づきます」と答えます。目的の1文は、あとの手順の物差しになります。",
+                "en": "Talk it through using the request from 2-1. Asked \"When do you run into the problem?\", you might answer, \"At the end of the month, when I find I've overspent on food.\" The goal sentence you end up with is the yardstick for every later step."
               },
               "expect": {
-                "jp": "「家計をあずかる自分が、月の途中で食費の使いすぎに気づける」という1文ができる。",
+                "jp": "「家計をあずかる自分が、月の途中で食費の使いすぎに気づける」という1文ができます。",
                 "en": "You end up with one sentence: \"As the person who runs the household budget, I can notice mid-month that I'm overspending on food.\""
               }
             },
@@ -624,60 +611,60 @@
               "id": "ex-ideas",
               "title": { "jp": "機能の候補を出す", "en": "Gather candidate features" },
               "md": {
-                "jp": "AIに「この目的に役立つ機能の候補を挙げて」と頼み、自分の案も足します。目的が決まっているので、候補を同じ物差しで比べられます。",
-                "en": "Ask the AI to \"list features that would help with this goal\", and add your own ideas. With the goal set, you can measure every candidate with the same yardstick."
+                "jp": "AIに「この目的に役立つ機能の候補を挙げて」と頼み、自分の案も足します。比べる物差しは目的です。",
+                "en": "Ask the AI to \"list features that would help with this goal\", and add your own ideas. The goal is the yardstick you compare them by."
               },
               "expect": {
-                "jp": "入力、残り金額の表示、通知、グラフ、レシート読み取りなどの候補が並ぶ。",
-                "en": "Candidates appear: logging, money left, reminders, charts, receipt scanning and so on."
+                "jp": "入力、予算と残り金額、通知、グラフ、レシート読み取り、家族との共有などが並びます。",
+                "en": "Candidates appear: logging expenses, the budget and money left, reminders, charts, receipt scanning, sharing with family and so on."
               }
             },
             {
               "id": "ex-moscow",
               "title": { "jp": "MoSCoWで分ける", "en": "Sort them with MoSCoW" },
               "md": {
-                "jp": "「これがなくても目的は果たせる？」と聞きながら分けます。最初の版を小さく保つため、このレッスンではMustを3つ以内に絞るのを目安にします。",
-                "en": "Sort them by asking, \"Could the goal still be met without this?\" To keep the first version small, this lesson aims for no more than three Musts."
+                "jp": "「これがなくても目的は果たせる？」と聞いて分けます。最初の版を小さく保つため、このレッスンでは「Mustは3つ以内」を目安にします。",
+                "en": "Sort them by asking, \"Could the goal still be met without this?\" To keep the first version small, this lesson uses a rule of thumb: no more than three Musts."
               },
               "expect": {
-                "jp": "Mustは「支出の入力」と「今月の残り金額の表示」の2つになる。",
-                "en": "Two Musts remain: \"log an expense\" and \"show the money left this month\"."
+                "jp": "Mustは「支出の入力」と「今月の予算の設定と残り金額の表示」の2つになります。",
+                "en": "Two Musts remain: \"log an expense\" and \"set this month's budget and show the money left\"."
               }
             },
             {
               "id": "ex-screens",
               "title": { "jp": "画面の流れを書く", "en": "Write the screen flow" },
               "md": {
-                "jp": "Mustの機能を使う順に、画面と移り方を並べます。画面が決まると、AIに作ってもらう範囲がはっきりします。",
-                "en": "Line up the screens, and how you move between them, in the order you use the Must features. Once the screens are set, it's clear what you'll ask the AI to build."
+                "jp": "Mustを使う順に、画面と移り方を並べます。画面が決まると、頼む範囲がはっきりします。",
+                "en": "Line up the screens, and how you move between them, in the order you use the Musts. Once the screens are set, it's clear what to ask the AI to build."
               },
               "expect": {
-                "jp": "「今月の残り画面」と「支出の入力画面」を行き来する流れになる（下の図）。",
-                "en": "The flow goes back and forth between the money-left screen and the add-expense screen (see the figure below)."
+                "jp": "2つの画面を行き来する流れになります（下の図）。",
+                "en": "The flow goes back and forth between two screens (see the figure below)."
               }
             },
             {
               "id": "ex-data",
               "title": { "jp": "扱うデータを言葉にする", "en": "Put the data into words" },
               "md": {
-                "jp": "第1章で見たデータベースに、何を残すかを決めます。決めないと、項目をAIが推測で選ぶことになります。項目名を並べるだけで十分です。",
-                "en": "Decide what to keep in the database you met in Chapter 1. If you don't, the AI has to guess which fields to keep. A list of field names is enough."
+                "jp": "第1章で学んだデータベースに、何を残すかを決めます。決めないと、AIが推測で項目を選びます。項目名だけで十分です。",
+                "en": "Decide what to keep in the database you met in Chapter 1. If you don't, the AI guesses which fields to keep. Field names are enough."
               },
               "expect": {
-                "jp": "「支出：日付・金額・メモ」と「予算：月ごとの金額」の2つが書ける。",
+                "jp": "「支出：日付・金額・メモ」と「予算：月ごとの金額」の2つが書けます。",
                 "en": "You can write two items: \"Expense: date, amount, note\" and \"Budget: amount per month\"."
               }
             },
             {
               "id": "ex-review",
-              "title": { "jp": "1枚にまとめてもらい、読み返す", "en": "Have it written up, then reread" },
+              "title": { "jp": "まとめてもらい、読み返す", "en": "Have it written up, then reread" },
               "md": {
-                "jp": "下の依頼文でAIにまとめてもらい、意図と違うところを直します。この1枚が、このあとAIと作るときの前提になります。",
-                "en": "Use the request below to have the AI write the page, then fix anything that doesn't match what you meant. This page is what you and the AI will build from next."
+                "jp": "下の依頼文でAIにまとめてもらいます。推測が混ざることがあるので、意図と違うところを直します。",
+                "en": "Use the request below to have the AI write the page. It may mix in guesses, so fix anything that doesn't match what you meant."
               },
               "expect": {
-                "jp": "6つの項目が1枚に並び、違うと感じたところを直してもらえる。",
-                "en": "All six items fit on one page, and the AI fixes whatever feels off once you point it out."
+                "jp": "6つの項目が1枚に並びます。違うところを伝えると、AIが直してくれます。",
+                "en": "All six items fit on one page, and the AI fixes whatever is off once you point it out."
               }
             }
           ]
@@ -687,20 +674,20 @@
           "type": "diagram",
           "engine": "mermaid",
           "code": {
-            "jp": "flowchart TD\n  A[アプリを開く] --> B[今月の残り画面<br>予算・使った額・残り]\n  B -->|追加ボタン| C[支出の入力画面<br>日付・金額・メモ]\n  C -->|保存| B",
-            "en": "flowchart TD\n  A[Open the app] --> B[Money-left screen<br>budget, spent, left]\n  B -->|Add button| C[Add-expense screen<br>date, amount, note]\n  C -->|Save| B"
+            "jp": "flowchart TD\n  A[アプリを開く] --> B[今月の残り画面<br>予算の設定・使った額・残り]\n  B -->|追加ボタン| C[支出の入力画面<br>日付・金額・メモ]\n  C -->|保存| B",
+            "en": "flowchart TD\n  A[Open the app] --> B[Money-left screen<br>set budget, spent, left]\n  B -->|Add button| C[Add-expense screen<br>date, amount, note]\n  C -->|Save| B"
           },
           "caption": {
             "jp": "Mustだけなら、最初の版の画面は2つで足りる",
             "en": "With only the Musts, the first version needs just two screens"
           },
           "alt": {
-            "jp": "アプリを開くと今月の残り画面が出て、追加ボタンで支出の入力画面へ進み、保存すると今月の残り画面に戻る図",
-            "en": "The app opens on the money-left screen; the Add button leads to the add-expense screen, and saving returns to the money-left screen"
+            "jp": "今月の残り画面で予算を設定し、追加ボタンで支出の入力画面へ進み、保存すると今月の残り画面に戻る図",
+            "en": "On the money-left screen you set the budget; the Add button leads to the add-expense screen, and saving returns to the money-left screen"
           },
           "description": {
-            "jp": "支出を入力して保存すると、残り金額が変わった画面に戻ります。",
-            "en": "Log an expense and save it, and you're back on the money-left screen with the new amount."
+            "jp": "今月の残り画面で予算を設定し、支出を入力して保存すると、今月の残り画面に戻ります。残り金額は新しい額になります。",
+            "en": "Set the budget on the money-left screen. Log an expense and save it, and you're back on the money-left screen with the new amount."
           }
         },
         {
@@ -709,7 +696,7 @@
           "title": { "jp": "1枚企画書を作ってもらう依頼文", "en": "A request for the one-page plan" },
           "target": "any",
           "prompt": {
-            "jp": "ここまでの相談をもとに、「{{アプリ名}}」の1枚企画書を作ってください。\n次の6つの見出しで、それぞれ短く書いてください。\n1. 目的（誰が・どんな場面で・どうなれる）\n2. 使う人\n3. 機能の優先順位（Must / Should / Could）\n4. 画面の流れ（画面名を「→」でつなぐ）\n5. 扱うデータ（項目名だけ）\n6. やらないこと（Won't）\nコードはまだ書かないでください。決めていないことは推測で埋めず、質問してください。",
+            "jp": "ここまでの相談をもとに、「{{アプリ名}}」の1枚企画書を作ってください。\n次の6つの見出しで、それぞれ短く書いてください。\n1. 目的（誰が・どんな場面で・どうなれる）\n2. 使う人\n3. 機能の優先順位（Must・Should・Could）\n4. 画面の流れ（画面名を「→」でつなぐ）\n5. 扱うデータ（項目名だけ）\n6. やらないこと（Won't）\nコードはまだ書かないでください。決めていないことは推測で埋めず、質問してください。",
             "en": "Based on our discussion so far, write a one-page plan for \"{{app name}}\".\nUse the six headings below and keep each one short.\n1. Goal (who, in what situation, can do what)\n2. Users\n3. Feature priorities (Must / Should / Could)\n4. Screen flow (screen names joined with \"→\")\n5. Data handled (field names only)\n6. What we won't build (Won't)\nDon't write any code yet. If something hasn't been decided, don't fill it in with a guess; ask me instead."
           },
           "vars": [
@@ -717,8 +704,8 @@
             { "name": "app name", "hint": { "jp": "例：食費の使いすぎに気づける家計簿アプリ", "en": "e.g. a budget app that flags food overspending" } }
           ],
           "expect": {
-            "jp": "家計簿アプリなら、たとえば次のような1枚になります。\n\n目的：家計をあずかる自分が、月の途中で食費の使いすぎに気づける。\n\n使う人：自分1人。\n\n機能の優先順位：Mustは支出の入力と今月の残り金額の表示。Shouldは入力忘れの通知、Couldは食費のグラフ。\n\n画面の流れ：今月の残り画面 → 支出の入力画面 → 今月の残り画面。\n\n扱うデータ：支出（日付・金額・メモ）、予算（月ごとの金額）。\n\nやらないこと：レシートの読み取り、家族との共有。",
-            "en": "For the budget app, the page might look like this.\n\nGoal: as the person who runs the household budget, I can notice mid-month that I'm overspending on food.\n\nUsers: only me.\n\nFeature priorities: Must: log an expense; show the money left this month. Should: a reminder to log. Could: a food-spending chart.\n\nScreen flow: money-left screen → add-expense screen → money-left screen.\n\nData handled: expense (date, amount, note); budget (amount per month).\n\nWhat we won't build: receipt scanning; sharing with family."
+            "jp": "たとえば、次のような1枚になります。\n\n目的：家計をあずかる自分が、月の途中で食費の使いすぎに気づける。\n\n使う人：自分1人。\n\n機能の優先順位：Mustは支出の入力と、今月の予算の設定と残り金額の表示。Shouldは入力忘れの通知、Couldは食費のグラフ。\n\n画面の流れ：今月の残り画面 → 支出の入力画面 → 今月の残り画面。\n\n扱うデータ：支出（日付・金額・メモ）、予算（月ごとの金額）。\n\nやらないこと：レシートの読み取り、家族との共有。",
+            "en": "For the budget app, the page might look like this.\n\nGoal: as the person who runs the household budget, I can notice mid-month that I'm overspending on food.\n\nUsers: only me.\n\nFeature priorities: Must: log an expense; set this month's budget and show the money left. Should: a reminder to log. Could: a food-spending chart.\n\nScreen flow: money-left screen → add-expense screen → money-left screen.\n\nData handled: expense (date, amount, note); budget (amount per month).\n\nWhat we won't build: receipt scanning; sharing with family."
           }
         },
         {
@@ -771,15 +758,15 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "頼んでいない機能まで、AIが作り足してしまう",
-                    "en": "The AI adds features you never asked for"
+                    "jp": "どこまで作るかを、AIが推測で決めることになる",
+                    "en": "How far to go is left to the AI's guesswork"
                   }
                 }
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。Claude Codeの公式ガイドも、よい仕様書（企画書のような文書）の条件として、範囲外を書くことを挙げています。",
-                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. The official Claude Code guide also lists stating what is out of scope as a mark of a good spec (a document like this plan)."
+                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。AIツールの開発元のガイドも、役に立つ仕様書（企画書のような文書）の特徴として、範囲外を書くことを挙げています。",
+                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. A guide from an AI tool maker likewise names stating what is out of scope as a feature of useful specs (documents like this plan)."
               },
               "hint": {
                 "jp": "書いていないことを、AIがどう扱うかを考えましょう。",
@@ -787,200 +774,6 @@
               },
               "objectiveId": "o4",
               "bloom": "analyze"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "practice",
-      "title": {
-        "jp": "演習：自分のアイデアで1枚企画書を作る",
-        "en": "Practice: a one-page plan for your own idea"
-      },
-      "role": "practice",
-      "blocks": [
-        {
-          "id": "practice-task",
-          "type": "markdown",
-          "style": "lead",
-          "md": {
-            "jp": "自分の作りたいアプリで、AIと1枚企画書を作ります。思いつかなければ「サークルの出欠確認アプリ」で試しましょう。目安は15分です。\n\n最後に、下のチェックリストで仕上がりを確かめます。",
-            "en": "Make a one-page plan with an AI for an app you want to build. If nothing comes to mind, try a club attendance app. Allow about 15 minutes.\n\nWhen you finish, check your plan against the checklist below."
-          }
-        },
-        {
-          "id": "practice-steps",
-          "type": "steps",
-          "items": [
-            {
-              "id": "p-idea",
-              "title": { "jp": "アイデアを1行で書く", "en": "Write the idea in one line" },
-              "md": {
-                "jp": "「誰の」「何のための」アプリかを1行で書きます。",
-                "en": "Write in one line whose app it is and what it's for."
-              },
-              "expect": {
-                "jp": "「サークルの幹事が、参加人数を早く知るためのアプリ」のような1行ができる。",
-                "en": "You have a line such as \"An app that lets a club organizer know the headcount early\"."
-              },
-              "hint": {
-                "jp": "思いつかないときは、最近「面倒だな」と感じた作業を1つ選びます。",
-                "en": "If nothing comes to mind, pick one task that has felt like a chore lately."
-              }
-            },
-            {
-              "id": "p-interview",
-              "title": { "jp": "AIに質問してもらう", "en": "Have the AI ask you questions" },
-              "md": {
-                "jp": "2-1の「壁打ちを始める依頼文」をAIに送り、質問に1つずつ答えます。",
-                "en": "Send \"A request to start talking it through\" from 2-1, and answer the AI's questions one by one."
-              },
-              "expect": {
-                "jp": "目的が「誰が・どんな場面で・どうなれる」の1文にまとまる。",
-                "en": "The goal comes together as one sentence: who, in what situation, can do what."
-              },
-              "hint": {
-                "jp": "答えに迷ったら、「例を3つ挙げて」とAIに頼みます。",
-                "en": "If you're stuck on an answer, ask the AI to \"give me three examples\"."
-              },
-              "troubleshoot": {
-                "jp": "AIがすぐにコードを書き始めたら、「コードはまだ不要です。質問だけしてください」と送り直します。",
-                "en": "If the AI starts writing code right away, reply: \"No code yet, please. Only ask me questions.\""
-              }
-            },
-            {
-              "id": "p-ideas",
-              "title": { "jp": "機能の候補を出す", "en": "Gather candidate features" },
-              "md": {
-                "jp": "AIに「この目的に役立つ機能の候補を挙げて」と頼み、自分の案も足します。",
-                "en": "Ask the AI to \"list features that would help with this goal\", and add your own ideas."
-              },
-              "expect": {
-                "jp": "機能の候補が5つ以上並ぶ。",
-                "en": "You have five or more candidate features."
-              },
-              "hint": {
-                "jp": "候補が少ないときは、目的の1文を読み返し、「どんな場面で、何があると助かる？」と自分に聞きます。",
-                "en": "If you have only a few, reread your goal sentence and ask yourself: \"In which moments would something help, and what?\""
-              }
-            },
-            {
-              "id": "p-moscow",
-              "title": { "jp": "自分で分けて、AIに見直してもらう", "en": "Sort them yourself, then have the AI review" },
-              "md": {
-                "jp": "まず自分で4つに分け、理由を1行ずつ書きます。次に下の依頼文で、AIに見直してもらいます。",
-                "en": "First sort the candidates into the four groups yourself, with a one-line reason for each. Then use the request below to have the AI review your sorting."
-              },
-              "expect": {
-                "jp": "4つの分け方と理由が書けている。AIの指摘を読み、直すかどうかを自分で決められる。",
-                "en": "Your four groups and reasons are written down. You read the AI's points and decide for yourself whether to change anything."
-              },
-              "hint": {
-                "jp": "Mustに迷ったら「これがなくても、目的は果たせる？」と自分に聞きます。",
-                "en": "If you're unsure about a Must, ask yourself: \"Could the goal still be met without this?\""
-              },
-              "troubleshoot": {
-                "jp": "Mustが4つ以上残ったら、目的を果たす最短の流れに要らないものをShouldに移します。",
-                "en": "If four or more Musts remain, move anything the shortest path to the goal doesn't need into Should."
-              }
-            },
-            {
-              "id": "p-plan",
-              "title": { "jp": "1枚企画書にまとめてもらう", "en": "Have it written up as a one-page plan" },
-              "md": {
-                "jp": "2-4の「1枚企画書を作ってもらう依頼文」で、6つの見出しの企画書を作ってもらいます。",
-                "en": "Use \"A request for the one-page plan\" from 2-4 to get a plan with the six headings."
-              },
-              "expect": {
-                "jp": "目的から「やらないこと」までの6項目が1枚に並ぶ。",
-                "en": "All six items, from the goal to what you won't build, sit on one page."
-              },
-              "hint": {
-                "jp": "AIが勝手に埋めた項目があれば、「これは決めていません」と伝えて質問してもらいます。",
-                "en": "If the AI filled in something you never decided, say \"I haven't decided this\" and have it ask you instead."
-              }
-            },
-            {
-              "id": "p-revise",
-              "title": { "jp": "読み返して直す", "en": "Reread and revise" },
-              "md": {
-                "jp": "自分の意図と違うところを1つ以上見つけ、AIに直してもらいます。",
-                "en": "Find at least one place that doesn't match what you meant, and have the AI fix it."
-              },
-              "expect": {
-                "jp": "直したあとの企画書で、下のチェックリストがすべて埋まる。",
-                "en": "The revised plan meets every item on the checklist below."
-              },
-              "hint": {
-                "jp": "チェックリストの項目ごとに企画書と見比べ、当てはまらない項目を1つ選びます。",
-                "en": "Compare the plan with the checklist item by item, and pick one item it doesn't meet yet."
-              },
-              "troubleshoot": {
-                "jp": "「Mustに○○が入っていますが、目的には不要なのでShouldに移してください」のように頼みます。どこを・なぜ・どう直すかを、1文で伝えます。",
-                "en": "Ask with something like: \"The Musts include X, but the goal doesn't need it, so please move it to Should.\" Say where, why and how to change it, in one sentence."
-              }
-            }
-          ]
-        },
-        {
-          "id": "practice-prompt",
-          "type": "prompt",
-          "title": { "jp": "MoSCoWの分け方を見直してもらう依頼文", "en": "A request to have your MoSCoW sorting reviewed" },
-          "target": "any",
-          "prompt": {
-            "jp": "目的は「{{目的}}」です。\n機能を、Must / Should / Could / Won'tで次のように分けました。理由も付けています。\n{{自分の分け方}}\nこの目的に照らして、分け方に問題があれば、理由と一緒に指摘してください。\n特に、なくても目的を果たせるMustがないかを確かめてください。\n分け直すかどうかは私が決めるので、指摘だけをお願いします。",
-            "en": "The goal is \"{{goal}}\".\nHere is how I sorted the features into Must / Should / Could / Won't, with my reasons:\n{{my sorting}}\nCheck my sorting against the goal, and point out any problems along with your reasons.\nIn particular, check whether any Must could be dropped with the goal still met.\nI'll decide whether to change anything, so please only point things out."
-          },
-          "vars": [
-            { "name": "目的", "hint": { "jp": "例：家計をあずかる自分が、月の途中で食費の使いすぎに気づける", "en": "e.g. As the person who runs the household budget, I can notice mid-month that I'm overspending on food" } },
-            { "name": "goal", "hint": { "jp": "例：家計をあずかる自分が、月の途中で食費の使いすぎに気づける", "en": "e.g. As the person who runs the household budget, I can notice mid-month that I'm overspending on food" } },
-            { "name": "自分の分け方", "hint": { "jp": "例：Must＝支出の入力（ないと記録できない）、残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）", "en": "e.g. Must = logging expenses (nothing gets recorded without it), money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)" } },
-            { "name": "my sorting", "hint": { "jp": "例：Must＝支出の入力（ないと記録できない）、残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）", "en": "e.g. Must = logging expenses (nothing gets recorded without it), money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)" } }
-          ],
-          "expect": {
-            "jp": "サークルの出欠確認アプリなら、たとえば次のように進みます。\n\n目的：幹事が前日までに参加人数を知り、お店の予約を確定できる。\n\n自分の分け方：Mustは出欠ボタン、参加人数の一覧、締め切り前日の通知です。Couldはひとことコメント欄、Won'tは参加費の集金です。\n\n理由の例：通知は「返事を忘れる人がいるから」、集金は「お金を扱うので、今回は作らない」です。\n\nAIの指摘の例：「通知がなくても、出欠ボタンと一覧があれば人数はわかります。Shouldでもよいかもしれません。」\n\nどうするかは自分で決めます。この例では通知をShouldに移し、Mustを2つにしました。\n\nこのあと2-4の依頼文で1枚にまとめます。画面の流れは「イベント一覧 → 出欠の入力 → 参加人数の一覧」です。扱うデータは「イベント（日付・場所・締め切り）」と「出欠（名前・参加するか）」です。",
-            "en": "For a club attendance app, it might go like this.\n\nGoal: the organizer knows the headcount a day early and can book the venue.\n\nYour sorting: Must: an attendance button, a headcount list, a reminder the day before the deadline. Could: a short comment field. Won't: collecting fees.\n\nSample reasons: the reminder, \"some people forget to reply\"; the fees, \"it involves money, so not this time\".\n\nA sample point from the AI: \"Even without the reminder, the button and the list tell you the headcount. It might fit under Should.\"\n\nThe decision is yours. In this example you move the reminder to Should, which leaves two Musts.\n\nNext, use the request from 2-4 to put it on one page. The screen flow is \"event list → mark attendance → headcount list\". The data handled is \"event (date, place, deadline)\" and \"attendance (name, coming or not)\"."
-          }
-        },
-        {
-          "id": "practice-tip",
-          "type": "callout",
-          "variant": "tip",
-          "title": { "jp": "それでも迷ったら", "en": "Still stuck?" },
-          "md": {
-            "jp": "依頼文の下の「期待される結果」を開くと、サークルの出欠確認アプリでの答えの例が読めます。自分の答えと比べ、違うところの理由を考えてみましょう。",
-            "en": "Open \"What a good answer looks like\" under the request to see a sample answer for the club attendance app. Compare it with yours and think about why they differ."
-          }
-        },
-        {
-          "id": "practice-checklist",
-          "type": "checklist",
-          "title": { "jp": "1枚企画書のチェックリスト", "en": "One-page plan checklist" },
-          "items": [
-            {
-              "id": "pc-goal",
-              "label": { "jp": "目的が「誰が・どんな場面で・どうなれる」の1文になっている", "en": "The goal is one sentence: who, in what situation, can do what" }
-            },
-            {
-              "id": "pc-must",
-              "label": { "jp": "Mustが3つ以内で、どれも「ないと目的を果たせない」機能になっている", "en": "There are three Musts or fewer, and the goal can't be met without any of them" }
-            },
-            {
-              "id": "pc-wont",
-              "label": { "jp": "「やらないこと」（Won't）が1つ以上書いてある", "en": "At least one Won't is written under \"what we won't build\"" }
-            },
-            {
-              "id": "pc-screens",
-              "label": { "jp": "画面の流れが、画面名と矢印で書いてある", "en": "The screen flow is written as screen names joined by arrows" }
-            },
-            {
-              "id": "pc-data",
-              "label": { "jp": "扱うデータが項目名で書いてある", "en": "The data handled is written as field names" }
-            },
-            {
-              "id": "pc-nocode",
-              "label": { "jp": "まだコードを頼んでいない", "en": "You haven't asked for any code yet" }
             }
           ]
         }
@@ -1026,23 +819,23 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "もっと性能の高いAIに、同じ依頼を送り直す",
-                    "en": "Send the same request to a more powerful AI"
+                    "jp": "いったん止めて、会員登録と決済が必要かを質問してもらう",
+                    "en": "Pause it and have it ask whether sign-up and payments are needed"
                   },
                   "feedback": {
-                    "jp": "AIを替えても、困りごとは伝わっていません。足りないのはAIの性能ではなく、目的の情報です。",
-                    "en": "Switching AIs still doesn't tell it the problem. What's missing is the goal, not the AI's ability."
+                    "jp": "機能の要不要から聞くと、目的が決まらないまま話が進みます。先に、誰が何に困っているかを質問してもらいます。",
+                    "en": "Starting with which features are needed skips past the goal. Have it ask who is struggling with what first."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "先に、画面の色や見た目の好みを質問してもらう",
-                    "en": "Have it ask about your color and style preferences first"
+                    "jp": "いったん止めて、ほしい機能を細かく並べた依頼文を送り直す",
+                    "en": "Pause it and resend a request that lists every feature in detail"
                   },
                   "feedback": {
-                    "jp": "見た目の好みを聞かれても、何のためのアプリかは決まりません。先に困りごとを質問してもらいます。",
-                    "en": "Questions about looks don't settle what the app is for. Have it ask about the problem first."
+                    "jp": "機能を細かく並べても、何のためのアプリかは伝わりません。先に困りごとを質問してもらい、目的を決めます。",
+                    "en": "Listing features in detail still doesn't say what the app is for. Have it ask about the problem first, so the goal gets set."
                   }
                 }
               ],
@@ -1076,12 +869,12 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "カレンダーなら、すぐAIに作ってもらおうか？",
-                    "en": "Shall we have an AI build the calendar right away?"
+                    "jp": "カレンダーがあれば、予定を忘れなくなるよね？",
+                    "en": "With a calendar, you'd stop forgetting your plans, right?"
                   },
                   "feedback": {
-                    "jp": "作り始める前に、何のための機能かを確かめます。目的が分かれば、カレンダー以外の手段が合うこともあります。",
-                    "en": "Before building, find out what the feature is for. Once the goal is clear, something other than a calendar may fit better."
+                    "jp": "答えを決めつけた聞き方だと、相手の目的ではなく自分の推測を確かめるだけです。答えを決めない形で、何がうれしいのかを聞きます。",
+                    "en": "A leading question only checks your own guess, not their goal. Ask an open question, such as what it would do for them."
                   }
                 },
                 {
@@ -1094,18 +887,18 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "カレンダーを作るのが得意なAIはどれ？",
-                    "en": "Which AI is best at building calendars?"
+                    "jp": "予定の管理なら、カレンダーより一覧のほうがよくない？",
+                    "en": "For keeping track of plans, wouldn't a list beat a calendar?"
                   },
                   "feedback": {
-                    "jp": "道具を選んでも、何のための機能かはわかりません。先に、それで何がうれしいのかを聞きます。",
-                    "en": "Picking a tool doesn't tell you what the feature is for. First ask what it would do for them."
+                    "jp": "自分の案を先に出すと、相手の目的を聞く前に答えを決めてしまいます。先に、カレンダーで何がうれしいのかを聞きます。",
+                    "en": "Offering your own fix first settles on an answer before you know their goal. First ask what the calendar would do for them."
                   }
                 }
               ],
               "answer": ["c"],
               "explanation": {
-                "jp": "「なぜ？」「何がうれしいの？」と聞き返すと、機能の奥の目的が出てきます。「予定の重なりにすぐ気づきたい」と分かれば、ほかの手段も選べます。",
+                "jp": "「なぜ？」「何がうれしいの？」と聞き返すと、機能の奥の目的が出てきます。「予定の重なりにすぐ気づきたい」とわかれば、ほかの手段も選べます。",
                 "en": "Asking \"why?\" or \"what would that do for you?\" brings out the goal behind a feature. If it turns out to be \"I want to spot clashing plans quickly\", other solutions open up too."
               },
               "objectiveId": "o2",
@@ -1172,8 +965,8 @@
               "id": "q8",
               "kind": "single",
               "prompt": {
-                "jp": "1枚企画書をAIに渡す前の見直しとして、最も適切なのはどれでしょう？",
-                "en": "Before handing a one-page plan to an AI, which review is most useful?"
+                "jp": "ペットの通院記録アプリの1枚企画書を、AIに渡す前に読み返しています。画面の流れと扱うデータの欄だけが空です。最も適切な見直しはどれでしょう？",
+                "en": "You're rereading a one-page plan for a pet vet-visit log before handing it to an AI. Only the screen flow and the data handled are empty. Which review step is best?"
               },
               "options": [
                 {
@@ -1190,37 +983,37 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "将来ほしくなりそうな機能も、念のためMustに入れておく",
-                    "en": "Put features you might want someday under Must, to be safe"
+                    "jp": "空いた欄はAIが補ってくれるので、そのまま渡す",
+                    "en": "Hand it over as is, since the AI will fill in the blanks"
                   },
                   "feedback": {
-                    "jp": "念のためのMustは、最初の版を重くします。将来の機能はShouldやWon'tに置いておきます。",
-                    "en": "\"To be safe\" Musts weigh the first version down. Keep future features under Should or Won't."
+                    "jp": "空いた欄は、AIの推測で埋まりがちです。画面名と項目名だけでも、自分で決めて書きます。",
+                    "en": "Blanks tend to get filled with the AI's guesses. Decide them yourself, even if it's only screen names and field names."
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "誤字や言い回しが完璧になるまで、何日もかけて書き直す",
-                    "en": "Rewrite it for days until every word and typo is perfect"
+                    "jp": "思いつく例外や細かい条件を、すべて書き足しておく",
+                    "en": "Add every edge case and detailed condition you can think of"
                   },
                   "feedback": {
-                    "jp": "企画書は、作って試したあとにも直すものです。1枚で読み取れれば、まず小さく作って確かめます。",
-                    "en": "A plan keeps changing after you build and test. Once it reads clearly on one page, build something small and check."
+                    "jp": "細かい条件の多くは、作って試すと見えてきます。先に、空いている見出しを自分で埋めます。",
+                    "en": "Many details only show up once you build and try. First fill in the empty headings yourself."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "目的から「やらないこと」までが、1枚で読み取れるか確かめる",
-                    "en": "Check that everything from the goal to \"what we won't build\" reads clearly on one page"
+                    "jp": "画面の流れと扱うデータを、自分で決めて書き足す",
+                    "en": "Decide the screen flow and the data yourself, and fill them in"
                   }
                 }
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "1枚企画書の役目は、目的と範囲をAIと共有することです。項目がそろって読み取れれば、細かいところはあとから一緒に詰められます。",
-                "en": "A one-page plan exists to share the goal and the scope with the AI. If every item reads clearly, you can work out the details together later."
+                "jp": "1枚企画書の役目は、目的と範囲をAIと共有することです。空いた見出しはAIの推測で埋まりがちなので、渡す前に自分で書きます。",
+                "en": "A one-page plan exists to share the goal and the scope with the AI. Empty headings tend to get filled with the AI's guesses, so fill them in yourself before handing it over."
               },
               "objectiveId": "o4",
               "bloom": "evaluate"
@@ -1229,7 +1022,7 @@
               "id": "q10",
               "kind": "single",
               "prompt": {
-                "jp": "英単語の復習アプリの1枚企画書です。目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。直し方として、最も適切なのはどれでしょう？",
+                "jp": "英単語の復習アプリの1枚企画書です。目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？",
                 "en": "Here is a one-page plan for an English vocabulary app. The goal is \"I can review English words for five minutes on my commute.\" The Musts are \"add words\", \"quiz me\" and \"a leaderboard with friends\", and \"what we won't build\" is left blank. What is the best way to revise it?"
               },
               "options": [
@@ -1243,8 +1036,8 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "ランキングを企画書から消して、なかったことにする",
-                    "en": "Delete the leaderboard from the plan as if it never existed"
+                    "jp": "ランキングをMustから外し、企画書からも消しておく",
+                    "en": "Take the leaderboard out of Must and delete it from the plan too"
                   },
                   "feedback": {
                     "jp": "消すと、次の版の候補も失われます。「やらないこと」に書けば、範囲の外だとAIにも伝わります。",
@@ -1304,30 +1097,30 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "先に企画書のMustと画面の流れを直し、次の版を頼む",
-                    "en": "Update the plan's Musts and screen flow first, then ask for the next version"
+                    "jp": "先に企画書のMustと画面の中身を直し、次の版を頼む",
+                    "en": "Update the plan's Musts and what the screen shows first, then ask for the next version"
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "失敗だったので、完璧な企画書が書けるまで作るのをやめる",
-                    "en": "Call it a failure and stop building until you can write a perfect plan"
+                    "jp": "最初の版は捨てて、新しい企画書を一から書き直す",
+                    "en": "Throw the first version away and write a new plan from scratch"
                   },
                   "feedback": {
-                    "jp": "使ってわかったことは、最初の版から学べた成果です。企画書を直して、また小さく試します。",
-                    "en": "What you learned by using it is exactly what the first version was for. Update the plan and test small again."
+                    "jp": "使ってわかったことは、最初の版から学べた成果です。一から書き直さず、変わった項目だけを直して、また小さく試します。",
+                    "en": "What you learned by using it is exactly what the first version was for. Don't start over; update only what changed and test small again."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "企画書にない機能も、思いつく限り一度に追加してもらう",
-                    "en": "Have every feature you can think of added at once, even off-plan"
+                    "jp": "最初の版は小さすぎたので、ShouldとCouldもまとめて作ってもらう",
+                    "en": "The first version was too small, so have the Shoulds and Coulds built all at once"
                   },
                   "feedback": {
-                    "jp": "一度に増やすと、どの変更が役に立ったのかわからなくなります。目的に合わせて1つずつ足します。",
-                    "en": "Adding many at once hides which change actually helped. Add them one at a time, guided by the goal."
+                    "jp": "わかったのは表示の変え方で、版が小さすぎたわけではありません。学んだことを企画書に反映し、また小さく試します。",
+                    "en": "What you learned is how to change one display, not that the version was too small. Put it into the plan and test small again."
                   }
                 }
               ],
@@ -1374,8 +1167,8 @@
           "id": "summary-next",
           "type": "markdown",
           "md": {
-            "jp": "最後に振り返ってみましょう。いちばん作りたいアプリで、Won'tに入れる機能は何でしょう？理由も1つ考えてみましょう。\n\n第3章では、AIと開発するためのVS Codeを準備します。第4章でAIに画面を作ってもらうときは、今日の1枚企画書を一緒に渡せます。",
-            "en": "To finish, look back. In the app you most want to build, which feature would you put under Won't? Think of one reason, too.\n\nIn Chapter 3 you'll set up VS Code for building with an AI. In Chapter 4, when you ask an AI to build screens, you can hand it today's one-page plan as well."
+            "jp": "いちばん作りたいアプリで、Won'tに入れる機能は何でしょう？　理由も1つ考えてみましょう。\n\n次の演習「自分のアイデアで1枚企画書をつくる」で、そのアプリの企画書をAIと作ります。",
+            "en": "In the app you most want to build, which feature would you put under Won't? Think of one reason, too.\n\nIn the next practice, \"your own one-page plan\", you'll make the plan for that app with an AI."
           }
         },
         {
@@ -1418,7 +1211,7 @@
               "id": "card-moscow",
               "front": { "jp": "MoSCoWの4分類", "en": "The four MoSCoW groups" },
               "back": {
-                "jp": "Must（必須）・Should（重要）・Could（あるとよい）・Won't（今回はやらない）。",
+                "jp": "Must（必須）・Should（重要）・Could（あるとよい）・Won't（今回やらない）。",
                 "en": "Must (essential), Should (important), Could (nice to have), Won't (not this time)."
               }
             },
@@ -1469,14 +1262,14 @@
     {
       "term": { "jp": "MVP", "en": "MVP" },
       "md": {
-        "jp": "Minimum Viable Product。いちばん少ない手間で、使う人についていちばん多くを学べる版。",
-        "en": "Minimum Viable Product: the version that lets you learn the most about your users with the least effort."
+        "jp": "Minimum Viable Product（実用最小限の製品）の略。いちばん少ない手間で、使う人についていちばん多くを学べる版。",
+        "en": "Short for Minimum Viable Product: the version that lets you learn the most about your users with the least effort."
       }
     },
     {
       "term": { "jp": "MoSCoW", "en": "MoSCoW" },
       "md": {
-        "jp": "機能をMust・Should・Could・Won't（今回はやらない）の4つに分ける優先順位の付け方。",
+        "jp": "機能をMust・Should・Could・Won't（今回やらない）の4つに分ける優先順位の付け方。",
         "en": "A way to prioritize features as Must, Should, Could and Won't (not this time)."
       }
     },

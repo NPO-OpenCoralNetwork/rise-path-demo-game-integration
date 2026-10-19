@@ -1,0 +1,86 @@
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The lesson uses です・ます throughout, has no banned phrases, and `lessons:lint --strict` is clean. The wrong-option feedback is warm and fits in 2 sentences. A few spots are still ambiguous or join two ideas in one sentence: p-moscow.expect「4つの分け方」, pq1.explanation, and summary-next's yes/no question followed by「その理由も」.",
+      "blockIds": ["p-moscow", "pq1", "summary-next"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "All sentences and paragraphs are within budget, and there are only three glossary terms. The practice section is long for a phone, though: practice-recap, practice-check, 6 steps, 3 prompts, practice-tip, practice-flow and practice-checklist all sit in one section. It works because each screen has a step heading, figure or check, but it is close to the limit.",
+      "blockIds": ["practice"]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "The lesson names Chapter 2 as its prerequisite and recalls MoSCoW in practice-recap. Terms match the glossary (壁打ち/Talking it through, 1枚企画書/One-page plan). One small issue: in p-interview, 壁打ち appears in the prompt name before the sentence that defines it.",
+      "blockIds": ["practice-recap", "p-interview"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Both locales are complete, including the practice-flow diagram labels, alt text and description. The labels match the screen flow in practice-prompt-plan.expect, and「期待される結果」/\"What a good answer looks like\" in practice-tip matches the PromptBlock UI. The English is mostly natural, with small slips: \"adding\" vs \"save\" in pq3, and stiff phrasing in practice-task and practice-prompt.expect.",
+      "blockIds": ["practice-flow", "practice-tip", "pq3", "practice-task", "practice-prompt"]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "p-moscow",
+      "issue": "In expect,「4つの分け方」can be read as \"four different ways of sorting\". It should clearly mean sorting into the four groups.",
+      "fix": "「4つの分け方と理由が書けています。」→「4つのグループへの分け方と、その理由が書けています。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "pq1",
+      "issue": "The explanation's second sentence chains three actions (確かめ、外して、Shouldにします), so one sentence carries more than one idea.",
+      "fix": "「AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめ、果たせるならMustから外して、重要ならShouldにします。」→「AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめます。果たせるならMustから外し、重要ならShouldにします。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "summary-next",
+      "issue": "The yes/no question is followed directly by「その理由も」, which doesn't fit a learner who answers \"no\". The text after the full-width「？」also continues with no space. Make it a single conditional sentence.",
+      "fix": "JP:「AIの指摘のうち、受け入れなかったものはありましたか？その理由も1行で書いておきましょう。」→「AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。」 EN: \"Was there any point from the AI that you didn't accept? Write down your reason in one line.\" → \"If you turned down any of the AI's points, write down why in one line.\""
+    },
+    {
+      "criterion": "prior",
+      "blockId": "p-interview",
+      "issue": "壁打ち is used in the prompt name「壁打ちを始める依頼文」before the sentence that defines it. Put the definition first.",
+      "fix": "JP:「下の「壁打ちを始める依頼文」をAIに送り、質問に1つずつ答えます。[[壁打ち]]は、質問してもらいながら考えを言葉にすることです。」→「[[壁打ち]]は、質問してもらいながら考えを言葉にすることです。下の「壁打ちを始める依頼文」をAIに送り、質問に1つずつ答えます。」 EN: \"Send \\\"A request to start talking it through\\\" below, and answer the AI's questions one by one. [[Talking it through]] means putting your thoughts into words while someone asks you questions.\" → \"[[Talking it through]] means putting your thoughts into words while someone asks you questions. Send \\\"A request to start talking it through\\\" below, and answer the AI's questions one by one.\""
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "pq3",
+      "issue": "The English feedback for option d says \"adding recipes\". Option c and the explanation call the same function \"save a recipe\" / \"saving\".",
+      "fix": "\"What's missing is a Must for adding recipes.\" → \"What's missing is a Must for saving recipes.\""
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "practice-task",
+      "issue": "The English second paragraph is awkward (\"sort the features and decide yourself, and ask the AI to review\").",
+      "fix": "\"In this practice you sort the features and decide yourself, and ask the AI to review. When you finish, check your plan against the checklist below.\" → \"In this practice you sort the features and make the decisions yourself; the AI only reviews them. When you finish, check your plan against the checklist below.\""
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "practice-prompt",
+      "issue": "In expect, the English line has a double colon (\"Your sorting: Must: ...\") and reads like a translated label list.",
+      "fix": "\"Your sorting: Must: creating an event, an attendance button, a headcount list, a reminder the day before the deadline. Could: a short comment field. Won't: collecting fees.\" → \"Your sorting: the Musts are creating an event, an attendance button, a headcount list and a reminder the day before the deadline. The Could is a short comment field, and the Won't is collecting fees.\""
+    }
+  ],
+  "niceToHave": [
+    "hook-b1 lists「通知」and「コメント欄」, but later blocks call them「締め切り前日の通知」and「ひとことコメント欄」. Consider using the later names in the hook too: 「…参加人数の一覧、締め切り前日の通知、ひとことコメント欄、集金と…」.",
+    "summary-next says「VS Code」, but course.json's Chapter 3 title says「VSCode」. Align the course title with the official name「VS Code」, or confirm which spelling the course uses.",
+    "Fact check, pq1 option d feedback: the claim that sorting by shop helps the goal of not forgetting items is arguable. Consider「並べ替えは買い物を楽にするので、Won'tよりShouldが合います。」.",
+    "pq2 options a/b use the「Should：…／Won't：…」form, while c/d are verb phrases. This is acceptable because all four answer \"how to sort the two\", but c could become「Must：2つとも（最初の版で作る）」for closer parallelism.",
+    "The objective o3 text「自分のアイデアの機能の候補を」stacks three の. Consider「自分のアイデアから出した機能の候補を」."
+  ],
+  "average": 3.5,
+  "verdict": "revise",
+  "summary": "The Japanese is warm, natural and consistent. Every wrong option has short feedback that names the misconception, and the diagram and labels match in both locales. Before this passes, fix the ambiguous or overloaded sentences (p-moscow, pq1, summary-next), define 壁打ち before it is used in p-interview, and fix the small English slips in pq3, practice-task and practice-prompt."
+}

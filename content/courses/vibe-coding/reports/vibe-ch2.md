@@ -1,40 +1,155 @@
 # Report: vibe-coding/vibe-ch2 (draft)
 
-**Status: DRAFT, not published.** The file is `content/courses/vibe-coding/drafts/vibe-ch2.lesson.json`.
-`lessons/`, `course.json` and `provenance.reviewedBy` are untouched. Publishing (author-lesson step 10) is the owner's
-call. **The review gate has not passed yet.** After round 3, all 9 open must-fix items are applied to the draft. The
-saved review JSONs still list them, though, because only an independent reviewer can clear them. `check-review.mjs`
-will keep exiting 1 until `ja-editor` and `visual-qa` re-score the revised draft. A fresh `pedagogy-reviewer` pass is
-also advisable because a few body sentences changed.
+**Status: DRAFT, not published. Final gate (2026-10-19): REVISE, `check-review.mjs` exits 1.** The draft is
+`content/courses/vibe-coding/drafts/vibe-ch2.lesson.json`. `lessons/`, `course.json` and `provenance.reviewedBy` are
+untouched. Publishing (author-lesson step 10) is the owner's call.
+
+The saved review JSONs are the round-6 reviews, and they describe the draft *before* the round-6 fixes. The rubric
+numbers pass: every criterion is ≥ 3 and the mean is 3.38. The gate fails only on 4 ja-editor must-fix items. The final
+gate confirmed that all 4 are in the current draft (see "Final gate"). Only a fresh independent review can clear
+them from the JSON, so by the contract the lesson is not "done" until that review makes `check-review.mjs` exit 0.
 
 - Lesson: 第2章｜AIと企画する力を身につける / Chapter 2 | Planning with AI. Rework of the migrated chapter
   `data/curricula/vibe_coding/chapter2.ts` (`VIBE_CHAPTER_2_DATA`). `provenance.migratedFrom` is kept and the author
   is `claude-code`, so the lesson is linted strict.
-- Locales: jp, en. Level: beginner. estMinutes: 30. Prerequisites: ch0 and ch1.
+- Locales: jp, en. Level: beginner. Prerequisites: ch0 and ch1.
+- estMinutes: **18** in the draft. `course.json` still lists 30; changing it is the owner's call.
+- In round 4 the hands-on practice moved to its own draft, `drafts/vibe-ch2-practice.lesson.json`. Its report is
+  `reports/vibe-ch2-practice.md`.
 - Brief, outline and the per-round notes: `content/courses/vibe-coding/briefs/vibe-ch2.md`.
 
-## Objectives
+## Objectives (current draft)
 
 | id | bloom | jp | assessed by |
 |---|---|---|---|
 | o1 | apply | ぼんやりしたアイデアを、AIに質問してもらう依頼文に書き換え、壁打ちに使える | q1 (inline), q5 (exam, transfer) |
 | o2 | analyze | アイデアの中から「目的」と「機能」を見分け、機能の奥にある目的を聞き出せる | q0 (predict, ungraded), q2 (inline), q6 (exam) |
 | o3 | evaluate | 機能の候補をMoSCoWで分け、最初の版（MVP）に入れる範囲を判断できる | q3 (inline), q7 (exam, transfer) |
-| o4 | create | 目的から「やらないこと」までをまとめた1枚企画書を、AIと作って直せる | q4 (inline), q8, q10, q9 (exam), practice |
+| o4 | evaluate | 目的から「やらないこと」までの1枚企画書を読み返し、直すところと直し方を判断できる | q4 (inline), q8, q10, q9 (exam) |
 
-o1 was reworded in round 3 (ja-editor must-fix). The EN text is now "Rewrite a vague idea as a request for the AI to
-interview you, and use it to talk the idea through".
+- o1 was reworded in round 3 (ja-editor must-fix). The EN text is now "Rewrite a vague idea as a request for the AI to
+  interview you, and use it to talk the idea through".
+- o4 moved from create to evaluate in round 4, because "build your own plan" now lives in `vibe-ch2-practice`
+  (its o4, create).
 
-## Review history and verdicts
+## Final gate (2026-10-19)
+
+Where this section disagrees with older sections of this report, this section wins.
+
+### Merged review table and verdict
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json`
+gives **REVISE, exit 1**. The table shows the lowest score per criterion from the saved round-6 reviews.
+
+| criterion | score | scored by |
+|---|---|---|
+| align | 3 | pedagogy-reviewer |
+| hook | 4 | pedagogy-reviewer |
+| prior | 4 | pedagogy-reviewer, ja-editor |
+| load | 3 | pedagogy-reviewer, ja-editor, visual-qa |
+| worked | 3 | pedagogy-reviewer |
+| active | 4 | pedagogy-reviewer |
+| miscon | 3 | pedagogy-reviewer |
+| visual | 4 | pedagogy-reviewer, visual-qa |
+| practice | 3 | pedagogy-reviewer |
+| meta | 4 | pedagogy-reviewer |
+| accuracy | 3 | pedagogy-reviewer |
+| voice | 3 | pedagogy-reviewer, ja-editor |
+| a11y_l10n | 3 | pedagogy-reviewer, ja-editor, visual-qa |
+| **mean** | **3.38** (needs ≥ 3.3; every criterion ≥ 3) | blocker: 4 open must-fix items in the saved JSON |
+
+### Must-fix items checked against the current draft
+
+The gate checked each item by string search in the draft JSON: the suggested new text is present, and the old text
+(where the reviewer quoted one) is gone. All 4 items pass.
+
+| # | reviewer · criterion · block | found in the draft |
+|---|---|---|
+| 1 | ja-editor · a11y_l10n · `s1-b1` | 「ビジョン（vision）を示すこと」 |
+| 2 | ja-editor · voice · `s5-b3` (EN) | "Only the features the goal can't do without become Musts." The old "make only the things it couldn't be met without into Musts" is gone. |
+| 3 | ja-editor · voice · q1 a feedback (EN) | "Asking about features gets you a list of features before the goal is set." The old wording is gone. |
+| 4 | ja-editor · voice · q5 c feedback (EN) | "Starting with which features are needed skips past the goal." The old wording is gone. |
+
+### Verdict history
 
 | round | reviewers | merged mean | lowest criterion | open must-fix | gate (before fixes) |
 |---|---|---|---|---|---|
 | 1 | pedagogy-reviewer, ja-editor | 3.15 | 3 (several) | 15 (12 ja-editor, 3 pedagogy) | REVISE, exit 1 (mean < 3.3, must-fix open) |
 | 2 | pedagogy-reviewer, ja-editor | 3.46 | 3 | 10 (8 ja-editor, 2 pedagogy) | REVISE, exit 1 (must-fix open only) |
 | 3 | pedagogy-reviewer (pass, 3.46), ja-editor (revise, 3.25), visual-qa (revise) | 3.38 | 3 | 9 (7 ja-editor, 2 visual-qa) | REVISE, exit 1 (must-fix open only) |
+| 4 | no new review | — | — | — | Fix-only round: the practice was split out, and length, Budget Must, ja-editor and niceToHave items were applied |
+| 5 (workflow round 1) | pedagogy-reviewer, ja-editor, visual-qa | 3.23 | 3 | 9 (5 ja-editor, 3 pedagogy, 1 visual-qa) | REVISE, exit 1 (mean < 3.3, must-fix open) |
+| 6 (workflow round 2) | pedagogy-reviewer (pass, 3.46), ja-editor (revise), visual-qa (pass, 4) | 3.38 | 3 | 4 (ja-editor) | REVISE, exit 1 (must-fix open only) |
+| final gate | saved round-6 JSON | 3.38 | 3 | 4, all found applied in the draft | **REVISE, exit 1**: a fresh review is needed to clear the JSON |
 
-All must-fix items from every round were applied before the next round. Round 3's 9 items are applied in this step
-(see below), but they have not been re-reviewed yet.
+### Length and time
+
+| measure (JP characters, whitespace not counted) | before the split (round 3) | now |
+|---|---|---|
+| Body: prose, without quizzes or copyable prompt text | 3,623 | **2,390** (budget 2,400) |
+| Body plus prompt model answers and hints | 4,587 | 2,742 |
+| All non-quiz text | 5,807 | 3,679 |
+| estMinutes | 30 | **18** (contract estimate 15.5) |
+
+The lesson has 11 questions: q0 is an ungraded predict, q1–q4 are inline, and q5–q10 make up the 6-question exam.
+The summary has 4 points and there are 6 flashcards.
+
+### CI steps and checks (run at the final gate)
+
+| command | result |
+|---|---|
+| `npm run typecheck` | 0 errors |
+| `npm test` | 654 tests, 654 pass, 0 fail |
+| `npm run lessons:validate` | 13 lesson files, 1 course file: no errors |
+| `npm run lessons:validate -- --drafts` | 15 lesson files, 1 course file: no errors |
+| `npm run lessons:lint -- --strict` | exit 0, 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed published lessons, none of which this branch touches. |
+| `lessons:validate` / `lessons:lint --strict` on this draft | 0 errors · 0 errors, 0 warnings |
+| `npm run lessons:schema -- --check` | generated schemas up to date |
+| `node .claude/skills/author-lesson/scripts/build-references.mjs --check` | references up to date |
+| `npx vite build` | not needed: no code changed |
+
+### Preview metrics
+
+The preview `metrics.json` has `generatedAt` 2026-10-19T09:43:22Z, after the last draft edit at 09:39Z.
+
+- Status: OK, `overflowX: false`, `consoleErrors: 0`, `mermaidErrors: 0`, `unknownBlocks: 0`, `brokenImages: 0`.
+- No text-only screens.
+- 21 failed `/api/v2/user/*` requests (503, no database) are environment noise and are not counted.
+
+| shot | viewport | page height | screens | chars/line median (min–max) |
+|---|---|---|---|---|
+| desktop-jp | 1440×900 | 13,324 px | 16 | 37 (35–42), target 30–40 |
+| mobile-jp | 390×844 | 17,559 px | 25 | 19 (16–22) |
+| desktop-en | 1440×900 | 13,985 px | 17 | 73 (66–78), target 60–75 |
+
+The screenshots are in `.artifacts/preview/vibe-coding/vibe-ch2/`, which is gitignored and local only. The gate
+checked two pages by eye:
+- `pages/mobile-jp-09.png`: the two-column MoSCoW table. Each 分類 label fits on one line, and each 意味 cell starts
+  with 必須 / 重要 / あるとよい / 今回やらない.
+- `pages/desktop-jp-13.png`: the q8 options, the q10 stem and the next-lesson card.
+
+### Open questions for the owner
+
+1. **Fresh review round.** Should a review round (pedagogy-reviewer, ja-editor, visual-qa) run on the current draft?
+   The gate can only pass once the saved JSONs describe this draft and `check-review.mjs` exits 0.
+2. **List `vibe-ch2-practice` in `course.json`?** It would go in module m2 after `vibe-ch2`, with estMinutes 20 and
+   the `next` links updated. vibe-ch2's estMinutes there would change from 30 to 18. If you reject the split, the
+   practice section goes back into vibe-ch2 and a length waiver is recorded in the brief.
+3. **Publish both?** Once they pass, should both drafts move to `lessons/`, followed by `course.json` and
+   `lessons:catalog`? `lessons/vibe-ch2.lesson.json` is still the machine-migrated chapter (author `migration`).
+4. **VS Code or VSCode?** `course.json` and the published ch3, ch4, ch6 and ch11 write 「VSCode」. The ch2 drafts
+   write 「VS Code」, Microsoft's own short name. As a result, ch2's next-lesson card (from `course.json`) and its body
+   spell it differently. Which spelling should the course use?
+5. **Reader-level items** (outside the lesson files):
+   - On touch screens the flashcard hint should read 「タップでめくる」.
+   - Prompt blocks with `target: "any"` show a 「Claude Codeで使う」 button before ch3.
+   - The end card of an unlisted draft preview says the course is finished.
+
+## History: round 3 and earlier
+
+The sections from here to "Round 5" describe the draft as it was after round 3, before the split. Where they
+disagree with "Final gate" (for example estMinutes 30, o4 create, the practice section, the old table layout), the
+final gate is current.
 
 ### Merged review table (saved round-3 reviews, lowest score per criterion)
 
@@ -163,7 +278,7 @@ reflection with the new o1 wording.
 
 ## Assumptions
 
-- Headless run. estMinutes stays 30 to match `course.json`. About half of that time is the hands-on practice with a
+- Headless run. In round 3, estMinutes stayed 30 to match `course.json` (it is 18 since the round-4 split). About half of that time is the hands-on practice with a
   chat AI.
 - The prompts are tool-agnostic (`target: "any"`). The budget app and the club attendance app are invented teaching
   scenarios, not real products.
@@ -197,7 +312,7 @@ reflection with the new o1 wording.
   - `content/courses/vibe-coding/lessons/vibe-ch0`, `vibe-ch1`, `vibe-ch3` and `vibe-ch4`
   - `content/courses/vibe-coding/course.json`
 
-## Open questions for the owner
+## Open questions for the owner (round 3; superseded by the final gate)
 
 1. **Length.**
    - estMinutes is 30, against the contract's 8–20.
@@ -222,9 +337,98 @@ reflection with the new o1 wording.
    - Score and progress state possibly leaks between preview runs. It did not happen in this round.
    - Prompt blocks with `target: "any"` show 「Claude Codeで使う」 before ch3.
 
-## Next steps to pass the gate
+## Next steps to pass the gate (round 3; superseded by the final gate)
 
 1. Re-run `ja-editor` and `visual-qa` on the draft. Also re-run `pedagogy-reviewer`, because `s1-b5` and q4 d
    changed. Each reviewer gets only the file and brief paths, and each result is saved over its review JSON.
 2. Run `node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`.
    The lesson is done when it exits 0. It still stays in `drafts/` until the owner publishes it.
+
+## Round 5 (workflow review round 1) — gate, fixes, state
+
+This section supersedes the length and table items above: the practice section now lives in
+`drafts/vibe-ch2-practice.lesson.json` (round 4), and `s5-b2` is a two-column table (round 5).
+
+Gate on the saved round-5 reviews, before fixes (`check-review.mjs`, exit **1**):
+
+```
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.23 (needs ≥ 3.3) · every criterion ≥ 3
+  align 3 · hook 4 · prior 4 · load 3 · worked 3 · active 3 · miscon 3 · visual 3 · practice 3 · meta 3 ·
+  accuracy 3 · voice 3 · a11y_l10n 4
+  9 must-fix: pedagogy ×3 (active s1-check, active check-quiz, accuracy s5-b3), ja-editor ×5 (hook-b1,
+  s3-steps ×2, s3-b1, s2-check), visual-qa ×1 (s5-b2)
+```
+
+All 9 must-fix items were applied; the brief's "Review round 5" table lists each change and the niceToHave items
+applied or left out, with reasons. Two deviations from the suggested text: the `s5-b3` callout leaves out
+「（重要）」「（あるとよい）」 (the table right above shows them; body budget), and the `s5-b2` meaning sits in the
+second column (「必須：…」), because putting it in the first cell broke 「Could（あると/よい）」 at 390 px.
+
+State after fixes:
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body 2,389 JP characters (budget 2,400); estMinutes 18.
+- `npm run lessons:preview -- vibe-coding vibe-ch2` → OK: overflowX no, console errors 0, diagram errors 0, no
+  text-only screens; desktop-jp median 37 chars/line, desktop-en 71. Checked by eye: `pages/mobile-jp-09.png` (the
+  MoSCoW table: no mid-word breaks in the first column).
+
+Next: a fresh review round (pedagogy-reviewer, ja-editor, visual-qa) on the fixed draft, then `check-review.mjs`
+again. Owner decisions still open: list `vibe-ch2-practice` in `course.json` (m2, after vibe-ch2, estMinutes 20) and
+change vibe-ch2's estMinutes there from 30 to 18; VSCode vs VS Code; the reader-level flashcard hint on touch.
+
+## Round 6 (workflow review round 2) — gate, fixes, state
+
+This section supersedes the status lines at the top of this report (estMinutes is 18; o4 is evaluate).
+
+Reviewers: `pedagogy-reviewer` (mean 3.46, pass, 0 must-fix), `ja-editor` (revise, 4 must-fix), `visual-qa` (mean 4,
+pass, 0 must-fix). Saved over `reports/vibe-ch2.<reviewer>.review.json`. Gate before fixes (`check-review.mjs`, exit **1**):
+
+```
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  align 3 · hook 4 · prior 4 · load 3 · worked 3 · active 4 · miscon 3 · visual 4 · practice 3 · meta 4 ·
+  accuracy 3 · voice 3 · a11y_l10n 3
+  4 must-fix (ja-editor): s1-b1, s5-b3, q1, q5
+```
+
+The only blocker was the 4 open must-fix items; no criterion was below 3.
+
+| # | Source / criterion / block | Change |
+|---|---|---|
+| M1 | ja-editor / a11y_l10n / `s1-b1` | 「ビジョン（vision）を示すこと」. |
+| M2 | ja-editor / voice / `s5-b3` (EN) | "Ask, "Could the goal still be met without this?" Only the features the goal can't do without become Musts." |
+| M3 | ja-editor / voice / q1 a feedback (EN) | "Asking about features gets you a list of features before the goal is set." |
+| M4 | ja-editor / voice / q5 c feedback (EN) | "Starting with which features are needed skips past the goal." |
+| N1 | pedagogy / accuracy, voice / `s5-b3` | The first-version rule is now this lesson's choice, because the ABC MoSCoW timebox can also deliver Shoulds and Coulds, and the subject is explicit: 「「これがなくても、目的は果たせる？」と聞きます。答えが「果たせない」になる機能だけをMustにします。このレッスンでは、最初の版をMustだけで作ります。…」 (EN in sync). |
+| N2 | pedagogy / accuracy / q9 b | 「先に企画書のMustと画面の中身を直し、次の版を頼む」 / "Update the plan's Musts and what the screen shows first…" (the scenario changes what a screen shows, not the screen order). |
+| N3 | pedagogy / miscon / q6 b | Strawman replaced by a leading question that assumes the goal: 「カレンダーがあれば、予定を忘れなくなるよね？」. Feedback: a leading question only checks your own guess; ask an open question. |
+| N4 | pedagogy / align, active / q8 | q8 now gives a plan to review (a pet vet-visit log with the screen flow and data handled left empty). Key d is 「画面の流れと扱うデータを、自分で決めて書き足す」, so it no longer repeats o4's wording. Option b 「空いた欄はAIが補ってくれるので、そのまま渡す」 replaces the old "Must to be safe" distractor (that belief is still covered by q10 c). c feedback and the explanation are adjusted. Ids unchanged. |
+| N5 | pedagogy / practice / `s1-b5` | Invitation before the prompt: 「下の依頼文を自分のアイデアで試し、「期待される結果」と比べましょう。」 (EN uses the reader's label "What a good answer looks like"). |
+| N6 | pedagogy / worked / `ex-review` | Reason added: 「推測が混ざることがあるので、意図と違うところを直します。」 |
+| N7 | accuracy / `summary-next` | Dropped 「第4章では、その企画書を渡して画面を作ってもらいます。」: the current vibe-ch4 builds a page from an attached image and does not use a plan (the practice reviewer found the same claim there). The reflection question now has a full-width space after ？ (ja-editor nice). |
+| N8 | ja-editor nice / glossary MVP | Same wording as `s5-defs` (「Minimum Viable Product（実用最小限の製品）の略。…」 / "Short for Minimum Viable Product: …"). |
+| N9 | ja-editor nice / q2 a feedback, q3 explanation (EN) | As suggested. |
+| N10 | visual-qa nice / q10 stem (question 5 of the exam) | 「直し方として、最も適切なのはどれでしょう？」 → 「最も適切な直し方はどれでしょう？」 removes the orphaned 「う？」 on desktop JP (checked in `pages/desktop-jp-13.png`). |
+
+Body budget: M1, N1, N5 and N6 added text. N7 and three cuts pay for it: `s2-why` 「下の表は、家計簿アプリでの例です。」 (the
+table caption says it), a shorter first sentence in `s3-b1` (「目的と機能の優先順位に、画面の流れと扱うデータを足して、1枚にまとめます。」)
+and the opening 「最後に振り返ってみましょう。」 of `summary-next`.
+
+Not applied, with reasons: 「SNS（…）」 on first use in q7 (a long gloss inside one option would be a length cue, and
+SNS is the everyday Japanese word); trimming `s2-b3.expect` (it is the model answer in a closed disclosure, not body text);
+the EN line-length polish in `s5-b1` / `hook-b1` (median 73, inside the target); reader-level items (flashcard
+「タップでめくる」, the 「Claude Codeで使う」 button on phones) and `course.json` (owner only).
+
+State after fixes:
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body 2,390 JP characters (budget 2,400; same method as rounds 4–5); estMinutes 18.
+- `npm run lessons:preview -- vibe-coding vibe-ch2` → OK: overflowX no, console errors 0, diagram errors 0, no text-only
+  screens; desktop-jp median 37 chars/line, desktop-en 73. Checked by eye: `pages/desktop-jp-13.png` (q8 options, q10 stem).
+
+Next: a fresh review round on the fixed draft (the saved JSON describes the pre-fix draft), then `check-review.mjs`.
+Owner decisions still open: list `vibe-ch2-practice` in `course.json` (m2, after vibe-ch2) and set vibe-ch2's
+estMinutes there to 18; VSCode vs VS Code; reader-level touch hints.

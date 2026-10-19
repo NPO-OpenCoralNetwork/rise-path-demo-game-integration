@@ -1,0 +1,43 @@
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "No hard failures in metrics: overflowX false, 0 console, mermaid, unknown-block or image errors, and no text-only screens. The `practice-flow` flowchart TD stays readable at 390 px (mobile-jp-10/11). However, each node puts the screen name and the user role on two lines with nothing to mark which is which. In EN this reads as 'Create event organizer' and 'Headcount list organizer' (desktop-en-07/08).",
+      "blockIds": ["practice-flow"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Paragraphs are short. Desktop JP is a median of 37 chars per line (target 30–40) and EN 68 (target 60–75). The `practice` section is very long, though: desktop-jp-02 to 09 and mobile-jp-03 to 12. Steps, three prompt blocks, a tip, a diagram and a checklist run back to back after the single inline check `practice-check`.",
+      "blockIds": ["practice", "practice-steps", "practice-prompt-interview", "practice-prompt", "practice-prompt-plan"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The EN screens show no untranslated Japanese, and the JP screens show English only for intended terms (Must/Should/Could/Won't, MoSCoW). The figure has a caption and a '図の説明を読む / Describe the figure in words' expander. Contrast is good, and the mobile bottom bar does not hide any controls (mobile-jp-04, 18).",
+      "blockIds": ["practice-flow", "check-quiz"]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "practice-flow",
+      "issue": "Each node stacks the screen name and the role ('Create event<br>organizer', 'Headcount list<br>organizer', 'イベントの作成<br>幹事') without separating them. Learners can read the role as part of the screen name, especially in EN ('Create event organizer').",
+      "fix": "Mark the role clearly in both locales, for example `A[Create event<br>(organizer)]`, `B[Event list<br>(members)]`, and in JP `A[イベントの作成<br>（幹事）]`. Alternatively, prefix it: `A[幹事：イベントの作成]`. Keep flowchart TD.",
+      "screenshot": "pages/desktop-en-07.png"
+    }
+  ],
+  "niceToHave": [
+    "The `practice` section takes about 8 desktop screens and 10 mobile screens before the next heading. Consider splitting it into two sections, for example 'Steps 1–4: sorting' with `practice-check` and 'Steps 5–6: the one-page plan' with `practice-prompt-plan`, `practice-flow` and `practice-checklist`. That gives a section break and a TOC anchor midway (mobile-jp-03 to 12).",
+    "The `practice-flow` diagram is a narrow vertical strip with a lot of empty space at desktop width (desktop-jp-07). This is acceptable because TD works on mobile, so no change is required.",
+    "reader: the end banner says 'このコースの最後のレッスンまで読み終えました' on a draft preview of a chapter 2 lesson. This is probably because drafts are not in course.json order. Suppress it or adjust the wording in /preview (mobile-jp-18, desktop-jp-12).",
+    "reader: the outline marks '演習' as 未回答 / Unanswered as soon as the learner scrolls past `practice-check`. This can look like an error while the learner is still mid-lesson (desktop-jp-09)."
+  ],
+  "verdict": "revise",
+  "summary": "The page is clean: no overflow or rendering errors, line lengths are within target, every screen has a figure, check, prompt or heading, and the EN and JP screens are fully localized. The one required fix is in the `practice-flow` diagram, where the role labels need parentheses or a prefix so that 'Create event organizer' doesn't read as a screen name. Optionally, split the very long practice section in two."
+}

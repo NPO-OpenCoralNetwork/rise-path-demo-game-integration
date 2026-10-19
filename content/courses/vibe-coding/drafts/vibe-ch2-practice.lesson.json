@@ -1,0 +1,1050 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch2-practice",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第2章 演習｜自分のアイデアで1枚企画書をつくる",
+    "en": "Chapter 2 practice: your own one-page plan"
+  },
+  "subtitle": {
+    "jp": "機能を分けて最初の版を決め、1枚企画書に仕上げる",
+    "en": "Sort the features, decide the first version, and finish a one-page plan"
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "level": "beginner",
+  "estMinutes": 20,
+  "prerequisites": [
+    {
+      "jp": "第2章｜AIと企画する力を身につける",
+      "en": "Chapter 2 | Planning with AI"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "o3",
+      "text": {
+        "jp": "自分のアイデアから出した機能の候補を、Must以外も含めてMoSCoWで分け、最初の版に入れる範囲を判断できる",
+        "en": "Sort the candidate features you came up with for your own idea with MoSCoW, beyond the Musts too, and judge what goes into the first version"
+      },
+      "bloom": "evaluate"
+    },
+    {
+      "id": "o4",
+      "text": {
+        "jp": "自分のアイデアで、目的から「やらないこと」までの1枚企画書をAIと作り、チェックリストで直せる",
+        "en": "Build a one-page plan for your own idea with an AI, from the goal to what you won't build, and revise it against a checklist"
+      },
+      "bloom": "create"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": {
+        "jp": "はじめに：自分のアイデアだと、どれも大事に見える",
+        "en": "Start here: with your own idea, everything looks important"
+      },
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": {
+            "jp": "サークルの幹事が、第2章の家計簿アプリと同じ流れで、出欠確認アプリの機能を書き出しました。イベントの作成、出欠ボタン、参加人数の一覧、締め切り前日の通知、ひとことコメント欄、集金です。どれも外せない気がして、気づけば6つ全部を[[MoSCoW]]のMustにしていました。\n\nこの幹事は、AIの力をどう借りるとよいでしょうか。始める前に、予想してみましょう。",
+            "en": "A club organizer follows the same steps as Chapter 2's budget app and lists the features for an attendance app: creating an event, an attendance button, a headcount list, a reminder the day before the deadline, a short comment field and fee collection. Every one of them feels essential, and before long all six are [[MoSCoW]] Musts.\n\nHow should the organizer get help from an AI here? Before you start, make a guess."
+          }
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": {
+            "jp": "予想してみよう",
+            "en": "Make a prediction"
+          },
+          "questions": [
+            {
+              "id": "pq0",
+              "kind": "single",
+              "prompt": {
+                "jp": "この幹事が機能を分け直すとき、AIの力の借り方として最も合うのはどれでしょう？",
+                "en": "When the organizer sorts the features again, which way of getting help from an AI fits best?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "候補を全部渡して、AIにMoSCoWの4つに分けてもらう",
+                    "en": "Hand over every candidate and have the AI sort them into the four MoSCoW groups"
+                  },
+                  "feedback": {
+                    "jp": "AIの分け方は材料になりますが、何を最初の版に入れるかを決めるのは自分です。",
+                    "en": "The AI's sorting is useful input, but deciding what goes into the first version is up to you."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "自分で分けて理由を書き、AIには問題の指摘を頼む",
+                    "en": "Sort them yourself with reasons, and ask the AI to point out problems"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "迷う機能はMustに入れ、あとでAIに削ってもらう",
+                    "en": "Put every feature you're unsure about under Must, and have the AI trim them later"
+                  },
+                  "feedback": {
+                    "jp": "迷うものをMustに入れると、最初の版が重くなります。なくても目的を果たせるかを、自分で確かめて決めます。",
+                    "en": "Unsure features under Must weigh the first version down. Decide yourself by asking: \"Could the goal still be met without this?\""
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "自分で分けたあと、AIには足りない機能だけを挙げてもらう",
+                    "en": "Sort them yourself, then have the AI list only the features you're missing"
+                  },
+                  "feedback": {
+                    "jp": "足りない機能だけを聞いても、Mustが多すぎる問題は残ります。要らないMustがないかも、AIに見てもらいます。",
+                    "en": "Asking only for missing features leaves the too-many-Musts problem as it is. Have the AI check for Musts you don't need, too."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "決めるのは自分で、AIには要らないMustや見落としを指摘してもらいます。演習2の手順「自分で分けて、AIに見直してもらう」で、この頼み方を使います。",
+                "en": "You make the decisions, and the AI points out Musts you don't need and anything you missed. You'll use this in Practice 2, in the step \"Sort them yourself, then have the AI review\"."
+              },
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": {
+        "jp": "演習1：目的を1文にする",
+        "en": "Practice 1: put the goal in one sentence"
+      },
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": {
+            "jp": "自分の作りたいアプリで、AIと1枚企画書を作ります。思いつかなければ「サークルの出欠確認アプリ」で試しましょう。目安は15分です。\n\nこの演習では、機能は自分で分けて決め、AIには見直しを頼みます。演習1で目的を決め、演習2で機能を分け、演習3で1枚にまとめて直します。最後に、チェックリストで仕上がりを確かめます。",
+            "en": "Make a one-page plan with an AI for an app you want to build. If nothing comes to mind, try a club attendance app. Allow about 15 minutes.\n\nIn this practice you sort the features and make the decisions yourself; the AI only reviews them. Practice 1 sets the goal, Practice 2 sorts the features, and Practice 3 puts it all on one page and revises it. When you finish, check your plan against the checklist."
+          }
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-idea",
+              "title": {
+                "jp": "アイデアを1行で書く",
+                "en": "Write the idea in one line"
+              },
+              "md": {
+                "jp": "「誰の」「何のための」アプリかを1行で書きます。",
+                "en": "Write in one line whose app it is and what it's for."
+              },
+              "expect": {
+                "jp": "「サークルの幹事が、参加人数を早く知るためのアプリ」のような1行ができます。",
+                "en": "You have a line such as \"An app that lets a club organizer know the headcount early\"."
+              },
+              "hint": {
+                "jp": "思いつかないときは、最近「面倒だな」と感じた作業を1つ選びます。",
+                "en": "If nothing comes to mind, pick one task that has felt like a chore lately."
+              },
+              "troubleshoot": {
+                "jp": "機能の名前しか書けないときは、「それで誰が、どうなれる？」と自分に聞き直します。",
+                "en": "If your line only names features, ask yourself again: \"Who ends up able to do what?\""
+              }
+            },
+            {
+              "id": "p-interview",
+              "title": {
+                "jp": "AIに質問してもらう",
+                "en": "Have the AI ask you questions"
+              },
+              "md": {
+                "jp": "[[壁打ち]]は、質問してもらいながら考えを言葉にすることです。下の「壁打ちを始める依頼文」をAIに送り、質問に1つずつ答えます。",
+                "en": "[[Talking it through]] means putting your thoughts into words while someone asks you questions. Send \"A request to start talking it through\" below, and answer the AI's questions one by one."
+              },
+              "expect": {
+                "jp": "目的が「誰が・どんな場面で・どうなれる」の1文にまとまります。",
+                "en": "The goal comes together as one sentence: who, in what situation, can do what."
+              },
+              "hint": {
+                "jp": "答えに迷ったら、「例を3つ挙げて」とAIに頼みます。",
+                "en": "If you're stuck on an answer, ask the AI to \"give me three examples\"."
+              },
+              "troubleshoot": {
+                "jp": "AIがすぐにコードを書き始めたら、「コードはまだ不要です。質問だけしてください」と送り直します。",
+                "en": "If the AI starts writing code right away, reply: \"No code yet, please. Only ask me questions.\""
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt-interview",
+          "type": "prompt",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "title": {
+            "jp": "壁打ちを始める依頼文",
+            "en": "A request to start talking it through"
+          },
+          "target": "any",
+          "prompt": {
+            "jp": "「{{作りたいアプリ}}」を作りたいと考えています。まだアイデアはぼんやりしています。\nコードはまだ書かず、企画の相談相手になってください。\n誰が使うのか、どんな場面で何に困っているのかがはっきりするように、質問を1つずつしてください。\n5問ほど聞いたら、決まったことを3行でまとめてください。",
+            "en": "I want to build \"{{app idea}}\". The idea is still vague.\nDon't write any code yet; be my planning partner.\nAsk me questions one at a time so that it becomes clear who will use it, in what situation, and what problem they have.\nAfter about five questions, summarize what we've decided in three lines."
+          },
+          "vars": [
+            {
+              "name": "作りたいアプリ",
+              "hint": {
+                "jp": "例：サークルの出欠確認アプリ",
+                "en": "e.g. a club attendance app"
+              }
+            },
+            {
+              "name": "app idea",
+              "hint": {
+                "jp": "例：サークルの出欠確認アプリ",
+                "en": "e.g. a club attendance app"
+              }
+            }
+          ],
+          "expect": {
+            "jp": "AIが「誰が使いますか？」「いまはどんな場面で困っていますか？」のように、1つずつ質問を返します。コードはまだ出てきません。最後に、目的・使う人・困りごとが3行にまとまります。",
+            "en": "The AI replies with one question at a time, such as \"Who will use it?\" or \"When do you run into the problem today?\" No code appears yet. At the end, the goal, the users and the problem are summed up in three lines."
+          }
+        }
+      ]
+    },
+    {
+      "id": "practice-sort",
+      "title": {
+        "jp": "演習2：機能を分けて、最初の版を決める",
+        "en": "Practice 2: sort the features and decide the first version"
+      },
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-recap",
+          "type": "callout",
+          "variant": "note",
+          "cite": [
+            "abc-moscow"
+          ],
+          "title": {
+            "jp": "MoSCoWのおさらい",
+            "en": "MoSCoW in brief"
+          },
+          "md": {
+            "jp": "Mustは、ないと目的を果たせないものです。Shouldは重要だけれど、なくても最初の版は成り立つもの、Couldはあるとよいものです。Won'tは、この版では作らないと決めて企画書に書いておくものです。",
+            "en": "A Must is something the goal can't be met without. A Should is important, but the first version still works without it; a Could is nice to have. A Won't is something you agree not to build in this version, and you write it down in the plan."
+          }
+        },
+        {
+          "id": "practice-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "pq1",
+              "kind": "single",
+              "prompt": {
+                "jp": "買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustの「お店ごとの並べ替え」に、AIが「なくても買い忘れは防げます」と指摘しました。最も適切な判断はどれでしょう？",
+                "en": "A shopping-list app has the goal \"family members don't forget anything while shopping\". One of your Musts is \"sort items by shop\", and the AI points out that forgotten items can be prevented without it. Which decision is best?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "なくても目的は果たせるので、Shouldに移す",
+                    "en": "Move it to Should, since the goal can be met without it"
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "便利な機能ほど使われるので、Mustに残す",
+                    "en": "Keep it as a Must, since handy features get used more"
+                  },
+                  "feedback": {
+                    "jp": "便利さは、Mustかどうかの物差しではありません。なくても目的を果たせるかどうかで決めます。",
+                    "en": "Being handy isn't what makes a Must. Decide by asking: \"Could the goal still be met without this?\""
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "ほかのMustも、AIに全部分け直してもらう",
+                    "en": "Have the AI re-sort all the other Musts too"
+                  },
+                  "feedback": {
+                    "jp": "分けるのをAIに任せると、自分の目的に照らした判断が入りません。指摘は1つずつ、自分で確かめて決めます。",
+                    "en": "If the AI does the sorting, your own judgment against the goal drops out. Check each point yourself and decide."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "Won'tにして、企画書からも消しておく",
+                    "en": "Make it a Won't and delete it from the plan"
+                  },
+                  "feedback": {
+                    "jp": "店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。Won'tにするときも、消さずに企画書に書いておきます。",
+                    "en": "Grouping items by shop makes forgotten items easier to spot, so Should fits better than Won't. Even when something is a Won't, it stays written in the plan rather than deleted."
+                  }
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": {
+                "jp": "AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめます。果たせるならMustから外し、重要ならShouldにします。",
+                "en": "The AI's point is input for your decision. Check it yourself by asking whether the goal could be met without the feature. If it could, take it out of Must, and make it a Should if it matters."
+              },
+              "hint": {
+                "jp": "指摘を受け入れるかどうかを、何を物差しにして決めるか考えましょう。",
+                "en": "Think about which yardstick you use to decide whether to accept the point."
+              },
+              "objectiveId": "o3",
+              "bloom": "evaluate"
+            }
+          ]
+        },
+        {
+          "id": "practice-steps-sort",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-ideas",
+              "title": {
+                "jp": "機能の候補を出す",
+                "en": "Gather candidate features"
+              },
+              "md": {
+                "jp": "AIに「この目的に役立つ機能の候補を挙げて」と頼み、自分の案も足します。",
+                "en": "Ask the AI to \"list features that would help with this goal\", and add your own ideas."
+              },
+              "expect": {
+                "jp": "機能の候補が5つ以上並びます。",
+                "en": "You have five or more candidate features."
+              },
+              "hint": {
+                "jp": "候補が少ないときは、目的の1文を読み返し、「どんな場面で、何があると助かる？」と自分に聞きます。",
+                "en": "If you have only a few, reread your goal sentence and ask yourself: \"When would something help, and what would it be?\""
+              },
+              "troubleshoot": {
+                "jp": "目的と関係のない候補ばかりなら、目的の1文を貼り直し、「この目的に必要なものだけ挙げて」と頼みます。",
+                "en": "If most candidates have little to do with your goal, paste the goal sentence again and ask for \"only what this goal needs\"."
+              }
+            },
+            {
+              "id": "p-moscow",
+              "title": {
+                "jp": "自分で分けて、AIに見直してもらう",
+                "en": "Sort them yourself, then have the AI review"
+              },
+              "md": {
+                "jp": "まず自分で4つのグループに分け、理由を1行ずつ書きます。次に下の「MoSCoWの分け方を見直してもらう依頼文」で、AIに見直してもらいます。",
+                "en": "First sort the candidates into the four groups yourself, with a one-line reason for each. Then use \"A request to have your MoSCoW sorting reviewed\" below to have the AI review your sorting."
+              },
+              "expect": {
+                "jp": "4つのグループへの分け方と、その理由が書けています。AIの指摘を読み、直すかどうかを自分で決められます。",
+                "en": "Your sorting into the four groups, with a reason for each, is written down. You read the AI's points and decide for yourself whether to change anything."
+              },
+              "hint": {
+                "jp": "Mustに迷ったら「これがなくても、目的は果たせる？」と自分に聞きます。",
+                "en": "If you're unsure about a Must, ask yourself: \"Could the goal still be met without this?\""
+              },
+              "troubleshoot": {
+                "jp": "Mustが4つ以上残ったら、目的を果たす最短の流れに要らないものをShouldに移します。",
+                "en": "If four or more Musts remain, move anything the shortest path to the goal doesn't need into Should."
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt",
+          "type": "prompt",
+          "title": {
+            "jp": "MoSCoWの分け方を見直してもらう依頼文",
+            "en": "A request to have your MoSCoW sorting reviewed"
+          },
+          "target": "any",
+          "prompt": {
+            "jp": "目的は「{{目的}}」です。\n機能を、Must・Should・Could・Won'tで次のように分けました。理由も付けています。\n{{自分の分け方}}\nこの目的に照らして、分け方に問題があれば、理由と一緒に指摘してください。\n特に、なくても目的を果たせるMustがないかを確かめてください。\n目的を果たすのに足りない機能がないかも確かめてください。\n分け直すかどうかは私が決めるので、指摘だけをお願いします。",
+            "en": "The goal is \"{{goal}}\".\nHere is how I sorted the features into Must / Should / Could / Won't, with my reasons:\n{{my sorting}}\nCheck my sorting against the goal, and point out any problems along with your reasons.\nIn particular, check whether any Must could be dropped with the goal still met.\nAlso check whether anything the goal needs is missing.\nI'll decide whether to change anything, so please only point things out."
+          },
+          "vars": [
+            {
+              "name": "目的",
+              "hint": {
+                "jp": "例：家計をあずかる自分が、月の途中で食費の使いすぎに気づける",
+                "en": "e.g. As the person who runs the household budget, I can notice mid-month that I'm overspending on food"
+              }
+            },
+            {
+              "name": "goal",
+              "hint": {
+                "jp": "例：家計をあずかる自分が、月の途中で食費の使いすぎに気づける",
+                "en": "e.g. As the person who runs the household budget, I can notice mid-month that I'm overspending on food"
+              }
+            },
+            {
+              "name": "自分の分け方",
+              "hint": {
+                "jp": "例：Must＝支出の入力（ないと記録できない）、今月の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
+                "en": "e.g. Must = logging expenses (nothing gets recorded without it), setting this month's budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
+              }
+            },
+            {
+              "name": "my sorting",
+              "hint": {
+                "jp": "例：Must＝支出の入力（ないと記録できない）、今月の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
+                "en": "e.g. Must = logging expenses (nothing gets recorded without it), setting this month's budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
+              }
+            }
+          ],
+          "expect": {
+            "jp": "サークルの出欠確認アプリなら、たとえば次のように進みます。\n\n目的：幹事が前日までに参加人数を知り、お店の予約を確定できる。\n\n自分の分け方：Mustはイベントの作成、出欠ボタン、参加人数の一覧、締め切り前日の通知です。Couldはひとことコメント欄、Won'tは参加費の集金です。\n\n理由の例：イベントの作成は「出欠を聞く場がないと始まらないから」です。通知は「返事を忘れる人がいるから」、集金は「お金を扱うので、今回は見送るから」です。\n\nAIの指摘の例：「通知がなくても、出欠ボタンと一覧があれば人数はわかります。Shouldでもよいかもしれません。」\n\nどうするかは自分で決めます。この例では通知をShouldに移し、Mustを3つにしました。",
+            "en": "For a club attendance app, it might go like this.\n\nGoal: the organizer knows the headcount a day early and can book the venue.\n\nYour sorting: the Musts are creating an event, an attendance button, a headcount list and a reminder the day before the deadline. The Could is a short comment field, and the Won't is collecting fees.\n\nSample reasons: creating an event, \"there's nothing to reply to without one\"; the reminder, \"some people forget to reply\"; the fees, \"it involves money, so we're leaving it for now\".\n\nA sample point from the AI: \"Even without the reminder, the button and the list tell you the headcount. It might fit under Should.\"\n\nThe decision is yours. In this example you move the reminder to Should, which leaves three Musts."
+          }
+        }
+      ]
+    },
+    {
+      "id": "practice-plan",
+      "title": {
+        "jp": "演習3：1枚企画書にまとめて直す",
+        "en": "Practice 3: put it on one page and revise it"
+      },
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-steps-plan",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-plan",
+              "title": {
+                "jp": "1枚企画書にまとめてもらう",
+                "en": "Have it written up as a one-page plan"
+              },
+              "md": {
+                "jp": "下の「1枚企画書を作ってもらう依頼文」で、6つの見出しの企画書を作ってもらいます。",
+                "en": "Use \"A request for the one-page plan\" below to get a plan with the six headings."
+              },
+              "expect": {
+                "jp": "目的から「やらないこと」までの6項目が1枚に並びます。",
+                "en": "All six items, from the goal to what you won't build, sit on one page."
+              },
+              "hint": {
+                "jp": "AIが勝手に埋めた項目があれば、「これは決めていません」と伝えて質問してもらいます。",
+                "en": "If the AI filled in something you never decided, say \"I haven't decided this\" and have it ask you instead."
+              },
+              "troubleshoot": {
+                "jp": "見出しが6つそろわないときは、足りない見出しの名前を挙げて、「この項目について質問してください」と頼みます。",
+                "en": "If some of the six headings are missing, name them and ask: \"Please ask me about these items.\""
+              }
+            },
+            {
+              "id": "p-revise",
+              "title": {
+                "jp": "読み返して直す",
+                "en": "Reread and revise"
+              },
+              "md": {
+                "jp": "自分の意図と違うところを1つ以上見つけ、AIに直してもらいます。",
+                "en": "Find at least one place that doesn't match what you meant, and have the AI fix it."
+              },
+              "expect": {
+                "jp": "直したあとの企画書が、下のチェックリストにすべて当てはまります。",
+                "en": "The revised plan meets every item on the checklist below."
+              },
+              "hint": {
+                "jp": "チェックリストの項目ごとに企画書と見比べ、当てはまらない項目を1つ選びます。",
+                "en": "Compare the plan with the checklist item by item, and pick one item it doesn't meet yet."
+              },
+              "troubleshoot": {
+                "jp": "「Mustに○○が入っていますが、目的には不要なのでShouldに移してください」のように頼みます。どこを・なぜ・どう直すかを、1文で伝えます。",
+                "en": "Ask with something like: \"The Musts include X, but the goal doesn't need it, so please move it to Should.\" Say where, why and how to change it, in one sentence."
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt-plan",
+          "type": "prompt",
+          "title": {
+            "jp": "1枚企画書を作ってもらう依頼文",
+            "en": "A request for the one-page plan"
+          },
+          "target": "any",
+          "prompt": {
+            "jp": "ここまでの相談をもとに、「{{アプリ名}}」の1枚企画書を作ってください。\n次の6つの見出しで、それぞれ短く書いてください。\n1. 目的（誰が・どんな場面で・どうなれる）\n2. 使う人\n3. 機能の優先順位（Must・Should・Could）\n4. 画面の流れ（画面名を「→」でつなぐ）\n5. 扱うデータ（項目名だけ）\n6. やらないこと（Won't）\nコードはまだ書かないでください。決めていないことは推測で埋めず、質問してください。",
+            "en": "Based on our discussion so far, write a one-page plan for \"{{app name}}\".\nUse the six headings below and keep each one short.\n1. Goal (who, in what situation, can do what)\n2. Users\n3. Feature priorities (Must / Should / Could)\n4. Screen flow (screen names joined with \"→\")\n5. Data handled (field names only)\n6. What we won't build (Won't)\nDon't write any code yet. If something hasn't been decided, don't fill it in with a guess; ask me instead."
+          },
+          "vars": [
+            {
+              "name": "アプリ名",
+              "hint": {
+                "jp": "例：幹事が参加人数を早く知れる出欠確認アプリ",
+                "en": "e.g. an attendance app that tells the organizer the headcount early"
+              }
+            },
+            {
+              "name": "app name",
+              "hint": {
+                "jp": "例：幹事が参加人数を早く知れる出欠確認アプリ",
+                "en": "e.g. an attendance app that tells the organizer the headcount early"
+              }
+            }
+          ],
+          "expect": {
+            "jp": "サークルの出欠確認アプリなら、たとえば次のような1枚になります。\n\n目的：幹事が前日までに参加人数を知り、お店の予約を確定できる。\n\n使う人：サークルの幹事とメンバー。\n\n機能の優先順位：Mustはイベントの作成、出欠ボタン、参加人数の一覧。Shouldは締め切り前日の通知、Couldはひとことコメント欄。\n\n画面の流れ：イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧。\n\n扱うデータ：イベント（日付・場所・締め切り）、出欠（名前・参加するか）。\n\nやらないこと：参加費の集金。",
+            "en": "For the club attendance app, the page might look like this.\n\nGoal: the organizer knows the headcount a day early and can book the venue.\n\nUsers: the club organizer and the members.\n\nFeature priorities: Must: create an event; an attendance button; a headcount list. Should: a reminder the day before the deadline. Could: a short comment field.\n\nScreen flow: create event → event list → mark attendance → headcount list.\n\nData handled: event (date, place, deadline); attendance (name, coming or not).\n\nWhat we won't build: collecting fees."
+          }
+        },
+        {
+          "id": "practice-tip",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "それでも迷ったら",
+            "en": "Still stuck?"
+          },
+          "md": {
+            "jp": "演習2と演習3の依頼文の下にある「期待される結果」を開くと、サークルの出欠確認アプリでの答えの例が読めます。自分の答えと比べ、違うところの理由を考えてみましょう。",
+            "en": "Open \"What a good answer looks like\" under the requests in Practice 2 and Practice 3 to see sample answers for the club attendance app. Compare them with yours and think about why they differ."
+          }
+        },
+        {
+          "id": "practice-flow",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "flowchart TD\n  A[\"イベントの作成<br>（幹事）\"] --> B[\"イベント一覧<br>（メンバー）\"]\n  B --> C[\"出欠の入力<br>（メンバー）\"]\n  C --> D[\"参加人数の一覧<br>（幹事）\"]",
+            "en": "flowchart TD\n  A[\"Create event<br>(organizer)\"] --> B[\"Event list<br>(members)\"]\n  B --> C[\"Mark attendance<br>(members)\"]\n  C --> D[\"Headcount list<br>(organizer)\"]"
+          },
+          "caption": {
+            "jp": "出欠確認アプリの例：Mustの画面だけで、作成から人数の確認まで通る",
+            "en": "Attendance app example: the Must screens alone get you from creating an event to the headcount"
+          },
+          "alt": {
+            "jp": "幹事がイベントを作成し、メンバーがイベント一覧から出欠を入力し、幹事が参加人数の一覧で人数を確かめる流れの図",
+            "en": "The organizer creates an event, members open it from the event list and mark attendance, and the organizer checks the headcount list"
+          },
+          "description": {
+            "jp": "幹事がイベントを作ると、メンバーは一覧から開いて出欠を入力します。幹事は参加人数の一覧で人数を確かめ、お店を予約できます。",
+            "en": "Once the organizer creates an event, members open it from the list and mark attendance. The organizer checks the headcount list and can book the venue."
+          }
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": {
+            "jp": "1枚企画書のチェックリスト",
+            "en": "One-page plan checklist"
+          },
+          "items": [
+            {
+              "id": "pc-goal",
+              "label": {
+                "jp": "目的が「誰が・どんな場面で・どうなれる」の1文になっている",
+                "en": "The goal is one sentence: who, in what situation, can do what"
+              }
+            },
+            {
+              "id": "pc-must",
+              "label": {
+                "jp": "Mustが3つ以内（目安）で、どれも「ないと目的を果たせない」機能になっている",
+                "en": "There are three Musts or fewer (a rule of thumb), and the goal can't be met without any of them"
+              }
+            },
+            {
+              "id": "pc-flow",
+              "label": {
+                "jp": "Mustと画面の流れだけで、目的を最初から最後まで果たせる（入力・登録の画面が抜けていない）",
+                "en": "The Musts and the screen flow alone get you to the goal from start to finish (no screen for entering or saving data is missing)"
+              }
+            },
+            {
+              "id": "pc-wont",
+              "label": {
+                "jp": "「やらないこと」（Won't）が1つ以上書いてある",
+                "en": "At least one Won't is written under \"what we won't build\""
+              }
+            },
+            {
+              "id": "pc-screens",
+              "label": {
+                "jp": "画面の流れが、画面名と矢印で書いてある",
+                "en": "The screen flow is written as screen names joined by arrows"
+              }
+            },
+            {
+              "id": "pc-data",
+              "label": {
+                "jp": "扱うデータが項目名で書いてある",
+                "en": "The data handled is written as field names"
+              }
+            },
+            {
+              "id": "pc-nocode",
+              "label": {
+                "jp": "まだコードを頼んでいない",
+                "en": "You haven't asked for any code yet"
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-plan-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "pq5",
+              "kind": "single",
+              "prompt": {
+                "jp": "ゴミ出しアプリの1枚企画書です。目的は「ゴミ出しを管理できる」です。Mustは「収集日の登録」と「収集日の前夜の通知」、やらないことは「分別方法の検索」です。チェックリストに照らして、最初に直すべきなのはどれでしょう？",
+                "en": "Here is a one-page plan for a trash-day app. The goal is \"manage taking out the trash\". The Musts are \"register collection days\" and \"a reminder the night before collection\", and what we won't build is \"look up sorting rules\". Checked against the checklist, what should you fix first?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "やらないことの「分別方法の検索」を、企画書から消す",
+                    "en": "Delete \"look up sorting rules\" from the plan"
+                  },
+                  "feedback": {
+                    "jp": "やらないことは、作る範囲の外を示す大事な項目です。消さずに残し、チェックリストに当てはまらない項目を探します。",
+                    "en": "\"What we won't build\" marks the edge of the scope, so keep it. Look for the item that fails the checklist instead."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "目的を「自分が、収集日にゴミを出し忘れない」に書き直す",
+                    "en": "Rewrite the goal as \"I never forget to put the trash out on collection day\""
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "Mustに「分別方法の検索」も入れて、もっと便利にする",
+                    "en": "Add \"look up sorting rules\" to the Musts to make the app more useful"
+                  },
+                  "feedback": {
+                    "jp": "便利さは、Mustかどうかの物差しではありません。物差しになる目的が、まだぼんやりしています。",
+                    "en": "Being handy isn't what makes a Must. And the goal that should be your yardstick is still vague."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "目的の1文は、AIにそれらしく考えて書いてもらう",
+                    "en": "Have the AI come up with a plausible goal sentence"
+                  },
+                  "feedback": {
+                    "jp": "AIが書く目的は推測です。誰が、どんな場面で困っているかは、自分で決めて書きます。",
+                    "en": "A goal the AI writes is a guess. Who is struggling, and when, is yours to decide and write down."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "「管理できる」だけでは誰がどうなれるかがわからず、Mustを選ぶ物差しになりません。目的を1文に直してから、ほかの項目も見直します。",
+                "en": "\"Manage\" alone doesn't say who ends up able to do what, so it can't be the yardstick for choosing Musts. Fix the goal sentence first, then recheck the other items."
+              },
+              "hint": {
+                "jp": "上のチェックリストを、1つ目から順に企画書と見比べましょう。",
+                "en": "Go through the checklist above from the top and compare each item with the plan."
+              },
+              "objectiveId": "o4",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": {
+        "jp": "理解度チェック",
+        "en": "Knowledge check"
+      },
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "abc-moscow"
+          ],
+          "questions": [
+            {
+              "id": "pq2",
+              "kind": "single",
+              "prompt": {
+                "jp": "ジムの記録アプリの目的は「自分が、前回の重さを見てから今日の記録をつけられる」です。Mustは「記録の入力」と「前回の記録の表示」です。残る2つの候補の分け方として、最も適切なのはどれでしょう？",
+                "en": "A gym log app has the goal \"I can see last time's weights before I log today's workout.\" The Musts are \"log a workout\" and \"show the last record\". Which is the best way to sort the two remaining candidates?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "Should：つけ忘れた日の通知／Won't：友だちとのランキング",
+                    "en": "Should: a reminder when I forget to log / Won't: a leaderboard with friends"
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "Should：友だちとのランキング／Won't：つけ忘れた日の通知",
+                    "en": "Should: a leaderboard with friends / Won't: a reminder when I forget to log"
+                  },
+                  "feedback": {
+                    "jp": "ランキングは「前回を見て記録する」という目的とつながりません。記録を続ける助けになる通知のほうが、重要度は高いです。",
+                    "en": "A leaderboard has nothing to do with checking last time before logging. The reminder helps you keep the record going, so it matters more."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "2つともMustに入れて、最初の版で作る",
+                    "en": "Make both Musts and build them in the first version"
+                  },
+                  "feedback": {
+                    "jp": "どちらも、なくても前回を見て記録はできます。Mustは「ないと目的を果たせない」ものだけです。",
+                    "en": "You can still check last time and log without either one. A Must is only something the goal can't be met without."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "2つとも、企画書から消しておく",
+                    "en": "Delete both from the plan"
+                  },
+                  "feedback": {
+                    "jp": "消すと、次の版の候補も範囲の境目も残りません。今回作らないものは、Won'tに書いておきます。",
+                    "en": "Deleting them loses both the next-version candidates and the edge of the scope. Write what you won't build this time under Won't."
+                  }
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": {
+                "jp": "通知はなくても目的は果たせますが、記録を続ける助けになるのでShouldです。ランキングは目的とつながらないので、Won'tに書いて範囲の外だと伝えます。",
+                "en": "The goal can be met without the reminder, but it helps you keep logging, so it's a Should. The leaderboard doesn't serve the goal, so it goes under Won't, which marks it as out of scope."
+              },
+              "objectiveId": "o3",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "pq3",
+              "kind": "single",
+              "prompt": {
+                "jp": "レシピ帳アプリの1枚企画書です。目的は「自分が、作った料理を次も同じ手順で作れる」です。Mustは「レシピの一覧」と「レシピの表示」、画面の流れは「レシピ一覧 → レシピの表示」です。最も必要な直しはどれでしょう？",
+                "en": "Here is a one-page plan for a recipe app. The goal is \"I can cook a dish again the same way next time.\" The Musts are \"recipe list\" and \"show a recipe\", and the screen flow is \"recipe list → recipe view\". Which revision is needed most?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "料理の写真をきれいに加工する機能を、Couldに足す",
+                    "en": "Add photo touch-ups for your dishes under Could"
+                  },
+                  "feedback": {
+                    "jp": "Couldを足しても、レシピを残す手段がないままです。先に、目的に欠かせないMustが抜けていないかを確かめます。",
+                    "en": "Adding a Could still leaves no way to save a recipe. First check whether a Must the goal depends on is missing."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "画面の流れは消して、どう作るかはAIに任せる",
+                    "en": "Drop the screen flow and leave how to build it to the AI"
+                  },
+                  "feedback": {
+                    "jp": "流れを消すと、足りない画面に自分もAIも気づけません。足りない画面を書き足します。",
+                    "en": "Without the flow, neither you nor the AI can spot the missing screen. Add the screen that's missing."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "レシピの登録をMustに足し、入力画面を流れに入れる",
+                    "en": "Add \"save a recipe\" as a Must and put an entry screen in the flow"
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "レシピの検索をMustに足し、探しやすくする",
+                    "en": "Add \"search recipes\" as a Must so recipes are easier to find"
+                  },
+                  "feedback": {
+                    "jp": "検索を足しても、レシピを残す手段はないままです。足りないのは、レシピを登録するためのMustです。",
+                    "en": "Search still leaves no way to save a recipe. What's missing is a Must for saving recipes."
+                  }
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": {
+                "jp": "一覧と表示だけでは、レシピを残す手段がありません。目的に欠かせない「登録」が抜けていないかを、Mustと画面の流れの両方で確かめます。",
+                "en": "A list and a view alone give you no way to save a recipe. Check both the Musts and the screen flow for a step the goal depends on, such as saving."
+              },
+              "objectiveId": "o4",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "pq4",
+              "kind": "single",
+              "prompt": {
+                "jp": "AIが作った1枚企画書の「使う人」に、相談していない「20〜40代の共働き夫婦」が書かれていました。次にすることとして、最も適切なのはどれでしょう？",
+                "en": "In the plan the AI wrote, \"Users\" says \"working couples in their 20s to 40s\", which you never discussed. What is the best next step?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "AIの推測のほうが詳しそうなので、そのまま使う",
+                    "en": "Keep it, since the AI's guess sounds well informed"
+                  },
+                  "feedback": {
+                    "jp": "もっともらしくても、それはAIの推測です。使う人が違えば目的も機能も変わるので、自分で決めます。",
+                    "en": "However plausible, it's still the AI's guess. Different users mean a different goal and features, so you decide."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "使う人はあとで決めて、先に画面を作ってもらう",
+                    "en": "Decide the users later and have the screens built first"
+                  },
+                  "feedback": {
+                    "jp": "使う人が決まらないと、画面がよいかどうかを判断できません。作り始める前に決めておきます。",
+                    "en": "Without knowing the users, you can't judge whether the screens are any good. Settle it before building."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "企画書を自分で一から書き直し、AIには渡さない",
+                    "en": "Rewrite the whole plan yourself and keep it from the AI"
+                  },
+                  "feedback": {
+                    "jp": "違うのが一部なら、全部を書き直す必要はありません。違う項目を伝えて、AIに質問してもらいます。",
+                    "en": "If only part of it is off, there's no need to rewrite everything. Point out that item and have the AI ask you about it."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "「これは決めていません」と伝え、質問してもらって決める",
+                    "en": "Say \"I haven't decided this\" and decide after the AI asks you"
+                  }
+                }
+              ],
+              "answer": [
+                "d"
+              ],
+              "explanation": {
+                "jp": "決めていない項目が、AIの推測で埋まることがあります。「これは決めていません」と伝えれば、質問に答えながら自分で決められます。",
+                "en": "Items you haven't decided can get filled in with the AI's guesses. Saying \"I haven't decided this\" lets you settle it yourself as you answer its questions."
+              },
+              "objectiveId": "o4",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": {
+        "jp": "まとめ",
+        "en": "Summary"
+      },
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            {
+              "jp": "機能はまず自分で分けて理由を書き、AIには指摘だけを頼みます。直すかどうかは自分で決めます。",
+              "en": "Sort the features yourself first, with reasons, and ask the AI only to point out problems. You decide what to change."
+            },
+            {
+              "jp": "Mustは、ないと目的を果たせないものだけです。重要だけれど、なくても最初の版が成り立つものはShouldです。今回作らないものは、Won'tに書いて残します。",
+              "en": "A Must is only what the goal can't do without. Something important that the first version can still work without is a Should. What you won't build this time stays written under Won't."
+            },
+            {
+              "jp": "AIが決めていないことを埋めたら、「これは決めていません」と伝えて質問してもらいます。",
+              "en": "If the AI fills in something you never decided, say \"I haven't decided this\" and have it ask you."
+            },
+            {
+              "jp": "チェックリストで読み返し、足りない機能や画面がないかも確かめます。直しは、どこを・なぜ・どう直すかを1文で頼みます。",
+              "en": "Reread the plan against the checklist, including whether any feature or screen is missing. Ask for each fix in one sentence: where, why and how."
+            }
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": {
+            "jp": "最後に振り返ってみましょう。AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。\n\n第3章では、AIと開発するためのVS Codeを準備します。この先、AIに画面を作ってもらうときは、この1枚企画書を一緒に渡せます。",
+            "en": "To finish, look back. If you turned down any of the AI's points, write down why in one line.\n\nIn Chapter 3 you'll set up VS Code for building with an AI. Later on, when you ask an AI to build screens, you can hand it this one-page plan as well."
+          }
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-must-test",
+              "front": {
+                "jp": "Mustか迷ったときの質問は？",
+                "en": "What do you ask when you're unsure about a Must?"
+              },
+              "back": {
+                "jp": "「これがなくても、目的は果たせる？」。果たせるなら、Mustではない。",
+                "en": "\"Could the goal still be met without this?\" If it could, it isn't a Must."
+              }
+            },
+            {
+              "id": "card-should-wont",
+              "front": {
+                "jp": "ShouldとWon'tの違いは？",
+                "en": "Should vs Won't?"
+              },
+              "back": {
+                "jp": "Shouldは、なくても最初の版は成り立つが重要なもの。Won'tは、この版では作らないと決めて書いておくもの。",
+                "en": "A Should is important, but the first version works without it. A Won't is something you agree not to build in this version, and write down."
+              }
+            },
+            {
+              "id": "card-ai-review",
+              "front": {
+                "jp": "分け方をAIに見直してもらうときの頼み方は？",
+                "en": "How do you ask an AI to review your sorting?"
+              },
+              "back": {
+                "jp": "自分で分けて理由を書き、AIには指摘だけを頼む。直すかどうかは自分で決める。",
+                "en": "Sort it yourself with reasons, and ask the AI only to point out problems. You decide what to change."
+              }
+            },
+            {
+              "id": "card-revise",
+              "front": {
+                "jp": "企画書の直しを頼むときに伝える3つは？",
+                "en": "Which three things do you say when asking for a fix to the plan?"
+              },
+              "back": {
+                "jp": "どこを・なぜ・どう直すか。1文で伝える。",
+                "en": "Where, why and how to change it, in one sentence."
+              }
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            {
+              "jp": "ShouldとWon'tの分け方に迷ったときは？",
+              "en": "How do I decide between Should and Won't?"
+            },
+            {
+              "jp": "自分の1枚企画書を、チェックリストで一緒に見てほしい",
+              "en": "Go through my one-page plan with the checklist with me"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": {
+        "jp": "壁打ち",
+        "en": "Talking it through"
+      },
+      "md": {
+        "jp": "答えをもらう前に、相手に質問してもらいながら、自分の考えを言葉にしていくこと。",
+        "en": "Putting your thoughts into words while someone asks you questions, before you get answers."
+      }
+    },
+    {
+      "term": {
+        "jp": "MoSCoW",
+        "en": "MoSCoW"
+      },
+      "md": {
+        "jp": "機能をMust・Should・Could・Won't（今回やらない）の4つに分ける優先順位の付け方。",
+        "en": "A way to prioritize features as Must, Should, Could and Won't (not this time)."
+      }
+    },
+    {
+      "term": {
+        "jp": "1枚企画書",
+        "en": "One-page plan"
+      },
+      "md": {
+        "jp": "目的・使う人・機能の優先順位・画面の流れ・扱うデータ・やらないことを1枚に並べた文書。",
+        "en": "One page listing the goal, users, feature priorities, screen flow, data handled and what you won't build."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-best-practices",
+      "title": "Best practices for Claude Code",
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-19"
+    },
+    {
+      "id": "abc-moscow",
+      "title": "What is MoSCoW Prioritization?",
+      "url": "https://www.agilebusiness.org/resource/what-is-moscow-prioritization/",
+      "publisher": "Agile Business Consortium",
+      "checkedAt": "2026-10-19"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-19"
+  }
+}
