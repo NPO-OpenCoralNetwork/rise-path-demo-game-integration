@@ -1,0 +1,125 @@
+/*
+ * Rise Path typography: per-language leading for the type scale, Japanese
+ * typesetting rules, and the .tabular / .eyebrow helpers.
+ * Imported by index.css right after tokens.css. See doc/design/design-system.md.
+ *
+ * Layering: element and language rules sit in @layer base so any Tailwind
+ * utility on an element (leading-*, tracking-*, italic, font-*) still wins.
+ * The two rules in @layer utilities at the bottom intentionally override
+ * utilities, and only for Japanese.
+ *
+ * Selectors use the compound form `x:lang(ja)`, not `:lang(ja) x`, so a
+ * lang="en" block inside a Japanese page is left alone.
+ */
+
+@layer base {
+  /*
+   * Line-heights for the text-* scale (text-display … text-caption).
+   * index.css reads these through @theme inline, so a [lang] island inside a
+   * page of the other language gets its own leading.
+   */
+  :root,
+  [lang]:not(:lang(ja)) {
+    --rp-leading-display: 1.2; /* 40 / 48 */
+    --rp-leading-h1: 1.2667; /* 30 / 38 */
+    --rp-leading-h2: 1.3636; /* 22 / 30 */
+    --rp-leading-h3: 1.4444; /* 18 / 26 */
+    --rp-leading-body-lg: 1.6471; /* 17 / 28 */
+    --rp-leading-body: 1.6; /* 15 / 24 */
+    --rp-leading-small: 1.5385; /* 13 / 20 */
+    --rp-leading-caption: 1.3333; /* 12 / 16 */
+  }
+
+  [lang]:lang(ja) {
+    --rp-leading-display: 1.35;
+    --rp-leading-h1: 1.4;
+    --rp-leading-h2: 1.45;
+    --rp-leading-h3: 1.5;
+    --rp-leading-body-lg: 1.85; /* lesson body may go to 1.9 */
+    --rp-leading-body: 1.75;
+    --rp-leading-small: 1.6;
+    --rp-leading-caption: 1.5;
+  }
+
+  /*
+   * Japanese defaults. Tracking and line breaking are set once on the
+   * language root and inherited, so an ancestor's tracking-* utility still
+   * reaches its children.
+   */
+  [lang]:lang(ja) {
+    letter-spacing: 0.02em;
+    line-break: strict;
+  }
+
+  [lang]:not(:lang(ja)) {
+    letter-spacing: normal;
+    line-break: auto;
+  }
+
+  /*
+   * Japanese running text gets 1.75. Scoped to paragraphs, not the root, so
+   * labels inside buttons and nav rows keep their current height; a leading-*
+   * or text-* utility on the paragraph itself still wins. Lesson bodies set
+   * their own 1.9 (or use text-body-lg).
+   */
+  :where(p, blockquote):lang(ja) {
+    line-height: 1.75;
+  }
+
+  /* Headings and buttons: proportional kana, phrase-aware wrapping. A phrase longer than the
+     line ("GitHubワークフロー完全理解" on a phone) still breaks instead of overflowing.
+     break-word, not anywhere: it leaves min-content sizes (flex rows of buttons) alone. */
+  :where(h1, h2, h3, h4, button, [role="tab"]):lang(ja) {
+    font-feature-settings: "palt";
+    letter-spacing: 0.01em;
+    word-break: auto-phrase;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+  }
+
+  /* Japanese has no italic. Emphasis becomes weight, never a slanted glyph. */
+  :where(em, i):lang(ja) {
+    font-style: normal;
+    font-weight: 600;
+  }
+}
+
+/* Numbers that change in place: XP, timers, stats. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Small label above a title. Named eyebrow because Tailwind already owns
+ * `overline` (text-decoration-line). Uppercase and wide tracking are
+ * Latin-only; Japanese gets neither.
+ */
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  &:lang(ja) {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+}
+
+@layer utilities {
+  /*
+   * Migration shims for existing components. Specificity (0,2,0) or more
+   * beats the single-class utility they correct.
+   *   - `italic` on Japanese text renders a synthetic slant: turn it off.
+   *   - Wide tracking on kana reads as "ミ ッ シ ョ ン": reset it to the
+   *     Japanese default. tracking-tight / tracking-tighter are untouched.
+   */
+  .italic:lang(ja) {
+    font-style: normal;
+  }
+
+  :is(.uppercase:not([class*="tracking-tight"]), [class*="tracking-wide"], [class*="tracking-[0."]):lang(ja) {
+    letter-spacing: 0.02em;
+  }
+}

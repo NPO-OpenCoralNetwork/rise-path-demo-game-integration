@@ -5,6 +5,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { fetchGeneratedCourseById, saveGeneratedCourse } from './services/curriculumApi';
+import { VIEW_PATHS } from './navigation/viewPaths';
+import { features } from './config/features';
 
 // Common Components
 import Layout from './components/common/Layout';
@@ -69,19 +71,9 @@ import {
   HtmlCssPartTwoView,
   WebInspectorView,
   VibePrologueView,
-  VibeChapterZeroView,
-  VibeChapterOneView,
-  VibeChapterTwoView,
-  VibeChapterThreeView,
-  VibeChapterFourView,
-  VibeChapterFiveView,
-  VibeChapterSixView,
-  VibeChapterSevenView,
-  VibeChapterEightView,
-  VibeChapterNineView,
-  VibeChapterTenView,
-  VibeChapterElevenView,
   VibePathView,
+  LearnRoute,
+  DevBlocksRoute,
   UnityPathView,
   UnityChapterView,
   ArtMuseumView,
@@ -101,6 +93,11 @@ import {
 } from './components/routes/lazyRoutes';
 
 import { User, Settings, Bell, Shield } from 'lucide-react';
+
+/** sessionStorage key for the page to open after sign-in. */
+const RETURN_TO_KEY = 'rp:returnTo';
+/** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
+const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
 
 // Profile Placeholder (kept for reference or usage)
 const ProfilePlaceholder: React.FC = () => (
@@ -194,88 +191,39 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/vibe')) return ViewState.PROGRAMMING_VIBE;
     if (path.startsWith('/unity')) return ViewState.UNITY_AI_GAME_DEV;
     if (path === '/library') return ViewState.LIBRARY;
+    // Lesson reader (default theme; the shell switches to the rail via isLessonPath).
+    if (path.startsWith('/learn/') || path.startsWith('/preview/')) return ViewState.LESSON;
+    if (path === '/dev/blocks') return ViewState.DEV_BLOCKS;
     return ViewState.DASHBOARD;
   };
 
   const handleNavigate = (view: ViewState) => {
-    switch (view) {
-      case ViewState.DASHBOARD: navigate('/'); break;
-      case ViewState.LEARNING_HUB: navigate('/learning-hub'); break;
-      case ViewState.COURSES: navigate('/courses'); break;
-      case ViewState.MY_CONTENT: navigate('/my-content'); break;
-      case ViewState.PROFILE: navigate('/profile'); break;
-      case ViewState.PROFILE_DIAGNOSIS: navigate('/profile/diagnosis'); break;
-      case ViewState.PROFILE_HISTORY: navigate('/profile/history'); break;
-      case ViewState.PROFILE_BADGES: navigate('/profile/badges'); break;
-      case ViewState.PROFILE_GENERATED: navigate('/profile/generated'); break;
-      case ViewState.PROFILE_MIRROR: navigate('/profile/mirror'); break;
-      case ViewState.PROFILE_EDIT: navigate('/profile/edit'); break;
-      case ViewState.NOTIFICATIONS: navigate('/notifications'); break;
-      case ViewState.SUBSCRIPTION: navigate('/subscription'); break;
-      case ViewState.SETTINGS: navigate('/settings'); break;
-      case ViewState.SETTINGS_VOICE: navigate('/settings/voice'); break;
-      case ViewState.SETTINGS_DIALOGUE_VOICE: navigate('/settings/voice/dialogue'); break;
-      case ViewState.SETTINGS_API_KEY: navigate('/settings/api-key'); break;
-      case ViewState.SETTINGS_PRIVACY: navigate('/settings/privacy'); break;
-      case ViewState.SETTINGS_AI_MEMORY: navigate('/settings/ai-memory'); break;
-      case ViewState.LIBRARY: navigate('/library'); break;
-
-      case ViewState.LESSON:
-        const currentChapterId = sessionStorage.getItem('current_chapter_id');
-        const currentCourseId = sessionStorage.getItem('current_course_id');
-        // Simple heuristic: Generated IDs are usually UUIDs (>30 chars), static IDs are shorter
-        if (currentCourseId && currentCourseId.length > 30) {
-          navigate(`/generated-lesson/${currentCourseId}`);
-        } else if (currentCourseId) {
-          navigate(`/lesson/${currentCourseId}`);
-        } else {
-          console.warn("No course ID context for Lesson view");
-          navigate('/');
-        }
-        break;
-
-      // Feature Hubs
-      case ViewState.BLENDER: navigate('/blender'); break;
-      case ViewState.PROGRAMMING: navigate('/programming'); break;
-      case ViewState.PROGRAMMING_WEB: navigate('/programming/web'); break;
-      case ViewState.PROGRAMMING_AI: navigate('/programming/ai'); break;
-      case ViewState.PROGRAMMING_VIBE: navigate('/vibe'); break;
-      case ViewState.VIBE_PATH: navigate('/vibe'); break;
-      case ViewState.UNITY_AI_GAME_DEV: navigate('/unity'); break;
-      case ViewState.ART_MUSEUM: navigate('/art'); break;
-      case ViewState.SONIC_LAB: navigate('/sonic'); break;
-      case ViewState.SONIC_SYNTH: navigate('/sonic/synth'); break;
-      case ViewState.P_SCHOOL: navigate('/p-school'); break;
-
-      // Specific Tools
-      case ViewState.COURSE_GENERATOR: navigate('/course-generator'); break;
-      case ViewState.AI_DIAGNOSIS: navigate('/assessment'); break;
-      case ViewState.LIFE_JOURNAL: navigate('/life-journal'); break;
-      case ViewState.LIFE_JOURNAL_MONTHLY: navigate('/life-journal/monthly'); break;
-      case ViewState.LIFE_JOURNAL_INSIGHTS: navigate('/life-journal/insights'); break;
-      case ViewState.LIFE_JOURNAL_CHAT: navigate('/life-journal/chat'); break;
-      case ViewState.AI_CHARACTERS: navigate('/characters'); break;
-
-      // Deep Links (Mapping known sub-routes)
-      case ViewState.HTML_CSS_PATH: navigate('/programming/html-css'); break;
-      case ViewState.HTML_CSS_COURSE: navigate('/programming/html-css/course'); break;
-      case ViewState.HTML_CSS_PART_TWO: navigate('/programming/html-css/part2'); break;
-      case ViewState.WEB_INSPECTOR: navigate('/programming/web-inspector'); break;
-      case ViewState.PYTHON_COURSE: navigate('/programming/python'); break;
-
-      // Art Sub-routes
-      case ViewState.ART_HISTORY: navigate('/art/history'); break;
-      case ViewState.ART_CURRICULUM: navigate('/art/curriculum'); break;
-      case ViewState.ART_INTRO: navigate('/art/intro'); break;
-      case ViewState.ART_PERIOD_DETAIL: navigate('/art/period'); break;
-      case ViewState.ART_CRAFTS: navigate('/art/crafts'); break;
-      case ViewState.ART_KINTSUGI: navigate('/art/kintsugi'); break;
-      case ViewState.ART_TRIBAL: navigate('/art/tribal'); break;
-      case ViewState.ART_TRIBAL_DETAIL: navigate('/art/tribal/intro'); break; // Default
-
-      // Fallback
-      default: console.warn('Unhandled navigation:', view); navigate('/'); break;
+    if (view === ViewState.LESSON) {
+      const currentCourseId = sessionStorage.getItem('current_course_id');
+      // Simple heuristic: Generated IDs are usually UUIDs (>30 chars), static IDs are shorter
+      if (currentCourseId && currentCourseId.length > 30) {
+        navigate(`/generated-lesson/${currentCourseId}`);
+        return;
+      }
+      if (currentCourseId) {
+        navigate(`/lesson/${currentCourseId}`);
+        return;
+      }
     }
+
+    const path = VIEW_PATHS[view];
+    if (path) {
+      navigate(path);
+      return;
+    }
+    console.warn('Unhandled navigation:', view);
+    navigate('/');
+  };
+
+  const handleLogout = () => {
+    logout()
+      .catch((error) => console.warn('Logout failed:', error))
+      .finally(() => navigate('/', { replace: true }));
   };
 
   const handleCourseSelect = async (course: Course) => {
@@ -300,25 +248,36 @@ const AppContent: React.FC = () => {
     navigate(`/generated-course/${course.id}`);
   };
 
-  const openAuth = (mode: AuthMode) => {
+  // In-app path to open after sign-in (the landing's "read chapter 1" CTA when guest access
+  // is off). sessionStorage, so it survives the OAuth redirect through /auth/callback.
+  const openAuth = (mode: AuthMode, returnTo?: string) => {
+    try {
+      if (returnTo && isInAppPath(returnTo)) sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+      else sessionStorage.removeItem(RETURN_TO_KEY);
+    } catch {
+      // Storage blocked: sign-in still works and lands on the dashboard.
+    }
     setAuthMode(mode);
     setIsLoginPageVisible(true);
   };
 
   const handleLoginSuccess = () => {
     setIsLoginPageVisible(false);
-    navigate('/', { replace: true });
+    let target = '/';
+    try {
+      const saved = sessionStorage.getItem(RETURN_TO_KEY);
+      sessionStorage.removeItem(RETURN_TO_KEY);
+      if (saved && isInAppPath(saved)) target = saved;
+    } catch {
+      // Storage blocked: default to the dashboard.
+    }
+    navigate(target, { replace: true });
   };
 
   const handleBackToLogin = () => {
     setAuthMode('login');
     setIsLoginPageVisible(true);
     navigate('/', { replace: true });
-  };
-
-  // Vibe Chapter Navigation Helper
-  const navigateToVibeChapter = (chapter: string) => {
-    navigate(`/vibe/${chapter}`);
   };
 
   return (
@@ -346,7 +305,7 @@ const AppContent: React.FC = () => {
               </Routes>
             </Suspense>
           ) : (
-            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate}>
+            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout}>
               <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/" element={<Dashboard onNavigate={handleNavigate} />} />
@@ -412,18 +371,18 @@ const AppContent: React.FC = () => {
               {/* Vibe Coding */}
               <Route path="/vibe" element={<VibePathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
               <Route path="/vibe/prologue" element={<VibePrologueView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-0" element={<VibeChapterZeroView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-1" element={<VibeChapterOneView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-2" element={<VibeChapterTwoView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-3" element={<VibeChapterThreeView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-4" element={<VibeChapterFourView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-5" element={<VibeChapterFiveView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-6" element={<VibeChapterSixView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-7" element={<VibeChapterSevenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-8" element={<VibeChapterEightView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-9" element={<VibeChapterNineView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-10" element={<VibeChapterTenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
-              <Route path="/vibe/chapter-11" element={<VibeChapterElevenView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
+              {/* The 12 Vibe chapters now render in the lesson reader. */}
+              <Route path="/vibe/:chapter" element={<VibeChapterRedirect />} />
+
+              {/* Lesson reader (risepath.lesson/v1) */}
+              <Route path="/learn/:courseSlug" element={<LearnRoute />} />
+              <Route path="/learn/:courseSlug/:lessonId" element={<LearnRoute />} />
+              {import.meta.env.DEV && (
+                <Route path="/preview/:courseSlug/:lessonId" element={<LearnRoute mode="preview" />} />
+              )}
+              {import.meta.env.DEV && features.devSamples && (
+                <Route path="/dev/blocks" element={<DevBlocksRoute />} />
+              )}
 
               {/* Unity */}
               <Route path="/unity" element={<UnityPathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
@@ -451,6 +410,7 @@ const AppContent: React.FC = () => {
               {/* Demos */}
               <Route path="/demo/multi" element={<MultiFormatLessonView onBack={() => navigate('/')} />} />
               <Route path="/demo/checklist-gen" element={<BlenderChecklistGeneratorView onBack={() => navigate('/')} />} />
+              <Route path="/demo/:kind" element={<DemoBlockViewWrapper />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -465,6 +425,15 @@ const AppContent: React.FC = () => {
 };
 
 // --- Inline Wrappers for less common dynamic routes ---
+
+/** Old chapter URLs (/vibe/chapter-N) → the lesson reader. Unknown slugs go to the path page. */
+const VibeChapterRedirect: React.FC = () => {
+  const { chapter = '' } = useParams<{ chapter: string }>();
+  const match = /^chapter-(\d{1,2})$/.exec(chapter);
+  const n = match ? Number(match[1]) : NaN;
+  if (!Number.isInteger(n) || n < 0 || n > 11) return <Navigate to="/vibe" replace />;
+  return <Navigate to={`/learn/vibe-coding/vibe-ch${n}`} replace />;
+};
 
 const AICharacterDetailViewWrapper: React.FC<{ onNavigate: (v: ViewState) => void }> = ({ onNavigate }) => {
   const { characterId } = useParams<{ characterId: string }>();
@@ -503,6 +472,24 @@ const ArtTribalDetailViewWrapper: React.FC<{ language: any, setLanguage: any }> 
   const { chapterId } = useParams<{ chapterId: string }>();
   const navigate = useNavigate();
   return <ArtTribalDetailView chapterId={chapterId || 'intro'} onBack={() => navigate('/art/tribal')} language={language} setLanguage={setLanguage} />;
+};
+
+// Design samples: one MultiFormatLessonView page per block type (/demo/concept, ...).
+const DEMO_BLOCKS: Record<string, { blockType?: 'concept' | 'dialogue' | 'workshop' | 'reflection' | 'checklist'; subType?: 'blender' }> = {
+  checklist: { blockType: 'checklist' },
+  concept: { blockType: 'concept' },
+  dialogue: { blockType: 'dialogue' },
+  workshop: { blockType: 'workshop' },
+  blender: { subType: 'blender' },
+  reflection: { blockType: 'reflection' },
+};
+
+const DemoBlockViewWrapper: React.FC = () => {
+  const { kind } = useParams<{ kind: string }>();
+  const navigate = useNavigate();
+  const demo = DEMO_BLOCKS[kind ?? ''];
+  if (!demo) return <Navigate to="/demo/multi" replace />;
+  return <MultiFormatLessonView forceBlockType={demo.blockType} forceSubType={demo.subType} onBack={() => navigate('/')} />;
 };
 
 const App: React.FC = () => (

@@ -48,6 +48,32 @@ ChatGPT、Claude、Cursorなどの外部AIから、Rise Pathを直接操作・�
 
 ---
 
+## 📖 教材：リーダー・形式・制作
+
+### レッスンリーダー
+- すべてのレッスンは 1 つのリーダー **`/learn/:course/:lesson`**（例: `/learn/vibe-coding/vibe-ch1`）で開きます。左に目次、余白に AI先生と用語集、読みながら答える確認問題、最後に復習カードとふりかえりがあります。進み具合はレッスンごとに保存され、ダッシュボードの「続きから」で再開できます。
+- スマートフォンでは、目次・AI先生・練習が画面下のバーに移ります。**Aa** メニューで文字サイズ、行間、テーマ、UD 書体、集中モードを切り替えられます。
+- 開発ビルドでは **`/preview/:course/:lesson`**（下書きを優先し、検証結果を表示）と **`/dev/blocks?dev=1`**（全ブロックの見本）も使えます。
+
+### 教材の形式（`risepath.lesson/v1`）
+- レッスンは JSON ファイルです: `content/courses/<slug>/course.json` と `lessons/<id>.lesson.json`。下書きは `drafts/` に置き、プレビューにだけ表示されます。
+- 定義は `shared/lesson/schema.js`（zod）の 1 か所だけで、リーダー・サーバー・MCP ツール・CLI が共通で使います。JSON Schema は `content/schema/` に書き出します。
+- 1 つのレッスンは、Bloom のレベル付きの目標 2〜4 個と、役割（導入 → 説明 → 例題 → 演習 → 確認 → まとめ）を持つセクションでできています。ブロックは 15 種類（本文、コールアウト、表、コード、プロンプト、Mermaid の図、確認問題、復習カード、手順 など）です。
+
+```bash
+npm run lessons:catalog                       # コースとレッスンの一覧と状態
+npm run lessons:validate                      # 形式と意味のチェック（エラーは JSON パス付き）
+npm run lessons:lint -- <file> --strict       # 教え方と読みやすさのチェック
+npm run lessons:preview -- vibe-coding vibe-ch1   # スクリーンショットと metrics.json（開発サーバー起動中）
+```
+
+### Claude Code やほかの AI で教材をつくる
+- **Claude Code**: `/author-lesson <course> <lesson-id> "<依頼>"` で、brief → アウトライン → 下書き → 検証・lint → 独立レビュー（`pedagogy-reviewer`、`ja-editor`）→ スクリーンショットと `visual-qa` → レポート、までを進めます。書くのは下書きだけで、公開はオーナーが決めます。`/review-lesson <file>` で、どのレッスンも `content/schema/rubric.v1.json` に沿って採点できます。
+- **MCP**: `.mcp.json` に MCP サーバー `rise-path-learning`（`curriculum-builder` プロファイル）を登録しています（`lesson-schema-get`、`lesson-validate`、`lesson-get`、`lesson-upsert-draft`、`lesson-preview-url`）。Codex、Cursor、Gemini CLI、Claude Desktop、ChatGPT からも同じツールを使えます。共通のルールは `AGENTS.md` にあります。
+- 手順書: **[doc/guides/authoring-with-claude-code.ja.md](doc/guides/authoring-with-claude-code.ja.md)**
+
+---
+
 ## 🛠 技術スタック
 
 - **フロントエンド**: [React](https://react.dev/) (v19) + [Vite](https://vitejs.dev/)
@@ -71,7 +97,7 @@ npm run dev
 # フロントエンドURL: http://localhost:3007
 ```
 
-主要なAI機能（チャットコーチ等）は、ローカルで起動したLLMプロバイダー（**Hermes**など）経由で動作します。直接のGemini API呼び出しは、一部のレガシー機能でのみオプション（フォールバック）として使用されます。
+主要なAI機能（チャットコーチ等）は、ローカルで起動したLLMプロバイダー（**Hermes**など）経由で動作します。レッスン内のAI先生などは、サーバーの LLM ゲートウェイ（キーがなければモック）を使います。ブラウザから直接モデルの API を呼ぶことはありません。
 
 ### 🏁 起動モードの選択
 
@@ -110,19 +136,40 @@ flowchart TD
 |---|---|---|---|
 | `HERMES_API_URL` | `http://127.0.0.1:8642` | ローカルLLMプロキシ（Hermes）の接続先URL | **推奨** (AIチャット用) |
 | `HERMES_API_KEY` | `change-me-local-dev` | HermesのBearerトークン認証キー | **推奨** (AIチャット用) |
-| `VITE_GEMINI_API_KEY` | (未設定でOK) | 直接Gemini APIを叩く場合のクライアントキー | 任意 (レガシー機能用) |
+| `ANTHROPIC_API_KEY` | (未設定でOK) | LLM ゲートウェイ用のサーバー側キー | 任意（下記参照） |
+| `GEMINI_API_KEY` | (未設定でOK) | サーバー側の Gemini キー（ゲートウェイ、旧生成機能、RAG の埋め込み） | 任意 |
 
 ```env
 # ローカルLLMプロキシ（Hermes）の設定（標準）
 HERMES_API_URL=http://127.0.0.1:8642
 HERMES_API_KEY=change-me-local-dev
 
-# Gemini API キー（オプション/レガシー機能用）
-# VITE_GEMINI_API_KEY=ここにGeminiのAPIキーを入力
+# LLM ゲートウェイのキー（サーバー専用）
+# ANTHROPIC_API_KEY=
+# GEMINI_API_KEY=
 ```
+
 > [!WARNING]
 > **セキュリティの注意点**:
 > `.env.local` には本物のAPIキーが含まれる場合があるため、絶対にGitにコミットしないでください（すでに `.gitignore` で除外されています）。
+
+### 🤖 LLM ゲートウェイ（`/api/v2/llm`）
+
+モデルの呼び出しはすべて `server/llm/` のゲートウェイを通り、ブラウザはモデルのキーを持ちません。**キーを `VITE_*` 変数に入れないでください**（`VITE_*` の値はすべてブラウザに配信されます）。モデル ID は `server/llm/models.config.js` にだけ書きます。キーが 1 つもない場合、本番以外では内蔵のモックが応答します（本番では `LLM_PROVIDER=mock` でない限り 503 を返します）。
+
+| 環境変数 | 役割 |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic を有効にする（教材作成、AI先生、フィードバックの既定） |
+| `GEMINI_API_KEY`（または `GOOGLE_API_KEY`） | Gemini を有効にする。RAG の埋め込みにも使う |
+| `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定: `anthropic`、`gemini`、`mock` |
+| `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=gemini` |
+| `LLM_MOCK_FALLBACK` | `false` で、キーがないときのモックへの切り替えを止める |
+| `LLM_TIMEOUT_MS` | リクエストのタイムアウト（既定 120000） |
+| `LLM_MAX_RETRIES` | プロバイダー呼び出しの再試行回数 |
+| `LLM_ANTHROPIC_SERVER_FALLBACKS` | `false` で Anthropic のサーバー側モデルフォールバックを止める |
+| `ANTHROPIC_BASE_URL` | Anthropic の別エンドポイント（プロキシなど） |
+
+`GET /api/v2/llm/status` で、有効なプロバイダーとタスクの振り分けを（秘密情報なしで）確認できます。
 
 ---
 

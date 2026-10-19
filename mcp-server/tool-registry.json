@@ -1,5 +1,5 @@
 {
-  "version": "2026-06-22",
+  "version": "2026-10-18",
   "server": "rise-path-learning",
   "default_profile": "learner",
   "profiles": ["learner", "curriculum-builder", "coach", "admin"],
@@ -154,6 +154,91 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "lesson-schema-get",
+      "category": "lesson_meta",
+      "risk": "read",
+      "data_class": "system_config",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["curriculum-builder", "admin"],
+      "annotations": {
+        "title": "教材スキーマと契約を取得",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "lesson-validate",
+      "category": "lesson_meta",
+      "risk": "read",
+      "data_class": "user_input",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["curriculum-builder", "admin"],
+      "annotations": {
+        "title": "教材を検証（保存しない）",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "lesson-get",
+      "category": "lesson_read",
+      "risk": "read",
+      "data_class": "curriculum",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["curriculum-builder", "admin"],
+      "annotations": {
+        "title": "教材を読み出す",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "lesson-upsert-draft",
+      "category": "lesson_write",
+      "risk": "write",
+      "data_class": "curriculum",
+      "requires_approval": false,
+      "audit": true,
+      "max_calls_per_session": 50,
+      "exposure_profiles": ["curriculum-builder", "admin"],
+      "annotations": {
+        "title": "教材の下書きを保存",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "lesson-preview-url",
+      "category": "lesson_read",
+      "risk": "read",
+      "data_class": "system_config",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["curriculum-builder", "admin"],
+      "annotations": {
+        "title": "教材のプレビュー URL を取得",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
         "openWorldHint": false
       }
     },

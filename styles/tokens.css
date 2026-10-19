@@ -1,0 +1,262 @@
+/*
+ * Rise Path design tokens ("Sunrise Studio").
+ *
+ * Plain CSS custom properties, prefixed --rp-*. index.css maps them to
+ * Tailwind utilities (bg-canvas, text-fg, border-line, …) with @theme inline,
+ * so a [data-theme] or [data-world] subtree can swap values locally.
+ * The token table, contrast ratios and usage rules live in
+ * doc/design/design-system.md. Keep the two in sync.
+ *
+ * Theme scopes:
+ *   - :root / [data-theme="light"]  light values (the app default)
+ *   - [data-theme="dark"]           dark values, on <html> or any subtree
+ *   - [data-theme="system"]         follows prefers-color-scheme. Only this
+ *                                   scope reacts to the OS setting; the app
+ *                                   as a whole does not auto-switch yet.
+ */
+
+@layer base {
+  :root,
+  [data-theme="light"] {
+    color-scheme: light;
+
+    /* Surfaces */
+    --rp-canvas: #f7f7f4; /* app background (warm paper) */
+    --rp-surface: #ffffff; /* cards, sidebar */
+    --rp-sunken: #f0f0eb; /* wells, stat tiles, code background */
+    --rp-raised: #ffffff; /* popovers, modals (dark: lighter than surface) */
+    --rp-overlay: rgb(13 13 18 / 0.5); /* drawer / modal scrim */
+
+    /* Lines */
+    --rp-border: #e4e4de; /* decorative dividers, card borders */
+    --rp-border-strong: #8a8a96; /* input / checkbox outlines, 3.4:1 on surface */
+
+    /* Text */
+    --rp-fg: #16161d; /* body, 18.0:1 on surface */
+    --rp-fg-2: #454552; /* secondary, 9.4:1 */
+    --rp-fg-3: #676774; /* captions, replaces slate-400, 5.6:1 */
+
+    /* Action (indigo) */
+    --rp-primary: #4f46e5;
+    --rp-primary-hover: #4338ca;
+    --rp-on-primary: #ffffff; /* 6.3:1 on primary */
+    --rp-primary-soft: #eef0ff; /* selected nav, tinted chips */
+    --rp-primary-text: #4338ca; /* text on soft, 7.0:1 */
+
+    /* Achievement only (XP, streak). --rp-sun is a fill, never text. */
+    --rp-sun: #f59e0b;
+    --rp-sun-soft: #fff4db;
+    --rp-sun-text: #a34a06; /* 5.4:1 on sun-soft */
+
+    /* Status */
+    --rp-success: #137a3a;
+    --rp-danger: #b91c1c;
+    --rp-info: #0369a1;
+
+    /* Focus */
+    --rp-focus: #4f46e5;
+    --rp-ring: 0 0 0 2px var(--rp-surface), 0 0 0 4px var(--rp-focus);
+
+    /* Elevation */
+    --rp-shadow-1: 0 1px 2px rgb(16 16 24 / 0.06);
+    --rp-shadow-2: 0 1px 2px rgb(16 16 24 / 0.04), 0 6px 16px rgb(16 16 24 / 0.06);
+    --rp-shadow-3: 0 16px 40px rgb(16 16 24 / 0.14);
+
+    /* Scrollbar */
+    --rp-scroll-thumb: #cdcdc6;
+    --rp-scroll-thumb-hover: #8a8a96;
+  }
+
+  /* Keep this block and the prefers-color-scheme block below identical. */
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --rp-canvas: #0d0d12;
+    --rp-surface: #15151c;
+    --rp-sunken: #1c1c25;
+    --rp-raised: #22222c;
+    --rp-overlay: rgb(0 0 0 / 0.6);
+
+    --rp-border: #2a2a35;
+    --rp-border-strong: #62626f;
+
+    --rp-fg: #ececf1;
+    --rp-fg-2: #b6b6c2;
+    --rp-fg-3: #8c8c9a;
+
+    --rp-primary: #8c86ff;
+    --rp-primary-hover: #a29dff;
+    --rp-on-primary: #0d0d12;
+    --rp-primary-soft: #23224a;
+    --rp-primary-text: #a9a4ff;
+
+    --rp-sun: #fbbf24;
+    --rp-sun-soft: #2e2410;
+    --rp-sun-text: #fbbf24;
+
+    --rp-success: #4ade80;
+    --rp-danger: #f87171;
+    --rp-info: #38bdf8;
+
+    --rp-focus: #a9a4ff;
+
+    /* Dark elevation comes mostly from surface -> sunken -> raised plus a border. */
+    --rp-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --rp-shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 16px rgb(0 0 0 / 0.4);
+    --rp-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
+
+    --rp-scroll-thumb: #3a3a47;
+    --rp-scroll-thumb-hover: #62626f;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    [data-theme="system"] {
+      color-scheme: dark;
+
+      --rp-canvas: #0d0d12;
+      --rp-surface: #15151c;
+      --rp-sunken: #1c1c25;
+      --rp-raised: #22222c;
+      --rp-overlay: rgb(0 0 0 / 0.6);
+
+      --rp-border: #2a2a35;
+      --rp-border-strong: #62626f;
+
+      --rp-fg: #ececf1;
+      --rp-fg-2: #b6b6c2;
+      --rp-fg-3: #8c8c9a;
+
+      --rp-primary: #8c86ff;
+      --rp-primary-hover: #a29dff;
+      --rp-on-primary: #0d0d12;
+      --rp-primary-soft: #23224a;
+      --rp-primary-text: #a9a4ff;
+
+      --rp-sun: #fbbf24;
+      --rp-sun-soft: #2e2410;
+      --rp-sun-text: #fbbf24;
+
+      --rp-success: #4ade80;
+      --rp-danger: #f87171;
+      --rp-info: #38bdf8;
+
+      --rp-focus: #a9a4ff;
+
+      --rp-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+      --rp-shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 16px rgb(0 0 0 / 0.4);
+      --rp-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
+
+      --rp-scroll-thumb: #3a3a47;
+      --rp-scroll-thumb-hover: #62626f;
+    }
+  }
+
+  /* Non-color tokens. Same in every theme. */
+  :root {
+    --rp-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --rp-duration-fast: 120ms; /* hover */
+    --rp-duration-base: 200ms; /* UI */
+    --rp-duration-slow: 320ms; /* page, sheet */
+
+    /* Shell */
+    --rp-sidebar: 248px;
+    --rp-rail: 64px;
+    --rp-topbar: 56px;
+    --rp-tabbar: 64px; /* plus env(safe-area-inset-bottom) */
+
+    /* Reading-mode UD font. The face is NOT loaded globally; the reader
+       settings inject its stylesheet on demand. Falls back to Noto Sans JP. */
+    --rp-font-ud: "BIZ UDPGothic", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  }
+
+  /*
+   * World accents. A track sets data-world on its content canvas only; the
+   * shell never changes. Each world exposes:
+   *   --world-accent       bright fill (covers, bars). Not for text: most
+   *                        accents are below 3:1 on white.
+   *   --world-accent-text  AA text on surface/canvas/soft (text-world, bg-world)
+   *   --world-accent-soft  tinted chip / badge background (bg-world-soft)
+   *   --world-on-accent    text on bg-world
+   * Unknown data-world values fall back to the primary tokens.
+   */
+  [data-world] {
+    --world-accent-text: var(--world-text-light);
+    --world-accent-soft: var(--world-soft-light);
+    --world-on-accent: #ffffff;
+  }
+
+  [data-theme="dark"][data-world],
+  [data-theme="dark"] [data-world],
+  [data-world] [data-theme="dark"] {
+    --world-accent-text: var(--world-text-dark);
+    --world-accent-soft: var(--world-soft-dark);
+    --world-on-accent: #0d0d12;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    [data-theme="system"][data-world],
+    [data-theme="system"] [data-world],
+    [data-world] [data-theme="system"] {
+      --world-accent-text: var(--world-text-dark);
+      --world-accent-soft: var(--world-soft-dark);
+      --world-on-accent: #0d0d12;
+    }
+  }
+
+  [data-world="art"] {
+    --world-accent: #b4532a;
+    --world-text-light: #a1461f;
+    --world-soft-light: #f7e9e2;
+    --world-text-dark: #e9936a;
+    --world-soft-dark: #2e1a12;
+  }
+
+  [data-world="vibe"] {
+    --world-accent: #22c55e;
+    --world-text-light: #15803d;
+    --world-soft-light: #edf8f1;
+    --world-text-dark: #4ade80;
+    --world-soft-dark: #0f2a1a;
+  }
+
+  [data-world="unity"],
+  [data-world="ai"] {
+    --world-accent: #8b5cf6;
+    --world-text-light: #7c3aed;
+    --world-soft-light: #f1ecfe;
+    --world-text-dark: #a78bfa;
+    --world-soft-dark: #221a3d;
+  }
+
+  [data-world="sonic"] {
+    --world-accent: #06b6d4;
+    --world-text-light: #0e7490;
+    --world-soft-light: #e6f7fa;
+    --world-text-dark: #22d3ee;
+    --world-soft-dark: #0b2730;
+  }
+
+  [data-world="pschool"] {
+    --world-accent: #f97316;
+    --world-text-light: #c2410c;
+    --world-soft-light: #fff1e6;
+    --world-text-dark: #fb923c;
+    --world-soft-dark: #2e1a0c;
+  }
+
+  [data-world="blender"] {
+    --world-accent: #ea7600;
+    --world-text-light: #b45309;
+    --world-soft-light: #fff3e2;
+    --world-text-dark: #f59e42;
+    --world-soft-dark: #2c1d0a;
+  }
+
+  [data-world="web"] {
+    --world-accent: #0ea5e9;
+    --world-text-light: #0369a1;
+    --world-soft-light: #e0f2fe;
+    --world-text-dark: #38bdf8;
+    --world-soft-dark: #0b2233;
+  }
+}

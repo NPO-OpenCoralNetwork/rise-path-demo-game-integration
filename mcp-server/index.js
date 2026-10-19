@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Rise Path MCP Server (v2.3.0 — 16 tools incl. request-tts)
+ * Rise Path MCP Server (v2.4.0 — incl. request-tts and the lesson-* authoring tools)
  *
  * Exposes learning platform tools and resources via Model Context Protocol.
  * Can be connected from ChatGPT, Claude Desktop, Cursor, or any MCP client.
@@ -12,6 +12,10 @@
  * Environment:
  *   DATABASE_URL_PHASE1  — PostgreSQL connection string
  *   PHASE1_USER_ID       — Default user ID (dev mode)
+ *   RP_LESSON_STORE      — lesson-upsert-draft store: fs (default, content/courses/<slug>/drafts/) or db
+ *   RP_CONTENT_DIR       — content/ root for the lesson tools (default: repo content/)
+ *   RP_LESSON_FS_WRITE   — 1 allows file drafts on a production SSE server (refused by default)
+ *   RISE_PATH_PREVIEW_BASE_URL — base of lesson-preview-url (default http://localhost:3007)
  *
  * Auth (user scope):
  *   SSE  — syncAuthUserStub at /sse connect (JWT)
@@ -33,6 +37,17 @@ import { getProgress, updateProgress } from '../tools/core/learnerState.js';
 import { logEntry, getSummary, getRecent, getAdaptationSignals } from '../tools/core/journal.js';
 import { searchContent } from '../tools/core/ragSearch.js';
 import { getKit, validateIntake, saveDraft } from '../tools/core/curriculum.js';
+import {
+    SAFE_SLUG,
+    getLessonSchema,
+    getLessonJsonSchema,
+    validateLessonDraft,
+    getLesson,
+    upsertLessonDraft,
+    previewUrl,
+    resolveLessonStore,
+    buildAuthorLessonPrompt,
+} from '../tools/core/lessons.js';
 import { getLatestProfile } from '../tools/core/learnerProfile.js';
 import {
     logDaily,
@@ -54,6 +69,12 @@ import { loadEnv } from '../tools/core/env.js';
 import { DOMAINS } from '../tools/core/domains.js';
 
 await loadEnv();
+
+// File drafts (lesson-upsert-draft) are for local authoring. A production SSE server refuses
+// them unless RP_LESSON_FS_WRITE=1; set RP_LESSON_STORE=db there instead.
+const LESSON_FS_WRITE = !process.argv.includes('--sse')
+    || process.env.NODE_ENV !== 'production'
+    || process.env.RP_LESSON_FS_WRITE === '1';
 
 // ============================================================
 // Shared Utilities (module-scope, shared across all McpServer instances)
@@ -91,14 +112,16 @@ async function logToolCall({ toolName, startTime, isError, errorType }) {
 }
 
 // Helper: wrap tool result, handling error_type from tools/core/
+// meta.compact drops indentation for large payloads (lesson schema + exemplar).
 const toolResult = (data, meta = {}) => {
     if (meta.toolName) {
         logToolCall({ toolName: meta.toolName, startTime: meta.startTime, isError: !!data?.error_type, errorType: data?.error_type });
     }
+    const text = JSON.stringify(data, null, meta.compact ? 0 : 2);
     if (data?.error_type) {
-        return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], isError: true };
+        return { content: [{ type: 'text', text }], isError: true };
     }
-    return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    return { content: [{ type: 'text', text }] };
 };
 const toolError = (err, meta = {}) => {
     if (meta.toolName) {
@@ -156,7 +179,7 @@ function createMcpServer() {
 
 const server = new McpServer({
     name: 'rise-path-learning',
-    version: '2.3.0',
+    version: '2.4.0',
     description: `Rise Path パーソナライズ学習プラットフォームのMCP Server (profile: ${activeProfile})`,
 });
 
@@ -410,6 +433,129 @@ policyTool(
             }), { toolName: 'save-curriculum-draft', startTime: t });
         } catch (err) {
             return toolError(err, { toolName: 'save-curriculum-draft', startTime: t });
+        }
+    }
+);
+
+// --- lessons (risepath.lesson/v1 authoring; works without DB) ---
+const LESSON_SLUG_DESC = '小文字・数字・"-" のみ / lowercase letters, digits and "-"';
+const lessonSlug = () => z.string().max(80).regex(SAFE_SLUG, LESSON_SLUG_DESC);
+const lessonClientName = () => server.server.getClientVersion()?.name;
+
+policyTool(
+    'lesson-schema-get',
+    '教材スキーマ（risepath.lesson/v1）、レッスン契約、お手本教材を返す。教材を書く前に最初に呼ぶ / Returns the risepath.lesson/v1 JSON Schema, the lesson contract and an exemplar lesson. Call this before writing a lesson.',
+    {
+        profile: z.enum(['llm', 'full']).optional().describe('llm（既定。構造化出力向け）または full（検証器と同じ完全版） / llm (default, for structured output) or full (what the validator enforces)'),
+        exemplar: z.enum(['excerpt', 'full', 'none']).optional().describe('お手本 vibe-coding/vibe-ch1 をどこまで含めるか（既定 excerpt） / How much of the exemplar lesson to include (default excerpt)'),
+    },
+    async ({ profile, exemplar }) => {
+        const t = Date.now();
+        try {
+            return toolResult(await getLessonSchema({ profile, exemplar }), { toolName: 'lesson-schema-get', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'lesson-schema-get', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'lesson-validate',
+    '教材を保存せずに検証し、パス付きのエラーと lint 警告を返す（ok:true なら lesson-upsert-draft も通る） / Validates a lesson without saving it. Returns errors with JSON paths and pedagogy lint warnings; ok:true means lesson-upsert-draft will accept it.',
+    {
+        lesson: z.record(z.string(), z.unknown()).describe('risepath.lesson/v1 の教材 JSON / The lesson JSON (risepath.lesson/v1)'),
+        course_slug: lessonSlug().optional().describe('所属コース。next リンクと出典を course.json と照合する / Course slug; checks next links and sources against its course.json'),
+    },
+    async ({ lesson, course_slug }) => {
+        const t = Date.now();
+        try {
+            return toolResult(await validateLessonDraft(lesson, {
+                courseSlug: course_slug, clientName: lessonClientName(),
+            }), { toolName: 'lesson-validate', startTime: t });
+        } catch (err) {
+            return toolError(err, { toolName: 'lesson-validate', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'lesson-get',
+    '教材を読み出す（下書きがあれば下書き、なければ公開版）。更新時に使う hash も返す / Reads a lesson: the draft when one exists, else the published lesson. Returns the hash to pass as base_hash when you update it.',
+    {
+        course_slug: lessonSlug().describe(`コースのスラッグ（例: vibe-coding） / Course slug, e.g. vibe-coding (${LESSON_SLUG_DESC})`),
+        lesson_id: lessonSlug().describe('レッスンID（例: vibe-ch1） / Lesson id, e.g. vibe-ch1'),
+        source: z.enum(['auto', 'draft', 'published']).optional().describe('auto（既定: 下書き → 公開版）/ draft / published'),
+        curriculum_id: z.string().uuid().optional().describe('DB に保存した下書きを読むときのカリキュラムID / Read this database draft instead of files'),
+        user_id: z.string().optional().describe(USER_ID_DESC),
+    },
+    async ({ course_slug, lesson_id, source, curriculum_id, user_id }, extra) => {
+        const t = Date.now();
+        try {
+            const store = curriculum_id ? 'db' : resolveLessonStore();
+            let userId;
+            if (store === 'db') {
+                // In the db store the caller's own DB draft comes before the files (same user as
+                // lesson-upsert-draft, so the returned hash is the one it checks).
+                userId = await requireScopedUser(user_id, extra, { toolName: 'lesson-get', startTime: t });
+                if (typeof userId !== 'string') return userId;
+            }
+            return toolResult(await getLesson({
+                courseSlug: course_slug, lessonId: lesson_id, source, curriculumId: curriculum_id, userId, store,
+            }), { toolName: 'lesson-get', startTime: t });
+        } catch (err) {
+            return toolError(err, { toolName: 'lesson-get', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'lesson-upsert-draft',
+    '教材を検証して下書きとして保存する（公開はしない）。既存の教材・下書きを置き換えるときは lesson-get の hash を base_hash に渡す。食い違えば conflict / Validates a lesson and saves it as a draft (never publishes). To replace an existing lesson or draft, pass its hash from lesson-get as base_hash; a stale hash returns a conflict.',
+    {
+        course_slug: lessonSlug().describe(`コースのスラッグ / Course slug (${LESSON_SLUG_DESC})`),
+        lesson: z.record(z.string(), z.unknown()).describe('risepath.lesson/v1 の教材 JSON。lesson.id がファイル名になる / The lesson JSON; lesson.id becomes the draft file name'),
+        base_hash: z.string().max(64).optional().describe('lesson-get の hash。新規作成では省略 / hash from lesson-get; omit when creating a new lesson'),
+        curriculum_id: z.string().uuid().optional().describe('DB の下書きに新しい版を追加するときのカリキュラムID / Add a version to this database draft'),
+        user_id: z.string().optional().describe(USER_ID_DESC),
+    },
+    async ({ course_slug, lesson, base_hash, curriculum_id, user_id }, extra) => {
+        const t = Date.now();
+        try {
+            const store = curriculum_id ? 'db' : resolveLessonStore();
+            let userId;
+            if (store === 'db') {
+                userId = await requireScopedUser(user_id, extra, { toolName: 'lesson-upsert-draft', startTime: t });
+                if (typeof userId !== 'string') return userId;
+            }
+            return toolResult(await upsertLessonDraft({
+                courseSlug: course_slug,
+                lesson,
+                baseHash: base_hash,
+                curriculumId: curriculum_id,
+                userId,
+                store,
+                clientName: lessonClientName(),
+                allowFsWrite: LESSON_FS_WRITE,
+            }), { toolName: 'lesson-upsert-draft', startTime: t });
+        } catch (err) {
+            return toolError(err, { toolName: 'lesson-upsert-draft', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'lesson-preview-url',
+    '教材のプレビュー URL（開発サーバーの /preview）と公開版の URL を返す / Returns the preview URL (dev server /preview route) and, for published lessons, the /learn URL.',
+    {
+        course_slug: lessonSlug().describe(`コースのスラッグ / Course slug (${LESSON_SLUG_DESC})`),
+        lesson_id: lessonSlug().describe('レッスンID / Lesson id'),
+    },
+    async ({ course_slug, lesson_id }) => {
+        const t = Date.now();
+        try {
+            return toolResult(await previewUrl({ courseSlug: course_slug, lessonId: lesson_id }), { toolName: 'lesson-preview-url', startTime: t });
+        } catch (err) {
+            return toolError(err, { toolName: 'lesson-preview-url', startTime: t });
         }
     }
 );
@@ -770,6 +916,27 @@ server.resource(
     }
 );
 
+// Lesson schema resources follow the lesson tools' profile exposure.
+if (isToolAllowed('lesson-schema-get')) {
+    for (const [name, uriText, profile, description] of [
+        ['lesson-schema-v1', 'rp://schema/lesson/v1', 'full', 'risepath.lesson/v1 の JSON Schema（完全版） / Full JSON Schema of risepath.lesson/v1'],
+        ['lesson-schema-v1-llm', 'rp://schema/lesson/v1/llm', 'llm', 'risepath.lesson/v1 の JSON Schema（LLM 用。再帰なし） / LLM profile of the risepath.lesson/v1 JSON Schema (no recursion)'],
+    ]) {
+        server.resource(
+            name,
+            uriText,
+            { description, mimeType: 'application/json' },
+            async (uri) => ({
+                contents: [{
+                    uri: uri.href,
+                    mimeType: 'application/json',
+                    text: JSON.stringify(getLessonJsonSchema(profile), null, 2),
+                }],
+            })
+        );
+    }
+}
+
 // ============================================================
 // Prompts
 // ============================================================
@@ -797,6 +964,27 @@ server.prompt(
         }],
     })
 );
+
+// author-lesson: the Claude Code skill body (.claude/skills/author-lesson/SKILL.md) when present,
+// else a built-in procedure; read at request time so skill edits apply without a restart.
+if (isToolAllowed('lesson-upsert-draft')) {
+    server.prompt(
+        'author-lesson',
+        'Rise Path の教材（risepath.lesson/v1）を書いて下書き保存する手順 / Procedure to write a risepath.lesson/v1 lesson and save it as a draft',
+        {
+            course_slug: z.string().optional().describe('コースのスラッグ（例: vibe-coding） / Course slug, e.g. vibe-coding'),
+            lesson_id: z.string().optional().describe('レッスンID（例: vibe-ch1-practice） / Lesson id, e.g. vibe-ch1-practice'),
+            brief: z.string().optional().describe('どんな教材にしたいか / What the lesson should teach, and for whom'),
+        },
+        async ({ course_slug, lesson_id, brief }) => {
+            const { source, text } = await buildAuthorLessonPrompt({ courseSlug: course_slug, lessonId: lesson_id, brief });
+            return {
+                description: `author-lesson (${source})`,
+                messages: [{ role: 'user', content: { type: 'text', text } }],
+            };
+        }
+    );
+}
 
 return server;
 } // end createMcpServer()
@@ -920,7 +1108,7 @@ if (args.includes('--sse')) {
         const status = dbStatus === 'connected' || dbStatus === 'not_configured' ? 'ok' : 'degraded';
         res.json({
             status: isShuttingDown ? 'shutting_down' : status,
-            version: '2.3.0',
+            version: '2.4.0',
             profile: activeProfile,
             uptime_seconds: Math.floor((Date.now() - startedAt) / 1000),
             active_sessions: Math.floor(sessions.size / 2),

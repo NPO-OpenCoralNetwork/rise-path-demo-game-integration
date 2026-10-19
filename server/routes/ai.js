@@ -5,10 +5,18 @@
  *   Stage flow: requirements → roadmap → curriculum
  *
  * Replaces the deprecated LangGraph endpoints.
+ *
+ * Auth: server.js mounts requireAuth on /ai/generate and /ai/drafts, so req.userId is the
+ * authenticated user (or the dev fallback user outside strict mode).
+ * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
  */
 import express from 'express';
 import { getPool } from '../db.js';
-import { getKit } from '../../tools/core/curriculum.js';
+import { getKit, writeCurriculumVersion } from '../../tools/core/curriculum.js';
+import {
+  adaptCurriculumDraftForSave,
+  resolveCurriculumUiTemplate,
+} from '../services/chatgptCurriculumAdapter.js';
 import {
   getCachedKit,
   generateRequirements,
@@ -17,6 +25,205 @@ import {
 } from '../services/aiGenerator.js';
 
 const router = express.Router();
+
+/** The reader template the generation prompt (aiPrompts.js buildCurriculumPrompt) targets. */
+const GENERATED_TEMPLATE_ID = 'doc_chapter';
+
+const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const asArray = (value) => (Array.isArray(value) ? value : []);
+
+const countLessons = (curriculum) =>
+  asArray(curriculum?.modules).reduce((sum, m) => sum + asArray(m?.lessons).length, 0);
+
+const trimmed = (value) => (typeof value === 'string' ? value.trim() : '');
+
+/** Locale keys the model uses for localized text; `ja` is accepted as an alias of `jp`. */
+const JP_KEYS = ['jp', 'ja'];
+
+/**
+ * `{ jp, en }` as the model writes localized text: a flat object of strings with a non-empty
+ * `jp`, `ja` or `en`. Extra locale keys (`ko`, …) are allowed; objects holding non-string
+ * values (sections, blocks) are not text.
+ */
+const isLocalizedText = (value) => {
+  const record = asObject(value);
+  const values = Object.values(record);
+  return values.length > 0
+    && values.every((item) => item == null || typeof item === 'string')
+    && Boolean([...JP_KEYS, 'en'].some((key) => trimmed(record[key])));
+};
+
+const jpOf = (value) => JP_KEYS.map((key) => trimmed(value[key])).find(Boolean) || '';
+
+/** Plain text from a string or `{ jp, en }`, Japanese first; '' when there is none. */
+const pickText = (value) => {
+  if (typeof value === 'string') return value.trim();
+  return isLocalizedText(value) ? jpOf(value) || trimmed(value.en) : '';
+};
+
+const toLocalized = (value) => ({
+  jp: jpOf(value) || trimmed(value.en),
+  en: trimmed(value.en) || jpOf(value),
+});
+
+/** Replace every `{ jp, en }` with its plain text, for the adapter, which reads strings only. */
+const flattenLocalized = (value) => {
+  if (Array.isArray(value)) return value.map(flattenLocalized);
+  if (!value || typeof value !== 'object') return value;
+  if (isLocalizedText(value)) return pickText(value);
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, flattenLocalized(item)]));
+};
+
+/**
+ * The first source field (in the adapter's own order) that has text, as `{ jp, en }` when the
+ * model wrote it localized; undefined when that field is plain text or none has text, so the
+ * adapter's value stands.
+ */
+const localizedFrom = (source, keys) => {
+  const key = keys.find((k) => pickText(source[k]));
+  return key && isLocalizedText(source[key]) ? toLocalized(source[key]) : undefined;
+};
+
+/** Fields the reader (services/curriculumAdapter.ts) reads that the adapter does not rebuild. */
+const PASSTHROUGH_KEYS = ['quiz', 'nexloom', 'worlds', 'integration', 'metadata'];
+const passthrough = (source) => Object.fromEntries(
+  PASSTHROUGH_KEYS.filter((key) => source[key] !== undefined).map((key) => [key, source[key]])
+);
+
+/** The model's own sections, each with an id unique within the lesson. */
+const withUniqueSectionIds = (sections) => {
+  const seen = new Set();
+  return sections.map((section, index) => {
+    const base = trimmed(section.id) || `section-${index + 1}`;
+    let id = base;
+    for (let n = 2; seen.has(id); n += 1) id = `${base}-${n}`;
+    seen.add(id);
+    return { ...section, id };
+  });
+};
+
+const defined = (entries) => Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== undefined));
+
+/**
+ * Turn generateCurriculum output into the reader's doc_chapter content_json, through the same
+ * adapter as the ChatGPT and MCP draft saves (adaptCurriculumDraftForSave): module_id,
+ * lesson_id, sections built from the lesson fields, curriculum_id and ui_template_id.
+ * The model writes `{ jp, en }` text and often whole `sections`; the adapter reads plain strings
+ * and rebuilds sections, so it gets a flattened copy, and the bilingual text, the model's own
+ * sections and the fields the reader reads as-is (quiz, nexloom, worlds, integration,
+ * metadata) are put back over its output.
+ */
+export function adaptGeneratedCurriculum({ curriculum, curriculumId, title, description, learningMode = null }) {
+  const source = asObject(curriculum);
+  const adapted = adaptCurriculumDraftForSave({
+    curriculum: flattenLocalized(source),
+    curriculumId,
+    templateId: GENERATED_TEMPLATE_ID,
+    title,
+    description,
+    learningMode,
+    explanationStyle: null,
+  });
+  const sourceModules = asArray(source.modules);
+
+  return {
+    ...passthrough(source),
+    ...adapted,
+    ...defined({
+      title: localizedFrom(source, ['title']),
+      description: localizedFrom(source, ['summary', 'description']),
+    }),
+    modules: adapted.modules.map((module, mi) => {
+      const sourceModule = asObject(sourceModules[mi]);
+      const sourceLessons = asArray(sourceModule.lessons);
+      return {
+        ...module,
+        ...defined({
+          title: localizedFrom(sourceModule, ['title']),
+          objective: localizedFrom(sourceModule, ['goal', 'objective']),
+        }),
+        lessons: module.lessons.map((lesson, li) => {
+          const sourceLesson = asObject(sourceLessons[li]);
+          const sections = asArray(sourceLesson.sections).filter((s) => s && typeof s === 'object');
+          return {
+            ...passthrough(sourceLesson),
+            ...lesson,
+            ...defined({
+              title: localizedFrom(sourceLesson, ['title']),
+              // The adapter derives subtitle from summary → objective → description.
+              subtitle: localizedFrom(sourceLesson, pickText(sourceLesson.subtitle)
+                ? ['subtitle']
+                : ['summary', 'objective', 'description']),
+            }),
+            ...(sections.length > 0 && { sections: withUniqueSectionIds(sections) }),
+          };
+        }),
+      };
+    }),
+  };
+}
+
+/**
+ * Store a generated curriculum as the next draft version and point the curriculum at it.
+ * Uses the shared writer (tools/core/curriculum.js writeCurriculumVersion), so content lands in
+ * curriculum_versions.content_json, which the reader loads via current_version_id.
+ * `curricula.curriculum_data` does not exist.
+ * Status 'draft' (not 'draft_<stage>') keeps it out of the in-progress list below.
+ *
+ * @param {import('pg').Pool} pool
+ * @param {{ curriculumId: string, userId: string, curriculum: any, intake?: any, modules?: any, learningMode?: string }} params
+ * @returns {Promise<string>} the new curriculum_versions.id
+ */
+export async function saveDraftVersion(pool, { curriculumId, userId, curriculum, intake, modules, learningMode }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const owned = await client.query(
+      'SELECT id, title, description FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid) FOR UPDATE',
+      [curriculumId, userId]
+    );
+    if (!owned.rowCount) throw new Error('Draft not found');
+    const existing = owned.rows[0] || {};
+
+    // The model writes description as a string or { jp, en }; keep the stored one when it has none.
+    const title = pickText(curriculum?.title) || existing.title || null;
+    const description = pickText(curriculum?.description) || pickText(curriculum?.summary) || existing.description || null;
+    const content = {
+      ...adaptGeneratedCurriculum({ curriculum, curriculumId, title, description, learningMode }),
+      _meta: {
+        source: 'ai_generate',
+        template_id: GENERATED_TEMPLATE_ID,
+        learning_mode: learningMode || null,
+        saved_at: new Date().toISOString(),
+        source_curriculum: curriculum,
+      },
+    };
+
+    const saved = await writeCurriculumVersion(client, {
+      curriculumId,
+      userId,
+      title,
+      description,
+      uiTemplateId: resolveCurriculumUiTemplate(GENERATED_TEMPLATE_ID),
+      content,
+      requirements: intake ?? null,
+      roadmap: modules ?? null,
+      totalLessons: countLessons(content),
+    });
+    await client.query(
+      `UPDATE curricula SET status = 'draft', updated_at = NOW()
+       WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid)`,
+      [curriculumId, userId]
+    );
+    await client.query('COMMIT');
+    return saved.curriculumVersionId;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 // --- Daily generation limit ---
 const DAILY_LIMIT = parseInt(process.env.AI_DAILY_LIMIT || '5', 10);
@@ -41,8 +248,8 @@ router.post('/generate', async (req, res) => {
 
   const { message, session_id, curriculum_id, stage, decision, attachments } = req.body;
 
-  // Resolve user (dev-fallback)
-  const userId = req.user?.id || process.env.PHASE1_USER_ID || '00000000-0000-0000-0000-000000000001';
+  const userId = req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   try {
     // --- Cost limit check ---
@@ -148,28 +355,21 @@ router.post('/generate', async (req, res) => {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
       }
 
-      // Save final curriculum
-      await pool.query(
-        `UPDATE curricula SET 
-           status = 'published', 
-           curriculum_data = $1, 
-           title = COALESCE($2, title),
-           description = $3,
-           updated_at = NOW() 
-         WHERE id = $4 AND user_id = CAST($5 AS uuid)`,
-        [
-          JSON.stringify(result.curriculum),
-          result.curriculum.title?.jp || result.curriculum.title?.en,
-          result.curriculum.description?.jp || result.curriculum.description?.en || '',
-          curriculum_id,
-          userId,
-        ]
-      );
+      // Save as a draft version (see saveDraftVersion). Generated content is never published
+      // automatically; a person publishes it after review.
+      await saveDraftVersion(pool, {
+        curriculumId: curriculum_id,
+        userId,
+        curriculum: result.curriculum,
+        intake,
+        modules,
+        learningMode: kit?.learning_mode,
+      });
 
       return res.json({
         session_id,
         curriculum_id,
-        message: `カリキュラムが完成しました！🎉\n\n**${result.curriculum.title?.jp || result.curriculum.title?.en || '新しいコース'}** がライブラリに追加されました。`,
+        message: `カリキュラムが完成しました！🎉\n\n**${pickText(result.curriculum.title) || '新しいコース'}** を下書きとしてライブラリに保存しました。`,
         pending_approval: 'none',
         status: 'approved',
         agent_logs: [
@@ -263,7 +463,7 @@ router.post('/generate', async (req, res) => {
       return res.status(504).json({ error: '生成がタイムアウトしました。再試行してください' });
     }
 
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -272,7 +472,8 @@ router.get('/drafts', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
 
-  const userId = req.user?.id || process.env.PHASE1_USER_ID || '00000000-0000-0000-0000-000000000001';
+  const userId = req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   try {
     const result = await pool.query(
@@ -286,7 +487,7 @@ router.get('/drafts', async (req, res) => {
     return res.json({ drafts: result.rows });
   } catch (err) {
     console.error('[AI Drafts] Error:', err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Failed to load drafts' });
   }
 });
 

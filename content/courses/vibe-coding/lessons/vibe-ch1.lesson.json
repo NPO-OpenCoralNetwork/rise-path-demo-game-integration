@@ -1,0 +1,906 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch1",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第1章｜人間が理解すべき最低ライン",
+    "en": "Chapter 1 | Minimum Viable Knowledge"
+  },
+  "subtitle": {
+    "jp": "AIに指示を出すために、最低限知っておくべき「Webの仕組み」",
+    "en": "The basics of web architecture you need before directing an AI."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "level": "beginner",
+  "estMinutes": 20,
+  "prerequisites": [
+    {
+      "jp": "第0章｜この時代の前提を共有する",
+      "en": "Chapter 0 | Sharing the Premise"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": {
+        "jp": "フロントエンド・バックエンド・データベースの役割の違いを説明できる",
+        "en": "Explain how the frontend, backend and database divide the work"
+      },
+      "bloom": "understand"
+    },
+    {
+      "id": "o2",
+      "text": {
+        "jp": "変えたいものが UI か API かを見分けて、AIへの依頼を書き分けられる",
+        "en": "Tell whether a change belongs to the UI or the API, and word your AI request to match"
+      },
+      "bloom": "apply"
+    },
+    {
+      "id": "o3",
+      "text": {
+        "jp": "デプロイと Git のコミットが何をしているかを説明できる",
+        "en": "Explain what deployment and a Git commit actually do"
+      },
+      "bloom": "understand"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": {
+        "jp": "はじめに：「アプリを作って」の中身",
+        "en": "Start here: what \"build me an app\" really asks for"
+      },
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "AIに「タスク管理アプリを作って」と頼むと、画面はすぐに完成しました。ところが、ページを再読み込みすると、入力したタスクが消えてしまいます。\n\n何が足りないのでしょうか。読み進める前に、まず予想してみましょう。",
+            "en": "You ask an AI to \"build a task app\", and a working screen appears in seconds. But when you reload the page, every task you typed is gone.\n\nWhat is missing? Make a guess before you read on."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": {
+            "jp": "予想してみよう",
+            "en": "Make a prediction"
+          },
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": {
+                "jp": "タスクが消えた原因として、最も考えられるのはどれでしょう？",
+                "en": "What is the most likely reason the tasks disappeared?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "画面のデザインがまだ完成していないから",
+                    "en": "The screen design isn't finished yet"
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "データを保存する係（バックエンドとデータベース）がないから",
+                    "en": "Nothing is storing the data (no backend or database)"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "ブラウザのバージョンが古いから",
+                    "en": "The browser is out of date"
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "画面（フロントエンド）が覚えているだけのデータは、再読み込みで消えます。ずっと残すには、保存係のバックエンドとデータベースが必要です。1-1 で詳しく見ていきます。",
+                "en": "Data that lives only in the screen (the frontend) is lost on reload. Keeping it needs a backend and a database to store it. Section 1-1 looks at this in detail."
+              },
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1-1",
+      "title": {
+        "jp": "1-1. フロントエンド / バックエンド / DBの関係",
+        "en": "1-1. Frontend / Backend / DB relationship"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "「アプリを作りたい」とAIに頼むとき、私たちは何を作ろうとしているのでしょうか。Webアプリは、大きく分けて3つの要素が連携して動いています。",
+            "en": "What exactly are we asking for when we tell an AI to \"make an app\"? A web application is three parts working together."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b3",
+          "type": "callout",
+          "variant": "analogy",
+          "title": {
+            "jp": "レストランで例えると",
+            "en": "Think of a restaurant"
+          },
+          "md": {
+            "jp": "フロントエンドは「客席とウェイター」、バックエンドは「厨房のシェフ」、データベースは「食材庫」です。お客さん（ユーザー）は厨房に直接入れません。必ずウェイターを通して注文します。",
+            "en": "The frontend is the dining area and the waiters, the backend is the chef in the kitchen, and the database is the pantry. Customers (users) never walk into the kitchen; they always order through a waiter."
+          }
+        },
+        {
+          "id": "s1-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "graph LR\n    User((ユーザー)) --> Front[フロントエンド<br>客席・ウェイター]\n    Front <-->|API| Back[バックエンド<br>厨房・シェフ]\n    Back <-->|SQL| DB[(データベース<br>食材庫)]",
+            "en": "graph LR\n    User((User)) --> Front[Frontend<br>Dining area / waiters]\n    Front <-->|API| Back[Backend<br>Kitchen / chef]\n    Back <-->|SQL| DB[(Database<br>Pantry)]"
+          },
+          "caption": {
+            "jp": "Webアプリケーションの3層構造",
+            "en": "The 3-tier web architecture"
+          },
+          "alt": {
+            "jp": "ユーザーはフロントエンドを操作し、フロントエンドはAPIでバックエンドと、バックエンドはSQLでデータベースとやり取りする図",
+            "en": "Diagram: the user operates the frontend, the frontend talks to the backend through an API, and the backend talks to the database with SQL"
+          },
+          "description": {
+            "jp": "ユーザーが触るのはフロントエンドだけです。フロントエンドはAPIを通してバックエンドに頼み、バックエンドがデータベースを読み書きします。",
+            "en": "Users only touch the frontend. The frontend asks the backend for things through the API, and the backend reads and writes the database."
+          }
+        },
+        {
+          "id": "s1-b5",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "フロントエンド（frontend）",
+                "en": "Frontend"
+              },
+              "md": {
+                "jp": "ブラウザで動く部分。ReactやVue.jsなどで作られ、ユーザーの目に触れるすべてです。",
+                "en": "Runs in the browser (React, Vue, etc.). Everything the user sees."
+              }
+            },
+            {
+              "term": {
+                "jp": "バックエンド（backend）",
+                "en": "Backend"
+              },
+              "md": {
+                "jp": "サーバーで動く部分。Node.jsやPythonなどで作られ、データの加工や保存を担当します。",
+                "en": "Runs on a server (Node.js, Python, etc.). Processes and saves data."
+              }
+            },
+            {
+              "term": {
+                "jp": "データベース（DB）",
+                "en": "Database (DB)"
+              },
+              "md": {
+                "jp": "データをずっと残しておく場所。PostgreSQLやMySQLなどが使われます。",
+                "en": "Where data is stored permanently (PostgreSQL, MySQL, etc.)."
+              }
+            }
+          ]
+        },
+        {
+          "id": "s1-b4",
+          "type": "markdown",
+          "md": {
+            "jp": "AIに指示を出すときは、「これは厨房（バックエンド）の話？客席（フロントエンド）の話？」と意識しましょう。それだけで、生成されるコードの精度が大きく上がります。",
+            "en": "When you instruct an AI, ask yourself: is this about the kitchen (backend) or the dining area (frontend)? That one question makes the generated code far more accurate."
+          }
+        },
+        {
+          "id": "s1-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": {
+                "jp": "Webアプリケーションを「レストラン」に例えた場合、「バックエンド」に該当する役割はどれですか？",
+                "en": "If a web application were a restaurant, which part would be the backend?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "お客さんが食事をする「客席ホール」",
+                    "en": "The dining hall where customers eat"
+                  },
+                  "feedback": {
+                    "jp": "客席はお客さんが直接触れる場所なので、フロントエンドにあたります。料理を作る場所ではありません。",
+                    "en": "The dining hall is where customers interact directly, so it is the frontend. No cooking happens there."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "注文を受け取り料理を作る「厨房」",
+                    "en": "The kitchen, where orders are received and food is prepared"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "食材を保管している「巨大な冷蔵庫」",
+                    "en": "The giant refrigerator where ingredients are stored"
+                  },
+                  "feedback": {
+                    "jp": "食材をしまう冷蔵庫は、データを保存するデータベースにあたります。保管はしますが、調理はしません。",
+                    "en": "The refrigerator stores ingredients, the way a database stores data. It keeps things but doesn't cook them."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "お店の看板や「外観デザイン」",
+                    "en": "The store sign and exterior design"
+                  },
+                  "feedback": {
+                    "jp": "看板や外観は見た目の担当なので、フロントエンド（UI）にあたります。注文を処理する役ではありません。",
+                    "en": "The sign and exterior are about looks, which is the frontend (UI). They don't process orders."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "バックエンドは「厨房」です。フロントエンド（ホール）からの注文（リクエスト）を受け取り、データベース（冷蔵庫）から食材を取り出し、加工して提供します。",
+                "en": "The backend is the kitchen. It receives orders (requests) from the frontend (dining hall), takes ingredients from the database (refrigerator), prepares them and serves them."
+              },
+              "hint": {
+                "jp": "「注文を受けて、加工する」のはどこでしょう？",
+                "en": "Where are orders received and turned into food?"
+              },
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1-2",
+      "title": {
+        "jp": "1-2. UIとは何か、APIとは何か",
+        "en": "1-2. What is UI? What is API?"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "「UIを作って」と「APIを作って」は、まったく別の作業依頼です。この2つの境界線を理解しましょう。",
+            "en": "\"Make a UI\" and \"make an API\" are completely different requests. Let's find the boundary between them."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "UI（User Interface）",
+                "en": "UI (User Interface)"
+              },
+              "md": {
+                "jp": "人間とコンピュータの接点です。ボタン、入力フォーム、画面レイアウトなど、人間が操作するものを指します。",
+                "en": "The contact point between people and computers: buttons, forms, layouts. The things humans operate."
+              }
+            },
+            {
+              "term": {
+                "jp": "API（Application Programming Interface）",
+                "en": "API (Application Programming Interface)"
+              },
+              "md": {
+                "jp": "フロントエンドとバックエンド（またはシステム同士）が会話するための窓口です。",
+                "en": "The window through which the frontend and backend (or two systems) talk to each other."
+              }
+            }
+          ]
+        },
+        {
+          "id": "s2-json-intro",
+          "type": "markdown",
+          "md": {
+            "jp": "APIが返すデータは、たとえば次のような JSON です。画面はこのデータを受け取って表示します。",
+            "en": "An API typically answers with data like the JSON below. The screen receives it and displays it."
+          }
+        },
+        {
+          "id": "s2-b4",
+          "type": "code",
+          "lang": "json",
+          "filename": "api-response.json",
+          "code": "{\n  \"userId\": \"u_12345\",\n  \"name\": \"Gemini User\",\n  \"role\": \"admin\",\n  \"lastLogin\": \"2026-01-10T10:00:00Z\"\n}"
+        },
+        {
+          "id": "s2-b5",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "バイブコーディングのコツ",
+            "en": "Vibe coding tip"
+          },
+          "md": {
+            "jp": "「UIをリッチにして」と頼むと、AIはCSSやアニメーションを調整します。「APIからもっとデータを取ってきて」と頼むと、バックエンドのロジックやSQLを修正します。この2つを混同しないことが大切です。",
+            "en": "Ask to \"make the UI richer\" and the AI adjusts CSS and animations. Ask to \"fetch more data from the API\" and it changes backend logic and SQL queries. Keep the two apart."
+          }
+        },
+        {
+          "id": "s2-prompt-ui",
+          "type": "prompt",
+          "title": {
+            "jp": "UIへの依頼の例",
+            "en": "Example: a UI request"
+          },
+          "prompt": {
+            "jp": "タスク一覧の画面だけを変更してください。各タスクに{{表示したい項目}}を表示し、既存のカードのデザインに揃えてください。APIとデータベースは変更しないでください。",
+            "en": "Change only the task list screen. Show {{field to display}} on each task and match the existing card design. Do not change the API or the database."
+          },
+          "target": "any",
+          "expect": {
+            "jp": "画面のコンポーネントとスタイルだけが変わります。APIのファイルには手が入りません。",
+            "en": "Only the screen component and its styles change. The API files stay untouched."
+          }
+        },
+        {
+          "id": "s2-prompt-api",
+          "type": "prompt",
+          "title": {
+            "jp": "APIへの依頼の例",
+            "en": "Example: an API request"
+          },
+          "prompt": {
+            "jp": "ユーザー情報を返すAPIに「{{追加したい項目}}」を加えてください。データベースに列がなければ追加し、既存のレスポンスの項目は変えないでください。画面の見た目は変更しないでください。",
+            "en": "Add \"{{field to add}}\" to the API that returns user info. If the database has no column for it, add one, and keep the existing response fields as they are. Do not change how the screen looks."
+          },
+          "target": "any",
+          "expect": {
+            "jp": "バックエンドの処理とデータベースが変わり、レスポンスのJSONに項目が1つ増えます。",
+            "en": "The backend logic and the database change, and the response JSON gains one field."
+          }
+        },
+        {
+          "id": "s2-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": {
+                "jp": "AIに対して「APIのレスポンスを変更して」と依頼すべき場面はどれですか？",
+                "en": "When should you ask an AI to \"change the API response\"?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "ボタンの色を赤から青に変えたいとき",
+                    "en": "To change a button color from red to blue"
+                  },
+                  "feedback": {
+                    "jp": "ボタンの色は見た目なので、UI（フロントエンド）への依頼です。APIが返すデータは変わりません。",
+                    "en": "A button color is about looks, so it is a UI (frontend) request. The data the API returns stays the same."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "画面のアニメーションをもっと滑らかにしたいとき",
+                    "en": "To make screen animations smoother"
+                  },
+                  "feedback": {
+                    "jp": "アニメーションは画面の動きなので、UIの領域です。サーバーから届くデータとは関係ありません。",
+                    "en": "Animation is how the screen moves, so it belongs to the UI. It has nothing to do with the data the server sends."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "ユーザー情報として「年齢」も取得できるようにしたいとき",
+                    "en": "To let the app fetch \"age\" as part of the user info"
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "フォントサイズを大きくしたいとき",
+                    "en": "To increase the font size"
+                  },
+                  "feedback": {
+                    "jp": "文字の大きさは表示の問題なので、UIで調整します。取得するデータは同じままです。",
+                    "en": "Font size is a display question, adjusted in the UI. The fetched data doesn't change."
+                  }
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": {
+                "jp": "「取得するデータの中身」に関わる変更はAPI（バックエンド）の領域です。見た目（色、アニメーション、フォント）はUI（フロントエンド）の領域です。",
+                "en": "Changes to what data is fetched belong to the API (backend). Visuals such as color, animation and fonts belong to the UI (frontend)."
+              },
+              "hint": {
+                "jp": "サーバーから「届くデータの中身」が変わるのはどれでしょう？",
+                "en": "Which one changes the content of the data that arrives from the server?"
+              },
+              "objectiveId": "o2",
+              "bloom": "apply"
+            }
+          ]
+        },
+        {
+          "id": "s2-ask",
+          "type": "askTutor",
+          "suggestions": [
+            {
+              "jp": "APIとデータベースはどう違うの？",
+              "en": "How is an API different from a database?"
+            },
+            {
+              "jp": "JSONの読み方を教えて",
+              "en": "How do I read JSON?"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1-3",
+      "title": {
+        "jp": "1-3. デプロイとは「何が起きている行為」か",
+        "en": "1-3. What is Deployment?"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "自分のPC（ローカル）で作ったアプリを、世界中の人が使えるようにすることを「デプロイ（deploy）」と呼びます。これは単なるファイルのコピーではありません。",
+            "en": "Making an app you built on your own computer (locally) available to the whole world is called deployment. It is more than copying files."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "list",
+          "style": "number",
+          "items": [
+            {
+              "jp": "**ビルド（build）**：人間が読みやすいコードを、機械が効率よく実行できる形に変換・圧縮すること。",
+              "en": "**Build**: converting human-readable code into a compact form machines run efficiently."
+            },
+            {
+              "jp": "**転送**：サーバー（VercelやRenderなど）にファイルを送ること。",
+              "en": "**Transfer**: sending the files to a server (Vercel, Render, etc.)."
+            },
+            {
+              "jp": "**起動**：サーバー上でプログラムを動かし、リクエストを待ち受ける状態にすること。",
+              "en": "**Launch**: running the program on the server so it waits for requests."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1-4",
+      "title": {
+        "jp": "1-4. Gitはなぜ必須なのか（時間を保存する技術）",
+        "en": "1-4. Why Git is Essential"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "AI開発において、Gitは「コードのバックアップ」以上の意味を持ちます。AIが壊したコードを、時間を巻き戻して直すための「セーブポイント」です。",
+            "en": "In AI-assisted development, Git is more than a backup. It is your save point: the way to rewind time when an AI breaks your code."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "コミット（commit）",
+                "en": "Commit"
+              },
+              "md": {
+                "jp": "セーブポイントを作ること。「ここまでは動いていた」という記録です。",
+                "en": "Create a save point: a record that says \"it worked up to here\"."
+              }
+            },
+            {
+              "term": {
+                "jp": "プッシュ（push）",
+                "en": "Push"
+              },
+              "md": {
+                "jp": "セーブデータをクラウド（GitHub）にアップロードすること。",
+                "en": "Upload your save data to the cloud (GitHub)."
+              }
+            },
+            {
+              "term": {
+                "jp": "リバート（revert）",
+                "en": "Revert"
+              },
+              "md": {
+                "jp": "失敗した変更を取り消して、過去のセーブポイントの状態に戻すこと。",
+                "en": "Undo a failed change and return to the state of an earlier save point."
+              }
+            }
+          ]
+        },
+        {
+          "id": "s4-b4",
+          "type": "markdown",
+          "md": {
+            "jp": "AIは時々、大胆な修正をして既存の機能を壊すことがあります。Gitがあれば、「昨日の状態に戻って」と願う必要はありません。コマンド一つで確実に戻れます。",
+            "en": "AI sometimes makes bold changes that break existing features. With Git you don't have to wish things back to yesterday; one command takes you there."
+          }
+        },
+        {
+          "id": "s4-prompt-commit",
+          "type": "prompt",
+          "title": {
+            "jp": "AIに変更を頼む前のひとこと",
+            "en": "One line before you ask for changes"
+          },
+          "prompt": {
+            "jp": "変更を始める前に、いま動いている状態をGitにコミットしてください（メッセージ：「{{いまの状態}}」）。そのあとで、{{頼みたい変更}}を行ってください。",
+            "en": "Before you change anything, commit the current working state to Git (message: \"{{current state}}\"). Then make this change: {{change you want}}."
+          },
+          "target": "claude-code",
+          "expect": {
+            "jp": "まずコミットが1つ増え、そのあとに変更が入ります。うまくいかなければ、そのコミットまで戻せます。",
+            "en": "A new commit appears first, then the change. If the change goes wrong, you can return to that commit."
+          }
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": {
+        "jp": "理解度チェック",
+        "en": "Knowledge check"
+      },
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": {
+                "jp": "「デプロイ（deploy）」という言葉の意味として正しいものはどれですか？",
+                "en": "What does \"deployment\" mean?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "プログラムを書き始めること",
+                    "en": "Starting to write a program"
+                  },
+                  "feedback": {
+                    "jp": "プログラムを書くのは開発の作業です。デプロイは、できあがったものを公開する作業です。",
+                    "en": "Writing the program is development. Deployment is publishing what you built."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "ローカルで作ったアプリを、サーバーに配置して世界中で使える状態にすること",
+                    "en": "Putting an app built locally onto a server so people everywhere can use it"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "AIにコードのバグを見つけてもらうこと",
+                    "en": "Having an AI find bugs in the code"
+                  },
+                  "feedback": {
+                    "jp": "バグを探すのはデバッグです。デプロイは、ビルド・転送・起動でアプリを公開することです。",
+                    "en": "Finding bugs is debugging. Deployment publishes the app through build, transfer and launch."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "データベースの中身をすべて削除すること",
+                    "en": "Deleting everything in the database"
+                  },
+                  "feedback": {
+                    "jp": "デプロイはデータを消す作業ではありません。アプリを本番環境で動かすことです。",
+                    "en": "Deployment does not delete data. It gets the app running in production."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "デプロイとは、開発環境（ローカル）にあるコードを本番環境（サーバー）に転送し、実際に稼働させる一連のプロセスです。",
+                "en": "Deployment is the sequence that moves code from your development environment (local) to production (a server) and gets it running."
+              },
+              "objectiveId": "o3",
+              "bloom": "understand"
+            },
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": {
+                "jp": "AI開発において、Gitが「タイムマシン」と呼ばれる理由として最も適切なものはどれですか？",
+                "en": "Why is Git often called a \"time machine\" in AI development?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "AIが未来のコードを予測して書いてくれるから",
+                    "en": "Because AI predicts and writes future code"
+                  },
+                  "feedback": {
+                    "jp": "Gitはコードを予測したり書いたりしません。記録した過去の状態を保存しておく道具です。",
+                    "en": "Git doesn't predict or write code. It keeps the past states you recorded."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "開発にかかった時間を自動的に計測してくれるから",
+                    "en": "Because it automatically measures development time"
+                  },
+                  "feedback": {
+                    "jp": "時間の計測はGitの役割ではありません。「タイムマシン」は、過去の状態に戻れることのたとえです。",
+                    "en": "Git doesn't track time. \"Time machine\" refers to going back to an earlier state."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "失敗した時に、いつでも過去の「動いていた状態」に戻せるから",
+                    "en": "Because you can always return to an earlier working state when something fails"
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "世界中の開発者のコードを瞬時に検索できるから",
+                    "en": "Because you can instantly search code from developers worldwide"
+                  },
+                  "feedback": {
+                    "jp": "コードの検索はGitの役割ではありません。Gitは自分のプロジェクトの変更履歴を管理します。",
+                    "en": "Searching code is not what Git does. Git manages the change history of your own project."
+                  }
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": {
+                "jp": "Gitは「セーブポイント」を作る道具です。AIがコードを壊しても、コミットさえしていれば、過去の状態に戻せます。",
+                "en": "Git creates save points. Even if an AI breaks your code, you can return to an earlier state as long as you committed."
+              },
+              "objectiveId": "o3",
+              "bloom": "understand"
+            },
+            {
+              "id": "q5",
+              "kind": "single",
+              "prompt": {
+                "jp": "AIへの指示出し（プロンプト）で、最も精度が高くなるアプローチはどれですか？",
+                "en": "Which way of prompting an AI gives the most accurate results?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "「いい感じのアプリを作って」と一任する",
+                    "en": "Asking it to \"just build a good app\" and leaving the rest to the AI"
+                  },
+                  "feedback": {
+                    "jp": "「いい感じに」では、AIはどこを変えるべきか判断できません。対象と範囲を具体的に伝えましょう。",
+                    "en": "\"Make it good\" gives the AI no idea what to change. Name the target and the scope."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "「これはフロントの話？バックエンドの話？」と意識して、責務を分けて依頼する",
+                    "en": "Asking \"is this frontend or backend?\" and splitting requests by responsibility"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "一度に全ての機能要件をまとめて長文で送る",
+                    "en": "Sending every requirement at once in one long message"
+                  },
+                  "feedback": {
+                    "jp": "一度に全部を頼むと、AIは変更する場所を取り違えやすくなります。UIとAPIのように分けて頼むほうが確実です。",
+                    "en": "Asking for everything at once makes it easier for the AI to change the wrong place. Separate requests, such as UI and API, work better."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "専門用語を使わず、小学生でもわかる言葉だけで説明する",
+                    "en": "Explaining only in words a primary school child would understand"
+                  },
+                  "feedback": {
+                    "jp": "やさしい言葉は大切ですが、「UI」「API」などの用語はAIにとって正確な目印になります。",
+                    "en": "Plain words help, but terms like \"UI\" and \"API\" give the AI precise landmarks."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "「今はUIの話」「今はDBの話」と人間が交通整理をすると、AIは変更する場所を間違えにくくなり、出力の精度が上がります。",
+                "en": "When you direct the traffic (\"this is about the UI\", \"this is about the DB\"), the AI is less likely to change the wrong place, and its output gets more accurate."
+              },
+              "objectiveId": "o2",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": {
+        "jp": "まとめ",
+        "en": "Summary"
+      },
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            {
+              "jp": "Webアプリは、フロントエンド（客席）・バックエンド（厨房）・データベース（食材庫）の3つで動く。",
+              "en": "A web app runs on three parts: the frontend (dining area), the backend (kitchen) and the database (pantry)."
+            },
+            {
+              "jp": "見た目を変えたいなら UI、届くデータを変えたいなら API。AIへの依頼ではどちらかを明示する。",
+              "en": "Change the looks in the UI, change the data in the API, and tell the AI which one you mean."
+            },
+            {
+              "jp": "デプロイは、ビルド・転送・起動を経て、作ったアプリを世界に公開すること。",
+              "en": "Deployment publishes your app to the world through build, transfer and launch."
+            },
+            {
+              "jp": "Git のコミットはセーブポイント。AIに作業を頼む前にコミットしておけば、いつでも戻れる。",
+              "en": "A Git commit is a save point. Commit before asking an AI for changes and you can always go back."
+            }
+          ]
+        },
+        {
+          "id": "cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-frontend",
+              "front": {
+                "jp": "フロントエンド",
+                "en": "Frontend"
+              },
+              "back": {
+                "jp": "ブラウザで動き、ユーザーが見て操作する部分。レストランなら客席とウェイター。",
+                "en": "The part that runs in the browser and that users see and operate. In the restaurant: the dining area and waiters."
+              }
+            },
+            {
+              "id": "card-backend",
+              "front": {
+                "jp": "バックエンド",
+                "en": "Backend"
+              },
+              "back": {
+                "jp": "サーバーで動き、データを加工・保存する部分。レストランなら厨房のシェフ。",
+                "en": "The part that runs on a server and processes and saves data. In the restaurant: the chef in the kitchen."
+              }
+            },
+            {
+              "id": "card-api",
+              "front": {
+                "jp": "API",
+                "en": "API"
+              },
+              "back": {
+                "jp": "フロントエンドとバックエンドが会話するための窓口。届くデータの中身を決める。",
+                "en": "The window through which the frontend and backend talk. It decides what data arrives."
+              }
+            },
+            {
+              "id": "card-deploy",
+              "front": {
+                "jp": "デプロイ",
+                "en": "Deployment"
+              },
+              "back": {
+                "jp": "ビルド・転送・起動を経て、アプリを本番環境で公開すること。",
+                "en": "Publishing an app to production through build, transfer and launch."
+              }
+            },
+            {
+              "id": "card-commit",
+              "front": {
+                "jp": "コミット（Git）",
+                "en": "Commit (Git)"
+              },
+              "back": {
+                "jp": "「ここまで動いていた」というセーブポイントを作ること。失敗したらここへ戻れる。",
+                "en": "Creating a save point that says \"it worked up to here\". If something fails, you can return to it."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "human+claude-code",
+    "generatedAt": "2026-10-18",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter1.ts",
+      "export": "VIBE_CHAPTER_1_DATA",
+      "quizSource": "data/curricula/vibe_coding/chapter1_quiz.ts",
+      "quizExport": "VIBE_CHAPTER_1_QUIZ",
+      "counts": {
+        "sections": 4,
+        "blocks": 16,
+        "tableRows": 0,
+        "quizQuestions": 5,
+        "text": 8,
+        "mermaid": 1,
+        "callout": 2,
+        "list": 3,
+        "code": 1,
+        "image": 1
+      }
+    }
+  }
+}

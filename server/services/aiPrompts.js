@@ -130,7 +130,7 @@ intake と modules を受け取り、レッスン詳細を埋めた完全な JSO
     "modules": [...],
     "ui_template_id": "doc_chapter",
     "duration": "X hours",
-    "modelUsed": "gemini-2.5-flash"
+    "modelUsed": "<model id>"
   }
 }
 \`\`\``;

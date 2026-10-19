@@ -53,7 +53,7 @@ graph TD
 *   `/public/p_school/assets/` に新しいファイル（例: `new_boss_dragon.png`）を配置します。
 
 ### ② ロード処理の修正
-*   [components/features/PSchool/game/battle.js](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/components/features/PSchool/game/battle.js) または該当の `BattleScene*.js` を開きます。
+*   [components/features/PSchool/game/battle.js](../../components/features/PSchool/game/battle.js) または該当の `BattleScene*.js` を開きます。
 *   `preload()` メソッド内で、アセットをロードする処理を追記または書き換えます。
     ```javascript
     // 修正前:

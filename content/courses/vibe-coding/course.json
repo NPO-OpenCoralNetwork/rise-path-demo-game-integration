@@ -1,0 +1,192 @@
+{
+  "schema": "risepath.course/v1",
+  "id": "vibe-coding",
+  "world": "vibe",
+  "title": {
+    "jp": "バイブコーディング",
+    "en": "Vibe Coding"
+  },
+  "subtitle": {
+    "jp": "AIを指揮してソフトウェアを構築する技術。暗記は不要です。",
+    "en": "Master the art of directing AI to build software. No memorization required."
+  },
+  "level": "intermediate",
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "modules": [
+    {
+      "id": "m1",
+      "title": {
+        "jp": "はじめに：前提と最低ライン",
+        "en": "Foundations"
+      },
+      "lessons": [
+        {
+          "id": "vibe-ch0",
+          "title": {
+            "jp": "第0章｜この時代の前提を共有する",
+            "en": "Chapter 0 | Sharing the Premise"
+          },
+          "estMinutes": 10,
+          "next": {
+            "lessonId": "vibe-ch1"
+          }
+        },
+        {
+          "id": "vibe-ch1",
+          "title": {
+            "jp": "第1章｜人間が理解すべき最低ライン",
+            "en": "Chapter 1 | Minimum Viable Knowledge"
+          },
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "vibe-ch2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "title": {
+        "jp": "企画と開発環境",
+        "en": "Plan and set up"
+      },
+      "lessons": [
+        {
+          "id": "vibe-ch2",
+          "title": {
+            "jp": "第2章｜AIと企画する力を身につける",
+            "en": "Chapter 2 | Planning with AI"
+          },
+          "estMinutes": 30,
+          "next": {
+            "lessonId": "vibe-ch3"
+          }
+        },
+        {
+          "id": "vibe-ch3",
+          "title": {
+            "jp": "第3章｜開発環境コックピット（VSCode）",
+            "en": "Chapter 3 | The Development Cockpit"
+          },
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "vibe-ch4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "title": {
+        "jp": "AIと一緒に作る",
+        "en": "Build with AI"
+      },
+      "lessons": [
+        {
+          "id": "vibe-ch4",
+          "title": {
+            "jp": "第4章｜フロントエンドをAIで生成する",
+            "en": "Chapter 4 | Generating Frontend with AI"
+          },
+          "estMinutes": 25,
+          "next": {
+            "lessonId": "vibe-ch5"
+          }
+        },
+        {
+          "id": "vibe-ch5",
+          "title": {
+            "jp": "第5章｜GitHubワークフロー完全理解",
+            "en": "Chapter 5 | GitHub Workflow Mastery"
+          },
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "vibe-ch6"
+          }
+        },
+        {
+          "id": "vibe-ch6",
+          "title": {
+            "jp": "第6章｜Gemini CLIによるバイブコーディング",
+            "en": "Chapter 6 | Vibe Coding with Gemini CLI"
+          },
+          "estMinutes": 30,
+          "next": {
+            "lessonId": "vibe-ch7"
+          }
+        },
+        {
+          "id": "vibe-ch7",
+          "title": {
+            "jp": "第7章｜Supabaseでデータを持たせる",
+            "en": "Chapter 7 | Data Persistence with Supabase"
+          },
+          "estMinutes": 25,
+          "next": {
+            "lessonId": "vibe-ch8"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m4",
+      "title": {
+        "jp": "届けて、育てる",
+        "en": "Ship and grow"
+      },
+      "lessons": [
+        {
+          "id": "vibe-ch8",
+          "title": {
+            "jp": "第8章｜デプロイして“世界に出す”",
+            "en": "Chapter 8 | Deployment: Taking it to the World"
+          },
+          "estMinutes": 30,
+          "next": {
+            "lessonId": "vibe-ch9"
+          }
+        },
+        {
+          "id": "vibe-ch9",
+          "title": {
+            "jp": "第9章｜失敗と修正を前提にした開発",
+            "en": "Chapter 9 | Debugging & Error Handling"
+          },
+          "estMinutes": 40,
+          "next": {
+            "lessonId": "vibe-ch10"
+          }
+        },
+        {
+          "id": "vibe-ch10",
+          "title": {
+            "jp": "第10章｜応用：ゲーム・サービス開発へ",
+            "en": "Chapter 10 | Advanced Application: From Static to Dynamic"
+          },
+          "estMinutes": 30,
+          "next": {
+            "lessonId": "vibe-ch11"
+          }
+        },
+        {
+          "id": "vibe-ch11",
+          "title": {
+            "jp": "第11章｜これからの学び方",
+            "en": "Chapter 11 | The Future of Learning"
+          },
+          "estMinutes": 15
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "human+claude-code",
+    "migratedFrom": {
+      "source": "components/features/programming/VibePathView.tsx"
+    }
+  }
+}

@@ -1,0 +1,1312 @@
+{
+  "title": "risepath.lesson/v1 (LLM profile)",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "risepath.lesson/v1"
+    },
+    "id": {
+      "description": "Lesson id; the file is named <id>.lesson.json.",
+      "type": "string"
+    },
+    "courseId": {
+      "description": "Slug of the course this lesson belongs to.",
+      "type": "string"
+    },
+    "title": {
+      "$ref": "#/$defs/LText"
+    },
+    "subtitle": {
+      "$ref": "#/$defs/LText"
+    },
+    "locale": {
+      "description": "Source locale; plain strings are in this locale.",
+      "$ref": "#/$defs/Locale"
+    },
+    "locales": {
+      "description": "Locales that must be complete in every localized text.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Locale"
+      }
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ]
+    },
+    "estMinutes": {
+      "description": "Estimated minutes to finish (1–600).",
+      "type": "integer"
+    },
+    "prerequisites": {
+      "description": "What the learner should know first, e.g. an earlier lesson title.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LText"
+      }
+    },
+    "objectives": {
+      "description": "2–4 observable objectives.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Objective"
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Section"
+      }
+    },
+    "next": {
+      "$ref": "#/$defs/LessonLink"
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/GlossaryEntry"
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Source"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "title",
+    "locale",
+    "estMinutes",
+    "objectives",
+    "sections",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "description": "A Rise Path lesson (risepath.lesson/v1).",
+  "$defs": {
+    "LText": {
+      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "jp": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            },
+            "fr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Locale": {
+      "type": "string",
+      "enum": [
+        "jp",
+        "en",
+        "fr"
+      ],
+      "description": "Content locale key. \"jp\" is Japanese (BCP-47 \"ja\")."
+    },
+    "Objective": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Observable outcome, e.g. \"…を説明できる\" / \"Explain …\".",
+          "$ref": "#/$defs/LText"
+        },
+        "bloom": {
+          "$ref": "#/$defs/Bloom"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "bloom"
+      ],
+      "additionalProperties": false,
+      "description": "What the learner can do after the lesson."
+    },
+    "Bloom": {
+      "type": "string",
+      "enum": [
+        "remember",
+        "understand",
+        "apply",
+        "analyze",
+        "evaluate",
+        "create"
+      ],
+      "description": "Bloom taxonomy level of an objective or question."
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "role": {
+          "$ref": "#/$defs/SectionRole"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "blocks",
+        "role"
+      ],
+      "additionalProperties": false,
+      "description": "A titled group of blocks."
+    },
+    "SectionRole": {
+      "type": "string",
+      "enum": [
+        "hook",
+        "concept",
+        "example",
+        "practice",
+        "check",
+        "pitfalls",
+        "summary",
+        "reflection"
+      ],
+      "description": "Pedagogical role of a section."
+    },
+    "Block": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MarkdownBlock"
+        },
+        {
+          "$ref": "#/$defs/CalloutBlock"
+        },
+        {
+          "$ref": "#/$defs/ListBlock"
+        },
+        {
+          "$ref": "#/$defs/DefinitionsBlock"
+        },
+        {
+          "$ref": "#/$defs/TableBlock"
+        },
+        {
+          "$ref": "#/$defs/CodeBlock"
+        },
+        {
+          "$ref": "#/$defs/PromptBlock"
+        },
+        {
+          "$ref": "#/$defs/DiagramBlock"
+        },
+        {
+          "$ref": "#/$defs/ImageBlock"
+        },
+        {
+          "$ref": "#/$defs/QuizBlock"
+        },
+        {
+          "$ref": "#/$defs/FlashcardsBlock"
+        },
+        {
+          "$ref": "#/$defs/StepsBlock"
+        },
+        {
+          "$ref": "#/$defs/ChecklistBlock"
+        },
+        {
+          "$ref": "#/$defs/SummaryBlock"
+        },
+        {
+          "$ref": "#/$defs/AskTutorBlock"
+        }
+      ],
+      "description": "A lesson block, discriminated by \"type\"."
+    },
+    "MarkdownBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "markdown"
+        },
+        "md": {
+          "$ref": "#/$defs/Md"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "lead",
+            "quote"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "md"
+      ],
+      "additionalProperties": false,
+      "description": "Prose paragraph(s). Keep each paragraph within 160 JP characters / 80 EN words."
+    },
+    "Md": {
+      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "jp": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            },
+            "fr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CalloutBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "callout"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "tip",
+            "warning",
+            "info",
+            "analogy",
+            "pitfall",
+            "note",
+            "success"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "md": {
+          "$ref": "#/$defs/Md"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "md"
+      ],
+      "additionalProperties": false,
+      "description": "Highlighted note. At most 2 per section; an analogy goes before the formal definition."
+    },
+    "ListBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "list"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "bullet",
+            "number",
+            "check"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Md"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "items"
+      ],
+      "additionalProperties": false,
+      "description": "Bulleted, numbered or check list (7 items max). Use definitions for \"label: description\" items."
+    },
+    "DefinitionsBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "definitions"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "term": {
+                "$ref": "#/$defs/LText"
+              },
+              "md": {
+                "$ref": "#/$defs/Md"
+              }
+            },
+            "required": [
+              "term",
+              "md"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "items"
+      ],
+      "additionalProperties": false,
+      "description": "Term / description pairs, rendered as a definition list."
+    },
+    "TableBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "table"
+        },
+        "caption": {
+          "$ref": "#/$defs/LText"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LText"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Md"
+            }
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "columns",
+        "rows"
+      ],
+      "additionalProperties": false,
+      "description": "Data table (6 columns max). Every row has one cell per column."
+    },
+    "CodeBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "code"
+        },
+        "lang": {
+          "description": "Language id for highlighting, e.g. ts, bash, json, python.",
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "filename": {
+          "description": "Shown in the code header. Recommended.",
+          "type": "string"
+        },
+        "highlight": {
+          "description": "1-based line numbers to emphasize.",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "lang",
+        "code"
+      ],
+      "additionalProperties": false,
+      "description": "Source code (25 lines max inline). Instructions to an AI go in a prompt block, not here."
+    },
+    "PromptBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "prompt"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "prompt": {
+          "description": "The instruction to give an AI. {{name}} marks an editable variable.",
+          "$ref": "#/$defs/LText"
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "any",
+            "claude",
+            "claude-code",
+            "chatgpt",
+            "gemini"
+          ]
+        },
+        "vars": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Variable name as written inside {{ }} in the prompt.",
+                "type": "string"
+              },
+              "hint": {
+                "$ref": "#/$defs/LText"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "expect": {
+          "description": "What a good AI answer looks like (shown collapsed).",
+          "$ref": "#/$defs/Md"
+        },
+        "note": {
+          "$ref": "#/$defs/Md"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "prompt"
+      ],
+      "additionalProperties": false,
+      "description": "A prompt the learner can copy into an AI tool. Every example instruction to an AI uses this block."
+    },
+    "DiagramBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "diagram"
+        },
+        "engine": {
+          "type": "string",
+          "const": "mermaid"
+        },
+        "code": {
+          "description": "Mermaid source (flowchart, sequence, er, mindmap, …). May be localized per locale.",
+          "$ref": "#/$defs/LText"
+        },
+        "caption": {
+          "$ref": "#/$defs/LText"
+        },
+        "alt": {
+          "description": "Short text alternative for screen readers.",
+          "$ref": "#/$defs/LText"
+        },
+        "description": {
+          "description": "Longer prose explanation shown under the figure.",
+          "$ref": "#/$defs/Md"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "engine",
+        "code",
+        "alt"
+      ],
+      "additionalProperties": false,
+      "description": "Mermaid diagram (12 nodes max) with caption and alt text. Mind maps use mermaid \"mindmap\" syntax."
+    },
+    "ImageBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "image"
+        },
+        "src": {
+          "type": "string"
+        },
+        "alt": {
+          "$ref": "#/$defs/LText"
+        },
+        "caption": {
+          "$ref": "#/$defs/LText"
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "wide"
+          ]
+        },
+        "decorative": {
+          "description": "Decorative images belong on the course cover only.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "src",
+        "alt"
+      ],
+      "additionalProperties": false,
+      "description": "A teaching image (screenshot, comparison). Alt text is required."
+    },
+    "QuizBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "quiz"
+        },
+        "mode": {
+          "description": "inline = a check while reading (確認しよう); exam = end-of-lesson test; predict = an ungraded prediction in the hook (the pick is not scored; the explanation is revealed after answering).",
+          "type": "string",
+          "enum": [
+            "inline",
+            "exam",
+            "predict"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuizQuestion"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "mode",
+        "questions"
+      ],
+      "additionalProperties": false,
+      "description": "Retrieval practice. Place an inline quiz at least every 2 sections."
+    },
+    "QuizQuestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Defaults to single.",
+          "type": "string",
+          "enum": [
+            "single",
+            "multi",
+            "truefalse"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/Md"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuizOption"
+          }
+        },
+        "answer": {
+          "description": "Ids of the correct options.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "explanation": {
+          "$ref": "#/$defs/Md"
+        },
+        "hint": {
+          "$ref": "#/$defs/Md"
+        },
+        "objectiveId": {
+          "description": "The lesson objective this question assesses. Required when the lesson has objectives.",
+          "type": "string"
+        },
+        "bloom": {
+          "$ref": "#/$defs/Bloom"
+        }
+      },
+      "required": [
+        "id",
+        "prompt",
+        "options",
+        "answer",
+        "explanation",
+        "objectiveId"
+      ],
+      "additionalProperties": false,
+      "description": "A question with options, the correct option ids and an explanation."
+    },
+    "QuizOption": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "md": {
+          "$ref": "#/$defs/Md"
+        },
+        "feedback": {
+          "description": "Shown when this option is picked. Required for wrong options: name and correct the misconception in 2 sentences.",
+          "$ref": "#/$defs/Md"
+        }
+      },
+      "required": [
+        "id",
+        "md"
+      ],
+      "additionalProperties": false,
+      "description": "One answer option."
+    },
+    "FlashcardsBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "flashcards"
+        },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+                "type": "string"
+              },
+              "front": {
+                "$ref": "#/$defs/Md"
+              },
+              "back": {
+                "$ref": "#/$defs/Md"
+              }
+            },
+            "required": [
+              "id",
+              "front",
+              "back"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "cards"
+      ],
+      "additionalProperties": false,
+      "description": "Review cards (4–8 per lesson) that feed the review queue."
+    },
+    "StepsBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "steps"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+                "type": "string"
+              },
+              "title": {
+                "$ref": "#/$defs/LText"
+              },
+              "md": {
+                "$ref": "#/$defs/Md"
+              },
+              "keys": {
+                "description": "Keyboard keys shown as <kbd> chips.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "expect": {
+                "description": "Expected result of the step.",
+                "$ref": "#/$defs/Md"
+              },
+              "hint": {
+                "$ref": "#/$defs/Md"
+              },
+              "troubleshoot": {
+                "$ref": "#/$defs/Md"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "items"
+      ],
+      "additionalProperties": false,
+      "description": "A procedure (8 steps max), each with an expected result."
+    },
+    "ChecklistBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "checklist"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+                "type": "string"
+              },
+              "label": {
+                "$ref": "#/$defs/LText"
+              },
+              "md": {
+                "$ref": "#/$defs/Md"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "items"
+      ],
+      "additionalProperties": false,
+      "description": "Items the learner ticks off; state is saved."
+    },
+    "SummaryBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "summary"
+        },
+        "title": {
+          "$ref": "#/$defs/LText"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Md"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "points"
+      ],
+      "additionalProperties": false,
+      "description": "Key takeaways (3–5 points). Required in the last section."
+    },
+    "AskTutorBlock": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "slide": {
+          "description": "false hides the block in Slides mode.",
+          "type": "boolean"
+        },
+        "narration": {
+          "description": "Spoken text for Slides/listen mode (TTS).",
+          "$ref": "#/$defs/LText"
+        },
+        "cite": {
+          "description": "Ids of lesson.sources (or course.sources) that back this block.",
+          "type": "array",
+          "items": {
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "askTutor"
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LText"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "suggestions"
+      ],
+      "additionalProperties": false,
+      "description": "Suggested questions that open the AI tutor."
+    },
+    "LessonLink": {
+      "type": "object",
+      "properties": {
+        "lessonId": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "courseId": {
+          "description": "Defaults to the same course.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lessonId"
+      ],
+      "additionalProperties": false,
+      "description": "Reference to another lesson."
+    },
+    "GlossaryEntry": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "$ref": "#/$defs/LText"
+        },
+        "md": {
+          "$ref": "#/$defs/Md"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "term",
+        "md"
+      ],
+      "additionalProperties": false,
+      "description": "A course or lesson glossary term, referenced inline as [[term]]."
+    },
+    "Source": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "checkedAt": {
+          "description": "ISO date the source was last checked.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false,
+      "description": "A reference that blocks can cite."
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration.",
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "skill": {
+          "type": "string"
+        },
+        "skillVersion": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "description": "ISO timestamp.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "author"
+      ],
+      "additionalProperties": false,
+      "description": "Authorship record."
+    }
+  }
+}

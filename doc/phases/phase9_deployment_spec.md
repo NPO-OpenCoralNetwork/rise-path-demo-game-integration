@@ -102,7 +102,7 @@ cloudflared tunnel route dns rise-path-mcp mcp.risepath.dev
 ```yaml
 # ~/.cloudflared/config.yml
 tunnel: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-credentials-file: /Users/<user>/.cloudflared/a1b2c3d4-e5f6-7890-abcd-ef1234567890.json
+credentials-file: <home-dir>/.cloudflared/a1b2c3d4-e5f6-7890-abcd-ef1234567890.json
 
 ingress:
   # MCP SSE Server

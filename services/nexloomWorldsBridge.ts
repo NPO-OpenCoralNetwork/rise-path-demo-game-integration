@@ -64,22 +64,35 @@ export interface NexloomLessonCompletionResult {
 }
 
 const BRIDGE_PROVIDER_KEY = 'rise_path';
-const env = ((import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {}) as Record<string, string | undefined>;
 const warnedKeys = new Set<string>();
 const learningTrackCache = new Map<string, Promise<WorldsLearningTrack[]>>();
 
-// Optional bridge envs:
-// VITE_NEXLOOM_WORLDS_BASE_URL
-// VITE_NEXLOOM_REALM_ID or VITE_NEXLOOM_WORLDS_REALM_ID
-// VITE_NEXLOOM_WORLDS_ORGANIZATION_ID
-// VITE_NEXLOOM_WORLDS_BEARER_TOKEN
-// VITE_NEXLOOM_RISE_PATH_TRACK_MAP
-// VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_KEY
-// VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_ID
-// VITE_NEXLOOM_RISE_PATH_DEFAULT_PROVIDER_CURRICULUM_ID
+/**
+ * Optional, non-secret bridge config. Each value is a separate `import.meta.env.VITE_*` property read so
+ * Vite inlines only these; reading the whole `import.meta.env` object would ship every VITE_* value.
+ *
+ * Auth is the signed-in learner's own Supabase access token. There is deliberately no static bearer
+ * token here: any VITE_* value is public, so a shared service token must live on the server. A
+ * server-side proxy (e.g. POST /api/v2/nexloom/progress holding NEXLOOM_WORLDS_BEARER_TOKEN) is the
+ * follow-up if guests or service-to-service reporting are needed.
+ */
+const BRIDGE_ENV = {
+    VITE_NEXLOOM_WORLDS_BASE_URL: import.meta.env.VITE_NEXLOOM_WORLDS_BASE_URL,
+    VITE_NEXLOOM_API_BASE_URL: import.meta.env.VITE_NEXLOOM_API_BASE_URL,
+    VITE_NEXLOOM_REALM_ID: import.meta.env.VITE_NEXLOOM_REALM_ID,
+    VITE_NEXLOOM_WORLDS_REALM_ID: import.meta.env.VITE_NEXLOOM_WORLDS_REALM_ID,
+    VITE_NEXLOOM_WORLDS_ORGANIZATION_ID: import.meta.env.VITE_NEXLOOM_WORLDS_ORGANIZATION_ID,
+    VITE_NEXLOOM_RISE_PATH_TRACK_MAP: import.meta.env.VITE_NEXLOOM_RISE_PATH_TRACK_MAP,
+    VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_KEY: import.meta.env.VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_KEY,
+    VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_ID: import.meta.env.VITE_NEXLOOM_RISE_PATH_DEFAULT_TRACK_ID,
+    VITE_NEXLOOM_RISE_PATH_DEFAULT_PROVIDER_CURRICULUM_ID: import.meta.env.VITE_NEXLOOM_RISE_PATH_DEFAULT_PROVIDER_CURRICULUM_ID,
+} as const;
 
-function readEnv(name: string): string {
-    return String(env[name] || '').trim();
+type BridgeEnvName = keyof typeof BRIDGE_ENV;
+
+function readEnv(name: BridgeEnvName): string {
+    const value: unknown = BRIDGE_ENV[name];
+    return typeof value === 'string' ? value.trim() : '';
 }
 
 function cleanText(value: unknown): string {
@@ -119,7 +132,7 @@ function isRecord(value: unknown): value is JsonRecord {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function readJsonEnv<T>(name: string): T | null {
+function readJsonEnv<T>(name: BridgeEnvName): T | null {
     const raw = readEnv(name);
     if (!raw) return null;
     try {
@@ -288,8 +301,6 @@ function resolveBridgeConfig(input: NexloomLessonCompletionInput): ResolvedBridg
 }
 
 async function resolveBearerToken(user?: AuthUser | null): Promise<string> {
-    const staticToken = readEnv('VITE_NEXLOOM_WORLDS_BEARER_TOKEN');
-    if (staticToken) return staticToken;
     if (!user || user.isGuest) return '';
 
     const supabase = getSupabaseClient();
@@ -456,7 +467,7 @@ export async function reportNexloomLessonCompletion(
 
     const token = await resolveBearerToken(input.user);
     if (!token) {
-        warnOnce('auth:missing', 'Bridge skipped because no bearer token is available. Use Supabase auth or VITE_NEXLOOM_WORLDS_BEARER_TOKEN.');
+        warnOnce('auth:missing', 'Bridge skipped because no signed-in Supabase session is available.');
         return { status: 'skipped', reason: 'auth_missing' };
     }
 

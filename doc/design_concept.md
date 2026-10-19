@@ -103,7 +103,7 @@ flowchart TD
 
 ゲーム体験を高めるBGMや効果音（SE）を追加・変更する際の共通ルールです。
 
-- **配置ディレクトリ**: 音声ファイルは必ず [**`public/p_school/assets/audio/`**](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/public/p_school/assets/audio/) 配下に保存してください。
+- **配置ディレクトリ**: 音声ファイルは必ず [**`public/p_school/assets/audio/`**](../public/p_school/assets/audio/) 配下に保存してください。
 - **推奨ファイルフォーマット**: 常時ループ再生やクロスプラットフォームに対応しやすい **`.mp3`**（または `.ogg`）形式を標準とします。
 - **命名規則**: 小文字の英数字およびアンダースコア（`_`）で記述してください。
   - **BGM**: `bgm_[ステージ名/シーン名].mp3` (例: `bgm_battle_01.mp3`)

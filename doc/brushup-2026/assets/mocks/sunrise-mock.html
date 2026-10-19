@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunrise Studio mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Noto+Sans+JP:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --canvas:#F7F7F4; --surface:#FFFFFF; --sunken:#F0F0EB; --line:#E4E4DE; --line-strong:#8A8A96;
+  --fg:#16161D; --fg2:#454552; --fg3:#676774;
+  --primary:#4F46E5; --primary-hover:#4338CA; --primary-soft:#EEF0FF; --primary-text:#4338CA; --on-primary:#fff;
+  --sun:#F59E0B; --sun-soft:#FFF4DB; --sun-text:#A34A06; --success:#137A3A;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  --sh1:0 1px 2px rgb(16 16 24/.06); --sh2:0 1px 2px rgb(16 16 24/.04),0 6px 16px rgb(16 16 24/.06); --sh3:0 16px 40px rgb(16 16 24/.14);
+  --font:"Inter","Noto Sans JP","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--canvas);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.75}
+:lang(ja) h1,:lang(ja) h2,:lang(ja) h3{font-feature-settings:"palt";word-break:auto-phrase;text-wrap:balance;letter-spacing:.01em}
+.tab{font-variant-numeric:tabular-nums}
+.app{display:grid;grid-template-columns:248px 1fr;min-height:900px}
+aside{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px;font-weight:700;font-size:17px}
+.mark{width:30px;height:30px}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:var(--r-md);color:var(--fg2);font-weight:500}
+.nav svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+.nav.on{background:var(--primary-soft);color:var(--primary-text);font-weight:600}
+.cont{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--canvas)}
+.cont small{color:var(--fg3);font-size:12px;display:block}
+.cont b{font-size:13px;display:block;line-height:1.5;margin:2px 0 8px}
+.bar{height:4px;border-radius:99px;background:var(--sunken);overflow:hidden}.bar i{display:block;height:100%;background:var(--primary)}
+.avatar{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--r-md);border:1px solid var(--line)}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#FDE68A,#F59E0B);display:grid;place-items:center;font-weight:700;color:#7C2D12;font-size:13px}
+main{padding:32px 40px 48px;max-width:1200px}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:24px}
+.hdr p{margin:0;color:var(--fg3);font-size:13px}
+h1{font-size:30px;line-height:1.4;margin:2px 0 4px;font-weight:700}
+.sub{color:var(--fg2);margin:0}
+.cluster{display:flex;gap:8px}
+.chip{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;color:var(--fg2);box-shadow:var(--sh1)}
+.chip .sun{color:var(--sun-text);font-weight:700}
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh1)}
+.hero{overflow:hidden;display:grid;grid-template-columns:1.25fr 1fr}
+.hero .txt{padding:24px 24px 22px}
+.eyebrow{font-size:12px;font-weight:600;color:var(--fg3)}
+.world{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#166534;background:#E7F7EE;padding:3px 9px;border-radius:999px}
+.hero h2{font-size:22px;line-height:1.45;margin:10px 0 6px}
+.hero ul{margin:8px 0 18px;padding-left:1.2em;color:var(--fg2);font-size:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r-md);font-weight:600;font-size:14px;border:1px solid transparent}
+.btn.p{background:var(--primary);color:var(--on-primary)} .btn.s{background:var(--surface);border-color:var(--line);color:var(--fg)}
+.cover{position:relative;background:radial-gradient(120% 90% at 85% 10%,#FDE68A 0,#FBBF24 18%,transparent 42%),linear-gradient(160deg,#0F3D2E,#14532D 55%,#22C55E);}
+.cover pre{position:absolute;left:22px;bottom:20px;right:22px;margin:0;font:500 12.5px/1.7 var(--mono);color:#DCFCE7;background:rgb(0 0 0/.28);border:1px solid rgb(255 255 255/.12);border-radius:var(--r-md);padding:12px 14px}
+.side{display:flex;flex-direction:column;gap:20px}
+.pad{padding:20px}
+.pad h3{font-size:16px;margin:0 0 4px}
+.muted{color:var(--fg3);font-size:13px;margin:0}
+.empty{display:flex;gap:14px;align-items:flex-start}
+.ico{width:40px;height:40px;border-radius:var(--r-md);background:var(--sun-soft);display:grid;place-items:center;color:var(--sun-text);font-weight:700;flex:none}
+.ico.i{background:var(--primary-soft);color:var(--primary-text)}
+.sec{display:flex;justify-content:space-between;align-items:baseline;margin:32px 0 12px}
+.sec h2{font-size:20px;margin:0}.sec a{color:var(--primary-text);font-weight:600;font-size:14px;text-decoration:none}
+.tracks{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.cc .cv{height:112px;border-radius:var(--r-lg) var(--r-lg) 0 0;position:relative;overflow:hidden}
+.cc .cv span{position:absolute;right:12px;bottom:6px;font:700 46px/1 var(--mono);color:rgb(255 255 255/.85)}
+.cc .b{padding:12px 14px 14px}
+.cc h4{margin:6px 0 4px;font-size:15px;line-height:1.5}
+.meta{font-size:12px;color:var(--fg3)}
+.code{font:500 12.5px/1.7 var(--mono);background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;margin:12px 0 0;color:var(--fg)}
+.code .c{color:#6B6B78}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#16161D"/><circle cx="21.5" cy="11" r="4" fill="#F59E0B"/><path d="M6 25c5-1 8-4 10-8s4-6 9-6.5" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg>
+      Rise Path
+    </div>
+    <div class="nav on"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>ホーム</div>
+    <div class="nav"><svg viewBox="0 0 24 24"><path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg>学ぶ</div>
+    <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>つくる</div>
+    <div class="nav"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h3"/></svg>ふりかえり</div>
+    <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>AIパートナー</div>
+    <div class="cont">
+      <small>続きから</small>
+      <b>第1章｜人間が理解すべき最低ライン</b>
+      <div class="bar"><i style="width:38%"></i></div>
+    </div>
+    <div class="avatar"><div class="av">G</div><div style="line-height:1.3"><b style="font-size:13px">Guest</b><br><span class="muted" style="font-size:12px">設定・言語・ログアウト</span></div></div>
+  </aside>
+  <main>
+    <div class="hdr">
+      <div>
+        <p>10月18日（土）</p>
+        <h1>おかえりなさい、Guest さん</h1>
+        <p class="sub">今日は 10分 だけ進めましょう。確認問題までやると記録がつきます。</p>
+      </div>
+      <div class="cluster">
+        <div class="chip"><span class="sun">●</span>連続 <b class="tab">0</b>日 — 今日の1レッスンでスタート</div>
+        <div class="chip">Lv <b class="tab">1</b> · <span class="tab">0 / 120 XP</span></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card hero">
+        <div class="txt">
+          <span class="world">● Vibe Coding</span>
+          <h2>第1章｜人間が理解すべき最低ライン</h2>
+          <p class="muted">約15分 · 初級 · 4セクション · 確認問題 3</p>
+          <ul>
+            <li>フロントエンド / バックエンド / DB の役割を説明できる</li>
+            <li>AIへの依頼が「UI」と「API」のどちらの話か見分けられる</li>
+          </ul>
+          <div style="display:flex;gap:8px"><a class="btn p">続きから読む（1-2 から）</a><a class="btn s">目次</a></div>
+        </div>
+        <div class="cover"><pre>&gt; claude
+&gt; /author-lesson vibe-coding ch12
+  ✓ outline · ✓ draft · ✓ validate
+  ✓ review 3.6 / 4 · ✓ preview</pre></div>
+      </div>
+      <div class="side">
+        <div class="card pad empty"><div class="ico">↻</div><div><h3>今日の復習 0枚</h3><p class="muted">確認問題で間違えた所と、カードにした用語がここに並びます。</p></div></div>
+        <div class="card pad empty"><div class="ico i">✦</div><div><h3>AI先生は教材の中に</h3><p class="muted">段落の ✦ から質問できます。すぐ答えは言わず、ヒントから一緒に考えます。</p></div></div>
+      </div>
+    </div>
+
+    <div class="sec"><h2>トラック</h2><a>すべて見る →</a></div>
+    <div class="tracks">
+      <div class="card cc"><div class="cv" style="background:linear-gradient(150deg,#0F3D2E,#22C55E)"><span>&gt;_</span></div><div class="b"><span class="world">Vibe Coding</span><h4>AIと作るWebアプリ</h4><div class="meta tab">12レッスン · 約3時間</div></div></div>
+      <div class="card cc"><div class="cv" style="background:linear-gradient(150deg,#1E1B4B,#8B5CF6)"><span>{ }</span></div><div class="b"><span class="world" style="color:#5B21B6;background:#F1ECFE">Unity × AI</span><h4>AI時代のゲーム開発</h4><div class="meta tab">4レッスン · 約1時間</div></div></div>
+      <div class="card cc"><div class="cv" style="background:linear-gradient(150deg,#7C2D12,#EA7600)"><span>◆</span></div><div class="b"><span class="world" style="color:#9A3412;background:#FFEDD5">Blender</span><h4>はじめての3Dモデリング</h4><div class="meta tab">6ステージ · 約2時間</div></div></div>
+      <div class="card cc"><div class="cv" style="background:linear-gradient(150deg,#44241A,#B4532A)"><span>❖</span></div><div class="b"><span class="world" style="color:#7C2D12;background:#F7E9E2">Art</span><h4>美術史と工芸の旅</h4><div class="meta tab">8章 · 約2時間</div></div></div>
+    </div>
+
+    <div class="sec"><h2>つくる</h2><a>作成ガイド →</a></div>
+    <div class="card pad" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center">
+      <div><h3>Claude Code で教材をつくる</h3><p class="muted">同じスキーマで書かれた教材は、検証・レビュー・プレビューを通ってから、このリーダーにそのまま表示されます。ChatGPT や Gemini からも MCP で同じ手順を使えます。</p></div>
+      <div class="code"><span class="c"># リポジトリで</span><br>/author-lesson vibe-coding ch12 "MCPの基本"<br><span class="c"># 検証とプレビュー</span><br>npm run lessons:validate &amp;&amp; npm run lessons:preview</div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

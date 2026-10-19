@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ViewState, Big5Profile, AssessmentProfile, PersonalityType, AIAdvice } from '../../../../types';
 import PersonalityAssessment from './PersonalityAssessment';
 import IntroSequence from './IntroSequence';
-import { analyzePersonality } from '../../../../services/geminiService';
+import { analyzePersonality, toLlmLocale } from '../../../../services/llmApi';
 import { useTheme } from '../../../../context/ThemeContext';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { notifyAssessmentProfileChanged } from '../../../../constants/assessment';
@@ -26,7 +26,8 @@ enum Step {
   RESULTS = 'RESULTS'
 }
 
-const USE_DEMO_ASSESSMENT = true;
+// Keep the analysis screen up long enough to read, even when the answer comes back instantly.
+const MIN_ANALYZING_MS = 1200;
 
 const DEMO_AI_ADVICE_BY_LANG: Record<'en' | 'jp' | 'fr', AIAdvice> = {
   en: {
@@ -276,7 +277,6 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
       overviewTitle: 'AI Learning Diagnosis Program',
       overviewBody: 'Visualize your potential and build a personalized curriculum that fits your brain.',
       overviewCta: 'Start Analysis',
-      poweredBy: 'Powered by Gemini 2.5 Flash • Big Five Matrix',
       assessmentTitle: 'AI Identity Scan',
       assessmentSubtitle: 'Deep Neural Insight Pattern Analysis in Progress',
       analyzingTitle: 'Running analysis protocol...',
@@ -286,7 +286,6 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
       overviewTitle: 'AI学習診断プログラム',
       overviewBody: 'あなたの潜在能力を可視化し、脳の特性に最もフィットするパーソナライズされたカリキュラムを構築します。',
       overviewCta: '分析を開始する',
-      poweredBy: 'Powered by Gemini 2.5 Flash • Big Five Matrix',
       assessmentTitle: 'AI Identity Scan',
       assessmentSubtitle: 'Deep Neural Insight Pattern Analysis in Progress',
       analyzingTitle: '分析プロトコル実行中...',
@@ -296,7 +295,6 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
       overviewTitle: 'Programme de diagnostic d’apprentissage IA',
       overviewBody: 'Visualisez votre potentiel et construisez un parcours adapté à votre façon d’apprendre.',
       overviewCta: 'Lancer l’analyse',
-      poweredBy: 'Powered by Gemini 2.5 Flash • Big Five Matrix',
       assessmentTitle: 'AI Identity Scan',
       assessmentSubtitle: 'Deep Neural Insight Pattern Analysis in Progress',
       analyzingTitle: 'Analyse en cours...',
@@ -341,36 +339,30 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
   const handleAssessmentComplete = async (finalScores: Big5Profile) => {
     setStep(Step.ANALYZING);
 
-    if (USE_DEMO_ASSESSMENT) {
-      await new Promise(resolve => setTimeout(resolve, 1400));
-      const demoAdvice = DEMO_AI_ADVICE_BY_LANG[assessmentLanguage] || DEMO_AI_ADVICE_BY_LANG.jp;
-      const demoProfile: AssessmentProfile = {
-        scores: finalScores,
-        personalityType: 'character/openness',
-        learningStyle: demoAdvice.learningStrategy.title,
-        motivation: demoAdvice.learningStrategy.approach,
-        completedAt: new Date().toISOString(),
-        aiAdvice: demoAdvice
-      };
-      persistAssessmentProfile(demoProfile);
-      setProfile(demoProfile);
-      setGlobalProfile(finalScores);
-      setStep(Step.INTRO);
-      return;
+    // Server-side analysis (/api/v2/llm). If the AI is unavailable, the built-in profile text
+    // for the chosen language keeps the results screen useful.
+    let advice: AIAdvice & { personalityType?: string };
+    try {
+      const [insight] = await Promise.all([
+        analyzePersonality(finalScores, { locale: toLlmLocale(assessmentLanguage) }),
+        new Promise(resolve => setTimeout(resolve, MIN_ANALYZING_MS)),
+      ]);
+      advice = insight;
+    } catch (error) {
+      console.warn('Personality analysis unavailable, using built-in profile text:', error);
+      advice = DEMO_AI_ADVICE_BY_LANG[assessmentLanguage] || DEMO_AI_ADVICE_BY_LANG.jp;
     }
 
     try {
-      // Gemini API で分析を実行
-      const advice = await analyzePersonality(finalScores);
-      console.log("Gemini Advice:", advice);
-      
+      // personalityType is a lookup key for the result visuals, not the AI's free-text label.
+      const { personalityType: _label, ...aiAdvice } = advice;
       const newProfile: AssessmentProfile = {
         scores: finalScores,
-        personalityType: (advice?.personalityType || 'バランサー') as PersonalityType,
-        learningStyle: advice?.learningStrategy?.title || 'バランス型学習',
-        motivation: advice?.learningStrategy?.approach || '継続的な改善',
+        personalityType: 'character/openness' as PersonalityType,
+        learningStyle: aiAdvice.learningStrategy?.title || 'バランス型学習',
+        motivation: aiAdvice.learningStrategy?.approach || '継続的な改善',
         completedAt: new Date().toISOString(),
-        aiAdvice: advice
+        aiAdvice
       };
 
       persistAssessmentProfile(newProfile);
@@ -426,9 +418,6 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
             <span>{labels.overviewCta}</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
-          <p className="mt-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            {labels.poweredBy}
-          </p>
         </div>
       </div>
     );

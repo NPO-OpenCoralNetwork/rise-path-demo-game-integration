@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { retrieveContext } from "./ragService.js";
 import fs from 'fs/promises';
+import { MODEL_IDS } from "./llm/models.config.js";
 
 const getApiKey = () => {
   const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
@@ -51,7 +52,7 @@ export const analyzeDocumentWithGemini = async (filePath, mimeType) => {
     `;
 
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: MODEL_IDS.gemini.flash,
       contents: [{
         role: "user",
         parts: [
@@ -86,7 +87,7 @@ export const generateImageWithGemini = async ({
   console.log(`[Gemini Image] config: aspectRatio=${aspectRatio} imageSize=${imageSize}`);
 
   const response = await genAI.models.generateContent({
-    model: "gemini-3-pro-image-preview",
+    model: MODEL_IDS.gemini.image,
     contents: prompt,
     config: {
       responseModalities: ["TEXT", "IMAGE"],
@@ -322,7 +323,7 @@ export const generateRequirements = async (message, attachments = [], userId) =>
 
   try {
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: MODEL_IDS.gemini.flash,
       systemInstruction: `
         You are an expert Learning Concierge. 
         Your goal is to analyze the user's request and extract structured learning requirements.
@@ -368,7 +369,7 @@ export const generateRoadmap = async (requirements) => {
 
   try {
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: MODEL_IDS.gemini.flash,
       systemInstruction: `
         You are a Curriculum Architect.
         Create a high-level roadmap based on the provided requirements.
@@ -597,7 +598,7 @@ Create content that learners will LOVE and recommend to others!
 
   try {
     const result = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: MODEL_IDS.gemini.flash,
       systemInstruction: systemInstruction,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {

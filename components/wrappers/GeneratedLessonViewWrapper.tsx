@@ -13,6 +13,29 @@ import {
 } from '../../services/curriculumAdapter';
 import { reportNexloomLessonCompletion, toNexloomLessonPayload } from '../../services/nexloomWorldsBridge';
 
+const copy = {
+  en: {
+    loading: 'Loading lesson...',
+    noCourseId: 'No course ID provided',
+    noLessons: 'No lessons found in this curriculum',
+    loadFailed: 'Failed to load course',
+    notFound: 'Lesson not found',
+    notFoundBody: "The lesson you're looking for doesn't exist or couldn't be loaded.",
+    backToMyContent: 'Back to My Content',
+  },
+  jp: {
+    loading: 'レッスンを読み込み中...',
+    noCourseId: 'コースIDが指定されていません',
+    noLessons: 'このカリキュラムにはレッスンがありません',
+    loadFailed: 'コースを読み込めませんでした',
+    notFound: 'レッスンが見つかりません',
+    notFoundBody: 'お探しのレッスンは存在しないか、読み込めませんでした。',
+    backToMyContent: 'マイコンテンツに戻る',
+  },
+} as const;
+
+type LessonError = 'noCourseId' | 'noLessons' | 'loadFailed';
+
 const GeneratedLessonViewWrapper: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
@@ -24,7 +47,8 @@ const GeneratedLessonViewWrapper: React.FC = () => {
   const [currentLesson, setCurrentLesson] = useState<GeneratedLesson | null>(null);
   const [lessonIndex, setLessonIndex] = useState<{ module: number; lesson: number }>({ module: 0, lesson: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LessonError | null>(null);
+  const t = copy[language];
 
   // Get lesson ID from URL params (optional)
   const lessonIdParam = searchParams.get('lesson');
@@ -33,7 +57,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
 
   useEffect(() => {
     if (!courseId) {
-      setError("No course ID provided");
+      setError('noCourseId');
       setLoading(false);
       return;
     }
@@ -46,12 +70,8 @@ const GeneratedLessonViewWrapper: React.FC = () => {
 
     fetchGeneratedCourseById(courseId)
       .then((rawCourse) => {
-        console.log('[LessonWrapper] Raw course data:', rawCourse);
-
         // Convert to V2 format using adapter
         const converted = convertToGeneratedCurriculumV2(rawCourse as any, courseId);
-        console.log('[LessonWrapper] Converted curriculum:', converted);
-
         setCurriculum(converted);
 
         // Determine which lesson to show
@@ -81,13 +101,10 @@ const GeneratedLessonViewWrapper: React.FC = () => {
           setCurrentLesson(converted.modules[0].lessons[0]);
           setLessonIndex({ module: 0, lesson: 0 });
         } else {
-          setError("No lessons found in this curriculum");
+          setError('noLessons');
         }
       })
-      .catch((err) => {
-        console.error('[LessonWrapper] Error loading course:', err);
-        setError("Failed to load course");
-      })
+      .catch(() => setError('loadFailed'))
       .finally(() => setLoading(false));
   }, [courseId, lessonIdParam, moduleIndexParam, lessonIndexParam]);
 
@@ -164,7 +181,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 font-medium">Loading lesson...</p>
+          <p className="text-slate-500 font-medium">{t.loading}</p>
         </div>
       </div>
     );
@@ -173,15 +190,16 @@ const GeneratedLessonViewWrapper: React.FC = () => {
   // Error state
   if (error || !currentLesson || !curriculum) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center max-w-md">
-          <h2 className="text-2xl font-bold text-red-500 mb-4">{error || "Lesson not found"}</h2>
-          <p className="text-slate-500 mb-6">The lesson you're looking for doesn't exist or couldn't be loaded.</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="text-center max-w-md" role="alert">
+          <h2 className="text-2xl font-bold text-danger mb-4">{error ? t[error] : t.notFound}</h2>
+          <p className="text-slate-500 mb-6">{t.notFoundBody}</p>
           <button
+            type="button"
             onClick={() => navigate('/my-content')}
             className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all"
           >
-            Back to My Content
+            {t.backToMyContent}
           </button>
         </div>
       </div>
@@ -191,7 +209,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
   // Get localized title for the header
   const courseTitle = typeof curriculum.title === 'string'
     ? curriculum.title
-    : (curriculum.title.jp || curriculum.title.en || 'Generated Curriculum');
+    : (curriculum.title[language] || curriculum.title.jp || curriculum.title.en || undefined);
   const handleComplete = () => {
     if (currentLesson) {
       void reportNexloomLessonCompletion({

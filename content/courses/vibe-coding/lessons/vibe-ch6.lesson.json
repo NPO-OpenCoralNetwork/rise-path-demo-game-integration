@@ -1,0 +1,217 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch6",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第6章｜Gemini CLIによるバイブコーディング",
+    "en": "Chapter 6 | Vibe Coding with Gemini CLI"
+  },
+  "subtitle": {
+    "jp": "チャット画面を飛び出し、自然言語でコードベースに直接ロジックを実装する。",
+    "en": "Moving beyond chat. Implementing logic directly into your codebase with natural language."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 30,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "6-1",
+      "title": {
+        "jp": "6-1. なぜCLIなのか？コピペ地獄からの解放",
+        "en": "6-1. Why CLI? No More Copy-Paste"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "これまでは、ブラウザで生成されたコードをコピーし、VSCodeにペーストしていました。**Gemini CLI** を使えば、AIがあなたのターミナルの中に住み着きます。AIはあなたのファイルを読み、直接編集してくれます。",
+            "en": "Until now, you had to copy code from the browser and paste it into VSCode. With **Gemini CLI**, the AI lives *inside* your terminal. It reads your files and edits them directly."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "graph LR\n    Human[You] -- \"Fix the bug\" --> CLI[Gemini CLI]\n    CLI -- Read --> File[Source Code]\n    CLI -- Edit --> File\n    File -- Run --> App[Application]",
+          "caption": {
+            "jp": "直接操作のワークフロー",
+            "en": "Direct Manipulation Workflow"
+          },
+          "alt": {
+            "jp": "直接操作のワークフロー",
+            "en": "Direct Manipulation Workflow"
+          }
+        }
+      ]
+    },
+    {
+      "id": "6-2",
+      "title": {
+        "jp": "6-2. 導入とセットアップ",
+        "en": "6-2. Installation & Setup"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "用意するものは、APIキーとターミナルの2つです。",
+            "en": "You need two things: an API key and a terminal."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "code",
+          "lang": "bash",
+          "filename": "Terminal",
+          "code": "# 1. Install the tool (Example command)\nnpm install -g @google/gemini-cli\n\n# 2. Set your API Key\nexport GEMINI_API_KEY=\"AIzaSy...\"\n\n# 3. Start coding!\ngemini \"Create a simple Express server\""
+        },
+        {
+          "id": "s2-b3",
+          "type": "callout",
+          "variant": "warning",
+          "title": {
+            "jp": "セキュリティの注意点",
+            "en": "Security Note"
+          },
+          "md": {
+            "jp": "APIキーは絶対にGitHubにコミットしないでください。必ず環境変数（.env）を使用するか、シェルセッションでexportしてください。",
+            "en": "Never commit your API Key to GitHub. Always use environment variables (.env) or export it in your shell session."
+          }
+        }
+      ]
+    },
+    {
+      "id": "6-3",
+      "title": {
+        "jp": "6-3. 自然言語でコードを実装する",
+        "en": "6-3. Coding with Natural Language"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "あなたはコードを書くのではなく、「意図」を書きます。構文はCLIが処理します。",
+            "en": "You don't write code; you write 'intent'. The CLI handles the syntax."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "リファクタリング",
+                "en": "Refactoring"
+              },
+              "md": {
+                "jp": "'user.ts を async/await を使うように書き換えて'",
+                "en": "'Refactor user.ts to use async/await'"
+              }
+            },
+            {
+              "term": {
+                "jp": "バグ修正",
+                "en": "Bug Fix"
+              },
+              "md": {
+                "jp": "'50行目でTypeErrorが出るんだけど、直して'",
+                "en": "'I get a TypeError on line 50. Fix it.'"
+              }
+            },
+            {
+              "term": {
+                "jp": "機能追加",
+                "en": "Feature Add"
+              },
+              "md": {
+                "jp": "'ヘッダーにダークモード切り替えボタンを追加して'",
+                "en": "'Add a dark mode toggle to the header'"
+              }
+            }
+          ]
+        },
+        {
+          "id": "s3-b3",
+          "type": "code",
+          "lang": "bash",
+          "filename": "Example Session",
+          "code": "$ gemini \"Add a validation check for email format in signup.ts\"\n> Reading signup.ts...\n> Analyzing context...\n> Applied changes to signup.ts\n> Done."
+        }
+      ]
+    },
+    {
+      "id": "6-4",
+      "title": {
+        "jp": "6-4. フロントとバックを接続する",
+        "en": "6-4. Connecting Frontend and Backend"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "CLIの真価は、複数ファイルの編集で発揮されます。新しいReactフォームを作成し、それをNode.jsのAPIに接続するといった作業を一括で依頼できます。",
+            "en": "The real power of CLI shines when editing multiple files. You can ask it to connect your new React form to your Node.js API."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "sequenceDiagram\n    participant User\n    participant CLI\n    participant React\n    participant Node\n    User->>CLI: \"Connect Login Form to /api/login\"\n    CLI->>React: Update handleSubmit()\n    CLI->>Node: Update app.post('/login')\n    CLI-->>User: \"Connected!\"",
+          "caption": {
+            "jp": "複数ファイルの一括編集",
+            "en": "Multi-file Editing"
+          },
+          "alt": {
+            "jp": "複数ファイルの一括編集",
+            "en": "Multi-file Editing"
+          }
+        },
+        {
+          "id": "s4-b3",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "バイブチェック",
+            "en": "Vibe Check"
+          },
+          "md": {
+            "jp": "コミットする前に、必ず `git diff` で変更内容を確認してください。AIは強力ですが、完璧ではありません。",
+            "en": "Always verify the changes with `git diff` before committing. AI is powerful but not perfect."
+          }
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration+claude-code",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter6.ts",
+      "export": "VIBE_CHAPTER_6_DATA",
+      "counts": {
+        "sections": 4,
+        "blocks": 11,
+        "tableRows": 0,
+        "quizQuestions": 0,
+        "text": 4,
+        "mermaid": 2,
+        "code": 2,
+        "callout": 2,
+        "list": 1
+      }
+    }
+  }
+}

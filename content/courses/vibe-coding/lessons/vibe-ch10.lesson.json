@@ -1,0 +1,217 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch10",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第10章｜応用：ゲーム・サービス開発へ",
+    "en": "Chapter 10 | Advanced Application: From Static to Dynamic"
+  },
+  "subtitle": {
+    "jp": "静的なWebサイトを超えて。AIと共に、インタラクティブなゲームやリアルタイムサービスを構築する。",
+    "en": "Moving beyond simple websites. Building interactive games and real-time services with AI."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 30,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "10-1",
+      "title": {
+        "jp": "10-1. ゲーム開発に応用する流れ",
+        "en": "10-1. Game Development Flow"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "ゲーム開発は「状態管理」の究極のテストです。Webサイトと違い、ゲームには1秒間に60回実行される「ゲームループ」が存在します。",
+            "en": "Game development is the ultimate test of \"State Management.\" Unlike websites, games have a \"Game Loop\" that runs 60 times a second."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "prompt",
+          "title": "Game Prompt Example",
+          "prompt": "Create a simple \"Clicker Game\" using React + Tailwind.\n\nRequirements:\n- A big button in the center.\n- A score counter that increases when clicked.\n- \"Upgrades\" shop that appears when score reaches 100.\n- An upgrade automatically adds +1 score every second (useEffect).\n- Use framer-motion for satisfying click animations."
+        },
+        {
+          "id": "s1-b3",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "小さく始める",
+            "en": "Start Small"
+          },
+          "md": {
+            "jp": "いきなり「MMORPG」を頼まないでください。「数字が増えるボタン」から始めてください。AIは小さな論理的ステップの積み重ねが得意です。",
+            "en": "Do not ask for \"MMORPG\". Ask for \"A button that increases a number\". AI excels at small, logical steps."
+          }
+        }
+      ]
+    },
+    {
+      "id": "10-2",
+      "title": {
+        "jp": "10-2. リアルタイム処理の考え方",
+        "en": "10-2. Thinking in Real-time"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "静的なアプリは更新（リロード）を待ちますが、リアルタイムアプリは即座に反応します。Supabaseを使えば、これが驚くほど簡単に実装できます。",
+            "en": "Static apps wait for a refresh. Real-time apps update instantly. Supabase makes this easy."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "sequenceDiagram\n    participant User A\n    participant Supabase\n    participant User B\n    User A->>Supabase: Send Message \"Hello\"\n    Supabase-->>User A: Broadcast \"Hello\"\n    Supabase-->>User B: Broadcast \"Hello\"\n    Note over User B: UI updates instantly without reload",
+          "caption": {
+            "jp": "リアルタイム・ブロードキャストの流れ",
+            "en": "Real-time Broadcast Flow"
+          },
+          "alt": {
+            "jp": "リアルタイム・ブロードキャストの流れ",
+            "en": "Real-time Broadcast Flow"
+          }
+        },
+        {
+          "id": "s2-b3",
+          "type": "markdown",
+          "md": {
+            "jp": "AIへの指示：「Supabase Realtimeを使って 'messages' テーブルを購読し、新しい行が追加されたらチャットリストを更新して」",
+            "en": "You can ask AI: \"Use Supabase Realtime to subscribe to the 'messages' table and update the chat list when a new row is inserted.\""
+          }
+        }
+      ]
+    },
+    {
+      "id": "10-3",
+      "title": {
+        "jp": "10-3. UI/UXをAIと磨く",
+        "en": "10-3. Polishing UI/UX with AI"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "動くだけでは不十分です。アプリには「手触り（Juice）」が必要です。AIはアニメーションやマイクロインタラクションを追加するのが得意です。",
+            "en": "A working app is not enough. It needs \"Juice\" (satisfaction). AI is great at adding animations and micro-interactions."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "動き",
+                "en": "Motion"
+              },
+              "md": {
+                "jp": "「Framer Motionを使って、ボタンクリック時にバウンドするエフェクトを追加して」",
+                "en": "\"Add a bounce effect when the button is clicked using Framer Motion.\""
+              }
+            },
+            {
+              "term": {
+                "jp": "待機",
+                "en": "Loading"
+              },
+              "md": {
+                "jp": "「'Loading...'という文字を、光るスケルトンローダーに置き換えて」",
+                "en": "\"Replace the text 'Loading...' with a spinning skeleton loader.\""
+              }
+            },
+            {
+              "term": {
+                "jp": "通知",
+                "en": "Toast"
+              },
+              "md": {
+                "jp": "「保存完了時、右上に成功トースト通知を出して」",
+                "en": "\"Show a success toast notification at the top right when saved.\""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10-4",
+      "title": {
+        "jp": "10-4. 小さく作って公開する戦略",
+        "en": "10-4. Strategy: \"Ship It\""
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "バイブコーディングのゴールは、コードを書くことではなく、**価値を届けること**です。永遠に磨き続けてはいけません。「ベータ版」として世に出しましょう。",
+            "en": "The goal of Vibe Coding is not to write code, but to **deliver value**. Don't polish forever. Ship the \"Beta\"."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "graph LR\n    Idea[Idea] --> AI[Vibe Coding]\n    AI --> Deploy[Vercel/Supabase]\n    Deploy --> Feedback[User Feedback]\n    Feedback --> Iterate[Refine with AI]\n    Iterate --> Deploy",
+          "caption": {
+            "jp": "バイブ・サイクル",
+            "en": "The Vibe Cycle"
+          },
+          "alt": {
+            "jp": "バイブ・サイクル",
+            "en": "The Vibe Cycle"
+          }
+        },
+        {
+          "id": "s4-b3",
+          "type": "callout",
+          "variant": "success",
+          "title": {
+            "jp": "あなたのポートフォリオ",
+            "en": "Your Portfolio"
+          },
+          "md": {
+            "jp": "デプロイされたアプリは、たとえ単純なものであっても、100個の「未完成プロジェクト」より価値があります。URLをSNSでシェアしましょう。あなたの「バイブ」を世界に見せるのです。",
+            "en": "A deployed app, even a simple one, is worth 100 unfinished projects. Share the URL on X (Twitter). Let the world see your Vibe."
+          }
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter10.ts",
+      "export": "VIBE_CHAPTER_10_DATA",
+      "counts": {
+        "sections": 4,
+        "blocks": 11,
+        "tableRows": 0,
+        "quizQuestions": 0,
+        "text": 5,
+        "code": 1,
+        "callout": 2,
+        "mermaid": 2,
+        "list": 1
+      }
+    }
+  }
+}

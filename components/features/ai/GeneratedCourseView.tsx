@@ -40,18 +40,11 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
     const [activeChapter, setActiveChapter] = useState<number | null>(null);
     const [isNavigating, setIsNavigating] = useState(false);
     const navTimerRef = useRef<number | null>(null);
-    console.log("GeneratedCourseView: Rendering with course:", {
-        id: course.id,
-        title: course.title,
-        chaptersCount: course.chapters?.length,
-    });
 
     const copy = {
         en: {
             back: 'Back to Courses',
-            generatedWith: 'Generated with',
-            modelPro: 'Gemini 3.0 Pro',
-            modelFlash: 'Gemini 2.0 Flash',
+            aiGenerated: 'AI-generated course',
             start: 'Start Learning',
             share: 'Share',
             encyclopedia: 'Encyclopedia',
@@ -60,9 +53,7 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
         },
         jp: {
             back: 'コース一覧に戻る',
-            generatedWith: '生成モデル',
-            modelPro: 'Gemini 3.0 Pro',
-            modelFlash: 'Gemini 2.0 Flash',
+            aiGenerated: 'AI生成コース',
             start: '学習を開始',
             share: '共有',
             encyclopedia: '図鑑',
@@ -73,7 +64,6 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
     const t = copy[language];
 
     const handleStartClick = () => {
-        console.log("Start Learning clicked");
         const firstChapter = course.chapters?.[0] as any;
         const moduleIndex = firstChapter?._moduleIndex ?? 0;
         const lessonIndex = firstChapter?._lessonIndex ?? 0;
@@ -83,7 +73,6 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
     const handleChapterClick = (chapterIndex: number) => {
         if (isNavigating) return;
         const chapter: any = course.chapters[chapterIndex];
-        console.log("Chapter clicked:", chapterIndex);
         setActiveChapter(chapterIndex);
         setIsNavigating(true);
         navTimerRef.current = window.setTimeout(() => {
@@ -109,16 +98,13 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent"></div>
 
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 pt-10 sm:pt-12 pb-20 sm:pb-24 relative z-10">
-                    <button onClick={onBack} className="flex items-center gap-2 text-slate-300 hover:text-white mb-8 transition-colors">
-                        <ArrowLeft size={20} /> {t.back}
+                    <button type="button" onClick={onBack} className="flex items-center gap-2 text-slate-300 hover:text-white mb-8 transition-colors">
+                        <ArrowLeft size={20} aria-hidden="true" /> {t.back}
                     </button>
 
                     <div className="flex flex-wrap items-center gap-3 mb-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border backdrop-blur ${course.modelUsed === 'pro'
-                            ? 'bg-purple-500/80 border-purple-400/50'
-                            : 'bg-indigo-500/80 border-indigo-400/50'
-                            }`}>
-                            {t.generatedWith} {course.modelUsed === 'pro' ? t.modelPro : t.modelFlash}
+                        <span className="px-3 py-1 rounded-full text-xs font-bold border backdrop-blur bg-indigo-500/80 border-indigo-400/50 flex items-center gap-1">
+                            <Sparkles size={12} aria-hidden="true" /> {t.aiGenerated}
                         </span>
                         <span className="bg-white/10 backdrop-blur px-3 py-1 rounded-full text-xs font-bold border border-white/10 flex items-center gap-1"><Clock size={12} /> {course.duration}</span>
                     </div>
@@ -213,6 +199,14 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
                                         activeChapter === index ? 'path-card-active' : ''
                                     }`}
                                     onClick={() => handleChapterClick(index)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleChapterClick(index);
+                                        }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
                                 >
                                     <div className="path-card-glow" aria-hidden="true" />
                                     {/* Node */}

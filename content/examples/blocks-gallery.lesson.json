@@ -1,0 +1,1234 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "blocks-gallery",
+  "title": {
+    "jp": "ブロック見本帳",
+    "en": "Block gallery"
+  },
+  "subtitle": {
+    "jp": "Rise Path の教材ブロックを、実際の見た目と操作で確かめる",
+    "en": "Every Rise Path lesson block, as learners see and use it"
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "level": "beginner",
+  "estMinutes": 15,
+  "prerequisites": [
+    {
+      "jp": "risepath.lesson/v1 の概要（doc/brushup-2026/PLAN.ja.md §5）",
+      "en": "The risepath.lesson/v1 overview (doc/brushup-2026/PLAN.ja.md §5)"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": {
+        "jp": "段落・リスト・用語のブロックを、内容に合わせて使い分けられる",
+        "en": "Choose paragraph, list and glossary blocks to fit the content"
+      },
+      "bloom": "apply"
+    },
+    {
+      "id": "o2",
+      "text": {
+        "jp": "図と表に必要な情報（キャプションと代替テキスト）を説明できる",
+        "en": "Explain what figures and tables need: a caption and alt text"
+      },
+      "bloom": "understand"
+    },
+    {
+      "id": "o3",
+      "text": {
+        "jp": "確認問題・プロンプト・手順のブロックを、学習者の操作に合わせて選べる",
+        "en": "Pick quiz, prompt and steps blocks for what the learner should do"
+      },
+      "bloom": "apply"
+    }
+  ],
+  "glossary": [
+    {
+      "term": {
+        "jp": "ブロック",
+        "en": "block"
+      },
+      "md": {
+        "jp": "レッスンを組み立てる部品。段落、図、コード、確認問題などの種類があり、`type` で区別する。",
+        "en": "A building piece of a lesson: a paragraph, figure, code, check and so on, told apart by its `type`."
+      },
+      "aliases": [
+        "blocks",
+        "ブロック型"
+      ]
+    },
+    {
+      "term": {
+        "jp": "lint",
+        "en": "lint"
+      },
+      "md": {
+        "jp": "教材の読みやすさと教え方のルールを機械的に確かめるチェック。`npm run lessons:lint` で実行する。",
+        "en": "An automatic check of the readability and teaching rules. Run it with `npm run lessons:lint`."
+      },
+      "aliases": [
+        "リント"
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": {
+        "jp": "はじめに：教材はブロックでできている",
+        "en": "Start here: lessons are made of blocks"
+      },
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": {
+            "jp": "Rise Path のレッスンは、段落・図・コード・確認問題などの[[ブロック]]を並べて作ります。このページは、すべてのブロックを実際の見た目で確かめるための見本帳です。",
+            "en": "Every Rise Path lesson is a row of [[block|blocks]]: paragraphs, figures, code, checks and more. This page is the sample book that shows each one as learners see it."
+          }
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "questions": [
+            {
+              "id": "hook-q1",
+              "prompt": {
+                "jp": "教材の中で、AIへの指示文の例を見せるのに使うブロックはどれだと思いますか？",
+                "en": "Which block do you think shows an example instruction for an AI?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "`code` ブロック",
+                    "en": "The `code` block"
+                  },
+                  "feedback": {
+                    "jp": "コードと同じ見た目だと、指示文だと気づきにくくなります。",
+                    "en": "Looking like code hides the fact that it is an instruction."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "`prompt` ブロック",
+                    "en": "The `prompt` block"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "`callout` ブロック",
+                    "en": "The `callout` block"
+                  },
+                  "feedback": {
+                    "jp": "callout は補足のためのブロックで、コピーの機能はありません。",
+                    "en": "A callout is for side notes; it cannot be copied as a prompt."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "AIへの指示は `prompt` ブロックで書きます。`{{変数}}` を書き換えてコピーでき、Claude Code 用のコマンドにもなります。",
+                "en": "Instructions for an AI go in a `prompt` block. Learners fill in its `{{variables}}`, copy it, or copy it as a Claude Code command."
+              },
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prose",
+      "title": {
+        "jp": "1. 文章のブロック",
+        "en": "1. Blocks for prose"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "prose-md",
+          "type": "markdown",
+          "md": {
+            "jp": "本文は `markdown` ブロックで書きます。**太字**、`インラインコード`、[外部リンク](https://developer.mozilla.org/ja/docs/Web/HTML)、用語へのリンク [[lint]] が使えます。\n\n1つの段落は160字以内、1文は60字以内を目安にします。段落にカーソルを合わせると、右側に ✦ が出ます。",
+            "en": "Body text goes in a `markdown` block. It supports **bold**, `inline code`, [external links](https://developer.mozilla.org/en-US/docs/Web/HTML) and glossary links such as [[lint]].\n\nKeep a paragraph under 80 words. Hover a paragraph to reveal the ✦ ask button on its right."
+          }
+        },
+        {
+          "id": "prose-quote",
+          "type": "markdown",
+          "style": "quote",
+          "md": {
+            "jp": "良い教材は、読む・考える・確かめるを短い間隔でくり返します。",
+            "en": "Good lessons loop through reading, thinking and checking in short steps."
+          }
+        },
+        {
+          "id": "prose-analogy",
+          "type": "callout",
+          "variant": "analogy",
+          "title": {
+            "jp": "たとえるなら",
+            "en": "Think of it like this"
+          },
+          "md": {
+            "jp": "ブロックはレゴの部品のようなものです。形が決まっているので、だれが組み立てても同じように表示されます。",
+            "en": "Blocks are like LEGO bricks. Each has a fixed shape, so a lesson looks the same whoever builds it."
+          }
+        },
+        {
+          "id": "prose-list",
+          "type": "list",
+          "style": "bullet",
+          "items": [
+            {
+              "jp": "段落は `markdown`",
+              "en": "Paragraphs: `markdown`"
+            },
+            {
+              "jp": "補足や注意は `callout`",
+              "en": "Side notes and warnings: `callout`"
+            },
+            {
+              "jp": "並んだ項目は `list`",
+              "en": "Items in a row: `list`"
+            }
+          ]
+        },
+        {
+          "id": "prose-defs",
+          "type": "definitions",
+          "items": [
+            {
+              "term": {
+                "jp": "レッスン",
+                "en": "Lesson"
+              },
+              "md": {
+                "jp": "1回で学び終える単位。15〜20分が目安。",
+                "en": "One sitting of learning, about 15–20 minutes."
+              }
+            },
+            {
+              "term": {
+                "jp": "セクション",
+                "en": "Section"
+              },
+              "md": {
+                "jp": "見出しの付いたブロックのまとまり。目次に1行ずつ並ぶ。",
+                "en": "A titled group of blocks; one row in the contents."
+              }
+            },
+            {
+              "term": {
+                "jp": "ブロック",
+                "en": "Block"
+              },
+              "md": {
+                "jp": "セクションの中に並ぶ部品。`type` で種類が決まる。",
+                "en": "A piece inside a section; its `type` decides what it is."
+              }
+            }
+          ]
+        },
+        {
+          "id": "prose-tip",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "書き分けのコツ",
+            "en": "Tip"
+          },
+          "md": {
+            "jp": "「**用語**：説明」の形が続くリストは、`definitions` ブロックに置き換えると読みやすくなります。",
+            "en": "A list where every item reads \"**Term**: description\" is easier to read as a `definitions` block."
+          }
+        },
+        {
+          "id": "prose-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "prose-q1",
+              "prompt": {
+                "jp": "日本語の1つの段落の長さは、何字以内が目安でしょう？",
+                "en": "What is the length limit for one Japanese paragraph?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "80字",
+                    "en": "80 characters"
+                  },
+                  "feedback": {
+                    "jp": "80字だと短すぎて、説明が細切れになりがちです。",
+                    "en": "80 is too short; explanations get chopped into pieces."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "160字",
+                    "en": "160 characters"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "400字",
+                    "en": "400 characters"
+                  },
+                  "feedback": {
+                    "jp": "400字は画面で5〜6行になり、読み飛ばされやすくなります。",
+                    "en": "400 characters fill five or six lines, and readers start to skim."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "160字はおよそ3〜4行です。それより長くなったら、段落を分けるか、リストや表に置き換えます。",
+                "en": "160 characters is about three or four lines. Anything longer is split, or turned into a list or a table."
+              },
+              "hint": {
+                "jp": "スマートフォンの画面で、3〜4行に収まる長さを考えてみましょう。",
+                "en": "Think of what fits in three or four lines on a phone."
+              },
+              "objectiveId": "o1",
+              "bloom": "remember"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "visuals",
+      "title": {
+        "jp": "2. 表・図・画像",
+        "en": "2. Tables, figures and images"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "visuals-md",
+          "type": "markdown",
+          "md": {
+            "jp": "比べる情報は表に、流れや関係は図にします。図と画像には番号が自動で付き、本文から「図1」のように参照できます。",
+            "en": "Comparisons go in a table; flows and relations go in a figure. Figures and images are numbered for you, so the text can say \"Figure 1\"."
+          }
+        },
+        {
+          "id": "visuals-table",
+          "type": "table",
+          "caption": {
+            "jp": "見せ方のブロックと決まりごと",
+            "en": "Visual blocks and their rules"
+          },
+          "columns": [
+            {
+              "jp": "ブロック",
+              "en": "Block"
+            },
+            {
+              "jp": "使う場面",
+              "en": "Use it for"
+            },
+            {
+              "jp": "決まりごと",
+              "en": "Rules"
+            }
+          ],
+          "rows": [
+            [
+              {
+                "jp": "`table`",
+                "en": "`table`"
+              },
+              {
+                "jp": "項目を比べる",
+                "en": "Comparing items"
+              },
+              {
+                "jp": "6列まで、キャプションを付ける",
+                "en": "Up to 6 columns, with a caption"
+              }
+            ],
+            [
+              {
+                "jp": "`diagram`",
+                "en": "`diagram`"
+              },
+              {
+                "jp": "流れや関係を見せる",
+                "en": "Showing a flow or a relation"
+              },
+              {
+                "jp": "ノード12個まで、キャプションと alt",
+                "en": "Up to 12 nodes, caption and alt"
+              }
+            ],
+            [
+              {
+                "jp": "`image`",
+                "en": "`image`"
+              },
+              {
+                "jp": "画面や実物を見せる",
+                "en": "Showing a real screen or object"
+              },
+              {
+                "jp": "alt 必須、飾りの画像は使わない",
+                "en": "Alt required, no decorative images"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "visuals-flow",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "flowchart LR\n  A[下書きを書く] --> B[validate で検証]\n  B --> C[lint で読みやすさを確認]\n  C --> D[プレビューで見た目を確認]\n  D --> E((公開))",
+            "en": "flowchart LR\n  A[Write a draft] --> B[Validate the schema]\n  B --> C[Lint for readability]\n  C --> D[Preview the page]\n  D --> E((Publish))"
+          },
+          "caption": {
+            "jp": "教材を公開するまでの流れ",
+            "en": "From draft to published lesson"
+          },
+          "alt": {
+            "jp": "下書き、検証、lint、プレビュー、公開の5段階が左から右へ矢印でつながっている図",
+            "en": "Five steps joined by arrows from left to right: draft, validate, lint, preview, publish"
+          },
+          "description": {
+            "jp": "最初に下書きを書き、`validate` でスキーマを検証します。次に `lint` で読みやすさのルールを確かめ、プレビューで見た目を確認してから公開します。",
+            "en": "Write a draft, then `validate` the schema. Next, `lint` checks the readability rules, and a preview shows the page before you publish."
+          }
+        },
+        {
+          "id": "visuals-info",
+          "type": "callout",
+          "variant": "info",
+          "title": {
+            "jp": "図の決まりごと",
+            "en": "Figure rules"
+          },
+          "md": {
+            "jp": "図には必ずキャプションと代替テキスト（alt）を付けます。alt は画面読み上げで、図の代わりに読まれます。",
+            "en": "Every figure needs a caption and alt text. Screen readers read the alt text in place of the figure."
+          }
+        },
+        {
+          "id": "visuals-image",
+          "type": "image",
+          "src": "/teacher-bot/media/editors_3dview_navigate_introduction_gizmo.png",
+          "alt": {
+            "jp": "Blender の3Dビュー右上にあるナビゲーションギズモ。X・Y・Z 軸の丸いボタンの下に、ズーム・移動・カメラ・グリッドのアイコンが縦に並んでいる。",
+            "en": "Blender's navigation gizmo in the top-right of the 3D view: round X, Y and Z axis buttons above zoom, pan, camera and grid icons."
+          },
+          "caption": {
+            "jp": "画像ブロックの例：Blender のナビゲーションギズモ（スクリーンショット）",
+            "en": "Image block example: Blender's navigation gizmo (screenshot)"
+          }
+        },
+        {
+          "id": "visuals-note",
+          "type": "callout",
+          "variant": "note",
+          "md": {
+            "jp": "画像は最大420pxの高さで表示されます。飾りの写真ではなく、学ぶ内容が写ったスクリーンショットや図を使います。",
+            "en": "Images are shown at most 420px tall. Use screenshots and diagrams that teach, not decorative photos."
+          }
+        },
+        {
+          "id": "visuals-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "visuals-q1",
+              "kind": "multi",
+              "prompt": {
+                "jp": "図のブロックに必ず付けるものを、すべて選んでください。",
+                "en": "Select everything a figure block must have."
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "キャプション",
+                    "en": "A caption"
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "代替テキスト（alt）",
+                    "en": "Alt text"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "背景色の指定",
+                    "en": "A background color"
+                  },
+                  "feedback": {
+                    "jp": "色はリーダーのテーマから自動で決まります。",
+                    "en": "Colors come from the reader theme automatically."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "アニメーション",
+                    "en": "An animation"
+                  },
+                  "feedback": {
+                    "jp": "動きは必須ではなく、むしろ読みにくくなることがあります。",
+                    "en": "Motion is not required and can make figures harder to read."
+                  }
+                }
+              ],
+              "answer": [
+                "a",
+                "b"
+              ],
+              "explanation": {
+                "jp": "キャプションは図の要点を伝え、alt は図を見られない人に内容を伝えます。どちらも欠かせません。",
+                "en": "The caption gives the point of the figure; the alt text carries its content for people who cannot see it. Both are required."
+              },
+              "hint": {
+                "jp": "2つあります。1つは図の下に、もう1つは画面読み上げのためにあります。",
+                "en": "There are two: one sits under the figure, the other is for screen readers."
+              },
+              "objectiveId": "o2",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": {
+        "jp": "3. コードを見せる",
+        "en": "3. Showing code"
+      },
+      "role": "example",
+      "blocks": [
+        {
+          "id": "code-md",
+          "type": "markdown",
+          "md": {
+            "jp": "`code` ブロックは色分けされ、6行以上で行番号が付きます。`highlight` で指定した行は左に線が入り、[✦説明] を押すとその行番号も AI先生に送られます。",
+            "en": "A `code` block is syntax-highlighted and numbered from six lines up. Lines listed in `highlight` get a bar on the left, and ✦ Explain sends their numbers to the AI tutor."
+          }
+        },
+        {
+          "id": "code-ts",
+          "type": "code",
+          "lang": "ts",
+          "filename": "firstTryRate.ts",
+          "code": "type Answer = { attempts: number; correct: boolean };\n\nexport function firstTryRate(answers: Answer[]): number {\n  const answered = answers.filter((a) => a.attempts > 0);\n  if (answered.length === 0) return 0;\n  const firstTry = answered.filter((a) => a.correct && a.attempts === 1);\n  return Math.round((firstTry.length / answered.length) * 100);\n}\n\nfirstTryRate([\n  { attempts: 1, correct: true },\n  { attempts: 2, correct: true },\n]); // → 50",
+          "highlight": [
+            6,
+            7
+          ]
+        },
+        {
+          "id": "code-bash",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "# Check the schema, then the readability rules\nnpm run lessons:validate\nnpm run lessons:lint -- --strict content/examples/blocks-gallery.lesson.json"
+        },
+        {
+          "id": "code-py",
+          "type": "code",
+          "lang": "python",
+          "filename": "review.py",
+          "code": "def next_review(days: int, remembered: bool) -> int:\n    \"\"\"Days until a flashcard comes back.\"\"\"\n    if not remembered:\n        return 1          # \"Again\": see it tomorrow\n    return min(days * 2, 60)  # \"Got it\": wait twice as long\n\n\nprint(next_review(4, True))   # 8\nprint(next_review(4, False))  # 1",
+          "highlight": [
+            4,
+            5
+          ]
+        },
+        {
+          "id": "code-warning",
+          "type": "callout",
+          "variant": "warning",
+          "title": {
+            "jp": "長いコードは分ける",
+            "en": "Split long code"
+          },
+          "md": {
+            "jp": "本文に置くコードは25行以内にします。それより長いときは、大事な部分だけを抜き出して見せます。",
+            "en": "Keep inline code within 25 lines. For longer files, show only the part that matters."
+          }
+        },
+        {
+          "id": "code-pitfall",
+          "type": "callout",
+          "variant": "pitfall",
+          "title": {
+            "jp": "よくある失敗",
+            "en": "Common mistake"
+          },
+          "md": {
+            "jp": "AIへの指示文を `code` ブロックに書くと、lint が `prompt` ブロックへの置き換えを求めます。",
+            "en": "Writing an AI instruction in a `code` block makes lint ask you to use a `prompt` block instead."
+          }
+        },
+        {
+          "id": "code-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "code-q1",
+              "kind": "truefalse",
+              "prompt": {
+                "jp": "コードブロックの [✦説明] を押すと、強調された行の番号も AI先生に送られる。",
+                "en": "Pressing ✦ Explain on a code block also sends the highlighted line numbers to the AI tutor."
+              },
+              "options": [
+                {
+                  "id": "true",
+                  "md": {
+                    "jp": "正しい",
+                    "en": "True"
+                  }
+                },
+                {
+                  "id": "false",
+                  "md": {
+                    "jp": "まちがい",
+                    "en": "False"
+                  },
+                  "feedback": {
+                    "jp": "送られるのはコード全体と、`highlight` で指定した行の番号です。",
+                    "en": "The tutor receives the whole code and the line numbers listed in `highlight`."
+                  }
+                }
+              ],
+              "answer": [
+                "true"
+              ],
+              "explanation": {
+                "jp": "強調行が分かると、AI先生は学習者が注目している部分から説明できます。",
+                "en": "Knowing the highlighted lines lets the tutor start from the part the learner is looking at."
+              },
+              "objectiveId": "o3",
+              "bloom": "remember"
+            }
+          ]
+        },
+        {
+          "id": "code-ask",
+          "type": "askTutor",
+          "suggestions": [
+            {
+              "jp": "強調された2行は何をしている？",
+              "en": "What do the two highlighted lines do?"
+            },
+            {
+              "jp": "attempts === 1 の意味を教えて",
+              "en": "What does attempts === 1 mean?"
+            },
+            {
+              "jp": "Python 版との違いは？",
+              "en": "How does the Python example differ?"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": {
+        "jp": "4. 手を動かすブロック",
+        "en": "4. Hands-on blocks"
+      },
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-md",
+          "type": "markdown",
+          "md": {
+            "jp": "`prompt` の色付きの欄は書き換えられます。[Claude Codeで使う] を押すと、ターミナルに貼り付けて使えるコマンドがコピーされます。",
+            "en": "The colored fields in a `prompt` can be edited. Use in Claude Code copies a command you can paste into a terminal."
+          }
+        },
+        {
+          "id": "practice-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": {
+            "jp": "Claude Code への依頼",
+            "en": "A request for Claude Code"
+          },
+          "prompt": {
+            "jp": "{{対象のファイル}} を読み、{{目的}} ために必要な変更点を3つ挙げてください。まだファイルは変更しないでください。",
+            "en": "Read {{file}} and list three changes needed to {{goal}}. Do not edit any files yet."
+          },
+          "vars": [
+            {
+              "name": "対象のファイル",
+              "hint": {
+                "jp": "例：components/lesson/blocks/CodeBlock.tsx",
+                "en": "e.g. components/lesson/blocks/CodeBlock.tsx"
+              }
+            },
+            {
+              "name": "目的",
+              "hint": {
+                "jp": "例：コピーした後に通知を出す",
+                "en": "e.g. announce the copy to screen readers"
+              }
+            },
+            {
+              "name": "file",
+              "hint": {
+                "jp": "例：components/lesson/blocks/CodeBlock.tsx",
+                "en": "e.g. components/lesson/blocks/CodeBlock.tsx"
+              }
+            },
+            {
+              "name": "goal",
+              "hint": {
+                "jp": "例：コピーした後に通知を出す",
+                "en": "e.g. announce the copy to screen readers"
+              }
+            }
+          ],
+          "expect": {
+            "jp": "変更点が3つ、理由と一緒に箇条書きで返ってくる。ファイルはまだ変更されていない。",
+            "en": "Three changes come back as a list, each with a reason, and no file has been edited yet."
+          },
+          "note": {
+            "jp": "「まだ変更しないで」と書くと、先に計画を確認できます。",
+            "en": "Saying \"do not edit yet\" lets you review the plan first."
+          }
+        },
+        {
+          "id": "practice-prompt-chat",
+          "type": "prompt",
+          "target": "chatgpt",
+          "title": {
+            "jp": "チャットAIへの質問",
+            "en": "A question for a chat AI"
+          },
+          "prompt": {
+            "jp": "中学生にも分かるように、{{用語}} を身近なたとえで説明してください。",
+            "en": "Explain {{term}} with an everyday analogy a 14-year-old would follow."
+          },
+          "vars": [
+            {
+              "name": "用語",
+              "hint": {
+                "jp": "例：API",
+                "en": "e.g. API"
+              }
+            },
+            {
+              "name": "term",
+              "hint": {
+                "jp": "例：API",
+                "en": "e.g. API"
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "step-1",
+              "title": {
+                "jp": "ターミナルを開く",
+                "en": "Open a terminal"
+              },
+              "md": {
+                "jp": "VS Code では、メニューの「ターミナル → 新しいターミナル」からも開けます。",
+                "en": "In VS Code you can also use Terminal → New Terminal."
+              },
+              "keys": [
+                "Ctrl+`"
+              ],
+              "expect": {
+                "jp": "画面の下にターミナルが表示される。",
+                "en": "A terminal opens at the bottom of the window."
+              }
+            },
+            {
+              "id": "step-2",
+              "title": {
+                "jp": "検証コマンドを実行する",
+                "en": "Run the validator"
+              },
+              "md": {
+                "jp": "`npm run lessons:validate` と入力して実行します。",
+                "en": "Type `npm run lessons:validate` and run it."
+              },
+              "keys": [
+                "Enter"
+              ],
+              "expect": {
+                "jp": "最後の行に `no errors` と表示される。",
+                "en": "The last line says `no errors`."
+              },
+              "hint": {
+                "jp": "プロジェクトのフォルダーで実行しているか確かめましょう。",
+                "en": "Check that you are in the project folder."
+              },
+              "troubleshoot": {
+                "jp": "`command not found` と出たら、先に `npm install` を実行します。",
+                "en": "If you see `command not found`, run `npm install` first."
+              }
+            },
+            {
+              "id": "step-3",
+              "title": {
+                "jp": "プレビューで確認する",
+                "en": "Check the preview"
+              },
+              "md": {
+                "jp": "ブラウザで `/dev/blocks?dev=1` を開き、強制再読み込みします。",
+                "en": "Open `/dev/blocks?dev=1` in the browser and force a reload."
+              },
+              "keys": [
+                "Ctrl+Shift+R"
+              ],
+              "expect": {
+                "jp": "すべてのブロックが表示され、赤い警告が出ていない。",
+                "en": "Every block shows up and no red warning appears."
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-list",
+          "type": "list",
+          "style": "number",
+          "items": [
+            {
+              "jp": "書いたら `validate` を実行する",
+              "en": "Run `validate` after writing"
+            },
+            {
+              "jp": "警告が出たら `lint` の指摘を直す",
+              "en": "Fix what `lint` reports"
+            },
+            {
+              "jp": "プレビューで、スマートフォン幅でも確認する",
+              "en": "Check the preview at phone width too"
+            }
+          ]
+        },
+        {
+          "id": "practice-success",
+          "type": "callout",
+          "variant": "success",
+          "title": {
+            "jp": "ここまでできたら",
+            "en": "If you got this far"
+          },
+          "md": {
+            "jp": "検証・lint・プレビューの3つが通れば、教材を公開する準備ができています。",
+            "en": "When validate, lint and the preview all pass, the lesson is ready to publish."
+          }
+        },
+        {
+          "id": "practice-tutor",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "sequenceDiagram\n  actor L as 学習者\n  participant R as リーダー\n  participant T as AI先生\n  L->>R: ✦ を押す\n  R->>T: 段落と質問を送る\n  T-->>L: ヒントを返す（答えはすぐに言わない）",
+            "en": "sequenceDiagram\n  actor L as Learner\n  participant R as Reader\n  participant T as AI tutor\n  L->>R: Press ✦\n  R->>T: Send the paragraph and the question\n  T-->>L: Reply with a hint (not the answer yet)"
+          },
+          "caption": {
+            "jp": "✦ を押したときの流れ",
+            "en": "What happens when you press ✦"
+          },
+          "alt": {
+            "jp": "学習者が ✦ を押すと、リーダーが段落と質問を AI先生に送り、AI先生がヒントを返す流れを示したシーケンス図",
+            "en": "Sequence diagram: the learner presses ✦, the reader sends the paragraph and question to the AI tutor, and the tutor replies with a hint"
+          }
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": {
+            "jp": "公開前のチェックリスト",
+            "en": "Before you publish"
+          },
+          "items": [
+            {
+              "id": "publish-1",
+              "label": {
+                "jp": "学習目標が2〜4個ある",
+                "en": "There are 2–4 objectives"
+              }
+            },
+            {
+              "id": "publish-2",
+              "label": {
+                "jp": "2セクションに1つ以上、確認問題がある",
+                "en": "Every two sections have at least one check"
+              },
+              "md": {
+                "jp": "誤答の選択肢には、それぞれ解説を付けます。",
+                "en": "Each wrong option has its own feedback."
+              }
+            },
+            {
+              "id": "publish-3",
+              "label": {
+                "jp": "図にキャプションと alt がある",
+                "en": "Figures have a caption and alt text"
+              }
+            },
+            {
+              "id": "publish-4",
+              "label": {
+                "jp": "lint --strict の警告が0件",
+                "en": "lint --strict reports nothing"
+              }
+            }
+          ]
+        },
+        {
+          "id": "practice-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "practice-q1",
+              "prompt": {
+                "jp": "学習者に、コマンドを順番に実行してもらいたいときに使うブロックは？",
+                "en": "Which block walks the learner through commands in order?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "`list`（番号付き）",
+                    "en": "`list` (numbered)"
+                  },
+                  "feedback": {
+                    "jp": "番号付きリストには、期待される結果や完了チェックがありません。",
+                    "en": "A numbered list has no expected results or done checks."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "`steps`",
+                    "en": "`steps`"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "`checklist`",
+                    "en": "`checklist`"
+                  },
+                  "feedback": {
+                    "jp": "checklist は確認項目の一覧で、手順の順番やヒントは持ちません。",
+                    "en": "A checklist lists things to verify; it has no order or hints."
+                  }
+                },
+                {
+                  "id": "d",
+                  "md": {
+                    "jp": "`summary`",
+                    "en": "`summary`"
+                  },
+                  "feedback": {
+                    "jp": "summary はレッスンの最後に要点をまとめるブロックです。",
+                    "en": "A summary wraps up the key points at the end."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "`steps` は各ステップに操作キー、期待される結果、うまくいかないときのヒントを持てます。",
+                "en": "`steps` gives every step its keys, an expected result and a hint for when it goes wrong."
+              },
+              "hint": {
+                "jp": "「期待される結果」を書けるブロックはどれでしょう？",
+                "en": "Which block lets you write an expected result?"
+              },
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exam",
+      "title": {
+        "jp": "5. 理解度チェック",
+        "en": "5. Knowledge check"
+      },
+      "role": "check",
+      "blocks": [
+        {
+          "id": "exam-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "questions": [
+            {
+              "id": "exam-q1",
+              "prompt": {
+                "jp": "「**用語**：説明」の形が続く箇条書きは、どのブロックに置き換えるとよい？",
+                "en": "A list where every item is \"**Term**: description\" is better as which block?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "`definitions`",
+                    "en": "`definitions`"
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "`table`",
+                    "en": "`table`"
+                  },
+                  "feedback": {
+                    "jp": "表は複数の列を比べるときに使います。用語と説明の対応には向きません。",
+                    "en": "Tables compare several columns; they are not meant for term–definition pairs."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "`callout`",
+                    "en": "`callout`"
+                  },
+                  "feedback": {
+                    "jp": "callout は補足のためのもので、用語の一覧には使いません。",
+                    "en": "Callouts hold side notes, not lists of terms."
+                  }
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": {
+                "jp": "`definitions` は用語と説明を並べて表示し、用語が折り返されません。",
+                "en": "`definitions` lines terms up with their descriptions and never wraps the term."
+              },
+              "objectiveId": "o1",
+              "bloom": "apply"
+            },
+            {
+              "id": "exam-q2",
+              "prompt": {
+                "jp": "表のブロックに付けると、内容を一言で伝えられるものは？",
+                "en": "What tells readers what a table is about in one line?"
+              },
+              "options": [
+                {
+                  "id": "a",
+                  "md": {
+                    "jp": "列の幅",
+                    "en": "Column widths"
+                  },
+                  "feedback": {
+                    "jp": "列の幅はリーダーが自動で決めます。",
+                    "en": "The reader sets column widths automatically."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "キャプション",
+                    "en": "A caption"
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "背景色",
+                    "en": "A background color"
+                  },
+                  "feedback": {
+                    "jp": "色だけでは意味が伝わらず、テーマによって変わります。",
+                    "en": "Color alone carries no meaning, and it changes with the theme."
+                  }
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": {
+                "jp": "キャプションは表の上に表示され、何を比べた表なのかを伝えます。",
+                "en": "The caption sits with the table and says what it compares."
+              },
+              "objectiveId": "o2",
+              "bloom": "remember"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wrapup",
+      "title": {
+        "jp": "まとめ",
+        "en": "Summary"
+      },
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "wrapup-summary",
+          "type": "summary",
+          "points": [
+            {
+              "jp": "文章は `markdown`、補足は `callout`、用語の対応は `definitions` で書く。",
+              "en": "Prose in `markdown`, side notes in `callout`, term pairs in `definitions`."
+            },
+            {
+              "jp": "図と表には、キャプションと代替テキストを必ず付ける。",
+              "en": "Figures and tables always get a caption and alt text."
+            },
+            {
+              "jp": "AIへの指示は `prompt`、作業の手順は `steps` で見せる。",
+              "en": "AI instructions go in `prompt`, procedures in `steps`."
+            },
+            {
+              "jp": "確認問題は2セクションに1つ以上置き、誤答には解説を付ける。",
+              "en": "Put a check in every two sections, with feedback on each wrong option."
+            }
+          ]
+        },
+        {
+          "id": "wrapup-map",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "mindmap\n  root((ブロック))\n    読む\n      段落\n      用語\n    見る\n      図\n      コード\n    試す\n      プロンプト\n      確認問題",
+            "en": "mindmap\n  root((Blocks))\n    Read\n      Paragraph\n      Terms\n    See\n      Figure\n      Code\n    Try\n      Prompt\n      Check"
+          },
+          "caption": {
+            "jp": "ブロックの分類",
+            "en": "Blocks by what the learner does"
+          },
+          "alt": {
+            "jp": "中心の「ブロック」から、読む（段落・用語）、見る（図・コード）、試す（プロンプト・確認問題）の3つに分かれるマインドマップ",
+            "en": "Mind map: Blocks branch into Read (paragraph, terms), See (figure, code) and Try (prompt, check)"
+          }
+        },
+        {
+          "id": "wrapup-checklist-list",
+          "type": "list",
+          "style": "check",
+          "items": [
+            {
+              "jp": "すべてのブロックを日本語と英語で確認した",
+              "en": "Checked every block in Japanese and English"
+            },
+            {
+              "jp": "スマートフォン幅でも崩れていない",
+              "en": "Nothing breaks at phone width"
+            }
+          ]
+        },
+        {
+          "id": "wrapup-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-1",
+              "front": {
+                "jp": "確認問題で2回まちがえると？",
+                "en": "What happens after two wrong answers?"
+              },
+              "back": {
+                "jp": "正解と解説が表示される。ヒントはその前に見られる。",
+                "en": "The answer and explanation appear. Hints are available before that."
+              }
+            },
+            {
+              "id": "card-2",
+              "front": {
+                "jp": "[✦説明] が AI先生に送るものは？",
+                "en": "What does ✦ Explain send to the tutor?"
+              },
+              "back": {
+                "jp": "コード全体と、強調された行の番号。",
+                "en": "The whole code and the highlighted line numbers."
+              }
+            },
+            {
+              "id": "card-3",
+              "front": {
+                "jp": "図に必ず付けるものは？",
+                "en": "What must every figure have?"
+              },
+              "back": {
+                "jp": "キャプションと代替テキスト（alt）。",
+                "en": "A caption and alt text."
+              }
+            },
+            {
+              "id": "card-4",
+              "front": {
+                "jp": "AIへの指示文の例に使うブロックは？",
+                "en": "Which block holds an example AI instruction?"
+              },
+              "back": {
+                "jp": "`prompt` ブロック。",
+                "en": "The `prompt` block."
+              }
+            },
+            {
+              "id": "card-5",
+              "front": {
+                "jp": "1つの段落の目安は？",
+                "en": "How long can a paragraph be?"
+              },
+              "back": {
+                "jp": "日本語で160字以内、英語で80語以内。",
+                "en": "Up to 160 Japanese characters or 80 English words."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "dev",
+    "gallery",
+    "blocks"
+  ],
+  "provenance": {
+    "author": "human+claude-code",
+    "generatedAt": "2026-10-18T00:00:00Z"
+  }
+}

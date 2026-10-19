@@ -1,0 +1,331 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch2",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第2章｜AIと企画する力を身につける",
+    "en": "Chapter 2 | Planning with AI"
+  },
+  "subtitle": {
+    "jp": "「ふんわりしたアイデア」を、エンジニアリング可能な「設計図」に翻訳する技術",
+    "en": "Translating \"vague ideas\" into \"blueprints\" that AI can understand."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 30,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "2-1",
+      "title": {
+        "jp": "2-1. ChatGPTとの壁打ち設計術",
+        "en": "2-1. AI Sparring for Design"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "プログラミングにおけるAIは「単なるコード生成機」ではありません。もっと上流の、「何を作るか」を相談できる**「シニアエンジニア兼プロダクトマネージャー」**です。",
+            "en": "In programming, AI is not just a \"code generator.\" It is a \"Senior Engineer and Product Manager\" you can consult about \"what to build.\""
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "markdown",
+          "md": {
+            "jp": "いきなり「コード書いて」と言うのは、建築家に「とりあえずレンガ積んで」と言うようなものです。まずは「どんな家を建てたいか」を相談しましょう。これを「壁打ち」と呼びます。",
+            "en": "Asking AI to \"write code\" immediately is like asking an architect to \"just lay bricks.\" First, discuss what kind of house you want to build. This is called \"Sparring\" or \"Wall-boarding.\""
+          }
+        },
+        {
+          "id": "s1-b3",
+          "type": "callout",
+          "variant": "info",
+          "title": {
+            "jp": "Step 1: 役割を与える (Role Prompting)",
+            "en": "Step 1: Assign a Role"
+          },
+          "md": {
+            "jp": "AIに適切な帽子を被せます。「優秀なPM」「ベテランエンジニア」などの役割を与えることで、回答の質と視座が変わります。",
+            "en": "Put the right hat on the AI. By giving roles like \"Expert PM\" or \"Veteran Engineer,\" the quality and perspective of the answers change."
+          }
+        },
+        {
+          "id": "s1-b4",
+          "type": "prompt",
+          "title": "Sparring Prompt Example",
+          "prompt": "You are a veteran Product Manager and Full-stack Engineer.\nI want to build a \"Task Management App for solo developers.\"\nMy ideas are still vague, so please be my sparring partner.\nFirst, ask me questions to clarify the target users and the problems they face."
+        },
+        {
+          "id": "s1-b5",
+          "type": "markdown",
+          "md": {
+            "jp": "このように、「質問してください」と頼むのがコツです。AIに答えを出させるのではなく、AIに引き出してもらうことで、自分の思考が整理されます。",
+            "en": "The trick is to ask the AI to \"ask questions.\" Instead of letting the AI give the answers, let it pull them out of you to organize your own thoughts."
+          }
+        }
+      ]
+    },
+    {
+      "id": "2-2",
+      "title": {
+        "jp": "2-2. 「作りたい」を構造化する（要件定義）",
+        "en": "2-2. Structuring \"What You Want\""
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "壁打ちでアイデアが固まってきたら、それを「システムとして実装可能な形」に翻訳します。ここで重要なのは**「機能の棚卸し」**と**「優先順位付け」**です。",
+            "en": "Once your idea solidifies, translate it into a \"system-implementable\" form. The key here is \"Inventory of Features\" and \"Prioritization.\""
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "callout",
+          "variant": "tip",
+          "title": {
+            "jp": "AIに出力させるべき成果物",
+            "en": "Deliverables to Ask From AI"
+          },
+          "md": {
+            "jp": "1. 機能一覧（Must/Should/Wantに分類）\n2. ユーザーフロー（画面遷移の流れ）\n3. データモデル（扱う情報の定義）",
+            "en": "1. Feature List (Categorized as Must/Should/Want)\n2. User Flow (Screen transitions)\n3. Data Model (Definition of information handled)"
+          }
+        },
+        {
+          "id": "s2-b3",
+          "type": "prompt",
+          "title": "PRD Generation Prompt",
+          "prompt": "Summarize our discussion and create a draft \"Product Requirements Document (PRD)\" including:\n\n## 1. App Overview\n## 2. Target Users & Problems\n## 3. Core Features (Select 3 essential for MVP)\n## 4. Screen Transitions (Mermaid syntax)\n## 5. Data Model (Mermaid syntax: ER Diagram)\n\nAssume the tech stack is React, TypeScript, Tailwind CSS, and Supabase."
+        },
+        {
+          "id": "s2-b4",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "flowchart TD\n    Start(App Launch) --> Login{Logged in?}\n    Login --No--> Auth[Auth Screen]\n    Login --Yes--> Dashboard[Dashboard]\n    Auth --> Dashboard\n    Dashboard --> TaskList[Task List]\n    Dashboard --> AddTask[Add Task]\n    AddTask --> Save{Save}\n    Save --> TaskList",
+          "caption": {
+            "jp": "AIが生成する画面遷移フローの例",
+            "en": "Example Screen Transition Flow"
+          },
+          "alt": {
+            "jp": "AIが生成する画面遷移フローの例",
+            "en": "Example Screen Transition Flow"
+          }
+        }
+      ]
+    },
+    {
+      "id": "2-3",
+      "title": {
+        "jp": "2-3. データモデリングの「バイブ」",
+        "en": "2-3. The \"Vibe\" of Data Modeling"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "アプリ開発で最も重要なのが「データ設計」です。ここさえ間違っていなければ、UIは後からいくらでも修正できます。AIには「リレーション（関係性）」を言葉で伝えます。",
+            "en": "The most important part of app development is \"Data Design.\" As long as this is correct, the UI can be fixed later. Tell the AI about \"Relationships\" in plain words."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "list",
+          "style": "check",
+          "items": [
+            {
+              "jp": "**1対多 (1:N)**: 「1人のユーザーは、複数のタスクを持つ」",
+              "en": "**1-to-Many (1:N)**: \"One user has multiple tasks\""
+            },
+            {
+              "jp": "**多対多 (N:M)**: 「タスクは複数のタグを持ち、タグも複数のタスクに使われる」",
+              "en": "**Many-to-Many (N:M)**: \"Tasks have multiple tags, and tags are used by multiple tasks\""
+            },
+            {
+              "jp": "**1対1 (1:1)**: 「ユーザーは1つのプロフィール設定を持つ」",
+              "en": "**1-to-1 (1:1)**: \"A user has one profile setting\""
+            }
+          ]
+        },
+        {
+          "id": "s3-b3",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "erDiagram\n    USER ||--o{ TASK : \"has\"\n    USER ||--o{ TAG : \"creates\"\n    TASK }|--|{ TAG : \"labeled_with\"\n\n    USER {\n        uuid id PK\n        string email\n        string username\n    }\n    TASK {\n        uuid id PK\n        uuid user_id FK\n        string title\n        boolean is_completed\n    }\n    TAG {\n        uuid id PK\n        string name\n        string color\n    }",
+          "caption": {
+            "jp": "ユーザー、タスク、タグの関係を示すER図",
+            "en": "ER Diagram showing relationships"
+          },
+          "alt": {
+            "jp": "ユーザー、タスク、タグの関係を示すER図",
+            "en": "ER Diagram showing relationships"
+          }
+        }
+      ]
+    },
+    {
+      "id": "2-4",
+      "title": {
+        "jp": "2-4. UI/UXを言語化するデザイン・ボキャブラリー",
+        "en": "2-4. Design Vocabulary for UI/UX"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "「いい感じのデザインにして」は禁句です。AIには**「デザインシステム」**や**「雰囲気」**を具体的な言葉（ボキャブラリー）で伝える必要があります。",
+            "en": "Avoid saying \"make it look good.\" You need to communicate the \"Design System\" or \"Vibe\" using specific vocabulary."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "table",
+          "columns": [
+            {
+              "jp": "キーワード",
+              "en": "Keyword"
+            },
+            {
+              "jp": "AIの解釈・出力傾向",
+              "en": "AI Interpretation"
+            }
+          ],
+          "rows": [
+            [
+              {
+                "jp": "Modern / Clean",
+                "en": "Modern / Clean"
+              },
+              {
+                "jp": "余白多め、サンセリフ体、フラットデザイン",
+                "en": "Spacious, Sans-serif, Flat design"
+              }
+            ],
+            [
+              {
+                "jp": "Bento Grids",
+                "en": "Bento Grids"
+              },
+              {
+                "jp": "Appleのようなグリッドレイアウト、角丸のカード",
+                "en": "Apple-style grid, rounded cards"
+              }
+            ],
+            [
+              {
+                "jp": "Neubrutalism",
+                "en": "Neubrutalism"
+              },
+              {
+                "jp": "太い枠線、原色使い、強いドロップシャドウ",
+                "en": "Thick borders, primary colors, hard shadows"
+              }
+            ],
+            [
+              {
+                "jp": "Glassmorphism",
+                "en": "Glassmorphism"
+              },
+              {
+                "jp": "すりガラス効果、背景ぼかし、半透明",
+                "en": "Frosted glass effect, background blur"
+              }
+            ],
+            [
+              {
+                "jp": "Corporate / Trust",
+                "en": "Corporate / Trust"
+              },
+              {
+                "jp": "ネイビー・青基調、堅実なフォント、情報の密度高め",
+                "en": "Navy palette, solid fonts, high density"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2-5",
+      "title": {
+        "jp": "2-5. 失敗しない要件定義：MVPの美学",
+        "en": "2-5. MVP Philosophy"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s5-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "AI開発は爆速ですが、それでも機能が増えればバグの温床になります。最初のリリース（MVP: Minimum Viable Product）では、勇気を持って機能を削ぎ落とします。",
+            "en": "AI development is lightning fast, but more features still lead to more bugs. For the first release (MVP), have the courage to strip away features."
+          }
+        },
+        {
+          "id": "s5-b2",
+          "type": "list",
+          "style": "number",
+          "items": [
+            {
+              "jp": "**Must (必須)**: これがないとゴミ。絶対に作る。",
+              "en": "**Must**: Essential. App is useless without it."
+            },
+            {
+              "jp": "**Should (推奨)**: あった方がいいが、リリースを遅らせるほどではない。",
+              "en": "**Should**: Recommended, but won't delay release."
+            },
+            {
+              "jp": "**Won't (やらない)**: 今回は作らないと決めること。これが一番大事。",
+              "en": "**Won't**: Decided NOT to build this time. Most important."
+            }
+          ]
+        },
+        {
+          "id": "s5-b3",
+          "type": "callout",
+          "variant": "success",
+          "title": {
+            "jp": "AI時代のMVP開発",
+            "en": "Iterative Development"
+          },
+          "md": {
+            "jp": "AIを使えば「後から機能追加」のコストは極めて低いです。だからこそ、最初は**「ログインできて、文字が表示されるだけ」**くらいの極小構成からスタートし、そこから雪だるま式に機能を足していく（イテレーティブ開発）のが正解です。",
+            "en": "With AI, adding features later is very low cost. Start with a minimal setup—just login and displaying text—and grow it like a snowball."
+          }
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter2.ts",
+      "export": "VIBE_CHAPTER_2_DATA",
+      "counts": {
+        "sections": 5,
+        "blocks": 17,
+        "tableRows": 5,
+        "quizQuestions": 0,
+        "text": 7,
+        "callout": 3,
+        "code": 2,
+        "mermaid": 2,
+        "list": 2,
+        "table": 1
+      }
+    }
+  }
+}

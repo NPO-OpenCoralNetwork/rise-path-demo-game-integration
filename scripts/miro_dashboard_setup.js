@@ -102,7 +102,7 @@ async function buildDashboard(boardId) {
     
     await createSticky(boardId, "<b>🚨 アセット上書きの絶対ルール</b><br><br>新しい画像は既存のファイルと<b>「全く同じファイル名・同じ拡張子（小文字）」</b>で上書き配置すること！コード変更が不要になります。", -550, -200, "light_pink");
     await createSticky(boardId, "<b>🏷️ Gitコミット・ブランチルール</b><br><br>アセット追加時は <code>asset: ○○画像の差し替え</code> とプレフィックスをつける。<br>作業前は最新のmainからブランチを切る。", -350, -200, "light_green");
-    await createSticky(boardId, "<b>📄 詳細ガイド（GitHub）</b><br><br><a href='file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/README.md'>doc/README.md</a><br>詳細はリポジトリ内の設計書を参照してください。", -450, -20, "light_blue");
+    await createSticky(boardId, "<b>📄 詳細ガイド（GitHub）</b><br><br><code>doc/README.md</code><br>詳細はリポジトリ内の設計書を参照してください。", -450, -20, "light_blue");
 
     // --- 3. エリア②：アセット進行管理カンバン ---
     console.log("Building Area 2: Kanban Board...");

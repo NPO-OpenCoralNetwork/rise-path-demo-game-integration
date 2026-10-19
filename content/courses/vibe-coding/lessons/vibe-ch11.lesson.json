@@ -1,0 +1,217 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch11",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第11章｜これからの学び方",
+    "en": "Chapter 11 | The Future of Learning"
+  },
+  "subtitle": {
+    "jp": "何を学び、何を捨てるべきか。AI時代の開発者として進化し続けるための羅針盤。",
+    "en": "What to learn, what to ignore, and how to evolve as a developer in the AI era."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 15,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "11-1",
+      "title": {
+        "jp": "11-1. プログラミングをどう学ぶか（学ばなくていい範囲）",
+        "en": "11-1. What NOT to Learn"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "構文を暗記する時代は終わりました。APIのパラメータやCSSのクラス名を覚えることに時間を使わないでください。AIはそれらをミリ秒で思い出せます。",
+            "en": "The era of memorizing syntax is over. Do not spend time memorizing API parameters or CSS class names. AI can recall them in milliseconds."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "list",
+          "style": "check",
+          "items": [
+            {
+              "jp": "**暗記しない**: 正規表現、日付のフォーマット、ボイラープレート（定型コード）。",
+              "en": "**Don't Memorize**: Regex, Date formatting, Boilerplate code."
+            },
+            {
+              "jp": "**理解する**: 「どう動くのか（アーキテクチャ）」、「なぜ必要なのか（ビジネスロジック）」、「安全か（セキュリティ）」。",
+              "en": "**Focus On**: \"How it works\" (Architecture), \"Why it matters\" (Business Logic), and \"Is it secure?\" (Security)."
+            }
+          ]
+        },
+        {
+          "id": "s1-b3",
+          "type": "callout",
+          "variant": "info",
+          "title": {
+            "jp": "深堀りと俯瞰",
+            "en": "Deep Dive vs Broad View"
+          },
+          "md": {
+            "jp": "ソートアルゴリズムの「書き方」を知る必要はありませんが、「いつ使うべきか」「どれが速いか」は知っている必要があります。「書き手」から「選び手」にシフトしましょう。",
+            "en": "You don't need to know *how to write* a sorting algorithm, but you must know *when to use* it and *which one is faster*. Shift from \"Writer\" to \"Selector\"."
+          }
+        }
+      ]
+    },
+    {
+      "id": "11-2",
+      "title": {
+        "jp": "11-2. AIツールの選別力を育てる",
+        "en": "11-2. Cultivating Tool Selection Eyes"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "新しいAIツールは毎日登場します。すべてのトレンドに飛びついていては溺れてしまいます。「選球眼」を養いましょう。",
+            "en": "New AI tools appear every day. If you jump on every trend, you will drown. Develop an \"Eye\" for tools."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "table",
+          "columns": [
+            {
+              "jp": "判断基準",
+              "en": "Criteria"
+            },
+            {
+              "jp": "自分への問いかけ",
+              "en": "Question to Ask"
+            }
+          ],
+          "rows": [
+            [
+              {
+                "jp": "統合性",
+                "en": "Integration"
+              },
+              {
+                "jp": "今のワークフロー（VSCode/Git）に馴染むか？それとも独自のプラットフォームを強制してくるか？",
+                "en": "Does it fit into my current workflow (VSCode/Git)? Or does it force me to use a new platform?"
+              }
+            ],
+            [
+              {
+                "jp": "ロックイン",
+                "en": "Lock-in"
+              },
+              {
+                "jp": "コードをエクスポートできるか？明日そのツールが消えても、プロジェクトは生き残れるか？",
+                "en": "Can I export the code? If the tool dies tomorrow, does my project survive?"
+              }
+            ],
+            [
+              {
+                "jp": "本質的価値",
+                "en": "Value"
+              },
+              {
+                "jp": "いま抱えている課題を解決してくれるか？それとも単なる「すごいデモ」か？",
+                "en": "Does it solve a problem I actually have, or is it just a cool demo?"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "11-3",
+      "title": {
+        "jp": "11-3. 個人開発・チーム開発への展開",
+        "en": "11-3. From Solo to Team"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "バイブコーディングはスケールします。チーム開発において、AIは全員にとっての「専属ジュニア開発者」になります。ただし、コードレビューには注意が必要です。",
+            "en": "Vibe Coding scales. In a team, AI acts as a \"Junior Developer\" for everyone. But be careful with Code Reviews."
+          }
+        },
+        {
+          "id": "s3-b2",
+          "type": "markdown",
+          "md": {
+            "jp": "AIのコードをそのままプルリクエストに貼り付けないでください。コミットした時点で、そのコードの責任者はあなたです。「AIが書いたから」はバグの言い訳になりません。",
+            "en": "Do not just copy-paste AI code into a Pull Request. You are responsible for the code you commit. \"AI wrote it\" is not an excuse for bugs."
+          }
+        }
+      ]
+    },
+    {
+      "id": "11-4",
+      "title": {
+        "jp": "11-4. 2026年以降の開発者像",
+        "en": "11-4. The Developer of 2026"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-b1",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "mindmap\n  root((\"未来の開発者\"))\n    n1[\"アーキテクト\"]\n    n2[\"プロダクトオーナー\"]\n    n3[\"AI指揮者\"]",
+            "en": "mindmap\n  root((\"The Future Developer\"))\n    n1[\"Architect\"]\n    n2[\"Product Owner\"]\n    n3[\"AI Conductor\"]"
+          },
+          "caption": {
+            "jp": "未来の開発者の全体像",
+            "en": "The Future Developer: overview"
+          },
+          "alt": {
+            "jp": "マインドマップ。中心は「未来の開発者」。枝は「アーキテクト」、「プロダクトオーナー」、「AI指揮者」。",
+            "en": "Mind map centered on \"The Future Developer\" with branches: Architect, Product Owner, AI Conductor."
+          },
+          "description": {
+            "jp": "- **アーキテクト**：システムの全体像を描き、APIを繋ぎ、スケーラビリティを担保する。\n- **プロダクトオーナー**：ユーザーのニーズを理解し、それを技術要件に翻訳する。\n- **AI指揮者**：複数のAIエージェントを指揮し、かつてない速度でソフトウェアを構築する。",
+            "en": "- **Architect**: Designing systems, connecting APIs, ensuring scalability.\n- **Product Owner**: Understanding user needs and translating them into technical requirements.\n- **AI Conductor**: Managing multiple AI agents to build software faster than ever."
+          }
+        },
+        {
+          "id": "s4-b2",
+          "type": "markdown",
+          "md": {
+            "jp": "あなたはもはや単なる「コーダー」ではありません。コードとAIを道具として使い、価値を生み出す **「クリエイター」** です。ようこそ、新時代へ。",
+            "en": "You are no longer just a \"Coder\". You are a **Creator** who uses Code and AI as tools to build value. Welcome to the new era."
+          },
+          "style": "lead"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter11.ts",
+      "export": "VIBE_CHAPTER_11_DATA",
+      "counts": {
+        "sections": 4,
+        "blocks": 9,
+        "tableRows": 3,
+        "quizQuestions": 0,
+        "text": 5,
+        "list": 1,
+        "callout": 1,
+        "table": 1,
+        "mindmap": 1
+      }
+    }
+  }
+}

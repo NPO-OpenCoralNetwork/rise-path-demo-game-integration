@@ -1,7 +1,23 @@
 import { lazy } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
-export const RouteLoading = () => (
-  <div className="p-8 text-sm text-slate-500">Loading...</div>
+export const RouteLoading = () => {
+  const { language } = useLanguage();
+  return (
+    <div role="status" className="p-8 text-small text-fg-3">
+      {language === 'jp' ? '読み込んでいます…' : 'Loading…'}
+    </div>
+  );
+};
+
+/** Lesson reader for risepath.lesson/v1 (/learn and, in dev, /preview). */
+export const LearnRoute = lazy(
+  () => import('./LearnRoute')
+);
+
+/** /dev/blocks block gallery. Dev builds only: production bundles drop the import. */
+export const DevBlocksRoute = lazy(
+  () => (import.meta.env.DEV ? import('./DevBlocksRoute') : Promise.resolve({ default: () => null }))
 );
 
 export const CoursePathViewWrapper = lazy(
@@ -84,42 +100,6 @@ export const WebInspectorView = lazy(
 );
 export const VibePrologueView = lazy(
   () => import('../features/programming/VibePrologueView')
-);
-export const VibeChapterZeroView = lazy(
-  () => import('../features/programming/VibeChapterZeroView')
-);
-export const VibeChapterOneView = lazy(
-  () => import('../features/programming/VibeChapterOneView')
-);
-export const VibeChapterTwoView = lazy(
-  () => import('../features/programming/VibeChapterTwoView')
-);
-export const VibeChapterThreeView = lazy(
-  () => import('../features/programming/VibeChapterThreeView')
-);
-export const VibeChapterFourView = lazy(
-  () => import('../features/programming/VibeChapterFourView')
-);
-export const VibeChapterFiveView = lazy(
-  () => import('../features/programming/VibeChapterFiveView')
-);
-export const VibeChapterSixView = lazy(
-  () => import('../features/programming/VibeChapterSixView')
-);
-export const VibeChapterSevenView = lazy(
-  () => import('../features/programming/VibeChapterSevenView')
-);
-export const VibeChapterEightView = lazy(
-  () => import('../features/programming/VibeChapterEightView')
-);
-export const VibeChapterNineView = lazy(
-  () => import('../features/programming/VibeChapterNineView')
-);
-export const VibeChapterTenView = lazy(
-  () => import('../features/programming/VibeChapterTenView')
-);
-export const VibeChapterElevenView = lazy(
-  () => import('../features/programming/VibeChapterElevenView')
 );
 export const VibePathView = lazy(
   () => import('../features/programming/VibePathView')

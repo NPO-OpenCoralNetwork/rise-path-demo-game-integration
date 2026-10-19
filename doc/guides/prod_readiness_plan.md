@@ -3,7 +3,7 @@
 > 作成日: 2026-06-22  
 > 更新日: 2026-06-23（`risepath-vm` 専用 Docker スタック方針）
 > 対象リポジトリ: `t012093/rise-path-demo-game-Integration-`  
-> 対象ローカル: `/Users/2005nk/Works/personal/rise-path-demo-game-integration`
+> 対象: このリポジトリ（`rise-path-demo-game-integration`）のルート
 
 ## 1. 現状サマリー
 

@@ -3,55 +3,84 @@ import { useLocation } from 'react-router-dom';
 import { ViewState } from '../../types';
 import {
   LayoutDashboard,
-  Layers, // For Learning Hub
+  Layers,
   Map as MapIcon,
   Library as LibraryIcon,
   Sparkles,
   User,
+  IdCard,
   Menu,
   X,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Box,
-  Terminal,
-  Palette,
   Activity,
   Settings as SettingsIcon,
   ChevronDown,
   Brain,
-  FileText,
   Users,
-  CheckCircle2,
-  Image,
   Trophy,
-  BookOpen
+  BookOpen,
+  Blocks,
+  type LucideIcon,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage, type SelectedLanguage } from '../../context/LanguageContext';
+import { VIEW_PATHS, pathToNavKey, isLessonPath, type NavKey } from '../../navigation/viewPaths';
+import { features } from '../../config/features';
+import BrandMark from './BrandMark';
 
 interface LayoutProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
+  onLogout?: () => void;
   children: React.ReactNode;
 }
 
 type NavItem = {
-  view?: ViewState;
+  key: NavKey;
+  view: ViewState;
   label: string;
-  icon: any;
-  id?: string;
-  children?: NavItem[];
+  icon: LucideIcon;
 };
 
-const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) => {
+type NavGroup = {
+  id: 'account' | 'samples';
+  label: string;
+  icon: LucideIcon;
+  children: NavItem[];
+};
+
+const isGroup = (entry: NavItem | NavGroup): entry is NavGroup => 'children' in entry;
+
+// Pages that live in the Account group (it opens itself when one is current).
+const ACCOUNT_KEYS = new Set<NavKey>(['passport', 'history', 'badges', 'generated', 'myContent', 'characters']);
+
+const LANGUAGE_OPTIONS: { value: SelectedLanguage; short: string; name: string; lang: string }[] = [
+  { value: 'en', short: 'EN', name: 'English', lang: 'en' },
+  { value: 'jp', short: 'JP', name: '日本語', lang: 'ja' },
+  { value: 'fr', short: 'FR', name: 'Français', lang: 'fr' },
+];
+
+const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>('lab');
   const mainRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { language, selectedLanguage, setLanguage } = useLanguage();
+
+  const activeKey = pathToNavKey(location.pathname);
+  // Lesson reader routes get a 64px rail and the full width.
+  const railMode = isLessonPath(location.pathname);
+  // The mobile drawer always shows labels, whatever the desktop collapse state is.
+  const collapsed = (railMode || isCollapsed) && !isMobileMenuOpen;
+
+  const [openGroups, setOpenGroups] = useState<Set<NavGroup['id']>>(() => (
+    new Set(activeKey && ACCOUNT_KEYS.has(activeKey) ? ['account'] : [])
+  ));
 
   useEffect(() => {
     const view = currentView.toString();
@@ -75,36 +104,108 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
     } else {
       window.scrollTo(0, 0);
     }
+    setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Open the group that holds the current page.
+  useEffect(() => {
+    if (activeKey && ACCOUNT_KEYS.has(activeKey)) {
+      setOpenGroups((prev) => (prev.has('account') ? prev : new Set(prev).add('account')));
+    }
+  }, [activeKey]);
+
+  // Mobile drawer: focus the first link on open, Esc closes and returns focus.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    // Wait a tick: the drawer is visibility:hidden until its slide-in starts.
+    const timer = window.setTimeout(() => {
+      navRef.current?.querySelector<HTMLElement>('a[href], button')?.focus();
+    }, 50);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      // Keep Tab inside the drawer: the menu button and the drawer's controls, in a loop.
+      if (event.key !== 'Tab') return;
+      const sidebar = document.getElementById('app-sidebar');
+      const items = [
+        menuButtonRef.current,
+        ...Array.from(sidebar?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? []),
+      ].filter((el): el is HTMLElement => Boolean(el) && el!.offsetParent !== null);
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = index < 0
+        ? 0
+        : (index + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+      event.preventDefault();
+      items[nextIndex].focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isMobileMenuOpen]);
+
+  // The drawer is mobile-only; drop it when the viewport grows past md.
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setIsMobileMenuOpen(false);
+    };
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  // Art and Vibe keep their dark shell; everything else uses the design tokens.
   const getThemeStyles = () => {
     switch (theme) {
       case 'art':
         return {
+          dark: true,
           sidebar: 'bg-[#1c1917] border-stone-800 text-stone-400',
           sidebarActive: 'bg-stone-800 text-stone-100',
           sidebarHover: 'hover:bg-stone-800 hover:text-stone-200',
           main: 'bg-[#1c1917]',
           text: 'text-stone-400',
-          mobileHeader: 'bg-[#1c1917] border-stone-800 text-stone-100'
+          mobileHeader: 'bg-[#1c1917] border-stone-800 text-stone-100',
+          brandText: 'text-stone-100',
+          iconButton: 'text-stone-300 hover:bg-stone-800 hover:text-stone-100',
+          panel: 'bg-transparent border-stone-800',
+          langOn: 'bg-stone-800 text-stone-100',
+          langOff: 'text-stone-400 hover:text-stone-100',
         };
       case 'vibe':
         return {
+          dark: true,
           sidebar: 'bg-black border-white/10 text-slate-400',
           sidebarActive: 'bg-white/10 text-white',
           sidebarHover: 'hover:bg-white/5 hover:text-white',
           main: 'bg-black',
           text: 'text-slate-400',
-          mobileHeader: 'bg-black border-white/10 text-white'
+          mobileHeader: 'bg-black border-white/10 text-white',
+          brandText: 'text-white',
+          iconButton: 'text-white/80 hover:bg-white/10 hover:text-white',
+          panel: 'bg-transparent border-white/10',
+          langOn: 'bg-white/10 text-white',
+          langOff: 'text-white/70 hover:text-white',
         };
       default:
         return {
-          sidebar: 'bg-white border-slate-200',
-          sidebarActive: 'bg-indigo-50 text-indigo-700',
-          sidebarHover: 'hover:bg-slate-50 hover:text-slate-900',
-          main: 'bg-slate-50',
-          text: 'text-slate-600',
-          mobileHeader: 'bg-white border-slate-200 text-slate-800'
+          dark: false,
+          sidebar: 'bg-surface border-line text-fg-2',
+          sidebarActive: 'bg-primary-soft text-primary-text',
+          sidebarHover: 'hover:bg-sunken hover:text-fg',
+          main: 'bg-canvas',
+          text: 'text-fg-3',
+          mobileHeader: 'bg-surface border-line text-fg',
+          brandText: 'text-fg',
+          iconButton: 'text-fg-2 hover:bg-sunken hover:text-fg',
+          panel: 'bg-sunken border-line',
+          langOn: 'bg-fg text-canvas',
+          langOff: 'text-fg-2 hover:text-fg',
         };
     }
   };
@@ -113,8 +214,14 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
 
   const copy = {
     en: {
+      skipToContent: 'Skip to content',
+      mainNav: 'Main',
+      openMenu: 'Open menu',
+      closeMenu: 'Close menu',
+      collapseSidebar: 'Collapse sidebar',
+      expandSidebar: 'Expand sidebar',
       dashboard: 'Dashboard',
-      learningHub: 'Learning Hub',
+      learningHub: 'Learning Content',
       aiDiagnosis: 'AI Learning Diagnosis',
       lifeJournal: 'Life Journal',
       courseGenerator: 'AI Course Generator',
@@ -126,12 +233,10 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       workshop: 'Workshop Page',
       blender: 'Blender Viewport',
       reflection: 'Reflection Page',
-      documents: 'Documents',
+      blocksGallery: 'Blocks Gallery',
       aiCharacters: 'AI Characters',
       account: 'Account',
-      profile: 'Profile',
       profileOverview: 'Student Card',
-      profileDiagnosis: 'AI Diagnosis',
       profileHistory: 'History',
       profileBadges: 'Badges',
       profileGenerated: 'Generated',
@@ -141,6 +246,12 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       settings: 'Settings',
     },
     jp: {
+      skipToContent: '本文へスキップ',
+      mainNav: 'メイン',
+      openMenu: 'メニューを開く',
+      closeMenu: 'メニューを閉じる',
+      collapseSidebar: 'サイドバーを折りたたむ',
+      expandSidebar: 'サイドバーを広げる',
       dashboard: 'ダッシュボード',
       learningHub: '学習コンテンツ',
       aiDiagnosis: 'AI学習診断',
@@ -154,12 +265,10 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       workshop: 'ワークショップページ',
       blender: 'Blenderビューポート',
       reflection: 'リフレクションページ',
-      documents: 'ドキュメント',
+      blocksGallery: 'ブロック見本帳',
       aiCharacters: 'AIキャラクター',
       account: 'アカウント',
-      profile: 'プロフィール',
       profileOverview: '学生証',
-      profileDiagnosis: 'AI診断',
       profileHistory: '履歴',
       profileBadges: 'バッジ',
       profileGenerated: '生成物',
@@ -172,89 +281,47 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
 
   const t = copy[language];
 
-  const navItems: NavItem[] = [
-    { view: ViewState.DASHBOARD, label: t.dashboard, icon: LayoutDashboard },
-    { view: ViewState.COURSES, label: t.learningHub, icon: Layers },
-
-    { view: ViewState.AI_DIAGNOSIS, label: t.aiDiagnosis, icon: Brain },
-    { view: ViewState.LIFE_JOURNAL, label: t.lifeJournal, icon: BookOpen },
-    { view: ViewState.COURSE_GENERATOR, label: t.courseGenerator, icon: MapIcon },
-    {
-      id: 'lab',
-      label: t.risePathLab,
-      icon: Sparkles,
-      children: [
-        { view: ViewState.DEMO_CHECKLIST, label: t.checklist, icon: CheckCircle2 },
-        { view: ViewState.DEMO_CHECKLIST_GENERATOR, label: t.checklistGenerator, icon: Image },
-        { view: ViewState.DEMO_CONCEPT, label: t.concept, icon: Box },
-        { view: ViewState.DEMO_DIALOGUE, label: t.dialogue, icon: Users },
-        { view: ViewState.DEMO_WORKSHOP, label: t.workshop, icon: Terminal },
-        { view: ViewState.DEMO_BLENDER, label: t.blender, icon: Box },
-        { view: ViewState.DEMO_REFLECTION, label: t.reflection, icon: Brain },
-      ]
-    },
-    {
-      id: 'documents',
-      label: t.documents,
-      icon: FileText,
-      children: [
-        { view: ViewState.AI_CHARACTERS, label: t.aiCharacters, icon: Users },
-      ]
-    },
+  const navEntries: (NavItem | NavGroup)[] = [
+    { key: 'dashboard', view: ViewState.DASHBOARD, label: t.dashboard, icon: LayoutDashboard },
+    { key: 'learning', view: ViewState.LEARNING_HUB, label: t.learningHub, icon: Layers },
+    { key: 'generator', view: ViewState.COURSE_GENERATOR, label: t.courseGenerator, icon: MapIcon },
+    { key: 'diagnosis', view: ViewState.AI_DIAGNOSIS, label: t.aiDiagnosis, icon: Brain },
+    { key: 'journal', view: ViewState.LIFE_JOURNAL, label: t.lifeJournal, icon: BookOpen },
     {
       id: 'account',
       label: t.account,
       icon: User,
       children: [
-        { view: ViewState.PROFILE, label: t.profileOverview, icon: User },
-        { view: ViewState.PROFILE_DIAGNOSIS, label: t.profileDiagnosis, icon: Brain },
-        { view: ViewState.PROFILE_HISTORY, label: t.profileHistory, icon: Activity },
-        { view: ViewState.PROFILE_BADGES, label: t.profileBadges, icon: Trophy },
-        { view: ViewState.PROFILE_GENERATED, label: t.profileGenerated, icon: Sparkles },
-        { view: ViewState.MY_CONTENT, label: t.myContent, icon: LibraryIcon }
+        { key: 'passport', view: ViewState.PROFILE, label: t.profileOverview, icon: IdCard },
+        { key: 'history', view: ViewState.PROFILE_HISTORY, label: t.profileHistory, icon: Activity },
+        { key: 'badges', view: ViewState.PROFILE_BADGES, label: t.profileBadges, icon: Trophy },
+        { key: 'generated', view: ViewState.PROFILE_GENERATED, label: t.profileGenerated, icon: Sparkles },
+        { key: 'myContent', view: ViewState.MY_CONTENT, label: t.myContent, icon: LibraryIcon },
+        { key: 'characters', view: ViewState.AI_CHARACTERS, label: t.aiCharacters, icon: Users },
       ]
     },
+    ...(features.devSamples ? [{
+      id: 'samples' as const,
+      label: t.risePathLab,
+      icon: Sparkles,
+      children: [
+        { key: 'demoChecklist', view: ViewState.DEMO_CHECKLIST, label: t.checklist, icon: Sparkles },
+        { key: 'demoChecklistGenerator', view: ViewState.DEMO_CHECKLIST_GENERATOR, label: t.checklistGenerator, icon: Sparkles },
+        { key: 'demoConcept', view: ViewState.DEMO_CONCEPT, label: t.concept, icon: Sparkles },
+        { key: 'demoDialogue', view: ViewState.DEMO_DIALOGUE, label: t.dialogue, icon: Sparkles },
+        { key: 'demoWorkshop', view: ViewState.DEMO_WORKSHOP, label: t.workshop, icon: Sparkles },
+        { key: 'demoBlender', view: ViewState.DEMO_BLENDER, label: t.blender, icon: Sparkles },
+        { key: 'demoReflection', view: ViewState.DEMO_REFLECTION, label: t.reflection, icon: Sparkles },
+        { key: 'devBlocks', view: ViewState.DEV_BLOCKS, label: t.blocksGallery, icon: Blocks },
+      ] satisfies NavItem[],
+    }] : []),
+    { key: 'settings', view: ViewState.SETTINGS, label: t.settings, icon: SettingsIcon },
   ];
 
-  const isNavItemActive = (itemInfo: NavItem) => {
-    if (!itemInfo.view) return false;
+  const languageOptions = LANGUAGE_OPTIONS.filter((option) => option.value !== 'fr' || features.frLocale);
 
-    if (currentView === ViewState.LESSON && itemInfo.view === ViewState.DASHBOARD) {
-      return true;
-    }
-    if ((currentView === ViewState.SONIC_SYNTH) && itemInfo.view === ViewState.LEARNING_HUB) {
-      return true;
-    }
-
-    if ((
-      currentView === ViewState.BLENDER || currentView === ViewState.BLENDER_PATH || currentView === ViewState.BLENDER_LESSON ||
-      currentView.toString().startsWith('VIBE') || currentView.toString().startsWith('PROGRAMMING') || currentView.toString().startsWith('PYTHON') ||
-      currentView.toString().startsWith('ART') ||
-      currentView === ViewState.SONIC_LAB
-    ) && itemInfo.view === ViewState.LEARNING_HUB) {
-      return true;
-    }
-    if (
-      itemInfo.view === ViewState.LIFE_JOURNAL
-      && (
-        currentView === ViewState.LIFE_JOURNAL
-        || currentView === ViewState.LIFE_JOURNAL_MONTHLY
-        || currentView === ViewState.LIFE_JOURNAL_INSIGHTS
-        || currentView === ViewState.LIFE_JOURNAL_CHAT
-      )
-    ) {
-      return true;
-    }
-    return currentView === itemInfo.view;
-  };
-
-  const isGroupActive = (item: NavItem) => {
-    if (item.children) {
-      return item.children.some(child => isNavItemActive(child));
-    }
-    return false;
-  };
   const isFullBleedView = (
+    railMode ||
     currentView === ViewState.DASHBOARD ||
     currentView === ViewState.LESSON ||
     currentView === ViewState.BLENDER_LESSON ||
@@ -262,255 +329,226 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
     currentView === ViewState.AI_DIAGNOSIS
   );
 
-  return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50">
-      {/* Mobile Header */}
-      <div className={`md:hidden fixed w-full z-50 border-b px-4 py-3 flex justify-between items-center ${styles.mobileHeader}`}>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">L</div>
-          <span className={`font-bold tracking-tight ${theme === 'default' ? 'text-slate-700' : 'text-white'} `}>Rise Path</span>
-        </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-slate-600">
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+  // Plain clicks navigate in-app; modified clicks keep the browser's link behaviour.
+  const handleNavClick = (event: React.MouseEvent<HTMLAnchorElement>, view: ViewState) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onNavigate(view);
+    setIsMobileMenuOpen(false);
+  };
+
+  const toggleGroup = (group: NavGroup) => {
+    if (railMode) {
+      // The rail cannot expand; open the group's first page instead.
+      onNavigate(group.children[0].view);
+      return;
+    }
+    if (collapsed) {
+      setIsCollapsed(false);
+      setOpenGroups((prev) => new Set(prev).add(group.id));
+      return;
+    }
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group.id)) next.delete(group.id);
+      else next.add(group.id);
+      return next;
+    });
+  };
+
+  const rowClass = `flex items-center rounded-control transition-colors duration-200 font-medium ${collapsed
+    ? 'justify-center w-10 h-10 mx-auto p-0'
+    : 'w-full gap-3 px-3 py-2.5 min-h-11 md:min-h-10'
+  }`;
+
+  const renderItem = (item: NavItem, nested = false) => {
+    const isActive = activeKey === item.key;
+    return (
+      <li key={item.key}>
+        <a
+          href={VIEW_PATHS[item.view]}
+          onClick={(event) => handleNavClick(event, item.view)}
+          aria-current={isActive ? 'page' : undefined}
+          title={collapsed ? item.label : undefined}
+          className={`${rowClass} ${nested ? 'pl-11 text-sm' : 'text-body'} ${isActive ? styles.sidebarActive : styles.sidebarHover}`}
+        >
+          {!nested && (
+            <item.icon size={20} aria-hidden="true" className={`shrink-0 ${isActive ? '' : styles.text}`} />
+          )}
+          <span className={collapsed ? 'sr-only' : 'truncate'}>{item.label}</span>
+        </a>
+      </li>
+    );
+  };
+
+  const renderGroup = (group: NavGroup) => {
+    const isOpen = !collapsed && openGroups.has(group.id);
+    const hasActiveChild = group.children.some((child) => child.key === activeKey);
+    const panelId = `nav-group-${group.id}`;
+    return (
+      <li key={group.id}>
+        <button
+          type="button"
+          onClick={() => toggleGroup(group)}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          title={collapsed ? group.label : undefined}
+          className={`${rowClass} text-body ${collapsed ? '' : 'justify-between'} ${hasActiveChild && !isOpen ? styles.sidebarActive : styles.sidebarHover}`}
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <group.icon size={20} aria-hidden="true" className={`shrink-0 ${hasActiveChild && !isOpen ? '' : styles.text}`} />
+            <span className={collapsed ? 'sr-only' : 'truncate'}>{group.label}</span>
+          </span>
+          {!collapsed && (
+            <ChevronDown size={14} aria-hidden="true" className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${styles.text}`} />
+          )}
         </button>
-      </div>
+        <ul id={panelId} hidden={!isOpen} className="pt-1 pb-2 space-y-1">
+          {group.children.map((child) => renderItem(child, true))}
+        </ul>
+      </li>
+    );
+  };
+
+  const skipToContent = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    mainRef.current?.focus();
+  };
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-canvas">
+      <a
+        href="#main-content"
+        onClick={skipToContent}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-fg focus:shadow-3"
+      >
+        {t.skipToContent}
+      </a>
+
+      {/* Mobile Header (the lesson reader brings its own bar) */}
+      {!railMode && (
+        <header
+          data-theme={styles.dark ? 'dark' : undefined}
+          className={`md:hidden fixed inset-x-0 top-0 z-50 h-14 border-b px-4 flex justify-between items-center ${styles.mobileHeader}`}
+        >
+          <div className="flex items-center gap-2">
+            <BrandMark size={28} />
+            <span className={`font-bold tracking-tight ${styles.brandText}`}>Rise Path</span>
+          </div>
+          <button
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => setIsMobileMenuOpen((open) => !open)}
+            aria-label={isMobileMenuOpen ? t.closeMenu : t.openMenu}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="app-sidebar"
+            className={`-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-control transition-colors ${styles.iconButton}`}
+          >
+            {isMobileMenuOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
+          </button>
+        </header>
+      )}
 
       {/* Sidebar Navigation */}
-      <aside className={`
-        fixed md:relative z-40 h-full border-r flex flex-col transition-all duration-300 ease-in-out
-        ${styles.sidebar}
-        ${isMobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
-        ${isCollapsed ? 'md:w-20' : 'md:w-64'}
-        pt-16 md:pt-0 group/sidebar relative
-      `}>
-        {/* Toggle Button - Floating on Border */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`
-            absolute -right-3 top-8 z-50
-            w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center
-            text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-all
-            hidden md:flex
-          `}
-        >
-          {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-        </button>
-
-        <div className={`p-4 hidden md:flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} gap-3 h-16`}>
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md text-base shrink-0 transition-all">L</div>
-          <div className={`flex flex-col overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-            <span className={`text-lg font-bold tracking-tight whitespace-nowrap ${theme === 'default' ? 'text-slate-700' : 'text-white'}`}>Rise Path</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
-            if (item.children) {
-              // Group Item
-              const isActiveGroup = isGroupActive(item);
-              const isExpanded = expandedMenu === item.id;
-
-              return (
-                <div key={item.id} className="space-y-1">
-                  <button
-                    onClick={() => {
-                      if (isCollapsed) {
-                        setIsCollapsed(false);
-                        setExpandedMenu(item.id || null);
-                      } else {
-                        setExpandedMenu(isExpanded ? null : item.id || null);
-                      }
-                    }}
-                    className={`
-                      flex items-center justify-between rounded-lg transition-all duration-200 font-medium w-full
-                      ${isActiveGroup ? styles.sidebarActive : styles.sidebarHover}
-                      ${isCollapsed ? 'justify-center w-10 h-10 mx-auto p-0' : 'px-3 py-2.5'}
-                    `}
-                    title={isCollapsed ? item.label : ''}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon size={20} className={`shrink-0 ${isActiveGroup ? 'text-indigo-600' : styles.text}`} />
-                      {!isCollapsed && (
-                        <span className="whitespace-nowrap overflow-hidden text-sm">{item.label}</span>
-                      )}
-                    </div>
-                    {!isCollapsed && (
-                      <ChevronDown size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${styles.text}`} />
-                    )}
-                  </button>
-
-                  {/* Sub Items */}
-                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded && !isCollapsed ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <div className="pt-1 pb-2 space-y-1">
-                      {item.children.map((child) => {
-                        const isActive = isNavItemActive(child);
-                        return (
-                          <button
-                            key={child.view}
-                            onClick={() => {
-                              if (child.view) onNavigate(child.view);
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={`
-                              flex items-center rounded-lg transition-all duration-200 font-medium w-full pl-10 pr-3 py-2
-                              ${isActive ? 'bg-indigo-50/50 text-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'}
-                              text-sm
-                            `}
-                          >
-                            <span className="whitespace-nowrap">{child.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Regular Item
-            const isActive = isNavItemActive(item);
-            return (
-              <button
-                key={item.view}
-                onClick={() => {
-                  if (item.view) onNavigate(item.view);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`
-                  flex items-center rounded-lg transition-all duration-200 font-medium
-                  ${isActive
-                    ? styles.sidebarActive
-                    : styles.sidebarHover
-                  }
-                  ${isCollapsed
-                    ? 'justify-center w-10 h-10 mx-auto p-0'
-                    : 'w-full gap-3 px-3 py-2.5'
-                  }
-                `}
-                title={isCollapsed ? item.label : ''}
-              >
-                <item.icon size={20} className={`shrink-0 ${isActive ? 'text-indigo-600' : styles.text}`} />
-                <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
+      <div
+        id="app-sidebar"
+        data-theme={styles.dark ? 'dark' : undefined}
+        className={`
+          fixed md:relative z-40 h-full border-r flex flex-col transition-all duration-300 ease-in-out
+          ${styles.sidebar}
+          ${isMobileMenuOpen ? 'translate-x-0' : 'max-md:invisible -translate-x-full md:translate-x-0'}
+          w-(--rp-sidebar) ${collapsed ? 'md:w-(--rp-rail)' : 'md:w-(--rp-sidebar)'}
+          pt-14 md:pt-0
+        `}
+      >
+        {/* Collapse toggle, floating on the border */}
+        {!railMode && (
           <button
             type="button"
-            onClick={() => {
-              onNavigate(ViewState.SETTINGS);
-              setIsMobileMenuOpen(false);
-            }}
-            className={`
-              flex items-center rounded-lg transition-all duration-200 font-medium
-              ${(
-                currentView === ViewState.SETTINGS
-                || currentView === ViewState.SETTINGS_VOICE
-                || currentView === ViewState.SETTINGS_DIALOGUE_VOICE
-                || currentView === ViewState.SETTINGS_API_KEY
-              )
-                ? styles.sidebarActive
-                : styles.sidebarHover
-              }
-              ${isCollapsed
-                ? 'justify-center w-10 h-10 mx-auto p-0'
-                : 'w-full gap-3 px-3 py-2.5'
-              }
-            `}
-            title={isCollapsed ? t.settings : ''}
+            onClick={() => setIsCollapsed((value) => !value)}
+            aria-label={isCollapsed ? t.expandSidebar : t.collapseSidebar}
+            aria-expanded={!isCollapsed}
+            aria-controls="app-sidebar"
+            className="absolute -right-3 top-8 z-50 hidden md:flex w-6 h-6 rounded-full bg-surface border border-line shadow-1 items-center justify-center text-fg-3 hover:text-primary-text hover:border-primary transition-colors"
           >
-            <SettingsIcon size={20} className={`shrink-0 ${(
-                currentView === ViewState.SETTINGS
-                || currentView === ViewState.SETTINGS_VOICE
-                || currentView === ViewState.SETTINGS_DIALOGUE_VOICE
-                || currentView === ViewState.SETTINGS_API_KEY
-            ) ? 'text-indigo-600' : styles.text}`} />
-            <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-              {t.settings}
-            </span>
+            {isCollapsed ? <ChevronRight size={12} aria-hidden="true" /> : <ChevronLeft size={12} aria-hidden="true" />}
           </button>
+        )}
 
-          <div className={`mt-4 ${isCollapsed ? 'px-0' : 'px-1'}`}>
+        <div className={`hidden md:flex items-center gap-3 h-16 shrink-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
+          <BrandMark size={32} />
+          {!collapsed && (
+            <span className={`text-lg font-bold tracking-tight whitespace-nowrap ${styles.brandText}`}>Rise Path</span>
+          )}
+        </div>
+
+        <nav
+          ref={navRef}
+          aria-label={t.mainNav}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 flex flex-col"
+        >
+          <ul className="space-y-1">
+            {navEntries.map((entry) => (isGroup(entry) ? renderGroup(entry) : renderItem(entry)))}
+          </ul>
+
+          <div className="mt-auto pt-4 space-y-1">
             <div
-              className={`
-                flex items-center rounded-lg border px-2 py-2
-                ${isCollapsed ? 'flex-col gap-2' : 'justify-between'}
-                ${theme === 'default' ? 'bg-slate-100 border-slate-200' : 'bg-transparent border-white/10'}
-              `}
+              role="group"
+              aria-label={t.language}
+              className={`flex items-center rounded-control border ${styles.panel} ${collapsed ? 'flex-col gap-1 px-0 py-1' : 'justify-between px-2 py-1.5'}`}
             >
-              {!isCollapsed && (
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'default' ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {t.language}
-                </span>
+              {!collapsed && (
+                <span aria-hidden="true" className={`eyebrow ${styles.text}`}>{t.language}</span>
               )}
-              <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-2'}`}>
-                <button
-                  type="button"
-                  onClick={() => setLanguage('en')}
-                  className={`px-2 py-1 rounded-full text-[10px] font-bold transition-all ${selectedLanguage === 'en'
-                    ? (theme === 'default' ? 'bg-slate-900 text-white' : 'bg-white/10 text-white')
-                    : (theme === 'default' ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white')
-                  }`}
-                  aria-pressed={selectedLanguage === 'en'}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLanguage('jp')}
-                  className={`px-2 py-1 rounded-full text-[10px] font-bold transition-all ${selectedLanguage === 'jp'
-                    ? (theme === 'default' ? 'bg-slate-900 text-white' : 'bg-white/10 text-white')
-                    : (theme === 'default' ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white')
-                  }`}
-                  aria-pressed={selectedLanguage === 'jp'}
-                >
-                  JP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLanguage('fr')}
-                  className={`px-2 py-1 rounded-full text-[10px] font-bold transition-all ${selectedLanguage === 'fr'
-                    ? (theme === 'default' ? 'bg-slate-900 text-white' : 'bg-white/10 text-white')
-                    : (theme === 'default' ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white')
-                  }`}
-                  aria-pressed={selectedLanguage === 'fr'}
-                >
-                  FR
-                </button>
+              <div className={`flex items-center ${collapsed ? 'flex-col gap-1' : 'gap-1'}`}>
+                {languageOptions.map((option) => {
+                  const isSelected = selectedLanguage === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setLanguage(option.value)}
+                      aria-pressed={isSelected}
+                      aria-label={option.name}
+                      lang={option.lang}
+                      className={`min-w-9 min-h-8 px-2 rounded-full text-xs font-bold transition-colors ${isSelected ? styles.langOn : styles.langOff}`}
+                    >
+                      {option.short}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onLogout?.();
+              }}
+              title={collapsed ? t.logOut : undefined}
+              className={`${rowClass} text-body ${styles.sidebarHover} ${styles.text}`}
+            >
+              <LogOut size={18} aria-hidden="true" className="shrink-0" />
+              <span className={collapsed ? 'sr-only' : 'truncate'}>{t.logOut}</span>
+            </button>
           </div>
-          {/* Sign Out - Unified */}
-          <button
-            className={`
-              flex items-center rounded-lg transition-all duration-200 font-medium mt-auto
-              ${styles.sidebarHover} ${styles.text}
-              ${isCollapsed
-                ? 'justify-center w-10 h-10 mx-auto p-0'
-                : 'w-full gap-3 px-3 py-2.5'
-              }
-            `}
-            title={isCollapsed ? t.logOut : ""}
-          >
-            <LogOut size={18} className="shrink-0" />
-            <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-              {t.logOut}
-            </span>
-          </button>
         </nav>
-      </aside>
+      </div>
 
       {/* Main Content Area */}
       <main
+        id="main-content"
         ref={mainRef}
-        className={`flex-1 min-w-0 overflow-y-auto h-full w-full pt-16 md:pt-0 relative overflow-x-hidden ${styles.main}`}
+        tabIndex={-1}
+        inert={isMobileMenuOpen || undefined}
+        className={`flex-1 min-w-0 overflow-y-auto h-full w-full ${railMode ? '' : 'pt-14 md:pt-0'} relative overflow-x-hidden focus:outline-none ${styles.main}`}
       >
         <div
           className={`min-h-full w-full ${
             isFullBleedView
               ? ''
-              : 'max-w-[1440px] 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8'
+              : 'max-w-wide 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8'
           }`}
         >
           <div key={location.pathname} className="page-transition">
@@ -522,7 +560,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          aria-hidden="true"
+          className="fixed inset-0 bg-overlay z-30 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

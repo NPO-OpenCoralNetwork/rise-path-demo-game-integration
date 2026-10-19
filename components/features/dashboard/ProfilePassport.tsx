@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import {
-    User, LogOut, RotateCcw, Bell, Settings
-} from 'lucide-react';
+import { LogOut, RotateCcw, Bell, Settings, ShieldCheck } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
-import { getGeminiApiKeyInfo, hasGeminiApiKey } from '../../../services/geminiApiKey';
+import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
 import { getTotalXp, getLevel, getStreak } from '../../../services/gamificationService';
 
 interface ProfilePassportProps {
@@ -17,69 +14,122 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
     const { language } = useLanguage();
     const { user: authUser, logout } = useAuth();
     const [isFlipped, setIsFlipped] = useState(false);
-    const [apiKeyInfo, setApiKeyInfo] = useState(getGeminiApiKeyInfo());
+    const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
+    const [llmStatusFailed, setLlmStatusFailed] = useState(false);
     const copy = {
         en: {
             studentId: 'Student ID',
             identitySubtitle: 'Manage your identity and credentials.',
-            apiKeyTitle: 'Gemini API Key',
-            apiKeyActive: 'Active',
-            apiKeyMissing: 'Missing',
-            apiKeyManage: 'Manage in Settings',
-            apiKeySourceEnv: 'Source: Environment',
-            apiKeySourceLocal: 'Source: Browser storage',
-            apiKeySourceNone: 'Source: Not set',
-            apiKeyEnvHint: 'Environment key is active. Local key is ignored.',
+            campus: 'Rise Path Campus',
+            idCard: 'ID card',
+            active: 'Active',
+            level: 'Level',
+            xp: 'XP',
+            flip: 'Flip',
+            flipLabel: 'Show the back of the card',
+            front: 'Front',
+            frontLabel: 'Show the front of the card',
+            passport: 'Digital passport',
+            streak: 'Learning streak',
+            streakValue: (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`,
+            totalXp: 'Total XP',
+            roleGuest: 'Guest',
+            roleMember: 'Learner',
+            settings: 'Settings',
+            editProfile: 'Edit profile details',
+            mirror: 'Learning mirror',
+            subscription: 'Manage subscription',
+            notifications: 'Notifications',
+            signOut: 'Sign out',
+            footnote: 'Your card keeps your level, XP and settings in one place.',
+            aiTitle: 'AI features',
+            aiBody: 'AI runs securely on the server. No API key is needed.',
+            aiChecking: 'Checking',
+            aiLive: 'Active',
+            aiDemo: 'Demo',
+            aiOff: 'Off',
+            aiUnreachable: 'Offline',
+            aiDetails: 'View AI status',
         },
         jp: {
             studentId: '学生証',
             identitySubtitle: '身分情報と資格を管理します。',
-            apiKeyTitle: 'Gemini APIキー',
-            apiKeyActive: '設定済み',
-            apiKeyMissing: '未設定',
-            apiKeyManage: '設定で管理',
-            apiKeySourceEnv: '設定元: 環境変数',
-            apiKeySourceLocal: '設定元: ブラウザ保存',
-            apiKeySourceNone: '設定元: 未設定',
-            apiKeyEnvHint: '環境変数のキーが優先されます。',
+            campus: 'Rise Path キャンパス',
+            idCard: '学生証',
+            active: '有効',
+            level: 'レベル',
+            xp: 'XP',
+            flip: '裏返す',
+            flipLabel: 'カードの裏面を見る',
+            front: '表へ',
+            frontLabel: 'カードの表面を見る',
+            passport: 'デジタルパスポート',
+            streak: '連続日数',
+            streakValue: (n: number) => `${n}日`,
+            totalXp: '合計XP',
+            roleGuest: 'ゲスト',
+            roleMember: '学習者',
+            settings: '設定',
+            editProfile: 'プロフィール編集',
+            mirror: '学習の鏡',
+            subscription: 'サブスクリプション管理',
+            notifications: '通知',
+            signOut: 'ログアウト',
+            footnote: 'レベル・XP・設定を、このカードにまとめています。',
+            aiTitle: 'AI 機能',
+            aiBody: 'AI はサーバーで安全に実行されています。API キーは不要です。',
+            aiChecking: '確認中',
+            aiLive: '利用可能',
+            aiDemo: 'デモ',
+            aiOff: '未設定',
+            aiUnreachable: '接続不可',
+            aiDetails: 'AI の状態を見る',
         }
     } as const;
     const t = copy[language];
-    const location = useLocation();
 
     useEffect(() => {
-        setApiKeyInfo(getGeminiApiKeyInfo());
-    }, [location.key]);
+        clearLegacyBrowserKey();
+        const controller = new AbortController();
+        getLlmStatus(controller.signal)
+            .then(setLlmStatus)
+            .catch(() => { if (!controller.signal.aborted) setLlmStatusFailed(true); });
+        return () => controller.abort();
+    }, []);
 
-    const maskedKey = apiKeyInfo.key
-        ? `${apiKeyInfo.key.slice(0, 4)}••••${apiKeyInfo.key.slice(-4)}`
-        : '—';
-
-    const apiKeySourceLabel = apiKeyInfo.source === 'env'
-        ? t.apiKeySourceEnv
-        : apiKeyInfo.source === 'local'
-        ? t.apiKeySourceLocal
-        : t.apiKeySourceNone;
+    const aiAvailability = summarizeLlmStatus(llmStatus, llmStatusFailed);
+    const aiProvider = aiAvailability === 'live' ? primaryProviderLabel(llmStatus) : null;
+    const aiBadge = {
+        checking: t.aiChecking,
+        live: t.aiLive,
+        demo: t.aiDemo,
+        off: t.aiOff,
+        unreachable: t.aiUnreachable,
+    }[aiAvailability];
 
     const user = {
         name: authUser?.name || 'Guest Explorer',
-        id: authUser?.id?.slice(0, 12)?.toUpperCase() || 'LUM-0000-XX',
-        role: authUser?.isGuest ? 'Guest' : 'Cadet Engineer',
+        role: !authUser || authUser.isGuest ? t.roleGuest : t.roleMember,
         level: getLevel(),
         xp: getTotalXp(),
         streak: getStreak(),
-        joined: "2024.11.01",
-        email: authUser?.email || 'guest@risepath.system',
-        avatar: authUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+        // No stock photo of a stranger: the learner's own avatar, else their initials.
+        avatar: authUser?.avatar || null,
     };
+    const initials = user.name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => Array.from(part)[0]?.toUpperCase() ?? '')
+        .join('') || '?';
 
     return (
-        <div className="min-h-screen bg-slate-50/50 flex flex-col items-center pt-12 pb-20 px-4 md:pt-24">
+        <div className="min-h-screen bg-canvas flex flex-col items-center pt-12 pb-20 px-4 md:pt-24">
 
             {/* Page Header */}
             <div className="text-center mb-12">
-                <h1 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight mb-2">{t.studentId}</h1>
-                <p className="text-slate-500">{t.identitySubtitle}</p>
+                <h1 className="text-h1 text-fg mb-2">{t.studentId}</h1>
+                <p className="text-body text-fg-2">{t.identitySubtitle}</p>
             </div>
 
             {/* 3D Flip Container - Using inline styles for reliable 3D transforms */}
@@ -122,23 +172,29 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-slate-900/20">L</div>
                                         <div>
-                                            <span className="block font-bold tracking-tight text-slate-800 text-sm leading-none">Rise Path Campus</span>
-                                            <span className="text-[10px] text-slate-500 font-mono">ID CARD</span>
+                                            <span className="block font-bold text-fg text-small leading-none">{t.campus}</span>
+                                            <span className="eyebrow text-fg-3">{t.idCard}</span>
                                         </div>
                                     </div>
-                                    <div className="bg-emerald-100/80 backdrop-blur-sm text-emerald-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-200/50 shadow-sm">
-                                        Active
+                                    <div className="bg-surface text-success px-2 py-1 rounded-chip text-caption font-bold border border-line shadow-1">
+                                        {t.active}
                                     </div>
                                 </div>
 
                                 {/* Main Identity */}
                                 <div className="flex gap-5 items-center mt-2">
                                     <div className="w-20 h-20 rounded-2xl bg-white shadow-inner border-[3px] border-white shrink-0 overflow-hidden relative group-hover:scale-105 transition-transform ring-1 ring-slate-100">
-                                        <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        {user.avatar ? (
+                                            <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span aria-hidden="true" className="grid h-full w-full place-items-center bg-primary-soft text-h2 font-bold text-primary-text">
+                                                {initials}
+                                            </span>
+                                        )}
                                     </div>
                                     <div>
-                                        <h2 className="text-2xl font-bold text-slate-900 leading-tight mb-1 drop-shadow-sm">{user.name}</h2>
-                                        <p className="text-xs font-semibold text-indigo-700 bg-indigo-50/80 backdrop-blur-sm px-2 py-0.5 rounded-md w-fit border border-indigo-100">{user.role}</p>
+                                        <h2 className="text-h2 text-fg mb-1">{user.name}</h2>
+                                        <p className="text-caption font-semibold text-primary-text bg-primary-soft px-2 py-0.5 rounded-chip w-fit">{user.role}</p>
                                     </div>
                                 </div>
 
@@ -146,20 +202,22 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                 <div className="flex items-end justify-between mt-2">
                                     <div className="flex gap-5">
                                         <div>
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Level</div>
-                                            <div className="text-lg font-bold text-slate-800 leading-none mt-0.5">{user.level}</div>
+                                            <div className="eyebrow text-fg-3">{t.level}</div>
+                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5">{user.level}</div>
                                         </div>
                                         <div>
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">XP</div>
-                                            <div className="text-lg font-bold text-slate-800 leading-none mt-0.5">{user.xp}</div>
+                                            <div className="eyebrow text-fg-3">{t.xp}</div>
+                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5">{user.xp}</div>
                                         </div>
                                     </div>
 
                                     <button
+                                        type="button"
                                         onClick={() => setIsFlipped(true)}
-                                        className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-white/80 backdrop-blur-sm border border-slate-200/60 hover:border-indigo-200 shadow-sm px-3 py-1.5 rounded-full"
+                                        aria-label={t.flipLabel}
+                                        className="flex items-center gap-1.5 text-caption font-bold text-fg-2 hover:text-primary-text transition-colors bg-surface border border-line hover:border-primary shadow-1 px-3 py-1.5 rounded-full"
                                     >
-                                        <RotateCcw size={10} /> Flip
+                                        <RotateCcw size={12} aria-hidden="true" /> {t.flip}
                                     </button>
                                 </div>
 
@@ -167,8 +225,9 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* BACK: Settings / Data */}
+                    {/* BACK: Settings / Data (dark tokens scoped to the card face) */}
                     <div
+                        data-theme="dark"
                         className={`absolute inset-0 ${!isFlipped ? 'pointer-events-none' : ''}`}
                         style={{
                             backfaceVisibility: 'hidden',
@@ -181,13 +240,15 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                             <div className="flex items-center justify-between p-4 border-b border-white/5 bg-slate-900/50 backdrop-blur-md z-10">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                    Digital Passport
+                                    {t.passport}
                                 </h3>
                                 <button
+                                    type="button"
                                     onClick={() => setIsFlipped(false)}
-                                    className="text-xs font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-1"
+                                    aria-label={t.frontLabel}
+                                    className="text-caption font-bold text-fg-2 hover:text-fg transition-colors flex items-center gap-1"
                                 >
-                                    Front <RotateCcw size={10} />
+                                    {t.front} <RotateCcw size={12} aria-hidden="true" />
                                 </button>
                             </div>
 
@@ -197,36 +258,33 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                 {/* Quick Stats Row */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                                        <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Learning Streak</div>
-                                        <div className="text-xl font-bold text-white">{user.streak} {user.streak === 1 ? 'Day' : 'Days'}</div>
+                                        <div className="eyebrow text-fg-3 mb-1">{t.streak}</div>
+                                        <div className="tabular text-h2 text-fg">{t.streakValue(user.streak)}</div>
                                     </div>
                                     <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                                        <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Total XP</div>
-                                        <div className="text-xl font-bold text-white">{user.xp}</div>
+                                        <div className="eyebrow text-fg-3 mb-1">{t.totalXp}</div>
+                                        <div className="tabular text-h2 text-fg">{user.xp}</div>
                                     </div>
                                 </div>
 
-                                {/* API Key summary — manage in Settings (Phase 17-C) */}
+                                {/* AI status — models run on the server; no key in the browser (WP-08) */}
                                 <div className="bg-slate-800/30 rounded-xl p-3 border border-white/5 space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t.apiKeyTitle}</label>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasGeminiApiKey() ? 'text-emerald-400 bg-emerald-400/10' : 'text-amber-300 bg-amber-300/10'}`}>
-                                            {hasGeminiApiKey() ? t.apiKeyActive : t.apiKeyMissing}
+                                    <div className="flex justify-between items-center gap-2">
+                                        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-300">
+                                            <ShieldCheck size={14} className="text-emerald-400" aria-hidden="true" />
+                                            {t.aiTitle}
+                                        </span>
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${aiAvailability === 'live' ? 'text-emerald-300 bg-emerald-400/10' : 'text-amber-200 bg-amber-300/10'}`}>
+                                            {aiProvider ? `${aiBadge} · ${aiProvider}` : aiBadge}
                                         </span>
                                     </div>
-                                    <p className="text-[9px] text-slate-500">{apiKeySourceLabel}</p>
-                                    <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10 text-xs">
-                                        <span className="font-mono text-slate-400 truncate flex-1">{maskedKey}</span>
-                                    </div>
-                                    {apiKeyInfo.source === 'env' && (
-                                        <p className="text-[9px] text-amber-300">{t.apiKeyEnvHint}</p>
-                                    )}
+                                    <p className="text-xs text-slate-300">{t.aiBody}</p>
                                     <button
                                         type="button"
                                         onClick={() => onNavigate(ViewState.SETTINGS_API_KEY)}
-                                        className="w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 px-2 py-2 rounded text-white transition-colors"
+                                        className="w-full text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-2 rounded text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                                     >
-                                        {t.apiKeyManage}
+                                        {t.aiDetails}
                                     </button>
                                 </div>
 
@@ -236,35 +294,35 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                         onClick={() => onNavigate(ViewState.SETTINGS)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
                                     >
-                                        <span className="flex items-center gap-2"><Settings size={12} /> {language === 'jp' ? '設定' : 'Settings'}</span>
+                                        <span className="flex items-center gap-2"><Settings size={12} aria-hidden="true" /> {t.settings}</span>
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
                                     <button
                                         onClick={() => onNavigate(ViewState.PROFILE_EDIT)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
                                     >
-                                        {language === 'jp' ? 'プロフィール編集' : 'Edit Profile Details'}
+                                        {t.editProfile}
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
                                     <button
                                         onClick={() => onNavigate(ViewState.PROFILE_MIRROR)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
                                     >
-                                        {language === 'jp' ? '学習の鏡' : 'Learning Mirror'}
+                                        {t.mirror}
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
                                     <button
                                         onClick={() => onNavigate(ViewState.SUBSCRIPTION)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
                                     >
-                                        {language === 'jp' ? 'サブスクリプション管理' : 'Manage Subscription'}
+                                        {t.subscription}
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
                                     <button
                                         onClick={() => onNavigate(ViewState.NOTIFICATIONS)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
                                     >
-                                        <span className="flex items-center gap-2"><Bell size={12} /> {language === 'jp' ? '通知' : 'Notifications'}</span>
+                                        <span className="flex items-center gap-2"><Bell size={12} aria-hidden="true" /> {t.notifications}</span>
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
                                     <button
@@ -274,7 +332,7 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                         }}
                                         className="w-full text-left p-2 hover:bg-red-500/10 rounded-lg text-xs font-medium text-red-400 transition-colors flex items-center gap-2 mt-2"
                                     >
-                                        <LogOut size={12} /> Sign Out
+                                        <LogOut size={12} aria-hidden="true" /> {t.signOut}
                                     </button>
                                 </div>
                             </div>
@@ -288,16 +346,11 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                 onClick={() => onNavigate(ViewState.SETTINGS)}
                 className="mt-6 flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
             >
-                <Settings size={16} />
-                {language === 'jp' ? '設定' : 'Settings'}
+                <Settings size={16} aria-hidden="true" />
+                {t.settings}
             </button>
 
-            {/* Helper Text */}
-            <div className="mt-4 text-center opacity-60">
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                    This digital ID grants you access to all Rise Path facilities including the Vibe Coding cockpit and the Art Atelier.
-                </p>
-            </div>
+            <p className="mt-4 max-w-xs text-center text-caption text-fg-3">{t.footnote}</p>
 
         </div>
     );

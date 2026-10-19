@@ -29,7 +29,6 @@
   // exclude skips orphan files only; imports (e.g. PersonalAssessmentView → ai-learning-diagnosis) still typecheck.
   "exclude": [
     "ai-learning-diagnosis/**",
-    "test_generation.ts",
     "dist/**",
     "node_modules/**"
   ]

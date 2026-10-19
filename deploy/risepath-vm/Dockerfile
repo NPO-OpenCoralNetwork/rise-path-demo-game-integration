@@ -33,6 +33,8 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY server.js ./
 COPY server/ ./server/
 COPY tools/ ./tools/
+COPY shared/ ./shared/
+COPY content/ ./content/
 COPY scripts/ ./scripts/
 COPY public/ ./public/
 COPY data/ ./data/
@@ -54,6 +56,8 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY mcp-server/ ./mcp-server/
 COPY tools/ ./tools/
+COPY shared/ ./shared/
+COPY content/ ./content/
 COPY server/ ./server/
 COPY scripts/ ./scripts/
 COPY agents/ ./agents/

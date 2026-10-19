@@ -169,7 +169,14 @@ const BlenderCurriculum: React.FC<BlenderCurriculumProps> = ({ onNavigate }) => 
         {courses.map(course => (
           <div
             key={course.id}
+            role="link"
+            tabIndex={0}
             onClick={handleProjectClick}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              handleProjectClick();
+            }}
             className={`
               group rounded-2xl cursor-pointer transition-all overflow-hidden flex flex-col h-full relative border
               bg-white border-slate-100 shadow-sm hover:shadow-lg hover:border-orange-100 hover:-translate-y-1

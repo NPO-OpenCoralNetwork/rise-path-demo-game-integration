@@ -1,0 +1,115 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "vibe-ch0",
+  "courseId": "vibe-coding",
+  "title": {
+    "jp": "第0章｜この時代の前提を共有する",
+    "en": "Chapter 0 | Sharing the Premise"
+  },
+  "subtitle": {
+    "jp": "なぜ今「コードを書かない開発」が可能なのか。そして私たちの役割は何かに迫る。",
+    "en": "Understanding why \"No-Code\" development is now possible and what our roles are."
+  },
+  "locale": "jp",
+  "locales": [
+    "jp",
+    "en"
+  ],
+  "estMinutes": 10,
+  "objectives": [],
+  "sections": [
+    {
+      "id": "0-1",
+      "title": {
+        "jp": "0-1. パラダイムシフトの全体像",
+        "en": "0-1. The Paradigm Shift (Mind Map)"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "具体的な方法に入る前に、まずは全体像を俯瞰しましょう。各トピックの詳細は、図の下の説明で確認できます。",
+            "en": "Before we dive into the how-to, let's look at the big picture. The description under the figure explains each topic."
+          },
+          "style": "lead"
+        },
+        {
+          "id": "s1-b2",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": {
+            "jp": "mindmap\n  root((\"バイブコーディング\"))\n    n1[\"なぜ今成立するのか\"]\n      n2[\"ロングコンテキスト\"]\n      n3[\"ネイティブな速度\"]\n    n4[\"人間の新しい役割\"]\n    n5[\"AIの役割\"]",
+            "en": "mindmap\n  root((\"Vibe Coding\"))\n    n1[\"Why Now?\"]\n      n2[\"Long Context\"]\n      n3[\"Native Speed\"]\n    n4[\"Human Role\"]\n    n5[\"AI Role\"]"
+          },
+          "caption": {
+            "jp": "バイブコーディングの全体像",
+            "en": "Vibe Coding: overview"
+          },
+          "alt": {
+            "jp": "マインドマップ。中心は「バイブコーディング」。枝は「なぜ今成立するのか」、「人間の新しい役割」、「AIの役割」。",
+            "en": "Mind map centered on \"Vibe Coding\" with branches: Why Now?, Human Role, AI Role."
+          },
+          "description": {
+            "jp": "- **なぜ今成立するのか**：LLM（Gemini 3 Proなど）の推論能力が劇的に向上し、「一行ずつ命令する」から「意図を指揮する」への転換が起きたため。\n  - **ロングコンテキスト**：AIがプロジェクト全体を一気に理解できる。\n  - **ネイティブな速度**：思考の速度でコードが形になる。\n- **人間の新しい役割**：構文と戦う時間は終わり。あなたの仕事は「ビジョンの提示」「体験(UX)の設計」「正しいかどうかの判断」です。\n- **AIの役割**：実装の実行、構文の管理、そして地道なルーチンワークの完遂。",
+            "en": "- **Why Now?**: Massive improvement in LLM reasoning (Gemini 3 Pro) and the shift from \"Instruction\" to \"Orchestration.\".\n  - **Long Context**: AI can read your whole project at once.\n  - **Native Speed**: Near-instant generation cycle.\n- **Human Role**: No more fighting with syntax. Your job is Vision, UX, and Validation.\n- **AI Role**: Execution, syntax management, and tedious implementation."
+          }
+        }
+      ]
+    },
+    {
+      "id": "0-2",
+      "title": {
+        "jp": "0-2. このカリキュラムで“やらないこと”",
+        "en": "0-2. What we \"Don't Do\" in this course"
+      },
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-b1",
+          "type": "markdown",
+          "md": {
+            "jp": "バイブコーディングを習得するために、あえて「捨てる」習慣があります。",
+            "en": "To master Vibe Coding, you must let go of some old habits."
+          }
+        },
+        {
+          "id": "s2-b2",
+          "type": "list",
+          "style": "check",
+          "items": [
+            {
+              "jp": "タグや構文の暗記（AIに任せる）",
+              "en": "Memorizing tags and syntax"
+            },
+            {
+              "jp": "一行ずつの手動デバッグ（ログをAIに食わせる）",
+              "en": "Debugging line-by-line manually"
+            },
+            {
+              "jp": "ゼロからのスクラッチ開発（叩き台はAIに作らせる）",
+              "en": "Building everything from scratch"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "author": "migration+claude-code",
+    "migratedFrom": {
+      "source": "data/curricula/vibe_coding/chapter0.ts",
+      "export": "VIBE_CHAPTER_0_DATA",
+      "counts": {
+        "sections": 2,
+        "blocks": 4,
+        "tableRows": 0,
+        "quizQuestions": 0,
+        "text": 2,
+        "mindmap": 1,
+        "list": 1
+      }
+    }
+  }
+}

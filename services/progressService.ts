@@ -42,7 +42,9 @@ const loadStore = (): ProgressStore => {
 };
 
 const saveStore = (store: ProgressStore): void => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    } catch { /* Storage full or blocked: keep going without saving. */ }
 };
 
 const loadEvents = (): LearningEvent[] => {
@@ -53,7 +55,9 @@ const loadEvents = (): LearningEvent[] => {
 };
 
 const saveEvents = (events: LearningEvent[]): void => {
-    localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+    try {
+        localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+    } catch { /* Storage full or blocked: keep going without saving. */ }
 };
 
 // --- Sync to API (fire-and-forget) ---
@@ -176,8 +180,10 @@ export const clearCourseProgress = (courseId: string): void => {
 };
 
 export const clearAllProgress = (): void => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(EVENTS_KEY);
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(EVENTS_KEY);
+    } catch { /* Storage blocked: nothing to clear. */ }
 };
 
 export const getLearningEvents = (): LearningEvent[] => loadEvents();

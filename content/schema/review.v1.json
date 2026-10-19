@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rise Path lesson review (review.v1)",
+  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lessonId", "file", "reviewer", "rubricVersion", "scores", "mustFix", "niceToHave", "verdict", "summary"],
+  "properties": {
+    "lessonId": {
+      "type": "string",
+      "description": "The lesson id (file name without .lesson.json)."
+    },
+    "file": {
+      "type": "string",
+      "description": "Repo-relative path of the reviewed file, e.g. content/courses/vibe-coding/drafts/vibe-ch1-practice.lesson.json."
+    },
+    "reviewer": {
+      "type": "string",
+      "description": "Who reviewed: pedagogy-reviewer, ja-editor, visual-qa, ci or human:<name>."
+    },
+    "rubricVersion": {
+      "type": "string",
+      "enum": ["rubric.v1"]
+    },
+    "scores": {
+      "type": "array",
+      "description": "One entry per criterion in the reviewer's scope. pedagogy-reviewer scores all 13; ja-editor and visual-qa score the criteria they can judge.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "score", "evidence"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["align", "hook", "prior", "load", "worked", "active", "miscon", "visual", "practice", "meta", "accuracy", "voice", "a11y_l10n"]
+          },
+          "score": {
+            "type": "integer",
+            "enum": [0, 1, 2, 3, 4]
+          },
+          "evidence": {
+            "type": "string",
+            "description": "One or two sentences that quote the lesson or name block ids."
+          },
+          "blockIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "mustFix": {
+      "type": "array",
+      "description": "Changes required before the lesson can pass. Each fix is specific enough to apply without guessing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "blockId", "issue", "fix"],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "enum": ["align", "hook", "prior", "load", "worked", "active", "miscon", "visual", "practice", "meta", "accuracy", "voice", "a11y_l10n"]
+          },
+          "blockId": {
+            "type": "string",
+            "description": "Block, section or objective id; \"lesson\" for lesson-wide issues."
+          },
+          "issue": { "type": "string" },
+          "fix": { "type": "string" },
+          "screenshot": {
+            "type": "string",
+            "description": "visual-qa only: the PNG that shows the issue, relative to the preview folder."
+          }
+        }
+      }
+    },
+    "niceToHave": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "average": {
+      "type": "number",
+      "description": "Mean of the scores given. Optional; check-review.mjs recomputes it."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "revise", "reject"],
+      "description": "pass: every scored criterion ≥ 3, mean ≥ 3.3, no mustFix. revise: fixable. reject: wrong audience or outcome; needs a rewrite."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Two or three sentences for the author: the biggest strength and the most important fix."
+    }
+  }
+}

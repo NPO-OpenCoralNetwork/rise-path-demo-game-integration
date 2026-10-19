@@ -6,6 +6,7 @@ import {
     Copy, Check, FileText, Brain, ChevronDown, ChevronLeft, ChevronUp, Image, Play, Pause, Volume2, VolumeX
 } from 'lucide-react';
 import mermaid from 'mermaid';
+import DOMPurify from 'dompurify';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -57,9 +58,10 @@ type SlideDeck = {
 
 const SLIDE_DECKS: Record<string, SlideDeck & { slideTimestamps?: number[] }> = {
     'm1-l1': {
-        type: 'pdf',
+        // The PDF export of this deck is not in the repo (*.pdf is git-ignored); the per-slide SVGs are.
+        type: 'images',
         title: { en: 'Variables & Memory Slides', jp: '変数とメモリ管理スライド' },
-        pdfUrl: '/slides/variables-memory/variables-memory.pdf',
+        slides: [1, 2, 3, 4, 5].map((n) => `/slides/variables-memory/0${n}.svg`),
         narrations: [
             {
                 en: 'A variable is a label. It does not store a value directly, it points to an object in memory. Multiple labels can reference the same object.',
@@ -85,8 +87,27 @@ const SLIDE_DECKS: Record<string, SlideDeck & { slideTimestamps?: number[] }> = 
         // Single master audio file for the entire deck
         audio: ['/audio/slides/m1-l1/01.wav'], 
         // Cumulative timestamps (seconds) when each slide should transition to the next
-        slideTimestamps: [10.87, 21.74, 32.61, 43.48, 54.37] 
+        slideTimestamps: [10.87, 21.74, 32.61, 43.48, 54.37]
     }
+};
+
+// Slide files are deployed separately from the app, and the SPA fallback answers a missing file
+// with index.html (200, text/html). Probe the deck's first file and only offer the Slides tab
+// when it comes back as a PDF or an image.
+const useSlideDeckAvailable = (deck?: SlideDeck) => {
+    const probeUrl = deck ? (deck.type === 'pdf' ? deck.pdfUrl : deck.slides?.[0]) : undefined;
+    const expected = deck?.type === 'pdf' ? 'pdf' : 'image/';
+    const [available, setAvailable] = useState(false);
+    useEffect(() => {
+        setAvailable(false);
+        if (!probeUrl) return;
+        const controller = new AbortController();
+        fetch(probeUrl, { method: 'HEAD', signal: controller.signal })
+            .then((res) => setAvailable(res.ok && (res.headers.get('content-type') || '').includes(expected)))
+            .catch(() => {});
+        return () => controller.abort();
+    }, [probeUrl, expected]);
+    return available;
 };
 
 // Personalization mode badge labels
@@ -170,7 +191,8 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
     const observer = useRef<IntersectionObserver | null>(null);
     const hasQuiz = Boolean(lesson.quiz && lesson.quiz.questions && lesson.quiz.questions.length > 0);
     const slideDeck = SLIDE_DECKS[lesson.lesson_id];
-    const hasSlides = Boolean(
+    const slideDeckAvailable = useSlideDeckAvailable(slideDeck);
+    const hasSlides = slideDeckAvailable && Boolean(
         slideDeck &&
         ((slideDeck.type === 'images' && slideDeck.slides && slideDeck.slides.length > 0) ||
             (slideDeck.type === 'pdf' && slideDeck.pdfUrl))
@@ -266,15 +288,6 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
         applyPendingSeek();
     };
 
-    // Debug: Log lesson data
-    console.log('[GeneratedDocView] Rendering with lesson:', {
-        lessonId: lesson?.lesson_id,
-        title: lesson?.title,
-        sectionsCount: lesson?.sections?.length,
-        firstSectionBlocks: lesson?.sections?.[0]?.content?.length,
-        fullLesson: lesson
-    });
-
     useEffect(() => {
         let active = true;
         Promise.all([loadTtsPreferences(language), checkTtsAvailable()])
@@ -311,7 +324,22 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
             checkAnswers: "Check Answers",
             correct: "Correct!",
             incorrect: "Incorrect",
-            score: "Score"
+            score: "Score",
+            lesson: "Lesson",
+            back: "Back to course",
+            backToDoc: "Back to the lesson",
+            viewMode: "View mode",
+            language: "Language",
+            slideAlt: (n: number) => `Slide ${n}`,
+            prevSlide: "Previous slide",
+            nextSlide: "Next slide",
+            playNarration: "Play narration",
+            pauseNarration: "Pause narration",
+            mute: "Mute narration",
+            unmute: "Unmute narration",
+            audioTimeline: "Narration position",
+            slidePosition: "Slide position",
+            slidesUnavailable: "The slides are not available right now."
         },
         jp: {
             tag: courseTitle || "生成カリキュラム",
@@ -328,41 +356,24 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
             checkAnswers: "回答を確認",
             correct: "正解！",
             incorrect: "不正解",
-            score: "スコア"
+            score: "スコア",
+            lesson: "レッスン",
+            back: "コースに戻る",
+            backToDoc: "レッスンに戻る",
+            viewMode: "表示モード",
+            language: "言語",
+            slideAlt: (n: number) => `スライド ${n}`,
+            prevSlide: "前のスライド",
+            nextSlide: "次のスライド",
+            playNarration: "ナレーションを再生",
+            pauseNarration: "ナレーションを一時停止",
+            mute: "ナレーションをミュート",
+            unmute: "ミュートを解除",
+            audioTimeline: "ナレーションの再生位置",
+            slidePosition: "スライドの位置",
+            slidesUnavailable: "スライドは現在表示できません。"
         }
     }[language];
-
-    const mermaidConfig = {
-        startOnLoad: false,
-        theme: 'base',
-        securityLevel: 'loose',
-        fontFamily: '"IBM Plex Sans","Noto Sans JP",ui-sans-serif,system-ui,sans-serif',
-        flowchart: {
-            curve: 'basis',
-            nodeSpacing: 40,
-            rankSpacing: 50
-        },
-        themeVariables: {
-            primaryColor: '#ffffff',
-            primaryTextColor: '#0f172a',
-            primaryBorderColor: '#e2e8f0',
-            lineColor: '#94a3b8',
-            secondaryColor: '#fff7ed',
-            tertiaryColor: '#f1f5f9',
-            edgeLabelBackground: '#ffffff',
-            clusterBkg: '#f8fafc',
-            clusterBorder: '#e2e8f0',
-            noteBkgColor: '#ecfeff',
-            noteTextColor: '#0f172a',
-            noteBorderColor: '#67e8f9',
-            fontSize: '14px'
-        }
-    } as const;
-
-    useEffect(() => {
-        // Note: Theme is handled by context, no need to override here
-        mermaid.initialize(mermaidConfig);
-    }, []);
 
     useEffect(() => {
         setViewMode('doc');
@@ -480,7 +491,6 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
     };
 
     const handleSlidePlayToggle = () => {
-        console.log('[Audio] Play toggle clicked. Current state:', isSlidePlaying);
         const nextState = !isSlidePlaying;
         setIsSlidePlaying(nextState);
         // The effect will handle the actual play/pause
@@ -520,36 +530,24 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
     // 2. Handle Audio Source Changes (Only update src when strictly necessary)
     useEffect(() => {
         const audioEl = slideAudioRef.current;
-        if (!audioEl) {
-            console.warn('[Audio] Element ref is missing');
-            return;
-        }
-        if (!currentAudioSrc) {
-            console.warn('[Audio] Source URL is missing');
-            return;
-        }
+        // The audio element only exists while the Slides view is open.
+        if (!audioEl || !currentAudioSrc) return;
 
         // Check if src actually needs updating to avoid reloading
         const currentSrcAttr = audioEl.getAttribute('src');
         const needsUpdate = !currentSrcAttr || !currentSrcAttr.endsWith(currentAudioSrc);
 
         if (needsUpdate) {
-            console.log('[Audio] Changing source to:', currentAudioSrc);
             audioEl.src = currentAudioSrc;
-            
+
             if (!isMasterAudioMode) {
                 audioEl.currentTime = 0;
             }
         }
 
         if (isSlidePlaying) {
-            console.log('[Audio] Attempting to play...');
-            audioEl.play()
-                .then(() => console.log('[Audio] Playback started'))
-                .catch(e => {
-                    console.error('[Audio] Autoplay/Play blocked:', e);
-                    setIsSlidePlaying(false);
-                });
+            // Autoplay can be blocked by the browser; fall back to the paused state.
+            audioEl.play().catch(() => setIsSlidePlaying(false));
         }
     }, [currentAudioSrc, isMasterAudioMode, isSlidePlaying]);
 
@@ -636,12 +634,6 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
         onPrevLesson?.();
     };
 
-    useEffect(() => {
-        if (effectiveViewMode === 'doc') {
-            mermaid.contentLoaded();
-        }
-    }, [lesson, effectiveViewMode]);
-
     const handleQuizAnswer = (questionId: string, optionId: string) => {
         if (quizSubmitted) return;
         setQuizAnswers(prev => ({ ...prev, [questionId]: optionId }));
@@ -660,131 +652,100 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
         return { correct, total: lesson.quiz.questions.length };
     };
 
+    const modes: { id: 'doc' | 'slides' | 'quiz'; label: string; icon: typeof FileText }[] = [
+        { id: 'doc', label: t.doc, icon: FileText },
+        ...(hasSlides ? [{ id: 'slides' as const, label: t.slides, icon: Image }] : []),
+        ...(hasQuiz ? [{ id: 'quiz' as const, label: t.quiz, icon: Brain }] : []),
+    ];
+
+    const renderModeToggle = () => (
+        <div role="group" aria-label={t.viewMode} className="flex bg-slate-100 p-1 rounded-lg">
+            {modes.map(({ id, label, icon: Icon }) => (
+                <button
+                    key={id}
+                    type="button"
+                    aria-pressed={effectiveViewMode === id}
+                    onClick={() => setViewMode(id)}
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === id
+                        ? 'bg-white text-purple-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                >
+                    <Icon size={14} aria-hidden="true" />
+                    {label}
+                </button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-white text-slate-800 font-sans">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 z-50 flex items-center justify-between px-4 sm:px-6">
-                <div className="flex items-center gap-4">
+            {/* Header: sticky inside the app's scroll container, so it never covers the sidebar */}
+            <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between gap-3 px-4 sm:px-6">
+                <div className="flex items-center gap-3 min-w-0">
                     <button
+                        type="button"
                         onClick={onBack}
-                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                        aria-label={t.back}
+                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors shrink-0"
                     >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={20} aria-hidden="true" />
                     </button>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">{t.tag}</span>
-                        <span className="text-sm font-bold text-slate-800 line-clamp-1">{getText(lesson.title, language)}</span>
+                    <div className="flex flex-col min-w-0">
+                        <span className="eyebrow text-fg-3 truncate">{t.tag}</span>
+                        <span className="text-sm font-bold text-slate-800 truncate">{getText(lesson.title, language)}</span>
                     </div>
                 </div>
 
                 {/* View Mode Toggle */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex bg-slate-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => setViewMode('doc')}
-                        className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'doc'
-                            ? 'bg-white text-purple-600 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        <FileText size={14} />
-                        {t.doc}
-                    </button>
+                {modes.length > 1 && (
+                    <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        {renderModeToggle()}
+                    </div>
+                )}
 
-                    {hasSlides && (
-                        <button
-                            onClick={() => setViewMode('slides')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'slides'
-                                ? 'bg-white text-purple-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            <Image size={14} />
-                            {t.slides}
-                        </button>
-                    )}
-
-                    {hasQuiz && (
-                        <button
-                            onClick={() => setViewMode('quiz')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'quiz'
-                                ? 'bg-white text-purple-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            <Brain size={14} />
-                            {t.quiz}
-                        </button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                     {setLanguage && (
-                        <div className="flex bg-slate-50 rounded-lg p-1 border border-slate-200/60">
-                            <button onClick={() => setLanguage('en')} className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${language === 'en' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>EN</button>
-                            <button onClick={() => setLanguage('jp')} className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${language === 'jp' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>JP</button>
+                        <div role="group" aria-label={t.language} className="flex bg-slate-50 rounded-lg p-1 border border-slate-200/60">
+                            {(['en', 'jp'] as const).map((lang) => (
+                                <button
+                                    key={lang}
+                                    type="button"
+                                    aria-pressed={language === lang}
+                                    onClick={() => setLanguage(lang)}
+                                    className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${language === lang ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-fg-3 hover:text-slate-700'}`}
+                                >
+                                    {lang.toUpperCase()}
+                                </button>
+                            ))}
                         </div>
                     )}
-                    <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                        <Clock size={14} /> {getText(lesson.readingTime, language)}
+                    <span className="hidden sm:flex text-xs font-medium text-fg-3 items-center gap-1">
+                        <Clock size={14} aria-hidden="true" /> {getText(lesson.readingTime, language)}
                     </span>
                 </div>
             </header>
 
             {/* Mobile View Mode Toggle */}
-            <div className="md:hidden sticky top-16 z-40 bg-white/90 backdrop-blur border-b border-slate-100 px-4 py-2 flex justify-center">
-                <div className="flex bg-slate-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => setViewMode('doc')}
-                        className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'doc'
-                            ? 'bg-white text-purple-600 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        <FileText size={14} />
-                        {t.doc}
-                    </button>
-
-                    {hasSlides && (
-                        <button
-                            onClick={() => setViewMode('slides')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'slides'
-                                ? 'bg-white text-purple-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            <Image size={14} />
-                            {t.slides}
-                        </button>
-                    )}
-
-                    {hasQuiz && (
-                        <button
-                            onClick={() => setViewMode('quiz')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${effectiveViewMode === 'quiz'
-                                ? 'bg-white text-purple-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            <Brain size={14} />
-                            {t.quiz}
-                        </button>
-                    )}
+            {modes.length > 1 && (
+                <div className="lg:hidden sticky top-16 z-20 bg-white/90 backdrop-blur border-b border-slate-100 px-4 py-2 flex justify-center">
+                    {renderModeToggle()}
                 </div>
-            </div>
+            )}
 
             {effectiveViewMode === 'doc' && (
-                <main className="pt-24 pb-20 max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+                <div className="pt-10 md:pt-14 pb-20 max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
 
                     {/* Main Content */}
                     <article className="lg:col-span-8 lg:col-start-2 xl:col-span-7 xl:col-start-3 min-w-0">
                         <header className="mb-12 text-center">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-bold uppercase tracking-wider mb-6">
-                                <BookOpen size={14} /> Lesson
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-600 eyebrow mb-6">
+                                <BookOpen size={14} aria-hidden="true" /> {t.lesson}
                             </div>
                             <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6 leading-tight tracking-tight break-words">
                                 {getText(lesson.title, language)}
                             </h1>
-                            <p className="text-xl text-slate-500 leading-relaxed font-serif italic break-words">
+                            <p className="text-lg md:text-xl text-fg-2 leading-relaxed break-words">
                                 {getText(lesson.subtitle, language)}
                             </p>
                             {personalization && <PersonalizationBar p={personalization} lang={language} />}
@@ -867,16 +828,17 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
 
                     {/* Right Sidebar (TOC) */}
                     <aside className="hidden xl:block col-span-2 relative">
-                        <div className="sticky top-32">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <List size={14} /> {t.onThisPage}
+                        <nav className="sticky top-32" aria-label={t.onThisPage}>
+                            <h3 className="eyebrow text-fg-3 mb-4 flex items-center gap-2">
+                                <List size={14} aria-hidden="true" /> {t.onThisPage}
                             </h3>
                             <ul className="space-y-1 relative border-l border-slate-100">
                                 {lesson.sections.map((section) => (
                                     <li key={section.id} className="relative">
                                         <button
+                                            type="button"
                                             onClick={() => scrollToSection(section.id)}
-                                            className={`text-sm py-1.5 pl-4 text-left w-full transition-colors border-l-2 -ml-[2px] ${activeSection === section.id
+                                            className={`text-sm py-1.5 pl-4 text-left w-full transition-colors border-l-2 -ml-0.5 ${activeSection === section.id
                                                 ? 'border-purple-500 text-purple-600 font-medium'
                                                 : 'border-transparent text-slate-500 hover:text-slate-800'
                                                 }`}
@@ -886,18 +848,18 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                     </li>
                                 ))}
                             </ul>
-                        </div>
+                        </nav>
                     </aside>
 
-                </main>
+                </div>
             )}
 
             {effectiveViewMode === 'slides' && hasSlides && slideDeck && (
-                <main className="pt-24 pb-20 max-w-6xl mx-auto px-4 sm:px-6">
+                <div className="pt-8 pb-20 max-w-6xl mx-auto px-4 sm:px-6">
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 sm:p-6 border-b border-slate-100">
                             <div>
-                                <p className="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">{t.slides}</p>
+                                <p className="eyebrow text-fg-3 mb-1">{t.slides}</p>
                                 <h2 className="text-xl font-bold text-slate-900">
                                     {slideDeck.title ? getText(slideDeck.title, language) : getText(lesson.title, language)}
                                 </h2>
@@ -926,34 +888,43 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                         {voiceBadgeLabel}
                                     </button>
                                     <button
+                                        type="button"
+                                        aria-label={t.prevSlide}
                                         onClick={() => goToPrevSlide()}
                                         disabled={!canGoPrev}
                                         className={`p-2 rounded-lg border transition ${canGoPrev ? 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50' : 'border-slate-200 text-slate-300 cursor-not-allowed opacity-50'}`}
                                     >
-                                        <ChevronLeft size={18} />
+                                        <ChevronLeft size={18} aria-hidden="true" />
                                     </button>
                                     {hasSlideAudio && (
                                         <>
                                             <button
+                                                type="button"
+                                                aria-label={isSlidePlaying ? t.pauseNarration : t.playNarration}
                                                 onClick={handleSlidePlayToggle}
                                                 className={`p-2 rounded-lg border transition ${isSlidePlaying ? 'border-indigo-200 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                                             >
-                                                {isSlidePlaying ? <Pause size={18} /> : <Play size={18} />}
+                                                {isSlidePlaying ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
                                             </button>
                                             <button
+                                                type="button"
+                                                aria-label={isSlideMuted ? t.unmute : t.mute}
+                                                aria-pressed={isSlideMuted}
                                                 onClick={handleSlideMuteToggle}
                                                 className={`p-2 rounded-lg border transition ${isSlideMuted ? 'border-amber-200 text-amber-600 bg-amber-50' : 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                                             >
-                                                {isSlideMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                                                {isSlideMuted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
                                             </button>
                                         </>
                                     )}
                                     <button
+                                        type="button"
+                                        aria-label={t.nextSlide}
                                         onClick={() => goToNextSlide()}
                                         disabled={!canGoNext}
                                         className={`p-2 rounded-lg border transition ${canGoNext ? 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50' : 'border-slate-200 text-slate-300 cursor-not-allowed opacity-50'}`}
                                     >
-                                        <ChevronRight size={18} />
+                                        <ChevronRight size={18} aria-hidden="true" />
                                     </button>
                                 </div>
                             )}
@@ -964,13 +935,13 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                 <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-900 shadow-inner">
                                     <img
                                         src={slideDeck.slides[slideIndex]}
-                                        alt={`Slide ${slideIndex + 1}`}
+                                        alt={t.slideAlt(slideIndex + 1)}
                                         className="w-full h-full object-contain bg-black"
                                     />
                                     <audio
                                         ref={slideAudioRef}
                                         className="hidden"
-                                        onError={(e) => console.error('[Audio] Error loading media:', e.currentTarget.error, e.currentTarget.src)}
+                                        onError={() => setIsSlidePlaying(false)}
                                         onLoadedMetadata={handleAudioLoadedMetadata}
                                         onTimeUpdate={handleAudioTimeUpdate}
                                         onEnded={() => {
@@ -994,9 +965,9 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                         ? 'border-indigo-200 text-indigo-600 bg-indigo-50'
                                                         : 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                                                 }`}
-                                                aria-label={isSlidePlaying ? 'Pause audio' : 'Play audio'}
+                                                aria-label={isSlidePlaying ? t.pauseNarration : t.playNarration}
                                             >
-                                                {isSlidePlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+                                                {isSlidePlaying ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
                                             </button>
                                             <input
                                                 type="range"
@@ -1006,10 +977,10 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                 value={audioProgress}
                                                 onChange={(event) => handleAudioScrub(Number(event.target.value))}
                                                 className="w-full accent-indigo-500"
-                                                aria-label="Audio timeline"
+                                                aria-label={t.audioTimeline}
                                             />
                                         </div>
-                                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                        <div className="flex items-center justify-between text-xs text-fg-3 tabular">
                                             <span>{formatTime(audioProgress)}</span>
                                             <span>{formatTime(totalAudioDuration)}</span>
                                         </div>
@@ -1025,7 +996,7 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                 value={slideIndex}
                                                 onChange={(event) => handleSlideScrub(Number(event.target.value))}
                                                 className="w-full accent-indigo-500"
-                                                aria-label="Slide position"
+                                                aria-label={t.slidePosition}
                                             />
                                         </div>
                                     )
@@ -1043,14 +1014,14 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                         file={slideDeck.pdfUrl}
                                         onLoadSuccess={({ numPages }) => setPdfPageCount(numPages)}
                                         loading={
-                                            <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                            <div className="flex items-center gap-2 text-fg-3 text-sm">
                                                 <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                                                 {language === 'jp' ? 'スライドを読み込み中...' : 'Loading slides...'}
                                             </div>
                                         }
                                         error={
-                                            <div className="text-sm text-red-500 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
-                                                {language === 'jp' ? 'PDFの読み込みに失敗しました。' : 'Failed to load PDF.'}
+                                            <div className="text-sm text-fg-2 bg-sunken border border-line px-3 py-2 rounded-lg">
+                                                {t.slidesUnavailable}
                                             </div>
                                         }
                                         className="w-full h-full flex items-center justify-center"
@@ -1077,7 +1048,7 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                     <audio
                                         ref={slideAudioRef}
                                         className="hidden"
-                                        onError={(e) => console.error('[Audio] Error loading media:', e.currentTarget.error, e.currentTarget.src)}
+                                        onError={() => setIsSlidePlaying(false)}
                                         onLoadedMetadata={handleAudioLoadedMetadata}
                                         onTimeUpdate={handleAudioTimeUpdate}
                                         onEnded={() => {
@@ -1101,9 +1072,9 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                         ? 'border-indigo-200 text-indigo-600 bg-indigo-50'
                                                         : 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                                                 }`}
-                                                aria-label={isSlidePlaying ? 'Pause audio' : 'Play audio'}
+                                                aria-label={isSlidePlaying ? t.pauseNarration : t.playNarration}
                                             >
-                                                {isSlidePlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+                                                {isSlidePlaying ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
                                             </button>
                                             <input
                                                 type="range"
@@ -1113,10 +1084,10 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                 value={audioProgress}
                                                 onChange={(event) => handleAudioScrub(Number(event.target.value))}
                                                 className="w-full accent-indigo-500"
-                                                aria-label="Audio timeline"
+                                                aria-label={t.audioTimeline}
                                             />
                                         </div>
-                                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                        <div className="flex items-center justify-between text-xs text-fg-3 tabular">
                                             <span>{formatTime(audioProgress)}</span>
                                             <span>{formatTime(totalAudioDuration)}</span>
                                         </div>
@@ -1132,7 +1103,7 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                                 value={slideIndex}
                                                 onChange={(event) => handleSlideScrub(Number(event.target.value))}
                                                 className="w-full accent-indigo-500"
-                                                aria-label="Slide position"
+                                                aria-label={t.slidePosition}
                                             />
                                         </div>
                                     )
@@ -1140,15 +1111,15 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                             </div>
                         )}
                     </div>
-                </main>
+                </div>
             )}
 
             {/* Quiz View */}
             {effectiveViewMode === 'quiz' && lesson.quiz && (
-                <main className="pt-24 pb-20 max-w-3xl mx-auto px-4 sm:px-6">
+                <div className="pt-8 pb-20 max-w-3xl mx-auto px-4 sm:px-6">
                     <div className="mb-8">
-                        <button onClick={() => setViewMode('doc')} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-4">
-                            <ArrowLeft size={16} /> Back to Document
+                        <button type="button" onClick={() => setViewMode('doc')} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-4">
+                            <ArrowLeft size={16} aria-hidden="true" /> {t.backToDoc}
                         </button>
                         <h1 className="text-3xl font-bold text-slate-900">{getText(lesson.quiz.title, language)}</h1>
                     </div>
@@ -1247,7 +1218,7 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                             </>
                         )}
                     </div>
-                </main>
+                </div>
             )}
 
             {/* Lesson Reflection Modal */}
@@ -1282,6 +1253,45 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
 
 // --- Mermaid Helpers ---
 type MermaidDiagramType = 'flowchart' | 'sequence' | 'er' | 'other';
+
+// Generated lessons are LLM output, so diagrams render in strict mode (no click handlers, no raw
+// HTML in labels) and the SVG is sanitized again before it is injected into the page.
+const MERMAID_CONFIG = {
+    startOnLoad: false,
+    theme: 'base',
+    securityLevel: 'strict',
+    suppressErrorRendering: true,
+    fontFamily: '"IBM Plex Sans","Noto Sans JP",ui-sans-serif,system-ui,sans-serif',
+    flowchart: {
+        curve: 'basis',
+        nodeSpacing: 40,
+        rankSpacing: 50
+    },
+    themeVariables: {
+        primaryColor: '#ffffff',
+        primaryTextColor: '#0f172a',
+        primaryBorderColor: '#e2e8f0',
+        lineColor: '#94a3b8',
+        secondaryColor: '#fff7ed',
+        tertiaryColor: '#f1f5f9',
+        edgeLabelBackground: '#ffffff',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#e2e8f0',
+        noteBkgColor: '#ecfeff',
+        noteTextColor: '#0f172a',
+        noteBorderColor: '#67e8f9',
+        fontSize: '14px'
+    }
+} as const;
+
+// Mermaid draws flowchart labels as HTML inside <foreignObject>, so that element is allowed
+// as the only SVG-to-HTML switch; the HTML inside it still goes through the HTML allow-list.
+const sanitizeMermaidSvg = (svg: string) =>
+    DOMPurify.sanitize(svg, {
+        USE_PROFILES: { svg: true, svgFilters: true, html: true },
+        ADD_TAGS: ['foreignObject'],
+        HTML_INTEGRATION_POINTS: { foreignobject: true },
+    });
 
 const detectMermaidType = (chart: string): MermaidDiagramType => {
     const stripped = chart
@@ -1433,14 +1443,14 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
 
     if (!src) {
         return (
-            <div className={`my-8 ${block.layout === 'full' ? '-mx-6 md:-mx-12' : ''}`}>
+            <div className={`my-8 ${block.layout === 'full' ? '-mx-4 sm:-mx-6 md:-mx-12' : ''}`}>
                 <div className="w-full h-64 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-50 animate-pulse" />
             </div>
         );
     }
 
     return (
-        <figure className={`my-8 ${block.layout === 'full' ? '-mx-6 md:-mx-12' : ''}`}>
+        <figure className={`my-8 ${block.layout === 'full' ? '-mx-4 sm:-mx-6 md:-mx-12' : ''}`}>
             <img
                 src={src}
                 alt={block.alt}
@@ -1448,7 +1458,7 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                 className={`w-full rounded-xl shadow-md border border-slate-100 ${isLoading ? 'opacity-80' : 'opacity-100'}`}
             />
             {block.caption && (
-                <figcaption className="text-center text-xs text-slate-400 mt-2 font-medium">
+                <figcaption className="text-center text-xs text-fg-3 mt-2 font-medium">
                     {getText(block.caption, language)}
                 </figcaption>
             )}
@@ -1511,10 +1521,11 @@ const injectFlowchartClasses = (chart: string) => {
     return `${chart}\n\n%% auto styles %%\n${classLines.join('\n')}\n`;
 };
 
+
 // --- Mermaid Block Component ---
 const MermaidBlock: React.FC<{ chart: string; caption?: LocalizedText | string; language: 'en' | 'jp' }> = ({ chart, caption, language }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
     const [svgContent, setSvgContent] = useState<string>('');
+    const [failed, setFailed] = useState(false);
     const id = useId().replace(/:/g, '');
     const diagramType = detectMermaidType(chart);
     const containerStyleByType: Record<MermaidDiagramType, { bg: string; border: string; label: string }> = {
@@ -1546,38 +1557,114 @@ const MermaidBlock: React.FC<{ chart: string; caption?: LocalizedText | string; 
         er: { en: 'ER', jp: 'ER' },
         other: { en: 'Diagram', jp: '図' }
     };
+    const failedText = {
+        en: 'This diagram could not be drawn. Its source is shown instead.',
+        jp: '図を描画できませんでした。代わりに元のテキストを表示しています。'
+    }[language];
+    const captionText = caption ? getText(caption, language) : '';
 
     useEffect(() => {
+        let cancelled = false;
         const renderChart = async () => {
-            if (!containerRef.current) return;
             try {
+                mermaid.initialize(MERMAID_CONFIG);
                 const themedChart = injectMermaidTheme(
                     diagramType === 'flowchart' ? injectFlowchartClasses(chart) : chart,
                     diagramType
                 );
                 const uniqueRenderId = `mermaid-svg-${id}-${Date.now()}`;
                 const { svg } = await mermaid.render(uniqueRenderId, themedChart);
-                setSvgContent(svg);
-            } catch (error) {
-                console.error('Mermaid rendering failed:', error);
-                setSvgContent(`<div class="p-4 bg-red-50 text-red-600 text-sm font-mono rounded">Diagram Error: Invalid Syntax</div>`);
+                if (cancelled) return;
+                setSvgContent(sanitizeMermaidSvg(svg));
+                setFailed(false);
+            } catch {
+                if (cancelled) return;
+                setSvgContent('');
+                setFailed(true);
             }
         };
         renderChart();
+        return () => { cancelled = true; };
     }, [chart, id]);
 
     return (
-        <div className={`my-10 p-8 bg-gradient-to-br ${containerStyle.bg} rounded-2xl border ${containerStyle.border} shadow-[0_12px_30px_rgba(15,23,42,0.08)] flex flex-col items-center justify-center relative`}>
-            <div className={`absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur rounded-full border border-slate-200 text-[10px] font-bold uppercase tracking-widest ${containerStyle.label}`}>
+        <figure className={`my-10 p-6 sm:p-8 bg-gradient-to-br ${containerStyle.bg} rounded-2xl border ${containerStyle.border} shadow-[0_12px_30px_rgba(15,23,42,0.08)] flex flex-col items-center justify-center relative`}>
+            <div className={`absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur rounded-full border border-slate-200 text-xs font-bold uppercase tracking-widest ${containerStyle.label}`} aria-hidden="true">
                 {labelTextByType[diagramType][language]}
             </div>
+            {failed ? (
+                <div className="w-full pt-8">
+                    <p className="text-sm text-fg-2 mb-3">{failedText}</p>
+                    <pre className="overflow-x-auto rounded-lg bg-sunken p-4 text-xs font-mono text-fg-2 whitespace-pre">{chart}</pre>
+                </div>
+            ) : (
+                <div
+                    role="img"
+                    aria-label={captionText || labelTextByType[diagramType][language]}
+                    className="w-full flex justify-center overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:rounded-lg [&_svg]:drop-shadow-[0_8px_16px_rgba(15,23,42,0.08)]"
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+            )}
+            {captionText && <figcaption className="mt-4 text-sm text-slate-500 font-medium text-center">{captionText}</figcaption>}
+        </figure>
+    );
+};
+
+// --- Table Block Component ---
+// Mirrors the lesson reader's TableBlock: 1px rules, a sunken header row, and a sticky first
+// column so wide tables scroll sideways on phones instead of squeezing the text.
+const TableBlock: React.FC<{ headers: LocalizedText[]; rows: LocalizedText[][]; language: 'en' | 'jp' }> = ({ headers, rows, language }) => {
+    const headerTexts = headers.map((header) => getText(header, language));
+    const tableLabel = language === 'jp' ? '表' : 'Table';
+    return (
+        <figure className="my-8">
             <div
-                ref={containerRef}
-                className="w-full flex justify-center overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:rounded-lg [&_svg]:drop-shadow-[0_8px_16px_rgba(15,23,42,0.08)]"
-                dangerouslySetInnerHTML={{ __html: svgContent }}
-            />
-            {caption && <p className="mt-4 text-sm text-slate-500 font-medium text-center">{getText(caption, language)}</p>}
-        </div>
+                role="region"
+                tabIndex={0}
+                aria-label={`${tableLabel}: ${headerTexts.join(' / ')}`}
+                className="overflow-x-auto rounded-card border border-line bg-surface"
+            >
+                <table className="w-full border-separate border-spacing-0 text-left text-sm leading-relaxed">
+                    <thead>
+                        <tr>
+                            {headerTexts.map((header, i) => (
+                                <th
+                                    key={i}
+                                    scope="col"
+                                    className={`bg-sunken px-4 py-3 align-bottom font-semibold text-fg border-b border-line ${i === 0 ? 'sticky left-0 z-10 min-w-28 border-r' : 'min-w-40'}`}
+                                >
+                                    <GlossaryText text={header} />
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row, ri) => {
+                            const isLast = ri === rows.length - 1;
+                            return (
+                                <tr key={ri}>
+                                    {row.map((cell, ci) =>
+                                        ci === 0 ? (
+                                            <th
+                                                key={ci}
+                                                scope="row"
+                                                className={`sticky left-0 z-10 bg-surface px-4 py-3 align-top font-medium text-fg border-r border-line ${isLast ? '' : 'border-b'}`}
+                                            >
+                                                <GlossaryText text={getText(cell, language)} />
+                                            </th>
+                                        ) : (
+                                            <td key={ci} className={`px-4 py-3 align-top text-fg-2 border-line ${isLast ? '' : 'border-b'}`}>
+                                                <GlossaryText text={getText(cell, language)} />
+                                            </td>
+                                        )
+                                    )}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </figure>
     );
 };
 
@@ -1589,7 +1676,7 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
                 <p className={`
                leading-8 text-slate-700
                ${block.style === 'lead' ? 'text-xl font-light text-slate-600 mb-8' : 'text-base'}
-               ${block.style === 'quote' ? 'font-serif text-lg italic text-slate-600 border-l-4 border-slate-200 pl-4 py-1' : ''}
+               ${block.style === 'quote' ? 'text-lg text-slate-600 border-l-4 border-slate-200 pl-4 py-1' : ''}
             `}>
                     <GlossaryText text={getText(block.text, language)} />
                 </p>
@@ -1606,7 +1693,7 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
                 </div>
             );
 
-        case 'callout':
+        case 'callout': {
             // Guard: if no text, don't render the callout
             if (!block.text && !block.title) return null;
             const variants = {
@@ -1620,8 +1707,8 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
             const Icon = style.icon;
             return (
                 <div className={`my-8 p-6 rounded-xl border ${style.bg} ${style.border} flex gap-4`}>
-                    <div className={`mt-0.5 shrink-0 ${style.iconColor}`}><Icon size={20} /></div>
-                    <div>
+                    <div className={`mt-0.5 shrink-0 ${style.iconColor}`}><Icon size={20} aria-hidden="true" /></div>
+                    <div className="min-w-0">
                         {block.title && (
                             <h4 className={`font-bold text-sm uppercase tracking-wide mb-2 ${style.text} opacity-80`}>
                                 <GlossaryText text={getText(block.title, language)} />
@@ -1635,12 +1722,12 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
                     </div>
                 </div>
             );
+        }
 
-        case 'list':
+        case 'list': {
             if (!block.items || !Array.isArray(block.items)) return null;
             const listBlock = block as any;
             const listStyle = listBlock.style || listBlock.listStyle || 'bullet';
-            const isNumbered = listStyle === 'number';
             const isKeyed = listStyle === 'key';
             const renderListItem = (item: LocalizedText) => {
                 const text = getText(item, language);
@@ -1665,58 +1752,43 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
                     </span>
                 );
             };
+            if (listStyle === 'number') {
+                // A real <ol>: list items must stay display:list-item for the numbers to render.
+                return (
+                    <ol className="my-6 list-decimal space-y-3 pl-6 text-slate-700 leading-relaxed marker:font-semibold marker:text-fg-3">
+                        {block.items.map((item, i) => (
+                            <li key={i} className="pl-1">{renderListItem(item)}</li>
+                        ))}
+                    </ol>
+                );
+            }
             return (
-                <ul className={`my-6 space-y-3 ${isNumbered ? 'list-decimal pl-5' : ''}`}>
+                <ul className="my-6 space-y-3">
                     {block.items.map((item, i) => (
                         <li key={i} className="flex gap-3 text-slate-700 leading-relaxed group">
-                            {!isNumbered && (
-                                <span
-                                    className={`mt-2 shrink-0 transition-transform ${isKeyed ? 'w-1 h-5 rounded bg-amber-300/80' : 'w-1.5 h-1.5 rounded-full bg-purple-400 group-hover:scale-125'}`}
-                                />
-                            )}
-                            {renderListItem(item)}
+                            <span
+                                aria-hidden="true"
+                                className={`mt-2 shrink-0 transition-transform ${isKeyed ? 'w-1 h-5 rounded bg-amber-300/80' : 'w-1.5 h-1.5 rounded-full bg-purple-400 group-hover:scale-125'}`}
+                            />
+                            <span className="min-w-0">{renderListItem(item)}</span>
                         </li>
                     ))}
                 </ul>
             );
+        }
 
         case 'mermaid':
             return <MermaidBlock chart={block.chart} caption={block.caption} language={language} />;
 
         case 'table':
             if (!block.headers || !block.rows) return null;
-            return (
-                <div className="my-8 overflow-x-auto">
-                    <table className="w-full border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50">
-                                {block.headers.map((header, i) => (
-                                    <th key={i} className="px-4 py-3 text-left text-sm font-bold text-slate-700 border-b border-slate-200">
-                                        <GlossaryText text={getText(header, language)} />
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {block.rows.map((row, ri) => (
-                                <tr key={ri} className="hover:bg-slate-50">
-                                    {row.map((cell, ci) => (
-                                        <td key={ci} className="px-4 py-3 text-sm text-slate-600 border-b border-slate-100">
-                                            <GlossaryText text={getText(cell, language)} />
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
+            return <TableBlock headers={block.headers} rows={block.rows} language={language} />;
 
         case 'mindmap':
             return (
                 <div className="my-12 p-8 bg-slate-50/50 rounded-3xl border border-slate-100">
-                    <div className="flex items-center gap-2 mb-8 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        <Brain size={14} className="text-purple-500" /> Interactive Mind Map
+                    <div className="flex items-center gap-2 mb-8 eyebrow text-fg-3">
+                        <Brain size={14} className="text-purple-500" aria-hidden="true" /> {language === 'jp' ? 'インタラクティブ・マインドマップ' : 'Interactive mind map'}
                     </div>
                     <MindMapNode node={block.root} language={language} isRoot />
                 </div>
@@ -1752,7 +1824,7 @@ const MindMapNode: React.FC<{
                     </span>
                     {node.children && (
                         <div className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                            <ChevronDown size={16} className={isRoot ? 'text-white/70' : 'text-slate-400'} />
+                            <ChevronDown size={16} className={isRoot ? 'text-white/70' : 'text-fg-3'} />
                         </div>
                     )}
                 </div>

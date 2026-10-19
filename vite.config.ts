@@ -3,9 +3,20 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+// Model-provider keys and service-role keys must never reach the browser. VITE_* values are
+// public by design, and any whole-object `import.meta.env` read inlines all of them, so these
+// are forced to `undefined` in the client even if someone sets them. Keys belong on the server
+// (GEMINI_API_KEY / ANTHROPIC_API_KEY, read by server/llm).
+const CLIENT_SECRET_ENV = /^VITE_(?:GEMINI|GOOGLE|ANTHROPIC|CLAUDE|OPENAI)_\w*KEY$|^VITE_\w*SERVICE_ROLE\w*$/;
+
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    // Only VITE_* values are read here; never `define` server secrets into the bundle.
+    const env = loadEnv(mode, '.', 'VITE_');
     const appBasePath = env.VITE_APP_BASE_PATH || '/';
+    const secretEnvKeys = Object.keys(env).filter((key) => CLIENT_SECRET_ENV.test(key));
+    if (secretEnvKeys.length) {
+        console.warn(`[vite] Not exposing ${secretEnvKeys.join(', ')} to the client; model keys belong on the server.`);
+    }
     return {
       base: appBasePath,
       server: {
@@ -13,7 +24,8 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         proxy: {
           '/api': {
-            target: 'http://localhost:3006',
+            // Dev only: API_PROXY_TARGET points a second dev server at another API instance.
+            target: process.env.API_PROXY_TARGET || 'http://localhost:3006',
             changeOrigin: true,
             secure: false,
           }
@@ -39,7 +51,6 @@ export default defineConfig(({ mode }) => {
               // Do NOT bucket lazy-only deps (mermaid, phaser, scratch-blocks, react-pdf):
               // forcing them into shared vendor chunks hoists them into the entry preload graph.
               if (id.includes('recharts') || id.includes('d3-')) return 'recharts';
-              if (id.includes('@google/genai')) return 'genai';
               if (id.includes('lucide-react')) return 'icons';
               if (id.includes('react-router')) return 'router';
               if (id.includes('react-dom/') || id.includes('/react-dom/')) return 'react-vendor';
@@ -48,10 +59,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
+      define: Object.fromEntries(secretEnvKeys.map((key) => [`import.meta.env.${key}`, 'undefined'])),
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),

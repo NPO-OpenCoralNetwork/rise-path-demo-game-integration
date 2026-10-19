@@ -47,6 +47,32 @@ ChatGPT・Claude・Cursor などの AI から Rise Path を直接操作できま
 
 ---
 
+## 📖 Lessons: Reader, Format and Authoring
+
+### Lesson reader
+- Every lesson opens in one reader at **`/learn/:course/:lesson`** (for example `/learn/vibe-coding/vibe-ch1`): an outline on the left, the AI tutor and glossary in the margin, inline checks while you read, flashcards and a wrap-up at the end. Progress is saved per lesson, and the dashboard's "Continue" card resumes it.
+- On phones the outline, AI tutor and practice move to a bottom bar. The **Aa** menu sets text size, line spacing, theme, a UD reading font and focus mode.
+- Dev builds add **`/preview/:course/:lesson`** (prefers the draft and shows the validation report) and **`/dev/blocks?dev=1`** (every block type).
+
+### Lesson format (`risepath.lesson/v1`)
+- Lessons are JSON files: `content/courses/<slug>/course.json` plus `lessons/<id>.lesson.json`. Drafts live in `drafts/` and only appear in previews.
+- One definition: `shared/lesson/schema.js` (zod), used by the reader, the server, the MCP tools and the CLIs. JSON Schema exports live in `content/schema/`.
+- A lesson has 2–4 objectives with Bloom levels and sections with roles (hook → concept → example → practice → check → summary), built from 15 block types (markdown, callout, table, code, prompt, mermaid diagram, quiz, flashcards, steps, …).
+
+```bash
+npm run lessons:catalog                       # courses and lessons with their status
+npm run lessons:validate                      # schema + semantic checks (errors carry JSON paths)
+npm run lessons:lint -- <file> --strict       # pedagogy and readability rules
+npm run lessons:preview -- vibe-coding vibe-ch1   # screenshots + metrics.json (dev server running)
+```
+
+### Authoring with Claude Code and other agents
+- **Claude Code**: `/author-lesson <course> <lesson-id> "<brief>"` runs brief → outline → draft → validate and lint → independent review (`pedagogy-reviewer`, `ja-editor`) → screenshots and `visual-qa` → report. Drafts only; the owner publishes. `/review-lesson <file>` reviews any lesson against `content/schema/rubric.v1.json`.
+- **MCP**: `.mcp.json` registers the `rise-path-learning` server with the `curriculum-builder` profile (`lesson-schema-get`, `lesson-validate`, `lesson-get`, `lesson-upsert-draft`, `lesson-preview-url`). Codex, Cursor, Gemini CLI, Claude Desktop and ChatGPT can use the same tools; `AGENTS.md` holds the shared rules.
+- Guide: **[doc/guides/authoring-with-claude-code.ja.md](doc/guides/authoring-with-claude-code.ja.md)** (Japanese) · [English summary](doc/guides/authoring-with-claude-code.md)
+
+---
+
 ## 🛠 Tech Stack
 
 - **Frontend**: [React](https://react.dev/) (v19) + [Vite](https://vitejs.dev/)
@@ -71,7 +97,7 @@ npm run dev
 # Frontend: http://localhost:3007
 ```
 
-You can browse most screens and use the primary AI features (like the Chat Coach) using a local LLM provider or LLM CLI (e.g., **Hermes** running locally). Direct Gemini API calls are only used as an option/fallback for legacy features.
+You can browse most screens and use the primary AI features (like the Chat Coach) using a local LLM provider or LLM CLI (e.g., **Hermes** running locally). The in-lesson AI tutor and other model features go through the server's LLM gateway (a built-in mock answers when no key is set); the browser never calls a model API directly.
 
 ### 🏁 Choose Your Setup Mode
 
@@ -110,19 +136,40 @@ Create a [**`.env.local`**](.env.local) file in the root directory to store your
 |---|---|---|---|
 | `HERMES_API_URL` | `http://127.0.0.1:8642` | Connection URL for your local LLM proxy (Hermes) | **Recommended** (AI Chat) |
 | `HERMES_API_KEY` | `change-me-local-dev` | Bearer authorization token for Hermes | **Recommended** (AI Chat) |
-| `VITE_GEMINI_API_KEY` | (Leave blank) | Gemini API Client Key for direct calls | Optional (Legacy features) |
+| `ANTHROPIC_API_KEY` | (blank) | Server-side key for the LLM gateway | Optional (see below) |
+| `GEMINI_API_KEY` | (blank) | Server-side Gemini key (gateway, legacy generator, RAG embeddings) | Optional |
 
 ```env
 # Local LLM Provider (Hermes) Settings (Standard)
 HERMES_API_URL=http://127.0.0.1:8642
 HERMES_API_KEY=change-me-local-dev
 
-# Gemini API Key (Optional fallback/legacy)
-# VITE_GEMINI_API_KEY=your_gemini_api_key
+# LLM gateway keys (server only)
+# ANTHROPIC_API_KEY=
+# GEMINI_API_KEY=
 ```
+
 > [!WARNING]
 > **Security Reminder**:
 > `.env.local` might contain sensitive API keys. Never commit it to git (already added to `.gitignore`).
+
+### 🤖 LLM gateway (`/api/v2/llm`)
+
+Every model call goes through the server gateway in `server/llm/`; the browser never holds a model key. **Never put keys in `VITE_*` variables**: every `VITE_*` value is shipped to the browser. Model IDs live only in `server/llm/models.config.js`. Without any key, the gateway answers from a built-in mock outside production (and returns 503 in production unless `LLM_PROVIDER=mock`).
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Enables the Anthropic provider (the default for authoring, tutor and feedback tasks) |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Enables the Gemini provider; also used by RAG embeddings |
+| `LLM_PROVIDER` | Forces every task onto one provider: `anthropic`, `gemini` or `mock` |
+| `LLM_TASK_<TASK>` | Per-task route, `provider[:model]`, e.g. `LLM_TASK_TUTOR_CHAT=gemini` |
+| `LLM_MOCK_FALLBACK` | `false` turns off the mock fallback when the routed provider has no key |
+| `LLM_TIMEOUT_MS` | Request timeout (default 120000) |
+| `LLM_MAX_RETRIES` | SDK retry count for provider calls |
+| `LLM_ANTHROPIC_SERVER_FALLBACKS` | `false` disables Anthropic server-side model fallbacks |
+| `ANTHROPIC_BASE_URL` | Alternative Anthropic endpoint (proxy or gateway) |
+
+`GET /api/v2/llm/status` shows the active providers and task routes without secrets.
 
 ---
 
@@ -198,7 +245,7 @@ We have successfully migrated to a **LangGraph-based Multi-Agent Backend**.
 4. Follow the project's coding style (Functional React components, TypeScript, Tailwind).
 
 ### Collaboration Tips
-- **Keys & secrets**: Use `.env.local` or localStorage; never commit secrets.
+- **Keys & secrets**: Keep keys in `.env.local` on the server side; never in `VITE_*` variables, localStorage or commits.
 - **Large files**: Avoid committing large binaries (PDFs, datasets) unless agreed.
 - **Demo vs full stack**: UI-only is fine for quick reviews; full stack is needed for AI generation flows.
 
