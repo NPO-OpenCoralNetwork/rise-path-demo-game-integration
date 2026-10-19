@@ -490,13 +490,15 @@ describe('generated skill references', () => {
 });
 
 describe('lessons:catalog', () => {
-  it('lists the 12 Vibe Coding lessons in outline order', async () => {
+  it('lists the Vibe Coding lessons in outline order', async () => {
     const catalog = await buildCatalog({ check: false });
     const vibe = catalog.courses.find((c) => c.id === 'vibe-coding');
     assert.ok(vibe);
     const listed = vibe.lessons.filter((l) => l.inOutline);
-    assert.equal(listed.length, 12);
-    assert.deepEqual(listed.map((l) => l.id), Array.from({ length: 12 }, (_, i) => `vibe-ch${i}`));
+    const outline = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/courses/vibe-coding/course.json'), 'utf8'))
+      .modules.flatMap((m) => m.lessons).map((l) => l.id);
+    assert.deepEqual(listed.map((l) => l.id), outline);
+    for (let i = 0; i < 12; i += 1) assert.ok(outline.includes(`vibe-ch${i}`), `vibe-ch${i} in outline`);
     assert.ok(listed.every((l) => l.status !== 'missing'));
     assert.ok(catalog.examples.some((e) => e.id === 'blocks-gallery'));
     const short = formatCatalog(catalog, 'short');

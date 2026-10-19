@@ -5,83 +5,31 @@
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "784d2d9",
-    "changed": [
-      "s3-check",
-      "check-quiz",
-      "summary-cards"
-    ],
-    "changedShare": 0.1,
+    "reviewedRevision": "dcb3095",
+    "changed": ["check-quiz"],
+    "changedShare": 0.04,
     "fullReviewRequired": false,
-    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
+    "previousReview": "bb56d49:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
   },
-  "resolved": [
-    {
-      "blockId": "q4",
-      "criterion": "load",
-      "status": "resolved",
-      "evidence": "The explanation now has 3 sentences. It defines 仕様書 where the word first appears: 「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」 The en version still says the same thing (\"a useful spec (a document like this plan) states what is out of scope\"), and lessons:lint --strict is clean."
-    },
-    {
-      "blockId": "card-goal",
-      "criterion": "voice",
-      "status": "resolved",
-      "evidence": "The back now uses です・ます and has no noun-ending sentences: 「目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。」 The en version still matches."
-    }
-  ],
+  "resolved": [],
   "scores": [
-    {
-      "id": "voice",
-      "score": 3,
-      "evidence": "card-goal now follows です・ます. The q8 options use parallel forms that all end in a dictionary-form verb (書く / 渡す / 書く / 書き足す), and the rewritten q4 sentence reads naturally. The rest of the prose is unchanged: warm, no pressure phrases (hook-b1, s1-b5).",
-      "blockIds": [
-        "card-goal",
-        "q8",
-        "q4"
-      ]
-    },
-    {
-      "id": "load",
-      "score": 3,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The q4 explanation is down to 3 sentences, and the q8 explanation has 3 short sentences.",
-      "blockIds": [
-        "q4",
-        "q8"
-      ]
-    },
-    {
-      "id": "prior",
-      "score": 4,
-      "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.",
-      "blockIds": [
-        "q4",
-        "q8",
-        "s3-defs"
-      ]
-    },
-    {
-      "id": "a11y_l10n",
-      "score": 4,
-      "evidence": "Every changed string (q4, q8 options and explanation, card-goal) has both jp and en, and each pair means the same thing. The en q8 options are understandable, with a small wording note under niceToHave. Diagram labels are unchanged and localized.",
-      "blockIds": [
-        "q8",
-        "q4",
-        "card-goal"
-      ]
-    }
+    {"id": "voice", "score": 3, "evidence": "The new q8 option c feedback uses です・ます and natural Japanese with no pressure phrases: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 It now points to the correct action (option d) instead of the vague 「空いている見出しを自分で埋めます」. The rest of the prose is unchanged.", "blockIds": ["q8"]},
+    {"id": "load", "score": 3, "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The changed q8 option c feedback has 2 short sentences, within the wrong-option feedback limit.", "blockIds": ["q8"]},
+    {"id": "prior", "score": 4, "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.", "blockIds": ["q4", "q8", "s3-defs"], "carriedOver": true},
+    {"id": "a11y_l10n", "score": 4, "evidence": "The changed q8 option c feedback has both jp and en, and they mean the same thing: 「いまは画面名と項目名を決めれば十分です。」 / \"For now, deciding the screen names and field names is enough.\" The other strings and diagram labels are unchanged and localized.", "blockIds": ["q8"]}
   ],
   "mustFix": [],
   "niceToHave": [
-    "q8 explanation: 「名前だけ」 does not say which names; repeat the pair from the option and feedback — 「名前だけで十分です。」→「画面名と項目名だけで十分です。」 (en: \"Names alone are enough.\" → \"Screen names and field names are enough.\")",
-    "q8 options a–c (en): \"fields\" is used both for the plan's headings (\"screen-flow and data fields\") and for data items (\"field names\" in option d), and \"Fill … down to\" reads stiffly. Use \"sections\" for the headings — \"Fill the screen-flow and data fields down to the language and how files are split\" → \"Fill in the screen-flow and data sections, right down to the language and file layout\"; \"Leave the screen-flow and data fields blank, since the AI fills them in\" → \"Leave the screen-flow and data sections blank, since the AI fills them in\"; \"Fill the screen-flow and data fields with every edge case and condition\" → \"Fill the screen-flow and data sections with every edge case and condition\"",
-    "q8 prompt / option d: the prompt says 「扱うデータ」 and option d says 「保存する項目名」. Aligning them makes the link easier to see — 「画面名と保存する項目名だけを」→「画面名と扱うデータの項目名だけを」",
-    "Carried over, unchanged text: vibe-ch2 glossary (機能) still has two noun-ending sentences in a row — 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
-    "Carried over: ex-review / card-plan use 項目 and 見出し for the same headings — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」",
-    "Carried over: q7 option c — 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
-    "Carried over: ex-goal — 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」",
-    "Carried over: s5-b2 rows[0][1] (with ex-moscow expect and s2-b3 expect) — 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」"
+    "q8 explanation: 「名前だけで十分です。」→「画面名と項目名だけで十分です。」 (en: \"Names alone are enough.\" → \"Screen names and field names are enough.\")",
+    "q8 options a–c (en): use \"sections\" for the plan headings — \"Fill in the screen-flow and data sections, right down to the language and file layout\"; \"Leave the screen-flow and data sections blank, since the AI fills them in\"; \"Fill the screen-flow and data sections with every edge case and condition\"",
+    "q8 option d: 「画面名と保存する項目名だけを」→「画面名と扱うデータの項目名だけを」",
+    "Carried over: glossary (機能) 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
+    "Carried over: ex-review / card-plan 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」",
+    "Carried over: q7 option c 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
+    "Carried over: ex-goal 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」",
+    "Carried over: s5-b2 rows[0][1] (with ex-moscow expect and s2-b3 expect) 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round: 3 of 30 blocks changed (q4, q8, card-goal), so no full review was needed. Both previous must-fix items are resolved. The q4 explanation now has 3 sentences and defines 仕様書 where it first appears, and the card-goal back uses です・ます. The rewritten q8 options have parallel forms, both locales mean the same thing, and lessons:lint --strict is clean. No new errors; the remaining notes are non-blocking wording suggestions."
+  "summary": "Verification round. 1 of 30 blocks changed (check-quiz, q8 option c feedback only). The new JP and EN feedback is 2 sentences in です・ます, points to the correct answer, and the locales match. No errors in classes (a)–(e); voice, load and a11y_l10n re-scored unchanged, prior carried over."
 }

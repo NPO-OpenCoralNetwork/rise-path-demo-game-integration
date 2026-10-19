@@ -798,3 +798,13 @@ The same run as in `reports/vibe-ch2.md` ("Verification round", after the vibe-c
 
 Next: wait for vibe-ch2's verification round on its q8 fix. If that exits 0, publish both together. This lesson needs
 no new review unless its draft changes.
+
+## Published (2026-10-19)
+
+- Gate: `check-review.mjs` exit 0 (PASS) with previous reviews cross-checked via `--previous`.
+  vibe-ch2: mean 3.46, every criterion ≥ 3, no open must-fix (final fix-verification round on q8).
+  vibe-ch2-practice: mean 3.62, every criterion ≥ 3, no open must-fix.
+- Published on the owner's approval: moved from `drafts/` to `lessons/`; `course.json` lists
+  vibe-ch2 (18 min) → vibe-ch2-practice (20 min) → vibe-ch3. `provenance.reviewedBy` is left to the owner.
+- Checks after publishing: lessons:validate 0 errors, lint --strict 0 warnings for both lessons,
+  typecheck 0 errors, npm test 677/677, build:prod OK, real-route screenshots without page errors.
