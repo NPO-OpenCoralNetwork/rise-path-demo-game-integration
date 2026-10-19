@@ -192,6 +192,18 @@ npm run dev
 ```
 Once started, open your browser and navigate to [**`http://localhost:3007`**](http://localhost:3007) to explore the UI and play P-School coding battles!
 
+#### 4. Checks before a pull request (CI)
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every pull request and on every push to `main`:
+```bash
+npm run typecheck
+npm test
+npm run lessons:validate
+npm run lessons:lint -- --strict
+npm run lessons:schema -- --check
+node .claude/skills/author-lesson/scripts/build-references.mjs --check
+```
+It also builds the production bundle (`npm run build:prod`) with dummy values in every model and service key, and fails if any of them appears in the output.
+
 
 ---
 

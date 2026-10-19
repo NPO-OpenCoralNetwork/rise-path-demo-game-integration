@@ -192,6 +192,18 @@ npm run dev
 ```
 起動完了後、ブラウザで [**`http://localhost:3007`**](http://localhost:3007) にアクセスすると、ゲームのプレイおよび学習UIの確認が可能です。
 
+#### 4. プルリクエスト前のチェック（CI）
+GitHub Actions（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）が、すべてのプルリクエストと `main` への push で次のコマンドを実行します。
+```bash
+npm run typecheck
+npm test
+npm run lessons:validate
+npm run lessons:lint -- --strict
+npm run lessons:schema -- --check
+node .claude/skills/author-lesson/scripts/build-references.mjs --check
+```
+さらに、モデルやサービスのキーにダミー値を入れて本番ビルド（`npm run build:prod`）を実行し、その値がビルド結果に含まれていれば失敗します。
+
 
 ---
 
