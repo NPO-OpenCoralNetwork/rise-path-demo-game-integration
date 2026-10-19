@@ -9,8 +9,11 @@ import {
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
     embedTexts,
+    extractKeywords,
+    mergeByRelevance,
     isEmbeddingConfigured,
     resetEmbeddingClientForTests,
+    resetLegacyEmbeddingWarningForTests,
     searchContent,
     setEmbeddingClientForTests,
 } from '../../tools/core/ragSearch.js';
@@ -30,12 +33,20 @@ const fakeEmbeddingClient = (log = []) => ({
     },
 });
 
-/** Mock pg pool: records every query; `vector` toggles the pgvector type check. */
-const mockPool = ({ hasVector = true, rows = [] } = {}) => {
+/**
+ * Mock pg pool: records every query; `hasVector` toggles the pgvector type check, `coverage`
+ * answers the EXISTS probes (current = chunks embedded with the configured model), `rows` answers
+ * other SELECTs and `keywordRows` (default `rows`) the ILIKE keyword search.
+ */
+const mockPool = ({ hasVector = true, rows = [], keywordRows = rows, coverage = { current: true, legacy: false } } = {}) => {
     const queries = [];
     const run = async (sql, params) => {
         queries.push({ sql, params });
         if (/FROM pg_type/.test(sql)) return { rowCount: hasVector ? 1 : 0, rows: hasVector ? [{}] : [] };
+        if (/AS has_current/.test(sql)) {
+            return { rowCount: 1, rows: [{ has_current: coverage.current, has_legacy: coverage.legacy }] };
+        }
+        if (/ILIKE/.test(sql)) return { rowCount: keywordRows.length, rows: keywordRows };
         if (/^\s*SELECT/i.test(sql)) return { rowCount: rows.length, rows };
         return { rowCount: 1, rows: [] };
     };
@@ -57,6 +68,7 @@ beforeEach(() => {
         delete process.env[key];
     }
     resetEmbeddingClientForTests();
+    resetLegacyEmbeddingWarningForTests();
 });
 
 afterEach(() => {
@@ -65,6 +77,7 @@ afterEach(() => {
         else process.env[key] = savedEnv[key];
     }
     resetEmbeddingClientForTests();
+    resetLegacyEmbeddingWarningForTests();
     resetPoolForTests();
 });
 
@@ -219,5 +232,171 @@ describe('server/ragService ingest + retrieve', () => {
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.match(search.sql, /c\.embedding_model = \$3/);
         assert.deepEqual(search.params.slice(1), ['user-1', MODEL_IDS.gemini.embedding, 3]);
+    });
+});
+
+/** Run `fn` with console.log silenced and console.warn captured. */
+const captureWarnings = async (fn) => {
+    const warnings = [];
+    const { log, warn } = console;
+    console.log = () => {};
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+        return { value: await fn(), warnings };
+    } finally {
+        console.log = log;
+        console.warn = warn;
+    }
+};
+
+describe('legacy chunks (older or no embedding model) are never compared with current vectors', () => {
+    it('extractKeywords splits Japanese into kanji/katakana runs and keeps symbols and other scripts', () => {
+        assert.deepEqual(extractKeywords('Blenderのモディファイアとは何ですか？'), ['Blender', 'モディファイア']);
+        assert.deepEqual(extractKeywords('what is a modifier?'), ['what', 'is', 'modifier']);
+        assert.deepEqual(extractKeywords('教材 教材 AI ai ゲーム開発'), ['教材', 'AI', 'ゲーム', '開発']);
+        assert.deepEqual(extractKeywords('は が の'), []);
+        assert.deepEqual(extractKeywords('C# と C++ の違い').slice(0, 2), ['C#', 'C++']);
+        assert.deepEqual(extractKeywords('C# basics'), ['C#', 'basics']);
+        assert.deepEqual(extractKeywords('Node.js の使い方')[0], 'Node.js');
+        assert.deepEqual(extractKeywords('블렌더 모디파이어'), ['블렌더', '모디파이어']);
+        assert.deepEqual(extractKeywords('Как работает Blender'), ['Как', 'работает', 'Blender']);
+        assert.deepEqual(extractKeywords('ひらがなだけ'), ['ひらがなだけ'], 'a hiragana-only word is kept whole');
+        assert.deepEqual(extractKeywords('「Unity」の物理'), ['Unity', '物理']);
+    });
+
+    it('mergeByRelevance ranks vector hits (1 - distance) and keyword hits (0.5) together', () => {
+        const merged = mergeByRelevance(
+            [{ content: 'close', distance: 0.2 }, { content: 'far', distance: 0.7 }],
+            [{ content: 'legacy' }],
+            3,
+        );
+        assert.deepEqual(merged.map((r) => [r.content, r.relevance, r.match]), [
+            ['close', 0.8, 'vector'], ['legacy', 0.5, 'keyword'], ['far', 0.3, 'vector'],
+        ]);
+        assert.equal(mergeByRelevance([{ content: 'tie', distance: 0.5 }], [{ content: 'legacy' }], 1)[0].content, 'tie');
+    });
+
+    it('retrieveContext keyword-matches the user\'s chunks without embedding the query when none use the current model', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool({
+            coverage: { current: false, legacy: true },
+            rows: [{ content: 'モディファイアは形状を非破壊で変えます。', chunk_index: 2, material_id: 'm1' }],
+        });
+        setPoolForTests(pool);
+
+        const { value: chunks, warnings } = await captureWarnings(async () => {
+            const first = await retrieveContext('Blenderのモディファイアとは？', 3, 'user-1');
+            await retrieveContext('another question about modifiers', 3, 'user-1');
+            return first;
+        });
+
+        assert.deepEqual(chunks, ['モディファイアは形状を非破壊で変えます。']);
+        assert.equal(client.log.length, 0, 'no query embedding: there is nothing comparable to search');
+        assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)), 'no vector comparison against older-model rows');
+
+        const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
+        assert.doesNotMatch(coverage.sql, /COUNT/, 'existence probes, not a full count');
+        assert.match(coverage.sql, /EXISTS \(SELECT 1 FROM material_chunks c JOIN materials m ON c\.material_id = m\.id WHERE m\.user_id = \$1 AND c\.embedding_model = \$2\)/);
+        assert.match(coverage.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\)/, 'NULL models (seeded rows) count as legacy');
+        assert.deepEqual(coverage.params, ['user-1', MODEL_IDS.gemini.embedding]);
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.match(keyword.sql, /ORDER BY \(\(c\.content ILIKE \$2\)::int \+ \(c\.content ILIKE \$3\)::int\) DESC/);
+        assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
+
+        assert.equal(warnings.length, 1, 'warned once per process, not per request');
+        assert.ok(warnings[0].includes(`not embedded with ${MODEL_IDS.gemini.embedding}`), warnings[0]);
+        assert.match(warnings[0], /Re-embedding is required: node scripts\/rag\/reembed\.mjs --dry-run/);
+    });
+
+    it('retrieveContext with mixed chunks: vector search over current ones, keyword hits over older ones, merged', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool({
+            coverage: { current: true, legacy: true },
+            rows: [{ content: 'Godot scenes are trees of nodes.', distance: 0.7 }],
+            keywordRows: [{ content: 'Blenderのモディファイアは形状を非破壊で変えます。', chunk_index: 0, material_id: 'm1' }],
+        });
+        setPoolForTests(pool);
+
+        const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('Blenderのモディファイアとは？', 3, 'user-1'));
+        assert.deepEqual(chunks, ['Blenderのモディファイアは形状を非破壊で変えます。', 'Godot scenes are trees of nodes.'],
+            'the older material does not disappear once one material uses the current model');
+        assert.equal(client.log.length, 1);
+        const search = pool.queries.find((q) => /<=>/.test(q.sql));
+        assert.match(search.sql, /c\.embedding_model = \$3/);
+        assert.equal(search.params[2], MODEL_IDS.gemini.embedding);
+        assert.ok(!/ILIKE/.test(search.sql), 'vectors are never compared with older-model rows');
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.deepEqual(keyword.params, ['user-1', MODEL_IDS.gemini.embedding, '%Blender%', '%モディファイア%', 3]);
+        assert.equal(warnings.length, 1);
+    });
+
+    it('retrieveContext stays quiet and skips keyword search when every chunk already uses the current model', async () => {
+        const pool = mockPool({ coverage: { current: true, legacy: false }, rows: [{ content: 'chunk C', distance: 0.1 }] });
+        setEmbeddingClientForTests(fakeEmbeddingClient());
+        setPoolForTests(pool);
+        const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('modifiers', 3, 'user-1'));
+        assert.deepEqual(chunks, ['chunk C']);
+        assert.deepEqual(warnings, []);
+        assert.ok(!pool.queries.some((q) => /ILIKE/.test(q.sql)));
+    });
+
+    it('searchContent falls back to keyword search over the same ready/user scope when no chunk uses the current model', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool({
+            coverage: { current: false, legacy: true },
+            rows: [{ content: 'Blender modifiers stack', chunk_index: 1, material_id: 'm9' }],
+        });
+        setPoolForTests(pool);
+
+        const { value: result, warnings } = await captureWarnings(() =>
+            searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: 'u1' }));
+
+        assert.equal(result.search_type, 'keyword');
+        assert.equal(result.fallback_reason, 'reembed_required');
+        assert.equal(result.results[0].source, 'm9');
+        assert.equal(client.log.length, 0);
+        assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
+
+        const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
+        assert.match(coverage.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$2/);
+        assert.deepEqual(coverage.params, ['u1', MODEL_IDS.gemini.embedding]);
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.deepEqual(keyword.params, ['u1', '%blender%', '%modifiers%', 2]);
+        assert.equal(warnings.length, 1);
+    });
+
+    it('searchContent over all users (MCP rag-search, no userId): another user\'s current chunk does not hide older chunks', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool({
+            coverage: { current: true, legacy: true },
+            rows: [{ content: 'Krita brushes', chunk_index: 0, distance: 0.6, material_id: 'm-krita' }],
+            keywordRows: [{ content: 'Blender modifier stack', chunk_index: 3, material_id: 'm-blender' }],
+        });
+        setPoolForTests(pool);
+
+        const { value: result } = await captureWarnings(() =>
+            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3 }));
+
+        assert.equal(result.search_type, 'vector+keyword');
+        assert.equal(result.reembed_required, true);
+        assert.deepEqual(result.results.map((r) => [r.source, r.relevance_score, r.match]), [
+            ['m-blender', 0.5, 'keyword'],
+            ['m-krita', 0.4, undefined],
+        ]);
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$1 OR c\.embedding_model > \$1\) AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.deepEqual(keyword.params, [MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
+        const search = pool.queries.find((q) => /<=>/.test(q.sql));
+        assert.deepEqual(search.params.slice(1), [MODEL_IDS.gemini.embedding, 3]);
     });
 });

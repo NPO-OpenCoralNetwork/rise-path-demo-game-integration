@@ -2,7 +2,16 @@ import fs from 'fs/promises';
 import { createRequire } from 'module';
 import { getPool } from './db.js';
 // Embeddings are shared with the MCP rag-search tool so ingest and query always use one model.
-import { EMBEDDING_DIM, EMBEDDING_MODEL, embedTexts } from '../tools/core/ragSearch.js';
+import {
+    EMBEDDING_DIM,
+    EMBEDDING_MODEL,
+    embeddingCoverage,
+    embedTexts,
+    keywordSearchChunks,
+    legacyChunkScope,
+    mergeByRelevance,
+    warnLegacyEmbeddingsOnce,
+} from '../tools/core/ragSearch.js';
 // Native text splitter (replaces @langchain/textsplitters)
 
 const require = createRequire(import.meta.url);
@@ -115,10 +124,19 @@ export const retrieveContext = async (query, limit = 3, userId) => {
         const hasVector = typeCheck.rowCount > 0;
 
         let result;
-        if (hasVector) {
+        // Always scoped to the caller's own materials (an undefined userId matches nothing).
+        const scope = { conditions: ['m.user_id = $1'], params: [userId] };
+        const coverage = hasVector ? await embeddingCoverage(pool, scope) : null;
+        if (coverage) warnLegacyEmbeddingsOnce(coverage.legacy);
+
+        if (coverage && !coverage.current) {
+            // Vectors from different models are never compared: with no EMBEDDING_MODEL chunks yet
+            // (all from an older model), match this user's chunks by keyword until re-embedded.
+            result = { rows: await keywordSearchChunks(pool, { query, scope, limit }) };
+        } else if (hasVector) {
             const [queryVector] = await embedTexts([query]);
-            // Only compare against chunks embedded by the same model (older rows need re-ingestion).
-            result = await pool.query(
+            // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older rows).
+            const vector = await pool.query(
                 `SELECT c.content, (c.embedding <=> $1::vector) as distance
                  FROM material_chunks c
                  JOIN materials m ON c.material_id = m.id
@@ -127,6 +145,12 @@ export const retrieveContext = async (query, limit = 3, userId) => {
                  LIMIT $4`,
                 [JSON.stringify(queryVector), userId, EMBEDDING_MODEL, limit]
             );
+            // The user's older-model chunks are matched by keyword and merged in by relevance, so
+            // they do not disappear once one material uses the current model.
+            const legacy = coverage?.legacy
+                ? await keywordSearchChunks(pool, { query, scope: legacyChunkScope(scope), limit })
+                : [];
+            result = { rows: mergeByRelevance(vector.rows, legacy, limit) };
         } else {
             // Simple fallback if no pgvector: just return latest or match basic if needed
             // For now, let's just return top items by ID as similarity is hard in pure SQL float8[]

@@ -34,6 +34,8 @@ npm run db:migrate:status
 | `006_life_journal.sql` | 日次ダイアリー・生活習慣 |
 | `007_agent_tables.sql` | Hermes プロキシ consent / session binding |
 | `008_seed_learning_portals.sql` | Learning Hub カード seed |
+| `009_learner_memory_meta.sql` | 学習者メモリの同期メタデータ |
+| `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス |
 
 ## 参考資料（適用しない）
 
