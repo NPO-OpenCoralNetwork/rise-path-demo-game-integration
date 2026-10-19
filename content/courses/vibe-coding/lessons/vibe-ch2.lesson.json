@@ -933,7 +933,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "記録と通知、写真での種類判定、SNS（ソーシャルメディア）への投稿",
+                    "jp": "記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿",
                     "en": "Records, reminders, species ID from photos and social posting"
                   },
                   "feedback": {

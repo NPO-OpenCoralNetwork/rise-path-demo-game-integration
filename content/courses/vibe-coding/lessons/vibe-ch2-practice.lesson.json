@@ -279,7 +279,7 @@
                   "id": "a",
                   "md": {
                     "jp": "並べ替えだけShouldに移し、品物の追加はMustに残す",
-                    "en": "Move only the sorting to Should; keep adding items as a Must"
+                    "en": "Move only the sorting to Should; keep \"add items\" as a Must"
                   }
                 },
                 {
@@ -922,8 +922,8 @@
           "id": "summary-next",
           "type": "markdown",
           "md": {
-            "jp": "最後に振り返ってみましょう。AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。\n\n第3章では、AIと開発するためのVS Codeを準備します。この先、AIに画面を作ってもらうときは、この1枚企画書を一緒に渡せます。",
-            "en": "To finish, look back. If you turned down any of the AI's points, write down why in one line.\n\nIn Chapter 3 you'll set up VS Code for building with an AI. Later on, when you ask an AI to build screens, you can hand it this one-page plan as well."
+            "jp": "最後に振り返ってみましょう。AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。\n\n第3章では、AIと開発するためのVS Code（Visual Studio Code）を準備します。この先、AIに画面を作ってもらうときは、この1枚企画書を一緒に渡せます。",
+            "en": "To finish, look back. If you turned down any of the AI's points, write down why in one line.\n\nIn Chapter 3 you'll set up VS Code (Visual Studio Code) for building with an AI. Later on, when you ask an AI to build screens, you can hand it this one-page plan as well."
           }
         },
         {
