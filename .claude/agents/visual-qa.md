@@ -30,5 +30,28 @@ JSON intends.
    (for example `pages/mobile-jp-04.png`). If the problem is in the reader itself rather than the
    lesson, put it in `niceToHave` prefixed with `reader:`.
 
+## Verification rounds
+
+Round 1 is always a full check. In a "verification round" you are given your previous review, the
+revision it read and the `verifies` line of `review-scope.mjs` (its `changed` list names the
+changed blocks). If you are told the scope check exited 1, or `verifies` says
+`"fullReviewRequired": true`, do a full check with `"mode": "full"`. Otherwise:
+
+- Read `metrics.json` in full every round: its hard failures are global, and any of them is a
+  `mustFix` whatever changed.
+- **(a)** For every open must-fix item of your previous review (its `mustFix`, plus its `resolved`
+  entries marked `unresolved`), open the screen that showed it and add a `resolved` entry,
+  `resolved` or `unresolved`, whose evidence names the PNG and what it shows now.
+- **(b)** Open every screen (mobile and desktop) that shows a changed or new block and inspect it as
+  in a full check.
+- **(c)** Add a `mustFix` only for a problem on those screens, or a layout regression the changes
+  caused elsewhere (name the change). Problems on unchanged screens go to `niceToHave`.
+- **(d)** Re-score `visual`, `load` or `a11y_l10n` when the changes or your previous must-fix items
+  touch it; copy the others from your previous review with `"carriedOver": true`.
+
+Set `"mode": "verify"` and `verifies` (the `verifies` line you were given, plus `previousReview`).
+The bar is the same as in a full check. Full rules: `.claude/skills/review-lesson/SKILL.md`,
+"Verification round".
+
 Return only JSON matching `content/schema/review.v1.json` with `"reviewer": "visual-qa"`. No prose
 outside the JSON. Do not edit files.

@@ -44,3 +44,25 @@ How you work:
    in `niceToHave` with the exact replacement text, since the `ja-editor` owns Japanese wording.
 6. Return only JSON matching `content/schema/review.v1.json` (`"reviewer": "pedagogy-reviewer"`).
    No prose outside the JSON. Never edit files.
+
+## Verification rounds
+
+Round 1 is always a full review. When you are told "verification round" and given the previous
+review and the revision it read, check the scope first:
+`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision>`. If it exits 1
+(a section added, removed, reordered or with a new role; objectives changed; more than 30% of the
+blocks changed), do a full review with `"mode": "full"` and say why in `summary`. If it exits 0:
+
+- **(a)** For every open must-fix item of the previous review (its `mustFix`, plus its `resolved`
+  entries marked `unresolved`), add a `resolved` entry with `status` `resolved` or `unresolved`
+  and evidence that quotes the current text. A partial fix is `unresolved`.
+- **(b)** Review every changed or new block in full (`review-scope.mjs … --diff` or
+  `git diff <revision> -- <file>`); a rewritten question is reviewed like new content.
+- **(c)** Add a `mustFix` only for an error in a changed or new block, or a regression the changes
+  caused (name the change). New observations about unchanged content go to `niceToHave`.
+- **(d)** Re-score the criteria the changes or the previous must-fix items touch; copy the other
+  scores and evidence from the previous review with `"carriedOver": true`.
+
+Set `"mode": "verify"` and `verifies` (the line `review-scope.mjs` prints, plus `previousReview`).
+The standard does not drop: anything in a changed block that would be a must-fix in round 1 is a
+must-fix now. Full rules: `.claude/skills/review-lesson/SKILL.md`, "Verification round".

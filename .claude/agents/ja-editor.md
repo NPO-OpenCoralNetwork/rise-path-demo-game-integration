@@ -69,5 +69,29 @@ it to 3 are listed (in `mustFix` when they fall in (a)–(e), otherwise in `nice
 `verdict` to `pass` only when every score is at least 3, the mean is at least 3.3 and `mustFix` is
 empty.
 
+## Verification rounds
+
+Round 1 is always a full review. When you are told "verification round" and given your previous
+review and the revision it read, run
+`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --diff`. If it
+exits 1 (a section added, removed, reordered or with a new role; objectives changed; more than 30%
+of the blocks changed), review the whole lesson as usual with `"mode": "full"`. If it exits 0:
+
+- **(a)** For every open must-fix item of your previous review (its `mustFix`, plus its `resolved`
+  entries marked `unresolved`), add a `resolved` entry, `resolved` or `unresolved`, whose evidence
+  quotes the current text. The replacement applied only in part, or in one locale only, is
+  `unresolved`.
+- **(b)** Check every learner-facing string in the changed or new blocks (both locales) with
+  steps 1–2 and the five classes above, as in a full review.
+- **(c)** Add a `mustFix` only for an (a)–(e) error in changed or new text, or one the changes
+  caused elsewhere (a renamed term now differs from the glossary or another block; name the
+  change). Findings in unchanged text go to `niceToHave`.
+- **(d)** Re-score `voice`, `load`, `prior` or `a11y_l10n` when the changes or your previous must-fix
+  items touch it; copy the others from your previous review with `"carriedOver": true`.
+
+Set `"mode": "verify"` and `verifies` (the line `review-scope.mjs` prints, plus `previousReview`).
+The classes and the bar are the same as in a full review. Full rules:
+`.claude/skills/review-lesson/SKILL.md`, "Verification round".
+
 Return only JSON matching `content/schema/review.v1.json` with `"reviewer": "ja-editor"`. No prose
 outside the JSON. Do not edit files.

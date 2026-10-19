@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Rise Path lesson review (review.v1)",
-  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
+  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Round 1 is a full review; a later round may be a fix-verification round (\"mode\": \"verify\", rules in .claude/skills/review-lesson/SKILL.md). Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["lessonId", "file", "reviewer", "rubricVersion", "scores", "mustFix", "niceToHave", "verdict", "summary"],
@@ -22,9 +22,71 @@
       "type": "string",
       "enum": ["rubric.v1"]
     },
+    "mode": {
+      "type": "string",
+      "enum": ["full", "verify"],
+      "description": "full (the default when absent): the whole lesson is reviewed and every criterion in scope is scored afresh. verify: a fix-verification round that checks the previous review's must-fix items and reviews what changed since it; it needs `verifies` and `resolved`."
+    },
+    "verifies": {
+      "type": "object",
+      "description": "Verification rounds only: what this round verifies. Copy reviewedRevision, changed, changedShare and fullReviewRequired from `review-scope.mjs <file> --since <revision>` and add previousReview.",
+      "additionalProperties": false,
+      "required": ["reviewedRevision", "previousReview", "changed", "fullReviewRequired"],
+      "properties": {
+        "reviewedRevision": {
+          "type": "string",
+          "description": "The lesson revision the previous review read: a git commit, or sha256:<hash> from `review-scope.mjs --snapshot`."
+        },
+        "previousReview": {
+          "type": "string",
+          "description": "The review this round verifies: a path (for example the snapshot copy under .artifacts/review/) or <commit>:<path>."
+        },
+        "changed": {
+          "type": "array",
+          "description": "What changed since reviewedRevision, as review-scope.mjs lists it: block ids, section.<id> for section fields, lesson.<field> for lesson fields. Each was reviewed in full.",
+          "items": { "type": "string" }
+        },
+        "changedShare": {
+          "type": "number",
+          "description": "Share of blocks changed, added, removed or moved since reviewedRevision (0–1). Above 0.3 a full review is required."
+        },
+        "fullReviewRequired": {
+          "type": "boolean",
+          "description": "The review-scope.mjs decision. A verification review is valid only when it is false."
+        }
+      }
+    },
+    "resolved": {
+      "type": "array",
+      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus its resolved entries marked unresolved). check-review.mjs counts every unresolved entry as an open must-fix.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["blockId", "criterion", "status", "evidence"],
+        "properties": {
+          "blockId": {
+            "type": "string",
+            "description": "The blockId of the previous must-fix item."
+          },
+          "criterion": {
+            "type": "string",
+            "enum": ["align", "hook", "prior", "load", "worked", "active", "miscon", "visual", "practice", "meta", "accuracy", "voice", "a11y_l10n"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["resolved", "unresolved"],
+            "description": "resolved: the change removes the problem completely. unresolved: not applied, applied only in part, or the problem moved elsewhere."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "One or two sentences that quote the current text (or name the screenshot) and show why."
+          }
+        }
+      }
+    },
     "scores": {
       "type": "array",
-      "description": "One entry per criterion in the reviewer's scope. pedagogy-reviewer scores all 13; ja-editor and visual-qa score the criteria they can judge.",
+      "description": "One entry per criterion in the reviewer's scope. pedagogy-reviewer scores all 13; ja-editor and visual-qa score the criteria they can judge. A verification round lists every criterion the previous review scored: the re-scored ones, and the others with carriedOver: true.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -45,13 +107,17 @@
           "blockIds": {
             "type": "array",
             "items": { "type": "string" }
+          },
+          "carriedOver": {
+            "type": "boolean",
+            "description": "Verification rounds only: true when score and evidence are copied unchanged from the previous review because the changes do not affect this criterion. Absent or false: scored in this round."
           }
         }
       }
     },
     "mustFix": {
       "type": "array",
-      "description": "Changes required before the lesson can pass. Each fix is specific enough to apply without guessing.",
+      "description": "Changes required before the lesson can pass. Each fix is specific enough to apply without guessing. In a verification round: only errors in changed or new blocks, or regressions the changes caused elsewhere (the issue names the change).",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -85,7 +151,7 @@
     "verdict": {
       "type": "string",
       "enum": ["pass", "revise", "reject"],
-      "description": "pass: every scored criterion ≥ 3, mean ≥ 3.3, no mustFix. revise: fixable. reject: wrong audience or outcome; needs a rewrite."
+      "description": "pass: every scored criterion ≥ 3, mean ≥ 3.3, no mustFix and no unresolved item. revise: fixable. reject: wrong audience or outcome; needs a rewrite."
     },
     "summary": {
       "type": "string",

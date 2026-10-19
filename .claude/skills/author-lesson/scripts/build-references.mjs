@@ -463,6 +463,20 @@ export function buildRubric() {
     '`scores[] {id, score 0–4, evidence, blockIds?}`, `mustFix[] {criterion, blockId, issue, fix, screenshot?}`, `niceToHave[]`,',
     '`verdict` (pass | revise | reject) and `summary`. Evidence quotes the lesson or names block ids; a fix is specific enough',
     'to apply without guessing.',
+    '',
+    '## Review rounds',
+    '',
+    '- Round 1 is a full review (`mode` absent or `"full"`): every criterion in the reviewer\'s scope is scored afresh.',
+    '- A later round is a **verification round** (`"mode": "verify"`) when the author applied the previous must-fix items and',
+    '  `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision>` exits 0. The reviewer marks each',
+    '  previous must-fix `resolved` or `unresolved` in `resolved[] {blockId, criterion, status, evidence}`, reviews every changed',
+    '  or new block in full, adds `mustFix` only for errors in changed blocks or regressions the changes caused, re-scores the',
+    '  criteria the changes affect and copies the others with `carriedOver: true`. `verifies {reviewedRevision, previousReview,',
+    '  changed, changedShare?, fullReviewRequired}` records what was verified.',
+    '- A full review is still required when a section was added, removed, reordered or changed its role, the objectives changed,',
+    '  or more than 30% of the blocks changed (`review-scope.mjs` exits 1).',
+    '- `check-review.mjs` counts every `unresolved` entry as an open must-fix; the pass rule above is the same in both modes.',
+    '  Rules: `.claude/skills/review-lesson/SKILL.md`.',
   );
   return `${out.join('\n')}\n`;
 }

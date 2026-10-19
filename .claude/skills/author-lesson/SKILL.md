@@ -3,7 +3,7 @@ name: author-lesson
 description: "Write or rework one Rise Path lesson (教材・レッスン・チャプター) as risepath.lesson/v1 JSON in content/courses/<course>/drafts/ — brief, outline, draft, validate and lint, independent pedagogy review, screenshot QA, report. Use when asked to create, convert, redesign or improve learning material."
 when_to_use: "Requests such as 教材を作って, レッスンを書いて, この資料をレッスンにして, 第N章を作り直して, 演習を追加して, or turning notes, docs or an issue into a lesson."
 argument-hint: "<course-slug> <lesson-id> [brief text or path to a brief]"
-allowed-tools: "Read Grep Glob Edit(content/courses/**) Bash(npm run lessons:validate *) Bash(npm run -s lessons:validate *) Bash(npm run lessons:lint *) Bash(npm run -s lessons:lint *) Bash(npm run lessons:preview *) Bash(npm run lessons:catalog *) Bash(npm run -s lessons:catalog *) Bash(node .claude/skills/review-lesson/scripts/check-review.mjs *) Skill(review-lesson *)"
+allowed-tools: "Read Grep Glob Edit(content/courses/**) Bash(npm run lessons:validate *) Bash(npm run -s lessons:validate *) Bash(npm run lessons:lint *) Bash(npm run -s lessons:lint *) Bash(npm run lessons:preview *) Bash(npm run lessons:catalog *) Bash(npm run -s lessons:catalog *) Bash(node .claude/skills/review-lesson/scripts/check-review.mjs *) Bash(node .claude/skills/review-lesson/scripts/review-scope.mjs *) Skill(review-lesson *)"
 effort: high
 hooks:
   PostToolUse:
@@ -111,18 +111,36 @@ Reach 0 errors and 0 warnings. A warning may stay only with a written reason in 
 
 ## 6. Independent review (at most 2 rounds)
 
-- You never score your own draft. Run `/review-lesson content/courses/<course>/drafts/<lesson>.lesson.json`
-  (it forks into the `pedagogy-reviewer` subagent) and, in the same message, ask the `ja-editor`
-  subagent to review the same file. Give them the file and brief paths only — not your opinion of
-  the draft.
+- You never score your own draft. **Round 1 is a full review**: run
+  `/review-lesson content/courses/<course>/drafts/<lesson>.lesson.json` (it forks into the
+  `pedagogy-reviewer` subagent) and, in the same message, ask the `ja-editor` subagent to review
+  the same file. Give them the file and brief paths only — not your opinion of the draft.
 - Run reviewers in the **foreground** (Agent tool with `run_in_background: false`; `/review-lesson`
   already waits) and wait for their JSON. Never end your turn while a reviewer is running.
 - Save each JSON answer with Write as `content/courses/<course>/reports/<lesson>.<reviewer>.review.json`
   (a later round overwrites the earlier one; keep the history in the report, and do not rename
   files with `mv`), then merge and gate them:
   `node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/<course>/reports/<lesson>.*.review.json`
-- Apply every `mustFix` and raise every criterion below 3. Re-validate, then re-review once.
-- Still failing after 2 rounds: stop and report what blocks a pass. Do not lower the bar.
+- Right after saving a round's reviews, record what they read:
+  `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot`. It keeps a copy of
+  the lesson and the saved reviews in `.artifacts/review/<course>/<lesson>/<hash>/` and prints the
+  revision `sha256:<hash>`. When the reviewed draft is committed, the commit is the revision instead.
+- Apply every `mustFix` and raise every criterion below 3. Re-validate.
+- **Round 2 is a verification round** (fix-verification mode, rules in
+  `.claude/skills/review-lesson/SKILL.md`) when
+  `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision>` exits 0. It
+  exits 1 — a full review again — when a section was added, removed, reordered or changed its role,
+  the objectives changed, or more than 30% of the blocks changed. For a verification, run
+  `/review-lesson <file> --verify <previous review> --since <revision>` and tell the `ja-editor`:
+  "Verification round: lesson `<file>`, previous review `<previous review>`, revision
+  `<revision>`, verifies `<the line review-scope.mjs printed>`." The previous review is the snapshot
+  copy `.artifacts/review/<course>/<lesson>/<hash>/<reviewer>.review.json` or `<commit>:<path>`.
+  Do not argue with round 1 or say what you think is fixed; the reviewer checks.
+- Save and gate as in round 1. `check-review.mjs` loads `verifies.previousReview` to check that every
+  earlier must-fix was verified; when it says it could not, pass `--previous <file or commit:path>`.
+- Still failing after 2 rounds: stop and report what blocks a pass. Do not lower the bar: a
+  verification judges every changed block by the round-1 standard, and an `unresolved` item is an
+  open must-fix.
 
 ## 7. Preview and visual QA
 
@@ -135,6 +153,10 @@ Reach 0 errors and 0 warnings. A warning may stay only with a written reason in 
   Save its review next to the others and fix
   what it finds: horizontal overflow, console or diagram errors, text-only screens, unreadable
   tables or diagrams on mobile. Re-run the preview after layout-relevant fixes.
+- A `visual-qa` re-check after fixes follows the round rule of step 6: when `review-scope.mjs`
+  exits 0, tell it "Verification round: preview folder `<folder>`, previous review
+  `<previous review>`, revision `<revision>`, verifies `<the printed line>`". It has no shell: give
+  it a readable path such as the snapshot copy, or paste the previous review JSON.
 
 ## 8. Translate (when the brief lists more locales)
 

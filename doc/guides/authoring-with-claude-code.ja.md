@@ -86,6 +86,7 @@ Claude Code は次の順に進めます（詳細は `.claude/skills/author-lesso
 6. **独立レビュー**: `/review-lesson` が `pedagogy-reviewer` で採点し、並行して `ja-editor` が日本語を
    見ます。結果は `reports/<lesson>.<reviewer>.review.json` に保存し、`check-review.mjs` で合否を
    出します。必須修正を直して再レビュー（最大 2 往復）。それでも通らなければ止めて報告します。
+   2 回目は、構成が変わっていなければ修正確認レビューです（4 章の「修正確認レビュー」）。
 7. **画面確認**: `npm run lessons:preview -- <course> <lesson>` のあと、`visual-qa` が PNG を見ます。
 8. **翻訳**: brief に `en` があれば英語を足し、もう一度検証とプレビューをします。
 9. **レポート**: `reports/<lesson>.md` に、採点結果、直したこと、残った警告とその理由、前提、
@@ -178,6 +179,30 @@ node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-
 | `pedagogy-reviewer` | 教え方全体 | 13 観点すべて |
 | `ja-editor` | 日本語（と英語）の文章 | `voice`、`load`、`prior`、`a11y_l10n` |
 | `visual-qa` | スクリーンショットと `metrics.json` | `visual`、`load`、`a11y_l10n` |
+
+### 修正確認レビュー（2 回目以降）
+
+1 回目は必ず全体レビューです。2 回目以降、前回の必須修正を直しただけなら、修正確認レビュー
+（`"mode": "verify"`）にします。レビュアーには、前回のレビューと、前回が読んだ版を渡します。
+
+- 前回の必須修正を一つずつ、「解決」か「未解決」かで判定します（`resolved`）。
+- 変わったブロックは、全体レビューと同じ基準ですべて見ます。書き直した問題は新しい問題として見ます。
+- 新しい必須修正は、変わったブロックの誤りと、変更が原因の不具合だけです。
+- 変わっていない部分への新しい気づきは `niceToHave` に入れます。
+- 変更が関わる観点だけを採点し直します。ほかの観点は前回の点を引き継ぎます（`carriedOver`）。
+
+次のどれかに当たるときは、もう一度全体レビューです。`review-scope.mjs` が判定し、終了コード 1 を返します。
+
+- セクションの追加・削除・並べ替え、または役割の変更
+- 学習目標の変更（id、文、Bloom レベル、順番）
+- ブロックの 30% を超える変更（書き換え・追加・削除・移動）
+
+```bash
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <コミット | sha256:…>
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot   # コミット前の下書きの版を記録
+```
+
+合格の基準は変わりません。`check-review.mjs` は「未解決」を、残っている必須修正として数えます。
 
 ---
 
