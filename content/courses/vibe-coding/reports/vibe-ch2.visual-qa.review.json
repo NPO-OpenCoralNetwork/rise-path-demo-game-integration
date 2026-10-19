@@ -1,58 +1,52 @@
 {
   "lessonId": "vibe-ch2",
-  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "784d2d9",
-    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json",
-    "changed": [
-      "check-quiz",
-      "s3-check",
-      "summary-cards"
-    ],
-    "changedShare": 0.1,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Each segment has its own visual anchor: the goal/feature definition list and the feature-to-goal table in 2-2, the MoSCoW table in 2-3, the 6-step procedure and the screen-flow diagram s2-b4 in 2-4, plus the prompt cards. The diagram labels are large, in the right language and readable at 390 px (pages/mobile-jp-14.png, pages/desktop-en-10.png).",
+      "evidence": "Every segment has its own visual anchor. 2-2 has the goal/feature definitions and the feature-to-goal table. The section shown as 2-3 has the MVP/MoSCoW definitions and the MoSCoW table. 2-4 has the 6-step procedure, the screen-flow diagram (図1 / Figure 1) and the prompt cards. The diagram labels are large, in the right language and readable at 390 px (pages/mobile-jp-14.png, pages/desktop-jp-09.png, pages/desktop-en-10.png).",
       "blockIds": [
-        "s2-b4"
-      ],
-      "carriedOver": true
+        "s2-table",
+        "s5-b2",
+        "s3-steps",
+        "s2-b4",
+        "s2-b3"
+      ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Fresh metrics.json shows no text-only screens in any locale. Desktop JP lines run 37 chars (median, target 30–40) and EN lines 71 (target 60–75). The longer q8 options in check-quiz wrap to 2 even lines on mobile (pages/mobile-jp-19.png) and on desktop EN (pages/desktop-en-13.png). On desktop JP each one fits on a single line (pages/desktop-jp-13.png). The option cards keep their spacing, and the quiz does not turn into a wall of text.",
+      "evidence": "metrics.json lists no text-only screens in any locale. Desktop JP has a median of 37 chars per line (target 30–40) and EN a median of 71 (target 60–75). Prose sits between definition lists, tables, steps and checks, with no walls of text. Long quiz options wrap to 2 even lines on mobile (pages/mobile-jp-19.png, pages/mobile-jp-21.png) and on desktop EN (pages/desktop-en-13.png), and the option cards keep their spacing.",
       "blockIds": [
-        "check-quiz"
+        "check-quiz",
+        "s3-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The rewritten q8 options are fully localized. JP '画面名と保存する項目名だけを、自分で決めて書き足す' appears in pages/desktop-jp-13.png and pages/mobile-jp-19.png. EN 'Decide just the screen names and field names yourself, and add them' appears in pages/desktop-en-13.png. Neither locale mixes in the other language. Contrast is unchanged, and on mobile the last option sits above the bottom bar (pages/mobile-jp-19.png).",
+      "evidence": "Both locales are fully localized, with no Japanese in the EN shots and no stray English in JP beyond the intended terms (MVP, MoSCoW, Must/Should/Could/Won't). Example: the q8 option '画面名と保存する項目名だけを、自分で決めて書き足す' (pages/desktop-jp-13.png) and 'Decide just the screen names and field names yourself, and add them' (pages/desktop-en-13.png). Contrast is fine, and on mobile the last options and the 答える buttons sit above the bottom bar (pages/mobile-jp-19.png, pages/mobile-jp-21.png). The diagram has an alt toggle ('図の説明を読む').",
       "blockIds": [
-        "check-quiz"
+        "check-quiz",
+        "s2-b4"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "process: no shell was available in this round, so I could not run git diff or review-scope.mjs. The changed blocks were inferred from the other reviewers' must-fix items and the current draft: q8 options and explanation in check-quiz, the q4 explanation in s3-check, and the card-goal back in summary-cards. The changedShare of about 3/30 is an estimate. Confirm the list with review-scope.mjs before gating.",
-    "check-quiz q8 explanation, s3-check q4 explanation and the summary-cards card-goal back only show after the learner answers or flips a card, so the static captures do not show them (pages/desktop-jp-10.png, pages/desktop-jp-15.png, pages/mobile-jp-23.png show the unanswered or front states). Their length is similar to the previous text, so no layout risk is expected.",
-    "s2-b4: the two curved edges between the money-left screen and the input screen carry the labels '追加ボタン' and '保存' side by side. At 390 px it is hard to tell which label goes with which arrow (pages/mobile-jp-14.png). Consider labelling them '追加ボタンで→' and '保存で戻る', or describing the round trip in the caption.",
+    "process: this is a full review, not a verify round. visual-qa has no shell (tools: Read, Glob, Grep), so I could not run `git show c961471:…`, `review-scope.mjs --since 784d2d9` or `review-scope.mjs --hash`. Without them I have no verifies line, no changed list and no lessonHash, and I will not make them up. The lesson also has sections that the previous review did not list as changed (section id 2-5 with s5-*, shown as 2-3, and check-quiz q10), so a structural change cannot be ruled out. The author should run review-scope.mjs, give me the lessonHash and the verifies line, and re-run me (check-review.mjs refuses a review without lessonHash).",
+    "s2-b4: the two curved edges between the money-left screen and the input screen carry the labels '追加ボタン' and '保存' side by side. At 390 px it is hard to tell which label goes with which arrow (pages/mobile-jp-14.png). Consider '追加ボタンで→' / '保存で戻る', or describing the round trip in the caption.",
+    "Static captures do not show feedback, explanations or flashcard backs, so their layout was not checked (pages/mobile-jp-23.png, pages/desktop-jp-15.png show the unanswered or front states).",
     "reader: the flashcard hint reads 'クリックまたはスペースキーでめくる' on mobile (pages/mobile-jp-23.png). On touch devices it should say 'タップしてめくる'.",
     "reader: on desktop, the sidebar outline marks sections the learner has only scrolled past as '未回答' / 'Unanswered' with an alert icon (pages/desktop-jp-13.png, pages/desktop-en-13.png). This may read as an error rather than a reminder.",
-    "reader: the mobile-jp capture is still marked truncated in metrics.json. The last screen (pages/mobile-jp-25.png) overlaps the previous one, but the content appears complete."
+    "reader: section ids and display numbers differ (id 2-5 is shown as '2-3', id 2-3 as '2-4'). This is fine for learners but confusing in reviews.",
+    "reader: the mobile-jp capture is marked truncated in metrics.json. The last screen (pages/mobile-jp-25.png) overlaps the previous one, but the content ends with the next-lesson card, so it is complete."
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "This is a verification round, and the change is not structural. The previous visual-qa review had no must-fix items, so there was nothing to resolve. The fresh metrics.json is clean: no overflow, console, mermaid, unknown-block or image errors, no text-only screens, and line lengths on target. The changes are text edits from the other reviewers: q8 options and explanation in check-quiz, the q4 explanation in s3-check, and the card-goal back in summary-cards. The new q8 options render cleanly in JP desktop, JP mobile and EN desktop, with no clipping, overlap or untranslated text. I found no regressions and added no must-fix items."
+  "summary": "lessonHash is left out on purpose: I was not given one and have no shell to run review-scope.mjs --hash, so check-review.mjs will refuse this review until the author gives me the hash and re-runs me. For the same reason I could not get the scope or verifies line, so this is a full check (mode full) of the fresh published-lesson preview instead of a verify round. metrics.json is clean: no overflow, console, mermaid, unknown-block or image errors, no text-only screens, and line lengths on target. I opened all 25 mobile-jp screens, all 16 desktop-jp screens and the desktop-en screens with figures, tables and questions, and found no clipping, overlap, untranslated text or controls hidden under the bars. I added no must-fix items, and the working-tree copy of the previous visual-qa review also has none."
 }

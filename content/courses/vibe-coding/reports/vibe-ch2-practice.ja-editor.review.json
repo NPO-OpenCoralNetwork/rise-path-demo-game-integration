@@ -1,27 +1,18 @@
 {
   "lessonId": "vibe-ch2-practice",
-  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
+  "lessonHash": "sha256:7dfd5355b05405d5",
   "verifies": {
-    "reviewedRevision": "784d2d9",
-    "changed": [
-      "practice-check",
-      "check-quiz"
-    ],
-    "changedShare": 0.1,
+    "reviewedRevision": "dcb3095",
+    "changed": [],
+    "changedShare": 0,
     "fullReviewRequired": false,
-    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json"
+    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json"
   },
-  "resolved": [
-    {
-      "blockId": "check-quiz",
-      "criterion": "voice",
-      "status": "resolved",
-      "evidence": "In pq2, all four options are now verb phrases in the same form. a: 「つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする」. b: 「友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする」. c: 「2つともMustにして、最初の版で作る」. d: 「2つとも、企画書から消しておく」. The en options match: 'Make the forgot-to-log reminder a Should and the friends leaderboard a Won't' / 'Make the friends leaderboard a Should and the forgot-to-log reminder a Won't'."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
@@ -32,7 +23,8 @@
         "check-quiz",
         "practice-prompt-plan",
         "practice-steps-plan"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
@@ -64,7 +56,8 @@
         "practice-check",
         "check-quiz",
         "practice-flow"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
@@ -80,5 +73,5 @@
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "Verification round: 2 of 20 blocks changed (10%); sections and objectives are unchanged. The only previous mustFix is resolved: the pq2 options are now parallel verb phrases in both locales. The rewritten pq1 in practice-check has parallel options, feedback that names the misconception in 2 sentences or fewer, and matching jp/en text. lessons:lint --strict is clean, and the changes introduce no new errors."
+  "summary": "Verification round under the updated gate rules. review-scope.mjs --since dcb3095 exited 0: 0 of 20 blocks changed (0%), and sections and objectives are unchanged. The previous review (c961471) recorded no lessonHash, so the check ran without --expect-hash. Publishing from drafts/ to lessons/ changed no content. The previous review had no mustFix and no unresolved entries, so nothing is left to verify. All four scores it gave (voice 3, load 4, prior 4, a11y_l10n 4) are carried over unchanged. lessons:lint --strict is clean (0 errors, 0 warnings). The earlier niceToHave suggestions are still open and do not block."
 }

@@ -1,22 +1,57 @@
 {
   "lessonId": "vibe-ch2",
-  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
+  "lessonHash": "sha256:09186fc0e87a2e68",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "dcb3095",
-    "changed": ["check-quiz"],
-    "changedShare": 0.04,
+    "reviewedRevision": "bb56d49",
+    "changed": [],
+    "changedShare": 0,
     "fullReviewRequired": false,
-    "previousReview": "bb56d49:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
+    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
-    {"id": "voice", "score": 3, "evidence": "The new q8 option c feedback uses です・ます and natural Japanese with no pressure phrases: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 It now points to the correct action (option d) instead of the vague 「空いている見出しを自分で埋めます」. The rest of the prose is unchanged.", "blockIds": ["q8"]},
-    {"id": "load", "score": 3, "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The changed q8 option c feedback has 2 short sentences, within the wrong-option feedback limit.", "blockIds": ["q8"]},
-    {"id": "prior", "score": 4, "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.", "blockIds": ["q4", "q8", "s3-defs"], "carriedOver": true},
-    {"id": "a11y_l10n", "score": 4, "evidence": "The changed q8 option c feedback has both jp and en, and they mean the same thing: 「いまは画面名と項目名を決めれば十分です。」 / \"For now, deciding the screen names and field names is enough.\" The other strings and diagram labels are unchanged and localized.", "blockIds": ["q8"]}
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The new q8 option c feedback uses です・ます and natural Japanese with no pressure phrases: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 It now points to the correct action (option d) instead of the vague 「空いている見出しを自分で埋めます」. The rest of the prose is unchanged.",
+      "blockIds": [
+        "q8"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The changed q8 option c feedback has 2 short sentences, within the wrong-option feedback limit.",
+      "blockIds": [
+        "q8"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.",
+      "blockIds": [
+        "q4",
+        "q8",
+        "s3-defs"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The changed q8 option c feedback has both jp and en, and they mean the same thing: 「いまは画面名と項目名を決めれば十分です。」 / \"For now, deciding the screen names and field names is enough.\" The other strings and diagram labels are unchanged and localized.",
+      "blockIds": [
+        "q8"
+      ],
+      "carriedOver": true
+    }
   ],
   "mustFix": [],
   "niceToHave": [
@@ -31,5 +66,5 @@
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round. 1 of 30 blocks changed (check-quiz, q8 option c feedback only). The new JP and EN feedback is 2 sentences in です・ます, points to the correct answer, and the locales match. No errors in classes (a)–(e); voice, load and a11y_l10n re-scored unchanged, prior carried over."
+  "summary": "Verification round against bb56d49. review-scope.mjs reported 0 of 30 blocks changed (exit 0). Publishing moved the lesson from drafts/ to lessons/ but did not change its content. lessons:lint --strict found 0 errors and 0 warnings. The previous review had no open mustFix items, so there are no resolved entries. All four criteria it scored (voice 3, load 3, prior 4, a11y_l10n 4) are carried over unchanged. Gate note: the previous review has no lessonHash, so check-review.mjs needs --allow-legacy."
 }

@@ -1,27 +1,18 @@
 {
   "lessonId": "vibe-ch2-practice",
-  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
+  "lessonHash": "sha256:7dfd5355b05405d5",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "784d2d9",
-    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json",
-    "changed": [
-      "practice-check",
-      "check-quiz"
-    ],
-    "changedShare": 0.1,
+    "reviewedRevision": "dcb3095",
+    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json",
+    "changed": [],
+    "changedShare": 0,
     "fullReviewRequired": false
   },
-  "resolved": [
-    {
-      "blockId": "practice-check",
-      "criterion": "miscon",
-      "status": "resolved",
-      "evidence": "pq1 is rewritten as specified. The AI now makes one sound remark and one wrong one: 「Mustは「品物の追加」と「お店ごとの並べ替え」です。AIは2つとも「Shouldでもよいかもしれません」と指摘しました」. The correct option a 「並べ替えだけShouldに移し、品物の追加はMustに残す」 no longer carries the recap's criterion, so it cannot be matched by wording. Misconception 1 is now a graded distractor: b 「AIの指摘どおり、2つともShouldに移す」 has the feedback 「品物を追加できないと、メモが作れず目的を果たせません。指摘は1つずつ、目的に照らして確かめます。」. A learner who simply follows the AI now gets pq1 wrong. objectiveId o3 and bloom evaluate are kept."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -32,7 +23,8 @@
         "check-quiz",
         "practice-plan-check",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -81,7 +73,8 @@
       "blockIds": [
         "practice-check",
         "practice-plan-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -90,7 +83,8 @@
       "blockIds": [
         "practice-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -133,7 +127,8 @@
         "practice-check",
         "check-quiz",
         "practice-prompt-interview"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -142,7 +137,8 @@
       "blockIds": [
         "practice-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -151,16 +147,18 @@
       "blockIds": [
         "practice-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
     "pq1 option d: the correct option a is the only one that splits the two features, so a test-wise learner can spot it. Make d split too, and keep its feedback: jp 「品物の追加はMustに残し、並べ替えはWon'tにして企画書から消す」 / en \"Keep \\\"add items\\\" as a Must; make the sorting a Won't and delete it from the plan\".",
     "pq1 option a en: \"keep adding items as a Must\" can be read as \"continue adding items\". Use \"Move only the sorting to Should; keep \\\"add items\\\" as a Must\".",
-    "Carried over from the previous review and still open: practice-prompt.expect could model a rejected AI remark (「AIは「イベントの作成は、幹事がチャットで日時を送れば不要かもしれません」とも指摘しました。出欠を聞く場がなくなるので、これはMustに残しました。」). p-interview.md could add 「最後の3行のまとめをもとに、目的を自分で1文に書きます。」. A `practice-flow-lead` sentence could go before practice-flow. practice-tip could get a worked before/after for p-revise. practice-prompt-interview.expect could open with 「多くの場合、AIは…」. practice-task could give a time estimate (「目安は15〜20分です。…」)."
+    "Carried over and still open: practice-prompt.expect could model a rejected AI remark (「AIは「イベントの作成は、幹事がチャットで日時を送れば不要かもしれません」とも指摘しました。出欠を聞く場がなくなるので、これはMustに残しました。」). p-interview.md could add 「最後の3行のまとめをもとに、目的を自分で1文に書きます。」. A `practice-flow-lead` sentence could go before practice-flow. practice-tip could get a worked before/after for p-revise. practice-prompt-interview.expect could open with 「多くの場合、AIは…」. practice-task could give a time estimate (「目安は15〜20分です。…」).",
+    "Gate note: the previous review (c961471) has no lessonHash, and its verifies.previousReview names the working-tree reports file. check-review.mjs therefore needs --allow-legacy to accept this round, so --expect-hash was left out of the scope check."
   ],
   "average": 3.62,
   "verdict": "pass",
-  "summary": "This was a verification round. review-scope found 2 of 20 blocks changed (10%), with sections and objectives unchanged, so a verification is allowed. The only previous must-fix, pq1 giving its answer away and never testing misconception 1, is resolved: the AI now makes one right and one wrong remark, the correct option carries no criterion wording, and 'follow the AI' is a distractor with corrective feedback. pq2 changed only in option phrasing, and the meaning and answer are intact. align, active, miscon, accuracy, voice and a11y_l10n were re-scored, and the rest are carried over. Validate and lint --strict are clean, and there is no new must-fix."
+  "summary": "This is a verification round under the updated gate rules. review-scope --since dcb3095 exits 0: 0 of 20 blocks changed (0%), sections and objectives are unchanged, and the only change is the move from drafts/ to lessons/, so the content is the same. The previous review had no open must-fix (mustFix [] and its one resolved entry was resolved), so there are no resolved entries. All 13 criteria it scored are carried over with the same scores (mean 3.62). Validate shows 0 errors and lint --strict shows 0 warnings on the published file. There is no new must-fix. The previous review has no lessonHash, so the gate must run with --allow-legacy."
 }

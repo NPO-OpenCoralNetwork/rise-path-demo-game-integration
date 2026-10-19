@@ -1,33 +1,164 @@
 {
   "lessonId": "vibe-ch2",
-  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
+  "lessonHash": "sha256:09186fc0e87a2e68",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "dcb3095",
-    "previousReview": "bb56d49:content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json",
-    "changed": ["check-quiz"],
-    "changedShare": 0.04,
+    "reviewedRevision": "bb56d49",
+    "previousReview": "c961471:content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json",
+    "changed": [],
+    "changedShare": 0,
     "fullReviewRequired": false
   },
-  "resolved": [
-    {"blockId": "check-quiz", "criterion": "miscon", "status": "resolved", "evidence": "q8 option c feedback now reads 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 / \"For now, deciding the screen names and field names is enough.\" It no longer tells a learner who already filled the headings to fill them. It corrects the over-specification belief and says how much is enough, in 2 sentences."}
-  ],
+  "resolved": [],
   "scores": [
-    {"id": "align", "score": 4, "evidence": "Four can-do objectives, each assessed inline and in the exam: o1 q1/q5, o2 q2/q6, o3 q3/q7, o4 q4/q8/q10/q9. q8 still targets o4 at evaluate, and the feedback change leaves its stem, options and key d unchanged.", "blockIds": ["s1-check", "s2-check", "s5-check", "s3-check", "check-quiz"]},
-    {"id": "hook", "score": 4, "evidence": "hook-b1 sets a concrete scene in 3 sentences; no trivia; the ungraded predict q0 leads into o2.", "blockIds": ["hook-b1", "hook-predict"], "carriedOver": true},
-    {"id": "prior", "score": 3, "evidence": "Prerequisites are stated, s1-b1 and ex-data recall ch0 and ch1, and terms are defined before the quizzes. The q4 explanation still names 「Claude Codeの公式ガイド（Anthropic）」, which ch0/ch1 don't introduce; 仕様書 is now glossed inline.", "blockIds": ["s1-b1", "ex-data", "s3-check"], "carriedOver": true},
-    {"id": "load", "score": 3, "evidence": "Each segment teaches one idea with at most 2 new terms; lint shows 0 sentence or paragraph warnings; section 2-3 is dense but is the worked example.", "blockIds": ["s3-b1", "s3-steps", "s2-b4", "s2-b3"], "carriedOver": true},
-    {"id": "worked", "score": 3, "evidence": "s3-steps is a 6-step worked example with subgoal titles and reasons, ending in a full model plan in s2-b3.expect. No faded step here; fading happens in vibe-ch2-practice.", "blockIds": ["s3-steps", "s2-b3"], "carriedOver": true},
-    {"id": "active", "score": 4, "evidence": "Every segment has an inline check in a new context, and the exam has apply and evaluate items. In q8 all four options act on 「画面の流れとデータの欄」, so the choice turns on how much to write. The new option c feedback is shown only after answering.", "blockIds": ["s1-check", "s2-check", "s5-check", "s3-check", "check-quiz"]},
-    {"id": "miscon", "score": 4, "evidence": "All four brief misconceptions are corrected with a reason in the body. Every wrong option in all 11 questions has feedback of 2 sentences or fewer naming its belief. q8 now covers under-specifying (b), over-specifying (c) and technology choice (a).", "blockIds": ["s1-b5", "s3-b1", "s5-b1", "s2-table", "check-quiz"]},
-    {"id": "visual", "score": 4, "evidence": "s2-b4 is a 3-node process diagram whose labels match the text, with a takeaway caption, alt text and description; no decorative images.", "blockIds": ["s2-b4"], "carriedOver": true},
-    {"id": "practice", "score": 3, "evidence": "s1-b5 asks the learner to try s1-b4 with their own idea and compare with 「期待される結果」; s2-b3 gives a full model plan. The hint-ladder practice lives in vibe-ch2-practice.", "blockIds": ["s1-b5", "s1-b4", "s2-b3"], "carriedOver": true},
-    {"id": "meta", "score": 4, "evidence": "4 summary takeaways after the exam, reflection prompt and next step in summary-next, 6 flashcards; the reworded card-goal matches s2-defs.", "blockIds": ["summary-points", "summary-next", "summary-cards", "summary-ask"], "carriedOver": true},
-    {"id": "accuracy", "score": 3, "evidence": "The new q8 option c feedback agrees with the key d, the explanation, ex-data and the s1-b4 prompt. s3-check still cites cc-best-practices; no factual errors found.", "blockIds": ["check-quiz", "ex-data", "s1-b4", "s3-check"]},
-    {"id": "voice", "score": 3, "evidence": "The new q8 c feedback is warm です・ます with no banned phrases; lint is clean. Flashcard backs mix です・ます and noun endings (unchanged, not a rule break).", "blockIds": ["check-quiz", "summary-cards"]},
-    {"id": "a11y_l10n", "score": 3, "evidence": "The changed feedback has jp and en with matching meaning; validate 0 errors and lint --strict 0 warnings; no text baked into images.", "blockIds": ["check-quiz"]}
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "Four can-do objectives, each assessed inline and in the exam: o1 q1/q5, o2 q2/q6, o3 q3/q7, o4 q4/q8/q10/q9. q8 still targets o4 at evaluate, and the feedback change leaves its stem, options and key d unchanged.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s5-check",
+        "s3-check",
+        "check-quiz"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 sets a concrete scene in 3 sentences; no trivia; the ungraded predict q0 leads into o2.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites are stated, s1-b1 and ex-data recall ch0 and ch1, and terms are defined before the quizzes. The q4 explanation still names 「Claude Codeの公式ガイド（Anthropic）」, which ch0/ch1 don't introduce; 仕様書 is now glossed inline.",
+      "blockIds": [
+        "s1-b1",
+        "ex-data",
+        "s3-check"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Each segment teaches one idea with at most 2 new terms; lint shows 0 sentence or paragraph warnings; section 2-3 is dense but is the worked example.",
+      "blockIds": [
+        "s3-b1",
+        "s3-steps",
+        "s2-b4",
+        "s2-b3"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s3-steps is a 6-step worked example with subgoal titles and reasons, ending in a full model plan in s2-b3.expect. No faded step here; fading happens in vibe-ch2-practice.",
+      "blockIds": [
+        "s3-steps",
+        "s2-b3"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "active",
+      "score": 4,
+      "evidence": "Every segment has an inline check in a new context, and the exam has apply and evaluate items. In q8 all four options act on 「画面の流れとデータの欄」, so the choice turns on how much to write. The new option c feedback is shown only after answering.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s5-check",
+        "s3-check",
+        "check-quiz"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All four brief misconceptions are corrected with a reason in the body. Every wrong option in all 11 questions has feedback of 2 sentences or fewer naming its belief. q8 now covers under-specifying (b), over-specifying (c) and technology choice (a).",
+      "blockIds": [
+        "s1-b5",
+        "s3-b1",
+        "s5-b1",
+        "s2-table",
+        "check-quiz"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "s2-b4 is a 3-node process diagram whose labels match the text, with a takeaway caption, alt text and description; no decorative images.",
+      "blockIds": [
+        "s2-b4"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "s1-b5 asks the learner to try s1-b4 with their own idea and compare with 「期待される結果」; s2-b3 gives a full model plan. The hint-ladder practice lives in vibe-ch2-practice.",
+      "blockIds": [
+        "s1-b5",
+        "s1-b4",
+        "s2-b3"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "4 summary takeaways after the exam, reflection prompt and next step in summary-next, 6 flashcards; the reworded card-goal matches s2-defs.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "The new q8 option c feedback agrees with the key d, the explanation, ex-data and the s1-b4 prompt. s3-check still cites cc-best-practices; no factual errors found.",
+      "blockIds": [
+        "check-quiz",
+        "ex-data",
+        "s1-b4",
+        "s3-check"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The new q8 c feedback is warm です・ます with no banned phrases; lint is clean. Flashcard backs mix です・ます and noun endings (unchanged, not a rule break).",
+      "blockIds": [
+        "check-quiz",
+        "summary-cards"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The changed feedback has jp and en with matching meaning; validate 0 errors and lint --strict 0 warnings; no text baked into images.",
+      "blockIds": [
+        "check-quiz"
+      ],
+      "carriedOver": true
+    }
   ],
   "mustFix": [],
   "niceToHave": [
@@ -35,10 +166,9 @@
     "summary-cards card-goal: align the card back endings across all six cards (ja-editor decides; carried over).",
     "check-quiz q8 option a EN: \"In the screen-flow and data fields, also specify the programming language and how files are split\" (carried over).",
     "s2-why: 「ほしい[[機能]]が浮かんだら、「なぜそれがほしいの？」と自分に聞き返します。答えがまだ手段なら、もう1回聞きます。」 (carried over, unchanged block).",
-    "s2-check q2 option a feedback nearly gives the key to exam q6 c; consider 「見られた結果、保護者がどうなれるかを考えると、目的が見えてきます。」 (carried over).",
-    "summary-next points to vibe-ch2-practice, which course.json does not list yet. Publish both lessons together (carried over)."
+    "s2-check q2 option a feedback nearly gives the key to exam q6 c; consider 「見られた結果、保護者がどうなれるかを考えると、目的が見えてきます。」 (carried over)."
   ],
   "average": 3.46,
   "verdict": "pass",
-  "summary": "Verification of dcb3095: 1 of 30 blocks changed (check-quiz, q8 option c feedback). Section structure and objectives unchanged. The fix is applied as specified, resolves the q8 regression (miscon rises to 4) and introduces no regression. Every criterion ≥ 3, mean 3.46, no open must-fix."
+  "summary": "Verification of bb56d49, the version the previous review read. review-scope exits 0: 0 of 30 blocks changed, and sections and objectives are unchanged. The draft at bb56d49 and the published lessons/vibe-ch2.lesson.json have identical JSON, including provenance. The previous review had no open must-fix items, so resolved is empty. All 13 criteria it scored are carried over with the same scores. Validate reports 0 errors and lint --strict 0 warnings. The earlier niceToHave about summary-next is dropped: course.json now lists vibe-ch2-practice as the next lesson after vibe-ch2. Every criterion is 3 or higher, the mean is 3.46 and there is no mustFix, so the verdict is pass. This review does not authorize the merge."
 }

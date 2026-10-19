@@ -808,3 +808,114 @@ no new review unless its draft changes.
   vibe-ch2 (18 min) → vibe-ch2-practice (20 min) → vibe-ch3. `provenance.reviewedBy` is left to the owner.
 - Checks after publishing: lessons:validate 0 errors, lint --strict 0 warnings for both lessons,
   typecheck 0 errors, npm test 677/677, build:prod OK, real-route screenshots without page errors.
+
+## Gate re-verification under the fixed check-review (2026-10-19)
+
+The review gate was rewritten after publishing (PR #20 review findings F1–F10 and the bypasses an adversarial test
+found). Every review now records `lessonHash`, the hash of the lesson it read, and the gate refuses a review whose hash
+is not the lesson's hash now. A verification is checked against a recorded previous round (`<commit>:<reports file>`
+or a snapshot copy), and that round is followed back to its full review. A previous round without `lessonHash` is
+accepted only with `--allow-legacy`. The PASS under "Published" above came from the old gate, and the reviews
+committed with it have no `lessonHash`.
+
+### Round
+
+All three reviewers re-checked the published file `content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json`.
+
+- Scope: `node .claude/skills/review-lesson/scripts/review-scope.mjs content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json --since dcb3095`
+  → exit 0: 0 of 20 blocks changed, sections and objectives unchanged. `dcb3095` holds the draft that the previous
+  reviews (recorded in `bb56d49`, unchanged in `c961471`) read. The published file is byte-identical to it.
+- `lessonHash` (`review-scope.mjs … --hash`): `sha256:7dfd5355b05405d5`.
+- Preview of the published lesson (`npm run lessons:preview -- vibe-coding vibe-ch2-practice`): desktop-jp, mobile-jp
+  and desktop-en with no overflow, console, diagram, unknown-block or image errors.
+- The reviews are saved over `reports/vibe-ch2-practice.<reviewer>.review.json`. The previous ones stay in git at
+  `c961471`.
+
+| Reviewer | Mode | lessonHash | Previous review | Carried over | Average | Verdict | Must-fix |
+|---|---|---|---|---|---|---|---|
+| pedagogy-reviewer | verify (since `dcb3095`) | `sha256:7dfd5355b05405d5` | `c961471:…/vibe-ch2-practice.pedagogy-reviewer.review.json` | all 13 criteria | 3.62 | pass | 0 |
+| ja-editor | verify (since `dcb3095`) | `sha256:7dfd5355b05405d5` | `c961471:…/vibe-ch2-practice.ja-editor.review.json` | voice, load, prior, a11y_l10n | 3.75 | pass | 0 |
+| visual-qa | full | none | — | — | 4 | pass | 0 |
+
+visual-qa has no shell and was not given the lessonHash or the `verifies` line. It left the hash out rather than invent
+it, and did a full check of the new screenshots instead of a verification.
+
+### Gate
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2-practice.*.review.json`
+→ **exit 2 (not a valid set of reviews)**:
+
+```text
+Not a valid set of reviews of content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json (sha256:7dfd5355b05405d5):
+  - stale: review 3 (visual-qa) has no "lessonHash", so nothing shows which version of the lesson it read; review content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json again (or pass --allow-legacy for a review written before lessonHash existed)
+  - review 1 (ja-editor): its previous review c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json has no "lessonHash", so nothing binds verifies.reviewedRevision (dcb3095) to the version it read; verify a review that records lessonHash or do a full review (--allow-legacy accepts reviews written before lessonHash existed)
+  - review 2 (pedagogy-reviewer): its previous review c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json has no "lessonHash", so nothing binds verifies.reviewedRevision (dcb3095) to the version it read; verify a review that records lessonHash or do a full review (--allow-legacy accepts reviews written before lessonHash existed)
+```
+
+Why it does not pass:
+
+1. **visual-qa is stale.** Its review has no `lessonHash`. It was written after the field existed, so `--allow-legacy`
+   is not the way to accept it. visual-qa needs to run again with the lessonHash `sha256:7dfd5355b05405d5` from the
+   author.
+2. **pedagogy-reviewer and ja-editor verify a round without `lessonHash`.** Their previous reviews in `c961471` (the
+   `bb56d49` round), and the round before them at `dcb3095`, predate the field. The fixed gate checks such a chain only
+   with `--allow-legacy`.
+
+For diagnosis only, not the gate result: the same command with `--allow-legacy` exits 0 (PASS). Both
+verifications are cross-checked against `c961471` and 1 earlier round (`dcb3095`), and the scope is recomputed from
+`dcb3095:content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json` (0 changed). Every criterion is ≥ 3, the
+mean is 3.62 and no must-fix is open. The notes name each legacy review the flag accepted:
+
+```text
+Review of vibe-ch2-practice by ja-editor, pedagogy-reviewer, visual-qa: PASS
+  lesson content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json (sha256:7dfd5355b05405d5)
+  ja-editor: verification of dcb3095 (previous review cross-checked; scope recomputed from dcb3095:content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json) · 0 resolved, 0 unresolved · 0 changed · carried over: voice, load, prior, a11y_l10n · previous c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json and 1 earlier round checked
+  pedagogy-reviewer: verification of dcb3095 (previous review cross-checked; scope recomputed from dcb3095:content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json) · 0 resolved, 0 unresolved · 0 changed · carried over: align, hook, prior, load, worked, active, miscon, visual, practice, meta, accuracy, voice, a11y_l10n · previous c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json and 1 earlier round checked
+  visual-qa: full review
+  mean 3.62 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer carried)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      4  (ja-editor carried, pedagogy-reviewer carried)
+  ✓ load       3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer carried)
+  ✓ miscon     4  (pedagogy-reviewer carried)
+  ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
+  ✓ practice   4  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ accuracy   3  (pedagogy-reviewer carried)
+  ✓ voice      3  (ja-editor carried, pedagogy-reviewer carried)
+  ✓ a11y_l10n  4  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
+  note: LEGACY REVIEW: review 3 (visual-qa) has no "lessonHash", so nothing shows it read content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json as it is now (sha256:7dfd5355b05405d5); accepted only because of --allow-legacy
+  note: LEGACY PREVIOUS REVIEW: ja-editor: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json has no "lessonHash"; the scope since dcb3095 is bound only to c961471 or an earlier commit, not to the version it read; accepted only because of --allow-legacy
+  note: LEGACY PREVIOUS REVIEW: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json: its previousReview names its own reports file; the round before it is dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json, the version of that file before it
+  note: LEGACY PREVIOUS REVIEW: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json: dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json has no "lessonHash"; the scope since 784d2d9 is bound only to dcb3095 or an earlier commit, not to the version it read; accepted only because of --allow-legacy
+  note: LEGACY PREVIOUS REVIEW: pedagogy-reviewer: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json has no "lessonHash"; the scope since dcb3095 is bound only to c961471 or an earlier commit, not to the version it read; accepted only because of --allow-legacy
+  note: LEGACY PREVIOUS REVIEW: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json: its previousReview names its own reports file; the round before it is dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json, the version of that file before it
+  note: LEGACY PREVIOUS REVIEW: c961471:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json: dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json has no "lessonHash"; the scope since 784d2d9 is bound only to dcb3095 or an earlier commit, not to the version it read; accepted only because of --allow-legacy
+```
+
+### Must-fix items
+
+None. No review has a must-fix item and no block changed since `dcb3095`, so nothing was applied. The lesson file is
+unchanged.
+
+### State
+
+- **Does not pass the fixed gate (exit 2).** The lesson stays published: `lessons/vibe-ch2-practice.lesson.json`
+  and `course.json` are unchanged.
+- A further round is needed. visual-qa must run again with the lessonHash. To pass without `--allow-legacy`,
+  pedagogy-reviewer and ja-editor also need a full review that records `lessonHash`, because any verification of the
+  PR #20 rounds rests on reviews without it. Whether the legacy chain may pass with `--allow-legacy` instead is the
+  owner's decision.
+- Checks with these reviews saved:
+
+| command | result |
+|---|---|
+| `npm run typecheck` | 0 errors |
+| `npm test` | 728 tests, 728 pass, 0 fail |
+| `npm run lessons:validate` | 14 lesson files, 1 course file: no errors |
+| `npm run lessons:lint -- --strict` | exit 0, 0 errors. 71 advisory warnings, all in 10 migrated-unreviewed lessons; both chapter 2 lessons clean |
+| `npm run lessons:schema -- --check` | generated schemas up to date |
+| `node .claude/skills/author-lesson/scripts/build-references.mjs --check` | references up to date |
+| `npm run build:prod -- --outDir <tmp dir> --emptyOutDir` with the CI sentinel keys | built; no sentinel key in the 3246 built files |
