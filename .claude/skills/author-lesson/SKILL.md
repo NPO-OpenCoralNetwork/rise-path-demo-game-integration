@@ -63,6 +63,8 @@ project rules).
 
 - If `<lesson>` already exists (catalog above), this is a rework: read it, copy it to
   `content/courses/<course>/drafts/<lesson>.lesson.json` and keep every existing id stable.
+  Keep `provenance.migratedFrom` and set a new `author` (step 4): a migrated chapter whose author
+  is `migration…` gets advisory lint, a reworked one is strict (lesson-contract §8).
 - Read the neighbouring lessons of the course so terms, tone and difficulty connect.
 - Inspect files with Read, Grep and Glob; `npm run -s lessons:catalog -- --json` gives the course
   structure. One-off `node -e` or `python3` scripts are not pre-approved and stall headless runs.

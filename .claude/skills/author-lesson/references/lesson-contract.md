@@ -107,3 +107,18 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
   when the owner asks.
 - `provenance`: `{author, model?, skill?, skillVersion?, generatedAt, reviewedBy?}`. Do not invent
   a reviewer; `reviewedBy` is set by the human who reviewed it.
+
+## 8. Lint gate and migrated lessons
+
+- Done means `lessons:lint --strict` reports 0 warnings (or each one is justified in the report).
+- Exception (owner decision 2026-10-19): a **migrated-unreviewed** lesson — `provenance.migratedFrom`
+  is set, `provenance.author` is `migration` or starts with `migration+` (e.g.
+  `migration+claude-code` for spot fixes), and there is no `reviewedBy` — is a machine-migrated
+  chapter that nobody has reworked yet. `--strict` still prints its warnings, labelled advisory,
+  and exits 0 for them. Errors always fail.
+- Drafts (`drafts/`) are always strict, whatever their provenance.
+- Reworking a migrated chapter: keep `provenance.migratedFrom` and every id, and replace `author`
+  with the new authorship (`claude-code`, or `human+claude-code` when a person co-wrote it). From
+  then on the lesson is strict, also after publishing.
+- `npm run lessons:lint -- --strict --include-migrated` makes every lesson strict, to see what is
+  left to rework.

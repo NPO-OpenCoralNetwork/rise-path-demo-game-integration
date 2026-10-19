@@ -2,7 +2,8 @@
 /**
  * Pedagogy and readability lint for risepath.lesson/v1 (PLAN §5.4 / §7.2 lesson contract).
  * Run it on a lesson that already passed validateLesson. Results are warnings; the CLI's
- * `--strict` turns them into a failing exit code.
+ * `--strict` turns them into a failing exit code, except for migrated-unreviewed lessons
+ * (see lintPolicy).
  *
  * @typedef {import('./schema.js').Lesson} Lesson
  * @typedef {import('./schema.js').Section} Section
@@ -40,6 +41,48 @@ export const LINT_RULES = /** @type {const} */ ({
   'banned-phrase': 'No pressuring phrases (「簡単です」「誰でも」, "simply", "obviously").',
   'locale-plain-string': 'In a multi-locale lesson, learner-facing text is an object with every locale, not a plain string.',
 });
+
+/**
+ * True when `author` records machine-migrated content: exactly `migration`, or `migration+…`
+ * (spot fixes on top, e.g. `migration+claude-code`). Case and spacing must match exactly.
+ * @param {unknown} author
+ * @returns {boolean}
+ */
+export function isMigrationAuthor(author) {
+  return typeof author === 'string' && /^migration(\+|$)/.test(author);
+}
+
+/**
+ * True for a lesson that was machine-migrated from `data/curricula/**` and not reworked since
+ * (owner decision 2026-10-19, option A: a known, accepted state). All three must hold:
+ * - `provenance.migratedFrom` is set (the lesson came from `npm run lessons:migrate`);
+ * - `provenance.author` is `migration` or starts with `migration+` (isMigrationAuthor). A rework
+ *   records a new first author (`claude-code`, `human+claude-code`), so the lesson stops being
+ *   exempt;
+ * - `provenance.reviewedBy` names no reviewer (absent or blank).
+ *
+ * @param {Pick<Lesson, 'provenance'>} lesson
+ * @returns {boolean}
+ */
+export function isMigratedUnreviewed(lesson) {
+  const provenance = lesson && lesson.provenance;
+  if (!provenance || !provenance.migratedFrom) return false;
+  if (typeof provenance.reviewedBy === 'string' && provenance.reviewedBy.trim()) return false;
+  return isMigrationAuthor(provenance.author);
+}
+
+/**
+ * Whether `--strict` fails on this lesson's warnings ('strict') or only reports them
+ * ('advisory'). Drafts are always strict, and `includeMigrated` makes every lesson strict.
+ *
+ * @param {Pick<Lesson, 'provenance'>} lesson
+ * @param {{ draft?: boolean, includeMigrated?: boolean }} [options]
+ * @returns {'strict' | 'advisory'}
+ */
+export function lintPolicy(lesson, { draft = false, includeMigrated = false } = {}) {
+  if (draft || includeMigrated) return 'strict';
+  return isMigratedUnreviewed(lesson) ? 'advisory' : 'strict';
+}
 
 /** Sections that are not "content" for the check-density rule. */
 const NON_CONTENT_ROLES = new Set(['hook', 'check', 'summary', 'reflection']);

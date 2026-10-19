@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { BLOCK_TYPES } from '../../shared/lesson/schema.js';
 import { validateLesson, validateCourse } from '../../shared/lesson/validate.js';
-import { lintLesson } from '../../shared/lesson/lint.js';
+import { isMigrationAuthor, lintLesson } from '../../shared/lesson/lint.js';
 import { lessonStats, formatPath } from '../../shared/lesson/walk.js';
 import { docChapterStats } from '../../shared/lesson/fromDocChapter.js';
 import { t, resolveText, hasLocale, toBcp47, fromBcp47 } from '../../shared/lesson/text.js';
@@ -239,7 +239,9 @@ describe('legacy migration', () => {
       assert.equal(stats.tableRows, legacy.tableRows, `${entry.lessonId} table rows`);
       tables += stats.table || 0;
 
-      if (lesson.provenance.author !== 'human+claude-code') {
+      // Only lessons still in machine-migrated form keep the legacy block counts; a rework
+      // (any new author, e.g. claude-code from /author-lesson) restructures them.
+      if (isMigrationAuthor(lesson.provenance.author)) {
         assert.equal(stats.sections, legacy.sections, `${entry.lessonId} sections`);
         assert.equal(stats.blocks, legacy.blocks, `${entry.lessonId} blocks`);
         assert.equal(stats.markdown || 0, legacy.text || 0, `${entry.lessonId} text`);

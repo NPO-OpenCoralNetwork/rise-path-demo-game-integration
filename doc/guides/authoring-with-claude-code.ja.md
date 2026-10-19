@@ -82,6 +82,7 @@ Claude Code は次の順に進めます（詳細は `.claude/skills/author-lesso
 4. **下書き**: `content/courses/<course>/drafts/<lesson>.lesson.json` に書きます。書くたびに hook が
    検証し、エラーがあれば Claude がすぐ直します。
 5. **検証**: `npm run lessons:validate -- <file>` と `npm run lessons:lint -- <file> --strict`。
+   下書きは警告 0 件にします。残す警告には、レポートに理由を書きます（移行したままの章は後述）。
 6. **独立レビュー**: `/review-lesson` が `pedagogy-reviewer` で採点し、並行して `ja-editor` が日本語を
    見ます。結果は `reports/<lesson>.<reviewer>.review.json` に保存し、`check-review.mjs` で合否を
    出します。必須修正を直して再レビュー（最大 2 往復）。それでも通らなければ止めて報告します。
@@ -135,6 +136,24 @@ claude -p '/author-lesson vibe-coding vibe-ch1-practice "第1章の演習。15�
 （`content/examples/blocks-gallery.lesson.json`）、lint ルール、採点基準を変えたら、
 `node .claude/skills/author-lesson/scripts/build-references.mjs` で作り直してください
 （`npm test` が古いままだと失敗します）。
+
+### 移行したままの章と `lessons:lint --strict`
+
+`data/curricula/**` から機械的に移行し、まだ作り直していない章は、いまの教材ルールを満たして
+いません（2026-10-19 時点では、Vibe Coding の第 1 章以外の 11 章）。オーナーの判断
+（2026-10-19）により、これは既知の状態として扱い、完了の条件には含めません。
+
+- **判定**: `provenance.migratedFrom` があり、`provenance.author` が `migration` か
+  `migration+…`（`migration+claude-code` など、部分的な手直しだけ）で、`reviewedBy` がない
+  レッスンです。
+- **`--strict` の動き**: これらの警告は「advisory（参考）」と表示し、件数も出します。
+  警告だけなら終了コードは 0 です。検証エラーは常に失敗になります。
+- **厳格なまま**: `drafts/` の下書きと、それ以外のレッスンは、警告が 1 件でもあれば失敗します。
+- **作り直すと厳格になる**: `/author-lesson` で章を作り直すと、`provenance.author` が新しい作者
+  （`claude-code` など）に変わります。`migratedFrom` は残します。その章は以後、公開後も含めて
+  厳格に判定されます。
+- **全部を厳格に**: `npm run lessons:lint -- --strict --include-migrated` は移行したままの章も
+  失敗扱いにします。作り直しが残っている章を確かめるときに使います。
 
 ---
 
@@ -352,6 +371,7 @@ Streamable HTTP（`/mcp`）と OAuth 2.1 への移行は P2 の予定です（�
 | `npm run lessons:catalog` | コース・レッスン・下書きの一覧と、検証・lint の状態（常に終了コード 0） |
 | `npm run lessons:validate -- <file>` | 形式と意味のチェック（`--drafts` で下書きも含める） |
 | `npm run lessons:lint -- <file> --strict` | 教え方と読みやすさのチェック |
+| `npm run lessons:lint -- --strict --include-migrated` | 移行したままの章も含めて厳格にチェック（§3） |
 | `npm run lessons:preview -- <course> <lesson>` | スクリーンショットと `metrics.json` |
 | `npm run lessons:schema` | `content/schema/` の JSON Schema を作り直す |
 | `npm run lessons:mcp-smoke` | MCP の教材ツールの動作確認 |

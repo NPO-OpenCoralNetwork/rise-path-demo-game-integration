@@ -16,6 +16,11 @@ paths:
 - After every change: `npm run lessons:validate -- <file>` (0 errors) and
   `npm run lessons:lint -- <file> --strict`. Errors carry JSON paths such as
   `sections[2].blocks[0].questions[0].answer[0]`.
+- Migrated-unreviewed lessons (`provenance.migratedFrom` set, `author` `migration` or `migration+…`,
+  no `reviewedBy`) are machine-migrated chapters not yet reworked: `--strict` prints their warnings
+  as advisory and exits 0. Drafts are always strict. A rework (`/author-lesson`) writes a new
+  `provenance.author` and keeps `migratedFrom`, so the lesson becomes strict.
+  `--include-migrated` makes every lesson strict.
 - Ids: lowercase kebab-case, unique in the lesson, stable. Never renumber existing ids — progress,
   reviews and citations point at them. The lesson id equals the file name.
 - Text: a plain string is in `lesson.locale`; `{jp, en, fr}` objects when the lesson declares several

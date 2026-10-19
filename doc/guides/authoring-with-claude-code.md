@@ -19,6 +19,24 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
   only when the owner asks.
 
+## Migrated chapters and `lessons:lint --strict`
+
+Chapters that were machine-migrated from `data/curricula/**` and not reworked yet do not meet the
+current lesson rules (as of 2026-10-19: every Vibe Coding chapter except ch1). The owner accepted
+this as a known state on 2026-10-19; it is not part of the done criteria.
+
+- **Rule**: a lesson is *migrated-unreviewed* when `provenance.migratedFrom` is set,
+  `provenance.author` is `migration` or starts with `migration+` (e.g. `migration+claude-code` for
+  spot fixes), and there is no `reviewedBy`.
+- **`--strict`** prints their warnings labelled advisory, with a count, and exits 0 for them.
+  Validation errors always fail.
+- **Still strict**: drafts in `drafts/` and every other lesson fail on any warning.
+- **Reworking flips it**: `/author-lesson` on a migrated chapter keeps `migratedFrom` and records a
+  new `provenance.author` (`claude-code`, or `human+claude-code`), so the lesson is strict from then
+  on, also after publishing.
+- **Everything strict**: `npm run lessons:lint -- --strict --include-migrated` gates the migrated
+  chapters too; use it to list what is left to rework.
+
 ## Commands
 
 ```bash
@@ -29,6 +47,7 @@ claude                                              # start Claude Code at the r
 npm run lessons:catalog                             # courses, lessons, drafts, status (always exit 0)
 npm run lessons:validate -- <file>                  # schema + semantic checks
 npm run lessons:lint -- <file> --strict             # pedagogy and readability rules
+npm run lessons:lint -- --strict --include-migrated # also gate migrated, not reworked chapters
 npm run lessons:preview -- <course> <lesson>        # .artifacts/preview/<course>/<lesson>/
 node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict
 node .claude/skills/author-lesson/scripts/build-references.mjs              # regenerate cookbook + rubric.md
