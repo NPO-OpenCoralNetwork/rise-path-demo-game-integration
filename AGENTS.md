@@ -33,6 +33,10 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No fabricated facts, URLs, images or commands. Cite non-obvious claims (`sources` + `cite`).
 - Done = `lessons:validate` 0 errors, `lessons:lint --strict` clean, rubric pass
   (`content/schema/rubric.v1.json`: every criterion ≥ 3, mean ≥ 3.3), screenshots checked.
+  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration`
+  or `migration+…`, no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory.
+  Drafts are always strict; a rework records a new author and becomes strict (`--include-migrated`
+  gates them all).
 - Write new lessons to `drafts/`. Moving one to `lessons/` + `course.json` is publishing: owner only.
 
 ## Code conventions
@@ -49,6 +53,6 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Don't publish to the database or mark lessons published from an authoring flow; drafts + PR.
 - Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`) by hand.
 - Don't touch P-School (`components/features/PSchool`, `data/curricula/p_school`, `public/p_school`).
-- No secrets, `.env` contents or absolute personal paths (`/Users/…`, `/Volumes/…`) in commits.
+- No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.
 - No `git push --force`, and no rewriting shared history.

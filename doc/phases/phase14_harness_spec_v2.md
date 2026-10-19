@@ -1,6 +1,6 @@
 # Phase 14: MCP ハーネス設計 v2 — LLM 主導カリキュラム生成
 
-> リサーチ分析 ([phase14_harness_research.md](file:///Volumes/space/dev/test-rise-path/rise-path-demo-game-Integration-/doc/phase14_harness_research.md)) の4つの Gap を反映した改訂版。
+> リサーチ分析 ([phase14_harness_research.md](phase14_harness_research.md)) の4つの Gap を反映した改訂版。
 
 ## 設計哲学
 

@@ -28,7 +28,7 @@ Date of research: 2026-10-18. Model IDs used: `claude-opus-5-5`, `claude-sonnet-
 | Area | Evidence | Assessment |
 |---|---|---|
 | Claude Code config | no `CLAUDE.md`, `AGENTS.md`, `.claude/`, `.mcp.json`, `.github/` (ls at repo root) | Claude Code starts blind; there's no repeatable authoring workflow. |
-| Other agent configs | `.gemini/settings.json` and `.grok/config.toml` hardcode `/Users/2005nk/Works/personal/...`; `mcp-server/claude_desktop_config.example.json` hardcodes `/Volumes/space/dev/...` | Personal absolute paths are committed and break for anyone else. Use repo-relative paths or `${RISE_PATH_ROOT}`. |
+| Other agent configs | `.gemini/settings.json` and `.grok/config.toml` hardcode a personal absolute path (a home folder under `/Users`); `mcp-server/claude_desktop_config.example.json` hardcodes a `/Volumes/…` path | Personal absolute paths are committed and break for anyone else. Use repo-relative paths or `${RISE_PATH_ROOT}`. |
 | Runtime skills | `skills/{curriculum-generator,learning-coach,content-search,progress-tracker,life-habit-analyst,personal-memory-curator}/SKILL.md` | JP, written for Hermes and MCP clients. `curriculum-generator/SKILL.md` references the tool `learner-state` (the real ones are `learner-state-get`/`-update`) and a `version:` field that Claude Code ignores. Not discoverable by Claude Code (it reads `.claude/skills/`). |
 | Agent persona | `agents/rise-path-tutor.yaml` (`model: gemini-3-flash`, 12 tools, 4 resources) | 7 of the 12 listed tools are not registered in `mcp-server/index.js`: `learner-state` (real: `learner-state-get`/`-update`), `journal` (real: `journal-log`/`-recent`/`-summary`), `derive-personalization`, `save-assessment`, `get-resume-card`, `publish-curriculum`, `learning-insights`. Resources don't match `content://domains` and `learner://profile/me` (`mcp-server/index.js:730-770`). |
 | MCP server | `mcp-server/index.js` (1078 lines): `McpServer` + `server.tool()` (:167), stdio (:1016) and **`SSEServerTransport`** (:815); 22 tools, 2 resources, 1 prompt (`socratic-tutor`, :778) | Legacy API (`server.tool` rather than `registerTool` with `outputSchema`). SSE is deprecated by the 2026-07-28 spec. Authoring tools are coarse (`get-generation-kit`, `validate-intake`, `save-curriculum-draft` with passthrough objects, :329-416). There are no read-back, validate-lesson or preview tools. |
@@ -307,7 +307,7 @@ Phaser P-School, MCP server (mcp-server/), Hermes agent runtime (hermes/). UI lo
 - A lesson is done only when `content:validate` has 0 errors and the rubric passes (each ≥3, mean ≥3.3).
 
 ## Don'ts
-- No secrets in code or config; no absolute personal paths (/Users/…, /Volumes/…).
+- No secrets in code or config; no absolute personal paths (home folders under /Users, volumes under /Volumes).
 - Don't publish to the DB from authoring flows; drafts + PR only.
 - Don't add per-lesson React components or routes.
 ```

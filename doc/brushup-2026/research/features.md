@@ -1,6 +1,6 @@
 # Rise Path: feature inventory and pruning analysis (key: `features`)
 
-Repo: `/home/user/rise-path-demo-game-integration` (branch `claude/gracious-edison-7cl4fe`, 1 commit, last 2026-07-03).
+Repo: `rise-path-demo-game-integration` (branch `claude/gracious-edison-7cl4fe`, 1 commit, last 2026-07-03).
 Method: read `App.tsx`, `components/routes/lazyRoutes.tsx`, `components/common/Layout.tsx`, every feature folder, and the services. Ran Playwright against the dev server (localhost:3007, guest, JP and EN) to click through the navigation, find broken images and record network failures. Checked 147 hard-coded external image URLs with curl. Measured tracked asset sizes with `git ls-files | du`.
 
 New evidence screenshots are in `<session-scratchpad>/shots-before/extra/features/`. That folder has 43 per-route PNGs plus contact sheets in `sheets/sheet1..9.png` and `sheets/mobile.png`. Helper scripts: `<session-scratchpad>/navtest.mjs` (click test), `<session-scratchpad>/brokenimg.mjs` (broken-image scan), `<session-scratchpad>/ext_status.txt` (HTTP status of every external image).

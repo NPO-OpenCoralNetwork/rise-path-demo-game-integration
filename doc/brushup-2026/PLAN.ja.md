@@ -1,6 +1,6 @@
 # Rise Path ブラッシュアップ計画（PLAN.ja）
 
-作成日: 2026-10-18 ／ 対象: `/home/user/rise-path-demo-game-integration`（React 19 + Vite 6 + TS + Tailwind v4 ／ Express `server.js` :3006 ／ MCP `mcp-server/`）
+作成日: 2026-10-18 ／ 対象: このリポジトリ（`rise-path-demo-game-integration`。React 19 + Vite 6 + TS + Tailwind v4 ／ Express `server.js` :3006 ／ MCP `mcp-server/`）
 根拠資料: [`research/`](research/) 配下の 8 レポート（+ critique.md）（code-content, code-llm, features, ui-shell, ui-lessons, research-apps, research-pedagogy, research-claude）と、各レポートのスクリーンショット
 デザインモック（今回作成）: [`assets/mocks/sunrise-mock.html`](assets/mocks/sunrise-mock.html) / [`landing-mock.html`](assets/mocks/landing-mock.html)、スクリーンショット [`assets/mocks/dashboard.png`](assets/mocks/dashboard.png) / [`landing.png`](assets/mocks/landing.png)
 読書画面のプロトタイプ: [`assets/mocks/reader-mock.html`](assets/mocks/reader-mock.html)（[`reader-desktop.png`](assets/mocks/reader-desktop.png) / [`reader-mobile.png`](assets/mocks/reader-mobile.png)）／ 改修前のスクリーンショット: [`assets/before/`](assets/before/)
@@ -397,7 +397,7 @@ lint ルールは `lessons:lint` が機械的に検査します。
 ```ts
 { message, lesson:{courseId, lessonId, title, objectives, level},
   anchor:{sectionId, blockId, blockType, excerpt(≤1,500字), codeLang?, highlightedLines?},
-  learner:{attemptsOnBlock?, chosenOptionId?}, mode:'explain'|'socratic' }
+  learner:{attemptsOnBlock?, chosenOptionId?, questionId?, answerShown?}, mode:'explain'|'socratic' }
 ```
 
 **振る舞い:**
@@ -610,9 +610,14 @@ content/schema/{lesson.schema.json, lesson.llm.schema.json, rubric.v1.json, revi
 | 段階 | このセッション | P1 以降 |
 |---|---|---|
 | 構造 | `npm run lessons:validate`（zod + 意味チェック：ID の重複、正解 ID、objectiveId、ロケールの欠け） | CI で PR に注釈を付ける（`--format github`） |
-| 教育設計 | `npm run lessons:lint`（警告。`--strict` で失敗扱い） | 新しいレッスンは CI で `--strict` |
+| 教育設計 | `npm run lessons:lint`（警告。`--strict` で失敗扱い。ただし移行したままの章の警告は参考扱い。下記） | 新しいレッスンは CI で `--strict` |
 | 判断 | subagent によるレビュー | `claude -p --json-schema review.v1.json` で CI 審査、アプリ内生成でも同じ judge を使う |
 | 見た目 | `npm run lessons:preview`（PNG + `metrics.json`：横はみ出し、コンソールエラー、Mermaid のエラー、1 行の文字数） | 視覚的な回帰テスト（`/dev/blocks`） |
+
+**移行したままの章の扱い（2026-10-19 オーナー判断、案 A）:** 機械的に移行し、まだ作り直していない章は既知の状態として受け入れ、完了の条件に含めません。
+- 判定: `provenance.migratedFrom` があり、`provenance.author` が `migration` か `migration+…` で、`reviewedBy` がないレッスン（`shared/lesson/lint.js` の `isMigratedUnreviewed`）。
+- `lessons:lint --strict` は、これらの警告を advisory（参考）として件数付きで表示し、終了コード 0 にします。検証エラー、下書き（`drafts/`）、それ以外のレッスンの警告は、これまでどおり失敗です。
+- `/author-lesson` で作り直すと `provenance.author` が新しい作者に変わり、その章は厳格に判定されます。`--include-migrated` を付けると、移行したままの章も失敗扱いにします。
 
 ---
 
@@ -699,7 +704,7 @@ content/schema/{lesson.schema.json, lesson.llm.schema.json, rubric.v1.json, revi
 - **書き方のルール:**
   - 新しいコードで色の直書き（`[#hex]`）、`rounded-[…]`、`text-[9-11px]`、`text-slate-400` を使わない。
   - 学習者向けの文言を足すときは EN と JP を両方用意する。
-- **依存パッケージの扱い:** 追加は `npm install <pkg>` で行います。`package.json` と `package-lock.json` を手でマージしてはいけません（衝突しやすいファイルです）。
+- **依存パッケージの扱い:** 追加は `npm install <pkg>` で行います。`package.json` と `package-lock.json` を手でマージしてはいけません（衝突しやすいファイルです）。このセッションで追加した 6 つは承認済みです（§9.3）。これから追加するものは、引き続きオーナーの承認が必要です（`AGENTS.md`）。
 
 ### 9.1 依存関係と実施の順番（ウェーブ）
 
@@ -732,7 +737,7 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
   export type AskTutorDetail = { message: string; mode?: 'explain'|'socratic';
     lesson?: { courseId: string; lessonId: string; title: string; objectives: string[]; level?: string };
     anchor?: { sectionId: string; blockId: string; blockType: string; excerpt: string; codeLang?: string; highlightedLines?: number[] };
-    learner?: { attemptsOnBlock?: number; chosenOptionId?: string } };
+    learner?: { attemptsOnBlock?: number; chosenOptionId?: string; questionId?: string; answerShown?: boolean } };
   export function openTutor(detail: AskTutorDetail): void; // window 'open-rise-path-chat'
   ```
   WP-08 のサーバー側 `/llm/tutor` は、これと同じ形を zod で検証します。
@@ -850,7 +855,7 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
   - `scripts/lessons/validate.mjs`
     - 引数なしなら `content/courses/**/*.lesson.json` を全部検査し、ファイルを引数に取ることもできる。
     - `--format text|json|github`。エラーがあれば exit 1。
-  - `scripts/lessons/lint.mjs`（`--strict` で警告も exit 1）
+  - `scripts/lessons/lint.mjs`（`--strict` で警告も exit 1。ただし移行したまま未レビューのレッスン（migrated-unreviewed、§7.5）の警告は表示のみ。`--include-migrated` を付けると、それも exit 1 にする）
   - `scripts/lessons/export-schema.mjs`: `z.toJSONSchema` で `content/schema/lesson.schema.json` と `lesson.llm.schema.json` を書き出す。LLM 用は再帰なし、`mindmap` なし、`additionalProperties:false`。
   - `scripts/lessons/migrate-legacy.mjs`: `data/curricula/vibe_coding/chapterN.ts` を esbuild（vite の依存として入っている）でメモリ上でバンドルして import し、JSON に変換する。
   - `content/courses/vibe-coding/course.json`: `world:'vibe'`、モジュール構成、各レッスンの `next`
@@ -1156,3 +1161,16 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
 | 3 | WP-04 | `/learn/vibe-coding/vibe-ch1` を日英・デスクトップ・モバイルで撮影 |
 | 4 | WP-05、WP-06、WP-09 | `/dev/blocks`、`lessons:preview` の metrics、ホームとランディングをモックと比較 |
 | 最後 | 全体 | `npm run typecheck && npm run build && npm test && npm run lessons:validate`、全ルートの before / after スクリーンショットを並べて比較（`.shots/shoot.mjs`） |
+
+### 9.3 依存パッケージ追加の承認記録
+
+2026-10-19、オーナーが次の 6 つの実行時依存の追加を承認しました（WP-00 のコミット `594f5f5` で追加）。`AGENTS.md` のルールはそのままで、これから追加する依存には、あらためてオーナーの承認が必要です。
+
+| パッケージ | バージョン | 用途 |
+|---|---|---|
+| `@anthropic-ai/sdk` | `^0.135.0` | サーバー側 LLM ゲートウェイの Claude プロバイダー（`server/llm/providers/anthropic.js`） |
+| `@modelcontextprotocol/sdk` | `^1.29.0` | MCP サーバー（`mcp-server/`）。以前は推移的に入っていただけ |
+| `dompurify` | `^3.4.11` | Mermaid の SVG と旧リーダーの HTML のサニタイズ |
+| `remark-gfm` | `^4.0.1` | レッスン本文の Markdown（表など）の描画（`components/lesson/Md.tsx`） |
+| `shiki` | `^4.5.0` | コードブロックのシンタックスハイライト（`components/lesson/blocks/highlighter.ts`） |
+| `zod` | `^3.25.76` | 教材スキーマ `risepath.lesson/v1`（`shared/lesson/schema.js`）。以前は推移的に入っていただけ |

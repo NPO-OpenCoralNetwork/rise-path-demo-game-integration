@@ -1,6 +1,6 @@
 # UI/UX audit of learning-material display, and a design for one "Lesson Reader" (key: `ui-lessons`)
 
-Repo: `/home/user/rise-path-demo-game-integration` (commit 6f9cc1d). Line numbers refer to that tree.
+Repo: `rise-path-demo-game-integration` (commit 6f9cc1d). Line numbers refer to that tree.
 Companion reports: `research/code-content.md` (the content schema `risepath.lesson/v1` and the block registry) and `research/ui-shell.md` (tokens, the shell and mobile P0). This report covers the reading surface. Its block library uses the block names from `code-content.md` §8.2, so the two can be implemented together.
 
 Scratchpad root `S=<session-scratchpad>`

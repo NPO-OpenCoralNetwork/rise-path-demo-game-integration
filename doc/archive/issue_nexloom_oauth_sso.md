@@ -3,8 +3,8 @@
 - **状態**: Open (バックログ)
 - **対象フェーズ**: 将来 (v2以降の検討課題)
 - **関連ドキュメント**:
-  - [phase18_user_registration_spec.md](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/phase18_user_registration_spec.md)
-  - [implementation_progress.md](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/implementation_progress.md)
+  - [phase18_user_registration_spec.md](../phases/phase18_user_registration_spec.md)
+  - [implementation_progress.md](implementation_progress.md)
 
 ---
 

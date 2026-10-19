@@ -1,6 +1,6 @@
 # Rise Path — LLM Integration Audit and Redesign (key: `code-llm`)
 
-Audit date: 2026-10-18. Repo: `/home/user/rise-path-demo-game-integration` (single commit `6f9cc1d`).
+Audit date: 2026-10-18. Repo: `rise-path-demo-game-integration` (single commit `6f9cc1d`).
 Scope: every place an LLM is called (browser + server), MCP server, Hermes agent, skills/agents, RAG.
 Method: read all LLM-touching code, verified SDK behaviour against installed `@google/genai@1.33.0` and `@modelcontextprotocol/sdk@1.29.0`, proved the client key leak with a sentinel build, checked Google's deprecation page and OpenAI's model page (fetched 2026-10-18), Anthropic model IDs from the bundled Claude API reference.
 
@@ -355,7 +355,7 @@ Resources: `rp://schema/lesson/v1` (JSON Schema generated from Zod), `rp://guide
 ### 11.3 Claude Code specifically
 - Commit `.mcp.json` (project-scoped stdio server, `--scope authoring`) so Claude Code in this repo gets the tools automatically; and a project skill `.claude/skills/rise-path-lesson-author/SKILL.md` (workflow + rubric + "always call `rp_validate_lesson` before `rp_upsert_lesson`").
 - **Files-first authoring** for repo-curated courses: `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json` (LessonSpec v1). CLI `node scripts/lessons.mjs validate|preview|push <path>` reuses `shared/lesson-spec/validate.js`; Vite route `/preview/lesson?src=` hot-reloads the reader while Claude edits. Content becomes reviewable in Git PRs and replaces the 2,978-line `services/curriculumApi.ts` demo data over time.
-- Same server works for Cursor (`.cursor/mcp.json`), Claude Desktop (`claude_desktop_config.example.json` — fix its hard-coded `/Volumes/space/...` path), ChatGPT (remote `/mcp` + OAuth).
+- Same server works for Cursor (`.cursor/mcp.json`), Claude Desktop (`claude_desktop_config.example.json` — fix its hard-coded `/Volumes/…` path), ChatGPT (remote `/mcp` + OAuth).
 
 ### 11.4 Fix-now items in the current MCP server
 `save-curriculum-draft` → write `curriculum_versions` via the same function the REST route uses (extract `saveCurriculumDraftVersion()` from `chatgptCurriculum.js:351-446` into `tools/core/curriculum.js`); align `agents/rise-path-tutor.yaml` and `skills/*/SKILL.md` with the real tool names (generate the YAML tool list from `tool-registry.json` in a test).

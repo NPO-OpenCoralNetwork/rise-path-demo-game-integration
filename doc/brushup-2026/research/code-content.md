@@ -1,6 +1,6 @@
 # Rise Path: Learning-content system audit and a unified "Lesson Block" model
 
-Key: `code-content`. Repo: `/home/user/rise-path-demo-game-integration` (commit 6f9cc1d). All line numbers are from that tree.
+Key: `code-content`. Repo: `rise-path-demo-game-integration` (commit 6f9cc1d). All line numbers are from that tree.
 Screenshots referenced below are in
 `<session-scratchpad>/shots-before/extra/`.
 

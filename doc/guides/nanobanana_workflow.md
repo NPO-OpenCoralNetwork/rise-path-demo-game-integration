@@ -28,7 +28,7 @@ graph TD
 
 > 📌 **【社内用操作画面のプレースホルダー】**
 > ※ 実際のツール画面のスクリーンショットを撮影し、以下のパスに配置して差し替えてください。
-> `![NanoBanana UI操作手順](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/images/nanobanana_ui_step.png)`
+> `![NanoBanana UI操作手順](images/nanobanana_ui_step.png)`
 
 ### ② プロンプト作成のコツ（ゲーム用）
 ゲームの世界観（ファンタジー・ピクセルアート・サイバーパンク等）に合わせるため、以下のプロンプトテンプレートを活用してください。
@@ -47,9 +47,9 @@ P-Schoolで統一すべき主要なビジュアルスタイル、それぞれの
 
 | ビジュアルスタイル | 推奨プロンプト構成（英語） | スタイルサンプル（プレースホルダー） | 適用時のコメント・注意点 |
 | :--- | :--- | :--- | :--- |
-| **ドット絵スタイル**<br>(Pixel Art) | `pixel art sprite of a [キャラ名], 16-bit retro RPG style, vibrant colors, solid flat white background, clean edges, centered, full body, isolated, detailed shading --aspect 1:1` | `![Pixel Art](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/images/style_pixel_art.png)` | レトロゲーム風の世界観に最適。輪郭がはっきりしており、ドットのサイズ（解像度）がキャラクター間で揃うように調整してください。透過処理用に白背景を指定しています。 |
-| **手描きイラスト風**<br>(Hand-drawn) | `hand-drawn illustration of a [キャラ名], whimsical fantasy style, soft coloring, clean background --aspect 1:1` | `![Hand-drawn](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/images/style_hand_drawn.png)` | ぬくもり感のある絵本のようなスタイル。グラデーションが細かくなりすぎず、ゲーム画面で輪郭がぼやけないようにエッジを強めにプロンプトで指示します。 |
-| **フラットアイコン**<br>(Flat Vector) | `flat vector icon of a [アイテム名], clean shapes, bold outline, game asset UI, solid colors --aspect 1:1` | `![Flat Vector](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/images/style_flat_vector.png)` | 魔法書やバフ・デバフのスキルアイコン用。非常にクリーンで陰影がシンプル、背景が完全に透過されている必要があります。 |
+| **ドット絵スタイル**<br>(Pixel Art) | `pixel art sprite of a [キャラ名], 16-bit retro RPG style, vibrant colors, solid flat white background, clean edges, centered, full body, isolated, detailed shading --aspect 1:1` | `![Pixel Art](images/style_pixel_art.png)` | レトロゲーム風の世界観に最適。輪郭がはっきりしており、ドットのサイズ（解像度）がキャラクター間で揃うように調整してください。透過処理用に白背景を指定しています。 |
+| **手描きイラスト風**<br>(Hand-drawn) | `hand-drawn illustration of a [キャラ名], whimsical fantasy style, soft coloring, clean background --aspect 1:1` | `![Hand-drawn](images/style_hand_drawn.png)` | ぬくもり感のある絵本のようなスタイル。グラデーションが細かくなりすぎず、ゲーム画面で輪郭がぼやけないようにエッジを強めにプロンプトで指示します。 |
+| **フラットアイコン**<br>(Flat Vector) | `flat vector icon of a [アイテム名], clean shapes, bold outline, game asset UI, solid colors --aspect 1:1` | `![Flat Vector](images/style_flat_vector.png)` | 魔法書やバフ・デバフのスキルアイコン用。非常にクリーンで陰影がシンプル、背景が完全に透過されている必要があります。 |
 
 ---
 
@@ -70,7 +70,7 @@ P-Schoolで統一すべき主要なビジュアルスタイル、それぞれの
 
 ## 4. ゲームへの適用・検証手順
 
-アセットの準備ができたら、[アセット安全適用ワークフロー](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/assets_workflow.md) に従って適用します。
+アセットの準備ができたら、[アセット安全適用ワークフロー](assets_workflow.md) に従って適用します。
 
 ### ① イージーパス (上書き配置)
 既存アセット（例: スライム `srime.png`）をブラッシュアップする場合：
@@ -80,7 +80,7 @@ P-Schoolで統一すべき主要なビジュアルスタイル、それぞれの
 ### ② アドバンスドパス (コード修正が必要な場合)
 新しいキャラクターの追加や、比率変更により座標調整が必要な場合：
 1. 新規ファイル名で `/public/p_school/assets/` に配置します。
-2. [components/features/PSchool/game/battle.js](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/components/features/PSchool/game/battle.js) の `preload()` でアセットパスを変更します。
+2. [components/features/PSchool/game/battle.js](../../components/features/PSchool/game/battle.js) の `preload()` でアセットパスを変更します。
 3. 同ファイルの表示処理箇所で `setScale()` などの表示比率を微調整します。
 
 ---
@@ -89,6 +89,6 @@ P-Schoolで統一すべき主要なビジュアルスタイル、それぞれの
 
 アセットを新しくした、または着手した際は、速やかに以下のドキュメントを更新してメンバーに共有してください。
 
-1.  **[アセット管理リスト (assets_management.md)](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/assets_management.md)** のステータスを更新。
+1.  **[アセット管理リスト (assets_management.md)](../assets_management.md)** のステータスを更新。
 2.  新アセットの参考用として、Figma/Miroの該当フレームのURL（ディープリンク）を追記。
 3.  検証が完了したら Git にコミット（メッセージのプレフィックスに `asset:` を付与）してプッシュ。

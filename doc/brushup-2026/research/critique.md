@@ -1,6 +1,6 @@
 # Critique of PLAN.ja.md §9 backlog (principal-engineer review)
 
-Reviewer key: `critique` / date 2026-10-18 / repo `/home/user/rise-path-demo-game-integration` @ `6f9cc1d` (clean tree; `.shots/` ignored via `.git/info/exclude`).
+Reviewer key: `critique` / date 2026-10-18 / repo `rise-path-demo-game-integration` @ `6f9cc1d` (clean tree; `.shots/` ignored via `.git/info/exclude`).
 
 Verdict: the plan is directionally right and most file/line citations check out. It is **not executable as written**. Five problems would make WPs fail their own acceptance tests or ship broken behaviour:
 
@@ -179,7 +179,7 @@ Registry now: `shiki@4.5.0`, `@anthropic-ai/sdk@0.135.0` (peer `zod ^3.25 || ^4`
 - `tutorBridge` must accept the legacy `{message, context: string}` from `GlossaryText.tsx:67`.
 - WP-09: `loginAsGuest()` throws when Supabase auth is active (`AuthContext.tsx:241-243`), so the "ゲストで第1章を読む" CTA needs a fallback to login. Dropping recharts from the dashboard removes 159 kB gz from the critical path; add that as an acceptance check. `components/ui/` would sit next to the existing `components/common/ui/`; pick one.
 - Embeddings: `gemini-embedding-2` is the current GA model. `gemini-embedding-001` is deprecated (shutdown 2028-05-14). `gemini-3-pro-image` is not listed on Google's deprecations page, so verify the image model ID before writing it into `models.config.js`.
-- `.gemini/settings.json` hardcodes `/Users/2005nk/...` and the `admin` profile. WP-06 should fix it to a relative path and `curriculum-builder`. The existing Hermes skill `skills/curriculum-generator/SKILL.md` still prescribes Big5 "learning style", which contradicts §2.2. Flag it as a follow-up.
+- `.gemini/settings.json` hardcodes a personal absolute path (a home folder under `/Users`) and the `admin` profile. WP-06 should fix it to a relative path and `curriculum-builder`. The existing Hermes skill `skills/curriculum-generator/SKILL.md` still prescribes Big5 "learning style", which contradicts §2.2. Flag it as a follow-up.
 - A second client-exposed secret: `VITE_NEXLOOM_WORLDS_BEARER_TOKEN` (`services/nexloomWorldsBridge.ts:291`). Flag it to the owner.
 - `.page-transition` animates `transform` (`index.css:300-310`). Reader drawers and bottom sheets should portal to `body`, otherwise they mis-position during the 0.5 s animation.
 - Competitor claims I could **not** verify: the Progate prices (¥990/¥2,490) and the existence of a Progate Claude Code/Codex course. They are not load-bearing for the backlog, but mark them "unverified" in the deck.

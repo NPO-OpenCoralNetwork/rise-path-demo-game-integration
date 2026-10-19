@@ -16,14 +16,14 @@
 
 | ディレクトリ | 役割・内容 |
 | :--- | :--- |
-| **[`README.md`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/README.md)** | このインデックスファイル。全体マップ。 |
-| **[`assets_management.md`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/assets_management.md)** | **[NEW]** アセットのブラッシュアップ進行管理リストと適用ルール。 |
-| **[`design_concept.md`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/design_concept.md)** | **[NEW]** ゲームのアート＆デザインコンセプト仕様書（配色定義、AI推奨プロンプト等）。 |
-| **[`system_design/`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/system_design/)** | システムの基本仕様書、データベース設計（RLS）、マルチエージェントシステムの設計など。 |
-| **[`curricula/`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/curricula/)** | カリキュラム設計書。各チャプターのドキュメント原稿。 |
-| **[`phases/`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/phases/)** | フェーズごとの要件定義および詳細仕様書（Phase 7〜19）。 |
-| **[`guides/`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/)** | 開発者向け各種ガイド。環境構築・デプロイ方法のほか、以下を含みます：<br>・[アセット安全適用ワークフロー](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/assets_workflow.md)<br>・[チーム開発ガイドライン](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/team_development_guidelines.md)<br>・[NanoBananaアセット生成・適用ワークフロー](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/nanobanana_workflow.md)<br>・[コンセプトボード作成ガイドライン](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/concept_board_guidelines.md)<br>・[セキュリティガイドライン & 漏洩防止](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/guides/security_guidelines.md) **[NEW]** |
-| **[`archive/`](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/archive/)** | 過去バージョンのアーキテクチャ設計や、解決済みのIssueに関する一時メモ。 |
+| **[`README.md`](README.md)** | このインデックスファイル。全体マップ。 |
+| **[`assets_management.md`](assets_management.md)** | **[NEW]** アセットのブラッシュアップ進行管理リストと適用ルール。 |
+| **[`design_concept.md`](design_concept.md)** | **[NEW]** ゲームのアート＆デザインコンセプト仕様書（配色定義、AI推奨プロンプト等）。 |
+| **[`system_design/`](system_design/)** | システムの基本仕様書、データベース設計（RLS）、マルチエージェントシステムの設計など。 |
+| **[`curricula/`](curricula/)** | カリキュラム設計書。各チャプターのドキュメント原稿。 |
+| **[`phases/`](phases/)** | フェーズごとの要件定義および詳細仕様書（Phase 7〜19）。 |
+| **[`guides/`](guides/)** | 開発者向け各種ガイド。環境構築・デプロイ方法のほか、以下を含みます：<br>・[アセット安全適用ワークフロー](guides/assets_workflow.md)<br>・[チーム開発ガイドライン](guides/team_development_guidelines.md)<br>・[NanoBananaアセット生成・適用ワークフロー](guides/nanobanana_workflow.md)<br>・[コンセプトボード作成ガイドライン](guides/concept_board_guidelines.md)<br>・[セキュリティガイドライン & 漏洩防止](guides/security_guidelines.md) **[NEW]** |
+| **[`archive/`](archive/)** | 過去バージョンのアーキテクチャ設計や、解決済みのIssueに関する一時メモ。 |
 
 ---
 
@@ -33,7 +33,7 @@
     *   適切なディレクトリ（仕様書なら `phases/`、システム全体設計なら `system_design/`）に配置してください。
     *   本ファイル（`doc/README.md`）の一覧に追記してください。
 2.  **アセットを更新・追加する場合**:
-    *   [アセット管理ドキュメント (`doc/assets_management.md`)](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/doc/assets_management.md) のステータスとFigmaリンクを必ず更新してください。
+    *   [アセット管理ドキュメント (`doc/assets_management.md`)](assets_management.md) のステータスとFigmaリンクを必ず更新してください。
 
 ---
 
@@ -50,7 +50,7 @@
 
 ## ⚖️ ライセンス (License)
 
-本プロジェクトは **[Apache License, Version 2.0](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/LICENSE)** の下でライセンスされています。商用利用、改変、再配布が許諾されていますが、著作権表示および免責事項の保持が必要です。詳細は [LICENSE](file:///Users/2005nk/Works/personal/rise-path-demo-game-integration/LICENSE) ファイルを参照してください。
+本プロジェクトは **[Apache License, Version 2.0](../LICENSE)** の下でライセンスされています。商用利用、改変、再配布が許諾されていますが、著作権表示および免責事項の保持が必要です。詳細は [LICENSE](../LICENSE) ファイルを参照してください。
 
 Copyright 2026 Naoya Kusunoki / Coral Network
 
