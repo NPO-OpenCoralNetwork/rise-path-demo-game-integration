@@ -338,8 +338,8 @@
           "id": "s2-goal",
           "type": "markdown",
           "md": {
-            "jp": "[[目的]]が1文になると、機能を選ぶ物差しができます。「月の途中で使いすぎに気づく」なら、凝ったグラフより「今月の残り金額」の表示で足りるかもしれません。",
-            "en": "Once the [[goal]] is one sentence, you have a yardstick for choosing features. If the goal is to notice overspending mid-month, showing the money left this month may be enough, without an elaborate chart."
+            "jp": "[[目的]]が1文になると、機能を選ぶ物差しができます。「月の途中で食費の使いすぎに気づける」が目的なら、凝ったグラフより「今月の残り金額」の表示で足りるかもしれません。",
+            "en": "Once the [[goal]] is one sentence, you have a yardstick for choosing features. If the goal is to notice mid-month that you're overspending on food, showing the money left this month may be enough, without an elaborate chart."
           }
         },
         {
@@ -487,8 +487,8 @@
           "variant": "tip",
           "title": { "jp": "Mustに迷ったら", "en": "Not sure if it's a Must?" },
           "md": {
-            "jp": "「これがなくても、目的は果たせる？」と聞きます。答えが「果たせない」になる機能だけをMustにします。このレッスンでは、最初の版をMustだけで作ります。ShouldとCouldはそのあとに足す候補です。Won'tは今回作らず、次の版の候補として残します。",
-            "en": "Ask, \"Could the goal still be met without this?\" Only the features the goal can't do without become Musts. In this lesson, the first version is built from the Musts alone; Shoulds and Coulds are candidates to add after that. A Won't is not built this time and stays on as a candidate for the next version."
+            "jp": "「これがなくても、目的は果たせる？」と聞き、「果たせない」機能だけをMustにします。\n\nこのレッスンでは、最初の版をMustだけで作り、ShouldとCouldはそのあとに足します。Won'tは今回作らず、次の版の候補に残します。",
+            "en": "Ask, \"Could the goal still be met without this?\" and make only the features it can't do without Musts.\n\nIn this lesson, we build the first version from the Musts alone and add Shoulds and Coulds after that. A Won't is not built this time and stays on as a candidate for the next version."
           }
         },
         {
@@ -766,7 +766,7 @@
               "answer": ["d"],
               "explanation": {
                 "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。AIツールの開発元のガイドも、役に立つ仕様書（企画書のような文書）の特徴として、範囲外を書くことを挙げています。",
-                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. A guide from an AI tool maker likewise names stating what is out of scope as a feature of useful specs (documents like this plan)."
+                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. A guide from an AI tool maker likewise says a useful spec (a document like this plan) states what is out of scope."
               },
               "hint": {
                 "jp": "書いていないことを、AIがどう扱うかを考えましょう。",
@@ -1022,8 +1022,8 @@
               "id": "q10",
               "kind": "single",
               "prompt": {
-                "jp": "英単語の復習アプリの1枚企画書です。目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？",
-                "en": "Here is a one-page plan for an English vocabulary app. The goal is \"I can review English words for five minutes on my commute.\" The Musts are \"add words\", \"quiz me\" and \"a leaderboard with friends\", and \"what we won't build\" is left blank. What is the best way to revise it?"
+                "jp": "英単語の復習アプリの目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？",
+                "en": "An English vocabulary app's plan has the goal \"I can review English words for five minutes on my commute.\" The Musts are \"add words\", \"quiz me\" and \"a leaderboard with friends\", and \"what we won't build\" is left blank. What is the best way to revise it?"
               },
               "options": [
                 {

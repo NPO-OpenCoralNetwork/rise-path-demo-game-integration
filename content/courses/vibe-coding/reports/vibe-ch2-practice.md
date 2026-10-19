@@ -249,3 +249,97 @@ State after fixes:
 
 Next: a fresh review round on the fixed draft (the saved JSON describes the pre-fix draft), then `check-review.mjs`.
 The owner still needs to list `vibe-ch2-practice` in `course.json`.
+
+## Confirmation review (round 7)
+
+This section supersedes the "Final gate" status lines and the Round 6 "Next" line above.
+
+Fresh, independent reviews of the round-6 draft: `pedagogy-reviewer` (own average 3.62, pass, 0 must-fix),
+`ja-editor` (revise, 6 must-fix), `visual-qa` (pass, 0 must-fix). Saved over
+`reports/vibe-ch2-practice.<reviewer>.review.json`. The workflow's preview of the round-6 draft, run before the
+reviews, was OK on all three viewports: desktop-jp 10,566 px with a median of 36 chars/line, mobile-jp 13,573 px,
+desktop-en 11,242 px with a median of 70. It had no overflow, 0 console errors and 0 diagram errors.
+
+Official confirmation verdict:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2-practice.*.review.json`
+exited **1**.
+
+```
+Review of vibe-ch2-practice by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.54 (needs ≥ 3.3) · every criterion ≥ 3
+  align 4 · hook 4 · prior 4 · load 3 · worked 3 · active 3 · miscon 4 · visual 3 · practice 4 · meta 4 ·
+  accuracy 3 · voice 3 · a11y_l10n 4
+  6 must-fix (ja-editor): practice-recap, summary-points, card-must-test, card-ai-review, card-revise, practice-check
+```
+
+| criterion | merged (lowest) | pedagogy-reviewer | ja-editor | visual-qa |
+|---|---|---|---|---|
+| align | 4 | 4 | — | — |
+| hook | 4 | 4 | — | — |
+| prior | 4 | 4 | 4 | — |
+| load | **3** | 3 | 3 | 3 |
+| worked | **3** | 3 | — | — |
+| active | **3** | 3 | — | — |
+| miscon | 4 | 4 | — | — |
+| visual | **3** | 3 | — | 4 |
+| practice | 4 | 4 | — | — |
+| meta | 4 | 4 | — | — |
+| accuracy | **3** | 3 | — | — |
+| voice | **3** | 4 | 3 | — |
+| a11y_l10n | 4 | 4 | 4 | 4 |
+| **mean** | **3.54** | | | |
+
+The verdict is REVISE only because 6 must-fix items were open. No criterion is below 3, and the mean passes.
+
+### Must-fix items, applied after the confirmation round
+
+All 6 items are small wording fixes, so they were applied after this round. The recorded verdict above (REVISE,
+exit 1) describes the draft **before** these fixes. Each fix used the reviewer's text exactly, with JP and EN in sync.
+
+| # | Source / criterion / block | Change applied |
+|---|---|---|
+| C1 | ja-editor / load / `practice-recap` | As given: 「Mustは、ないと目的を果たせないものです。Shouldは、重要だけれど、なくても最初の版が成り立つものです。⏎⏎Couldは、あるとよいものです。Won'tは、この版では作らないと決めて、企画書に書いておくものです。」 The EN is split the same way: "… A Should is important, but the first version still works without it. ⏎⏎ A Could is nice to have. A Won't …". The semicolon became a full stop. |
+| C2 | ja-editor / voice / `summary-points[2]` | As given: 「自分が決めていないことをAIが埋めたら、…」. The EN ("If the AI fills in something you never decided…") already meant this. |
+| C3 | ja-editor / voice / `card-must-test` | As given: 「…果たせるなら、Mustではありません。」. The EN needed no change. |
+| C4 | ja-editor / voice / `card-ai-review` | As given: 「…AIには指摘だけを頼みます。直すかどうかは自分で決めます。」. The EN needed no change. |
+| C5 | ja-editor / voice / `card-revise` | As given: 「どこを・なぜ・どう直すか。1文で伝えます。」. The EN needed no change. |
+| C6 | ja-editor / voice / `practice-check` pq1 d feedback | As given: 「お店ごとに並ぶと…」, which matches the stem's 「お店ごとの並べ替え」. |
+
+The pedagogy-reviewer called plain-form flashcard backs acceptable, but C3–C5 follow the ja-editor must-fix. The
+lessons stay consistent: the ch2 flashcard backs end in nouns (体言止め), not plain-form verbs.
+
+### niceToHave items left open
+
+This round applied must-fix items only. These suggestions remain open:
+
+- pedagogy-reviewer: a case where the learner rightly rejects an AI remark, for example reworking pq1 or adding an
+  item. That is a content change, so it was not attempted here; the author decides. Also open: the `practice-flow`
+  caption versus list screens (イベント一覧 against pq3's レシピの一覧); the pq5 hint, which gives the answer away;
+  where `practice-tip` sits; and estMinutes 20 against a contract estimate of about 23.
+- ja-editor: the `practice-prompt` Won't reason (「最初の版には重いから」); "agree" → "decide" in the EN of
+  `practice-recap` and `card-should-wont`; 「勝手に」 → 「推測で」 in the p-plan hint; the EN of `summary-points[1]`.
+- visual-qa: all four items are reader-level:
+  - the touch hint on flashcards;
+  - the end-of-course banner on draft previews;
+  - phrase-aware Japanese line breaking;
+  - empty width beside the TD diagram on desktop.
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body grows by at most 15 JP characters: `practice-recap` +5, summary +3, flashcard backs +7. It stays near 2,110–2,120,
+  under the 2,400 budget. estMinutes 20.
+- `npm run lessons:preview -- vibe-coding vibe-ch2-practice`, re-run after the fixes → OK. desktop-jp is 10,613 px with
+  a median of 36 chars/line, mobile-jp 13,589 px, and desktop-en 11,259 px with a median of 70. There is no overflow, no
+  console or diagram error and no text-only screen. Checked by eye: `pages/desktop-jp-04.png` (`practice-recap` shows
+  as two paragraphs, and the pq1 stem is visible).
+- Whole repository checks:
+  - `npm run lessons:validate -- --drafts`: 15 lesson files and 1 course file, 0 errors.
+  - `npm run lessons:lint -- --strict`: 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed lessons; the
+    drafts have none.
+  - `npm test`: 654 pass, 0 fail.
+
+Next: the recorded confirmation verdict is REVISE (exit 1) and describes the draft before the fixes. A gate result of
+exit 0 needs a fresh review of the fixed draft; the owner decides whether to run one. The owner still needs to list
+`vibe-ch2-practice` in `course.json`.

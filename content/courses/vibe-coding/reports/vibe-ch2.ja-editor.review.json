@@ -1,1 +1,68 @@
-{"lessonId":"vibe-ch2","file":"content/courses/vibe-coding/drafts/vibe-ch2.lesson.json","reviewer":"ja-editor","rubricVersion":"rubric.v1","scores":[{"id":"voice","score":3,"evidence":"The Japanese uses です・ます throughout. It is warm and free of pressure phrases (s3-b1 「最初から完璧でなくてかまいません。」). The wrong-option feedback names the misunderstanding, then gives the correct idea. A few English lines read as direct translations (s5-b3, q1 option a feedback, q5 option c feedback).","blockIds":["s3-b1","s5-b3","q1","q5"]},{"id":"load","score":4,"evidence":"Each segment introduces at most 2 new terms (s1-defs: 壁打ち; s2-defs: 目的・機能; s5-defs: MVP・MoSCoW). lessons:lint --strict reports no sentence-length or paragraph-length findings. One worked example, the budget app, runs through ex-goal to s2-b3.","blockIds":["s1-defs","s2-defs","s5-defs","ex-goal","s2-b3"]},{"id":"prior","score":4,"evidence":"s1-b1 links back to Chapter 0 (the human's role) and ex-data to the Chapter 1 database. The opening budget-app failure (hook-b1) comes back in s2-table, s5-b2 and the s2-b3 expect example.","blockIds":["s1-b1","ex-data","hook-b1","s2-table"]},{"id":"a11y_l10n","score":3,"evidence":"Terms match across the glossary, body text and diagram labels (今月の残り画面 and 支出の入力画面 in s2-b4, the text and the s2-b3 expect). The diagram has both alt and description. Notation follows the rules (3つ, 1枚, no spaces). Gaps: 「ビジョン」 appears without English, and a few EN lines are unnatural.","blockIds":["s2-b4","s2-b3","s1-b1"]}],"mustFix":[{"criterion":"a11y_l10n","blockId":"s1-b1","issue":"The katakana word 「ビジョン」 appears for the first time in this lesson without English. The style guide requires English on first use.","fix":"「ビジョンを示すこと」→「ビジョン（vision）を示すこと」"},{"criterion":"voice","blockId":"s5-b3","issue":"The EN sentence is awkward and hard to parse: 'make only the things it couldn't be met without into Musts'.","fix":"en: \"Ask, \\\"Could the goal still be met without this?\\\" and make only the things it couldn't be met without into Musts.\" → \"Ask, \\\"Could the goal still be met without this?\\\" Only the features the goal can't do without become Musts.\""},{"criterion":"voice","blockId":"q1","issue":"The EN feedback for option a reads as a literal translation: 'Questions about features line up features before the goal is set.'","fix":"en (option a feedback): \"Questions about features line up features before the goal is set.\" → \"Asking about features gets you a list of features before the goal is set.\""},{"criterion":"voice","blockId":"q5","issue":"The EN feedback for option c is unnatural: 'Asking about features first moves on before the goal is set.'","fix":"en (option c feedback): \"Asking about features first moves on before the goal is set.\" → \"Starting with which features are needed skips past the goal.\""}],"niceToHave":["glossary MVP: the jp text 「Minimum Viable Product。」 does not match s5-defs 「Minimum Viable Product（実用最小限の製品）の略。」. Use the s5-defs wording in both places.","q2 option a feedback (en): 'it describes a means, showing a table in the app, so it's a feature' would read better as 'what it describes is a means (showing a table in the app), so it's a feature'.","q3 explanation (en): 'A Must is only a feature without which the goal can't be met.' → 'Only features the goal can't do without are Musts.'","q7 and the q3 feedback use 「SNS」 without the full name. It is widely known, but the abbreviation rule asks for it once: 「SNS（ソーシャルメディア）」.","summary-next: 「何でしょう？理由も」 has no space after the full-width ？. A full-width space here (「何でしょう？　理由も」) would match common Japanese typesetting.","Factual check (not changed): q4 explanation says an AI tool maker's guide lists stating what is out of scope as a feature of useful specs. Confirm that the cc-best-practices source actually says this."],"verdict":"revise","summary":"The Japanese is natural and warm, and well paced for a phone. The budget-app example and the terms stay consistent from the hook to the one-page plan, and the wrong-option feedback is short and specific throughout. The fixes are small: add English to 「ビジョン」 on its first use and rewrite three translated-sounding English lines (s5-b3, q1, q5)."}
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "The text uses です・ます throughout and has no banned or pressure phrases. It reassures the learner without pressure, e.g. s3-b1 「最初から完璧でなくてかまいません。」 and q8 option a feedback 「まだ決めなくて大丈夫です」. Every wrong-option feedback is at most 2 sentences, and the second sentence gives the correct idea.",
+      "blockIds": ["s3-b1", "q8", "q5", "q6"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Lint --strict is clean, and each segment adds 3 or fewer new terms. However, the s5-b3 tip packs 5 sentences into one paragraph, and the style guide allows 3. The q10 prompt runs to 4 sentences and is heavy to read on a phone.",
+      "blockIds": ["s5-b3", "q10"]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "s1-b1 links back to Chapter 0 (「第0章で…ビジョン（vision）を示すこと」), and ex-data links to Chapter 1 (「第1章で学んだデータベース」). The analogy in s1-b2 says exactly what maps to what: 「大工さんがAI、家がアプリです」.",
+      "blockIds": ["s1-b1", "s1-b2", "ex-data"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The EN text is natural and matches the JP meaning. The UI labels 「期待される結果」 and 'What a good answer looks like' match PromptBlock.tsx, and the diagram labels match the body text. One problem: in the q4 EN explanation, 'a feature of useful specs' collides with the glossary term Feature. The s2-goal paraphrase of the goal also drifts from the glossary wording.",
+      "blockIds": ["q4", "s2-goal", "s2-b4"]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "load",
+      "blockId": "s5-b3",
+      "issue": "This paragraph has 5 sentences. The style guide allows 3 per paragraph. It also mixes two ideas: how to judge a Must, and what to do with each group.",
+      "fix": "Split it into two paragraphs by inserting a blank line after 「…機能だけをMustにします。」. Result: 「「これがなくても、目的は果たせる？」と聞きます。答えが「果たせない」になる機能だけをMustにします。\n\nこのレッスンでは、最初の版をMustだけで作ります。ShouldとCouldはそのあとに足す候補です。Won'tは今回作らず、次の版の候補として残します。」 (JP and EN alike, if EN is split the same way: break after 'become Musts.')"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "s2-goal",
+      "issue": "The quoted goal 「月の途中で使いすぎに気づく」 drops 食費 and changes 気づける to 気づく. It no longer matches the goal used in hook-b1, s2-table, ex-goal and s2-b3, so it reads like a different goal.",
+      "fix": "「「月の途中で使いすぎに気づく」なら、」→「「月の途中で食費の使いすぎに気づける」が目的なら、」 (the sentence becomes 57 characters). EN: 'If the goal is to notice overspending mid-month,' → 'If the goal is to notice mid-month that you're overspending on food,'"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "q4",
+      "issue": "In the EN explanation, 'as a feature of useful specs' uses 'feature' to mean 'characteristic'. In this lesson, Feature is a glossary term meaning something the app does, so a learner can misread it.",
+      "fix": "EN: 'names stating what is out of scope as a feature of useful specs (documents like this plan).' → 'says a useful spec (a document like this plan) states what is out of scope.'"
+    },
+    {
+      "criterion": "load",
+      "blockId": "q10",
+      "issue": "The prompt has 4 sentences and about 100 characters before the question. The Must list and the empty 「やらないこと」 are hard to keep in mind on a phone.",
+      "fix": "「英単語の復習アプリの1枚企画書です。目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？」→「英単語の復習アプリの目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？」 (EN: drop the opening sentence 'Here is a one-page plan for an English vocabulary app.' and start with 'An English vocabulary app's plan has the goal \"I can review English words for five minutes on my commute.\"')"
+    }
+  ],
+  "niceToHave": [
+    "s2-why: the JP sentence 「ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。」 does not say who asks whom. Section 2-1 has the AI asking questions, so this is ambiguous. Consider 「ほしい[[機能]]が浮かんだら、「なぜそれがほしいの？」と自分に1回聞き返します。」",
+    "s5-b2: the column header 「意味：家計簿の例」 does not match the caption 「家計簿アプリの機能」. Consider 「意味：家計簿アプリの例」.",
+    "ex-goal: the sample question 「いつ困りますか？」 differs from the s1-b4 expect text 「いまはどんな場面で困っていますか？」. Aligning the two would help the learner see that it is the same interview.",
+    "glossary MoSCoW: only Won't gets a Japanese gloss (「Won't（今回やらない）」). The flashcard card-moscow glosses all four groups. Consider matching it: 「Must（必須）・Should（重要）・Could（あるとよい）・Won't（今回やらない）」.",
+    "Fact check, not a language issue: q4 attributes to the cited Claude Code best-practices page the claim that useful specs state what is out of scope. Please confirm the page actually says this before publishing.",
+    "q5: the correct option a is noticeably shorter than options c and d, which can give the answer away. Consider 「いったん止めて、まず誰が何に困っているかを質問してもらう」."
+  ],
+  "verdict": "revise",
+  "summary": "The Japanese is warm, consistent and short. Terms (壁打ち, 目的, 機能, MVP, MoSCoW, 1枚企画書) match across the body text, glossary and diagram, and all feedback stays within 2 sentences. The fixes needed are a 5-sentence tip paragraph (s5-b3), a goal paraphrase in s2-goal that drifts from the glossary wording, and the EN word 'feature' in q4 colliding with the glossary term."
+}

@@ -432,3 +432,94 @@ State after fixes:
 Next: a fresh review round on the fixed draft (the saved JSON describes the pre-fix draft), then `check-review.mjs`.
 Owner decisions still open: list `vibe-ch2-practice` in `course.json` (m2, after vibe-ch2) and set vibe-ch2's
 estMinutes there to 18; VSCode vs VS Code; reader-level touch hints.
+
+## Confirmation review (round 7)
+
+This section supersedes the "Final gate" status lines and the Round 6 "Next" line above.
+
+Fresh, independent reviews of the round-6 draft: `pedagogy-reviewer` (own average 3.54, revise, 1 must-fix),
+`ja-editor` (revise, 4 must-fix), `visual-qa` (pass, 0 must-fix). Saved over
+`reports/vibe-ch2.<reviewer>.review.json`. The workflow's preview of the round-6 draft, run before the reviews, was OK
+on all three viewports: desktop-jp 13,324 px with a median of 37 chars/line, mobile-jp 17,559 px, desktop-en 13,985 px
+with a median of 73. It had no overflow, 0 console errors and 0 diagram errors.
+
+Official confirmation verdict:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`
+exited **1**.
+
+```
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
+  align 4 · hook 4 · prior 4 · load 3 · worked 3 · active 3 · miscon 4 · visual 4 · practice 3 · meta 4 ·
+  accuracy 3 · voice 3 · a11y_l10n 3
+  5 must-fix: ja-editor ×4 (s5-b3, s2-goal, q4, q10), pedagogy-reviewer ×1 (s5-b3)
+```
+
+| criterion | merged (lowest) | pedagogy-reviewer | ja-editor | visual-qa |
+|---|---|---|---|---|
+| align | 4 | 4 | — | — |
+| hook | 4 | 4 | — | — |
+| prior | 4 | 4 | 4 | — |
+| load | **3** | 3 | 3 | 4 |
+| worked | **3** | 3 | — | — |
+| active | **3** | 3 | — | — |
+| miscon | 4 | 4 | — | — |
+| visual | 4 | 4 | — | 4 |
+| practice | **3** | 3 | — | — |
+| meta | 4 | 4 | — | — |
+| accuracy | **3** | 3 | — | — |
+| voice | **3** | 3 | 4 | — |
+| a11y_l10n | **3** | 4 | 3 | 4 |
+| **mean** | **3.46** | | | |
+
+The verdict is REVISE only because 5 must-fix items were open. No criterion is below 3, and the mean passes.
+
+### Must-fix items, applied after the confirmation round
+
+All 5 items are small wording or translation fixes, so they were applied after this round. The recorded verdict
+above (REVISE, exit 1) describes the draft **before** these fixes. JP and EN were kept in sync.
+
+| # | Source / criterion / block | Change applied |
+|---|---|---|
+| C1 | pedagogy-reviewer / load / `s5-b3` and ja-editor / load / `s5-b3` | The two fixes overlap, so one change covers both. It uses the pedagogy 3-sentence rewrite and adds the ja-editor paragraph break after 「…機能だけをMustにします。」. It keeps the round-6 hedge 「このレッスンでは、」 (round-6 N1: the ABC MoSCoW timebox can also deliver Shoulds and Coulds, so "the first version has only Musts" is this lesson's choice). JP: 「「これがなくても、目的は果たせる？」と聞き、「果たせない」機能だけをMustにします。⏎⏎このレッスンでは、最初の版をMustだけで作り、ShouldとCouldはそのあとに足します。Won'tは今回作らず、次の版の候補に残します。」 EN: "Ask, "Could the goal still be met without this?" and make only the features it can't do without Musts. ⏎⏎ In this lesson, we build the first version from the Musts alone and add Shoulds and Coulds after that. A Won't is not built this time and stays on as a candidate for the next version." The EN keeps the lesson's double quotes. The callout now has 3 sentences instead of 5, and the body is 14 characters shorter. |
+| C2 | ja-editor / a11y_l10n / `s2-goal` | As given: 「「月の途中で食費の使いすぎに気づける」が目的なら、…」 (57 characters). EN: "If the goal is to notice mid-month that you're overspending on food, …". |
+| C3 | ja-editor / a11y_l10n / q4 explanation (EN) | As given: "A guide from an AI tool maker likewise says a useful spec (a document like this plan) states what is out of scope." |
+| C4 | ja-editor / load / q10 stem | As given: 「英単語の復習アプリの目的は「通勤中の自分が、英単語を5分で復習できる」です。…」, without the opening 「…1枚企画書です。」. EN begins "An English vocabulary app's plan has the goal "I can review English words for five minutes on my commute."" |
+
+C1 is the only change that departs from a reviewer's text. It combines two must-fix suggestions and keeps the
+round-6 hedge, for the reasons given in the table.
+
+### niceToHave items left open
+
+This round applied must-fix items only. These suggestions remain open:
+
+- pedagogy-reviewer: the q2 hint (point to the s2-why probe); sharper distractors for q7 a and q3 d; the Bloom tag
+  of q4 (analyze → understand, or a reframed item); the q8 b feedback wording (「依頼文で頼まない限り…」);
+  `s3-b1` 「目的と、機能の優先順位に」; listing `vibe-ch2-practice` in `course.json` (owner).
+- ja-editor: `s2-why` 「自分に1回聞き返します」; the `s5-b2` header 「意味：家計簿アプリの例」; the `ex-goal` sample
+  question wording; Japanese glosses for all four MoSCoW groups in the glossary; the q5 option-length cue; a fact check
+  of the cc-best-practices out-of-scope claim behind q4 (author or owner).
+- visual-qa: the one-character widow in the `s2-defs` 機能 definition. Reader-level items: 「タップでめくる」 on touch
+  devices, and the duplicated 理解度チェック label.
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body about 2,383 JP characters (2,390 − 14 + 7, same method as rounds 4–6; q4 and q10 are quiz text). estMinutes 18.
+- `npm run lessons:preview -- vibe-coding vibe-ch2`, re-run after the fixes → OK. desktop-jp is 13,373 px with a
+  median of 37 chars/line, mobile-jp 17,575 px, and desktop-en 14,001 px with a median of 73. There is no overflow, no
+  console or diagram error and no text-only screen. Checked by eye: `pages/mobile-jp-09.png` and `pages/mobile-jp-10.png`
+  (the `s5-b3` callout shows as two paragraphs).
+- Whole repository checks:
+  - `npm run lessons:validate -- --drafts`: 15 lesson files and 1 course file, 0 errors.
+  - `npm run lessons:lint -- --strict`: 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed lessons; the
+    drafts have none.
+  - `npm test`: 654 pass, 0 fail.
+
+Next: the recorded confirmation verdict is REVISE (exit 1) and describes the draft before the fixes. A gate result of
+exit 0 needs a fresh review of the fixed draft; the owner decides whether to run one. Owner decisions still open:
+- list `vibe-ch2-practice` in `course.json` and set vibe-ch2's estMinutes to 18;
+- VS Code vs VSCode;
+- the reader-level touch hints;
+- the cc-best-practices fact check.

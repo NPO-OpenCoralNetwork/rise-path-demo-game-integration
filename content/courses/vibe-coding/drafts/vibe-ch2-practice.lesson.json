@@ -258,8 +258,8 @@
             "en": "MoSCoW in brief"
           },
           "md": {
-            "jp": "Mustは、ないと目的を果たせないものです。Shouldは重要だけれど、なくても最初の版は成り立つもの、Couldはあるとよいものです。Won'tは、この版では作らないと決めて企画書に書いておくものです。",
-            "en": "A Must is something the goal can't be met without. A Should is important, but the first version still works without it; a Could is nice to have. A Won't is something you agree not to build in this version, and you write it down in the plan."
+            "jp": "Mustは、ないと目的を果たせないものです。Shouldは、重要だけれど、なくても最初の版が成り立つものです。\n\nCouldは、あるとよいものです。Won'tは、この版では作らないと決めて、企画書に書いておくものです。",
+            "en": "A Must is something the goal can't be met without. A Should is important, but the first version still works without it.\n\nA Could is nice to have. A Won't is something you agree not to build in this version, and you write it down in the plan."
           }
         },
         {
@@ -311,7 +311,7 @@
                     "en": "Make it a Won't and delete it from the plan"
                   },
                   "feedback": {
-                    "jp": "店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。Won'tにするときも、消さずに企画書に書いておきます。",
+                    "jp": "お店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。Won'tにするときも、消さずに企画書に書いておきます。",
                     "en": "Grouping items by shop makes forgotten items easier to spot, so Should fits better than Won't. Even when something is a Won't, it stays written in the plan rather than deleted."
                   }
                 }
@@ -909,7 +909,7 @@
               "en": "A Must is only what the goal can't do without. Something important that the first version can still work without is a Should. What you won't build this time stays written under Won't."
             },
             {
-              "jp": "AIが決めていないことを埋めたら、「これは決めていません」と伝えて質問してもらいます。",
+              "jp": "自分が決めていないことをAIが埋めたら、「これは決めていません」と伝えて質問してもらいます。",
               "en": "If the AI fills in something you never decided, say \"I haven't decided this\" and have it ask you."
             },
             {
@@ -937,7 +937,7 @@
                 "en": "What do you ask when you're unsure about a Must?"
               },
               "back": {
-                "jp": "「これがなくても、目的は果たせる？」。果たせるなら、Mustではない。",
+                "jp": "「これがなくても、目的は果たせる？」。果たせるなら、Mustではありません。",
                 "en": "\"Could the goal still be met without this?\" If it could, it isn't a Must."
               }
             },
@@ -959,7 +959,7 @@
                 "en": "How do you ask an AI to review your sorting?"
               },
               "back": {
-                "jp": "自分で分けて理由を書き、AIには指摘だけを頼む。直すかどうかは自分で決める。",
+                "jp": "自分で分けて理由を書き、AIには指摘だけを頼みます。直すかどうかは自分で決めます。",
                 "en": "Sort it yourself with reasons, and ask the AI only to point out problems. You decide what to change."
               }
             },
@@ -970,7 +970,7 @@
                 "en": "Which three things do you say when asking for a fix to the plan?"
               },
               "back": {
-                "jp": "どこを・なぜ・どう直すか。1文で伝える。",
+                "jp": "どこを・なぜ・どう直すか。1文で伝えます。",
                 "en": "Where, why and how to change it, in one sentence."
               }
             }

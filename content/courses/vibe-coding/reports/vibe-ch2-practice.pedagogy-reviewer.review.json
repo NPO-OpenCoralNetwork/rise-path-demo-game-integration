@@ -1,1 +1,97 @@
-{"lessonId":"vibe-ch2-practice","file":"content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json","reviewer":"pedagogy-reviewer","rubricVersion":"rubric.v1","scores":[{"id":"align","score":4,"evidence":"There are two can-do objectives. o3 is evaluate (「判断できる」) and o4 is create (「作り…直せる」). o3 is tested by pq1 (inline, 買い物メモ) and pq2 (exam, ジム記録), with pq0 as an ungraded predict. o4 is tested by pq3 (レシピ帳, missing Must) and pq4 (AI-guessed 「使う人」). Every item uses a new context. The create level is also assessed by practice-checklist.","blockIds":["hook-predict","practice-check","check-quiz","practice-checklist"]},{"id":"hook","score":3,"evidence":"hook-b1 is a concrete 3-sentence scene (「気づけば、6つ全部をMustにしていました。」) followed by an ungraded predict question, pq0, that leads into o3. However, the problem shown is over-scoping, while pq0 asks how to split work with the AI. Also, option b is the only non-extreme choice, so the answer is easy to guess rather than predict.","blockIds":["hook-b1","hook-predict"]},{"id":"prior","score":3,"evidence":"The prerequisite (第2章) is stated, and hook-b1 recalls 「第2章の家計簿アプリと同じ流れで」. practice-recap restates MoSCoW, and the glossary has 壁打ち, MoSCoW and 1枚企画書. But 「Must」 (hook-b1) and 「MoSCoWの4つ」 (pq0 a) appear before practice-recap defines them. In p-interview, the term is used once before its gloss sentence.","blockIds":["hook-b1","hook-predict","practice-recap","practice-steps"]},{"id":"load","score":3,"evidence":"Lint is clean (0 warnings), and the brief reports a body of about 2,038 characters with no new terms. But the practice section holds 10 blocks. Steps p-interview, p-moscow and p-plan say 「下の…依頼文」, yet all three prompts come after all six steps. The learner has to scroll back and forth, and the checklist the steps point to comes last.","blockIds":["practice-steps","practice-prompt-interview","practice-prompt","practice-prompt-plan","practice-checklist"]},{"id":"worked","score":3,"evidence":"This is a practice lesson split from vibe-ch2, which holds the full 家計簿 worked example, so having no concept or example segment is justified. Within this lesson there are partial faded examples: the var hint for 自分の分け方 shows a full 家計簿 sort, and the club-app model in practice-prompt.expect gives 「理由の例」 and the AI's remark. The step blocks themselves give what to do and an expected result, but rarely why.","blockIds":["practice-steps","practice-prompt","practice-prompt-plan"]},{"id":"active","score":3,"evidence":"The single content section has one inline check, pq1, an evaluate-level item in a new context with feedback on every wrong option, so density is met. But the right option (「なくても目的は果たせるので」) echoes the AI remark in the stem. There is also no inline retrieval for o4 before the exam.","blockIds":["practice-check"]},{"id":"miscon","score":4,"evidence":"All four misconceptions in the brief appear as distractors with feedback of at most 2 sentences. 「AIに任せる」 is pq0 a and pq1 c. 「便利・迷う→Must」 is pq0 c, pq1 b and pq2 c. 「Won'tは消す」 is pq1 d and pq2 d. 「AIの推測をそのまま使う」 is pq4 a. Each feedback names the misconception and corrects it, e.g. 「便利さは、Mustかどうかの物差しではありません。」","blockIds":["hook-predict","practice-check","check-quiz"]},{"id":"visual","score":4,"evidence":"practice-flow is a 4-node process diagram whose labels match the plan's screen flow (イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧). It has a takeaway caption (「Mustの画面だけで、作成から人数の確認まで通る」), an alt, and EN labels. There are no images.","blockIds":["practice-flow"]},{"id":"practice","score":4,"evidence":"This is a transfer task on the learner's own app. All six steps have expect, hint and troubleshoot, which gives a hint ladder. There are model answers in practice-prompt.expect and practice-prompt-plan.expect, in disclosures that practice-tip points to, plus a 7-item self-check (practice-checklist), including pc-flow.","blockIds":["practice-task","practice-steps","practice-prompt","practice-prompt-plan","practice-tip","practice-checklist"]},{"id":"meta","score":4,"evidence":"summary-points (4 points) comes after the exam. summary-next has a reflection prompt (「AIの指摘のうち、受け入れなかったものはありましたか？」) and the next step (ch3/ch4). There are 4 flashcards that ask for retrieval, plus askTutor suggestions.","blockIds":["summary-points","summary-next","summary-cards","summary-ask"]},{"id":"accuracy","score":3,"evidence":"The MoSCoW meanings in practice-recap and check-quiz are cited to abc-moscow, the interview prompt is cited to cc-best-practices, and the AI-behaviour claims are hedged (「埋まることがあります」, 「書き始めたら」). One inaccuracy: summary-next says 「第4章でAIに画面を作ってもらうときは、この1枚企画書を一緒に渡せます」, but the current vibe-ch4 prompt builds a page from an attached image and never uses a plan.","blockIds":["practice-recap","practice-prompt-interview","check-quiz","summary-next"]},{"id":"voice","score":3,"evidence":"Body text, step expects and summary are in です・ます, warm and non-pressuring (「思いつかなければ…試しましょう」). There are no banned phrases, and the terms Must/Should/Could/Won't and 1枚企画書 are used consistently. Flashcard backs and checklist labels use plain form, which is acceptable for those block types.","blockIds":["practice-task","practice-steps","summary-points","summary-cards"]},{"id":"a11y_l10n","score":4,"evidence":"Every learner-facing string has jp and en (none missing), including the Mermaid labels, caption and alt. The EN reads naturally. practice-tip's EN quotes the reader's real EN disclosure label, \"What a good answer looks like\".","blockIds":["practice-flow","practice-tip"]}],"mustFix":[],"niceToHave":["practice-steps / prompts: put each prompt right after the step that uses it, or add the prompt title and a step number to each step, so learners don't scroll past 4 later steps to find 「下の…依頼文」.","hook-predict: make the options parallel so b is not the only balanced choice. For example, make d 「自分で分けたあと、AIに足りない機能だけ挙げてもらう」, a near-miss that skips the reasons. Or tie pq0 more directly to the 6-Must problem in hook-b1.","hook-predict pq0 a feedback: 「AIは分けられても、自分の目的にとって何が必須かは決められません」 conflicts with pq1, where the AI correctly judges a Must against the goal. Suggest 「AIの分け方は材料になりますが、何を最初の版に入れるかを決めるのは自分です。」","summary-next: the current vibe-ch4 prompt builds from an attached image and does not use a plan. Soften the sentence to 「この先、AIに画面を作ってもらうときに…」, or confirm with the owner when ch4 is reworked.","o3 says 「Must以外も含めて」, but no graded item separates Should from Could. Consider a Could option in pq2, or a flashcard on Should vs Could.","o4 has no inline check. A short inline item after practice-prompt-plan (e.g. spot the missing heading in a sample plan) would give o4 the inline-plus-exam pair the contract recommends.","hook-b1 / pq0: write MoSCoW as [[MoSCoW]], linked to the glossary, on first use in the hook, since practice-recap comes later."],"average":3.46,"verdict":"pass","summary":"Biggest strength: the practice is a real transfer task with a hint and troubleshoot ladder on every step, club-app model answers, and a checklist that the exam items (pq2–pq4) test in new contexts. Every distractor encodes one of the brief's four misconceptions. Most useful fix: put each prompt next to the step that uses it, and make the hook's predict options parallel so the answer is not obvious."}
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "Both objectives use Bloom verbs and can-do wording: o3 「判断できる」 and o4 「作り…直せる」. o3 is graded by pq1 and pq2 and also used by the ungraded pq0. o4 is graded by pq5, pq3 and pq4, all in new contexts (買い物メモ, ジム, ゴミ出し, レシピ帳). The create level of o4 is performed in practice-plan and self-checked against practice-checklist.",
+      "blockIds": ["practice-check", "practice-plan-check", "check-quiz", "practice-checklist"]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 is a concrete three-sentence scene (「気づけば6つ全部をMoSCoWのMustにしていました」) followed by an ungraded predict quiz, pq0. The answer is not given away, there is no trivia, and the organizer's problem is the one the practice-prompt model answer later solves.",
+      "blockIds": ["hook-b1", "hook-predict"]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "The prerequisite names 「第2章｜AIと企画する力を身につける」. hook-b1 recalls 「第2章の家計簿アプリ」. practice-recap restates MoSCoW before any graded use, and the var hints reuse the ch2 budget-app sort. The glossary entries (壁打ち, MoSCoW, 1枚企画書) match ch2, and p-interview glosses 壁打ち inline at first use.",
+      "blockIds": ["hook-b1", "practice-recap", "p-interview", "practice-prompt"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Lint shows 0 warnings, the body is about 2,000 JP characters, and no new terms are introduced. practice-plan is dense, though: steps, a prompt with a long expect, practice-tip, practice-flow, a 7-item checklist and pq5 all in one section. Every screen still has a heading, figure or check.",
+      "blockIds": ["practice-plan", "practice-prompt-plan", "practice-checklist"]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "The full worked example (家計簿) lives in the prerequisite vibe-ch2. Here the scaffolding fades: var hints use the budget-app sort with reasons. The practice-prompt expect then gives a reasoned club-app model (「理由の例：…出欠を聞く場がないと始まらないから」) inside a collapsed disclosure. There is no in-lesson worked example before practice, which is acceptable for a practice-only lesson.",
+      "blockIds": ["practice-prompt", "practice-prompt-plan", "practice-tip"]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Both later practice sections have an inline evaluate item (pq1, pq5), and feedback is given on every wrong option. In pq1, though, the AI's remark 「なくても買い忘れは防げます」 almost matches the correct option 「なくても目的は果たせるので」, so it can be answered by word-matching. pq5's hint 「1つ目から順に」 points straight at the answer.",
+      "blockIds": ["practice-check", "practice-plan-check"]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All four misconceptions in the brief are encoded as distractors with feedback of two sentences or fewer. AI decides: pq0 a, pq1 c. Convenient means Must: pq1 b, pq2 c, pq5 c. Delete Won't: pq1 d, pq2 d, pq5 a. Keep the AI's guess: pq4 a. Each piece of feedback states the yardstick, e.g. 「便利さは、Mustかどうかの物差しではありません」.",
+      "blockIds": ["hook-predict", "practice-check", "practice-plan-check", "check-quiz"]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "practice-flow has 4 nodes, labels in both locales, an alt text and a takeaway caption, and there are no images. The caption says 「Mustの画面だけで…通る」, but 「イベント一覧」 is not one of the club-app Musts (作成・出欠ボタン・参加人数の一覧). Meanwhile pq3 treats 「レシピの一覧」 as a Must, so the two examples model list screens inconsistently.",
+      "blockIds": ["practice-flow", "practice-prompt-plan", "check-quiz"]
+    },
+    {
+      "id": "practice",
+      "score": 4,
+      "evidence": "It is a transfer task (「自分の作りたいアプリ」) and gives 15 minutes. All 6 steps have an expect, a hint and a troubleshoot entry. Collapsed model answers sit in practice-prompt and practice-prompt-plan, and practice-checklist (7 items, including pc-flow) works as a self-check.",
+      "blockIds": ["practice-steps", "practice-steps-sort", "practice-steps-plan", "practice-checklist"]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "summary-points (4) comes after the check-quiz exam. summary-next asks a reflection question (「受け入れなかったものがあれば、その理由を1行で」) and names the next step (第3章 VS Code). There are 4 flashcards that test retrieval, and askTutor offers 2 suggestions.",
+      "blockIds": ["summary-points", "summary-next", "summary-cards", "summary-ask"]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "practice-recap and check-quiz cite abc-moscow, and their wording matches DSDM's Must/Should/Could/Won't definitions. The interview prompt cites cc-best-practices, and the AI-behaviour claims are hedged (「埋まることがあります」). The rule of thumb 「Mustが3つ以内（目安）」 in pc-must and p-moscow is the lesson's own and uncited. It is labelled 目安 (rule of thumb), so it is acceptable but not traceable.",
+      "blockIds": ["practice-recap", "check-quiz", "practice-prompt-interview", "practice-checklist"]
+    },
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "The prose is consistently です・ます, warm and non-pressuring (「思いつかなければ…で試しましょう」), with no banned phrases. Terms are consistent across the lesson: Must/Should/Could/Won't, 1枚企画書, 最初の版. Checklist labels and flashcard backs use plain form, which is appropriate for those formats.",
+      "blockIds": ["practice-task", "practice-steps", "summary-points"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Every learner-facing field has both jp and en, including the Mermaid labels, caption, alt and description of practice-flow. The var names follow the ch2 per-locale pattern (作りたいアプリ / app idea). There are no images or links that need link text.",
+      "blockIds": ["practice-flow", "practice-prompt-interview", "practice-prompt"]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-check (pq1) and the practice-prompt model answer both show the learner accepting an AI remark. Nothing models declining one, yet the lesson's thesis is 「直すかどうかは自分で決めます」. Make pq1 (or add a second item) a case where the AI wrongly suggests demoting a true Must, e.g. 「イベントの作成はなくてもよいのでは」. That would test o3's judgement and remove the word-match between the AI remark and option a.",
+    "practice-flow caption 「Mustの画面だけで…」: either change it to 「Mustの機能と画面の流れで…」 or explain that 「イベント一覧」 is a navigation screen and not a feature. pq3 counts 「レシピの一覧」 as a Must, so learners could get two different rules for list screens.",
+    "pq5 hint 「上のチェックリストを、1つ目から順に…」 combined with 「最初に直すべき」 gives the answer away. Use a hint like 「目的は、Mustを選ぶ物差しになっていますか？」 instead.",
+    "practice-tip sits in 演習3 but points back to the 演習2 model answer. Move it, or add a one-line pointer near practice-prompt, so learners who get stuck during sorting know the disclosure is there.",
+    "The contract's time estimate (about 2,000 chars at 450/min, 6 questions at 40 s, and a 15-min practice) comes to roughly 23 minutes against estMinutes 20. Either confirm 20 is realistic or trim practice-plan."
+  ],
+  "average": 3.62,
+  "verdict": "pass",
+  "summary": "The lesson is a strong, well-aligned practice lesson. The hook is concrete, all six steps have a hint ladder with troubleshoot and expect, model answers sit in collapsed disclosures, and the exam distractors encode every misconception in the brief. The most useful fix is to show or test a case where the learner rightly rejects an AI remark: at the moment every AI remark in the lesson is correct, which works against the 「自分で決める」 message. Validate and lint --strict are both clean."
+}
