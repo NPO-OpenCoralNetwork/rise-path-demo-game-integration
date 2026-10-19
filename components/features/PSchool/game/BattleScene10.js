@@ -2,6 +2,7 @@
 // --- 新しい設計に基づく全面リファクタリング ---
 import Phaser from "phaser";
 import { BattleScene } from "./battle";
+import { releaseMotion } from "./characterMotion";
 
 // ステージ10「初級ボス戦」用のバトルシーン
 // これまでの魔法（閃光魔法、麻痺魔法、回復魔法、属性魔法）をすべて駆使して戦う
@@ -678,8 +679,9 @@ export class BattleScene10 extends BattleScene {
     // 勝利エフェクト
     this.cameras.main.flash(1500, 255, 215, 0);
     
-    // 敵スプライトを消す
+    // 敵スプライトを消す（待機の呼吸を止めてから、ボス専用の縮んで消える演出にする）
     if (this.enemySprite) {
+      releaseMotion(this.enemySprite);
       this.tweens.add({
         targets: this.enemySprite,
         alpha: 0,

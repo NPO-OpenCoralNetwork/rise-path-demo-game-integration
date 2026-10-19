@@ -4,6 +4,8 @@ import { Enemy } from "./enemy";
 import { UI } from "./ui";
 import { SpellBook } from "./SpellBook";
 import { filterBlocksByLevel, getAvailableBlocksByLevel, getNewlyUnlockedBlocks } from "./levelBlockRestrictions";
+import { ENEMY_MAX_WIDTH, GROUND, PLAYER_ART, stageArt } from "./stageArt";
+import { castPose, defeat, hitReact, lunge, settled, startIdle, stopIdle, victory } from "./characterMotion";
 
 export class BattleScene extends Phaser.Scene {
   constructor(config) {
@@ -83,6 +85,16 @@ export class BattleScene extends Phaser.Scene {
       console.warn(`Failed to load asset: ${file.src}`);
     });
 
+    // 2026年版の画像（stageArt.js）を優先する。キーはステージごとに分ける
+    // （同じキーのままだと、先に遊んだステージの画像が次のステージにも残る）
+    this.stageArt = stageArt(this.settings.stageNumber);
+    if (this.stageArt) {
+      this.settings.backgroundTextureKey = this.stageArt.backgroundKey;
+      this.settings.backgroundTexturePath = this.stageArt.background;
+      this.settings.enemyTextureKey = this.stageArt.enemyKey;
+      this.settings.enemyTexturePath = this.stageArt.enemy;
+    }
+
     // バトル用アセットをロード（エラー時のフォールバック付き）
     const backgroundKey = this.settings.backgroundTextureKey || 'battleBg';
     const inferredBackgroundPath = this.settings.backgroundTexturePath || this.getBackgroundTexturePathByName(this.settings.background);
@@ -90,7 +102,7 @@ export class BattleScene extends Phaser.Scene {
     this.settings.backgroundTexturePath = backgroundPath;
     console.log('[BattleScene preload] background key:', backgroundKey, 'path:', backgroundPath, 'name:', this.settings.background);
     this.load.image(backgroundKey, backgroundPath);
-    this.load.image('player', '/p_school/assets/main-chara01_transparent.png');
+    this.load.image(PLAYER_ART.key, PLAYER_ART.path);
     // 敵テクスチャはシーンごとに差し替え可能
     const enemyKey = this.settings.enemyTextureKey || 'enemy';
     const inferredPath = this.settings.enemyTexturePath || this.getEnemyTexturePathByName(this.settings.enemy);
@@ -99,40 +111,9 @@ export class BattleScene extends Phaser.Scene {
     this.settings.enemyTexturePath = enemyPath;
     console.log('[BattleScene preload] enemy key:', enemyKey, 'path:', enemyPath, 'name:', this.settings.enemy);
     this.load.image(enemyKey, enemyPath);
-    
-    // UI要素（オプショナル）
-    try {
-      this.load.image('buttonBg', '/p_school/assets/button.png');
-    } catch (e) {
-      console.warn('button.png not found, using fallback');
-    }
-    
-    try {
-      this.load.image('hpBarFrame', '/p_school/assets/hp-bar-frame.png');
-    } catch (e) {
-      console.warn('hp-bar-frame.png not found, using fallback');
-    }
-    
-    try {
-      this.load.image('panelBg', '/p_school/assets/panel-bg.png');
-    } catch (e) {
-      console.warn('panel-bg.png not found, using fallback');
-    }
-    
-    // エフェクト用アセット（オプショナル）
-    try {
-      this.load.image('particle', '/p_school/assets/particle.png');
-    } catch (e) {
-      console.warn('particle.png not found, using fallback');
-    }
-    
-    // 魔法の書の画像をロード（オプショナル）
-    try {
-      this.load.image('spellbook', '/p_school/assets/spellbook.png');
-    } catch (e) {
-      console.warn('spellbook.png not found, using fallback');
-    }
-    
+
+    // （button / hp-bar-frame / panel-bg / particle / spellbook の画像は存在せず、どこでも使われていないため読み込まない）
+
     // BGMの読み込み
     this.load.audio('battleTheme', '/p_school/assets/audio/battle_bgm_01.mp3');
     
@@ -187,7 +168,7 @@ export class BattleScene extends Phaser.Scene {
     if (this.textures.exists(backgroundKey)) {
       console.log('[BattleScene create] background texture found:', backgroundKey, 'path:', this.settings.backgroundTexturePath);
       this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, backgroundKey);
-      this.background.setDisplaySize(this.scale.width, this.scale.height);
+      this.fitBackground(this.scale.width, this.scale.height);
     } else {
       console.warn('[BattleScene create] background texture missing, using fallback. key:', backgroundKey, 'expected path:', this.settings.backgroundTexturePath);
       // フォールバック: 単色の背景を作成
@@ -198,15 +179,9 @@ export class BattleScene extends Phaser.Scene {
     // リサイズイベントの登録
     this.scale.on('resize', this.resize, this);
 
-    // プレイヤーと敵のスプライト（フォールバック付き）
-    if (this.textures.exists('player')) {
-      this.playerSprite = this.add.sprite(this.scale.width * 0.25, this.scale.height * 0.67, 'player');
-      
-      // 画像比率を維持したままサイズを拡大 (高さ基準で350px程度に)
-      const playerTexture = this.textures.get('player').getSourceImage();
-      const playerAspectRatio = playerTexture.width / playerTexture.height;
-      const targetHeight = 350;
-      this.playerSprite.setDisplaySize(targetHeight * playerAspectRatio, targetHeight);
+    // プレイヤーと敵のスプライト（フォールバック付き）。大きさと位置は layoutCharacters() で決める
+    if (this.textures.exists(PLAYER_ART.key)) {
+      this.playerSprite = this.add.sprite(this.scale.width * 0.25, this.scale.height * 0.67, PLAYER_ART.key);
     } else {
       // フォールバック: 円形のプレイヤー
       const playerGraphics = this.add.graphics();
@@ -219,13 +194,6 @@ export class BattleScene extends Phaser.Scene {
     const enemyKey = this.settings.enemyTextureKey || 'enemy';
     if (this.textures.exists(enemyKey)) {
       this.enemySprite = this.add.sprite(this.scale.width * 0.75, this.scale.height * 0.6, enemyKey);
-      
-      // 画像比率を維持したままサイズを調整 (200pxの2/3である約133pxに縮小)
-      const enemyTexture = this.textures.get(enemyKey).getSourceImage();
-      const enemyAspectRatio = enemyTexture.width / enemyTexture.height;
-      const targetWidth = 133;
-      this.enemySprite.setDisplaySize(targetWidth, targetWidth / enemyAspectRatio);
-      
       console.log('[BattleScene create] enemy texture found:', enemyKey, 'path:', this.settings.enemyTexturePath);
     } else {
       console.warn('[BattleScene create] enemy texture missing, using fallback graphics. key:', enemyKey, 'expected path:', this.settings.enemyTexturePath);
@@ -237,13 +205,8 @@ export class BattleScene extends Phaser.Scene {
       console.warn('enemy asset not found, using fallback graphics');
     }
     
-    // キャラクターに影をつける（スプライトの場合のみ）
-    if (this.playerSprite.setAlpha) {
-      this.playerSprite.setAlpha(0.9);
-    }
-    if (this.enemySprite.setAlpha) {
-      this.enemySprite.setAlpha(0.9);
-    }
+    // 画面の高さに合わせて大きさを決め、足元を地面にそろえて、待機の呼吸を始める
+    this.layoutCharacters();
 
     // 魔法の書ボタンを作成（左上に配置）
     const spellBookContainer = this.add.container(90, 50);
@@ -395,25 +358,52 @@ export class BattleScene extends Phaser.Scene {
     this.updatePlayerLevelAsync();
   }
   
+  /** 背景を縦横比を保ったまま画面いっぱいに広げる（はみ出た分は切れる）。 */
+  fitBackground(width, height) {
+    if (!this.background || !this.background.setScale || !this.background.frame) return;
+    const scale = Math.max(width / this.background.width, height / this.background.height);
+    this.background.setScale(scale);
+    this.background.setPosition(width / 2, height / 2);
+  }
+
+  /**
+   * キャラクターの大きさを画面の高さから決め、足元を地面の線（stageArt.js の GROUND）にそろえる。
+   * 敵が横に広すぎるときは画面幅の ENEMY_MAX_WIDTH に収める。終わったら待機の呼吸をやり直す。
+   */
+  layoutCharacters() {
+    const { width, height } = this.scale;
+    const place = (sprite, x, groundY, targetHeight, maxWidth) => {
+      if (!sprite || !sprite.setDisplaySize || !sprite.frame) return false;
+      stopIdle(sprite);
+      const ratio = sprite.width / sprite.height;
+      let displayHeight = targetHeight;
+      if (maxWidth && displayHeight * ratio > maxWidth) displayHeight = maxWidth / ratio;
+      sprite.setDisplaySize(displayHeight * ratio, displayHeight);
+      sprite.setPosition(x, groundY - displayHeight / 2);
+      return true;
+    };
+    const art = this.stageArt;
+    // 倒れて消えたキャラクター（alpha 0）は、画面サイズが変わっても呼吸を再開しない
+    if (place(this.playerSprite, width * 0.25, height * GROUND.player, height * PLAYER_ART.height) && this.playerSprite.alpha > 0) {
+      startIdle(this, this.playerSprite);
+    }
+    const enemyGround = height * (GROUND.enemy - (art?.lift ?? 0));
+    if (place(this.enemySprite, width * 0.74, enemyGround, height * (art?.enemyHeight ?? 0.4), width * ENEMY_MAX_WIDTH) && this.enemySprite.alpha > 0) {
+      startIdle(this, this.enemySprite, { delay: 400, duration: art?.boss ? 1700 : 1500 });
+    }
+  }
+
   resize(gameSize, baseSize, displaySize, resolution) {
     const width = gameSize.width;
     const height = gameSize.height;
 
     this.cameras.main.setViewport(0, 0, width, height);
 
-    if (this.background) {
-      this.background.setPosition(width / 2, height / 2);
-      this.background.setDisplaySize(width, height);
-    }
+    this.fitBackground(width, height);
 
-    // プレイヤーと敵の位置調整
-    if (this.playerSprite) {
-      this.playerSprite.setPosition(width * 0.25, height * 0.67);
-    }
-    if (this.enemySprite) {
-      this.enemySprite.setPosition(width * 0.75, height * 0.6);
-    }
-    
+    // プレイヤーと敵の大きさと位置を、新しい画面サイズで決め直す
+    this.layoutCharacters();
+
     // UI要素の位置調整（必要に応じて追加）
     // 例: ログパネルや魔法の書ボタンの再配置など
     
@@ -736,38 +726,32 @@ export class BattleScene extends Phaser.Scene {
   // アニメーション再生
   async playAnimation(animationType) {
     console.log(`Playing animation: ${animationType}`);
-    
+
+    // 前の演出（のけぞりなど）が終わってから始める。重なると位置がずれていくため
+    await settled(this.playerSprite, this.enemySprite);
+
     // アニメーションタイプに応じた処理
     switch(animationType) {
-      case 'playerAttack':
-        // プレイヤーの攻撃アニメーション - より現代的なアニメーション
-        const originalX = this.playerSprite.x;
-        
-        // 1. プレイヤーが素早く動く（攻撃動作）
-        this.tweens.add({
-          targets: this.playerSprite,
-          x: originalX + 80,
-          angle: 5, // 少し傾く
-          duration: 150,
-          ease: 'Power2',
-          yoyo: true,
-          repeat: 0
-        });
-
-        // 2. 切り裂くエフェクト（プレイヤーが動き出した直後に発生）
-        this.time.delayedCall(100, () => {
+      case 'playerAttack': {
+        // 主人公がためてから踏み込み、踏み込みきった瞬間に斬撃と敵ののけぞりを出す
+        const reach = Math.max(60, (this.enemySprite.x - this.playerSprite.x) * 0.3);
+        await lunge(this, this.playerSprite, {
+          direction: 1,
+          distance: reach,
+          onImpact: () => {
             const slash = this.add.graphics();
             slash.lineStyle(4, 0xffffff, 1);
-            
-            // 斬撃線を描画 (サイズを拡大)
+
+            // 斬撃線（敵の大きさに合わせて広げる）
+            const size = Math.max(1, (this.enemySprite.displayHeight || 160) / 160);
             for (let i = 0; i < 3; i++) {
-              const offset = i * 15; // オフセットも少し広げる
+              const offset = i * 15 * size;
               slash.beginPath();
-              slash.moveTo(this.enemySprite.x - 80 + offset, this.enemySprite.y - 60 + offset);
-              slash.lineTo(this.enemySprite.x + 60 + offset, this.enemySprite.y + 40 + offset);
+              slash.moveTo(this.enemySprite.x - 80 * size + offset, this.enemySprite.y - 60 * size + offset);
+              slash.lineTo(this.enemySprite.x + 60 * size + offset, this.enemySprite.y + 40 * size + offset);
               slash.strokePath();
             }
-            
+
             // 斬撃のフェードアウト
             this.tweens.add({
               targets: slash,
@@ -775,33 +759,19 @@ export class BattleScene extends Phaser.Scene {
               duration: 200,
               onComplete: () => slash.destroy()
             });
-        });
 
-        // 3. 敵のダメージ演出（斬撃が表示された少し後に発生）
-        this.time.delayedCall(250, () => {
-            this.enemySprite.setTint(0xff0000);
-            
-            // 敵が揺れる
-            this.tweens.add({
-              targets: this.enemySprite,
-              x: this.enemySprite.x + 10,
-              duration: 50,
-              yoyo: true,
-              repeat: 1,
-              onComplete: () => this.enemySprite.clearTint()
-            });
-            
-            // 軽いカメラシェイクを追加して打撃感を出す
+            hitReact(this, this.enemySprite, { direction: 1 });
+            // 軽いカメラシェイクで打撃感を出す
             this.cameras.main.shake(100, 0.005);
+          },
         });
-        
-        // アニメーションの完了を待機
-        await new Promise(resolve => setTimeout(resolve, 500));
         break;
+      }
         
       case 'magic_fire':
         // 火の魔法エフェクト - 爆発的な炎の演出
-        
+        castPose(this, this.playerSprite, { color: 0xff7a1a });
+
         // カメラシェイク効果
         this.cameras.main.shake(150, 0.005);
         
@@ -891,9 +861,8 @@ export class BattleScene extends Phaser.Scene {
               onComplete: () => explosion.destroy()
             });
             
-            // 敵のダメージ演出
-            this.enemySprite.setTint(0xff3300);
-            setTimeout(() => this.enemySprite.clearTint(), 400);
+            // 敵のダメージ演出（赤く光ってのけぞる）
+            hitReact(this, this.enemySprite, { direction: 1, distance: 26, tint: 0xff3300 });
           }
         });
         
@@ -902,7 +871,8 @@ export class BattleScene extends Phaser.Scene {
         
       case 'magic_ice':
         // 氷の魔法エフェクト - より結晶的なアイスエフェクト
-        
+        castPose(this, this.playerSprite, { color: 0x66e0ff });
+
         // 魔法の詠唱エフェクト（プレイヤー周り）
         const iceCastFx = this.add.graphics();
         iceCastFx.fillStyle(0x00ffff, 0.4);
@@ -1002,7 +972,8 @@ export class BattleScene extends Phaser.Scene {
         
       case 'magic_thunder':
         // 雷の魔法エフェクト - よりダイナミックな稲妻
-        
+        castPose(this, this.playerSprite, { color: 0xffe14d });
+
         // 魔法の詠唱エフェクト（プレイヤー周り）
         const thunderCastFx = this.add.graphics();
         thunderCastFx.fillStyle(0xffff00, 0.4);
@@ -1106,9 +1077,9 @@ export class BattleScene extends Phaser.Scene {
           // カメラシェイク
           this.cameras.main.shake(300, 0.02);
           
-          // 敵のダメージ演出
-          this.enemySprite.setTint(0xffff00);
-          
+          // 敵のダメージ演出（黄色く光ってのけぞる）
+          hitReact(this, this.enemySprite, { direction: 1, distance: 20, tint: 0xffff00 });
+
           // 稲妻のフェードアウト
           setTimeout(() => {
             this.tweens.add({
@@ -1140,25 +1111,18 @@ export class BattleScene extends Phaser.Scene {
         await new Promise(resolve => setTimeout(resolve, 1300));
         break;
         
-      case 'enemyAttack':
-        // 敵の攻撃アニメーション
-        const enemyOriginalX = this.enemySprite.x;
-        
-        // 敵が前進する
-        this.tweens.add({
-          targets: this.enemySprite,
-          x: enemyOriginalX - 80,
-          angle: -5,
-          duration: 150,
-          ease: 'Power2',
-          yoyo: true,
-          repeat: 0,
-          onComplete: () => {
-            // 攻撃エフェクト（衝撃波）
-            const impact = this.add.graphics();
+      case 'enemyAttack': {
+        // 敵がためてから踏み込み、踏み込みきった瞬間に衝撃波・斬撃・主人公ののけぞりを出す
+        const reach = Math.max(60, (this.enemySprite.x - this.playerSprite.x) * 0.3);
+        await lunge(this, this.enemySprite, {
+          direction: -1,
+          distance: reach,
+          onImpact: () => {
+            // 攻撃エフェクト（衝撃波）。主人公の位置に置いて中心から広げる
+            const impact = this.add.graphics({ x: this.playerSprite.x, y: this.playerSprite.y });
             impact.lineStyle(4, 0xff0000, 1);
-            impact.strokeCircle(this.playerSprite.x, this.playerSprite.y, 30);
-            
+            impact.strokeCircle(0, 0, 30);
+
             // 斬撃エフェクト
             const enemySlash = this.add.graphics();
             enemySlash.lineStyle(4, 0xff3333, 1);
@@ -1169,7 +1133,7 @@ export class BattleScene extends Phaser.Scene {
               enemySlash.lineTo(this.playerSprite.x - 25 - offset, this.playerSprite.y + 20 + offset);
               enemySlash.strokePath();
             }
-            
+
             // 衝撃波の拡大
             this.tweens.add({
               targets: impact,
@@ -1178,7 +1142,7 @@ export class BattleScene extends Phaser.Scene {
               duration: 300,
               onComplete: () => impact.destroy()
             });
-            
+
             // 斬撃のフェードアウト
             this.tweens.add({
               targets: enemySlash,
@@ -1186,25 +1150,14 @@ export class BattleScene extends Phaser.Scene {
               duration: 200,
               onComplete: () => enemySlash.destroy()
             });
-            
-            // プレイヤーのダメージ演出
-            this.playerSprite.setTint(0xff0000);
-            this.tweens.add({
-              targets: this.playerSprite,
-              x: this.playerSprite.x - 10,
-              duration: 50,
-              yoyo: true,
-              repeat: 2,
-              onComplete: () => this.playerSprite.clearTint()
-            });
-            
-            // カメラシェイク
+
+            // 主人公ののけぞりとカメラシェイク
+            hitReact(this, this.playerSprite, { direction: -1, tint: 0xff4040 });
             this.cameras.main.shake(200, 0.01);
-          }
+          },
         });
-        
-        await new Promise(resolve => setTimeout(resolve, 600));
         break;
+      }
         
       case 'enemyAttack_poison':
         // 毒攻撃エフェクト（ステージ6用）
@@ -1239,17 +1192,9 @@ export class BattleScene extends Phaser.Scene {
               });
             }
             
-            // プレイヤーに毒エフェクト
+            // プレイヤーに毒エフェクト（紫に光ってのけぞる）
             setTimeout(() => {
-              this.playerSprite.setTint(0x9900ff);
-              this.tweens.add({
-                targets: this.playerSprite,
-                x: this.playerSprite.x - 8,
-                duration: 60,
-                yoyo: true,
-                repeat: 2,
-                onComplete: () => this.playerSprite.clearTint()
-              });
+              hitReact(this, this.playerSprite, { direction: -1, distance: 16, tint: 0x9900ff });
               this.cameras.main.shake(150, 0.008);
             }, 300);
           }
@@ -1303,9 +1248,8 @@ export class BattleScene extends Phaser.Scene {
                   onComplete: () => explosion.destroy()
                 });
                 
-                this.playerSprite.setTint(0xff6600);
+                hitReact(this, this.playerSprite, { direction: -1, distance: 26, tint: 0xff6600 });
                 this.cameras.main.shake(300, 0.015);
-                setTimeout(() => this.playerSprite.clearTint(), 400);
               }
             });
           }
@@ -1351,9 +1295,8 @@ export class BattleScene extends Phaser.Scene {
               onComplete: () => darkAura.destroy()
             });
             
-            this.playerSprite.setTint(0x4B0082);
+            hitReact(this, this.playerSprite, { direction: -1, distance: 24, tint: 0x4b0082 });
             this.cameras.main.shake(400, 0.02);
-            setTimeout(() => this.playerSprite.clearTint(), 500);
           }
         });
         
@@ -1404,10 +1347,9 @@ export class BattleScene extends Phaser.Scene {
               });
             }
             
-            this.playerSprite.setTint(0xff0000);
+            hitReact(this, this.playerSprite, { direction: -1, distance: 34, tint: 0xff0000 });
             this.cameras.main.shake(400, 0.025);
             this.cameras.main.flash(100, 255, 0, 0);
-            setTimeout(() => this.playerSprite.clearTint(), 500);
           }
         });
         
@@ -1567,6 +1509,10 @@ export class BattleScene extends Phaser.Scene {
     if (typeof window.setBattleMode === 'function') {
       window.setBattleMode(false);
     }
+
+    // 敵が倒れ、主人公がはねてから結果を出す
+    await settled(this.playerSprite, this.enemySprite);
+    await Promise.all([defeat(this, this.enemySprite, { direction: 1 }), victory(this, this.playerSprite)]);
 
     // バトル終了時刻を記録
     this.battleStats.battleEndTime = Date.now();
@@ -1795,6 +1741,10 @@ export class BattleScene extends Phaser.Scene {
       window.setBattleMode(false);
     }
 
+    // 主人公が倒れ、敵がはねる（結果の表示は待たずに重ねる）
+    defeat(this, this.playerSprite, { direction: -1 });
+    victory(this, this.enemySprite);
+
     const resultText = "敗北...";
     
     // 大きな結果テキストを画面中央に表示
@@ -1924,8 +1874,8 @@ export class BattleScene extends Phaser.Scene {
       this.cameras.main.setBackgroundColor(stageConfig.backgroundColor);
     }
     
-    // 敵のティント設定
-    if (stageConfig.enemyTint && this.enemySprite && typeof this.enemySprite.setTint === 'function') {
+    // 敵のティント設定（同じ画像を色で見分けていた旧画像だけ。専用の画像があるステージは色を塗らない）
+    if (!this.stageArt && stageConfig.enemyTint && this.enemySprite && typeof this.enemySprite.setTint === 'function') {
       this.enemySprite.setTint(stageConfig.enemyTint);
     }
     
