@@ -94,6 +94,11 @@ import {
 
 import { User, Settings, Bell, Shield } from 'lucide-react';
 
+/** sessionStorage key for the page to open after sign-in. */
+const RETURN_TO_KEY = 'rp:returnTo';
+/** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
+const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
+
 // Profile Placeholder (kept for reference or usage)
 const ProfilePlaceholder: React.FC = () => (
   <div className="p-8 max-w-2xl mx-auto">
@@ -188,6 +193,7 @@ const AppContent: React.FC = () => {
     if (path === '/library') return ViewState.LIBRARY;
     // Lesson reader (default theme; the shell switches to the rail via isLessonPath).
     if (path.startsWith('/learn/') || path.startsWith('/preview/')) return ViewState.LESSON;
+    if (path === '/dev/blocks') return ViewState.DEV_BLOCKS;
     return ViewState.DASHBOARD;
   };
 
@@ -242,14 +248,30 @@ const AppContent: React.FC = () => {
     navigate(`/generated-course/${course.id}`);
   };
 
-  const openAuth = (mode: AuthMode) => {
+  // In-app path to open after sign-in (the landing's "read chapter 1" CTA when guest access
+  // is off). sessionStorage, so it survives the OAuth redirect through /auth/callback.
+  const openAuth = (mode: AuthMode, returnTo?: string) => {
+    try {
+      if (returnTo && isInAppPath(returnTo)) sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+      else sessionStorage.removeItem(RETURN_TO_KEY);
+    } catch {
+      // Storage blocked: sign-in still works and lands on the dashboard.
+    }
     setAuthMode(mode);
     setIsLoginPageVisible(true);
   };
 
   const handleLoginSuccess = () => {
     setIsLoginPageVisible(false);
-    navigate('/', { replace: true });
+    let target = '/';
+    try {
+      const saved = sessionStorage.getItem(RETURN_TO_KEY);
+      sessionStorage.removeItem(RETURN_TO_KEY);
+      if (saved && isInAppPath(saved)) target = saved;
+    } catch {
+      // Storage blocked: default to the dashboard.
+    }
+    navigate(target, { replace: true });
   };
 
   const handleBackToLogin = () => {

@@ -117,7 +117,7 @@ Rules:
 | Utility | Stack | Use |
 |---|---|---|
 | `font-sans` (default) | `Inter`, `Noto Sans JP`, Hiragino Sans, Hiragino Kaku Gothic ProN, Yu Gothic UI, Meiryo, system-ui | All UI and body text |
-| `font-serif` | `Newsreader`, `Noto Serif JP`, Hiragino Mincho ProN, Yu Mincho | Art world and pull quotes only. Not shell headings (WP-09 removes the remaining ones). |
+| `font-serif` | `Newsreader`, `Noto Serif JP`, Hiragino Mincho ProN, Yu Mincho | Art world and pull quotes only. Not shell headings (WP-09 removed them from the dashboard and landing). |
 | `font-mono` | `JetBrains Mono`, ui-monospace, SFMono-Regular, Menlo, Consolas, `Noto Sans JP` | Code only, not decoration |
 | `font-ud` | `BIZ UDPGothic`, `Noto Sans JP`, … | Optional UD reading font for lesson bodies. **Not loaded globally** (see below). |
 
@@ -125,17 +125,26 @@ Playfair Display is gone. Existing `font-serif` usages now render Newsreader / N
 
 ### Loading
 
-`index.html` preconnects to Google Fonts and requests, with `display=swap`:
+`index.html` preconnects to Google Fonts and makes two requests, both with `display=swap`.
 
-| Family | Axes requested | Why it is in the global request |
+The first stylesheet blocks rendering, as the first screen needs it:
+
+| Family | Axes requested | Why it is in the blocking request |
 |---|---|---|
 | Inter | `wght@300..700` (variable) | UI font. 300 is kept because 21 existing `font-light` usages would otherwise change weight. |
 | Noto Sans JP | `wght@400..700` (variable) | Japanese UI and body text |
 | JetBrains Mono | `wght@400..700` (variable) | Code; existing `font-mono font-bold` labels |
-| Newsreader | `ital,opsz,wght@0,6..72,400..700;1,6..72,400..700` | `font-serif` is still used on first-paint screens (dashboard H1, landing hero, Art), including real italics in EN |
-| Noto Serif JP | `wght@400..700` (variable) | The same serif headings in JP |
 
-Google serves each family as `unicode-range` slices (124 for each Noto JP family). The browser downloads a slice only when rendered text needs it. EN screens never fetch Noto glyph files, and screens without `font-serif` never fetch Newsreader or Noto Serif JP. The fixed cost is the stylesheet itself: about 237 kB uncompressed, most of it the two Noto `@font-face` lists. When WP-09 removes `font-serif` from the shell, move Newsreader and Noto Serif JP to a lazy `<link>` on the Art routes.
+The second stylesheet does not block rendering. It is loaded with `media="print"` and switched to `all` on load, with a `<noscript>` copy:
+
+| Family | Axes requested | Why it is still loaded |
+|---|---|---|
+| Newsreader | `ital,opsz,wght@0,6..72,400..700;1,6..72,400..700` | `font-serif` on the Art routes and the Vibe prologue, including real italics in EN |
+| Noto Serif JP | `wght@400..700` (variable) | The same serif text in JP |
+
+The dashboard and landing no longer use `font-serif` (WP-09), so no first-paint screen waits for the serif stylesheet. That removes about 117 kB of render-blocking CSS. A serif screen opened first may show the fallback serif for a moment before the swap.
+
+Google serves each family as `unicode-range` slices (124 for each Noto JP family). The browser downloads a slice only when rendered text needs it. EN screens never fetch Noto glyph files, and screens without `font-serif` never fetch Newsreader or Noto Serif JP glyphs. A later step could move the serif `<link>` onto the Art routes only.
 
 **BIZ UDPGothic is not in `index.html`.** When the reader's "UD font" setting is chosen, inject its stylesheet on demand (`family=BIZ+UDPGothic:wght@400;700`) and apply `font-ud`. Until it loads, `font-ud` falls back to Noto Sans JP.
 

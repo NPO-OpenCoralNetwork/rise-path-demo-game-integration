@@ -21,6 +21,7 @@ import {
   Users,
   Trophy,
   BookOpen,
+  Blocks,
   type LucideIcon,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -217,6 +218,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
       workshop: 'Workshop Page',
       blender: 'Blender Viewport',
       reflection: 'Reflection Page',
+      blocksGallery: 'Blocks Gallery',
       aiCharacters: 'AI Characters',
       account: 'Account',
       profileOverview: 'Student Card',
@@ -248,6 +250,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
       workshop: 'ワークショップページ',
       blender: 'Blenderビューポート',
       reflection: 'リフレクションページ',
+      blocksGallery: 'ブロック見本帳',
       aiCharacters: 'AIキャラクター',
       account: 'アカウント',
       profileOverview: '学生証',
@@ -294,6 +297,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
         { key: 'demoWorkshop', view: ViewState.DEMO_WORKSHOP, label: t.workshop, icon: Sparkles },
         { key: 'demoBlender', view: ViewState.DEMO_BLENDER, label: t.blender, icon: Sparkles },
         { key: 'demoReflection', view: ViewState.DEMO_REFLECTION, label: t.reflection, icon: Sparkles },
+        { key: 'devBlocks', view: ViewState.DEV_BLOCKS, label: t.blocksGallery, icon: Blocks },
       ] satisfies NavItem[],
     }] : []),
     { key: 'settings', view: ViewState.SETTINGS, label: t.settings, icon: SettingsIcon },

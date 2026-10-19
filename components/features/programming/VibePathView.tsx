@@ -228,8 +228,12 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
               const summary = readLessonSummary(VIBE_COURSE, lessonId);
               const done = Boolean(summary && DONE_STATES.has(summary.state));
               const status = (done ? 'completed' : lessonId === resumeId ? 'current' : 'available') as ChapterStatus;
-              return { ...ch, status, href: `/learn/${VIBE_COURSE}/${lessonId}` };
+              return { ...ch, status, pct: summary?.pct ?? 0, href: `/learn/${VIBE_COURSE}/${lessonId}` };
             });
+            // Course progress: mean saved reading share over all chapters (0 before the first read).
+            const coursePct = chapters.length
+              ? Math.round(chapters.reduce((sum, ch) => sum + ch.pct, 0) / chapters.length)
+              : 0;
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-600 pb-20">
       {/* Hero Section */}
@@ -308,12 +312,12 @@ const VibePathView: React.FC<VibePathViewProps> = ({ onBack, onNavigate, languag
             <div className="flex justify-between items-end mb-2">
               <div className="text-sm font-bold text-slate-700 uppercase tracking-wider">{t.progressTitle}</div>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold text-purple-600">75%</span>
-                <span className="text-xs text-slate-400 font-medium">COMPLETED</span>
+                <span className="text-2xl font-bold text-purple-600">{coursePct}%</span>
+                <span className="text-xs text-slate-500 font-medium">{language === 'en' ? 'COMPLETED' : '完了'}</span>
               </div>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-              <div className="bg-purple-500 h-full rounded-full shadow-[0_0_10px_rgba(168,85,247,0.5)]" style={{ width: '75%' }}></div>
+              <div className="bg-purple-500 h-full rounded-full shadow-[0_0_10px_rgba(168,85,247,0.5)]" style={{ width: `${coursePct}%` }}></div>
             </div>
           </div>
           <div className="hidden md:flex gap-8 border-l border-slate-100 pl-8">

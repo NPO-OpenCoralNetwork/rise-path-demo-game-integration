@@ -59,12 +59,14 @@ type Options = {
   container: HTMLElement | null;
   /** False until the reader has restored the resume position; the position is not saved before. */
   trackPosition: boolean;
+  /** False keeps this lesson out of rp:lastLesson (dev gallery), so "continue" is not replaced. */
+  recordLastLesson?: boolean;
 };
 
 const blockElements = (article: HTMLElement | null) =>
   article ? Array.from(article.querySelectorAll<HTMLElement>('[data-rp-block]')) : [];
 
-export function useLessonProgress({ courseSlug, lesson, title, articleRef, container, trackPosition }: Options): LessonProgressApi {
+export function useLessonProgress({ courseSlug, lesson, title, articleRef, container, trackPosition, recordLastLesson = true }: Options): LessonProgressApi {
   const [progress, setProgress] = useState<LessonProgress>(() => readProgress(courseSlug, lesson.id));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [topBlockId, setTopBlockId] = useState<string | null>(null);
@@ -100,8 +102,8 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
       dirty.current = false;
       writeProgress(courseSlug, lesson.id, withSummary(progress, { pct, state }));
     }
-    setLastLesson({ courseSlug, lessonId: lesson.id, title, pct });
-  }, [courseSlug, lesson.id, progress, title, pct, state]);
+    if (recordLastLesson) setLastLesson({ courseSlug, lessonId: lesson.id, title, pct });
+  }, [courseSlug, lesson.id, progress, title, pct, state, recordLastLesson]);
 
   // --- seen: IntersectionObserver rooted on the scrolling <main> ---
   useEffect(() => {

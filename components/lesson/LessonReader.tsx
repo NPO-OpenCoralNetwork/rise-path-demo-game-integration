@@ -24,6 +24,7 @@ import {
   type GlossaryItem,
 } from './model';
 import { BlockView } from './blocks/registry';
+import { practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
 import { LessonHeader } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
@@ -63,6 +64,7 @@ const copy = {
     fromStart: 'Start from the top',
     dismiss: 'Dismiss',
     sectionLabel: (n: number, m: number) => `${n}/${m}`,
+    practiceCount: (n: number, m: number) => `${n} of ${m} questions answered`,
   },
   jp: {
     article: 'レッスン本文',
@@ -84,6 +86,7 @@ const copy = {
     fromStart: '最初から読む',
     dismiss: '閉じる',
     sectionLabel: (n: number, m: number) => `${n}/${m}`,
+    practiceCount: (n: number, m: number) => `${m}問中 ${n}問回答済み`,
   },
 } as const;
 
@@ -120,9 +123,11 @@ export type LessonReaderProps = {
   prev: LessonLinkInfo | null;
   /** Dev preview: validation report under the bar. */
   banner?: React.ReactNode;
+  /** False keeps the lesson out of the dashboard's "continue" record (dev gallery). Default true. */
+  recordLastLesson?: boolean;
 };
 
-export default function LessonReader({ course, courseSlug, lesson, backTo, entry, next, prev, banner }: LessonReaderProps) {
+export default function LessonReader({ course, courseSlug, lesson, backTo, entry, next, prev, banner, recordLastLesson = true }: LessonReaderProps) {
   const { language } = useLanguage();
   const text = copy[language];
   const locale: ContentLocale = language;
@@ -158,7 +163,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const outlineReturnRef = useRef<HTMLElement | null>(null);
 
   const { container, scrollToElement, scrollToTop } = useScrollContainer(rootRef);
-  const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition });
+  const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition, recordLastLesson });
   const initialProgress = useRef(progress.progress);
 
   const sections = useMemo(() => sectionByBlock(lesson), [lesson]);
@@ -173,6 +178,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     () => sectionStatuses(lesson, progress.progress, progress.activeSectionId),
     [lesson, progress.progress, progress.activeSectionId],
   );
+  // Same "練習 x/y" count as the desktop LessonBar, for the mobile bottom bar.
+  const practice = useMemo(() => practiceProgress(lesson, progress.progress), [lesson, progress.progress]);
 
   const activeSection = lesson.sections.find((s) => s.id === progress.activeSectionId) ?? lesson.sections[0];
   const activeBlock = useMemo<Block | undefined>(() => {
@@ -537,7 +544,16 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           </button>
           <button type="button" className="rp-bottom-btn" disabled aria-describedby="rp-bottom-soon">
             <CircleDot size={20} aria-hidden="true" />
-            <span>{text.practice}</span>
+            <span>
+              {text.practice}
+              {practice.total > 0 && (
+                <>
+                  {' '}
+                  <span className="tabular" aria-hidden="true">{practice.answered}/{practice.total}</span>
+                  <span className="sr-only">{text.practiceCount(practice.answered, practice.total)}</span>
+                </>
+              )}
+            </span>
           </button>
           <span id="rp-bottom-soon" className="sr-only">{text.soon}</span>
           {next ? (

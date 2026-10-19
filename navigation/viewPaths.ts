@@ -115,6 +115,7 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.DEMO_WORKSHOP]: '/demo/workshop',
   [ViewState.DEMO_BLENDER]: '/demo/blender',
   [ViewState.DEMO_REFLECTION]: '/demo/reflection',
+  [ViewState.DEV_BLOCKS]: '/dev/blocks',
 };
 
 /** Sidebar entries that can be highlighted. */
@@ -137,7 +138,8 @@ export type NavKey =
   | 'demoDialogue'
   | 'demoWorkshop'
   | 'demoBlender'
-  | 'demoReflection';
+  | 'demoReflection'
+  | 'devBlocks';
 
 const startsWithSegment = (pathname: string, prefix: string) =>
   pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -191,6 +193,7 @@ export function pathToNavKey(pathname: string): NavKey | null {
     || startsWithSegment(path, '/notifications')
     || startsWithSegment(path, '/subscription')
   ) return 'settings';
+  if (startsWithSegment(path, '/dev/blocks')) return 'devBlocks';
   if (startsWithSegment(path, '/demo')) {
     return DEMO_KEYS[path.split('/')[2] ?? ''] ?? null;
   }

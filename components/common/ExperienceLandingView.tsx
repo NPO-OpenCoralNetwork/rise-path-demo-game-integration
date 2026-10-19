@@ -12,7 +12,8 @@ import { AUTHORING_GUIDE_URL } from '../ui/links';
 export type AuthEntryMode = 'login' | 'signup';
 
 interface LandingViewProps {
-  onAuthClick: (mode: AuthEntryMode) => void;
+  /** Opens sign-in/sign-up; `returnTo` is the in-app path to open after signing in. */
+  onAuthClick: (mode: AuthEntryMode, returnTo?: string) => void;
 }
 
 /** Where the guest CTA lands: the first real chapter in the lesson reader. */
@@ -132,7 +133,7 @@ const ExperienceLandingView: React.FC<LandingViewProps> = ({ onAuthClick }) => {
 
   const startReading = () => {
     if (!guestAllowed) {
-      onAuthClick('login');
+      onAuthClick('login', FIRST_CHAPTER);
       return;
     }
     try {
@@ -141,7 +142,7 @@ const ExperienceLandingView: React.FC<LandingViewProps> = ({ onAuthClick }) => {
     } catch (error) {
       // Guest access can be switched off (Supabase auth, strict mode): fall back to sign-in.
       console.warn('Guest login unavailable, opening sign-in:', error);
-      onAuthClick('login');
+      onAuthClick('login', FIRST_CHAPTER);
     }
   };
 

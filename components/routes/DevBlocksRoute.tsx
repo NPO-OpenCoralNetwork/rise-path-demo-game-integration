@@ -6,7 +6,7 @@ import { validateLessonDev, type DevLessonReport } from '../../content';
 import type { Block, Course, Lesson, Section } from '../../shared/lesson/schema.js';
 import { BLOCK_TYPES, WORLDS } from '../../shared/lesson/constants.js';
 import LessonReader from '../lesson/LessonReader';
-import { LAST_LESSON_KEY, clearProgress } from '../lesson/progressStore';
+import { clearProgress } from '../lesson/progressStore';
 
 /**
  * /dev/blocks (dev builds with features.devSamples only): every lesson block rendered by the
@@ -19,6 +19,8 @@ import { LAST_LESSON_KEY, clearProgress } from '../lesson/progressStore';
  * mermaid source for the sanitizer and an unknown block type.
  *
  * The world accent is picked with ?world=<name>; ?checks=0 hides the render checks.
+ * The reader runs with recordLastLesson={false}, so the dashboard's "continue" card keeps the
+ * learner's real last lesson.
  */
 
 const COURSE_SLUG = 'dev-blocks';
@@ -124,31 +126,6 @@ function renderChecksSection(): Section {
     { id: 'dev-unknown', type: 'sandbox', md: 'An unsupported block type.' },
   ] as unknown as Block[];
   return { id: 'dev-checks', title: { jp: copy.jp.checksTitle, en: copy.en.checksTitle }, role: 'example', blocks };
-}
-
-/** The reader records the lesson as "last read" for the dashboard; undo that for the gallery. */
-function useRestoreLastLesson() {
-  useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = window.localStorage.getItem(LAST_LESSON_KEY);
-    } catch {
-      return undefined;
-    }
-    const restore = () => {
-      try {
-        if (saved === null) window.localStorage.removeItem(LAST_LESSON_KEY);
-        else window.localStorage.setItem(LAST_LESSON_KEY, saved);
-      } catch {
-        // Storage blocked: nothing to undo.
-      }
-    };
-    window.addEventListener('pagehide', restore);
-    return () => {
-      window.removeEventListener('pagehide', restore);
-      restore();
-    };
-  }, []);
 }
 
 function DevBanner({
@@ -260,8 +237,6 @@ export default function DevBlocksRoute() {
   const world: Course['world'] = (WORLDS as readonly string[]).includes(worldParam ?? '') ? (worldParam as Course['world']) : 'vibe';
   const checks = params.get('checks') !== '0';
 
-  useRestoreLastLesson();
-
   useEffect(() => {
     let cancelled = false;
     import('../../content/examples/blocks-gallery.lesson.json')
@@ -341,6 +316,7 @@ export default function DevBlocksRoute() {
       backTo="/learning-hub"
       next={null}
       prev={null}
+      recordLastLesson={false}
       banner={(
         <DevBanner
           lesson={gallery}
