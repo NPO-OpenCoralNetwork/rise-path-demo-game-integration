@@ -35,6 +35,18 @@ export const MODEL_IDS = Object.freeze({
   }),
 });
 
+/**
+ * Image models on OpenRouter's Images API (POST /api/v1/images), by the aliases that
+ * scripts/assets/try-image-models.mjs and its plans use. Parameters and prices per model:
+ * GET https://openrouter.ai/api/v1/images/models/<id>/endpoints.
+ */
+export const OPENROUTER_IMAGE_MODEL_IDS = Object.freeze({
+  gptImageSunburst: 'openai/gpt-image-2.5-sunburst', // precision tier; transparent backgrounds
+  gptImageFlare: 'openai/gpt-image-2.5-flare', // speed tier; transparent backgrounds
+  seedreamPro: 'bytedance-seed/seedream-5-0-pro',
+  seedreamLite: 'bytedance-seed/seedream-5-0-lite',
+});
+
 /** Which concrete model each provider uses for a tier, so LLM_PROVIDER=gemini stays sensible. */
 const TIER_MODELS = Object.freeze({
   anthropic: { authoring: MODEL_IDS.anthropic.opus, general: MODEL_IDS.anthropic.sonnet, cheap: MODEL_IDS.anthropic.haiku },
