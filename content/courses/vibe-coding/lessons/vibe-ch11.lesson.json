@@ -101,8 +101,8 @@
                 "en": "Integration"
               },
               {
-                "jp": "今のワークフロー（VSCode/Git）に馴染むか？それとも独自のプラットフォームを強制してくるか？",
-                "en": "Does it fit into my current workflow (VSCode/Git)? Or does it force me to use a new platform?"
+                "jp": "今のワークフロー（VS Code/Git）に馴染むか？それとも独自のプラットフォームを強制してくるか？",
+                "en": "Does it fit into my current workflow (VS Code/Git)? Or does it force me to use a new platform?"
               }
             ],
             [
@@ -197,7 +197,7 @@
     }
   ],
   "provenance": {
-    "author": "migration",
+    "author": "migration+claude-code",
     "migratedFrom": {
       "source": "data/curricula/vibe_coding/chapter11.ts",
       "export": "VIBE_CHAPTER_11_DATA",

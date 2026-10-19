@@ -3,11 +3,11 @@
   "id": "vibe-ch3",
   "courseId": "vibe-coding",
   "title": {
-    "jp": "第3章｜開発環境コックピット（VSCode）",
+    "jp": "第3章｜開発環境コックピット（VS Code）",
     "en": "Chapter 3 | The Development Cockpit"
   },
   "subtitle": {
-    "jp": "最強の武器「VSCode」を導入し、AI開発に最適化されたコックピットを構築する。",
+    "jp": "最強の武器「VS Code」を導入し、AI開発に最適化されたコックピットを構築する。",
     "en": "Setting up Visual Studio Code, the ultimate weapon for modern developers."
   },
   "locale": "jp",
@@ -39,8 +39,8 @@
           "id": "s1-b2",
           "type": "markdown",
           "md": {
-            "jp": "**Visual Studio Code (VSCode)** は、現代の業界標準エディタです。軽量で無料、そして無限の拡張機能エコシステムを持っています。",
-            "en": "**Visual Studio Code (VSCode)** is the industry standard. It is lightweight, free, and has an endless ecosystem of extensions."
+            "jp": "**Visual Studio Code（VS Code）** は、現代の業界標準エディタです。軽量で無料、そして無限の拡張機能エコシステムを持っています。",
+            "en": "**Visual Studio Code (VS Code)** is the industry standard. It is lightweight, free, and has an endless ecosystem of extensions."
           }
         },
         {
@@ -134,8 +134,8 @@
           "id": "s3-b1",
           "type": "markdown",
           "md": {
-            "jp": "初期状態のVSCodeは「素体」です。拡張機能という「装備」を整えましょう。",
-            "en": "VSCode is just a skeleton. You need to equip it with armor (Extensions)."
+            "jp": "初期状態のVS Codeは「素体」です。拡張機能という「装備」を整えましょう。",
+            "en": "VS Code is just a skeleton. You need to equip it with armor (Extensions)."
           }
         },
         {
@@ -208,8 +208,8 @@
           "id": "s4-b1",
           "type": "markdown",
           "md": {
-            "jp": "もしAI開発にフルコミットするなら、**Cursor** という選択肢もあります。VSCodeをベースに作られており、`Cmd + K` でエディタ内に直接AIコードを生成できる機能などが標準搭載されています。",
-            "en": "If you want to go all-in on AI, try **Cursor**. It is a fork of VSCode with built-in AI capabilities like \"Command K\" to generate code inline."
+            "jp": "もしAI開発にフルコミットするなら、**Cursor** という選択肢もあります。VS Codeをベースに作られており、`Cmd + K` でエディタ内に直接AIコードを生成できる機能などが標準搭載されています。",
+            "en": "If you want to go all-in on AI, try **Cursor**. It is a fork of VS Code with built-in AI capabilities like \"Command K\" to generate code inline."
           }
         },
         {
@@ -221,15 +221,15 @@
             "en": "Migration is Easy"
           },
           "md": {
-            "jp": "CursorはVSCodeがベースなので、VSCodeで使っていた拡張機能や設定をワンクリックで引き継ぐことができます。",
-            "en": "Since Cursor is built on VSCode, you can import all your VSCode extensions and settings with one click."
+            "jp": "CursorはVS Codeがベースなので、VS Codeで使っていた拡張機能や設定をワンクリックで引き継ぐことができます。",
+            "en": "Since Cursor is built on VS Code, you can import all your VS Code extensions and settings with one click."
           }
         }
       ]
     }
   ],
   "provenance": {
-    "author": "migration",
+    "author": "migration+claude-code",
     "migratedFrom": {
       "source": "data/curricula/vibe_coding/chapter3.ts",
       "export": "VIBE_CHAPTER_3_DATA",

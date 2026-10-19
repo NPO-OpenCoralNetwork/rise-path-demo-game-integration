@@ -251,8 +251,8 @@
               "en": "**Download**: Use the \"Download\" or \"Export\" button in AI Studio to save your project as a folder."
             },
             {
-              "jp": "**VSCodeで開く**: 保存したフォルダをVSCodeで開き、ローカルでの開発・微調整を開始します。",
-              "en": "**Open in VSCode**: Open the downloaded folder in VSCode to start the development environment."
+              "jp": "**VS Codeで開く**: 保存したフォルダをVS Codeで開き、ローカルでの開発・微調整を開始します。",
+              "en": "**Open in VS Code**: Open the downloaded folder in VS Code to start the development environment."
             },
             {
               "jp": "**GitHubへPush**: `git init` でリポジトリを作成し、GitHubにリモート登録して `push` します。これで「セーブポイント」がクラウドに保存されます。",
@@ -286,8 +286,8 @@
             "en": "The Professional Loop"
           },
           "md": {
-            "jp": "AI Studio（試作）→ ダウンロード → VSCode（調整）→ GitHub（保存・共有）→ Clone（展開）。これが現代のクリエイターの標準的なパイプラインです。",
-            "en": "AI Studio (Prototype) -> Download -> VSCode (Refine) -> GitHub (Save/Share) -> Clone (Scale). This is the standard pipeline for modern creators."
+            "jp": "AI Studio（試作）→ ダウンロード → VS Code（調整）→ GitHub（保存・共有）→ Clone（展開）。これが現代のクリエイターの標準的なパイプラインです。",
+            "en": "AI Studio (Prototype) -> Download -> VS Code (Refine) -> GitHub (Save/Share) -> Clone (Scale). This is the standard pipeline for modern creators."
           }
         },
         {
@@ -302,7 +302,7 @@
     }
   ],
   "provenance": {
-    "author": "migration",
+    "author": "migration+claude-code",
     "migratedFrom": {
       "source": "data/curricula/vibe_coding/chapter4.ts",
       "export": "VIBE_CHAPTER_4_DATA",
