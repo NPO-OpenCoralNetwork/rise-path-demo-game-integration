@@ -210,8 +210,12 @@ export const FloatingChatbot: React.FC = () => {
         }
     }, [isOpen]);
 
-    // openTutor() and the legacy glossary event both land here.
+    // openTutor() and the legacy glossary event both land here. On lesson routes the reader's
+    // inline TutorPanel answers lesson questions (detail.lesson), so this panel ignores them.
+    const pathnameRef = useRef(location.pathname);
+    pathnameRef.current = location.pathname;
     useEffect(() => onTutorRequest((request) => {
+        if (request.tutor.lesson && isLessonPath(pathnameRef.current)) return;
         openPanel();
         void handleSend(request.message, { tutor: request.tutor, legacyContext: request.legacyContext });
     }), [handleSend, openPanel]);

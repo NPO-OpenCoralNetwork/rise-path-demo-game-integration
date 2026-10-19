@@ -4,7 +4,8 @@ import { ChevronLeft, ChevronRight, CircleDot, ListTree, Sparkles } from 'lucide
 import type { Block, Course, LText, Lesson, Section } from '../../shared/lesson/schema.js';
 import { toBcp47 } from '../../shared/lesson/text.js';
 import { useLanguage } from '../../context/LanguageContext';
-import { openTutor, TUTOR_EXCERPT_MAX } from '../../services/tutorBridge';
+import { onTutorRequest, openTutor, TUTOR_EXCERPT_MAX } from '../../services/tutorBridge';
+import { streamTutor, toLlmLocale } from '../../services/llmApi';
 import type { LessonEntry } from '../../content';
 import { ReaderContext, type AskTutorArgs, type ReaderContextValue } from './ReaderContext';
 import { useLessonProgress } from './useLessonProgress';
@@ -31,6 +32,8 @@ import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
 import { Outline } from './Outline';
 import { MarginPanel, type MarginAnchor } from './MarginPanel';
 import { ReaderSheet } from './ReaderSheet';
+import { TutorPanel, type TutorLayout } from './TutorPanel';
+import { useTutorStream } from './useTutorStream';
 import ReaderSettings, { useReaderSettings } from './ReaderSettings';
 import './reader.css';
 
@@ -41,6 +44,11 @@ import './reader.css';
  * 1280px the outline and the margin open as drawers; below 768px as bottom sheets, with a
  * bottom bar for prev / contents / tutor / next. The reader scopes its own theme
  * (data-theme light | sepia | dark) and world accent (data-world) to its root.
+ *
+ * AI tutor (WP-11): openTutor() requests that carry `lesson` stream into TutorPanel, a card at
+ * the top of the margin at ≥1280px, a right drawer at 1024–1279px and a bottom sheet below
+ * (also a drawer in focus mode, which hides the margin). The margin's glossary card stays in
+ * MarginPanel; its old tutor card is hidden.
  */
 
 const copy = {
@@ -51,7 +59,8 @@ const copy = {
     side: 'AI tutor and terms',
     close: 'Close',
     closeOutline: 'Close the contents',
-    closeSide: 'Close the side panel',
+    closeSide: 'Close the terms',
+    terms: 'Terms',
     prev: 'Previous',
     next: 'Next',
     prevLesson: 'Previous lesson',
@@ -73,7 +82,8 @@ const copy = {
     side: 'AI先生と用語',
     close: '閉じる',
     closeOutline: '目次を閉じる',
-    closeSide: '補助パネルを閉じる',
+    closeSide: '用語を閉じる',
+    terms: '用語',
     prev: '前へ',
     next: '次へ',
     prevLesson: '前のレッスン',
@@ -105,6 +115,12 @@ function useMediaQuery(query: string): boolean {
   }, [query]);
   return matches;
 }
+
+/**
+ * MarginPanel still renders the WP-04 tutor card (it handed questions to the chat panel);
+ * TutorPanel replaces it, so it is hidden here and the glossary card stays.
+ */
+const HIDE_OLD_TUTOR_CARD = 'contents [&_.rp-tutor-card]:hidden';
 
 const isTyping = (target: EventTarget | null) => {
   const el = target as HTMLElement | null;
@@ -145,15 +161,21 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const tutorButtonRef = useRef<HTMLButtonElement>(null);
   const bottomOutlineRef = useRef<HTMLButtonElement>(null);
   const bottomTutorRef = useRef<HTMLButtonElement>(null);
-  const marginInputRef = useRef<HTMLInputElement>(null);
+  const tutorInputRef = useRef<HTMLInputElement>(null);
+  const tutorPanelRef = useRef<HTMLElement>(null);
+  const tutorReturnRef = useRef<HTMLElement | null>(null);
 
   const wide = useMediaQuery('(min-width: 1280px)');
+  const desktop = useMediaQuery('(min-width: 1024px)');
   const tablet = useMediaQuery('(min-width: 768px)');
 
   const [settings, updateSettings] = useReaderSettings();
+  // Focus mode hides the margin column; the tutor and glossary then open as drawers.
+  const marginShown = wide && !settings.focus;
   const [trackPosition, setTrackPosition] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [asked, setAsked] = useState<MarginAnchor>(null);
   const [armedBlockId, setArmedBlockId] = useState<string | null>(null);
@@ -323,22 +345,83 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     const item = findGlossaryItem(glossary, term);
     if (!item) return;
     setSelectedTermKey(item.key);
-    if (!wide) {
+    if (!marginShown) {
       sideReturnRef.current = document.activeElement as HTMLElement | null;
+      setTutorOpen(false);
       setSideOpen(true);
     }
-  }, [glossary, wide]);
+  }, [glossary, marginShown]);
 
   const onSelectGlossary = useCallback((item: GlossaryItem) => setSelectedTermKey(item.key), []);
 
-  const openSide = useCallback((returnTo: HTMLElement | null) => {
-    if (wide) {
-      marginInputRef.current?.focus();
+  // The inline tutor (WP-11). Lesson requests from openTutor() land here; the floating chat
+  // ignores them on lesson routes.
+  const tutor = useTutorStream({ locale: toLlmLocale(language), stream: streamTutor });
+  const { ask: tutorAsk, dismiss: tutorDismiss } = tutor;
+  const tutorLayout: TutorLayout = marginShown ? 'margin' : desktop ? 'drawer' : 'sheet';
+  const tutorLayoutRef = useRef(tutorLayout);
+  tutorLayoutRef.current = tutorLayout;
+
+  useEffect(() => onTutorRequest((request) => {
+    if (!request.tutor.lesson) return; // legacy glossary questions stay with the chat panel
+    const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null;
+    const inPanel = active?.closest('[data-rp-tutor], #rp-tutor-sheet');
+    if (!inPanel) {
+      const blockId = request.tutor.anchor?.blockId;
+      const block = blockId ? document.getElementById(`b-${blockId}`) : null;
+      const opener = active?.closest('.rp-sheet-root')
+        ? sideReturnRef.current // e.g. "Ask the tutor" in the glossary sheet
+        : active;
+      tutorReturnRef.current = opener ?? block?.querySelector<HTMLElement>('.rp-ask-btn, button') ?? null;
+    } else if (tutorLayoutRef.current === 'margin') {
+      tutorReturnRef.current = tutorInputRef.current;
+    }
+    tutorAsk(request);
+    if (tutorLayoutRef.current === 'margin') {
+      window.requestAnimationFrame(() => {
+        const panel = tutorPanelRef.current;
+        panel?.closest('.rp-col-sticky')?.scrollTo({ top: 0 });
+        if (!inPanel) panel?.focus({ preventScroll: true });
+      });
+    } else {
+      setSideOpen(false);
+      setTutorOpen(true);
+    }
+  }), [tutorAsk]);
+
+  const dismissTutor = useCallback((returnFocus: boolean) => {
+    tutorDismiss();
+    setAsked(null);
+    if (returnFocus) {
+      const target = tutorReturnRef.current;
+      if (target && document.contains(target)) target.focus({ preventScroll: true });
+    } else {
+      window.requestAnimationFrame(() => tutorInputRef.current?.focus());
+    }
+  }, [tutorDismiss]);
+
+  const showTutorSource = useCallback((blockId: string) => {
+    if (tutorOpen) {
+      setTutorOpen(false);
+      // Let the sheet close (and return focus) before moving to the block.
+      window.requestAnimationFrame(() => scrollToBlock(blockId));
+    } else {
+      scrollToBlock(blockId);
+    }
+  }, [tutorOpen, scrollToBlock]);
+
+  const openTutorPanel = useCallback((returnTo: HTMLElement | null) => {
+    if (marginShown) {
+      tutorPanelRef.current?.closest('.rp-col-sticky')?.scrollTo({ top: 0 });
+      tutorInputRef.current?.focus();
       return;
     }
-    sideReturnRef.current = returnTo;
-    setSideOpen(true);
-  }, [wide]);
+    tutorReturnRef.current = returnTo;
+    setSideOpen(false);
+    setTutorOpen(true);
+  }, [marginShown]);
 
   const openOutline = useCallback((returnTo: HTMLElement | null) => {
     outlineReturnRef.current = returnTo;
@@ -347,23 +430,27 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
 
   // Close drawers that no longer apply after a resize.
   useEffect(() => {
-    if (wide) {
-      setOutlineOpen(false);
-      setSideOpen(false);
-    }
+    if (wide) setOutlineOpen(false);
   }, [wide]);
+
+  useEffect(() => {
+    if (marginShown) {
+      setSideOpen(false);
+      setTutorOpen(false);
+    }
+  }, [marginShown]);
 
   // F toggles focus mode (not while typing or with a dialog open).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'f' && event.key !== 'F') return;
       if (event.altKey || event.ctrlKey || event.metaKey || isTyping(event.target)) return;
-      if (outlineOpen || sideOpen || settingsOpen) return;
+      if (outlineOpen || sideOpen || tutorOpen || settingsOpen) return;
       updateSettings({ focus: !settings.focus });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [outlineOpen, sideOpen, settingsOpen, settings.focus, updateSettings]);
+  }, [outlineOpen, sideOpen, tutorOpen, settingsOpen, settings.focus, updateSettings]);
 
   // --- Context -----------------------------------------------------------------------------
 
@@ -416,6 +503,19 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     onSelectTerm: onSelectGlossary,
   };
   const variantSide = tablet ? 'drawer-end' : 'sheet';
+  const tutorProps = {
+    tutor,
+    layout: tutorLayout,
+    open: tutorOpen,
+    onClose: () => setTutorOpen(false),
+    onDismiss: dismissTutor,
+    returnFocusRef: tutorReturnRef,
+    scope,
+    current: { block: activeBlock, section: activeSection },
+    onShowSource: showTutorSource,
+    inputRef: tutorInputRef,
+    panelRef: tutorPanelRef,
+  };
 
   return (
     <ReaderContext.Provider value={contextValue}>
@@ -443,9 +543,9 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           onOpenSettings={() => setSettingsOpen((open) => !open)}
           settingsButtonRef={settingsButtonRef}
           settingsOpen={settingsOpen}
-          onAskTutor={() => openSide(tutorButtonRef.current)}
+          onAskTutor={() => openTutorPanel(tutorButtonRef.current)}
           tutorButtonRef={tutorButtonRef}
-          tutorExpanded={sideOpen}
+          tutorExpanded={tutorOpen}
           notice={resumed ? (
             <div className="rp-notice" role="status">
               <span>{text.resumed}</span>
@@ -503,7 +603,12 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
 
           <aside className="rp-col-margin" aria-label={text.side}>
             <div className="rp-col-sticky">
-              <MarginPanel {...marginProps} inputRef={marginInputRef} />
+              <div className="rp-margin-stack">
+                {tutorLayout === 'margin' && <TutorPanel {...tutorProps} />}
+                <div className={HIDE_OLD_TUTOR_CARD}>
+                  <MarginPanel {...marginProps} />
+                </div>
+              </div>
             </div>
           </aside>
         </div>
@@ -536,8 +641,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
             type="button"
             className="rp-bottom-btn rp-bottom-ai"
             aria-haspopup="dialog"
-            aria-expanded={sideOpen}
-            onClick={() => openSide(bottomTutorRef.current)}
+            aria-expanded={tutorOpen}
+            onClick={() => openTutorPanel(bottomTutorRef.current)}
           >
             <Sparkles size={20} aria-hidden="true" />
             <span>{text.tutor}</span>
@@ -588,13 +693,17 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
         open={sideOpen}
         onClose={() => setSideOpen(false)}
         variant={variantSide}
-        title={text.side}
+        title={text.terms}
         closeLabel={text.closeSide}
         scope={scope}
         returnFocusRef={sideReturnRef}
       >
-        <MarginPanel {...marginProps} onDone={() => setSideOpen(false)} />
+        <div className={HIDE_OLD_TUTOR_CARD}>
+          <MarginPanel {...marginProps} onDone={() => setSideOpen(false)} />
+        </div>
       </ReaderSheet>
+
+      {tutorLayout !== 'margin' && <TutorPanel {...tutorProps} />}
 
       <ReaderSettings
         open={settingsOpen}
