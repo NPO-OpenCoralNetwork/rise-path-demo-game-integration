@@ -42,20 +42,17 @@
  * 2 invalid input.
  */
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson } from '../../../../shared/lesson/canonical.js';
+import { HASH_IGNORED_FIELDS as IGNORED_FIELDS, lessonHash } from '../../../../shared/lesson/hash.js';
 import { forEachBlock } from '../../../../shared/lesson/walk.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 /** Above this share of changed blocks a re-review must be a full review. */
 export const FULL_REVIEW_SHARE = 0.3;
-
-/** Lesson fields that are not learner-facing content. */
-const IGNORED_FIELDS = new Set(['provenance']);
 
 /** The form of a lesson hash (`lessonHash` of a review, the revision of a snapshot). */
 export const LESSON_HASH = /^sha256:[0-9a-f]{16}$/;
@@ -81,19 +78,8 @@ const USAGE = [
 /** @param {unknown} a @param {unknown} b */
 const same = (a, b) => canonicalJson(a) === canonicalJson(b);
 
-/**
- * The lesson hash a review records as `lessonHash`: sha256 of the canonical JSON of the lesson
- * without `provenance`, as `sha256:<16 hex>`.
- *
- * @param {unknown} lesson
- * @returns {string}
- */
-export function lessonHash(lesson) {
-  const content = lesson && typeof lesson === 'object' && !Array.isArray(lesson)
-    ? Object.fromEntries(Object.entries(lesson).filter(([key]) => !IGNORED_FIELDS.has(key)))
-    : lesson;
-  return `sha256:${crypto.createHash('sha256').update(canonicalJson(content) ?? 'null').digest('hex').slice(0, 16)}`;
-}
+/** The lesson hash a review records as `lessonHash` (shared with lessons:preview). */
+export { lessonHash };
 
 /**
  * Runs git in the repository.

@@ -20,11 +20,13 @@ import { BLOCK_TYPES } from '../../shared/lesson/constants.js';
 import { GUIDE, lintRulesFor, referenceFiles } from '../../.claude/skills/author-lesson/scripts/build-references.mjs';
 import { checkSchema, evaluateReviews as evaluateReviewsWith, loadSchemas } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
 import { lessonHash } from '../../.claude/skills/review-lesson/scripts/review-scope.mjs';
+import { lessonHash as sharedLessonHash } from '../../shared/lesson/hash.js';
 import { buildCatalog, formatCatalog, parseArgs as parseCatalogArgs } from '../../scripts/lessons/catalog.mjs';
 import {
   parseArgs as parsePreviewArgs,
   resolveChromium,
   findLessonFile,
+  lessonHashOfFile,
   isApiUrl,
   summarize,
   lessonLocales,
@@ -569,6 +571,25 @@ describe('lessons:preview helpers', () => {
       fs.writeFileSync(path.join(base, 'drafts', 'l.lesson.json'), '{}');
       assert.equal(findLessonFile('c', 'l', dir).source, 'draft');
       assert.equal(findLessonFile('c', 'missing', dir), null);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records the same lessonHash as review-scope --hash for the lesson it shows', () => {
+    const rel = 'content/courses/vibe-coding/lessons/vibe-ch2.lesson.json';
+    const lesson = readJson(rel);
+    const hash = lessonHashOfFile(path.join(ROOT, rel));
+    assert.match(hash, /^sha256:[0-9a-f]{16}$/);
+    assert.equal(hash, lessonHash(lesson));
+    assert.equal(hash, sharedLessonHash(lesson));
+    // provenance is not content: stamping a reviewer does not invalidate reviews or screenshots.
+    assert.equal(sharedLessonHash({ ...lesson, provenance: { ...lesson.provenance, reviewedBy: 'owner' } }), hash);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-preview-hash-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'broken.lesson.json'), '{ nope');
+      assert.equal(lessonHashOfFile(path.join(dir, 'broken.lesson.json')), null);
+      assert.equal(lessonHashOfFile(path.join(dir, 'missing.lesson.json')), null);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

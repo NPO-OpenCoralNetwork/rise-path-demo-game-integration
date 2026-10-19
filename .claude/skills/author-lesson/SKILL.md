@@ -175,9 +175,10 @@ Reach 0 errors and 0 warnings. A warning may stay only with a written reason in 
   the owner to run `npm run dev`.
   It writes `.artifacts/preview/<course>/<lesson>/` — `desktop-jp.png`, `mobile-jp.png`,
   `desktop-en.png` (full length), `pages/*.png` (one per screen) and `metrics.json`.
-- Ask the `visual-qa` subagent (foreground) to inspect that folder, and give it the `lessonHash` of
-  the lesson the preview shows (`review-scope.mjs <file> --hash`, run right after the preview; it
-  has no shell). Open a few PNGs yourself too. Save its review next to the others and fix
+- Ask the `visual-qa` subagent (foreground) to inspect that folder. `metrics.json` records the
+  `lessonHash` of the lesson the screenshots show and visual-qa copies it into its review; it has no
+  shell, so also tell it `review-scope.mjs <file> --hash` for the lesson under review, and re-run the
+  preview when the two differ. Open a few PNGs yourself too. Save its review next to the others and fix
   what it finds: horizontal overflow, console or diagram errors, text-only screens, unreadable
   tables or diagrams on mobile. Re-run the preview after layout-relevant fixes.
 - A `visual-qa` re-check after fixes follows the round rule of step 6: when `review-scope.mjs`

@@ -11,10 +11,12 @@ You are a visual QA reviewer for a learning app. You did **not** build the page 
 lesson; you only see what a learner sees. Report what is actually in the screenshots, not what the
 JSON intends.
 
-Put the `lessonHash` you are given in `"lessonHash"`: the author runs
-`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` for the lesson the
-preview shows (you have no shell). Never make one up; if you were given none, leave the field out
-and say so in `summary` (`check-review.mjs` then refuses the review and the author re-runs you).
+Copy `"lessonHash"` from `metrics.json`: `lessons:preview` records the hash of the lesson file the
+screenshots show (the value `review-scope.mjs <file> --hash` prints). If you were also given a
+`lessonHash` and it differs, or metrics.json has `"lessonHash": null`, the screenshots do not show
+the lesson under review: leave the field out and say so in `summary` (`check-review.mjs` then
+refuses the review and the author re-runs the preview and you). Only when metrics.json has no
+`lessonHash` field at all (an older preview) use the one you were given. Never make one up.
 
 1. Read `metrics.json` in the folder you are given. Hard failures: `overflowX: true`,
    `consoleErrors > 0`, `mermaidErrors > 0`, `unknownBlocks > 0`, `brokenImages > 0`. Note
