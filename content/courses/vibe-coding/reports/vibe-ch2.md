@@ -1,6 +1,8 @@
 # Report: vibe-coding/vibe-ch2 (draft)
 
-**Status: DRAFT, not published. Final gate (2026-10-19): REVISE, `check-review.mjs` exits 1.** The draft is
+**Status: DRAFT, not published. Verification round (2026-10-19): REVISE, `check-review.mjs` exits 1 on one new
+must-fix (q8 option c feedback), which was applied after the gate. See "Verification round (2026-10-19)" at the end of
+this report; it supersedes the final-gate status below.** The draft is
 `content/courses/vibe-coding/drafts/vibe-ch2.lesson.json`. `lessons/`, `course.json` and `provenance.reviewedBy` are
 untouched. Publishing (author-lesson step 10) is the owner's call.
 
@@ -876,3 +878,172 @@ s1-b4 question, the origin of the name MoSCoW, the の chain in s5-b2, and the s
 
 Next: re-review the current draft (at least pedagogy-reviewer for q8 and ja-editor for q4 and card-goal), save the
 JSON over the old files, and re-run `check-review.mjs`. Publish together with vibe-ch2-practice only when both exit 0.
+
+## Verification round (2026-10-19)
+
+The first round under the owner's fix-verification mode (decision of 2026-10-19). Round 1 of the publish gate was a
+full review; this round only checks the previous must-fix items and looks for errors the fixes introduced. The bar is
+the same: `check-review.mjs` must exit 0, with every criterion ≥ 3 and a mean ≥ 3.3.
+
+### Scope
+
+`node .claude/skills/review-lesson/scripts/review-scope.mjs content/courses/vibe-coding/drafts/vibe-ch2.lesson.json --since 784d2d9`
+→ exit 0, so a verification round is allowed. The draft at `784d2d9` is identical to `5d2a414`, which the saved
+final-gate reviews read. The draft the reviewers read is the one committed in `dcb3095`.
+
+```text
+Changes in content/courses/vibe-coding/drafts/vibe-ch2.lesson.json since 784d2d9
+  3 of 30 blocks changed (10%; above 30% a full review is required) · sections and objectives unchanged
+  → VERIFY: a fix-verification round is allowed. Every change below is reviewed in full.
+  modified  2-3 / s3-check           questions.q4
+  modified  check / check-quiz       questions.q8
+  modified  summary / summary-cards  cards.card-goal
+
+verifies (copy into each verification review and add "previousReview"):
+  {"reviewedRevision":"784d2d9","changed":["s3-check","check-quiz","summary-cards"],"changedShare":0.1,"fullReviewRequired":false}
+```
+
+The reviewers got only these facts (lesson, previous review, revision, `verifies` line), not a view of what was fixed.
+visual-qa has no shell. It inferred the changed blocks from the report, and its list matches `review-scope.mjs`.
+
+### Gate
+
+The three verification reviews are saved over the old JSON in `reports/vibe-ch2.<reviewer>.review.json`. The
+previous reviews stay in git at `dcb3095`.
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`
+→ **exit 1 (REVISE)**. Each review's `verifies.previousReview` names the file it overwrote, so this run could
+not cross-check the previous round:
+
+```text
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  ja-editor: verification of 784d2d9 (previous review not loaded) · 2 resolved, 0 unresolved · 3 changed · carried over: none
+  pedagogy-reviewer: verification of 784d2d9 (previous review not loaded) · 1 resolved, 0 unresolved · 3 changed · carried over: hook, load, worked, visual, practice
+  visual-qa: verification of 784d2d9 (previous review not loaded) · 0 resolved, 0 unresolved · 3 changed · carried over: visual
+  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     3  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer carried, visual-qa carried)
+  ✓ practice   3  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  resolved [load] q4 (ja-editor)
+  resolved [voice] card-goal (ja-editor)
+  resolved [active] check-quiz (pedagogy-reviewer)
+  must fix [miscon] check-quiz: This regression comes from the q8 rewrite. Option c now reads 「画面の流れとデータの欄に、思いつく例外や条件をすべて書く」, so the learner who picks it has already filled the empty headings. Its kept feedback ends 「先に、空いている見出しを自分で埋めます。」 / "First fill in the empty headings yourself." That tells them to do what they already did, and it never says how much is enough, which is the actual misconception. → Replace q8 option c feedback. JP: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 EN: "Many details only show up once you build and try. For now, deciding the screen names and field names is enough." Leave the feedback for options a and b as it is.
+  note: ja-editor: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: pedagogy-reviewer: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: visual-qa: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: ja-editor: the previous review (content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+  note: pedagogy-reviewer: the previous review (content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+  note: visual-qa: the previous review (content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+```
+
+With the previous reviews from git, as the notes ask:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json`
+→ **exit 1 (REVISE)**. Every previous must-fix has a `resolved` entry, and every carried-over score equals the
+previous score:
+
+```text
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  ja-editor: verification of 784d2d9 (previous review cross-checked) · 2 resolved, 0 unresolved · 3 changed · carried over: none
+  pedagogy-reviewer: verification of 784d2d9 (previous review cross-checked) · 1 resolved, 0 unresolved · 3 changed · carried over: hook, load, worked, visual, practice
+  visual-qa: verification of 784d2d9 (previous review cross-checked) · 0 resolved, 0 unresolved · 3 changed · carried over: visual
+  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     3  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer carried, visual-qa carried)
+  ✓ practice   3  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  resolved [load] q4 (ja-editor)
+  resolved [voice] card-goal (ja-editor)
+  resolved [active] check-quiz (pedagogy-reviewer)
+  must fix [miscon] check-quiz: This regression comes from the q8 rewrite. Option c now reads 「画面の流れとデータの欄に、思いつく例外や条件をすべて書く」, so the learner who picks it has already filled the empty headings. Its kept feedback ends 「先に、空いている見出しを自分で埋めます。」 / "First fill in the empty headings yourself." That tells them to do what they already did, and it never says how much is enough, which is the actual misconception. → Replace q8 option c feedback. JP: 「細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」 EN: "Many details only show up once you build and try. For now, deciding the screen names and field names is enough." Leave the feedback for options a and b as it is.
+```
+
+| Reviewer | Mode | Resolved | Unresolved | Carried over | Average | Verdict | New must-fix |
+|---|---|---|---|---|---|---|---|
+| pedagogy-reviewer | verify | 1 (`active`, q8) | 0 | hook, load, worked, visual, practice | 3.38 | revise | 1 (`miscon`, check-quiz q8 c) |
+| ja-editor | verify | 2 (`load`, q4; `voice`, card-goal) | 0 | none | 3.5 | pass | 0 |
+| visual-qa | verify | 0 (none were open) | 0 | visual | 4 | pass | 0 |
+| **Merged** (lowest per criterion) | | **3** | **0** | | **3.38** | **REVISE** | **1** |
+
+All three must-fix items from the final gate are resolved. Every criterion is ≥ 3 and the mean clears 3.3. The only
+blocker is a regression in the q8 rewrite, a changed block.
+
+**Not published.** vibe-ch2-practice passed (exit 0), but the owner's decision publishes both lessons together only
+when both pass. `lessons/`, `course.json` and `provenance.reviewedBy` are untouched.
+
+### Must-fix item, applied after the gate
+
+This was applied after the gate ran, so the saved reviews describe the draft before it.
+
+- **q8 option c feedback** (pedagogy-reviewer, `miscon`, check-quiz): a regression from the q8 rewrite. Option c
+  now fills the empty fields with every edge case, so the kept feedback 「先に、空いている見出しを自分で埋めます。」
+  told the learner to do what they had already done, and it never said how much is enough. Replaced with the
+  reviewer's exact text. Option a and b feedback, the options, key d and the explanation are unchanged.
+  - JP: 「細かい条件の多くは、作って試すと見えてきます。先に、空いている見出しを自分で埋めます。」 → 「細かい条件の多くは、
+    作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。」
+  - EN: "Many details only show up once you build and try. First fill in the empty headings yourself." → "Many details
+    only show up once you build and try. For now, deciding the screen names and field names is enough."
+
+No niceToHave items were applied. These remain open:
+- pedagogy-reviewer: the neutral attribution in the q4 explanation, the card-goal register, the q8 a EN wording,
+  the second 「なぜ？」 in s2-why, and the q2 a feedback.
+- ja-editor: 「名前だけ」 in the q8 explanation, "fields" versus "sections" in the q8 EN options, 扱うデータ in option d,
+  the 機能 glossary endings, 項目 / 見出し, 「SNS」, ex-goal, and the の chain in s5-b2.
+- visual-qa: the s2-b4 edge labels, plus reader items (touch flashcard hint, 「未回答」 in the outline, the truncated
+  mobile capture).
+
+### State after the fix
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json --strict` → 0 errors, 0 warnings.
+- Against the revision these reviews read, only one block changed:
+
+```text
+Changes in content/courses/vibe-coding/drafts/vibe-ch2.lesson.json since dcb3095
+  1 of 30 blocks changed (4%; above 30% a full review is required) · sections and objectives unchanged
+  → VERIFY: a fix-verification round is allowed. Every change below is reviewed in full.
+  modified  check / check-quiz  questions.q8
+
+verifies (copy into each verification review and add "previousReview"):
+  {"reviewedRevision":"dcb3095","changed":["check-quiz"],"changedShare":0.04,"fullReviewRequired":false}
+```
+
+- The feedback shows only after a learner answers, so the static preview captures do not include it. The text is a
+  2-sentence swap of similar length. The preview was not re-run.
+
+### CI steps and checks (run after the fix)
+
+| command | result |
+|---|---|
+| `npm run lessons:validate` | 13 lesson files, 1 course file: no errors |
+| `npm run lessons:validate -- --drafts` | 15 lesson files, 1 course file: no errors |
+| `npm run lessons:lint -- --strict` | exit 0, 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed published lessons. |
+| `lessons:lint --strict` on both chapter 2 drafts | 2 lesson files: 0 errors, 0 warnings |
+| `npm run lessons:schema -- --check` | generated schemas up to date |
+| `node .claude/skills/author-lesson/scripts/build-references.mjs --check` | references up to date |
+| `npm run -s lessons:catalog -- --short` | vibe-coding lists 12 lessons; vibe-ch2 is "published+draft, 18min, obj 4, valid, lint 0"; vibe-ch2-practice is "draft, 20min, obj 2, valid, lint 0 — not in course.json" |
+| `npm run typecheck` | 0 errors |
+| `npm test` | 677 tests, 677 pass, 0 fail |
+| `npm run build:prod -- --outDir <tmp dir> --emptyOutDir` | built (only the existing chunk-size warning) |
+
+Next: a verification round on the q8 fix only. Run `review-scope.mjs <draft> --since dcb3095`; it reports 1 of 30
+blocks changed (check-quiz). The previous reviews are the JSON saved in this round. Publish together with
+vibe-ch2-practice only when both exit 0.

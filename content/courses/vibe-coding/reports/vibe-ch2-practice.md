@@ -1,7 +1,8 @@
 # Report: vibe-coding/vibe-ch2-practice (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Final gate (2026-10-19): REVISE, `check-review.mjs`
-exits 1.**
+**Status: DRAFT, not published, not listed in `course.json`. Verification round (2026-10-19): PASS,
+`check-review.mjs` exits 0. Waiting for vibe-ch2, because both are published together. See "Verification round
+(2026-10-19)" at the end of this report; it supersedes the final-gate status below.**
 
 - Title: 第2章 演習｜自分のアイデアで1枚企画書をつくる / Chapter 2 practice: your own one-page plan.
 - Draft: `content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json`.
@@ -666,3 +667,134 @@ the desktop height of practice-flow and the reader items (visual-qa).
 
 Next: re-review the current draft (at least pedagogy-reviewer for pq1 and ja-editor for pq1 and pq2), save the JSON
 over the old files, and re-run `check-review.mjs`. Publish together with vibe-ch2 only when both exit 0.
+
+## Verification round (2026-10-19)
+
+The first round under the owner's fix-verification mode (decision of 2026-10-19). Round 1 of the publish gate was a
+full review; this round only checks the previous must-fix items and looks for errors the fixes introduced. The bar is
+the same: `check-review.mjs` must exit 0, with every criterion ≥ 3 and a mean ≥ 3.3.
+
+### Scope
+
+`node .claude/skills/review-lesson/scripts/review-scope.mjs content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json --since 784d2d9`
+→ exit 0, so a verification round is allowed. The draft at `784d2d9` is identical to `5d2a414`, which the saved
+final-gate reviews read. The draft the reviewers read is the one committed in `dcb3095`, and it is unchanged since.
+
+```text
+Changes in content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json since 784d2d9
+  2 of 20 blocks changed (10%; above 30% a full review is required) · sections and objectives unchanged
+  → VERIFY: a fix-verification round is allowed. Every change below is reviewed in full.
+  modified  practice-sort / practice-check  questions.pq1
+  modified  check / check-quiz              questions.pq2
+
+verifies (copy into each verification review and add "previousReview"):
+  {"reviewedRevision":"784d2d9","changed":["practice-check","check-quiz"],"changedShare":0.1,"fullReviewRequired":false}
+```
+
+The reviewers got only these facts (lesson, previous review, revision, `verifies` line), not a view of what was fixed.
+visual-qa has no shell. It took the changed blocks from the lesson file and this report, and its list matches
+`review-scope.mjs`.
+
+### Gate
+
+The three verification reviews are saved over the old JSON in `reports/vibe-ch2-practice.<reviewer>.review.json`.
+The previous reviews stay in git at `dcb3095`.
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2-practice.*.review.json`
+→ **exit 0 (PASS)**. Each review's `verifies.previousReview` names the file it overwrote, so this run could not
+cross-check the previous round:
+
+```text
+Review of vibe-ch2-practice by ja-editor, pedagogy-reviewer, visual-qa: PASS
+  ja-editor: verification of 784d2d9 (previous review not loaded) · 1 resolved, 0 unresolved · 2 changed · carried over: load, prior
+  pedagogy-reviewer: verification of 784d2d9 (previous review not loaded) · 1 resolved, 0 unresolved · 2 changed · carried over: hook, prior, load, worked, visual, practice, meta
+  visual-qa: verification of 784d2d9 (previous review not loaded) · 0 resolved, 0 unresolved · 2 changed · carried over: visual, load
+  mean 3.62 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      4  (ja-editor carried, pedagogy-reviewer carried)
+  ✓ load       3  (ja-editor carried, pedagogy-reviewer carried, visual-qa carried)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     3  (pedagogy-reviewer carried, visual-qa carried)
+  ✓ practice   4  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
+  resolved [voice] check-quiz (ja-editor)
+  resolved [miscon] practice-check (pedagogy-reviewer)
+  note: ja-editor: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: pedagogy-reviewer: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: visual-qa: verifies.previousReview is the file being checked (overwritten by this round); pass --previous <commit>:<path> or the snapshot copy
+  note: ja-editor: the previous review (content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+  note: pedagogy-reviewer: the previous review (content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+  note: visual-qa: the previous review (content/courses/vibe-coding/reports/vibe-ch2-practice.visual-qa.review.json) was not loaded, so nothing checked that "resolved" covers every previous must-fix; pass --previous <file or commit:path>
+```
+
+With the previous reviews from git, as the notes ask:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2-practice.*.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json --previous dcb3095:content/courses/vibe-coding/reports/vibe-ch2-practice.visual-qa.review.json`
+→ **exit 0 (PASS)**. Every previous must-fix has a `resolved` entry, and every carried-over score equals the
+previous score:
+
+```text
+Review of vibe-ch2-practice by ja-editor, pedagogy-reviewer, visual-qa: PASS
+  ja-editor: verification of 784d2d9 (previous review cross-checked) · 1 resolved, 0 unresolved · 2 changed · carried over: load, prior
+  pedagogy-reviewer: verification of 784d2d9 (previous review cross-checked) · 1 resolved, 0 unresolved · 2 changed · carried over: hook, prior, load, worked, visual, practice, meta
+  visual-qa: verification of 784d2d9 (previous review cross-checked) · 0 resolved, 0 unresolved · 2 changed · carried over: visual, load
+  mean 3.62 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      4  (ja-editor carried, pedagogy-reviewer carried)
+  ✓ load       3  (ja-editor carried, pedagogy-reviewer carried, visual-qa carried)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     3  (pedagogy-reviewer carried, visual-qa carried)
+  ✓ practice   4  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
+  resolved [voice] check-quiz (ja-editor)
+  resolved [miscon] practice-check (pedagogy-reviewer)
+```
+
+| Reviewer | Mode | Resolved | Unresolved | Carried over | Average | Verdict | New must-fix |
+|---|---|---|---|---|---|---|---|
+| pedagogy-reviewer | verify | 1 (`miscon`, practice-check pq1) | 0 | hook, prior, load, worked, visual, practice, meta | 3.62 | pass | 0 |
+| ja-editor | verify | 1 (`voice`, check-quiz pq2) | 0 | load, prior | 3.75 | pass | 0 |
+| visual-qa | verify | 0 (none were open) | 0 | visual, load | 4 | pass | 0 |
+| **Merged** (lowest per criterion) | | **2** | **0** | | **3.62** | **PASS** | **0** |
+
+Both must-fix items from the final gate are resolved, no reviewer found a regression, every criterion is ≥ 3 and the
+mean is 3.62. This lesson passes the gate.
+
+**Not published.** The owner's decision publishes vibe-ch2 and vibe-ch2-practice together only when both pass, and
+vibe-ch2 exited 1 (one new must-fix in q8, applied after its gate; see `reports/vibe-ch2.md`). `lessons/`,
+`course.json` and `provenance.reviewedBy` are untouched. This draft was not edited in this round.
+
+No niceToHave items were applied. These remain open:
+- pedagogy-reviewer: make pq1 d split the two features too; quote "add items" in the pq1 a EN; the carried-over items
+  (a rejected AI remark in the club model answer, the goal sentence in p-interview, a lead-in for practice-flow, a
+  worked revise example, hedging practice-prompt-interview.expect, a time estimate in practice-task).
+- ja-editor: the pq1 a and explanation EN, 「知れる」, 「勝手に」, glossary endings, the pq3 EN label, the summary-ask EN,
+  and the pq2 explanation.
+- visual-qa: an answered-state capture for the pq1 and pq2 feedback, the desktop height of practice-flow, and reader
+  items.
+
+### CI steps and checks
+
+The same run as in `reports/vibe-ch2.md` ("Verification round", after the vibe-ch2 q8 fix):
+- `npm run lessons:validate` and `-- --drafts`: no errors.
+- `npm run lessons:lint -- --strict`: exit 0, with advisory warnings only in migrated-unreviewed lessons. Both
+  chapter 2 drafts have 0 warnings.
+- `lessons:schema --check` and `build-references.mjs --check`: up to date.
+- `npm run typecheck`: 0 errors.
+- `npm test`: 677 of 677 pass.
+- `build:prod`: built.
+- `lessons:catalog --short`: this draft is "draft, 20min, obj 2, valid, lint 0 — not in course.json".
+
+Next: wait for vibe-ch2's verification round on its q8 fix. If that exits 0, publish both together. This lesson needs
+no new review unless its draft changes.

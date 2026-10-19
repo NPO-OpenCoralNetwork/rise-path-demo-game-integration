@@ -998,8 +998,8 @@
                     "en": "Fill the screen-flow and data fields with every edge case and condition"
                   },
                   "feedback": {
-                    "jp": "細かい条件の多くは、作って試すと見えてきます。先に、空いている見出しを自分で埋めます。",
-                    "en": "Many details only show up once you build and try. First fill in the empty headings yourself."
+                    "jp": "細かい条件の多くは、作って試すと見えてきます。いまは画面名と項目名を決めれば十分です。",
+                    "en": "Many details only show up once you build and try. For now, deciding the screen names and field names is enough."
                   }
                 },
                 {

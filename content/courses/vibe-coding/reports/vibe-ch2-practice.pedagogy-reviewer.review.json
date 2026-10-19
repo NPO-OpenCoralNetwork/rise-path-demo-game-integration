@@ -3,103 +3,164 @@
   "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "784d2d9",
+    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json",
+    "changed": [
+      "practice-check",
+      "check-quiz"
+    ],
+    "changedShare": 0.1,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "practice-check",
+      "criterion": "miscon",
+      "status": "resolved",
+      "evidence": "pq1 is rewritten as specified. The AI now makes one sound remark and one wrong one: 「Mustは「品物の追加」と「お店ごとの並べ替え」です。AIは2つとも「Shouldでもよいかもしれません」と指摘しました」. The correct option a 「並べ替えだけShouldに移し、品物の追加はMustに残す」 no longer carries the recap's criterion, so it cannot be matched by wording. Misconception 1 is now a graded distractor: b 「AIの指摘どおり、2つともShouldに移す」 has the feedback 「品物を追加できないと、メモが作れず目的を果たせません。指摘は1つずつ、目的に照らして確かめます。」. A learner who simply follows the AI now gets pq1 wrong. objectiveId o3 and bloom evaluate are kept."
+    }
+  ],
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "Two can-do objectives with Bloom levels: o3 (evaluate, 「判断できる」) and o4 (create, 「作り、チェックリストで直せる」). o3 is assessed by pq1 and pq2. o4 is assessed by pq5, pq3 and pq4. Every graded item uses a new context (買い物メモ, ジム, ゴミ出し, レシピ帳), and the create half of o4 is assessed by the practice checklist.",
-      "blockIds": ["practice-check", "practice-plan-check", "check-quiz", "practice-checklist"]
+      "evidence": "Re-scored because the questions changed. o3 (evaluate) is assessed by pq1, now a real judgement of AI remarks, and by pq2. o4 (create) is assessed by pq5, pq3, pq4 and the practice checklist. Every graded item uses a new context (買い物メモ, ジム, ゴミ出し, レシピ帳).",
+      "blockIds": [
+        "practice-check",
+        "check-quiz",
+        "practice-plan-check",
+        "practice-checklist"
+      ]
     },
     {
       "id": "hook",
       "score": 4,
       "evidence": "hook-b1 is a concrete three-sentence scene: the organizer lists six features and 「気づけば6つ全部を[[MoSCoW]]のMustにしていました」. It leads into the ungraded predict pq0, which asks how to use the AI. There is no trivia, and the answer is not given away. The club-app model answer later resolves the same six features.",
-      "blockIds": ["hook-b1", "hook-predict"]
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
       "evidence": "prerequisites names 「第2章｜AIと企画する力を身につける」. practice-recap recalls MoSCoW from ch2, with a citation. The glossary repeats 壁打ち, MoSCoW and 1枚企画書, and p-interview glosses 壁打ち inline. No new terms are introduced.",
-      "blockIds": ["practice-recap", "p-interview"]
+      "blockIds": [
+        "practice-recap",
+        "p-interview"
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
       "evidence": "Lint is clean, and the body (about 2,038 chars per the brief) is within 2,400. The practice is split into three one-idea sections. practice-plan stacks seven blocks: steps, prompt, tip, diagram, a 7-item checklist and a quiz. p-revise's 「下のチェックリスト」 sits four blocks below it.",
-      "blockIds": ["practice-plan"]
+      "blockIds": [
+        "practice-plan"
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
       "score": 3,
       "evidence": "The fully worked budget-app example lives in the prerequisite vibe-ch2. This lesson gives a club-app model with reasons (「理由の例：イベントの作成は「出欠を聞く場がないと始まらないから」」) in practice-prompt.expect and practice-prompt-plan.expect, plus the practice-flow diagram. These are collapsed and pointed to by practice-tip, so learners attempt first and compare after. That is acceptable for a practice lesson, but the revise step has no worked model.",
-      "blockIds": ["practice-prompt", "practice-prompt-plan", "practice-flow"]
+      "blockIds": [
+        "practice-prompt",
+        "practice-prompt-plan",
+        "practice-flow"
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "Density is met: there are inline checks in practice-sort (pq1) and practice-plan (pq5), and every wrong option has feedback. pq5 makes the learner apply the checklist to a new plan. pq1's key option a carries the recap's criterion verbatim (「なくても目的は果たせるので」 vs. 「ないと目的を果たせないもの」 one block above), so it can be answered by matching words.",
-      "blockIds": ["practice-check", "practice-plan-check"]
+      "score": 4,
+      "evidence": "Re-scored. pq1 now makes the learner evaluate each AI remark against the goal (accept one, reject one), and pq5 applies the checklist to a new plan. Neither can be answered by matching recap wording, and every wrong option has feedback. One mild cue remains: a is the only option that treats the two features differently (see niceToHave).",
+      "blockIds": [
+        "practice-check",
+        "practice-plan-check"
+      ]
     },
     {
       "id": "miscon",
-      "score": 3,
-      "evidence": "Misconceptions 2–4 from the brief are named and corrected in short feedback: pq1 b 「便利さは、Mustかどうかの物差しではありません」, pq2 d (Won't kept, not deleted), and pq4 a (an AI guess). Misconception 1 (「AIに任せればよい」) is only asserted. In every graded case and in the model answer, the AI's remark turns out right, so a learner who follows the AI never gets a wrong answer.",
-      "blockIds": ["practice-check", "check-quiz", "practice-prompt"]
+      "score": 4,
+      "evidence": "Re-scored. Each brief misconception is now a graded distractor with a reasoned correction of 2 sentences or fewer. Misconception 1: pq1 b 「指摘は1つずつ、目的に照らして確かめます」. Misconception 2: pq1 c 「便利さは、Mustかどうかの物差しではありません」. Misconception 3: pq1 d and pq2 d (Won't kept, not deleted). Misconception 4: pq4 a (an AI guess). The club-app model answer still never shows the AI being wrong (niceToHave).",
+      "blockIds": [
+        "practice-check",
+        "check-quiz"
+      ]
     },
     {
       "id": "visual",
       "score": 3,
       "evidence": "One process diagram, practice-flow: 4 nodes, labels in both locales matching the expect's 「イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧」. The caption states the takeaway, and alt is present. It sits after the 「それでも迷ったら」 tip with no lead-in, so its link to pc-flow is left for the learner to infer.",
-      "blockIds": ["practice-flow"]
+      "blockIds": [
+        "practice-flow"
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
       "score": 4,
       "evidence": "This is a transfer task on the learner's own idea. Each of the 6 steps has md, expect, hint and troubleshoot. There are model answers in two prompt expects and a 7-item self-check checklist (pc-goal through pc-nocode). Nothing in the steps tells the learner to turn the interview's 3-line summary into the one-sentence goal that p-interview.expect promises.",
-      "blockIds": ["practice-steps", "practice-steps-sort", "practice-steps-plan", "practice-checklist"]
+      "blockIds": [
+        "practice-steps",
+        "practice-steps-sort",
+        "practice-steps-plan",
+        "practice-checklist"
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
       "evidence": "summary-points (4 points) comes after the exam. summary-next has a reflection (「受け入れなかったものがあれば、その理由を1行で」) and the next step (ch3 VS Code). There are 4 flashcards and 2 askTutor suggestions.",
-      "blockIds": ["summary-points", "summary-next", "summary-cards", "summary-ask"]
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The MoSCoW meanings in practice-recap and check-quiz match the Agile Business Consortium definitions and are cited (abc-moscow), and the interview technique is cited (cc-best-practices). The 「3つ以内」 Must limit is labelled 「第2章の目安」. practice-prompt-interview.expect states as fact that any chat AI will ask one question at a time without code; the brief's constraints ask to avoid that kind of claim, though the troubleshoot softens it.",
-      "blockIds": ["practice-recap", "check-quiz", "practice-prompt-interview"]
+      "evidence": "Re-scored because claims changed in pq1 and pq2. The new pq1 reasoning (no list without adding items; sorting is not needed for the goal) matches the cited MoSCoW definition in practice-recap (abc-moscow), and pq2's reworded options keep the same meaning. The previous reservation is unchanged: practice-prompt-interview.expect still states as fact 「AIが…1つずつ質問を返します」.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz",
+        "practice-prompt-interview"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Consistent です・ます with a warm tone (「思いつかなければ…試しましょう」, 「予想してみましょう」), and no banned phrases. Terms are consistent (Must/Should/Could/Won't, 1枚企画書). The glossary entries for 壁打ち and 1枚企画書 end in a noun while MoSCoW ends in です; ja-editor owns that.",
-      "blockIds": ["hook-b1", "practice-task"]
+      "evidence": "Re-scored. The new feedback and explanations use です・ます and stay warm (「指摘は1つずつ、目的に照らして確かめます」). pq2's options are now parallel sentences (「…をShould、…をWon'tにする」), and the terms Must/Should/Won't and 企画書 stay consistent. The glossary register inconsistency noted before remains, and ja-editor owns it.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every learner-facing string has jp and en, including the diagram code labels, caption, alt and description. Prompt vars have locale-specific names with hints in both languages. There are no images or links.",
-      "blockIds": ["practice-flow", "practice-prompt-interview", "practice-prompt", "practice-prompt-plan"]
+      "evidence": "Re-scored. Every changed string in pq1 (prompt, 4 options, 3 feedbacks, explanation) and in pq2's options has both jp and en. Validate shows 0 errors, and lint --strict shows 0 warnings.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz"
+      ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "miscon",
-      "blockId": "practice-check",
-      "issue": "pq1 is the only item where the learner judges an AI remark, and it gives the answer away. Option a carries the recap's criterion as its reason (「なくても目的は果たせるので」), so the learner can match words instead of evaluating. The AI's remark is also correct, so the core misconception 1 (「分けるのはAIに任せればよい」) is never tested. A learner who simply follows the AI still gets the right answer here, in pq0's explanation and in the model answer, so o3's 「判断できる」 is not really assessed.",
-      "fix": "In pq1, give the AI two remarks, one right and one wrong. Put no reason in the correct option. Keep id, objectiveId o3, bloom evaluate and the hint. prompt.jp: 「買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustは「品物の追加」と「お店ごとの並べ替え」です。AIは2つとも「Shouldでもよいかもしれません」と指摘しました。最も適切な判断はどれでしょう？」 / en: \"A shopping-list app has the goal \\\"family members don't forget anything while shopping\\\". Its Musts are \\\"add items\\\" and \\\"sort items by shop\\\". The AI suggests both might fit under Should. Which decision is best?\". Options (answer a): a 「並べ替えだけShouldに移し、品物の追加はMustに残す」 / \"Move only the sorting to Should; keep adding items as a Must\". b 「AIの指摘どおり、2つともShouldに移す」 / \"Follow the AI and move both to Should\", feedback 「品物を追加できないと、メモが作れず目的を果たせません。指摘は1つずつ、目的に照らして確かめます。」 / \"Without adding items there is no list, so the goal can't be met. Check each point against the goal, one at a time.\". c 「2つとも便利なので、Mustに残す」 / \"Keep both as Musts, since both are handy\", feedback 「便利さは、Mustかどうかの物差しではありません。並べ替えがなくても、メモを見れば買い忘れは防げます。」 / \"Being handy isn't what makes a Must. Even without sorting, the list itself keeps you from forgetting things.\". d 「並べ替えはWon'tにして、企画書から消す」 / \"Make the sorting a Won't and delete it from the plan\", keeping the current d feedback. explanation 「AIの指摘は、判断の材料です。品物の追加がないとメモが作れないので、Mustに残します。並べ替えはなくても買い忘れは防げるので、Shouldに移します。」 / \"The AI's points are input for your decision. Without adding items there is no list, so it stays a Must. The goal can be met without sorting, so that moves to Should.\""
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "practice-prompt.expect: model a rejected remark too, so the club example shows the learner overruling the AI. Append 「AIは「イベントの作成は、幹事がチャットで日時を送れば不要かもしれません」とも指摘しました。出欠を聞く場がなくなるので、これはMustに残しました。」 / \"The AI also suggested: 'Creating an event may be unnecessary if the organizer posts the date in a chat.' Without it there's nowhere to reply, so it stays a Must.\"",
-    "p-interview.md: say who writes the goal sentence. Append 「最後の3行のまとめをもとに、目的を自分で1文に書きます。」 / \"Then use the three-line summary to write the goal in one sentence yourself.\" Today the prompt's expect ends at three lines, while the step's expect promises a one-sentence goal.",
-    "practice-plan order: practice-steps-plan → practice-prompt-plan → practice-checklist → a new markdown block `practice-flow-lead` → practice-flow → practice-plan-check → practice-tip. Text for `practice-flow-lead`: 「「Mustと画面の流れだけで目的を果たせる」かは、次の図のように流れをたどって確かめます。」 / \"To check that the Musts and the screen flow alone reach the goal, trace the flow as in the diagram below.\"",
-    "p-revise: add a worked before/after to practice-tip, for example 「出欠確認アプリの最初の版では、画面の流れが「イベント一覧」から始まっていました。「画面の流れにイベントの作成がないので、先頭に足してください」と頼んで直しました。」 / \"In the attendance app's first draft, the flow started at the event list. The fix was: 'The flow has no screen to create an event, so please add it at the start.'\" This models the create-level 'revise' half of o4.",
-    "practice-prompt-interview.expect: hedge the claim about AI behaviour. Change the opening to 「多くの場合、AIは「誰が使いますか？」…のように、1つずつ質問を返します。」 / \"Usually the AI replies with one question at a time…\". This follows the brief's rule against asserting how AIs respond.",
-    "practice-task: the work covers a five-question interview, candidates, sorting, a plan and a revision. Consider 「目安は15〜20分です。途中で区切って、演習2のあとに戻ってきても大丈夫です。」 / \"Allow about 15–20 minutes; it's fine to stop after Practice 2 and come back.\""
+    "pq1 option d: the correct option a is the only one that splits the two features, so a test-wise learner can spot it. Make d split too, and keep its feedback: jp 「品物の追加はMustに残し、並べ替えはWon'tにして企画書から消す」 / en \"Keep \\\"add items\\\" as a Must; make the sorting a Won't and delete it from the plan\".",
+    "pq1 option a en: \"keep adding items as a Must\" can be read as \"continue adding items\". Use \"Move only the sorting to Should; keep \\\"add items\\\" as a Must\".",
+    "Carried over from the previous review and still open: practice-prompt.expect could model a rejected AI remark (「AIは「イベントの作成は、幹事がチャットで日時を送れば不要かもしれません」とも指摘しました。出欠を聞く場がなくなるので、これはMustに残しました。」). p-interview.md could add 「最後の3行のまとめをもとに、目的を自分で1文に書きます。」. A `practice-flow-lead` sentence could go before practice-flow. practice-tip could get a worked before/after for p-revise. practice-prompt-interview.expect could open with 「多くの場合、AIは…」. practice-task could give a time estimate (「目安は15〜20分です。…」)."
   ],
-  "average": 3.46,
-  "verdict": "revise",
-  "summary": "The lesson is a well-built transfer practice: a concrete hook, six steps each with expect, hint and troubleshoot, worked club-app model answers, a self-check checklist and transfer contexts in every graded item. The one must-fix is pq1. Its correct option repeats the recap's criterion, and the AI's remark is always right, so the core misconception (letting the AI decide) is never actually tested. Rewrite pq1 so the AI makes one sound remark and one wrong one."
+  "average": 3.62,
+  "verdict": "pass",
+  "summary": "This was a verification round. review-scope found 2 of 20 blocks changed (10%), with sections and objectives unchanged, so a verification is allowed. The only previous must-fix, pq1 giving its answer away and never testing misconception 1, is resolved: the AI now makes one right and one wrong remark, the correct option carries no criterion wording, and 'follow the AI' is a distractor with corrective feedback. pq2 changed only in option phrasing, and the meaning and answer are intact. align, active, miscon, accuracy, voice and a11y_l10n were re-scored, and the rest are carried over. Validate and lint --strict are clean, and there is no new must-fix."
 }

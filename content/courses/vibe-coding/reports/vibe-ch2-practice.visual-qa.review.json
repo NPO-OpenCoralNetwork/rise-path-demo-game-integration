@@ -3,34 +3,59 @@
   "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "784d2d9",
+    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2-practice.visual-qa.review.json",
+    "changed": [
+      "practice-check",
+      "check-quiz"
+    ],
+    "changedShare": 0.1,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "visual",
       "score": 4,
       "evidence": "Every screen at both widths has a structural element: steps with expected results, prompt cards with highlighted fill-in fields, a callout, the practice-flow diagram, the practice-checklist and the quizzes, and textOnlyScreens is empty. The 4-node flowchart TD diagram (practice-flow) is legible at 390 px (mobile-jp-11/12). Its labels are Japanese in the JP screens and English in the EN screens.",
-      "blockIds": ["practice-flow", "practice-checklist", "practice-steps", "practice-prompt-plan"]
+      "blockIds": [
+        "practice-flow",
+        "practice-checklist",
+        "practice-steps",
+        "practice-prompt-plan"
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
       "evidence": "There are no walls of text. The longest prose run is the three short paragraphs of practice-task (desktop-jp-02, mobile-jp-03), and a steps block follows them right away. Desktop JP has a median of 36 characters per line (target 30–40) and EN has 69 (target 60–75). The pacing alternates between steps, prompt, quiz and checklist.",
-      "blockIds": ["practice-task", "practice-steps-sort", "check-quiz"]
+      "blockIds": [
+        "practice-task",
+        "practice-steps-sort",
+        "check-quiz"
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN screens show no leftover Japanese, and the JP screens show no stray English beyond the intended terms (MoSCoW, Must/Should/Could/Won't). Nothing is clipped or overlapping, and there is no horizontal overflow. The mobile bottom bar does not cover any controls, since the answer buttons are visible on mobile-jp-07/14/16. The diagram has a caption and a 'describe the figure' toggle. Text contrast is good throughout.",
-      "blockIds": ["practice-flow", "hook-predict"]
+      "evidence": "The rewritten pq1 (desktop-jp-04, mobile-jp-06, desktop-en-04/05) and pq2 (desktop-jp-09/10, mobile-jp-14, desktop-en-10) render fully localized in both languages. The JP shows no stray English beyond Must/Should/Won't, and the EN shows no leftover Japanese. The options are clipped nowhere: the longer pq2 options wrap to two lines at 390 px and to one line on desktop JP. The 答える button sits clear of the mobile bottom bar once the page scrolls (mobile-jp-07, mobile-jp-15). Metrics are clean, with no overflow, console errors or mermaid errors.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-flow: on desktop the 4-node linear flowchart TD takes about 650 px of height inside a wide, mostly empty card (desktop-jp-07/08, desktop-en-08). Keeping TD is the right call for mobile. If the reader ever supports per-device engines, a compact LR variant for desktop would save a screen.",
-    "reader: the end-of-lesson banner says 「このコースの最後のレッスンまで読み終えました。」 on a draft preview (desktop-jp-13, mobile-jp-19). This is probably because the draft is not listed in course.json. Confirm the banner is correct once the lesson is published.",
-    "reader: on mobile the flashcard hint reads 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch-appropriate hint such as 「タップでめくる」 would fit 390 px devices better.",
-    "reader: the AI tutor and glossary side panels stay fixed while the long checklist and quiz screens scroll, which leaves the right column mostly empty below about 550 px (desktop-jp-08 to 11). This is not a lesson issue."
+    "Not visible in the captures: feedback and explanation text for the rewritten pq1 and pq2. The screenshots show only the unanswered state, so these new strings were not checked visually. An answered-state capture would cover them.",
+    "practice-flow: on desktop the 4-node TD diagram leaves a wide, mostly empty card. Keep TD for mobile. This is unchanged from the previous round.",
+    "reader: the touch hint on mobile flashcards, the end-of-course banner on unlisted draft previews and the empty right column beside long quiz screens (desktop-jp-09/10) are all unchanged from the previous review."
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "The metrics are clean: no overflow, no console, mermaid or image errors, no unknown blocks and no text-only screens. Line length is on target in JP and EN, and both locales are fully localized. Steps, prompt cards, the checklist and quizzes give every screen a clear visual anchor. No lesson-content fixes are needed. The only observations are about desktop space in the vertical diagram and a few reader-level details."
+  "summary": "Verification round, not structural: only practice-check (pq1) and check-quiz (pq2) changed, 2 of 20 blocks. I could not run review-scope.mjs or git diff because I have no shell access, so the changed list comes from the lesson file and the report's 'Must-fix items, applied after the gate' section. The previous visual-qa review had no must-fix items, so there was nothing to resolve. The rewritten pq1 and pq2 render cleanly in JP mobile, JP desktop and EN desktop, and the fresh metrics have no hard failures."
 }

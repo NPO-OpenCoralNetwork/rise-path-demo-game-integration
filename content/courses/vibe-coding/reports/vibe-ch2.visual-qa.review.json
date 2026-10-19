@@ -3,33 +3,56 @@
   "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "784d2d9",
+    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json",
+    "changed": [
+      "check-quiz",
+      "s3-check",
+      "summary-cards"
+    ],
+    "changedShare": 0.1,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "visual",
       "score": 4,
       "evidence": "Each segment has its own visual anchor: the goal/feature definition list and the feature-to-goal table in 2-2, the MoSCoW table in 2-3, the 6-step procedure and the screen-flow diagram s2-b4 in 2-4, plus the prompt cards. The diagram labels are large, in the right language and readable at 390 px (pages/mobile-jp-14.png, pages/desktop-en-10.png).",
-      "blockIds": ["s2-b4"]
+      "blockIds": [
+        "s2-b4"
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "metrics.json shows no text-only screens in any locale. Desktop JP lines run 37 chars (median, target 30–40) and EN lines 71 (target 60–75). Paragraphs are short and broken up by callouts, tables or checks (pages/desktop-jp-02..10.png). No walls of text or empty gaps on the full-length pages."
+      "evidence": "Fresh metrics.json shows no text-only screens in any locale. Desktop JP lines run 37 chars (median, target 30–40) and EN lines 71 (target 60–75). The longer q8 options in check-quiz wrap to 2 even lines on mobile (pages/mobile-jp-19.png) and on desktop EN (pages/desktop-en-13.png). On desktop JP each one fits on a single line (pages/desktop-jp-13.png). The option cards keep their spacing, and the quiz does not turn into a wall of text.",
+      "blockIds": [
+        "check-quiz"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN screenshots are fully translated: headings, tables, the diagram ('Money-left screen', 'Add button'), prompt cards and flashcards. The JP screenshots contain no stray English beyond intended terms (MVP, MoSCoW, PRD with their expansions). The diagram has a 'Describe the figure in words' toggle. Contrast is fine, and no controls are hidden under the top or bottom bars on mobile.",
-      "blockIds": ["s2-b4"]
+      "evidence": "The rewritten q8 options are fully localized. JP '画面名と保存する項目名だけを、自分で決めて書き足す' appears in pages/desktop-jp-13.png and pages/mobile-jp-19.png. EN 'Decide just the screen names and field names yourself, and add them' appears in pages/desktop-en-13.png. Neither locale mixes in the other language. Contrast is unchanged, and on mobile the last option sits above the bottom bar (pages/mobile-jp-19.png).",
+      "blockIds": [
+        "check-quiz"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
+    "process: no shell was available in this round, so I could not run git diff or review-scope.mjs. The changed blocks were inferred from the other reviewers' must-fix items and the current draft: q8 options and explanation in check-quiz, the q4 explanation in s3-check, and the card-goal back in summary-cards. The changedShare of about 3/30 is an estimate. Confirm the list with review-scope.mjs before gating.",
+    "check-quiz q8 explanation, s3-check q4 explanation and the summary-cards card-goal back only show after the learner answers or flips a card, so the static captures do not show them (pages/desktop-jp-10.png, pages/desktop-jp-15.png, pages/mobile-jp-23.png show the unanswered or front states). Their length is similar to the previous text, so no layout risk is expected.",
     "s2-b4: the two curved edges between the money-left screen and the input screen carry the labels '追加ボタン' and '保存' side by side. At 390 px it is hard to tell which label goes with which arrow (pages/mobile-jp-14.png). Consider labelling them '追加ボタンで→' and '保存で戻る', or describing the round trip in the caption.",
     "reader: the flashcard hint reads 'クリックまたはスペースキーでめくる' on mobile (pages/mobile-jp-23.png). On touch devices it should say 'タップしてめくる'.",
-    "reader: on desktop, the sidebar outline marks sections the learner has only scrolled past as '未回答' / 'Unanswered' with an alert icon (pages/desktop-jp-08.png, pages/desktop-en-09.png). This may read as an error rather than a reminder.",
-    "reader: the mobile-jp capture is marked truncated in metrics.json. The last screen (pages/mobile-jp-25.png) overlaps the previous one, but the content appears complete."
+    "reader: on desktop, the sidebar outline marks sections the learner has only scrolled past as '未回答' / 'Unanswered' with an alert icon (pages/desktop-jp-13.png, pages/desktop-en-13.png). This may read as an error rather than a reminder.",
+    "reader: the mobile-jp capture is still marked truncated in metrics.json. The last screen (pages/mobile-jp-25.png) overlaps the previous one, but the content appears complete."
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "The metrics are clean (no overflow, console, mermaid, block or image errors), and every screen in all three captures has a heading, table, figure, prompt or check. Line lengths are on target for both JP and EN. Nothing needs fixing in the lesson. The only small lesson-side improvement is clearer edge labels in the screen-flow diagram s2-b4 at mobile width."
+  "summary": "This is a verification round, and the change is not structural. The previous visual-qa review had no must-fix items, so there was nothing to resolve. The fresh metrics.json is clean: no overflow, console, mermaid, unknown-block or image errors, no text-only screens, and line lengths on target. The changes are text edits from the other reviewers: q8 options and explanation in check-quiz, the q4 explanation in s3-check, and the card-goal back in summary-cards. The new q8 options render cleanly in JP desktop, JP mobile and EN desktop, with no clipping, overlap or untranslated text. I found no regressions and added no must-fix items."
 }

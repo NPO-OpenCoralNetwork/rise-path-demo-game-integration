@@ -3,50 +3,82 @@
   "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "784d2d9",
+    "changed": [
+      "practice-check",
+      "check-quiz"
+    ],
+    "changedShare": 0.1,
+    "fullReviewRequired": false,
+    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "check-quiz",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "In pq2, all four options are now verb phrases in the same form. a: 「つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする」. b: 「友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする」. c: 「2つともMustにして、最初の版で作る」. d: 「2つとも、企画書から消しておく」. The en options match: 'Make the forgot-to-log reminder a Should and the friends leaderboard a Won't' / 'Make the friends leaderboard a Should and the forgot-to-log reminder a Won't'."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The text uses です・ます throughout, with warm, short sentences and no pressure phrases. The feedback follows the 'name the misconception, then give the right idea' pattern (pq1-b, pq3-a). One quiz (pq2) mixes noun-list options with verb-phrase options, and a few spots read slightly colloquial or stiff (「知れる」, 「勝手に」).",
-      "blockIds": ["check-quiz", "practice-prompt-plan", "practice-steps-plan"]
+      "evidence": "Re-scored. The pq2 options in check-quiz are now parallel. The rewritten pq1 in practice-check uses the same dictionary-form ending in every option (「〜残す」「〜移す」「〜残す」「〜消す」). Its feedback names the misconception and then gives the rule, in 2 sentences or fewer. A few colloquial or stiff spots in unchanged text are still there (「知れる」, 「勝手に」), so the score stays at 3.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz",
+        "practice-prompt-plan",
+        "practice-steps-plan"
+      ]
     },
     {
       "id": "load",
       "score": 4,
       "evidence": "lessons:lint --strict is clean. Every paragraph has 3 sentences or fewer, and the practice is split into three sections, each with its request placed right after the step that uses it (practice-steps → practice-prompt-interview, practice-steps-sort → practice-prompt).",
-      "blockIds": ["practice", "practice-sort", "practice-plan"]
+      "blockIds": [
+        "practice",
+        "practice-sort",
+        "practice-plan"
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
       "evidence": "The lesson adds no new terms. 壁打ち, MoSCoW and 1枚企画書 are linked with [[…]] and match the glossary, and practice-recap restates the four MoSCoW groups before they are used. The same names are used in the text, the model plan and the practice-flow labels (イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧).",
-      "blockIds": ["practice-recap", "practice-flow", "practice-prompt-plan"]
+      "blockIds": [
+        "practice-recap",
+        "practice-flow",
+        "practice-prompt-plan"
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "jp and en are complete and say the same thing in every block, including diagram labels, alt, description and prompt vars. The UI label 「期待される結果」/'What a good answer looks like' in practice-tip matches PromptBlock.tsx, and the English is natural rather than literal.",
-      "blockIds": ["practice-flow", "practice-tip"]
+      "evidence": "Re-scored because practice-check and check-quiz changed. jp and en say the same thing in the new pq1 prompt, options, feedback and explanation, and in the rewritten pq2 options. The rest of the lesson stays complete in both locales, including the diagram labels and alt text.",
+      "blockIds": [
+        "practice-check",
+        "check-quiz",
+        "practice-flow"
+      ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) §5 options must have the same form and ending: in pq2, options a and b are noun lists (「Should：つけ忘れた日の通知／Won't：友だちとのランキング」), while c and d are verb phrases ending in 「作る」 and 「おく」.",
-      "fix": "pq2 a: 「Should：つけ忘れた日の通知／Won't：友だちとのランキング」→「つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする」 (en: 'Make the forgot-to-log reminder a Should and the friends leaderboard a Won't'). pq2 b: 「Should：友だちとのランキング／Won't：つけ忘れた日の通知」→「友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする」 (en: 'Make the friends leaderboard a Should and the forgot-to-log reminder a Won't'). pq2 c: 「2つともMustに入れて、最初の版で作る」→「2つともMustにして、最初の版で作る」. d stays as it is."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "practice-prompt-plan: 「知れる」 is colloquial; a neutral form suits a var hint better — 「例：幹事が参加人数を早く知れる出欠確認アプリ」→「例：幹事が参加人数をすぐにわかる出欠確認アプリ」 (or 「例：参加人数がすぐわかる出欠確認アプリ」)",
-    "practice-steps-plan (p-plan hint): 「勝手に」 sounds like blame, and summary-points[2] already uses neutral wording — 「AIが勝手に埋めた項目があれば」→「自分が決めていない項目をAIが埋めていたら」",
-    "glossary: the definition endings are inconsistent (MoSCoW ends in です; 壁打ち and 1枚企画書 end with a noun) — 「…自分の考えを言葉にしていくこと。」→「…自分の考えを言葉にしていくことです。」, 「…を1枚に並べた文書。」→「…を1枚に並べた文書です。」",
+    "practice-check (pq1 a, en): 'keep adding items as a Must' can be read as 'keep adding more items'; quote the feature name instead — 'Move only the sorting to Should; keep adding items as a Must'→'Move only the sorting to Should; keep \"add items\" as a Must'",
+    "practice-check (pq1 explanation, en): 'so that moves to Should' has a vague referent — 'The goal can be met without sorting, so that moves to Should.'→'The goal can be met without sorting, so sorting moves to Should.'",
+    "practice-prompt-plan: 「知れる」 is colloquial; a neutral form suits a var hint better — 「例：幹事が参加人数を早く知れる出欠確認アプリ」→「例：参加人数がすぐわかる出欠確認アプリ」",
+    "practice-steps-plan (p-plan hint): 「勝手に」 sounds like blame — 「AIが勝手に埋めた項目があれば」→「自分が決めていない項目をAIが埋めていたら」",
+    "glossary: the definition endings are inconsistent — 「…自分の考えを言葉にしていくこと。」→「…自分の考えを言葉にしていくことです。」, 「…を1枚に並べた文書。」→「…を1枚に並べた文書です。」",
     "check-quiz (pq3, en): the same JP label 「レシピの表示」 is rendered two ways in one prompt — 'The Musts are \"recipe list\" and \"show a recipe\"'→'The Musts are \"recipe list\" and \"recipe view\"'",
     "summary-ask (en): 'with … with me' repeats — 'Go through my one-page plan with the checklist with me'→'Go through my one-page plan against the checklist with me'",
-    "summary-next: two 「〜ましょう」 in a row — 「最後に振り返ってみましょう。AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。」→「最後に振り返ってみましょう。AIの指摘のうち受け入れなかったものがあれば、その理由を1行で書いておきます。」",
-    "check-quiz (pq2 explanation): 主語と述語が離れて読みにくい — 「ただ、つけ忘れると次に見る前回の記録が残らないので、重要なShouldです。」→「ただ、つけ忘れると、次に見る前回の記録が残りません。だから重要なShouldです。」"
+    "check-quiz (pq2 explanation): the subject and the predicate are far apart — 「ただ、つけ忘れると次に見る前回の記録が残らないので、重要なShouldです。」→「ただ、つけ忘れると、次に見る前回の記録が残りません。だから重要なShouldです。」"
   ],
   "average": 3.75,
-  "verdict": "revise",
-  "summary": "The Japanese is warm and consistent. Terms, the model plan and the diagram labels match across locales, and lessons:lint --strict is clean. The only blocker is pq2 in check-quiz, which mixes noun-list options with verb-phrase options; rewrite a and b as 「〜をShould、〜をWon'tにする」 so all four options end the same way."
+  "verdict": "pass",
+  "summary": "Verification round: 2 of 20 blocks changed (10%); sections and objectives are unchanged. The only previous mustFix is resolved: the pq2 options are now parallel verb phrases in both locales. The rewritten pq1 in practice-check has parallel options, feedback that names the misconception in 2 sentences or fewer, and matching jp/en text. lessons:lint --strict is clean, and the changes introduce no new errors."
 }

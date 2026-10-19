@@ -3,71 +3,85 @@
   "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "784d2d9",
+    "changed": [
+      "s3-check",
+      "check-quiz",
+      "summary-cards"
+    ],
+    "changedShare": 0.1,
+    "fullReviewRequired": false,
+    "previousReview": "content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "q4",
+      "criterion": "load",
+      "status": "resolved",
+      "evidence": "The explanation now has 3 sentences. It defines 仕様書 where the word first appears: 「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」 The en version still says the same thing (\"a useful spec (a document like this plan) states what is out of scope\"), and lessons:lint --strict is clean."
+    },
+    {
+      "blockId": "card-goal",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "The back now uses です・ます and has no noun-ending sentences: 「目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。」 The en version still matches."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The prose is natural and uses です・ます throughout, with no 翻訳調 and no pressure phrases (hook-b1, s1-b5, s5-b1). One flashcard back, card-goal, has two noun-ending sentences in a row, which §1 does not allow.",
+      "evidence": "card-goal now follows です・ます. The q8 options use parallel forms that all end in a dictionary-form verb (書く / 渡す / 書く / 書き足す), and the rewritten q4 sentence reads naturally. The rest of the prose is unchanged: warm, no pressure phrases (hook-b1, s1-b5).",
       "blockIds": [
         "card-goal",
-        "hook-b1",
-        "s1-b5"
+        "q8",
+        "q4"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "lessons:lint --strict is clean, and every paragraph is short with one idea per sentence. The q4 explanation is the only paragraph with 4 sentences. It also uses 仕様書 before it defines it.",
+      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The q4 explanation is down to 3 sentences, and the q8 explanation has 3 short sentences.",
       "blockIds": [
         "q4",
-        "s5-b1"
+        "q8"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "New terms are defined before use and stay within budget: 壁打ち, 目的・機能, MVP・MoSCoW and 1枚企画書・PRD each have a definitions block. Katakana and abbreviations get English on first use (ビジョン（vision）, MVP（Minimum Viable Product）, PRD（Product Requirements Document）). The glossary matches the text.",
+      "evidence": "q4 now defines 仕様書 in parentheses where it first appears. The terms in q8 (画面名, 項目名, 欄) match the 1枚企画書 terms from s3-defs and ex-review. The definitions blocks and glossary are unchanged and still match the text.",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s5-defs",
+        "q4",
+        "q8",
         "s3-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every string has jp and en, and the two versions mean the same thing. The English reads naturally (q6, s2-b3 expect). The mermaid labels and alt text are localized and match the in-text names (今月の残り画面 / money-left screen).",
+      "evidence": "Every changed string (q4, q8 options and explanation, card-goal) has both jp and en, and each pair means the same thing. The en q8 options are understandable, with a small wording note under niceToHave. Diagram labels are unchanged and localized.",
       "blockIds": [
-        "s2-b4",
-        "s2-b3",
-        "q6"
+        "q8",
+        "q4",
+        "card-goal"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "load",
-      "blockId": "q4",
-      "issue": "(d) 3 sentences per paragraph (§1): the explanation has 4 sentences. It also uses 「仕様書」 in sentence 3 and explains it only in sentence 4.",
-      "fix": "「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。」→「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "card-goal",
-      "issue": "(d) です・ます, no consecutive 体言止め (§1): the card back is two noun-ending sentences in a row, 「…どうなれる」。」 and 「…手段。」.",
-      "fix": "「目的は「誰が・どんな場面で・どうなれる」。機能はそのための手段。」→「目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "vibe-ch2 glossary (機能): two noun-ending sentences in a row, unlike s2-defs. Align it with the definitions block — 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
-    "ex-review / card-plan / q8: one set of headings is called 見出し, 項目 and 欄. 「項目」 also means data fields (「項目名だけ」), so use 見出し everywhere — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」; 「画面の流れと扱うデータの欄だけが空です。」→「画面の流れと扱うデータの見出しだけが空です。」",
-    "q7 option c: SNS should be spelled out by its full name (§2) — 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
-    "ex-goal: the sample question differs from the one in s1-b4 expect. Reuse it so the learner sees the same exchange — 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」 (en: \"When do you run into the problem?\" → \"When do you run into the problem today?\")",
-    "s5-defs (MoSCoW): the reason for the name helps recall — 「機能をMust・Should・Could・Won'tの4つに分けて、優先順位を決める方法です。」→「Must・Should・Could・Won'tの頭文字から名づけられた、機能を4つに分けて優先順位を決める方法です。」",
-    "s5-b2 rows[0][1] (also ex-moscow expect and s2-b3 expect): the chain of の is heavy — 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」 (change all three together)."
+    "q8 explanation: 「名前だけ」 does not say which names; repeat the pair from the option and feedback — 「名前だけで十分です。」→「画面名と項目名だけで十分です。」 (en: \"Names alone are enough.\" → \"Screen names and field names are enough.\")",
+    "q8 options a–c (en): \"fields\" is used both for the plan's headings (\"screen-flow and data fields\") and for data items (\"field names\" in option d), and \"Fill … down to\" reads stiffly. Use \"sections\" for the headings — \"Fill the screen-flow and data fields down to the language and how files are split\" → \"Fill in the screen-flow and data sections, right down to the language and file layout\"; \"Leave the screen-flow and data fields blank, since the AI fills them in\" → \"Leave the screen-flow and data sections blank, since the AI fills them in\"; \"Fill the screen-flow and data fields with every edge case and condition\" → \"Fill the screen-flow and data sections with every edge case and condition\"",
+    "q8 prompt / option d: the prompt says 「扱うデータ」 and option d says 「保存する項目名」. Aligning them makes the link easier to see — 「画面名と保存する項目名だけを」→「画面名と扱うデータの項目名だけを」",
+    "Carried over, unchanged text: vibe-ch2 glossary (機能) still has two noun-ending sentences in a row — 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
+    "Carried over: ex-review / card-plan use 項目 and 見出し for the same headings — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」",
+    "Carried over: q7 option c — 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
+    "Carried over: ex-goal — 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」",
+    "Carried over: s5-b2 rows[0][1] (with ex-moscow expect and s2-b3 expect) — 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」"
   ],
   "average": 3.5,
-  "verdict": "revise",
-  "summary": "The Japanese is warm and natural, terms are introduced carefully, and the English versions match the Japanese closely. Two small rule breaks block the gate: the q4 explanation has 4 sentences in one paragraph, and the card-goal back uses two noun-ending sentences in a row. Both have exact replacements above, and lessons:lint --strict is already clean."
+  "verdict": "pass",
+  "summary": "Verification round: 3 of 30 blocks changed (q4, q8, card-goal), so no full review was needed. Both previous must-fix items are resolved. The q4 explanation now has 3 sentences and defines 仕様書 where it first appears, and the card-goal back uses です・ます. The rewritten q8 options have parallel forms, both locales mean the same thing, and lessons:lint --strict is clean. No new errors; the remaining notes are non-blocking wording suggestions."
 }
