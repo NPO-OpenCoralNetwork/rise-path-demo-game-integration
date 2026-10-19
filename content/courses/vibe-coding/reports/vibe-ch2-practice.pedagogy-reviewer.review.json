@@ -1,20 +1,30 @@
 {
   "lessonId": "vibe-ch2-practice",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
-  "lessonHash": "sha256:7dfd5355b05405d5",
+  "lessonHash": "sha256:d7c528c2bebfd7fe",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "practice-check",
+      "summary-next"
+    ],
+    "changedShare": 0.05,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2-practice.pedagogy-reviewer.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "Two can-do objectives (o3 evaluate, o4 create). o3 is graded by pq1 (買い物メモ) and pq2 (ジム), and o4 by pq5 (ゴミ出し), pq3 (レシピ帳) and pq4, all in new contexts at evaluate level. The create part of o4 is done in the practice and self-checked with practice-checklist.",
+      "evidence": "Re-scored because pq1 changed. pq1 still carries objectiveId o3 at bloom evaluate, and o3 is also assessed by pq2. o4 is assessed by pq5, pq3 and pq4, all in new contexts. The edit to option a's EN text (\"keep \\\"add items\\\" as a Must\") leaves the answer, the objective and the decision being tested the same.",
       "blockIds": [
         "practice-check",
         "practice-plan-check",
-        "check-quiz",
-        "practice-checklist"
+        "check-quiz"
       ]
     },
     {
@@ -24,7 +34,8 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -33,7 +44,8 @@
       "blockIds": [
         "practice-recap",
         "p-interview"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
@@ -43,7 +55,8 @@
         "practice-plan",
         "p-revise",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -53,12 +66,13 @@
         "practice-prompt",
         "practice-prompt-plan",
         "practice-flow"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
       "score": 4,
-      "evidence": "There are two inline checks across three practice sections. pq1 has the learner accept one AI remark and reject the other against the goal; pq5 applies the checklist to a new plan and finds the vague goal 「ゴミ出しを管理できる」. Neither can be answered by matching the recap's wording, and every wrong option has feedback.",
+      "evidence": "Re-scored because pq1 changed. pq1 still has the learner accept one AI remark and reject the other against the goal. The new EN option a quotes \"add items\" exactly as the stem does, but the stem names both features in quotes, so this is no cue that only the answer has. pq5 still applies the checklist to a new plan, and every wrong option in both checks has feedback.",
       "blockIds": [
         "practice-check",
         "practice-plan-check"
@@ -67,7 +81,7 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "All four misconceptions in the brief appear as distractors, each with feedback of at most two sentences that corrects it. Letting the AI sort: pq0 a. Handy or unsure features as Musts: pq0 c, pq1 c, pq2 c, pq5 c (「便利さは、Mustかどうかの物差しではありません」). Deleting Won'ts: pq1 d, pq2 d, pq5 a. Accepting what the AI guessed: pq4 a, pq5 d.",
+      "evidence": "Re-scored because pq1 changed. pq1's distractors and feedback are unchanged: b (letting the AI decide: 「指摘は1つずつ、目的に照らして確かめます」), c (handy features as Musts: 「便利さは、Mustかどうかの物差しではありません」) and d (deleting Won'ts: 「消さずに企画書に書いておきます」), each in two sentences or fewer. The brief's four misconceptions are still covered across pq0–pq5.",
       "blockIds": [
         "hook-predict",
         "practice-check",
@@ -81,7 +95,8 @@
       "evidence": "practice-flow is a 4-node process diagram. Its labels match the screen names in practice-prompt-plan.expect, and roles are given in parentheses. The caption states the takeaway (「Mustと画面の流れだけで、作成から人数の確認まで通る」), and alt and description are present in both locales. It supports the pc-flow check, and there are no decorative images.",
       "blockIds": [
         "practice-flow"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -93,12 +108,13 @@
         "practice-steps-plan",
         "practice-tip",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "The summary section comes after the exam and has four takeaways. summary-next gives a reflection prompt (「AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で」) and a next step (第3章 VS Code, which matches course.json). There are four flashcards and an askTutor block.",
+      "evidence": "Re-scored because summary-next changed. The summary still comes after the exam and has four takeaways. summary-next keeps the reflection prompt (「AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう」) and the next step 「第3章では、AIと開発するためのVS Code（Visual Studio Code）を準備します」, which matches course.json 「第3章｜開発環境コックピット（VS Code）」. There are four flashcards and an askTutor block.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -109,42 +125,43 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Both sources resolve and support their cites. The Claude Code best-practices page has a \"Let Claude interview you\" section (practice-prompt-interview), and the Agile Business Consortium page defines Should/Could/Won't this time (practice-recap, check-quiz). The 「Mustは3つ以内」 rule of thumb matches vibe-ch2. No tool version is needed (target any), and the claims about AI behaviour are hedged (「埋まることがあります」).",
+      "evidence": "Re-scored because summary-next changed. The expansion 「VS Code（Visual Studio Code）」 / \"VS Code (Visual Studio Code)\" is the product's correct full name, and pq1's EN wording change makes no new claim. The sources and cites are unchanged: the Claude Code \"Let Claude interview you\" section and the Agile Business Consortium's MoSCoW definitions, with claims about AI behaviour hedged.",
       "blockIds": [
+        "summary-next",
         "practice-prompt-interview",
         "practice-recap",
-        "check-quiz",
-        "practice-checklist"
+        "check-quiz"
       ]
     },
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The text is consistently in です・ます and is warm without pressure (「思いつかなければ…で試しましょう」), with no banned phrases. Terms stay consistent: Must/Should/Could/Won't, 1枚企画書, 壁打ち and 「これは決めていません」 are used the same way across steps, quizzes, summary and cards.",
+      "evidence": "Re-scored because both changed blocks hold text. The JP text of pq1 is unchanged, and summary-next's added 「（Visual Studio Code）」 keeps the です・ます sentence intact and well under 60 chars. Terms stay consistent (Must/Should/Could/Won't, 1枚企画書, 壁打ち), and strict lint reports no banned phrases.",
       "blockIds": [
-        "practice-task",
-        "summary-points"
+        "practice-check",
+        "summary-next"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every text has jp and en, including the diagram code, alt and description and the prompt vars. practice-tip's label references match the reader: PromptBlock renders 「期待される結果」 and \"What a good answer looks like\" as a collapsible details element. There are no links and no text baked into images.",
+      "evidence": "Re-scored because both changed blocks were edited per locale. pq1 option a's EN now mirrors the JP 「品物の追加はMustに残す」 and uses the stem's own feature name (\"add items\"). summary-next spells out VS Code identically in jp and en. Every text still has jp and en, and there are no links and no text baked into images.",
       "blockIds": [
-        "practice-tip",
+        "practice-check",
+        "summary-next",
         "practice-flow"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "pq4 (check-quiz): option d quotes the exact phrase taught in p-plan's hint, so it can be picked by matching words. Paraphrase it as d.md.jp 「AIに、使う人はまだ決めていないと伝え、質問に答えながら自分で決める」 / en \"Tell the AI you haven't decided the users yet, and settle it yourself by answering its questions\".",
-    "pq2 (check-quiz): the stem never names the two remaining candidates, so the learner only meets them in the options. Append to the prompt jp 「残る候補は「つけ忘れた日の通知」と「友だちとのランキング」です。」 / en \"The remaining candidates are a forgot-to-log reminder and a friends leaderboard.\" before the question sentence.",
-    "p-interview (practice-steps): the prompt's expect ends with a three-line summary (目的・使う人・困りごと), but the step expect wants the goal as one sentence, and no instruction says who writes it. Append to p-interview.md.jp 「最後に、AIのまとめをもとに、目的を「誰が・どんな場面で・どうなれる」の1文に自分で書きます。」 / en \"Finally, use the AI's summary to write the goal yourself as one sentence: who, in what situation, can do what.\"",
-    "practice-plan: p-revise points to 「下のチェックリスト」, which sits four blocks below it. Move practice-checklist to directly after practice-prompt-plan (order: practice-steps-plan, practice-prompt-plan, practice-checklist, practice-flow, practice-tip, practice-plan-check) so the success criteria follow the step that uses them.",
-    "summary-cards: card-ai-review's back repeats summary point 1 almost word for word. A retrieval-style front such as jp 「AIに分け方を見直してもらうとき、AIに任せないことは？」 / back 「直すかどうかの判断です。自分で分けて理由を書き、AIには指摘だけを頼みます。」 would make the learner recall rather than reread."
+    "Still open from the previous round (block unchanged): pq4 (check-quiz) option d quotes the exact phrase taught in p-plan's hint, so it can be picked by matching words. Paraphrase it as d.md.jp 「AIに、使う人はまだ決めていないと伝え、質問に答えながら自分で決める」 / en \"Tell the AI you haven't decided the users yet, and settle it yourself by answering its questions\".",
+    "Still open from the previous round (block unchanged): pq2 (check-quiz) never names the two remaining candidates in the stem. Before the question sentence, add to the prompt jp 「残る候補は「つけ忘れた日の通知」と「友だちとのランキング」です。」 / en \"The remaining candidates are a forgot-to-log reminder and a friends leaderboard.\"",
+    "Still open from the previous round (block unchanged): p-interview (practice-steps) does not say who writes the one-sentence goal. Append to p-interview.md.jp 「最後に、AIのまとめをもとに、目的を「誰が・どんな場面で・どうなれる」の1文に自分で書きます。」 / en \"Finally, use the AI's summary to write the goal yourself as one sentence: who, in what situation, can do what.\"",
+    "Still open from the previous round (section unchanged): in practice-plan, reorder the blocks to practice-steps-plan, practice-prompt-plan, practice-checklist, practice-flow, practice-tip, practice-plan-check, so the checklist p-revise refers to (「下のチェックリスト」) directly follows the step that uses it.",
+    "Still open from the previous round (block unchanged): summary-cards card-ai-review repeats summary point 1. Use the front jp 「AIに分け方を見直してもらうとき、AIに任せないことは？」 / back 「直すかどうかの判断です。自分で分けて理由を書き、AIには指摘だけを頼みます。」 so it asks for recall."
   ],
   "average": 3.85,
   "verdict": "pass",
-  "summary": "Full review of the published lesson (sha256:7dfd5355b05405d5); validate and strict lint are clean. The biggest strength: every graded item is a transfer case in a new context, every distractor matches one of the brief's four misconceptions with short corrective feedback, and the practice has a hint ladder, collapsed club-app model answers and a checklist as success criteria. No must-fix. The most useful polish is to remove the verbatim answer cue in pq4 option d and to tell the learner to write the goal sentence in p-interview."
+  "summary": "Verification round against f66e3f3 (previous lessonHash sha256:7dfd5355b05405d5). review-scope.mjs exited 0: 2 of 42 parts (5%) changed, and sections and objectives are unchanged. Validate and strict lint are clean. The previous review had no must-fix items, so there is nothing to resolve. Both changed blocks were reviewed in full: in practice-check, pq1 option a's EN now reads \"keep \\\"add items\\\" as a Must\", matching the stem's feature name and the JP text, with the answer, feedback, objectiveId o3 and difficulty unchanged and no new answer cue; in summary-next, the expansion 「VS Code（Visual Studio Code）」 is accurate, matches course.json chapter 3 and is the same in both locales. No errors and no regressions. align, active, miscon, meta, accuracy, voice and a11y_l10n were re-scored; the other six criteria are carried over. The previous round's niceToHave items were not applied and are listed again."
 }

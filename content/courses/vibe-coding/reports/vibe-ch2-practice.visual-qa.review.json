@@ -1,15 +1,27 @@
 {
   "lessonId": "vibe-ch2-practice",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
-  "lessonHash": "sha256:7dfd5355b05405d5",
+  "lessonHash": "sha256:d7c528c2bebfd7fe",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "practice-check",
+      "summary-next"
+    ],
+    "changedShare": 0.05,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2-practice.visual-qa.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "visual",
       "score": 3,
-      "evidence": "The one figure (practice-flow, flowchart TD) renders cleanly at 390 px and 1440 px. Its JP labels (イベントの作成（幹事）→…→参加人数の一覧（幹事）) and EN labels are readable and in the right language, and it has a caption and a 図の説明を読む / Describe the figure in words toggle (mobile-jp-11/12, desktop-en-08). On mobile the four stacked boxes fill a whole screen with wide side margins (mobile-jp-11), which works but is not dense.",
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. The two changes are text edits inside a quiz option and a summary paragraph. They do not touch the practice-flow figure or any other visual block, and none of the re-checked screens shows a layout regression.",
       "blockIds": [
         "practice-flow",
         "practice-checklist",
@@ -20,7 +32,8 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "No screen is text-only (textOnlyScreens empty in all three shots). The page alternates steps with expected-result boxes, prompt cards, the checklist and quizzes, so no screen holds a wall of prose (mobile-jp-03 to -16). Desktop JP lines average 36 chars per line (target 30–40) and EN 69 (target 60–75).",
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. textOnlyScreens is still empty in all three shots. Desktop JP is still a median 36 chars per line (target 30–40) and EN 69 (target 60–75). The longer summary-next sentence adds only one line (desktop-en-12, mobile-jp-17).",
       "blockIds": [
         "practice-task",
         "practice-steps-sort",
@@ -31,22 +44,22 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN screenshots contain no leftover Japanese: prompt vars show 'goal', 'my sorting' and 'app name', the diagram labels are English, and the glossary chips read Talking it through / MoSCoW / One-page plan (desktop-en-05, -07, -08). Nothing is hidden under the mobile top or bottom bars, the quiz option boxes are large tap targets, and the diagram has alt text plus a text description.",
+      "evidence": "Re-scored because both changes touch wording and localization. pq1 option 1 in EN now reads 'Move only the sorting to Should; keep \"add items\" as a Must' on one line inside its option box. The quoted term matches the question's \"add items\" (desktop-en-04). The JP option is unchanged and fits on two lines at 390 px (mobile-jp-06) and on one line on desktop (desktop-jp-04). summary-next shows 「VS Code（Visual Studio Code）」 in JP (mobile-jp-17, desktop-jp-12) and 'VS Code (Visual Studio Code)' in EN (desktop-en-12). The line breaks around the parenthesis are clean, there is no Japanese in EN or the reverse, and nothing is hidden under the mobile bars.",
       "blockIds": [
-        "practice-flow",
-        "practice-prompt-plan",
-        "summary-cards"
+        "practice-check",
+        "summary-next"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "hook-predict: on desktop JP the question wraps with a lone 「う？」 on the second line (desktop-jp-01). A slightly shorter prompt, e.g. 「幹事が機能を分け直すとき、AIの借り方として最も合うのはどれでしょう？」, would fit on one line at 680 px.",
-    "practice-prompt-interview: on mobile the line breaks inside 「1つず／つしてください」 (mobile-jp-05). This is acceptable for prompt text, but 「質問は1つずつしてください。」 as its own line would read better.",
-    "practice-flow: on mobile the diagram takes a full screen (mobile-jp-11). It is optional, but shorter labels with the role on the same line, e.g. 「イベント作成（幹事）」, would make the boxes less tall.",
-    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch device should say タップ instead.",
-    "reader: the left table of contents on desktop JP breaks 「演習3：1枚企画書にまと／めて直す」 mid-word (desktop-jp-06). Wrapping at phrase boundaries (word-break: auto-phrase) would avoid this."
+    "summary-next: on mobile the paragraph breaks 「この1枚／企画書を一緒に渡せます。」 inside the compound 「1枚企画書」 (mobile-jp-17). Moving the clause earlier or shortening it, e.g. 「この先、AIに画面を作ってもらうときに、この1枚企画書も渡せます。」, may avoid the split. It is cosmetic.",
+    "hook-predict (unchanged, carried over): on desktop JP the question wraps with a lone 「う？」 on the second line (desktop-jp-01). A slightly shorter prompt would fit on one line.",
+    "practice-prompt-interview (unchanged, carried over): on mobile the line breaks inside 「1つず／つしてください」 (mobile-jp-05).",
+    "practice-flow (unchanged, carried over): on mobile the diagram takes a full screen (mobile-jp-11). Shorter labels would make the boxes less tall.",
+    "reader: on mobile the flashcard hint still says 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch device should say タップ.",
+    "reader: the left table of contents on desktop JP still breaks 「演習3：1枚企画書にまと／めて直す」 mid-word (desktop-jp-04, desktop-jp-12). word-break: auto-phrase would avoid this."
   ],
   "verdict": "pass",
-  "summary": "lessonHash sha256:7dfd5355b05405d5 matches metrics.json. There are no hard failures: no sideways overflow, console errors, mermaid errors, unknown blocks or broken images. Mobile, desktop JP and desktop EN all render cleanly. Steps, prompt cards, the TD flow diagram, the checklist and the quizzes break the page into readable chunks, and the EN version is fully localized. Nothing needs to be fixed; the remaining points are cosmetic line breaks and two reader-level tweaks."
+  "summary": "lessonHash sha256:d7c528c2bebfd7fe in metrics.json matches the hash I was given. metrics.json has no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks, 0 broken images, no text-only screens, and chars per line within target. The previous review had no must-fix items, so nothing needed resolving. I re-checked both changed blocks on mobile and desktop. practice-check (pq1, option 1 changed in EN only): mobile-jp-06, desktop-jp-04, desktop-en-04/05. summary-next: mobile-jp-17, desktop-jp-12, desktop-en-12. Both render cleanly with correct localization and no layout regression. a11y_l10n was re-scored at 4; visual (3) and load (4) are carried over."
 }
