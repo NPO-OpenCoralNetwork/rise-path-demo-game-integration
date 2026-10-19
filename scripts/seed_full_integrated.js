@@ -32,7 +32,7 @@ const FULL_COURSES = [
             { id: 'ch0', title: { en: 'Chapter 0: Sharing the Premise', jp: '第0章｜この時代の前提を共有する' }, desc: { en: 'Why "No-Code" development works now.', jp: 'なぜ「コードを書かない開発」が成立するのか。' }, duration: 30 },
             { id: 'ch1', title: { en: 'Chapter 1: Minimum Viable Knowledge', jp: '第1章｜人間が理解すべき最低ライン' }, desc: { en: 'Frontend, Backend, DB, and Git.', jp: 'フロントエンド / バックエンド / DBの関係。' }, duration: 45 },
             { id: 'ch2', title: { en: 'Chapter 2: Planning with AI', jp: '第2章｜AIと企画する力を身につける' }, desc: { en: 'Wall-boarding with ChatGPT.', jp: 'ChatGPTとの壁打ち設計術。' }, duration: 60 },
-            { id: 'ch3', title: { en: 'Chapter 3: The Development Cockpit', jp: '第3章｜開発環境コックピット' }, desc: { en: 'Setting up VSCode and Cursor.', jp: 'VSCodeの導入とAIネイティブエディタCursorの活用法。' }, duration: 45 },
+            { id: 'ch3', title: { en: 'Chapter 3: The Development Cockpit', jp: '第3章｜開発環境コックピット' }, desc: { en: 'Setting up VS Code and Cursor.', jp: 'VS Codeの導入とAIネイティブエディタCursorの活用法。' }, duration: 45 },
             { id: 'ch4', title: { en: 'Chapter 4: Generating Frontend', jp: '第4章｜フロントエンドをAIで生成する' }, desc: { en: 'Google AI Studio basics.', jp: 'Google AI Studioの基本操作。' }, duration: 90 },
             { id: 'ch5', title: { en: 'Chapter 5: GitHub Workflow', jp: '第5章｜GitHubワークフロー完全理解' }, desc: { en: 'Understanding Repositories and Commits.', jp: 'リポジトリとは何か。AI開発でGitが必須な理由。' }, duration: 60 },
             { id: 'ch6', title: { en: 'Chapter 6: Vibe Coding with CLI', jp: '第6章｜Gemini CLIによるバイブコーディング' }, desc: { en: 'Implementing logic with natural language.', jp: '自然言語でコードを実装する。' }, duration: 120 },
