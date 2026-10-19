@@ -27,18 +27,23 @@
     *   💤 **未着手 (旧アセット使用中)**: 開発初期の古い画像が現在もゲーム内で使用されている状態。
     *   🔄 **既存維持**: ブラッシュアップ不要と判断され、既存のアセットをそのまま使い続けるもの。
 
-### ⚔️ 戦闘画像（2026年10月：全20ステージを v2 に置き換え）
+### ⚔️ 戦闘画像（2026年10月：ステージ2〜20を v2 に置き換え）
 
-戦闘画面の主人公、20ステージの敵と背景は、すべて `/p_school/assets/v2/` の WebP を使います（✅ **適用完了**）。旧ドット絵（`chemical.png`、`srime.png`、`labo.jpg` など）は戦闘では使っていません。
+ステージ2〜20の敵と背景、その主人公は `/p_school/assets/v2/` の WebP を使います（✅ **適用完了**）。旧ドット絵（`chemical.png`、`srime.png`、`labo.jpg` など）は戦闘では使っていません。
 
-*   **どの画像をどの大きさで出すか**: `components/features/PSchool/game/stageArt.js` で決めます。同じファイル名・同じ形式で上書きすれば、コードを変えずに差し替えられます。
-*   **置き場所**: 敵は `v2/enemies/stageNN.webp`（左向き・全身・背景透過）、背景は `v2/backgrounds/stageNN.webp`（16:9、下3分の1が地面）、主人公は `v2/characters/hero.webp`（右向き）です。
+*   **ステージ1は元のまま**: 敵（森の精霊 `serirei01.png`）・背景（`battle-seen01.jpeg`）・主人公（`main-chara01_transparent.png`）も、オーナーが調整した立ち位置もそのままです。主人公は高さ 350px で画面の (25%, 67%)、敵は幅 133px で (75%, 60%) に置き、背景は画面の大きさに引き伸ばします。数値は `stageArt.js` の `ORIGINAL_LAYOUT` にあります。
+*   **ステージ2〜20の立ち位置**: `components/features/PSchool/game/stageArt.js` の `STAGE_ART` で、ステージごとに決めます。
+    *   `ground`: 足元の高さ [主人公, 敵]（背景の高さに対する割合）。敵は少し奥（上）に立たせます。どの背景も、床はおよそ 0.70〜0.90 の範囲です。
+    *   `enemyHeight`: 敵の表示の高さ（画面の高さに対する割合）。主人公は 0.31 です。
+    *   `enemyX`: 敵の横位置（画面の幅に対する割合）。`hover`: 宙に浮く敵の、地面からの高さ。
+    *   `focus`: 背景の縦横比が画面と合わずに端が切れるとき、どこを残すか [横, 縦]。
+    *   背景は縦横比を保って画面いっぱいに広げ、地面の位置は背景に合わせて計算します（画面の縦横比が変わっても足元がずれません）。足元には薄い影を付けています。
+*   **置き場所**: 敵は `v2/enemies/stageNN.webp`（左向き・全身・背景透過）、背景は `v2/backgrounds/stageNN.webp`（16:9、下3分の1が地面）、主人公は `v2/characters/hero.webp`（右向き）です。同じファイル名・同じ形式で上書きすれば、コードを変えずに差し替えられます。
 *   **作り方**（GPT Image 2.5 Flare、OpenRouter 経由。1枚約0.04〜0.07ドル）:
     1. プロンプトは `scripts/assets/pschool-assets.json` にステージごとに書きます。絵柄を合わせるため、主人公・森の精霊・ステージ1の背景を参照画像として渡します。
     2. 生成: `OPENROUTER_API_KEY=… node scripts/assets/try-image-models.mjs --plan scripts/assets/pschool-assets.json --models gptImageFlare --out <出力先>`（`--jobs stage05-enemy` のように1枚だけ作り直せます）
     3. 変換: `python3 scripts/assets/prepare-pschool-art.py <出力先>`（余白の切り詰め・縮小・WebP 化。Pillow が必要）
-*   **ステージ1**: 敵（森の精霊 `serirei01.png`）と背景（`battle-seen01.jpeg`）、主人公（`main-chara01_transparent.png`）は、既存の新しい絵柄を変換して使っています。
-*   **動き**: 待機の呼吸・攻撃の踏み込み・被弾ののけぞり・詠唱・倒れる・勝利のジャンプは `characterMotion.js` で JS（tween）だけで動かしています。画像を差し替えても動きはそのまま使えます。
+*   **動き**: 待機の呼吸・攻撃の踏み込み・被弾ののけぞり・詠唱・倒れる・勝利のジャンプは `characterMotion.js` で JS（tween）だけで動かしています（ステージ1も同じ）。宙に浮く敵は上下にも揺れます。画像を差し替えても動きはそのまま使えます。
 
 ### 🏞️ 背景アセット（戦闘以外）
 | 画面 | アセットID | 現行ファイルパス | 新ビジュアル（Figma/Miro個別URL） | ステータス | 担当 | 備考 |
@@ -50,7 +55,7 @@
 | キャラ名 | アセットID | 現行ファイルパス | 新ビジュアル（Figma/Miro個別URL） | ステータス | 担当 | 備考 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | プレイヤー（ストーリー） | `character1` | `/p_school/assets/main-chara.png` | [Figma#Player_Chara](https://figma.com/...) | 🚧 **制作中** | 山田 | 立ち絵イラストの清書段階 |
-| 森の精霊（ストーリー） | `character2` | `/p_school/assets/serirei01.png` | [Miro#Enemy_Seirei](https://miro.com/...) | ✅ **適用完了** | 鈴木 | 戦闘ではステージ1の敵として v2 に変換して使用 |
+| 森の精霊（ストーリー） | `character2` | `/p_school/assets/serirei01.png` | [Miro#Enemy_Seirei](https://miro.com/...) | ✅ **適用完了** | 鈴木 | 戦闘でもステージ1の敵としてそのまま使用 |
 
 ### 🎵 音楽・効果音 (Audio)
 | 音声種別 | アセットID | 現行ファイルパス | 新音源（GoogleDrive等URL） | ステータス | 担当 | 備考 |

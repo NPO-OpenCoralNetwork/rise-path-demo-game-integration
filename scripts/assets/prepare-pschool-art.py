@@ -6,7 +6,8 @@ Usage:
 
 Each <dir> holds try-image-models.mjs output named stageNN-enemy__<model>.png and
 stageNN-bg__<model>.png; when a file is in several dirs, the later dir wins (for regenerated
-images). Stage 1 and the hero come from the new-style assets already in public/p_school/assets/.
+images). The hero comes from the new-style art already in public/p_school/assets/. Stage 1 keeps
+its original art and layout, so it has no v2 files.
 
 Sprites: transparent margins trimmed (a 2% border kept), longest side at most 1024 px, WebP with
 alpha. Backgrounds: longest side at most 1920 px, WebP. Needs Pillow.
@@ -55,13 +56,11 @@ def main(dirs):
             match = re.match(r'stage(\d+)-(enemy|bg)__', os.path.basename(path))
             if match:
                 sources[(int(match.group(1)), match.group(2))] = path
-    sources[(1, 'enemy')] = os.path.join(ASSETS, 'serirei01.png')
-    sources[(1, 'bg')] = os.path.join(ASSETS, 'battle-seen01.jpeg')
 
     for sub in ('enemies', 'backgrounds', 'characters'):
         os.makedirs(os.path.join(OUT, sub), exist_ok=True)
     jobs = [('hero', os.path.join(ASSETS, 'main-chara01_transparent.png'), os.path.join(OUT, 'characters', 'hero.webp'), sprite)]
-    for stage in range(1, 21):
+    for stage in range(2, 21):
         for kind, sub, convert in (('enemy', 'enemies', sprite), ('bg', 'backgrounds', background)):
             source = sources.get((stage, kind))
             if not source:

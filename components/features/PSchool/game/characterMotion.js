@@ -36,17 +36,20 @@ export function settled(...sprites) {
   return Promise.race([all, new Promise((resolve) => setTimeout(resolve, 2000))]);
 }
 
-/** 足元を固定したまま、ゆっくり呼吸させる。今の大きさと位置が基準になる。 */
-export function startIdle(scene, sprite, { amount = 0.022, duration = 1300, delay = 0 } = {}) {
+/**
+ * 足元を固定したまま、ゆっくり呼吸させる。今の大きさと位置が基準になる。
+ * float（ピクセル）を指定すると、宙に浮く敵のように呼吸に合わせて上下にも揺れる。
+ */
+export function startIdle(scene, sprite, { amount = 0.022, duration = 1300, delay = 0, float = 0 } = {}) {
   stopIdle(sprite);
   if (!isSprite(sprite)) return;
-  sprite.idleConfig = { amount, duration };
+  sprite.idleConfig = { amount, duration, float };
   if (reducedMotion()) return;
   sprite.idleBase = { scaleY: sprite.scaleY, y: sprite.y };
   sprite.idleTween = scene.tweens.add({
     targets: sprite,
     scaleY: sprite.scaleY * (1 + amount),
-    y: sprite.y - (sprite.displayHeight * amount) / 2,
+    y: sprite.y - (sprite.displayHeight * amount) / 2 - float,
     duration,
     delay,
     ease: 'Sine.easeInOut',
@@ -136,7 +139,8 @@ export function castPose(scene, sprite, { color = 0x8fd3ff } = {}) {
     const reduced = reducedMotion();
     const { y } = sprite;
     const ring = scene.add.ellipse(sprite.x, y + sprite.displayHeight * 0.47, sprite.displayWidth * 0.7, sprite.displayHeight * 0.1, color, 0.45);
-    ring.setDepth(sprite.depth - 1);
+    // キャラクターのすぐ後ろに描く（depth を下げると背景より奥になって見えなくなる）
+    scene.children.moveBelow(ring, sprite);
     scene.tweens.add({ targets: ring, scaleX: 1.6, scaleY: 1.6, alpha: 0, duration: 600, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
     await play(scene, { targets: sprite, y: y - sprite.displayHeight * (reduced ? 0.01 : 0.04), duration: 180, ease: 'Quad.easeOut' });
     await play(scene, { targets: sprite, y, duration: 220, ease: 'Quad.easeIn' });

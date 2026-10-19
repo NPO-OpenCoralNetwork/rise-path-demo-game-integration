@@ -4,7 +4,7 @@ import { Enemy } from "./enemy";
 import { UI } from "./ui";
 import { SpellBook } from "./SpellBook";
 import { filterBlocksByLevel, getAvailableBlocksByLevel, getNewlyUnlockedBlocks } from "./levelBlockRestrictions";
-import { ENEMY_MAX_WIDTH, GROUND, PLAYER_ART, stageArt } from "./stageArt";
+import { ENEMY_MAX_WIDTH, FEET, ORIGINAL_LAYOUT, PLAYER_ART, stageArt } from "./stageArt";
 import { castPose, defeat, hitReact, lunge, settled, startIdle, stopIdle, victory } from "./characterMotion";
 
 export class BattleScene extends Phaser.Scene {
@@ -85,8 +85,9 @@ export class BattleScene extends Phaser.Scene {
       console.warn(`Failed to load asset: ${file.src}`);
     });
 
-    // 2026年版の画像（stageArt.js）を優先する。キーはステージごとに分ける
-    // （同じキーのままだと、先に遊んだステージの画像が次のステージにも残る）
+    // 2026年版の画像（stageArt.js）があるステージはそれを使う。キーはステージごとに分ける
+    // （同じキーのままだと、先に遊んだステージの画像が次のステージにも残る）。
+    // 登録のないステージ（ステージ1）は、シーンの設定の画像と元の配置のまま
     this.stageArt = stageArt(this.settings.stageNumber);
     if (this.stageArt) {
       this.settings.backgroundTextureKey = this.stageArt.backgroundKey;
@@ -102,7 +103,8 @@ export class BattleScene extends Phaser.Scene {
     this.settings.backgroundTexturePath = backgroundPath;
     console.log('[BattleScene preload] background key:', backgroundKey, 'path:', backgroundPath, 'name:', this.settings.background);
     this.load.image(backgroundKey, backgroundPath);
-    this.load.image(PLAYER_ART.key, PLAYER_ART.path);
+    const playerArt = this.stageArt ? PLAYER_ART : ORIGINAL_LAYOUT.player;
+    this.load.image(playerArt.key, playerArt.path);
     // 敵テクスチャはシーンごとに差し替え可能
     const enemyKey = this.settings.enemyTextureKey || 'enemy';
     const inferredPath = this.settings.enemyTexturePath || this.getEnemyTexturePathByName(this.settings.enemy);
@@ -180,8 +182,9 @@ export class BattleScene extends Phaser.Scene {
     this.scale.on('resize', this.resize, this);
 
     // プレイヤーと敵のスプライト（フォールバック付き）。大きさと位置は layoutCharacters() で決める
-    if (this.textures.exists(PLAYER_ART.key)) {
-      this.playerSprite = this.add.sprite(this.scale.width * 0.25, this.scale.height * 0.67, PLAYER_ART.key);
+    const playerKey = this.stageArt ? PLAYER_ART.key : ORIGINAL_LAYOUT.player.key;
+    if (this.textures.exists(playerKey)) {
+      this.playerSprite = this.add.sprite(this.scale.width * 0.25, this.scale.height * 0.67, playerKey);
     } else {
       // フォールバック: 円形のプレイヤー
       const playerGraphics = this.add.graphics();
@@ -205,7 +208,26 @@ export class BattleScene extends Phaser.Scene {
       console.warn('enemy asset not found, using fallback graphics');
     }
     
-    // 画面の高さに合わせて大きさを決め、足元を地面にそろえて、待機の呼吸を始める
+    if (this.stageArt) {
+      // 足元の影。キャラクターのすぐ後ろに描き、毎フレーム横の位置・大きさ・透明度を追わせる
+      this.shadows = [['player', this.playerSprite], ['enemy', this.enemySprite]]
+        .filter(([, sprite]) => sprite && sprite.frame)
+        .map(([role, sprite]) => {
+          const shape = this.add.ellipse(sprite.x, sprite.y, 10, 4, 0x000000, 1);
+          this.children.moveBelow(shape, sprite);
+          return { role, sprite, shape };
+        });
+      this.events.off('update', this.syncShadows, this);
+      this.events.on('update', this.syncShadows, this);
+      this.events.once('shutdown', () => this.events.off('update', this.syncShadows, this));
+    } else {
+      // 元の配置では、キャラクターを少し透けさせていた
+      for (const sprite of [this.playerSprite, this.enemySprite]) {
+        if (sprite.setAlpha) sprite.setAlpha(ORIGINAL_LAYOUT.alpha);
+      }
+    }
+
+    // 大きさと位置を決めて、待機の呼吸を始める
     this.layoutCharacters();
 
     // 魔法の書ボタンを作成（左上に配置）
@@ -358,38 +380,94 @@ export class BattleScene extends Phaser.Scene {
     this.updatePlayerLevelAsync();
   }
   
-  /** 背景を縦横比を保ったまま画面いっぱいに広げる（はみ出た分は切れる）。 */
+  /**
+   * 背景を画面に合わせる。新しい画像のステージは縦横比を保ったまま画面いっぱいに広げ（はみ出た分は切れる）、
+   * 切れるときは stageArt の focus の位置を残す。元の配置のステージは、元どおり画面の大きさに引き伸ばす。
+   */
   fitBackground(width, height) {
-    if (!this.background || !this.background.setScale || !this.background.frame) return;
+    if (!this.background) return;
+    if (!this.stageArt) {
+      this.background.setPosition(width / 2, height / 2);
+      this.background.setDisplaySize(width, height);
+      return;
+    }
+    if (!this.background.setScale || !this.background.frame) return;
     const scale = Math.max(width / this.background.width, height / this.background.height);
+    const shownWidth = this.background.width * scale;
+    const shownHeight = this.background.height * scale;
+    const [focusX, focusY] = this.stageArt.focus;
     this.background.setScale(scale);
-    this.background.setPosition(width / 2, height / 2);
+    this.background.setPosition((width - shownWidth) * focusX + shownWidth / 2, (height - shownHeight) * focusY + shownHeight / 2);
   }
 
-  /**
-   * キャラクターの大きさを画面の高さから決め、足元を地面の線（stageArt.js の GROUND）にそろえる。
-   * 敵が横に広すぎるときは画面幅の ENEMY_MAX_WIDTH に収める。終わったら待機の呼吸をやり直す。
-   */
+  /** キャラクターの大きさと位置を決め、待機の呼吸をやり直す。 */
   layoutCharacters() {
     const { width, height } = this.scale;
-    const place = (sprite, x, groundY, targetHeight, maxWidth) => {
+    const place = (sprite, size, x, y) => {
       if (!sprite || !sprite.setDisplaySize || !sprite.frame) return false;
       stopIdle(sprite);
       const ratio = sprite.width / sprite.height;
-      let displayHeight = targetHeight;
-      if (maxWidth && displayHeight * ratio > maxWidth) displayHeight = maxWidth / ratio;
-      sprite.setDisplaySize(displayHeight * ratio, displayHeight);
-      sprite.setPosition(x, groundY - displayHeight / 2);
+      const shownHeight = size.height ?? size.width / ratio;
+      sprite.setDisplaySize(shownHeight * ratio, shownHeight);
+      sprite.setPosition(x, typeof y === 'function' ? y(shownHeight) : y);
       return true;
     };
     const art = this.stageArt;
-    // 倒れて消えたキャラクター（alpha 0）は、画面サイズが変わっても呼吸を再開しない
-    if (place(this.playerSprite, width * 0.25, height * GROUND.player, height * PLAYER_ART.height) && this.playerSprite.alpha > 0) {
-      startIdle(this, this.playerSprite);
+    let playerPlaced;
+    let enemyPlaced;
+    if (!art) {
+      // 元の配置（オーナーが手で調整したもの）：主人公は高さ 350px、敵は幅 133px
+      const { player, enemy } = ORIGINAL_LAYOUT;
+      playerPlaced = place(this.playerSprite, { height: player.height }, width * player.x, height * player.y);
+      enemyPlaced = place(this.enemySprite, { width: enemy.width }, width * enemy.x, height * enemy.y);
+    } else {
+      // 足元（画像の FEET の位置）を、背景の地面の高さにそろえる。浮く敵は hover の分だけ上に置く
+      const feetAt = (groundY) => (shownHeight) => groundY - shownHeight * (FEET - 0.5);
+      const [playerGround, enemyGround] = art.ground.map((share) => this.groundY(share));
+      playerPlaced = place(this.playerSprite, { height: height * PLAYER_ART.height }, width * PLAYER_ART.x, feetAt(playerGround));
+      const ratio = this.enemySprite?.frame ? this.enemySprite.width / this.enemySprite.height : 1;
+      const enemyHeight = Math.min(height * art.enemyHeight, (width * ENEMY_MAX_WIDTH) / ratio);
+      enemyPlaced = place(this.enemySprite, { height: enemyHeight }, width * art.enemyX, feetAt(enemyGround - height * art.hover));
+      this.layoutShadows({ player: playerGround, enemy: enemyGround });
     }
-    const enemyGround = height * (GROUND.enemy - (art?.lift ?? 0));
-    if (place(this.enemySprite, width * 0.74, enemyGround, height * (art?.enemyHeight ?? 0.4), width * ENEMY_MAX_WIDTH) && this.enemySprite.alpha > 0) {
-      startIdle(this, this.enemySprite, { delay: 400, duration: art?.boss ? 1700 : 1500 });
+    // 倒れて消えたキャラクター（alpha 0）は、画面サイズが変わっても呼吸を再開しない
+    if (playerPlaced && this.playerSprite.alpha > 0) startIdle(this, this.playerSprite);
+    if (enemyPlaced && this.enemySprite.alpha > 0) {
+      // 浮いている敵は上下にもゆっくり揺らす
+      const float = art?.hover ? height * 0.012 : 0;
+      startIdle(this, this.enemySprite, { delay: 400, duration: art?.boss ? 1700 : 1500, float });
+    }
+  }
+
+  /** 背景の高さに対する割合 share を、画面の y に直す（背景の上下が切れていても地面の位置がずれない）。 */
+  groundY(share) {
+    const bg = this.background;
+    if (!bg || !bg.frame) return this.scale.height * share;
+    return bg.y - bg.displayHeight / 2 + bg.displayHeight * share;
+  }
+
+  /** 足元の影の大きさと高さを決める（grounds は役割ごとの地面の y）。浮いている敵の影は小さく薄くする。 */
+  layoutShadows(grounds) {
+    for (const shadow of this.shadows ?? []) {
+      const { role, sprite, shape } = shadow;
+      const hovering = role === 'enemy' && this.stageArt.hover > 0;
+      const shadowWidth = sprite.displayWidth * (hovering ? 0.45 : 0.62);
+      shape.setSize(shadowWidth, shadowWidth * 0.14);
+      shape.y = grounds[role];
+      shadow.alpha = hovering ? 0.2 : 0.32;
+      shadow.scaleX = sprite.scaleX;
+    }
+    this.syncShadows();
+  }
+
+  /** 影をキャラクターの横の位置・大きさ・透明度に合わせる（踏み込み・のけぞり・倒れるときも追う）。 */
+  syncShadows() {
+    for (const { sprite, shape, alpha, scaleX } of this.shadows ?? []) {
+      if (!sprite.scene || !shape.scene) continue;
+      shape.x = sprite.x;
+      shape.setScale(scaleX ? Math.abs(sprite.scaleX / scaleX) : 1);
+      shape.setAlpha((alpha ?? 0.3) * sprite.alpha);
+      shape.setVisible(sprite.visible);
     }
   }
 
