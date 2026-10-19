@@ -1,248 +1,277 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { ArrowRight, Sparkles, Brain, Zap, Fingerprint, Activity, Layers, Play } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext';
+import React, { useState } from 'react';
+import { ArrowRight, BookOpenText, CircleCheck, PenTool } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useLanguage, type SelectedLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { allowGuestLogin } from '../../services/authPolicy';
+import { features } from '../../config/features';
+import BrandMark from './BrandMark';
+import { Button, ButtonLink } from '../ui/Button';
+import { AUTHORING_GUIDE_URL } from '../ui/links';
 
 export type AuthEntryMode = 'login' | 'signup';
 
 interface LandingViewProps {
-    onAuthClick: (mode: AuthEntryMode) => void;
+  onAuthClick: (mode: AuthEntryMode) => void;
 }
 
+/** Where the guest CTA lands: the first real chapter in the lesson reader. */
+const FIRST_CHAPTER = '/learn/vibe-coding/vibe-ch1';
+
+const copy = {
+  en: {
+    skip: 'Skip to content',
+    language: 'Language',
+    signIn: 'Sign in',
+    pill: 'A Japanese-first learning studio',
+    titleLead: 'Every page you read,',
+    titleRest: { before: 'more ', em: 'clicks into place', after: '.' },
+    lead:
+      'Lessons made by people and AI, set in the most readable form. Ask the AI tutor about any paragraph, and make it stick with check questions and review cards.',
+    guestCta: 'Read Chapter 1 as a guest',
+    signInCta: 'Sign in to read Chapter 1',
+    authorCta: 'For lesson authors',
+    opensInNewTab: '(opens in a new tab)',
+    noteGuest: 'Read Chapter 1 without signing up. All AI processing happens on our server.',
+    noteSignIn: 'All AI processing happens on our server.',
+    shotAlt:
+      'The Rise Path lesson reader: chapter contents on the left, the lesson text with its learning goals in the middle, and the AI tutor and glossary on the right.',
+    featuresLabel: 'What you can do',
+    features: [
+      {
+        key: 'read',
+        num: '01',
+        label: 'Read',
+        title: 'A reader built for focus',
+        body: 'Japanese typesetting at about 40 characters per line with 1.9 line spacing. Contents, progress and resume work the same in every chapter.',
+      },
+      {
+        key: 'check',
+        num: '02',
+        label: 'Check',
+        title: 'Questions while you read',
+        body: 'Short questions between sections. Pick a wrong answer and you get an explanation of that specific mix-up.',
+      },
+      {
+        key: 'create',
+        num: '03',
+        label: 'Create',
+        title: 'Author lessons with Claude Code and MCP',
+        body: 'Write to one schema, then validate and preview with a command. Only lessons that pass appear in this reader.',
+      },
+    ],
+    footerSignIn: 'Already have an account? Sign in',
+  },
+  jp: {
+    skip: '本文へ移動',
+    language: '言語',
+    signIn: 'ログイン',
+    pill: '日本語ファーストの学習スタジオ',
+    titleLead: '読むたびに、',
+    titleRest: { before: '', em: 'わかる', after: 'が増えていく。' },
+    lead:
+      'AIと人がつくった教材を、いちばん読みやすい形で。段落ごとに AI先生 に質問でき、確認問題と復習カードで「わかった」を定着させます。',
+    guestCta: 'ゲストで第1章を読む',
+    signInCta: 'ログインして第1章を読む',
+    authorCta: '教材をつくる人へ',
+    opensInNewTab: '（新しいタブで開きます）',
+    noteGuest: '登録なしで第1章を読めます。AIの処理はすべてサーバー側で行います。',
+    noteSignIn: 'AIの処理はすべてサーバー側で行います。',
+    shotAlt: 'Rise Path のレッスンリーダー。左に章の目次、中央に学習目標と本文、右に AI先生 と用語のパネルが並びます。',
+    featuresLabel: 'できること',
+    features: [
+      {
+        key: 'read',
+        num: '01',
+        label: '読む',
+        title: '集中できる教材リーダー',
+        body: '1行約40字・行間1.9の日本語組版。目次・進捗・続きからを、どの章でも同じ操作で使えます。',
+      },
+      {
+        key: 'check',
+        num: '02',
+        label: '確かめる',
+        title: '読みながら確認問題',
+        body: 'セクションの合間に小さな問題。間違えたら、選んだ答えに合わせて考え方を説明します。',
+      },
+      {
+        key: 'create',
+        num: '03',
+        label: 'つくる',
+        title: 'Claude Code・MCPで教材制作',
+        body: '同じスキーマで書き、検証とプレビューをコマンドで実行。通った教材だけがこのリーダーに載ります。',
+      },
+    ],
+    footerSignIn: 'アカウントをお持ちの方はログイン',
+  },
+} as const;
+
+const FEATURE_ICONS = { read: BookOpenText, check: CircleCheck, create: PenTool } as const;
+
+/** Soft morning sun behind the screenshot. Decorative. */
+const GLOW_STYLE: React.CSSProperties = {
+  backgroundImage:
+    'radial-gradient(circle, color-mix(in oklab, var(--rp-sun) 45%, white) 0%, var(--rp-sun-soft) 38%, transparent 68%)',
+};
+
 const ExperienceLandingView: React.FC<LandingViewProps> = ({ onAuthClick }) => {
-    const { language, selectedLanguage, setLanguage } = useLanguage();
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const heroRef = useRef<HTMLDivElement>(null);
+  const { language, selectedLanguage, setLanguage } = useLanguage();
+  const { loginAsGuest } = useAuth();
+  const navigate = useNavigate();
+  const t = copy[language];
+  const [guestAllowed] = useState(() => {
+    try {
+      return allowGuestLogin();
+    } catch {
+      return false;
+    }
+  });
 
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!heroRef.current) return;
-            const { left, top, width, height } = heroRef.current.getBoundingClientRect();
-            const x = (e.clientX - left) / width - 0.5;
-            const y = (e.clientY - top) / height - 0.5;
-            setMousePos({ x, y });
-        };
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+  const shotLang = language === 'jp' ? 'jp' : 'en';
+  const languages: SelectedLanguage[] = features.frLocale ? ['en', 'jp', 'fr'] : ['en', 'jp'];
 
-    const copy = {
-        en: {
-            nav: {
-                signIn: 'Enter System',
-                signUp: 'Create Account',
-                brand: 'Rise Path'
-            },
-            hero: {
-                badge: 'Neuro-Adaptive Learning Engine v2.0',
-                titleLine1: 'Learning that',
-                titleLine2: 'Feels Like',
-                titleHighlight: 'Instinct',
-                description: 'Stop memorizing. Start absorbing. Our AI re-architects the curriculum in real-time based on your cognitive patterns, guiding you into a permanent state of Flow.',
-                ctaPrimary: 'Initialize Profile',
-                ctaSecondary: 'Watch Demo'
-            },
-            features: [
-                {
-                    id: 'adaptive',
-                    icon: Fingerprint,
-                    title: 'Cognitive Fingerprinting',
-                    desc: 'The system maps your unique learning DNA—how you abstract concepts, your pace, and your curiosity triggers.'
-                },
-                {
-                    id: 'flow',
-                    icon: Activity,
-                    title: 'Flow State Engineering',
-                    desc: 'Difficulty is dynamically adjusted millisecond-by-millisecond to keep you in the "Zone"—never bored, never overwhelmed.'
-                },
-                {
-                    id: 'symbiosis',
-                    icon: Brain,
-                    title: 'Symbiotic Intelligence',
-                    desc: 'Your AI partner doesn\'t just teach. It evolves with you, anticipating your questions before you ask them.'
-                }
-            ],
-            stats: {
-                label: 'Global Neural Network',
-                value: 'Active'
-            },
-            footer: '© 2026 Rise Path. Redefining Human Potential.'
-        },
-        jp: {
-            nav: {
-                signIn: 'ログイン',
-                signUp: '新規登録',
-                brand: 'Rise Path'
-            },
-            hero: {
-                badge: 'ニューロ・アダプティブ学習エンジン v2.0',
-                titleLine1: '学習は、',
-                titleLine2: 'もっと',
-                titleHighlight: '本能的になる',
-                description: '「暗記」をやめて、「吸収」しよう。あなたの認知パターンに合わせてリアルタイムに再構築されるカリキュラムが、あなたを永続的な「フロー状態」へと導きます。',
-                ctaPrimary: 'プロファイルを初期化',
-                ctaSecondary: 'デモを見る'
-            },
-            features: [
-                {
-                    id: 'adaptive',
-                    icon: Fingerprint,
-                    title: '認知フィンガープリント',
-                    desc: 'あなたの学習DNAをマッピング。概念の抽象化の癖、理解のペース、好奇心のトリガーを解析します。'
-                },
-                {
-                    id: 'flow',
-                    icon: Activity,
-                    title: 'フロー・エンジニアリング',
-                    desc: '「退屈」と「不安」の間にある"Zone"に留まり続けるよう、難易度をミリ秒単位で動的に調整します。'
-                },
-                {
-                    id: 'symbiosis',
-                    icon: Brain,
-                    title: '共生型インテリジェンス',
-                    desc: 'AIパートナーは単に教えるだけではありません。あなたと共に進化し、あなたが質問する前にその意図を予期します。'
-                }
-            ],
-            stats: {
-                label: 'グローバル・ニューラルネットワーク',
-                value: '稼働中'
-            },
-            footer: '© 2026 Rise Path. 人間の可能性を再定義する。'
-        }
-    } as const;
+  const startReading = () => {
+    if (!guestAllowed) {
+      onAuthClick('login');
+      return;
+    }
+    try {
+      loginAsGuest();
+      navigate(FIRST_CHAPTER);
+    } catch (error) {
+      // Guest access can be switched off (Supabase auth, strict mode): fall back to sign-in.
+      console.warn('Guest login unavailable, opening sign-in:', error);
+      onAuthClick('login');
+    }
+  };
 
-    const t = copy[language];
+  return (
+    <div className="min-h-screen overflow-x-clip bg-canvas text-fg">
+      <a
+        href="#landing-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:shadow-3"
+      >
+        {t.skip}
+      </a>
 
-    return (
-        <div className="min-h-screen bg-black text-white font-sans overflow-hidden selection:bg-rose-500/30">
-            
-            {/* Ambient Lighting / Noise */}
-            <div className="fixed inset-0 pointer-events-none z-0">
-                <div 
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] bg-rose-900/20 rounded-full blur-[120px] transition-transform duration-75 ease-out"
-                    style={{ transform: `translate(${mousePos.x * -30}px, ${mousePos.y * -30}px) translate(-50%, -50%)` }}
-                />
-                <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-10 mix-blend-overlay"></div>
-                
-                {/* Grid Lines */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-            </div>
-
-            {/* Navbar */}
-            <nav className="fixed top-0 w-full z-50 p-6 flex justify-between items-center mix-blend-difference text-white">
-                <div className="flex items-center gap-2">
-                    <Layers className="w-6 h-6" />
-                    <span className="text-lg font-bold tracking-widest uppercase">{t.nav.brand}</span>
-                </div>
-                
-                <div className="flex items-center gap-6">
-                    <div className="hidden md:flex gap-4 text-xs font-mono text-white/50">
-                        {(['en', 'jp', 'fr'] as const).map((lang) => (
-                            <button
-                                key={lang}
-                                onClick={() => setLanguage(lang)}
-                                className={`uppercase hover:text-white transition-colors ${selectedLanguage === lang ? 'text-white underline decoration-rose-500 underline-offset-4' : ''}`}
-                            >
-                                {lang}
-                            </button>
-                        ))}
-                    </div>
-                    <button
-                        onClick={() => onAuthClick('login')}
-                        className="border border-white/20 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-black transition-all"
-                    >
-                        {t.nav.signIn}
-                    </button>
-                </div>
-            </nav>
-
-            {/* Main Content */}
-            <main ref={heroRef} className="relative z-10 flex flex-col justify-center min-h-screen max-w-7xl mx-auto px-6 pt-20">
-                
-                {/* Hero */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                    <div className="lg:col-span-7 space-y-8">
-                        <div className="inline-flex items-center gap-2 text-rose-500 text-xs font-mono tracking-[0.2em] uppercase animate-in fade-in slide-in-from-left-4 duration-700">
-                            <Zap className="w-3 h-3 fill-current" />
-                            {t.hero.badge}
-                        </div>
-
-                        <h1 className="text-6xl md:text-8xl font-medium tracking-tight leading-[0.95] animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                            <span className="block text-white/40">{t.hero.titleLine1}</span>
-                            <span className="block">{t.hero.titleLine2}</span>
-                            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 italic font-serif pr-4 pb-2">
-                                {t.hero.titleHighlight}
-                            </span>
-                        </h1>
-
-                        <p className="text-lg md:text-xl text-white/60 max-w-xl leading-relaxed animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
-                            {t.hero.description}
-                        </p>
-
-                        <div className="flex flex-wrap gap-4 pt-4 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
-                            <button
-                                onClick={() => onAuthClick('signup')}
-                                className="bg-white text-black px-8 py-4 rounded-full text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center gap-3 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
-                            >
-                                {t.hero.ctaPrimary}
-                                <ArrowRight className="w-4 h-4" />
-                            </button>
-                            <button className="px-8 py-4 rounded-full text-sm font-bold uppercase tracking-widest text-white border border-white/10 hover:bg-white/5 transition-colors flex items-center gap-3">
-                                <Play className="w-4 h-4" />
-                                {t.hero.ctaSecondary}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Abstract Visual / Features */}
-                    <div className="lg:col-span-5 relative mt-12 lg:mt-0 animate-in fade-in zoom-in-95 duration-1000 delay-500">
-                        {/* Status Indicator */}
-                        <div className="absolute -top-12 right-0 flex items-center gap-2 text-xs font-mono text-emerald-500">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            {t.stats.value}
-                        </div>
-
-                        <div className="space-y-4">
-                            {t.features.map((feature, idx) => (
-                                <div 
-                                    key={feature.id}
-                                    className="group p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-rose-500/30 hover:bg-white/10 transition-all duration-500 cursor-default"
-                                    style={{ transform: `translateX(${(mousePos.x * (idx + 1)) * 10}px)` }}
-                                >
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-3 rounded-lg bg-black border border-white/10 text-white/80 group-hover:text-rose-400 group-hover:border-rose-500/50 transition-colors">
-                                            <feature.icon className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-bold mb-2 group-hover:text-rose-200 transition-colors">{feature.title}</h3>
-                                            <p className="text-sm text-white/50 leading-relaxed">
-                                                {feature.desc}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-            </main>
-
-            {/* Footer */}
-            <footer className="absolute bottom-6 left-6 right-6 flex justify-between items-end text-white/20 text-[10px] uppercase tracking-widest font-mono">
-                <div>{t.footer}</div>
-                <button
-                    type="button"
-                    onClick={() => onAuthClick('login')}
-                    className="hidden md:block text-right hover:text-white/50 transition-colors pointer-events-auto"
-                >
-                    {language === 'jp' ? 'アカウントをお持ちの方はログイン' : 'Already have an account? Sign in'}
-                </button>
-            </footer>
+      <header className="relative z-10 mx-auto flex max-w-wide items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-10">
+        <div className="flex items-center gap-2.5 text-h3 font-bold text-fg">
+          <BrandMark size={30} />
+          <span>Rise Path</span>
         </div>
-    );
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div role="group" aria-label={t.language} className="flex items-center gap-1 text-small">
+            {languages.map((lang) => {
+              const active = selectedLanguage === lang;
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  lang={lang === 'jp' ? 'ja' : lang}
+                  aria-pressed={active}
+                  onClick={() => setLanguage(lang)}
+                  className={`h-8 min-w-10 rounded-full px-2.5 font-semibold transition-colors duration-120 ${
+                    active ? 'border border-line bg-surface text-fg shadow-1' : 'text-fg-3 hover:text-fg'
+                  }`}
+                >
+                  {lang.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+          <Button variant="secondary" size="md" onClick={() => onAuthClick('login')}>
+            {t.signIn}
+          </Button>
+        </div>
+      </header>
+
+      <main id="landing-main" tabIndex={-1} className="focus:outline-none">
+        <section
+          aria-labelledby="landing-title"
+          className="relative mx-auto grid max-w-wide items-center gap-10 px-4 pb-8 pt-6 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:px-10 lg:pt-10"
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full opacity-70 sm:-top-16 sm:right-0 sm:size-128 sm:opacity-90 lg:right-16"
+            style={GLOW_STYLE}
+          />
+
+          <div className="relative min-w-0">
+            <span className="inline-flex items-center gap-2 rounded-full bg-sun-soft px-3 py-1 text-small font-semibold text-sun-text">
+              <span aria-hidden="true" className="size-2 rounded-full bg-sun-text" />
+              {t.pill}
+            </span>
+            <h1 id="landing-title" className="mt-4 text-[2.125rem] font-bold leading-[1.35] text-fg sm:text-display">
+              <span className="block">{t.titleLead}</span>
+              <span className="block">
+                {t.titleRest.before}
+                <em className="not-italic text-primary-text">{t.titleRest.em}</em>
+                {t.titleRest.after}
+              </span>
+            </h1>
+            <p className="mt-4 max-w-xl text-body-lg text-fg-2">{t.lead}</p>
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+              <Button variant="primary" size="lg" onClick={startReading} trailingIcon={<ArrowRight size={18} aria-hidden="true" />}>
+                {guestAllowed ? t.guestCta : t.signInCta}
+              </Button>
+              <ButtonLink href={AUTHORING_GUIDE_URL} external variant="secondary" size="lg">
+                {t.authorCta}
+                <span className="sr-only">{t.opensInNewTab}</span>
+              </ButtonLink>
+            </div>
+            <p className="mt-3.5 text-small text-fg-3">{guestAllowed ? t.noteGuest : t.noteSignIn}</p>
+          </div>
+
+          <figure className="relative m-0 min-w-0">
+            {/* Real captures of /learn/vibe-coding/vibe-ch1 (see components/ui/README.md). */}
+            <picture className="mx-auto block max-w-72 overflow-hidden rounded-hero border border-line bg-surface shadow-3 sm:max-w-none">
+              <source
+                media="(max-width: 639px)"
+                srcSet={`/marketing/reader-${shotLang}-mobile.webp`}
+                width={780}
+                height={1440}
+              />
+              <img
+                src={`/marketing/reader-${shotLang}.webp`}
+                alt={t.shotAlt}
+                width={1440}
+                height={900}
+                fetchPriority="high"
+                decoding="async"
+                className="block h-auto w-full"
+              />
+            </picture>
+          </figure>
+        </section>
+
+        <section aria-label={t.featuresLabel} className="mx-auto max-w-wide px-4 pb-12 pt-4 sm:px-6 lg:px-10">
+          <ul className="grid gap-4 md:grid-cols-3">
+            {t.features.map((feature) => {
+              const Icon = FEATURE_ICONS[feature.key];
+              return (
+                <li key={feature.key} className="rounded-card border border-line bg-surface p-5 shadow-1">
+                  <p className="flex items-center gap-2 text-small font-semibold text-primary-text">
+                    <Icon size={16} aria-hidden="true" />
+                    <span className="tabular">{feature.num}</span>
+                    <span>{feature.label}</span>
+                  </p>
+                  <h2 className="mt-2 text-h3 text-fg">{feature.title}</h2>
+                  <p className="mt-1 text-small text-fg-2">{feature.body}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </main>
+
+      <footer className="mx-auto flex max-w-wide flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-6 text-small text-fg-3 sm:px-6 lg:px-10">
+        <span>© 2026 Rise Path</span>
+        <button type="button" onClick={() => onAuthClick('login')} className="rounded-chip font-medium text-primary-text hover:underline underline-offset-4">
+          {t.footerSignIn}
+        </button>
+      </footer>
+    </div>
+  );
 };
 
 export default ExperienceLandingView;

@@ -1,20 +1,46 @@
 import React, { useEffect, useState } from 'react';
 import {
-    Terminal, Box, Palette, BookOpen,
+    Terminal, Box, Palette, BookOpen, Compass,
     Sparkles, Cpu, ArrowRight, Gamepad2, Settings, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { LearningPortal, LocalizedText, ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { fetchLearningPortals, updateLearningPortal, updateLearningPortalOrder } from '../../../services/learningPortalApi';
+import { VIEW_PATHS } from '../../../navigation/viewPaths';
+import { features } from '../../../config/features';
+import PageHeader from '../../ui/PageHeader';
+import CourseCard from '../../ui/CourseCard';
+import { Button, ButtonLink } from '../../ui/Button';
 
-type IconComponent = React.ComponentType<{ size: number; className: string }>;
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
 
 const VIEW_STATE_LOOKUP = new Set<string>(Object.values(ViewState));
 
 const resolveViewState = (value: string): ViewState => {
     return VIEW_STATE_LOOKUP.has(value) ? (value as ViewState) : ViewState.DASHBOARD;
 };
+
+/** World accent for a portal's cover and badge (doc/design/design-system.md §3). */
+const WORLD_BY_VIEW: Partial<Record<ViewState, string>> = {
+    [ViewState.PROGRAMMING_WEB]: 'web',
+    [ViewState.PROGRAMMING_AI]: 'ai',
+    [ViewState.PROGRAMMING_VIBE]: 'vibe',
+    [ViewState.VIBE_PATH]: 'vibe',
+    [ViewState.P_SCHOOL]: 'pschool',
+    [ViewState.UNITY_AI_GAME_DEV]: 'unity',
+    [ViewState.BLENDER]: 'blender',
+    [ViewState.TEACHER_BOT_LIVE]: 'blender',
+    [ViewState.ART_MUSEUM]: 'art',
+    [ViewState.SONIC_LAB]: 'sonic',
+};
+
+const worldForView = (view: ViewState): string => WORLD_BY_VIEW[view] ?? 'default';
+
+/** Experimental tracks stay hidden unless their labs flag is on (config/features.ts). */
+const isLabsHidden = (view: ViewState): boolean =>
+    (view === ViewState.TEACHER_BOT_LIVE && !features.labs.teacherBot) ||
+    (view === ViewState.SONIC_LAB && !features.labs.sonic);
 
 const iconMap: Record<string, IconComponent> = {
     globe: GlobeIcon,
@@ -339,7 +365,8 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         return a.id.localeCompare(b.id);
     });
 
-    const displayPortals = isEditing ? orderedPortals : orderedPortals.filter((portal) => portal.isActive);
+    const availablePortals = orderedPortals.filter((portal) => !isLabsHidden(resolveViewState(portal.view)));
+    const displayPortals = isEditing ? availablePortals : availablePortals.filter((portal) => portal.isActive);
 
     const updatePortalState = (updates: Array<{ id: string; changes: Partial<LearningPortal> }>) => {
         setPortals((prev) =>
@@ -398,163 +425,117 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         }
     };
 
-    return (
-        <div className="p-6 md:p-12 max-w-[1600px] mx-auto min-h-screen bg-slate-50/50">
-            {/* Header */}
-            <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-700 mb-2 tracking-tight">
-                        {t.headerTitle}
-                    </h1>
-                    <p className="text-slate-500">
-                        {t.headerSubtitle}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    {notice && (
-                        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full">
-                            {notice}
-                        </span>
-                    )}
-                    <button
-                        onClick={() => setIsEditing((prev) => !prev)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
-                            isEditing
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                        }`}
-                    >
-                        <Settings size={14} />
-                        {isEditing ? t.manageDone : t.manageLabel}
-                    </button>
-                </div>
-            </div>
+    const portalHref = (view: ViewState): string | undefined => VIEW_PATHS[view] || undefined;
 
-            {/* 3 Column Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {displayPortals.map((portal, index) => {
+    return (
+        <div className="mx-auto w-full max-w-wide pb-16 pt-6 sm:pt-8">
+            <PageHeader
+                title={t.headerTitle}
+                description={t.headerSubtitle}
+                actions={
+                    <>
+                        {notice && (
+                            <span role="status" className="rounded-full bg-sun-soft px-3 py-1 text-caption font-semibold text-sun-text">
+                                {notice}
+                            </span>
+                        )}
+                        <Button
+                            variant={isEditing ? 'primary' : 'secondary'}
+                            size="sm"
+                            aria-pressed={isEditing}
+                            leadingIcon={<Settings size={14} aria-hidden="true" />}
+                            onClick={() => setIsEditing((prev) => !prev)}
+                        >
+                            {isEditing ? t.manageDone : t.manageLabel}
+                        </Button>
+                    </>
+                }
+            />
+
+            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5">
+                {displayPortals.map((portal) => {
                     const Icon = iconMap[portal.icon] || BookOpen;
                     const subtitle = resolveLocalizedText(portal.subtitle, language);
                     const title = resolveLocalizedText(portal.title, language);
                     const description = resolveLocalizedText(portal.description, language);
                     const viewState = resolveViewState(portal.view);
-                    const borderColor = portal.borderColor || 'border-slate-200';
-                    const bgColor = portal.bg || 'bg-slate-100';
-                    const iconColor = portal.color || 'text-slate-500';
-                    const image = portal.image || '';
                     const portalIndex = orderedPortals.findIndex((item) => item.id === portal.id);
-                    const cardDelay = `${index * 90}ms`;
-                    const shimmerDelay = `${index * 90 + 160}ms`;
+                    const href = portalHref(viewState);
 
                     return (
-                        <div
-                            key={portal.id}
-                            onClick={() => {
-                                if (!isEditing) {
-                                    onNavigate(viewState);
-                                }
-                            }}
-                            className={`
-                              group relative bg-white rounded-2xl p-0 cursor-pointer portal-card-animate
-                              border ${borderColor} shadow-sm hover:shadow-xl hover:-translate-y-1
-                              transition-all duration-300 overflow-hidden flex flex-col h-[280px]
-                              ${isEditing ? 'cursor-default' : 'cursor-pointer'}
-                            `}
-                            style={{ animationDelay: cardDelay }}
-                        >
-                            <div
-                                className="portal-card-shimmer"
-                                style={{ animationDelay: shimmerDelay }}
-                                aria-hidden="true"
-                            />
-                            {/* Image Header Area (Height 45%) */}
-                            <div className="h-[45%] w-full relative overflow-hidden bg-slate-100">
-                                <img
-                                    src={image}
-                                    alt={title}
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                                />
-                                <div className={`absolute inset-0 bg-gradient-to-t from-white via-transparent opacity-80`}></div>
-
-                                {/* Floating Icon Badge */}
-                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur shadow-sm p-2 rounded-lg text-slate-700 group-hover:scale-110 transition-transform">
-                                    <Icon size={20} className={iconColor} />
-                                </div>
-                            </div>
-
-                            {/* Content Area */}
-                            <div className="flex-1 p-6 relative z-10">
-                                {isEditing && (
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <button
-                                            onClick={(event) => handleToggleVisibility(portal, event)}
-                                            className={`text-[10px] font-bold px-2 py-1 rounded-full border transition-colors ${
-                                                portal.isActive
-                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                                            }`}
-                                            title={portal.isActive ? t.visibilityOn : t.visibilityOff}
-                                        >
-                                            {portal.isActive ? t.visibilityOn : t.visibilityOff}
-                                        </button>
-                                        <div className="ml-auto flex items-center gap-1">
-                                            <button
-                                                onClick={(event) => handleMove(portal.id, -1, event)}
-                                                disabled={portalIndex <= 0}
-                                                className="p-1 rounded border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={t.moveUp}
+                        <li key={portal.id} className="flex">
+                            <CourseCard
+                                className="flex-1"
+                                headingLevel={2}
+                                world={worldForView(viewState)}
+                                badge={subtitle}
+                                title={title}
+                                description={description}
+                                image={portal.image || undefined}
+                                glyph={<Icon size={44} className="" />}
+                                dimmed={isEditing && !portal.isActive}
+                                {...(isEditing
+                                    ? {}
+                                    : href
+                                        ? { to: href }
+                                        : { onClick: () => onNavigate(viewState) })}
+                                footer={
+                                    isEditing ? (
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                aria-pressed={portal.isActive}
+                                                onClick={(event) => handleToggleVisibility(portal, event)}
                                             >
-                                                <ChevronUp size={14} />
-                                            </button>
-                                            <button
-                                                onClick={(event) => handleMove(portal.id, 1, event)}
-                                                disabled={portalIndex === orderedPortals.length - 1}
-                                                className="p-1 rounded border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={t.moveDown}
-                                            >
-                                                <ChevronDown size={14} />
-                                            </button>
+                                                {portal.isActive ? t.visibilityOn : t.visibilityOff}
+                                            </Button>
+                                            <div className="ml-auto flex items-center gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    aria-label={`${t.moveUp}: ${title}`}
+                                                    onClick={(event) => handleMove(portal.id, -1, event)}
+                                                    disabled={portalIndex <= 0}
+                                                >
+                                                    <ChevronUp size={16} aria-hidden="true" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    aria-label={`${t.moveDown}: ${title}`}
+                                                    onClick={(event) => handleMove(portal.id, 1, event)}
+                                                    disabled={portalIndex === orderedPortals.length - 1}
+                                                >
+                                                    <ChevronDown size={16} aria-hidden="true" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                <div className="mb-1">
-                                    <span className={`text-xs font-bold uppercase tracking-wider text-slate-500 bg-opacity-10 px-2 py-0.5 rounded-full ${bgColor}`}>
-                                        {subtitle}
-                                    </span>
-                                </div>
-                                <h2 className="text-xl font-bold text-slate-700 mb-2 tracking-tight group-hover:text-indigo-600 transition-colors">
-                                    {title}
-                                </h2>
-                                <p className="text-slate-500 text-sm leading-relaxed line-clamp-2">
-                                    {description}
-                                </p>
-
-                                <div className="absolute bottom-6 right-6 opacity-0 transform translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-indigo-600">
-                                        <ArrowRight size={16} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                    ) : undefined
+                                }
+                            />
+                        </li>
                     );
                 })}
-            </div>
+            </ul>
 
-            {/* Aptitude Test Banner (Optional, keeping it clean for now) */}
-            <div className="mt-12 bg-white rounded-2xl border border-slate-200 p-8 flex flex-col md:flex-row items-center justify-between shadow-sm gap-6">
+            <section
+                aria-labelledby="hub-diagnosis"
+                className="mt-10 flex flex-col items-start justify-between gap-4 rounded-card border border-line bg-surface p-5 shadow-1 md:flex-row md:items-center md:p-6"
+            >
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
-                        <BookOpen size={24} />
+                    <div aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-control bg-primary-soft text-primary-text">
+                        <Compass size={22} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-800">{t.bannerTitle}</h3>
-                        <p className="text-slate-500 text-sm">{t.bannerSubtitle}</p>
+                        <h2 id="hub-diagnosis" className="text-h3 text-fg">{t.bannerTitle}</h2>
+                        <p className="text-small text-fg-2">{t.bannerSubtitle}</p>
                     </div>
                 </div>
-                <button className="whitespace-nowrap bg-slate-900 text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors">
+                <ButtonLink to={VIEW_PATHS[ViewState.AI_DIAGNOSIS]} variant="secondary" trailingIcon={<ArrowRight size={16} aria-hidden="true" />}>
                     {t.bannerCta}
-                </button>
-            </div>
+                </ButtonLink>
+            </section>
         </div>
     );
 };

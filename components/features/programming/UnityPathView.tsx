@@ -231,7 +231,16 @@ const UnityPathView: React.FC<UnityPathViewProps> = ({ onBack, onNavigate, langu
                 {/* Content Card */}
                 <div className={`flex-1 transition-all duration-300 ${chapter.status === 'current' ? 'transform -translate-y-1' : 'opacity-80 hover:opacity-100'}`}>
                   <div
+                    role="link"
+                    tabIndex={chapter.status === 'locked' || !chapter.view ? -1 : 0}
+                    aria-disabled={chapter.status === 'locked' || !chapter.view || undefined}
+                    aria-label={chapter.title}
                     onClick={() => chapter.status !== 'locked' && chapter.view && onNavigate(chapter.view)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      if (chapter.status !== 'locked' && chapter.view) onNavigate(chapter.view);
+                    }}
                     className={`
                                     group/card rounded-2xl border overflow-hidden transition-all duration-300 flex flex-col md:flex-row h-full md:h-40
                                     ${chapter.status === 'current'

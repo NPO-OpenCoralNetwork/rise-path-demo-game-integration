@@ -1,870 +1,498 @@
-import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ArrowUpRight,
-  Brain,
-  Compass,
-  Flame,
-  BookOpen,
-  Sparkles,
-  Target,
-  Trophy,
-  Zap,
-  Wand2
-} from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip
-} from 'recharts';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Box, Braces, Check, Palette, RotateCw, Sparkles, Terminal } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
-import { getTotalXp, getLevel, getStreak, getXpForNextLevel, getCompletedLessonsCount } from '../../../services/gamificationService';
-import LearningInsightsWidget from './LearningInsightsWidget';
-const LifeJournalWeeklyWidget = lazy(
-  () => import('../life-journal/LifeJournalWeeklyWidget')
-);
+import { getCourse, getLessonEntry, listCourses, loadLesson } from '../../../content';
+import { getLastLesson, readLessonSummary, readProgress } from '../../lesson/progressStore';
+import { minutesLeft, resolveLText, type ContentLocale } from '../../lesson/model';
+import type { Course, Lesson } from '../../../shared/lesson/schema.js';
+import PageHeader from '../../ui/PageHeader';
+import ProgressCluster from '../../ui/ProgressCluster';
+import EmptyState from '../../ui/EmptyState';
+import CourseCard, { WORLD_COVER_STYLE } from '../../ui/CourseCard';
+import { ButtonLink } from '../../ui/Button';
+import { AUTHORING_GUIDE_URL } from '../../ui/links';
+import { courseTotals, formatCourseMeta, lessonFacts, pickResumeTarget, type LessonFacts } from '../../ui/lessonResume';
+
+// Real data widgets below the fold: loaded on demand so they stay off the critical path.
+const LifeJournalWeeklyWidget = lazy(() => import('../life-journal/LifeJournalWeeklyWidget'));
+const LearningInsightsWidget = lazy(() => import('./LearningInsightsWidget'));
 
 interface DashboardProps {
   onNavigate: (view: ViewState) => void;
 }
 
+/** Track page for a course slug (the reader's own outline lives there). */
+const COURSE_HOME: Record<string, string> = { 'vibe-coding': '/vibe' };
+
+const copy = {
+  en: {
+    greeting: (name: string) => `Welcome back, ${name}`,
+    guestName: 'Guest',
+    subtitle: 'Ten minutes is enough for today. The reader saves your place as you go.',
+    continueKicker: 'Continue',
+    startKicker: 'Start with Vibe Coding, Chapter 1',
+    continueFrom: (label: string) => `Continue (from ${label})`,
+    continuePlain: 'Continue reading',
+    startCta: 'Read Chapter 1',
+    readAgain: 'Read again',
+    nextChapter: 'Next chapter',
+    outline: 'Contents',
+    minutes: (n: number) => `about ${n} min`,
+    minutesLeft: (n: number) => `${n} min left`,
+    sections: (n: number) => `${n} ${n === 1 ? 'section' : 'sections'}`,
+    questions: (n: number) => `${n} ${n === 1 ? 'check question' : 'check questions'}`,
+    levels: { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' } as Record<string, string>,
+    objectivesLabel: 'In this chapter you will',
+    progressLabel: 'Read so far',
+    loading: 'Loading the chapter outline…',
+    outlineLabel: 'Chapter outline',
+    sectionDone: 'done',
+    sectionCurrent: 'you are here',
+    reviewTitle: '0 reviews due today',
+    reviewBody: 'Questions you missed and terms you turn into cards will show up here.',
+    tutorTitle: 'Your AI tutor lives in the lesson',
+    tutorBody: 'Ask about any paragraph with ✦. It starts with a hint and thinks it through with you instead of handing over the answer.',
+    tracks: 'Tracks',
+    seeAll: 'See all',
+    create: 'Create',
+    guide: 'Authoring guide',
+    opensInNewTab: '(opens in a new tab)',
+    createTitle: 'Create lessons with Claude Code',
+    createBody:
+      'Lessons written to the same schema go through validation, review and preview, then show up in this reader as they are. ChatGPT and Gemini can follow the same steps through MCP.',
+    codeLabel: 'Example commands',
+    codeComment1: '# in the repository',
+    codeComment2: '# validate and preview',
+    reflect: 'Reflect',
+    tracksList: {
+      vibe: { badge: 'Vibe Coding', title: 'Build web apps with AI' },
+      unity: { badge: 'Unity × AI', title: 'Game development in the AI era', description: 'Design games with Unity and AI as your partner.' },
+      blender: { badge: 'Blender', title: 'Your first 3D models', description: 'Model, light and render step by step in Blender.' },
+      art: { badge: 'Art', title: 'A journey through art and craft', description: 'Art history and the ideas behind great works.' },
+    },
+    trackProgress: 'Track progress',
+  },
+  jp: {
+    greeting: (name: string) => `おかえりなさい、${name} さん`,
+    guestName: 'Guest',
+    subtitle: '今日は 10分 だけ進めましょう。読んだところは自動で記録されます。',
+    continueKicker: '続きから',
+    startKicker: 'Vibe Coding 第1章からはじめる',
+    continueFrom: (label: string) => `続きから読む（${label} から）`,
+    continuePlain: '続きから読む',
+    startCta: '第1章を読む',
+    readAgain: 'もう一度読む',
+    nextChapter: '次の章へ',
+    outline: '目次',
+    minutes: (n: number) => `約${n}分`,
+    minutesLeft: (n: number) => `残り約${n}分`,
+    sections: (n: number) => `${n}セクション`,
+    questions: (n: number) => `確認問題 ${n}`,
+    levels: { beginner: '初級', intermediate: '中級', advanced: '上級' } as Record<string, string>,
+    objectivesLabel: 'この章でできるようになること',
+    progressLabel: 'ここまで読んだ割合',
+    loading: '章の内容を読み込んでいます…',
+    outlineLabel: 'この章の構成',
+    sectionDone: '読了',
+    sectionCurrent: '前回ここまで',
+    reviewTitle: '今日の復習 0枚',
+    reviewBody: '確認問題で間違えた所と、カードにした用語がここに並びます。',
+    tutorTitle: 'AI先生は教材の中に',
+    tutorBody: '段落の ✦ から質問できます。すぐ答えは言わず、ヒントから一緒に考えます。',
+    tracks: 'トラック',
+    seeAll: 'すべて見る',
+    create: 'つくる',
+    guide: '作成ガイド',
+    opensInNewTab: '（新しいタブで開きます）',
+    createTitle: 'Claude Code で教材をつくる',
+    createBody:
+      '同じスキーマで書かれた教材は、検証・レビュー・プレビューを通ってから、このリーダーにそのまま表示されます。ChatGPT や Gemini からも MCP で同じ手順を使えます。',
+    codeLabel: 'コマンドの例',
+    codeComment1: '# リポジトリで',
+    codeComment2: '# 検証とプレビュー',
+    reflect: 'ふりかえり',
+    tracksList: {
+      vibe: { badge: 'Vibe Coding', title: 'AIと作るWebアプリ' },
+      unity: { badge: 'Unity × AI', title: 'AI時代のゲーム開発', description: 'AIを相棒に、Unityでゲームを設計します。' },
+      blender: { badge: 'Blender', title: 'はじめての3Dモデリング', description: 'モデリングからライティングまで、手順どおりに。' },
+      art: { badge: 'Art', title: '美術史と工芸の旅', description: '名作の背景にある歴史と考え方をたどります。' },
+    },
+    trackProgress: 'トラックの進捗',
+  },
+} as const;
+
+/** "10月18日（土）" / "Saturday, October 18". */
+function formatToday(now: Date, lang: 'en' | 'jp'): string {
+  if (lang === 'jp') {
+    const weekday = new Intl.DateTimeFormat('ja-JP', { weekday: 'short' }).format(now);
+    return `${now.getMonth() + 1}月${now.getDate()}日（${weekday}）`;
+  }
+  return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(now);
+}
+
+function lessonExists(courseSlug: string, lessonId: string): boolean {
+  const course = getCourse(courseSlug);
+  return Boolean(course && getLessonEntry(course, lessonId));
+}
+
+const sectionHead = 'mb-3 mt-10 flex items-baseline justify-between gap-4';
+const sectionLink =
+  'inline-flex items-center gap-1 rounded-chip text-small font-semibold text-primary-text hover:underline underline-offset-4';
+
 const MissionControlDashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { setTheme } = useTheme();
   const { language } = useLanguage();
-  const { user: authUser } = useAuth();
-  const [chartReady, setChartReady] = useState(false);
-  const [levelNotice, setLevelNotice] = useState(true);
-  const [showLevelUp, setShowLevelUp] = useState(false);
-  const [showLevelToast, setShowLevelToast] = useState(false);
-  const [showLevelCelebration, setShowLevelCelebration] = useState(false);
-  const [achievementPopup, setAchievementPopup] = useState<{
-    title: string;
-    subtitle: string;
-    body: string;
-    reward?: string;
-    progress?: { label: string; value: string; percent: number };
-    icon: React.ComponentType<{ size?: number }>;
-    accent: string;
-  } | null>(null);
-  const [showAchievementPopup, setShowAchievementPopup] = useState(false);
-  const [levelValue, setLevelValue] = useState(() => getLevel());
-  const [toastProgress, setToastProgress] = useState(0);
-  const [toastXp, setToastXp] = useState(0);
-  const levelUpTimer = useRef<number | null>(null);
-  const levelToastTimer = useRef<number | null>(null);
-  const levelValueTimer = useRef<number | null>(null);
-  const levelCelebrateTimer = useRef<number | null>(null);
-  const achievementTimer = useRef<number | null>(null);
+  const { user } = useAuth();
+  const t = copy[language];
 
   useEffect(() => {
     setTheme('default');
   }, [setTheme]);
 
-  useEffect(() => {
-    setChartReady(true);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (levelUpTimer.current) {
-        window.clearTimeout(levelUpTimer.current);
-      }
-      if (levelToastTimer.current) {
-        window.clearTimeout(levelToastTimer.current);
-      }
-      if (levelValueTimer.current) {
-        window.clearTimeout(levelValueTimer.current);
-      }
-      if (levelCelebrateTimer.current) {
-        window.clearTimeout(levelCelebrateTimer.current);
-      }
-      if (achievementTimer.current) {
-        window.clearTimeout(achievementTimer.current);
-      }
-    };
-  }, []);
-
-  const copy = {
-    en: {
-      heroKicker: 'Mission Control',
-      heroTitle: 'Welcome back, Alex',
-      heroSubtitle: 'Pick a lane, ship a win, and let AI do the heavy lifting.',
-      streak: '3 day streak',
-      weeklyHours: '2.5h this week',
-      levelLabel: 'Level',
-      levelUpTitle: 'Level Up!',
-      levelUpBody: 'New rewards unlocked in your quest board.',
-      streakPopupTitle: 'Streak Bonus',
-      streakPopupBody: 'Keep your momentum for the 7-day reward.',
-      streakPopupReward: '+40 XP today',
-      streakPopupProgressLabel: 'Progress',
-      streakPopupProgressValue: '3 / 7 days',
-      badgePopupTitle: 'Badge Unlocked',
-      badgePopupRewardLabel: 'Reward',
-      badgePopupBodies: [
-        'Three days in a row. Next reward at day 7.',
-        'Your first AI curriculum shipped.',
-        'Explored a new AI pathway.'
-      ],
-      badgePopupRewards: ['+30 XP', '+50 XP', '+40 XP'],
-      primaryKicker: 'Now Playing',
-      primaryTitle: 'Vibe Coding: The Engine',
-      primaryDescription: 'Master OSS workflows with Codex as your co-pilot. You are 75% through Chapter 3.',
-      primaryMeta: 'Chapter 3 • 25 min',
-      primaryCta: 'Resume chapter',
-      quickActions: 'Quick Actions',
-      actionDiagnosisTitle: 'AI Learning Diagnosis',
-      actionDiagnosisBody: '5-question demo assessment',
-      actionJournalTitle: 'Life Journal',
-      actionJournalBody: 'Log mood, sleep, and exercise',
-      actionGeneratorTitle: 'AI Course Generator',
-      actionGeneratorBody: 'Turn any topic into a path',
-      actionHubTitle: 'Learning Hub',
-      actionHubBody: 'Browse themed experiences',
-      actionProfileTitle: 'Profile Passport',
-      actionProfileBody: 'See your strengths',
-      conditionTitle: 'Learning Condition',
-      conditionSubtitle: 'Keep your pace sustainable.',
-      conditionMeta: 'Last 7 days average',
-      conditionItems: [
-        { label: 'Focus', value: '82%', percent: 82, tone: 'indigo', note: 'Strong attention window' },
-        { label: 'Energy', value: '64%', percent: 64, tone: 'emerald', note: 'Afternoons dip a bit' },
-        { label: 'Sleep', value: '7h 10m', percent: 78, tone: 'amber', note: 'Average per night' }
-      ],
-      questBoardTitle: 'Quest Board',
-      questBoardSubtitle: 'Complete quests to earn XP and unlock badges.',
-      questSeeAll: 'See all quests',
-      quests: [
-        {
-          title: '15-min Focus Sprint',
-          description: 'Finish one focused block without distractions.',
-          reward: '+40 XP',
-          progress: '0 / 1',
-          percent: 20,
-          difficulty: '★',
-          tone: 'indigo'
-        },
-        {
-          title: 'AI Diagnosis',
-          description: 'Run today’s 5-question assessment.',
-          reward: '+30 XP',
-          progress: '0 / 1',
-          percent: 0,
-          difficulty: '★★',
-          tone: 'emerald'
-        },
-        {
-          title: 'Lesson Complete',
-          description: 'Finish one lesson in any track.',
-          reward: '+60 XP',
-          progress: '1 / 3',
-          percent: 35,
-          difficulty: '★★★',
-          tone: 'amber'
-        }
-      ],
-      aiCoachTitle: 'AI Coach',
-      aiCoachSubtitle: 'Personalized guidance based on your focus, energy, and streak.',
-      aiCoachMeta: 'Signals from the last 7 days',
-      aiCoachCards: [
-        { title: 'Best focus window', body: 'Schedule a 20-minute deep focus block around 20:30.', tag: 'Recommended' },
-        { title: 'Low-energy fallback', body: 'If energy dips, switch to review + quiz for 10 minutes.', tag: 'Light' },
-        { title: 'Streak protection', body: 'Keep the 3-day streak with a micro-task today.', tag: 'Streak' }
-      ],
-      aiScheduleTitle: 'Smart Schedule',
-      aiScheduleSubtitle: 'Auto-adjusts when your energy drops.',
-      aiScheduleSlots: [
-        { time: 'Tue 20:30', label: 'Focus sprint (20m)' },
-        { time: 'Thu 07:30', label: 'Review + quiz (10m)' },
-        { time: 'Sat 11:00', label: 'Build session (45m)' }
-      ],
-      aiScheduleCta: 'Open planner',
-      gamificationTitle: 'Level Up',
-      gamificationSubtitle: 'Complete one quest to gain +40 XP.',
-      gamificationMeta: 'Next reward at 500 XP',
-      gamificationLevelLabel: 'Level',
-      gamificationLevelValue: '12',
-      gamificationXpLabel: 'XP Progress',
-      gamificationXpValue: 340,
-      gamificationXpGoal: 500,
-      gamificationQuestTitle: 'Daily Quest',
-      gamificationQuestBody: '15 min focus block',
-      gamificationQuestReward: '+40 XP',
-      gamificationBadges: ['Streak 3', 'First Build', 'AI Explorer'],
-      momentumTitle: 'Momentum',
-      momentumMeta: 'Total 2.5 hours this week',
-      momentumCardTitle: 'Weekly goal',
-      momentumCardValue: '75%',
-      momentumCardBody: '3 sessions to hit 4h',
-      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    },
-    jp: {
-      heroKicker: 'ミッションコントロール',
-      heroTitle: 'おかえりなさい、Alex',
-      heroSubtitle: 'レーンを決めて、成果を出そう。重い作業はAIに任せる。',
-      streak: '3日連続',
-      weeklyHours: '今週 2.5h',
-      levelLabel: 'レベル',
-      levelUpTitle: 'レベルアップ！',
-      levelUpBody: 'クエスト報酬が解放されました。',
-      streakPopupTitle: '連続ボーナス',
-      streakPopupBody: '7日連続でさらに報酬が増加します。',
-      streakPopupReward: '本日 +40 XP',
-      streakPopupProgressLabel: '進捗',
-      streakPopupProgressValue: '3 / 7 日',
-      badgePopupTitle: 'バッジ獲得',
-      badgePopupRewardLabel: '報酬',
-      badgePopupBodies: [
-        '3日連続で学習を継続。次は7日を狙いましょう。',
-        '初めてのAIカリキュラムを完成。',
-        '新しいAIパスを探索。'
-      ],
-      badgePopupRewards: ['+30 XP', '+50 XP', '+40 XP'],
-      primaryKicker: '再開ポイント',
-      primaryTitle: 'Vibe Coding: The Engine',
-      primaryDescription: 'Codexを相棒にOSSワークフローを攻略。第3章は75%完了。',
-      primaryMeta: '第3章 • 25分',
-      primaryCta: '続きから再開',
-      quickActions: 'クイックアクション',
-      actionDiagnosisTitle: 'AI学習診断',
-      actionDiagnosisBody: '5問のデモ診断',
-      actionJournalTitle: 'ライフジャーナル',
-      actionJournalBody: '気分・睡眠・運動を記録',
-      actionGeneratorTitle: 'AIコース生成',
-      actionGeneratorBody: '任意トピックを学習パス化',
-      actionHubTitle: 'ラーニングハブ',
-      actionHubBody: 'テーマ別体験を一覧',
-      actionProfileTitle: 'プロフィール',
-      actionProfileBody: '強みを可視化',
-      conditionTitle: '学習コンディション',
-      conditionSubtitle: '無理なく続けるための指標',
-      conditionMeta: '直近7日平均',
-      conditionItems: [
-        { label: '集中度', value: '82%', percent: 82, tone: 'indigo', note: '集中の持続が良好' },
-        { label: 'エネルギー', value: '64%', percent: 64, tone: 'emerald', note: '午後に少し低下' },
-        { label: '睡眠', value: '7h 10m', percent: 78, tone: 'amber', note: '平均 7時間10分' }
-      ],
-      questBoardTitle: 'クエストボード',
-      questBoardSubtitle: 'クエスト達成でXPとバッジを獲得。',
-      questSeeAll: 'すべてのクエスト',
-      quests: [
-        {
-          title: '集中15分スプリント',
-          description: '集中ブロックを1回完了する。',
-          reward: '+40 XP',
-          progress: '0 / 1',
-          percent: 20,
-          difficulty: '★',
-          tone: 'indigo'
-        },
-        {
-          title: 'AI学習診断',
-          description: '5問の診断を実施する。',
-          reward: '+30 XP',
-          progress: '0 / 1',
-          percent: 0,
-          difficulty: '★★',
-          tone: 'emerald'
-        },
-        {
-          title: 'レッスン完了',
-          description: '任意のレッスンを1つ完了する。',
-          reward: '+60 XP',
-          progress: '1 / 3',
-          percent: 35,
-          difficulty: '★★★',
-          tone: 'amber'
-        }
-      ],
-      aiCoachTitle: 'AIコーチ',
-      aiCoachSubtitle: '集中・体力・継続データから最適な提案。',
-      aiCoachMeta: '直近7日間のシグナル',
-      aiCoachCards: [
-        { title: '最適な集中時間', body: '20:30 前後に20分の集中ブロックを提案。', tag: 'おすすめ' },
-        { title: '低エネルギー時', body: '疲れている日はレビュー＋クイズ10分に切替。', tag: '軽量' },
-        { title: '継続ボーナス維持', body: '3日連続を守るためにミニタスクを提案。', tag: 'ストリーク' }
-      ],
-      aiScheduleTitle: 'スマートスケジュール',
-      aiScheduleSubtitle: '体調が落ちたら自動で軽量タスクに切り替え。',
-      aiScheduleSlots: [
-        { time: '火 20:30', label: '集中スプリント (20分)' },
-        { time: '木 07:30', label: 'レビュー＋クイズ (10分)' },
-        { time: '土 11:00', label: 'ビルドセッション (45分)' }
-      ],
-      aiScheduleCta: 'プランナーを開く',
-      gamificationTitle: 'レベルアップ',
-      gamificationSubtitle: 'クエスト達成で +40 XP',
-      gamificationMeta: '次の報酬まで 500 XP',
-      gamificationLevelLabel: 'レベル',
-      gamificationLevelValue: '12',
-      gamificationXpLabel: 'XP 進捗',
-      gamificationXpValue: 340,
-      gamificationXpGoal: 500,
-      gamificationQuestTitle: 'デイリークエスト',
-      gamificationQuestBody: '集中15分チャレンジ',
-      gamificationQuestReward: '+40 XP',
-      gamificationBadges: ['連続3日', '初ビルド', 'AIエクスプローラー'],
-      momentumTitle: 'モメンタム',
-      momentumMeta: '今週合計 2.5 時間',
-      momentumCardTitle: '週間ゴール',
-      momentumCardValue: '75%',
-      momentumCardBody: 'あと3セッションで4h達成',
-      days: ['月', '火', '水', '木', '金', '土', '日']
+  const today = useMemo(() => formatToday(new Date(), language), [language]);
+  const name = !user || user.isGuest ? t.guestName : user.name || t.guestName;
+  const curriculumId = useMemo(() => {
+    try {
+      return window.localStorage.getItem('active_curriculum_id') || undefined;
+    } catch {
+      return undefined;
     }
-  } as const;
+  }, []);
 
+  return (
+    <div className="w-full px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-10">
+      <div className="mx-auto max-w-page">
+      <PageHeader eyebrow={today} title={t.greeting(name)} description={t.subtitle} actions={<ProgressCluster />} />
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+        <ContinueCard />
+        <div className="flex flex-col gap-5">
+          <EmptyState tone="sun" icon={<RotateCw size={18} />} title={t.reviewTitle} description={t.reviewBody} headingLevel={2} />
+          <EmptyState tone="primary" icon={<Sparkles size={18} />} title={t.tutorTitle} description={t.tutorBody} headingLevel={2} />
+        </div>
+      </div>
+
+      <TrackSection />
+
+      <section aria-labelledby="dash-create">
+        <div className={sectionHead}>
+          <h2 id="dash-create" className="text-h2 text-fg">
+            {t.create}
+          </h2>
+          <a href={AUTHORING_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={sectionLink}>
+            {t.guide}
+            <ArrowRight size={16} aria-hidden="true" />
+            <span className="sr-only">{t.opensInNewTab}</span>
+          </a>
+        </div>
+        <div className="grid items-center gap-5 rounded-card border border-line bg-surface p-5 shadow-1 md:grid-cols-2 md:gap-6">
+          <div className="min-w-0">
+            <h3 className="text-h3 text-fg">{t.createTitle}</h3>
+            <p className="mt-1 text-small text-fg-3">{t.createBody}</p>
+          </div>
+          <figure className="m-0 min-w-0">
+            <pre
+              tabIndex={0}
+              aria-label={t.codeLabel}
+              className="overflow-x-auto rounded-control border border-line bg-sunken px-3 py-2.5 font-mono text-small text-fg"
+            >
+              <code>
+                <span className="text-fg-3">{t.codeComment1}</span>
+                {'\n/author-lesson vibe-coding vibe-ch12 "MCPの基本"\n'}
+                <span className="text-fg-3">{t.codeComment2}</span>
+                {'\nnpm run lessons:validate\nnpm run lessons:preview -- vibe-coding vibe-ch12'}
+              </code>
+            </pre>
+          </figure>
+        </div>
+      </section>
+
+      <section aria-labelledby="dash-reflect">
+        <div className={sectionHead}>
+          <h2 id="dash-reflect" className="text-h2 text-fg">
+            {t.reflect}
+          </h2>
+        </div>
+        <Suspense fallback={<div className="h-48 rounded-card bg-sunken motion-safe:animate-pulse" aria-hidden="true" />}>
+          <LifeJournalWeeklyWidget onNavigate={onNavigate} />
+        </Suspense>
+      </section>
+
+      {curriculumId ? (
+        <Suspense fallback={null}>
+          <div className="mt-5">
+            <LearningInsightsWidget curriculumId={curriculumId} />
+          </div>
+        </Suspense>
+      ) : null}
+      </div>
+    </div>
+  );
+};
+
+// --- Continue card -------------------------------------------------------------------------
+
+type LoadedFacts = { lessonKey: string; lesson: Lesson; facts: LessonFacts } | { lessonKey: string; failed: true };
+
+const ContinueCard: React.FC = () => {
+  const { language } = useLanguage();
+  const t = copy[language];
+  const locale: ContentLocale = language;
+
+  const target = useMemo(() => pickResumeTarget(getLastLesson(), lessonExists), []);
+  const course = getCourse(target.courseSlug) as Course;
+  const entry = getLessonEntry(course, target.lessonId);
+  const lessonKey = `${target.courseSlug}/${target.lessonId}`;
+  const href = `/learn/${target.courseSlug}/${target.lessonId}`;
+  const summary = useMemo(() => readLessonSummary(target.courseSlug, target.lessonId), [target]);
+  const pct = summary?.pct ?? target.pct;
+  const finished = Boolean(summary && summary.state !== 'not_started' && summary.state !== 'in_progress');
+  const fallbackLocale = (course.locale as ContentLocale | undefined) ?? 'jp';
+
+  const [loaded, setLoaded] = useState<LoadedFacts | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadLesson(target.courseSlug, target.lessonId)
+      .then((result) => {
+        if (!alive) return;
+        if (!result) {
+          setLoaded({ lessonKey, failed: true });
+          return;
+        }
+        const progress = readProgress(target.courseSlug, target.lessonId);
+        setLoaded({ lessonKey, lesson: result.lesson, facts: lessonFacts(result.lesson, progress, locale) });
+      })
+      .catch(() => {
+        if (alive) setLoaded({ lessonKey, failed: true });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [target, lessonKey, locale]);
+
+  const ready = loaded && loaded.lessonKey === lessonKey && !('failed' in loaded) ? loaded : null;
+  const lesson = ready?.lesson;
+  const facts = ready?.facts;
+
+  const title = resolveLText(lesson?.title ?? entry?.ref.title, locale, fallbackLocale);
+  const estMinutes = lesson?.estMinutes ?? entry?.ref.estMinutes;
+  const trackBadge = target.courseSlug === 'vibe-coding' ? copy[language].tracksList.vibe.badge : resolveLText(course.title, locale, fallbackLocale).value;
+  const world = course.world ?? 'vibe';
+
+  const meta: string[] = [];
+  if (estMinutes) meta.push(target.fromLast && pct > 0 && !finished ? t.minutesLeft(minutesLeft(estMinutes, pct)) : t.minutes(estMinutes));
+  if (lesson?.level && t.levels[lesson.level]) meta.push(t.levels[lesson.level]);
+  if (facts) meta.push(t.sections(facts.sections));
+  if (facts && facts.questions > 0) meta.push(t.questions(facts.questions));
+
+  const objectives = (lesson?.objectives ?? []).slice(0, 3).map((objective) => ({
+    id: objective.id,
+    ...resolveLText(objective.text, locale, (lesson?.locale as ContentLocale | undefined) ?? fallbackLocale),
+  }));
+
+  const subtitle = resolveLText(lesson?.subtitle, locale, (lesson?.locale as ContentLocale | undefined) ?? fallbackLocale);
+
+  const next = finished && entry ? course.modules.flatMap((m) => m.lessons)[entry.index + 1] : undefined;
+  let primary: { label: string; to: string };
+  if (!target.fromLast) primary = { label: t.startCta, to: href };
+  else if (finished && next) primary = { label: t.nextChapter, to: `/learn/${target.courseSlug}/${next.id}` };
+  else if (finished) primary = { label: t.readAgain, to: href };
+  else primary = { label: facts?.resumeSection?.label ? t.continueFrom(facts.resumeSection.label) : t.continuePlain, to: href };
+
+  return (
+    <article
+      data-world={world}
+      aria-labelledby="dash-continue-title"
+      className="grid min-w-0 overflow-hidden rounded-card border border-line bg-surface shadow-1 md:grid-cols-[1.25fr_1fr]"
+    >
+      <div className="flex min-w-0 flex-col p-5 sm:p-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-world-soft px-2.5 py-0.5 text-caption font-semibold text-world">
+            <span aria-hidden="true" className="size-2 rounded-full bg-world" />
+            {target.fromLast ? trackBadge : t.startKicker}
+          </span>
+          {target.fromLast ? <span className="text-caption text-fg-3">{t.continueKicker}</span> : null}
+        </div>
+
+        <h2 id="dash-continue-title" lang={title.lang} className="mt-3 text-h2 text-fg">
+          {title.value}
+        </h2>
+        {meta.length ? <p className="tabular mt-1 text-small text-fg-3">{meta.join(' · ')}</p> : null}
+
+        {target.fromLast && pct > 0 ? (
+          <div className="mt-3 flex items-center gap-3">
+            <div
+              role="progressbar"
+              aria-label={t.progressLabel}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pct}
+              className="h-1.5 max-w-60 flex-1 overflow-hidden rounded-full bg-sunken"
+            >
+              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="tabular text-caption text-fg-3">{pct}%</span>
+          </div>
+        ) : null}
+
+        <div className="mt-3 min-h-16">
+          {objectives.length ? (
+            <>
+              <p className="sr-only">{t.objectivesLabel}</p>
+              <ul className="list-disc space-y-1 pl-5 text-small text-fg-2 marker:text-fg-3">
+                {objectives.map((objective) => (
+                  <li key={objective.id} lang={objective.lang}>
+                    {objective.value}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : subtitle.value ? (
+            <p lang={subtitle.lang} className="text-small text-fg-2">
+              {subtitle.value}
+            </p>
+          ) : !loaded ? (
+            <div role="status" className="space-y-2" aria-label={t.loading}>
+              <div className="h-3 w-4/5 rounded-full bg-sunken motion-safe:animate-pulse" />
+              <div className="h-3 w-3/5 rounded-full bg-sunken motion-safe:animate-pulse" />
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <ButtonLink to={primary.to} variant="primary" size="md" trailingIcon={<ArrowRight size={16} aria-hidden="true" />}>
+            {primary.label}
+          </ButtonLink>
+          {finished && next ? (
+            <ButtonLink to={href} variant="secondary" size="md">
+              {t.readAgain}
+            </ButtonLink>
+          ) : null}
+          <ButtonLink to={COURSE_HOME[target.courseSlug] ?? '/learning-hub'} variant="secondary" size="md">
+            {t.outline}
+          </ButtonLink>
+        </div>
+      </div>
+
+      <div className="relative order-first h-20 min-w-0 md:order-none md:h-auto md:min-h-64" style={COVER_STYLE}>
+        {facts ? (
+          <div className="absolute inset-x-5 bottom-5 hidden rounded-control border border-white/15 bg-black/30 p-3 text-white backdrop-blur-sm md:block">
+            <p className="text-caption font-semibold text-white/75">{t.outlineLabel}</p>
+            <ol className="mt-1.5 space-y-1">
+              {facts.outline.slice(0, 5).map((item) => (
+                <li key={item.id} className="flex items-start gap-2 text-small" lang={item.lang}>
+                  <span
+                    aria-hidden="true"
+                    className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full ${
+                      item.status === 'done'
+                        ? 'bg-white text-fg'
+                        : item.status === 'current'
+                          ? 'bg-sun'
+                          : 'border border-white/50'
+                    }`}
+                  >
+                    {item.status === 'done' ? <Check size={11} strokeWidth={3} /> : null}
+                  </span>
+                  <span className={`min-w-0 truncate ${item.status === 'current' ? 'font-semibold text-white' : 'text-white/85'}`}>
+                    {item.num ? <span className="tabular mr-1.5 text-white/65">{item.num}</span> : null}
+                    {item.title}
+                    {item.status === 'done' ? <span className="sr-only">（{t.sectionDone}）</span> : null}
+                    {item.status === 'current' ? <span className="sr-only">（{t.sectionCurrent}）</span> : null}
+                  </span>
+                </li>
+              ))}
+              {facts.outline.length > 5 ? (
+                <li className="pl-6 text-caption text-white/65">+{facts.outline.length - 5}</li>
+              ) : null}
+            </ol>
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
+};
+
+/** World gradient plus the morning sun in the top-right corner. */
+const COVER_STYLE: React.CSSProperties = {
+  backgroundImage: [
+    'radial-gradient(110% 85% at 88% 6%, color-mix(in oklab, var(--rp-sun) 45%, white) 0%, var(--rp-sun) 16%, transparent 40%)',
+    WORLD_COVER_STYLE.backgroundImage as string,
+  ].join(', '),
+};
+
+// --- Tracks --------------------------------------------------------------------------------
+
+const TrackSection: React.FC = () => {
+  const { language } = useLanguage();
   const t = copy[language];
 
-  // Real gamification data
-  const realXp = getTotalXp();
-  const realLevel = getLevel();
-  const realStreak = getStreak();
-  const xpNext = getXpForNextLevel();
-  const completedLessons = getCompletedLessonsCount();
-  const userName = authUser?.name || 'Explorer';
-
-  const baseXp = xpNext.current;
-  const goalXp = xpNext.goal;
-  const startPercent = Math.min(100, Math.round((baseXp / goalXp) * 100));
-  const levelText = `${t.levelLabel} ${realLevel}`;
-  const streakProgress = {
-    label: t.streakPopupProgressLabel,
-    value: `${realStreak} / 7 ${language === 'jp' ? '日' : 'days'}`,
-    percent: Math.min(100, Math.round((realStreak / 7) * 100))
-  };
-
-  const activityData = useMemo(() => (
-    t.days.map((day, index) => ({
-      day,
-      count: [12, 18, 15, 25, 20, 8, 30][index]
-    }))
-  ), [t.days]);
-  const conditionToneMap = {
-    indigo: 'bg-indigo-500',
-    emerald: 'bg-emerald-500',
-    amber: 'bg-amber-500'
-  } as const;
-  const questToneMap = {
-    indigo: {
-      ring: 'ring-indigo-200/70',
-      glow: 'from-indigo-500/20 via-sky-500/10 to-transparent',
-      icon: 'bg-indigo-500 text-white',
-      bar: 'bg-indigo-500'
-    },
-    emerald: {
-      ring: 'ring-emerald-200/70',
-      glow: 'from-emerald-500/20 via-teal-500/10 to-transparent',
-      icon: 'bg-emerald-500 text-white',
-      bar: 'bg-emerald-500'
-    },
-    amber: {
-      ring: 'ring-amber-200/80',
-      glow: 'from-amber-400/20 via-orange-400/10 to-transparent',
-      icon: 'bg-amber-500 text-white',
-      bar: 'bg-amber-500'
-    }
-  } as const;
-
-  const triggerLevelUp = () => {
-    setLevelNotice(false);
-    setShowLevelUp(false);
-    setShowLevelToast(true);
-    setToastProgress(startPercent);
-    setToastXp(baseXp);
-    if (levelUpTimer.current) {
-      window.clearTimeout(levelUpTimer.current);
-    }
-    if (levelToastTimer.current) {
-      window.clearTimeout(levelToastTimer.current);
-    }
-    if (levelValueTimer.current) {
-      window.clearTimeout(levelValueTimer.current);
-    }
-    if (levelCelebrateTimer.current) {
-      window.clearTimeout(levelCelebrateTimer.current);
-    }
-    requestAnimationFrame(() => setShowLevelUp(true));
-    requestAnimationFrame(() => setToastProgress(100));
-    levelUpTimer.current = window.setTimeout(() => setShowLevelUp(false), 1200);
-    levelToastTimer.current = window.setTimeout(() => setShowLevelToast(false), 2000);
-    levelValueTimer.current = window.setTimeout(() => {
-      setToastXp(goalXp);
-      setLevelValue(13);
-      setShowLevelCelebration(true);
-      levelCelebrateTimer.current = window.setTimeout(() => setShowLevelCelebration(false), 900);
-    }, 900);
-  };
-
-  const triggerAchievementPopup = (data: {
-    title: string;
-    subtitle: string;
-    body: string;
-    reward?: string;
-    progress?: { label: string; value: string; percent: number };
-    icon: React.ComponentType<{ size?: number }>;
-    accent: string;
-  }) => {
-    setAchievementPopup(data);
-    setShowAchievementPopup(false);
-    if (achievementTimer.current) {
-      window.clearTimeout(achievementTimer.current);
-    }
-    requestAnimationFrame(() => setShowAchievementPopup(true));
-    achievementTimer.current = window.setTimeout(() => setShowAchievementPopup(false), 2200);
-  };
+  const vibe = useMemo(() => {
+    const course = listCourses().find((c) => c.id === 'vibe-coding');
+    return course ? courseTotals(course, readLessonSummary) : null;
+  }, []);
 
   return (
-    <div className="relative overflow-hidden p-4 sm:p-6 lg:p-10 max-w-[1200px] xl:max-w-[1280px] w-full mx-auto min-h-screen">
-      <div
-        className={`absolute right-4 md:right-6 top-6 md:top-8 z-50 w-[88vw] max-w-[320px] rounded-2xl border border-indigo-200/60 bg-white/95 px-5 py-4 shadow-xl backdrop-blur transition-all duration-300 ${
-          showLevelToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none'
-        } ${showLevelCelebration ? 'level-toast-glow' : ''}`}
-      >
-        <div className={`level-toast-confetti ${showLevelCelebration ? 'level-toast-confetti-active' : ''}`}>
-          <span className="level-confetti" style={{ ['--x' as any]: '-16px', ['--y' as any]: '10px', ['--delay' as any]: '0ms', ['--size' as any]: '6px', ['--hue' as any]: '38' }} />
-          <span className="level-confetti" style={{ ['--x' as any]: '12px', ['--y' as any]: '12px', ['--delay' as any]: '60ms', ['--size' as any]: '5px', ['--hue' as any]: '210' }} />
-          <span className="level-confetti" style={{ ['--x' as any]: '22px', ['--y' as any]: '-6px', ['--delay' as any]: '90ms', ['--size' as any]: '4px', ['--hue' as any]: '280' }} />
-          <span className="level-confetti" style={{ ['--x' as any]: '-22px', ['--y' as any]: '-8px', ['--delay' as any]: '120ms', ['--size' as any]: '5px', ['--hue' as any]: '120' }} />
-          <span className="level-confetti" style={{ ['--x' as any]: '4px', ['--y' as any]: '-14px', ['--delay' as any]: '150ms', ['--size' as any]: '4px', ['--hue' as any]: '24' }} />
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-300 via-yellow-200 to-rose-200 text-amber-900 flex items-center justify-center shadow-md">
-            <Trophy size={18} />
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-500">{t.levelUpTitle}</div>
-            <div className="text-sm font-semibold text-slate-900">{levelText}</div>
-            <div className="text-xs text-slate-500">{t.levelUpBody}</div>
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>XP</span>
-                <span className="font-semibold text-slate-700">{toastXp} / {goalXp}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="level-toast-bar h-2 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-indigo-400"
-                  style={{ width: `${toastProgress}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+    <section aria-labelledby="dash-tracks">
+      <div className={sectionHead}>
+        <h2 id="dash-tracks" className="text-h2 text-fg">
+          {t.tracks}
+        </h2>
+        <ButtonLink to="/learning-hub" variant="ghost" size="sm" className="-mr-3" trailingIcon={<ArrowRight size={16} aria-hidden="true" />}>
+          {t.seeAll}
+        </ButtonLink>
       </div>
-      {achievementPopup && (
-        <div
-          className={`absolute right-4 md:right-6 top-28 md:top-32 z-40 w-[84vw] max-w-[280px] rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur transition-all duration-300 ${
-            showAchievementPopup ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            {(() => {
-              const PopupIcon = achievementPopup.icon;
-              return (
-                <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${achievementPopup.accent} text-white flex items-center justify-center shadow-md`}>
-                  <PopupIcon size={18} />
-                </div>
-              );
-            })()}
-            <div className="space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-indigo-500">{achievementPopup.title}</div>
-              <div className="text-sm font-semibold text-slate-900">{achievementPopup.subtitle}</div>
-              <div className="text-xs text-slate-500">{achievementPopup.body}</div>
-              {achievementPopup.reward && (
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                  {t.badgePopupRewardLabel}: {achievementPopup.reward}
-                </div>
-              )}
-              {achievementPopup.progress && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{achievementPopup.progress.label}</span>
-                    <span className="font-semibold text-slate-700">{achievementPopup.progress.value}</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-2 rounded-full bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-300"
-                      style={{ width: `${achievementPopup.progress.percent}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="pointer-events-none absolute -top-40 -right-40 h-[420px] w-[420px] rounded-full bg-gradient-to-br from-indigo-400/40 via-purple-300/20 to-transparent blur-[120px]" />
-      <div className="pointer-events-none absolute -bottom-32 -left-24 h-[360px] w-[360px] rounded-full bg-gradient-to-tr from-emerald-200/40 via-sky-200/20 to-transparent blur-[120px]" />
-
-      <div className="space-y-10">
-        <header className="relative z-10 flex flex-col gap-6 dashboard-fade" style={{ animationDelay: '40ms' }}>
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{t.heroKicker}</p>
-              <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl text-slate-900 mt-2 break-words">{language === 'jp' ? `おかえりなさい、${userName}` : `Welcome back, ${userName}`}</h1>
-              <p className="text-slate-500 mt-3 max-w-xl break-words">{t.heroSubtitle}</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-            <StatPill
-              icon={Flame}
-              label={language === 'jp' ? `${realStreak}日連続` : `${realStreak} day streak`}
-              tone="orange"
-              delay="120ms"
-              onClick={() =>
-                triggerAchievementPopup({
-                  title: t.streakPopupTitle,
-                  subtitle: language === 'jp' ? `${realStreak}日連続` : `${realStreak} day streak`,
-                  body: t.streakPopupBody,
-                  reward: `+${realStreak * 10} XP`,
-                  progress: streakProgress,
-                  icon: Flame,
-                  accent: 'from-orange-400 via-amber-300 to-yellow-300'
-                })
-              }
-            />
-            <StatPill icon={Target} label={t.weeklyHours} tone="indigo" delay="200ms" />
-              <StatPill
-                icon={Trophy}
-                label={levelText}
-                tone="emerald"
-                delay="280ms"
-                notify={levelNotice}
-                animate={showLevelUp}
-                onClick={triggerLevelUp}
-              />
-            </div>
-          </div>
-        </header>
-
-        <section className="grid lg:grid-cols-[1.15fr,0.85fr] gap-6">
-          <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white p-6 sm:p-7 md:p-8 shadow-xl dashboard-fade-float min-w-0" style={{ animationDelay: '120ms' }}>
-            <div className="pointer-events-none absolute -top-16 right-0 h-64 w-64 rounded-full bg-purple-500/30 blur-[90px] dashboard-glow" />
-            <div className="pointer-events-none absolute bottom-0 left-10 h-44 w-44 rounded-full bg-emerald-400/20 blur-[80px] dashboard-glow" />
-            <div className="relative z-10 space-y-5">
-              <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-300">
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{t.primaryKicker}</span>
-                <span>{t.primaryMeta}</span>
-              </div>
-              <div>
-                <h2 className="font-serif text-2xl md:text-3xl break-words">{t.primaryTitle}</h2>
-                <p className="text-slate-300 mt-3 text-sm md:text-base max-w-xl break-words">{t.primaryDescription}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate(ViewState.VIBE_PATH)}
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-slate-900 font-semibold shadow-lg shadow-white/20 hover:bg-purple-50 transition"
-              >
-                {t.primaryCta} <ArrowUpRight size={18} />
-              </button>
-            </div>
-          </div>
-
-          <div className="dashboard-fade min-w-0" style={{ animationDelay: '200ms' }}>
-            <Suspense fallback={<div className="h-40 animate-pulse rounded-3xl bg-slate-100/80" aria-hidden />}>
-              <LifeJournalWeeklyWidget onNavigate={onNavigate} />
-            </Suspense>
-          </div>
-        </section>
-
-      <section className="grid md:grid-cols-2 gap-6">
-        <div className="rounded-3xl border border-slate-100 bg-white/80 backdrop-blur p-6 shadow-sm dashboard-fade min-w-0" style={{ animationDelay: '280ms' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">{t.quickActions}</h3>
-          </div>
-          <div className="grid gap-3">
-            <ActionCard
-              title={t.actionDiagnosisTitle}
-              description={t.actionDiagnosisBody}
-              icon={Brain}
-              tone="indigo"
-              onClick={() => onNavigate(ViewState.AI_DIAGNOSIS)}
-            />
-            <ActionCard
-              title={t.actionJournalTitle}
-              description={t.actionJournalBody}
-              icon={BookOpen}
-              tone="amber"
-              onClick={() => onNavigate(ViewState.LIFE_JOURNAL)}
-            />
-            <ActionCard
-              title={t.actionGeneratorTitle}
-              description={t.actionGeneratorBody}
-              icon={Wand2}
-              tone="emerald"
-              onClick={() => onNavigate(ViewState.COURSE_GENERATOR)}
-            />
-            <ActionCard
-              title={t.actionHubTitle}
-              description={t.actionHubBody}
-              icon={Compass}
-              tone="amber"
-              onClick={() => onNavigate(ViewState.LEARNING_HUB)}
-            />
-            <ActionCard
-              title={t.actionProfileTitle}
-              description={t.actionProfileBody}
-              icon={Sparkles}
-              tone="rose"
-              onClick={() => onNavigate(ViewState.PROFILE)}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-100 bg-white/80 backdrop-blur p-6 shadow-sm dashboard-fade min-w-0" style={{ animationDelay: '320ms' }}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">{t.questBoardTitle}</h3>
-              <p className="text-xs text-slate-500 mt-2">{t.questBoardSubtitle}</p>
-            </div>
-            <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">
-              {t.questSeeAll}
-            </button>
-          </div>
-          <div className="space-y-3">
-            {t.quests.map((quest, index) => {
-              const styles = questToneMap[quest.tone as keyof typeof questToneMap];
-              return (
-                <div
-                  key={quest.title}
-                  className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ${styles.ring}`}
-                >
-                  <div className="relative z-10 flex items-start gap-3">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${styles.icon} shadow-md`}>
-                      <Sparkles size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <h4 className="font-semibold text-slate-800 break-words min-w-0 flex-1">{quest.title}</h4>
-                        <span className="text-xs font-semibold text-slate-500 shrink-0">{quest.difficulty}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">{quest.description}</p>
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>{quest.progress}</span>
-                          <span className="font-semibold text-emerald-600">{quest.reward}</span>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-slate-100">
-                          <div
-                            className={`h-2 rounded-full ${styles.bar} dashboard-progress`}
-                            style={{ ['--progress' as any]: `${quest.percent}%` } as React.CSSProperties}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-100 bg-white/90 backdrop-blur p-6 sm:p-8 shadow-sm dashboard-fade min-w-0" style={{ animationDelay: '380ms' }}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t.aiCoachTitle}</p>
-            <h3 className="text-2xl font-semibold text-slate-900 mt-2 break-words">{t.aiCoachSubtitle}</h3>
-            <p className="text-sm text-slate-500 mt-2 break-words">{t.aiCoachMeta}</p>
-          </div>
-          <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-            <Brain size={22} />
-          </div>
-        </div>
-        <div className="grid md:grid-cols-[1.1fr,0.9fr] gap-6 mt-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3 min-w-0">
-            {t.aiCoachCards.map((card) => (
-              <div key={card.title} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm min-w-0">
-                <div className="flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <Sparkles size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-sm font-semibold text-slate-800 break-words min-w-0 flex-1">{card.title}</div>
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full shrink-0">
-                        {card.tag}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 break-words">{card.body}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="rounded-2xl bg-slate-900 text-white p-5 flex flex-col gap-4 min-w-0">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-              <Zap size={14} />
-              {t.aiScheduleTitle}
-            </div>
-            <p className="text-sm text-slate-300 break-words">{t.aiScheduleSubtitle}</p>
-            <div className="space-y-2">
-              {t.aiScheduleSlots.map((slot) => (
-                <div key={`${slot.time}-${slot.label}`} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3 min-w-0">
-                  <div className="text-sm font-semibold text-white shrink-0">{slot.time}</div>
-                  <div className="text-xs text-slate-300 break-words">{slot.label}</div>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-slate-900 text-sm font-semibold shadow-lg shadow-white/20 hover:bg-indigo-50 transition"
-            >
-              {t.aiScheduleCta} <ArrowUpRight size={16} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 sm:p-8 shadow-sm dashboard-fade min-w-0" style={{ animationDelay: '460ms' }}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-6">
-          <h3 className="text-slate-800 font-bold">{t.momentumTitle}</h3>
-          <span className="text-sm text-slate-400">{t.momentumMeta}</span>
-        </div>
-        <div className="grid md:grid-cols-[1fr,220px] gap-6 items-stretch">
-          <div className="h-[140px] w-full min-w-[220px]">
-            {chartReady && (
-              <ResponsiveContainer width="100%" height="100%" minWidth={220} minHeight={120}>
-                <AreaChart data={activityData}>
-                  <defs>
-                    <linearGradient id="momentumStroke" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#818cf8" />
-                      <stop offset="100%" stopColor="#38bdf8" />
-                    </linearGradient>
-                    <filter id="momentumGlow" x="-30%" y="-30%" width="160%" height="160%">
-                      <feGaussianBlur stdDeviation="6" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#6366f1"
-                    strokeOpacity={0.35}
-                    strokeWidth={10}
-                    fill="transparent"
-                    filter="url(#momentumGlow)"
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="url(#momentumStroke)"
-                    strokeWidth={3}
-                    fill="transparent"
-                    dot={{ r: 4, fill: '#cbd5e1', strokeWidth: 0 }}
-                    activeDot={{ r: 6, fill: '#6366f1' }}
-                  />
-                  <RechartsTooltip
-                    contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '10px', color: 'white' }}
-                    itemStyle={{ color: 'white' }}
-                    cursor={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-          <div className="rounded-2xl bg-slate-900 text-white p-5 flex flex-col justify-between">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">{t.momentumCardTitle}</div>
-            <div className="text-3xl font-bold">{t.momentumCardValue}</div>
-            <div className="text-sm text-slate-300">{t.momentumCardBody}</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Learning Insights (powered by personalization APIs) */}
-      <section className="dashboard-fade" style={{ animationDelay: '500ms' }}>
-        <LearningInsightsWidget curriculumId={localStorage.getItem('active_curriculum_id') || undefined} />
-      </section>
-    </div>
-  </div>
-  );
-};
-
-const StatPill = ({
-  icon: Icon,
-  label,
-  tone,
-  delay,
-  notify,
-  animate,
-  onClick
-}: {
-  icon: any;
-  label: string;
-  tone: 'orange' | 'indigo' | 'emerald';
-  delay?: string;
-  notify?: boolean;
-  animate?: boolean;
-  onClick?: () => void;
-}) => {
-  const toneMap = {
-    orange: 'bg-orange-50 text-orange-600 border-orange-100',
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100'
-  };
-  const Element = onClick ? 'button' : 'div';
-  const elementProps = onClick ? { type: 'button' as const, onClick } : {};
-  return (
-    <Element
-      {...elementProps}
-      className={`relative rounded-full border px-4 py-2 text-sm font-semibold dashboard-pop ${toneMap[tone]}`}
-      style={delay ? { animationDelay: delay } : undefined}
-    >
-      {notify && <span className="level-notify-dot" />}
-      {animate && (
-        <>
-          <span className="level-up-flare" />
-          <span className="level-burst" />
-          <span className="level-burst level-burst-second" />
-        </>
-      )}
-      <span className={`level-pill-body ${animate ? 'level-up-pop' : ''}`}>
-        <Icon size={16} />
-        {label}
-      </span>
-    </Element>
-  );
-};
-
-const ActionCard = ({
-  title,
-  description,
-  icon: Icon,
-  tone,
-  onClick
-}: {
-  title: string;
-  description: string;
-  icon: any;
-  tone: 'indigo' | 'emerald' | 'amber' | 'rose';
-  onClick: () => void;
-}) => {
-  const toneMap = {
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    rose: 'bg-rose-50 text-rose-600 border-rose-100'
-  };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md min-w-0"
-    >
-      <div className={`h-11 w-11 rounded-xl border flex items-center justify-center ${toneMap[tone]}`}>
-        <Icon size={20} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold text-slate-800 break-words">{title}</div>
-        <div className="text-xs text-slate-500 break-words">{description}</div>
-      </div>
-      <ArrowUpRight size={18} className="text-slate-400 group-hover:text-slate-600 transition" />
-    </button>
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <li className="flex">
+          <CourseCard
+            className="flex-1"
+            world="vibe"
+            badge={t.tracksList.vibe.badge}
+            title={t.tracksList.vibe.title}
+            meta={vibe ? formatCourseMeta(vibe, language) : undefined}
+            progress={vibe && vibe.pct > 0 ? vibe.pct : undefined}
+            progressLabel={t.trackProgress}
+            glyph={<Terminal aria-hidden="true" />}
+            to="/vibe"
+          />
+        </li>
+        <li className="flex">
+          <CourseCard
+            className="flex-1"
+            world="unity"
+            badge={t.tracksList.unity.badge}
+            title={t.tracksList.unity.title}
+            description={t.tracksList.unity.description}
+            glyph={<Braces aria-hidden="true" />}
+            to="/unity"
+          />
+        </li>
+        <li className="flex">
+          <CourseCard
+            className="flex-1"
+            world="blender"
+            badge={t.tracksList.blender.badge}
+            title={t.tracksList.blender.title}
+            description={t.tracksList.blender.description}
+            glyph={<Box aria-hidden="true" />}
+            to="/blender"
+          />
+        </li>
+        <li className="flex">
+          <CourseCard
+            className="flex-1"
+            world="art"
+            badge={t.tracksList.art.badge}
+            title={t.tracksList.art.title}
+            description={t.tracksList.art.description}
+            glyph={<Palette aria-hidden="true" />}
+            to="/art"
+          />
+        </li>
+      </ul>
+    </section>
   );
 };
 
