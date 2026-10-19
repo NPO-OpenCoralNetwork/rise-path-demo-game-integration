@@ -7,34 +7,29 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The screen-flow diagram (s2-b3/s2-b4 area, 'アプリを開く → 今月の残り画面 ⇄ 支出の入力画面') is readable at 390 px. Its labels are in the correct language in JP and EN, and it has a caption and a '図の説明を読む' toggle. Both tables (s2-table, the MoSCoW table) wrap cleanly on mobile, and no metric reports overflow, broken images or mermaid errors.",
-      "blockIds": [
-        "s2-table",
-        "s5-b2",
-        "s3-steps"
-      ]
+      "evidence": "Each segment has its own visual anchor: the goal/feature definition list and the feature-to-goal table in 2-2, the MoSCoW table in 2-3, the 6-step procedure and the screen-flow diagram s2-b4 in 2-4, plus the prompt cards. The diagram labels are large, in the right language and readable at 390 px (pages/mobile-jp-14.png, pages/desktop-en-10.png).",
+      "blockIds": ["s2-b4"]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "No screen is text-only. Each section breaks up its prose with definitions, a table, a callout or a check. Two minor points: desktop JP charsPerLine max is 42 (target 30–40, median 37 is fine), and the 6-question exam runs about 5 mobile screens with no break (mobile-jp-16..21).",
-      "blockIds": [
-        "s3-steps"
-      ]
+      "score": 4,
+      "evidence": "metrics.json shows no text-only screens in any locale. Desktop JP lines run 37 chars (median, target 30–40) and EN lines 71 (target 60–75). Paragraphs are short and broken up by callouts, tables or checks (pages/desktop-jp-02..10.png). No walls of text or empty gaps on the full-length pages."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN screenshots have no leftover Japanese: headings, tables, diagram nodes, the prompt and quiz options are all translated. JP has no awkward breaks inside words, contrast is good, and no controls are hidden under the 56/60 px bars on mobile. EN charsPerLine median 73 is within 60–75 (max 78)."
+      "evidence": "The EN screenshots are fully translated: headings, tables, the diagram ('Money-left screen', 'Add button'), prompt cards and flashcards. The JP screenshots contain no stray English beyond intended terms (MVP, MoSCoW, PRD with their expansions). The diagram has a 'Describe the figure in words' toggle. Contrast is fine, and no controls are hidden under the top or bottom bars on mobile.",
+      "blockIds": ["s2-b4"]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "reader: on mobile the flashcard hint reads 'クリックまたはスペースキーでめくる' (pages/mobile-jp-23.png). On touch devices show a tap hint instead.",
-    "reader: the knowledge-check block shows all 6 questions as one long card on mobile (pages/mobile-jp-16.png to mobile-jp-21.png). A per-question pager or a sticky '6問中 n問目' would make it easier to find your place.",
-    "s2-defs: in the desktop JP definition rows the last line holds only 'す。' or 'れる」の形で…' (pages/desktop-jp-04.png). Trimming a few characters, e.g. '入力欄や画面、通知など、アプリが「すること」。', would avoid the orphan.",
-    "s3-steps: the 6-step worked example takes about 3.5 mobile screens of continuous text (pages/mobile-jp-11.png to mobile-jp-14.png). Shortening each step's body to one sentence would tighten it."
+    "s2-b4: the two curved edges between the money-left screen and the input screen carry the labels '追加ボタン' and '保存' side by side. At 390 px it is hard to tell which label goes with which arrow (pages/mobile-jp-14.png). Consider labelling them '追加ボタンで→' and '保存で戻る', or describing the round trip in the caption.",
+    "reader: the flashcard hint reads 'クリックまたはスペースキーでめくる' on mobile (pages/mobile-jp-23.png). On touch devices it should say 'タップしてめくる'.",
+    "reader: on desktop, the sidebar outline marks sections the learner has only scrolled past as '未回答' / 'Unanswered' with an alert icon (pages/desktop-jp-08.png, pages/desktop-en-09.png). This may read as an error rather than a reminder.",
+    "reader: the mobile-jp capture is marked truncated in metrics.json. The last screen (pages/mobile-jp-25.png) overlaps the previous one, but the content appears complete."
   ],
+  "average": 4,
   "verdict": "pass",
-  "summary": "The lesson looks clean in all three renders: no overflow, console errors or broken visuals, and a full EN translation. Every section is broken up by a definition list, table, diagram or check. Nothing has to be fixed. The only content polish is minor: orphaned line endings in the s2-defs rows and a slightly long s3-steps worked example on mobile."
+  "summary": "The metrics are clean (no overflow, console, mermaid, block or image errors), and every screen in all three captures has a heading, table, figure, prompt or check. Line lengths are on target for both JP and EN. Nothing needs fixing in the lesson. The only small lesson-side improvement is clearer edge labels in the screen-flow diagram s2-b4 at mobile width."
 }

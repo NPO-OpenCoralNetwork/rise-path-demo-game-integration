@@ -6,18 +6,27 @@
   "scores": [
     {
       "id": "voice",
-      "score": 4,
-      "evidence": "The lesson reads like a teacher talking beside you: hook-b1 opens with a concrete failure, s1-b2 maps the analogy explicitly (「大工さんがAI、家がアプリです。」), and every feedback runs 'misconception, then the correct view' in 2 sentences. One sentence in the q9 option a feedback can be read two ways (see mustFix).",
+      "score": 3,
+      "evidence": "The prose is natural and uses です・ます throughout, with no 翻訳調 and no pressure phrases (hook-b1, s1-b5, s5-b1). One flashcard back, card-goal, has two noun-ending sentences in a row, which §1 does not allow.",
       "blockIds": [
+        "card-goal",
         "hook-b1",
-        "s1-b2",
-        "check-quiz"
+        "s1-b5"
       ]
     },
     {
       "id": "load",
+      "score": 3,
+      "evidence": "lessons:lint --strict is clean, and every paragraph is short with one idea per sentence. The q4 explanation is the only paragraph with 4 sentences. It also uses 仕様書 before it defines it.",
+      "blockIds": [
+        "q4",
+        "s5-b1"
+      ]
+    },
+    {
+      "id": "prior",
       "score": 4,
-      "evidence": "`lessons:lint --strict` reports 0 warnings, so every sentence and paragraph is within budget. Each section has 1–2 new terms (壁打ち / 目的・機能 / MVP・MoSCoW / 1枚企画書), and tables, steps, a diagram or a quiz break up the text.",
+      "evidence": "New terms are defined before use and stay within budget: 壁打ち, 目的・機能, MVP・MoSCoW and 1枚企画書・PRD each have a definitions block. Katakana and abbreviations get English on first use (ビジョン（vision）, MVP（Minimum Viable Product）, PRD（Product Requirements Document）). The glossary matches the text.",
       "blockIds": [
         "s1-defs",
         "s2-defs",
@@ -26,42 +35,39 @@
       ]
     },
     {
-      "id": "prior",
-      "score": 4,
-      "evidence": "s1-b1 recalls Chapter 0 (「ビジョン（vision）を示すこと」), and ex-data recalls the database from Chapter 1. Each term is defined in a definitions block before use and is then linked with [[目的]] or [[機能]]. The glossary wording matches s1-defs, s2-defs, s5-defs and s3-defs, and MVP and PRD are spelled out at first use.",
-      "blockIds": [
-        "s1-b1",
-        "ex-data",
-        "s2-why",
-        "s5-b1"
-      ]
-    },
-    {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every string has both jp and en, and the EN reads as natural English, not translation. The mermaid labels in s2-b4 are localized, alt and description are present, and the EN UI label 「期待される結果」/'What a good answer looks like' in s1-b5 matches PromptBlock.tsx.",
+      "evidence": "Every string has jp and en, and the two versions mean the same thing. The English reads naturally (q6, s2-b3 expect). The mermaid labels and alt text are localized and match the in-text names (今月の残り画面 / money-left screen).",
       "blockIds": [
         "s2-b4",
-        "s1-b5"
+        "s2-b3",
+        "q6"
       ]
     }
   ],
   "mustFix": [
     {
+      "criterion": "load",
+      "blockId": "q4",
+      "issue": "(d) 3 sentences per paragraph (§1): the explanation has 4 sentences. It also uses 「仕様書」 in sentence 3 and explains it only in sentence 4.",
+      "fix": "「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。」→「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」"
+    },
+    {
       "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(a) meaning: q9 option a feedback 「先に企画書を直し、同じ1枚を渡します。」 can be read two ways. 「同じ1枚」 can mean the unchanged plan, which contradicts 「直し」 in the same sentence. The EN 'then hand over the same page' has the same problem.",
-      "fix": "JP: 「先に企画書を直し、同じ1枚を渡します。」→「先に企画書を直し、直した1枚をAIに渡します。」 EN: \"Fix the plan first, then hand over the same page.\" → \"Fix the plan first, then hand the updated page to the AI.\""
+      "blockId": "card-goal",
+      "issue": "(d) です・ます, no consecutive 体言止め (§1): the card back is two noun-ending sentences in a row, 「…どうなれる」。」 and 「…手段。」.",
+      "fix": "「目的は「誰が・どんな場面で・どうなれる」。機能はそのための手段。」→「目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。」"
     }
   ],
   "niceToHave": [
-    "check-quiz: q7 options c and d use the abbreviation SNS without spelling it out. Most adults know it, but §2 asks for the full form at first use. 「写真での種類判定、SNSへの投稿」→「写真での種類判定、SNS（ソーシャルメディア）への投稿」 in option c, which is the first time SNS appears.",
-    "s2-table / s5-b2 / s2-b3: the same reminder is named 「毎晩の通知」, 「入力忘れを知らせる通知」 and 「入力忘れの通知」. It is still recognizable, but one name would help the learner match them. In s2-b3.expect: 「Shouldは入力忘れの通知」→「Shouldは入力忘れを知らせる通知」.",
-    "s5-b2 / s2-b3: the chart is 「食費の推移のグラフ」 in the table and 「食費のグラフ」 in the model plan. In s2-b3.expect: 「Couldは食費のグラフ」→「Couldは食費の推移のグラフ」 (EN \"a food-spending chart\" → \"a chart of food spending over time\").",
-    "s3-defs: the EN adds 'that teams use', which the JP does not say. 'It's a small version of the PRD (Product Requirements Document) that teams use to write down a product's requirements.' → 'It's a small version of a PRD (Product Requirements Document), a document that sets out a product's requirements.'",
-    "ex-goal: the EN 'you might answer' is softer than the JP 「と答えます」. Either is fine, but the JP could match the example's tone: 「と答えます。」→「のように答えます。」."
+    "vibe-ch2 glossary (機能): two noun-ending sentences in a row, unlike s2-defs. Align it with the definitions block — 「目的を果たすための手段。アプリが「すること」。」→「目的を果たすための手段です。アプリが「すること」にあたります。」",
+    "ex-review / card-plan / q8: one set of headings is called 見出し, 項目 and 欄. 「項目」 also means data fields (「項目名だけ」), so use 見出し everywhere — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」; 「1枚企画書の6項目」→「1枚企画書の6つの見出し」; 「画面の流れと扱うデータの欄だけが空です。」→「画面の流れと扱うデータの見出しだけが空です。」",
+    "q7 option c: SNS should be spelled out by its full name (§2) — 「SNS（ソーシャルメディア）」→「SNS（ソーシャル・ネットワーキング・サービス）」",
+    "ex-goal: the sample question differs from the one in s1-b4 expect. Reuse it so the learner sees the same exchange — 「「いつ困りますか？」には」→「「いまはどんな場面で困っていますか？」には」 (en: \"When do you run into the problem?\" → \"When do you run into the problem today?\")",
+    "s5-defs (MoSCoW): the reason for the name helps recall — 「機能をMust・Should・Could・Won'tの4つに分けて、優先順位を決める方法です。」→「Must・Should・Could・Won'tの頭文字から名づけられた、機能を4つに分けて優先順位を決める方法です。」",
+    "s5-b2 rows[0][1] (also ex-moscow expect and s2-b3 expect): the chain of の is heavy — 「今月の食費の予算の設定と残り金額の表示」→「今月の食費の予算を決めて、残り金額を表示する」 (change all three together)."
   ],
-  "average": 4,
+  "average": 3.5,
   "verdict": "revise",
-  "summary": "The Japanese is warm and natural, and terms match across the text, glossary, tables and diagram. `lessons:lint --strict` is clean, and the EN conveys the same content in natural English. The one blocking item is the ambiguous 「同じ1枚を渡します」 in q9 option a's feedback; changing it to 「直した1枚をAIに渡します」 (and the matching EN) clears the gate."
+  "summary": "The Japanese is warm and natural, terms are introduced carefully, and the English versions match the Japanese closely. Two small rule breaks block the gate: the q4 explanation has 4 sentences in one paragraph, and the card-goal back uses two noun-ending sentences in a row. Both have exact replacements above, and lessons:lint --strict is already clean."
 }

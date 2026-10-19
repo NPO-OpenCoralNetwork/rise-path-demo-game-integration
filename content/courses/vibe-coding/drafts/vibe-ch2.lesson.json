@@ -765,7 +765,7 @@
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。",
+                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。",
                 "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. Anthropic's official guide to Claude Code likewise says a useful spec (a document like this plan) states what is out of scope."
               },
               "hint": {
@@ -972,8 +972,8 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "プログラミング言語やファイルの分け方まで、決めて書き込む",
-                    "en": "Decide and write down the programming language and how files are split"
+                    "jp": "画面の流れとデータの欄に、使う言語やファイルの分け方まで書く",
+                    "en": "Fill the screen-flow and data fields down to the language and how files are split"
                   },
                   "feedback": {
                     "jp": "使う技術は、企画の段階ではまだ決めなくて大丈夫です。企画書では「何を・なぜ」を決め、「どう作るか」はAIと相談します。",
@@ -983,8 +983,8 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "空いた欄はAIが補ってくれるので、そのまま渡す",
-                    "en": "Hand it over as is, since the AI will fill in the blanks"
+                    "jp": "画面の流れとデータの欄は、AIが補うので空のまま渡す",
+                    "en": "Leave the screen-flow and data fields blank, since the AI fills them in"
                   },
                   "feedback": {
                     "jp": "空いた欄は、AIの推測で埋まりがちです。画面名と項目名だけでも、自分で決めて書きます。",
@@ -994,8 +994,8 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "思いつく例外や細かい条件を、すべて書き足しておく",
-                    "en": "Add every edge case and detailed condition you can think of"
+                    "jp": "画面の流れとデータの欄に、思いつく例外や条件をすべて書く",
+                    "en": "Fill the screen-flow and data fields with every edge case and condition"
                   },
                   "feedback": {
                     "jp": "細かい条件の多くは、作って試すと見えてきます。先に、空いている見出しを自分で埋めます。",
@@ -1005,15 +1005,15 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "画面の流れと扱うデータを、自分で決めて書き足す",
-                    "en": "Decide the screen flow and the data yourself, and fill them in"
+                    "jp": "画面名と保存する項目名だけを、自分で決めて書き足す",
+                    "en": "Decide just the screen names and field names yourself, and add them"
                   }
                 }
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "1枚企画書の役目は、目的と範囲をAIと共有することです。空いた見出しはAIの推測で埋まりがちなので、渡す前に自分で書きます。",
-                "en": "A one-page plan exists to share the goal and the scope with the AI. Empty headings tend to get filled with the AI's guesses, so fill them in yourself before handing it over."
+                "jp": "1枚企画書の役目は、目的と範囲をAIと共有することです。空いた見出しはAIの推測で埋まりがちなので、渡す前に自分で書きます。名前だけで十分です。",
+                "en": "A one-page plan exists to share the goal and the scope with the AI. Empty headings tend to get filled with the AI's guesses, so fill them in yourself before handing it over. Names alone are enough."
               },
               "objectiveId": "o4",
               "bloom": "evaluate"
@@ -1187,7 +1187,7 @@
               "id": "card-goal",
               "front": { "jp": "目的と機能の違いは？", "en": "Goal vs feature?" },
               "back": {
-                "jp": "目的は「誰が・どんな場面で・どうなれる」。機能はそのための手段。",
+                "jp": "目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。",
                 "en": "A goal says who, in what situation, can do what. A feature is a means to get there."
               }
             },

@@ -795,3 +795,84 @@ applied and checked in the draft but has not been re-reviewed. The steps are:
 2. Re-run `npm run lessons:preview -- vibe-coding vibe-ch2` and have visual-qa look at the current captures.
 3. Run a fresh independent review of the current draft (ja-editor at least) and save it over the old JSON.
 4. Publish, together with vibe-ch2-practice, only once `check-review.mjs` exits 0.
+
+## Final gate (2026-10-19)
+
+Fresh independent reviews of the current draft (pedagogy-reviewer, ja-editor, visual-qa), run after the 11:07 UTC
+preview. They are saved over the old JSON in `reports/vibe-ch2.<reviewer>.review.json`. The preview of the same draft
+was clean in all three views: no overflow, 0 console errors, 0 diagram errors, no text-only screens, JP median 37
+chars per line (target 30–40) and EN median 71 (target 60–75).
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`
+→ **exit 1 (REVISE)**:
+
+```text
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer)
+  ✓ active     3  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
+  ✓ practice   3  (pedagogy-reviewer)
+  ✓ meta       4  (pedagogy-reviewer)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  must fix [load] q4: (d) 3 sentences per paragraph (§1): the explanation has 4 sentences. It also uses 「仕様書」 in sentence 3 and explains it only in sentence 4. → 「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。」→「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」
+  must fix [voice] card-goal: (d) です・ます, no consecutive 体言止め (§1): the card back is two noun-ending sentences in a row, 「…どうなれる」。」 and 「…手段。」. → 「目的は「誰が・どんな場面で・どうなれる」。機能はそのための手段。」→「目的は「誰が・どんな場面で・どうなれる」の形で書きます。機能は、目的を果たすための手段です。」
+  must fix [active] check-quiz: q8 (o4, evaluate) gives its answer away. The stem names the empty fields (「画面の流れと扱うデータの欄だけが空です」), and only the key d repeats them (「画面の流れと扱うデータを、自分で決めて書き足す」). Options a and c do not even address the blanks, so a test-wise learner can pick d by word matching without judging what to fix or how. → Make every option act on the two empty fields, so the judgment is about how to fill them. Keep the ids and key d. JP: a 「画面の流れとデータの欄に、使う言語やファイルの分け方まで書く」; b 「画面の流れとデータの欄は、AIが補うので空のまま渡す」; c 「画面の流れとデータの欄に、思いつく例外や条件をすべて書く」; d 「画面名と保存する項目名だけを、自分で決めて書き足す」. EN: a "Fill the screen-flow and data fields down to the language and how files are split"; b "Leave the screen-flow and data fields blank, since the AI fills them in"; c "Fill the screen-flow and data fields with every edge case and condition"; d "Decide just the screen names and field names yourself, and add them". Keep the existing feedback for a, b and c. Append to the explanation 「名前だけで十分です。」 / "Names alone are enough."
+```
+
+| Reviewer | Average | Verdict | Must-fix |
+|---|---|---|---|
+| pedagogy-reviewer | 3.38 | revise | 1 (`active`, q8) |
+| ja-editor | 3.5 | revise | 2 (`load`, q4; `voice`, card-goal) |
+| visual-qa | 4 | pass | 0 |
+| **Merged** (lowest per criterion) | **3.38** | **REVISE** | **3** |
+
+Every criterion is at least 3 and the mean clears 3.3, so the only blockers are the three must-fix items. **Not
+published**: the owner's decision publishes vibe-ch2 and vibe-ch2-practice together only when both exit 0, and both
+exited 1.
+
+### Must-fix items, applied after the gate
+
+These were applied to the draft after the gate ran, so the saved reviews describe the draft before them.
+
+- **q4 explanation** (ja-editor, (d) at most 3 sentences per paragraph, §1): the reviewer's exact text. The last two
+  sentences become one, and 仕様書 is glossed where it first appears: 「Claude Codeの公式ガイド（Anthropic）も、役に立つ
+  仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。」 → 「Claude Codeの公式ガイド
+  （Anthropic）も、役に立つ仕様書（企画書のような文書）には範囲外を書く、としています。」 The EN already says "a useful
+  spec (a document like this plan) states what is out of scope", so it is unchanged. `cite: cc-best-practices` stays.
+- **card-goal back** (ja-editor, (d) です・ます and no consecutive 体言止め, §1): the reviewer's exact text.
+  「目的は「誰が・どんな場面で・どうなれる」。機能はそのための手段。」 → 「目的は「誰が・どんな場面で・どうなれる」の形で
+  書きます。機能は、目的を果たすための手段です。」 The EN carries the same meaning and is unchanged.
+- **q8 options** (pedagogy-reviewer, `active`): a clear assessment error, because the key was the only option that
+  repeated the stem's 「画面の流れと扱うデータ」 and a and c ignored the blanks. All four options now act on the two
+  empty fields, with the reviewer's exact JP and EN. Ids, key d, objectiveId o4 and bloom stay. The a, b and c feedback
+  is kept, as the fix says. The explanation gains 「名前だけで十分です。」 / "Names alone are enough."
+  - a 「画面の流れとデータの欄に、使う言語やファイルの分け方まで書く」 / "Fill the screen-flow and data fields down to
+    the language and how files are split"
+  - b 「画面の流れとデータの欄は、AIが補うので空のまま渡す」 / "Leave the screen-flow and data fields blank, since the AI
+    fills them in"
+  - c 「画面の流れとデータの欄に、思いつく例外や条件をすべて書く」 / "Fill the screen-flow and data fields with every edge
+    case and condition"
+  - d (key) 「画面名と保存する項目名だけを、自分で決めて書き足す」 / "Decide just the screen names and field names
+    yourself, and add them"
+
+No niceToHave items were applied in this step. These remain open: the neutral attribution in q4 (pedagogy), the
+second 「なぜ？」 in s2-why, the q2 a feedback, the 見出し / 項目 / 欄 naming, 「SNS」 spelled out, ex-goal reusing the
+s1-b4 question, the origin of the name MoSCoW, the の chain in s5-b2, and the s2-b4 edge labels (visual-qa).
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json …` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body text, estMinutes (18) and the diagram are unchanged. The edits touch only quiz and flashcard text. The 11:07 UTC
+  preview still describes every block except q4, q8 and card-goal.
+
+Next: re-review the current draft (at least pedagogy-reviewer for q8 and ja-editor for q4 and card-goal), save the
+JSON over the old files, and re-run `check-review.mjs`. Publish together with vibe-ch2-practice only when both exit 0.

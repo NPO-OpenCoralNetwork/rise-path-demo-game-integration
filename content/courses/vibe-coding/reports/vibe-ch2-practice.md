@@ -582,3 +582,87 @@ draft. Decision 3 publishes once both pass. Both lessons' pedagogy reviews also 
 because vibe-ch2's `summary-next` points here. Publishing moves the draft to `lessons/` and lists it in `course.json`
 after vibe-ch2. That is the owner-approved publish step, not this authoring step. When the dev server is up, re-run
 `npm run lessons:preview -- vibe-coding vibe-ch2-practice` so the round-1 changes get a capture.
+
+## Final gate (2026-10-19)
+
+Fresh independent reviews of the current draft (pedagogy-reviewer, ja-editor, visual-qa), run after the 11:07 UTC
+preview. They are saved over the old JSON in `reports/vibe-ch2-practice.<reviewer>.review.json`. The preview of the
+same draft was clean in all three views: no overflow, 0 console errors, 0 diagram errors, no text-only screens, JP
+median 36 chars per line (target 30–40) and EN median 69 (target 60–75).
+
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2-practice.*.review.json`
+→ **exit 1 (REVISE)**:
+
+```text
+Review of vibe-ch2-practice by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      4  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer)
+  ✓ active     3  (pedagogy-reviewer)
+  ✓ miscon     3  (pedagogy-reviewer)
+  ✓ visual     3  (pedagogy-reviewer, visual-qa)
+  ✓ practice   4  (pedagogy-reviewer)
+  ✓ meta       4  (pedagogy-reviewer)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
+  must fix [voice] check-quiz: (d) §5 options must have the same form and ending: in pq2, options a and b are noun lists (「Should：つけ忘れた日の通知／Won't：友だちとのランキング」), while c and d are verb phrases ending in 「作る」 and 「おく」. → pq2 a: 「Should：つけ忘れた日の通知／Won't：友だちとのランキング」→「つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする」 (en: 'Make the forgot-to-log reminder a Should and the friends leaderboard a Won't'). pq2 b: 「Should：友だちとのランキング／Won't：つけ忘れた日の通知」→「友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする」 (en: 'Make the friends leaderboard a Should and the forgot-to-log reminder a Won't'). pq2 c: 「2つともMustに入れて、最初の版で作る」→「2つともMustにして、最初の版で作る」. d stays as it is.
+  must fix [miscon] practice-check: pq1 is the only item where the learner judges an AI remark, and it gives the answer away. Option a carries the recap's criterion as its reason (「なくても目的は果たせるので」), so the learner can match words instead of evaluating. The AI's remark is also correct, so the core misconception 1 (「分けるのはAIに任せればよい」) is never tested. A learner who simply follows the AI still gets the right answer here, in pq0's explanation and in the model answer, so o3's 「判断できる」 is not really assessed. → In pq1, give the AI two remarks, one right and one wrong. Put no reason in the correct option. Keep id, objectiveId o3, bloom evaluate and the hint. prompt.jp: 「買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustは「品物の追加」と「お店ごとの並べ替え」です。AIは2つとも「Shouldでもよいかもしれません」と指摘しました。最も適切な判断はどれでしょう？」 / en: "A shopping-list app has the goal \"family members don't forget anything while shopping\". Its Musts are \"add items\" and \"sort items by shop\". The AI suggests both might fit under Should. Which decision is best?". Options (answer a): a 「並べ替えだけShouldに移し、品物の追加はMustに残す」 / "Move only the sorting to Should; keep adding items as a Must". b 「AIの指摘どおり、2つともShouldに移す」 / "Follow the AI and move both to Should", feedback 「品物を追加できないと、メモが作れず目的を果たせません。指摘は1つずつ、目的に照らして確かめます。」 / "Without adding items there is no list, so the goal can't be met. Check each point against the goal, one at a time.". c 「2つとも便利なので、Mustに残す」 / "Keep both as Musts, since both are handy", feedback 「便利さは、Mustかどうかの物差しではありません。並べ替えがなくても、メモを見れば買い忘れは防げます。」 / "Being handy isn't what makes a Must. Even without sorting, the list itself keeps you from forgetting things.". d 「並べ替えはWon'tにして、企画書から消す」 / "Make the sorting a Won't and delete it from the plan", keeping the current d feedback. explanation 「AIの指摘は、判断の材料です。品物の追加がないとメモが作れないので、Mustに残します。並べ替えはなくても買い忘れは防げるので、Shouldに移します。」 / "The AI's points are input for your decision. Without adding items there is no list, so it stays a Must. The goal can be met without sorting, so that moves to Should."
+```
+
+| Reviewer | Average | Verdict | Must-fix |
+|---|---|---|---|
+| pedagogy-reviewer | 3.46 | revise | 1 (`miscon`, practice-check pq1) |
+| ja-editor | 3.75 | revise | 1 (`voice`, check-quiz pq2) |
+| visual-qa | 4 | pass | 0 |
+| **Merged** (lowest per criterion) | **3.46** | **REVISE** | **2** |
+
+Every criterion is at least 3 and the mean clears 3.3, so the only blockers are the two must-fix items. This lesson
+passed the round-2 gate, but the fresh reviews found two new blockers. **Not published**: the owner's decision
+publishes vibe-ch2 and vibe-ch2-practice together only when both exit 0, and both exited 1.
+
+### Must-fix items, applied after the gate
+
+These were applied to the draft after the gate ran, so the saved reviews describe the draft before them.
+
+- **pq2 options** (ja-editor, (d) options with the same form and ending, §5): the reviewer's exact text. a and b were
+  noun lists, while c and d were verb phrases.
+  - a 「Should：つけ忘れた日の通知／Won't：友だちとのランキング」 → 「つけ忘れた日の通知をShould、友だちとのランキングを
+    Won'tにする」 / "Make the forgot-to-log reminder a Should and the friends leaderboard a Won't"
+  - b 「Should：友だちとのランキング／Won't：つけ忘れた日の通知」 → 「友だちとのランキングをShould、つけ忘れた日の通知を
+    Won'tにする」 / "Make the friends leaderboard a Should and the forgot-to-log reminder a Won't"
+  - c 「2つともMustに入れて、最初の版で作る」 → 「2つともMustにして、最初の版で作る」. Its EN ("Make both Musts and build
+    them in the first version") already matches. d, the key, the feedback and the explanation are unchanged.
+- **pq1** (pedagogy-reviewer, `miscon`): a clear assessment error, because the key was the only option that carried
+  the recap's rule as its reason, and the AI's remark was always right, so the item did not test whether the learner
+  judges the AI (o3). Rewritten with the reviewer's exact JP and EN: the app now has two Musts (品物の追加, お店ごとの
+  並べ替え), and the AI suggests both might be Should; only the sorting should move. Id, objectiveId o3, bloom evaluate,
+  the hint, key a and d's feedback stay.
+  - a (key) 「並べ替えだけShouldに移し、品物の追加はMustに残す」 / "Move only the sorting to Should; keep adding items as
+    a Must"
+  - b 「AIの指摘どおり、2つともShouldに移す」 / "Follow the AI and move both to Should", with new feedback on following
+    the AI without checking each point against the goal.
+  - c 「2つとも便利なので、Mustに残す」 / "Keep both as Musts, since both are handy", with new feedback that handiness
+    is not the yardstick.
+  - d 「並べ替えはWon'tにして、企画書から消す」 / "Make the sorting a Won't and delete it from the plan"
+  - explanation 「AIの指摘は、判断の材料です。品物の追加がないとメモが作れないので、Mustに残します。並べ替えはなくても
+    買い忘れは防げるので、Shouldに移します。」 and the matching EN.
+
+No niceToHave items were applied in this step. These remain open: a rejected AI remark in the club model answer, who
+writes the goal sentence in p-interview, a lead-in for practice-flow, a worked revise example, hedging
+practice-prompt-interview.expect, the time estimate in practice-task (pedagogy); 「知れる」, 「勝手に」, glossary
+endings, the pq3 EN label, the summary-ask EN, the two 「〜ましょう」 in summary-next and the pq2 explanation (ja-editor);
+the desktop height of practice-flow and the reader items (visual-qa).
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json …` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body text, estMinutes (20) and the diagram are unchanged. The edits touch only quiz text (pq1 and pq2). The 11:07 UTC
+  preview still describes every other block.
+
+Next: re-review the current draft (at least pedagogy-reviewer for pq1 and ja-editor for pq1 and pq2), save the JSON
+over the old files, and re-run `check-review.mjs`. Publish together with vibe-ch2 only when both exit 0.

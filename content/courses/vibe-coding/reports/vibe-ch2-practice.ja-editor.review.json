@@ -6,55 +6,47 @@
   "scores": [
     {
       "id": "voice",
-      "score": 4,
-      "evidence": "Every paragraph uses です・ます, and the tone is warm with no pressure phrases (lint finds no banned phrases). Each wrong-option feedback names the misconception and then gives the right idea (pq1 b, pq2 c, pq3 d). The en text reads as natural English, not a literal translation.",
-      "blockIds": [
-        "hook-b1",
-        "practice-check",
-        "check-quiz",
-        "summary-points"
-      ]
+      "score": 3,
+      "evidence": "The text uses です・ます throughout, with warm, short sentences and no pressure phrases. The feedback follows the 'name the misconception, then give the right idea' pattern (pq1-b, pq3-a). One quiz (pq2) mixes noun-list options with verb-phrase options, and a few spots read slightly colloquial or stiff (「知れる」, 「勝手に」).",
+      "blockIds": ["check-quiz", "practice-prompt-plan", "practice-steps-plan"]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict reports 0 warnings, so every sentence and paragraph is within budget. The lesson adds no new terms. Each step does one thing, and the practice is split into three short sections.",
-      "blockIds": [
-        "practice-task",
-        "practice-steps",
-        "practice-steps-sort",
-        "practice-steps-plan"
-      ]
+      "evidence": "lessons:lint --strict is clean. Every paragraph has 3 sentences or fewer, and the practice is split into three sections, each with its request placed right after the step that uses it (practice-steps → practice-prompt-interview, practice-steps-sort → practice-prompt).",
+      "blockIds": ["practice", "practice-sort", "practice-plan"]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "壁打ち is defined inline in p-interview and in the glossary. MoSCoW and 1枚企画書 are linked to the glossary on first use. practice-recap reviews the four groups before pq1 and the sorting step use them.",
-      "blockIds": [
-        "p-interview",
-        "practice-recap",
-        "hook-b1",
-        "practice-task"
-      ]
+      "evidence": "The lesson adds no new terms. 壁打ち, MoSCoW and 1枚企画書 are linked with [[…]] and match the glossary, and practice-recap restates the four MoSCoW groups before they are used. The same names are used in the text, the model plan and the practice-flow labels (イベントの作成 → イベント一覧 → 出欠の入力 → 参加人数の一覧).",
+      "blockIds": ["practice-recap", "practice-flow", "practice-prompt-plan"]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every learner-facing string has both jp and en, and the two say the same thing. Both diagram versions have alt text, a caption and a description. The 「期待される結果」/\"What a good answer looks like\" label in practice-tip matches the label in PromptBlock.tsx.",
-      "blockIds": [
-        "practice-flow",
-        "practice-tip"
-      ]
+      "evidence": "jp and en are complete and say the same thing in every block, including diagram labels, alt, description and prompt vars. The UI label 「期待される結果」/'What a good answer looks like' in practice-tip matches PromptBlock.tsx, and the English is natural rather than literal.",
+      "blockIds": ["practice-flow", "practice-tip"]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "glossary: The 壁打ち and 1枚企画書 entries end without a verb (体言止め), while the MoSCoW entry ends in です. Make all three end the same way. — 「自分の考えを言葉にしていくこと。」→「自分の考えを言葉にしていくことです。」、「やらないことを1枚に並べた文書。」→「やらないことを1枚に並べた文書です。」",
-    "practice-plan-check: The second sentence of pq5 c's feedback says what is wrong but not what to do next. — 「物差しになる目的が、まだぼんやりしています。」→「先に、物差しになる目的を1文に直します。」",
-    "summary-ask: The en text repeats 'with'. — \"Go through my one-page plan with the checklist with me\"→\"Go through my one-page plan with me, using the checklist\"",
-    "check-quiz: In pq2, options a and b use the 「Should：…／Won't：…」 form, but c and d are full sentences. Making all four the same form would help, for example — 「2つともMustに入れて、最初の版で作る」→「Must：つけ忘れた日の通知とランキングの両方」、「2つとも、企画書から消しておく」→「どちらも書かない：企画書から2つとも消す」"
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) §5 options must have the same form and ending: in pq2, options a and b are noun lists (「Should：つけ忘れた日の通知／Won't：友だちとのランキング」), while c and d are verb phrases ending in 「作る」 and 「おく」.",
+      "fix": "pq2 a: 「Should：つけ忘れた日の通知／Won't：友だちとのランキング」→「つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする」 (en: 'Make the forgot-to-log reminder a Should and the friends leaderboard a Won't'). pq2 b: 「Should：友だちとのランキング／Won't：つけ忘れた日の通知」→「友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする」 (en: 'Make the friends leaderboard a Should and the forgot-to-log reminder a Won't'). pq2 c: 「2つともMustに入れて、最初の版で作る」→「2つともMustにして、最初の版で作る」. d stays as it is."
+    }
   ],
-  "average": 4,
-  "verdict": "pass",
-  "summary": "The Japanese is clear and warm throughout, lint finds nothing, and the jp and en versions say the same thing. Terms and labels stay consistent across the text, glossary, diagram and options. Nothing blocks the gate; the only open items are optional polish: matching the glossary sentence endings and making pq2's options the same form."
+  "niceToHave": [
+    "practice-prompt-plan: 「知れる」 is colloquial; a neutral form suits a var hint better — 「例：幹事が参加人数を早く知れる出欠確認アプリ」→「例：幹事が参加人数をすぐにわかる出欠確認アプリ」 (or 「例：参加人数がすぐわかる出欠確認アプリ」)",
+    "practice-steps-plan (p-plan hint): 「勝手に」 sounds like blame, and summary-points[2] already uses neutral wording — 「AIが勝手に埋めた項目があれば」→「自分が決めていない項目をAIが埋めていたら」",
+    "glossary: the definition endings are inconsistent (MoSCoW ends in です; 壁打ち and 1枚企画書 end with a noun) — 「…自分の考えを言葉にしていくこと。」→「…自分の考えを言葉にしていくことです。」, 「…を1枚に並べた文書。」→「…を1枚に並べた文書です。」",
+    "check-quiz (pq3, en): the same JP label 「レシピの表示」 is rendered two ways in one prompt — 'The Musts are \"recipe list\" and \"show a recipe\"'→'The Musts are \"recipe list\" and \"recipe view\"'",
+    "summary-ask (en): 'with … with me' repeats — 'Go through my one-page plan with the checklist with me'→'Go through my one-page plan against the checklist with me'",
+    "summary-next: two 「〜ましょう」 in a row — 「最後に振り返ってみましょう。AIの指摘のうち、受け入れなかったものがあれば、その理由を1行で書いておきましょう。」→「最後に振り返ってみましょう。AIの指摘のうち受け入れなかったものがあれば、その理由を1行で書いておきます。」",
+    "check-quiz (pq2 explanation): 主語と述語が離れて読みにくい — 「ただ、つけ忘れると次に見る前回の記録が残らないので、重要なShouldです。」→「ただ、つけ忘れると、次に見る前回の記録が残りません。だから重要なShouldです。」"
+  ],
+  "average": 3.75,
+  "verdict": "revise",
+  "summary": "The Japanese is warm and consistent. Terms, the model plan and the diagram labels match across locales, and lessons:lint --strict is clean. The only blocker is pq2 in check-quiz, which mixes noun-list options with verb-phrase options; rewrite a and b as 「〜をShould、〜をWon'tにする」 so all four options end the same way."
 }

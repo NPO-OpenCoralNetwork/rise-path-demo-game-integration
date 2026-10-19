@@ -271,44 +271,44 @@
               "id": "pq1",
               "kind": "single",
               "prompt": {
-                "jp": "買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustの「お店ごとの並べ替え」について、AIが「Shouldでもよいかもしれません」と指摘しました。最も適切な判断はどれでしょう？",
-                "en": "A shopping-list app has the goal \"family members don't forget anything while shopping\". One of your Musts is \"sort items by shop\", and the AI suggests it might fit under Should. Which decision is best?"
+                "jp": "買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustは「品物の追加」と「お店ごとの並べ替え」です。AIは2つとも「Shouldでもよいかもしれません」と指摘しました。最も適切な判断はどれでしょう？",
+                "en": "A shopping-list app has the goal \"family members don't forget anything while shopping\". Its Musts are \"add items\" and \"sort items by shop\". The AI suggests both might fit under Should. Which decision is best?"
               },
               "options": [
                 {
                   "id": "a",
                   "md": {
-                    "jp": "なくても目的は果たせるので、Shouldに移す",
-                    "en": "Move it to Should, since the goal can be met without it"
+                    "jp": "並べ替えだけShouldに移し、品物の追加はMustに残す",
+                    "en": "Move only the sorting to Should; keep adding items as a Must"
                   }
                 },
                 {
                   "id": "b",
                   "md": {
-                    "jp": "便利な機能ほど使われるので、Mustに残す",
-                    "en": "Keep it as a Must, since handy features get used more"
+                    "jp": "AIの指摘どおり、2つともShouldに移す",
+                    "en": "Follow the AI and move both to Should"
                   },
                   "feedback": {
-                    "jp": "便利さは、Mustかどうかの物差しではありません。なくても目的を果たせるかどうかで決めます。",
-                    "en": "Being handy isn't what makes a Must. Decide by asking: \"Could the goal still be met without this?\""
+                    "jp": "品物を追加できないと、メモが作れず目的を果たせません。指摘は1つずつ、目的に照らして確かめます。",
+                    "en": "Without adding items there is no list, so the goal can't be met. Check each point against the goal, one at a time."
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "ほかのMustも、AIに全部分け直してもらう",
-                    "en": "Have the AI re-sort all the other Musts too"
+                    "jp": "2つとも便利なので、Mustに残す",
+                    "en": "Keep both as Musts, since both are handy"
                   },
                   "feedback": {
-                    "jp": "分けるのをAIに任せると、自分の目的に照らした判断が入りません。指摘は1つずつ、自分で確かめて決めます。",
-                    "en": "If the AI does the sorting, your own judgment against the goal drops out. Check each point yourself and decide."
+                    "jp": "便利さは、Mustかどうかの物差しではありません。並べ替えがなくても、メモを見れば買い忘れは防げます。",
+                    "en": "Being handy isn't what makes a Must. Even without sorting, the list itself keeps you from forgetting things."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "Won'tにして、企画書からも消しておく",
-                    "en": "Make it a Won't and delete it from the plan"
+                    "jp": "並べ替えはWon'tにして、企画書から消す",
+                    "en": "Make the sorting a Won't and delete it from the plan"
                   },
                   "feedback": {
                     "jp": "お店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。Won'tにするときも、消さずに企画書に書いておきます。",
@@ -320,8 +320,8 @@
                 "a"
               ],
               "explanation": {
-                "jp": "AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめます。並べ替えがなくても、メモを見れば買い忘れは防げるので、Mustから外してShouldにします。",
-                "en": "The AI's point is input for your decision. Check it yourself by asking whether the goal could be met without the feature. Even without sorting, the list itself keeps you from forgetting things, so take it out of Must and make it a Should."
+                "jp": "AIの指摘は、判断の材料です。品物の追加がないとメモが作れないので、Mustに残します。並べ替えはなくても買い忘れは防げるので、Shouldに移します。",
+                "en": "The AI's points are input for your decision. Without adding items there is no list, so it stays a Must. The goal can be met without sorting, so that moves to Should."
               },
               "hint": {
                 "jp": "指摘を受け入れるかどうかを、何を物差しにして決めるか考えましょう。",
@@ -718,15 +718,15 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "Should：つけ忘れた日の通知／Won't：友だちとのランキング",
-                    "en": "Should: a reminder when I forget to log / Won't: a leaderboard with friends"
+                    "jp": "つけ忘れた日の通知をShould、友だちとのランキングをWon'tにする",
+                    "en": "Make the forgot-to-log reminder a Should and the friends leaderboard a Won't"
                   }
                 },
                 {
                   "id": "b",
                   "md": {
-                    "jp": "Should：友だちとのランキング／Won't：つけ忘れた日の通知",
-                    "en": "Should: a leaderboard with friends / Won't: a reminder when I forget to log"
+                    "jp": "友だちとのランキングをShould、つけ忘れた日の通知をWon'tにする",
+                    "en": "Make the friends leaderboard a Should and the forgot-to-log reminder a Won't"
                   },
                   "feedback": {
                     "jp": "ランキングは「前回を見て記録する」という目的とつながりません。記録を続ける助けになる通知のほうが、重要度は高いです。",
@@ -736,7 +736,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "2つともMustに入れて、最初の版で作る",
+                    "jp": "2つともMustにして、最初の版で作る",
                     "en": "Make both Musts and build them in the first version"
                   },
                   "feedback": {

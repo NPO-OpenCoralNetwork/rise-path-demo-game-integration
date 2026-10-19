@@ -6,45 +6,31 @@
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "Steps with expected results, prompt cards with fill-in fields, the practice-checklist and the 4-node practice-flow diagram all render cleanly. The diagram is readable at 390 px (mobile-jp-11) and in EN (desktop-en-08). On desktop the diagram is a narrow vertical strip in a wide, mostly empty card. It also follows the practice-tip callout with no sentence introducing it.",
-      "blockIds": [
-        "practice-flow",
-        "practice-checklist",
-        "practice-prompt",
-        "practice-steps-sort"
-      ]
+      "score": 4,
+      "evidence": "Every screen at both widths has a structural element: steps with expected results, prompt cards with highlighted fill-in fields, a callout, the practice-flow diagram, the practice-checklist and the quizzes, and textOnlyScreens is empty. The 4-node flowchart TD diagram (practice-flow) is legible at 390 px (mobile-jp-11/12). Its labels are Japanese in the JP screens and English in the EN screens.",
+      "blockIds": ["practice-flow", "practice-checklist", "practice-steps", "practice-prompt-plan"]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "No screen is text-only (textOnlyScreens is empty on all three runs). Desktop JP median is 36 chars per line (target 30-40) and EN median is 70 (target 60-75). Prose stays at 2-4 lines between components, and there are no walls of text in the full-length captures.",
-      "blockIds": [
-        "hook-b1",
-        "practice-task",
-        "summary-points"
-      ]
+      "evidence": "There are no walls of text. The longest prose run is the three short paragraphs of practice-task (desktop-jp-02, mobile-jp-03), and a steps block follows them right away. Desktop JP has a median of 36 characters per line (target 30–40) and EN has 69 (target 60–75). The pacing alternates between steps, prompt, quiz and checklist.",
+      "blockIds": ["practice-task", "practice-steps-sort", "check-quiz"]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN run is fully translated, including prompts, the checklist, diagram node labels and flashcards, and no Japanese is left in desktop-en-*. The diagram has a caption and a 'Describe the figure in words' / 図の説明を読む disclosure. Quizzes show keyboard hints, and nothing is hidden under the mobile top or bottom bars.",
-      "blockIds": [
-        "practice-flow",
-        "check-quiz",
-        "summary-cards"
-      ]
+      "evidence": "The EN screens show no leftover Japanese, and the JP screens show no stray English beyond the intended terms (MoSCoW, Must/Should/Could/Won't). Nothing is clipped or overlapping, and there is no horizontal overflow. The mobile bottom bar does not cover any controls, since the answer buttons are visible on mobile-jp-07/14/16. The diagram has a caption and a 'describe the figure' toggle. Text contrast is good throughout.",
+      "blockIds": ["practice-flow", "hook-predict"]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-flow: add one sentence before the diagram, e.g. 「図1は、出欠確認アプリのMustだけで目的を最後まで果たせるかを示した例です。」. Right now it follows the practice-tip callout with no lead-in (desktop-jp-07/08, mobile-jp-11).",
-    "practice-flow: on desktop the 4-node TD chart sits in a wide card that is mostly empty (desktop-jp-07/08). That is acceptable, but keep TD for mobile and do not switch to LR.",
-    "reader: the flashcard hint says 「クリックまたはスペースキーでめくる」 even on the 390 px mobile view (mobile-jp-18). On touch devices it should say タップ.",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」 because the draft is not listed in course.json, while summary-next points ahead to 第3章 (mobile-jp-19, desktop-jp-13). In preview, the banner should not claim this is the last lesson.",
-    "reader: on mobile, the step header 「自分で分けて、AIに見直してもらう」 runs right up to the 完了 checkbox (mobile-jp-07). The reader should reserve a little gap or let the title wrap earlier."
+    "practice-flow: on desktop the 4-node linear flowchart TD takes about 650 px of height inside a wide, mostly empty card (desktop-jp-07/08, desktop-en-08). Keeping TD is the right call for mobile. If the reader ever supports per-device engines, a compact LR variant for desktop would save a screen.",
+    "reader: the end-of-lesson banner says 「このコースの最後のレッスンまで読み終えました。」 on a draft preview (desktop-jp-13, mobile-jp-19). This is probably because the draft is not listed in course.json. Confirm the banner is correct once the lesson is published.",
+    "reader: on mobile the flashcard hint reads 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch-appropriate hint such as 「タップでめくる」 would fit 390 px devices better.",
+    "reader: the AI tutor and glossary side panels stay fixed while the long checklist and quiz screens scroll, which leaves the right column mostly empty below about 550 px (desktop-jp-08 to 11). This is not a lesson issue."
   ],
-  "average": 3.67,
+  "average": 4,
   "verdict": "pass",
-  "summary": "The metrics are clean: no overflow or console, mermaid, block or image errors, and characters per line are on target in JP and EN. The lesson reads as a well-paced sequence of steps, prompt cards, checklist and quizzes on both mobile and desktop. The only lesson-side suggestion is a lead-in sentence for the practice-flow diagram. The other notes are reader issues."
+  "summary": "The metrics are clean: no overflow, no console, mermaid or image errors, no unknown blocks and no text-only screens. Line length is on target in JP and EN, and both locales are fully localized. Steps, prompt cards, the checklist and quizzes give every screen a clear visual anchor. No lesson-content fixes are needed. The only observations are about desktop space in the vertical diagram and a few reader-level details."
 }
