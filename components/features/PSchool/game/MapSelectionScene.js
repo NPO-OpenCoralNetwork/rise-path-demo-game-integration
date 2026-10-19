@@ -1,9 +1,13 @@
 // MapSelectionScene.js - マップ選択画面
+
+// マップに並べるステージの数（Stage1Battle〜Stage20Battle）
+export const STAGE_COUNT = 20;
+
 export class MapSelectionScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MapSelectionScene' });
     this.selectedStage = 1;
-    this.unlockedStages = 10; // デモ用にステージ10まで解放
+    this.unlockedStages = STAGE_COUNT; // デモ用に全ステージ解放
     this.isZoomedIn = false; // ズーム状態を追跡
     this.originalCameraX = 0;
     this.originalCameraY = 0;
@@ -65,9 +69,9 @@ export class MapSelectionScene extends Phaser.Scene {
     try {
       // 開発モードの場合はすべてのステージをアンロック
       if (this.isDevelopmentMode) {
-        console.log('🔧 開発モード: ステージ10までアンロック');
-        this.unlockedStages = 10;
-        this.playerLevel = 10; // 開発用に最大レベル設定
+        console.log(`🔧 開発モード: 全${STAGE_COUNT}ステージをアンロック`);
+        this.unlockedStages = STAGE_COUNT;
+        this.playerLevel = 20; // 開発用に最大レベル設定（全ステージを解放できるレベル）
         return;
       }
       
@@ -176,22 +180,22 @@ export class MapSelectionScene extends Phaser.Scene {
       7: 8,   // レベル7: ステージ8まで
       8: 9,   // レベル8: ステージ9まで
       9: 10,  // レベル9: ステージ10まで
-      // 10: 12, // レベル10: ステージ12まで（ボーナス）
-      // 11: 13, // レベル11: ステージ13まで
-      // 12: 14, // レベル12: ステージ14まで
-      // 13: 15, // レベル13: ステージ15まで
-      // 14: 16, // レベル14: ステージ16まで
-      // 15: 18, // レベル15: ステージ18まで（ボーナス）
-      // 16: 19, // レベル16: ステージ19まで
-      // 17: 19, // レベル17: ステージ19まで
-      // 18: 19, // レベル18: ステージ19まで
-      // 19: 20, // レベル19: ステージ20まで
-      // 20: 20  // レベル20: 全ステージ
+      10: 12, // レベル10: ステージ12まで（ボーナス）
+      11: 13, // レベル11: ステージ13まで
+      12: 14, // レベル12: ステージ14まで
+      13: 15, // レベル13: ステージ15まで
+      14: 16, // レベル14: ステージ16まで
+      15: 18, // レベル15: ステージ18まで（ボーナス）
+      16: 19, // レベル16: ステージ19まで
+      17: 19, // レベル17: ステージ19まで
+      18: 19, // レベル18: ステージ19まで
+      19: 20, // レベル19: ステージ20まで
+      20: 20  // レベル20: 全ステージ
     };
-    
+
     // プレイヤーレベルに対応するアンロック可能ステージ数を返す
     // レベルが20を超える場合は20ステージすべてアンロック
-    return Math.min(stageUnlockTable[Math.min(playerLevel, 10)] || 1, 10);
+    return Math.min(stageUnlockTable[Math.min(playerLevel, STAGE_COUNT)] || 1, STAGE_COUNT);
   }
 
   createBackground() {
@@ -383,7 +387,7 @@ export class MapSelectionScene extends Phaser.Scene {
     // 背景画像に合わせたステージの配置座標
     const stagePositions = this.generateMapBasedStagePositions();
     
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= STAGE_COUNT; i++) {
       const pos = stagePositions[i - 1];
       const isUnlocked = i <= this.unlockedStages;
       
@@ -411,21 +415,21 @@ export class MapSelectionScene extends Phaser.Scene {
       { x: width * 0.5, y: height * 0.35 },   // ステージ9
       { x: width * 0.4, y: height * 0.3 },    // ステージ10 - 森林終点
       
-      // ステージ11-15（山岳エリア）- 右上への道
-      { x: width * 0.35, y: height * 0.25 },  // ステージ11 - 山麓
-      { x: width * 0.45, y: height * 0.2 },   // ステージ12
-      { x: width * 0.55, y: height * 0.15 },  // ステージ13
-      { x: width * 0.65, y: height * 0.12 },  // ステージ14
-      { x: width * 0.75, y: height * 0.1 },   // ステージ15 - 山頂
-      
-      // ステージ16-19（廃墟エリア）- 右側を下る
-      { x: width * 0.85, y: height * 0.15 },  // ステージ16 - 古代遺跡
-      { x: width * 0.9, y: height * 0.25 },   // ステージ17 - 呪われた廃墟
-      { x: width * 0.85, y: height * 0.35 },  // ステージ18 - 闇の神殿
-      { x: width * 0.8, y: height * 0.45 },   // ステージ19 - 魔王の塔
-      
-      // ステージ20（最終ボス）- 中央上部
-      { x: width * 0.5, y: height * 0.05 }    // ステージ20 - コードの王座
+      // ステージ11-15 - 上の道を右へ（タイトルと、ピンの上に出る説明が画面の上で切れない高さ）
+      { x: width * 0.29, y: height * 0.24 },  // ステージ11 - 幻影の森
+      { x: width * 0.37, y: height * 0.17 },  // ステージ12 - 獣の森
+      { x: width * 0.47, y: height * 0.21 },  // ステージ13 - 城の武器庫
+      { x: width * 0.58, y: height * 0.17 },  // ステージ14 - 水晶の洞窟
+      { x: width * 0.69, y: height * 0.22 },  // ステージ15 - 属性の祭壇
+
+      // ステージ16-19 - 右側を下る（右上の「ブロック」ボタンより下）
+      { x: width * 0.79, y: height * 0.17 },  // ステージ16 - 鏡の湖
+      { x: width * 0.87, y: height * 0.27 },  // ステージ17 - 月夜の墓地
+      { x: width * 0.81, y: height * 0.37 },  // ステージ18 - 錬金術師の店
+      { x: width * 0.87, y: height * 0.47 },  // ステージ19 - 騎士の訓練場
+
+      // ステージ20（最終ボス）- 右側の道の終点
+      { x: width * 0.8, y: height * 0.59 }    // ステージ20 - コードの王座
     ];
     
     return fixedPositions;
@@ -617,12 +621,12 @@ export class MapSelectionScene extends Phaser.Scene {
     this.hoverTooltipBg.fillStyle(0x000000, 0.9);
     this.hoverTooltipBg.lineStyle(2, 0xffd700, 0.8);
     
-    // ツールチップの位置を計算（ピンの上に表示）
-    const tooltipX = x - 120;
-    const tooltipY = y - 80;
+    // ツールチップの位置を計算（ピンの上に表示。右端・左端のピンでも画面からはみ出さないように収める）
     const tooltipWidth = 240;
     const tooltipHeight = 60;
-    
+    const tooltipX = Phaser.Math.Clamp(x - tooltipWidth / 2, 8, this.scale.width - tooltipWidth - 8);
+    const tooltipY = y - 80;
+
     this.hoverTooltipBg.fillRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
     this.hoverTooltipBg.strokeRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
     
@@ -966,16 +970,17 @@ export class MapSelectionScene extends Phaser.Scene {
       8: { name: '🍄 キノコの森', description: 'ネストしたループの挑戦', reward: 'ゴールド×300, 経験値×600' },
       9: { name: '🌙 月光の森', description: '高度な関数を使いこなす', reward: 'ゴールド×400, 経験値×700' },
       10: { name: '🏔️ 森の奥', description: 'オブジェクト指向の導入', reward: 'ゴールド×500, 経験値×800' },
-      // 11: { name: '⛰️ 山麓の村', description: 'アルゴリズムの最適化', reward: 'ゴールド×600, 経験値×1000' },
-      // 12: { name: '🏔️ 雪山の試練', description: '再帰処理の理解', reward: 'ゴールド×750, 経験値×1200' },
-      // 13: { name: '❄️ 氷の洞窟', description: 'データ構造の活用', reward: 'ゴールド×900, 経験値×1400' },
-      // 14: { name: '🌨️ 吹雪の峠', description: '並列処理の基礎', reward: 'ゴールド×1100, 経験値×1600' },
-      // 15: { name: '🗻 山頂の神殿', description: '最適化アルゴリズム', reward: 'ゴールド×1300, 経験値×1800' },
-      // 16: { name: '🏛️ 古代遺跡', description: 'デザインパターンの応用', reward: 'ゴールド×1500, 経験値×2000' },
-      // 17: { name: '💀 呪われた廃墟', description: 'エラーハンドリング', reward: 'ゴールド×1800, 経験値×2300' },
-      // 18: { name: '🌑 闇の神殿', description: '高度なプログラミング技法', reward: 'ゴールド×2100, 経験値×2600' },
-      // 19: { name: '⚡ 魔王の塔', description: '全技術の統合', reward: 'ゴールド×2500, 経験値×3000' },
-      // 20: { name: '👑 コードの王座', description: '最終試練 - 真のプログラマーへ', reward: '伝説の装備, マスタープログラマー称号' }
+      // 11〜20 は、各ステージの戦闘画面（背景）と、そこで使うブロックに合わせた名前と説明
+      11: { name: '🔮 幻影の森', description: '変数に敵の攻撃を覚えて、はね返そう', reward: 'ゴールド×600, 経験値×1000' },
+      12: { name: '🐾 獣の森', description: '条件分岐で攻撃を見分けて反撃しよう', reward: 'ゴールド×750, 経験値×1200' },
+      13: { name: '⚔️ 城の武器庫', description: '連続攻撃を関数にまとめて守りを崩そう', reward: 'ゴールド×900, 経験値×1400' },
+      14: { name: '💎 水晶の洞窟', description: 'ループ処理で水晶の鎧を砕こう', reward: 'ゴールド×1100, 経験値×1600' },
+      15: { name: '🔥 属性の祭壇', description: '敵の属性を調べて、効く魔法を選ぼう', reward: 'ゴールド×1300, 経験値×1800' },
+      16: { name: '💠 鏡の湖', description: 'すきを待ってカウンターを決めよう', reward: 'ゴールド×1500, 経験値×2000' },
+      17: { name: '💀 月夜の墓地', description: '関数を作って、何度も呼び出そう', reward: 'ゴールド×1800, 経験値×2300' },
+      18: { name: '⚗️ 錬金術師の店', description: 'レシピを関数にして薬を合成しよう', reward: 'ゴールド×2100, 経験値×2600' },
+      19: { name: '🛡️ 騎士の訓練場', description: '素材で武器を強化し、使い分けよう', reward: 'ゴールド×2500, 経験値×3000' },
+      20: { name: '👑 コードの王座', description: '最終試練 - これまでの技をすべて使おう', reward: '伝説の装備, マスタープログラマー称号' }
     };
 
     return stageTypes[stageNum] || { 
@@ -1151,11 +1156,11 @@ export class MapSelectionScene extends Phaser.Scene {
     this.lockTooltipBg.fillStyle(0x2c3e50, 0.95);
     this.lockTooltipBg.lineStyle(2, 0xff6b6b, 0.8);
     
-    const tooltipX = x - 120;
-    const tooltipY = y - 100;
     const tooltipWidth = 240;
     const tooltipHeight = 80;
-    
+    const tooltipX = Phaser.Math.Clamp(x - tooltipWidth / 2, 8, this.scale.width - tooltipWidth - 8);
+    const tooltipY = y - 100;
+
     this.lockTooltipBg.fillRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
     this.lockTooltipBg.strokeRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
     
