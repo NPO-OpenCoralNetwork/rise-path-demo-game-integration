@@ -8,14 +8,30 @@ This page is the summary for English readers.
 ```
 request → brief → outline (one check-in) → draft JSON in content/courses/<course>/drafts/
 → validate hook + lessons:validate + lessons:lint --strict
-→ independent review (pedagogy-reviewer + ja-editor) → fix (max 2 rounds)
+→ independent review (pedagogy-reviewer + ja-editor) → fix → verification review (max 2 rounds)
 → lessons:preview (3 screenshots + metrics.json) → visual-qa → fix
 → translate (en) → report → the owner publishes
 ```
 
 - The author never grades itself. Reviewers are separate subagents that score
   `content/schema/rubric.v1.json` (13 criteria, 0–4). Pass = every criterion ≥ 3, mean ≥ 3.3, no
-  open must-fix item; `check-review.mjs` computes it.
+  open must-fix item; `check-review.mjs` computes it. Every review records `lessonHash`, the
+  version it read (`review-scope.mjs <file> --hash`); the gate refuses a review of another version
+  (stale) and one without it, with no flag to accept it.
+- Round 1 is a full review. A later round is a fix-verification review (`"mode": "verify"`): each
+  previous must-fix is marked resolved or unresolved, every changed block is reviewed in full,
+  new must-fix items only for changed blocks or regressions, unaffected scores carried over. The
+  bar is the same. A full review is required again when sections were added, removed, reordered
+  or changed role, the objectives changed, or more than 30% of the lesson's parts (each block,
+  each section's own fields, each lesson field, each glossary and source entry) or of its blocks
+  changed (`review-scope.mjs` decides; `check-review.mjs` recomputes it and loads the previous
+  review, a recorded round given as `<commit id>:<reports path>` or its snapshot copy; commits are
+  named by id, never `HEAD` or a branch). The gate follows a previous verification back to its
+  full review and refuses a chain with an invalid round; every reviewer of the verified round (the
+  reviews recorded next to it that read the same version) is gated together; a must-fix marked
+  resolved stays open unless its block, or a `fixedIn` block, changed since the round that last had
+  it open, and a lesson-wide must-fix needs a changed lesson-level field or a `fixedIn` whose
+  blocks all changed. Rules: `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
   only when the owner asks.
 
@@ -49,7 +65,10 @@ npm run lessons:validate -- <file>                  # schema + semantic checks
 npm run lessons:lint -- <file> --strict             # pedagogy and readability rules
 npm run lessons:lint -- --strict --include-migrated # also gate migrated, not reworked chapters
 npm run lessons:preview -- <course> <lesson>        # .artifacts/preview/<course>/<lesson>/
-node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict
+node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict (2 = invalid or stale)
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash        # lessonHash of the version a review reads
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <rev> --expect-hash <previous lessonHash> # verification allowed? (exit 0) / full review (exit 1)
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot    # record an uncommitted reviewed revision (one folder per round)
 node .claude/skills/author-lesson/scripts/build-references.mjs              # regenerate cookbook + rubric.md
 npm run lessons:mcp-smoke                           # MCP lesson tools, no database needed
 ```
@@ -68,7 +87,7 @@ else Playwright's default.
 | `AGENTS.md` / `CLAUDE.md` | Shared agent rules / Claude Code notes (imports `@AGENTS.md`) |
 | `.claude/rules/content.md` | Lesson rules, loaded when working under `content/` |
 | `.claude/skills/author-lesson/` | The authoring procedure; `references/` holds the lesson contract, block cookbook, JP style guide and rubric |
-| `.claude/skills/review-lesson/` | Forked review by `pedagogy-reviewer`; `scripts/check-review.mjs` |
+| `.claude/skills/review-lesson/` | Forked review by `pedagogy-reviewer`; `scripts/check-review.mjs` (gate), `scripts/review-scope.mjs` (full or verification round) |
 | `.claude/agents/` | `pedagogy-reviewer`, `ja-editor`, `visual-qa` (read-only, fixed JSON output) |
 | `.claude/hooks/validate-lesson.mjs` | PostToolUse validation (exit 2 with JSON paths on errors) |
 | `.claude/settings.example.json` | Always-on hook and permissions — the owner decides whether to copy it to `.claude/settings.json` |

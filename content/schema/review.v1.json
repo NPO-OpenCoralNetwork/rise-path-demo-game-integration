@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Rise Path lesson review (review.v1)",
-  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
+  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Round 1 is a full review; a later round may be a fix-verification round (\"mode\": \"verify\", rules in .claude/skills/review-lesson/SKILL.md). Every review records lessonHash, the lesson version it read. Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["lessonId", "file", "reviewer", "rubricVersion", "scores", "mustFix", "niceToHave", "verdict", "summary"],
@@ -12,7 +12,12 @@
     },
     "file": {
       "type": "string",
-      "description": "Repo-relative path of the reviewed file, e.g. content/courses/vibe-coding/drafts/vibe-ch1-practice.lesson.json."
+      "description": "Repo-relative path of the reviewed lesson file: content/courses/<course>/drafts/<lessonId>.lesson.json or content/courses/<course>/lessons/<lessonId>.lesson.json, e.g. content/courses/vibe-coding/drafts/vibe-ch1-practice.lesson.json. check-review.mjs refuses any other path, and hashes whichever of the two exists (--lesson when both exist and differ)."
+    },
+    "lessonHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{16}$",
+      "description": "The version of the lesson this review read: the output of `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` (sha256 of the canonical lesson JSON without provenance; moving the file between drafts/ and lessons/ does not change it). Required for every review, full or verify: check-review.mjs refuses a review whose lessonHash is not the lesson's current hash as stale, and one without it (always; a verification of a previous review without it is refused too)."
     },
     "reviewer": {
       "type": "string",
@@ -22,9 +27,76 @@
       "type": "string",
       "enum": ["rubric.v1"]
     },
+    "mode": {
+      "type": "string",
+      "enum": ["full", "verify"],
+      "description": "full (the default when absent): the whole lesson is reviewed and every criterion in scope is scored afresh. verify: a fix-verification round that checks the previous review's must-fix items and reviews what changed since it; it needs `verifies` and `resolved`."
+    },
+    "verifies": {
+      "type": "object",
+      "description": "Verification rounds only: what this round verifies. Copy reviewedRevision, changed, changedShare and fullReviewRequired from `review-scope.mjs <file> --since <revision>` and add previousReview. check-review.mjs recomputes the scope from reviewedRevision and refuses the review when it requires a full review or when changed leaves out a change.",
+      "additionalProperties": false,
+      "required": ["reviewedRevision", "previousReview", "changed", "fullReviewRequired"],
+      "properties": {
+        "reviewedRevision": {
+          "type": "string",
+          "description": "The lesson revision the previous review read, as review-scope.mjs prints it: a commit id (7–40 lowercase hex digits of a commit of this repository, never HEAD, a branch, a tag or HEAD~n, which name another commit when refs move), or sha256:<hash> (the previous review's lessonHash) of a snapshot saved with `review-scope.mjs --snapshot`. At a commit the lesson is looked up at drafts/<id> first, then lessons/<id>; check-review.mjs takes the version whose hash is the previous review's lessonHash."
+        },
+        "previousReview": {
+          "type": "string",
+          "description": "The review this round verifies, as a recorded round: <commit id>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json (the commit id as in reviewedRevision, never a ref such as HEAD or a branch), or the snapshot copy .artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json. Never the working-tree reports file of the same lesson and reviewer (each round overwrites it), and never any other file. It must record lessonHash. check-review.mjs refuses the review when it cannot load this review, and follows a previous verification back to its full review, checking every round on the way. The round is the reviews recorded next to it (at that commit, or in that snapshot round folder) that read the same version, its lessonHash."
+        },
+        "changed": {
+          "type": "array",
+          "description": "What changed since reviewedRevision, as review-scope.mjs lists it: block ids, section.<id> for section fields, lesson.<field> for lesson fields. Each was reviewed in full.",
+          "items": { "type": "string" }
+        },
+        "changedShare": {
+          "type": "number",
+          "description": "Share of the lesson's parts changed, added, removed or moved since reviewedRevision (0–1, rounded up): each block, each section's own fields (one part per section), each top-level field except sections and provenance, and each glossary and source entry. Above 0.3 a full review is required, and also when more than 30% of the blocks changed."
+        },
+        "fullReviewRequired": {
+          "type": "boolean",
+          "description": "The review-scope.mjs decision. A verification review is valid only when it is false (check-review.mjs recomputes it)."
+        }
+      }
+    },
+    "resolved": {
+      "type": "array",
+      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus the items still open from the rounds before it). check-review.mjs counts every unresolved entry, every item without an entry, and every resolved entry without a change as an open must-fix. A change counts when it came after the round that last had the item open (the review that raised it, or a later round that found it unresolved or gave it no entry) and touched its block or a fixedIn block; a lesson-wide item (blockId \"lesson\") needs a changed lesson-level field, or fixedIn blocks that all changed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["blockId", "criterion", "status", "evidence"],
+        "properties": {
+          "blockId": {
+            "type": "string",
+            "description": "The blockId of the previous must-fix item."
+          },
+          "criterion": {
+            "type": "string",
+            "enum": ["align", "hook", "prior", "load", "worked", "active", "miscon", "visual", "practice", "meta", "accuracy", "voice", "a11y_l10n"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["resolved", "unresolved"],
+            "description": "resolved: the change removes the problem completely. unresolved: not applied, applied only in part, or the problem moved elsewhere."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "One or two sentences that quote the current text (or name the screenshot) and show why."
+          },
+          "fixedIn": {
+            "type": "array",
+            "description": "Optional, for status resolved: the ids of the changed blocks (from verifies.changed) that resolve the item when the fix is not in blockId itself, e.g. a term now defined in the block before it. A resolved entry counts only when blockId or one of these changed since the round that last had the item open. For a lesson-wide item (blockId \"lesson\") without a changed lesson-level field, list every block that holds the fix: each of them must have changed.",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
     "scores": {
       "type": "array",
-      "description": "One entry per criterion in the reviewer's scope. pedagogy-reviewer scores all 13; ja-editor and visual-qa score the criteria they can judge.",
+      "description": "One entry per criterion in the reviewer's scope. pedagogy-reviewer scores all 13; ja-editor and visual-qa score the criteria they can judge. A verification round lists every criterion the previous review scored: the re-scored ones, and the others with carriedOver: true.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -45,13 +117,17 @@
           "blockIds": {
             "type": "array",
             "items": { "type": "string" }
+          },
+          "carriedOver": {
+            "type": "boolean",
+            "description": "Verification rounds only: true when score and evidence are copied unchanged from the previous review because the changes do not affect this criterion. Absent or false: scored in this round."
           }
         }
       }
     },
     "mustFix": {
       "type": "array",
-      "description": "Changes required before the lesson can pass. Each fix is specific enough to apply without guessing.",
+      "description": "Changes required before the lesson can pass. Each fix is specific enough to apply without guessing. In a verification round: only errors in changed or new blocks, or regressions the changes caused elsewhere (the issue names the change).",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -85,7 +161,7 @@
     "verdict": {
       "type": "string",
       "enum": ["pass", "revise", "reject"],
-      "description": "pass: every scored criterion ≥ 3, mean ≥ 3.3, no mustFix. revise: fixable. reject: wrong audience or outcome; needs a rewrite."
+      "description": "pass: every scored criterion ≥ 3, mean ≥ 3.3, no mustFix and no unresolved item. revise: fixable. reject: wrong audience or outcome; needs a rewrite."
     },
     "summary": {
       "type": "string",

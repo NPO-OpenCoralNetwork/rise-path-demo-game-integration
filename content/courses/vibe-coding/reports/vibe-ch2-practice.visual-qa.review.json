@@ -1,0 +1,65 @@
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
+  "lessonHash": "sha256:d7c528c2bebfd7fe",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "practice-check",
+      "summary-next"
+    ],
+    "changedShare": 0.05,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2-practice.visual-qa.review.json"
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. The two changes are text edits inside a quiz option and a summary paragraph. They do not touch the practice-flow figure or any other visual block, and none of the re-checked screens shows a layout regression.",
+      "blockIds": [
+        "practice-flow",
+        "practice-checklist",
+        "practice-steps",
+        "practice-prompt"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. textOnlyScreens is still empty in all three shots. Desktop JP is still a median 36 chars per line (target 30–40) and EN 69 (target 60–75). The longer summary-next sentence adds only one line (desktop-en-12, mobile-jp-17).",
+      "blockIds": [
+        "practice-task",
+        "practice-steps-sort",
+        "practice-steps-plan",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Re-scored because both changes touch wording and localization. pq1 option 1 in EN now reads 'Move only the sorting to Should; keep \"add items\" as a Must' on one line inside its option box. The quoted term matches the question's \"add items\" (desktop-en-04). The JP option is unchanged and fits on two lines at 390 px (mobile-jp-06) and on one line on desktop (desktop-jp-04). summary-next shows 「VS Code（Visual Studio Code）」 in JP (mobile-jp-17, desktop-jp-12) and 'VS Code (Visual Studio Code)' in EN (desktop-en-12). The line breaks around the parenthesis are clean, there is no Japanese in EN or the reverse, and nothing is hidden under the mobile bars.",
+      "blockIds": [
+        "practice-check",
+        "summary-next"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "summary-next: on mobile the paragraph breaks 「この1枚／企画書を一緒に渡せます。」 inside the compound 「1枚企画書」 (mobile-jp-17). Moving the clause earlier or shortening it, e.g. 「この先、AIに画面を作ってもらうときに、この1枚企画書も渡せます。」, may avoid the split. It is cosmetic.",
+    "hook-predict (unchanged, carried over): on desktop JP the question wraps with a lone 「う？」 on the second line (desktop-jp-01). A slightly shorter prompt would fit on one line.",
+    "practice-prompt-interview (unchanged, carried over): on mobile the line breaks inside 「1つず／つしてください」 (mobile-jp-05).",
+    "practice-flow (unchanged, carried over): on mobile the diagram takes a full screen (mobile-jp-11). Shorter labels would make the boxes less tall.",
+    "reader: on mobile the flashcard hint still says 「クリックまたはスペースキーでめくる」 (mobile-jp-18). A touch device should say タップ.",
+    "reader: the left table of contents on desktop JP still breaks 「演習3：1枚企画書にまと／めて直す」 mid-word (desktop-jp-04, desktop-jp-12). word-break: auto-phrase would avoid this."
+  ],
+  "verdict": "pass",
+  "summary": "lessonHash sha256:d7c528c2bebfd7fe in metrics.json matches the hash I was given. metrics.json has no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks, 0 broken images, no text-only screens, and chars per line within target. The previous review had no must-fix items, so nothing needed resolving. I re-checked both changed blocks on mobile and desktop. practice-check (pq1, option 1 changed in EN only): mobile-jp-06, desktop-jp-04, desktop-en-04/05. summary-next: mobile-jp-17, desktop-jp-12, desktop-en-12. Both render cleanly with correct localization and no layout regression. a11y_l10n was re-scored at 4; visual (3) and load (4) are carried over."
+}

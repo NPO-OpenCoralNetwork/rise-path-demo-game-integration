@@ -1,0 +1,117 @@
+# CI for pull requests and main: typecheck, unit tests, lesson gates, and a production build
+# whose output is scanned for leaked server keys. Run the same commands locally before a PR
+# (AGENTS.md, "Commands").
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A new push to a PR cancels its older run; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # `npm ci --ignore-scripts` (as in the Dockerfile) runs no dependency install scripts, so
+  # nothing is downloaded at install time; this also keeps Playwright from fetching browsers.
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+
+jobs:
+  checks:
+    name: Typecheck, tests and lessons
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        run: npm ci --ignore-scripts
+
+      # Each check below runs even when an earlier one failed, so one run reports every problem.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test
+
+      - name: Validate lessons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lessons:validate -- --format github
+
+      - name: Lint lessons (strict)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lessons:lint -- --strict --format github
+
+      - name: Generated lesson schemas are up to date
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lessons:schema -- --check
+
+      - name: author-lesson skill references are up to date
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node .claude/skills/author-lesson/scripts/build-references.mjs --check
+
+  build:
+    name: Build and key-leak scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # The production build (as deployed: build:prod) with a sentinel value in every model,
+      # service-role and server key, in both plain and VITE_ form. None may reach the bundle.
+      - name: Production build with sentinel keys
+        env:
+          # Peak heap is under 2 GB; 4 GB leaves headroom and fits a 7 GB runner.
+          NODE_OPTIONS: --max-old-space-size=4096
+          API_KEY: ci-leak-sentinel-API_KEY
+          GEMINI_API_KEY: ci-leak-sentinel-GEMINI_API_KEY
+          VITE_GEMINI_API_KEY: ci-leak-sentinel-VITE_GEMINI_API_KEY
+          GOOGLE_API_KEY: ci-leak-sentinel-GOOGLE_API_KEY
+          VITE_GOOGLE_API_KEY: ci-leak-sentinel-VITE_GOOGLE_API_KEY
+          ANTHROPIC_API_KEY: ci-leak-sentinel-ANTHROPIC_API_KEY
+          VITE_ANTHROPIC_API_KEY: ci-leak-sentinel-VITE_ANTHROPIC_API_KEY
+          OPENAI_API_KEY: ci-leak-sentinel-OPENAI_API_KEY
+          VITE_OPENAI_API_KEY: ci-leak-sentinel-VITE_OPENAI_API_KEY
+          SUPABASE_SERVICE_ROLE_KEY: ci-leak-sentinel-SUPABASE_SERVICE_ROLE_KEY
+          VITE_SUPABASE_SERVICE_ROLE_KEY: ci-leak-sentinel-VITE_SUPABASE_SERVICE_ROLE_KEY
+          HERMES_API_KEY: ci-leak-sentinel-HERMES_API_KEY
+          RISE_PATH_BRIDGE_TOKEN: ci-leak-sentinel-RISE_PATH_BRIDGE_TOKEN
+          DATABASE_URL_PHASE1: ci-leak-sentinel-DATABASE_URL_PHASE1
+        run: npm run build:prod -- --outDir "$RUNNER_TEMP/dist" --emptyOutDir
+
+      - name: Fail if a sentinel key reached the bundle
+        run: |
+          dist="$RUNNER_TEMP/dist"
+          test -f "$dist/index.html" || { echo "::error title=Build output missing::$dist/index.html not found"; exit 1; }
+          if grep -rlF 'ci-leak-sentinel-' "$dist"; then
+            echo "::error title=Key leak::A server or VITE_*_KEY value was compiled into the client bundle (files listed above). Keys belong on the server; see CLIENT_SECRET_ENV in vite.config.ts."
+            exit 1
+          fi
+          echo "No sentinel key in $(find "$dist" -type f | wc -l) built files."

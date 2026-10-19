@@ -1,0 +1,180 @@
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "lessonHash": "sha256:54674b81ebd4f945",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "check-quiz"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json"
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "Re-scored after the check-quiz change. q7 still has objectiveId o3 (evaluate) and still asks for an MVP scope judgment in a new context (「観葉植物の水やり記録アプリ」), and the key is still b. Each of the four objectives is still checked inline and in the exam (o1 q1/q5, o2 q2/q6, o3 q3/q7, o4 q4 plus q8/q10/q9).",
+      "blockIds": [
+        "check-quiz",
+        "s1-check",
+        "s2-check",
+        "s5-check",
+        "s3-check"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 sets up a concrete failure in 3 sentences (「グラフや分類が並んだ画面がすぐにできました。でも、ほしかったのは「月の途中で食費の使いすぎに気づける」ことでした。」). There is no trivia. The ungraded predict q0 leads into the goal-first idea that 2-1 and 2-2 resolve.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites list ch0/ch1. s1-b1 recalls ch0's ビジョン, and ex-data recalls ch1's データベース. Terms are defined in definitions blocks before the quizzes use them. However, the q4 explanation names 「Claude Codeの公式ガイド（Anthropic）」, and neither ch0 nor ch1 mentions Claude Code (grep finds no match).",
+      "blockIds": [
+        "s1-b1",
+        "ex-data",
+        "s1-defs",
+        "s2-defs",
+        "s5-defs",
+        "s3-defs",
+        "s3-check"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Re-scored because the change adds text. The new q7 option c 「記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿」 is about 48 characters, under the 60 budget, and adds no new lesson term, so the earlier finding still holds. Section 2-3 is still dense (two-paragraph lead, a definition, 6 steps, a diagram, a long model plan), and PRD in s3-defs is still never used again.",
+      "blockIds": [
+        "check-quiz",
+        "s3-b1",
+        "s3-defs",
+        "s3-steps",
+        "s2-b3"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s3-steps is a 6-step worked example with subgoal titles and a stated why for each step (e.g. ex-data 「決めないと、AIが推測で項目を選びます。」). It ends in the full model plan in s2-b3.expect. There is no faded example in this lesson; fading happens in the separate vibe-ch2-practice lesson.",
+      "blockIds": [
+        "s3-steps",
+        "s2-b3"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Re-scored. I answered q7 before reading the key and chose b (記録と通知). The longer option c doesn't point to the answer: the extra length is on a distractor, and the 「全部入り」 trap is still there. q3 in s5-check is unchanged and can still be answered by word matching (「読み返せるように残す」 ≈ option b), so the score stays 3.",
+      "blockIds": [
+        "check-quiz",
+        "s5-check",
+        "s1-check",
+        "s2-check",
+        "s3-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "Re-scored. The q7 c feedback is unchanged and still matches the option: 「全部入りにすると、確かめる量も壊れる場所も増えます。目的に必要な機能だけで始めます。」 names the more-features-is-better belief that s5-b1 corrects. The body still corrects the brief's misconceptions (s1-b5, s3-b1, s5-b1, s2-table), and every wrong option still has feedback of at most 2 sentences.",
+      "blockIds": [
+        "check-quiz",
+        "s1-b5",
+        "s3-b1",
+        "s5-b1",
+        "s2-check"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "s2-b4 is a 3-node process diagram with a takeaway caption (「Mustだけなら、最初の版の画面は2つで足りる」), alt text and a description, and there are no decorative images. Node B reads 「食費の予算・使った額・残り」, while the alt and the Must in s5-b2 say the budget is set (「予算の設定」) on that screen. The figure does not show that step.",
+      "blockIds": [
+        "s2-b4",
+        "s5-b2"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "s1-b5 has the learner try s1-b4 with their own idea and compare the result with 「期待される結果」, which is the reader's actual expect label. s2-b3 gives a complete model plan. The hint ladder and checklist practice is in vibe-ch2-practice, which course.json lists as this lesson's next.",
+      "blockIds": [
+        "s1-b5",
+        "s1-b4",
+        "s2-b3",
+        "summary-next"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "Four summary points come after the exam. summary-next has a reflection question (「Won'tに入れる機能は何でしょう？　理由も1つ考えてみましょう。」) and a next step. There are 6 flashcards that match the definitions, plus askTutor.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "Re-scored because the change makes a claim. 「SNS（Social Networking Service）」 is the correct, common expansion and needs no citation. It replaces 「ソーシャルメディア」, which was a gloss of the meaning rather than an expansion. The other findings are unchanged: cc-best-practices supports s1-b5 and the q4 explanation, MVP and MoSCoW match ries-mvp and abc-moscow, and s1-b5 still extends a Claude-specific source to AI in general.",
+      "blockIds": [
+        "check-quiz",
+        "s1-b5",
+        "s3-check",
+        "s5-defs",
+        "s5-b3"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "Re-scored. q7 c is the first use of SNS in the lesson (option d's 「SNSへの投稿」 comes after it), so spelling the acronym out on first use follows the convention, and 「SNSへの投稿」 is consistent across c and d. The rest is warm です・ます with no banned phrases. The q4 explanation ending 「範囲外を書く、としています」 still reads a little stiff.",
+      "blockIds": [
+        "check-quiz",
+        "hook-b1",
+        "s3-check",
+        "summary-points"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Re-scored. The new q7 c jp 「…SNS（Social Networking Service）への投稿」 still means the same as en \"Records, reminders, species ID from photos and social posting\". validate reports 0 errors and lint --strict 0 warnings. The s2-b4 diagram labels, alt and description stay bilingual, and no text is baked into images.",
+      "blockIds": [
+        "check-quiz",
+        "s2-b4",
+        "s1-b5"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "voice / check-quiz q7 option c (ja-editor's call): the English expansion tells the learner what the letters stand for but not what an SNS is, which the old gloss 「ソーシャルメディア」 did. To keep both, use jp 「記録と通知、写真での種類判定、SNS（Social Networking Service、交流サイト）への投稿」 (about 53 characters, under budget). en stays as is.",
+    "miscon / check-quiz q7 option d feedback (still open from the previous review, unchanged): it explains why posting is not needed but not that the reminder is missing. Replace with jp 「投稿は「枯らさない」目的に必要なく、通知がないと水やりを忘れます。投稿はWon'tにして、通知を入れます。」 / en \"Posting isn't needed to keep plants alive, and without a reminder you'll still forget to water. Make posting a Won't and add the reminder.\"",
+    "active / s5-check q3 (unchanged; carried from the previous review): make the Must judgment real by replacing option d with jp 「感想にタグを付けて、キーワードで探せる機能」 / en \"Tagging your notes so you can search them by keyword\"; feedback jp 「読み返しに役立ちますが、一覧から開ければ目的は果たせます。Mustではなく、Shouldの候補です。」 / en \"It helps with rereading, but opening notes from the list already meets the goal. It's a Should candidate, not a Must.\" Key stays b.",
+    "miscon / s1-check q1 option b feedback (unchanged; carried from the previous review): replace with jp 「目的が1文に決まる前に提案を頼むと、AIの答えが先に来ます。機能の候補は、目的が決まってから出してもらいます。」 / en \"Asking for suggestions before the goal is a clear sentence puts the AI's answers first. Ask for candidate features once the goal is set.\""
+  ],
+  "average": 3.38,
+  "verdict": "pass",
+  "summary": "Verification round for vibe-ch2 (sha256:54674b81ebd4f945) against f66e3f3 (sha256:09186fc0e87a2e68). The previous review had no must-fix items, so there is nothing to resolve. The only change is the ja-editor's wording fix in check-quiz q7 option c, which spells out SNS as 「SNS（Social Networking Service）」. I reviewed it in full. The expansion is accurate, comes on the first use of SNS, stays within the length budget, and keeps the jp and en meanings the same. The longer text sits on a distractor, so it does not point to the key (b). Feedback, key and objectiveId o3 are unchanged. I re-scored align, load, active, miscon, accuracy, voice and a11y_l10n with no change in score, and carried over the other six. Every criterion is ≥ 3, the mean is 3.38, and there is no must-fix item, so the lesson passes. The niceToHave items from earlier rounds that were not applied are listed again."
+}

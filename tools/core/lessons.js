@@ -21,6 +21,7 @@ import { validateLesson } from '../../shared/lesson/validate.js';
 import { lintLesson } from '../../shared/lesson/lint.js';
 import { lessonJsonSchema } from '../../shared/lesson/jsonSchema.js';
 import { lessonStats } from '../../shared/lesson/walk.js';
+import { canonicalJson } from '../../shared/lesson/canonical.js';
 import { t } from '../../shared/lesson/text.js';
 import { LESSON_SCHEMA_ID, BLOCK_TYPES, SECTION_ROLES } from '../../shared/lesson/constants.js';
 
@@ -120,18 +121,6 @@ export function checkSlug(value, label) {
         };
     }
     return null;
-}
-
-/** JSON with sorted object keys, so the hash ignores key order and whitespace. */
-function canonicalJson(value) {
-    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-    if (isPlainObject(value)) {
-        return `{${Object.keys(value).sort()
-            .filter((key) => value[key] !== undefined)
-            .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
-            .join(',')}}`;
-    }
-    return JSON.stringify(value);
 }
 
 /** Content hash used for optimistic locking (sha256 of canonical JSON, 16 hex chars). */

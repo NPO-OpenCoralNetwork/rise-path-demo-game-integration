@@ -42,10 +42,16 @@ function tmpDir(prefix) {
 }
 after(() => { for (const dir of tmpDirs) fs.rmSync(dir, { recursive: true, force: true }); });
 
-/** Temporary content/ with a copy of the vibe-coding course, so tests never write to the repo. */
+/**
+ * Temporary content/ with a copy of the vibe-coding course, so tests never write to the repo.
+ * The repo's own drafts/ is left out: tests start from the published course and create their
+ * drafts themselves, whatever drafts are committed or in progress.
+ */
 function makeContentDir() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-lesson-tools-'));
-    fs.cpSync(path.join(ROOT, 'content/courses', COURSE), path.join(dir, 'courses', COURSE), { recursive: true });
+    const source = path.join(ROOT, 'content/courses', COURSE);
+    const repoDrafts = path.join(source, 'drafts');
+    fs.cpSync(source, path.join(dir, 'courses', COURSE), { recursive: true, filter: (src) => src !== repoDrafts });
     return dir;
 }
 

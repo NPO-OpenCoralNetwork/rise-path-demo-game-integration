@@ -61,7 +61,18 @@
             "jp": "第2章｜AIと企画する力を身につける",
             "en": "Chapter 2 | Planning with AI"
           },
-          "estMinutes": 30,
+          "estMinutes": 18,
+          "next": {
+            "lessonId": "vibe-ch2-practice"
+          }
+        },
+        {
+          "id": "vibe-ch2-practice",
+          "title": {
+            "jp": "第2章 演習｜自分のアイデアで1枚企画書をつくる",
+            "en": "Chapter 2 practice: your own one-page plan"
+          },
+          "estMinutes": 20,
           "next": {
             "lessonId": "vibe-ch3"
           }
@@ -69,7 +80,7 @@
         {
           "id": "vibe-ch3",
           "title": {
-            "jp": "第3章｜開発環境コックピット（VSCode）",
+            "jp": "第3章｜開発環境コックピット（VS Code）",
             "en": "Chapter 3 | The Development Cockpit"
           },
           "estMinutes": 20,

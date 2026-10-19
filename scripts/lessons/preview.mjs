@@ -7,8 +7,12 @@
  * .artifacts/preview/<course>/<lesson>/:
  *   desktop-jp.png, mobile-jp.png, desktop-en.png   full-length page (capped at --max-height)
  *   pages/<shot>-NN.png                              one PNG per screen, scrolled like a learner
- *   metrics.json                                     overflowX, consoleErrors, mermaidErrors,
- *                                                    charsPerLine, text-only screens, …
+ *   metrics.json                                     lessonHash, overflowX, consoleErrors,
+ *                                                    mermaidErrors, charsPerLine, text-only screens, …
+ *
+ * lessonHash is the hash of the lesson file the screenshots show (the same value as
+ * `review-scope.mjs <file> --hash`); visual-qa copies it into its review, so check-review can tell
+ * whether the screenshots still match the lesson.
  *
  * Usage:
  *   npm run lessons:preview -- <course> <lesson> [options]
@@ -34,6 +38,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { lessonHashOfFile } from '../../shared/lesson/hash.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FALLBACK_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -127,6 +132,9 @@ export function findLessonFile(course, lesson, root = ROOT) {
   if (fs.existsSync(published)) return { file: published, source: 'published' };
   return null;
 }
+
+/** The lesson hash of a lesson file, or null when it is not readable JSON (shared/lesson/hash.js). */
+export { lessonHashOfFile };
 
 /**
  * Locales a lesson file provides (`locales`, else `locale`, else jp). Unreadable files give [].
@@ -523,6 +531,8 @@ async function main() {
     console.error(`No lesson file: content/courses/${args.course}/{drafts,lessons}/${args.lesson}.lesson.json`);
     return 2;
   }
+  // Hashed before the page loads, so the hash names the lesson text the screenshots render.
+  const shownHash = lessonHashOfFile(found.file);
   if (!fs.existsSync(path.join(ROOT, 'content', 'courses', args.course, 'course.json'))) {
     console.error(`No course.json in content/courses/${args.course}/ — the reader needs the course.`);
     return 2;
@@ -558,6 +568,9 @@ async function main() {
   }
   await browser.close();
 
+  // A lesson edited while the shots ran: the screenshots match neither version, so record no hash.
+  const lessonHashAfter = lessonHashOfFile(found.file);
+  if (lessonHashAfter !== shownHash) console.error(`The lesson changed while it was captured (${shownHash} → ${lessonHashAfter}); metrics.json records no lessonHash. Run the preview again.`);
   const verdict = summarize(shots);
   /** @type {Record<string, unknown>} */
   const charsPerLine = {};
@@ -568,6 +581,7 @@ async function main() {
     lesson: args.lesson,
     source: found.source,
     file: path.relative(ROOT, found.file),
+    lessonHash: lessonHashAfter === shownHash ? shownHash : null,
     url,
     generatedAt: new Date().toISOString(),
     ok: verdict.ok,
@@ -593,7 +607,7 @@ async function main() {
   } else {
     const relative = path.relative(ROOT, args.out);
     const rel = !relative || relative.startsWith('..') || path.isAbsolute(relative) ? args.out : relative;
-    console.log(`lessons:preview ${args.course}/${args.lesson} (${found.source}: ${metrics.file})`);
+    console.log(`lessons:preview ${args.course}/${args.lesson} (${found.source}: ${metrics.file}, ${shownHash ?? 'lessonHash unavailable'})`);
     console.log(`  validate: ${validation.ok ? 'ok' : `${validation.errors} error(s)`} · lint: ${validation.warnings} warning(s)`);
     for (const s of shots) console.log(shotLine(s));
     for (const s of shots) {

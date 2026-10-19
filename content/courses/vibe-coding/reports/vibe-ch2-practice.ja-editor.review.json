@@ -1,0 +1,93 @@
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json",
+  "lessonHash": "sha256:d7c528c2bebfd7fe",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "practice-check",
+      "summary-next"
+    ],
+    "changedShare": 0.05,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2-practice.ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "practice-check",
+      "criterion": "a11y_l10n",
+      "status": "resolved",
+      "evidence": "pq1 option a en now reads \"Move only the sorting to Should; keep \\\"add items\\\" as a Must\". It names the feature \"add items\" exactly as the prompt does, so it can no longer be read as 'continue adding items'. It matches jp 「並べ替えだけShouldに移し、品物の追加はMustに残す」."
+    },
+    {
+      "blockId": "summary-next",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "jp: 「第3章では、AIと開発するためのVS Code（Visual Studio Code）を準備します。」; en: \"In Chapter 3 you'll set up VS Code (Visual Studio Code) for building with an AI.\" The abbreviation is now spelled out in both locales, with full-width parentheses in jp (style-guide §3)."
+    }
+  ],
+  "scores": [
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "The text is consistently in です・ます and warm, with no pressure phrases; steps and feedback read like a tutor sitting beside you (p-interview troubleshoot 「コードはまだ不要です。質問だけしてください」, pq1 feedback). Only a few small stiff spots remain (pq1 hint, pq5 explanation), and they are niceToHave.",
+      "blockIds": [
+        "practice-steps",
+        "practice-check",
+        "practice-plan-check"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "lessons:lint --strict is clean, so every sentence and paragraph is within budget. Each practice section breaks into steps, prompt blocks, a checklist or an inline quiz, so there is no run of text-only screens.",
+      "blockIds": [
+        "practice-steps-sort",
+        "practice-steps-plan",
+        "practice-checklist"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "Re-scored. The prerequisite chapter is stated, and practice-recap recalls MoSCoW before it is used. 壁打ち is defined at first use in p-interview and matches the glossary. summary-next now spells out 「VS Code（Visual Studio Code）」 at its first use, so every term and abbreviation is introduced at first use.",
+      "blockIds": [
+        "practice-recap",
+        "practice-steps",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Re-scored. Both locales are complete, including the diagram labels, alt text and description. The pq1 option a ambiguity is fixed (practice-check). A few small en wording slips remain in unchanged blocks (check-quiz pq4 option c \"keep it from the AI\", practice-plan-check pq5 option a drops 「やらないことの」, check-quiz pq3 \"recipe view\" vs \"show a recipe\"). They do not confuse, so they stay niceToHave, but they keep the locales from being fully equivalent and natural (anchor 4).",
+      "blockIds": [
+        "practice-flow",
+        "practice-check",
+        "check-quiz",
+        "practice-plan-check"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-check: the pq1 hint has two を-clauses in a row and reads stiffly — 「指摘を受け入れるかどうかを、何を物差しにして決めるか考えましょう。」→「指摘を受け入れるかどうかを決める物差しは何か、考えましょう。」",
+    "practice-plan-check: the goal in pq5 is already one sentence, so 「1文に直して」 is slightly off; name the checklist form instead — 「目的を1文に直してから、ほかの項目も見直します。」→「目的を「誰が・どんな場面で・どうなれる」の1文に直してから、ほかの項目も見直します。」",
+    "check-quiz: in pq3 en the same thing is called both \"show a recipe\" (Must) and \"recipe view\" (flow), while jp uses 「レシピの表示」 for both — 「the screen flow is \"recipe list → recipe view\"」→「the screen flow is \"recipe list → show a recipe\"」",
+    "practice-plan-check: pq5 option a en drops 「やらないことの」, which tells the learner where the item sits — 「Delete \"look up sorting rules\" from the plan」→「Delete \"look up sorting rules\" from what we won't build」",
+    "hook-b1: the en comparison is slightly off (an organizer cannot follow the 'steps as an app') — 「follows the same steps as Chapter 2's budget app」→「follows the same steps as the budget app in Chapter 2」",
+    "lesson (objectives o3 en): 'beyond the Musts too' is awkward — 「with MoSCoW, beyond the Musts too, and judge」→「with MoSCoW, including the groups other than Must, and judge」",
+    "glossary: the definition endings are mixed; 壁打ち and 1枚企画書 end in a noun 「…こと。」「…文書。」, while MoSCoW uses です・ます — 「自分の考えを言葉にしていくこと。」→「自分の考えを言葉にしていくことです。」, 「…やらないことを1枚に並べた文書。」→「…やらないことを1枚に並べた文書です。」",
+    "practice-flow: style-guide §4 asks for one sentence near a figure that says what it shows; the diagram follows practice-tip without an introduction. Consider adding a lead line before it, e.g. 「下の図は、上の企画書例のMustと画面の流れをつないだものです。」",
+    "lesson (title jp): 「第2章 演習｜…」 has a half-width space, while the other chapter titles use 「第N章｜…」 with no space; check this against the course's naming for practice lessons — 「第2章 演習｜」→「第2章演習｜」 if the course has no convention for it.",
+    "check-quiz: pq4 option c en 'keep it from the AI' suggests hiding something, while jp 「AIには渡さない」 means not handing it over — 「Rewrite the whole plan yourself and keep it from the AI」→「Rewrite the whole plan yourself without the AI」"
+  ],
+  "average": 3.75,
+  "verdict": "pass",
+  "summary": "Verification round (scope exit 0: 2 of 20 blocks changed, 5%). Both previous must-fix items are resolved. pq1 option a en now names the feature \"add items\" without ambiguity and matches the jp. summary-next spells out VS Code（Visual Studio Code）at first use in both locales. The changed text has no new errors: lessons:lint --strict is clean, validate passes, and both locales agree. prior is re-scored to 4 and a11y_l10n stays at 3; voice and load are carried over. The earlier niceToHave items in unchanged text are still open as suggestions only."
+}

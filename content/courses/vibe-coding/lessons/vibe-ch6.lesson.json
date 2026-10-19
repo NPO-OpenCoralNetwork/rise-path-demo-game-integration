@@ -30,8 +30,8 @@
           "id": "s1-b1",
           "type": "markdown",
           "md": {
-            "jp": "これまでは、ブラウザで生成されたコードをコピーし、VSCodeにペーストしていました。**Gemini CLI** を使えば、AIがあなたのターミナルの中に住み着きます。AIはあなたのファイルを読み、直接編集してくれます。",
-            "en": "Until now, you had to copy code from the browser and paste it into VSCode. With **Gemini CLI**, the AI lives *inside* your terminal. It reads your files and edits them directly."
+            "jp": "これまでは、ブラウザで生成されたコードをコピーし、VS Codeにペーストしていました。**Gemini CLI** を使えば、AIがあなたのターミナルの中に住み着きます。AIはあなたのファイルを読み、直接編集してくれます。",
+            "en": "Until now, you had to copy code from the browser and paste it into VS Code. With **Gemini CLI**, the AI lives *inside* your terminal. It reads your files and edits them directly."
           },
           "style": "lead"
         },

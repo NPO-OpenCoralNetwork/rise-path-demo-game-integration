@@ -38,9 +38,10 @@ function runCli(script, args) {
 }
 
 describe('risepath.lesson/v1 content', () => {
-  it('validates all 12 Vibe Coding lessons against the course', () => {
+  it('validates every Vibe Coding lesson listed in the course', () => {
     const files = fs.readdirSync(path.join(COURSE_DIR, 'lessons')).filter((f) => f.endsWith('.lesson.json'));
-    assert.equal(files.length, 12);
+    const listed = course.modules.flatMap((m) => m.lessons).map((r) => `${r.id}.lesson.json`);
+    assert.deepEqual([...files].sort(), [...listed].sort());
     for (const file of files) {
       const result = validateLesson(readJson(path.join(COURSE_DIR, 'lessons', file)), { course });
       assert.deepEqual(result.errors, [], file);
@@ -49,12 +50,15 @@ describe('risepath.lesson/v1 content', () => {
   });
 
   it('validates course.json and its next-lesson chain', () => {
-    const ids = VIBE_LEGACY.map((e) => e.lessonId);
+    const refs = course.modules.flatMap((m) => m.lessons);
+    const ids = refs.map((r) => r.id);
     const result = validateCourse(course, { lessonIds: ids });
     assert.deepEqual(result.errors, []);
     assert.equal(course.world, 'vibe');
-    const refs = course.modules.flatMap((m) => m.lessons);
-    assert.deepEqual(refs.map((r) => r.id), ids);
+    // Every migrated chapter stays in the outline, in its original order; new lessons
+    // (e.g. vibe-ch2-practice) may sit between them.
+    const legacyIds = VIBE_LEGACY.map((e) => e.lessonId);
+    assert.deepEqual(ids.filter((id) => legacyIds.includes(id)), legacyIds);
     refs.forEach((ref, i) => {
       if (i < refs.length - 1) assert.equal(ref.next.lessonId, refs[i + 1].id);
       else assert.equal(ref.next, undefined);
@@ -235,13 +239,13 @@ describe('legacy migration', () => {
       const stats = lessonStats(lesson);
 
       assert.deepEqual(lesson.provenance.migratedFrom.counts, legacy, `${entry.lessonId} provenance counts`);
-      assert.equal(stats.table || 0, legacy.table || 0, `${entry.lessonId} tables`);
-      assert.equal(stats.tableRows, legacy.tableRows, `${entry.lessonId} table rows`);
-      tables += stats.table || 0;
+      tables += legacy.table || 0;
 
       // Only lessons still in machine-migrated form keep the legacy block counts; a rework
       // (any new author, e.g. claude-code from /author-lesson) restructures them.
       if (isMigrationAuthor(lesson.provenance.author)) {
+        assert.equal(stats.table || 0, legacy.table || 0, `${entry.lessonId} tables`);
+        assert.equal(stats.tableRows, legacy.tableRows, `${entry.lessonId} table rows`);
         assert.equal(stats.sections, legacy.sections, `${entry.lessonId} sections`);
         assert.equal(stats.blocks, legacy.blocks, `${entry.lessonId} blocks`);
         assert.equal(stats.markdown || 0, legacy.text || 0, `${entry.lessonId} text`);

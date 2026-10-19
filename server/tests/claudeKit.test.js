@@ -18,12 +18,15 @@ import { fileURLToPath } from 'node:url';
 import { LINT_RULES } from '../../shared/lesson/lint.js';
 import { BLOCK_TYPES } from '../../shared/lesson/constants.js';
 import { GUIDE, lintRulesFor, referenceFiles } from '../../.claude/skills/author-lesson/scripts/build-references.mjs';
-import { checkSchema, evaluateReviews, loadSchemas } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
+import { checkSchema, evaluateReviews as evaluateReviewsWith, loadSchemas } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
+import { lessonHash } from '../../.claude/skills/review-lesson/scripts/review-scope.mjs';
+import { lessonHash as sharedLessonHash } from '../../shared/lesson/hash.js';
 import { buildCatalog, formatCatalog, parseArgs as parseCatalogArgs } from '../../scripts/lessons/catalog.mjs';
 import {
   parseArgs as parsePreviewArgs,
   resolveChromium,
   findLessonFile,
+  lessonHashOfFile,
   isApiUrl,
   summarize,
   lessonLocales,
@@ -274,6 +277,30 @@ describe('subagents (.claude/agents/*.md)', () => {
       assert.doesNotMatch(text, MODEL_ID);
     });
   }
+
+  it('ja-editor blocks only on the five error classes; preferences go to niceToHave with replacement text', () => {
+    const { body } = parseFrontmatter(read('.claude/agents/ja-editor.md'));
+    const mustFix = body.slice(body.indexOf('## mustFix'), body.indexOf('## niceToHave'));
+    assert.ok(mustFix.length > 0, 'has a mustFix section before the niceToHave section');
+    for (const tag of ['(a) meaning', '(b) locale', '(c) grammar', '(d) rule', '(e) naming']) {
+      assert.ok(mustFix.includes(`**${tag}**`), `mustFix defines ${tag}`);
+    }
+    assert.match(mustFix, /Start `issue` with\s+the class tag/);
+    assert.match(mustFix, /lessons:lint --strict/);
+    assert.match(mustFix, /style-guide\.ja\.md/);
+    const nice = body.slice(body.indexOf('## niceToHave'), body.indexOf('## Scores'));
+    for (const preference of ['Rhythm', 'smoother', 'word-choice', 'register']) assert.ok(nice.includes(preference), `niceToHave covers ${preference}`);
+    assert.match(nice, /「旧」→「新」/);
+    // Honest scores: moving a finding to niceToHave never raises its criterion.
+    assert.match(body, /Do not raise a score because its findings are now `niceToHave`/);
+  });
+
+  it('pedagogy-reviewer defines mustFix strictly and leaves wording preferences to niceToHave', () => {
+    const { body } = parseFrontmatter(read('.claude/agents/pedagogy-reviewer.md'));
+    assert.match(body, /`mustFix` item[\s\S]*every criterion below 3, every factual error/);
+    assert.match(body, /break\s+of the lesson contract/);
+    assert.match(body, /wording preferences[\s\S]*`niceToHave`/);
+  });
 });
 
 describe('rules and instruction files', () => {
@@ -364,9 +391,14 @@ describe('rubric.v1 and review.v1', () => {
 describe('check-review.mjs (deterministic pass rule)', () => {
   const schemas = loadSchemas(ROOT);
   const ids = schemas.rubric.criteria.map((c) => c.id);
+  // Every review read this version of the lesson (its lessonHash); the gate compares the two.
+  const LESSON = { schema: 'risepath.lesson/v1', id: 'vibe-ch1', courseId: 'vibe-coding', title: 'Demo', objectives: [], sections: [] };
+  const HASH = lessonHash(LESSON);
+  const evaluateReviews = (reviews, s) => evaluateReviewsWith(reviews, s, { lesson: { id: 'vibe-ch1', hash: HASH } });
   const make = (reviewer, scoreOf, extra = {}) => ({
     lessonId: 'vibe-ch1',
     file: 'content/courses/vibe-coding/drafts/vibe-ch1.lesson.json',
+    lessonHash: HASH,
     reviewer,
     rubricVersion: 'rubric.v1',
     scores: ids.filter((id) => scoreOf(id) !== undefined).map((id) => ({ id, score: scoreOf(id), evidence: `Block x shows ${id}.` })),
@@ -433,11 +465,14 @@ describe('check-review.mjs (deterministic pass rule)', () => {
       const pass = write('pass.json', make('pedagogy-reviewer', () => 4));
       const revise = write('revise.json', make('ja-editor', (id) => (id === 'voice' ? 2 : undefined)));
       const broken = write('broken.json', '{');
-      const run = (...files) => spawnSync(process.execPath, [script, ...files], { encoding: 'utf8' }).status;
+      const lesson = write('vibe-ch1.lesson.json', LESSON);
+      const run = (...files) => spawnSync(process.execPath, [script, ...files, '--lesson', lesson], { encoding: 'utf8' }).status;
       assert.equal(run(pass), 0);
       assert.equal(run(pass, revise), 1);
       assert.equal(run(broken), 2);
       assert.equal(run(), 2);
+      // A review of another version of the lesson is stale.
+      assert.equal(run(write('stale.json', make('pedagogy-reviewer', () => 4, { lessonHash: 'sha256:0000000000000000' }))), 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -466,13 +501,15 @@ describe('generated skill references', () => {
 });
 
 describe('lessons:catalog', () => {
-  it('lists the 12 Vibe Coding lessons in outline order', async () => {
+  it('lists the Vibe Coding lessons in outline order', async () => {
     const catalog = await buildCatalog({ check: false });
     const vibe = catalog.courses.find((c) => c.id === 'vibe-coding');
     assert.ok(vibe);
     const listed = vibe.lessons.filter((l) => l.inOutline);
-    assert.equal(listed.length, 12);
-    assert.deepEqual(listed.map((l) => l.id), Array.from({ length: 12 }, (_, i) => `vibe-ch${i}`));
+    const outline = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/courses/vibe-coding/course.json'), 'utf8'))
+      .modules.flatMap((m) => m.lessons).map((l) => l.id);
+    assert.deepEqual(listed.map((l) => l.id), outline);
+    for (let i = 0; i < 12; i += 1) assert.ok(outline.includes(`vibe-ch${i}`), `vibe-ch${i} in outline`);
     assert.ok(listed.every((l) => l.status !== 'missing'));
     assert.ok(catalog.examples.some((e) => e.id === 'blocks-gallery'));
     const short = formatCatalog(catalog, 'short');
@@ -534,6 +571,25 @@ describe('lessons:preview helpers', () => {
       fs.writeFileSync(path.join(base, 'drafts', 'l.lesson.json'), '{}');
       assert.equal(findLessonFile('c', 'l', dir).source, 'draft');
       assert.equal(findLessonFile('c', 'missing', dir), null);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records the same lessonHash as review-scope --hash for the lesson it shows', () => {
+    const rel = 'content/courses/vibe-coding/lessons/vibe-ch2.lesson.json';
+    const lesson = readJson(rel);
+    const hash = lessonHashOfFile(path.join(ROOT, rel));
+    assert.match(hash, /^sha256:[0-9a-f]{16}$/);
+    assert.equal(hash, lessonHash(lesson));
+    assert.equal(hash, sharedLessonHash(lesson));
+    // provenance is not content: stamping a reviewer does not invalidate reviews or screenshots.
+    assert.equal(sharedLessonHash({ ...lesson, provenance: { ...lesson.provenance, reviewedBy: 'owner' } }), hash);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-preview-hash-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'broken.lesson.json'), '{ nope');
+      assert.equal(lessonHashOfFile(path.join(dir, 'broken.lesson.json')), null);
+      assert.equal(lessonHashOfFile(path.join(dir, 'missing.lesson.json')), null);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
