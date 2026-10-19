@@ -1,0 +1,40 @@
+{
+  "name": "P-School 画像モデルお試し：主人公・敵・背景を各モデルで1枚ずつ",
+  "models": ["gptImageSunburst", "gptImageFlare", "seedreamPro", "seedreamLite"],
+  "quality": "high",
+  "resolution": "1K",
+  "maxUsd": 1.5,
+  "style": "Art style: match the reference images. Hand-painted 2D fantasy adventure game art with soft painterly shading, clean edges, warm natural light from the upper left, rich but natural colours and anime-influenced proportions. Not pixel art. No text, logo, watermark, signature, frame or border.",
+  "sprite": {
+    "rules": "One character only, full body from head to feet, turned three-quarters in a side view, seen from eye level, standing on an invisible ground line near the bottom edge with a small margin around the figure.",
+    "transparent": "Transparent background: no scenery, no ground and no cast shadow.",
+    "flat": "Plain flat pure white background (#FFFFFF): no scenery, no ground, no shadow and no gradient."
+  },
+  "background": "Wide battle background for a side-view game, seen from eye level. A flat walkable ground area fills the lower third across the whole width, where the hero stands on the left and an enemy on the right; keep the left and right middle areas free of large objects. No characters, creatures or people, and no UI.",
+  "jobs": [
+    {
+      "id": "hero-battle-pose",
+      "title": "主人公（戦闘の構え・右向き）",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "references": ["public/p_school/assets/main-chara01_transparent.png"],
+      "prompt": "The young explorer from the reference image, with the same face, aviator goggles on a safari hat, khaki shirt and shorts, large backpack with a bedroll, wooden staff and orange boots, in the same colours. A battle-ready stance holding the staff with both hands, facing RIGHT."
+    },
+    {
+      "id": "enemy-chemical-gorilla",
+      "title": "ステージ2の敵：ケミカルゴリラ（左向き）",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "references": ["public/p_school/assets/main-chara01_transparent.png", "public/p_school/assets/seirei01_transparent.png"],
+      "prompt": "A game enemy: a hulking gorilla mutated by chemicals that escaped from a laboratory, with glowing green slime on its fur and glass vials and tubes strapped to its body. Menacing but not gory, with a clear silhouette. Facing LEFT, toward the hero. Use the reference images for the art style only; do not draw the characters in them."
+    },
+    {
+      "id": "bg-stage2-lab",
+      "title": "ステージ2の背景：荒れた研究所",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "references": ["public/p_school/assets/battle-seen01.jpeg"],
+      "prompt": "An abandoned, overgrown laboratory: rows of large glass tanks of glowing green liquid along the back wall, old computers and tangled cables, and a cracked tiled floor with moss, lit by dim fluorescent light mixed with a green glow. Use the reference image for the art style and rendering only; do not copy its content."
+    }
+  ]
+}
