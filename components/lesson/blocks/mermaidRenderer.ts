@@ -2,9 +2,13 @@
  * Lazy mermaid rendering for DiagramBlock. Mermaid (~1 MB) and DOMPurify load only when a lesson
  * has a diagram. Renders are serialized because mermaid.initialize() is global.
  *
- * Security: securityLevel 'strict' (no click handlers, HTML labels escaped by mermaid) and the
- * resulting SVG is sanitized again with DOMPurify before it touches the DOM.
+ * Security: `%%{init}%%` directives are stripped (content cannot change the theme, font floor or
+ * security level), securityLevel 'strict' (no click handlers, HTML labels escaped by mermaid),
+ * and the resulting SVG is sanitized again with DOMPurify (svg + html profiles, no event
+ * handlers, no script/iframe/object, no images in labels, links reduced to fragment
+ * references) before it touches the DOM.
  */
+import { stripMermaidDirectives } from './blockText';
 
 export type DiagramPalette = {
   fg: string;
@@ -102,11 +106,46 @@ function themeVariables(p: DiagramPalette) {
 }
 
 let counter = 0;
+let diagramPurify: Purify | null = null;
+
+/**
+ * A private DOMPurify instance (hooks on the shared default instance would affect every other
+ * sanitize call in the app). Links inside a diagram may only point at fragments of the SVG.
+ */
+function diagramSanitizer(factory: Purify): Purify {
+  if (diagramPurify) return diagramPurify;
+  const instance = factory(window);
+  instance.addHook('afterSanitizeAttributes', (node) => {
+    for (const name of ['href', 'xlink:href']) {
+      const value = node.getAttribute?.(name);
+      if (value != null && !value.trim().startsWith('#')) node.removeAttribute(name);
+    }
+  });
+  diagramPurify = instance;
+  return instance;
+}
+
+const PURIFY_CONFIG = {
+  USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  ADD_TAGS: ['foreignObject'],
+  HTML_INTEGRATION_POINTS: { foreignobject: true },
+  // <a> stays (mermaid wraps clickable nodes in it and positions them there); the hook strips
+  // its href and blocks.css makes it inert.
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'textarea', 'select', 'img'],
+  FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'formaction', 'srcdoc'],
+};
+
+/** Sanitizes mermaid output; exported for the dev sanitization check. */
+export async function sanitizeDiagramSvg(svg: string): Promise<string> {
+  const purify = diagramSanitizer(await loadPurify());
+  return purify.sanitize(svg, PURIFY_CONFIG as Parameters<Purify['sanitize']>[1]) as unknown as string;
+}
 
 /** Renders mermaid source to sanitized SVG markup. Throws on syntax errors. */
 export function renderMermaid(code: string, palette: DiagramPalette, idHint: string): Promise<string> {
   const run = async () => {
-    const [mermaid, purify] = await Promise.all([loadMermaid(), loadPurify()]);
+    const [mermaid] = await Promise.all([loadMermaid(), loadPurify()]);
+    const source = stripMermaidDirectives(code);
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
@@ -119,13 +158,9 @@ export function renderMermaid(code: string, palette: DiagramPalette, idHint: str
     counter += 1;
     const id = `rp-mmd-${idHint.replace(/[^a-zA-Z0-9_-]/g, '-')}-${counter}`;
     try {
-      await mermaid.parse(code);
-      const { svg } = await mermaid.render(id, code);
-      return purify.sanitize(svg, {
-        USE_PROFILES: { svg: true, svgFilters: true, html: true },
-        ADD_TAGS: ['foreignObject'],
-        HTML_INTEGRATION_POINTS: { foreignobject: true },
-      } as Parameters<Purify['sanitize']>[1]) as unknown as string;
+      await mermaid.parse(source);
+      const { svg } = await mermaid.render(id, source);
+      return await sanitizeDiagramSvg(svg);
     } finally {
       // mermaid leaves its scratch container behind when rendering fails.
       document.getElementById(`d${id}`)?.remove();

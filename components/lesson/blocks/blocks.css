@@ -1,0 +1,943 @@
+/*
+ * Rich lesson blocks (WP-05): code highlighting and folding, prompt variable fields, diagram
+ * zoom, quiz layouts, flashcard flip, steps / checklist / askTutor details.
+ *
+ * Imported by blocks/registry.tsx, so it lands before components/lesson/reader.css in the
+ * cascade. Both live in @layer components. Rules that refine a reader.css rule are prefixed
+ * with `.rp-block` (the frame every block renders in) to win on specificity; new elements use
+ * their own class names. Colors come from the --rp-* tokens only.
+ */
+
+@layer components {
+  /* ---------------------------------------------------------------------------------------
+   * Code
+   * ------------------------------------------------------------------------------------- */
+
+  /* Shiki tokens: both themes ride along as variables; the card is dark on screen. */
+  .rp-tok {
+    color: var(--shiki-dark, inherit);
+    font-style: var(--shiki-dark-font-style, inherit);
+    font-weight: var(--shiki-dark-font-weight, inherit);
+    text-decoration: var(--shiki-dark-text-decoration, inherit);
+  }
+
+  .rp-block .rp-code {
+    position: relative;
+  }
+
+  /* No ligatures in code: learners must see === and => as typed (JetBrains Mono uses calt). */
+  .rp-block :is(pre, code, kbd) {
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+  }
+
+  .rp-block .rp-code-line[data-fold-hidden] {
+    display: none;
+  }
+
+  .rp-block .rp-code[data-folded] .rp-code-pre {
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 4.5em), transparent);
+    mask-image: linear-gradient(to bottom, black calc(100% - 4.5em), transparent);
+    padding-bottom: 6px;
+  }
+
+  .rp-block .rp-code-btn[data-copied] {
+    color: var(--rp-success);
+    border-color: color-mix(in srgb, var(--rp-success) 45%, var(--rp-border));
+  }
+
+  .rp-code-fold {
+    display: flex;
+    border-top: 1px solid var(--rp-border);
+  }
+
+  .rp-code-fold-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--rp-fg-2);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--rp-duration-fast) var(--rp-ease), color var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-code-fold-btn:hover {
+    color: var(--rp-fg);
+    background: var(--rp-sunken);
+  }
+
+  .rp-code-fold-btn:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .rp-code-fold-icon {
+    transition: transform var(--rp-duration-base) var(--rp-ease);
+  }
+
+  .rp-code-fold-btn[aria-expanded="true"] .rp-code-fold-icon {
+    transform: rotate(180deg);
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Prompt
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-prompt-spacer {
+    flex: 1 1 0;
+  }
+
+  .rp-prompt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rp-block .rp-btn[data-copied] {
+    color: var(--rp-success);
+    border-color: color-mix(in srgb, var(--rp-success) 45%, var(--rp-border));
+  }
+
+  .rp-prompt-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--rp-border);
+    background: color-mix(in srgb, var(--rp-success) 7%, var(--rp-surface));
+    color: var(--rp-fg);
+    font-size: 13px;
+    line-height: 1.6;
+    animation: rp-fade var(--rp-duration-base) var(--rp-ease);
+  }
+
+  .rp-prompt-toast > svg {
+    margin-top: 0.25em;
+    color: var(--rp-success);
+  }
+
+  .rp-prompt-cmd {
+    display: block;
+    margin-top: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--rp-mono);
+    font-size: 12px;
+    color: var(--rp-fg-2);
+  }
+
+  /* Variable fields: an <input> stacked on a hidden copy of its text, so it grows with it. */
+  .rp-var {
+    display: inline-grid;
+    vertical-align: baseline;
+    max-width: 100%;
+    margin: 0 2px;
+  }
+
+  .rp-var::after,
+  .rp-var-input {
+    grid-area: 1 / 1;
+    padding: 0 7px;
+    border: 1.5px dashed transparent;
+    font: inherit;
+    font-size: 0.94em;
+    font-weight: 600;
+    line-height: 1.55;
+    letter-spacing: inherit;
+  }
+
+  .rp-var::after {
+    content: attr(data-size) "\00a0";
+    visibility: hidden;
+    white-space: pre;
+    overflow: hidden;
+  }
+
+  .rp-var-input {
+    width: 100%;
+    min-width: 3.5em;
+    border-color: color-mix(in srgb, var(--rp-primary) 55%, var(--rp-surface));
+    border-radius: var(--radius-chip, 6px);
+    background: var(--rp-primary-soft);
+    color: var(--rp-fg);
+    transition: border-color var(--rp-duration-fast) var(--rp-ease), background-color var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-var-input::placeholder {
+    color: var(--rp-primary-text);
+    opacity: 1;
+  }
+
+  .rp-var-input:hover {
+    border-color: var(--rp-primary);
+  }
+
+  .rp-var-input:focus-visible {
+    outline: 2px solid var(--rp-focus);
+    outline-offset: 1px;
+    border-style: solid;
+    background: var(--rp-surface);
+  }
+
+  .rp-var[data-filled] .rp-var-input {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--rp-primary) 35%, var(--rp-surface));
+    background: color-mix(in srgb, var(--rp-primary-soft) 55%, var(--rp-surface));
+  }
+
+  .rp-prompt-fill {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 10px;
+    padding: 10px 18px;
+    border-top: 1px dashed var(--rp-border);
+    color: var(--rp-fg-3);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .rp-block .rp-prompt-fill-text {
+    flex: 1 1 16em;
+    min-width: 0;
+    margin: 0;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-prompt-fill-text strong {
+    color: var(--rp-fg);
+  }
+
+  .rp-prompt-left {
+    flex: none;
+    font-weight: 600;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-prompt-left[data-done] {
+    color: var(--rp-success);
+  }
+
+  .rp-prompt-fill .rp-link-btn {
+    padding: 0;
+    font-size: 13px;
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Diagram zoom
+   * ------------------------------------------------------------------------------------- */
+
+  /*
+   * A centred flex row that overflows cannot be scrolled back to its start, so the SVG centres
+   * itself with auto margins instead (they collapse to 0 when it is wider than the card).
+   * Scroll shadows show that a wide diagram continues to the side.
+   */
+  .rp-block .rp-diagram-host {
+    justify-content: flex-start;
+    background:
+      linear-gradient(to right, var(--rp-surface) 30%, transparent) left center / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--rp-surface) 30%, transparent) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--rp-fg) 16%, transparent), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--rp-fg) 16%, transparent), transparent) right center / 14px 100% no-repeat scroll;
+    background-color: var(--rp-surface);
+  }
+
+  .rp-block .rp-diagram-host svg {
+    margin-inline: auto;
+  }
+
+  .rp-block .rp-diagram-host[aria-busy="true"] {
+    justify-content: center;
+    background: linear-gradient(90deg, var(--rp-surface), var(--rp-sunken), var(--rp-surface));
+    background-size: 200% 100%;
+  }
+
+  /* Links inside a diagram are inert (their href is stripped when sanitizing). */
+  .rp-diagram-host a,
+  .rp-zoom-svg a {
+    color: inherit;
+    text-decoration: none;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  /* Card on top; the caption centred under it with the zoom button at its right end. */
+  .rp-block :is(.rp-diagram, .rp-image) {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    column-gap: 8px;
+  }
+
+  :is(.rp-diagram, .rp-image) > :is(.rp-diagram-card, .rp-image-frame, .rp-details) {
+    grid-column: 1 / -1;
+  }
+
+  :is(.rp-diagram, .rp-image) > .rp-figcaption {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .rp-diagram-zoom {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    align-self: start;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    margin-top: 5px;
+    padding: 0;
+    border-radius: var(--radius-control, 10px);
+    border: 1px solid var(--rp-border);
+    background: var(--rp-surface);
+    color: var(--rp-fg-2);
+    cursor: zoom-in;
+    transition: color var(--rp-duration-fast) var(--rp-ease), border-color var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-diagram-zoom:hover {
+    color: var(--rp-fg);
+    border-color: var(--rp-border-strong);
+  }
+
+  .rp-zoom-panel {
+    position: absolute;
+    inset: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--rp-raised);
+    color: var(--rp-fg);
+    border: 1px solid var(--rp-border);
+    border-radius: var(--radius-hero, 20px);
+    box-shadow: var(--rp-shadow-3);
+    animation: rp-fade var(--rp-duration-base) var(--rp-ease);
+  }
+
+  .rp-zoom-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 10px 10px 20px;
+    border-bottom: 1px solid var(--rp-border);
+  }
+
+  .rp-zoom-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    font-weight: 700;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rp-zoom-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rp-zoom-tools .rp-btn[aria-pressed="true"] {
+    color: var(--rp-primary-text);
+    border-color: color-mix(in srgb, var(--rp-primary) 45%, var(--rp-border));
+    background: var(--rp-primary-soft);
+  }
+
+  .rp-zoom-level {
+    min-width: 3.5em;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-zoom-stage {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 24px;
+    background: var(--rp-surface);
+    cursor: grab;
+    touch-action: pan-x pan-y;
+  }
+
+  .rp-zoom-stage:active {
+    cursor: grabbing;
+  }
+
+  .rp-zoom-stage[data-fit] {
+    display: flex;
+    cursor: default;
+  }
+
+  .rp-zoom-stage[data-fit] .rp-zoom-svg {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .rp-zoom-stage:not([data-fit]) .rp-zoom-svg {
+    width: max-content;
+    margin: 0 auto;
+  }
+
+  .rp-zoom-stage:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .rp-zoom-svg svg,
+  .rp-zoom-img {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .rp-zoom-stage[data-fit] .rp-zoom-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .rp-zoom-foot {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    padding: 10px 20px 12px;
+    border-top: 1px solid var(--rp-border);
+  }
+
+  .rp-zoom-caption {
+    flex: 1 1 20em;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-zoom-keys {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--rp-fg-3);
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Quiz
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-question[data-kind="truefalse"] .rp-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rp-block .rp-feedback:focus {
+    outline: none;
+  }
+
+  .rp-block .rp-feedback:focus-visible {
+    outline: 2px solid var(--rp-focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Flashcards
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-cards-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+
+  .rp-cards-known {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-cards-known svg {
+    color: var(--rp-success);
+  }
+
+  .rp-block .rp-card-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 8px 0 0 -6px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rp-card-dot {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .rp-card-dot::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--rp-border-strong);
+    background: var(--rp-surface);
+    transition: transform var(--rp-duration-fast) var(--rp-ease), background-color var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-card-dot[data-state="known"]::before {
+    border-color: var(--rp-success);
+    background: var(--rp-success);
+  }
+
+  .rp-card-dot[data-state="again"]::before {
+    border-color: var(--rp-danger);
+  }
+
+  .rp-card-dot[aria-current="true"]::before {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 2px var(--rp-surface), 0 0 0 4px var(--rp-primary);
+  }
+
+  .rp-card-dot:hover::before {
+    transform: scale(1.2);
+  }
+
+  .rp-block .rp-card-face {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 0;
+    margin-top: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-card, 14px);
+    background: transparent;
+    perspective: 1400px;
+    text-align: center;
+  }
+
+  .rp-block .rp-card-face[data-flipped],
+  .rp-block .rp-card-face[data-known] {
+    background: transparent;
+  }
+
+  .rp-card-inner {
+    display: grid;
+    transform-style: preserve-3d;
+    transition: transform 480ms var(--rp-ease);
+  }
+
+  .rp-card-face[data-flipped] .rp-card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .rp-card-side {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 188px;
+    padding: 24px 28px;
+    border-radius: var(--radius-card, 14px);
+    border: 1.5px solid var(--rp-border);
+    background: var(--rp-sunken);
+    color: var(--rp-fg);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  .rp-card-back {
+    transform: rotateY(180deg);
+    background: var(--rp-primary-soft);
+    border-color: color-mix(in srgb, var(--rp-primary) 35%, var(--rp-surface));
+  }
+
+  .rp-card-face[data-known] .rp-card-side {
+    border-color: color-mix(in srgb, var(--rp-success) 50%, var(--rp-surface));
+  }
+
+  .rp-card-face:hover .rp-card-side {
+    border-color: color-mix(in srgb, var(--rp-primary) 45%, var(--rp-surface));
+  }
+
+  .rp-card-hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--rp-surface);
+    border: 1px solid color-mix(in srgb, var(--rp-success) 45%, var(--rp-border));
+    color: var(--rp-success);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .rp-cards-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .rp-block .rp-cards-keys {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--rp-fg-3);
+    text-align: center;
+  }
+
+  .rp-cards-done {
+    margin-top: 12px;
+    padding: 20px;
+    border-radius: var(--radius-card, 14px);
+    border: 1.5px solid color-mix(in srgb, var(--rp-success) 40%, var(--rp-border));
+    background: color-mix(in srgb, var(--rp-success) 6%, var(--rp-surface));
+  }
+
+  .rp-block .rp-cards-done-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-weight: 700;
+    color: var(--rp-success);
+  }
+
+  .rp-block .rp-cards-done-body {
+    margin: 4px 0 0;
+    color: var(--rp-fg-2);
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Steps
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-steps-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rp-border);
+  }
+
+  .rp-block .rp-steps-label {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-steps-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-steps-count[data-done] {
+    color: var(--rp-success);
+  }
+
+  .rp-block .rp-step[data-done] .rp-step-title {
+    color: var(--rp-fg-2);
+  }
+
+  .rp-block .rp-step:not(:last-child)::before {
+    transition: background-color var(--rp-duration-base) var(--rp-ease);
+  }
+
+  .rp-block .rp-step[data-done]:not(:last-child)::before {
+    background: color-mix(in srgb, var(--rp-success) 55%, var(--rp-border));
+  }
+
+  .rp-block .rp-step-expect {
+    border-left: 3px solid color-mix(in srgb, var(--rp-success) 60%, var(--rp-border));
+    border-radius: 0 var(--radius-control, 10px) var(--radius-control, 10px) 0;
+  }
+
+  .rp-block .rp-step-expect-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .rp-step-expect-label svg {
+    color: var(--rp-success);
+  }
+
+  .rp-block .rp-step-stuck {
+    margin-top: 6px;
+  }
+
+  .rp-block kbd.rp-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 1em;
+  }
+
+  .rp-combo-plus {
+    font-size: 0.8em;
+    color: var(--rp-fg-3);
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Checklist
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-checklist-count {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-block .rp-checklist[data-complete] {
+    border-color: color-mix(in srgb, var(--rp-success) 40%, var(--rp-border));
+  }
+
+  .rp-checklist[data-complete] .rp-checklist-count {
+    color: var(--rp-success);
+  }
+
+  .rp-block .rp-check-row[data-checked] .rp-check-label {
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--rp-fg-3) 60%, transparent);
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * askTutor
+   * ------------------------------------------------------------------------------------- */
+
+  .rp-block .rp-asktutor {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--rp-primary) 22%, var(--rp-border));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--rp-primary-soft) 60%, var(--rp-surface)), var(--rp-surface) 80%);
+  }
+
+  .rp-asktutor-icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--rp-primary-soft);
+    color: var(--rp-primary-text);
+  }
+
+  .rp-block .rp-asktutor-hint {
+    margin: 6px 0 12px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-block .rp-asktutor-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rp-block .rp-asktutor-q {
+    gap: 6px;
+    background: var(--rp-surface);
+    color: var(--rp-fg);
+  }
+
+  .rp-asktutor-arrow {
+    flex: none;
+    color: var(--rp-fg-3);
+    transition: color var(--rp-duration-fast) var(--rp-ease), transform var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-asktutor-q:hover .rp-asktutor-arrow {
+    color: var(--rp-primary-text);
+    transform: translate(1px, -1px);
+  }
+
+  /* Identifiers in table cells stay whole ("diagram", not "diagra/m"); the table scrolls. */
+  .rp-block .rp-table code {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
+  /* LessonBar: "練習 2/5" */
+  .rp-mode-count {
+    color: var(--rp-fg-2);
+    font-weight: 600;
+  }
+
+  /* ---------------------------------------------------------------------------------------
+   * Small screens, touch, print
+   * ------------------------------------------------------------------------------------- */
+
+  @media (max-width: 767px) {
+    .rp-prompt-spacer {
+      flex-basis: 100%;
+      height: 0;
+    }
+
+    .rp-prompt-actions {
+      width: 100%;
+    }
+
+    .rp-prompt-actions .rp-btn {
+      flex: 1 1 auto;
+    }
+
+    .rp-prompt-toast,
+    .rp-prompt-fill {
+      padding-inline: 16px;
+    }
+
+    .rp-zoom-panel {
+      inset: 0;
+      border-radius: 0;
+      border: 0;
+    }
+
+    .rp-zoom-stage {
+      padding: 12px;
+    }
+
+    .rp-zoom-keys {
+      display: none;
+    }
+
+    .rp-question[data-kind="truefalse"] .rp-options {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rp-card-side {
+      min-height: 168px;
+      padding: 20px;
+    }
+
+    .rp-cards-keys {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .rp-diagram-zoom {
+      width: 40px;
+      height: 40px;
+      margin-top: 2px;
+    }
+
+    .rp-block :is(.rp-diagram, .rp-image) {
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
+    }
+
+    .rp-block .rp-cards-keys,
+    .rp-zoom-keys {
+      display: none;
+    }
+
+    .rp-card-dot {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rp-card-inner,
+    .rp-code-fold-icon,
+    .rp-zoom-panel,
+    .rp-prompt-toast {
+      transition: none;
+      animation: none;
+    }
+  }
+
+  @media print {
+    .rp-block .rp-code {
+      background: Canvas;
+      color: CanvasText;
+      border-color: GrayText;
+      box-shadow: none;
+    }
+
+    .rp-tok {
+      color: var(--shiki-light, inherit);
+      font-style: var(--shiki-light-font-style, inherit);
+      font-weight: var(--shiki-light-font-weight, inherit);
+    }
+
+    .rp-code-btn,
+    .rp-code-fold,
+    .rp-diagram-zoom,
+    .rp-prompt-actions {
+      display: none;
+    }
+
+    .rp-block .rp-code-line[data-fold-hidden] {
+      display: block;
+    }
+
+    .rp-block .rp-code[data-folded] .rp-code-pre {
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+  }
+}

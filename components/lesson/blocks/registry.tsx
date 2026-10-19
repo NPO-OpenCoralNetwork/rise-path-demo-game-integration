@@ -16,11 +16,12 @@ import ChecklistBlock from './ChecklistBlock';
 import SummaryBlock from './SummaryBlock';
 import AskTutorBlock from './AskTutorBlock';
 import UnknownBlock from './UnknownBlock';
+import './blocks.css';
 
 /**
  * risepath.lesson/v1 block type → renderer. The mapped type makes TypeScript fail when a type in
- * shared/lesson/schema.js has no renderer. One file per block so WP-05 can upgrade blocks
- * independently; register new types here.
+ * shared/lesson/schema.js has no renderer. One file per block; register new types here.
+ * blocks.css holds the rich-block styles (code highlighting, prompt fields, zoom, flashcards…).
  */
 
 export type BlockType = Block['type'];

@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Check, CircleHelp, Lightbulb, Sparkles, Target, X } from 'lucide-react';
 import type { BlockProps } from './registry';
 import { MdText, Txt } from '../Md';
@@ -12,9 +12,11 @@ import { useLanguage } from '../../../context/LanguageContext';
  *   second miss (or "show answer") reveals the answer with a neutral explanation.
  * - predict (予想してみよう): ungraded; the pick is recorded and the explanation shown.
  * - exam (理解度チェック): every question in one card, with a first-try score.
- * Native radios/checkboxes (arrow keys), 1–9 select options while focus is inside a question,
- * feedback is announced via aria-live. Answers are saved with the lesson progress.
- * WP-05 upgrades this file in place.
+ * Native radios/checkboxes (arrow keys), 1–9 select options and Enter submits while focus is
+ * inside the question (never globally, so screen-reader keys are untouched), feedback is
+ * announced via aria-live and focus moves to it (the options lock after a submit), retry puts
+ * focus back on the first option. Answers are saved with the lesson progress; "Ask why" opens
+ * the tutor in Socratic mode with the attempt count and the picked option.
  */
 
 type QuizBlock = BlockProps<'quiz'>['block'];
@@ -44,7 +46,7 @@ const copy = {
     askWhy: 'Ask the AI tutor why',
     askWhyMessage: 'I picked a wrong answer on this check. Help me see why, without giving the answer away.',
     score: (n: number, m: number) => `Right on the first try: ${n} of ${m}`,
-    keys: 'Tip: press 1–4 to pick, Enter to check.',
+    keys: (n: number) => `Tip: press 1–${n} to pick, Enter to check.`,
   },
   jp: {
     inline: '確認しよう',
@@ -69,7 +71,7 @@ const copy = {
     askWhy: 'なぜ？をAI先生に聞く',
     askWhyMessage: 'この確認問題で間違えました。答えは言わずに、考え方のヒントをください。',
     score: (n: number, m: number) => `1回目で正解：${m}問中 ${n}問`,
-    keys: '1〜4キーで選択、Enterで回答できます。',
+    keys: (n: number) => `1〜${n}キーで選択、Enterで回答できます。`,
   },
 } as const;
 
@@ -105,6 +107,11 @@ function QuestionView({
   const [nudge, setNudge] = useState(false);
   const uid = useId();
   const promptId = `${uid}-prompt`;
+  const formRef = useRef<HTMLFormElement>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  // Where focus goes after the next render: the feedback panel (options just locked) or the
+  // first option (retry).
+  const [focusTo, setFocusTo] = useState<'feedback' | 'options' | null>(null);
 
   let phase: Phase = 'answering';
   if (record && (record.attempts > 0 || record.revealed)) {
@@ -140,7 +147,19 @@ function QuestionView({
       revealed: !predict && !correct && attempts >= 2,
     });
     setRetrying(false);
+    setHintOpen(false);
+    setFocusTo('feedback');
   };
+
+  useEffect(() => {
+    if (!focusTo) return;
+    if (focusTo === 'feedback') {
+      feedbackRef.current?.querySelector<HTMLElement>('.rp-feedback')?.focus({ preventScroll: false });
+    } else {
+      formRef.current?.querySelector<HTMLInputElement>('input:not(:disabled)')?.focus();
+    }
+    setFocusTo(null);
+  }, [focusTo]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -176,7 +195,9 @@ function QuestionView({
 
   return (
     <form
+      ref={formRef}
       className="rp-question"
+      data-kind={kind}
       aria-labelledby={promptId}
       onSubmit={(event) => {
         event.preventDefault();
@@ -231,14 +252,14 @@ function QuestionView({
             {predict ? text.submitPredict : text.submit}
           </button>
           {nudge ? <span className="text-small text-danger">{text.selectFirst}</span> : (
-            <span className="rp-key-tip text-small text-fg-3">{text.keys}</span>
+            <span className="rp-key-tip text-small text-fg-3">{text.keys(Math.min(9, question.options.length))}</span>
           )}
         </div>
       )}
 
-      <div role="status" aria-live="polite" className="rp-feedback-live">
+      <div ref={feedbackRef} role="status" aria-live="polite" className="rp-feedback-live">
         {phase === 'wrong' && (
-          <div className="rp-feedback rp-feedback-wrong">
+          <div className="rp-feedback rp-feedback-wrong" tabIndex={-1}>
             <p className="rp-feedback-title"><X size={16} aria-hidden="true" />{text.almost}</p>
             {pickedFeedback.map((o) => <MdText key={o.id} value={o.feedback} className="rp-feedback-body" />)}
             {hintOpen && question.hint && (
@@ -267,7 +288,14 @@ function QuestionView({
               >
                 <Sparkles size={14} aria-hidden="true" />{text.askWhy}
               </button>
-              <button type="button" className="rp-btn" onClick={() => progress.revealAnswer(block.id, question.id)}>
+              <button
+                type="button"
+                className="rp-btn"
+                onClick={() => {
+                  progress.revealAnswer(block.id, question.id);
+                  setFocusTo('feedback');
+                }}
+              >
                 {text.reveal}
               </button>
               <button
@@ -276,6 +304,8 @@ function QuestionView({
                 onClick={() => {
                   setSelected([]);
                   setRetrying(true);
+                  setHintOpen(false);
+                  setFocusTo('options');
                 }}
               >
                 {text.retry}
@@ -285,7 +315,7 @@ function QuestionView({
         )}
 
         {showAnswer && (
-          <div className={`rp-feedback ${phase === 'correct' ? 'rp-feedback-correct' : 'rp-feedback-neutral'}`}>
+          <div className={`rp-feedback ${phase === 'correct' ? 'rp-feedback-correct' : 'rp-feedback-neutral'}`} tabIndex={-1}>
             <p className="rp-feedback-title">
               {phase === 'correct' && <><Check size={16} aria-hidden="true" />{text.correct}</>}
               {phase === 'revealed' && <><CircleHelp size={16} aria-hidden="true" />{text.answerIs}{answerOptions.map((o, i) => (

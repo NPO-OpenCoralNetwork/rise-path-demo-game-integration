@@ -6,6 +6,7 @@ import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { fetchGeneratedCourseById, saveGeneratedCourse } from './services/curriculumApi';
 import { VIEW_PATHS } from './navigation/viewPaths';
+import { features } from './config/features';
 
 // Common Components
 import Layout from './components/common/Layout';
@@ -72,6 +73,7 @@ import {
   VibePrologueView,
   VibePathView,
   LearnRoute,
+  DevBlocksRoute,
   UnityPathView,
   UnityChapterView,
   ArtMuseumView,
@@ -355,6 +357,9 @@ const AppContent: React.FC = () => {
               <Route path="/learn/:courseSlug/:lessonId" element={<LearnRoute />} />
               {import.meta.env.DEV && (
                 <Route path="/preview/:courseSlug/:lessonId" element={<LearnRoute mode="preview" />} />
+              )}
+              {import.meta.env.DEV && features.devSamples && (
+                <Route path="/dev/blocks" element={<DevBlocksRoute />} />
               )}
 
               {/* Unity */}

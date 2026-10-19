@@ -15,6 +15,11 @@ export const LearnRoute = lazy(
   () => import('./LearnRoute')
 );
 
+/** /dev/blocks block gallery. Dev builds only: production bundles drop the import. */
+export const DevBlocksRoute = lazy(
+  () => (import.meta.env.DEV ? import('./DevBlocksRoute') : Promise.resolve({ default: () => null }))
+);
+
 export const CoursePathViewWrapper = lazy(
   () => import('../wrappers/CoursePathViewWrapper')
 );

@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ListTree, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { ProgressRing } from './ProgressRing';
+import { useOptionalReader } from './ReaderContext';
+import { practiceProgress } from './blocks/blockText';
 
 /**
- * Sticky (never fixed) bar inside <main>: back, breadcrumb, mode tabs (only "Read" works yet),
- * reading progress, Aa settings and the AI tutor. A 3px progress line runs along its bottom.
+ * Sticky (never fixed) bar inside <main>: back, breadcrumb, mode tabs (only "Read" works yet;
+ * "Practice" already counts answered checks, 練習 x/y), reading progress, Aa settings and the AI
+ * tutor. A 3px progress line runs along its bottom.
  */
 
 const copy = {
@@ -18,6 +21,7 @@ const copy = {
     slides: 'Slides',
     practice: 'Practice',
     soon: 'Coming soon',
+    practiceCount: (n: number, m: number) => `${n} of ${m} questions answered`,
     progress: (pct: number) => `${pct}% of this lesson done`,
     outline: 'Contents',
     outlineLabel: (n: number, m: number) => `Open the contents (section ${n} of ${m})`,
@@ -33,6 +37,7 @@ const copy = {
     slides: 'スライド',
     practice: '練習',
     soon: '準備中',
+    practiceCount: (n: number, m: number) => `${m}問中 ${n}問回答済み`,
     progress: (pct: number) => `このレッスンの ${pct}% を学習済み`,
     outline: '目次',
     outlineLabel: (n: number, m: number) => `目次を開く（${m}セクション中 ${n}）`,
@@ -82,6 +87,13 @@ export function LessonBar({
 }: LessonBarProps) {
   const { language } = useLanguage();
   const text = copy[language];
+  const reader = useOptionalReader();
+  const lesson = reader?.lesson;
+  const progressData = reader?.progress.progress;
+  const practice = useMemo(
+    () => (lesson && progressData ? practiceProgress(lesson, progressData) : { answered: 0, total: 0 }),
+    [lesson, progressData],
+  );
 
   return (
     <header className="rp-bar">
@@ -109,6 +121,12 @@ export function LessonBar({
           </button>
           <button type="button" className="rp-mode" disabled aria-describedby="rp-mode-soon" title={text.soon}>
             {text.practice}
+            {practice.total > 0 && (
+              <>
+                <span className="rp-mode-count tabular" aria-hidden="true">{practice.answered}/{practice.total}</span>
+                <span className="sr-only">{text.practiceCount(practice.answered, practice.total)}</span>
+              </>
+            )}
             <span className="rp-soon" aria-hidden="true">{text.soon}</span>
           </button>
           <span id="rp-mode-soon" className="sr-only">{text.soon}</span>

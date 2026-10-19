@@ -120,7 +120,9 @@ describe('validateLesson errors', () => {
   it('lessons:validate exits 0 on the repository content', () => {
     const result = runCli('validate.mjs', []);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /12 lesson files, 1 course file: no errors/);
+    // 12 Vibe chapters plus content/examples/blocks-gallery.lesson.json (WP-05).
+    const summary = /(\d+) lesson files, 1 course file: no errors/.exec(result.stdout);
+    assert.ok(summary && Number(summary[1]) >= 13, result.stdout);
   });
 
   it('names unknown block types and unknown fields', () => {
