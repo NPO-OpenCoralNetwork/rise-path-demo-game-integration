@@ -3,13 +3,14 @@ import { Flame } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { getLevel, getXpForNextLevel } from '../../services/gamificationService';
 import { getLearningEvents } from '../../services/progressService';
-import { getLastLesson, parseProgress, PROGRESS_EVENT } from '../lesson/progressStore';
+import { parseProgress, PROGRESS_EVENT } from '../lesson/progressStore';
 import { activeDaysFrom, streakFromDays, type StreakInfo } from './activity';
 
 /**
  * Streak and level chips for the page header. Real data only:
  * - Streak: days with a learning event (gamificationService's source) or with lesson-reader
- *   progress (`rp:progress:*`, `rp:lastLesson`), counted in local days. The reader saves its
+ *   progress (`rp:progress:*`, saved only when a block was read or a check answered), counted in
+ *   local days. The reader saves its
  *   progress there, so reading one lesson today starts a streak.
  * - Level and XP: gamificationService.
  * Zero states say what to do instead of showing an empty number.
@@ -31,8 +32,7 @@ function readerTimestamps(): string[] {
   } catch {
     // Storage blocked: no reader activity to count.
   }
-  const last = getLastLesson();
-  if (last) out.push(last.at);
+  // rp:lastLesson is not counted: it changes when a lesson is only opened, not read.
   return out;
 }
 

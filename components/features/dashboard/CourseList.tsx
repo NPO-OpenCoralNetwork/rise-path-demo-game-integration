@@ -2,8 +2,29 @@ import React, { useEffect, useState } from 'react';
 import { Course } from '../../../types';
 import { COURSES_DATA } from '../../../services/curriculumData';
 import { fetchGeneratedCourses } from '../../../services/curriculumApi';
-import { Briefcase, Clock, Filter, Search, X } from 'lucide-react';
+import { BookOpen, Briefcase, Clock, Filter, Search, X } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
+import { WORLD_COVER_STYLE } from '../../ui/CourseCard';
+
+/** Course photo, or the generated cover (gradient + icon) when there is none or it fails to load. */
+const CourseThumb: React.FC<{ src?: string }> = ({ src }) => {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div aria-hidden="true" className="grid h-full w-full place-items-center text-white/85" style={WORLD_COVER_STYLE}>
+        <BookOpen size={44} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+    />
+  );
+};
 
 interface CourseListProps {
   onSelectCourse: (course: Course) => void;
@@ -454,11 +475,7 @@ const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
                 aria-hidden="true"
               />
               <div className="relative h-40 sm:h-48 overflow-hidden">
-                <img 
-                  src={course.thumbnail} 
-                  alt={title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                <CourseThumb key={course.thumbnail} src={course.thumbnail} />
                 <div className="absolute top-4 left-4">
                   <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-bold text-slate-900 shadow-sm uppercase tracking-wider">
                     {categoryLabel}

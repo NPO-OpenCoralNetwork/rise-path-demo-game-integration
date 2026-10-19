@@ -198,7 +198,7 @@ function QuestionView({
       ref={formRef}
       className="rp-question"
       data-kind={kind}
-      aria-labelledby={promptId}
+      // Unnamed on purpose: a named form is a landmark, and the fieldset legend names the group.
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -345,7 +345,7 @@ export default function QuizCheckBlock({ block, section }: BlockProps<'quiz'>) {
   const answered = block.questions.filter((q) => (progress.getAnswer(block.id, q.id)?.attempts ?? 0) > 0).length;
 
   return (
-    <section className={`rp-quiz rp-quiz-${block.mode}`} aria-labelledby={labelId}>
+    <div role="group" className={`rp-quiz rp-quiz-${block.mode}`} aria-labelledby={labelId}>
       <p id={labelId} className="rp-quiz-label">
         {block.mode === 'predict' ? <Target size={16} aria-hidden="true" /> : <CircleHelp size={16} aria-hidden="true" />}
         <span>{block.title ? <Txt value={block.title} /> : label}</span>
@@ -365,6 +365,6 @@ export default function QuizCheckBlock({ block, section }: BlockProps<'quiz'>) {
       {block.mode === 'exam' && answered === block.questions.length && (
         <p className="rp-quiz-score" role="status">{text.score(firstTry, block.questions.length)}</p>
       )}
-    </section>
+    </div>
   );
 }

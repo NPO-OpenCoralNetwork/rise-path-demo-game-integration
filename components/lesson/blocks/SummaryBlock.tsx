@@ -14,7 +14,7 @@ export default function SummaryBlock({ block, section }: BlockProps<'summary'>) 
   const headingId = `${block.id}-title`;
   const showTitle = Boolean(block.title) || section.role !== 'summary';
   return (
-    <section className="rp-summary" aria-labelledby={showTitle ? headingId : undefined}>
+    <div role="group" className="rp-summary" aria-labelledby={showTitle ? headingId : undefined}>
       {showTitle && (
         <h3 id={headingId} className="rp-card-title">
           {block.title ? <Txt value={block.title} /> : copy[language].title}
@@ -25,6 +25,6 @@ export default function SummaryBlock({ block, section }: BlockProps<'summary'>) 
           <li key={i}><MdText value={point} inline /></li>
         ))}
       </ol>
-    </section>
+    </div>
   );
 }

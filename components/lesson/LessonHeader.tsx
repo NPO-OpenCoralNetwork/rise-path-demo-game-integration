@@ -76,7 +76,7 @@ export function LessonHeader({ lesson, entry }: LessonHeaderProps) {
         )}
       </ul>
       {lesson.objectives.length > 0 && (
-        <section className="rp-objectives" aria-labelledby={objectivesId}>
+        <div role="group" className="rp-objectives" aria-labelledby={objectivesId}>
           <h2 id={objectivesId} className="rp-objectives-title">
             <Target size={16} aria-hidden="true" />
             {text.objectives}
@@ -86,7 +86,7 @@ export function LessonHeader({ lesson, entry }: LessonHeaderProps) {
               <li key={objective.id}><MdText value={objective.text} inline /></li>
             ))}
           </ul>
-        </section>
+        </div>
       )}
     </header>
   );

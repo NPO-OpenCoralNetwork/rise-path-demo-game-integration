@@ -83,6 +83,7 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
   const [finished, setFinished] = useState(false);
   const [live, setLive] = useState('');
   const faceRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
   const titleId = `${block.id}-title`;
 
   const key = (cardId: string) => `card:${block.id}/${cardId}`;
@@ -113,6 +114,8 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
     else {
       setFlipped(false);
       setFinished(true);
+      // The marking button unmounts with the card: move focus to the summary, not <body>.
+      window.requestAnimationFrame(() => doneRef.current?.focus());
     }
   };
   const restart = (indexes: number[]) => {
@@ -132,7 +135,7 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
   const stateLabel = (s: boolean | undefined) => (s === true ? text.stateKnown : s === false ? text.stateAgain : '');
 
   return (
-    <section className="rp-cards" aria-labelledby={titleId} onKeyDown={onKeyDown}>
+    <div role="group" className="rp-cards" aria-labelledby={titleId} onKeyDown={onKeyDown}>
       <div className="rp-cards-head">
         <h3 id={titleId} className="rp-card-title m-0">{text.title}</h3>
         <span className="text-small text-fg-3 tabular">{text.count(pos + 1, safeOrder.length)}</span>
@@ -166,7 +169,7 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
 
       {finished ? (
         <div className="rp-cards-done" role="status">
-          <p className="rp-cards-done-title">
+          <p ref={doneRef} tabIndex={-1} className="rp-cards-done-title">
             <Check size={18} aria-hidden="true" />{text.doneTitle}
           </p>
           <p className="rp-cards-done-body">
@@ -228,6 +231,6 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
           <p className="rp-cards-keys" aria-hidden="true">{text.keys}</p>
         </>
       )}
-    </section>
+    </div>
   );
 }

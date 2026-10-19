@@ -125,7 +125,22 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
       if (event.key === 'Escape') {
         setIsMobileMenuOpen(false);
         menuButtonRef.current?.focus();
+        return;
       }
+      // Keep Tab inside the drawer: the menu button and the drawer's controls, in a loop.
+      if (event.key !== 'Tab') return;
+      const sidebar = document.getElementById('app-sidebar');
+      const items = [
+        menuButtonRef.current,
+        ...Array.from(sidebar?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? []),
+      ].filter((el): el is HTMLElement => Boolean(el) && el!.offsetParent !== null);
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = index < 0
+        ? 0
+        : (index + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+      event.preventDefault();
+      items[nextIndex].focus();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -435,7 +450,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
       )}
 
       {/* Sidebar Navigation */}
-      <aside
+      <div
         id="app-sidebar"
         data-theme={styles.dark ? 'dark' : undefined}
         className={`
@@ -519,7 +534,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
             </button>
           </div>
         </nav>
-      </aside>
+      </div>
 
       {/* Main Content Area */}
       <main

@@ -79,11 +79,15 @@ const EVENT_COPY: Record<LessonEventType, { en: string; jp: string }> = {
 function recordLessonEvent(type: LessonEventType, lesson: Lesson, courseTitle: LText | undefined) {
   const title = (locale: 'en' | 'jp') => resolveText(lesson.title, locale, lesson.locale).value;
   const course = (locale: 'en' | 'jp') => (courseTitle ? resolveText(courseTitle, locale, lesson.locale).value : '');
-  addLearningEvent({
-    type,
-    title: { en: `${EVENT_COPY[type].en}: ${title('en')}`, jp: `${EVENT_COPY[type].jp}: ${title('jp')}` },
-    description: { en: course('en'), jp: course('jp') },
-  });
+  try {
+    addLearningEvent({
+      type,
+      title: { en: `${EVENT_COPY[type].en}: ${title('en')}`, jp: `${EVENT_COPY[type].jp}: ${title('jp')}` },
+      description: { en: course('en'), jp: course('jp') },
+    });
+  } catch {
+    // Storage full or blocked: the event is lost, the lesson stays readable.
+  }
 }
 
 const blockElements = (article: HTMLElement | null) =>

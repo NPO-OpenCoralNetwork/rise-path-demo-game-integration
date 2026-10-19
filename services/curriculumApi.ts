@@ -2641,7 +2641,9 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
       },
       {
         data: AIDJ_DEMO_DATA,
-        img: 'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&q=80&w=800',
+        // The old Unsplash photo is gone (404). No self-hosted image yet: the card draws its
+        // generated cover instead.
+        img: '',
         category: 'DJ・音楽',
         categoryKey: 'music',
         level: 'intermediate',

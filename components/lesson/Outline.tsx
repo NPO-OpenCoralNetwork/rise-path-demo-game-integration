@@ -104,8 +104,9 @@ export function Outline({ lesson, statuses, activeSectionId, pct, next, onSelect
                 <span className="rp-outline-text" lang={title.lang}>
                   {num && <span className="rp-outline-num">{num}</span>}
                   {label}
+                  {/* Under the title, not a third column: the rail is about 200px wide. */}
+                  {status === 'attention' && <span className="rp-outline-tag" aria-hidden="true">{text.unanswered}</span>}
                 </span>
-                {status === 'attention' && <span className="rp-outline-tag" aria-hidden="true">{text.unanswered}</span>}
                 <span className="sr-only">{text.wrap(text.status[current && status !== 'done' ? 'current' : status])}</span>
               </a>
             </li>

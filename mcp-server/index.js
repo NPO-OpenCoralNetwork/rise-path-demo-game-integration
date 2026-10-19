@@ -491,13 +491,16 @@ policyTool(
     async ({ course_slug, lesson_id, source, curriculum_id, user_id }, extra) => {
         const t = Date.now();
         try {
+            const store = curriculum_id ? 'db' : resolveLessonStore();
             let userId;
-            if (curriculum_id) {
+            if (store === 'db') {
+                // In the db store the caller's own DB draft comes before the files (same user as
+                // lesson-upsert-draft, so the returned hash is the one it checks).
                 userId = await requireScopedUser(user_id, extra, { toolName: 'lesson-get', startTime: t });
                 if (typeof userId !== 'string') return userId;
             }
             return toolResult(await getLesson({
-                courseSlug: course_slug, lessonId: lesson_id, source, curriculumId: curriculum_id, userId,
+                courseSlug: course_slug, lessonId: lesson_id, source, curriculumId: curriculum_id, userId, store,
             }), { toolName: 'lesson-get', startTime: t });
         } catch (err) {
             return toolError(err, { toolName: 'lesson-get', startTime: t });

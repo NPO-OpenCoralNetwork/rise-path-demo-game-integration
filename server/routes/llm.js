@@ -7,7 +7,9 @@
  * POST /llm/tutor               AskTutorDetail (PLAN §9.1) → SSE: meta, text.delta…, done | error
  *
  * Mounted in server.js before the blanket /api/v2 auth middlewares, with optionalAuth, so
- * guests can use it in strict mode; the AI rate limiter applies to the POST routes only.
+ * guests can use it in strict mode; the AI rate limiter and the guest daily budget
+ * (server/llm/guestAccess.js) apply to the POST routes only. Anonymous tutor calls must come
+ * from a lesson (lesson + anchor) and get a shorter history and answer.
  */
 import express from 'express';
 import { getGateway } from '../llm/index.js';
@@ -24,6 +26,7 @@ import {
 import { buildWritingFeedbackPrompt } from '../llm/prompts/writingFeedback.js';
 import { buildPersonalityInsightPrompt } from '../llm/prompts/personalityInsight.js';
 import { buildTutorPrompt } from '../llm/prompts/tutor.js';
+import { GUEST_TUTOR_LIMITS } from '../llm/guestAccess.js';
 
 const HEARTBEAT_MS = 15000;
 
@@ -55,11 +58,11 @@ const writeSse = (res, type, data) => {
 };
 
 /**
- * @param {{ limiter?: import('express').RequestHandler }} [options]
+ * @param {{ limiter?: import('express').RequestHandler, guestBudget?: import('express').RequestHandler }} [options]
  */
 export function createLlmRouter(options = {}) {
   const router = express.Router();
-  const limit = options.limiter ? [options.limiter] : [];
+  const limit = [options.limiter, options.guestBudget].filter(Boolean);
 
   router.get('/status', (_req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -107,6 +110,19 @@ export function createLlmRouter(options = {}) {
   router.post('/tutor', ...limit, async (req, res) => {
     const body = parseBody(TutorRequest, req, res);
     if (!body) return;
+    const guest = !req.userId;
+    if (guest && (!body.lesson || !body.anchor)) {
+      res.status(400).json({
+        error: 'Guests can ask the tutor from inside a lesson only (lesson and anchor are required).',
+        error_type: 'lesson_required',
+      });
+      return;
+    }
+    if (guest && body.history) {
+      body.history = body.history
+        .slice(-GUEST_TUTOR_LIMITS.historyTurns)
+        .map((turn) => ({ ...turn, content: turn.content.slice(0, GUEST_TUTOR_LIMITS.historyChars) }));
+    }
     const mode = resolveTutorMode(body);
     const locale = body.locale ?? 'ja';
     const controller = abortOnDisconnect(res);
@@ -129,6 +145,7 @@ export function createLlmRouter(options = {}) {
         userId: req.userId ?? null,
         locale,
         signal: controller.signal,
+        ...(guest ? { override: { maxTokens: GUEST_TUTOR_LIMITS.maxTokens } } : {}),
         ...buildTutorPrompt(body, { mode, locale }),
       });
       for await (const event of events) {

@@ -39,7 +39,7 @@ const copy = {
     claudeLive: 'Claude Code command copied to the clipboard. Paste it into your terminal and press Enter.',
     expect: 'What a good answer looks like',
     variable: (name: string) => `Fill in: ${name}`,
-    fillHint: 'Edit the highlighted fields, then copy. Empty fields stay as {{…}}.',
+    fillHint: 'Replace the highlighted fields with your own words, then copy. A field you leave empty stays as a marker.',
     left: (n: number) => (n === 1 ? '1 field left' : `${n} fields left`),
     allFilled: 'All fields filled',
     reset: 'Reset',
@@ -58,7 +58,7 @@ const copy = {
     claudeLive: 'Claude Code 用のコマンドをコピーしました。ターミナルに貼り付けて Enter キーで実行できます。',
     expect: '期待される結果',
     variable: (name: string) => `入力欄：${name}`,
-    fillHint: '色付きの欄を書き換えてからコピーできます。空欄は {{…}} のまま残ります。',
+    fillHint: '色付きの欄を自分の言葉に書き換えてからコピーしましょう。空欄のままだと、その部分は目印のまま残ります。',
     left: (n: number) => `未入力 ${n}`,
     allFilled: 'すべて入力済み',
     reset: 'リセット',
@@ -127,7 +127,7 @@ export default function PromptBlock({ block }: BlockProps<'prompt'>) {
         : '';
 
   return (
-    <section className="rp-prompt" aria-labelledby={titleId}>
+    <div role="group" className="rp-prompt" aria-labelledby={titleId}>
       <div className="rp-prompt-head">
         <MessageSquareText size={16} aria-hidden="true" className="shrink-0 text-primary-text" />
         <h3 id={titleId} className="rp-prompt-title">
@@ -214,6 +214,6 @@ export default function PromptBlock({ block }: BlockProps<'prompt'>) {
         </details>
       )}
       <span role="status" aria-live="polite" className="sr-only">{live}</span>
-    </section>
+    </div>
   );
 }

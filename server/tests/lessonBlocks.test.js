@@ -19,6 +19,7 @@ import {
   normalizeCodeLang,
   posixSingleQuote,
   practiceProgress,
+  nextPracticeBlockId,
   promptVarNames,
   splitKeyCombo,
   stripMermaidDirectives,
@@ -141,6 +142,28 @@ describe('practice counter (練習 x/y)', () => {
     assert.deepEqual(practiceProgress(lesson, progress), { answered: 1, total: 3 });
     progress = withRevealed(progress, answerKey('e', 'q1'));
     assert.deepEqual(practiceProgress(lesson, progress), { answered: 2, total: 3 });
+  });
+
+  it('finds the next unanswered check for the mobile practice slot (predictions skipped, wraps)', () => {
+    const lesson = {
+      sections: [{
+        id: 's', title: 's', blocks: [
+          { id: 'i1', type: 'quiz', mode: 'inline', questions: [{ id: 'q' }] },
+          { id: 'p', type: 'quiz', mode: 'predict', questions: [{ id: 'q' }] },
+          { id: 'm', type: 'markdown', md: 'x' },
+          { id: 'e', type: 'quiz', mode: 'exam', questions: [{ id: 'q1' }, { id: 'q2' }] },
+        ],
+      }],
+    };
+    let progress = emptyProgress();
+    assert.equal(nextPracticeBlockId(lesson, progress), 'i1');
+    assert.equal(nextPracticeBlockId(lesson, progress, 'm'), 'e');
+    progress = withAnswer(progress, answerKey('e', 'q1'), { chosen: ['a'], correct: true });
+    assert.equal(nextPracticeBlockId(lesson, progress, 'm'), 'e', 'one exam question is still open');
+    progress = withAnswer(progress, answerKey('e', 'q2'), { chosen: ['a'], correct: true });
+    assert.equal(nextPracticeBlockId(lesson, progress, 'm'), 'i1', 'wraps to the first open check');
+    progress = withAnswer(progress, answerKey('i1', 'q'), { chosen: ['a'], correct: true });
+    assert.equal(nextPracticeBlockId(lesson, progress, 'm'), null);
   });
 });
 

@@ -169,6 +169,24 @@ export function splitKeyCombo(combo: string): string[] {
  * "練習 x/y" in the LessonBar: y = questions in inline checks and exams (predictions are
  * ungraded and not practice), x = those answered (submitted or revealed).
  */
+/**
+ * The practice slot of the mobile bottom bar: the next inline or exam check with an unanswered
+ * question, at or after `fromBlockId` (wrapping to the first), or null when all are answered.
+ */
+export function nextPracticeBlockId(lesson: Lesson, progress: LessonProgress, fromBlockId?: string | null): string | null {
+  const blocks = lesson.sections.flatMap((section) => section.blocks);
+  const start = fromBlockId ? Math.max(0, blocks.findIndex((block) => block.id === fromBlockId)) : 0;
+  let first: string | null = null;
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i];
+    if (!isQuiz(block) || block.mode === 'predict') continue;
+    if (block.questions.every((question) => isAnswered(progress, block.id, question.id))) continue;
+    if (i >= start) return block.id;
+    first ??= block.id;
+  }
+  return first;
+}
+
 export function practiceProgress(lesson: Lesson, progress: LessonProgress): { answered: number; total: number } {
   let answered = 0;
   let total = 0;

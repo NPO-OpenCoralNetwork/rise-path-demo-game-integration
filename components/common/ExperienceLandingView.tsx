@@ -7,7 +7,7 @@ import { allowGuestLogin } from '../../services/authPolicy';
 import { features } from '../../config/features';
 import BrandMark from './BrandMark';
 import { Button, ButtonLink } from '../ui/Button';
-import { AUTHORING_GUIDE_URL } from '../ui/links';
+import { authoringGuideUrl } from '../ui/links';
 
 export type AuthEntryMode = 'login' | 'signup';
 
@@ -215,7 +215,7 @@ const ExperienceLandingView: React.FC<LandingViewProps> = ({ onAuthClick }) => {
               <Button variant="primary" size="lg" onClick={startReading} trailingIcon={<ArrowRight size={18} aria-hidden="true" />}>
                 {guestAllowed ? t.guestCta : t.signInCta}
               </Button>
-              <ButtonLink href={AUTHORING_GUIDE_URL} external variant="secondary" size="lg">
+              <ButtonLink href={authoringGuideUrl(language)} external variant="secondary" size="lg">
                 {t.authorCta}
                 <span className="sr-only">{t.opensInNewTab}</span>
               </ButtonLink>

@@ -9,6 +9,8 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { fetchLearningPortals, updateLearningPortal, updateLearningPortalOrder } from '../../../services/learningPortalApi';
 import { VIEW_PATHS } from '../../../navigation/viewPaths';
 import { features } from '../../../config/features';
+import { getCourse } from '../../../content';
+import { trackCopy, type TrackId } from '../../ui/tracks';
 import PageHeader from '../../ui/PageHeader';
 import CourseCard from '../../ui/CourseCard';
 import { Button, ButtonLink } from '../../ui/Button';
@@ -53,6 +55,24 @@ const iconMap: Record<string, IconComponent> = {
     book: BookOpen,
 };
 
+/** Title, badge and description of a shared track (components/ui/tracks.ts) in both locales. */
+const trackFields = (id: TrackId) => {
+    const course = id === 'vibe' ? getCourse('vibe-coding') : undefined;
+    const en = trackCopy(id, 'en', course);
+    const jp = trackCopy(id, 'jp', course);
+    return {
+        title: { en: en.title, jp: jp.title },
+        subtitle: { en: en.badge, jp: jp.badge },
+        description: { en: en.description, jp: jp.description },
+    };
+};
+
+/**
+ * The portal admin controls (visibility, order) call PATCH /api/learning-portals/*, which the
+ * server does not serve yet. Until it does, they show only in dev with ?dev=1.
+ */
+const canManagePortals = features.devSamples;
+
 const resolveLocalizedText = (value: LocalizedText, language: 'en' | 'jp'): string => {
     if (!value) return '';
     if (typeof value === 'string') return value;
@@ -93,25 +113,10 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     subtitle: 'Generative AI & Python',
                     description: 'Learn how LLMs work and build AI apps with Python.'
                 },
-                vibe: {
-                    title: 'Vibe Coding',
-                    subtitle: 'Immersive Coding Experience',
-                    description: 'Story-driven learning through Git and OSS.'
-                },
-                blender: {
-                    title: 'Blender 3D',
-                    subtitle: '3D Modeling',
-                    description: 'Basics of 3D creation and spatial design with Blender.'
-                },
                 teacherBot: {
                     title: 'Teacher Bot Live',
                     subtitle: 'Blender Sidecar',
                     description: 'Sync the current Blender step on a big screen.'
-                },
-                art: {
-                    title: 'Art Atelier',
-                    subtitle: 'Art History & Philosophy',
-                    description: 'Explore the history and theory of visual arts.'
                 },
                 english: {
                     title: 'Global Communication',
@@ -123,11 +128,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     subtitle: 'Block Coding RPG',
                     description: 'Learn programming by building battle scripts with Scratch-style blocks.'
                 },
-                unity: {
-                    title: 'Unity AI Game Dev',
-                    subtitle: 'AI x Unity Game Dev',
-                    description: 'Develop games using Unity and AI. Learn the role of an architect.'
-                }
             },
             bannerTitle: 'Learning Path Diagnosis',
             bannerSubtitle: 'We recommend a curriculum tailored to your interests and skills.',
@@ -154,25 +154,10 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     subtitle: '生成AI & Python',
                     description: 'LLMの仕組みとPythonによるAIアプリケーション開発。'
                 },
-                vibe: {
-                    title: 'Vibe Coding',
-                    subtitle: '没入型コード体験',
-                    description: 'GitとOSSの世界を冒険する、新感覚のストーリー学習。'
-                },
-                blender: {
-                    title: 'Blender 3D',
-                    subtitle: '3Dモデリング',
-                    description: 'Blenderを使った3DCG制作と空間デザインの基礎。'
-                },
                 teacherBot: {
                     title: 'Teacher Bot Live',
                     subtitle: 'Blender サイドカー',
                     description: 'Blenderの現在ステップを大画面で同期表示。'
-                },
-                art: {
-                    title: 'Art Atelier',
-                    subtitle: '美術史 & 哲学',
-                    description: '視覚芸術の歴史と理論。クリエイティブの源泉を探る。'
                 },
                 english: {
                     title: 'Global Communication',
@@ -184,11 +169,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     subtitle: 'ブロックプログラミングRPG',
                     description: 'Scratchブロックでバトルの作戦を組み、遊びながらプログラミングを学ぶ。'
                 },
-                unity: {
-                    title: 'Unity AI Game Dev',
-                    subtitle: 'AI x Unity ゲーム開発',
-                    description: 'AIと共にUnityでゲームを作る。コードを書くのではなく、設計する力を養う。'
-                }
             },
             bannerTitle: '学習パス診断',
             bannerSubtitle: 'あなたの興味とスキルに最適なカリキュラムを提案します。',
@@ -230,9 +210,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         },
         {
             id: 'vibe',
-            title: { en: copy.en.portals.vibe.title, jp: copy.jp.portals.vibe.title },
-            subtitle: { en: copy.en.portals.vibe.subtitle, jp: copy.jp.portals.vibe.subtitle },
-            description: { en: copy.en.portals.vibe.description, jp: copy.jp.portals.vibe.description },
+            ...trackFields('vibe'),
             icon: 'sparkles',
             view: ViewState.PROGRAMMING_VIBE,
             color: 'text-purple-500',
@@ -258,9 +236,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         },
         {
             id: 'unity',
-            title: { en: copy.en.portals.unity.title, jp: copy.jp.portals.unity.title },
-            subtitle: { en: copy.en.portals.unity.subtitle, jp: copy.jp.portals.unity.subtitle },
-            description: { en: copy.en.portals.unity.description, jp: copy.jp.portals.unity.description },
+            ...trackFields('unity'),
             icon: 'gamepad',
             view: ViewState.UNITY_AI_GAME_DEV,
             color: 'text-blue-600',
@@ -272,9 +248,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         },
         {
             id: '3d',
-            title: { en: copy.en.portals.blender.title, jp: copy.jp.portals.blender.title },
-            subtitle: { en: copy.en.portals.blender.subtitle, jp: copy.jp.portals.blender.subtitle },
-            description: { en: copy.en.portals.blender.description, jp: copy.jp.portals.blender.description },
+            ...trackFields('blender'),
             icon: 'box',
             view: ViewState.BLENDER,
             color: 'text-orange-500',
@@ -300,9 +274,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         },
         {
             id: 'art',
-            title: { en: copy.en.portals.art.title, jp: copy.jp.portals.art.title },
-            subtitle: { en: copy.en.portals.art.subtitle, jp: copy.jp.portals.art.subtitle },
-            description: { en: copy.en.portals.art.description, jp: copy.jp.portals.art.description },
+            ...trackFields('art'),
             icon: 'palette',
             view: ViewState.ART_MUSEUM,
             color: 'text-stone-600',
@@ -439,15 +411,17 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                                 {notice}
                             </span>
                         )}
-                        <Button
-                            variant={isEditing ? 'primary' : 'secondary'}
-                            size="sm"
-                            aria-pressed={isEditing}
-                            leadingIcon={<Settings size={14} aria-hidden="true" />}
-                            onClick={() => setIsEditing((prev) => !prev)}
-                        >
-                            {isEditing ? t.manageDone : t.manageLabel}
-                        </Button>
+                        {canManagePortals && (
+                            <Button
+                                variant={isEditing ? 'primary' : 'secondary'}
+                                size="sm"
+                                aria-pressed={isEditing}
+                                leadingIcon={<Settings size={14} aria-hidden="true" />}
+                                onClick={() => setIsEditing((prev) => !prev)}
+                            >
+                                {isEditing ? t.manageDone : t.manageLabel}
+                            </Button>
+                        )}
                     </>
                 }
             />

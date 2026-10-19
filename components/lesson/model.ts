@@ -117,7 +117,8 @@ export type SectionStatus = 'todo' | 'current' | 'done' | 'attention';
 
 /**
  * Outline state per section: ✓ done (every block done), ● current, ! an inline check was left
- * unanswered in a section the learner has already read into, ○ otherwise.
+ * unanswered after the learner passed it (the section lies before the active one, or the check
+ * itself was seen), ○ otherwise. A section after the active one is never flagged.
  */
 export function sectionStatuses(
   lesson: Lesson,
@@ -125,17 +126,21 @@ export function sectionStatuses(
   activeSectionId: string | null,
 ): Record<string, SectionStatus> {
   const seen = new Set(progress.seen);
+  const activeIndex = activeSectionId ? lesson.sections.findIndex((s) => s.id === activeSectionId) : -1;
   const out: Record<string, SectionStatus> = {};
-  for (const section of lesson.sections) {
+  lesson.sections.forEach((section, index) => {
     const done = section.blocks.every((b) => blockDone(b, progress, seen));
-    const touched = section.blocks.some((b) => seen.has(b.id));
+    const passed = activeIndex >= 0 && index < activeIndex;
+    const ahead = activeIndex >= 0 && index > activeIndex;
     // Predictions are ungraded and exams are optional at this point: only inline checks nag.
-    const pendingCheck = section.blocks.some((b) => isQuiz(b) && b.mode === 'inline' && !quizAnswered(b, progress));
+    const skippedCheck = section.blocks.some(
+      (b) => isQuiz(b) && b.mode === 'inline' && !quizAnswered(b, progress) && (passed || seen.has(b.id)),
+    );
     if (done) out[section.id] = 'done';
     else if (section.id === activeSectionId) out[section.id] = 'current';
-    else if (touched && pendingCheck) out[section.id] = 'attention';
+    else if (!ahead && skippedCheck) out[section.id] = 'attention';
     else out[section.id] = 'todo';
-  }
+  });
   return out;
 }
 
@@ -312,11 +317,20 @@ export function splitPromptVars(prompt: string): PromptPart[] {
 
 export type ScrollTarget = { kind: 'section' | 'block'; id: string };
 
+/** decodeURIComponent that returns the input instead of throwing on a malformed escape ("100%"). */
+export function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /** URL hash (#s-<section> / #b-<block>) first, then the saved resume block. */
 export function resumeTarget(hash: string, progress: LessonProgress, lesson: Lesson): ScrollTarget | null {
   const sectionIds = new Set(lesson.sections.map((s) => s.id));
   const blockIds = new Set(allBlocks(lesson).map((b) => b.id));
-  const clean = decodeURIComponent(hash.replace(/^#/, ''));
+  const clean = safeDecode(hash.replace(/^#/, ''));
   if (clean.startsWith('s-') && sectionIds.has(clean.slice(2))) return { kind: 'section', id: clean.slice(2) };
   if (clean.startsWith('b-') && blockIds.has(clean.slice(2))) return { kind: 'block', id: clean.slice(2) };
   if (progress.lastBlockId && blockIds.has(progress.lastBlockId)) return { kind: 'block', id: progress.lastBlockId };

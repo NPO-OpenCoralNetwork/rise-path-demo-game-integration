@@ -14,12 +14,13 @@ import { useReader } from './ReaderContext';
 
 const copy = {
   en: {
-    ask: 'Ask the AI tutor about this paragraph',
+    // Starts with the visible label (WCAG 2.5.3), so a speech command for it matches.
+    ask: 'Ask AI tutor about this paragraph',
     label: 'Ask AI tutor',
     message: 'Can you explain this paragraph in simpler terms?',
   },
   jp: {
-    ask: 'この段落についてAI先生に質問する',
+    ask: 'AI先生に聞く（この段落について）',
     label: 'AI先生に聞く',
     message: 'この段落をもう少しかみくだいて説明してください。',
   },

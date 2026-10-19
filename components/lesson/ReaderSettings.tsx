@@ -19,6 +19,8 @@ export type ReaderSettingsValue = {
   leading: ReaderLeading;
   theme: ReaderTheme;
   focus: boolean;
+  /** The single-key F shortcut for focus mode (WCAG 2.1.4: it can be turned off). */
+  focusKey: boolean;
 };
 
 export const SETTINGS_KEY = 'rp:reader-settings';
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: ReaderSettingsValue = {
   leading: 'normal',
   theme: 'light',
   focus: false,
+  focusKey: true,
 };
 
 const pick = <T extends string>(value: unknown, options: readonly T[], fallback: T): T =>
@@ -46,6 +49,7 @@ export function parseSettings(raw: string | null): ReaderSettingsValue {
       leading: pick(data.leading, ['normal', 'relaxed'] as const, DEFAULT_SETTINGS.leading),
       theme: pick(data.theme, ['light', 'sepia', 'dark'] as const, DEFAULT_SETTINGS.theme),
       focus: data.focus === true,
+      focusKey: data.focusKey !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -103,6 +107,8 @@ const copy = {
     themes: { light: 'Light', sepia: 'Sepia', dark: 'Dark' },
     focus: 'Focus mode',
     focusHint: 'Hide the outline and side panel (F key)',
+    focusKey: 'F key shortcut',
+    focusKeyHint: 'Press F while reading to switch focus mode',
     language: 'Language',
   },
   jp: {
@@ -118,6 +124,8 @@ const copy = {
     themes: { light: 'ライト', sepia: 'セピア', dark: 'ダーク' },
     focus: '集中モード',
     focusHint: '目次と補助パネルを隠します（Fキー）',
+    focusKey: 'Fキーのショートカット',
+    focusKeyHint: '本文を読んでいるときにFキーで集中モードを切り替えます',
     language: '言語',
   },
 } as const;
@@ -264,6 +272,20 @@ export default function ReaderSettings({
             className="rp-switch"
             checked={settings.focus}
             onChange={(event) => onChange({ focus: event.target.checked })}
+          />
+        </label>
+        <label htmlFor="rp-focus-key" className="rp-switch-row">
+          <span className="min-w-0 flex-1">
+            <span className="block text-small font-semibold text-fg">{text.focusKey}</span>
+            <span className="block text-caption text-fg-3">{text.focusKeyHint}</span>
+          </span>
+          <input
+            id="rp-focus-key"
+            type="checkbox"
+            role="switch"
+            className="rp-switch"
+            checked={settings.focusKey}
+            onChange={(event) => onChange({ focusKey: event.target.checked })}
           />
         </label>
       </div>

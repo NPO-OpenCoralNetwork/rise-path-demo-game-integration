@@ -1,7 +1,11 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 
-/** Reading progress as a ring with the number inside (colour is never the only cue). */
-export function ProgressRing({ pct, label, size = 36 }: { pct: number; label: string; size?: number }) {
+/**
+ * Reading progress as a ring with the number inside (colour is never the only cue). The visible
+ * label is the bare number (the "%" lives in aria-label) so "100" fits; at 100 it shows a check.
+ */
+export function ProgressRing({ pct, label, size = 40 }: { pct: number; label: string; size?: number }) {
   const value = Math.max(0, Math.min(100, Math.round(pct)));
   const stroke = 3;
   const radius = (size - stroke) / 2;
@@ -31,7 +35,9 @@ export function ProgressRing({ pct, label, size = 36 }: { pct: number; label: st
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
-      <span className="rp-ring-label tabular" aria-hidden="true">{value}<span className="rp-ring-pct">%</span></span>
+      <span className="rp-ring-label tabular" aria-hidden="true">
+        {value >= 100 ? <Check size={16} strokeWidth={3} /> : value}
+      </span>
     </div>
   );
 }

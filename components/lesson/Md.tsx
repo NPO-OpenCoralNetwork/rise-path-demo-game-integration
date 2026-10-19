@@ -11,6 +11,8 @@ import { TERM_HREF_PREFIX, linkGlossaryTerms } from './model';
  * Lesson markdown: GFM (tables, strikethrough, autolinks), raw HTML skipped, unsafe URLs
  * dropped by react-markdown's default urlTransform, external links in a new tab,
  * `[[term]]` rendered as a glossary button, and `**…**` next to Japanese brackets still bold.
+ * `untrusted` (model output) renders images as their alt text, so an answer cannot make the
+ * browser fetch a URL, and keeps only http(s) links (rel nofollow).
  */
 
 const REMARK_PLUGINS = [remarkGfm, remarkCjkEmphasis];
@@ -22,13 +24,23 @@ const copy = {
 
 const isExternal = (href: string) => /^https?:\/\//i.test(href);
 
-function MdLink({ href = '', children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+/** The glossary term of a `#rp-term:` href, or null when its escape is malformed. */
+function termOf(href: string): string | null {
+  try {
+    return decodeURIComponent(href.slice(TERM_HREF_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+function MdLink({ href = '', children, untrusted = false, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { untrusted?: boolean }) {
   const reader = useOptionalReader();
   const { language } = useLanguage();
   const text = copy[language];
 
   if (href.startsWith(TERM_HREF_PREFIX)) {
-    const term = decodeURIComponent(href.slice(TERM_HREF_PREFIX.length));
+    const term = termOf(href);
+    if (term === null) return <span>{children}</span>;
     if (!reader) return <span className="rp-term">{children}</span>;
     return (
       <button
@@ -47,12 +59,13 @@ function MdLink({ href = '', children, ...rest }: React.AnchorHTMLAttributes<HTM
   if (!href) return <span>{children}</span>;
   if (isExternal(href)) {
     return (
-      <a {...rest} href={href} target="_blank" rel="noopener noreferrer">
+      <a {...rest} href={href} target="_blank" rel={untrusted ? 'noopener noreferrer nofollow' : 'noopener noreferrer'}>
         {children}
         <span className="sr-only"> {text.newTab}</span>
       </a>
     );
   }
+  if (untrusted) return <span>{children}</span>;
   return <a {...rest} href={href}>{children}</a>;
 }
 
@@ -76,20 +89,29 @@ const inlineComponents: Components = {
   p: ({ children }) => <>{children}</>,
 };
 
+/** Model output: no remote images (alt text only), only http(s) links. */
+const untrustedComponents: Components = {
+  ...baseComponents,
+  a: ({ node: _node, ...props }) => <MdLink {...props} untrusted />,
+  img: ({ alt }) => (alt ? <span>{alt}</span> : null),
+};
+
 type MarkdownProps = {
   source: string;
   /** Render without wrapping paragraphs (titles, options, table cells). */
   inline?: boolean;
+  /** Model output (tutor answers): see untrustedComponents. */
+  untrusted?: boolean;
 };
 
 /** Memoized: a block re-render (progress, theme) does not re-parse unchanged markdown. */
-export const Markdown = React.memo(function Markdown({ source, inline = false }: MarkdownProps) {
+export const Markdown = React.memo(function Markdown({ source, inline = false, untrusted = false }: MarkdownProps) {
   const linked = useMemo(() => linkGlossaryTerms(source), [source]);
   return (
     <ReactMarkdown
       remarkPlugins={REMARK_PLUGINS}
       skipHtml
-      components={inline ? inlineComponents : baseComponents}
+      components={untrusted ? untrustedComponents : inline ? inlineComponents : baseComponents}
     >
       {linked}
     </ReactMarkdown>

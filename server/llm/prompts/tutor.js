@@ -1,5 +1,5 @@
 // @ts-check
-import { DATA_NOT_INSTRUCTIONS, fence, languageName } from './shared.js';
+import { DATA_NOT_INSTRUCTIONS, fence, languageName, stripTags } from './shared.js';
 import { ASSESSMENT_BLOCK_TYPES } from '../schemas.js';
 
 /** @typedef {import('./shared.js').PromptSpec} PromptSpec */
@@ -9,7 +9,7 @@ import { ASSESSMENT_BLOCK_TYPES } from '../schemas.js';
 /** Tags the tutor prompt wraps request data in. Request text may not open or close any of them. */
 export const TUTOR_TAGS = /** @type {const} */ (['lesson', 'anchor', 'excerpt', 'learner_state', 'learner_question']);
 
-const TAG_PATTERN = new RegExp(`</?\\s*(?:${TUTOR_TAGS.join('|')})\\b[^>]*>`, 'gi');
+const TAG_PATTERN = new RegExp(`<\\s*/?\\s*(?:${TUTOR_TAGS.join('|')})\\b[^>]*>`, 'gi');
 
 /**
  * Fence request data: removes every tutor tag from the content (not only `tag`), so lesson or
@@ -18,7 +18,7 @@ const TAG_PATTERN = new RegExp(`</?\\s*(?:${TUTOR_TAGS.join('|')})\\b[^>]*>`, 'g
  * @param {string} content
  */
 export function tutorData(tag, content) {
-  return fence(tag, String(content ?? '').replace(TAG_PATTERN, ''));
+  return fence(tag, stripTags(content, TAG_PATTERN));
 }
 
 /**
@@ -127,7 +127,7 @@ export function buildTutorPrompt(body, resolved) {
     if (last && last.role === turn.role) continue; // keep turns alternating
     history.push({
       role: turn.role,
-      content: turn.role === 'user' ? tutorData('learner_question', turn.content) : turn.content.replace(TAG_PATTERN, ''),
+      content: turn.role === 'user' ? tutorData('learner_question', turn.content) : stripTags(turn.content, TAG_PATTERN),
     });
   }
   // The current question is a user turn, so the history must end with the tutor.

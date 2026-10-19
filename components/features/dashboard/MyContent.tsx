@@ -7,7 +7,7 @@ import PageHeader from '../../ui/PageHeader';
 import EmptyState from '../../ui/EmptyState';
 import CourseCard from '../../ui/CourseCard';
 import { Button, ButtonLink } from '../../ui/Button';
-import { AUTHORING_GUIDE_URL } from '../../ui/links';
+import { authoringGuideUrl } from '../../ui/links';
 
 interface MyContentProps {
   onNavigate?: (view: ViewState) => void;
@@ -131,7 +131,7 @@ const MyContent: React.FC<MyContentProps> = ({ onNavigate, onSelectCourse, newCo
                 {t.seeGenerated}
               </Button>
             ) : null}
-            <ButtonLink href={AUTHORING_GUIDE_URL} external variant="ghost" trailingIcon={<ArrowRight size={16} aria-hidden="true" />}>
+            <ButtonLink href={authoringGuideUrl(language)} external variant="ghost" trailingIcon={<ArrowRight size={16} aria-hidden="true" />}>
               {t.guide}
               <span className="sr-only">{t.opensInNewTab}</span>
             </ButtonLink>

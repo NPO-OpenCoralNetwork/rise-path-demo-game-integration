@@ -65,7 +65,7 @@ export function MarginPanel({ asked, current, glossary, selectedTerm, onSelectTe
   if (glossary.length === 0) return null;
 
   return (
-    <section className="rp-margin-card rp-glossary-card" aria-labelledby={glossaryTitleId}>
+    <div role="group" className="rp-margin-card rp-glossary-card" aria-labelledby={glossaryTitleId}>
       <div className="rp-tutor-head">
         <BookOpen size={15} aria-hidden="true" className="text-fg-3" />
         <h2 id={glossaryTitleId} className="rp-margin-title">{text.glossary}</h2>
@@ -121,6 +121,6 @@ export function MarginPanel({ asked, current, glossary, selectedTerm, onSelectTe
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

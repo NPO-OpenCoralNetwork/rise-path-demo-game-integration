@@ -418,7 +418,9 @@ export async function validateLessonDraft(lesson, { courseSlug, stamp = true, co
 
 /**
  * Read a lesson. Files: the draft first, then the published lesson (source 'auto').
- * With curriculumId, read the current DB version owned by userId instead.
+ * With curriculumId, read the current DB version owned by userId instead. In the db store
+ * (RP_LESSON_STORE=db) without curriculumId, userId's DB draft of courseSlug/lessonId comes
+ * first, so the hash it returns is the one lesson-upsert-draft checks.
  *
  * @param {Object} params
  * @param {string} [params.courseSlug]
@@ -426,13 +428,26 @@ export async function validateLessonDraft(lesson, { courseSlug, stamp = true, co
  * @param {'auto'|'draft'|'published'} [params.source]
  * @param {string} [params.curriculumId]
  * @param {string} [params.userId]
+ * @param {'fs'|'db'} [params.store] - defaults to RP_LESSON_STORE
  * @param {string} [params.contentDir]
  */
-export async function getLesson({ courseSlug, lessonId, source = 'auto', curriculumId, userId, contentDir } = {}) {
+export async function getLesson({ courseSlug, lessonId, source = 'auto', curriculumId, userId, store, contentDir } = {}) {
     if (curriculumId) return getLessonFromDb({ curriculumId, userId });
 
     const bad = checkSlug(courseSlug, 'course_slug') || checkSlug(lessonId, 'lesson_id');
     if (bad) return bad;
+
+    if ((store || resolveLessonStore()) === 'db' && userId && source !== 'published') {
+        const pool = getPool();
+        if (pool) {
+            try {
+                const found = await findDbDraft(pool, { userId, courseSlug, lessonId });
+                if (found) return getLessonFromDb({ curriculumId: found.id, userId });
+            } catch (err) {
+                return classifyDbError(err, 'getLesson');
+            }
+        }
+    }
 
     try {
         const dir = resolveContentDir(contentDir);
@@ -476,6 +491,28 @@ export async function getLesson({ courseSlug, lessonId, source = 'auto', curricu
         }
         return { error: `Failed to read lesson: ${err.message}`, error_type: 'exception' };
     }
+}
+
+/**
+ * The user's DB draft of courseSlug/lessonId (the curricula row lesson-upsert-draft created),
+ * newest first. `lock` takes a row lock inside a transaction.
+ * @returns {Promise<{ id: string, content_json: any } | null>}
+ */
+async function findDbDraft(db, { userId, courseSlug, lessonId, lock = false }) {
+    const result = await db.query(
+        `select c.id as curriculum_id, v.content_json
+         from curricula c
+         join curriculum_versions v on v.id = c.current_version_id
+         where c.user_id = CAST($1 AS uuid)
+           and c.ui_template_id = $2
+           and v.ui_hints->>'course_slug' = $3
+           and v.ui_hints->>'lesson_id' = $4
+         order by c.updated_at desc
+         limit 1${lock ? '\n         for update of c' : ''}`,
+        [userId, LESSON_UI_TEMPLATE_ID, courseSlug, lessonId]
+    );
+    const row = result.rowCount ? result.rows[0] : null;
+    return row ? { id: row.curriculum_id, content_json: row.content_json } : null;
 }
 
 async function getLessonFromDb({ curriculumId, userId }) {
@@ -676,6 +713,13 @@ async function upsertDbDraft({ dir, courseSlug, draft, baseHash, curriculumId, u
         client = await pool.connect();
         await client.query('BEGIN');
 
+        // Without curriculum_id, the user's existing DB draft of this lesson is the one to update
+        // (so a second upsert does not create a second curricula row).
+        if (!curriculumId) {
+            const found = await findDbDraft(client, { userId, courseSlug, lessonId: draft.id, lock: true });
+            if (found) curriculumId = found.id;
+        }
+
         // A new DB draft of a published lesson cites the published hash, as in the fs store.
         let currentHash = null;
         if (!curriculumId) {
@@ -820,7 +864,8 @@ export async function buildAuthorLessonPrompt({ courseSlug, lessonId, brief, roo
         body = stripFrontmatter(skill.text)
             // Claude Code shell injection (!`cmd`) means nothing to other clients; show the command instead.
             .replace(/!`([^`]+)`/g, '`$1`')
-            .replace(/\$ARGUMENTS\b/g, args || '(none)')
+            // A replacer function: "$'", "$&" or "$$" in the brief stay literal text.
+            .replace(/\$ARGUMENTS\b/g, () => args || '(none)')
             .trim();
     } else {
         source = 'builtin';

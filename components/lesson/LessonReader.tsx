@@ -18,6 +18,7 @@ import {
   glossaryItems,
   resolveLText,
   resumeTarget,
+  safeDecode,
   sectionByBlock,
   sectionStatuses,
   splitSectionTitle,
@@ -25,7 +26,7 @@ import {
   type GlossaryItem,
 } from './model';
 import { BlockView } from './blocks/registry';
-import { practiceProgress } from './blocks/blockText';
+import { nextPracticeBlockId, practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
 import { LessonHeader } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
@@ -73,6 +74,8 @@ const copy = {
     dismiss: 'Dismiss',
     sectionLabel: (n: number, m: number) => `${n}/${m}`,
     practiceCount: (n: number, m: number) => `${n} of ${m} questions answered`,
+    practiceGo: (n: number, m: number) => `Go to the next open question (${n} of ${m} answered)`,
+    practiceDone: (m: number) => `All ${m} questions answered`,
   },
   jp: {
     article: 'レッスン本文',
@@ -96,6 +99,8 @@ const copy = {
     dismiss: '閉じる',
     sectionLabel: (n: number, m: number) => `${n}/${m}`,
     practiceCount: (n: number, m: number) => `${m}問中 ${n}問回答済み`,
+    practiceGo: (n: number, m: number) => `次の未回答の問題へ移動（${m}問中 ${n}問回答済み）`,
+    practiceDone: (m: number) => `${m}問すべて回答済み`,
   },
 } as const;
 
@@ -195,6 +200,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   );
   // Same "練習 x/y" count as the desktop LessonBar, for the mobile bottom bar.
   const practice = useMemo(() => practiceProgress(lesson, progress.progress), [lesson, progress.progress]);
+  const nextPractice = nextPracticeBlockId(lesson, progress.progress, progress.activeBlockId);
 
   const activeSection = lesson.sections.find((s) => s.id === progress.activeSectionId) ?? lesson.sections[0];
   const activeBlock = useMemo<Block | undefined>(() => {
@@ -288,7 +294,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     const hash = window.location.hash;
     if (!hash.startsWith('#s-') && !hash.startsWith('#b-')) return;
     const sectionOfTop = sections.get(progress.topBlockId)?.id;
-    const hashed = decodeURIComponent(hash.slice(3));
+    const hashed = safeDecode(hash.slice(3));
     const stillThere = hash.startsWith('#s-') ? sectionOfTop === hashed : progress.topBlockId === hashed;
     if (stillThere) return;
     try {
@@ -433,17 +439,41 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     }
   }, [marginShown]);
 
-  // F toggles focus mode (not while typing or with a dialog open).
+  // F toggles focus mode (WCAG 2.1.4): only while reading (focus on the page or in the
+  // article), never while typing or with a dialog open, and it can be turned off in Aa.
   useEffect(() => {
+    if (!settings.focusKey) return undefined;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'f' && event.key !== 'F') return;
       if (event.altKey || event.ctrlKey || event.metaKey || isTyping(event.target)) return;
       if (outlineOpen || sideOpen || tutorOpen || settingsOpen) return;
+      const active = document.activeElement;
+      const reading = !active || active === document.body || active.id === 'main-content'
+        || Boolean(articleRef.current?.contains(active));
+      if (!reading) return;
       updateSettings({ focus: !settings.focus });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [outlineOpen, sideOpen, tutorOpen, settingsOpen, settings.focus, updateSettings]);
+  }, [outlineOpen, sideOpen, tutorOpen, settingsOpen, settings.focus, settings.focusKey, updateSettings]);
+
+  // Focus mode hides the outline and margin columns: move focus out of them before it is lost.
+  useEffect(() => {
+    if (!settings.focus) return;
+    const active = document.activeElement;
+    if (!active?.closest('.rp-col-outline, .rp-col-margin')) return;
+    const id = activeRef.current.section?.id ?? lesson.sections[0]?.id;
+    document.getElementById(`s-${id}-title`)?.focus({ preventScroll: true });
+  }, [settings.focus, lesson]);
+
+  // The reader theme also colours the app shell (the rail), so a dark page never sits in a
+  // light frame (design-system.md §3). Removed again when the reader unmounts.
+  useEffect(() => {
+    if (settings.theme === 'light') return undefined;
+    const root = document.documentElement;
+    root.setAttribute('data-theme', settings.theme);
+    return () => root.removeAttribute('data-theme');
+  }, [settings.theme]);
 
   // --- Context -----------------------------------------------------------------------------
 
@@ -559,6 +589,77 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           ) : null}
         />
 
+        {/* Phones: fixed to the bottom of the screen, but early in the tab order (right after the
+            bar), so Contents and the AI tutor are a few Tabs away, not after the whole article. */}
+        <nav className="rp-bottombar" aria-label={text.lessonActions}>
+          {prev ? (
+            <Link to={prev.href} className="rp-bottom-btn" aria-label={`${text.prevLesson}: ${prev.title}`}>
+              <ChevronLeft size={20} aria-hidden="true" />
+              <span>{text.prev}</span>
+            </Link>
+          ) : (
+            <span className="rp-bottom-btn" aria-disabled="true">
+              <ChevronLeft size={20} aria-hidden="true" />
+              <span>{text.prev}</span>
+            </span>
+          )}
+          <button
+            ref={bottomOutlineRef}
+            type="button"
+            className="rp-bottom-btn"
+            aria-haspopup="dialog"
+            aria-expanded={outlineOpen}
+            onClick={() => openOutline(bottomOutlineRef.current)}
+          >
+            <ListTree size={20} aria-hidden="true" />
+            <span>{text.outline} <span className="tabular">{text.sectionLabel(sectionIndex + 1, lesson.sections.length)}</span></span>
+          </button>
+          <button
+            ref={bottomTutorRef}
+            type="button"
+            className="rp-bottom-btn rp-bottom-ai"
+            aria-haspopup="dialog"
+            aria-expanded={tutorOpen}
+            onClick={() => openTutorPanel(bottomTutorRef.current)}
+          >
+            <Sparkles size={20} aria-hidden="true" />
+            <span>{text.tutor}</span>
+          </button>
+          <button
+            type="button"
+            className="rp-bottom-btn"
+            aria-disabled={!nextPractice || undefined}
+            aria-label={practice.total > 0
+              ? (nextPractice ? text.practiceGo(practice.answered, practice.total) : text.practiceDone(practice.total))
+              : text.practice}
+            onClick={() => {
+              if (nextPractice) scrollToBlock(nextPractice);
+            }}
+          >
+            <CircleDot size={20} aria-hidden="true" />
+            <span>
+              {text.practice}
+              {practice.total > 0 && (
+                <>
+                  {' '}
+                  <span className="tabular">{practice.answered}/{practice.total}</span>
+                </>
+              )}
+            </span>
+          </button>
+          {next ? (
+            <Link to={next.href} className="rp-bottom-btn" aria-label={`${text.nextLesson}: ${next.title}`}>
+              <ChevronRight size={20} aria-hidden="true" />
+              <span>{text.next}</span>
+            </Link>
+          ) : (
+            <span className="rp-bottom-btn" aria-disabled="true">
+              <ChevronRight size={20} aria-hidden="true" />
+              <span>{text.next}</span>
+            </span>
+          )}
+        </nav>
+
         {banner}
 
         <div className="rp-grid">
@@ -604,66 +705,6 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           </aside>
         </div>
 
-        <nav className="rp-bottombar" aria-label={text.lessonActions}>
-          {prev ? (
-            <Link to={prev.href} className="rp-bottom-btn" aria-label={`${text.prevLesson}: ${prev.title}`}>
-              <ChevronLeft size={20} aria-hidden="true" />
-              <span>{text.prev}</span>
-            </Link>
-          ) : (
-            <span className="rp-bottom-btn" aria-disabled="true">
-              <ChevronLeft size={20} aria-hidden="true" />
-              <span>{text.prev}</span>
-            </span>
-          )}
-          <button
-            ref={bottomOutlineRef}
-            type="button"
-            className="rp-bottom-btn"
-            aria-haspopup="dialog"
-            aria-expanded={outlineOpen}
-            onClick={() => openOutline(bottomOutlineRef.current)}
-          >
-            <ListTree size={20} aria-hidden="true" />
-            <span>{text.outline} <span className="tabular">{text.sectionLabel(sectionIndex + 1, lesson.sections.length)}</span></span>
-          </button>
-          <button
-            ref={bottomTutorRef}
-            type="button"
-            className="rp-bottom-btn rp-bottom-ai"
-            aria-haspopup="dialog"
-            aria-expanded={tutorOpen}
-            onClick={() => openTutorPanel(bottomTutorRef.current)}
-          >
-            <Sparkles size={20} aria-hidden="true" />
-            <span>{text.tutor}</span>
-          </button>
-          <button type="button" className="rp-bottom-btn" disabled aria-describedby="rp-bottom-soon">
-            <CircleDot size={20} aria-hidden="true" />
-            <span>
-              {text.practice}
-              {practice.total > 0 && (
-                <>
-                  {' '}
-                  <span className="tabular" aria-hidden="true">{practice.answered}/{practice.total}</span>
-                  <span className="sr-only">{text.practiceCount(practice.answered, practice.total)}</span>
-                </>
-              )}
-            </span>
-          </button>
-          <span id="rp-bottom-soon" className="sr-only">{text.soon}</span>
-          {next ? (
-            <Link to={next.href} className="rp-bottom-btn" aria-label={`${text.nextLesson}: ${next.title}`}>
-              <ChevronRight size={20} aria-hidden="true" />
-              <span>{text.next}</span>
-            </Link>
-          ) : (
-            <span className="rp-bottom-btn" aria-disabled="true">
-              <ChevronRight size={20} aria-hidden="true" />
-              <span>{text.next}</span>
-            </span>
-          )}
-        </nav>
       </div>
 
       <ReaderSheet

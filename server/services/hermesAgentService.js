@@ -3,7 +3,7 @@
  * Forwards authenticated Web UI chat to Hermes API Server (OpenAI-compatible).
  */
 import { setAgentChatConsent, registerAgentSession } from '../../tools/core/agentSessionStore.js';
-import { DATA_NOT_INSTRUCTIONS, fence } from '../llm/prompts/shared.js';
+import { DATA_NOT_INSTRUCTIONS, fence, stripTags } from '../llm/prompts/shared.js';
 
 export const ALLOWED_SKILLS = new Set([
     'life-habit-analyst',
@@ -56,14 +56,14 @@ const LESSON_FIELD_MAX = 200;
 const LESSON_ID_MAX = 80;
 const LESSON_OBJECTIVES_MAX = 6;
 const HIGHLIGHTED_LINES_MAX = 20;
-const DATA_TAGS = /<\/?(?:lesson|excerpt)\b[^>]*>/gi;
+const DATA_TAGS = /<\s*\/?\s*(?:lesson|excerpt)\b[^>]*>/gi;
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 /** Untrusted text on one line, without our delimiter tags, at most `max` characters. */
 const dataLine = (value, max = LESSON_FIELD_MAX) => (
     typeof value === 'string'
-        ? value.replace(DATA_TAGS, '').replace(/\s+/g, ' ').trim().slice(0, max)
+        ? stripTags(value, DATA_TAGS).replace(/\s+/g, ' ').trim().slice(0, max)
         : ''
 );
 
@@ -114,7 +114,7 @@ export function buildLessonContextLines(context = {}) {
     }
 
     const excerpt = anchor && typeof anchor.excerpt === 'string'
-        ? anchor.excerpt.replace(DATA_TAGS, '').trim().slice(0, LESSON_EXCERPT_MAX)
+        ? stripTags(anchor.excerpt, DATA_TAGS).trim().slice(0, LESSON_EXCERPT_MAX)
         : '';
 
     const out = [];

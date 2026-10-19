@@ -13,11 +13,12 @@ import ProgressCluster from '../../ui/ProgressCluster';
 import EmptyState from '../../ui/EmptyState';
 import CourseCard, { WORLD_COVER_STYLE } from '../../ui/CourseCard';
 import { ButtonLink } from '../../ui/Button';
-import { AUTHORING_GUIDE_URL } from '../../ui/links';
+import { authoringGuideUrl } from '../../ui/links';
+import { trackCopy } from '../../ui/tracks';
 import { courseTotals, formatCourseMeta, lessonFacts, pickResumeTarget, type LessonFacts } from '../../ui/lessonResume';
 
 // Real data widgets below the fold: loaded on demand so they stay off the critical path.
-const LifeJournalWeeklyWidget = lazy(() => import('../life-journal/LifeJournalWeeklyWidget'));
+// (The life-journal weekly widget lives on /life-journal; the dashboard mock has no such row.)
 const LearningInsightsWidget = lazy(() => import('./LearningInsightsWidget'));
 
 interface DashboardProps {
@@ -66,13 +67,7 @@ const copy = {
     codeLabel: 'Example commands',
     codeComment1: '# in the repository',
     codeComment2: '# validate and preview',
-    reflect: 'Reflect',
-    tracksList: {
-      vibe: { badge: 'Vibe Coding', title: 'Build web apps with AI' },
-      unity: { badge: 'Unity × AI', title: 'Game development in the AI era', description: 'Design games with Unity and AI as your partner.' },
-      blender: { badge: 'Blender', title: 'Your first 3D models', description: 'Model, light and render step by step in Blender.' },
-      art: { badge: 'Art', title: 'A journey through art and craft', description: 'Art history and the ideas behind great works.' },
-    },
+    sampleLessonTitle: 'MCP basics',
     trackProgress: 'Track progress',
   },
   jp: {
@@ -80,7 +75,7 @@ const copy = {
     guestName: 'Guest',
     subtitle: '今日は 10分 だけ進めましょう。読んだところは自動で記録されます。',
     continueKicker: '続きから',
-    startKicker: 'Vibe Coding 第1章からはじめる',
+    startKicker: 'バイブコーディング 第1章からはじめる',
     continueFrom: (label: string) => `続きから読む（${label} から）`,
     continuePlain: '続きから読む',
     startCta: '第1章を読む',
@@ -113,13 +108,7 @@ const copy = {
     codeLabel: 'コマンドの例',
     codeComment1: '# リポジトリで',
     codeComment2: '# 検証とプレビュー',
-    reflect: 'ふりかえり',
-    tracksList: {
-      vibe: { badge: 'Vibe Coding', title: 'AIと作るWebアプリ' },
-      unity: { badge: 'Unity × AI', title: 'AI時代のゲーム開発', description: 'AIを相棒に、Unityでゲームを設計します。' },
-      blender: { badge: 'Blender', title: 'はじめての3Dモデリング', description: 'モデリングからライティングまで、手順どおりに。' },
-      art: { badge: 'Art', title: '美術史と工芸の旅', description: '名作の背景にある歴史と考え方をたどります。' },
-    },
+    sampleLessonTitle: 'MCPの基本',
     trackProgress: 'トラックの進捗',
   },
 } as const;
@@ -142,7 +131,7 @@ const sectionHead = 'mb-3 mt-10 flex items-baseline justify-between gap-4';
 const sectionLink =
   'inline-flex items-center gap-1 rounded-chip text-small font-semibold text-primary-text hover:underline underline-offset-4';
 
-const MissionControlDashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const MissionControlDashboard: React.FC<DashboardProps> = () => {
   const { setTheme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -182,7 +171,7 @@ const MissionControlDashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <h2 id="dash-create" className="text-h2 text-fg">
             {t.create}
           </h2>
-          <a href={AUTHORING_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={sectionLink}>
+          <a href={authoringGuideUrl(language)} target="_blank" rel="noopener noreferrer" className={sectionLink}>
             {t.guide}
             <ArrowRight size={16} aria-hidden="true" />
             <span className="sr-only">{t.opensInNewTab}</span>
@@ -201,24 +190,13 @@ const MissionControlDashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             >
               <code>
                 <span className="text-fg-3">{t.codeComment1}</span>
-                {'\n/author-lesson vibe-coding vibe-ch12 "MCPの基本"\n'}
+                {`\n/author-lesson vibe-coding vibe-ch12 "${t.sampleLessonTitle}"\n`}
                 <span className="text-fg-3">{t.codeComment2}</span>
                 {'\nnpm run lessons:validate\nnpm run lessons:preview -- vibe-coding vibe-ch12'}
               </code>
             </pre>
           </figure>
         </div>
-      </section>
-
-      <section aria-labelledby="dash-reflect">
-        <div className={sectionHead}>
-          <h2 id="dash-reflect" className="text-h2 text-fg">
-            {t.reflect}
-          </h2>
-        </div>
-        <Suspense fallback={<div className="h-48 rounded-card bg-sunken motion-safe:animate-pulse" aria-hidden="true" />}>
-          <LifeJournalWeeklyWidget onNavigate={onNavigate} />
-        </Suspense>
       </section>
 
       {curriculumId ? (
@@ -279,7 +257,7 @@ const ContinueCard: React.FC = () => {
 
   const title = resolveLText(lesson?.title ?? entry?.ref.title, locale, fallbackLocale);
   const estMinutes = lesson?.estMinutes ?? entry?.ref.estMinutes;
-  const trackBadge = target.courseSlug === 'vibe-coding' ? copy[language].tracksList.vibe.badge : resolveLText(course.title, locale, fallbackLocale).value;
+  const trackBadge = target.courseSlug === 'vibe-coding' ? trackCopy('vibe', language, course).title : resolveLText(course.title, locale, fallbackLocale).value;
   const world = course.world ?? 'vibe';
 
   const meta: string[] = [];
@@ -379,8 +357,8 @@ const ContinueCard: React.FC = () => {
 
       <div className="relative order-first h-20 min-w-0 md:order-none md:h-auto md:min-h-64" style={COVER_STYLE}>
         {facts ? (
-          <div className="absolute inset-x-5 bottom-5 hidden rounded-control border border-white/15 bg-black/30 p-3 text-white backdrop-blur-sm md:block">
-            <p className="text-caption font-semibold text-white/75">{t.outlineLabel}</p>
+          <div className="absolute inset-x-5 bottom-5 hidden rounded-control border border-white/15 bg-black/55 p-3 text-white backdrop-blur-sm md:block">
+            <p className="text-caption font-semibold text-white/90">{t.outlineLabel}</p>
             <ol className="mt-1.5 space-y-1">
               {facts.outline.slice(0, 5).map((item) => (
                 <li key={item.id} className="flex items-start gap-2 text-small" lang={item.lang}>
@@ -396,8 +374,8 @@ const ContinueCard: React.FC = () => {
                   >
                     {item.status === 'done' ? <Check size={11} strokeWidth={3} /> : null}
                   </span>
-                  <span className={`min-w-0 truncate ${item.status === 'current' ? 'font-semibold text-white' : 'text-white/85'}`}>
-                    {item.num ? <span className="tabular mr-1.5 text-white/65">{item.num}</span> : null}
+                  <span className={`min-w-0 truncate ${item.status === 'current' ? 'font-semibold text-white' : 'text-white'}`}>
+                    {item.num ? <span className="tabular mr-1.5 text-white/90">{item.num}</span> : null}
                     {item.title}
                     {item.status === 'done' ? <span className="sr-only">（{t.sectionDone}）</span> : null}
                     {item.status === 'current' ? <span className="sr-only">（{t.sectionCurrent}）</span> : null}
@@ -405,7 +383,7 @@ const ContinueCard: React.FC = () => {
                 </li>
               ))}
               {facts.outline.length > 5 ? (
-                <li className="pl-6 text-caption text-white/65">+{facts.outline.length - 5}</li>
+                <li className="pl-6 text-caption text-white/90">+{facts.outline.length - 5}</li>
               ) : null}
             </ol>
           </div>
@@ -429,10 +407,14 @@ const TrackSection: React.FC = () => {
   const { language } = useLanguage();
   const t = copy[language];
 
-  const vibe = useMemo(() => {
-    const course = listCourses().find((c) => c.id === 'vibe-coding');
-    return course ? courseTotals(course, readLessonSummary) : null;
-  }, []);
+  const vibeCourse = useMemo(() => listCourses().find((c) => c.id === 'vibe-coding') ?? null, []);
+  const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary) : null), [vibeCourse]);
+  const tracks = {
+    vibe: trackCopy('vibe', language, vibeCourse),
+    unity: trackCopy('unity', language),
+    blender: trackCopy('blender', language),
+    art: trackCopy('art', language),
+  };
 
   return (
     <section aria-labelledby="dash-tracks">
@@ -449,8 +431,8 @@ const TrackSection: React.FC = () => {
           <CourseCard
             className="flex-1"
             world="vibe"
-            badge={t.tracksList.vibe.badge}
-            title={t.tracksList.vibe.title}
+            badge={tracks.vibe.badge}
+            title={tracks.vibe.title}
             meta={vibe ? formatCourseMeta(vibe, language) : undefined}
             progress={vibe && vibe.pct > 0 ? vibe.pct : undefined}
             progressLabel={t.trackProgress}
@@ -462,9 +444,9 @@ const TrackSection: React.FC = () => {
           <CourseCard
             className="flex-1"
             world="unity"
-            badge={t.tracksList.unity.badge}
-            title={t.tracksList.unity.title}
-            description={t.tracksList.unity.description}
+            badge={tracks.unity.badge}
+            title={tracks.unity.title}
+            description={tracks.unity.description}
             glyph={<Braces aria-hidden="true" />}
             to="/unity"
           />
@@ -473,9 +455,9 @@ const TrackSection: React.FC = () => {
           <CourseCard
             className="flex-1"
             world="blender"
-            badge={t.tracksList.blender.badge}
-            title={t.tracksList.blender.title}
-            description={t.tracksList.blender.description}
+            badge={tracks.blender.badge}
+            title={tracks.blender.title}
+            description={tracks.blender.description}
             glyph={<Box aria-hidden="true" />}
             to="/blender"
           />
@@ -484,9 +466,9 @@ const TrackSection: React.FC = () => {
           <CourseCard
             className="flex-1"
             world="art"
-            badge={t.tracksList.art.badge}
-            title={t.tracksList.art.title}
-            description={t.tracksList.art.description}
+            badge={tracks.art.badge}
+            title={tracks.art.title}
+            description={tracks.art.description}
             glyph={<Palette aria-hidden="true" />}
             to="/art"
           />

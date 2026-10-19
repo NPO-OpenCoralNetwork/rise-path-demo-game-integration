@@ -34,7 +34,7 @@ export default function ChecklistBlock({ block }: BlockProps<'checklist'>) {
   const titleId = `${block.id}-title`;
 
   return (
-    <section className="rp-checklist" aria-labelledby={titleId} data-complete={complete || undefined}>
+    <div role="group" className="rp-checklist" aria-labelledby={titleId} data-complete={complete || undefined}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <ListChecks size={17} aria-hidden="true" className="shrink-0 text-primary-text" />
         <h3 id={titleId} className="rp-card-title m-0">
@@ -90,6 +90,6 @@ export default function ChecklistBlock({ block }: BlockProps<'checklist'>) {
           </button>
         </div>
       )}
-    </section>
+    </div>
   );
 }

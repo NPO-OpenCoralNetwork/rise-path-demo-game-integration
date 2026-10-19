@@ -201,16 +201,14 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     }
   };
 
+  // The welcome message follows the UI language until the conversation starts.
   useEffect(() => {
-    setMessages([
-        {
-            id: 'init',
-            role: 'model',
-            text: t.initialMessage,
-            timestamp: new Date()
-        }
-    ]);
-  }, []);
+    setMessages((prev) => (
+      prev.length === 0 || (prev.length === 1 && prev[0].id === 'init')
+        ? [{ id: 'init', role: 'model', text: t.initialMessage, timestamp: prev[0]?.timestamp ?? new Date() }]
+        : prev
+    ));
+  }, [t.initialMessage]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -474,7 +472,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {[
                                         { id: 'python', prompt: t.demoPromptPython, icon: <Zap size={18} aria-hidden="true" />, color: 'border-blue-500 text-blue-600', label: t.demoLabelPython },
-                                        { id: 'art', prompt: t.demoPromptArt, icon: <Palette size={18} aria-hidden="true" />, color: 'border-orange-500 text-orange-600', label: t.demoLabelArt },
+                                        { id: 'art', prompt: t.demoPromptArt, icon: <Palette size={18} aria-hidden="true" />, color: 'border-orange-500 text-orange-700', label: t.demoLabelArt },
                                         { id: 'unity', prompt: t.demoPromptUnity, icon: <Brain size={18} aria-hidden="true" />, color: 'border-indigo-500 text-indigo-600', label: t.demoLabelUnity }
                                     ].map((demo) => (
                                         <button
@@ -823,7 +821,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
 
             <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-100 p-4 sm:p-6 md:p-8 space-y-8 bg-slate-50/50">
                 <div className="hidden md:block space-y-3">
-                    <h4 className="eyebrow text-fg-3">{t.stepsTitle}</h4>
+                    <p className="eyebrow text-fg-3">{t.stepsTitle}</p>
                     <ol className="space-y-2">
                         {(['requirements', 'roadmap', 'curriculum'] as const).map((step, index) => {
                             const isCurrent = pendingApproval === step;

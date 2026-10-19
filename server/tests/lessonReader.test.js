@@ -215,7 +215,13 @@ describe('reader model', () => {
     assert.equal(st['1-1'], 'attention', 'an unanswered inline check is flagged');
     assert.equal(st['1-2'], 'current');
     assert.equal(st.summary, 'todo');
+    // Reading into 1-1 while the hook is still active never flags 1-1 (its check lies ahead).
+    const firstOf11 = withSeen(emptyProgress(), [s11.blocks[0].id]);
+    assert.equal(sectionStatuses(ch1, firstOf11, 'hook')['1-1'], 'todo', 'a section ahead is not flagged');
+    assert.equal(sectionStatuses(ch1, firstOf11, null)['1-1'], 'todo', 'reading in is not passing the check');
     const check = s11.blocks.find((b) => b.type === 'quiz');
+    const sawCheck = withSeen(emptyProgress(), [s11.blocks[0].id, check.id]);
+    assert.equal(sectionStatuses(ch1, sawCheck, null)['1-1'], 'attention', 'a seen, unanswered check is flagged');
     for (const q of check.questions) p = withAnswer(p, answerKey(check.id, q.id), { chosen: ['x'], correct: false });
     st = sectionStatuses(ch1, p, '1-2');
     assert.equal(st['1-1'], 'done');

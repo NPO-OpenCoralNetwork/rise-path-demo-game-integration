@@ -46,8 +46,10 @@ function fitSvg(host: HTMLElement) {
   const svg = host.querySelector('svg');
   if (!svg) return false;
   const natural = svgWidth(host);
-  const available = host.clientWidth;
-  if (!natural || !available) return false;
+  // clientWidth includes the host padding; the SVG only gets the content box.
+  const style = getComputedStyle(host);
+  const available = host.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+  if (!natural || available <= 0) return false;
   const width = Math.min(natural, Math.max(available, natural * MIN_SCALE));
   svg.removeAttribute('width');
   svg.removeAttribute('height');
@@ -56,7 +58,7 @@ function fitSvg(host: HTMLElement) {
   svg.style.height = 'auto';
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
-  return width > available + 1;
+  return width > available + 1 || host.scrollWidth > host.clientWidth + 1;
 }
 
 export default function DiagramBlock({ block }: BlockProps<'diagram'>) {

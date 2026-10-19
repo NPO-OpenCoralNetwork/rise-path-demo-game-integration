@@ -116,7 +116,7 @@ export function LessonEnd({ next, prev, backTo }: LessonEndProps) {
 
   return (
     <footer className="rp-end">
-      <section className="rp-end-card" aria-labelledby={titleId}>
+      <div role="group" className="rp-end-card" aria-labelledby={titleId}>
         <h2 id={titleId} className="rp-end-title">
           <Flag size={18} aria-hidden="true" />
           {text.title}
@@ -157,7 +157,7 @@ export function LessonEnd({ next, prev, backTo }: LessonEndProps) {
             </li>
           )}
         </ul>
-      </section>
+      </div>
 
       {next ? (
         <Link to={next.href} className="rp-next-card">

@@ -26,6 +26,14 @@ const markdownComponents = {
     em: ({ ...props }: React.HTMLAttributes<HTMLElement>) => <em className="italic text-fg-2" {...props} />,
     code: ({ ...props }: React.HTMLAttributes<HTMLElement>) => <code className="px-1.5 py-0.5 rounded-chip bg-sunken text-fg text-xs font-mono" {...props} />,
     blockquote: ({ ...props }: React.HTMLAttributes<HTMLQuoteElement>) => <blockquote className="border-l-2 border-line pl-3 text-fg-2 my-2" {...props} />,
+    // Model output: only http(s) links, and images as their alt text so a reply cannot make the
+    // browser fetch a URL.
+    a: ({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+        /^https?:\/\//i.test(href ?? '')
+            ? <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary-text underline">{children}</a>
+            : <span>{children}</span>
+    ),
+    img: ({ alt }: React.ImgHTMLAttributes<HTMLImageElement>) => (alt ? <span>{alt}</span> : null),
 };
 
 const makeId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -46,6 +54,8 @@ export const FloatingChatbot: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     // Set when a reply finishes while the panel is closed; cleared on open.
     const [hasUnread, setHasUnread] = useState(false);
+    // Screen readers hear the finished reply once (not every streamed chunk), plus thinking/errors.
+    const [announcement, setAnnouncement] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const launcherRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +80,7 @@ export const FloatingChatbot: React.FC = () => {
             rateLimited: 'Too many requests. Please wait a minute.',
             demoUnavailable: 'AI coach requires the API server (not available in demo mode).',
             loginRequired: 'Please sign in to use the AI coach.',
+            thinking: 'Thinking…',
         },
         jp: {
             title: 'Rise Path AI',
@@ -87,6 +98,7 @@ export const FloatingChatbot: React.FC = () => {
             rateLimited: 'リクエストが多すぎます。1分ほどお待ちください。',
             demoUnavailable: 'AI コーチには API サーバーが必要です（デモモードでは利用できません）。',
             loginRequired: 'AI コーチを利用するにはログインが必要です。',
+            thinking: '考えています…',
         },
     } as const;
     const t = copy[language];
@@ -134,6 +146,7 @@ export const FloatingChatbot: React.FC = () => {
 
         setMessages((prev) => [...prev, userMessage, assistantPlaceholder]);
         setIsLoading(true);
+        setAnnouncement(t.thinking);
 
         const context = {
             timezone: getClientTimezone(),
@@ -175,13 +188,16 @@ export const FloatingChatbot: React.FC = () => {
                         ? { ...m, text: result.answer || '', isStreaming: false }
                         : m
                 )));
+                setAnnouncement(result.answer || '');
             } else {
                 setMessages((prev) => prev.map((m) => (
                     m.id === assistantId ? { ...m, isStreaming: false } : m
                 )));
+                setAnnouncement(streamedText);
             }
         } catch (error) {
             const errorText = mapAgentChatError(error, errorCopy);
+            setAnnouncement(errorText);
             setMessages((prev) => [
                 ...prev.filter((m) => m.id !== assistantId),
                 {
@@ -195,7 +211,7 @@ export const FloatingChatbot: React.FC = () => {
             setIsLoading(false);
             if (!isOpenRef.current) setHasUnread(true);
         }
-    }, [errorCopy, isLoading, language]);
+    }, [errorCopy, isLoading, language, t.thinking]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -272,7 +288,8 @@ export const FloatingChatbot: React.FC = () => {
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-canvas" aria-live="polite">
+            <p role="status" className="sr-only">{announcement}</p>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-canvas">
                 {messages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-center p-4 text-fg-3 gap-3">
                         <div className="w-12 h-12 bg-primary-soft text-primary-text rounded-card flex items-center justify-center">

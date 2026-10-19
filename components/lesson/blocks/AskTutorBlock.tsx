@@ -36,7 +36,7 @@ export default function AskTutorBlock({ block, section }: BlockProps<'askTutor'>
   );
   const titleId = `${block.id}-title`;
   return (
-    <section className="rp-asktutor" aria-labelledby={titleId}>
+    <div role="group" className="rp-asktutor" aria-labelledby={titleId}>
       <div className="flex items-center gap-2">
         <span className="rp-asktutor-icon" aria-hidden="true">
           <Sparkles size={15} />
@@ -64,6 +64,6 @@ export default function AskTutorBlock({ block, section }: BlockProps<'askTutor'>
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

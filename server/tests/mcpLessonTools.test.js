@@ -146,6 +146,10 @@ describe('lesson-schema-get', () => {
         assert.ok(prompt.text.includes('Catalog: `npm run -s lessons:catalog`'));
         assert.ok(prompt.text.includes('Args: vibe-coding vibe-ch1-practice 演習'));
         assert.ok(prompt.text.includes('lesson-upsert-draft'));
+
+        // "$'", "$&", "$`" and "$$" in the brief are text, not String.replace patterns.
+        const dollars = await buildAuthorLessonPrompt({ courseSlug: COURSE, lessonId: 'x', brief: "costs $' and $& and $$ per seat", root });
+        assert.ok(dollars.text.includes("Args: vibe-coding x costs $' and $& and $$ per seat\n"), dollars.text);
     });
 
     it('falls back to the built-in author-lesson prompt', async () => {
@@ -390,8 +394,12 @@ describe('lesson tools (db store, mock pool)', () => {
         assert.equal(saved.curriculum_version_id, 'version-1');
         assert.equal(saved.version, 1);
         assert.deepEqual(pool.statements(), [
-            'begin', 'insert into curricula', 'insert into curriculum_versions', 'update curricula set', 'commit',
+            'begin', 'select c.id as', 'insert into curricula', 'insert into curriculum_versions', 'update curricula set', 'commit',
         ]);
+        const lookup = findQuery(pool, 'select c.id as curriculum_id');
+        assert.match(lookup.sql, /ui_hints->>'course_slug' = \$3/);
+        assert.match(lookup.sql, /for update of c/);
+        assert.deepEqual(lookup.params, [USER_ID, LESSON_UI_TEMPLATE_ID, COURSE, 'mcp-new-lesson']);
 
         const created = findQuery(pool, 'insert into curricula ');
         assert.deepEqual(created.params.slice(0, 2), [USER_ID, EXEMPLAR.title.jp]);
@@ -434,6 +442,41 @@ describe('lesson tools (db store, mock pool)', () => {
         assert.equal(saved.previous_hash, currentHash);
         assert.equal(JSON.parse(findQuery(pool, 'insert into curriculum_versions').params[2]).estMinutes, 33);
         assert.equal(findQuery(pool, 'insert into curricula '), undefined);
+    });
+
+    it('updates the user\'s existing DB draft of the same lesson when no curriculum_id is given', async () => {
+        const current = stampDraft(newLesson(), { courseSlug: COURSE }).lesson;
+        const currentHash = hashLesson(current);
+        const respond = (sql) => (sql.toLowerCase().startsWith('select c.id as curriculum_id')
+            ? { rowCount: 1, rows: [{ curriculum_id: CURRICULUM_ID, content_json: current }] }
+            : versionInsertResponder({ existing: current, nextVersion: 2 })(sql));
+
+        let pool = createMockPool(respond);
+        setPoolForTests(pool);
+        const blind = await upsertLessonDraft({ courseSlug: COURSE, lesson: { ...newLesson(), estMinutes: 40 }, store: 'db', userId: USER_ID, contentDir });
+        assert.equal(blind.error_type, 'conflict', 'a second upsert without base_hash does not create a second curriculum');
+        assert.equal(blind.current_hash, currentHash);
+        assert.equal(findQuery(pool, 'insert into curricula '), undefined);
+
+        pool = createMockPool(respond);
+        setPoolForTests(pool);
+        const saved = await upsertLessonDraft({ courseSlug: COURSE, lesson: { ...newLesson(), estMinutes: 40 }, store: 'db', baseHash: currentHash, userId: USER_ID, contentDir });
+        assert.equal(saved.action, 'updated', JSON.stringify(saved));
+        assert.equal(saved.curriculum_id, CURRICULUM_ID);
+        assert.equal(findQuery(pool, 'insert into curricula '), undefined);
+
+        // lesson-get by slug/id in the db store reads the same draft (and its hash).
+        pool = createMockPool((sql) => {
+            const lower = sql.toLowerCase();
+            if (lower.startsWith('select c.id as curriculum_id')) return { rowCount: 1, rows: [{ curriculum_id: CURRICULUM_ID, content_json: current }] };
+            if (lower.startsWith('select c.id, v.id as version_id')) return { rowCount: 1, rows: [{ id: CURRICULUM_ID, version_id: 'v-1', version: 1, status: 'draft', content_json: current }] };
+            return undefined;
+        });
+        setPoolForTests(pool);
+        const got = await getLesson({ courseSlug: COURSE, lessonId: 'mcp-new-lesson', store: 'db', userId: USER_ID, contentDir });
+        assert.equal(got.source, 'db');
+        assert.equal(got.curriculum_id, CURRICULUM_ID);
+        assert.equal(got.hash, currentHash);
     });
 
     it('returns not_found for a curriculum the user does not own, and db_connection without a pool', async () => {

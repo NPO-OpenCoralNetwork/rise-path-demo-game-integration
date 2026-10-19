@@ -41,6 +41,7 @@ const copy = {
     aboutTerm: 'About this term',
     quoteLabel: 'Quoted from the lesson',
     intro: 'Press ✦ next to a paragraph, or ask here. The tutor answers from this lesson.',
+    introTap: 'Tap a paragraph and choose "Ask AI tutor", or ask here. The tutor answers from this lesson.',
     hintMode: 'Hint mode',
     hintModeDetail: 'Hints first. The check shows the answer after your second try.',
     you: 'You',
@@ -98,6 +99,7 @@ const copy = {
     aboutTerm: 'この用語について',
     quoteLabel: 'レッスンからの引用',
     intro: '段落の横の ✦ を押すか、ここから質問できます。AI先生はこのレッスンの内容をふまえて答えます。',
+    introTap: '段落をタップして「AI先生に聞く」を押すか、ここから質問できます。AI先生はこのレッスンの内容をふまえて答えます。',
     hintMode: 'ヒントモード',
     hintModeDetail: 'まずはヒントで考えます。答えは2回挑戦したあとに問題の中で表示されます。',
     you: 'あなた',
@@ -229,8 +231,8 @@ export function TutorPanel(props: TutorPanelProps) {
 
   if (layout === 'margin') {
     return (
-      <section
-        ref={panelRef}
+      <div role="group"
+        ref={panelRef as React.RefObject<HTMLDivElement | null> | undefined}
         tabIndex={-1}
         aria-labelledby={titleId}
         className="rp-margin-card focus-visible:outline-offset-4"
@@ -264,7 +266,7 @@ export function TutorPanel(props: TutorPanelProps) {
           )}
         </div>
         <TutorBody {...props} text={text} cardOpen={cardOpen} setCardOpen={setCardOpen} />
-      </section>
+      </div>
     );
   }
 
@@ -317,6 +319,32 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
   const uid = useId();
   const threadRef = useRef<HTMLDivElement>(null);
   const dialog = layout !== 'margin';
+
+  // Send and Stop are separate buttons that take turns in one slot. When the focused one is
+  // removed (the answer starts or ends), focus goes back to the question field instead of <body>,
+  // so the keyboard user stays in the panel (and inside the sheet dialog).
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLInputElement | null>(null);
+  const lastFocused = useRef<HTMLElement | null>(null);
+  const setFieldRef = (el: HTMLInputElement | null) => {
+    fieldRef.current = el;
+    if (inputRef) (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+  };
+  useEffect(() => {
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      lastFocused.current = target && controlsRef.current?.contains(target) ? target : null;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+  useEffect(() => {
+    const last = lastFocused.current;
+    const active = document.activeElement;
+    if (!last || last.isConnected || (active && active !== document.body)) return;
+    lastFocused.current = null;
+    fieldRef.current?.focus({ preventScroll: true });
+  }, [busy]);
 
   // Leaving a thread closes its card editor and notice.
   const threadKey = thread?.key ?? null;
@@ -466,7 +494,7 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
         </p>
       )}
 
-      {!thread && <p className="rp-tutor-intro mt-0">{text.intro}</p>}
+      {!thread && <p className="rp-tutor-intro mt-0">{layout === 'sheet' ? text.introTap : text.intro}</p>}
 
       {thread && (
         <div
@@ -509,7 +537,7 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
           }}
         />
       ) : (
-        <div className={dialog ? 'sticky bottom-0 -mx-5 mt-auto border-t border-line bg-raised px-5 pb-1 pt-1' : ''}>
+        <div ref={controlsRef} className={dialog ? 'sticky bottom-0 -mx-5 mt-auto border-t border-line bg-raised px-5 pb-1 pt-1' : ''}>
           {cardNotice && (
             <p className={`mt-2 flex items-start gap-1.5 text-small ${cardNotice.ok ? 'text-success' : 'text-danger'}`}>
               {cardNotice.ok
@@ -523,9 +551,12 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
               <li key={s.id}>
                 <button
                   type="button"
-                  className="rp-suggestion rp-suggestion-sm disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={busy}
-                  onClick={() => ask(s.message)}
+                  className="rp-suggestion rp-suggestion-sm aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                  // aria-disabled, not disabled: a disabled button would drop the keyboard focus.
+                  aria-disabled={busy || undefined}
+                  onClick={() => {
+                    if (!busy) ask(s.message);
+                  }}
                 >
                   {s.label}
                 </button>
@@ -536,10 +567,11 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
                 <button
                   ref={cardButtonRef}
                   type="button"
-                  className="rp-suggestion rp-suggestion-sm gap-1 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={busy || !hasAnswer}
+                  className="rp-suggestion rp-suggestion-sm gap-1 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                  aria-disabled={busy || !hasAnswer || undefined}
                   title={hasAnswer ? undefined : text.makeCardHint}
                   onClick={() => {
+                    if (busy || !hasAnswer) return;
                     setCardNotice(null);
                     cardFocusBack.current = true;
                     setCardOpen(true);
@@ -562,7 +594,7 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
           >
             <label htmlFor={`${uid}-input`} className="sr-only">{text.inputLabel}</label>
             <input
-              ref={inputRef}
+              ref={setFieldRef}
               id={`${uid}-input`}
               type="text"
               className="rp-input pointer-coarse:h-11 pointer-coarse:text-base"
@@ -574,12 +606,17 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
               enterKeyHint="send"
             />
             {busy ? (
-              <button type="button" className="rp-btn rp-btn-sm" onClick={tutor.stop}>
+              <button key="stop" type="button" className="rp-btn rp-btn-sm" onClick={tutor.stop}>
                 <Square size={12} aria-hidden="true" className="fill-current" />
                 {text.stop}
               </button>
             ) : (
-              <button type="submit" className="rp-btn rp-btn-primary rp-btn-sm" disabled={!draft.trim()}>
+              <button
+                key="send"
+                type="submit"
+                className="rp-btn rp-btn-primary rp-btn-sm"
+                aria-disabled={!draft.trim() || undefined}
+              >
                 <Send size={14} aria-hidden="true" />
                 {text.send}
               </button>
@@ -612,7 +649,7 @@ function TurnView({ turn, text, sourceChip, onRetry }: {
       <span className="sr-only">{text.tutor}: </span>
       {turn.text ? (
         <div className={ANSWER_MD}>
-          <Markdown source={turn.text} />
+          <Markdown source={turn.text} untrusted />
         </div>
       ) : turn.status === 'streaming' ? (
         <p className="flex items-center gap-2 text-small text-fg-3">

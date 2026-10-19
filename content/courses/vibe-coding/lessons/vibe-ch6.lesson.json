@@ -63,8 +63,8 @@
           "id": "s2-b1",
           "type": "markdown",
           "md": {
-            "jp": "セットアップは簡単です。必要なのはAPIキーとターミナルだけです。",
-            "en": "Setting up is simple. You just need an API Key and a terminal."
+            "jp": "用意するものは、APIキーとターミナルの2つです。",
+            "en": "You need two things: an API key and a terminal."
           }
         },
         {
@@ -197,7 +197,7 @@
     }
   ],
   "provenance": {
-    "author": "migration",
+    "author": "migration+claude-code",
     "migratedFrom": {
       "source": "data/curricula/vibe_coding/chapter6.ts",
       "export": "VIBE_CHAPTER_6_DATA",

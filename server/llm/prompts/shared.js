@@ -21,11 +21,26 @@ const LANGUAGE_NAMES = /** @type {const} */ ({ ja: 'Japanese', en: 'English', fr
 export const languageName = (locale) => LANGUAGE_NAMES[locale || 'en'] || LANGUAGE_NAMES.en;
 
 /**
+ * Removes every match of a global tag pattern, repeating until nothing changes, so nested
+ * pieces cannot reassemble a tag after one pass ("<</x>/x>" → "</x>" → "").
+ * @param {string} text
+ * @param {RegExp} pattern  must have the g flag
+ */
+export function stripTags(text, pattern) {
+  let out = String(text ?? '');
+  for (let previous = ''; out !== previous;) {
+    previous = out;
+    out = out.replace(pattern, '');
+  }
+  return out;
+}
+
+/**
  * Wrap untrusted text in a tag; a closing tag inside the text cannot end the block early.
  * @param {string} tag
  * @param {string} content
  */
 export function fence(tag, content) {
-  const safe = String(content ?? '').replace(new RegExp(`</?${tag}\\b[^>]*>`, 'gi'), '');
+  const safe = stripTags(content, new RegExp(`<\\s*/?\\s*${tag}\\b[^>]*>`, 'gi'));
   return `<${tag}>\n${safe}\n</${tag}>`;
 }
