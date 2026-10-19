@@ -49,8 +49,9 @@ list names the changed blocks). If you are told the scope check exited 1, or `ve
 - **(a)** For every open must-fix item of your previous review (its `mustFix`, plus the items still
   open from earlier rounds), open the screen that showed it and add a `resolved` entry, `resolved`
   or `unresolved`, whose evidence names the PNG and what it shows now. An item is resolved only by
-  a change: when the fix is in another block than its `blockId`, add
-  `"fixedIn": ["<changed block id>"]`.
+  a change since the round that last had it open: when the fix is in another block than its
+  `blockId`, add `"fixedIn": ["<changed block id>"]`. A lesson-wide item (`blockId` `"lesson"`)
+  needs a changed lesson-level field or a `fixedIn` that lists every changed block holding the fix.
 - **(b)** Open every screen (mobile and desktop) that shows a changed or new block and inspect it as
   in a full check.
 - **(c)** Add a `mustFix` only for a problem on those screens, or a layout regression the changes
@@ -59,9 +60,10 @@ list names the changed blocks). If you are told the scope check exited 1, or `ve
   touch it; copy the others from your previous review with `"carriedOver": true`.
 
 Set `"mode": "verify"`, `"lessonHash"` and `verifies` (the `verifies` line you were given, plus
-`previousReview` as you were given it, a recorded round: `<commit>:<path>` or the snapshot copy
+`previousReview` as you were given it, a recorded round: `<commit id>:<path>` or the snapshot copy
 under `.artifacts/review/`, never the working-tree `reports/` file of this lesson and reviewer or a
-pasted copy). List every criterion your previous review scored. The bar is the same as in a full check. Full rules: `.claude/skills/review-lesson/SKILL.md`,
+pasted copy; commits by id, never `HEAD` or a branch). List every criterion your previous review
+scored. The bar is the same as in a full check. Full rules: `.claude/skills/review-lesson/SKILL.md`,
 "Verification round".
 
 Return only JSON matching `content/schema/review.v1.json` with `"reviewer": "visual-qa"` and

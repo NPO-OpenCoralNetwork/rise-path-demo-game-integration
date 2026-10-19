@@ -38,7 +38,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { lessonHash } from '../../shared/lesson/hash.js';
+import { lessonHashOfFile } from '../../shared/lesson/hash.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FALLBACK_CHROMIUM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -133,19 +133,8 @@ export function findLessonFile(course, lesson, root = ROOT) {
   return null;
 }
 
-/**
- * The lesson hash of a lesson file, or null when it is not readable JSON.
- *
- * @param {string} file
- * @returns {string | null}
- */
-export function lessonHashOfFile(file) {
-  try {
-    return lessonHash(JSON.parse(fs.readFileSync(file, 'utf8')));
-  } catch {
-    return null;
-  }
-}
+/** The lesson hash of a lesson file, or null when it is not readable JSON (shared/lesson/hash.js). */
+export { lessonHashOfFile };
 
 /**
  * Locales a lesson file provides (`locales`, else `locale`, else jp). Unreadable files give [].

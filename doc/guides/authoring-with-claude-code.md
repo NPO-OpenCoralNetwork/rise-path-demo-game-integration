@@ -17,18 +17,21 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
   `content/schema/rubric.v1.json` (13 criteria, 0–4). Pass = every criterion ≥ 3, mean ≥ 3.3, no
   open must-fix item; `check-review.mjs` computes it. Every review records `lessonHash`, the
   version it read (`review-scope.mjs <file> --hash`); the gate refuses a review of another version
-  (stale) and one without it (`--allow-legacy` accepts reviews written before the field existed).
+  (stale) and one without it, with no flag to accept it.
 - Round 1 is a full review. A later round is a fix-verification review (`"mode": "verify"`): each
   previous must-fix is marked resolved or unresolved, every changed block is reviewed in full,
   new must-fix items only for changed blocks or regressions, unaffected scores carried over. The
   bar is the same. A full review is required again when sections were added, removed, reordered
-  or changed role, the objectives changed, or more than 30% of the blocks changed
-  (`review-scope.mjs` decides; `check-review.mjs` recomputes it and loads the previous review, a
-  recorded round given as `<commit>:<reports path>` or its snapshot copy). The gate follows a
-  previous verification back to its full review and refuses a chain with an invalid round; every
-  reviewer of the verified round is gated together; a must-fix marked resolved on a block that did
-  not change stays open (`fixedIn` names the changed block when the fix is elsewhere). Rules:
-  `.claude/skills/review-lesson/SKILL.md`.
+  or changed role, the objectives changed, or more than 30% of the lesson's parts (each block,
+  each section's own fields, each lesson field, each glossary and source entry) or of its blocks
+  changed (`review-scope.mjs` decides; `check-review.mjs` recomputes it and loads the previous
+  review, a recorded round given as `<commit id>:<reports path>` or its snapshot copy; commits are
+  named by id, never `HEAD` or a branch). The gate follows a previous verification back to its
+  full review and refuses a chain with an invalid round; every reviewer of the verified round (the
+  reviews recorded next to it that read the same version) is gated together; a must-fix marked
+  resolved stays open unless its block, or a `fixedIn` block, changed since the round that last had
+  it open, and a lesson-wide must-fix needs a changed lesson-level field or a `fixedIn` whose
+  blocks all changed. Rules: `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
   only when the owner asks.
 

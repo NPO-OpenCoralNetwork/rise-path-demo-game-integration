@@ -194,7 +194,7 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
     assert.ok(invalid(structural).errors.some((e) => /full review/.test(e)));
     const big = verification();
     big.verifies = { ...big.verifies, changedShare: 0.45 };
-    assert.ok(invalid(big).errors.some((e) => /45% of the blocks changed/.test(e)));
+    assert.ok(invalid(big).errors.some((e) => /45% of the lesson's parts changed/.test(e)));
     const badStatus = verification();
     badStatus.resolved[0] = { ...badStatus.resolved[0], status: 'partly' };
     assert.ok(invalid(badStatus).errors.some((e) => /resolved\[0\]\.status/.test(e)));
@@ -319,10 +319,10 @@ describe('check-review.mjs CLI with verification rounds', () => {
       const selfRun = run(selfFile);
       assert.equal(selfRun.status, 2);
       assert.match(selfRun.stderr, /is the file being checked/);
-      // --previous stands in only for a review written before lessonHash existed.
+      // --previous, which stood in for reviews written before lessonHash existed, is gone.
       const viaPrevious = run(selfFile, '--previous', prevFile);
       assert.equal(viaPrevious.status, 2, viaPrevious.stdout);
-      assert.match(viaPrevious.stderr, /--previous is only for reviews written before lessonHash existed/);
+      assert.match(viaPrevious.stderr, /--previous was removed/);
       // A previous must-fix without a "resolved" entry is caught against the recorded round.
       const partial = structuredClone(ok);
       partial.resolved = partial.resolved.slice(0, 1);
@@ -337,7 +337,8 @@ describe('check-review.mjs CLI with verification rounds', () => {
 
       const asJson = JSON.parse(run(okFile, '--json').stdout);
       assert.equal(asJson.rounds[0].mode, 'verify');
-      assert.equal(asJson.rounds[0].changedShare, 0.2);
+      // Recomputed: 2 of 17 parts (10 blocks, 2 sections, 5 lesson fields).
+      assert.equal(asJson.rounds[0].changedShare, 0.12);
       assert.equal(asJson.verdict, 'pass');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -396,7 +397,10 @@ describe('review-scope.mjs: verification or full review', () => {
     assert.equal(scope.fullReviewRequired, false);
     assert.deepEqual(scope.changes, [{ id: 'quiz', section: 's2', change: 'modified', parts: ['questions.q2'] }]);
     assert.deepEqual(scope.changed, ['quiz']);
-    assert.equal(scope.changedShare, 0.1);
+    // 1 of 19 parts: 10 blocks, 2 sections, 7 lesson fields and entries (schema, id, courseId,
+    // title, objectives, 1 glossary entry, 1 source).
+    assert.deepEqual([scope.parts.changed, scope.parts.total], [1, 19]);
+    assert.equal(scope.changedShare, 0.06);
     assert.deepEqual(changedParts({ items: [{ id: 'a' }, { id: 'b' }] }, { items: [{ id: 'b' }, { id: 'a' }, { id: 'c' }] }), ['items.c (new)', 'items (order)']);
   });
 
@@ -470,14 +474,40 @@ describe('review-scope.mjs: verification or full review', () => {
     const three = lesson();
     for (const b of three.sections[0].blocks.slice(0, 3)) b.md = 'Changed.';
     const atLimit = compareLessons(lesson(), three);
-    assert.equal(atLimit.changedShare, 0.3);
+    assert.deepEqual(atLimit.blocks, { total: 10, changed: 3 });
+    assert.equal(atLimit.changedShare, 0.16, '3 of 19 parts');
     assert.equal(atLimit.fullReviewRequired, false);
     const four = lesson();
     for (const b of four.sections[0].blocks.slice(0, 4)) b.md = 'Changed.';
     const over = compareLessons(lesson(), four);
-    assert.equal(over.changedShare, 0.4);
-    assert.equal(over.fullReviewRequired, true);
+    assert.equal(over.changedShare, 0.22, '4 of 19 parts');
+    assert.equal(over.fullReviewRequired, true, 'more than 30% of the blocks');
     assert.match(over.reasons.join('\n'), /4 of 10 blocks changed \(40%, more than 30%\)/);
+  });
+
+  it('allows up to 30% changed parts and requires a full review above, with no block changed', () => {
+    // 19 parts; 5 changed (26%) is allowed, 6 (32%) is not.
+    const fields = (n) => {
+      const after = lesson();
+      const edits = [
+        (l) => { l.title = 'Demo, renamed'; },
+        (l) => { l.sections[0].title = 'One, renamed'; },
+        (l) => { l.sections[1].title = 'Two, renamed'; },
+        (l) => { l.glossary[0].md = 'The x, rewritten.'; },
+        (l) => { l.sources[0].title = 'Doc, second edition'; },
+        (l) => { l.courseId = 'demo-course-2'; },
+      ];
+      for (const edit of edits.slice(0, n)) edit(after);
+      return compareLessons(lesson(), after);
+    };
+    const five = fields(5);
+    assert.deepEqual([five.blocks.changed, five.parts.changed, five.parts.total], [0, 5, 19]);
+    assert.equal(five.changedShare, 0.27);
+    assert.equal(five.fullReviewRequired, false);
+    const six = fields(6);
+    assert.equal(six.changedShare, 0.32);
+    assert.equal(six.fullReviewRequired, true);
+    assert.match(six.reasons.join('\n'), /6 of 19 parts of the lesson changed \(32%, more than 30%\): 0 of 10 blocks, 2 of 2 sections, 4 of 7 lesson fields and entries/);
   });
 
   it('snapshots the reviewed revision with its reviews and reads it back', () => {

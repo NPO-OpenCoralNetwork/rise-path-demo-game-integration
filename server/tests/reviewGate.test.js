@@ -57,8 +57,13 @@ const review = (reviewer, scoreOf, extra = {}) => ({
   ...extra,
 });
 
+/** The versions the rounds below read: round 1 the unfixed draft, round 2 the fixed one. */
+const H1 = reviewScope.lessonHash(demoLesson());
+const H2 = reviewScope.lessonHash(demoLesson({ fixed: true }));
+
 /** Round 1: a full review; voice is 2 because of b2. */
 const round1 = (extra = {}) => review('pedagogy-reviewer', (id) => (id === 'voice' ? 2 : 4), {
+  lessonHash: H1,
   verdict: 'revise',
   mustFix: [{ criterion: 'voice', blockId: 'b2', issue: 'Plain form 「…だ。」.', fix: '「…だ。」→「…です。」' }],
   ...extra,
@@ -66,7 +71,7 @@ const round1 = (extra = {}) => review('pedagogy-reviewer', (id) => (id === 'voic
 
 /** Round 2: a verification of round 1 (b2 fixed, voice re-scored, the rest carried over). */
 const round2 = (extra = {}) => ({
-  ...review('pedagogy-reviewer', () => 4),
+  ...review('pedagogy-reviewer', () => 4, { lessonHash: H2 }),
   scores: ids.map((id) => ({ id, score: 4, evidence: `Block b1 shows ${id}.`, ...(id === 'voice' ? {} : { carriedOver: true }) })),
   mode: 'verify',
   verifies: { reviewedRevision: 'abc1234', previousReview: `abc1234:${REPORT}`, changed: ['b2'], changedShare: 0.1, fullReviewRequired: false },
@@ -74,8 +79,8 @@ const round2 = (extra = {}) => ({
   ...extra,
 });
 
-/** Without lessonHash: also a valid review for the gate before lessonHash existed. */
-const LEGACY = { lesson: { id: 'demo', hash: 'sha256:0123456789abcdef' }, allowLegacy: true };
+/** evaluateReviews in library use: the lesson as it is now, the version round 2 read. */
+const NOW = { lesson: { id: 'demo', hash: H2 } };
 const scopeOf = (before, after) => ({ 'pedagogy-reviewer': reviewScope.compareLessons(before, after) });
 
 /** A scratch repository root; removed afterwards. */
@@ -121,7 +126,7 @@ const snapshotRound1 = (root, write, { after = demoLesson({ fixed: true }) } = {
 
 describe('F1: a verification whose previous review cannot be loaded fails the gate', () => {
   it('library: no previous review is an error, not a warning', () => {
-    const result = checkReview.evaluateReviews([round2()], schemas, { ...LEGACY, scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
+    const result = checkReview.evaluateReviews([round2()], schemas, { ...NOW, scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
     assert.equal(result.valid, false, 'the old gate passed it with a note');
     assert.ok(result.errors.some((e) => /previous review was not loaded/.test(e)), result.errors.join('\n'));
   });
@@ -157,14 +162,14 @@ describe('F2: a verification must list every criterion its previous review score
   };
 
   it('a low score left out of the verification cannot be replaced by another reviewer\'s higher score', () => {
-    const ja = review('ja-editor', (id) => (id === 'voice' || id === 'load' ? 4 : undefined));
-    const result = checkReview.evaluateReviews([withoutVoice(), ja], schemas, { ...LEGACY, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
+    const ja = review('ja-editor', (id) => (id === 'voice' || id === 'load' ? 4 : undefined), { lessonHash: H2 });
+    const result = checkReview.evaluateReviews([withoutVoice(), ja], schemas, { ...NOW, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
     assert.equal(result.valid, false, `the old gate merged voice = ${result.scores?.find((s) => s.id === 'voice')?.score} and said ${result.verdict}`);
     assert.ok(result.errors.some((e) => /previous review scored voice, which this verification leaves out/.test(e)), result.errors.join('\n'));
   });
 
   it('re-scored and carried-over criteria both count as listed', () => {
-    const result = checkReview.evaluateReviews([round2()], schemas, { ...LEGACY, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
+    const result = checkReview.evaluateReviews([round2()], schemas, { ...NOW, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true })) });
     assert.equal(result.valid, true, result.errors.join('\n'));
     assert.equal(result.verdict, 'pass');
   });
@@ -249,7 +254,7 @@ describe('F4: every review records lessonHash; stale reviews fail the gate', () 
     assert.ok(checkReview.checkSchema(review('ja-editor', () => 4, { lessonHash: 'abc' }), schemas.review).some((e) => /lessonHash: "abc" does not match/.test(e)));
   });
 
-  it('a review of another version is stale; one without lessonHash is stale unless --allow-legacy', () => {
+  it('a review of another version is stale, and so is one without lessonHash (no allowLegacy option)', () => {
     const hash = reviewScope.lessonHash(demoLesson({ fixed: true }));
     const lesson = { id: 'demo', hash };
     const fresh = review('ja-editor', (id) => (id === 'voice' ? 4 : undefined), { lessonHash: hash });
@@ -263,13 +268,12 @@ describe('F4: every review records lessonHash; stale reviews fail the gate', () 
     const refused = checkReview.evaluateReviews([legacy], schemas, { lesson });
     assert.equal(refused.valid, false);
     assert.ok(refused.errors.some((e) => /^stale: .* has no "lessonHash"/.test(e)), refused.errors.join('\n'));
-    const accepted = checkReview.evaluateReviews([legacy], schemas, { lesson, allowLegacy: true });
-    assert.equal(accepted.valid, true);
-    assert.ok(accepted.warnings.some((w) => /^LEGACY REVIEW: .*--allow-legacy/.test(w)));
+    assert.doesNotMatch(refused.errors.join('\n'), /allow-legacy/);
+    assert.equal(checkReview.evaluateReviews([legacy], schemas, { lesson, allowLegacy: true }).valid, false, 'the old option is ignored');
     assert.equal(checkReview.evaluateReviews([fresh], schemas, {}).valid, false, 'no current lesson, no verdict');
   });
 
-  it('CLI: the lesson the reviews name is hashed; a stale review exits 2, --allow-legacy only for reviews without lessonHash', () => withRoot((root, write) => {
+  it('CLI: the lesson the reviews name is hashed; a stale review or one without lessonHash exits 2, and --allow-legacy is refused', () => withRoot((root, write) => {
     write(PUBLISHED, demoLesson({ fixed: true }));
     const hash = reviewScope.lessonHash(demoLesson({ fixed: true }));
     // The reviews name the draft; it was published since and is found under lessons/.
@@ -282,13 +286,15 @@ describe('F4: every review records lessonHash; stale reviews fail the gate', () 
     const staleRun = gateIn(root, [stale]);
     assert.equal(staleRun.status, 2);
     assert.match(staleRun.stderr, /stale: review 1 \(pedagogy-reviewer\) read sha256:/);
-    assert.equal(gateIn(root, [stale, '--allow-legacy']).status, 2, '--allow-legacy does not excuse a hash mismatch');
+    assert.equal(gateIn(root, [stale, '--allow-legacy']).status, 2);
 
     const legacy = write('legacy.json', review('pedagogy-reviewer', () => 4));
-    assert.equal(gateIn(root, [legacy]).status, 2);
-    const legacyRun = gateIn(root, [legacy, '--allow-legacy']);
-    assert.equal(legacyRun.status, 0, legacyRun.stderr);
-    assert.match(legacyRun.stderr, /LEGACY REVIEW/);
+    const legacyRun = gateIn(root, [legacy]);
+    assert.equal(legacyRun.status, 2);
+    assert.match(legacyRun.stderr, /stale: review 1 \(pedagogy-reviewer\) has no "lessonHash"/);
+    const flagged = gateIn(root, [legacy, '--allow-legacy']);
+    assert.equal(flagged.status, 2, flagged.stdout);
+    assert.match(flagged.stderr, /--allow-legacy was removed/);
 
     const elsewhere = write('other/demo.lesson.json', demoLesson());
     assert.equal(gateIn(root, [fresh, '--lesson', elsewhere]).status, 2, '--lesson names the lesson to hash');
@@ -298,13 +304,13 @@ describe('F4: every review records lessonHash; stale reviews fail the gate', () 
 describe('F5: check-review recomputes the scope of a verification', () => {
   it('library: refuses a verification the recomputed scope does not allow, whatever the review records', () => {
     const claimed = round2(); // records fullReviewRequired: false, changedShare 0.1
-    const result = checkReview.evaluateReviews([claimed], schemas, { ...LEGACY, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true, reordered: true })) });
+    const result = checkReview.evaluateReviews([claimed], schemas, { ...NOW, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true, reordered: true })) });
     assert.equal(result.valid, false, 'the old gate trusted the recorded scope');
     assert.ok(result.errors.some((e) => /recomputed scope since abc1234 requires a full review, not a verification \(sections reordered/.test(e)), result.errors.join('\n'));
   });
 
   it('library: refuses a verification whose "changed" leaves out a change', () => {
-    const result = checkReview.evaluateReviews([round2()], schemas, { ...LEGACY, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true, b5: 'Also rewritten.' })) });
+    const result = checkReview.evaluateReviews([round2()], schemas, { ...NOW, previous: [round1()], scopes: scopeOf(demoLesson(), demoLesson({ fixed: true, b5: 'Also rewritten.' })) });
     assert.equal(result.valid, false);
     assert.ok(result.errors.some((e) => /verifies\.changed leaves out b5/.test(e)), result.errors.join('\n'));
   });
@@ -428,6 +434,32 @@ describe('F10: shared helpers are reused, not copied', () => {
     assert.deepEqual(reviewScope.blockList(lesson), walked);
     assert.match(source('.claude/skills/review-lesson/scripts/review-scope.mjs'), /import \{ forEachBlock \} from '\.\.\/\.\.\/\.\.\/\.\.\/shared\/lesson\/walk\.js'/);
   });
+
+  it('CR-10: the hash of a lesson text or file comes from shared/lesson/hash.js (null when unreadable), in all three callers', () => withRoot(async (root, write) => {
+    const shared = await import('../../shared/lesson/hash.js');
+    assert.equal(typeof shared.lessonHashOfText, 'function', 'the old code had three private copies');
+    assert.equal(typeof shared.lessonHashOfFile, 'function');
+    const text = JSON.stringify(demoLesson());
+    assert.equal(shared.lessonHashOfText(text), reviewScope.lessonHash(demoLesson()));
+    assert.equal(shared.lessonHashOfText('{ nope'), null);
+    assert.equal(shared.lessonHashOfFile(write('ok.lesson.json', text)), reviewScope.lessonHash(demoLesson()));
+    assert.equal(shared.lessonHashOfFile(write('broken.lesson.json', '{ nope')), null);
+    assert.equal(shared.lessonHashOfFile(path.join(root, 'missing.lesson.json')), null);
+    const preview = await import('../../scripts/lessons/preview.mjs');
+    assert.equal(preview.lessonHashOfFile, shared.lessonHashOfFile, 'lessons:preview re-exports the shared helper');
+    // [file, the shared helper it imports, its old private copy]
+    const callers = [
+      ['.claude/skills/review-lesson/scripts/check-review.mjs', /\blessonHashOfFile\b/, /return lessonHash\(JSON\.parse\(/],
+      ['.claude/skills/review-lesson/scripts/review-scope.mjs', /\blessonHashOfText\b/, /function hashOfText\(/],
+      ['scripts/lessons/preview.mjs', /\blessonHashOfFile\b/, /function lessonHashOfFile\(/],
+    ];
+    for (const [rel, uses, copy] of callers) {
+      const text = source(rel);
+      const imported = /import \{([^}]*)\} from '(?:\.\.\/)+shared\/lesson\/hash\.js'/.exec(text)?.[1] ?? '';
+      assert.match(imported, uses, `${rel} imports the shared helper`);
+      assert.doesNotMatch(text, copy, `${rel} keeps its own copy`);
+    }
+  }));
 
   it('check-review.mjs runs git through review-scope.mjs', () => {
     const text = source('.claude/skills/review-lesson/scripts/check-review.mjs');

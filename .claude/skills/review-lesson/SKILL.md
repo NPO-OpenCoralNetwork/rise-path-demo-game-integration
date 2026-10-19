@@ -60,18 +60,23 @@ judged exactly as in a full review.
 
 **When a full review is still required.** Run
 `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --expect-hash <previous lessonHash>`
-(`<previous lessonHash>` is the `lessonHash` of the previous review; leave `--expect-hash` out only
-for a previous review that has none). It exits 1, and a full review is required, when since the
+(`<previous lessonHash>` is the `lessonHash` of the previous review; a previous review without one
+cannot be verified: do a full review). It exits 1, and a full review is required, when since the
 reviewed revision a section was added, removed or reordered or changed its role; the objectives
-changed (ids, text, Bloom level or order); or more than 30% of the blocks were changed, added,
-removed or moved. Then do the full review above, set `"mode": "full"` and say in `summary` why. It
-exits 0 when a verification is allowed, and 2 when `<revision>` holds no version with that hash
-(then the revision or the previous review is wrong: say so and stop).
+changed (ids, text, Bloom level or order); more than 30% of the lesson's parts changed (each block,
+each section's own fields such as its title, each lesson field such as the title or estMinutes, and
+each glossary and source entry); or more than 30% of the blocks were changed, added, removed or
+moved. Then do the full review above, set `"mode": "full"` and say in `summary` why. It exits 0
+when a verification is allowed, and 2 when `<revision>` holds no version with that hash (then the
+revision or the previous review is wrong: say so and stop).
 
-`<revision>` is a git commit, or `sha256:<hash>` for an uncommitted draft that the author saved
+`<revision>` is a commit id, or `sha256:<hash>` for an uncommitted draft that the author saved
 with `--snapshot` (the hash is the previous review's `lessonHash`; a unique prefix of 6 or more
-digits also works). At a commit, the lesson is looked up at `drafts/<id>` first, then
-`lessons/<id>`, so a lesson published between rounds is compared with the draft that was reviewed.
+digits also works). A commit id is 7–40 lowercase hex digits (`git rev-parse --short <commit>`;
+the `reviewedRevision` that `review-scope.mjs` prints is one), never `HEAD`, a branch, a tag or
+`HEAD~n`, which name another commit when refs move. At a commit, the lesson is looked up at
+`drafts/<id>` first, then `lessons/<id>`, so a lesson published between rounds is compared with
+the draft that was reviewed.
 
 1. Run `review-scope.mjs <file> --hash` for `lessonHash`. Read the previous review
    (`git show <commit>:<path>` when it is given that way), the lesson, the rubric and the contract,
@@ -87,7 +92,13 @@ digits also works). At a commit, the lesson is looked up at `drafts/<id>` first,
    applied in part, or the problem moved elsewhere is `unresolved`. A must-fix is resolved only by
    a change: when the fix is in another block than `blockId` (a term now defined in the block
    before it), add `"fixedIn": ["<changed block id>"]`. The gate keeps an item open when neither
-   `blockId` nor a `fixedIn` block changed since the review that raised it.
+   `blockId` nor a `fixedIn` block changed since the round that last had it open: the review that
+   raised it, or a later round that found it `unresolved` or gave it no entry (then only a change
+   after that round counts). A **lesson-wide** item (`blockId` `"lesson"`) is resolved by a change
+   to a lesson-level field (title, subtitle, glossary, sources, prerequisites, estMinutes, level,
+   locales: anything outside the sections and `provenance`); when its fix is in blocks instead,
+   list in `fixedIn` every block that holds the fix. Each of them must have changed: an edit to a
+   block or section that `fixedIn` does not name never resolves a lesson-wide item.
 4. **(b) Review every changed or new block in full**, as in a full review. A rewritten question is
    new content: check its options, feedback, answer, `objectiveId` and whether it gives the answer
    away.
@@ -107,27 +118,31 @@ A verification review adds `"mode": "verify"`, `"resolved": […]` and
 `"verifies": {"reviewedRevision", "previousReview", "changed", "changedShare", "fullReviewRequired"}`:
 copy the `verifies` line that `review-scope.mjs` prints and add `previousReview`, the review you
 verified as given to you, which is a recorded round:
-`<commit>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json` or the snapshot copy
+`<commit id>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json` or the snapshot copy
 `.artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json`. Nothing else: never
-the working-tree `reports/` file of the same lesson and reviewer (this round overwrites it), and
-never a pasted or hand-made copy. `file` is the lesson's own path,
-`content/courses/<course>/drafts/<lesson>.lesson.json` or `…/lessons/<lesson>.lesson.json`.
+the working-tree `reports/` file of the same lesson and reviewer (this round overwrites it), never
+a pasted or hand-made copy, and never a commit named by a ref (`HEAD:…`, `main:…`, `HEAD~1:…`).
+`reviewedRevision` is the commit id or snapshot revision `review-scope.mjs` printed. `file` is the
+lesson's own path, `content/courses/<course>/drafts/<lesson>.lesson.json` or
+`…/lessons/<lesson>.lesson.json`.
 
 `check-review.mjs` (exit 2 = the review does not count) refuses a verification when it cannot load
 `previousReview` as a recorded round, when that is the review being checked or the working-tree
-reports file of the same lesson and reviewer, when the scope it recomputes from `reviewedRevision`
-(the version with the previous review's `lessonHash`) requires a full review, when
-`verifies.changed` leaves out a change, when a criterion the previous review scored is missing or a
-carried-over score differs, and when `lessonHash` is not the lesson's current hash. It checks the
-previous review the same way: a previous verification is followed back to its full review, and a
-round the gate would refuse cannot be verified (verify the last valid round, or review in full). A
-previous review without `lessonHash` needs `--allow-legacy`, and `reviewedRevision` must then be the
-commit that holds it or an earlier one. Every reviewer of the verified round (the reviews recorded
-next to the previous review) must be in the same gate run, verifying that round or with a full
-review that scores at least the criteria its review in that round scored, and each reviewer
-appears once. It counts as an open must-fix every `unresolved` entry,
-every open item without a `resolved` entry, and every `resolved` entry whose block (and `fixedIn`
-blocks) did not change; open items carry over to the next round.
+reports file of the same lesson and reviewer, when `previousReview` or `reviewedRevision` names a
+commit by anything but a commit id of this repository, when the previous review has no
+`lessonHash`, when the scope it recomputes from `reviewedRevision` (the version with the previous
+review's `lessonHash`) requires a full review, when `verifies.changed` leaves out a change, when a
+criterion the previous review scored is missing or a carried-over score differs, and when
+`lessonHash` is not the lesson's current hash (a review without `lessonHash` is always stale). It
+checks the previous review the same way: a previous verification is followed back to its full
+review, and a round the gate would refuse cannot be verified (verify the last valid round, or
+review in full). Every reviewer of the verified round must be in the same gate run, verifying that
+round or with a full review that scores at least the criteria its review in that round scored, and
+each reviewer appears once. The round is the reviews recorded next to the previous review (at that
+commit, or in that snapshot round folder) that read the same version, its `lessonHash`; a review of
+another version recorded there is not part of it. It counts as an open must-fix every `unresolved`
+entry, every open item without a `resolved` entry, and every `resolved` entry without a change (step
+3); open items carry over to the next round.
 
 Return **only** one JSON object that matches `content/schema/review.v1.json`, with
 `"reviewer": "pedagogy-reviewer"`, `"rubricVersion": "rubric.v1"` and `"lessonHash"`. No prose

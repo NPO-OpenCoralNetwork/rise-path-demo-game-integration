@@ -1,8 +1,9 @@
 /**
- * Review gate, second hardening pass: the bypasses an adversarial test of the fixed gate found
- * (PR #20). Each describe block reproduces one finding by its id and checks that check-review.mjs
- * now refuses it, next to the legitimate case it must keep passing. Every scenario runs the CLI
- * in-process against a scratch git repository. Rules: .claude/skills/review-lesson/SKILL.md.
+ * Review gate, second and third hardening passes: the bypasses an adversarial test of the fixed
+ * gate found, and the findings of the code review that followed (CR-<n>; PR #20). Each describe
+ * block reproduces one finding by its id and checks that check-review.mjs now refuses it, next to
+ * the legitimate case it must keep passing. Every scenario runs the CLI in-process against a
+ * scratch git repository. Rules: .claude/skills/review-lesson/SKILL.md.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -242,8 +243,8 @@ describe('CHAIN-3: a forged carried-over score is not laundered by the next roun
   }));
 });
 
-describe('LEG-1: a previous review without lessonHash binds reviewedRevision to its commit', () => {
-  const setup = ({ write, commit, round1Committed }) => {
+describe('LEG-1: a previous review without lessonHash binds no version (CR-7: it is never verified)', () => {
+  it('a verification naming a later commit that hides reordered sections is refused', () => withRepo(({ write, commit, gate, round1Committed }) => {
     const { c1, r1 } = round1Committed({ legacy: true });
     const v2 = lesson({ fixB2: true, reorder: true });
     write(DRAFT, v2);
@@ -254,28 +255,10 @@ describe('LEG-1: a previous review without lessonHash binds reviewedRevision to 
       rescored: { voice: 4 },
       resolved: resolvedB2(),
     }));
-    return { c1, c2 };
-  };
-
-  it('needs --allow-legacy, and even then refuses a reviewedRevision after the commit that holds it', () => withRepo((repo) => {
-    const { c1, c2 } = setup(repo);
-    const run = repo.gate([rep(PED)]);
+    const run = gate([rep(PED)]);
     assert.equal(run.status, 2, `the old gate passed with "0 changed":\n${run.all}`);
     assert.match(run.stderr, new RegExp(`its previous review ${c1}:\\S+ has no "lessonHash", so nothing binds verifies\\.reviewedRevision \\(${c2}\\)`));
-    const legacy = repo.gate([rep(PED), '--allow-legacy']);
-    assert.equal(legacy.status, 2, legacy.all);
-    assert.match(legacy.stderr, new RegExp(`verifies\\.reviewedRevision ${c2} is neither ${c1} nor an earlier commit`));
-  }));
-
-  it('with --allow-legacy, a verification of the commit that holds the legacy review passes, with a loud note', () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
-    const { c1, r1 } = round1Committed({ legacy: true });
-    const v2 = lesson({ fixB2: true });
-    write(DRAFT, v2);
-    write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(c1, null, `${c1}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() }));
-    assert.equal(gate([rep(PED)]).status, 2);
-    const run = gate([rep(PED), '--allow-legacy']);
-    assert.equal(run.status, 0, run.all);
-    assert.match(run.stderr, /LEGACY PREVIOUS REVIEW: .*has no "lessonHash"; the scope since [0-9a-f]+ is bound only to [0-9a-f]+ or an earlier commit/);
+    assert.equal(gate([rep(PED), '--allow-legacy']).status, 2);
   }));
 });
 
@@ -316,8 +299,9 @@ describe('NOCHANGE-1/2: a must-fix is resolved only by a change', () => {
     after.sections[2].blocks[1].questions[0].prompt = 'Rewritten?';
     const scope = reviewScope.compareLessons(before, after);
     assert.deepEqual(scope.changed, ['c2']);
-    for (const id of ['c2', 'c2-q1', 's3', 'o1', 'lesson']) assert.ok(scope.touched.includes(id), id);
-    for (const id of ['c3', 'c3-q1', 'o2', 'b2']) assert.ok(!scope.touched.includes(id), id);
+    for (const id of ['c2', 'c2-q1', 's3', 'o1']) assert.ok(scope.touched.includes(id), id);
+    // "lesson" only for a lesson-level change (CR-5).
+    for (const id of ['c3', 'c3-q1', 'o2', 'b2', 'lesson']) assert.ok(!scope.touched.includes(id), id);
   });
 });
 
@@ -398,7 +382,7 @@ describe('ARB-1: the previous review is a recorded round, nothing else', () => {
     write(rep(PED), verifyReview(fake, { lessonHash: h2, verifies: verifiesSince(saved.revision, h1, 'notes/pedagogy-previous.json') }));
     const run = gate([rep(PED)]);
     assert.equal(run.status, 2, `the old gate passed against the hand-made copy:\n${run.all}`);
-    assert.match(run.stderr, /notes\/pedagogy-previous\.json is not a recorded round: a previous review is <commit>:content\/courses\/demo-course\/reports\/demo\.pedagogy-reviewer\.review\.json or the snapshot copy \.artifacts\/review\/demo-course\/demo\/<hash>\/<round>\/pedagogy-reviewer\.review\.json/);
+    assert.match(run.stderr, /notes\/pedagogy-previous\.json is not a recorded round: a previous review is <commit id>:content\/courses\/demo-course\/reports\/demo\.pedagogy-reviewer\.review\.json or the snapshot copy \.artifacts\/review\/demo-course\/demo\/<hash>\/<round>\/pedagogy-reviewer\.review\.json/);
     // Against the real snapshot copy, the open must-fix on b2 shows.
     assert.match(copy, /^\.artifacts\/review\/demo-course\/demo\/[0-9a-f]{16}\/round-1\/pedagogy-reviewer\.review\.json$/);
     write(rep(PED), verifyReview(r1, { lessonHash: h2, verifies: verifiesSince(saved.revision, h1, copy) }));
@@ -407,12 +391,16 @@ describe('ARB-1: the previous review is a recorded round, nothing else', () => {
     assert.match(honest.stdout, /must fix \(unverified\) \[voice\] b2/);
   }));
 
-  it('recordedRound accepts only <rev>:<reports file of this reviewer> and the snapshot copy', () => {
+  it('recordedRound accepts only <commit id>:<reports file of this reviewer> and the snapshot copy', () => {
     const context = { reviewer: PED, lessonId: ID, reportsDir: REPORTS, snapshotBase: null, cwd: ROOT, root: ROOT };
     assert.ok('loc' in checkReview.recordedRound(`abc1234:${rep(PED)}`, context));
-    assert.ok('loc' in checkReview.recordedRound(`HEAD~1:./${rep(PED)}`, context));
+    assert.ok('loc' in checkReview.recordedRound(`abc1234:./${rep(PED)}`, context));
     for (const bad of [`abc1234:${rep(JA_EDITOR)}`, 'abc1234:content/courses/demo-course/notes/demo.pedagogy-reviewer.review.json', `-x:${rep(PED)}`, `--output=/tmp/x:${rep(PED)}`, 'a b:c']) {
       assert.match(checkReview.recordedRound(bad, context).error ?? '', /is not a recorded round/, bad);
+    }
+    // A ref is no commit id (CR-4).
+    for (const ref of ['HEAD~1', 'HEAD', 'main', 'v1.0', 'abc123', 'ABC1234']) {
+      assert.match(checkReview.recordedRound(`${ref}:${rep(PED)}`, context).error ?? '', /which is not a commit id/, ref);
     }
   });
 });
@@ -453,7 +441,7 @@ describe('MOVE-1: drafts/ and lessons/ both exist and differ', () => {
   }));
 });
 
-describe('K2-1/2: at most one previous review per reviewer, and --previous only stands in for legacy reviews', () => {
+describe('K2-1/2: the previous review comes from the review itself; --previous is gone (CR-7)', () => {
   it('two --previous for one reviewer, a history file, or --previous next to a recorded previousReview are refused', () => withRepo(({ write, commit, gate, round1Committed }) => {
     const { c1, r1 } = round1Committed();
     const v2 = lesson({ fixB2: true, reorder: true });
@@ -468,17 +456,20 @@ describe('K2-1/2: at most one previous review per reviewer, and --previous only 
     write(rep(PED), r2);
     write('prev/copy.json', r2);
     write('prev/history.json', [r2, r1[PED]]);
-    assert.equal(gate([rep(PED)]).status, 2, 'alone: the recomputed scope since round 1 requires a full review');
-    const copy = gate([rep(PED), '--previous', 'prev/copy.json', '--previous', `${c1}:${rep(PED)}`]);
-    assert.equal(copy.status, 2, `the old gate took the scope from the first and the checks from the last:\n${copy.all}`);
-    assert.match(copy.stderr, /--previous prev\/copy\.json is not a recorded round/);
-    assert.equal(gate([rep(PED), '--previous', 'prev/history.json']).status, 2);
-    const twice = gate([rep(PED), '--previous', `${c1}:${rep(PED)}`, '--previous', `${c2}:${rep(PED)}`]);
-    assert.equal(twice.status, 2);
-    assert.match(twice.stderr, /are both previous reviews by pedagogy-reviewer/);
-    const named = gate([rep(PED), '--previous', `${c1}:${rep(PED)}`]);
-    assert.equal(named.status, 2);
-    assert.match(named.stderr, /its review names its previous round already/);
+    // Alone: reviewedRevision (the later commit) holds no version with round 1's lessonHash.
+    const alone = gate([rep(PED)]);
+    assert.equal(alone.status, 2, alone.all);
+    assert.match(alone.stderr, new RegExp(`cannot recompute the scope since ${c2}: No version of the lesson at [0-9a-f]+ is sha256:[0-9a-f]{16}, the lesson the previous review read`));
+    for (const extra of [
+      ['--previous', 'prev/copy.json', '--previous', `${c1}:${rep(PED)}`],
+      ['--previous', 'prev/history.json'],
+      ['--previous', `${c1}:${rep(PED)}`, '--previous', `${c2}:${rep(PED)}`],
+      ['--previous', `${c1}:${rep(PED)}`],
+    ]) {
+      const run = gate([rep(PED), ...extra]);
+      assert.equal(run.status, 2, `the old gate took the scope from one --previous and the checks from another:\n${run.all}`);
+      assert.match(run.stderr, /--previous was removed/);
+    }
   }));
 });
 
@@ -534,13 +525,13 @@ describe('EMPTYID-1: lessonId must be the lesson id', () => {
       extra: { lessonId: '', file: DRAFT },
     });
     write(rep(PED), r);
-    const run = gate([rep(PED), '--allow-legacy']);
+    const run = gate([rep(PED)]);
     assert.equal(run.status, 2, `the old gate said "Review of null: PASS":\n${run.all}`);
     assert.match(run.stderr, /lessonId "" is not a lesson id/);
     assert.ok(checkReview.reviewErrors({ ...r, lessonId: '' }, schemas).some((e) => /lessonId "" is not a lesson id/.test(e)));
     // With the right lessonId, the reference names another lesson's file: not this reviewer's round.
     write(rep(PED), { ...r, lessonId: ID });
-    const named = gate([rep(PED), '--allow-legacy']);
+    const named = gate([rep(PED)]);
     assert.equal(named.status, 2, named.all);
     assert.match(named.stderr, /is not a recorded round/);
   }));
@@ -580,10 +571,335 @@ describe('SCHEMA-1: unknown fields named like Object.prototype members', () => {
   });
 });
 
-describe('the PR #20 reviews (legacy, before lessonHash) still pass with the documented flags', () => {
+// ---------------------------------------------------------------------------------------------
+// Third pass: findings of the code review of the hardened gate (CR-<n>, PR #20).
+// ---------------------------------------------------------------------------------------------
+
+describe('CR-1: a must-fix found unresolved or left unverified is resolved only by a change after that round', () => {
+  /** Round 1 committed (must-fix on b2); b2 rewritten but still plain; round 2 recorded and committed. */
+  const round2Committed = ({ write, commit, verifiesSince, round1Committed }, resolved) => {
+    const { c1, h1, r1 } = round1Committed();
+    const v2 = lesson({ edit: { b2: 'これも例だ。' } });
+    write(DRAFT, v2);
+    const h2 = reviewScope.lessonHash(v2);
+    const r2 = verifyReview(r1[PED], { lessonHash: h2, verifies: verifiesSince(c1, h1, `${c1}:${rep(PED)}`), resolved });
+    write(rep(PED), r2);
+    return { h2, r2, c2: commit('round 2') };
+  };
+  const cases = [
+    ['unresolved', () => [{ ...resolvedB2()[0], status: 'unresolved', evidence: 'b2 still ends in 「だ。」.' }], 'found it unresolved'],
+    ['left unverified', () => [], 'left it unverified'],
+  ];
+  for (const [label, resolved, why] of cases) {
+    it(`round 3 with no change since round 2 (b2 ${label}) cannot resolve it; a change after round 2 can`, () => withRepo((repo) => {
+      const { write, gate, verifiesSince } = repo;
+      const { h2, r2, c2 } = round2Committed(repo, resolved());
+      const round3 = (hash) => verifyReview(r2, { lessonHash: hash, verifies: verifiesSince(c2, h2, `${c2}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() });
+      write(rep(PED), round3(h2));
+      const run = gate([rep(PED)]);
+      assert.equal(run.status, 1, `the old gate counted the round-1 change that round 2 had not accepted:\n${run.all}`);
+      assert.match(run.stdout, new RegExp(`must fix \\(unchanged\\) \\[voice\\] b2: Marked resolved, but b2 did not change since ${c2}:\\S+, which ${why}`));
+      // b2 fixed after round 2: resolved.
+      const v3 = lesson({ fixB2: true });
+      write(DRAFT, v3);
+      write(rep(PED), round3(reviewScope.lessonHash(v3)));
+      const fixed = gate([rep(PED)]);
+      assert.equal(fixed.status, 0, fixed.all);
+    }));
+  }
+});
+
+describe('CR-4: a review names commits by id, never by a ref that moves', () => {
+  it('HEAD, a branch, HEAD~n or an upper-case id in previousReview or reviewedRevision is refused; the short or full id passes', () => withRepo(({ git, write, gate, verifiesSince, round1Committed }) => {
+    const { c1, h1, r1 } = round1Committed();
+    git('branch', 'round-1');
+    const full = git('rev-parse', 'HEAD');
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    const honest = verifiesSince(c1, h1, `${c1}:${rep(PED)}`);
+    const check = (verifies) => {
+      write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: { ...honest, ...verifies }, rescored: { voice: 4 }, resolved: resolvedB2() }));
+      return gate([rep(PED)]);
+    };
+    for (const id of [c1, full]) {
+      const ok = check({ reviewedRevision: id, previousReview: `${id}:${rep(PED)}` });
+      assert.equal(ok.status, 0, `${id}: ${ok.all}`);
+    }
+    // The full id in upper case (a short id may be all digits, which has no upper case).
+    const upper = full.toUpperCase();
+    assert.notEqual(upper, full);
+    const refused = [
+      [{ previousReview: `HEAD:${rep(PED)}` }, /names its commit as "HEAD", which is not a commit id/],
+      [{ previousReview: `round-1:${rep(PED)}` }, /names its commit as "round-1", which is not a commit id/],
+      [{ previousReview: `HEAD~0:${rep(PED)}` }, /names its commit as "HEAD~0", which is not a commit id/],
+      [{ previousReview: `${upper}:${rep(PED)}` }, /which is not a commit id/],
+      [{ reviewedRevision: 'HEAD' }, /cannot recompute the scope since HEAD: verifies\.reviewedRevision "HEAD" is not a commit id/],
+      [{ reviewedRevision: 'round-1' }, /verifies\.reviewedRevision "round-1" is not a commit id/],
+      [{ reviewedRevision: `${c1}^0` }, /is not a commit id/],
+      [{ reviewedRevision: upper }, /is not a commit id/],
+    ];
+    for (const [verifies, pattern] of refused) {
+      const run = check(verifies);
+      assert.equal(run.status, 2, `${JSON.stringify(verifies)}: the old gate resolved the ref:\n${run.all}`);
+      assert.match(run.stderr, pattern);
+    }
+  }));
+
+  it('an earlier round that names its commits by a branch is not a valid round to verify', () => withRepo(({ git, write, commit, gate, verifiesSince, round1Committed }) => {
+    const { c1, h1, r1 } = round1Committed();
+    git('branch', 'round-1');
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    const h2 = reviewScope.lessonHash(v2);
+    const r2 = verifyReview(r1[PED], { lessonHash: h2, verifies: { ...verifiesSince(c1, h1, `round-1:${rep(PED)}`), reviewedRevision: 'round-1' }, rescored: { voice: 4 }, resolved: resolvedB2() });
+    write(rep(PED), r2);
+    const c2 = commit('round 2, recorded with a branch name');
+    write(rep(PED), verifyReview(r2, { lessonHash: h2, verifies: verifiesSince(c2, h2, `${c2}:${rep(PED)}`) }));
+    const run = gate([rep(PED)]);
+    assert.equal(run.status, 2, `the old gate followed the branch round-1 back to round 1:\n${run.all}`);
+    assert.match(run.stderr, new RegExp(`its previous review ${c2}:\\S+ is not a valid round, or goes back to one that is not, so it cannot be verified: .*names its commit as "round-1", which is not a commit id`));
+  }));
+
+  it('a branch named like a commit id that points at another commit is not that commit', () => withRepo(({ root, git, write, gate, verifiesSince, round1Committed }) => {
+    const { c1, h1, r1 } = round1Committed();
+    const full = git('rev-parse', 'HEAD');
+    const name = ['abcdef0', '1234567'].find((n) => !full.startsWith(n));
+    git('branch', name);
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    const honest = verifiesSince(c1, h1, `${c1}:${rep(PED)}`);
+    for (const [verifies, pattern] of [
+      [{ previousReview: `${name}:${rep(PED)}` }, new RegExp(`${name} is not a commit of this repository`)],
+      [{ reviewedRevision: name }, new RegExp(`cannot recompute the scope since ${name}: ${name} is not a commit of this repository`)],
+    ]) {
+      write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: { ...honest, ...verifies }, rescored: { voice: 4 }, resolved: resolvedB2() }));
+      const run = gate([rep(PED)]);
+      assert.equal(run.status, 2, `the old gate followed the branch ${name}:\n${run.all}`);
+      assert.match(run.stderr, pattern);
+    }
+    assert.equal(reviewScope.resolveCommitId?.(name, root), null);
+    assert.equal(reviewScope.resolveCommitId?.(full.slice(0, 7), root), full);
+    assert.equal(reviewScope.resolveCommitId?.('HEAD', root), null);
+  }));
+});
+
+describe('CR-5: a lesson-wide must-fix is resolved only by a lesson-level change, or by the blocks fixedIn names', () => {
+  it('review-scope touches "lesson" only when a field outside sections and provenance changes', () => {
+    const before = lesson();
+    const touches = (change) => {
+      const after = structuredClone(before);
+      change(after);
+      return reviewScope.compareLessons(before, after).touched.includes('lesson');
+    };
+    for (const change of [(l) => { l.sections[1].blocks[4].md = 'b5 を言い換えました。'; }, (l) => { l.sections[1].title = 'Concept, renamed'; }, (l) => { l.provenance = { author: 'someone-else' }; }]) {
+      assert.equal(touches(change), false, `the old scope touched "lesson" on any change: ${change}`);
+    }
+    for (const change of [
+      (l) => { l.title = 'Demo, renamed'; },
+      (l) => { l.subtitle = 'New subtitle'; },
+      (l) => { l.estMinutes = 12; },
+      (l) => { l.glossary = [{ term: 'X', md: 'The x.' }]; },
+      (l) => { l.sources = [{ id: 'src1', title: 'Doc' }]; },
+      (l) => { l.prerequisites = ['Chapter 1']; },
+    ]) {
+      assert.equal(touches(change), true, String(change));
+    }
+  });
+
+  it('"resolved" after an unrelated block edit stays open; fixedIn must name only changed blocks; a glossary change resolves it', () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
+    const lessonWide = { criterion: 'prior', blockId: 'lesson', issue: 'X is used before it is defined; there is no glossary.', fix: 'Define X in a glossary entry.' };
+    const make = (name, hash) => review(name, { ...ALL4, prior: 2 }, { lessonHash: hash, verdict: 'revise', mustFix: [lessonWide] });
+    const { c1, h1, r1 } = round1Committed({ make });
+    const resolvedLesson = (extra = {}) => [{ blockId: 'lesson', criterion: 'prior', status: 'resolved', evidence: 'X is defined now.', ...extra }];
+    const v2 = lesson({ edit: { b5: 'X とは、例のことです。' } });
+    write(DRAFT, v2);
+    const check = (resolved, now = v2) => {
+      write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(now), verifies: verifiesSince(c1, h1, `${c1}:${rep(PED)}`), rescored: { prior: 4 }, resolved }));
+      return gate([rep(PED)]);
+    };
+    const bare = check(resolvedLesson());
+    assert.equal(bare.status, 1, `the old gate accepted it because b5 changed:\n${bare.all}`);
+    assert.match(bare.stdout, /must fix \(unchanged\) \[prior\] lesson: Marked resolved, but no lesson-level field changed since the review that raised it, and "fixedIn" names no changed block/);
+    const named = check(resolvedLesson({ fixedIn: ['b5'] }));
+    assert.equal(named.status, 0, named.all);
+    const partly = check(resolvedLesson({ fixedIn: ['b5', 'b4'] }));
+    assert.equal(partly.status, 1, partly.all);
+    assert.match(partly.stdout, /must fix \(unchanged\) \[prior\] lesson: Marked resolved, but no lesson-level field changed since the review that raised it, and "fixedIn" names b4, which did not change/);
+    // A lesson-level change resolves it without fixedIn.
+    const v3 = { ...lesson(), glossary: [{ term: 'X', md: '例のことです。' }] };
+    write(DRAFT, v3);
+    const glossary = check(resolvedLesson(), v3);
+    assert.equal(glossary.status, 0, glossary.all);
+  }));
+});
+
+describe('CR-6: lesson and section fields count toward the 30% share', () => {
+  /** 12 blocks + 3 sections + 8 fields (schema, id, courseId, title, subtitle, locale, estMinutes, objectives) + 3 glossary + 2 source entries = 28 parts. */
+  const rich = () => ({
+    ...lesson(),
+    subtitle: 'Sub',
+    glossary: [{ term: 'X', md: 'The x.' }, { term: 'Y', md: 'The y.' }, { term: { jp: 'ゼット', en: 'Z' }, md: { jp: 'z です。', en: 'The z.' } }],
+    sources: [{ id: 'src1', title: 'Doc 1' }, { id: 'src2', title: 'Doc 2' }],
+  });
+  const renamed = () => {
+    const after = rich();
+    after.title = 'Demo, renamed';
+    after.subtitle = 'Sub, renamed';
+    for (const s of after.sections) s.title = `${s.title}, renamed`;
+    for (const g of after.glossary) g.md = typeof g.md === 'string' ? `${g.md} Rewritten.` : { ...g.md, en: `${g.md.en} Rewritten.` };
+    after.sources[0].title = 'Doc 1, second edition';
+    return after;
+  };
+
+  it('rewriting the title, subtitle, section titles, glossary and a source without touching a block requires a full review', () => {
+    const scope = reviewScope.compareLessons(rich(), renamed());
+    assert.equal(scope.blocks.changed, 0);
+    assert.equal(scope.fullReviewRequired, true, `the old scope counted blocks only (changedShare ${scope.changedShare})`);
+    assert.deepEqual([scope.parts.total, scope.parts.changed], [28, 9]);
+    assert.equal(scope.changedShare, 0.33);
+    assert.match(scope.reasons.join('\n'), /9 of 28 parts of the lesson changed \(32%, more than 30%\)/);
+  });
+
+  it('every block, section, lesson field and glossary or source entry is one part; a list whose entries cannot be told apart is one part', () => {
+    const before = rich();
+    const after = structuredClone(before);
+    after.glossary[1].md = 'The y, rewritten.';
+    after.sources.push({ id: 'src3', title: 'Doc 3' });
+    after.sections[2].blocks[0].md = 'c1 を言い換えました。';
+    const scope = reviewScope.compareLessons(before, after);
+    assert.deepEqual(scope.parts, {
+      total: 29,
+      changed: 3,
+      blocks: { total: 12, changed: 1 },
+      sections: { total: 3, changed: 0 },
+      fields: { total: 14, changed: 2 },
+    });
+    assert.equal(scope.changedShare, 0.11);
+    assert.equal(scope.fullReviewRequired, false);
+    // Two entries with the same term: the glossary counts as one part (8 fields + 1 + 2 source entries).
+    const twice = structuredClone(before);
+    twice.glossary.push({ term: 'X', md: 'The x, again.' });
+    assert.deepEqual(reviewScope.compareLessons(before, twice).parts.fields, { total: 11, changed: 1 });
+    // Key order and provenance are not changes.
+    const same = Object.fromEntries(Object.entries(structuredClone(before)).reverse());
+    same.provenance = { author: 'someone-else' };
+    assert.equal(reviewScope.compareLessons(before, same).parts.changed, 0);
+  });
+
+  it('more than 30% of the blocks still requires a full review, however many other parts the lesson has', () => {
+    const before = rich();
+    const after = structuredClone(before);
+    for (const id of ['b1', 'b4', 'b5', 'c1']) after.sections.flatMap((s) => s.blocks).find((b) => b.id === id).md = `${id} rewritten.`;
+    const scope = reviewScope.compareLessons(before, after);
+    assert.equal(scope.changedShare, 0.15, '4 of 28 parts');
+    assert.equal(scope.fullReviewRequired, true);
+    assert.match(scope.reasons.join('\n'), /4 of 12 blocks changed \(33%, more than 30%\)/);
+  });
+
+  it('check-review refuses a verification whose recomputed scope counts the lesson and section fields', () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
+    const { c1, h1, r1 } = round1Committed({ v1: rich(), make: (name, hash) => review(name, ALL4, { lessonHash: hash }) });
+    const v2 = renamed();
+    write(DRAFT, v2);
+    const honest = verifiesSince(c1, h1, `${c1}:${rep(PED)}`);
+    write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: { ...honest, changedShare: 0, fullReviewRequired: false } }));
+    const run = gate([rep(PED)]);
+    assert.equal(run.status, 2, `the old gate allowed a verification because no block changed:\n${run.all}`);
+    assert.match(run.stderr, /the recomputed scope since [0-9a-f]+ requires a full review, not a verification \(9 of 28 parts of the lesson changed/);
+  }));
+});
+
+describe('CR-7: reviews without lessonHash never count; --allow-legacy is gone', () => {
+  it('a full review without lessonHash is stale, the CLI refuses --allow-legacy, and the library has no such option', () => withRepo(({ write, gate }) => {
+    const v = lesson({ fixB2: true });
+    write(DRAFT, v);
+    write(rep(PED), review(PED, ALL4));
+    const run = gate([rep(PED)]);
+    assert.equal(run.status, 2, run.all);
+    assert.match(run.stderr, /stale: review 1 \(pedagogy-reviewer\) has no "lessonHash", so nothing shows which version of the lesson it read/);
+    assert.doesNotMatch(run.all, /allow-legacy/, 'no escape hatch is offered');
+    const flag = gate([rep(PED), '--allow-legacy']);
+    assert.equal(flag.status, 2, `the old gate passed the review with a LEGACY note:\n${flag.all}`);
+    assert.match(flag.stderr, /--allow-legacy was removed/);
+    const lib = checkReview.evaluateReviews([review(PED, ALL4)], schemas, { lesson: { id: ID, hash: reviewScope.lessonHash(v) }, allowLegacy: true });
+    assert.equal(lib.valid, false);
+    assert.ok(lib.errors.some((e) => /^stale: .* has no "lessonHash"/.test(e)), lib.errors.join('\n'));
+  }));
+
+  it('a verification of a previous review without lessonHash is refused, also of the commit that holds it', () => withRepo(({ root, write, gate, verifiesSince, round1Committed }) => {
+    const { c1, r1 } = round1Committed({ legacy: true });
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(c1, null, `${c1}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() }));
+    for (const args of [[rep(PED)], [rep(PED), '--allow-legacy']]) {
+      const run = gate(args);
+      assert.equal(run.status, 2, `${args.join(' ')}: the old gate passed with --allow-legacy:\n${run.all}`);
+    }
+    const run = gate([rep(PED)]);
+    assert.match(run.stderr, new RegExp(`its previous review ${c1}:\\S+ has no "lessonHash", so nothing binds verifies\\.reviewedRevision \\(${c1}\\) to the version it read`));
+    assert.doesNotMatch(run.all, /allow-legacy/);
+    // The library refuses a previous review without lessonHash too.
+    const lib = checkReview.evaluateReviews([JSON.parse(fs.readFileSync(path.join(root, rep(PED)), 'utf8'))], schemas, { lesson: { id: ID, hash: reviewScope.lessonHash(v2) }, previous: [r1[PED]], allowLegacy: true });
+    assert.equal(lib.valid, false);
+    assert.ok(lib.errors.some((e) => /previous review \(pedagogy-reviewer\): has no "lessonHash"/.test(e)), lib.errors.join('\n'));
+  }));
+
+  it('--previous, which stood in only for reviews without lessonHash, is refused', () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
+    const { c1, h1, r1 } = round1Committed();
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(c1, h1, `${c1}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() }));
+    assert.equal(gate([rep(PED)]).status, 0);
+    const run = gate([rep(PED), '--previous', `${c1}:${rep(PED)}`]);
+    assert.equal(run.status, 2, run.all);
+    assert.match(run.stderr, /--previous was removed/);
+  }));
+});
+
+describe('CR-8: a recorded round is the reviews of the version its previous review read', () => {
+  for (const [label, hashOf] of [['another version', () => reviewScope.lessonHash(lesson({ reorder: true }))], ['no lessonHash', () => null]]) {
+    it(`git: a ja-editor review of ${label} at that commit is not part of the round`, () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
+      const make = (name, hash) => (name === JA_EDITOR ? round1Of(JA_EDITOR, JA, hashOf()) : round1Of(PED, ALL4, hash));
+      const { c1, h1, r1 } = round1Committed({ reviewers: { [PED]: ALL4, [JA_EDITOR]: JA }, make });
+      const v2 = lesson({ fixB2: true });
+      write(DRAFT, v2);
+      write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(c1, h1, `${c1}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() }));
+      const run = gate([rep(PED)]);
+      assert.equal(run.status, 0, `the old gate counted it as part of the round and required ja-editor:\n${run.all}`);
+    }));
+  }
+
+  it('snapshot: a review in the round folder that read another version is not part of the round', () => withRepo(({ root, write, gate, verifiesSince }) => {
+    const v1 = lesson();
+    write(DRAFT, v1);
+    const h1 = reviewScope.lessonHash(v1);
+    const r1 = round1Of(PED, ALL4, h1);
+    write(rep(PED), r1);
+    const saved = reviewScope.saveSnapshot(path.join(root, DRAFT), { root });
+    write(path.join(path.dirname(saved.reviews[0]), `${JA_EDITOR}.review.json`), round1Of(JA_EDITOR, JA, reviewScope.lessonHash(lesson({ reorder: true }))));
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    const copy = path.relative(root, saved.reviews[0]).split(path.sep).join('/');
+    write(rep(PED), verifyReview(r1, { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(saved.revision, h1, copy), rescored: { voice: 4 }, resolved: resolvedB2() }));
+    const run = gate([rep(PED)]);
+    assert.equal(run.status, 0, `the old gate counted the hand-placed review as part of the round:\n${run.all}`);
+  }));
+
+  it('a review of the same version at that commit is still part of the round (DROP-1)', () => withRepo(({ write, gate, verifiesSince, round1Committed }) => {
+    const make = (name, hash) => (name === JA_EDITOR ? round1Of(JA_EDITOR, JA, hash) : round1Of(PED, ALL4, hash));
+    const { c1, h1, r1 } = round1Committed({ reviewers: { [PED]: ALL4, [JA_EDITOR]: JA }, make });
+    const v2 = lesson({ fixB2: true });
+    write(DRAFT, v2);
+    write(rep(PED), verifyReview(r1[PED], { lessonHash: reviewScope.lessonHash(v2), verifies: verifiesSince(c1, h1, `${c1}:${rep(PED)}`), rescored: { voice: 4 }, resolved: resolvedB2() }));
+    const run = gate([rep(PED)]);
+    assert.equal(run.status, 2, run.all);
+    assert.match(run.stderr, /also has a review by ja-editor, which this set leaves out/);
+  }));
+});
+
+describe('CR-7: the PR #20 reviews (legacy, before lessonHash) are refused, with or without the old flags', () => {
   const P = 'content/courses/vibe-coding/reports';
-  // The reviews as committed in c961471. Later rounds overwrite the working-tree reports files, so
-  // the reviews are read from git into a scratch folder.
+  // The reviews as committed in c961471, the last rounds without lessonHash. Later rounds overwrite
+  // the working-tree reports files, so the reviews are read from git into a scratch folder.
   const AT = 'c961471';
   const hasHistory = ['dcb3095', 'bb56d49', AT].every((rev) => reviewScope.resolveCommit(rev, ROOT) !== null);
   const run = (...args) => {
@@ -608,20 +924,35 @@ describe('the PR #20 reviews (legacy, before lessonHash) still pass with the doc
     }
   };
 
-  it('vibe-ch2: its chain (bb56d49 → dcb3095) is followed and checked', { skip: !hasHistory && 'needs the PR #20 history (shallow clone)' }, () => {
-    withRecorded(['ja-editor', 'pedagogy-reviewer', 'visual-qa'].map((r) => `vibe-ch2.${r}.review.json`), (reports) => {
-      assert.equal(run(...reports).status, 2, 'without --allow-legacy');
-      const ok = run(...reports, '--allow-legacy', '--previous', `dcb3095:${P}/vibe-ch2.visual-qa.review.json`);
-      assert.equal(ok.status, 0, ok.all);
-      assert.match(ok.all, /pedagogy-reviewer: verification of dcb3095 .* and 1 earlier round checked/);
+  const REVIEWERS = ['ja-editor', 'pedagogy-reviewer', 'visual-qa'];
+  // [lesson, reviewers whose verification names a commit-anchored previous review, the flags the old gate needed]
+  const cases = [
+    ['vibe-ch2', ['ja-editor', 'pedagogy-reviewer'], ['--allow-legacy', '--previous', `dcb3095:${P}/vibe-ch2.visual-qa.review.json`]],
+    ['vibe-ch2-practice', [], ['--allow-legacy', ...REVIEWERS.flatMap((r) => ['--previous', `dcb3095:${P}/vibe-ch2-practice.${r}.review.json`])]],
+  ];
+  for (const [id, anchored, flags] of cases) {
+    it(`${id}: every review is stale and every previous review without lessonHash is refused; the old flags are refused`, { skip: !hasHistory && 'needs the PR #20 history (shallow clone)' }, () => {
+      withRecorded(REVIEWERS.map((r) => `${id}.${r}.review.json`), (reports) => {
+        for (const file of reports) {
+          const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+          assert.equal(doc.lessonHash, undefined, `${path.basename(file)} is legacy`);
+          assert.deepEqual(checkReview.reviewErrors(doc, schemas), [], `${path.basename(file)} is still a valid review.v1 document`);
+        }
+        const lesson = `content/courses/vibe-coding/lessons/${id}.lesson.json`;
+        const plain = run(...reports, '--lesson', lesson);
+        assert.equal(plain.status, 2, plain.all);
+        for (const reviewer of REVIEWERS) assert.match(plain.all, new RegExp(`stale: review \\d \\(${reviewer}\\) has no "lessonHash"`));
+        for (const reviewer of anchored) {
+          assert.match(plain.all, new RegExp(`\\(${reviewer}\\): its previous review bb56d49:${P}/${id}\\.${reviewer}\\.review\\.json has no "lessonHash"`));
+        }
+        for (const reviewer of REVIEWERS.filter((r) => !anchored.includes(r))) {
+          assert.match(plain.all, new RegExp(`\\(${reviewer}\\): its previous review was not loaded \\(${P}/${id}\\.${reviewer}\\.review\\.json is the working-tree reports file`));
+        }
+        assert.doesNotMatch(plain.all, /allow-legacy/);
+        const flagged = run(...reports, '--lesson', lesson, ...flags);
+        assert.equal(flagged.status, 2, `the old gate passed the legacy chain with these flags:\n${flagged.all}`);
+        assert.match(flagged.all, /--allow-legacy was removed/);
+      });
     });
-  });
-
-  it('vibe-ch2-practice', { skip: !hasHistory && 'needs the PR #20 history (shallow clone)' }, () => {
-    const names = ['pedagogy-reviewer', 'ja-editor', 'visual-qa'];
-    withRecorded(names.map((r) => `vibe-ch2-practice.${r}.review.json`), (reports) => {
-      const ok = run(...reports, '--allow-legacy', ...names.flatMap((r) => ['--previous', `dcb3095:${P}/vibe-ch2-practice.${r}.review.json`]));
-      assert.equal(ok.status, 0, ok.all);
-    });
-  });
+  }
 });

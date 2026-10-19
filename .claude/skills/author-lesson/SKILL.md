@@ -129,38 +129,44 @@ Reach 0 errors and 0 warnings. A warning may stay only with a written reason in 
   (exit 0 pass, 1 not yet, 2 invalid or stale). It hashes the lesson the reviews name (a draft
   published since is found under `lessons/`); when `drafts/` and `lessons/` both hold the lesson
   and differ (a rework of a published lesson), pass `--lesson <file>` to name the one reviewed.
-  One review per reviewer: keep no old copies under `reports/`.
-  `--allow-legacy` is only for re-checking reviews written before `lessonHash` existed.
+  One review per reviewer: keep no old copies under `reports/`. A review without `lessonHash`
+  never counts (there is no flag to accept one): re-run the reviewer.
 - Right after saving a round's reviews, record what they read:
   `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot`. It keeps the
   lesson in `.artifacts/review/<course>/<lesson>/<hash>/` and copies the saved reviews whose
   `lessonHash` is that hash to a new round folder `<hash>/round-<n>/` (never overwritten;
   `--round <label>` names it). It prints the revision `sha256:<hash>` (the reviews' `lessonHash`)
   and the folder. When the reviewed draft is committed, the commit is the revision instead and the
-  previous review is `<commit>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json`.
+  previous review is `<commit id>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json`.
+  Name commits by id (7–40 lowercase hex digits, `git rev-parse --short <commit>`), never `HEAD`, a
+  branch, a tag or `HEAD~n`: the gate refuses those, because they name another commit when refs move.
 - Apply every `mustFix` and raise every criterion below 3. Re-validate.
 - **Round 2 is a verification round** (fix-verification mode, rules in
   `.claude/skills/review-lesson/SKILL.md`) when
   `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --expect-hash <round-1 lessonHash>`
   exits 0. It exits 1 — a full review again — when a section was added, removed, reordered or
-  changed its role, the objectives changed, or more than 30% of the blocks changed. For a
+  changed its role, the objectives changed, or more than 30% of the lesson's parts (each block,
+  each section's own fields, each lesson field, each glossary and source entry) or of its blocks
+  changed. For a
   verification, run `/review-lesson <file> --verify <previous review> --since <revision>` and tell
   the `ja-editor`: "Verification round: lesson `<file>`, previous review `<previous review>`,
   revision `<revision>`, verifies `<the line review-scope.mjs printed>`." The previous review is
   the snapshot copy `.artifacts/review/<course>/<lesson>/<hash>/round-<n>/<reviewer>.review.json`
-  or `<commit>:<path>` — never the working-tree `reports/` file, which this round overwrites.
+  or `<commit id>:<path>` — never the working-tree `reports/` file, which this round overwrites.
   Do not argue with round 1 or say what you think is fixed; the reviewer checks.
-- Save and gate as in round 1, with every reviewer of the previous round: each one verifies its
-  review of that round (or reviews in full). For each verification `check-review.mjs` loads
-  `verifies.previousReview` (a recorded round; `--previous <commit:path>` stands in only for a
-  review written before `lessonHash` existed that names its own reports file), follows a previous
-  verification back to its full review, recomputes the scope from `verifies.reviewedRevision`, and
-  exits 2 when it cannot load the previous review or that round is itself invalid, the scope
-  requires a full review, `verifies.changed` leaves out a change, a criterion the previous review
-  scored is missing, a reviewer of the previous round is left out, or a review is stale. A
-  must-fix marked resolved on a block that did not change stays open. Commit a refused round if
-  you keep it as a record, but verify the last valid round next time. Fix the cause and re-run the
-  reviewer; never edit a review's JSON yourself.
+- Save and gate as in round 1, with every reviewer of the previous round (the reviews recorded
+  next to the previous review that read the same version): each one verifies its review of that
+  round (or reviews in full). For each verification `check-review.mjs` loads
+  `verifies.previousReview` (a recorded round), follows a previous verification back to its full
+  review, recomputes the scope from `verifies.reviewedRevision`, and exits 2 when it cannot load
+  the previous review, the previous review has no `lessonHash` or that round is itself invalid, a
+  commit is named by a ref instead of its id, the scope requires a full review, `verifies.changed`
+  leaves out a change, a criterion the previous review scored is missing, a reviewer of the
+  previous round is left out, or a review is stale. A must-fix marked resolved without a change
+  stays open: its block (or a `fixedIn` block) must have changed since the round that last had it
+  open, and a lesson-wide item (`"lesson"`) needs a lesson-level change or a `fixedIn` whose blocks
+  all changed. Commit a refused round if you keep it as a record, but verify the last valid round
+  next time. Fix the cause and re-run the reviewer; never edit a review's JSON yourself.
 - A lesson published (moved from `drafts/` to `lessons/`) between rounds keeps its hash and its
   snapshots; `--since <commit>` reads `drafts/<id>` at that commit. Pass the current path to the
   reviewers; their `file` names it.
@@ -185,7 +191,7 @@ Reach 0 errors and 0 warnings. A warning may stay only with a written reason in 
   exits 0, tell it "Verification round: preview folder `<folder>`, lessonHash `<hash>`, previous
   review `<previous review>`, revision `<revision>`, verifies `<the printed line>`". It has no
   shell: give it a readable path such as the snapshot copy, or paste the previous review JSON, and
-  keep `previousReview` the snapshot copy or `<commit>:<path>`.
+  keep `previousReview` the snapshot copy or `<commit id>:<path>`.
 
 ## 8. Translate (when the brief lists more locales)
 

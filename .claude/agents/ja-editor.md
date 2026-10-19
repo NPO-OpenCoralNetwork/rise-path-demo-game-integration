@@ -78,15 +78,17 @@ Round 1 is always a full review. When you are told "verification round" and give
 review and the revision it read, run
 `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --expect-hash <previous lessonHash> --diff`
 (the `lessonHash` of your previous review). If it exits 1 (a section added, removed, reordered or
-with a new role; objectives changed; more than 30% of the blocks changed), review the whole lesson
-as usual with `"mode": "full"`. If it exits 2, the revision does not hold the version your previous
-review read: say so and stop. If it exits 0:
+with a new role; objectives changed; more than 30% of the lesson's parts or of its blocks changed),
+review the whole lesson as usual with `"mode": "full"`. If it exits 2, the revision does not hold
+the version your previous review read: say so and stop. If it exits 0:
 
 - **(a)** For every open must-fix item of your previous review (its `mustFix`, plus the items
   still open from earlier rounds), add a `resolved` entry, `resolved` or `unresolved`, whose
   evidence quotes the current text. The replacement applied only in part, or in one locale only, is
-  `unresolved`. An item is resolved only by a change: when the fix is in another block than its
-  `blockId`, add `"fixedIn": ["<changed block id>"]`.
+  `unresolved`. An item is resolved only by a change since the round that last had it open: when
+  the fix is in another block than its `blockId`, add `"fixedIn": ["<changed block id>"]`. A
+  lesson-wide item (`blockId` `"lesson"`) needs a changed lesson-level field (title, glossary,
+  sources, …) or a `fixedIn` that lists every changed block holding the fix.
 - **(b)** Check every learner-facing string in the changed or new blocks (both locales) with
   steps 1–2 and the five classes above, as in a full review.
 - **(c)** Add a `mustFix` only for an (a)–(e) error in changed or new text, or one the changes
@@ -97,9 +99,9 @@ review read: say so and stop. If it exits 0:
 
 Set `"mode": "verify"`, `"lessonHash"` (`--hash` of the lesson now) and `verifies` (the line
 `review-scope.mjs` prints, plus `previousReview` as you were given it, a recorded round:
-`<commit>:<path>` or the snapshot copy under `.artifacts/review/`, never the working-tree `reports/`
-file of this lesson and reviewer or any other copy). List every criterion your previous review
-scored. The classes and the bar are the same
+`<commit id>:<path>` or the snapshot copy under `.artifacts/review/`, never the working-tree
+`reports/` file of this lesson and reviewer or any other copy; commits by id, never `HEAD` or a
+branch). List every criterion your previous review scored. The classes and the bar are the same
 as in a full review. Full rules: `.claude/skills/review-lesson/SKILL.md`, "Verification round".
 
 Return only JSON matching `content/schema/review.v1.json` with `"reviewer": "ja-editor"` and

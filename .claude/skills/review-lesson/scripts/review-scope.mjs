@@ -7,7 +7,12 @@
  *
  * A full review is required when, since the reviewed revision,
  *   - a section was added, removed or reordered, or a section's role changed;
- *   - the objectives changed (ids, text, Bloom level or order); or
+ *   - the objectives changed (ids, text, Bloom level or order);
+ *   - more than 30% of the lesson's parts changed (`changedShare`). The parts are every block,
+ *     every section's own fields (one part per section) and every top-level field except
+ *     `sections` and `provenance`, with one part per glossary and source entry (matched by id, else
+ *     by term; a list whose entries cannot be told apart is one part). A part counts once whether
+ *     it changed, came, went or moved; or
  *   - more than 30% of the blocks were changed, added, removed or moved.
  * Otherwise a verification round is allowed. Key order and `provenance` never count as changes.
  *
@@ -22,7 +27,8 @@
  * lessons/) do not change it. Every review records it as `lessonHash`; check-review.mjs refuses a
  * review whose lessonHash is not the hash of the lesson as it is now.
  *
- * --since <git-rev> reads the lesson at that commit. A lesson under drafts/ or lessons/ is looked up
+ * --since <git-rev> reads the lesson at that commit (any revision git knows; the `reviewedRevision`
+ * it prints is the commit id, which is what reviews record). A lesson under drafts/ or lessons/ is looked up
  * at drafts/<id> first, then lessons/<id> (a reworked published lesson is reviewed as its draft).
  * --expect-hash <lessonHash of the previous review> instead takes the version with that hash and
  * fails when there is none. --since sha256:<hex> reads a snapshot: the full hash or any unique
@@ -36,7 +42,8 @@
  *
  * --diff prints every changed block before and after. --json prints the result, including the
  * `verifies` object that a verification review copies and `touched`, the ids a must-fix item may
- * name that the changes touch (check-review.mjs accepts a "resolved" entry only for those).
+ * name that the changes touch (check-review.mjs accepts a "resolved" entry only for those;
+ * "lesson" is touched only when a lesson-level field changed).
  *
  * Exit codes: 0 verification allowed (or hash printed, snapshot saved) · 1 full review required ·
  * 2 invalid input.
@@ -46,12 +53,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson } from '../../../../shared/lesson/canonical.js';
-import { HASH_IGNORED_FIELDS as IGNORED_FIELDS, lessonHash } from '../../../../shared/lesson/hash.js';
+import { HASH_IGNORED_FIELDS as IGNORED_FIELDS, lessonHash, lessonHashOfText } from '../../../../shared/lesson/hash.js';
 import { forEachBlock } from '../../../../shared/lesson/walk.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
-/** Above this share of changed blocks a re-review must be a full review. */
+/** Above this share of changed parts of the lesson (or of its blocks) a re-review must be a full review. */
 export const FULL_REVIEW_SHARE = 0.3;
 
 /** The form of a lesson hash (`lessonHash` of a review, the revision of a snapshot). */
@@ -61,11 +68,18 @@ export const LESSON_HASH = /^sha256:[0-9a-f]{16}$/;
 const SNAPSHOT_REVISION = /^sha256:([0-9a-f]{6,64})$/i;
 
 /**
- * A git revision taken from a review or the command line: a commit, branch or tag name, optionally
- * with ~ or ^. It never starts with "-" and has no ":" or whitespace, so git cannot read it as an
- * option or a path.
+ * A git revision on the command line (--since): a commit, branch or tag name, optionally with ~ or
+ * ^. It never starts with "-" and has no ":" or whitespace, so git cannot read it as an option or a
+ * path. Reviews record commits by id only (COMMIT_ID).
  */
 export const GIT_REVISION = /^[A-Za-z0-9][A-Za-z0-9._/~^-]*$/;
+
+/**
+ * A commit as a review records it (verifies.reviewedRevision, the <commit> of <commit>:<path>): its
+ * id, 7–40 lowercase hex digits (`git rev-parse --short <commit>` or the full id). Never HEAD, a
+ * branch, a tag or HEAD~n: they name another commit when refs move.
+ */
+export const COMMIT_ID = /^[0-9a-f]{7,40}$/;
 
 const USAGE = [
   'Usage:',
@@ -103,6 +117,25 @@ export function resolveCommit(rev, root = ROOT) {
   if (typeof rev !== 'string' || !GIT_REVISION.test(rev)) return null;
   const res = git(['rev-parse', '--verify', '--quiet', '--end-of-options', `${rev}^{commit}`], root);
   return res.ok ? res.stdout.trim() : null;
+}
+
+/**
+ * The full id of the commit a commit id names, or null: the id is COMMIT_ID, no branch or tag has
+ * that name (git would take the ref, which moves, before the commit id), and it resolves to a
+ * commit whose id starts with it.
+ *
+ * @param {unknown} id
+ * @param {string} [root]
+ * @returns {string | null}
+ */
+export function resolveCommitId(id, root = ROOT) {
+  if (typeof id !== 'string' || !COMMIT_ID.test(id)) return null;
+  // The places git looks up a ref of that name (it reads no object names, so a short id that is
+  // also the prefix of a blob or tree is not refused here).
+  const refs = git(['for-each-ref', '--count=1', '--format=%(refname)', `refs/${id}`, `refs/tags/${id}`, `refs/heads/${id}`, `refs/remotes/${id}`], root);
+  if (!refs.ok || refs.stdout.trim()) return null;
+  const sha = resolveCommit(id, root);
+  return sha && sha.startsWith(id) ? sha : null;
 }
 
 /**
@@ -237,6 +270,64 @@ export function blockList(lesson) {
   return out;
 }
 
+/** Top-level lists counted one part per entry (changedShare). */
+const ENTRY_LISTS = new Set(['glossary', 'sources']);
+
+/**
+ * The entries of a glossary or sources list by key (`id:<id>`, else `term:<canonical term>`), or
+ * null when the entries cannot be told apart: not a list, an entry without either, or two entries
+ * with one key. An absent list has no entries.
+ *
+ * @param {unknown} list
+ * @returns {Map<string, unknown> | null}
+ */
+function keyedEntries(list) {
+  /** @type {Map<string, unknown>} */
+  const out = new Map();
+  if (list === undefined) return out;
+  if (!Array.isArray(list)) return null;
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const key = typeof entry.id === 'string' ? `id:${entry.id}` : entry.term !== undefined ? `term:${canonicalJson(entry.term)}` : null;
+    if (key === null || out.has(key)) return null;
+    out.set(key, entry);
+  }
+  return out;
+}
+
+/**
+ * The lesson-level parts of two revisions: one per top-level field except `sections` and the
+ * fields the hash ignores, and one per glossary or source entry when the entries can be told apart
+ * (else the list is one part). An entry counts as changed when it changed, came, went or moved.
+ *
+ * @param {any} before
+ * @param {any} after
+ * @returns {{ total: number, changed: number }}
+ */
+function fieldParts(before, after) {
+  const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])].filter((k) => k !== 'sections' && !IGNORED_FIELDS.has(k));
+  let total = 0;
+  let changed = 0;
+  for (const key of keys) {
+    const b = ENTRY_LISTS.has(key) ? keyedEntries(before?.[key]) : null;
+    const a = ENTRY_LISTS.has(key) ? keyedEntries(after?.[key]) : null;
+    if (!b || !a) {
+      total += 1;
+      if (!same(before?.[key], after?.[key])) changed += 1;
+      continue;
+    }
+    const inOrder = commonSubsequence([...b.keys()].filter((k) => a.has(k)), [...a.keys()].filter((k) => b.has(k)));
+    for (const k of new Set([...b.keys(), ...a.keys()])) {
+      total += 1;
+      if (!b.has(k) || !a.has(k) || !inOrder.has(k) || !same(b.get(k), a.get(k))) changed += 1;
+    }
+  }
+  return { total, changed };
+}
+
+/** @param {unknown} share @returns {number} 0–1, rounded up to whole percent, so a recorded share above the limit always means "above the limit" */
+const roundShare = (share) => Math.max(0, Math.ceil(Number(share) * 100 - 1e-9)) / 100;
+
 /**
  * Compares two revisions of one lesson and decides whether a verification round is allowed.
  *
@@ -300,16 +391,41 @@ export function compareLessons(before, after) {
   for (const x of bBlocks) if (!aMap.has(x.id)) changes.push({ id: x.id, section: x.section, change: 'removed' });
 
   const total = new Set([...bMap.keys(), ...aMap.keys()]).size;
-  const share = total ? changes.length / total : 0;
-  // Rounded up, so a recorded share above the limit always means "above the limit".
-  const changedShare = Math.max(0, Math.ceil(share * 100 - 1e-9)) / 100;
+  const blockShare = total ? changes.length / total : 0;
 
   const strip = (/** @type {any} */ lesson) => Object.fromEntries(Object.entries(lesson ?? {}).filter(([k]) => !IGNORED_FIELDS.has(k) && k !== 'sections' && k !== 'objectives'));
   const fields = changedParts(strip(before), strip(after));
 
+  // The parts of the lesson (changedShare): every block, every section's own fields and every
+  // lesson-level field or glossary/source entry, each counted once in both revisions together.
+  const ownFields = (/** @type {any} */ s) => {
+    const { blocks: _blocks, ...rest } = s ?? {};
+    return rest;
+  };
+  const aSectionMap = new Map(aSections.map((/** @type {any} */ s) => [String(s.id), s]));
+  const sectionIds = [...new Set([...bSectionMap.keys(), ...aSectionMap.keys()])];
+  const sectionParts = {
+    total: sectionIds.length,
+    changed: sectionIds.filter((id) => !bSectionMap.has(id) || !aSectionMap.has(id) || !same(ownFields(bSectionMap.get(id)), ownFields(aSectionMap.get(id)))).length,
+  };
+  const lessonParts = fieldParts(before, after);
+  const parts = {
+    total: total + sectionParts.total + lessonParts.total,
+    changed: changes.length + sectionParts.changed + lessonParts.changed,
+    blocks: { total, changed: changes.length },
+    sections: sectionParts,
+    fields: lessonParts,
+  };
+  const share = parts.total ? parts.changed / parts.total : 0;
+  const changedShare = roundShare(share);
+  const limit = Math.round(FULL_REVIEW_SHARE * 100);
+
   const reasons = [...structural];
   if (share > FULL_REVIEW_SHARE) {
-    reasons.push(`${changes.length} of ${total} blocks changed (${Math.round(share * 100)}%, more than ${Math.round(FULL_REVIEW_SHARE * 100)}%)`);
+    reasons.push(`${parts.changed} of ${parts.total} parts of the lesson changed (${Math.round(share * 100)}%, more than ${limit}%): ${changes.length} of ${total} blocks, ${sectionParts.changed} of ${sectionParts.total} sections, ${lessonParts.changed} of ${lessonParts.total} lesson fields and entries`);
+  }
+  if (blockShare > FULL_REVIEW_SHARE) {
+    reasons.push(`${changes.length} of ${total} blocks changed (${Math.round(blockShare * 100)}%, more than ${limit}%)`);
   }
   const changed = [
     ...changes.map((c) => c.id),
@@ -320,8 +436,10 @@ export function compareLessons(before, after) {
   // Every id a must-fix item may name that these changes touch: the changed blocks, the questions,
   // cards or steps whose content changed (or that came or went with their block), the sections of
   // the changed blocks and the sections whose fields changed, the objectives the changed blocks
-  // assess, and "lesson" when anything changed. check-review.mjs accepts a "resolved" entry only
-  // for an item whose id (or a `fixedIn` id) is touched.
+  // assess, and "lesson" when a lesson-level field changed (anything outside sections and
+  // provenance; a block or section edit does not touch it). check-review.mjs accepts a "resolved"
+  // entry only for an item whose id (or a `fixedIn` id) is touched, and a lesson-wide item also
+  // when every `fixedIn` id is.
   /** @type {Set<string>} */
   const touched = new Set();
   for (const c of changes) {
@@ -349,13 +467,14 @@ export function compareLessons(before, after) {
     }
   }
   for (const s of sections) touched.add(s.id);
-  if (changes.length || sections.length || fields.length) touched.add('lesson');
+  if (fields.length || !same(before?.objectives, after?.objectives)) touched.add('lesson');
 
   return {
     fullReviewRequired: reasons.length > 0,
     reasons,
     structural,
     blocks: { total, changed: changes.length },
+    parts,
     changedShare,
     changes,
     sections,
@@ -495,14 +614,8 @@ export function lessonPathCandidates(rel) {
   return match ? [`${match[1] ?? ''}drafts${match[2]}`, `${match[1] ?? ''}lessons${match[2]}`] : [rel];
 }
 
-/** @param {string} text */
-function hashOfText(text) {
-  try {
-    return lessonHash(JSON.parse(text));
-  } catch {
-    return '(not JSON)';
-  }
-}
+/** @param {string} text the lesson hash of a lesson text, for messages */
+const shownHash = (text) => lessonHashOfText(text) ?? '(not JSON)';
 
 /**
  * The text of the lesson the previous review read.
@@ -517,7 +630,7 @@ function hashOfText(text) {
 export function readBefore(args, file, lesson, { root = ROOT, expectHash = null } = {}) {
   const shown = (/** @type {string} */ p) => path.relative(root, p).split(path.sep).join('/');
   const expect = (/** @type {string} */ text, /** @type {string} */ where) => {
-    const hash = hashOfText(text);
+    const hash = shownHash(text);
     if (expectHash && hash !== expectHash) throw new Error(`${where} is ${hash}, not ${expectHash}, the lesson the previous review read`);
     return hash;
   };
@@ -550,7 +663,7 @@ export function readBefore(args, file, lesson, { root = ROOT, expectHash = null 
   for (const candidate of candidates) {
     const show = git(['show', `${short}:${candidate}`], root);
     if (!show.ok) continue;
-    const hash = hashOfText(show.stdout);
+    const hash = shownHash(show.stdout);
     if (!expectHash || hash === expectHash) return { text: show.stdout, revision: short, source: `${short}:${candidate}` };
     others.push(`${candidate} is ${hash}`);
   }
@@ -606,9 +719,10 @@ export function parseArgs(argv) {
  */
 export function formatScope(scope, info) {
   const pct = Math.round(scope.changedShare * 100);
+  const { parts } = scope;
   const lines = [
     `Changes in ${info.file} since ${info.revision}${info.source.startsWith(info.revision) ? '' : ` (${info.source})`}`,
-    `  ${scope.blocks.changed} of ${scope.blocks.total} blocks changed (${pct}%; above ${Math.round(FULL_REVIEW_SHARE * 100)}% a full review is required) · ${scope.structural.length ? 'structure changed' : 'sections and objectives unchanged'}`,
+    `  ${parts.changed} of ${parts.total} parts changed (${pct}%): ${parts.blocks.changed} of ${parts.blocks.total} blocks, ${parts.sections.changed} of ${parts.sections.total} sections, ${parts.fields.changed} of ${parts.fields.total} lesson fields and entries; above ${Math.round(FULL_REVIEW_SHARE * 100)}% of the parts or of the blocks a full review is required · ${scope.structural.length ? 'structure changed' : 'sections and objectives unchanged'}`,
     scope.fullReviewRequired
       ? `  → FULL REVIEW required: ${scope.reasons.join('; ')}`
       : `  → VERIFY: a fix-verification round is allowed. Every change below is reviewed in full.`,

@@ -17,7 +17,7 @@
     "lessonHash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{16}$",
-      "description": "The version of the lesson this review read: the output of `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` (sha256 of the canonical lesson JSON without provenance; moving the file between drafts/ and lessons/ does not change it). Required for every new review, full or verify: check-review.mjs refuses a review whose lessonHash is not the lesson's current hash as stale, and one without it unless --allow-legacy."
+      "description": "The version of the lesson this review read: the output of `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` (sha256 of the canonical lesson JSON without provenance; moving the file between drafts/ and lessons/ does not change it). Required for every review, full or verify: check-review.mjs refuses a review whose lessonHash is not the lesson's current hash as stale, and one without it (always; a verification of a previous review without it is refused too)."
     },
     "reviewer": {
       "type": "string",
@@ -40,11 +40,11 @@
       "properties": {
         "reviewedRevision": {
           "type": "string",
-          "description": "The lesson revision the previous review read: a git commit, or sha256:<hash> (the previous review's lessonHash) of a snapshot saved with `review-scope.mjs --snapshot`. At a commit the lesson is looked up at drafts/<id> first, then lessons/<id>; check-review.mjs takes the version whose hash is the previous review's lessonHash."
+          "description": "The lesson revision the previous review read, as review-scope.mjs prints it: a commit id (7–40 lowercase hex digits of a commit of this repository, never HEAD, a branch, a tag or HEAD~n, which name another commit when refs move), or sha256:<hash> (the previous review's lessonHash) of a snapshot saved with `review-scope.mjs --snapshot`. At a commit the lesson is looked up at drafts/<id> first, then lessons/<id>; check-review.mjs takes the version whose hash is the previous review's lessonHash."
         },
         "previousReview": {
           "type": "string",
-          "description": "The review this round verifies, as a recorded round: <commit>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json, or the snapshot copy .artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json. Never the working-tree reports file of the same lesson and reviewer (each round overwrites it), and never any other file. check-review.mjs refuses the review when it cannot load this review, and follows a previous verification back to its full review, checking every round on the way."
+          "description": "The review this round verifies, as a recorded round: <commit id>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json (the commit id as in reviewedRevision, never a ref such as HEAD or a branch), or the snapshot copy .artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json. Never the working-tree reports file of the same lesson and reviewer (each round overwrites it), and never any other file. It must record lessonHash. check-review.mjs refuses the review when it cannot load this review, and follows a previous verification back to its full review, checking every round on the way. The round is the reviews recorded next to it (at that commit, or in that snapshot round folder) that read the same version, its lessonHash."
         },
         "changed": {
           "type": "array",
@@ -53,7 +53,7 @@
         },
         "changedShare": {
           "type": "number",
-          "description": "Share of blocks changed, added, removed or moved since reviewedRevision (0–1). Above 0.3 a full review is required."
+          "description": "Share of the lesson's parts changed, added, removed or moved since reviewedRevision (0–1, rounded up): each block, each section's own fields (one part per section), each top-level field except sections and provenance, and each glossary and source entry. Above 0.3 a full review is required, and also when more than 30% of the blocks changed."
         },
         "fullReviewRequired": {
           "type": "boolean",
@@ -63,7 +63,7 @@
     },
     "resolved": {
       "type": "array",
-      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus the items still open from the rounds before it). check-review.mjs counts every unresolved entry, every item without an entry, and every resolved entry whose block (and fixedIn blocks) did not change since the item was raised, as an open must-fix.",
+      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus the items still open from the rounds before it). check-review.mjs counts every unresolved entry, every item without an entry, and every resolved entry without a change as an open must-fix. A change counts when it came after the round that last had the item open (the review that raised it, or a later round that found it unresolved or gave it no entry) and touched its block or a fixedIn block; a lesson-wide item (blockId \"lesson\") needs a changed lesson-level field, or fixedIn blocks that all changed.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -88,7 +88,7 @@
           },
           "fixedIn": {
             "type": "array",
-            "description": "Optional, for status resolved: the ids of the changed blocks (from verifies.changed) that resolve the item when the fix is not in blockId itself, e.g. a term now defined in the block before it. A resolved entry counts only when blockId or one of these changed since the review that raised the item.",
+            "description": "Optional, for status resolved: the ids of the changed blocks (from verifies.changed) that resolve the item when the fix is not in blockId itself, e.g. a term now defined in the block before it. A resolved entry counts only when blockId or one of these changed since the round that last had the item open. For a lesson-wide item (blockId \"lesson\") without a changed lesson-level field, list every block that holds the fix: each of them must have changed.",
             "items": { "type": "string" }
           }
         }
