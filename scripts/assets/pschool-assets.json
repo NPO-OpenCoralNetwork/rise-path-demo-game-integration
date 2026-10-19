@@ -1,0 +1,288 @@
+{
+  "name": "P-School 戦闘画像（ステージ3〜20の敵と背景）",
+  "models": [
+    "gptImageFlare"
+  ],
+  "quality": "high",
+  "maxUsd": 3,
+  "style": "Art style: match the reference images. Hand-painted 2D fantasy adventure game art with soft painterly shading, clean edges, warm natural light from the upper left, rich but natural colours and anime-influenced proportions. Friendly enough for a children's coding game: menacing but never gory or horrifying. Not pixel art. No text, letters, numbers, logo, watermark, signature, frame or border.",
+  "sprite": {
+    "rules": "One enemy only, full body from head to feet, turned three-quarters in a side view, seen from eye level, standing on an invisible ground line near the bottom edge, filling most of the image with a small margin. Facing LEFT, toward the hero. Use the reference images for the art style only; do not draw the characters in them.",
+    "transparent": "Transparent background: no scenery, no ground and no cast shadow.",
+    "flat": "Plain flat pure white background (#FFFFFF): no scenery, no ground, no shadow and no gradient."
+  },
+  "background": "Wide battle background for a side-view game, seen from eye level. A flat walkable ground area fills the lower third across the whole width, where the hero stands on the left and an enemy on the right; keep the left and right middle areas free of large objects. No characters, creatures or people, and no UI. Use the reference image for the art style and rendering only; do not copy its content.",
+  "spriteReferences": [
+    "public/p_school/assets/main-chara01_transparent.png",
+    "public/p_school/assets/seirei01_transparent.png"
+  ],
+  "backgroundReferences": [
+    "public/p_school/assets/battle-seen01.jpeg"
+  ],
+  "jobs": [
+    {
+      "id": "stage03-enemy",
+      "title": "St3 敵：アイスゴーレム",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Ice Golem: a hulking golem built from blocks of blue glacier ice and frosted stone, frost mist rising from its shoulders, glowing pale-blue eyes, heavy fists."
+    },
+    {
+      "id": "stage03-bg",
+      "title": "St3 背景：雪に埋もれた遺跡",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Frozen ancient ruins: snow-covered stone arches and broken statues, icicles, softly falling snow and a pale winter sky."
+    },
+    {
+      "id": "stage04-enemy",
+      "title": "St4 敵：フレイムウルフ",
+      "kind": "sprite",
+      "aspect_ratio": "3:2",
+      "prompt": "Flame Wolf: a large wolf whose mane and tail are living orange flames, glowing ember eyes and cracks of fire along its dark fur, in a crouching stance ready to pounce."
+    },
+    {
+      "id": "stage04-bg",
+      "title": "St4 背景：火山の洞窟",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Volcanic cavern: dark basalt rocks, rivers of glowing lava in the distance, embers drifting in hot orange air."
+    },
+    {
+      "id": "stage05-enemy",
+      "title": "St5 敵：タイムイーター",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Time Eater: a floating creature shaped like a cracked antique pocket watch with a toothy mouth, brass gears turning inside its body, clock-hand claws and a swirling violet aura."
+    },
+    {
+      "id": "stage05-bg",
+      "title": "St5 背景：時の迷宮",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Clockwork labyrinth of time: giant brass gears and floating clock faces under a swirling violet sky, with a stone walkway in front."
+    },
+    {
+      "id": "stage06-enemy",
+      "title": "St6 敵：ポイズンモス",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Poison Moth: a giant moth with purple and acid-green patterned wings, glowing toxic dust falling from its wings, feathery antennae, hovering just above the ground."
+    },
+    {
+      "id": "stage06-bg",
+      "title": "St6 背景：毒の沼",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Poison swamp: giant mushrooms, twisted trees, bubbling green-purple bog water and drifting toxic mist, with a firm mossy bank in front."
+    },
+    {
+      "id": "stage07-enemy",
+      "title": "St7 敵：アーマードキメラ",
+      "kind": "sprite",
+      "aspect_ratio": "3:2",
+      "prompt": "Armored Chimera: a lion-like beast with bat wings and a serpent tail, covered in riveted iron armor plates, sparks crackling between the plates."
+    },
+    {
+      "id": "stage07-bg",
+      "title": "St7 背景：鉄工所",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Old iron foundry: furnaces glowing orange, channels of molten metal, chains and gears overhead, a riveted metal floor in front."
+    },
+    {
+      "id": "stage08-enemy",
+      "title": "St8 敵：シールドゴブリン",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Shield Goblin: a sturdy green goblin warrior hiding behind a huge round wooden shield reinforced with iron, leather armor, a short club in the other hand."
+    },
+    {
+      "id": "stage08-bg",
+      "title": "St8 背景：ゴブリンの砦",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Goblin fortress: a wooden palisade gate with spiked logs, torches, crude banners and watchtowers at dusk, with packed dirt ground in front."
+    },
+    {
+      "id": "stage09-enemy",
+      "title": "St9 敵：シャドウゴースト",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Shadow Ghost: a hooded wraith made of swirling black-violet smoke, glowing red eyes, ragged shadowy cloak trailing into wisps, floating slightly."
+    },
+    {
+      "id": "stage09-bg",
+      "title": "St9 背景：幽霊屋敷",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Haunted mansion courtyard at night: a crooked old manor with dim windows, bare trees, iron fence, low fog and moonlight, with a cracked stone path in front."
+    },
+    {
+      "id": "stage10-enemy",
+      "title": "St10 ボス：ダークナイト",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Dark Knight, an imposing boss: tall knight in spiked black armor with violet glowing seams, horned helmet, tattered dark cape and a huge greatsword with red runes."
+    },
+    {
+      "id": "stage10-bg",
+      "title": "St10 背景：闇の城の玉座の間",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Dark castle throne hall: tall gothic pillars, purple flames in braziers, a distant empty throne, torn banners, with polished dark stone floor in front."
+    },
+    {
+      "id": "stage11-enemy",
+      "title": "St11 敵：幻影魔術師",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Phantom Sorcerer: a slender human mage with a pale porcelain half-mask and long silver hair, flowing indigo robes with star embroidery, translucent ghostly afterimages of himself flickering behind him, holding a staff topped with a glowing violet orb. This is an original character design; the reference image shows the art style only. Do not reuse the boy, the eyeball creature, feathers or blue robes from any reference.",
+      "references": [
+        "public/p_school/assets/main-chara01_transparent.png"
+      ]
+    },
+    {
+      "id": "stage11-bg",
+      "title": "St11 背景：幻影の森",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Mystical forest of illusions: tall trees with glowing blue runes, floating lights and shimmering mirage shapes, soft purple mist, with a mossy clearing in front."
+    },
+    {
+      "id": "stage12-enemy",
+      "title": "St12 敵：ビーストマスター",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Beast Master: a burly wild tamer wearing a wolf-pelt hood and bone ornaments, holding a long leather whip, clawed gauntlets and fierce war paint."
+    },
+    {
+      "id": "stage12-bg",
+      "title": "St12 背景：獣の森",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Wild beast forest: dense ancient trees with deep claw marks, tangled roots, scattered bones and shafts of afternoon light, with trampled earth in front."
+    },
+    {
+      "id": "stage13-enemy",
+      "title": "St13 敵：双子剣士",
+      "kind": "sprite",
+      "aspect_ratio": "3:2",
+      "prompt": "Twinblade Knights: two identical silver-armored knights standing side by side in a synchronized guard stance, blue capes, each holding a gleaming sword, both facing left."
+    },
+    {
+      "id": "stage13-bg",
+      "title": "St13 背景：武器庫",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Ancient armory hall: racks of swords, spears and shields along stone walls, torches and faint glowing blue runes, with a flagstone floor in front."
+    },
+    {
+      "id": "stage14-enemy",
+      "title": "St14 敵：クリスタルゴーレム",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Crystal Golem: a massive golem made of faceted violet and cyan crystals, light refracting inside it, smaller crystal shards orbiting its body."
+    },
+    {
+      "id": "stage14-bg",
+      "title": "St14 背景：水晶の洞窟",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Crystal cave: clusters of glowing blue and violet crystals on walls and ceiling, reflections on wet rock, with a smooth stone floor in front."
+    },
+    {
+      "id": "stage15-enemy",
+      "title": "St15 敵：エレメンタルシフター",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Elemental Shifter: a living elemental spirit with a humanoid torso of swirling energy and no clothing, its left half made of fire, its right half of ice crystals, crackling lightning connecting them, a glowing gem core in its chest, floating above the ground. This is an original character design; the reference image shows the art style only. Do not reuse the boy, the eyeball creature, feathers or blue robes from any reference.",
+      "references": [
+        "public/p_school/assets/main-chara01_transparent.png"
+      ]
+    },
+    {
+      "id": "stage15-bg",
+      "title": "St15 背景：属性の洞窟",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Elemental cavern: three glowing pillars of fire, ice and lightning in the distance, rune-carved rock walls, with a stone floor in front."
+    },
+    {
+      "id": "stage16-enemy",
+      "title": "St16 敵：ミラーナイト",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Mirror Knight: a knight in polished silver armor holding a large mirror-like shield that reflects light, a slender sword, calm counter-attack stance."
+    },
+    {
+      "id": "stage16-bg",
+      "title": "St16 背景：鏡の洞窟",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Mirror crystal cavern: smooth reflective crystal walls that mirror the space, pale cyan light, with a polished stone floor in front."
+    },
+    {
+      "id": "stage17-enemy",
+      "title": "St17 敵：スケルトン軍団",
+      "kind": "sprite",
+      "aspect_ratio": "3:2",
+      "prompt": "Skeleton Army: a small squad of four cartoonish skeleton soldiers with rusty helmets, chipped swords and round wooden shields, grouped together with the leader in front, all facing left. This is an original character design; the reference image shows the art style only. Do not reuse the boy, the eyeball creature, feathers or blue robes from any reference.",
+      "references": [
+        "public/p_school/assets/main-chara01_transparent.png"
+      ]
+    },
+    {
+      "id": "stage17-bg",
+      "title": "St17 背景：墓地",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Old graveyard at night: leaning tombstones, a crumbling chapel, bare trees, moonlight and drifting fog, with a dirt path in front."
+    },
+    {
+      "id": "stage18-enemy",
+      "title": "St18 敵：ペストドクター",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Plague Doctor: a tall alchemist in a long dark coat and wide-brimmed hat with a beaked mask, glass vials of bubbling green potions on a belt, holding a flask."
+    },
+    {
+      "id": "stage18-bg",
+      "title": "St18 背景：錬金術の研究室",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Alchemist's apothecary lab: shelves of potions and herbs, bubbling glassware, hanging dried plants and candlelight, with wooden floorboards in front."
+    },
+    {
+      "id": "stage19-enemy",
+      "title": "St19 敵：武器の達人",
+      "kind": "sprite",
+      "aspect_ratio": "2:3",
+      "prompt": "Arms Master: a tall, battle-hardened human warrior in mixed steel and leather armor with a red sash, carrying many weapons at once: a greatsword raised in one hand, and an axe and a spear strapped to the back. This is an original character design; the reference image shows the art style only. Do not reuse the boy, the eyeball creature, feathers or blue robes from any reference.",
+      "references": [
+        "public/p_school/assets/main-chara01_transparent.png"
+      ]
+    },
+    {
+      "id": "stage19-bg",
+      "title": "St19 背景：鍛錬場",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Training hall and forge: weapon displays, an anvil with a glowing forge fire, training dummies along the walls, with a wooden training floor in front."
+    },
+    {
+      "id": "stage20-enemy",
+      "title": "St20 ボス：コードイーター",
+      "kind": "sprite",
+      "aspect_ratio": "1:1",
+      "prompt": "Code Eater, the final boss: a large serpent-like digital monster made of glowing cyan and magenta code glyphs and circuit lines, a wide jaw devouring fragments of light, imposing and powerful."
+    },
+    {
+      "id": "stage20-bg",
+      "title": "St20 背景：デジタル空間",
+      "kind": "background",
+      "aspect_ratio": "16:9",
+      "prompt": "Digital void: a dark cyber space with vertical streams of glowing blue code, floating translucent geometric fragments and a glowing neon grid floor in front. Entirely digital: no trees, plants, rocks or sky."
+    }
+  ]
+}

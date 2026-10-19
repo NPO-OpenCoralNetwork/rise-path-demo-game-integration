@@ -9,9 +9,10 @@
  *   … --models gptImageSunburst,seedreamPro --jobs bg-stage2-lab --max-usd 0.5
  *   … --plan <plan.json> --out <dir>
  *
- * The plan (default scripts/assets/pschool-trial.json) names model aliases from
- * OPENROUTER_IMAGE_MODEL_IDS in server/llm/models.config.js, a shared style and the jobs (sprite or
- * background, with reference images). Parameters a model does not support are left out, as listed
+ * The plan (default scripts/assets/pschool-trial.json; the full stage set is pschool-assets.json)
+ * names model aliases from OPENROUTER_IMAGE_MODEL_IDS in server/llm/models.config.js, a shared style
+ * and the jobs (sprite or background). Reference images come from a job's `references`, else the
+ * plan's `spriteReferences` / `backgroundReferences`. Parameters a model does not support are left out, as listed
  * by GET /api/v1/images/models/<id>/endpoints. Sprites get a transparent background where the
  * model supports one and a flat white background otherwise.
  *
@@ -69,6 +70,11 @@ export function pickResolution(param, preferred) {
   if (param?.type !== 'enum' || preferred === undefined) return undefined;
   const listed = RESOLUTIONS.filter((value) => param.values.includes(value));
   return listed.find((value) => RESOLUTIONS.indexOf(value) >= RESOLUTIONS.indexOf(preferred)) ?? listed.at(-1);
+}
+
+/** A job's reference images: its own list, else the plan's spriteReferences or backgroundReferences. */
+export function referencesFor(plan, job) {
+  return job.references ?? plan[`${job.kind}References`] ?? [];
 }
 
 /** The POST /images body for one job on one model, using only the parameters the model supports. */
@@ -198,7 +204,7 @@ async function main() {
   let spent = 0;
   const results = [];
   for (const job of jobs) {
-    const references = await Promise.all((job.references ?? []).map(dataUrl));
+    const references = await Promise.all(referencesFor(plan, job).map(dataUrl));
     for (const model of models) {
       const body = buildRequest({ plan, job, modelId: model.id, supported: model.supported, references });
       const estimate = estimateUsd(model.pricing, body);

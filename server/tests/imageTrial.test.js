@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { buildRequest, estimateUsd, parseArgs, pickResolution, pickValue } from '../../scripts/assets/try-image-models.mjs';
+import { buildRequest, estimateUsd, parseArgs, pickResolution, pickValue, referencesFor } from '../../scripts/assets/try-image-models.mjs';
 import { OPENROUTER_IMAGE_MODEL_IDS } from '../llm/models.config.js';
 
 const plan = {
@@ -53,6 +53,14 @@ describe('try-image-models request building', () => {
     assert.equal(body.background, 'opaque');
     assert.match(body.prompt, /^LAB\n\nBACKGROUND RULES\n\nSTYLE$/);
     assert.equal('input_references' in body, false);
+  });
+
+  it('takes reference images from the job, else from the plan for its kind', () => {
+    const withDefaults = { ...plan, spriteReferences: ['s.png'], backgroundReferences: ['b.png'] };
+    assert.deepEqual(referencesFor(withDefaults, sprite), ['s.png']);
+    assert.deepEqual(referencesFor(withDefaults, background), ['b.png']);
+    assert.deepEqual(referencesFor(withDefaults, { ...sprite, references: ['own.png'] }), ['own.png']);
+    assert.deepEqual(referencesFor(plan, sprite), []);
   });
 
   it('picks enum values and resolutions', () => {
