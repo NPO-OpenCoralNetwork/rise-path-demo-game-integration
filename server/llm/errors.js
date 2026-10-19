@@ -45,11 +45,20 @@ const CLIENT_MESSAGES = /** @type {const} */ ({
 /** Codes where trying the next provider in the chain makes sense. */
 const RETRYABLE_CODES = new Set(['provider_unavailable', 'auth', 'rate_limited', 'timeout', 'provider_error']);
 
+/**
+ * Codes raised before any model produced output (nothing billed): no provider, provider down or
+ * overloaded, our key rejected, rate limited. Every other code means a model may have run.
+ */
+const BEFORE_MODEL_CODES = new Set(['no_provider', 'provider_unavailable', 'auth', 'rate_limited']);
+
 export class LlmError extends Error {
   /**
    * @param {LlmErrorCode} code
    * @param {string} message
-   * @param {{ provider?: string, model?: string, retryable?: boolean, cause?: unknown, details?: unknown }} [options]
+   * @param {{ provider?: string, model?: string, retryable?: boolean, cause?: unknown, details?: unknown, modelRan?: boolean }} [options]
+   *   modelRan: a model ran (and may have been billed) for this request even though the code
+   *   is one raised before a model (set by providers for unclassified failures and by the
+   *   gateway when an earlier attempt or a structured first turn already ran).
    */
   constructor(code, message, options = {}) {
     super(message);
@@ -61,12 +70,21 @@ export class LlmError extends Error {
     this.model = options.model;
     this.retryable = options.retryable ?? RETRYABLE_CODES.has(code);
     this.details = options.details;
+    /** @type {boolean} */
+    this.modelRan = options.modelRan ?? false;
     if (options.cause !== undefined) this.cause = options.cause;
   }
 }
 
 /** @param {unknown} error @returns {error is LlmError} */
 export const isLlmError = (error) => error instanceof LlmError;
+
+/**
+ * Whether a model may have run (and been billed) for the request that ended in `error`.
+ * Unknown errors count as "ran".
+ * @param {unknown} error
+ */
+export const modelMayHaveRun = (error) => !isLlmError(error) || error.modelRan || !BEFORE_MODEL_CODES.has(error.code);
 
 /**
  * Map any error to `{ status, body }` for a JSON response. Never echoes provider messages.

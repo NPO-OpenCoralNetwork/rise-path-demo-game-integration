@@ -42,7 +42,12 @@ export function mapGeminiError(sdk, error, route) {
     if (status >= 400) return new LlmError('bad_request', 'Gemini rejected the request', meta);
   }
   if (name === 'TimeoutError') return new LlmError('timeout', 'Gemini request timed out', meta);
-  return new LlmError('provider_unavailable', 'Gemini call failed', meta);
+  // fetch() could not reach Gemini: no model ran.
+  if (error instanceof TypeError && /fetch failed|network/i.test(String(/** @type {any} */ (error).message))) {
+    return new LlmError('provider_unavailable', 'Gemini connection failed', meta);
+  }
+  // Anything else may have failed after the model ran (and was billed).
+  return new LlmError('provider_unavailable', 'Gemini call failed', { ...meta, modelRan: true });
 }
 
 /**
@@ -147,6 +152,9 @@ export function createGeminiProvider(options) {
     },
 
     /**
+     * Text streaming: `text.delta` events, then `done`. A reply cut off by the token limit after
+     * visible text ends with `done` (`stopReason: 'max_tokens'`, `truncated: true`, real usage);
+     * cut off before any text, it throws `max_tokens`. Blocked replies throw `refusal`.
      * @param {LlmRequest} req
      * @param {TaskRoute} route
      */
@@ -161,18 +169,32 @@ export function createGeminiProvider(options) {
         });
         let text = '';
         let last = null;
+        let truncated = false;
         for await (const chunk of stream) {
           last = chunk;
-          assertUsable(chunk, route);
+          // A blocked chunk is never shown; a chunk cut off by the token limit still carries
+          // the end of the visible answer, so its text goes out first.
+          const hitLimit = chunk?.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+          if (!hitLimit) assertUsable(chunk, route);
           const delta = chunk.text;
           if (delta) {
             text += delta;
             yield { type: 'text.delta', text: delta };
           }
+          if (hitLimit) truncated = true;
         }
+        // Cut off before any visible text (thinking used the budget): nothing to keep.
+        if (truncated && !text.trim()) assertUsable(last, route);
         yield {
           type: 'done',
-          result: { provider: 'gemini', model: last?.modelVersion || route.model, text, stopReason: 'end', usage: normalizeUsage(last?.usageMetadata) },
+          result: {
+            provider: 'gemini',
+            model: last?.modelVersion || route.model,
+            text,
+            stopReason: truncated ? 'max_tokens' : 'end',
+            ...(truncated ? { truncated: true } : {}),
+            usage: normalizeUsage(last?.usageMetadata),
+          },
         };
       } catch (error) {
         throw mapGeminiError(sdk, error, route);

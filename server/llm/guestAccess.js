@@ -7,8 +7,12 @@
  *   the Vite dev server), and a POST from any other browser origin is refused with 403.
  * - Anonymous POSTs share a daily budget per IP and in total (in memory, reset at 00:00 UTC):
  *   LLM_GUEST_DAILY_PER_IP (default 100) and LLM_GUEST_DAILY_TOTAL (default 2000).
+ *   The routes mount the budget after body validation (and the guest lesson check), so only
+ *   requests that will reach a model are charged, and give a request back with
+ *   refundGuestBudget when the call fails before any model ran.
  * Signed-in requests (req.userId) skip the budget; the per-minute AI limiter still applies.
  */
+import { modelMayHaveRun } from './errors.js';
 
 const DEFAULT_PER_IP = 100;
 const DEFAULT_TOTAL = 2000;
@@ -67,7 +71,9 @@ export function originGuard(isAllowedOrigin) {
 }
 
 /**
- * Daily request budget for anonymous callers, per IP and in total.
+ * Daily request budget for anonymous callers, per IP and in total. Every POST that reaches the
+ * middleware is charged, so mount it after the checks that can reject a request. It leaves
+ * `res.locals.refundGuestBudget()` for refundGuestBudget below.
  * @param {{ env?: Record<string, string | undefined>, perIp?: number, total?: number, now?: () => number }} [options]
  */
 export function createGuestBudget({ env = process.env, perIp, total, now = () => Date.now() } = {}) {
@@ -103,9 +109,48 @@ export function createGuestBudget({ env = process.env, perIp, total, now = () =>
     }
     byIp.set(ip, mine + 1);
     used += 1;
+    const chargedDay = day;
+    let refunded = false;
+    if (res.locals) {
+      // Once per request, and only on the day it was charged (a new day starts from zero).
+      res.locals.refundGuestBudget = () => {
+        if (refunded || chargedDay !== day) return;
+        refunded = true;
+        used = Math.max(0, used - 1);
+        const left = (byIp.get(ip) ?? 1) - 1;
+        if (left > 0) byIp.set(ip, left);
+        else byIp.delete(ip);
+      };
+    }
     next();
   };
 }
 
-/** Tighter request limits for anonymous tutor calls (applied after validation). */
-export const GUEST_TUTOR_LIMITS = Object.freeze({ historyTurns: 6, historyChars: 2000, maxTokens: 1024 });
+/**
+ * Give a guest request back to the daily budget when no model ran for it, so an outage does not
+ * use up the guests' day. Refunded: no provider configured, every provider down or overloaded,
+ * our key rejected, rate limited (errors.js modelMayHaveRun). Charged: timeouts, refusals,
+ * truncated or invalid replies, unknown errors, and any request where an earlier attempt or a
+ * structured first turn already ran (the gateway marks those `modelRan`). The tutor route also
+ * keeps the charge once text was streamed. No-op for signed-in users.
+ * @param {import('express').Response} res
+ * @param {unknown} error  LlmError
+ */
+export function refundGuestBudget(res, error) {
+  if (!modelMayHaveRun(error)) res.locals?.refundGuestBudget?.();
+}
+
+/**
+ * Tighter limits for anonymous tutor calls (applied after validation).
+ * - maxTokens is the hard ceiling of one call. Thinking tokens count against it, and adaptive
+ *   thinking cannot be turned off on the current Claude models, so it leaves room for thinking
+ *   (a 1024 cap cut answers off mid-sentence). It still bounds what one guest call can cost.
+ * - The answer is kept short by `answerRule` (an extra system line) and low effort instead.
+ */
+export const GUEST_TUTOR_LIMITS = Object.freeze({
+  historyTurns: 6,
+  historyChars: 2000,
+  maxTokens: 4096,
+  effort: 'low',
+  answerRule: 'The learner is not signed in. Keep every answer at the default short length (about 120 Japanese characters or 60 English words, at most three short paragraphs or bullets), even when they ask for more detail.',
+});

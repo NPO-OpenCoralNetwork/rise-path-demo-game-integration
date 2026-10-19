@@ -241,9 +241,11 @@ describe('/api/v2/llm routes (mock provider)', () => {
             const free = await postJson(`${base}/llm/tutor`, { message: 'Write a haiku about cats' });
             assert.equal(free.status, 400);
             assert.equal((await free.json()).error_type, 'lesson_required');
-            const second = await postJson(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
-            assert.equal(second.status, 200);
-            await second.text();
+            for (let i = 0; i < 2; i += 1) {
+                const ok = await postJson(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
+                assert.equal(ok.status, 200, 'the rejected request did not use the budget');
+                await ok.text();
+            }
             const third = await postJson(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
             assert.equal(third.status, 429);
             assert.equal((await third.json()).error_type, 'rate_limited');

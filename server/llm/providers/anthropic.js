@@ -9,7 +9,8 @@
  *   stripped) and passed as a raw `output_config.format`; zod still validates the reply.
  * - Long outputs (task `stream` or maxTokens > 16k): `messages.stream(...).finalMessage()`.
  * - Thinking stays adaptive (it cannot be disabled on the current models); depth is set with
- *   `output_config.effort` per task. No sampling parameters (rejected by the current models).
+ *   `output_config.effort` per task. Thinking tokens count against `max_tokens`, so task limits
+ *   leave room for them. No sampling parameters (rejected by the current models).
  * - The stable system prefix carries `cache_control` so repeated calls read it from cache.
  */
 import { LlmError } from '../errors.js';
@@ -92,6 +93,9 @@ const collectText = (message) => (message?.content || [])
   .map((block) => block.text)
   .join('');
 
+/** Stop reasons where a token limit cut the reply off. */
+const TRUNCATED_STOP_REASONS = new Set(['max_tokens', 'model_context_window_exceeded']);
+
 /**
  * Raise typed errors for stop reasons that make the reply unusable.
  * @param {any} message
@@ -102,7 +106,7 @@ function assertUsable(message, route) {
   if (message?.stop_reason === 'refusal') {
     throw new LlmError('refusal', 'Claude declined the request', { ...meta, details: message.stop_details?.category ?? null });
   }
-  if (message?.stop_reason === 'max_tokens' || message?.stop_reason === 'model_context_window_exceeded') {
+  if (TRUNCATED_STOP_REASONS.has(message?.stop_reason)) {
     throw new LlmError('max_tokens', 'Claude reply hit the output limit', meta);
   }
 }
@@ -200,8 +204,10 @@ export function createAnthropicProvider(options) {
     },
 
     /**
-     * Text streaming: yields `text.delta` events, then `done`. A refusal or truncation after
-     * partial text throws a typed LlmError (the gateway turns it into an `error` event).
+     * Text streaming: yields `text.delta` events, then `done`. A refusal throws a typed LlmError
+     * (the gateway turns it into an `error` event). A reply cut off by the token limit after
+     * visible text ends with `done` (`stopReason: 'max_tokens'`, `truncated: true`): the reader
+     * already shows that text. Cut off before any text, it throws `max_tokens`.
      * @param {LlmRequest} req
      * @param {TaskRoute} route
      */
@@ -218,14 +224,17 @@ export function createAnthropicProvider(options) {
           }
         }
         const message = await stream.finalMessage();
-        assertUsable(message, route);
+        const text = collectText(message);
+        const truncated = TRUNCATED_STOP_REASONS.has(message?.stop_reason) && text.trim() !== '';
+        if (!truncated) assertUsable(message, route);
         yield {
           type: 'done',
           result: {
             provider: 'anthropic',
             model: message.model || route.model,
-            text: collectText(message),
-            stopReason: 'end',
+            text,
+            stopReason: truncated ? 'max_tokens' : 'end',
+            ...(truncated ? { truncated: true } : {}),
             usage: normalizeUsage(message.usage),
           },
         };

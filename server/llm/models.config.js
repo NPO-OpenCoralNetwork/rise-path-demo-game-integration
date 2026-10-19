@@ -54,7 +54,7 @@ export const ANTHROPIC_SERVER_FALLBACK_MODELS = new Set([MODEL_IDS.anthropic.opu
  * @property {ModelTier} tier
  * @property {ProviderId} provider  default provider
  * @property {Effort} effort        Anthropic output_config.effort (Gemini maps it to thinkingLevel)
- * @property {number} maxTokens
+ * @property {number} maxTokens     hard output ceiling; Anthropic thinking tokens count against it
  * @property {boolean} [stream]     long outputs: stream + finalMessage() even for non-streaming callers
  */
 
@@ -64,7 +64,7 @@ export const TASKS = Object.freeze({
   'lesson.author': { tier: 'authoring', provider: 'anthropic', effort: 'medium', maxTokens: 64000, stream: true },
   'lesson.judge': { tier: 'authoring', provider: 'anthropic', effort: 'medium', maxTokens: 8000 },
   'lesson.translate': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 32000, stream: true },
-  'tutor.chat': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 2048 },
+  'tutor.chat': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 8192 },
   'writing.feedback': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'assessment.insight': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'text.classify': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 1024 },

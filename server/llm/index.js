@@ -11,7 +11,7 @@
  * Without any key the gateway uses the mock provider outside production, and throws
  * `no_provider` (HTTP 503) in production.
  */
-import { LlmError, isLlmError } from './errors.js';
+import { LlmError, isLlmError, modelMayHaveRun } from './errors.js';
 import {
   PROVIDER_FALLBACK_ORDER,
   TASKS,
@@ -43,7 +43,7 @@ import { createMockProvider } from './providers/mock.js';
 
 /**
  * @typedef {{ inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number }} LlmUsage
- * @typedef {{ provider: string, model: string, text: string, data?: any, stopReason: string, usage: LlmUsage, repaired?: boolean }} LlmResult
+ * @typedef {{ provider: string, model: string, text: string, data?: any, stopReason: string, usage: LlmUsage, repaired?: boolean, truncated?: boolean }} LlmResult
  * @typedef {{ type: 'text.delta', text: string } | { type: 'done', result: LlmResult } | { type: 'error', error: LlmError }} LlmEvent
  */
 
@@ -62,6 +62,9 @@ import { createMockProvider } from './providers/mock.js';
  */
 
 const cleanKey = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
+
+/** @type {LlmUsage} */
+const NO_USAGE = Object.freeze({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
 
 /**
  * Whether mock may stand in when no provider key is configured.
@@ -160,6 +163,7 @@ export function createGateway(options = {}) {
       `ms=${Date.now() - startedAt}`,
       usage ? `in=${usage.inputTokens} out=${usage.outputTokens} cache_read=${usage.cacheReadTokens} cache_write=${usage.cacheWriteTokens}` : '',
       result?.repaired ? 'repaired=1' : '',
+      result?.truncated ? 'truncated=1' : '',
       error ? `error=${error.code}` : '',
       req.userId ? `user=${String(req.userId).slice(0, 8)}` : '',
     ];
@@ -191,23 +195,33 @@ export function createGateway(options = {}) {
     async generate(req) {
       assertRequest(req);
       let lastError = null;
+      // Whether any attempt (or a structured first turn) already ran a model: the final error
+      // then carries modelRan, so a guest's quota is not given back for a billed call.
+      let modelRan = false;
       for (const route of plan(req.task, req.override)) {
         const startedAt = Date.now();
         try {
           const provider = getProvider(route.provider);
+          const call = async (r) => {
+            const out = await provider.generate(r, route);
+            modelRan = true;
+            return out;
+          };
           const result = req.schema
             ? await generateStructured({
-              call: (r) => provider.generate(r, route),
+              call,
               req,
               schema: req.schema,
               provider: route.provider,
               model: route.model,
             })
-            : await provider.generate(req, route);
+            : await call(req);
           logCall(route, req, result, startedAt);
           return { ...result, provider: route.provider };
         } catch (error) {
           const llmError = asLlmError(error, route);
+          if (modelMayHaveRun(llmError)) modelRan = true;
+          if (modelRan) llmError.modelRan = true;
           logCall(route, req, undefined, startedAt, llmError);
           if (!llmError.retryable || req.signal?.aborted) throw llmError;
           lastError = llmError;
@@ -219,7 +233,8 @@ export function createGateway(options = {}) {
     /**
      * Streaming text call. Yields normalized events and never throws for provider failures:
      * they arrive as one final `error` event. Falls over to the next provider only before
-     * any text has been sent.
+     * any text has been sent. A reply cut off by the output limit after text was sent ends
+     * with `done` (`truncated: true`) carrying that text, not with an error.
      * @param {LlmRequest} req
      * @returns {AsyncGenerator<LlmEvent>}
      */
@@ -234,13 +249,16 @@ export function createGateway(options = {}) {
       }
 
       let lastError = null;
+      let modelRan = false; // as in generate(): any earlier attempt that may have been billed
       for (const route of routes) {
         const startedAt = Date.now();
         let sentText = false;
+        let text = '';
         try {
           for await (const event of getProvider(route.provider).stream(req, route)) {
             if (event.type === 'text.delta') {
               sentText = true;
+              text += event.text;
               yield event;
             } else if (event.type === 'done') {
               const result = { ...event.result, provider: route.provider };
@@ -252,6 +270,25 @@ export function createGateway(options = {}) {
           return;
         } catch (error) {
           const llmError = asLlmError(error, route);
+          if (sentText || modelMayHaveRun(llmError)) modelRan = true;
+          if (modelRan) llmError.modelRan = true;
+          // Providers that report truncation as an error: keep the text the reader already has.
+          // (The built-in providers end such replies with a truncated `done` and real usage;
+          // this path has no usage to report.)
+          if (llmError.code === 'max_tokens' && text.trim() && !req.signal?.aborted) {
+            /** @type {LlmResult} */
+            const result = {
+              provider: route.provider,
+              model: llmError.model || route.model,
+              text,
+              stopReason: 'max_tokens',
+              truncated: true,
+              usage: { ...NO_USAGE },
+            };
+            logCall(route, req, result, startedAt);
+            yield { type: 'done', result };
+            return;
+          }
           logCall(route, req, undefined, startedAt, llmError);
           if (sentText || !llmError.retryable || req.signal?.aborted) {
             yield { type: 'error', error: llmError };
