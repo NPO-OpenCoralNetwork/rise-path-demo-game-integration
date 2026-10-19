@@ -12,8 +12,9 @@ import {
   buildRoadmapPrompt,
   buildCurriculumPrompt,
 } from './aiPrompts.js';
+import { MODEL_IDS } from '../llm/models.config.js';
 
-const MODEL = process.env.AI_GENERATE_MODEL || 'gemini-2.5-flash';
+const MODEL = process.env.AI_GENERATE_MODEL || MODEL_IDS.gemini.flash;
 const TIMEOUT_MS = 45000;
 
 // --- Kit Cache (5 min TTL, LRU max 100) ---

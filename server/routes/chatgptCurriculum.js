@@ -300,7 +300,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     const generationMeta = {
         ...asObject(req.body?.generation_meta),
         provider: cleanString(req.body?.generation_meta?.provider) || 'openai',
-        model: cleanString(req.body?.generation_meta?.model) || 'gpt-5',
+        model: cleanString(req.body?.generation_meta?.model) || 'unknown',
         source_connector: cleanString(req.body?.generation_meta?.source_connector) || 'chatgpt_mcp',
         session_id: cleanString(req.body?.generation_meta?.session_id),
     };
@@ -444,6 +444,9 @@ router.post('/learner-profiles/assessments', requireBridgeOrAuth, async (req, re
     try {
         // Phase 7: ensurePhase1User removed
         await client.query('BEGIN');
+
+        // Serialize concurrent saves for this user so max(version)+1 can't collide
+        await client.query('select pg_advisory_xact_lock(hashtext($1))', [`learner_profiles:${req.userId}`]);
 
         // Determine next version for this user
         const versionResult = await client.query(
