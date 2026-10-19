@@ -1,0 +1,36 @@
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The two tables (s2-table, s5-b2) and the 3-node flowchart (s2-b4, 図1) render cleanly and are readable at 390 px and on desktop, with JP labels in JP and EN labels in EN. One weak spot: on mobile the 3-column MoSCoW table s5-b2 squeezes cells into 3-line wraps such as 「目的を果たせ/ない」「成り/立つ」「やらな/い」 (pages/mobile-jp-09.png, mobile-jp-10.png).",
+      "blockIds": ["s2-table", "s5-b2", "s2-b4"]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty for all three shots. Each screen mixes short paragraphs with a definitions card, callout, table, steps, prompt or quiz. There are no walls of text and no large empty gaps, and an inline check (確認しよう 1/4 to 4/4) closes each section.",
+      "blockIds": ["s1-check", "s2-check", "s5-check", "s3-check", "s3-steps"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The EN screenshots contain no Japanese, and the JP screenshots contain no untranslated English beyond intended terms (MoSCoW, MVP, Must/Won't). Nothing sits under the top or bottom bars, and contrast is good. Desktop JP is 37 characters per line (median, target 30–40), but some lines reach 44. Desktop EN is 70 (median, target 60–75), with a maximum of 79.",
+      "blockIds": ["summary-cards"]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s5-b2: on mobile, the 3-column MoSCoW table wraps the 意味 and 家計簿の例 cells into narrow 3-line stacks with breaks inside words (「目的を果たせ/ない」「この版では作ら/ない」), see pages/mobile-jp-09.png and pages/mobile-jp-10.png. Shorten the 意味 cells to about 6 characters (必須 / 重要 / あるとよい / 今回はやらない) and move the explanation into s5-defs or the s5-b3 callout. Another option is to drop the 意味 column and keep 分類 + 家計簿の例 only.",
+    "reader: the flashcard hint reads 「クリックまたはスペースキーでめくる」 on the 390 px mobile view (pages/mobile-jp-28.png). Use 「タップしてめくる」 on touch devices.",
+    "reader: the next-lesson card title shows 「開発環境コックピット（VSCode）」 while the lesson body writes 「VS Code」 (pages/mobile-jp-30.png, desktop-jp-20.png). Align the spelling in course.json when the owner next edits it.",
+    "reader: section numbers on screen are positional, so section id 2-5 shows as 「2-3」 and id 2-3 shows as 「2-4」. Learners don't see this, but reviewers matching ids to screenshots should know."
+  ],
+  "average": 3.33,
+  "verdict": "pass",
+  "summary": "Hard checks are clean: no overflow, no console or mermaid errors, no unknown blocks, no broken images. The lesson keeps a steady visual rhythm on mobile and desktop, and both locales are fully translated. The table, diagram and quizzes all read well. The only visual weakness is the cramped 3-column MoSCoW table s5-b2 at 390 px. Shortening its 意味 column would remove the awkward mid-word wraps."
+}

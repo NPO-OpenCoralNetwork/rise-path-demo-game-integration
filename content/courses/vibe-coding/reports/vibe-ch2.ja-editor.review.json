@@ -1,0 +1,87 @@
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The lesson keeps です・ます, uses no pressure phrases, and the feedback stays within 2 sentences. A few spots read stiffly. s2-why uses 「[[機能]]を言われたら」, practice-prompt.expect stacks noun-ending sentences (体言止め) in a row, and o1 uses 「依頼文（壁打ち）」, which equates the request with the activity.",
+      "blockIds": ["s2-why", "practice-prompt", "o1"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "lint --strict is clean, and each section has a table, figure, steps or check. The explanation of q4 is a single paragraph with 4 sentences (153 characters), which goes over the style guide's limit of 3 sentences per paragraph.",
+      "blockIds": ["q4"]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "Prerequisites list chapters 0 and 1, and s1-b1 and ex-data recall them. 壁打ち, 目的, 機能, MVP, MoSCoW and 1枚企画書 are all defined in definitions blocks before they are used, and PRD is spelled out on first use. Only glossary.1.md departs from the wording of s2-defs.",
+      "blockIds": ["s1-b1", "s1-defs", "s2-defs", "s5-defs", "s3-defs"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Every string has both jp and en, the diagram labels are in both languages, and the alt and description are specific. The EN explanation of q1 has a hard-to-parse sentence. The alt of s2-b4 says 「残り画面」, which does not match the diagram label 「今月の残り画面」.",
+      "blockIds": ["q1", "s2-b4"]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "o1",
+      "issue": "The parenthesis 「依頼文（壁打ち）」 makes the request itself look like it is called 壁打ち. In the lesson, 壁打ち is the activity, not the request.",
+      "fix": "「ぼんやりしたアイデアを、AIに質問してもらう依頼文（壁打ち）に書き換えて使える」→「ぼんやりしたアイデアを、AIに質問してもらう依頼文に書き換え、壁打ちに使える」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s2-why",
+      "issue": "「機能を言われたら」 is unnatural Japanese, and it is unclear who says the feature.",
+      "fix": "「[[機能]]を言われたら、「なぜそれがほしいの？」と1回聞き返します。」→「ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "practice-prompt",
+      "issue": "The expect text strings together noun endings and quote endings (体言止めの連続), which breaks the です・ます tone.",
+      "fix": "「自分の分け方：Mustは出欠ボタン、参加人数の一覧、締め切り前日の通知。Couldはひとことコメント欄。Won'tは参加費の集金。」→「自分の分け方：Mustは出欠ボタン、参加人数の一覧、締め切り前日の通知です。Couldはひとことコメント欄、Won'tは参加費の集金です。」 and 「理由の例：通知は「返事を忘れる人がいるから」。集金は「お金を扱うので、今回は作らない」。」→「理由の例：通知は「返事を忘れる人がいるから」、集金は「お金を扱うので、今回は作らない」です。」"
+    },
+    {
+      "criterion": "load",
+      "blockId": "q4",
+      "issue": "The explanation is one paragraph with 4 sentences, over the 3-sentence limit. 「範囲外のことを書くことを」 also repeats こと twice.",
+      "fix": "「Anthropic社のAIツール「Claude Code」の公式ガイドにも、同じ考え方があります。ガイドは、役に立つ仕様書（企画書のような文書）の特徴として、範囲外のことを書くことを挙げています。」→「Claude Codeの公式ガイドも、よい仕様書（企画書のような文書）の条件として、範囲外を書くことを挙げています。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "lesson",
+      "issue": "glossary[1].md ends in plain form (「1文で書く。」) and differs from the s2-defs definition. The glossary and the text should use the same wording.",
+      "fix": "glossary 「目的」.md: 「アプリを使った人が、どうなれたらうれしいか。「誰が・どんな場面で・どうなれる」の1文で書く。」→「アプリを使った人が、どうなれたらうれしいか。「誰が・どんな場面で・どうなれる」の形で1文に書きます。」"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "s2-b4",
+      "issue": "The alt says 「残り画面」, which does not match the diagram label and body text 「今月の残り画面」.",
+      "fix": "alt.jp 「…保存すると残り画面に戻る図」→「…保存すると今月の残り画面に戻る図」"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "q1",
+      "issue": "In the EN explanation, the subject \"whose problem you want to solve, and what it is\" is too long, so the sentence is hard to parse.",
+      "fix": "\"When the questions are about the goal rather than the features, whose problem you want to solve, and what it is, turn into words.\" → \"Questions about the goal rather than the features help you put into words whose problem you want to solve and what it is.\""
+    }
+  ],
+  "niceToHave": [
+    "s5-defs (EN) and the MVP glossary entry: \"learn the most about the people who use it with the least effort\" can be misread as \"use it with the least effort\". A comma before \"with the least effort\" would fix this.",
+    "In q4 the Claude Code official guide claim has no cite or source at the question level. Please confirm that the source and the cite are recorded.",
+    "summary-next: 「第4章でAIに画面を作ってもらう」 is a claim about the content of later chapters. Please check it against the actual chapter 3 and 4 lessons.",
+    "q4 option d hedges with 「〜ことがある」 while the other options are absolute statements, which can hint at the correct answer. Consider aligning the sentence endings.",
+    "The lesson consistently writes 「分かる」 in kanji. The style guide's example uses 「わかる」, so consider matching the course-wide convention.",
+    "Section id 2-5 has the title 2-3 and id 2-3 has the title 2-4. Learners never see this, but it may confuse authors."
+  ],
+  "average": 3.25,
+  "verdict": "revise",
+  "summary": "The material is carefully built. Concrete scenes come before definitions, every term is defined before use, the feedback is short, and the JP and EN versions mostly match. The most important fixes are the stiff Japanese in o1, s2-why and practice-prompt, and splitting the 4-sentence explanation in q4. The glossary wording and the diagram alt label also need to match the body text."
+}
