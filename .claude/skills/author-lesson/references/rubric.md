@@ -170,21 +170,30 @@ Are all declared locales complete, no text baked into images, alt text and link 
 
 ## Reviewer output
 
-Reviewers return JSON matching `content/schema/review.v1.json`: `lessonId`, `file`, `reviewer`, `rubricVersion: "rubric.v1"`,
-`scores[] {id, score 0–4, evidence, blockIds?}`, `mustFix[] {criterion, blockId, issue, fix, screenshot?}`, `niceToHave[]`,
-`verdict` (pass | revise | reject) and `summary`. Evidence quotes the lesson or names block ids; a fix is specific enough
-to apply without guessing.
+Reviewers return JSON matching `content/schema/review.v1.json`: `lessonId`, `file`, `lessonHash`, `reviewer`,
+`rubricVersion: "rubric.v1"`, `scores[] {id, score 0–4, evidence, blockIds?}`, `mustFix[] {criterion, blockId, issue, fix,
+screenshot?}`, `niceToHave[]`, `verdict` (pass | revise | reject) and `summary`. Evidence quotes the lesson or names block
+ids; a fix is specific enough to apply without guessing. `lessonHash` is the version the reviewer read
+(`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash`); `check-review.mjs` refuses a review whose
+`lessonHash` is not the lesson's current hash (stale), and one without it unless `--allow-legacy`.
 
 ## Review rounds
 
 - Round 1 is a full review (`mode` absent or `"full"`): every criterion in the reviewer's scope is scored afresh.
 - A later round is a **verification round** (`"mode": "verify"`) when the author applied the previous must-fix items and
-  `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision>` exits 0. The reviewer marks each
-  previous must-fix `resolved` or `unresolved` in `resolved[] {blockId, criterion, status, evidence}`, reviews every changed
-  or new block in full, adds `mustFix` only for errors in changed blocks or regressions the changes caused, re-scores the
-  criteria the changes affect and copies the others with `carriedOver: true`. `verifies {reviewedRevision, previousReview,
-  changed, changedShare?, fullReviewRequired}` records what was verified.
+  `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --expect-hash <previous lessonHash>`
+  exits 0. The reviewer marks each open must-fix `resolved` or `unresolved` in `resolved[] {blockId, criterion, status,
+  evidence, fixedIn?}` (a must-fix is resolved only by a change; `fixedIn` names the changed block when the fix is not in
+  `blockId`), reviews every changed or new block in full, adds `mustFix` only for errors in changed blocks or regressions the
+  changes caused, re-scores the criteria the changes affect and copies the others with `carriedOver: true` (every criterion
+  the previous review scored is listed). `verifies {reviewedRevision, previousReview,
+  changed, changedShare?, fullReviewRequired}` records what was verified; `previousReview` is a recorded round,
+  `<commit>:<reports path>` or the snapshot copy, never the working-tree reports file or any other copy.
 - A full review is still required when a section was added, removed, reordered or changed its role, the objectives changed,
   or more than 30% of the blocks changed (`review-scope.mjs` exits 1).
-- `check-review.mjs` counts every `unresolved` entry as an open must-fix; the pass rule above is the same in both modes.
-  Rules: `.claude/skills/review-lesson/SKILL.md`.
+- `check-review.mjs` counts as open must-fix items every `unresolved` entry, every open item without an entry and every
+  `resolved` entry whose block did not change; open items carry over. The pass rule above is the same in both modes.
+  It refuses a verification (exit 2) when the previous review cannot be loaded or is itself an invalid round (a previous
+  verification is followed back to its full review), the scope it recomputes from `reviewedRevision` requires a full
+  review or has changes `verifies.changed` leaves out, a criterion the previous review scored is missing, or a reviewer
+  of the verified round is left out of the gate run. Rules: `.claude/skills/review-lesson/SKILL.md`.

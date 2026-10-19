@@ -18,7 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { LINT_RULES } from '../../shared/lesson/lint.js';
 import { BLOCK_TYPES } from '../../shared/lesson/constants.js';
 import { GUIDE, lintRulesFor, referenceFiles } from '../../.claude/skills/author-lesson/scripts/build-references.mjs';
-import { checkSchema, evaluateReviews, loadSchemas } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
+import { checkSchema, evaluateReviews as evaluateReviewsWith, loadSchemas } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
+import { lessonHash } from '../../.claude/skills/review-lesson/scripts/review-scope.mjs';
 import { buildCatalog, formatCatalog, parseArgs as parseCatalogArgs } from '../../scripts/lessons/catalog.mjs';
 import {
   parseArgs as parsePreviewArgs,
@@ -388,9 +389,14 @@ describe('rubric.v1 and review.v1', () => {
 describe('check-review.mjs (deterministic pass rule)', () => {
   const schemas = loadSchemas(ROOT);
   const ids = schemas.rubric.criteria.map((c) => c.id);
+  // Every review read this version of the lesson (its lessonHash); the gate compares the two.
+  const LESSON = { schema: 'risepath.lesson/v1', id: 'vibe-ch1', courseId: 'vibe-coding', title: 'Demo', objectives: [], sections: [] };
+  const HASH = lessonHash(LESSON);
+  const evaluateReviews = (reviews, s) => evaluateReviewsWith(reviews, s, { lesson: { id: 'vibe-ch1', hash: HASH } });
   const make = (reviewer, scoreOf, extra = {}) => ({
     lessonId: 'vibe-ch1',
     file: 'content/courses/vibe-coding/drafts/vibe-ch1.lesson.json',
+    lessonHash: HASH,
     reviewer,
     rubricVersion: 'rubric.v1',
     scores: ids.filter((id) => scoreOf(id) !== undefined).map((id) => ({ id, score: scoreOf(id), evidence: `Block x shows ${id}.` })),
@@ -457,11 +463,14 @@ describe('check-review.mjs (deterministic pass rule)', () => {
       const pass = write('pass.json', make('pedagogy-reviewer', () => 4));
       const revise = write('revise.json', make('ja-editor', (id) => (id === 'voice' ? 2 : undefined)));
       const broken = write('broken.json', '{');
-      const run = (...files) => spawnSync(process.execPath, [script, ...files], { encoding: 'utf8' }).status;
+      const lesson = write('vibe-ch1.lesson.json', LESSON);
+      const run = (...files) => spawnSync(process.execPath, [script, ...files, '--lesson', lesson], { encoding: 'utf8' }).status;
       assert.equal(run(pass), 0);
       assert.equal(run(pass, revise), 1);
       assert.equal(run(broken), 2);
       assert.equal(run(), 2);
+      // A review of another version of the lesson is stale.
+      assert.equal(run(write('stale.json', make('pedagogy-reviewer', () => 4, { lessonHash: 'sha256:0000000000000000' }))), 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

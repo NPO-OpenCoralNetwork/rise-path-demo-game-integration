@@ -171,8 +171,12 @@ claude -p '/author-lesson vibe-coding vibe-ch1-practice "第1章の演習。15�
 node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch3.*.review.json
 ```
 
-終了コードは 0 = 合格、1 = 未合格（要修正・やり直し・未採点の観点あり）、2 = 形式エラーです。
-同じ観点を複数のレビュアーが採点した場合は、低いほうの点を使います。
+終了コードは 0 = 合格、1 = 未合格（要修正・やり直し・未採点の観点あり）、2 = 形式エラーまたは
+古いレビューです。同じ観点を複数のレビュアーが採点した場合は、低いほうの点を使います。
+
+どのレビューも、読んだ版を `lessonHash` に記録します（`review-scope.mjs <file> --hash` の出力）。
+教材を直すとハッシュが変わり、それより前のレビューは「古い」ものとして受け付けられません。
+`lessonHash` のない以前のレビューは、`--allow-legacy` を付けたときだけ警告つきで通ります。
 
 | レビュアー | 見るもの | 採点する観点 |
 |---|---|---|
@@ -198,11 +202,31 @@ node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-
 - ブロックの 30% を超える変更（書き換え・追加・削除・移動）
 
 ```bash
-node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <コミット | sha256:…>
-node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot   # コミット前の下書きの版を記録
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <コミット | sha256:…> --expect-hash <前回の lessonHash>
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot   # コミット前の下書きの版を記録（回ごとに別フォルダ）
 ```
 
 合格の基準は変わりません。`check-review.mjs` は「未解決」を、残っている必須修正として数えます。
+「解決」と判定しても、そのブロックが変わっていなければ必須修正は残ります。修正が別のブロックに
+あるときは、そのブロックの id を `fixedIn` に書きます。判定のない項目も残り、次の回へ持ち越されます。
+
+前回のレビューは、記録された回で指定します。`<コミット>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json`
+か、スナップショットの写し（`.artifacts/review/…/<round>/<reviewer>.review.json`）です。作業ツリーの
+`reports/` にある同じレビュアーのファイルは、今回の結果で上書きされるので使えません。手で作った
+写しも使えません。
+
+`check-review.mjs` は前回のレビューを読み込み、変更の範囲を自分で計算し直します。前回も修正確認
+レビューなら、全体レビューまでさかのぼって各回を同じ基準で確かめます。次のときは終了コード 2 で
+受け付けません。
+
+- 前回のレビューが読めないとき、または前回の回そのものが無効なとき
+- 全体レビューが必要なとき、変更の一覧に漏れがあるとき
+- 前回採点した観点が抜けているとき
+- 前回の回にいたレビュアーが、今回の実行に入っていないとき
+- 同じレビュアーのレビューが 2 つあるとき
+
+`lessonHash` のない前回のレビューは `--allow-legacy` が必要です。そのとき `reviewedRevision` は、
+そのレビューを含むコミットか、それより前のコミットでなければなりません。
 
 ---
 

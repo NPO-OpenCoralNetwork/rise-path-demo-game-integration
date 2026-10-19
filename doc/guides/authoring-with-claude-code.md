@@ -15,13 +15,20 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
 
 - The author never grades itself. Reviewers are separate subagents that score
   `content/schema/rubric.v1.json` (13 criteria, 0–4). Pass = every criterion ≥ 3, mean ≥ 3.3, no
-  open must-fix item; `check-review.mjs` computes it.
+  open must-fix item; `check-review.mjs` computes it. Every review records `lessonHash`, the
+  version it read (`review-scope.mjs <file> --hash`); the gate refuses a review of another version
+  (stale) and one without it (`--allow-legacy` accepts reviews written before the field existed).
 - Round 1 is a full review. A later round is a fix-verification review (`"mode": "verify"`): each
   previous must-fix is marked resolved or unresolved, every changed block is reviewed in full,
   new must-fix items only for changed blocks or regressions, unaffected scores carried over. The
   bar is the same. A full review is required again when sections were added, removed, reordered
   or changed role, the objectives changed, or more than 30% of the blocks changed
-  (`review-scope.mjs` decides). Rules: `.claude/skills/review-lesson/SKILL.md`.
+  (`review-scope.mjs` decides; `check-review.mjs` recomputes it and loads the previous review, a
+  recorded round given as `<commit>:<reports path>` or its snapshot copy). The gate follows a
+  previous verification back to its full review and refuses a chain with an invalid round; every
+  reviewer of the verified round is gated together; a must-fix marked resolved on a block that did
+  not change stays open (`fixedIn` names the changed block when the fix is elsewhere). Rules:
+  `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
   only when the owner asks.
 
@@ -55,9 +62,10 @@ npm run lessons:validate -- <file>                  # schema + semantic checks
 npm run lessons:lint -- <file> --strict             # pedagogy and readability rules
 npm run lessons:lint -- --strict --include-migrated # also gate migrated, not reworked chapters
 npm run lessons:preview -- <course> <lesson>        # .artifacts/preview/<course>/<lesson>/
-node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict
-node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <rev> # verification round allowed? (exit 0) / full review (exit 1)
-node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot    # record an uncommitted reviewed revision
+node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict (2 = invalid or stale)
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash        # lessonHash of the version a review reads
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <rev> --expect-hash <previous lessonHash> # verification allowed? (exit 0) / full review (exit 1)
+node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --snapshot    # record an uncommitted reviewed revision (one folder per round)
 node .claude/skills/author-lesson/scripts/build-references.mjs              # regenerate cookbook + rubric.md
 npm run lessons:mcp-smoke                           # MCP lesson tools, no database needed
 ```

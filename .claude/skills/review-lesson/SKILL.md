@@ -18,10 +18,20 @@ learning publisher would, for a learner who will study it alone.
 Without `--verify` this is a **full review**. With `--verify <previous review> --since <revision>`
 it is a **verification round** (below), unless the scope check says a full review is due.
 
+## Which version you review: `lessonHash`
+
+Every review, full or verify, records the version of the lesson it read. Before you read the
+lesson, run `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` and put the
+printed `sha256:<16 hex>` in `"lessonHash"`. The hash ignores key order, whitespace, `provenance`
+and whether the file is under `drafts/` or `lessons/`; any content change changes it.
+`check-review.mjs` refuses a review whose `lessonHash` is not the lesson's current hash (stale),
+and one without it.
+
 ## Full review (round 1, and any round a verification is not allowed for)
 
-1. Read the lesson file. If a brief path is given, or `content/courses/<course>/briefs/<lesson>.md`
-   exists, read it: the brief defines the audience and the outcomes.
+1. Run `review-scope.mjs <file> --hash` (above). Read the lesson file. If a brief path is given, or
+   `content/courses/<course>/briefs/<lesson>.md` exists, read it: the brief defines the audience
+   and the outcomes.
 2. Read `content/schema/rubric.v1.json` (criteria, anchors, pass rule) and
    `.claude/skills/author-lesson/references/lesson-contract.md`.
 3. Run the deterministic checks and use their findings as evidence:
@@ -49,21 +59,35 @@ changed; it does not re-review the unchanged lesson. The bar is not lowered: eve
 judged exactly as in a full review.
 
 **When a full review is still required.** Run
-`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision>`. It exits 1,
-and a full review is required, when since the reviewed revision a section was added, removed or
-reordered or changed its role; the objectives changed (ids, text, Bloom level or order); or more
-than 30% of the blocks were changed, added, removed or moved. Then do the full review above, set
-`"mode": "full"` and say in `summary` why. It exits 0 when a verification is allowed.
+`node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --since <revision> --expect-hash <previous lessonHash>`
+(`<previous lessonHash>` is the `lessonHash` of the previous review; leave `--expect-hash` out only
+for a previous review that has none). It exits 1, and a full review is required, when since the
+reviewed revision a section was added, removed or reordered or changed its role; the objectives
+changed (ids, text, Bloom level or order); or more than 30% of the blocks were changed, added,
+removed or moved. Then do the full review above, set `"mode": "full"` and say in `summary` why. It
+exits 0 when a verification is allowed, and 2 when `<revision>` holds no version with that hash
+(then the revision or the previous review is wrong: say so and stop).
 
-1. Read the previous review (`git show <commit>:<path>` when it is given that way), the lesson,
-   the rubric and the contract, and run validate and lint as in a full review.
-2. See what changed: `review-scope.mjs <file> --since <revision> --diff` (each changed block before
-   and after) or `git diff <revision> -- <file>`. Read the blocks around each change too.
-3. **(a) Verify every previous must-fix item**: each `mustFix` of the previous review, plus each of
-   its `resolved` entries marked `unresolved`. Add one `resolved` entry per item:
+`<revision>` is a git commit, or `sha256:<hash>` for an uncommitted draft that the author saved
+with `--snapshot` (the hash is the previous review's `lessonHash`; a unique prefix of 6 or more
+digits also works). At a commit, the lesson is looked up at `drafts/<id>` first, then
+`lessons/<id>`, so a lesson published between rounds is compared with the draft that was reviewed.
+
+1. Run `review-scope.mjs <file> --hash` for `lessonHash`. Read the previous review
+   (`git show <commit>:<path>` when it is given that way), the lesson, the rubric and the contract,
+   and run validate and lint as in a full review.
+2. See what changed: `review-scope.mjs <file> --since <revision> --expect-hash <previous lessonHash> --diff`
+   (each changed block before and after) or `git diff <revision> -- <file>`. Read the blocks
+   around each change too.
+3. **(a) Verify every previous must-fix item**: each `mustFix` of the previous review, plus each
+   item still open from the rounds before it (its `resolved` entries marked `unresolved`, and any
+   item it left without an entry). Add one `resolved` entry per item:
    `{"blockId", "criterion", "status": "resolved" | "unresolved", "evidence"}`. Evidence quotes the
-   current text. `resolved` only when the change removes the problem completely; not applied,
-   applied in part, or the problem moved elsewhere is `unresolved`.
+   current text. `resolved` only when a change removes the problem completely; not applied,
+   applied in part, or the problem moved elsewhere is `unresolved`. A must-fix is resolved only by
+   a change: when the fix is in another block than `blockId` (a term now defined in the block
+   before it), add `"fixedIn": ["<changed block id>"]`. The gate keeps an item open when neither
+   `blockId` nor a `fixedIn` block changed since the review that raised it.
 4. **(b) Review every changed or new block in full**, as in a full review. A rewritten question is
    new content: check its options, feedback, answer, `objectiveId` and whether it gives the answer
    away.
@@ -74,17 +98,38 @@ than 30% of the blocks were changed, added, removed or moved. Then do the full r
    or one whose evidence is or involves a changed block (questions: `align`, `active`, `miscon`;
    prose: `load`, `voice`, `accuracy`, …). Score it with the anchors over the whole lesson as it is
    now. Copy every other score and its evidence from the previous review and add
-   `"carriedOver": true`. List every criterion the previous review scored. When in doubt, re-score.
+   `"carriedOver": true`. List every criterion the previous review scored: one left out makes the
+   review invalid. When in doubt, re-score.
 7. `verdict`: `pass` only when every criterion ≥ 3, mean ≥ 3.3, no `mustFix` and no `unresolved`
    entry.
 
 A verification review adds `"mode": "verify"`, `"resolved": […]` and
 `"verifies": {"reviewedRevision", "previousReview", "changed", "changedShare", "fullReviewRequired"}`:
-copy the `verifies` line that `review-scope.mjs` prints and add `previousReview`. `check-review.mjs`
-counts every `unresolved` entry as an open must-fix, refuses a verification that the scope check
-does not allow, and, when it can load the previous review, counts a previous must-fix without a
-`resolved` entry as open and checks that carried-over scores match.
+copy the `verifies` line that `review-scope.mjs` prints and add `previousReview`, the review you
+verified as given to you, which is a recorded round:
+`<commit>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json` or the snapshot copy
+`.artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json`. Nothing else: never
+the working-tree `reports/` file of the same lesson and reviewer (this round overwrites it), and
+never a pasted or hand-made copy. `file` is the lesson's own path,
+`content/courses/<course>/drafts/<lesson>.lesson.json` or `…/lessons/<lesson>.lesson.json`.
+
+`check-review.mjs` (exit 2 = the review does not count) refuses a verification when it cannot load
+`previousReview` as a recorded round, when that is the review being checked or the working-tree
+reports file of the same lesson and reviewer, when the scope it recomputes from `reviewedRevision`
+(the version with the previous review's `lessonHash`) requires a full review, when
+`verifies.changed` leaves out a change, when a criterion the previous review scored is missing or a
+carried-over score differs, and when `lessonHash` is not the lesson's current hash. It checks the
+previous review the same way: a previous verification is followed back to its full review, and a
+round the gate would refuse cannot be verified (verify the last valid round, or review in full). A
+previous review without `lessonHash` needs `--allow-legacy`, and `reviewedRevision` must then be the
+commit that holds it or an earlier one. Every reviewer of the verified round (the reviews recorded
+next to the previous review) must be in the same gate run, verifying that round or with a full
+review that scores at least the criteria its review in that round scored, and each reviewer
+appears once. It counts as an open must-fix every `unresolved` entry,
+every open item without a `resolved` entry, and every `resolved` entry whose block (and `fixedIn`
+blocks) did not change; open items carry over to the next round.
 
 Return **only** one JSON object that matches `content/schema/review.v1.json`, with
-`"reviewer": "pedagogy-reviewer"` and `"rubricVersion": "rubric.v1"`. No prose before or after it.
-Do not edit any file, and never run `review-scope.mjs --snapshot` (the author does).
+`"reviewer": "pedagogy-reviewer"`, `"rubricVersion": "rubric.v1"` and `"lessonHash"`. No prose
+before or after it. Do not edit any file, and never run `review-scope.mjs --snapshot` (the author
+does).

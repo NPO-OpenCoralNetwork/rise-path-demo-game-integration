@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Rise Path lesson review (review.v1)",
-  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Round 1 is a full review; a later round may be a fix-verification round (\"mode\": \"verify\", rules in .claude/skills/review-lesson/SKILL.md). Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
+  "description": "What a reviewer (pedagogy-reviewer, ja-editor, visual-qa, a CI judge or a human) returns for one lesson, scored against content/schema/rubric.v1.json. Round 1 is a full review; a later round may be a fix-verification round (\"mode\": \"verify\", rules in .claude/skills/review-lesson/SKILL.md). Every review records lessonHash, the lesson version it read. Hand-written; usable with `claude -p --json-schema`. Check one or more reviews with `node .claude/skills/review-lesson/scripts/check-review.mjs <file>…`.",
   "type": "object",
   "additionalProperties": false,
   "required": ["lessonId", "file", "reviewer", "rubricVersion", "scores", "mustFix", "niceToHave", "verdict", "summary"],
@@ -12,7 +12,12 @@
     },
     "file": {
       "type": "string",
-      "description": "Repo-relative path of the reviewed file, e.g. content/courses/vibe-coding/drafts/vibe-ch1-practice.lesson.json."
+      "description": "Repo-relative path of the reviewed lesson file: content/courses/<course>/drafts/<lessonId>.lesson.json or content/courses/<course>/lessons/<lessonId>.lesson.json, e.g. content/courses/vibe-coding/drafts/vibe-ch1-practice.lesson.json. check-review.mjs refuses any other path, and hashes whichever of the two exists (--lesson when both exist and differ)."
+    },
+    "lessonHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{16}$",
+      "description": "The version of the lesson this review read: the output of `node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash` (sha256 of the canonical lesson JSON without provenance; moving the file between drafts/ and lessons/ does not change it). Required for every new review, full or verify: check-review.mjs refuses a review whose lessonHash is not the lesson's current hash as stale, and one without it unless --allow-legacy."
     },
     "reviewer": {
       "type": "string",
@@ -29,17 +34,17 @@
     },
     "verifies": {
       "type": "object",
-      "description": "Verification rounds only: what this round verifies. Copy reviewedRevision, changed, changedShare and fullReviewRequired from `review-scope.mjs <file> --since <revision>` and add previousReview.",
+      "description": "Verification rounds only: what this round verifies. Copy reviewedRevision, changed, changedShare and fullReviewRequired from `review-scope.mjs <file> --since <revision>` and add previousReview. check-review.mjs recomputes the scope from reviewedRevision and refuses the review when it requires a full review or when changed leaves out a change.",
       "additionalProperties": false,
       "required": ["reviewedRevision", "previousReview", "changed", "fullReviewRequired"],
       "properties": {
         "reviewedRevision": {
           "type": "string",
-          "description": "The lesson revision the previous review read: a git commit, or sha256:<hash> from `review-scope.mjs --snapshot`."
+          "description": "The lesson revision the previous review read: a git commit, or sha256:<hash> (the previous review's lessonHash) of a snapshot saved with `review-scope.mjs --snapshot`. At a commit the lesson is looked up at drafts/<id> first, then lessons/<id>; check-review.mjs takes the version whose hash is the previous review's lessonHash."
         },
         "previousReview": {
           "type": "string",
-          "description": "The review this round verifies: a path (for example the snapshot copy under .artifacts/review/) or <commit>:<path>."
+          "description": "The review this round verifies, as a recorded round: <commit>:content/courses/<course>/reports/<lesson>.<reviewer>.review.json, or the snapshot copy .artifacts/review/<course>/<lesson>/<hash>/<round>/<reviewer>.review.json. Never the working-tree reports file of the same lesson and reviewer (each round overwrites it), and never any other file. check-review.mjs refuses the review when it cannot load this review, and follows a previous verification back to its full review, checking every round on the way."
         },
         "changed": {
           "type": "array",
@@ -52,13 +57,13 @@
         },
         "fullReviewRequired": {
           "type": "boolean",
-          "description": "The review-scope.mjs decision. A verification review is valid only when it is false."
+          "description": "The review-scope.mjs decision. A verification review is valid only when it is false (check-review.mjs recomputes it)."
         }
       }
     },
     "resolved": {
       "type": "array",
-      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus its resolved entries marked unresolved). check-review.mjs counts every unresolved entry as an open must-fix.",
+      "description": "Verification rounds only: one entry per open must-fix item of the previous review (its mustFix, plus the items still open from the rounds before it). check-review.mjs counts every unresolved entry, every item without an entry, and every resolved entry whose block (and fixedIn blocks) did not change since the item was raised, as an open must-fix.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -80,6 +85,11 @@
           "evidence": {
             "type": "string",
             "description": "One or two sentences that quote the current text (or name the screenshot) and show why."
+          },
+          "fixedIn": {
+            "type": "array",
+            "description": "Optional, for status resolved: the ids of the changed blocks (from verifies.changed) that resolve the item when the fix is not in blockId itself, e.g. a term now defined in the block before it. A resolved entry counts only when blockId or one of these changed since the review that raised the item.",
+            "items": { "type": "string" }
           }
         }
       }

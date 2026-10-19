@@ -10,12 +10,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluateReviews, loadSchemas, modeErrors, openItems } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
+import { canonicalJson } from '../../shared/lesson/canonical.js';
+import { checkSchema, evaluateReviews, loadSchemas, modeErrors, openItems, runCli } from '../../.claude/skills/review-lesson/scripts/check-review.mjs';
 import {
   FULL_REVIEW_SHARE,
-  canonical,
   changedParts,
   compareLessons,
+  lessonHash,
   parseArgs as parseScopeArgs,
   readBefore,
   saveSnapshot,
@@ -26,10 +27,15 @@ const SCRIPTS = path.join(ROOT, '.claude', 'skills', 'review-lesson', 'scripts')
 const schemas = loadSchemas(ROOT);
 const ids = schemas.rubric.criteria.map((c) => c.id);
 
+/** The lesson every review below read (its lessonHash); the gate compares the two. */
+const HASH = 'sha256:5d2a414c0ffee000';
+const CURRENT = { id: 'vibe-ch2', hash: HASH, file: 'content/courses/vibe-coding/drafts/vibe-ch2.lesson.json' };
+
 /** A review.v1 document; `scoreOf` returns undefined for criteria outside the reviewer's scope. */
 const review = (reviewer, scoreOf, extra = {}) => ({
   lessonId: 'vibe-ch2',
   file: 'content/courses/vibe-coding/drafts/vibe-ch2.lesson.json',
+  lessonHash: HASH,
   reviewer,
   rubricVersion: 'rubric.v1',
   scores: ids.filter((id) => scoreOf(id) !== undefined).map((id) => ({ id, score: scoreOf(id), evidence: `Block x shows ${id}.` })),
@@ -50,6 +56,26 @@ const previous = () => review('pedagogy-reviewer', (id) => (id === 'active' ? 2 
 });
 
 const RESCORED = new Set(['active', 'voice']);
+
+/**
+ * The scope since 5d2a414 as check-review.mjs recomputes it: two blocks changed (question q8 of
+ * check-quiz, card card-goal of summary-cards), verification allowed.
+ */
+const allowedScope = () => ({
+  fullReviewRequired: false,
+  reasons: [],
+  changed: ['check-quiz', 'summary-cards'],
+  touched: ['card-goal', 'check', 'check-quiz', 'lesson', 'o4', 'q8', 'summary', 'summary-cards'],
+  changedShare: 0.07,
+  source: '5d2a414:content/courses/vibe-coding/drafts/vibe-ch2.lesson.json',
+});
+
+/** evaluateReviews as the CLI calls it: the current lesson, and a recomputed scope for every verification. */
+const gate = (reviews, options = {}) => evaluateReviews(reviews, schemas, {
+  lesson: CURRENT,
+  scopes: Object.fromEntries(reviews.filter((r) => r?.mode === 'verify').map((r) => [r.reviewer, allowedScope()])),
+  ...options,
+});
 
 /** Round 2: a verification of round 1 where both items are resolved; `active` and `voice` re-scored. */
 const verification = (extra = {}) => ({
@@ -77,7 +103,7 @@ const verification = (extra = {}) => ({
 
 describe('check-review.mjs: verification rounds (mode "verify")', () => {
   it('passes when every previous must-fix is resolved and the scores pass', () => {
-    const result = evaluateReviews([verification()], schemas, { previous: [previous()] });
+    const result = gate([verification()], { previous: [previous()] });
     assert.equal(result.valid, true, result.errors.join('\n'));
     assert.equal(result.verdict, 'pass');
     assert.deepEqual(result.mustFix, []);
@@ -85,6 +111,8 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
     const round = result.rounds[0];
     assert.equal(round.mode, 'verify');
     assert.equal(round.previousChecked, true);
+    assert.equal(round.changed, 2);
+    assert.equal(round.lessonHash, HASH);
     assert.equal(round.resolved, 2);
     assert.equal(round.unresolved, 0);
     assert.deepEqual(round.carriedOver, ids.filter((id) => !RESCORED.has(id)));
@@ -93,38 +121,35 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
     assert.equal(result.resolved.length, 2);
   });
 
-  it('still passes without the previous review, but says nothing cross-checked it', () => {
-    const result = evaluateReviews([verification()], schemas);
-    assert.equal(result.verdict, 'pass');
-    assert.equal(result.rounds[0].previousChecked, false);
-    assert.ok(result.warnings.some((w) => /previous review .* was not loaded/.test(w)));
+  it('refuses a verification whose previous review was not loaded', () => {
+    const result = gate([verification()]);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => /its previous review was not loaded/.test(e)), result.errors.join('\n'));
   });
 
   it('counts an unresolved item as an open must-fix (revise), with the previous fix text', () => {
     const r = verification();
     r.resolved[1] = { blockId: 'card-goal', criterion: 'voice', status: 'unresolved', evidence: 'The back still ends in 「手段。」.' };
-    const result = evaluateReviews([r], schemas, { previous: [previous()] });
+    const result = gate([r], { previous: [previous()] });
     assert.equal(result.verdict, 'revise');
     assert.equal(result.mustFix.length, 1);
     assert.equal(result.mustFix[0].status, 'unresolved');
     assert.equal(result.mustFix[0].blockId, 'card-goal');
     assert.equal(result.mustFix[0].fix, '「旧」→「新」');
     assert.match(result.mustFix[0].issue, /手段。/);
-    // Without the previous review the item is still open.
-    assert.equal(evaluateReviews([r], schemas).verdict, 'revise');
     // Restating it in mustFix with a new fix does not count it twice.
     const restated = { ...r, mustFix: [{ criterion: 'voice', blockId: 'card-goal', issue: 'Still noun-ending.', fix: '「旧」→「新2」' }] };
-    assert.equal(evaluateReviews([restated], schemas).mustFix.length, 1);
+    assert.equal(gate([restated], { previous: [previous()] }).mustFix.length, 1);
   });
 
   it('fails on a new must-fix in a changed block, and flags one on an unchanged block', () => {
     const inChanged = verification({ mustFix: [{ criterion: 'miscon', blockId: 'check-quiz', issue: 'New option c is also correct.', fix: 'Reword c.' }] });
-    const result = evaluateReviews([inChanged], schemas, { previous: [previous()] });
+    const result = gate([inChanged], { previous: [previous()] });
     assert.equal(result.verdict, 'revise');
     assert.equal(result.mustFix.length, 1);
     assert.deepEqual(result.warnings, []);
     const outside = verification({ mustFix: [{ criterion: 'load', blockId: 'hook-b1', issue: 'Long paragraph.', fix: 'Split it.' }] });
-    const flagged = evaluateReviews([outside], schemas, { previous: [previous()] });
+    const flagged = gate([outside], { previous: [previous()] });
     assert.equal(flagged.verdict, 'revise');
     assert.ok(flagged.warnings.some((w) => /hook-b1, which did not change/.test(w)));
   });
@@ -132,7 +157,7 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
   it('counts a previous must-fix that "resolved" leaves out as open (unverified)', () => {
     const r = verification();
     r.resolved = [r.resolved[0], { blockId: 'card-back', criterion: 'voice', status: 'resolved', evidence: 'Wrong block id.' }];
-    const result = evaluateReviews([r], schemas, { previous: [previous()] });
+    const result = gate([r], { previous: [previous()] });
     assert.equal(result.verdict, 'revise');
     assert.equal(result.mustFix.length, 1);
     assert.equal(result.mustFix[0].status, 'unverified');
@@ -145,7 +170,7 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
     round2.resolved[1] = { blockId: 'card-goal', criterion: 'voice', status: 'unresolved', evidence: 'Still noun-ending.' };
     assert.deepEqual(openItems(round2).map((m) => m.blockId), ['card-goal']);
     const round3 = verification({ resolved: [] });
-    const result = evaluateReviews([round3], schemas, { previous: [{ ...round2, verdict: 'revise' }] });
+    const result = gate([round3], { previous: [{ ...round2, verdict: 'revise' }] });
     assert.equal(result.verdict, 'revise');
     assert.deepEqual(result.mustFix.map((m) => [m.blockId, m.status]), [['card-goal', 'unverified']]);
   });
@@ -153,13 +178,13 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
   it('rejects a carried-over score that differs from the previous review', () => {
     const r = verification();
     r.scores.find((s) => s.id === 'active').carriedOver = true; // previous gave 2, this says 3
-    const result = evaluateReviews([r], schemas, { previous: [previous()] });
+    const result = gate([r], { previous: [previous()] });
     assert.equal(result.valid, false);
     assert.ok(result.errors.some((e) => /"active" is carried over as 3, but the previous review gave 2/.test(e)));
   });
 
   it('rejects verification reviews that are incomplete or not allowed', () => {
-    const invalid = (r) => evaluateReviews([r], schemas);
+    const invalid = (r) => gate([r], { previous: [previous()] });
     const { verifies: _v, ...noVerifies } = verification();
     assert.ok(invalid(noVerifies).errors.some((e) => /needs "verifies"/.test(e)));
     const { resolved: _r, ...noResolved } = verification();
@@ -185,12 +210,12 @@ describe('check-review.mjs: verification rounds (mode "verify")', () => {
     assert.match(modeErrors(carried).join('\n'), /carriedOver scores \(align\) belong to mode "verify"/);
     const withResolved = review('pedagogy-reviewer', () => 4, { resolved: [] });
     assert.match(modeErrors(withResolved).join('\n'), /"resolved" belongs to mode "verify"/);
-    assert.equal(evaluateReviews([withResolved], schemas).valid, false);
+    assert.equal(gate([withResolved]).valid, false);
   });
 
   it('merges a verification with full reviews of other reviewers (lowest score wins)', () => {
     const ja = review('ja-editor', (id) => (id === 'voice' ? 3 : id === 'load' ? 4 : undefined));
-    const result = evaluateReviews([verification(), ja], schemas, { previous: [previous()] });
+    const result = gate([verification(), ja], { previous: [previous()] });
     assert.equal(result.verdict, 'pass');
     assert.deepEqual(result.rounds.map((r) => r.mode), ['verify', 'full']);
     assert.equal(result.scores.find((s) => s.id === 'voice').score, 3);
@@ -201,51 +226,83 @@ describe('check-review.mjs: full reviews are unchanged', () => {
   it('reviews without "mode" and with "mode": "full" give the same verdicts as before', () => {
     const passing = review('pedagogy-reviewer', (id) => (['align', 'worked', 'active', 'miscon'].includes(id) ? 4 : 3));
     for (const r of [passing, { ...passing, mode: 'full' }]) {
-      const result = evaluateReviews([r], schemas);
+      const result = gate([r]);
       assert.equal(result.valid, true);
       assert.equal(result.verdict, 'pass');
       assert.equal(result.mean, 3.31);
-      assert.deepEqual(result.rounds, [{ reviewer: 'pedagogy-reviewer', mode: 'full' }]);
+      assert.deepEqual(result.rounds, [{ reviewer: 'pedagogy-reviewer', mode: 'full', lessonHash: HASH }]);
       assert.deepEqual(result.resolved, []);
     }
     const withMustFix = review('pedagogy-reviewer', () => 4, { mustFix: [{ criterion: 'voice', blockId: 'intro', issue: 'x', fix: 'y' }] });
-    const result = evaluateReviews([withMustFix], schemas);
+    const result = gate([withMustFix]);
     assert.equal(result.verdict, 'revise');
     assert.equal(result.mustFix[0].status, undefined);
-    assert.equal(evaluateReviews([review('pedagogy-reviewer', () => 3)], schemas).verdict, 'revise');
+    assert.equal(gate([review('pedagogy-reviewer', () => 3)]).verdict, 'revise');
   });
 
-  it('every committed review JSON is still a valid review.v1 document', () => {
+  it('every committed review JSON is still a valid review.v1 document (schema and mode rules)', () => {
     const courses = path.join(ROOT, 'content', 'courses');
     const files = fs.readdirSync(courses).flatMap((course) => {
       const dir = path.join(courses, course, 'reports');
       return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.review.json')).map((f) => path.join(dir, f)) : [];
     });
     for (const file of files) {
-      const result = evaluateReviews([JSON.parse(fs.readFileSync(file, 'utf8'))], schemas);
-      assert.equal(result.valid, true, `${path.relative(ROOT, file)}: ${result.errors.join('; ')}`);
+      const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const problems = [...checkSchema(doc, schemas.review), ...modeErrors(doc)];
+      assert.deepEqual(problems, [], `${path.relative(ROOT, file)}: ${problems.join('; ')}`);
     }
   });
 });
 
 describe('check-review.mjs CLI with verification rounds', () => {
-  it('prints the mode, loads the previous review, and exits 0 / 1 / 2', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-verify-'));
+  /** Lesson vibe-ch2 with ten blocks; the fixes change card-goal and check-quiz. */
+  const ch2 = (fixed) => {
+    const block = (id, md) => ({ id, type: 'markdown', md: md ?? `Text of ${id}.` });
+    return {
+      schema: 'risepath.lesson/v1',
+      id: 'vibe-ch2',
+      courseId: 'vibe-coding',
+      title: 'Chapter 2',
+      objectives: [{ id: 'o1', text: 'Explain X', bloom: 'understand' }],
+      sections: [
+        { id: 'hook', role: 'hook', title: 'Hook', blocks: [block('hook-b1'), block('card-goal', fixed ? '…の形で書きます。' : '…手段。'), block('b3'), block('b4')] },
+        { id: 'check', role: 'check', title: 'Check', blocks: [block('b5'), block('b6'), block('b7'), block('b8'), block('check-quiz', fixed ? 'q8, rewritten' : 'q8'), block('summary-cards')] },
+      ],
+    };
+  };
+
+  it('prints the mode, loads the previous review, recomputes the scope, and exits 0 / 1 / 2', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-verify-'));
     try {
-      const write = (name, value) => {
-        const file = path.join(dir, name);
+      const write = (rel, value) => {
+        const file = path.join(root, rel);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, JSON.stringify(value));
         return file;
       };
-      const prevFile = write('prev.json', previous());
-      const ok = verification();
-      ok.verifies = { ...ok.verifies, previousReview: prevFile };
+      // Round 1 read the unfixed draft and was saved to reports/; the author snapshotted both, then
+      // applied the fixes. The previous review is the snapshot copy of round 1.
+      const lessonFile = write('content/courses/vibe-coding/drafts/vibe-ch2.lesson.json', ch2(false));
+      write('content/courses/vibe-coding/reports/vibe-ch2.pedagogy-reviewer.review.json', { ...previous(), lessonHash: lessonHash(ch2(false)) });
+      const saved = saveSnapshot(lessonFile, { root });
+      const revision = saved.revision;
+      write('content/courses/vibe-coding/drafts/vibe-ch2.lesson.json', ch2(true));
+      const now = lessonHash(ch2(true));
+      const prevFile = path.relative(root, saved.reviews[0]).split(path.sep).join('/');
+      const ok = verification({ lessonHash: now });
+      ok.verifies = { reviewedRevision: revision, previousReview: prevFile, changed: ['card-goal', 'check-quiz'], changedShare: 0.2, fullReviewRequired: false };
       const okFile = write('ok.json', ok);
-      const run = (...args) => spawnSync(process.execPath, [path.join(SCRIPTS, 'check-review.mjs'), ...args], { encoding: 'utf8' });
+      const run = (...args) => {
+        const out = [];
+        const err = [];
+        const status = runCli(args, { root, cwd: root, log: (l) => out.push(l), error: (l) => err.push(l) });
+        return { status, stdout: out.join('\n'), stderr: err.join('\n') };
+      };
 
       const pass = run(okFile);
       assert.equal(pass.status, 0, pass.stdout + pass.stderr);
-      assert.match(pass.stdout, /pedagogy-reviewer: verification of 5d2a414 \(previous review cross-checked\) · 2 resolved, 0 unresolved/);
+      assert.match(pass.stdout, new RegExp(`lesson content/courses/vibe-coding/drafts/vibe-ch2.lesson.json \\(${now}\\)`));
+      assert.match(pass.stdout, /pedagogy-reviewer: verification of sha256:[0-9a-f]{16} \(previous review cross-checked; scope recomputed from \.artifacts\/review\/vibe-coding\/vibe-ch2\/[0-9a-f]{16}\/lesson\.json\) · 2 resolved, 0 unresolved · 2 changed/);
       assert.match(pass.stdout, /hook\s+4\s+\(pedagogy-reviewer carried\)/);
 
       const unresolved = structuredClone(ok);
@@ -254,32 +311,36 @@ describe('check-review.mjs CLI with verification rounds', () => {
       assert.equal(unresolvedRun.status, 1);
       assert.match(unresolvedRun.stdout, /must fix \(unresolved\) \[active\] check-quiz/);
 
-      // previousReview pointing at the file being checked cannot be the previous round.
+      // previousReview pointing at the file being checked cannot be the previous round: refused.
       const self = structuredClone(ok);
-      const selfFile = path.join(dir, 'self.json');
+      const selfFile = path.join(root, 'self.json');
       self.verifies.previousReview = selfFile;
       fs.writeFileSync(selfFile, JSON.stringify(self));
       const selfRun = run(selfFile);
-      assert.equal(selfRun.status, 0);
+      assert.equal(selfRun.status, 2);
       assert.match(selfRun.stderr, /is the file being checked/);
-      // --previous supplies it explicitly; a missing item is then caught.
-      const partial = structuredClone(self);
+      // --previous stands in only for a review written before lessonHash existed.
+      const viaPrevious = run(selfFile, '--previous', prevFile);
+      assert.equal(viaPrevious.status, 2, viaPrevious.stdout);
+      assert.match(viaPrevious.stderr, /--previous is only for reviews written before lessonHash existed/);
+      // A previous must-fix without a "resolved" entry is caught against the recorded round.
+      const partial = structuredClone(ok);
       partial.resolved = partial.resolved.slice(0, 1);
-      fs.writeFileSync(selfFile, JSON.stringify(partial));
-      const partialRun = run(selfFile, '--previous', prevFile);
-      assert.equal(partialRun.status, 1);
+      const partialRun = run(write('partial.json', partial));
+      assert.equal(partialRun.status, 1, partialRun.stderr);
       assert.match(partialRun.stdout, /must fix \(unverified\) \[voice\] card-goal/);
 
       const notAllowed = structuredClone(ok);
       notAllowed.verifies.fullReviewRequired = true;
       assert.equal(run(write('structural.json', notAllowed)).status, 2);
-      assert.equal(run(okFile, '--previous', path.join(dir, 'missing.json')).status, 2);
+      assert.equal(run(okFile, '--previous', path.join(root, 'missing.json')).status, 2);
 
       const asJson = JSON.parse(run(okFile, '--json').stdout);
       assert.equal(asJson.rounds[0].mode, 'verify');
+      assert.equal(asJson.rounds[0].changedShare, 0.2);
       assert.equal(asJson.verdict, 'pass');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 });
@@ -318,7 +379,8 @@ describe('review-scope.mjs: verification or full review', () => {
     const after = Object.fromEntries(Object.entries(structuredClone(before)).reverse());
     after.sections = before.sections.map((s) => ({ blocks: s.blocks.map((b) => Object.fromEntries(Object.entries(b).reverse())), title: s.title, role: s.role, id: s.id }));
     after.provenance = { author: 'someone-else', generatedAt: '2026-10-19' };
-    assert.equal(canonical({ a: 1, b: [1, { c: 2, d: 3 }] }), canonical({ b: [1, { d: 3, c: 2 }], a: 1 }));
+    assert.equal(canonicalJson({ a: 1, b: [1, { c: 2, d: 3 }] }), canonicalJson({ b: [1, { d: 3, c: 2 }], a: 1 }));
+    assert.equal(lessonHash(after), lessonHash(before), 'key order and provenance do not change the lesson hash');
     const scope = compareLessons(before, after);
     assert.equal(scope.fullReviewRequired, false);
     assert.deepEqual(scope.changes, []);
@@ -427,13 +489,16 @@ describe('review-scope.mjs: verification or full review', () => {
       fs.mkdirSync(reports, { recursive: true });
       const file = path.join(drafts, 'demo.lesson.json');
       fs.writeFileSync(file, JSON.stringify(lesson()));
-      fs.writeFileSync(path.join(reports, 'demo.pedagogy-reviewer.review.json'), '{}');
-      fs.writeFileSync(path.join(reports, 'demo-practice.ja-editor.review.json'), '{}');
+      const hash = lessonHash(lesson());
+      fs.writeFileSync(path.join(reports, 'demo.pedagogy-reviewer.review.json'), JSON.stringify({ lessonHash: hash }));
+      fs.writeFileSync(path.join(reports, 'demo-practice.ja-editor.review.json'), JSON.stringify({ lessonHash: hash }));
       fs.writeFileSync(path.join(reports, 'demo.md'), '# report');
       const saved = saveSnapshot(file, { root });
-      assert.match(saved.revision, /^sha256:[0-9a-f]{12}$/);
+      assert.equal(saved.revision, hash);
+      assert.match(saved.revision, /^sha256:[0-9a-f]{16}$/);
       assert.equal(path.relative(root, saved.dir).split(path.sep).join('/'), `.artifacts/review/demo-course/demo/${saved.revision.slice(7)}`);
-      assert.deepEqual(saved.reviews.map((f) => path.basename(f)), ['pedagogy-reviewer.review.json']);
+      assert.equal(saved.round, 'round-1');
+      assert.deepEqual(saved.reviews.map((f) => path.relative(saved.dir, f).split(path.sep).join('/')), ['round-1/pedagogy-reviewer.review.json']);
 
       const changed = lesson();
       changed.sections[0].blocks[0].md = 'New text.';
@@ -442,6 +507,7 @@ describe('review-scope.mjs: verification or full review', () => {
       assert.equal(before.revision, saved.revision);
       assert.deepEqual(compareLessons(JSON.parse(before.text), changed).changed, ['b1']);
       assert.throws(() => readBefore({ since: 'sha256:000000000000' }, file, changed, { root }), /No snapshot sha256:000000000000/);
+      assert.throws(() => readBefore({ since: saved.revision }, file, changed, { root, expectHash: lessonHash(changed) }), /not sha256:[0-9a-f]{16}, the lesson the previous review read/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -469,7 +535,8 @@ describe('review-scope.mjs: verification or full review', () => {
       const json = JSON.parse(run(smallFile, '--before', beforeFile, '--json').stdout);
       assert.equal(json.mode, 'verify');
       assert.deepEqual(json.verifies.changed, ['quiz']);
-      assert.match(json.verifies.reviewedRevision, /^sha256:[0-9a-f]{12}$/);
+      assert.equal(json.verifies.reviewedRevision, lessonHash(lesson()));
+      assert.equal(json.lessonHash, lessonHash(small));
 
       const moved = lesson();
       moved.sections.reverse();
