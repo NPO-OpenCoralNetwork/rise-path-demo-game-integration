@@ -1170,3 +1170,12 @@ unchanged.
 | `npm run lessons:schema -- --check` | generated schemas up to date |
 | `node .claude/skills/author-lesson/scripts/build-references.mjs --check` | references up to date |
 | `npm run build:prod -- --outDir <tmp dir> --emptyOutDir` with the CI sentinel keys | built; no sentinel key in the 3246 built files |
+
+## Gate under the hash-anchored check-review (2026-10-19)
+
+- Full review round recorded at `f66e3f3` (all three reviewers, lessonHash `sha256:09186fc0e87a2e68`):
+  REVISE only for one ja-editor must-fix (SNS at first use, q7 option c), every criterion ≥ 3.
+- Fixed in `af14619`; verification round by all three reviewers against `f66e3f3`
+  (scope: 1 of 57 parts, check-quiz). lessonHash `sha256:54674b81ebd4f945`.
+- `check-review.mjs` (no flags): **PASS, exit 0** — mean 3.38, every criterion ≥ 3, previous reviews
+  cross-checked, scope recomputed from `f66e3f3`, must-fix resolved.

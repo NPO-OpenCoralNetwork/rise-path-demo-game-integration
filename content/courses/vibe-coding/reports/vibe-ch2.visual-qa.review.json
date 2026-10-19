@@ -1,34 +1,46 @@
 {
   "lessonId": "vibe-ch2",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
-  "lessonHash": "sha256:09186fc0e87a2e68",
+  "lessonHash": "sha256:54674b81ebd4f945",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "check-quiz"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2.visual-qa.review.json"
+  },
   "scores": [
     {
       "id": "visual",
       "score": 4,
-      "evidence": "metrics.json shows no hard failures: overflowX false, 0 console, mermaid and unknown-block errors, 0 broken images. The 2-column definition and goal tables, the 4-row MoSCoW table and the 3-node screen-flow diagram all fit at 390 px without clipping (mobile-jp-06, -07, -09, -14). Diagram labels are large and in the right language in both locales (desktop-jp-09, desktop-en-10)."
+      "evidence": "I read metrics.json in full and it has no hard failures: overflowX is false in all three shots (no offenders), and consoleErrors, mermaidErrors, unknownBlocks and brokenImages are all 0. The changed q7 option 3 (the third question of six in check-quiz) shows its full text 「記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿」. On mobile it takes 3 lines inside its option card with nothing clipped and no sideways overflow (pages/mobile-jp-18.png to pages/mobile-jp-19.png). On desktop it takes 2 lines (pages/desktop-jp-12.png). The other options, the 答える button and the next question all keep their spacing."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty for all three shots. Desktop JP median is 37 chars per line (target 30-40) and EN median is 71 (target 60-75). Every screen has a heading, table, figure, prompt or check, and there are no walls of text or empty gaps across the 25 mobile screens."
+      "evidence": "textOnlyScreens is empty for all three shots. The desktop JP median is 37 chars per line (target 30-40) and the EN median is 71 (target 60-75). The longer q7 option only adds one line to its card and does not create a wall of text or a gap (pages/mobile-jp-19.png, pages/desktop-jp-12.png)."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The EN screens are fully translated, with no stray Japanese in the tables, figure labels, prompts, steps or the 6 knowledge-check questions (desktop-en-05, -10, -13). The figure has a 'Describe the figure in words' / 図の説明を読む disclosure (mobile-jp-14, desktop-en-10). On mobile, no control sits under the top or bottom bars, and the text has good contrast."
+      "carriedOver": true,
+      "evidence": "Carried over from the previous full review. The only change is to the JP text of q7 option c, and the EN text of that option did not change. On the changed screens, the spelled-out English in the JP option is intentional (it explains the term SNS), the text contrast is good, and no control sits under the top or bottom bars (pages/mobile-jp-19.png)."
     }
   ],
+  "resolved": [],
   "mustFix": [],
   "niceToHave": [
-    "In the 2-2 goal/feature definition list on desktop JP, the 機能 definition wraps and leaves 「す。」 alone on the second line (pages/desktop-jp-04.png). Trimming a few characters, for example 「アプリが『すること』です」 to 「アプリがすること」, would keep it on one line at 680 px.",
-    "In the screen-flow figure, the two edge labels 追加ボタン and 保存 sit close to the crossing curved arrows (pages/mobile-jp-14.png, pages/desktop-jp-09.png). They are readable, but more vertical spacing or shorter labels such as 追加 / 保存 would make it clearer which arrow each label belongs to.",
-    "reader: the small grey flashcard hint 「クリックまたはスペースキーでめくる」 / 'Click or press Space to flip' has fairly low contrast (pages/mobile-jp-23.png, pages/desktop-en-16.png).",
-    "reader: a faint preview/status strip shows through behind the top bar on desktop (pages/desktop-en-01.png, pages/desktop-jp-01.png)."
+    "In q7 option 3 on desktop JP, the longer gloss pushes 「投稿」 alone onto a second line (pages/desktop-jp-12.png). You could avoid this by glossing SNS earlier in the lesson and keeping the option short, for example 「記録と通知、写真での種類判定、SNSへの投稿」. That would also match option 4, which already says 「SNSへの投稿」.",
+    "From the previous review, on an unchanged screen: in the 2-2 機能 definition on desktop JP, 「す。」 sits alone on the second line (pages/desktop-jp-04.png).",
+    "From the previous review, on unchanged screens: the screen-flow figure's edge labels 追加ボタン and 保存 sit close to the crossing arrows (pages/mobile-jp-14.png, pages/desktop-jp-09.png).",
+    "reader: the flashcard hint 「クリックまたはスペースキーでめくる」 / 'Click or press Space to flip' has fairly low contrast (pages/mobile-jp-23.png, pages/desktop-en-16.png).",
+    "reader: a faint preview/status strip shows through behind the top bar on desktop (pages/desktop-jp-01.png, pages/desktop-en-01.png)."
   ],
   "verdict": "pass",
-  "summary": "The lesson renders cleanly in all three shots, and metrics.json reports no hard failures. Tables, the MoSCoW breakdown, the screen-flow diagram and both prompt blocks are readable at 390 px, and the EN version is fully translated. The only items are cosmetic: one orphaned 「す。」 in the 機能 definition on desktop JP and crowded edge labels in the diagram."
+  "summary": "This is a verification round for the one-option change in check-quiz (q7 option c). The lessonHash in metrics.json, sha256:54674b81ebd4f945, matches the one I was given. metrics.json shows no hard failures. The longer option text 「SNS（Social Networking Service）への投稿」 shows in full on mobile (pages/mobile-jp-18.png to pages/mobile-jp-19.png) and on desktop (pages/desktop-jp-12.png), with no clipping, overflow or layout regression. The previous review had no open must-fix items, so nothing needed a resolved entry. The only small point is that 「投稿」 wraps alone onto a second line on desktop JP."
 }

@@ -1,49 +1,61 @@
 {
   "lessonId": "vibe-ch2",
   "file": "content/courses/vibe-coding/lessons/vibe-ch2.lesson.json",
-  "lessonHash": "sha256:09186fc0e87a2e68",
+  "lessonHash": "sha256:54674b81ebd4f945",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "f66e3f3",
+    "changed": [
+      "check-quiz"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": "f66e3f3b0b7eceed843bb0d5f8f292d3011410c3:content/courses/vibe-coding/reports/vibe-ch2.ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "check-quiz",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "q7 option c (jp) now reads 「記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿」, so SNS is spelled out on first use as the fix specified. Option d keeps 「SNSへの投稿と、水やりした日の記録」 as the second use, and no other SNS occurs in the lesson (grep: lines 936 and 947 only). The en text 「Records, reminders, species ID from photos and social posting」 is unchanged and still means the same."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Every learner-facing string uses です・ます and has no pressure phrases. The text reads like a teacher talking, for example 「最初から完璧でなくてかまいません。作って試しながら直します。」 (s3-b1). 目的, 機能, 1枚企画書 and the screen names 「今月の残り画面」「食費の入力画面」 stay the same across the text, the diagram s2-b4, the prompt expect s2-b3 and the glossary. The awkward spots are minor (q1 feedback b, q8 option a) and are listed in niceToHave."
+      "evidence": "Re-scored because check-quiz changed. The edited q7 option c keeps です・ます context, the noun-list form of the other options and the same ending as option d (「〜への投稿」). The rest of the lesson is as before: every string is です・ます, has no pressure phrases, and names terms consistently across text, diagram, prompts and glossary. The minor spots (q1 feedback b, q8 option a) remain in niceToHave."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. Each segment has at most 2 new terms (2-2: 目的 and 機能; 2-3: MVP and MoSCoW). Every section breaks its text with a table, steps, a diagram or an inline check. Feedback is at most 2 sentences throughout."
+      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. Each segment has at most 2 new terms (2-2: 目的 and 機能; 2-3: MVP and MoSCoW). Every section breaks its text with a table, steps, a diagram or an inline check. Feedback is at most 2 sentences throughout.",
+      "carriedOver": true
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Prerequisites are stated, and the lesson recalls Chapter 0 (s1-b1, 「ビジョン（vision）」) and Chapter 1 (ex-data, 「第1章で学んだデータベース」). Terms are defined before use, PRD is spelled out, and the definitions match the glossary. One abbreviation is not spelled out on first use: q7 option c writes 「SNS（ソーシャルメディア）」 rather than giving the full name (see mustFix). That keeps this at 3."
+      "score": 4,
+      "evidence": "Re-scored because the previous must-fix was in this criterion. The lesson states its prerequisites and links back to Chapter 0 (s1-b1, 「ビジョン（vision）」) and Chapter 1 (ex-data). Terms are defined before use and match the glossary. Abbreviations are now spelled out on first use: PRD, and SNS in q7 option c 「SNS（Social Networking Service）」. The one gap that held this at 3 is gone."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every string has both jp and en, including the diagram code, alt text, description, table cells, prompt vars and flashcards. The English reads naturally and means the same as the Japanese. Cross-references match the UI and course: 「期待される結果」 and \"What a good answer looks like\" match the PromptBlock labels, and summary-next names the practice lesson by the title it has in course.json."
+      "evidence": "Re-scored because check-quiz changed. q7 option c still has both jp and en, and they say the same thing (the en 「social posting」 needs no expansion in English). Every other string has both locales, including diagram code, alt text, table cells, prompt vars and flashcards, and the cross-references match the UI labels and course.json titles."
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "prior",
-      "blockId": "check-quiz",
-      "issue": "(d) Abbreviations must be spelled out on first use (style-guide §2). In q7 option c, the first use of SNS gives 「SNS（ソーシャルメディア）」. That is a katakana paraphrase, not the full name, and the katakana word has no English next to it.",
-      "fix": "In q7 option c (jp): 「記録と通知、写真での種類判定、SNS（ソーシャルメディア）への投稿」→「記録と通知、写真での種類判定、SNS（Social Networking Service）への投稿」. Option d 「SNSへの投稿と、水やりした日の記録」 stays as it is (second use)."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "check-quiz: In q8 option a, 「使う言語」 can be read as the display language (Japanese or English) rather than a programming language. The feedback's 「使う技術」 resolves this, but only after the learner has answered — 「画面の流れとデータの欄に、使う言語やファイルの分け方まで書く」→「画面の流れとデータの欄に、使うプログラミング言語やファイルの分け方まで書く」",
-    "check-quiz: The q8 prompt calls the section 「扱うデータの欄」, but options a, b and c shorten it to 「データの欄」. The meaning is clear, but matching the heading name helps the learner — 「画面の流れとデータの欄」→「画面の流れと扱うデータの欄」 (options a, b, c)",
-    "s1-check: In q1 feedback b, 「AIの答えが先に来ます」 is slightly abstract and a little stiff — 「目的を一言そえても、提案を頼むとAIの答えが先に来ます。」→「目的を一言そえても、提案を頼むと、自分の考えより先にAIの答えが並びます。」",
-    "s2-check: The q2 hint shortens the goal pattern to 「誰が、どうなれる」. Matching the 「・」 notation of the definition makes the link to it clearer — 「「誰が、どうなれる」が残るもの」→「「誰が・どうなれる」が残るもの」",
-    "s3-steps: ex-review expect says 「6つの項目」, while the prompt s2-b3 right below it says 「6つの見出し」. Using the same word helps the learner see they are the same six — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」",
-    "s3-check: Factual doubt, please verify. The q4 explanation says the Claude Code best-practices page holds that a useful spec states what is out of scope. If the cited page (cc-best-practices) does not say this explicitly, soften it — rephrase it to what the page actually says, or remove the sentence (both locales).",
-    "lesson: Objective o3 shows 「MoSCoW」 and 「MVP」 before 2-3 defines them. This is acceptable in an objective statement, but a short gloss would help the learner reading objectives first — 「機能の候補をMoSCoWで分け」→「機能の候補を優先順位の分け方（MoSCoW）で分け」"
+    "check-quiz: With the full name added, q7 option c (about 40 characters) is now clearly the longest option on a phone screen. It is a wrong option, so it gives nothing away, but a shorter gloss keeps the four options closer in length — 「SNS（Social Networking Service）への投稿」→「SNS（Social Networking Service）投稿」 is optional. Keeping it as it is is also fine.",
+    "check-quiz: (carried from round 1) In q8 option a, 「使う言語」 can be read as the display language rather than a programming language — 「画面の流れとデータの欄に、使う言語やファイルの分け方まで書く」→「画面の流れとデータの欄に、使うプログラミング言語やファイルの分け方まで書く」",
+    "check-quiz: (carried from round 1) The q8 prompt calls the section 「扱うデータの欄」, but options a, b and c shorten it — 「画面の流れとデータの欄」→「画面の流れと扱うデータの欄」 (options a, b, c)",
+    "s1-check: (carried from round 1) q1 feedback b — 「目的を一言そえても、提案を頼むとAIの答えが先に来ます。」→「目的を一言そえても、提案を頼むと、自分の考えより先にAIの答えが並びます。」",
+    "s2-check: (carried from round 1) q2 hint — 「「誰が、どうなれる」が残るもの」→「「誰が・どうなれる」が残るもの」",
+    "s3-steps: (carried from round 1) ex-review expect — 「6つの項目が1枚に並びます。」→「6つの見出しが1枚に並びます。」",
+    "s3-check: (carried from round 1) Factual doubt: check that the cited cc-best-practices page really says a useful spec states what is out of scope (q4 explanation). If it does not, soften or remove the claim in both locales.",
+    "lesson: (carried from round 1) Objective o3 — 「機能の候補をMoSCoWで分け」→「機能の候補を優先順位の分け方（MoSCoW）で分け」"
   ],
-  "verdict": "revise",
-  "summary": "The Japanese reads naturally and warmly throughout, and the English matches it closely. Terms, screen names and the six plan headings stay consistent across the text, diagram, prompts and glossary, and the lesson is within every budget. The only blocking fix is spelling out SNS on its first use in q7 option c (「SNS（Social Networking Service）」)."
+  "verdict": "pass",
+  "summary": "Verification round, 1 of 30 blocks changed (check-quiz, q7 option c). The only must-fix from round 1 is resolved: SNS is now spelled out on first use as 「SNS（Social Networking Service）」, and the jp and en still mean the same. The changed text has no new errors, and lessons:lint --strict is clean. prior goes from 3 to 4. voice and a11y_l10n were re-scored and stay at 4, and load is carried over at 4. Every score is 4 (mean 4.0) and there is no open must-fix, so the verdict is pass."
 }
