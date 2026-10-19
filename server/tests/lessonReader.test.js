@@ -39,6 +39,7 @@ import {
   plainText,
   resolveLText,
   resumeTarget,
+  safeDecode,
   sectionStatuses,
   splitLessonTitle,
   splitPromptVars,
@@ -243,6 +244,10 @@ describe('reader model', () => {
     assert.deepEqual(resumeTarget('#b-s1-b4', p, ch1), { kind: 'block', id: 's1-b4' });
     assert.deepEqual(resumeTarget('', p, ch1), { kind: 'block', id: 's3-b2' });
     assert.deepEqual(resumeTarget('#s-nope', withLastBlock(emptyProgress(), 'gone'), ch1), null);
+    // A malformed escape in a shared link must not throw (it used to crash the reader).
+    assert.deepEqual(resumeTarget('#100%', p, ch1), { kind: 'block', id: 's3-b2' });
+    assert.equal(safeDecode('%zz'), '%zz');
+    assert.equal(safeDecode('%E3%81%82'), 'あ');
   });
 
   it('builds the glossary from definitions blocks and finds terms in any locale', () => {
