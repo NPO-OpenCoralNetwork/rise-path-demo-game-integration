@@ -1,1 +1,40 @@
-{"lessonId":"vibe-ch2","file":"content/courses/vibe-coding/drafts/vibe-ch2.lesson.json","reviewer":"visual-qa","rubricVersion":"rubric.v1","scores":[{"id":"visual","score":4,"evidence":"The flowchart TD screen-flow diagram (s2-b4) shows its labels clearly at 390 px and has a caption and a 図の説明を読む / 'Describe the figure in words' text alternative (pages/mobile-jp-14.png). The two-column tables s2-table and the MoSCoW table in s5-b2 wrap without clipping on mobile (pages/mobile-jp-07.png, pages/mobile-jp-09.png).","blockIds":["s2-b4","s2-table","s5-b2","s1-defs","s2-defs"]},{"id":"load","score":4,"evidence":"textOnlyScreens is empty on every viewport. Each screen has a heading, a definition box, a table, steps, a prompt or a check, and paragraphs stay at 2–4 lines on desktop. Desktop JP median is 37 chars per line (target 30–40) and EN median is 73 (target 60–75).","blockIds":["s3-steps","s1-b4","s2-b3"]},{"id":"a11y_l10n","score":4,"evidence":"The EN screens have no leftover Japanese, including the diagram labels ('Money-left screen', 'Add button'), the prompt placeholders ('app idea', 'app name') and the flashcards. The JP screens use Japanese diagram labels, and no control is hidden under the 56/60 px mobile bars.","blockIds":["s2-b4","s1-b4","s2-b3","summary-cards"]}],"mustFix":[],"niceToHave":["Desktop JP charsPerLine max is 42, a little over the 40 target, while the median of 37 is fine. In s2-defs the 機能 definition leaves 「す。」 alone on the last line on desktop (pages/desktop-jp-04.png). Shortening it to 「…アプリが『すること』。」 would avoid that one-character widow.","reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (pages/mobile-jp-23.png). Touch devices should get 「タップでめくる」 instead.","reader: the check section shows 理解度チェック twice, once as the section heading and again as the card label right below it (pages/desktop-jp-11.png, pages/mobile-jp-16.png). The card label could be dropped when it repeats the section title."],"verdict":"pass","summary":"No hard failures: no horizontal overflow, console, mermaid, unknown-block or broken-image errors. The tables, the TD diagram and the prompt blocks are easy to read at 390 px and fully localized in EN. The only visual nit in the lesson content is a one-character widow in the s2-defs definition; the other notes are about the reader."}
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "The screen-flow diagram (s2-b3/s2-b4 area, 'アプリを開く → 今月の残り画面 ⇄ 支出の入力画面') is readable at 390 px. Its labels are in the correct language in JP and EN, and it has a caption and a '図の説明を読む' toggle. Both tables (s2-table, the MoSCoW table) wrap cleanly on mobile, and no metric reports overflow, broken images or mermaid errors.",
+      "blockIds": [
+        "s2-table",
+        "s5-b2",
+        "s3-steps"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "No screen is text-only. Each section breaks up its prose with definitions, a table, a callout or a check. Two minor points: desktop JP charsPerLine max is 42 (target 30–40, median 37 is fine), and the 6-question exam runs about 5 mobile screens with no break (mobile-jp-16..21).",
+      "blockIds": [
+        "s3-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The EN screenshots have no leftover Japanese: headings, tables, diagram nodes, the prompt and quiz options are all translated. JP has no awkward breaks inside words, contrast is good, and no controls are hidden under the 56/60 px bars on mobile. EN charsPerLine median 73 is within 60–75 (max 78)."
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "reader: on mobile the flashcard hint reads 'クリックまたはスペースキーでめくる' (pages/mobile-jp-23.png). On touch devices show a tap hint instead.",
+    "reader: the knowledge-check block shows all 6 questions as one long card on mobile (pages/mobile-jp-16.png to mobile-jp-21.png). A per-question pager or a sticky '6問中 n問目' would make it easier to find your place.",
+    "s2-defs: in the desktop JP definition rows the last line holds only 'す。' or 'れる」の形で…' (pages/desktop-jp-04.png). Trimming a few characters, e.g. '入力欄や画面、通知など、アプリが「すること」。', would avoid the orphan.",
+    "s3-steps: the 6-step worked example takes about 3.5 mobile screens of continuous text (pages/mobile-jp-11.png to mobile-jp-14.png). Shortening each step's body to one sentence would tighten it."
+  ],
+  "verdict": "pass",
+  "summary": "The lesson looks clean in all three renders: no overflow, console errors or broken visuals, and a full EN translation. Every section is broken up by a definition list, table, diagram or check. Nothing has to be fixed. The only content polish is minor: orphaned line endings in the s2-defs rows and a slightly long s3-steps worked example on mobile."
+}

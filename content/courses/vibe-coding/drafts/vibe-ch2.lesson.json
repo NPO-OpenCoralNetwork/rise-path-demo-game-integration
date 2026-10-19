@@ -67,7 +67,7 @@
           "style": "lead",
           "md": {
             "jp": "AIに「家計簿アプリを作って」と頼んだら、グラフや分類が並んだ画面がすぐにできました。でも、ほしかったのは「月の途中で食費の使いすぎに気づける」ことでした。どこから直せばよいのか、わからなくなってしまいました。\n\n最初の依頼には、何が足りなかったのでしょうか。まず予想してみましょう。",
-            "en": "You ask an AI to \"build a household budget app\", and a screen full of charts and categories appears in seconds. But what you wanted was to notice, halfway through the month, that you were overspending on food. Now you can't tell where to start fixing it.\n\nWhat was missing from that first request? Make a guess first."
+            "en": "You ask an AI to \"build a household budget app\", and a screen full of charts and categories appears right away. But what you wanted was to notice, halfway through the month, that you were overspending on food. Now you can't tell where to start fixing it.\n\nWhat was missing from that first request? Make a guess first."
           }
         },
         {
@@ -209,12 +209,12 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "入れたい機能について、私に質問を1つずつしてください。",
-                    "en": "Ask me about the features I want, one question at a time."
+                    "jp": "目的に合う機能について、私に質問を1つずつしてください。",
+                    "en": "Ask me about features that fit the goal, one question at a time."
                   },
                   "feedback": {
-                    "jp": "機能について聞いてもらうと、目的が決まらないまま機能が並びます。先に、誰の何のためのアプリかを質問してもらいます。",
-                    "en": "Asking about features gets you a list of features before the goal is set. Have it ask whose app it is and what it's for first."
+                    "jp": "機能から聞いてもらうと、目的そのものが決まらないまま機能が並びます。先に、誰の何のためのアプリかを質問してもらいます。",
+                    "en": "Starting with features gets you a list of features before the goal itself is set. Have it ask whose app it is and what it's for first."
                   }
                 },
                 {
@@ -304,8 +304,8 @@
           "id": "s2-why",
           "type": "markdown",
           "md": {
-            "jp": "ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。",
-            "en": "When someone names a [[feature]], ask back once: \"Why do you want that?\""
+            "jp": "ほしい[[機能]]が浮かんだら、「なぜそれがほしいの？」と自分に1回聞き返します。",
+            "en": "When a [[feature]] you want comes to mind, ask yourself once: \"Why do I want that?\""
           }
         },
         {
@@ -329,7 +329,7 @@
               { "jp": "入力を忘れて記録が抜けるのを防げる", "en": "No gaps in the record when I forget to log" }
             ],
             [
-              { "jp": "レシートの読み取り", "en": "Receipt scanning" },
+              { "jp": "レシート読み取り", "en": "Receipt scanning" },
               { "jp": "入力の手間が減り、記録を続けられる", "en": "Less work to log, so I keep it up" }
             ]
           ]
@@ -444,8 +444,8 @@
             {
               "term": { "jp": "MoSCoW", "en": "MoSCoW" },
               "md": {
-                "jp": "機能をMust・Should・Could・Won'tの4つに分けて、優先順位を決める方法です。読み方は「モスクワ」です。",
-                "en": "A way to set priorities by sorting features into four groups: Must, Should, Could and Won't. It's pronounced like \"Moscow\"."
+                "jp": "機能をMust・Should・Could・Won'tの4つに分けて、優先順位を決める方法です。",
+                "en": "A way to set priorities by sorting features into four groups: Must, Should, Could and Won't."
               }
             }
           ]
@@ -460,12 +460,12 @@
           },
           "columns": [
             { "jp": "分類", "en": "Group" },
-            { "jp": "意味：家計簿の例", "en": "Meaning: budget app example" }
+            { "jp": "家計簿アプリでは", "en": "In the budget app" }
           ],
           "rows": [
             [
               { "jp": "Must", "en": "Must" },
-              { "jp": "必須：支出の入力、今月の予算の設定と残り金額の表示", "en": "Essential: logging an expense; setting this month's budget and showing the money left" }
+              { "jp": "必須：食費の入力、今月の食費の予算の設定と残り金額の表示", "en": "Essential: logging a food expense; setting this month's food budget and showing the money left" }
             ],
             [
               { "jp": "Should", "en": "Should" },
@@ -477,7 +477,7 @@
             ],
             [
               { "jp": "Won't", "en": "Won't" },
-              { "jp": "今回やらない：レシートの読み取り、家族との共有", "en": "Not this time: receipt scanning; sharing with family" }
+              { "jp": "今回やらない：レシート読み取り、家族との共有", "en": "Not this time: receipt scanning; sharing with family" }
             ]
           ]
         },
@@ -488,7 +488,7 @@
           "title": { "jp": "Mustに迷ったら", "en": "Not sure if it's a Must?" },
           "md": {
             "jp": "「これがなくても、目的は果たせる？」と聞き、「果たせない」機能だけをMustにします。\n\nこのレッスンでは、最初の版をMustだけで作り、ShouldとCouldはそのあとに足します。Won'tは今回作らず、次の版の候補に残します。",
-            "en": "Ask, \"Could the goal still be met without this?\" and make only the features it can't do without Musts.\n\nIn this lesson, we build the first version from the Musts alone and add Shoulds and Coulds after that. A Won't is not built this time and stays on as a candidate for the next version."
+            "en": "Ask, \"Could the goal still be met without this?\" Only the features it can't do without become Musts.\n\nIn this lesson, we build the first version from the Musts alone and add Shoulds and Coulds after that. A Won't is not built this time and stays on as a candidate for the next version."
           }
         },
         {
@@ -586,7 +586,7 @@
               "term": { "jp": "1枚企画書", "en": "One-page plan" },
               "md": {
                 "jp": "目的・使う人・機能の優先順位・画面の流れ・扱うデータ・やらないことを、1枚に並べた文書。製品の要件をまとめるPRD（Product Requirements Document）の小さな版です。",
-                "en": "A single page listing the goal, the users, feature priorities, the screen flow, the data handled and what you won't build. It's a small version of the PRD (Product Requirements Document) that teams use to write down a product's requirements."
+                "en": "A single page listing the goal, the users, feature priorities, the screen flow, the data handled and what you won't build. It's a small version of a PRD (Product Requirements Document), a document that sets out a product's requirements."
               }
             }
           ]
@@ -615,8 +615,8 @@
                 "en": "Ask the AI to \"list features that would help with this goal\", and add your own ideas. The goal is the yardstick you compare them by."
               },
               "expect": {
-                "jp": "入力、予算と残り金額、通知、グラフ、レシート読み取り、家族との共有などが並びます。",
-                "en": "Candidates appear: logging expenses, the budget and money left, reminders, charts, receipt scanning, sharing with family and so on."
+                "jp": "食費の入力、予算と残り金額、通知、グラフ、レシート読み取り、家族との共有などが並びます。",
+                "en": "Candidates appear: logging food expenses, the budget and money left, reminders, charts, receipt scanning, sharing with family and so on."
               }
             },
             {
@@ -627,8 +627,8 @@
                 "en": "Sort them by asking, \"Could the goal still be met without this?\" To keep the first version small, this lesson uses a rule of thumb: no more than three Musts."
               },
               "expect": {
-                "jp": "Mustは「支出の入力」と「今月の予算の設定と残り金額の表示」の2つになります。",
-                "en": "Two Musts remain: \"log an expense\" and \"set this month's budget and show the money left\"."
+                "jp": "Mustは「食費の入力」と「今月の食費の予算の設定と残り金額の表示」の2つになります。",
+                "en": "Two Musts remain: \"log a food expense\" and \"set this month's food budget and show the money left\"."
               }
             },
             {
@@ -651,8 +651,8 @@
                 "en": "Decide what to keep in the database you met in Chapter 1. If you don't, the AI guesses which fields to keep. Field names are enough."
               },
               "expect": {
-                "jp": "「支出：日付・金額・メモ」と「予算：月ごとの金額」の2つが書けます。",
-                "en": "You can write two items: \"Expense: date, amount, note\" and \"Budget: amount per month\"."
+                "jp": "「食費：日付・金額・メモ」と「食費の予算：月ごとの金額」の2つが書けます。",
+                "en": "You can write two items: \"Food expense: date, amount, note\" and \"Food budget: amount per month\"."
               }
             },
             {
@@ -674,20 +674,20 @@
           "type": "diagram",
           "engine": "mermaid",
           "code": {
-            "jp": "flowchart TD\n  A[アプリを開く] --> B[今月の残り画面<br>予算の設定・使った額・残り]\n  B -->|追加ボタン| C[支出の入力画面<br>日付・金額・メモ]\n  C -->|保存| B",
-            "en": "flowchart TD\n  A[Open the app] --> B[Money-left screen<br>set budget, spent, left]\n  B -->|Add button| C[Add-expense screen<br>date, amount, note]\n  C -->|Save| B"
+            "jp": "flowchart TD\n  A[アプリを開く] --> B[今月の残り画面<br>食費の予算・使った額・残り]\n  B -->|追加ボタン| C[食費の入力画面<br>日付・金額・メモ]\n  C -->|保存| B",
+            "en": "flowchart TD\n  A[Open the app] --> B[Money-left screen<br>food budget, spent, left]\n  B -->|Add button| C[Add-food-expense screen<br>date, amount, note]\n  C -->|Save| B"
           },
           "caption": {
             "jp": "Mustだけなら、最初の版の画面は2つで足りる",
             "en": "With only the Musts, the first version needs just two screens"
           },
           "alt": {
-            "jp": "今月の残り画面で予算を設定し、追加ボタンで支出の入力画面へ進み、保存すると今月の残り画面に戻る図",
-            "en": "On the money-left screen you set the budget; the Add button leads to the add-expense screen, and saving returns to the money-left screen"
+            "jp": "今月の残り画面で食費の予算を設定し、追加ボタンで食費の入力画面へ進み、保存すると今月の残り画面に戻る図",
+            "en": "On the money-left screen you set the food budget; the Add button leads to the add-food-expense screen, and saving returns to the money-left screen"
           },
           "description": {
-            "jp": "今月の残り画面で予算を設定し、支出を入力して保存すると、今月の残り画面に戻ります。残り金額は新しい額になります。",
-            "en": "Set the budget on the money-left screen. Log an expense and save it, and you're back on the money-left screen with the new amount."
+            "jp": "今月の残り画面で食費の予算を設定し、食費を入力して保存すると、この画面に戻り、残り金額が更新されます。",
+            "en": "Set the food budget on the money-left screen. Log a food expense and save it, and you're back on that screen with the money left updated."
           }
         },
         {
@@ -704,8 +704,8 @@
             { "name": "app name", "hint": { "jp": "例：食費の使いすぎに気づける家計簿アプリ", "en": "e.g. a budget app that flags food overspending" } }
           ],
           "expect": {
-            "jp": "たとえば、次のような1枚になります。\n\n目的：家計をあずかる自分が、月の途中で食費の使いすぎに気づける。\n\n使う人：自分1人。\n\n機能の優先順位：Mustは支出の入力と、今月の予算の設定と残り金額の表示。Shouldは入力忘れの通知、Couldは食費のグラフ。\n\n画面の流れ：今月の残り画面 → 支出の入力画面 → 今月の残り画面。\n\n扱うデータ：支出（日付・金額・メモ）、予算（月ごとの金額）。\n\nやらないこと：レシートの読み取り、家族との共有。",
-            "en": "For the budget app, the page might look like this.\n\nGoal: as the person who runs the household budget, I can notice mid-month that I'm overspending on food.\n\nUsers: only me.\n\nFeature priorities: Must: log an expense; set this month's budget and show the money left. Should: a reminder to log. Could: a food-spending chart.\n\nScreen flow: money-left screen → add-expense screen → money-left screen.\n\nData handled: expense (date, amount, note); budget (amount per month).\n\nWhat we won't build: receipt scanning; sharing with family."
+            "jp": "たとえば、次のような1枚になります。\n\n目的：家計をあずかる自分が、月の途中で食費の使いすぎに気づける。\n\n使う人：自分1人。\n\n機能の優先順位：Mustは食費の入力と、今月の食費の予算の設定と残り金額の表示。Shouldは入力忘れを知らせる通知、Couldは食費の推移のグラフ。\n\n画面の流れ：今月の残り画面 → 食費の入力画面 → 今月の残り画面。\n\n扱うデータ：食費（日付・金額・メモ）、食費の予算（月ごとの金額）。\n\nやらないこと：レシート読み取り、家族との共有。",
+            "en": "For the budget app, the page might look like this.\n\nGoal: as the person who runs the household budget, I can notice mid-month that I'm overspending on food.\n\nUsers: only me.\n\nFeature priorities: Must: log a food expense; set this month's food budget and show the money left. Should: a reminder when you forget to log. Could: a chart of food spending over time.\n\nScreen flow: money-left screen → add-food-expense screen → money-left screen.\n\nData handled: food expense (date, amount, note); food budget (amount per month).\n\nWhat we won't build: receipt scanning; sharing with family."
           }
         },
         {
@@ -758,15 +758,15 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "どこまで作るかを、AIが推測で決めることになる",
-                    "en": "How far to go is left to the AI's guesswork"
+                    "jp": "どこまで作るかの線引きを、AIに任せることになる",
+                    "en": "Where the scope ends is left up to the AI"
                   }
                 }
               ],
               "answer": ["d"],
               "explanation": {
-                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。AIツールの開発元のガイドも、役に立つ仕様書（企画書のような文書）の特徴として、範囲外を書くことを挙げています。",
-                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. A guide from an AI tool maker likewise says a useful spec (a document like this plan) states what is out of scope."
+                "jp": "「やらないこと」は、作る範囲の外側を示す線です。線がないと、どこまで作るかをAIが推測で決めることになります。Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書のような文書です。",
+                "en": "\"What we won't build\" draws the line around the scope. Without that line, how far to go is left to the AI's guesswork. Anthropic's official guide to Claude Code likewise says a useful spec (a document like this plan) states what is out of scope."
               },
               "hint": {
                 "jp": "書いていないことを、AIがどう扱うかを考えましょう。",
@@ -933,7 +933,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "記録と通知、写真での種類判定、SNSへの投稿",
+                    "jp": "記録と通知、写真での種類判定、SNS（ソーシャルメディア）への投稿",
                     "en": "Records, reminders, species ID from photos and social posting"
                   },
                   "feedback": {
@@ -1023,7 +1023,7 @@
               "kind": "single",
               "prompt": {
                 "jp": "英単語の復習アプリの目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？",
-                "en": "An English vocabulary app's plan has the goal \"I can review English words for five minutes on my commute.\" The Musts are \"add words\", \"quiz me\" and \"a leaderboard with friends\", and \"what we won't build\" is left blank. What is the best way to revise it?"
+                "en": "An English vocabulary app's plan has the goal \"I can review English words in five minutes on my commute.\" The Musts are \"add words\", \"quiz me\" and \"a leaderboard with friends\", and \"what we won't build\" is left blank. What is the best way to revise it?"
               },
               "options": [
                 {
@@ -1090,8 +1090,8 @@
                     "en": "Leave the plan as it is and ask for changes as they occur to you"
                   },
                   "feedback": {
-                    "jp": "企画書と中身がずれると、AIも自分も前提を見失います。先に企画書を直し、同じ1枚を渡します。",
-                    "en": "When the plan and the app drift apart, you and the AI both lose track of the assumptions. Fix the plan first, then hand over the same page."
+                    "jp": "企画書と中身がずれると、AIも自分も前提を見失います。先に企画書を直し、直した1枚をAIに渡します。",
+                    "en": "When the plan and the app drift apart, you and the AI both lose track of the assumptions. Fix the plan first, then hand the updated page to the AI."
                   }
                 },
                 {
@@ -1146,19 +1146,19 @@
           "type": "summary",
           "points": [
             {
-              "jp": "コードを頼む前に、AIに質問してもらい（壁打ち）、何を作りたいかを言葉にする。",
+              "jp": "コードを頼む前に、AIに質問してもらい（壁打ち）、何を作りたいかを言葉にします。",
               "en": "Before asking for code, have the AI ask you questions (talking it through) and put what you want to build into words."
             },
             {
-              "jp": "機能は手段。「なぜ？」と聞き返し、「誰が・どんな場面で・どうなれる」という目的を1文にする。",
+              "jp": "機能は手段です。「なぜ？」と聞き返し、「誰が・どんな場面で・どうなれる」という目的を1文にします。",
               "en": "Features are means. Ask \"why?\" and write the goal as one sentence: who, in what situation, can do what."
             },
             {
-              "jp": "最初は目的を果たせるか確かめられる最小の版（MVP）だけを作る。MoSCoWで分け、やらないことも決める。",
+              "jp": "最初は目的を果たせるか確かめられる最小の版（MVP）だけを作ります。MoSCoWで分け、やらないことも決めます。",
               "en": "First build only the smallest version that shows whether the goal is met (MVP). Sort with MoSCoW and decide what you won't build."
             },
             {
-              "jp": "目的から「やらないこと」までを1枚企画書にまとめ、使ってわかったことで直していく。",
+              "jp": "目的から「やらないこと」までを1枚企画書にまとめ、使ってわかったことで直していきます。",
               "en": "Put everything from the goal to what you won't build on one page, and revise it as you learn from use."
             }
           ]
@@ -1269,8 +1269,8 @@
     {
       "term": { "jp": "MoSCoW", "en": "MoSCoW" },
       "md": {
-        "jp": "機能をMust・Should・Could・Won't（今回やらない）の4つに分ける優先順位の付け方。",
-        "en": "A way to prioritize features as Must, Should, Could and Won't (not this time)."
+        "jp": "優先順位の付け方です。機能をMust（必須）・Should（重要）・Could（あるとよい）・Won't（今回やらない）の4つに分けます。",
+        "en": "A way to set priorities: sort features into Must (essential), Should (important), Could (nice to have) and Won't (not this time)."
       }
     },
     {

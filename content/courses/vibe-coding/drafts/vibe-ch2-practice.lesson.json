@@ -55,8 +55,8 @@
           "type": "markdown",
           "style": "lead",
           "md": {
-            "jp": "サークルの幹事が、第2章の家計簿アプリと同じ流れで、出欠確認アプリの機能を書き出しました。イベントの作成、出欠ボタン、参加人数の一覧、締め切り前日の通知、ひとことコメント欄、集金です。どれも外せない気がして、気づけば6つ全部を[[MoSCoW]]のMustにしていました。\n\nこの幹事は、AIの力をどう借りるとよいでしょうか。始める前に、予想してみましょう。",
-            "en": "A club organizer follows the same steps as Chapter 2's budget app and lists the features for an attendance app: creating an event, an attendance button, a headcount list, a reminder the day before the deadline, a short comment field and fee collection. Every one of them feels essential, and before long all six are [[MoSCoW]] Musts.\n\nHow should the organizer get help from an AI here? Before you start, make a guess."
+            "jp": "サークルの幹事が、第2章の家計簿アプリと同じ流れで、出欠確認アプリの機能を書き出しました。イベントの作成、出欠ボタン、参加人数の一覧、締め切り前日の通知、ひとことコメント欄、参加費の集金です。どれも外せない気がして、気づけば6つ全部を[[MoSCoW]]のMustにしていました。\n\nこの幹事は、AIの力をどう借りるとよいでしょうか。始める前に、予想してみましょう。",
+            "en": "A club organizer follows the same steps as Chapter 2's budget app and lists the features for an attendance app: creating an event, an attendance button, a headcount list, a reminder the day before the deadline, a short comment field and collecting fees. Every one of them feels essential, and before long all six are [[MoSCoW]] Musts.\n\nHow should the organizer get help from an AI here? Before you start, make a guess."
           }
         },
         {
@@ -90,7 +90,7 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "自分で分けて理由を書き、AIには問題の指摘を頼む",
+                    "jp": "自分で分けて理由を書き、AIには問題を指摘してもらう",
                     "en": "Sort them yourself with reasons, and ask the AI to point out problems"
                   }
                 },
@@ -144,8 +144,8 @@
           "type": "markdown",
           "style": "lead",
           "md": {
-            "jp": "自分の作りたいアプリで、AIと1枚企画書を作ります。思いつかなければ「サークルの出欠確認アプリ」で試しましょう。目安は15分です。\n\nこの演習では、機能は自分で分けて決め、AIには見直しを頼みます。演習1で目的を決め、演習2で機能を分け、演習3で1枚にまとめて直します。最後に、チェックリストで仕上がりを確かめます。",
-            "en": "Make a one-page plan with an AI for an app you want to build. If nothing comes to mind, try a club attendance app. Allow about 15 minutes.\n\nIn this practice you sort the features and make the decisions yourself; the AI only reviews them. Practice 1 sets the goal, Practice 2 sorts the features, and Practice 3 puts it all on one page and revises it. When you finish, check your plan against the checklist."
+            "jp": "自分の作りたいアプリで、AIと[[1枚企画書]]を作ります。思いつかなければ「サークルの出欠確認アプリ」で試しましょう。目安は15分です。\n\nこの演習では、機能は自分で分けて決め、AIには見直しを頼みます。演習1で目的を決め、演習2で機能を分け、演習3で1枚にまとめて直します。\n\n演習1〜3の依頼文は、同じチャットで続けて送ります。最後に、チェックリストで仕上がりを確かめます。",
+            "en": "Make a [[one-page plan]] with an AI for an app you want to build. If nothing comes to mind, try a club attendance app. Allow about 15 minutes.\n\nIn this practice you sort the features and make the decisions yourself; the AI only reviews them. Practice 1 sets the goal, Practice 2 sorts the features, and Practice 3 puts it all on one page and revises it.\n\nSend the requests for Practices 1 to 3 one after another in the same chat. When you finish, check your plan against the checklist."
           }
         },
         {
@@ -259,7 +259,7 @@
           },
           "md": {
             "jp": "Mustは、ないと目的を果たせないものです。Shouldは、重要だけれど、なくても最初の版が成り立つものです。\n\nCouldは、あるとよいものです。Won'tは、この版では作らないと決めて、企画書に書いておくものです。",
-            "en": "A Must is something the goal can't be met without. A Should is important, but the first version still works without it.\n\nA Could is nice to have. A Won't is something you agree not to build in this version, and you write it down in the plan."
+            "en": "A Must is something the goal can't be met without. A Should is important, but the first version still works without it.\n\nA Could is nice to have. A Won't is something you decide not to build in this version, and you write it down in the plan."
           }
         },
         {
@@ -271,8 +271,8 @@
               "id": "pq1",
               "kind": "single",
               "prompt": {
-                "jp": "買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustの「お店ごとの並べ替え」に、AIが「なくても買い忘れは防げます」と指摘しました。最も適切な判断はどれでしょう？",
-                "en": "A shopping-list app has the goal \"family members don't forget anything while shopping\". One of your Musts is \"sort items by shop\", and the AI points out that forgotten items can be prevented without it. Which decision is best?"
+                "jp": "買い物メモアプリの目的は「家族が、買い物中に買い忘れをしない」です。Mustの「お店ごとの並べ替え」について、AIが「Shouldでもよいかもしれません」と指摘しました。最も適切な判断はどれでしょう？",
+                "en": "A shopping-list app has the goal \"family members don't forget anything while shopping\". One of your Musts is \"sort items by shop\", and the AI suggests it might fit under Should. Which decision is best?"
               },
               "options": [
                 {
@@ -320,8 +320,8 @@
                 "a"
               ],
               "explanation": {
-                "jp": "AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめます。果たせるならMustから外し、重要ならShouldにします。",
-                "en": "The AI's point is input for your decision. Check it yourself by asking whether the goal could be met without the feature. If it could, take it out of Must, and make it a Should if it matters."
+                "jp": "AIの指摘は、判断の材料です。「これがなくても、目的は果たせる？」と自分で確かめます。並べ替えがなくても、メモを見れば買い忘れは防げるので、Mustから外してShouldにします。",
+                "en": "The AI's point is input for your decision. Check it yourself by asking whether the goal could be met without the feature. Even without sorting, the list itself keeps you from forgetting things, so take it out of Must and make it a Should."
               },
               "hint": {
                 "jp": "指摘を受け入れるかどうかを、何を物差しにして決めるか考えましょう。",
@@ -414,15 +414,15 @@
             {
               "name": "自分の分け方",
               "hint": {
-                "jp": "例：Must＝支出の入力（ないと記録できない）、今月の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
-                "en": "e.g. Must = logging expenses (nothing gets recorded without it), setting this month's budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
+                "jp": "例：Must＝食費の入力（ないと記録できない）、今月の食費の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
+                "en": "e.g. Must = logging food expenses (nothing gets recorded without it), setting this month's food budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
               }
             },
             {
               "name": "my sorting",
               "hint": {
-                "jp": "例：Must＝支出の入力（ないと記録できない）、今月の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
-                "en": "e.g. Must = logging expenses (nothing gets recorded without it), setting this month's budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
+                "jp": "例：Must＝食費の入力（ないと記録できない）、今月の食費の予算の設定と残り金額の表示（使いすぎに気づくため）／Should＝通知／Could＝グラフ／Won't＝レシート読み取り（今回は手入力で足りる）",
+                "en": "e.g. Must = logging food expenses (nothing gets recorded without it), setting this month's food budget and showing the money left (to spot overspending) / Should = reminders / Could = charts / Won't = receipt scanning (typing is enough for now)"
               }
             }
           ],
@@ -548,8 +548,8 @@
             "en": "flowchart TD\n  A[\"Create event<br>(organizer)\"] --> B[\"Event list<br>(members)\"]\n  B --> C[\"Mark attendance<br>(members)\"]\n  C --> D[\"Headcount list<br>(organizer)\"]"
           },
           "caption": {
-            "jp": "出欠確認アプリの例：Mustの画面だけで、作成から人数の確認まで通る",
-            "en": "Attendance app example: the Must screens alone get you from creating an event to the headcount"
+            "jp": "出欠確認アプリの例：Mustと画面の流れだけで、作成から人数の確認まで通る",
+            "en": "Attendance app example: the Musts and the screen flow alone get you from creating an event to the headcount"
           },
           "alt": {
             "jp": "幹事がイベントを作成し、メンバーがイベント一覧から出欠を入力し、幹事が参加人数の一覧で人数を確かめる流れの図",
@@ -578,8 +578,8 @@
             {
               "id": "pc-must",
               "label": {
-                "jp": "Mustが3つ以内（目安）で、どれも「ないと目的を果たせない」機能になっている",
-                "en": "There are three Musts or fewer (a rule of thumb), and the goal can't be met without any of them"
+                "jp": "Mustが3つ以内（第2章の目安）で、どれも「ないと目的を果たせない」機能になっている",
+                "en": "There are three Musts or fewer (the rule of thumb from Chapter 2), and the goal can't be met without any of them"
               }
             },
             {
@@ -760,8 +760,8 @@
                 "a"
               ],
               "explanation": {
-                "jp": "通知はなくても目的は果たせますが、記録を続ける助けになるのでShouldです。ランキングは目的とつながらないので、Won'tに書いて範囲の外だと伝えます。",
-                "en": "The goal can be met without the reminder, but it helps you keep logging, so it's a Should. The leaderboard doesn't serve the goal, so it goes under Won't, which marks it as out of scope."
+                "jp": "通知はなくても目的は果たせます。ただ、つけ忘れると次に見る前回の記録が残らないので、重要なShouldです。ランキングは目的とつながらないので、Won'tに書いて範囲の外だと伝えます。",
+                "en": "The goal can be met without the reminder. But if you forget to log, there's no last record to look at next time, so it's an important Should. The leaderboard doesn't serve the goal, so it goes under Won't, which marks it as out of scope."
               },
               "objectiveId": "o3",
               "bloom": "evaluate"
@@ -770,7 +770,7 @@
               "id": "pq3",
               "kind": "single",
               "prompt": {
-                "jp": "レシピ帳アプリの1枚企画書です。目的は「自分が、作った料理を次も同じ手順で作れる」です。Mustは「レシピの一覧」と「レシピの表示」、画面の流れは「レシピ一覧 → レシピの表示」です。最も必要な直しはどれでしょう？",
+                "jp": "レシピ帳アプリの1枚企画書です。目的は「自分が、作った料理を次も同じ手順で作れる」です。Mustは「レシピの一覧」と「レシピの表示」、画面の流れは「レシピの一覧 → レシピの表示」です。最も必要な直しはどれでしょう？",
                 "en": "Here is a one-page plan for a recipe app. The goal is \"I can cook a dish again the same way next time.\" The Musts are \"recipe list\" and \"show a recipe\", and the screen flow is \"recipe list → recipe view\". Which revision is needed most?"
               },
               "options": [
@@ -906,7 +906,7 @@
             },
             {
               "jp": "Mustは、ないと目的を果たせないものだけです。重要だけれど、なくても最初の版が成り立つものはShouldです。今回作らないものは、Won'tに書いて残します。",
-              "en": "A Must is only what the goal can't do without. Something important that the first version can still work without is a Should. What you won't build this time stays written under Won't."
+              "en": "A Must is only something the goal can't be met without. Something important that the first version can still work without is a Should. What you won't build this time stays written under Won't."
             },
             {
               "jp": "自分が決めていないことをAIが埋めたら、「これは決めていません」と伝えて質問してもらいます。",
@@ -933,7 +933,7 @@
             {
               "id": "card-must-test",
               "front": {
-                "jp": "Mustか迷ったときの質問は？",
+                "jp": "Mustにするか迷ったときの質問は？",
                 "en": "What do you ask when you're unsure about a Must?"
               },
               "back": {
@@ -948,8 +948,8 @@
                 "en": "Should vs Won't?"
               },
               "back": {
-                "jp": "Shouldは、なくても最初の版は成り立つが重要なもの。Won'tは、この版では作らないと決めて書いておくもの。",
-                "en": "A Should is important, but the first version works without it. A Won't is something you agree not to build in this version, and write down."
+                "jp": "Shouldは、重要だけれど、なくても最初の版が成り立つものです。Won'tは、この版では作らないと決めて、企画書に書いておくものです。",
+                "en": "A Should is important, but the first version works without it. A Won't is something you decide not to build in this version and write down in the plan."
               }
             },
             {
@@ -1010,8 +1010,8 @@
         "en": "MoSCoW"
       },
       "md": {
-        "jp": "機能をMust・Should・Could・Won't（今回やらない）の4つに分ける優先順位の付け方。",
-        "en": "A way to prioritize features as Must, Should, Could and Won't (not this time)."
+        "jp": "優先順位の付け方です。機能をMust（必須）・Should（重要）・Could（あるとよい）・Won't（今回やらない）の4つに分けます。",
+        "en": "A way to set priorities: sort features into Must (essential), Should (important), Could (nice to have) and Won't (not this time)."
       }
     },
     {

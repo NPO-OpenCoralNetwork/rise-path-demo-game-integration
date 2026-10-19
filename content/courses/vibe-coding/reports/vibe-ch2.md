@@ -523,3 +523,275 @@ exit 0 needs a fresh review of the fixed draft; the owner decides whether to run
 - VS Code vs VSCode;
 - the reader-level touch hints;
 - the cc-best-practices fact check.
+
+## Review round 1 (publish gate)
+
+This section supersedes the status and "Next" lines of "Confirmation review (round 7)" above.
+
+Owner decisions for this round:
+1. Tune the ja-editor must-fix rules. This round's ja-editor review follows the tuned rules, so a must-fix must name an
+   error class (a)–(e).
+2. Write the product name as 「VS Code」. Both drafts already do, so no draft change was needed.
+3. Publish vibe-ch2 and vibe-ch2-practice once both pass the review gate.
+
+Fresh, independent reviews of the round-7 draft (as committed in b53cdf1):
+
+| reviewer | own average | verdict | must-fix |
+|---|---|---|---|
+| `pedagogy-reviewer` | 3.54 | revise | 1 |
+| `ja-editor` | — | revise | 1 |
+| `visual-qa` | — | pass | 0 |
+
+They are saved over `reports/vibe-ch2.<reviewer>.review.json`.
+
+Preview: the workflow tried to preview this round, but it failed. `npm run -s lessons:preview -- vibe-coding vibe-ch2`
+exited 2 with "The dev server is not reachable at http://localhost:3007", because nothing was listening on :3007 or
+:3006. No new PNGs or `metrics.json` were written. The evidence in visual-qa's review cites the captures already in
+`.artifacts/preview/vibe-coding/vibe-ch2/`. They were written at 10:01 UTC on 2026-10-19 from the round-7 post-fix
+draft, which is the draft this round reviewed.
+
+Official verdict:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`
+exited **1**.
+
+```
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.54 (needs ≥ 3.3) · every criterion ≥ 3
+  align 4 · hook 4 · prior 4 · load 3 · worked 3 · active 3 · miscon 4 · visual 4 · practice 3 · meta 4 ·
+  accuracy 3 · voice 3 · a11y_l10n 4
+  2 must-fix: ja-editor ×1 (summary-points, voice), pedagogy-reviewer ×1 (s3-steps, worked)
+```
+
+| criterion | merged (lowest) | pedagogy-reviewer | ja-editor | visual-qa |
+|---|---|---|---|---|
+| align | 4 | 4 | — | — |
+| hook | 4 | 4 | — | — |
+| prior | 4 | 4 | 4 | — |
+| load | **3** | 3 | 4 | 4 |
+| worked | **3** | 3 | — | — |
+| active | **3** | 3 | — | — |
+| miscon | 4 | 4 | — | — |
+| visual | 4 | 4 | — | 4 |
+| practice | **3** | 3 | — | — |
+| meta | 4 | 4 | — | — |
+| accuracy | **3** | 3 | — | — |
+| voice | **3** | 3 | 3 | — |
+| a11y_l10n | 4 | 4 | 4 | 4 |
+| **mean** | **3.54** | | | |
+
+The verdict is REVISE only because 2 must-fix items were open. No criterion is below 3, and the mean passes.
+
+### Must-fix items, applied after this round
+
+The recorded verdict above (REVISE, exit 1) describes the draft **before** these fixes. JP and EN were kept in sync.
+
+**R1. pedagogy-reviewer / worked / `s3-steps`**
+
+The model plan's goal is about food (「月の途中で食費の使いすぎに気づける」), but its Musts and data were about all
+spending, so they could not show food overspending. The first version is now scoped to food, as the reviewer's
+first option suggested. No new term was added.
+
+| block | change (JP; the EN changes match) |
+|---|---|
+| `s5-b2` Must | 「必須：食費の入力、今月の食費の予算の設定と残り金額の表示」 |
+| `ex-ideas.expect` | Starts 「食費の入力、予算と残り金額、…」 |
+| `ex-moscow.expect` | 「Mustは「食費の入力」と「今月の食費の予算の設定と残り金額の表示」の2つになります。」 |
+| `ex-data.expect` | 「「食費：日付・金額・メモ」と「食費の予算：月ごとの金額」の2つが書けます。」 |
+| `s2-b3.expect` (model plan) | Must 「食費の入力と、今月の食費の予算の設定と残り金額の表示」, flow 「今月の残り画面 → 食費の入力画面 → 今月の残り画面」, data 「食費（日付・金額・メモ）、食費の予算（月ごとの金額）」 |
+| `s2-b4` diagram | Node C is 「食費の入力画面」 / "Add-food-expense screen". Node B's sub-label is 「食費の予算・使った額・残り」 / "food budget, spent, left", the same length as before. The alt text and description now say 食費の予算 and 食費. |
+
+**R2. ja-editor / voice / `summary-points`**
+
+Applied as given: all four points end in です・ます (「言葉にします」「機能は手段です」「1文にします」「作ります」
+「決めます」「直していきます」). The EN needed no change.
+
+### niceToHave items applied
+
+- **`hook-b1` EN** (ja-editor): "appears in seconds" → "appears right away". The JP says only 「すぐに」.
+- **q10 EN** (ja-editor): "for five minutes" → "in five minutes", matching 「5分で」.
+- **`s5-b3` EN** (ja-editor): "… Only the features it can't do without become Musts."
+- **`s2-why`** (ja-editor; flagged in round 7 and again now): 「ほしい[[機能]]が浮かんだら、「なぜそれがほしいの？」と
+  自分に1回聞き返します。」 The EN changed to match: "When a [[feature]] you want comes to mind, ask yourself once:
+  "Why do I want that?"". This removes the ambiguity about who asks whom.
+- **`s5-b2` column header** (pedagogy; also flagged by ja-editor in round 7): 「意味：家計簿の例」 → 「家計簿アプリでは」 /
+  "In the budget app". The 必須／重要 glosses stay in the cells.
+- **`s2-table`** (visual-qa): the cell 「レシートの読み取り」, which broke mid-word at 390 px, is now 「レシート読み取り」.
+  The `s5-b2` Won't cell and the `s2-b3` model plan use the same form, matching `ex-ideas`.
+- **q1 a** (pedagogy, `active`): the option is now 「目的に合う機能について、私に質問を1つずつしてください。」, so d is no
+  longer the only option that contains 目的. Its feedback is 「機能から聞いてもらうと、目的そのものが決まらないまま機能が
+  並びます。…」. The EN changed to match.
+- **q4 d** (pedagogy, `active`): the option is now 「どこまで作るかの線引きを、AIに任せることになる」 / "Where the scope ends
+  is left up to the AI". It no longer reuses 「推測」 from the body.
+- **Glossary MoSCoW** (ja-editor; flagged in round 7 and again now): 「優先順位の付け方です。機能をMust（必須）・Should（重要）・
+  Could（あるとよい）・Won't（今回やらない）の4つに分けます。」 Both sentences are 60 characters or fewer, and the glosses
+  now match `card-moscow`. vibe-ch2-practice got the same entry.
+
+### niceToHave items left open (reasons)
+
+- **`ex-goal`** 「いつ困りますか？」 → 「どんな場面で困っていますか？」: this adds 8 characters, and the body is exactly at its
+  2,400 budget.
+- **q7 SNS**: the ja-editor marked it non-blocking because SNS is everyday Japanese. Spelling it out only in option c
+  would make that option conspicuously longer.
+- **A faded step after `s3-steps`** (pedagogy, toward a 4 for `worked`): it would add body text the budget can't absorb.
+- **`summary-next` / `course.json`**: the practice lesson is listed when the owner-approved publish step runs.
+- **visual-qa reader-level items**: the touch hint 「タップでめくる」 on flashcards, the `truncated: true` flag in the
+  mobile-jp metrics, and the 未回答 badge in the desktop table of contents. They need app code, not lesson changes.
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body is **2,400** JP characters, at the 2,400 budget. The count uses the same method as rounds 4–7 (prose, definitions,
+  table cells, steps md and expect, summary points, diagram description) and reproduces the round-7 figure of 2,383
+  before the fixes. The changes were:
+  - summary +9;
+  - food scoping +12;
+  - `s2-why` +3;
+  - 「レシート読み取り」 −2;
+  - the diagram description −5. It is now one sentence: 「…この画面に戻り、残り金額が更新されます。」
+- estMinutes is unchanged at 18.
+- Whole repository:
+  - `npm run lessons:validate -- --drafts`: 15 lesson files and 1 course file, 0 errors.
+  - `npm run lessons:lint -- --strict`: 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed lessons.
+- Preview: **not re-run**, because the dev server is down. The `s2-b4` diagram labels changed, so the fixed draft needs a
+  new capture. The EN node "Add-food-expense screen" is 5 characters longer than before.
+
+Next: the recorded gate verdict is REVISE (exit 1), and it describes the draft before these fixes. Owner-approved
+publishing waits on a passing gate. The steps are:
+1. Start the dev server (`npm run dev`).
+2. Re-run `npm run lessons:preview -- vibe-coding vibe-ch2` and check the PNGs.
+3. Run a fresh independent review of the fixed draft (pedagogy-reviewer, ja-editor, visual-qa).
+4. Publish only once `check-review.mjs` exits 0.
+
+## Review round 2 (publish gate)
+
+This section supersedes the status and "Next" lines of "Review round 1 (publish gate)" above.
+
+The owner decisions are the same as in round 1:
+1. The ja-editor must-fix rules are tuned, so every ja-editor must-fix names an error class (a)–(e).
+2. The product name is written 「VS Code」. This draft does not mention it.
+3. vibe-ch2 and vibe-ch2-practice are published once both pass the review gate.
+
+Fresh, independent reviews of the round-1 post-fix draft (the working tree after "Review round 1"; not yet committed):
+
+| reviewer | own average | verdict | must-fix |
+|---|---|---|---|
+| `pedagogy-reviewer` | 3.54 | pass | 0 |
+| `ja-editor` | 4.0 | revise | 1 |
+| `visual-qa` | — (3.67 over its 3 scores) | pass | 0 |
+
+They are saved over `reports/vibe-ch2.<reviewer>.review.json`.
+
+Preview: not re-run. `npm run -s lessons:preview -- vibe-coding vibe-ch2` exited 2 with "The dev server is not
+reachable at http://localhost:3007". Nothing was listening on :3006 or :3007, and `RISE_PATH_PREVIEW_BASE_URL` was not
+set. No new PNGs or `metrics.json` were written. The newest captures in `.artifacts/preview/vibe-coding/vibe-ch2/` are
+from 10:01 UTC on 2026-10-19, which is the round-7 draft. visual-qa's evidence quotes the old diagram node
+「支出の入力画面」, which round 1 changed to 「食費の入力画面」. Its scores therefore describe the older captures, not
+the current draft.
+
+Official verdict:
+`node .claude/skills/review-lesson/scripts/check-review.mjs content/courses/vibe-coding/reports/vibe-ch2.*.review.json`
+exited **1**.
+
+```
+Review of vibe-ch2 by ja-editor, pedagogy-reviewer, visual-qa: REVISE
+  mean 3.54 (needs ≥ 3.3) · every criterion ≥ 3
+  align 4 · hook 4 · prior 4 · load 3 · worked 3 · active 3 · miscon 4 · visual 4 · practice 3 · meta 4 ·
+  accuracy 3 · voice 3 · a11y_l10n 4
+  must fix [voice] check-quiz: (a) meaning: q9 option a feedback 「先に企画書を直し、同じ1枚を渡します。」 can be
+  read two ways. … → JP: 「…同じ1枚を渡します。」→「…直した1枚をAIに渡します。」 EN: "…then hand over the same
+  page." → "…then hand the updated page to the AI."
+```
+
+| criterion | merged (lowest) | pedagogy-reviewer | ja-editor | visual-qa |
+|---|---|---|---|---|
+| align | 4 | 4 | — | — |
+| hook | 4 | 4 | — | — |
+| prior | 4 | 4 | 4 | — |
+| load | **3** | 3 | 4 | 3 |
+| worked | **3** | 3 | — | — |
+| active | **3** | 3 | — | — |
+| miscon | 4 | 4 | — | — |
+| visual | 4 | 4 | — | 4 |
+| practice | **3** | 3 | — | — |
+| meta | 4 | 4 | — | — |
+| accuracy | **3** | 3 | — | — |
+| voice | **3** | 3 | 4 | — |
+| a11y_l10n | 4 | 4 | 4 | 4 |
+| **mean** | **3.54** | | | |
+
+The verdict is REVISE only because 1 ja-editor must-fix item is open. No criterion is below 3, and the mean passes.
+Compared with round 1, the merged mean is unchanged at 3.54. pedagogy-reviewer now passes with no must-fix (round 1's
+`s3-steps` item is resolved), and ja-editor's `voice` rose from 3 to 4. The merged `voice` stays 3 because
+pedagogy-reviewer scores it 3.
+
+### Must-fix item, applied after this round
+
+The recorded verdict above (REVISE, exit 1) describes the draft **before** this fix.
+
+**R1. ja-editor / voice, error class (a) meaning / `check-quiz` q9 option a feedback**
+
+Applied as given:
+- JP: 「先に企画書を直し、同じ1枚を渡します。」 → 「先に企画書を直し、直した1枚をAIに渡します。」
+- EN: "Fix the plan first, then hand over the same page." → "Fix the plan first, then hand the updated page to the AI."
+
+A string search of the draft finds the new text in both locales, and the old text is gone.
+
+### niceToHave items applied
+
+- **`s2-b3.expect`** (ja-editor): each item now has one name across `s5-b2` and the model plan.
+  「Shouldは入力忘れの通知」 → 「Shouldは入力忘れを知らせる通知」, and 「Couldは食費のグラフ」 → 「Couldは食費の推移のグラフ」.
+  The EN matches the `s5-b2` cells: "Should: a reminder when you forget to log. Could: a chart of food spending over
+  time."
+- **`s3-defs` EN** (ja-editor): "It's a small version of a PRD (Product Requirements Document), a document that sets
+  out a product's requirements." This drops "that teams use", which the JP does not say.
+- **q4 explanation** (pedagogy, `accuracy`): the vague 「AIツールの開発元のガイド」 now names the source:
+  「Claude Codeの公式ガイド（Anthropic）も、役に立つ仕様書の特徴に、範囲外を書くことを挙げています。仕様書は、企画書の
+  ような文書です。」 The EN is "Anthropic's official guide to Claude Code likewise says a useful spec (a document like
+  this plan) states what is out of scope." Re-checked on 2026-10-19: `cc-best-practices`, which `s3-check` already
+  cites, says "The most useful specs are self-contained: they name the files and interfaces involved, state what is
+  out of scope, …". The JP is split into two sentences so each stays within 60 characters.
+- **`s5-defs`** (pedagogy, `accuracy`): removed 「読み方は「モスクワ」です。」 and "It's pronounced like "Moscow"."
+  Re-checked on 2026-10-19: the `abc-moscow` page, which this block cites, gives the four definitions but says nothing
+  about pronunciation, and no other source in the lesson does. Removing the sentence is better than leaving it under a
+  citation that does not support it. The body shrinks by 13 characters.
+- **q7 c** (ja-editor; style guide §2 「略語は初出で正式名を書きます」): 「SNSへの投稿」 → 「SNS（ソーシャルメディア）への投稿」,
+  at the first use. The EN already says "social posting". Round 1 left this item open because of option length. Option
+  c is a distractor and already the longest (the "everything" set), so the extra length does not point to the key.
+
+### niceToHave items left open (reasons)
+
+- **q8 stem as a plan excerpt** and **a new q7 a distractor** (pedagogy, `active`): both are new question content.
+  This late in the publish gate, they would go in unreviewed. They are good candidates for the next rework.
+- **An o1 item where the learner writes the request** (pedagogy, `align`): this would be a new exam question, so the
+  same reason applies. `align` is already 4.
+- **`ex-goal` 「と答えます」 → 「のように答えます」** (ja-editor): the reviewer said either form is fine.
+- **Trimming the `s2-defs` rows and shortening the `s3-steps` bodies** (visual-qa): line breaks depend on the render
+  width. Confirming them needs a fresh capture, and the dev server is down.
+- **Reader items** (visual-qa): a tap hint on mobile flashcards, and a per-question pager or 「6問中 n問目」 for the
+  exam. They need app code, not lesson changes.
+- **`course.json` listing and estMinutes** (pedagogy, owner dependency): this belongs to the publish step. The reviewer
+  recommends publishing this lesson and vibe-ch2-practice together.
+
+### State after fixes
+
+- `npm run -s lessons:validate -- content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` → 0 errors.
+- `npm run -s lessons:lint -- … --strict` → 0 errors, 0 warnings.
+- Body is **2,387** JP characters, down from 2,400 and within the 2,400 budget. This uses the same method as rounds
+  4–7 and round 1, which reproduces round 1's pre-fix figure of 2,383 from the committed draft. The only body change is
+  the −13 in `s5-defs`. Prompt expects and quiz text are not body, so the other edits do not change the count.
+- estMinutes is unchanged at 18. JP and EN are in sync: every edit is in both locales, except `s3-defs`, where only the
+  EN changed to match the existing JP.
+- Whole repository:
+  - `npm run lessons:validate -- --drafts`: 15 lesson files and 1 course file, 0 errors.
+  - `npm run lessons:lint -- --strict`: 0 errors. 81 advisory warnings, all in 11 migrated-unreviewed lessons.
+- Preview: **not re-run**, because the dev server is down. This round did not touch the diagram, but no capture exists
+  yet of round 1's diagram label changes.
+
+Next: this was the second publish-gate round, so per author-lesson step 6 the author stops here. The recorded verdict is
+REVISE (exit 1), and it describes the draft before R1. The only blocker is that one ja-editor must-fix, which is
+applied and checked in the draft but has not been re-reviewed. The steps are:
+1. Start the dev server (`npm run dev`).
+2. Re-run `npm run lessons:preview -- vibe-coding vibe-ch2` and have visual-qa look at the current captures.
+3. Run a fresh independent review of the current draft (ja-editor at least) and save it over the old JSON.
+4. Publish, together with vibe-ch2-practice, only once `check-review.mjs` exits 0.

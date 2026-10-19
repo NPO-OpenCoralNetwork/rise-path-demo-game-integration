@@ -6,73 +6,55 @@
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "The text is in warm です・ます throughout, with no pressure phrases, and every wrong-option feedback is 2 sentences or fewer. Three flashcard backs drop into plain form (「Mustではない。」「頼む。」「伝える。」), and summary-points[2] 「AIが決めていないことを埋めたら」 can be read two ways.",
-      "blockIds": ["card-must-test", "card-ai-review", "card-revise", "summary-points"]
+      "score": 4,
+      "evidence": "Every paragraph uses です・ます, and the tone is warm with no pressure phrases (lint finds no banned phrases). Each wrong-option feedback names the misconception and then gives the right idea (pq1 b, pq2 c, pq3 d). The en text reads as natural English, not a literal translation.",
+      "blockIds": [
+        "hook-b1",
+        "practice-check",
+        "check-quiz",
+        "summary-points"
+      ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "Lint --strict is clean, and there are only 3 glossary terms (壁打ち, MoSCoW, 1枚企画書). practice-recap puts the Should and Could definitions into one sentence (「Shouldは重要だけれど、…もの、Couldはあるとよいものです。」), which breaks the one-idea-per-sentence rule exactly where the key definitions are.",
-      "blockIds": ["practice-recap"]
+      "score": 4,
+      "evidence": "lessons:lint --strict reports 0 warnings, so every sentence and paragraph is within budget. The lesson adds no new terms. Each step does one thing, and the practice is split into three short sections.",
+      "blockIds": [
+        "practice-task",
+        "practice-steps",
+        "practice-steps-sort",
+        "practice-steps-plan"
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "hook-b1 ties back to 「第2章の家計簿アプリと同じ流れで」, and practice-recap restates MoSCoW before the learner uses it. The same club attendance app runs through the hook, the expected results and the diagram.",
-      "blockIds": ["hook-b1", "practice-recap", "practice-prompt", "practice-flow"]
+      "evidence": "壁打ち is defined inline in p-interview and in the glossary. MoSCoW and 1枚企画書 are linked to the glossary on first use. practice-recap reviews the four groups before pq1 and the sorting step use them.",
+      "blockIds": [
+        "p-interview",
+        "practice-recap",
+        "hook-b1",
+        "practice-task"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The English is natural and has the same meaning as the Japanese. The UI label 「期待される結果」 / \"What a good answer looks like\" in practice-tip matches PromptBlock.tsx. The diagram labels match the screen-flow text, and practice-flow has full alt text and a description.",
-      "blockIds": ["practice-tip", "practice-flow", "practice-prompt-plan"]
+      "evidence": "Every learner-facing string has both jp and en, and the two say the same thing. Both diagram versions have alt text, a caption and a description. The 「期待される結果」/\"What a good answer looks like\" label in practice-tip matches the label in PromptBlock.tsx.",
+      "blockIds": [
+        "practice-flow",
+        "practice-tip"
+      ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "load",
-      "blockId": "practice-recap",
-      "issue": "One sentence defines both Should and Could, and 「Shouldは重要だけれど」 reads awkwardly. Splitting it would make 4 sentences in one paragraph, so the text also needs a paragraph break.",
-      "fix": "「Mustは、ないと目的を果たせないものです。Shouldは重要だけれど、なくても最初の版は成り立つもの、Couldはあるとよいものです。Won'tは、この版では作らないと決めて企画書に書いておくものです。」→「Mustは、ないと目的を果たせないものです。Shouldは、重要だけれど、なくても最初の版が成り立つものです。\n\nCouldは、あるとよいものです。Won'tは、この版では作らないと決めて、企画書に書いておくものです。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-points",
-      "issue": "In points[2], 「AIが決めていないこと」 can be read as 'things the AI has not decided'. The intended meaning is 'things you have not decided'.",
-      "fix": "「AIが決めていないことを埋めたら、「これは決めていません」と伝えて質問してもらいます。」→「自分が決めていないことをAIが埋めたら、「これは決めていません」と伝えて質問してもらいます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "card-must-test",
-      "issue": "The back of the card ends in plain form 「ない。」, which breaks です・ます.",
-      "fix": "「「これがなくても、目的は果たせる？」。果たせるなら、Mustではない。」→「「これがなくても、目的は果たせる？」。果たせるなら、Mustではありません。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "card-ai-review",
-      "issue": "The back of the card ends in plain form 「頼む。」「決める。」.",
-      "fix": "「自分で分けて理由を書き、AIには指摘だけを頼む。直すかどうかは自分で決める。」→「自分で分けて理由を書き、AIには指摘だけを頼みます。直すかどうかは自分で決めます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "card-revise",
-      "issue": "The back of the card ends in plain form 「伝える。」.",
-      "fix": "「どこを・なぜ・どう直すか。1文で伝える。」→「どこを・なぜ・どう直すか。1文で伝えます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-check",
-      "issue": "Inconsistent term. The pq1 stem says 「お店ごとの並べ替え」, but the feedback for option d says 「店ごと」.",
-      "fix": "「店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。」→「お店ごとに並ぶと買い忘れに気づきやすいので、Won'tよりShouldが合います。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "practice-prompt expect: the Won't reason 「お金を扱うので、今回は見送るから」 is close to circular ('we skip it because we skip it'). Consider 「お金を扱うので、最初の版には重いから」 and change the en to match (\"it involves money, which is too much for the first version\"). This is a content choice, so the author decides.",
-    "practice-recap / card-should-wont (en): \"something you agree not to build\" adds an idea of agreement that the Japanese 「作らないと決めて」 does not have. \"something you decide not to build\" is closer.",
-    "p-plan hint: 「AIが勝手に埋めた項目」 sounds a little blaming. 「AIが推測で埋めた項目」 would match the wording of pq4 and its explanation.",
-    "summary-points[1] (en): \"what the goal can't do without\" is slightly odd. \"what you can't meet the goal without\" reads more naturally."
+    "glossary: The 壁打ち and 1枚企画書 entries end without a verb (体言止め), while the MoSCoW entry ends in です. Make all three end the same way. — 「自分の考えを言葉にしていくこと。」→「自分の考えを言葉にしていくことです。」、「やらないことを1枚に並べた文書。」→「やらないことを1枚に並べた文書です。」",
+    "practice-plan-check: The second sentence of pq5 c's feedback says what is wrong but not what to do next. — 「物差しになる目的が、まだぼんやりしています。」→「先に、物差しになる目的を1文に直します。」",
+    "summary-ask: The en text repeats 'with'. — \"Go through my one-page plan with the checklist with me\"→\"Go through my one-page plan with me, using the checklist\"",
+    "check-quiz: In pq2, options a and b use the 「Should：…／Won't：…」 form, but c and d are full sentences. Making all four the same form would help, for example — 「2つともMustに入れて、最初の版で作る」→「Must：つけ忘れた日の通知とランキングの両方」、「2つとも、企画書から消しておく」→「どちらも書かない：企画書から2つとも消す」"
   ],
-  "verdict": "revise",
-  "summary": "The Japanese is warm and natural, and the club attendance app runs as one thread through the hook, the expected results and the diagram. The English is a faithful, natural version. Before this passes, split the crowded MoSCoW definitions in practice-recap, fix the ambiguous 「AIが決めていないこと」 in the summary, and put three flashcard backs into です・ます."
+  "average": 4,
+  "verdict": "pass",
+  "summary": "The Japanese is clear and warm throughout, lint finds nothing, and the jp and en versions say the same thing. Terms and labels stay consistent across the text, glossary, diagram and options. Nothing blocks the gate; the only open items are optional polish: matching the glossary sentence endings and making pq2's options the same form."
 }

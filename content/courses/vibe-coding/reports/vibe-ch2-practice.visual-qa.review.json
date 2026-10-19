@@ -1,1 +1,50 @@
-{"lessonId":"vibe-ch2-practice","file":"content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json","reviewer":"visual-qa","rubricVersion":"rubric.v1","scores":[{"id":"visual","score":4,"evidence":"Every screen has a visual anchor: the hook-predict cards, step lists with expected results, prompt blocks with highlighted fields, the practice-flow diagram and the practice-checklist. The practice-flow diagram (flowchart TD, 4 nodes) reads well at 390 px in pages/mobile-jp-11.png, and its labels are Japanese in JP and English in EN.","blockIds":["practice-flow","practice-checklist","hook-predict","practice-prompt"]},{"id":"load","score":3,"evidence":"There are no walls of text and textOnlyScreens is empty in all three runs. Desktop JP has a median of 36 chars/line (target 30–40) but a maximum of 44, and EN has a median of 70 (target 60–75) but a maximum of 80. The longest lines are the wide prompt and checklist rows. The four sequential question screens in check-quiz (mobile-jp-14..16) are long but are broken up into separate cards.","blockIds":["check-quiz","practice-prompt-plan"]},{"id":"a11y_l10n","score":4,"evidence":"The EN screenshots have no untranslated Japanese, and the JP screenshots have no stray English beyond the intended MoSCoW terms. Text contrast and focus targets look adequate, and no controls are hidden under the 56/60 px top and bottom bars on mobile. Metrics show overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks and 0 broken images.","blockIds":["practice-flow","summary-cards"]}],"mustFix":[],"niceToHave":["reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (pages/mobile-jp-18.png). On touch devices it should say tap (タップでめくる).","reader: the end banner 「このコースの最後のレッスンまで読み終えました」 appears for a chapter 2 draft (pages/mobile-jp-19.png, desktop-jp-13.png). This is probably because drafts are not listed in course.json. Consider wording that is specific to preview mode.","reader: on mobile, Japanese line breaks fall inside words in prompt bodies, for example 「質問を1つず／つ」 in practice-prompt-interview (pages/mobile-jp-05.png) and 「どうな／れる」 in practice-prompt-plan (pages/mobile-jp-10.png). Phrase-aware breaking (word-break: auto-phrase or BudouX) would fix this.","practice-flow: on desktop the vertical 4-node diagram leaves a lot of empty width (pages/desktop-jp-07.png, desktop-jp-08.png). This is acceptable because TD is the right choice for mobile. Leave it as is unless the reader supports a separate desktop direction."],"verdict":"pass","summary":"The page is clean on mobile JP, desktop JP and desktop EN. Nothing overflows, nothing is clipped, every screen has a visual anchor and both locales are fully localized. The remaining issues are minor reader-level details: the flashcard hint wording on touch screens, the end-of-course banner on a draft and Japanese line breaks inside words. None of them require a change to the lesson content."}
+{
+  "lessonId": "vibe-ch2-practice",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "Steps with expected results, prompt cards with fill-in fields, the practice-checklist and the 4-node practice-flow diagram all render cleanly. The diagram is readable at 390 px (mobile-jp-11) and in EN (desktop-en-08). On desktop the diagram is a narrow vertical strip in a wide, mostly empty card. It also follows the practice-tip callout with no sentence introducing it.",
+      "blockIds": [
+        "practice-flow",
+        "practice-checklist",
+        "practice-prompt",
+        "practice-steps-sort"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "No screen is text-only (textOnlyScreens is empty on all three runs). Desktop JP median is 36 chars per line (target 30-40) and EN median is 70 (target 60-75). Prose stays at 2-4 lines between components, and there are no walls of text in the full-length captures.",
+      "blockIds": [
+        "hook-b1",
+        "practice-task",
+        "summary-points"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The EN run is fully translated, including prompts, the checklist, diagram node labels and flashcards, and no Japanese is left in desktop-en-*. The diagram has a caption and a 'Describe the figure in words' / 図の説明を読む disclosure. Quizzes show keyboard hints, and nothing is hidden under the mobile top or bottom bars.",
+      "blockIds": [
+        "practice-flow",
+        "check-quiz",
+        "summary-cards"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-flow: add one sentence before the diagram, e.g. 「図1は、出欠確認アプリのMustだけで目的を最後まで果たせるかを示した例です。」. Right now it follows the practice-tip callout with no lead-in (desktop-jp-07/08, mobile-jp-11).",
+    "practice-flow: on desktop the 4-node TD chart sits in a wide card that is mostly empty (desktop-jp-07/08). That is acceptable, but keep TD for mobile and do not switch to LR.",
+    "reader: the flashcard hint says 「クリックまたはスペースキーでめくる」 even on the 390 px mobile view (mobile-jp-18). On touch devices it should say タップ.",
+    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」 because the draft is not listed in course.json, while summary-next points ahead to 第3章 (mobile-jp-19, desktop-jp-13). In preview, the banner should not claim this is the last lesson.",
+    "reader: on mobile, the step header 「自分で分けて、AIに見直してもらう」 runs right up to the 完了 checkbox (mobile-jp-07). The reader should reserve a little gap or let the title wrap earlier."
+  ],
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "The metrics are clean: no overflow or console, mermaid, block or image errors, and characters per line are on target in JP and EN. The lesson reads as a well-paced sequence of steps, prompt cards, checklist and quizzes on both mobile and desktop. The only lesson-side suggestion is a lead-in sentence for the practice-flow diagram. The other notes are reader issues."
+}

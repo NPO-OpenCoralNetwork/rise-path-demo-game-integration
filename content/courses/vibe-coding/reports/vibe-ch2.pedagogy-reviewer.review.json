@@ -1,1 +1,165 @@
-{"lessonId":"vibe-ch2","file":"content/courses/vibe-coding/drafts/vibe-ch2.lesson.json","reviewer":"pedagogy-reviewer","rubricVersion":"rubric.v1","scores":[{"id":"align","score":4,"evidence":"Four can-do objectives with Bloom levels. Every objective has an inline item and an exam item: o1 q1/q5, o2 q2/q6, o3 q3/q7, o4 q4/q8/q10/q9. Apply-level items exist (q1, q5), and transfer contexts are used (料理教室, 水やり記録, 英単語アプリ).","blockIds":["s1-check","s2-check","s5-check","s3-check","check-quiz"]},{"id":"hook","score":4,"evidence":"hook-b1 sets up the budget-app failure in 3 sentences (「ほしかったのは「月の途中で食費の使いすぎに気づける」ことでした」). It is followed by an ungraded predict item q0 that leads into o2 and has feedback on every wrong option. There is no trivia or statistics.","blockIds":["hook-b1","hook-predict"]},{"id":"prior","score":4,"evidence":"Prerequisites list ch0 and ch1. s1-b1 recalls ch0 (「ビジョン（vision）を示すこと」), and ex-data recalls the ch1 database. 壁打ち, 目的・機能, MVP・MoSCoW and 1枚企画書 are each defined in definitions blocks before use and match the glossary. PRD and 仕様書 are glossed inline.","blockIds":["s1-b1","s1-defs","s2-defs","s5-defs","s3-defs","ex-data"]},{"id":"load","score":3,"evidence":"Body is about 2,390 JP chars (my count), within 2,400. Each segment adds at most 2 terms, and lint is clean. However, the s5-b3 callout has 5 sentences, which breaches the contract's callout budget of 3 sentences or fewer. Lint does not check this.","blockIds":["s5-b3"]},{"id":"worked","score":3,"evidence":"s3-steps is a full 6-step worked example with subgoal titles. Each step gives its why (「目的の1文は、あとの手順の物差しになります」, 「決めないと、AIが推測で項目を選びます」) and an expect. The finished page is in s2-b3.expect. There is no faded example in this file; it now lives in the separate practice draft.","blockIds":["s3-steps","s2-b3"]},{"id":"active","score":3,"evidence":"Each of the 4 content sections has an inline quiz with feedback on every wrong option. However, q4 can be answered by matching 「推測」 from ex-data and ex-review, and it is an understand-level item tagged analyze. q3 d and q7 a are off-goal at a glance, so those items lean toward recognition.","blockIds":["s3-check","s5-check","check-quiz"]},{"id":"miscon","score":4,"evidence":"The brief's four misconceptions each appear in the body and in distractors. Handing the plan to the AI: q1 c, q4 a, q8 b. Over-specifying: s3-b1 「最初から完璧でなくてかまいません」, q5 d, q8 a/c. Including every feature: s5-b1, q7 c, q10 c. Goal vs feature: s2-table, q2 a. Every feedback is 2 sentences or fewer and names the reason.","blockIds":["s3-b1","s5-b1","s2-table","s1-check","s2-check","check-quiz"]},{"id":"visual","score":4,"evidence":"The s2-b4 diagram has 3 nodes and shows a process. Its labels (今月の残り画面, 支出の入力画面) match the text and s2-b3.expect. The caption states the takeaway (「Mustだけなら、最初の版の画面は2つで足りる」), and alt and description are present in both locales. There are no images.","blockIds":["s2-b4","s2-table","s5-b2"]},{"id":"practice","score":3,"evidence":"The practice section moved to drafts/vibe-ch2-practice.lesson.json. In this file, s1-b4 still asks the learner to 「自分のアイデアで試し、「期待される結果」と比べましょう」 with an expect, and s2-b3 carries a model plan. That meets the hands-on + expect anchor, but this file has no hint ladder or checklist.","blockIds":["s1-b4","s2-b3","summary-next"]},{"id":"meta","score":4,"evidence":"The summary has 4 points and comes after the exam. summary-next has a reflection question (「Won'tに入れる機能は何でしょう？」) and a next step. There are 6 flashcards and askTutor suggestions. The named practice lesson is not yet listed in course.json, which is an owner action.","blockIds":["summary-points","summary-next","summary-cards","summary-ask"]},{"id":"accuracy","score":3,"evidence":"Key claims carry cites. 「頭の中までは読めません」 and 「違う問題を解く」 are on s1-b5, the MVP definition from Ries is on s5-defs, the MoSCoW groups are on s5-b2, and the out-of-scope point is on s3-check. The MVP wording faithfully renders 'maximum validated learning … least effort'. ex-data and ex-review claim AI guessing without a cite; this is consistent with cc-best-practices but not marked.","blockIds":["s1-b5","s5-defs","s5-b2","s3-check","s3-steps"]},{"id":"voice","score":3,"evidence":"Body text uses です・ます and is warm (「最初から完璧でなくてかまいません」), with no banned phrases, and 通知/やらないこと are consistent. Summary points and flashcards use plain form per course convention. s3-b1 「目的と機能の優先順位に」 can be misread as 'priority of goals and features'.","blockIds":["s3-b1","summary-points"]},{"id":"a11y_l10n","score":4,"evidence":"jp and en are complete everywhere, including diagram code, caption, alt and description. Prompt vars exist per locale (作りたいアプリ / app idea). The EN reads naturally and matches the JP content (e.g. s5-b2 'Essential: logging an expense; …').","blockIds":["s2-b4","s1-b4","s2-b3","s5-b2"]}],"mustFix":[{"criterion":"load","blockId":"s5-b3","issue":"The tip callout has 5 sentences; the contract allows at most 3 per callout. Lint's callout-count only counts callouts per section, so it misses this.","fix":"Rewrite the callout md as 3 sentences, which also saves body characters. JP: 「「これがなくても、目的は果たせる？」と聞き、「果たせない」機能だけをMustにします。最初の版はMustだけで作り、ShouldとCouldはそのあとに足します。Won'tは今回作らず、次の版の候補に残します。」 EN: \"Ask, 'Could the goal still be met without this?' and make only the features it can't do without Musts. Build the first version from the Musts alone and add Shoulds and Coulds after that. A Won't is not built this time and stays on as a candidate for the next version.\""}],"niceToHave":["q2 hint: the hint 「手段を外しても…「誰が、どうなれる」が残るもの」 does not separate option a from c. 「保護者が当番表をいつでも見られる」 still has who/can-do once アプリ is removed. Point the hint to the s2-why probe instead: 「それぞれに「なぜそれがほしいの？」と聞いて、それ以上さかのぼらなくてよいものを探しましょう。」","q7 option a (photo species ID) and q3 option d (reading-count chart) are clearly off-goal. A sharper q7 distractor is 「水やりした日の記録だけ（通知はなし）」, which tests whether the reminder is a Must for 「忘れて枯らさない」. Give it feedback that names the gap.","q4 (s3-check) is tagged analyze, but it is answerable by matching 「推測」 from ex-data and ex-review. Either retag it understand, or reframe it as a short plan with an empty Won't and ask what the AI is likely to add.","q8 option b feedback says 「空いた欄は、AIの推測で埋まりがちです」, but the lesson's own s2-b3 prompt tells the AI 「推測で埋めず、質問してください」. Consider 「依頼文で頼まない限り、空いた欄はAIの推測で埋まりがちです。」","s3-b1: 「目的と機能の優先順位に」 → 「目的と、機能の優先順位に」 to remove the ambiguity.","summary-next names 「自分のアイデアで1枚企画書をつくる」, but vibe-ch2-practice is not in course.json yet. The owner must list it (and set estMinutes 18) before learners can reach the practice this lesson's practice score depends on."],"average":3.54,"verdict":"revise","summary":"The lesson is well aligned: every objective has an inline and an exam item, the worked example on one page explains each step, and the distractors carry the brief's real misconceptions with short corrective feedback. One contract breach blocks a pass: the s5-b3 tip callout has 5 sentences against a 3-sentence limit. The suggested 3-sentence rewrite fixes it and keeps the body under 2,400 characters. After that, sharpen the q2 hint and the weak q3/q7 distractors."}
+{
+  "lessonId": "vibe-ch2",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch2.lesson.json",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "There are four can-do objectives with Bloom levels. Each has at least two graded items: o1 has q1 and q5 (transfer, 料理教室); o2 has q2 and q6; o3 has q3 and q7 (transfer, 水やり記録); o4 has q4, q8, q10 and q9. Every objective has at least one item at apply level or higher. One limit: the 「書き換え」 in o1 is tested only by choosing a request, never by writing one.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s5-check",
+        "s3-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 is a concrete three-sentence scenario. The learner asks for 「家計簿アプリを作って」, gets graphs, but wanted 「月の途中で食費の使いsすぎに気づける」. An ungraded predict question follows (q0, key c) that leads straight into 2-1 and 2-2. There is no trivia or statistics.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "Prerequisites list ch0 and ch1. s1-b1 recalls ch0 (「ビジョン（vision）を示すこと」), and ex-data recalls the database from ch1. 壁打ち, 目的/機能, MVP/MoSCoW and 1枚企画書 (with PRD glossed) are each defined in a definitions block before use, and they match the glossary and flashcards.",
+      "blockIds": [
+        "s1-b1",
+        "s1-defs",
+        "s2-defs",
+        "s5-defs",
+        "s3-defs",
+        "ex-data"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Lint finds no sentence, paragraph or callout violations, and each segment carries one idea with a quiz. The body is about 2,400 JP characters, right at the budget, and estMinutes is 18. Section 2-3 (id 2-5) adds MVP, MoSCoW and four category labels. Section 2-4 (id 2-3) stacks definitions, six steps, a diagram, a prompt with a long expect and a quiz, which makes it the heaviest screen.",
+      "blockIds": [
+        "s5-defs",
+        "s5-b2",
+        "s3-steps",
+        "s2-b3"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s3-steps is a complete six-step worked example on the budget app. Every step gives its reason (e.g. ex-data 「決めないと、AIが推測で項目を選びます」), and the Musts, data and diagram are now consistent (食費の入力 / 食費の予算). This lesson has no faded example. Fading happens only in the separate practice draft.",
+      "blockIds": [
+        "s3-steps",
+        "s2-b4",
+        "s2-b3"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Each of the four content sections has an inline check, and every wrong option has feedback. The answer key is spread out (c,d,c,b,d,a,c,b,d,a,b), and options are similar in length. q8's stem names the empty fields, and the key d repeats 「画面の流れと扱うデータ」, so it can be answered by word-matching. q7 a (「…判定する機能だけ」) is a weak distractor.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s5-check",
+        "s3-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All four brief misconceptions are corrected in the body and in the distractors. 丸投げ is handled by s1-b5 and q1 c. 細かいほど良い is handled by s3-b1 「最初から完璧でなくてかまいません」, q5 d and q8 a/c. 全部入れる is handled by s5-b1, q7 c and q9 d. 目的と機能の混同 is handled by q2 a/b. Each feedback corrects the belief in two sentences or fewer.",
+      "blockIds": [
+        "s1-b5",
+        "s3-b1",
+        "s5-b1",
+        "q2",
+        "q5",
+        "q8",
+        "q9"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "s2-b4 has three nodes with labels that match the text (今月の残り画面, 食費の入力画面). Its caption states the takeaway, 「Mustだけなら、最初の版の画面は2つで足りる」, and it has alt and description. The comparison tables are s2-table and s5-b2. There are no images.",
+      "blockIds": [
+        "s2-b4",
+        "s2-table",
+        "s5-b2"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "The hands-on parts in this lesson are two copyable prompts with expected results. In s1-b4 the learner tries the request with their own idea and compares it with 「期待される結果」, and s2-b3 includes a model plan in expect. The hint ladder and checklist practice moved to drafts/vibe-ch2-practice.lesson.json, which course.json does not list yet.",
+      "blockIds": [
+        "s1-b4",
+        "s1-b5",
+        "s2-b3",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "summary-points (4 points, です・ます) comes after the exam. summary-next asks a reflection question (「Won'tに入れる機能は何でしょう？ 理由も1つ」) and names the next step by the practice lesson's exact title. The lesson also has six flashcards and askTutor suggestions.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "Key claims are cited. The \"can infer intent but can't read your mind\" and interview points cite cc-best-practices (s1-b5, s1-b4), the MVP definition cites ries-mvp, and the MoSCoW buckets cite abc-moscow. The Must-only first version is hedged as 「このレッスンでは」. Two small weak points: the q4 explanation's 「AIツールの開発元のガイド」 is a vague attribution, and the pronunciation 「モスクワ」 is cited to abc-moscow, which probably does not state it.",
+      "blockIds": [
+        "s1-b5",
+        "s5-defs",
+        "s5-b3",
+        "s3-check"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The text is consistently です・ます and warm (「最初から完璧でなくてかまいません」), uses no banned phrases, and keeps 通知/目的/機能 consistent. A few links between sentences are weak. In s1-b1, the step from 人間の仕事 to 「AIは、…一緒に考える相手にもなります」 is abrupt.",
+      "blockIds": [
+        "s1-b1",
+        "s3-b1",
+        "summary-points"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Every learner-facing string has jp and en, and the strict locale-plain-string lint passes. The diagram code, caption, alt and description are localized. Prompt variables have a name for each locale (作りたいアプリ / app idea). Table headers are in Japanese, with Latin text only for the MoSCoW labels.",
+      "blockIds": [
+        "s2-b4",
+        "s1-b4",
+        "s2-b3",
+        "s5-b2"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "q8 (check-quiz): the stem should not say which fields are empty. Show a short plan excerpt and have the learner find the gap, so the item tests 「直すところ」 in o4 and the key does not repeat the stem.",
+    "q7 a: replace 「写真から植物の種類を判定する機能だけ」 with a plausible small-but-wrong set, e.g. record only without the notification, which encodes 'Must = smallest possible'.",
+    "q4 explanation: name the source plainly (e.g. 「Claude Codeの公式ガイド（Anthropic）」) or drop the attribution sentence. The vague 「AIツールの開発元のガイド」 cannot be traced from the text.",
+    "s5-defs: the 「読み方は「モスクワ」」 sentence is cited to abc-moscow. Check that the page says this, or move the sentence out of the cited block.",
+    "o1 says 「依頼文に書き換え」, but this lesson only tests recognition. Consider one exam item where the learner fixes a given vague request, or say that writing is assessed in vibe-ch2-practice.",
+    "Owner dependency: summary-next points to 「自分のアイデアで1枚企画書をつくる」, but course.json does not yet list vibe-ch2-practice and still gives estMinutes 30. Publish both together, or learners lose the practice step."
+  ],
+  "average": 3.54,
+  "verdict": "pass",
+  "summary": "I found no blocking issues. This is a well-aligned lesson. Each objective has inline and exam items, distractors encode the misconceptions from the brief, and the worked example, diagram and model plan now agree on 食費 data and Musts. The most useful next fix is to make q8 and the o1 items ask the learner to find or write the fix, not recognize it. Also make sure vibe-ch2-practice is published alongside this lesson, because the hands-on practice now lives there."
+}

@@ -7,62 +7,61 @@
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The text uses です・ます throughout and has no banned or pressure phrases. It reassures the learner without pressure, e.g. s3-b1 「最初から完璧でなくてかまいません。」 and q8 option a feedback 「まだ決めなくて大丈夫です」. Every wrong-option feedback is at most 2 sentences, and the second sentence gives the correct idea.",
-      "blockIds": ["s3-b1", "q8", "q5", "q6"]
+      "evidence": "The lesson reads like a teacher talking beside you: hook-b1 opens with a concrete failure, s1-b2 maps the analogy explicitly (「大工さんがAI、家がアプリです。」), and every feedback runs 'misconception, then the correct view' in 2 sentences. One sentence in the q9 option a feedback can be read two ways (see mustFix).",
+      "blockIds": [
+        "hook-b1",
+        "s1-b2",
+        "check-quiz"
+      ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "Lint --strict is clean, and each segment adds 3 or fewer new terms. However, the s5-b3 tip packs 5 sentences into one paragraph, and the style guide allows 3. The q10 prompt runs to 4 sentences and is heavy to read on a phone.",
-      "blockIds": ["s5-b3", "q10"]
+      "score": 4,
+      "evidence": "`lessons:lint --strict` reports 0 warnings, so every sentence and paragraph is within budget. Each section has 1–2 new terms (壁打ち / 目的・機能 / MVP・MoSCoW / 1枚企画書), and tables, steps, a diagram or a quiz break up the text.",
+      "blockIds": [
+        "s1-defs",
+        "s2-defs",
+        "s5-defs",
+        "s3-defs"
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "s1-b1 links back to Chapter 0 (「第0章で…ビジョン（vision）を示すこと」), and ex-data links to Chapter 1 (「第1章で学んだデータベース」). The analogy in s1-b2 says exactly what maps to what: 「大工さんがAI、家がアプリです」.",
-      "blockIds": ["s1-b1", "s1-b2", "ex-data"]
+      "evidence": "s1-b1 recalls Chapter 0 (「ビジョン（vision）を示すこと」), and ex-data recalls the database from Chapter 1. Each term is defined in a definitions block before use and is then linked with [[目的]] or [[機能]]. The glossary wording matches s1-defs, s2-defs, s5-defs and s3-defs, and MVP and PRD are spelled out at first use.",
+      "blockIds": [
+        "s1-b1",
+        "ex-data",
+        "s2-why",
+        "s5-b1"
+      ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The EN text is natural and matches the JP meaning. The UI labels 「期待される結果」 and 'What a good answer looks like' match PromptBlock.tsx, and the diagram labels match the body text. One problem: in the q4 EN explanation, 'a feature of useful specs' collides with the glossary term Feature. The s2-goal paraphrase of the goal also drifts from the glossary wording.",
-      "blockIds": ["q4", "s2-goal", "s2-b4"]
+      "score": 4,
+      "evidence": "Every string has both jp and en, and the EN reads as natural English, not translation. The mermaid labels in s2-b4 are localized, alt and description are present, and the EN UI label 「期待される結果」/'What a good answer looks like' in s1-b5 matches PromptBlock.tsx.",
+      "blockIds": [
+        "s2-b4",
+        "s1-b5"
+      ]
     }
   ],
   "mustFix": [
     {
-      "criterion": "load",
-      "blockId": "s5-b3",
-      "issue": "This paragraph has 5 sentences. The style guide allows 3 per paragraph. It also mixes two ideas: how to judge a Must, and what to do with each group.",
-      "fix": "Split it into two paragraphs by inserting a blank line after 「…機能だけをMustにします。」. Result: 「「これがなくても、目的は果たせる？」と聞きます。答えが「果たせない」になる機能だけをMustにします。\n\nこのレッスンでは、最初の版をMustだけで作ります。ShouldとCouldはそのあとに足す候補です。Won'tは今回作らず、次の版の候補として残します。」 (JP and EN alike, if EN is split the same way: break after 'become Musts.')"
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "s2-goal",
-      "issue": "The quoted goal 「月の途中で使いすぎに気づく」 drops 食費 and changes 気づける to 気づく. It no longer matches the goal used in hook-b1, s2-table, ex-goal and s2-b3, so it reads like a different goal.",
-      "fix": "「「月の途中で使いすぎに気づく」なら、」→「「月の途中で食費の使いすぎに気づける」が目的なら、」 (the sentence becomes 57 characters). EN: 'If the goal is to notice overspending mid-month,' → 'If the goal is to notice mid-month that you're overspending on food,'"
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "q4",
-      "issue": "In the EN explanation, 'as a feature of useful specs' uses 'feature' to mean 'characteristic'. In this lesson, Feature is a glossary term meaning something the app does, so a learner can misread it.",
-      "fix": "EN: 'names stating what is out of scope as a feature of useful specs (documents like this plan).' → 'says a useful spec (a document like this plan) states what is out of scope.'"
-    },
-    {
-      "criterion": "load",
-      "blockId": "q10",
-      "issue": "The prompt has 4 sentences and about 100 characters before the question. The Must list and the empty 「やらないこと」 are hard to keep in mind on a phone.",
-      "fix": "「英単語の復習アプリの1枚企画書です。目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？」→「英単語の復習アプリの目的は「通勤中の自分が、英単語を5分で復習できる」です。Mustは「単語の登録」「復習の出題」「友だちとのランキング」で、「やらないこと」は空欄です。最も適切な直し方はどれでしょう？」 (EN: drop the opening sentence 'Here is a one-page plan for an English vocabulary app.' and start with 'An English vocabulary app's plan has the goal \"I can review English words for five minutes on my commute.\"')"
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(a) meaning: q9 option a feedback 「先に企画書を直し、同じ1枚を渡します。」 can be read two ways. 「同じ1枚」 can mean the unchanged plan, which contradicts 「直し」 in the same sentence. The EN 'then hand over the same page' has the same problem.",
+      "fix": "JP: 「先に企画書を直し、同じ1枚を渡します。」→「先に企画書を直し、直した1枚をAIに渡します。」 EN: \"Fix the plan first, then hand over the same page.\" → \"Fix the plan first, then hand the updated page to the AI.\""
     }
   ],
   "niceToHave": [
-    "s2-why: the JP sentence 「ほしい[[機能]]が出てきたら、「なぜそれがほしいの？」と1回聞き返します。」 does not say who asks whom. Section 2-1 has the AI asking questions, so this is ambiguous. Consider 「ほしい[[機能]]が浮かんだら、「なぜそれがほしいの？」と自分に1回聞き返します。」",
-    "s5-b2: the column header 「意味：家計簿の例」 does not match the caption 「家計簿アプリの機能」. Consider 「意味：家計簿アプリの例」.",
-    "ex-goal: the sample question 「いつ困りますか？」 differs from the s1-b4 expect text 「いまはどんな場面で困っていますか？」. Aligning the two would help the learner see that it is the same interview.",
-    "glossary MoSCoW: only Won't gets a Japanese gloss (「Won't（今回やらない）」). The flashcard card-moscow glosses all four groups. Consider matching it: 「Must（必須）・Should（重要）・Could（あるとよい）・Won't（今回やらない）」.",
-    "Fact check, not a language issue: q4 attributes to the cited Claude Code best-practices page the claim that useful specs state what is out of scope. Please confirm the page actually says this before publishing.",
-    "q5: the correct option a is noticeably shorter than options c and d, which can give the answer away. Consider 「いったん止めて、まず誰が何に困っているかを質問してもらう」."
+    "check-quiz: q7 options c and d use the abbreviation SNS without spelling it out. Most adults know it, but §2 asks for the full form at first use. 「写真での種類判定、SNSへの投稿」→「写真での種類判定、SNS（ソーシャルメディア）への投稿」 in option c, which is the first time SNS appears.",
+    "s2-table / s5-b2 / s2-b3: the same reminder is named 「毎晩の通知」, 「入力忘れを知らせる通知」 and 「入力忘れの通知」. It is still recognizable, but one name would help the learner match them. In s2-b3.expect: 「Shouldは入力忘れの通知」→「Shouldは入力忘れを知らせる通知」.",
+    "s5-b2 / s2-b3: the chart is 「食費の推移のグラフ」 in the table and 「食費のグラフ」 in the model plan. In s2-b3.expect: 「Couldは食費のグラフ」→「Couldは食費の推移のグラフ」 (EN \"a food-spending chart\" → \"a chart of food spending over time\").",
+    "s3-defs: the EN adds 'that teams use', which the JP does not say. 'It's a small version of the PRD (Product Requirements Document) that teams use to write down a product's requirements.' → 'It's a small version of a PRD (Product Requirements Document), a document that sets out a product's requirements.'",
+    "ex-goal: the EN 'you might answer' is softer than the JP 「と答えます」. Either is fine, but the JP could match the example's tone: 「と答えます。」→「のように答えます。」."
   ],
+  "average": 4,
   "verdict": "revise",
-  "summary": "The Japanese is warm, consistent and short. Terms (壁打ち, 目的, 機能, MVP, MoSCoW, 1枚企画書) match across the body text, glossary and diagram, and all feedback stays within 2 sentences. The fixes needed are a 5-sentence tip paragraph (s5-b3), a goal paraphrase in s2-goal that drifts from the glossary wording, and the EN word 'feature' in q4 colliding with the glossary term."
+  "summary": "The Japanese is warm and natural, and terms match across the text, glossary, tables and diagram. `lessons:lint --strict` is clean, and the EN conveys the same content in natural English. The one blocking item is the ambiguous 「同じ1枚を渡します」 in q9 option a's feedback; changing it to 「直した1枚をAIに渡します」 (and the matching EN) clears the gate."
 }
