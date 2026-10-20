@@ -17,7 +17,7 @@ an exam with transfer items, summary + flashcards. Draft only (`courseId: "vibe-
 - o2 (bloom: evaluate): チェックリストを使って、自分の環境と作業の進め方を評価し、次に足すものを判断できる
 
 ## 範囲 / Scope
-- 扱う / in: 公式の「設定は少しずつ育てる」原則（CLAUDE.mdから始め、きっかけが来たら部品を足す）を設計のルールにする。お願い（CLAUDE.md・スキル）と強制（フック・権限ルール）の区別。例題：小さなToDoアプリ（短いCLAUDE.md、スキル1つ `/explain-diff`、PostToolUseの整形フック1つ、`git push` の確認ルール、`.env` の拒否ルール）。演習：自分のリポジトリで環境をつくり、1サイクル（探索→計画（プランモード）→実装と実行できる検証→別コンテキストのレビュー→差分の説明→コミット）を回す。点検チェックリスト（安全・検証・コンテキスト・コスト）と、変化への追いつき方（公式ドキュメント日本語版、What's new、Claude Code自身に聞く）。
+- 扱う / in: 公式の「設定は少しずつ育てる」原則（CLAUDE.mdから始め、きっかけが来たら部品を足す）を設計のルールにする。お願い（CLAUDE.md・スキル）と強制（フック・権限ルール）の区別。例題：小さなToDoアプリ（短いCLAUDE.md、スキル1つ `/explain-diff`、PostToolUseの整形フック1つ、`git push` の確認ルール、`.env` の拒否ルール）。演習：自分のリポジトリで環境をつくり、1サイクル（探索→計画（プランモード）→実装と実行できる検証→別コンテキストのレビュー→差分の説明→コミット）を回す。秘密情報とpushの守りは例外として、きっかけを待たずに初日から権限ルールで置く。点検チェックリスト（安全・検証・コンテキスト・コスト）と、変化への追いつき方（まとめで、公式ドキュメント日本語版で確かめる）。
 - 扱わない（別レッスン） / out: 各部品の詳しい書き方（第2回〜第10回で学習済み。思い出す程度にとどめる）、MCPサーバーやプラグインの導入手順、CI・並列（第9回）、料金（公式ページへ）。
 - 学習者がよく持つ誤解 / likely misconceptions (report §6 and the facts file):
   1. 「拡張機能は最初に全部入れる」— 公式の勧めは逆。CLAUDE.mdから始め、繰り返す困りごと（きっかけ）が来たら足す（pq0、e1 d）。
@@ -26,10 +26,10 @@ an exam with transfer items, summary + flashcards. Draft only (`courseId: "vibe-
   4. 「『完了しました』と言えば完了／同じ会話で聞き直せば確か」— 実行できる検証の結果で判断し、レビューは別のコンテキストで（e3）。
   5. 「レビューの指摘は全部直す／0になるまで回す」— 正しさと要件に関わるものだけ直す。追いかけすぎると過剰設計（q3）。
   6. 「長い会話を続けるほど賢くなる」— 関係のない作業の間は `/clear`（q4）。
-  7. 「古い記事どおりにすればよい」— Claude Codeは頻繁に変わる。公式ドキュメントで今の書き方を確かめる（e4）。
+  7. 「古い記事どおりにすればよい」— Claude Codeは頻繁に変わる。公式ドキュメントで今の書き方を確かめる（`summary-next`、`card-update`。試験では問わない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: estMinutes 23 (contract formula: body + prompt texts + flashcards ≈ 4,820 JP chars ÷ 450 = 10.7 min, + 9 questions × 40 s = 6 min, + 3 practice tasks × 2 min = 6 min). Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
+- 所要時間 / minutes: estMinutes 20 (contract formula: body 2,393 + prompt texts, model answers, notes and variable hints 1,817 + flashcards 410 = 4,620 JP chars ÷ 450 = 10.3 min, + 8 questions × 40 s = 5.3 min, + 2 hands-on practice tasks (`practice-setup`, `practice-cycle`) × 2 min = 4 min; 19.6 → 20). `self-check` is the success-criteria checklist of those two tasks, not a third task. Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only (course decision; English after the owner picks the publishing course).
 - 演習の題材 / practice task idea: the capstone task itself — on the learner's own repository (a working branch if it matters) or the earlier practice folder: build the setup (CLAUDE.md ≤ 25 lines, ask/deny rules, extensions only where a trigger already exists), then one full cycle on a small task they have been postponing. Success criteria: each step's `expect`, and `self-check-list` (6 items over safety, verification, context, cost; it doubles as the self-assessment). Hint ladder: step `hint` → `troubleshoot` → model answers. Model answers: CLAUDE.md for a Python kakeibo CLI (19 lines, in `setup-prompt-model`), an ask/deny settings snippet (`setup-settings-model`), and a plan prompt with an expected plan (`cycle-prompt-plan`).
@@ -51,8 +51,6 @@ All checked 2026-10-20 (facts file `facts-cc-11-capstone.md`, other cc facts fil
 - `cc-skills`* — Extend Claude with skills (project skill path, `` !`git diff HEAD` `` injection, `allowed-tools`, a failed command aborts the skill, `disable-model-invocation`) — https://code.claude.com/docs/en/skills
 - `cc-sub-agents` — Create custom subagents (own context window, returns a summary) — https://code.claude.com/docs/en/sub-agents
 - `cc-prompt-caching` — How Claude Code uses prompt caching (root CLAUDE.md edits load on the next `/clear`, `/compact` or restart) — https://code.claude.com/docs/en/prompt-caching
-- `cc-common-workflows`* — Common workflows (Ask Claude about its capabilities: "It looks up the answers in the current Claude Code documentation") — https://code.claude.com/docs/en/common-workflows
-- `cc-whats-new` — What's new (weekly digest) — https://code.claude.com/docs/en/whats-new
 - `cc-champion-kit` — Champion kit ("a real but contained task … tedious rather than difficult"; "Claude Code is updated frequently") — https://code.claude.com/docs/en/champion-kit
 - `cc-costs` — Manage costs effectively (`/usage`) — https://code.claude.com/docs/en/costs
 - `cc-authentication` — Authentication (`ANTHROPIC_API_KEY` overrides the subscription once approved; `/status`) — https://code.claude.com/docs/en/authentication
@@ -65,20 +63,19 @@ All checked 2026-10-20 (facts file `facts-cc-11-capstone.md`, other cc facts fil
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：学んだ部品を、どこから組み合わせる？ | 佐藤さんが初日に拡張を全部入れようとして止まる。何から始める？ | markdown `hook-b1` (3-sentence scenario), quiz predict `hook-predict` | `pq0` → o1 (ungraded) |
-| `design-rule` | concept | 設計のルール：CLAUDE.mdから始め、きっかけが来たら足す | 公式の「少しずつ育てる」原則と、きっかけ→部品の対応（第6〜8回の想起）。お願いと強制を分ける | markdown `dr-b1` (rule, defines きっかけ), table `dr-table` (6 triggers → part → lesson), markdown `dr-b2` (request vs guarantee; permission rules follow the same idea), quiz inline `dr-quiz` | `q1` → o1 (apply: ESLint forgotten despite CLAUDE.md → hook) |
-| `example` | example | 例題：小さなToDoアプリの環境 | 5 steps, each with its trigger (why): CLAUDE.md → deny `.env` + ask `git push` (v2.1.283 auto mode) → PostToolUse format hook → `/explain-diff` skill → commit and share | markdown `ex-b1`, steps `ex-steps` (5, subgoal titles, expect), prompt `ex-prompt-claude-md`, code `ex-settings` (`.claude/settings.json`, 19 lines), prompt `ex-prompt-skill`, quiz inline `ex-quiz` | `q2` → o1 (apply: `npm install` repeated twice → one CLAUDE.md line, not deny/hook) |
+| `design-rule` | concept | 設計のルール：CLAUDE.mdから始め、きっかけが来たら足す | 公式の「少しずつ育てる」原則と、きっかけ→部品の対応（第6〜8回の想起）。お願いと強制を分ける | markdown `dr-b1` (rule, defines きっかけ), table `dr-table` (5 triggers → part → lesson), markdown `dr-b2` (request vs guarantee; secrets and push are guarded with permission rules from day 1, without waiting for a trigger), quiz inline `dr-quiz` | `q1` → o1 (apply: ESLint forgotten despite CLAUDE.md → hook) |
+| `example` | example | 例題：小さなToDoアプリの環境 | 5 steps, each with its trigger (why): CLAUDE.md → deny `.env` + ask `git push` (v2.1.283 auto mode) → PostToolUse format hook → `/explain-diff` skill → commit and share | markdown `ex-b1` (timeline: ① and ② on day 1, ③ and ④ added in the week their trigger came), steps `ex-steps` (5, subgoal titles, expect), prompt `ex-prompt-claude-md`, code `ex-settings` (`.claude/settings.json`, 19 lines), prompt `ex-prompt-skill`, quiz inline `ex-quiz` | `q2` → o1 (apply: `npm install` repeated twice → one CLAUDE.md line, not deny/hook) |
 | `practice-setup` | practice | 演習1：自分のリポジトリに環境をつくる | Build the setup: CLAUDE.md, ask/deny, only extensions whose trigger exists, restart and check | markdown `setup-task`, steps `setup-steps` (4, hint and/or troubleshoot on each), prompt `setup-prompt-model` (model CLAUDE.md, 19 lines; `note` says it is a Python kakeibo example), code `setup-settings-model` (ask + 3 deny rules) | — |
 | `practice-cycle` | practice | 演習2：1つの変更を計画からコミットまで進める | One full cycle on a postponed small task (recall 第3〜5回) with predict and explain habits | markdown `cycle-task`, diagram `cycle-flow` (5 nodes + review loop), steps `cycle-steps` (5), prompt `cycle-prompt-plan` (model plan prompt + expected plan), prompt `cycle-prompt-review`, quiz inline `cycle-quiz` | `q3` → o2 (evaluate: triage 5 review findings) |
-| `self-check` | practice | 演習3：点検して、次に足すものを決める | Self-check in 4 areas (also the success criteria of the capstone); an unmet item is the next trigger; recurring review comments go to CLAUDE.md; how to keep up | markdown `sc-b1`, checklist `self-check-list` (6), markdown `sc-b2`, markdown `sc-b3`, list `sc-list` (docs ja, What's new, ask Claude Code), quiz inline `sc-quiz` | `q4` → o2 (evaluate: kitchen-sink session → `/clear`) |
-| `check` | check | 理解度チェック | Both objectives, all in new contexts | quiz exam `check-quiz` (4) | `e1` → o1 (Python API: three symptoms → design), `e2` → o1 (30-line release procedure in CLAUDE.md → skill), `e3` → o2 (teammate's self-check: no verification → add a runnable check), `e4` → o2 (command from an old article not found → official docs / ask Claude Code) |
-| `summary` | summary | まとめ | 4 takeaways, reflection, next step | summary `summary-points` (4), markdown `summary-next`, flashcards `summary-cards` (7), askTutor `summary-ask` (3) | — |
+| `self-check` | practice | 演習3：点検して、次に足すものを決める | Self-check in 4 areas (also the success criteria of the capstone); an unmet item is the next trigger; recurring review comments go to CLAUDE.md | markdown `sc-b1`, checklist `self-check-list` (6), markdown `sc-b2`, quiz inline `sc-quiz` | `q4` → o2 (evaluate: kitchen-sink session → `/clear`; the stem describes the symptom, not the checklist item) |
+| `check` | check | 理解度チェック | Both objectives, all in new contexts | quiz exam `check-quiz` (3) | `e1` → o1 (Python web app: three symptoms → design), `e2` → o1 (30-line release procedure in CLAUDE.md → skill), `e3` → o2 (teammate's self-check: no verification → add a runnable check) |
+| `summary` | summary | まとめ | 4 takeaways, reflection, next step, keep up with updates | summary `summary-points` (4), markdown `summary-next` (reflection, next step, check the Japanese official docs when something does not work), flashcards `summary-cards` (7), askTutor `summary-ask` (3) | — |
 
 Contract check: hook ≤ 3 sentences + predict; 5 content sections (2 segments + 3 practice), 4 with an inline quiz
 (lint needs 3; never 3 in a row without one); new terms: only きっかけ (glossary); the other terms are recalled from
 earlier lessons and linked to the glossary; worked example of 5 steps with subgoal titles, the trigger (why) and
 `expect`, before practice; practice has task, success criteria (step `expect` + the 6-item self-check list), hint → troubleshoot → model answers;
-exam covers both objectives with transfer contexts (Python API, release procedure, a teammate's self-check, an old
-article); summary 4 points after the exam; 7 flashcards; reflection + askTutor. One diagram (the cycle with the
+exam covers both objectives with transfer contexts (Python web app, release procedure, a teammate's self-check); summary 4 points after the exam; 7 flashcards; reflection + askTutor. One diagram (the cycle with the
 review loop); no images.
 
 ## Assumptions
@@ -95,15 +92,21 @@ review loop); no images.
   never asks to push; the ask rule makes any push prompt first.
 - 「関係のない作業の前に `/clear`」 is evaluated in the self-check rather than required inside the cycle, because the
   cycle starts in the fresh session opened by the restart in practice step `p-restart`.
-- Prerequisites list the lesson short titles as given in the course order; exact published titles may differ.
+- Prerequisites list the exact course titles of the lessons this one recalls (第2回–第8回, 第10回).
+- Secrets and push are the one exception to 「きっかけが来たら足す」: their permission rules go in on day 1, because one
+  leak or one unwanted push is already too many (`dr-b2`, `pq0` explanation, `ex-b1`).
+- Correct options are spread over the four positions (2 each over the 8 questions).
+- The abbreviations API and JSON no longer appear in learner text (`ex-rules` says 「秘密情報」, `p-rules` says
+  「設定ファイル」, `e1` says 「Webアプリ」), to stay within the body budget; MCP is spelled out in `e3`.
 - The capstone's success criteria and the self-assessment are one checklist (`self-check-list`) to stay within the
   body budget; a separate cycle checklist duplicated it.
 - Not included, to stay within the body budget: the large-codebases advice to review the configuration every 3–6
-  months and after major model releases (verified, could be added to `sc-b2`).
+  months and after major model releases (verified, could be added to `sc-b2`); the MCP row of the trigger table; the
+  What's new digest and asking Claude Code about itself (round-1 review cut `sc-b3`, `sc-list` and exam item `e4`).
 
 ## Measured
 Script over block texts, JP characters without whitespace, inline markup stripped (same method as the
 `vibe-ch2-practice` brief, which counts checklist labels): body (markdown, table cells, steps, checklist labels and
-details, summary points) **2,369**; with the 71 characters of list items in `sc-list` 2,440. Prompt texts, model answers and notes
-1,982; quiz text 3,881; flashcards 395; 9 questions (1 predict, 4 inline, 4 exam). `lessons:validate` 0 errors,
+details, summary points; no list blocks) **2,393** after the round-1 fixes. Prompt texts, model answers, notes and variable
+hints 1,817; quiz text with hints 3,713; flashcards 410; 8 questions (1 predict, 4 inline, 3 exam). `lessons:validate` 0 errors,
 `lessons:lint --strict` 0 warnings.
