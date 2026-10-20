@@ -15,18 +15,18 @@ Claude Code course (plan: `doc/brushup-2026/research/claude-code-curriculum.ja.m
 - o3 (bloom: evaluate): MCPサーバーやプラグインを入れる前に、出どころ・実行されるもの・権限を確かめ、入れてよいかを判断できる
 
 ## 範囲 / Scope
-- 扱う / in: フック＝決まったタイミングで必ず動く処理（CLAUDE.mdの「お願い」との対比、第6回の想起）。イベント（`PreToolUse`・`PostToolUse`・`Stop`）→ マッチャー → コマンドの3段の設定。標準入力のJSON（`tool_input.command` / `tool_input.file_path`）、標準エラー出力、終了コード 0 / 2 / それ以外（1を含む）。`PostToolUse` の `exit 2` は取り消しではない。`chmod +x`、`/hooks`、手でJSONを渡して試す方法。MCP（`claude mcp add --transport http`、stdio の形、SSEは非推奨、スコープ local / project / user、`.mcp.json` の承認）。プラグインとマーケットプレイス、入れる前の確認（出どころ・作者と保守・実行されるもの・外とのやり取り・権限・自動更新）、プロンプトインジェクション。
-- 扱わない（別レッスン） / out: JSON出力による細かい制御（`permissionDecision` など）、`http`・`prompt`・`agent` 型のハンドラーの書き方、`onFailure`、`if` フィルター、Stop フックの品質ゲート（第11回の題材）、モッド（mods）、MCPのOAuth、`managed-mcp.json` などの組織向け管理（第10回）、プラグインの作り方。
+- 扱う / in: フック＝決まったタイミングで必ず動く処理（CLAUDE.mdの「お願い」との対比、第6回の想起）。イベント（`PreToolUse`・`PostToolUse`・`Stop`）→ マッチャー → 処理（ここではコマンド）の3段の設定。標準入力のJSON（`tool_input.command` / `tool_input.file_path`）、標準エラー出力、終了コード 0 / 2 / それ以外（1を含む。ふつうは止めないエラー）。`PostToolUse` の `exit 2` は取り消しではない。`chmod +x`、`/hooks`、手でJSONを渡して試す方法。MCP（`claude mcp add --transport http`、stdio の形、SSEは非推奨、スコープ local / project / user、`.mcp.json` の承認）。プラグインとマーケットプレイス、入れる前の確認（出どころ・作者と保守・実行されるもの・外とのやり取り・権限・自動更新）、プロンプトインジェクション。
+- 扱わない（別レッスン） / out: JSON出力による細かい制御（`permissionDecision` など）、`http`・`prompt`・`agent` 型のハンドラーの書き方、`onFailure` の書き方（8-3の注意で「失敗でも止まる例外」として名前だけ出す）、`if` フィルター、Stop フックの品質ゲート（第11回の題材）、モッド（mods）、MCPのOAuth、`managed-mcp.json` などの組織向け管理（第10回）、プラグインの作り方。
 - 学習者がよく持つ誤解 / likely misconceptions (report §6 and facts):
   1. 「CLAUDE.mdに『〜するな』と書けば守られる」→ CLAUDE.mdはお願い。強制はフック（と権限ルール）。
-  2. 「`exit 1` で止まる」（Unixの習慣）→ フックの `exit 1` は止めないエラー。止めるのは `exit 2`。
+  2. 「`exit 1` で止まる」（Unixの習慣）→ フックの `exit 1` はふつう止めないエラー（`onFailure` を `"block"` にしたフックなどは例外）。止めるのは `exit 2`。
   3. 「`exit 0` は許可」→ 反対しないだけで、ふだんの権限確認へ進む。
   4. 「`PostToolUse` の `exit 2` で操作が取り消される」→ 取り消せない。理由がClaudeに届くだけ。
   5. 「フックの条件に書けば何でも止まる」→ 書いた条件の外（`cd x && rm y`、Bashでの `.env` 書き込み）は止まらない。
   6. 「MCPサーバーやプラグインは公式が安全を確認している」→ AnthropicはMCPサーバーを監査していない。プラグインはあなたの権限で任意のコードを実行できる。マーケットプレイスの名前は出し手を示すだけ。
 
 ## 形式 / Format
-- 所要時間 / minutes: 16（本文 2,545字（後半の模範の表 150字を含む）÷ 450 = 5.7分 + 問題10問 × 40秒 = 6.7分 + 演習2つ × 2分 = 4分 = 16.3分）。
+- 所要時間 / minutes: 16（コース共通の measure.mjs：`cc-08-hooks-mcp.lesson.json: prose 1369 (budget 1,200–2,400) · read 2343 · practice reading 917 · questions 10 · practice sections 1 · est 15.9 min (must be ≤ 20; estMinutes 16)`。(2,343 + 917) ÷ 450 ≈ 7.2分 + 問題10問 × 40秒 ≈ 6.7分 + 演習1セクション × 2分 = 2分、計 15.9分 → 16）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 例題と同じ練習用フォルダー（`cc-hooks-practice`）で、`.env` への書き込みを止める `PreToolUse` フック（`Edit|Write`、`tool_input.file_path`、`exit 2`）を作り、手で試す → Claudeに頼んで止まることを確かめ、理由を説明させる。後半は架空の2候補（社内の課題管理MCPサーバー／作者の情報がない「全部入り」プラグイン）を8-5の表の項目ごとに書き出して見極め、書き出しの例（`practice-b-model`）と比べる。
@@ -61,9 +61,9 @@ q2 commands: `rm notes.txt && ls` → 2, `rm -r build` → 2, `cd docs && rm not
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：「.envは編集しないで」が守られない | CLAUDE.mdの「〜しないで」は守られる保証がない | markdown (problem, 2 sentences + version line), quiz predict | `q0` → o1 (understand, ungraded) |
-| `s1` | concept | 8-1. フック：お願いではなく、必ず動く仕組み | フックはClaudeの判断と関係なく決まったタイミングで必ず動く；設定は イベント → マッチャー → コマンド | markdown lead (第6回の想起), definitions (フック・イベント・マッチャー), diagram (lifecycle, 6 nodes), markdown, code (Prettier `PostToolUse`), quiz inline | `q1` → o1 (apply: 編集のたびにテスト → `PostToolUse`) |
+| `s1` | concept | 8-1. フック：お願いではなく、必ず動く仕組み | フックはClaudeの判断と関係なく決まったタイミングで必ず動く；設定は イベント → マッチャー → 処理（ここではコマンド） | markdown lead (第6回の想起), definitions (フック・イベント・マッチャー), diagram (lifecycle, 6 nodes), markdown, code (Prettier `PostToolUse`), quiz inline | `q1` → o1 (apply: 編集のたびにテスト → `PostToolUse`) |
 | `s2` | example | 8-2. 例題：rmで始まるコマンドを止める | `PreToolUse` フックの作り方：スクリプト → 許可と登録 → 予想してから手で試す | markdown lead, definitions (標準入力・標準エラー出力・終了コード), code (setup: `jq --version` で確かめてから作る), code (`block-rm.sh`), code (`settings.json`), steps (3, subgoal titles + why + expect + troubleshoot, `Permission denied` → `chmod +x`), code (② `chmod +x` + ③ test), quiz inline | `q2` → o1 (analyze: 条件の外 `cd docs && rm` は止まらない。`rm notes.txt && ls` は止まる) |
-| `s3` | concept | 8-3. 終了コードで、Claude Codeの動きが変わる | 0 は進む（許可ではない）、2 は止めて理由が届く、1 などは止めないエラー；`PostToolUse` の 2 は取り消しではない | markdown lead, table (3 rows), markdown, callout pitfall (exit 1), markdown, quiz inline | `q3` → o2 (understand: `exit 1` の `.env` ガード) |
+| `s3` | concept | 8-3. 終了コードで、Claude Codeの動きが変わる | 0 は進む（許可ではない）、2 は止めて理由が届く、1 などは止めないエラー；`PostToolUse` の 2 は取り消しではない | markdown lead, table (3 rows), markdown, callout pitfall (exit 1), markdown, quiz inline | `q3` → o2 (understand: `onFailure` なしの `exit 1` の `.env` ガード) |
 | `s4` | concept | 8-4. MCPで外のツールにつなぐ | MCPで外部ツールをつなぎ、スコープで使える範囲を決める | markdown lead (MCP の定義を含む), definitions (MCP サーバー・スコープ), code (`claude mcp add` / `list`), markdown (http 推奨・SSE 非推奨), table (scopes) | — (density: s3 and s5 have checks) |
 | `s5` | concept | 8-5. プラグインは、入れる前に確かめる | プラグインもMCPサーバーもあなたの権限で動く；入れる前の6項目 | markdown lead (第7回の想起), definitions (プラグイン・マーケットプレイス・プロンプトインジェクション), markdown (risk), table (6 checks; 権限の行に「フックは対象外」), callout pitfall (公式の場所＝安全ではない), quiz inline | `q4` → o3 (evaluate: 何が実行されるかを最優先) |
 | `practice` | practice | 演習：.envを守るフックを作り、つなぐ候補を見極める | 例題を `.env` 用に作り変え（マッチャーと取り出す項目）、予想 → 手で試す → Claudeで確かめ説明させる；2候補を見極める | markdown (task), steps (3, hints + troubleshoot), prompt (claude-code, `{{追加する行}}`, expect, note), markdown + code ×2 (model answer: protect-files.sh, combined settings.json), markdown, quiz inline (2 candidates), table (`practice-b-model`: model of the written-out table), checklist (5) | `q9` → o3 (evaluate: 架空の2候補。表の行を比べて、Aは読むツールだけ許して試し、Bは入れない) |
@@ -98,3 +98,9 @@ Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
   「公式の例がもとです。」 ×2, s1-config's last sentence, s4-lead, s5-pitfall).
 - q8 option c does not say what the `project`-scope approval prompt shows: the MCP page (checked 2026-10-20) says only
   that Claude Code prompts for approval in interactive sessions.
+- Fact audit (2026-10-20, second fix round): the hooks reference says `exit 1` is non-blocking "unless the hook is one
+  whose failure blocks the action" (for example `"onFailure": "block"`). The lesson therefore says 「ふつう」 wherever it
+  states that `exit 1` does not block (s3-table, s3-pitfall, q3 feedback/explanation, q5 feedback, card-exit1, summary),
+  names `onFailure` once in s3-pitfall as the exception, and q3's prompt states that `onFailure` is not set.
+- `/hooks` lists hooks grouped by event and shows the command when a hook is selected; no page says the list shows the
+  matcher, so the practice expect and checklist only ask the learner to find the new hook under `PreToolUse`.

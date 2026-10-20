@@ -21,8 +21,8 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
   必要なもの（有料プランか Console アカウント、無料プランは不可、OS・メモリ）、ネイティブインストーラーと
   `claude --version`、Node.js は npm の経路だけで必要、作業フォルダで `claude` を起動、セッションは毎回まっさらな
   コンテキストで始まる（引き継ぐのは CLAUDE.md・自動メモリ・開き直した会話だけ。名前だけ）、公式クイックスタートの順
-  （質問 → 小さな変更 → Git）、`/diff` で差分を見てからコミット、変更を説明させる習慣、v2.1.283 から auto モードで
-  始まること（名前と影響だけ）。
+  （質問 → 小さな変更 → Git）、`/diff` で差分を見てからコミット、変更を説明させる習慣、v2.1.283 から
+  ターミナルと VS Code の対話セッションが auto モードで始まること（名前と影響だけ）。
 - 扱わない（別レッスン） / out: 権限モードの選び方と `/rewind`（第2回）、計画させる進め方（第3回）、検証の任せ方
   （第4回）、`/context`・`/compact`（第5回）、CLAUDE.md の書き方と `/init`（第6回）、Homebrew・WinGet・apt の
   インストール、リリースチャネル、Remote Control・モバイル・Dispatch、料金の金額（ページへのリンクもしない）。
@@ -34,8 +34,9 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
   5. 「完了しました、と言えば完了」→ 差分を自分で見て、説明できる変更だけコミットする（q4, q9）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（本文 2,400 字 + 依頼文・ヒント・チェックリスト・カード 1,407 字 = 3,807 字を 450 字/分で 8.5 分、
-  問題 10 問 × 40 秒で 6.7 分、演習 1 つで 2 分、計 17.1 分）。本文だけで数えると 14.0 分。実際の演習は 15 分ほどかかります。
+- 所要時間 / minutes: 16。コース共通の測り方（`measure.mjs`）の結果:
+  `prose 1585 (budget 1,200–2,400) · read 2405 · practice reading 806 · questions 10 · practice sections 1 · est 15.8 min`
+  （(2,405 + 806) 字 ÷ 450 字/分 = 7.1 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 15.8 分 → 16）。実際の演習は 15 分ほどかかります。
 - 難易度 / level: beginner
 - ロケール / locales: jp only（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ `cc-practice`（`git init` 済み）で、Claude に hello world の
@@ -62,11 +63,11 @@ interactive-mode and Japanese glossary pages).
 - `cc-vs-code` — Use Claude Code in VS Code — https://code.claude.com/docs/en/vs-code — extension bundles its CLI.
 - `cc-jetbrains` — JetBrains IDEs — https://code.claude.com/docs/en/jetbrains — plugin needs the CLI installed separately.
 - `cc-desktop` — Desktop application — https://code.claude.com/docs/en/desktop — Code tab, no terminal, paid subscription.
-- `cc-cloud` — Use Claude Code in the cloud — https://code.claude.com/docs/en/claude-code-on-the-web — clones the GitHub remote, push first, keeps running with the laptop closed.
+- `cc-cloud` — Use Claude Code in the cloud — https://code.claude.com/docs/en/claude-code-on-the-web — clones the GitHub remote, push first, keeps running with the laptop closed; `claude --cloud` can also upload a local git repository with at least one commit (q6-b feedback).
 - `cc-memory` — How Claude remembers your project — https://code.claude.com/docs/en/memory — only CLAUDE.md and auto memory carry over.
 - `cc-commands` — Commands — https://code.claude.com/docs/en/commands — `/diff` reviews the changes in the working tree, including Claude's edits.
 - `cc-terminal-guide` — Terminal guide for new users — https://code.claude.com/docs/en/terminal-guide — first task "a simple webpage that says hello world", open it by double-clicking.
-- `ai-skills-rct` — How AI assistance impacts the formation of coding skills (2026-01-29) — https://www.anthropic.com/research/AI-assistance-coding-skills — learners who asked the AI for explanations kept high quiz scores (report §6).
+- `ai-skills-rct` — How AI assistance impacts the formation of coding skills (2026-01-29) — https://www.anthropic.com/research/AI-assistance-coding-skills — learners whose interaction patterns asked the AI for explanations scored higher on the quiz right after the task than heavy-reliance patterns (no delayed test, no causal claim).
 - Prose links (not sources): https://code.claude.com/docs/ja/setup, https://code.claude.com/docs/ja/troubleshoot-install (linked from the Japanese quickstart).
 - Repository: `content/courses/vibe-coding/lessons/vibe-ch3.lesson.json` (VS Code), `vibe-ch5.lesson.json` (`git config`, commit), `vibe-ch2.lesson.json` (JSON shapes).
 
@@ -91,9 +92,8 @@ deferred to 第2回). Inline quizzes in 4 of 6 content sections (practice counts
 Every objective has an inline and an exam question. Worked example (5 steps with the why) → faded practice (same ①–⑤
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
-Body length (prose, definitions, table cells, steps md and expect, summary points, diagram description; the method of
-`reports/vibe-ch2.md`): **2,400** JP characters (budget 1,200–2,400). Prompt text, model answers, hints, troubleshoot,
-checklist and cards add 1,407.
+Body length: measured with the course-wide `measure.mjs` (see Format): prose **1,585** JP characters (budget 1,200–2,400),
+study reading 2,405, practice reading 806.
 
 ## Assumptions
 - Headless run: the outline was not checked in with a person.
@@ -107,13 +107,16 @@ checklist and cards add 1,407.
 - The first change may run without a permission prompt (auto mode, v2.1.283+), so step ② says "if asked, read it, then
   choose Yes" (the quickstart wording) and a callout explains why the diff check matters. Permission modes themselves
   are left to 第2回.
-- The comprehension-habit callout states only what report §6 says about the RCT (learners who asked for explanations
-  kept high scores), without the percentages.
+- The comprehension-habit callout states only what the RCT post says (learners who asked for explanations scored higher
+  on the immediate quiz than those who relied on the AI), without the percentages or a claim about retention.
+- auto mode: the lesson says it is the starting mode for interactive terminal and VS Code sessions
+  (「ターミナルとVS Codeの対話セッション」) from v2.1.283, matching the course's cross-lesson facts.
 - Desktop app and cloud session plan details (which Team/Enterprise seats) are left out of the body; the table says
   only "有料プランが必要" for Desktop. Cloud-session availability is cited to `cc-cloud`.
 - `/powerup` and asking Claude Code about itself were left out for the body budget; they could go in a later lesson.
-- Round-1 fixes: 「Consoleアカウント」 is defined from the quickstart wording ("API access with pre-paid credits") as
-  「APIの料金を前払いして使うアカウント」, without the reviewer's 「開発者向け」, which the source does not say.
+- Round-1 fixes: 「Consoleアカウント」 is described from the quickstart wording ("API access with pre-paid credits") as
+  「ConsoleアカウントではAPI（Application Programming Interface）を前払いで使えます」, without the reviewer's 「開発者向け」,
+  which the source does not say.
 - The diff in `example-diff` is an invented teaching example; it matches the model answer in `practice-prompt-explain`
   and is labelled as an example, not as the `/diff` screen.
 - o3 now names installing and starting Claude Code, so that `q3` (fresh context) and `q7` (plan, installer, Node.js)

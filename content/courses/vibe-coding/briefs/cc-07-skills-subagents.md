@@ -18,8 +18,8 @@
   - スキル：`.claude/skills/<名前>/SKILL.md`（YAML フロントマター＋本文）、`description` が要、`name` を省くとフォルダ名。
   - 段階的な読み込み（progressive disclosure）：名前と説明文だけが毎回、本文は使うとき。だから手順は CLAUDE.md ではなくスキルへ。
   - 呼び出し方：`/名前` か、依頼が description に合うと Claude が使う。`disable-model-invocation: true` で自分だけが呼ぶスキル（説明文もコンテキストに入らない）。
-  - 古い記事向け：カスタムコマンドはスキルに統合、`.claude/commands/` も動く。`/agents` の作成画面は v2.1.198 で廃止。
-  - サブエージェント：`.claude/agents/` の Markdown（`name`・`description` 必須、`tools` でしぼる）、自分のコンテキストウィンドウ・指示・ツール・権限、要約だけを返す。v2.1.198 から既定でバックグラウンド、`/tasks` で一覧。組み込みの Explore（読み取り専用）。
+  - 古い記事向け：カスタムコマンドはスキルに統合、`.claude/commands/` も動く。
+  - サブエージェント：`.claude/agents/` の Markdown（`name`・`description` 必須、`tools` でしぼる）、自分のコンテキストウィンドウ・指示・ツール・権限、要約だけを返す。v2.1.198 から既定でバックグラウンド（`/tasks` は演習のヒントだけ）。
   - フォーク：`/subtask <task>` で会話をまるごと引き継ぐ。ふつうのサブエージェントはまっさらから始まる。
   - 公式の「少しずつ育てる」：きっかけ（trigger）が来たら1つずつ足す。メインの会話のほうが向く場面。
 - 扱わない（別レッスン） / out: フック・MCP・プラグインの中身（第8回へ1行の予告だけ）、`context: fork`・`allowed-tools`・動的コンテキスト注入・`$ARGUMENTS`（中級の先）、動的ワークフロー・並列（第9回）、コスト（第10回）。
@@ -33,7 +33,7 @@
   7. 使われないスキルは本文を詳しくすれば使われる → 判断に使われるのは description。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（読む文：問題・コード・ヒント／トラブル対処・演習セクションを除く本文 約3,370字 ÷ 450 ＝ 約7.5分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習2課題 × 2分 ＝ 4分、計 約19.5分）
+- 所要時間 / minutes: 18（コース共通の measure.mjs：`prose 1913 (budget 1,200–2,400) · read 2549 · practice reading 931 · questions 12 · practice sections 1 · est 17.7 min (must be ≤ 20; estMinutes 18)`。(2,549 + 931) ÷ 450 ＝ 7.7分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習1セクション × 2分 ＝ 2分、計 17.7分 → 18）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語は公開先が決まってから）
 - 演習の題材 / practice task idea: 自分が繰り返している手順（なければ「README の更新手順」）を `.claude/skills/<名前>/SKILL.md` にし、自然な依頼と `/名前` の2通りで試す（使われるかを先に予想）。続けて、サブエージェントに調べものを任せ、`/context` の前後でメインのコンテキストの増え方を比べ、理由を自分の言葉で説明する。
@@ -67,8 +67,8 @@
 |---|---|---|---|---|---|
 | hook | hook | はじめに：毎回貼っている手順書 | 手順を毎回貼る／CLAUDE.md に足す／調べもので会話があふれる、という問題 | markdown (lead), quiz predict | hook-q (predict, ungraded) → o2 |
 | skill-basics | concept | 7-1. スキル：手順は使うときだけ読み込む | スキルは名前と説明文だけが毎回、本文は使うとき（段階的な読み込み）。だから手順はスキルへ | markdown, definitions（スキル・フロントマター・段階的な読み込み）, diagram, markdown, quiz inline | q1 → o2 (understand) |
-| skill-example | example | 7-2. 例題：コミットメッセージの手順をスキルにする | 置き場所 → description → 本文 → 2通りで試す → 差分と照合（worked example）。取り消しにくい手順・動かす時期を決めたい手順には `disable-model-invocation`。旧カスタムコマンド | markdown, code bash, code yaml (SKILL.md), steps ×6, markdown, callout info, quiz inline | q2 → o1 (apply), q3 → o1 (apply) |
-| subagents | concept | 7-3. サブエージェント：調べものを別のコンテキストで | 自分のコンテキストで読み、要約だけを返す。フォークは会話を引き継ぐ。バックグラウンド既定、`.claude/agents/` | markdown, definitions（サブエージェント・フォーク）, diagram, markdown ×3, code yaml (agent), callout info, quiz inline | q4 → o3 (understand), q5 → o2 (apply) |
+| skill-example | example | 7-2. 例題：コミットメッセージの手順をスキルにする | 置き場所 → description → 本文 → 2通りで試す（worked example）。取り消しにくい手順・動かす時期を決めたい手順には `disable-model-invocation`。旧カスタムコマンド | markdown, code bash, code yaml (SKILL.md), steps ×5, markdown, callout info, quiz inline | q2 → o1 (apply), q3 → o1 (apply) |
+| subagents | concept | 7-3. サブエージェント：調べものを別のコンテキストで | 自分のコンテキストで読み、要約だけを返す。フォークは会話を引き継ぐ。バックグラウンド既定、`.claude/agents/` | markdown, definitions（サブエージェント・フォーク）, diagram, markdown ×3, code yaml (agent), quiz inline | q4 → o3 (understand), q5 → o2 (apply) |
 | choose | concept | 7-4. どこに置く？ 足すのは「きっかけ」が来てから | 公式の「少しずつ育てる」：きっかけ → 足すもの。メインの会話のほうが向く場面 | markdown, table, markdown, callout pitfall, quiz inline | q6 → o2 (evaluate) |
 | practice | practice | 演習：自分の手順をスキルにし、調べものを任せる | 自分の手順をスキルにして2通りで試し、サブエージェントの前後で `/context` を比べる | markdown, code bash, steps ×7 (hint/troubleshoot), prompt (claude-code), checklist, markdown, code yaml (模範解答) | — |
 | check | check | 確認テスト | 全目標の総まとめ（転移2問） | quiz exam ×5 | e1 → o1 (apply, transfer: チーム共有), e2 → o1 (analyze), e3 → o2 (evaluate, transfer: ライブラリ入れ替え前の洗い出し), e5 → o3 (understand), e6 → o3 (analyze) |

@@ -23,15 +23,13 @@ decides where it is published.
   1. 「完了しました」と言えば完了 — 報告は主張。実行したコマンドと出力などの証拠を見る（best practices）。
   2. 同じ会話で「本当に大丈夫？」と聞き直せば確かめたことになる — 自己採点は甘くなる（harness design: agents "reliably skew positive when grading their own work"）。別のコンテキストに頼む。
   3. テストが通れば正しい — テストを消す・期待値を書き換える・エラーを無視する設定にすれば、間違った実装でも通る（long-running harness: removing or editing tests is "unacceptable"; best practices: "address the root cause, don't suppress the error"）。
-  4. レビューの指摘はすべて直すべき — 穴を探すよう頼まれたレビュー役は健全な作業にも指摘を返す。すべて直すと過剰設計になる（best practices callout）。
+  4. レビューの指摘はすべて直すべき — 穴を探すよう頼まれたレビュー役は健全な作業にもたいてい指摘を返す（"usually"）。すべて直すと過剰設計になる（best practices callout）。
   5. どんな確認でもよい — リンターで合計の正しさはわからない、ビルドで見た目はわからない。タスクの「完成」を直接測る確認を選ぶ。
   6. テストが通れば中身を理解しなくてよい — 説明できなければ次に壊れたときに直せない（RCT: AI-assisted learners scored lower unless they asked for explanations or concepts）。
   7. `/goal` の判定役がテストを実行してくれる — 判定役はコマンドを実行せず、会話に出た結果だけを読む（goal docs）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20 — body 2,557字 ÷ 450 ≈ 5.68分 + 問題12問 × 40秒 = 8分 + 演習3課題（テストから作る・レビューを仕分ける・説明させて予想する）× 2分 = 6分 → 19.68分。
-  Body is counted as in the vibe-ch2 report: markdown, callouts, definitions, step text and expected results, table cells and summary points, whitespace and inline code spans removed; prompt text, prompt `expect` (collapsed model answers), step hints and troubleshoots (collapsed), quizzes and code are left out.
-  Round-1 fixes (the browser note in 4-1, the definition of ターン, the empty-function step) put the body about 160字 over the contract's 2,400字 budget; niceToHave wording that only added length was left out to keep it there.
+- 所要時間 / minutes: 19 — measure.mjs: `cc-04-verify.lesson.json: prose 1998 (budget 1,200–2,400) · read 3118 · practice reading 1027 · questions 12 · practice sections 1 · est 19.2 min (must be ≤ 20)` → estMinutes 19.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only（コースの公開先が決まってから英訳する）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ（`cc-practice-verify`、`git init`）で、うるう年を判定する関数 `isLeapYear` をテストから作らせる。テストをコミット → テストを変えずに実装 → 自分でテストを実行 → 別のコンテキストでレビュー → 指摘を必須と任意に仕分け → 差分を説明させて予想を確かめる。チェックリスト・段階的なヒント・模範解答（テストのコードと仕分けの表）つき。
