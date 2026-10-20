@@ -6,7 +6,7 @@
   "subtitle": "CLAUDE.mdから育てる環境と、計画からコミットまでの1サイクル（2026年10月時点、Claude Code v2.1.304）",
   "locale": "jp",
   "level": "intermediate",
-  "estMinutes": 20,
+  "estMinutes": 19,
   "prerequisites": [
     "第2回｜任せる範囲を決める：権限モードと巻き戻し",
     "第3回｜探索→計画→実装→コミット",
@@ -152,7 +152,7 @@
             "steering-post",
             "cc-permissions"
           ],
-          "md": "CLAUDE.mdとスキルは「お願い」で、保証はありません。Claudeの判断に任せたくないことは、[[フック]]と[[権限ルール]]（permission rule）に置きます。ただし、秘密情報とpushは1回で困るので、きっかけを待たず、初日から権限ルールで守ります。"
+          "md": "CLAUDE.mdとスキルは「お願い」で、保証はありません。Claudeの判断に任せたくないことは、[[フック]]と[[権限ルール]]（permission rule）に置きます。ただし、秘密情報とpushは1回で困るので、きっかけを待たず、初日から権限ルールで守ります。\n\n権限ルールが止めるのは、ルールに一致した操作だけです。スクリプトが自分で開くファイルの読み取りや、`git -C . push` のような別の書き方のpushは、止まりません。"
         },
         {
           "id": "dr-quiz",
@@ -245,7 +245,8 @@
               "id": "ex-skill",
               "title": "④ 毎回の依頼をスキルにする",
               "md": "作業のたびに「差分（diff）を説明して」と打っていたので、スキルにします。",
-              "expect": "`/explain-diff` で、差分の説明が返ります。"
+              "expect": "`/explain-diff` と打つと、今の差分の説明が返ります。",
+              "troubleshoot": "呼べないときは `/reload-skills` を実行します。"
             },
             {
               "id": "ex-share",
@@ -294,7 +295,7 @@
             "cc-skills"
           ],
           "prompt": "`.claude/skills/explain-diff/SKILL.md` を、次の内容で作ってください。\n\n---\nname: explain-diff\ndescription: 今の変更（差分）を説明する。「差分を説明して」と頼まれたときに使う。\nallowed-tools: Bash(git diff *)\n---\n## 今の差分\n!`git diff HEAD`\n\n## 説明のしかた\n変えたファイルごとに、次の3つを短く説明してください。\n- 何を、なぜ変えたか\n- 動きが変わる場面と、それを確かめたテスト\n- 私が自分の目で確かめるとよい箇所を1つ\n差分が空なら、変更はないと答えてください。",
-          "expect": "Claudeが `.claude/skills/explain-diff/SKILL.md` を作ります。\n\n`!` で始まる行は、スキルを使うたびに `git diff HEAD` の結果に置きかわります。`/explain-diff` と打つと、今の差分にもとづく説明が返ります。",
+          "expect": "Claudeが `.claude/skills/explain-diff/SKILL.md` を作ります。\n\n`!` で始まる行は、スキルを使うたびに `git diff HEAD` の結果に置きかわります。\n\n起動後に `.claude/skills/` を新しく作ったときは、先に `/reload-skills` を実行します。そのあと `/explain-diff` と打つと、今の差分にもとづく説明が返ります。",
           "note": "コミットが1つもないリポジトリでは `git diff HEAD` が失敗し、スキル全体が止まります。先に1回コミットしておきます。"
         },
         {
@@ -406,7 +407,7 @@
             "cc-memory"
           ],
           "prompt": "`/init` が作ったCLAUDE.mdを、次の内容に書き直してください。書いたら差分を見せてください。\n\n# kakeibo-cli\nPython 3.12の家計簿ツール。CSVを読み、月ごとに集計する。\n\n## コマンド\n- テスト：`python -m pytest`（変更のたびに実行し、出力を見せる）\n- 実行例：`python -m kakeibo summary data/sample.csv`\n\n## 構成\n- 集計は `kakeibo/summary.py`、CSVの読み込みは `kakeibo/io.py`\n- `data/private/` は個人のデータ（読み取りは設定で拒否している）\n\n## 決まりごと\n- 金額は円の整数（int）で扱い、`float` は使わない\n- 新しい関数には、`tests/` にテストを足す\n- 依存を増やす前に、理由を説明して確認をとる\n- コミットメッセージは日本語。1行目に変えた内容を書く\n\n## 進め方\n- 3つ以上のファイルを変えるときは、先に計画を見せる",
-          "expect": "Claudeが、`/init` の下書きとの差分を見せながら書き直します。\n\nCLAUDE.mdは19行です。個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定で読み取りを拒否しています。",
+          "expect": "Claudeが、`/init` の下書きとの差分を見せながら書き直します。\n\nCLAUDE.mdは19行です。個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定でも読み取りを拒否しています。ただし、拒否できるのはClaudeのファイル操作で、Pythonのスクリプトが開くファイルは防げません。",
           "note": "Pythonで書いた家計簿ツールの例です。設定ファイルの模範解答は、この下にあります。"
         },
         {
@@ -847,8 +848,8 @@
             },
             {
               "id": "card-ask",
-              "front": "`git push` の前に必ず人が見るための設定は？",
-              "back": "`permissions.ask` に `Bash(git push *)` の確認ルールを書きます。"
+              "front": "`git push` の前に人が確認するための設定は？",
+              "back": "`permissions.ask` に `Bash(git push *)` の確認ルールを書きます。`git -C . push` のような別の書き方には一致しません。"
             },
             {
               "id": "card-review",
