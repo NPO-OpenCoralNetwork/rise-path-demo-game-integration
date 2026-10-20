@@ -59,3 +59,5 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.
 - No `git push --force`, and no rewriting shared history.
+- Don't merge, cherry-pick or patch in anything from the private personal repository; rebuild a
+  feature as new commits on `main`. What not to port and why: `doc/brushup-2026/integration/do-not-port.ja.md`.
