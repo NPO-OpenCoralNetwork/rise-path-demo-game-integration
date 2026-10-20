@@ -26,7 +26,7 @@ export class BattleScene8 extends BattleScene {
       backgroundColor: 0x4a3728, // ゴブリン要塞の茶色
       enemyTint: 0x228b22, // ゴブリンの緑色
       enemyHp: 30,
-      startMessage: `ステージ8「行動の繰り返し」が始まりました！\n🛡️ シールドゴブリンの盾は魔法が効かない！\n⚔️ 物理攻撃を8回繰り返して盾を破壊せよ！`,
+      startMessage: `ステージ8「行動の繰り返し」が始まりました！\n🛡️ シールドゴブリンの盾は攻撃魔法が効かない！\n⚔️ 物理攻撃を8回繰り返して盾を破壊せよ！`,
       availableBlocks: ['attack_basic', 'heal_magic', 'repeat_2x', 'repeat_3x', 'wave_left_hand', 'wave_right_hand', 'cast_magic', 'wait']
     });
     
@@ -178,6 +178,11 @@ export class BattleScene8 extends BattleScene {
 
   // 敵のターン処理
   async enemyTurn() {
+    // 麻痺している間は動けない（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
+      return;
+    }
+
     // 棍棒を振り下ろす
     await this.playAnimation('enemyAttack_sword');
     
