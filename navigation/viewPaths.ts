@@ -41,7 +41,7 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_PRIVACY]: '/settings/privacy',
   [ViewState.SETTINGS_AI_MEMORY]: '/settings/ai-memory',
 
-  // App.tsx resolves LESSON from the course in sessionStorage first; this is the fallback.
+  // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',
   [ViewState.MY_CONTENT]: '/my-content',
   [ViewState.GENERATED_COURSE_PATH]: '/profile/generated',

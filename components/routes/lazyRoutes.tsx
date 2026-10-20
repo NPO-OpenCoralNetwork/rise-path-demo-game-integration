@@ -38,11 +38,12 @@ export const EncyclopediaView = lazy(
 export const CourseGeneratorView = lazy(
   () => import('../features/ai/CourseGeneratorView')
 );
+/** /demo/* design samples. Dev builds only: production bundles drop the imports. */
 export const BlenderChecklistGeneratorView = lazy(
-  () => import('../features/ai/BlenderChecklistGeneratorView')
+  () => (import.meta.env.DEV ? import('../features/ai/BlenderChecklistGeneratorView') : Promise.resolve({ default: () => null }))
 );
 export const MultiFormatLessonView = lazy(
-  () => import('../features/ai/MultiFormatLessonView')
+  () => (import.meta.env.DEV ? import('../features/ai/MultiFormatLessonView') : Promise.resolve({ default: () => null }))
 );
 export const PersonalAssessmentView = lazy(
   () => import('../features/dashboard/assessment/PersonalAssessmentView')
