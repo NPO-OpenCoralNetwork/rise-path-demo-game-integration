@@ -63,7 +63,10 @@ export class BattleScene6 extends BattleScene {
 
   // 敵のターン処理をオーバーライド
   async enemyTurn() {
+    // 毒の玉を吐く（当たってから HP を減らす）
     await this.playAnimation('enemyAttack_poison');
+    // 演出を待つ間に画面を離れていたら、何もしない
+    if (this.isBattleOver()) return;
     
     const damage = 8;
     this.addLog(`${this.enemy.name}の毒攻撃！${damage}ダメージ！`);
@@ -78,7 +81,8 @@ export class BattleScene6 extends BattleScene {
     
     // 毒状態なら追加ダメージ
     if (this.playerPoisoned) {
-      this.applyPoisonDamage();
+      await this.applyPoisonDamage();
+      if (this.isBattleOver()) return;
     }
     
     if (this.player.hp <= 0) {
@@ -95,7 +99,11 @@ export class BattleScene6 extends BattleScene {
     }
   }
 
-  applyPoisonDamage() {
+  async applyPoisonDamage() {
+    // 毒がまわる演出（毒の泡が主人公を包んでから HP を減らす）
+    await this.playAnimation('status_poison');
+    if (this.isBattleOver()) return;
+    
     this.addLog(`💀 毒のダメージ！${this.poisonDamage}ダメージ！`);
     this.player.hp -= this.poisonDamage;
     this.updateHP(this.player.hp, this.enemy.hp);
@@ -119,6 +127,8 @@ export class BattleScene6 extends BattleScene {
       this.addLog('💙 解毒薬を使用！毒が治りました！残り在庫: ' + this.antidotes);
       this.statusText.setText('ステータス: 正常');
       this.statusText.setFill('#00ff00');
+      // 治った光（engine.js はこの処理を待たないので、演出も待たずに流す）
+      this.playAnimation('healing');
     } else if (!this.playerPoisoned) {
       this.addLog('⚠️ 毒状態ではありません');
     } else if (this.antidotes <= 0) {

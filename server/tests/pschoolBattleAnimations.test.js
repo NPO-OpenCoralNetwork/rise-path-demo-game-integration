@@ -142,6 +142,22 @@ describe('P-School battle animations', () => {
     }
   });
 
+  it('lets an evading enemy slip aside instead of flinching, only for the attacks it evades', async () => {
+    const flinches = async (type, dodges) => {
+      const scene = fakeScene();
+      let hits = 0;
+      scene.enemySprite.setTintFill = () => { hits += 1; return scene.enemySprite; };
+      scene.enemyDodges = (asked) => dodges(asked);
+      await playBattleAnimation(scene, type);
+      return hits;
+    };
+    const evadesNormal = (type) => type !== 'magic_flash';
+    assert.equal(await flinches('playerAttack', evadesNormal), 0, 'the slash misses');
+    assert.equal(await flinches('magic_fire', evadesNormal), 0, 'the fireball misses');
+    assert.equal(await flinches('magic_flash', evadesNormal), 1, 'the flash still hits');
+    assert.equal(await flinches('playerAttack', () => false), 1, 'a normal enemy flinches');
+  });
+
   it('keeps the ice shield up on a stage that blocks with it, then shatters it', async () => {
     const scene = fakeScene();
     scene.keepsIceShield = true;

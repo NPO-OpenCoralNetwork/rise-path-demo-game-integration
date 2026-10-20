@@ -88,12 +88,14 @@ export class BattleScene14 extends BattleScene {
     this.executeLoopAttack(iterations);
   }
 
-  executeLoopAttack(maxIterations) {
+  async executeLoopAttack(maxIterations) {
     if (this.loopVars.attackLoop < maxIterations && !this.battleEnded) {
       this.loopVars.attackLoop++;
       this.loopTexts.loopCounter.setText(`ループ: ${this.loopVars.attackLoop}/${maxIterations}`);
       
-      this.performLoopAttack();
+      // 斬撃が当たり終わってから次のループへ進む
+      await this.performLoopAttack();
+      if (this.isBattleOver()) return;
       
       // 次のループを300ms後に実行
       this.time.delayedCall(300, () => {
@@ -109,7 +111,7 @@ export class BattleScene14 extends BattleScene {
     }
   }
 
-  performLoopAttack() {
+  async performLoopAttack() {
     let damage = 8; // ループ攻撃は個別ダメージが小さい
     
     // 水晶シャードがある場合、ダメージ軽減
@@ -117,6 +119,10 @@ export class BattleScene14 extends BattleScene {
       damage = Math.floor(damage * 0.6);
       this.addLog(`💎 水晶シャードに阻まれた！（残り: ${this.golemState.crystalShards}）`);
     }
+    
+    // 斬撃が当たってから HP を減らす
+    await this.playAnimation('playerAttack');
+    if (this.isBattleOver()) return;
     
     const newHP = Math.max(0, this.enemy.getHP() - damage);
     this.enemy.setHP(newHP);
@@ -132,7 +138,13 @@ export class BattleScene14 extends BattleScene {
     }
   }
 
-  breakCrystal() {
+  async breakCrystal() {
+    // 水晶を打つ（本体には当たらないので、敵はびくともしない）。判定は打ったあとで行う
+    if (this.golemState.crystalShards > 0) {
+      await this.playAnimation('playerAttack_blocked');
+      if (this.isBattleOver()) return;
+    }
+    
     if (this.golemState.crystalShards > 0) {
       this.golemState.crystalShards--;
       this.loopVars.shardDestroyed++;
@@ -151,7 +163,7 @@ export class BattleScene14 extends BattleScene {
     this.time.delayedCall(1000, () => this.enemyAction());
   }
 
-  comboAttack() {
+  async comboAttack() {
     const comboMultiplier = Math.min(3, this.loopVars.comboCount / 5); // 5回につき1倍率増加、最大3倍
     const baseDamage = 25;
     const damage = Math.floor(baseDamage * (1 + comboMultiplier));
@@ -163,6 +175,10 @@ export class BattleScene14 extends BattleScene {
       finalDamage = Math.floor(damage * 0.4);
       this.addLog(`💎 水晶シャードに大幅軽減された！`);
     }
+    
+    // 十字の二連撃が当たってから HP を減らす
+    await this.playAnimation('playerAttack_combo');
+    if (this.isBattleOver()) return;
     
     const newHP = Math.max(0, this.enemy.getHP() - finalDamage);
     this.enemy.setHP(newHP);
@@ -187,9 +203,11 @@ export class BattleScene14 extends BattleScene {
     this.executeWhileLoop();
   }
 
-  executeWhileLoop() {
+  async executeWhileLoop() {
     if (this.golemState.crystalShards > 0 && !this.battleEnded) {
-      this.breakCrystal();
+      // 水晶を打ち終わってから次のループへ進む
+      await this.breakCrystal();
+      if (this.isBattleOver()) return;
       
       // 次のループを500ms後に実行
       this.time.delayedCall(500, () => {
@@ -200,7 +218,7 @@ export class BattleScene14 extends BattleScene {
     }
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     // 水晶再生の判定
@@ -212,17 +230,22 @@ export class BattleScene14 extends BattleScene {
       return;
     }
     
+    // 技ごとの演出（ビームは光線、プリズムは魔法陣からの光弾、リフレクションストライクは地面を割る一撃）
     const attacks = [
-      { id: 'crystal_beam', name: 'クリスタルビーム' },
-      { id: 'prism_attack', name: 'プリズム攻撃' },
-      { id: 'reflection_strike', name: 'リフレクションストライク' }
+      { id: 'crystal_beam', name: 'クリスタルビーム', animation: 'enemyAttack_beam' },
+      { id: 'prism_attack', name: 'プリズム攻撃', animation: 'enemyAttack_magic' },
+      { id: 'reflection_strike', name: 'リフレクションストライク', animation: 'enemyAttack_earth' }
     ];
     const attack = attacks[Math.floor(Math.random() * attacks.length)];
     const baseDamage = 18;
     const damage = baseDamage + this.golemState.crystalShards * 2; // 水晶数でダメージ増加
     
-    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.setName('クリスタルゴーレム');
+    // 技の演出が当たってから攻撃名を出し、HP を減らす
+    await this.playAnimation(attack.animation);
+    if (this.isBattleOver()) return;
+    
+    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.displayAttack(attack.name, damage);
     
     const newPlayerHP = Math.max(0, this.player.getHP() - damage);

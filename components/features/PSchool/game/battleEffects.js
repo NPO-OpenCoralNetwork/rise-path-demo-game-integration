@@ -425,13 +425,14 @@ export function magicCircle(scene, x, y, { radius = 70, color = 0x8fd3ff, flatte
 
 /** 画面をゆらす（動きを減らす設定では揺らさない）。 */
 export function shake(scene, duration, intensity) {
-  if (reducedMotion()) return;
+  // 演出の途中で画面を離れるとカメラがなくなる
+  if (reducedMotion() || !scene.cameras?.main) return;
   scene.cameras.main.shake(duration, intensity);
 }
 
 /** 画面全体を一瞬光らせる（動きを減らす設定では出さない）。 */
 export function flashScreen(scene, duration, r, g, b) {
-  if (reducedMotion()) return;
+  if (reducedMotion() || !scene.cameras?.main) return;
   scene.cameras.main.flash(duration, r, g, b);
 }
 

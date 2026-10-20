@@ -5,7 +5,7 @@
 // ダメージの数字が命中とほぼ同時に出る。
 // 大きさはキャラクターの表示の高さから決めるので、ステージ1（元の配置）でも新しい画像のステージでも合う。
 
-import { castPose, hitReact, lunge, restoreTint } from './characterMotion.js';
+import { castPose, dodge, hitReact, lunge, restoreTint } from './characterMotion.js';
 import {
   beam, burst, clawMarks, dimScreen, drawLightning, ensureFxTextures, fadeAndDestroy, flashScreen, glowPop,
   magicCircle, orb, progress, projectile, reducedMotion, shake, shockRing, slashArc, stopTrail, trail, wait,
@@ -23,8 +23,11 @@ const WIND = [0x9dffcf, 0xe6fff4, 0x5fe0a8];
 const EARTH = [0x9b7b52, 0xc9a77a, 0x6b5235];
 const DIGITAL = [0x39ff88, 0x2ad1ff, 0xd6ffe6];
 
-/** 主人公と敵の位置と大きさ（スプライトが読み込めずに図形で代用されていても動くように）。 */
-function anchors(scene) {
+/**
+ * 主人公と敵の位置と大きさ（スプライトが読み込めずに図形で代用されていても動くように）。
+ * opts.dodge が true なら、敵は攻撃をよける（enemyReact を参照）。
+ */
+function anchors(scene, opts = {}) {
   const P = scene.playerSprite;
   const E = scene.enemySprite;
   const { width, height } = scene.scale;
@@ -38,6 +41,7 @@ function anchors(scene) {
   const ey = E?.y ?? height * 0.6;
   return {
     P, E, ph, pw, eh, ew,
+    dodge: Boolean(opts.dodge),
     hero: { x: px, y: py },
     enemy: { x: ex, y: ey },
     // 杖の先（主人公の絵は右手で杖を掲げている）
@@ -148,6 +152,12 @@ function heroHit(scene, a, { colors, tint, size = 140, sparks = 16, distance = 2
   shake(scene, shakeMs, shakeAmount);
 }
 
+/** 敵が攻撃を受ける。よける敵（ステージ9の影など）なら、薄くなって横へすべる。 */
+function enemyReact(scene, a, opts) {
+  if (a.dodge) return dodge(scene, a.E, { direction: 1, distance: a.ew * 0.2 });
+  return hitReact(scene, a.E, opts);
+}
+
 /** 敵が少し前に出てから戻る（飛び道具や息を放つ前の動き）。 */
 function enemyWindup(scene, a, distance = 0.08) {
   return lunge(scene, a.E, { direction: -1, distance: Math.max(30, (a.enemy.x - a.hero.x) * distance) });
@@ -204,8 +214,8 @@ async function lightningStrike(scene, { from, to, width }) {
 
 export const BATTLE_ANIMATIONS = {
   /** 主人公の攻撃：踏み込んで斜めの斬撃、火花、敵ののけぞり。 */
-  async playerAttack(scene) {
-    const a = anchors(scene);
+  async playerAttack(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.P, {
       direction: 1,
       distance: Math.max(60, (a.enemy.x - a.hero.x) * 0.3),
@@ -216,15 +226,15 @@ export const BATTLE_ANIMATIONS = {
         scene.time.delayedCall(40, () => diagonalSlash(scene, a.enemy.x + 10 * a.se, a.enemy.y - 14 * a.se, { length: length * 0.85, color: 0xffffff, width: 4 * a.se }));
         impactFlash(scene, a.enemy.x, a.enemy.y, { colors: [0xfff3b0, 0xbfe9ff], size: 150 * a.se, sparks: 18 });
         dust(scene, a.enemyFeet.x, a.enemyFeet.y, a.se);
-        hitReact(scene, a.E, { direction: 1 });
+        enemyReact(scene, a, { direction: 1 });
         shake(scene, 110, 0.006);
       },
     });
   },
 
   /** 主人公の連続攻撃（会心・連携など）：踏み込んで十字に二度斬る。 */
-  async playerAttack_combo(scene) {
-    const a = anchors(scene);
+  async playerAttack_combo(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.P, {
       direction: 1,
       distance: Math.max(70, (a.enemy.x - a.hero.x) * 0.34),
@@ -238,15 +248,15 @@ export const BATTLE_ANIMATIONS = {
         });
         impactFlash(scene, a.enemy.x, a.enemy.y, { colors: [0xfff3b0, 0xffd75a], size: 140 * a.se, sparks: 14, ring: false });
         dust(scene, a.enemyFeet.x, a.enemyFeet.y, a.se);
-        hitReact(scene, a.E, { direction: 1, distance: 30, tint: 0xffd75a });
+        enemyReact(scene, a, { direction: 1, distance: 30, tint: 0xffd75a });
       },
     });
     await wait(scene, 120);
   },
 
   /** 攻撃が防がれる（装甲・盾）：斬撃が金属に当たって火花を散らし、敵はびくともしない。 */
-  async playerAttack_blocked(scene) {
-    const a = anchors(scene);
+  async playerAttack_blocked(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.P, {
       direction: 1,
       distance: Math.max(60, (a.enemy.x - a.hero.x) * 0.3),
@@ -264,8 +274,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の攻撃：踏み込んで爪あと、赤い火花、主人公ののけぞり。 */
-  async enemyAttack(scene) {
-    const a = anchors(scene);
+  async enemyAttack(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.E, {
       direction: -1,
       distance: Math.max(60, (a.enemy.x - a.hero.x) * 0.3),
@@ -278,8 +288,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の剣の攻撃：踏み込んで斜めに斬る。 */
-  async enemyAttack_sword(scene) {
-    const a = anchors(scene);
+  async enemyAttack_sword(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.E, {
       direction: -1,
       distance: Math.max(60, (a.enemy.x - a.hero.x) * 0.32),
@@ -292,8 +302,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 炎の魔法：魔法陣と溜め → 火の玉が火の粉を引いて飛ぶ → 爆発と煙。 */
-  async magic_fire(scene) {
-    const a = anchors(scene);
+  async magic_fire(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: FIRE[0], core: 0xfff0c0 });
     endSpell(scene, charge);
     await projectile(scene, a.hand, a.enemy, {
@@ -301,14 +311,14 @@ export const BATTLE_ANIMATIONS = {
       trailConfig: { tint: FIRE, scale: [0.42 * a.sp, 0], lifespan: 380, gravityY: -70, speed: [10, 50] },
     });
     explosion(scene, a.enemy.x, a.enemy.y, a.se);
-    hitReact(scene, a.E, { direction: 1, distance: 26, tint: 0xff5a1a });
+    enemyReact(scene, a, { direction: 1, distance: 26, tint: 0xff5a1a });
     shake(scene, 220, 0.012);
     await wait(scene, 160);
   },
 
   /** 氷の魔法（攻撃）：氷のかけらが次々に飛び、敵が凍りつく。 */
-  async magic_ice(scene) {
-    const a = anchors(scene);
+  async magic_ice(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: ICE[0], ms: 240 });
     endSpell(scene, charge);
     const flights = Array.from({ length: 5 }, async (_, i) => {
@@ -336,7 +346,7 @@ export const BATTLE_ANIMATIONS = {
     burst(scene, a.enemy.x, a.enemy.y - a.eh * 0.4, {
       count: 14, speed: [20, 70], angle: [60, 120], lifespan: [700, 1100], scale: [0.45, 0], tint: [0xffffff, ICE[0]], gravityY: 40,
     });
-    hitReact(scene, a.E, { direction: 1, distance: 16, tint: 0x8fe3ff });
+    enemyReact(scene, a, { direction: 1, distance: 16, tint: 0x8fe3ff });
     shake(scene, 140, 0.006);
     await wait(scene, 140);
   },
@@ -345,8 +355,8 @@ export const BATTLE_ANIMATIONS = {
    * 氷の盾（防御）：主人公の前に氷の壁が立ち上がる。
    * 盾で攻撃を防ぐステージ（keepsIceShield）では、防ぐまで薄く残し、shield_block で砕く。
    */
-  async ice_shield(scene) {
-    const a = anchors(scene);
+  async ice_shield(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: ICE[0], ms: 220 });
     endSpell(scene, charge);
     const old = scene.iceShieldWall;
@@ -369,8 +379,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 氷の盾が攻撃を防ぐ（ステージ4）：敵の炎が盾に当たり、盾が砕ける。主人公は無傷。 */
-  async shield_block(scene) {
-    const a = anchors(scene);
+  async shield_block(scene, opts) {
+    const a = anchors(scene, opts);
     let wall = scene.iceShieldWall;
     scene.iceShieldWall = null;
     if (wall?.g?.scene) {
@@ -388,8 +398,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 雷の魔法：空が暗くなり、雷雲から稲妻が二度光って落ちる。 */
-  async magic_thunder(scene) {
-    const a = anchors(scene);
+  async magic_thunder(scene, opts) {
+    const a = anchors(scene, opts);
     const veil = dimScreen(scene, { alpha: 0.42 });
     const clouds = [-1, 0, 1].map((k) => {
       const c = scene.add.image(a.enemy.x + k * a.ew * 0.35, 0, 'fx-glow').setTint(0x1c1c33).setAlpha(0);
@@ -407,7 +417,7 @@ export const BATTLE_ANIMATIONS = {
     impactFlash(scene, a.enemy.x, a.enemy.y, { colors: THUNDER, size: 180 * a.se, sparks: 26 });
     shockRing(scene, a.enemyFeet.x, a.enemyFeet.y, { radius: a.ew * 0.4, color: THUNDER[0], flatten: 0.3, duration: 460 });
     burst(scene, a.enemyFeet.x, a.enemyFeet.y, { count: 12, speed: [200, 420], angle: [200, 340], lifespan: [250, 450], scale: [0.6, 0], tint: THUNDER, gravityY: 600 });
-    hitReact(scene, a.E, { direction: 1, distance: 20, tint: 0xfff27a });
+    enemyReact(scene, a, { direction: 1, distance: 20, tint: 0xfff27a });
     shake(scene, 260, 0.016);
     fadeAndDestroy(scene, clouds, { duration: 420, delay: 120 });
     veil.lift(420);
@@ -415,8 +425,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 水の魔法：水の玉がしずくを引いて飛び、水しぶきと泡が上がる。 */
-  async magic_water(scene) {
-    const a = anchors(scene);
+  async magic_water(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: WATER[0], core: 0xe6f6ff });
     endSpell(scene, charge);
     await projectile(scene, a.hand, a.enemy, {
@@ -424,14 +434,14 @@ export const BATTLE_ANIMATIONS = {
       trailConfig: { texture: 'fx-drop', tint: WATER, scale: [0.9 * a.sp, 0.3], lifespan: 420, gravityY: 520, speed: [10, 60], alpha: [0.9, 0], blend: 'NORMAL' },
     });
     splash(scene, a.enemy, a.enemyFeet, a.eh, a.ew, a.se);
-    hitReact(scene, a.E, { direction: 1, distance: 22, tint: 0x4aa8ff });
+    enemyReact(scene, a, { direction: 1, distance: 22, tint: 0x4aa8ff });
     shake(scene, 160, 0.008);
     await wait(scene, 160);
   },
 
   /** ライデン（水と雷の合わせ技）：水の渦で敵を包み、そこへ稲妻が落ちて水ごと光る。 */
-  async magic_raiden(scene) {
-    const a = anchors(scene);
+  async magic_raiden(scene, opts) {
+    const a = anchors(scene, opts);
     const veil = dimScreen(scene, { alpha: 0.38 });
     const charge = await chargeSpell(scene, a, { color: WATER[0], core: 0xfff9c4, ms: 300 });
     endSpell(scene, charge);
@@ -455,15 +465,15 @@ export const BATTLE_ANIMATIONS = {
       const spark = drawLightning(scene, a.enemy.x, a.enemy.y, a.enemy.x + Math.cos(angle) * reach, a.enemy.y + Math.sin(angle) * reach * 0.7, { width: 3 * a.se, branches: 0 });
       fadeAndDestroy(scene, spark, { duration: 180, delay: 60 + i * 40 });
     }
-    hitReact(scene, a.E, { direction: 1, distance: 28, tint: 0xfff27a });
+    enemyReact(scene, a, { direction: 1, distance: 28, tint: 0xfff27a });
     shake(scene, 300, 0.018);
     veil.lift(420);
     await wait(scene, 200);
   },
 
   /** 閃光の魔法：杖の光が一気に広がり、敵から光の筋が放たれる。 */
-  async magic_flash(scene) {
-    const a = anchors(scene);
+  async magic_flash(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: 0xfff6c8, ms: 320 });
     endSpell(scene, charge);
     flashScreen(scene, 160, 255, 255, 235);
@@ -479,14 +489,14 @@ export const BATTLE_ANIMATIONS = {
     scene.tweens.add({ targets: rays, scaleX: 1.25, scaleY: 1.25, rotation: 0.35, alpha: 0, duration: 520, ease: 'Cubic.easeOut', onComplete: () => rays.destroy() });
     glowPop(scene, a.enemy.x, a.enemy.y, { size: a.eh * 1.6, color: 0xffffff, duration: 420 });
     burst(scene, a.enemy.x, a.enemy.y, { count: 24, speed: scaled([180, 460], a.se), lifespan: [300, 600], scale: [0.7, 0], tint: [0xffffff, 0xfff1a0] });
-    hitReact(scene, a.E, { direction: 1, distance: 18, tint: 0xfff6b0 });
+    enemyReact(scene, a, { direction: 1, distance: 18, tint: 0xfff6b0 });
     shake(scene, 140, 0.008);
     await wait(scene, 200);
   },
 
   /** 麻痺の魔法：電気の玉が当たり、光の輪が敵を締めつけ、体に電気が走る。 */
-  async magic_paralyze(scene) {
-    const a = anchors(scene);
+  async magic_paralyze(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: THUNDER[0], core: 0xf0c8ff, ms: 260 });
     endSpell(scene, charge);
     await projectile(scene, a.hand, a.enemy, {
@@ -506,7 +516,7 @@ export const BATTLE_ANIMATIONS = {
       scene.tweens.add({ targets: g, scaleX: 1, scaleY: 1, alpha: 1, duration: 220, delay: i * 70, ease: 'Back.easeIn' });
       return g;
     });
-    hitReact(scene, a.E, { direction: 1, distance: 10, tint: 0xfff27a });
+    enemyReact(scene, a, { direction: 1, distance: 10, tint: 0xfff27a });
     // 体に細い電気がぱちぱち走る
     for (let i = 0; i < 6; i += 1) {
       await wait(scene, 70);
@@ -520,8 +530,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 回復の魔法：緑の魔法陣、光の柱、十字のきらめきが舞い上がる。 */
-  async healing(scene) {
-    const a = anchors(scene);
+  async healing(scene, opts) {
+    const a = anchors(scene, opts);
     const charge = await chargeSpell(scene, a, { color: HEAL[0], core: 0xf2fff4, ms: 240 });
     const column = scene.add.image(a.hero.x, a.hero.y, 'fx-glow').setTint(HEAL[0]).setBlendMode('ADD').setAlpha(0);
     column.setDisplaySize(a.pw * 0.9, a.ph * 1.5);
@@ -543,8 +553,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の毒攻撃：毒の玉を三つ吐き、主人公に毒のしぶきと泡がまとわりつく。 */
-  async enemyAttack_poison(scene) {
-    const a = anchors(scene);
+  async enemyAttack_poison(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyWindup(scene, a);
     const globs = [0, 1, 2].map(async (i) => {
       await wait(scene, i * 90);
@@ -565,9 +575,36 @@ export const BATTLE_ANIMATIONS = {
     await wait(scene, 120);
   },
 
+  /** 毒がまわる（状態のダメージ）：主人公のまわりに毒の泡がわき、紫に染まる。敵は動かない。 */
+  async status_poison(scene, opts) {
+    const a = anchors(scene, opts);
+    glowPop(scene, a.hero.x, a.hero.y, { size: a.ph * 0.8, color: POISON[0], duration: 420, from: 0.6, to: 1.1, alpha: 0.8 });
+    burst(scene, a.hero.x, a.heroFeet.y - a.ph * 0.1, {
+      texture: 'fx-ring', count: 14, speed: [20, 60], angle: [240, 300], lifespan: [600, 1000], scale: [0.2, 0.6], alpha: [0.9, 0], tint: [POISON[0], POISON[1]], gravityY: -120,
+    });
+    burst(scene, a.hero.x, a.hero.y, { texture: 'fx-drop', count: 8, speed: [40, 120], angle: [200, 340], lifespan: [300, 500], scale: [0.5, 0.2], tint: POISON, gravityY: 600, blend: 'NORMAL' });
+    hitReact(scene, a.P, { direction: -1, distance: 8, tint: 0xb04dff });
+    await wait(scene, 380);
+  },
+
+  /** 敵の雷攻撃：主人公の頭上に雷雲がわき、稲妻が落ちる。 */
+  async enemyAttack_thunder(scene, opts) {
+    const a = anchors(scene, opts);
+    await enemyWindup(scene, a, 0.05);
+    const cloud = scene.add.image(a.hero.x, 0, 'fx-glow').setTint(0x1c1c33).setAlpha(0);
+    cloud.setDisplaySize(a.pw * 2.2, a.ph * 0.5);
+    scene.tweens.add({ targets: cloud, alpha: 0.9, y: a.ph * 0.1, duration: 240 });
+    await wait(scene, 240);
+    await lightningStrike(scene, { from: { x: a.hero.x + (Math.random() - 0.5) * 30, y: 0 }, to: a.hero, width: 10 * a.sp });
+    heroHit(scene, a, { colors: THUNDER, tint: 0xfff27a, size: 170, sparks: 22, shakeMs: 240, shakeAmount: 0.014 });
+    shockRing(scene, a.heroFeet.x, a.heroFeet.y, { radius: a.pw * 0.5, color: THUNDER[0], flatten: 0.3, duration: 420 });
+    fadeAndDestroy(scene, cloud, { duration: 360, delay: 120 });
+    await wait(scene, 160);
+  },
+
   /** 敵の炎攻撃：敵が身をかがめ、火の玉が主人公で爆発する。 */
-  async enemyAttack_fire(scene) {
-    const a = anchors(scene);
+  async enemyAttack_fire(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyShot(scene, a, {
       colors: FIRE, core: 0xfff0c0, size: 48,
       trailConfig: { tint: FIRE, scale: [0.42 * a.se, 0], lifespan: 360, gravityY: -70 },
@@ -579,8 +616,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の水攻撃：水の玉が主人公ではじける。 */
-  async enemyAttack_water(scene) {
-    const a = anchors(scene);
+  async enemyAttack_water(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyShot(scene, a, {
       colors: WATER, core: 0xe6f6ff, size: 42,
       trailConfig: { texture: 'fx-drop', tint: WATER, scale: [0.8 * a.se, 0.3], lifespan: 380, gravityY: 480, alpha: [0.9, 0], blend: 'NORMAL' },
@@ -592,8 +629,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の風攻撃：三日月形の風の刃が三つ飛んでくる。 */
-  async enemyAttack_wind(scene) {
-    const a = anchors(scene);
+  async enemyAttack_wind(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyWindup(scene, a);
     const blades = [0, 1, 2].map(async (i) => {
       await wait(scene, i * 80);
@@ -625,8 +662,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の地の攻撃：地面を割る衝撃が走り、主人公の足元から岩が突き上がる。 */
-  async enemyAttack_earth(scene) {
-    const a = anchors(scene);
+  async enemyAttack_earth(scene, opts) {
+    const a = anchors(scene, opts);
     await lunge(scene, a.E, { direction: -1, distance: 30 });
     shake(scene, 420, 0.012);
     // 敵から主人公へ、地面の上を土けむりと小石が走る
@@ -648,8 +685,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の咆哮：口元から衝撃の輪が何重にも広がり、主人公が押される。 */
-  async enemyAttack_roar(scene) {
-    const a = anchors(scene);
+  async enemyAttack_roar(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyWindup(scene, a, 0.05);
     for (let i = 0; i < 4; i += 1) {
       shockRing(scene, a.enemyFront.x, a.enemyFront.y, { radius: a.eh * 0.2, color: 0xffd0a0, width: 6, scale: 4.2, duration: 600, flatten: 0.8, alpha: 0.75 });
@@ -662,8 +699,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の魔法攻撃：魔法陣から紫の光弾が飛んでくる。 */
-  async enemyAttack_magic(scene) {
-    const a = anchors(scene);
+  async enemyAttack_magic(scene, opts) {
+    const a = anchors(scene, opts);
     const circle = magicCircle(scene, a.enemyFeet.x, a.enemyFeet.y, { radius: a.ew * 0.5, color: ARCANE[0], spin: 0.005 });
     glowPop(scene, a.enemyFront.x, a.enemyFront.y, { size: 90 * a.se, color: ARCANE[0], duration: 360, from: 0.2, to: 1 });
     await wait(scene, 260);
@@ -678,8 +715,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の光線：敵が光をため、まっすぐな光線が主人公を貫く。 */
-  async enemyAttack_beam(scene) {
-    const a = anchors(scene);
+  async enemyAttack_beam(scene, opts) {
+    const a = anchors(scene, opts);
     const glow = orb(scene, a.enemyFront.x, a.enemyFront.y, { size: 24 * a.se, color: ICE[0], core: 0xffffff });
     glow.parts.forEach((part) => {
       const full = part.scaleX;
@@ -694,8 +731,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵のデジタル攻撃：緑のコードの破片がノイズのように飛び、主人公の周りで弾ける。 */
-  async enemyAttack_digital(scene) {
-    const a = anchors(scene);
+  async enemyAttack_digital(scene, opts) {
+    const a = anchors(scene, opts);
     await enemyWindup(scene, a, 0.05);
     const volleys = [0, 1, 2, 3].map(async (i) => {
       await wait(scene, i * 60);
@@ -725,8 +762,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** 敵の闇の攻撃：敵が影に溶け、闇の玉が主人公を包む。 */
-  async enemyAttack_shadow(scene) {
-    const a = anchors(scene);
+  async enemyAttack_shadow(scene, opts) {
+    const a = anchors(scene, opts);
     if (a.E?.setAlpha) scene.tweens.add({ targets: a.E, alpha: 0.35, duration: 180, yoyo: true, hold: 360 });
     const darkOrb = orb(scene, a.enemyFront.x, a.enemyFront.y, { size: 40 * a.se, color: SHADOW[0], core: SHADOW[2] });
     const smoke = trail(scene, darkOrb.center, { tint: [0x1a0833, 0x2a0f4d], scale: [0.6 * a.se, 1.1 * a.se], lifespan: 420, alpha: [0.7, 0], blend: 'NORMAL', speed: [5, 30] });
@@ -752,8 +789,8 @@ export const BATTLE_ANIMATIONS = {
   },
 
   /** ボスの攻撃：赤い気をため、大きく踏み込んで十字に斬る。 */
-  async enemyAttack_boss(scene) {
-    const a = anchors(scene);
+  async enemyAttack_boss(scene, opts) {
+    const a = anchors(scene, opts);
     const veil = dimScreen(scene, { color: 0x1a0000, alpha: 0.35 });
     const circle = magicCircle(scene, a.enemyFeet.x, a.enemyFeet.y, { radius: a.ew * 0.6, color: 0xff2a2a, spin: 0.006 });
     glowPop(scene, a.enemy.x, a.enemy.y, { size: a.eh * 1.3, color: 0xff2a2a, duration: 520, from: 1, to: 1.3, alpha: 0.7 });
@@ -801,8 +838,10 @@ export async function playBattleAnimation(scene, type) {
     return false;
   }
   ensureFxTextures(scene);
+  // よける敵（ステージ9の影など）は、シーンがその攻撃をよけるかを答える
+  const dodges = typeof scene.enemyDodges === 'function' && Boolean(scene.enemyDodges(type));
   try {
-    await run(scene);
+    await run(scene, { dodge: dodges });
   } catch (error) {
     // 演出の失敗で戦闘を止めない
     console.warn(`[battleAnimations] ${type}`, error);

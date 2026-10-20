@@ -140,6 +140,17 @@ export function hitReact(scene, sprite, { direction = 1, distance = 22, tint = 0
   });
 }
 
+/** 攻撃をよける：薄くなって direction の向きへすべり、元の位置に戻る。 */
+export function dodge(scene, sprite, { direction = 1, distance = 60 } = {}) {
+  if (!isSprite(sprite)) return Promise.resolve();
+  return withoutIdle(scene, sprite, async () => {
+    const reduced = reducedMotion();
+    const { x, alpha } = sprite;
+    await play(scene, { targets: sprite, x: x + direction * (reduced ? distance * 0.3 : distance), alpha: alpha * 0.3, duration: 120, ease: 'Quad.easeOut' });
+    await play(scene, { targets: sprite, x, alpha, duration: reduced ? 160 : 320, ease: 'Sine.easeInOut' });
+  });
+}
+
 /** 魔法を唱える：足元に光の輪が広がり、少し浮いて戻る。 */
 export function castPose(scene, sprite, { color = 0x8fd3ff } = {}) {
   if (!isSprite(sprite)) return Promise.resolve();

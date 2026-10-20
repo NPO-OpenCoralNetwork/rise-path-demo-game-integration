@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { BattleScene } from "./battle";
+import { settled } from "./characterMotion";
 
 // ステージ7「雷の力」用のバトルシーン
 export class BattleScene7 extends BattleScene {
@@ -81,7 +82,11 @@ export class BattleScene7 extends BattleScene {
   }
 
   // ライデン魔法で装甲を破壊
-  applyRaidenEffect() {
+  async applyRaidenEffect() {
+    // 水と雷の演出（装甲があってもなくても同じ魔法が当たる）
+    await this.playAnimation('magic_raiden');
+    if (this.isBattleOver()) return;
+
     if (this.armorMode) {
       this.armorHealth--;
       
@@ -91,6 +96,10 @@ export class BattleScene7 extends BattleScene {
         this.addLog(`✅ ${this.settings.enemy}に通常ダメージが通るようになった！`);
         // this.updateArmorDisplay();
         
+        // のけぞりが終わってから砕く（のけぞりの最後に元の色へ戻り、灰色が消えるため）
+        await settled(this.enemySprite);
+        if (this.isBattleOver()) return;
+
         // 装甲破壊エフェクト
         this.cameras.main.flash(300, 255, 255, 0);
         this.cameras.main.shake(400, 0.02);
@@ -102,12 +111,9 @@ export class BattleScene7 extends BattleScene {
         // this.updateArmorDisplay();
       }
     } else {
-      // 装甲破壊後は通常のライデンダメージ＋エフェクト
+      // 装甲破壊後は通常のライデンダメージ
       const damage = 35;
       this.addLog(`⚡ ライデン！${damage}ダメージ！`);
-      
-      // ライデンエフェクト
-      this.playRaidenEffect();
       
       this.enemy.hp -= damage;
       this.updateHP(this.player.hp, this.enemy.hp);
@@ -118,98 +124,21 @@ export class BattleScene7 extends BattleScene {
     }
   }
 
-  // ライデン専用エフェクト
-  playRaidenEffect() {
-    // 水色の波動エフェクト（水魔法の要素）
-    const waterWave = this.add.graphics();
-    waterWave.fillStyle(0x00bfff, 0.7);
-    waterWave.fillCircle(this.playerSprite.x, this.playerSprite.y, 40);
-    
-    this.tweens.add({
-      targets: waterWave,
-      scale: 2,
-      alpha: 0,
-      duration: 400,
-      onComplete: () => waterWave.destroy()
-    });
-    
-    // 雷の稲妻エフェクト
-    setTimeout(() => {
-      for (let i = 0; i < 5; i++) {
-        const lightning = this.add.graphics();
-        lightning.lineStyle(3, 0xffff00, 1);
-        
-        const startX = this.playerSprite.x + (Math.random() * 60 - 30);
-        const startY = this.playerSprite.y - 50;
-        const endX = this.enemySprite.x + (Math.random() * 40 - 20);
-        const endY = this.enemySprite.y;
-        
-        // ジグザグの雷
-        lightning.beginPath();
-        lightning.moveTo(startX, startY);
-        const segments = 4;
-        for (let s = 1; s <= segments; s++) {
-          const x = startX + (endX - startX) * (s / segments) + (Math.random() * 20 - 10);
-          const y = startY + (endY - startY) * (s / segments);
-          lightning.lineTo(x, y);
-        }
-        lightning.strokePath();
-        
-        this.tweens.add({
-          targets: lightning,
-          alpha: 0,
-          duration: 200,
-          delay: i * 50,
-          onComplete: () => lightning.destroy()
-        });
-      }
-      
-      // 敵への着弾エフェクト
-      const impact = this.add.graphics();
-      impact.fillStyle(0xffff00, 0.9);
-      impact.fillCircle(this.enemySprite.x, this.enemySprite.y, 50);
-      impact.fillStyle(0x00bfff, 0.7);
-      impact.fillCircle(this.enemySprite.x, this.enemySprite.y, 30);
-      
-      this.tweens.add({
-        targets: impact,
-        scale: 1.5,
-        alpha: 0,
-        duration: 500,
-        onComplete: () => impact.destroy()
-      });
-      
-      // 敵のティント
-      this.enemySprite.setTint(0xffff00);
-      setTimeout(() => this.enemySprite.setTint(0x808080), 300);
-      
-      // カメラエフェクト
-      this.cameras.main.shake(300, 0.015);
-      this.cameras.main.flash(100, 255, 255, 0);
-    }, 300);
-  }
-
   // プレイヤーの攻撃を処理（装甲中は無効化）
   async playerAttack(damage) {
     if (this.armorMode) {
+      // 斬撃が装甲に弾かれて火花が散る（敵はびくともしない）
+      await this.playAnimation('playerAttack_blocked');
+      if (this.isBattleOver()) return 0;
+
       this.addLog('🛡️ 装甲に弾かれた！ダメージなし！');
-      
-      // 弾かれるエフェクト
-      const spark = this.add.graphics();
-      spark.fillStyle(0xffff00, 1);
-      spark.fillCircle(this.enemySprite.x, this.enemySprite.y, 20);
-      
-      this.tweens.add({
-        targets: spark,
-        alpha: 0,
-        scale: 2,
-        duration: 300,
-        onComplete: () => spark.destroy()
-      });
       
       return 0; // ダメージなし
     } else {
-      // 装甲破壊後は通常ダメージ
+      // 装甲破壊後は通常ダメージ（斬撃が当たってから HP を減らす）
+      await this.playAnimation('playerAttack');
+      if (this.isBattleOver()) return 0;
+
       this.addLog(`⚔️ 攻撃！${damage}ダメージ！`);
       this.enemy.hp -= damage;
       this.updateHP(this.player.hp, this.enemy.hp);
@@ -224,6 +153,7 @@ export class BattleScene7 extends BattleScene {
 
   // 敵のターン処理
   async enemyTurn() {
+    // 体当たり：大きく踏み込んでぶつかる
     await this.playAnimation('enemyAttack');
     
     const damage = 10;

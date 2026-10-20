@@ -210,7 +210,7 @@ export class BattleScene16 extends BattleScene {
     this.time.delayedCall(1000, () => this.enemyAction());
   }
 
-  timingAttack() {
+  async timingAttack() {
     if (this.mirrorState.isCounterActive) {
       // カウンター中に攻撃 - 跳ね返される
       const reflectedDamage = 25;
@@ -218,7 +218,14 @@ export class BattleScene16 extends BattleScene {
       this.mirrorState.totalReflections++;
       this.variables.reflection_count++;
       
+      // 斬撃が鏡の鎧にはね返される（敵はびくともしない）
+      await this.playAnimation('playerAttack_blocked');
+      if (this.isBattleOver()) return;
       this.addLog('❌ カウンター中に攻撃！跳ね返されました！');
+      
+      // 反撃の斬撃が当たってから HP を減らす
+      await this.playAnimation('enemyAttack_sword');
+      if (this.isBattleOver()) return;
       this.addLog(`💥 反射ダメージ: ${reflectedDamage}`);
       
       const newPlayerHP = Math.max(0, this.player.getHP() - reflectedDamage);
@@ -240,6 +247,10 @@ export class BattleScene16 extends BattleScene {
         this.addLog('⚔️ 通常攻撃！');
       }
       
+      // 斬撃が当たってから HP を減らす（隙を突いた一撃は十字の二連撃）
+      await this.playAnimation(this.mirrorState.vulnerablePhase ? 'playerAttack_combo' : 'playerAttack');
+      if (this.isBattleOver()) return;
+      
       const newHP = Math.max(0, this.enemy.getHP() - damage);
       this.enemy.setHP(newHP);
       this.addLog(`攻撃！ミラーナイトに ${damage} のダメージ！`);
@@ -256,15 +267,20 @@ export class BattleScene16 extends BattleScene {
     this.time.delayedCall(1000, () => this.enemyAction());
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
+    // どの技も剣の斬撃
     const attacks = ['ミラーブレード', '鏡像斬り', 'リフレクションスラッシュ'];
     const attackName = attacks[Math.floor(Math.random() * attacks.length)];
     const damage = 12 + Math.floor(Math.random() * 8);
     
-    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.setName('ミラーナイト');
+    // 剣の演出が当たってから攻撃名を出し、HP を減らす
+    await this.playAnimation('enemyAttack_sword');
+    if (this.isBattleOver()) return;
+    
+    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.displayAttack(attackName, damage);
     
     const newPlayerHP = Math.max(0, this.player.getHP() - damage);

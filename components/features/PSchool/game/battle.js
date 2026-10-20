@@ -127,6 +127,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create() {
+    // 勝ち負けの状態（restart では同じインスタンスが使われるので、ここで毎回戻す）
+    this.battleEnded = false;
+    this.resultShown = false;
+
     // バトル統計の初期化
     this.battleStats = {
       executionCount: 0,
@@ -580,7 +584,10 @@ export class BattleScene extends Phaser.Scene {
     const last = this.shownHP;
     this.shownHP = { player: playerHP, enemy: enemyHP };
     if (!last || !this.hpNumbersReady || this.sys.settings.status >= Phaser.Scenes.SHUTDOWN) return;
-    [[this.playerSprite, playerHP - last.player], [this.enemySprite, enemyHP - last.enemy]].forEach(([sprite, change]) => {
+    // 敵の HP を別の数え方で表示するステージ（17 のスケルトン軍団）は、敵の数字を出さない（showEnemyHPNumbers = false）
+    const sides = [[this.playerSprite, playerHP - last.player]];
+    if (this.showEnemyHPNumbers !== false) sides.push([this.enemySprite, enemyHP - last.enemy]);
+    sides.forEach(([sprite, change]) => {
       if (!sprite?.scene || !Number.isFinite(change) || Math.round(change) === 0) return;
       const height = sprite.displayHeight || this.scale.height * 0.3;
       const size = Math.max(26, Math.min(44, height * 0.13));
@@ -889,6 +896,20 @@ export class BattleScene extends Phaser.Scene {
     playBattleAnimation(this, 'healing');
   }
 
+  // 戦闘が終わったか、画面を離れたか（演出を待ったあとに続けてよいかの確認に使う）
+  isBattleOver() {
+    return Boolean(this.battleEnded) || this.sys.settings.status >= Phaser.Scenes.SHUTDOWN;
+  }
+
+  // ステージ11以降の処理が呼ぶ勝ち負け（中身は gameOver と同じ）
+  playerWin() {
+    this.gameOver(true);
+  }
+
+  playerLose() {
+    this.gameOver(false);
+  }
+
   // ゲームオーバー処理
   gameOver(isVictory) {
     // 勝利か敗北かに応じて結果を表示
@@ -903,6 +924,11 @@ export class BattleScene extends Phaser.Scene {
 
   // 勝利時の処理
   async handleVictory() {
+    // ステージの処理とエンジンの両方から呼ばれることがあるので、結果は1回だけ出す
+    if (this.resultShown) return;
+    this.resultShown = true;
+    this.battleEnded = true;
+
     // バトル終了を通知
     if (typeof window.setBattleMode === 'function') {
       window.setBattleMode(false);
@@ -1134,6 +1160,11 @@ export class BattleScene extends Phaser.Scene {
 
   // 敗北時の処理
   handleDefeat() {
+    // ステージの処理とエンジンの両方から呼ばれることがあるので、結果は1回だけ出す
+    if (this.resultShown) return;
+    this.resultShown = true;
+    this.battleEnded = true;
+
     // バトル終了を通知
     if (typeof window.setBattleMode === 'function') {
       window.setBattleMode(false);
@@ -1284,6 +1315,9 @@ export class BattleScene extends Phaser.Scene {
       if (this.enemyHPText) {
         this.enemyHPText.setText(`HP: ${stageConfig.enemyHp}/${stageConfig.enemyHp}`);
       }
+      // HP 表示と、ダメージの数字の基準をステージの HP にそろえる（ここでは数字を出さない）
+      this.shownHP = null;
+      this.updateHP(this.player.hp, this.enemy.hp);
     }
     
     // ステージ開始メッセージ
@@ -1649,7 +1683,8 @@ export class BattleScene extends Phaser.Scene {
     // ステージ11以降でenemyActionメソッドが存在する場合はそれを呼び出す
     if (typeof this.enemyAction === 'function') {
       console.log('Calling this.enemyAction() (stage 11+)');
-      this.enemyAction();
+      // 敵の攻撃が当たって HP が減るまで待つ（エンジンはこのあとで負けを判定する）
+      await this.enemyAction();
     } else if (this.enemy && this.enemy.takeTurn) {
       // enemyActionが存在しない場合（ステージ1-10）はenemy.takeTurn()を呼び出す
       console.log('Calling enemy.takeTurn()');

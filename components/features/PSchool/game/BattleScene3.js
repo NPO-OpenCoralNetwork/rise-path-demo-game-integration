@@ -5,6 +5,8 @@ import { BattleScene } from './battle';
 export class BattleScene3 extends BattleScene {
   constructor() {
     super({ key: 'Stage3Battle' });
+    // 敵の攻撃の演出（アイスゴーレムは地面をたたき、岩を突き上げる）
+    this.enemyAttackAnimation = 'enemyAttack_earth';
     this.settings = {
       background: 'snow',
       enemy: 'アイスゴーレム',

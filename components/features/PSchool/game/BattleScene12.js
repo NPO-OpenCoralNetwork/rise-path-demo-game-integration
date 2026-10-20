@@ -92,6 +92,13 @@ export class BattleScene12 extends BattleScene {
       damage = 80; // 超高威力！必ず氷の盾で防御が必要
     }
     
+    // 技ごとの演出（咆哮は衝撃の輪、ペット連携は爪、野生の本能は赤い気をためた大技）
+    const attackAnimations = {
+      '獣の咆哮': 'enemyAttack_roar',
+      'ペット連携攻撃': 'enemyAttack',
+      '野生の本能': 'enemyAttack_boss'
+    };
+    
     // 連続同一攻撃でダメージ増加
     if (this.beastState.consecutiveSameAttack >= 2) {
       damage += 5;
@@ -109,18 +116,26 @@ export class BattleScene12 extends BattleScene {
     if (counterResult.success) {
       this.ui.log(`✨ プレイヤーが${attackName}に対応しました！`);
       
-      // 各魔法の効果を適用
+      // 各魔法の効果を適用（魔法の演出が当たってから HP を減らす）
       if (counterResult.usedSpell === '氷の盾') {
+        await this.playAnimation('ice_shield');
+        if (this.isBattleOver()) return;
         this.ui.log(`🛡️ 氷の盾が展開され、攻撃を完全に防ぎました！`);
       } else if (counterResult.usedSpell === '炎の魔法') {
+        await this.playAnimation('magic_fire');
+        if (this.isBattleOver()) return;
         this.ui.log(`🔥 炎の魔法で反撃！敵に15ダメージ！`);
         this.enemy.hp -= 15;
         this.updateHP(this.player.hp, this.enemy.hp);
       } else if (counterResult.usedSpell === '雷の魔法') {
+        await this.playAnimation('magic_thunder');
+        if (this.isBattleOver()) return;
         this.ui.log(`⚡ 雷の魔法で反撃！敵に12ダメージ！`);
         this.enemy.hp -= 12;
         this.updateHP(this.player.hp, this.enemy.hp);
       } else if (counterResult.usedSpell === '水の魔法') {
+        await this.playAnimation('magic_water');
+        if (this.isBattleOver()) return;
         this.ui.log(`💧 水の魔法で反撃！敵に10ダメージ！`);
         this.enemy.hp -= 10;
         this.updateHP(this.player.hp, this.enemy.hp);
@@ -138,8 +153,8 @@ export class BattleScene12 extends BattleScene {
     }
     
     // カウンター不成立の場合、通常通り攻撃を実行
-    // enemy.jsのperformAttackメソッドを使用
-    this.enemy.performAttack(attackName, damage);
+    // enemy.jsのperformAttackメソッドを使用（技に合った演出が当たってから HP が減る）
+    await this.enemy.performAttack(attackName, damage, attackAnimations[attackName]);
   }
   
   async checkPlayerCounter(attackName) {

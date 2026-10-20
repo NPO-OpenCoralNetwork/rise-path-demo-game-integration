@@ -1,5 +1,12 @@
 import { BattleScene } from './battle.js';
 
+// アームズマスターの武器ごとの演出（剣は斬撃、重い斧は赤い気をためた十字斬り、杖は魔法陣からの光弾）
+const MASTER_WEAPON_ANIMATIONS = {
+  sword: 'enemyAttack_sword',
+  axe: 'enemyAttack_boss',
+  staff: 'enemyAttack_magic'
+};
+
 // ステージ19「武器の強化」用のバトルシーン
 export class BattleScene19 extends BattleScene {
   constructor() {
@@ -236,30 +243,39 @@ export class BattleScene19 extends BattleScene {
     this.variables.combat_effectiveness = Math.floor((totalLevels / 15) * 100); // 最大15レベル(3武器×5レベル)
   }
 
-  playerAttack() {
+  async playerAttack() {
     const damage = this.getCurrentDamage();
     const weapon = this.weaponSystem.currentWeapon;
     
     // 武器タイプ別の特殊効果
     let finalDamage = damage;
     let effectMessage = '';
+    // 演出（剣は斬撃、会心と斧の重撃は十字の二連撃、杖は雷の魔法）
+    let animation = 'playerAttack';
     
     switch (weapon) {
       case 'sword':
         if (Math.random() < 0.2) {
           finalDamage = Math.floor(damage * 1.5);
           effectMessage = ' (クリティカル！)';
+          animation = 'playerAttack_combo';
         }
         break;
       case 'axe':
         finalDamage = Math.floor(damage * 1.2); // 常に高ダメージ
         effectMessage = ' (重撃！)';
+        animation = 'playerAttack_combo';
         break;
       case 'staff':
         // 魔法ダメージは防御無視
         effectMessage = ' (魔法攻撃！)';
+        animation = 'magic_thunder';
         break;
     }
+    
+    // 攻撃が当たってから HP を減らす
+    await this.playAnimation(animation);
+    if (this.isBattleOver()) return;
     
     const newHP = Math.max(0, this.enemy.getHP() - finalDamage);
     this.enemy.setHP(newHP);
@@ -275,7 +291,7 @@ export class BattleScene19 extends BattleScene {
     this.time.delayedCall(1000, () => this.enemyAction());
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     // アームズマスターの武器切り替え
@@ -306,8 +322,12 @@ export class BattleScene19 extends BattleScene {
         break;
     }
     
-    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.setName('アームズマスター');
+    // 今の武器の技の演出が当たってから攻撃名を出し、HP を減らす
+    await this.playAnimation(MASTER_WEAPON_ANIMATIONS[this.masterState.currentWeapon] || 'enemyAttack');
+    if (this.isBattleOver()) return;
+    
+    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.displayAttack(actionName, damage);
     
     const newPlayerHP = Math.max(0, this.player.getHP() - damage);

@@ -14,7 +14,8 @@ export class Enemy {
       
       // 敵攻撃アニメーションを再生
       if (this.scene && typeof this.scene.playAnimation === 'function') {
-        await this.scene.playAnimation('enemyAttack');
+        // ステージが enemyAttackAnimation で敵らしい攻撃の演出を選べる（なければ爪の攻撃）
+        await this.scene.playAnimation(this.scene.enemyAttackAnimation ?? 'enemyAttack');
       } else if (this.sprite) {
         // フォールバック: シンプルなエフェクト
         this.sprite.setTint(0xff0000);
