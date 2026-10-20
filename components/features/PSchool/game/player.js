@@ -90,7 +90,7 @@ export class Player {
       if (this.scene) {
         this.scene.iceShieldActive = true;
         if (typeof this.scene.playAnimation === 'function') {
-          await this.scene.playAnimation('magic_ice');
+          await this.scene.playAnimation('ice_shield');
         }
         this.ui.log('🛡️ 氷の盾が発動！次の攻撃を無効化します');
       }
@@ -121,7 +121,7 @@ export class Player {
     }
     // アニメーション再生（typeで判定）
     if (this.scene && typeof this.scene.playAnimation === 'function') {
-      const animationType = type === 'RAIDEN' ? 'magic_thunder' : `magic_${type.toLowerCase()}`;
+      const animationType = type === 'RAIDEN' ? 'magic_raiden' : `magic_${type.toLowerCase()}`;
       await this.scene.playAnimation(animationType);
     }
     // ダメージ処理

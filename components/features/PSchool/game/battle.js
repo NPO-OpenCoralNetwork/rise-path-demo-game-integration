@@ -5,7 +5,9 @@ import { UI } from "./ui";
 import { SpellBook } from "./SpellBook";
 import { filterBlocksByLevel, getAvailableBlocksByLevel, getNewlyUnlockedBlocks } from "./levelBlockRestrictions";
 import { ENEMY_MAX_WIDTH, FEET, ORIGINAL_LAYOUT, PLAYER_ART, stageArt } from "./stageArt";
-import { castPose, defeat, hitReact, lunge, settled, startIdle, stopIdle, victory } from "./characterMotion";
+import { defeat, settled, startIdle, stopIdle, victory } from "./characterMotion";
+import { playBattleAnimation } from "./battleAnimations";
+import { floatingNumber } from "./battleEffects";
 
 export class BattleScene extends Phaser.Scene {
   constructor(config) {
@@ -313,6 +315,8 @@ export class BattleScene extends Phaser.Scene {
     
     // UIとゲーム状態を初期化
     this.ui = new UI();
+    // 主人公の処理（回復など）が呼ぶ ui.updateHP を、画面の HP 表示につなぐ
+    this.ui.updateHP = (playerHP, enemyHP) => this.updateHP(playerHP, enemyHP);
     
     // このテキストオブジェクトを UI のログエリアとして割り当てる
     this.ui.logArea = this.add.text(this.scale.width * 0.16, this.scale.height * 0.84, '', { 
@@ -351,6 +355,11 @@ export class BattleScene extends Phaser.Scene {
       this.player.maxHp = 50;
     }
     
+    // 前の戦闘の HP を引き継がない。ステージごとの準備（敵の HP の設定など）は create の中で済むので、
+    // 最初のフレームまでの HP の変化には数字を出さない
+    this.shownHP = null;
+    this.hpNumbersReady = false;
+    this.events.once('update', () => { this.hpNumbersReady = true; });
     this.updateHP(playerHP, enemyHP);
     
     // レベル表示を追加
@@ -566,8 +575,24 @@ export class BattleScene extends Phaser.Scene {
     // DOM版に移行したため処理なし
   }
   
+  // HP が変わったら、減った量（または回復した量）をキャラクターの頭の上に出す
+  showHPChange(playerHP, enemyHP) {
+    const last = this.shownHP;
+    this.shownHP = { player: playerHP, enemy: enemyHP };
+    if (!last || !this.hpNumbersReady || this.sys.settings.status >= Phaser.Scenes.SHUTDOWN) return;
+    [[this.playerSprite, playerHP - last.player], [this.enemySprite, enemyHP - last.enemy]].forEach(([sprite, change]) => {
+      if (!sprite?.scene || !Number.isFinite(change) || Math.round(change) === 0) return;
+      const height = sprite.displayHeight || this.scale.height * 0.3;
+      const size = Math.max(26, Math.min(44, height * 0.13));
+      // 続けて出たときに重ならないよう、横に少しずらす
+      const x = sprite.x + (Math.random() - 0.5) * height * 0.25;
+      floatingNumber(this, x, sprite.y - height * 0.42, Math.abs(Math.round(change)), { kind: change > 0 ? 'heal' : 'damage', size });
+    });
+  }
+
   // HPバー更新 (DOM版)
   updateHP(playerHP, enemyHP) {
+    this.showHPChange(playerHP, enemyHP);
     const playerMaxHP = this.player?.maxHp || 100;
     const enemyMaxHP = this.enemy?.maxHp || 50;
     
@@ -808,647 +833,17 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // アニメーション再生
+  // アニメーション再生（演出の中身は battleAnimations.js）
   async playAnimation(animationType) {
     console.log(`Playing animation: ${animationType}`);
 
     // 前の演出（のけぞりなど）が終わってから始める。重なると位置がずれていくため
     await settled(this.playerSprite, this.enemySprite);
-
-    // アニメーションタイプに応じた処理
-    switch(animationType) {
-      case 'playerAttack': {
-        // 主人公がためてから踏み込み、踏み込みきった瞬間に斬撃と敵ののけぞりを出す
-        const reach = Math.max(60, (this.enemySprite.x - this.playerSprite.x) * 0.3);
-        await lunge(this, this.playerSprite, {
-          direction: 1,
-          distance: reach,
-          onImpact: () => {
-            const slash = this.add.graphics();
-            slash.lineStyle(4, 0xffffff, 1);
-
-            // 斬撃線（敵の大きさに合わせて広げる）
-            const size = Math.max(1, (this.enemySprite.displayHeight || 160) / 160);
-            for (let i = 0; i < 3; i++) {
-              const offset = i * 15 * size;
-              slash.beginPath();
-              slash.moveTo(this.enemySprite.x - 80 * size + offset, this.enemySprite.y - 60 * size + offset);
-              slash.lineTo(this.enemySprite.x + 60 * size + offset, this.enemySprite.y + 40 * size + offset);
-              slash.strokePath();
-            }
-
-            // 斬撃のフェードアウト
-            this.tweens.add({
-              targets: slash,
-              alpha: 0,
-              duration: 200,
-              onComplete: () => slash.destroy()
-            });
-
-            hitReact(this, this.enemySprite, { direction: 1 });
-            // 軽いカメラシェイクで打撃感を出す
-            this.cameras.main.shake(100, 0.005);
-          },
-        });
-        break;
-      }
-        
-      case 'magic_fire':
-        // 火の魔法エフェクト - 爆発的な炎の演出
-        castPose(this, this.playerSprite, { color: 0xff7a1a });
-
-        // カメラシェイク効果
-        this.cameras.main.shake(150, 0.005);
-        
-        // 魔法の詠唱エフェクト（プレイヤー周り）
-        const castFx = this.add.graphics();
-        castFx.fillStyle(0xff3300, 0.4);
-        castFx.fillCircle(this.playerSprite.x, this.playerSprite.y, 40);
-        
-        // 詠唱エフェクトのアニメーション
-        this.tweens.add({
-          targets: castFx,
-          alpha: 0,
-          scale: 1.5,
-          duration: 300,
-          onComplete: () => castFx.destroy()
-        });
-
-        // 敵に向かって飛んでいく火の弾
-        const fireball = this.add.graphics();
-        fireball.fillStyle(0xff3300, 0.8);
-        fireball.fillCircle(0, 0, 15);
-        
-        // 内側の明るい部分
-        fireball.fillStyle(0xffff00, 0.9);
-        fireball.fillCircle(0, 0, 8);
-        
-        // 火の粒子を追加
-        const particles = [];
-        for (let i = 0; i < 5; i++) {
-          const particle = this.add.graphics();
-          particle.fillStyle(0xff5500, 0.6);
-          particle.fillCircle(0, 0, 5);
-          particles.push(particle);
-        }
-
-        // 火の弾の軌道アニメーション
-        const path = new Phaser.Curves.Path(this.playerSprite.x, this.playerSprite.y);
-        path.cubicBezierTo(
-          this.enemySprite.x, this.enemySprite.y, 
-          this.playerSprite.x, this.playerSprite.y - 150,
-          (this.playerSprite.x + this.enemySprite.x) / 2, this.playerSprite.y - 100
-        );
-        
-        // 火の弾を移動
-        this.tweens.add({
-          targets: fireball,
-          x: this.enemySprite.x,
-          y: this.enemySprite.y,
-          duration: 600,
-          onUpdate: (tween, target) => {
-            const position = path.getPoint(tween.progress);
-            fireball.x = position.x;
-            fireball.y = position.y;
-            
-            // 粒子もランダムに動かす
-            particles.forEach((p, i) => {
-              p.x = position.x + Math.sin(tween.progress * 10 + i) * 10;
-              p.y = position.y + Math.cos(tween.progress * 10 + i) * 10;
-            });
-          },
-          onComplete: () => {
-            // 爆発エフェクト
-            fireball.destroy();
-            particles.forEach(p => p.destroy());
-            
-            // 大きな爆発を描画
-            const explosion = this.add.graphics();
-            explosion.fillStyle(0xff3300, 0.8);
-            explosion.fillCircle(this.enemySprite.x, this.enemySprite.y, 60);
-            
-            // 内側の白熱部分
-            explosion.fillStyle(0xffcc00, 0.9);
-            explosion.fillCircle(this.enemySprite.x, this.enemySprite.y, 40);
-            
-            explosion.fillStyle(0xffff00, 1);
-            explosion.fillCircle(this.enemySprite.x, this.enemySprite.y, 20);
-            
-            // 爆発によるカメラシェイク
-            this.cameras.main.shake(300, 0.01);
-            
-            // 爆発のフェードアウト
-            this.tweens.add({
-              targets: explosion,
-              alpha: 0,
-              scale: 1.5,
-              duration: 500,
-              onComplete: () => explosion.destroy()
-            });
-            
-            // 敵のダメージ演出（赤く光ってのけぞる）
-            hitReact(this, this.enemySprite, { direction: 1, distance: 26, tint: 0xff3300 });
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 1100));
-        break;
-        
-      case 'magic_ice':
-        // 氷の魔法エフェクト - より結晶的なアイスエフェクト
-        castPose(this, this.playerSprite, { color: 0x66e0ff });
-
-        // 魔法の詠唱エフェクト（プレイヤー周り）
-        const iceCastFx = this.add.graphics();
-        iceCastFx.fillStyle(0x00ffff, 0.4);
-        iceCastFx.fillCircle(this.playerSprite.x, this.playerSprite.y, 40);
-        
-        this.tweens.add({
-          targets: iceCastFx,
-          alpha: 0,
-          scale: 1.5,
-          duration: 300,
-          onComplete: () => iceCastFx.destroy()
-        });
-
-        // 氷の結晶を複数作成
-        const iceShards = [];
-        for (let i = 0; i < 6; i++) {
-          const shard = this.add.graphics();
-          
-          // 六角形の結晶を描く
-          shard.fillStyle(0x00ffff, 0.8);
-          shard.fillCircle(0, 0, 10);
-          
-          // 内側の明るい部分
-          shard.fillStyle(0xaaffff, 0.9);
-          shard.fillCircle(0, 0, 5);
-          
-          // 初期位置設定
-          shard.x = this.playerSprite.x;
-          shard.y = this.playerSprite.y;
-          
-          // 飛んでいく先の位置をランダムに少しずらす
-          const targetX = this.enemySprite.x + (Math.random() * 60 - 30);
-          const targetY = this.enemySprite.y + (Math.random() * 60 - 30);
-          
-          // アニメーション
-          this.tweens.add({
-            targets: shard,
-            x: targetX,
-            y: targetY,
-            scale: 1.5,
-            duration: 400 + i * 50,
-            ease: 'Cubic.easeOut',
-            onComplete: function() {
-              // 結晶が消える
-              this.tweens.add({
-                targets: shard,
-                alpha: 0,
-                scale: 0.5,
-                duration: 200,
-                onComplete: () => shard.destroy()
-              });
-            }.bind(this)
-          });
-          
-          iceShards.push(shard);
-        }
-        
-        // 氷結エフェクト
-        setTimeout(() => {
-          const freezeEffect = this.add.graphics();
-          
-          // 氷の結晶のパターン
-          freezeEffect.fillStyle(0x00ffff, 0.6);
-          freezeEffect.fillRect(this.enemySprite.x - 40, this.enemySprite.y - 40, 80, 80);
-          
-          freezeEffect.lineStyle(2, 0xaaffff, 0.8);
-          
-          // 結晶パターンを描く
-          for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const length = 50;
-            freezeEffect.lineBetween(
-              this.enemySprite.x, 
-              this.enemySprite.y, 
-              this.enemySprite.x + Math.cos(angle) * length,
-              this.enemySprite.y + Math.sin(angle) * length
-            );
-          }
-          
-          // 敵を青く染める
-          this.enemySprite.setTint(0x00ffff);
-          
-          // 氷結エフェクトのアニメーション
-          this.tweens.add({
-            targets: freezeEffect,
-            alpha: { from: 0.8, to: 0 },
-            duration: 800,
-            onComplete: () => {
-              freezeEffect.destroy();
-              this.enemySprite.clearTint();
-            }
-          });
-        }, 400);
-        
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        break;
-        
-      case 'magic_thunder':
-        // 雷の魔法エフェクト - よりダイナミックな稲妻
-        castPose(this, this.playerSprite, { color: 0xffe14d });
-
-        // 魔法の詠唱エフェクト（プレイヤー周り）
-        const thunderCastFx = this.add.graphics();
-        thunderCastFx.fillStyle(0xffff00, 0.4);
-        thunderCastFx.fillCircle(this.playerSprite.x, this.playerSprite.y, 40);
-        
-        this.tweens.add({
-          targets: thunderCastFx,
-          alpha: 0,
-          scale: 1.5,
-          duration: 300,
-          onComplete: () => thunderCastFx.destroy()
-        });
-        
-        // 天候を暗く
-        const darkOverlay = this.add.graphics();
-        darkOverlay.fillStyle(0x000033, 0.5);
-        darkOverlay.fillRect(0, 0, this.scale.width, this.scale.height);
-        
-        // 雲が集まる演出
-        const cloud = this.add.graphics();
-        cloud.fillStyle(0x444466, 0.7);
-        cloud.fillRect(this.enemySprite.x - this.scale.width * 0.125, 0, this.scale.width * 0.25, this.scale.height * 0.167);
-        
-        // 雲のアニメーション
-        this.tweens.add({
-          targets: cloud,
-          y: 60,
-          alpha: 0.9,
-          duration: 400
-        });
-        
-        // 複数の稲妻を描画
-        setTimeout(() => {
-          // 閃光
-          this.cameras.main.flash(100, 255, 255, 180);
-          
-          // 大きな稲妻
-          const mainLightning = this.add.graphics();
-          mainLightning.lineStyle(8, 0xffffff, 1);
-          mainLightning.beginPath();
-          
-          // ジグザグの稲妻を描画 - より複雑なパターン
-          let x = this.enemySprite.x;
-          let y = 100;
-          const segments = 6;
-          mainLightning.moveTo(x, y);
-          
-          for (let i = 1; i <= segments; i++) {
-            const progress = i / segments;
-            const xOffset = (Math.random() * 60 - 30) * (1 - progress); // 下に行くほど収束
-            x = this.enemySprite.x + xOffset;
-            y = 100 + (this.enemySprite.y - 100) * progress;
-            mainLightning.lineTo(x, y);
-          }
-          
-          mainLightning.strokePath();
-          
-          // 中心の輝く部分
-          const coreLightning = this.add.graphics();
-          coreLightning.lineStyle(4, 0xffff99, 0.8);
-          coreLightning.lineBetween(
-            this.enemySprite.x, 100,
-            this.enemySprite.x, this.enemySprite.y
-          );
-          
-          // 分岐する小さな稲妻
-          const branches = [];
-          for (let i = 0; i < 4; i++) {
-            const branch = this.add.graphics();
-            branch.lineStyle(3, 0xffffff, 0.7);
-            
-            const startY = 100 + Math.random() * (this.enemySprite.y - 150);
-            const length = 30 + Math.random() * 60;
-            const angle = (Math.random() * Math.PI / 2) + Math.PI / 4;
-            
-            branch.beginPath();
-            branch.moveTo(this.enemySprite.x, startY);
-            branch.lineTo(
-              this.enemySprite.x + Math.cos(angle) * length,
-              startY + Math.sin(angle) * length
-            );
-            branch.strokePath();
-            
-            branches.push(branch);
-          }
-          
-          // 衝撃波エフェクト
-          const shockwave = this.add.graphics();
-          shockwave.lineStyle(2, 0xffff99, 0.8);
-          shockwave.strokeCircle(this.enemySprite.x, this.enemySprite.y, 30);
-          
-          // 衝撃波を拡大
-          this.tweens.add({
-            targets: shockwave,
-            scale: 2,
-            alpha: 0,
-            duration: 400,
-            onComplete: () => shockwave.destroy()
-          });
-          
-          // カメラシェイク
-          this.cameras.main.shake(300, 0.02);
-          
-          // 敵のダメージ演出（黄色く光ってのけぞる）
-          hitReact(this, this.enemySprite, { direction: 1, distance: 20, tint: 0xffff00 });
-
-          // 稲妻のフェードアウト
-          setTimeout(() => {
-            this.tweens.add({
-              targets: [mainLightning, coreLightning, ...branches],
-              alpha: 0,
-              duration: 200,
-              onComplete: () => {
-                mainLightning.destroy();
-                coreLightning.destroy();
-                branches.forEach(b => b.destroy());
-              }
-            });
-            
-            this.enemySprite.clearTint();
-          }, 200);
-          
-          // 暗さのフェードアウト
-          this.tweens.add({
-            targets: [darkOverlay, cloud],
-            alpha: 0,
-            duration: 500,
-            onComplete: () => {
-              darkOverlay.destroy();
-              cloud.destroy();
-            }
-          });
-        }, 500);
-        
-        await new Promise(resolve => setTimeout(resolve, 1300));
-        break;
-        
-      case 'enemyAttack': {
-        // 敵がためてから踏み込み、踏み込みきった瞬間に衝撃波・斬撃・主人公ののけぞりを出す
-        const reach = Math.max(60, (this.enemySprite.x - this.playerSprite.x) * 0.3);
-        await lunge(this, this.enemySprite, {
-          direction: -1,
-          distance: reach,
-          onImpact: () => {
-            // 攻撃エフェクト（衝撃波）。主人公の位置に置いて中心から広げる
-            const impact = this.add.graphics({ x: this.playerSprite.x, y: this.playerSprite.y });
-            impact.lineStyle(4, 0xff0000, 1);
-            impact.strokeCircle(0, 0, 30);
-
-            // 斬撃エフェクト
-            const enemySlash = this.add.graphics();
-            enemySlash.lineStyle(4, 0xff3333, 1);
-            for (let i = 0; i < 3; i++) {
-              const offset = i * 8;
-              enemySlash.beginPath();
-              enemySlash.moveTo(this.playerSprite.x + 30 - offset, this.playerSprite.y - 25 + offset);
-              enemySlash.lineTo(this.playerSprite.x - 25 - offset, this.playerSprite.y + 20 + offset);
-              enemySlash.strokePath();
-            }
-
-            // 衝撃波の拡大
-            this.tweens.add({
-              targets: impact,
-              scale: 2,
-              alpha: 0,
-              duration: 300,
-              onComplete: () => impact.destroy()
-            });
-
-            // 斬撃のフェードアウト
-            this.tweens.add({
-              targets: enemySlash,
-              alpha: 0,
-              duration: 200,
-              onComplete: () => enemySlash.destroy()
-            });
-
-            // 主人公ののけぞりとカメラシェイク
-            hitReact(this, this.playerSprite, { direction: -1, tint: 0xff4040 });
-            this.cameras.main.shake(200, 0.01);
-          },
-        });
-        break;
-      }
-        
-      case 'enemyAttack_poison':
-        // 毒攻撃エフェクト（ステージ6用）
-        const poisonEnemyOriginalX = this.enemySprite.x;
-        
-        this.tweens.add({
-          targets: this.enemySprite,
-          x: poisonEnemyOriginalX - 60,
-          duration: 200,
-          ease: 'Power2',
-          yoyo: true,
-          onComplete: () => {
-            // 毒の飛沫エフェクト
-            for (let i = 0; i < 8; i++) {
-              const droplet = this.add.graphics();
-              droplet.fillStyle(0x9900ff, 0.8);
-              droplet.fillCircle(0, 0, 6);
-              droplet.x = this.enemySprite.x;
-              droplet.y = this.enemySprite.y;
-              
-              const targetX = this.playerSprite.x + (Math.random() * 60 - 30);
-              const targetY = this.playerSprite.y + (Math.random() * 60 - 30);
-              
-              this.tweens.add({
-                targets: droplet,
-                x: targetX,
-                y: targetY,
-                alpha: 0,
-                duration: 400 + i * 50,
-                ease: 'Power2',
-                onComplete: () => droplet.destroy()
-              });
-            }
-            
-            // プレイヤーに毒エフェクト（紫に光ってのけぞる）
-            setTimeout(() => {
-              hitReact(this, this.playerSprite, { direction: -1, distance: 16, tint: 0x9900ff });
-              this.cameras.main.shake(150, 0.008);
-            }, 300);
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 700));
-        break;
-        
-      case 'enemyAttack_fire':
-        // 炎攻撃エフェクト（ステージ4用）
-        const fireEnemyOriginalX = this.enemySprite.x;
-        
-        this.tweens.add({
-          targets: this.enemySprite,
-          x: fireEnemyOriginalX - 50,
-          angle: -3,
-          duration: 150,
-          ease: 'Power2',
-          yoyo: true,
-          onComplete: () => {
-            // 炎の球
-            const fireball = this.add.graphics();
-            fireball.fillStyle(0xff6600, 0.9);
-            fireball.fillCircle(0, 0, 20);
-            fireball.fillStyle(0xffcc00, 0.8);
-            fireball.fillCircle(0, 0, 12);
-            fireball.x = this.enemySprite.x;
-            fireball.y = this.enemySprite.y;
-            
-            this.tweens.add({
-              targets: fireball,
-              x: this.playerSprite.x,
-              y: this.playerSprite.y,
-              duration: 300,
-              ease: 'Power2',
-              onComplete: () => {
-                fireball.destroy();
-                
-                // 爆発エフェクト
-                const explosion = this.add.graphics();
-                explosion.fillStyle(0xff3300, 0.8);
-                explosion.fillCircle(this.playerSprite.x, this.playerSprite.y, 50);
-                explosion.fillStyle(0xffcc00, 0.9);
-                explosion.fillCircle(this.playerSprite.x, this.playerSprite.y, 30);
-                
-                this.tweens.add({
-                  targets: explosion,
-                  alpha: 0,
-                  scale: 1.5,
-                  duration: 400,
-                  onComplete: () => explosion.destroy()
-                });
-                
-                hitReact(this, this.playerSprite, { direction: -1, distance: 26, tint: 0xff6600 });
-                this.cameras.main.shake(300, 0.015);
-              }
-            });
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
-        break;
-        
-      case 'enemyAttack_shadow':
-        // 闇の攻撃エフェクト（ステージ9用）
-        this.tweens.add({
-          targets: this.enemySprite,
-          alpha: 0.3,
-          duration: 200,
-          yoyo: true,
-          repeat: 1
-        });
-        
-        const darkWaveEffect = this.add.graphics();
-        darkWaveEffect.fillStyle(0x4B0082, 0.8);
-        darkWaveEffect.fillCircle(this.enemySprite.x, this.enemySprite.y, 20);
-        
-        this.tweens.add({
-          targets: darkWaveEffect,
-          x: this.playerSprite.x - this.enemySprite.x,
-          y: this.playerSprite.y - this.enemySprite.y,
-          scale: 3,
-          alpha: 0,
-          duration: 600,
-          ease: 'Power2',
-          onComplete: () => {
-            darkWaveEffect.destroy();
-            
-            const darkAura = this.add.graphics();
-            darkAura.fillStyle(0x000000, 0.7);
-            darkAura.fillCircle(this.playerSprite.x, this.playerSprite.y, 60);
-            
-            this.tweens.add({
-              targets: darkAura,
-              alpha: 0,
-              scale: 0.5,
-              duration: 500,
-              onComplete: () => darkAura.destroy()
-            });
-            
-            hitReact(this, this.playerSprite, { direction: -1, distance: 24, tint: 0x4b0082 });
-            this.cameras.main.shake(400, 0.02);
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        break;
-        
-      case 'enemyAttack_boss':
-        // ボス攻撃エフェクト（ステージ10用）
-        const bossOriginalX = this.enemySprite.x;
-        
-        const bossAura = this.add.graphics();
-        bossAura.fillStyle(0x8B0000, 0.5);
-        bossAura.fillCircle(this.enemySprite.x, this.enemySprite.y, 80);
-        
-        this.tweens.add({
-          targets: bossAura,
-          scale: 1.5,
-          alpha: 0,
-          duration: 500,
-          onComplete: () => bossAura.destroy()
-        });
-        
-        this.tweens.add({
-          targets: this.enemySprite,
-          x: bossOriginalX - 100,
-          duration: 200,
-          ease: 'Power3',
-          yoyo: true,
-          onComplete: () => {
-            for (let i = 0; i < 5; i++) {
-              const bossSlash = this.add.graphics();
-              bossSlash.lineStyle(5, 0xff0000, 1);
-              const angle = (i / 5) * Math.PI - Math.PI / 2;
-              bossSlash.beginPath();
-              bossSlash.moveTo(this.playerSprite.x, this.playerSprite.y);
-              bossSlash.lineTo(
-                this.playerSprite.x + Math.cos(angle) * 60,
-                this.playerSprite.y + Math.sin(angle) * 60
-              );
-              bossSlash.strokePath();
-              
-              this.tweens.add({
-                targets: bossSlash,
-                alpha: 0,
-                duration: 300,
-                delay: i * 50,
-                onComplete: () => bossSlash.destroy()
-              });
-            }
-            
-            hitReact(this, this.playerSprite, { direction: -1, distance: 34, tint: 0xff0000 });
-            this.cameras.main.shake(400, 0.025);
-            this.cameras.main.flash(100, 255, 0, 0);
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 900));
-        break;
-        
-      default:
-        console.log(`未知のアニメーションタイプ: ${animationType}`);
-        await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    
-    return true;
+    // 待つ間に戦闘が終わって画面を離れていたら、何も出さない
+    if (this.sys.settings.status >= Phaser.Scenes.SHUTDOWN) return false;
+    return playBattleAnimation(this, animationType);
   }
-  
+
   // 敵へのダメージ処理
   dealDamageToEnemy(damage, attackType = 'normal') {
     if (this.enemy) {
@@ -1489,91 +884,9 @@ export class BattleScene extends Phaser.Scene {
     return true;
   }
 
-  // 回復エフェクトを表示する
+  // 回復エフェクトを表示する（回復の魔法と同じ演出。待たずに進める）
   showHealEffect() {
-    // プレイヤースプライトの位置を取得
-    const x = this.playerSprite.x;
-    const y = this.playerSprite.y;
-    
-    // パーティクルの画像がない場合は、シェイプを代用
-    if (!this.textures.exists('healParticle')) {
-      this.make.graphics({ x: 0, y: 0, add: false })
-        .fillStyle(0x00ff00, 1)  // 緑色
-        .fillCircle(8, 8, 8)     // 半径8のサークル
-        .generateTexture('healParticle', 16, 16);
-    }
-    
-    // Phaser 3.60 新API使用 - 回復エフェクト用のパーティクルエミッター作成
-    const particles = this.add.particles(x, y, {
-      key: 'healParticle',
-      speed: { min: 50, max: 100 },
-      scale: { start: 0.5, end: 0 },
-      alpha: { start: 0.8, end: 0 },
-      tint: [0x00ff00, 0x99ff66, 0x66ff99], // 緑色のバリエーション
-      lifespan: 1000,
-      blendMode: 'ADD',
-      frequency: 50,
-      rotate: { min: 0, max: 360 },
-      angle: { min: 0, max: 360 },
-      radial: true,
-      gravityY: -50,
-      emitting: true,
-      duration: 2000
-    });
-    
-    // 光のオーラエフェクト
-    const glowCircle = this.add.graphics();
-    glowCircle.fillStyle(0x00ff00, 0.3);
-    glowCircle.fillCircle(x, y, 50);
-    
-    // プレイヤーを一時的に緑色に着色
-    this.playerSprite.setTint(0x99ff99);
-    
-    // キラキラ効果アニメーション
-    this.tweens.add({
-      targets: glowCircle,
-      alpha: { from: 0.3, to: 0 },
-      scale: { from: 1, to: 2 },
-      duration: 800,
-      ease: 'Sine.easeOut',
-      onComplete: () => {
-        glowCircle.destroy();
-      }
-    });
-    
-    // 回復テキストの表示
-    const healText = this.add.text(x, y - 50, 'Heal!', {
-      fontFamily: 'Verdana, "メイリオ", sans-serif',
-      fontSize: '28px',
-      fontStyle: 'bold',
-      fill: '#00ff00',
-      stroke: '#004400',
-      strokeThickness: 4,
-      shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 2, fill: true }
-    }).setOrigin(0.5);
-    
-    // テキストアニメーション
-    this.tweens.add({
-      targets: healText,
-      y: y - 100,
-      alpha: { from: 1, to: 0 },
-      duration: 1000,
-      ease: 'Power2',
-      onComplete: () => {
-        healText.destroy();
-      }
-    });
-    
-    // 一定時間後にエフェクトを停止して色を元に戻す
-    this.time.delayedCall(1000, () => {
-      particles.stop();
-      this.playerSprite.clearTint();
-      
-      // 少し遅れてパーティクルを破棄（残りのパーティクルが消えるのを待つ）
-      this.time.delayedCall(500, () => {
-        particles.destroy();
-      });
-    });
+    playBattleAnimation(this, 'healing');
   }
 
   // ゲームオーバー処理
@@ -2218,8 +1531,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   // 敵に麻痺効果を適用（グローバルメソッド）
-  applyParalyzeEffect() {
+  async applyParalyzeEffect() {
     console.log('Applying paralyze effect to enemy (global)');
+    // 電気の輪が敵を締めつけてから、麻痺の状態と表示を出す
+    await this.playAnimation('magic_paralyze');
     console.log('Before paralysis application:', {
       isEnemyParalyzed: this.isEnemyParalyzed,
       paralyzeRemainingTurns: this.paralyzeRemainingTurns
@@ -2259,17 +1574,6 @@ export class BattleScene extends Phaser.Scene {
     this.addLog('🔮 麻痺魔法成功！敵が3ターン行動不能になりました！');
     console.log('Enemy paralyzed for', this.paralyzeRemainingTurns, 'turns');
     
-    // 敵スプライトに麻痺エフェクト
-    if (this.enemySprite) {
-      this.tweens.add({
-        targets: this.enemySprite,
-        alpha: { from: 1, to: 0.3 },
-        duration: 300,
-        yoyo: true,
-        repeat: 2
-      });
-    }
-
     // 少し後に状態を再確認
     setTimeout(() => {
       console.log('Paralysis state after 100ms:', {
@@ -2381,70 +1685,9 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // 閃光魔法のアニメーション
+  // 閃光魔法のアニメーション（演出は battleAnimations.js の magic_flash）
   async playFlashAnimation() {
-    // 画面全体を白くフラッシュ
-    const flash = this.add.graphics();
-    flash.fillStyle(0xffffff, 0.9);
-    flash.fillRect(0, 0, this.scale.width, this.scale.height);
-    
-    // 眩しい光のエフェクト
-    const lightRays = [];
-    for (let i = 0; i < 8; i++) {
-      const ray = this.add.graphics();
-      ray.lineStyle(4, 0xffffff, 0.8);
-      
-      const centerX = this.scale.width / 2;
-      const centerY = this.scale.height / 2;
-      const angle = (i / 8) * Math.PI * 2;
-      const length = 300;
-      
-      ray.lineBetween(
-        centerX,
-        centerY,
-        centerX + Math.cos(angle) * length,
-        centerY + Math.sin(angle) * length
-      );
-      
-      lightRays.push(ray);
-    }
-    
-    // カメラの激しいフラッシュ
-    this.cameras.main.flash(200, 255, 255, 255, true);
-    
-    // 敵の強烈な点滅エフェクト
-    if (this.enemySprite) {
-      this.enemySprite.setTint(0xffffff);
-      
-      this.tweens.add({
-        targets: this.enemySprite,
-        alpha: { from: 1, to: 0.1 },
-        duration: 100,
-        yoyo: true,
-        repeat: 3
-      });
-    }
-    
-    // エフェクトのフェードアウト
-    setTimeout(() => {
-      this.tweens.add({
-        targets: [flash, ...lightRays],
-        alpha: 0,
-        duration: 300,
-        onComplete: () => {
-          flash.destroy();
-          lightRays.forEach(ray => ray.destroy());
-        }
-      });
-      
-      if (this.enemySprite) {
-        this.enemySprite.clearTint();
-        this.enemySprite.alpha = 1;
-      }
-    }, 400);
-    
-    // アニメーション完了まで待機
-    await new Promise(resolve => setTimeout(resolve, 700));
+    await this.playAnimation('magic_flash');
   }
   
   // 敵名からアセットパスを推測するユーティリティ

@@ -24,6 +24,8 @@ export class BattleScene4 extends BattleScene {
     
     // 氷の盾フラグを初期化
     this.iceShieldActive = false;
+    // 氷の盾の絵を、攻撃を防ぐまで主人公の前に残す（battleAnimations の ice_shield / shield_block）
+    this.keepsIceShield = true;
     
     // 攻撃カウンターを初期化（0から開始 = 最初は強攻撃）
     this.attackCounter = 0;

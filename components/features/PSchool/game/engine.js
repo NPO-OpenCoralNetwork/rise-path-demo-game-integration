@@ -568,7 +568,7 @@ async function executeGameAction(action, game, ui) {
         ui.log("⚡ ライデンを詠唱中...");
         
         if (game.scene.applyRaidenEffect) {
-          game.scene.applyRaidenEffect();
+          await game.scene.applyRaidenEffect();
         }
       }
       // ステージ8での魔法処理（シールドに弾かれる）
@@ -587,7 +587,7 @@ async function executeGameAction(action, game, ui) {
         
         // BattleSceneの麻痺処理を呼び出し（グローバル化済み）
         if (game.scene && game.scene.applyParalyzeEffect) {
-          game.scene.applyParalyzeEffect();
+          await game.scene.applyParalyzeEffect();
         } else {
           ui.log("🔮 麻痺魔法成功！敵を3ターン麻痺させます");
           console.warn('applyParalyzeEffect method not found');
@@ -600,19 +600,20 @@ async function executeGameAction(action, game, ui) {
         
         // 閃光魔法の効果（回避不可の大ダメージ）
         if (game.scene && game.scene.applyFlashEffect) {
-          game.scene.applyFlashEffect();
+          await game.scene.applyFlashEffect();
         } else {
           // デフォルトの閃光魔法効果
           const damage = 25; // 高威力の固定ダメージ
           ui.log(`⚡ 閃光魔法発動！回避不可の${damage}ダメージ！`);
           
           if (game.enemy) {
+            // 光が当たってから HP を減らす（ダメージの数字が命中と同時に出るように）
+            if (game.scene && typeof game.scene.playAnimation === 'function') {
+              await game.scene.playAnimation('magic_flash');
+            }
             game.enemy.hp -= damage;
             if (game.scene && typeof game.scene.updateHP === 'function') {
               game.scene.updateHP(game.player.hp, game.enemy.hp);
-            }
-            if (game.scene && typeof game.scene.playAnimation === 'function') {
-              await game.scene.playAnimation('magic_flash');
             }
           }
         }

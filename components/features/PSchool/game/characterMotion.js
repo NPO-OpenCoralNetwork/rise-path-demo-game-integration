@@ -114,12 +114,20 @@ export function lunge(scene, sprite, { direction = 1, distance = 90, onImpact } 
   });
 }
 
+/** 色を元に戻す（kept が null なら色なし）。 */
+export function restoreTint(sprite, kept) {
+  if (kept === null || kept === undefined) sprite.clearTint();
+  else sprite.setTint(kept);
+}
+
 /** 攻撃を受けてのけぞる。白く光ってから tint の色になり、direction の向きへ押される。 */
 export function hitReact(scene, sprite, { direction = 1, distance = 22, tint = 0xff5a5a } = {}) {
   if (!isSprite(sprite)) return Promise.resolve();
   return withoutIdle(scene, sprite, async () => {
     const reduced = reducedMotion();
     const { x, angle } = sprite;
+    // ステージが付けている色（装甲が壊れた灰色など）は、のけぞりのあとに戻す
+    const kept = sprite.isTinted && !sprite.tintFill ? sprite.tintTopLeft : null;
     // 押される間は白く光り、戻る間は tint の色。色の切り替えも同じ流れの中で行う（別のタイマーにしない）
     sprite.setTintFill(0xffffff);
     await play(scene, {
@@ -128,7 +136,7 @@ export function hitReact(scene, sprite, { direction = 1, distance = 22, tint = 0
     });
     if (isSprite(sprite)) sprite.setTint(tint);
     await play(scene, { targets: sprite, x, angle, duration: reduced ? 120 : 260, ease: 'Back.easeOut' });
-    if (isSprite(sprite)) sprite.clearTint();
+    if (isSprite(sprite)) restoreTint(sprite, kept);
   });
 }
 
