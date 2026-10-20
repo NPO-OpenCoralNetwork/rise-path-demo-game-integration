@@ -10,6 +10,13 @@ export class BattleScene16 extends BattleScene {
       stageNumber: 16
     };
     
+    // 1回の戦いの状態（create でも毎回戻す）
+    this.resetBattleState();
+  }
+
+  // 1回の戦いの状態を最初に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、
+  // 前の戦いのカウンター・構え・反射の回数や変数を引き継がない）。オブジェクトは毎回新しく作る
+  resetBattleState() {
     // ミラーナイト専用の状態管理
     this.mirrorState = {
       isCounterActive: false,
@@ -36,6 +43,9 @@ export class BattleScene16 extends BattleScene {
   }
 
   create() {
+    // 前の戦いの状態を引き継がないよう、最初に戻す
+    this.resetBattleState();
+
     super.create();
     
     // ステージ16の設定

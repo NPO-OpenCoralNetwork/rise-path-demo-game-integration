@@ -16,7 +16,14 @@ export class BattleScene20 extends BattleScene {
       enemy: 'codeeater',
       stageNumber: 20
     };
-    
+
+    // 1回の戦いの状態（create でも毎回戻す）
+    this.resetBattleState();
+  }
+
+  // 1回の戦いの状態を最初に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、
+  // 前の戦いのフェーズ・無効化・習得概念・変数・関数を引き継がない）。オブジェクトや配列、Map は毎回新しく作る
+  resetBattleState() {
     // コードイーター専用の状態管理
     this.bossState = {
       phase: 1,
@@ -50,6 +57,9 @@ export class BattleScene20 extends BattleScene {
   }
 
   create() {
+    // 前の戦いの状態を引き継がないよう、最初に戻す（setupBossSystem より前）
+    this.resetBattleState();
+
     super.create();
     
     // ステージ20の設定

@@ -24,11 +24,7 @@ export class BattleScene18 extends BattleScene {
       enemy: 'plaguedoctor',
       stageNumber: 18
     };
-    
-    // 関数管理システム
-    this.userFunctions = new Map();
-    this.functionUsageCount = new Map();
-    
+
     // 薬の合成システム
     this.potionRecipes = {
       'antidote': ['herb', 'water', 'salt'],
@@ -36,7 +32,18 @@ export class BattleScene18 extends BattleScene {
       'resist_potion': ['crystal', 'salt', 'essence'],
       'cure_all': ['herb', 'crystal', 'salt', 'essence', 'water']
     };
-    
+
+    // 1回の戦いの状態（create でも毎回戻す）
+    this.resetBattleState();
+  }
+
+  // 1回の戦いの状態を最初に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、
+  // 前の戦いの状態異常・材料・薬・変数・レシピ関数を引き継がない）。オブジェクトや Map は毎回新しく作る
+  resetBattleState() {
+    // 関数管理システム
+    this.userFunctions = new Map();
+    this.functionUsageCount = new Map();
+
     // プレーグドクターの状態異常システム
     this.statusEffects = {
       poison: { active: false, duration: 0, damage: 5 },
@@ -73,6 +80,9 @@ export class BattleScene18 extends BattleScene {
   }
 
   create() {
+    // 前の戦いの状態を引き継がないよう、最初に戻す
+    this.resetBattleState();
+
     super.create();
     
     // ステージ18の設定

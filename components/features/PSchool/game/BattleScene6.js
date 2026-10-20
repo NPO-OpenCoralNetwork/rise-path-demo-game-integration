@@ -18,6 +18,10 @@ export class BattleScene6 extends BattleScene {
   }
 
   create() {
+    // 毒と解毒薬は戦いごとに元に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、前の戦いの毒や在庫を引き継がない）
+    this.playerPoisoned = false;
+    this.antidotes = 0;
+
     super.create();
     
     // ステージ6の設定

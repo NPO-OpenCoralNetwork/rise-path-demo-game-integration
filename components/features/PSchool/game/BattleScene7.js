@@ -18,6 +18,10 @@ export class BattleScene7 extends BattleScene {
   }
 
   create() {
+    // 装甲は戦いごとに元に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、前の戦いで壊した装甲を引き継がない）
+    this.armorMode = true;
+    this.armorHealth = 1;
+
     super.create();
     
     // ステージ7の設定
