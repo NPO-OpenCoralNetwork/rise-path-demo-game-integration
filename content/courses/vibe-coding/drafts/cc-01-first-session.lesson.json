@@ -108,24 +108,20 @@
           "caption": "見るものと、することの違い",
           "columns": [
             "道具",
-            "見るもの",
-            "すること"
+            "見るものと、すること"
           ],
           "rows": [
             [
               "チャットAI",
-              "貼り付けた文章",
-              "文章で答えて待つ"
+              "貼り付けた文章を見て、文章で答えて待つ"
             ],
             [
               "エディタの補完",
-              "開いているファイル",
-              "続きのコードを提案する"
+              "開いているファイルを見て、続きのコードを提案する"
             ],
             [
               "Claude Code",
-              "プロジェクトのファイル、ターミナル、Git",
-              "自分で調べ、変更し、確かめる"
+              "プロジェクトのファイル、ターミナル、Gitを見て、自分で調べ、変更し、確かめる"
             ]
           ]
         },
@@ -248,29 +244,24 @@
           "caption": "4つのサーフェスと、向いている場面",
           "columns": [
             "サーフェス",
-            "向いている場面",
-            "知っておくこと"
+            "場面と、知っておくこと"
           ],
           "rows": [
             [
               "ターミナルCLI（Command Line Interface）",
-              "基本の入口。演習で使う",
-              "ネイティブインストーラー（native installer）で入れる"
+              "基本の入口。演習で使う。ネイティブインストーラー（native installer）で入れる"
             ],
             [
               "IDE拡張（VS Code・JetBrains）",
-              "エディタで変更箇所を見たい",
-              "JetBrains版はCLIが別に必要"
+              "エディタで変更箇所を見たい。JetBrains版はCLIが別に必要"
             ],
             [
               "デスクトップアプリ",
-              "ターミナルなしで始めたい",
-              "有料プランが必要"
+              "ターミナルなしで始めたい。有料プランが必要"
             ],
             [
               "クラウドセッション",
-              "PCを閉じても進めたい",
-              "GitHubのリポジトリを使う。先にpushする"
+              "PCを閉じても進めたい。GitHubのリポジトリを使う。先にpushする"
             ]
           ]
         },
@@ -492,7 +483,7 @@
                 },
                 {
                   "id": "c",
-                  "md": "昨日の会話は見えないので、伝え直すか開き直すのが確実"
+                  "md": "昨日の会話は見えないが、伝え直すか開き直せば続けられる"
                 },
                 {
                   "id": "d",
@@ -503,7 +494,7 @@
               "answer": [
                 "c"
               ],
-              "explanation": "セッションは毎回まっさらなコンテキストで始まり、昨日の会話は入っていません。自動メモリに残ることもありますが、毎回とは限りません。続けたいときは `claude --continue` で開き直すか、決めたことを依頼文に書きます。何度も使う決まりごとは、CLAUDE.mdに書いておけます。",
+              "explanation": "セッションは毎回まっさらなコンテキストで始まり、昨日の会話は入っていません。自動メモリに残ることもありますが、毎回とは限りません。続けたいときは `claude --continue` で開き直すか、決めたことを依頼文やCLAUDE.mdに書きます。",
               "hint": "コンテキストに入っているものと、ディスクに残っているものを分けて考えましょう。",
               "objectiveId": "o3",
               "bloom": "understand"
@@ -584,7 +575,7 @@
           "type": "code",
           "lang": "diff",
           "filename": "差分の例（index.html）",
-          "code": "   <h1>hello world</h1>\n+  <p id=\"today\"></p>\n+  <script>\n+    document.getElementById(\"today\").textContent = new Date().toLocaleDateString();\n+  </script>"
+          "code": "   <h1>hello world</h1>\n+  <p id=\"today\"></p>\n+  <script>\n+    const p = document.getElementById(\"today\");\n+    p.textContent = new Date().toLocaleDateString();\n+  </script>"
         },
         {
           "id": "example-mode",

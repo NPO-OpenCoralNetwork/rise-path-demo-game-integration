@@ -1,10 +1,28 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:c7223f9f160f438c",
+  "lessonHash": "sha256:48733d77bde8508c",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:c7223f9f160f438c",
+    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/c7223f9f160f438c/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "s2-isolate",
+      "s2-layers",
+      "s2-table",
+      "s3-steps",
+      "s3-code",
+      "s5-md2",
+      "s5-table",
+      "practice-case-zshrc",
+      "practice-folder"
+    ],
+    "changedShare": 0.11,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -16,7 +34,8 @@
         "s3-check",
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -25,36 +44,33 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Terms are defined before use: プロンプトインジェクション (s1-defs), VM (s1-practices), ワークスペースの信頼 and サンドボックス (s2-defs), クラウドセッション (s2-isolate), エフォート (s5-table). `--dangerously-skip-permissions` is now glossed in e1-b, `~/` and `//` are taught in s3-pitfall, and `/compact` cost is in s5-table. The prerequisites still leave out 第6回 and 第7回, although CLAUDE.md (q1-d, s3-lead, e6-c), スキル (e6-c) and サブエージェント (s5-table) come from them.",
+      "evidence": "The new qualifier in s2-isolate, 「`--bare` なしの `claude -p`」, is not glossed here. It is taught in 第9回, which is a listed prerequisite (cc-09 practice and its exam use `claude --bare -p`), so it is fair prior knowledge. s5-md2 now defines 「[[エフォート]]（effort）は、考える量の設定です。」 before s5-table uses it. The 第6回 and 第7回 gap (CLAUDE.md, スキル, サブエージェント) is unchanged.",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s3-pitfall",
-        "s5-table",
-        "check-quiz"
+        "s2-isolate",
+        "s5-md2",
+        "s5-table"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 1735 (budget 1,200–2,400) · read 2356 · practice reading 1072 · questions 11 · est 17.0 min (must be ≤ 20; estMinutes 17)」, so estMinutes 17 matches, and strict lint is clean. s2 is still the densest segment (7 blocks: two definitions, Seatbelt/bubblewrap/Windows, `claude -p`, a diagram, a table and a quiz). s4 is a two-block segment with no check and no objective.",
+      "evidence": "measure.mjs: 「prose 1896 (budget 1,200–2,400) · read 2468 · practice reading 1072 · questions 11 · est 17.2 min (must be ≤ 20; estMinutes 17)」, so estMinutes 17 still matches, and strict lint reports 0 warnings. The 2-column tables (s2-table, s5-table) are lighter to scan. s5-md2's second paragraph now packs three unrelated facts (`-p` and the key, `/clear` vs `/compact`, the definition of エフォート) in front of the table as a 「補足」. s2 is still 7 blocks long.",
       "blockIds": [
-        "s2-defs",
-        "s2-sandbox",
-        "s2-isolate",
-        "s4-lead",
-        "s4-note"
+        "s2-table",
+        "s5-md2",
+        "s5-table"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Before practice, s3-steps works an example in four labelled subgoals with reasons (「コミットすれば、チーム全員に効きます」, 「`./` は今のフォルダー、`**` は下の階層すべて」) plus s3-code. p-deny then fades it (hint 「10-3の `keys/**` と同じ形です」). ex-target still gives no reason for its choice, and there is no partly blank example between the full example and the practice.",
+      "evidence": "s3-steps still works the example in four labelled subgoals with reasons, and s3-code now matches the renamed target (`Read(./config/secret.json)` agrees with ex-target 「`config/secret.json` と `keys/` に決まります。」). ex-target still gives no reason for its choice, and there is no faded step between the full example and p-deny.",
       "blockIds": [
         "s3-steps",
         "s3-code",
@@ -64,11 +80,11 @@
     {
       "id": "active",
       "score": 3,
-      "evidence": "Every assessed segment has a scenario inline check (q1–q4), wrong-option feedback is complete, and the s3, s4, s5 sequence never goes two content sections without a check. Some items can still be answered by matching words: q2's key 「VMかクラウドセッションの中で開いて試す」 mirrors s2-table and s2-isolate, and its hint points at the VM box. e2-b repeats the s2-table cell 「ネットにつながらないコンテナやVM」, and e5 repeats the practice case whose answer practice-prompt-review expect spells out.",
+      "evidence": "The inline checks q1–q4 and the exam are unchanged. Because s2-table now reads 「オフラインのコンテナかVMだけで使う」, e2-b (「ネットにつながらないコンテナやVMの中で使う」) no longer repeats a table cell word for word. q2 can still be answered by matching words, since its key mirrors s2-table row 2 and s2-isolate, and its hint points at the VM box.",
       "blockIds": [
+        "s2-table",
         "s2-check",
-        "check-quiz",
-        "practice-prompt-review"
+        "check-quiz"
       ]
     },
     {
@@ -82,12 +98,13 @@
         "s3-check",
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 3,
-      "evidence": "s2-layers is a structural diagram with 5 nodes and 2 subgraphs, a takeaway caption (「サンドボックスが囲むのはシェルコマンドだけ」) and specific alt text, and the lesson has no images. Hooks are missing from the diagram, although s2-sandbox, e2-c and card-sandbox all say hooks run outside the sandbox. So the labels do not fully match the text.",
+      "evidence": "s2-layers keeps 5 nodes and 2 subgraphs, and its labels are shorter for mobile (「シェル<br>コマンド」, 「ファイル操作・MCP<br>（サンドボックス外）」). The caption now states the takeaway in two sentences: 「VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。」 Hooks are still missing from the diagram, although s2-sandbox, e2-c and card-sandbox say they run outside the sandbox.",
       "blockIds": [
         "s2-layers"
       ]
@@ -95,14 +112,13 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The practice is an authentic audit of 田中さん's files and habits with three tasks (p-audit, p-deny, p-bill). Each task has an expect and a hint, and p-deny and p-bill also have a troubleshoot. There is a safe dummy folder, the model answers agree (practice-answer-rule and practice-prompt-review ③ both list `Read(./.env.*)`), and a four-item checklist closes it. The hint ladder has two levels at most, and p-audit has only one.",
+      "evidence": "practice-folder now puts one command per line (`mkdir cc-practice`, `cd cc-practice`, `git init`, …), which is easier to copy and debug. practice-case-zshrc reads 「（副業用のキー）」, and both changes are harmless. The audit, deny and bill tasks keep their expect, hint and troubleshoot, the model answers agree, and the checklist is unchanged. The hint ladder is still one or two levels.",
       "blockIds": [
-        "practice-steps",
-        "practice-steps-deny",
         "practice-folder",
+        "practice-case-zshrc",
+        "practice-steps-deny",
         "practice-answer-rule",
-        "practice-prompt-review",
-        "practice-checklist"
+        "practice-prompt-review"
       ]
     },
     {
@@ -114,54 +130,52 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "All 7 confirmed audit fixes are in the text: s1-auto 「2026年3月の公式記事の検証では」 and 「ターミナルとVS Codeの対話セッション」, s2-isolate and q2-c 「フックや `.mcp.json` のサーバー」, ex-place 「コミットすれば」, ex-verify 「Readツールや `cat` での読み取りが拒否されます」, and e2-d 「LinuxとmacOSでは…起動を拒否します」. The rebuilt e3 and e4 match the permissions page quoted in the brief (`~/path`, `//path`, scripts not covered). The version is pinned (v2.1.304) and every factual block cites a dated source.",
+      "evidence": "The new s2-isolate qualifier matches the audit quote 「Without `--bare`, a `-p` session runs the hooks in a project's `.claude/settings.json` and connects the servers in its `.mcp.json`」. The facts that moved into s5-md2 (`-p` uses `ANTHROPIC_API_KEY` without approval; 「`/clear` は費用がかかりませんが、`/compact` は…それ自体が大きな要求です」) match facts-cc-10 line 210, and s5-md2 now cites cc-authentication and cc-model-config. The s2-table cell 「オフラインのコンテナかVM」 matches 「containers, VMs, or dev containers without internet access」.",
       "blockIds": [
-        "s1-auto",
         "s2-isolate",
-        "s2-check",
-        "s3-steps",
-        "s3-pitfall",
-        "check-quiz"
+        "s2-table",
+        "s5-md2",
+        "s5-table"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The prose is in です・ます (「本番の変更は自分で確かめます。」), lint finds no banned phrases, and terms follow the glossary (拒否ルール, 利用上限, エフォート). Definitions and table cells use plain form, which is acceptable. The tone is terse rather than warm in places; the ja-editor owns wording.",
+      "evidence": "The s2-layers caption and alt now use です・ま す (「守りは重ねて使います。」, 「…に入る図です。」), and s5-md2 stays in です・ます. Table cells use plain form, which is acceptable. 「下の表の補足です。」 is serviceable but flat, and s2-table's 「オフライン」 differs from the 「ネットにつながらない」 used in e1-b, e2-b and practice-prompt-review ①.",
       "blockIds": [
-        "s1-auto",
-        "s3-lead",
-        "summary-points"
+        "s2-layers",
+        "s5-md2",
+        "s2-table"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp only and complete. The diagram labels are Japanese, the alt text is specific, and the link text is descriptive (「セキュリティの公式ドキュメント」, 「公式の料金ページ」). The brief says s2-layers was only parsed, not rendered in the reader, so its readability still needs the visual-qa screenshots.",
+      "evidence": "The s2-layers alt is specific and fuller than before. It names the flow, what the sandbox encloses, and 「VM・クラウドセッションの枠は、Claude Code全体を囲みます。」 It also names items the shortened labels no longer show (「分類器」, 「子プロセス」). The 2-column tables suit mobile, but the diagram's rendering still needs the visual-qa screenshots.",
       "blockIds": [
-        "s1-md2",
         "s2-layers",
-        "s5-md2"
+        "s2-table",
+        "s5-table"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "q2 (s2-check) can be answered by matching the s2-table and s2-isolate wording, and its hint points at the answer. Replace the hint with 「フックやMCPサーバーまで囲めるのはどれか、考えましょう。」, or reframe the stem as a case: a repo whose `.claude/settings.json` defines a hook; which protection keeps that hook off your own machine?",
-    "e2's key 「ネットにつながらないコンテナやVMの中で使う」 repeats the s2-table cell word for word. Consider rewording it to 「外部とつながらないコンテナやVMに、Claude Codeごと入れて使う」 so that recalling the idea, not the phrase, is what is tested.",
-    "e5 repeats the practice case (nightly `claude -p`, an env key, an API bill), and practice-prompt-review expect states the answer. To move o3 to a new path, consider the interactive approval route: 「以前、起動時に表示されたAPIキーを使うかの質問で、使うを選んでいた」 → API charges, checked with `/status`. e1 still covers the contract's transfer item, so this is optional.",
-    "Add 「第6回｜CLAUDE.mdで前提を伝える」 and 「第7回｜手順はスキルに、調べものはサブエージェントに」 to prerequisites: CLAUDE.md, スキル and サブエージェント are used without a gloss (q1-d, s3-lead, s5-table, e6-c).",
-    "s2-layers leaves out hooks. Add a separate node inside VMBOX and outside SBOX, with no edge from C because hooks are not gated by permission rules, e.g. `F[\"リポジトリのフック<br>（サンドボックスの外）\"]`. Then the diagram matches s2-sandbox, e2-c and card-sandbox (6 nodes).",
-    "ex-target (s3-steps) gives no reason for its choice. Consider md 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」 (this links to s4-lead, which already cites cc-sandbox-environments).",
-    "p-deny says 「Claude Codeを起動したら」, but no block shows when or how to start it. Consider md 「下のコマンドでダミーを作り、`.claude/settings.json` に拒否ルールを書きます。書けたら同じフォルダーで `claude` を起動し、結果を予想してから依頼文を送ります。」",
-    "s4 is not tied to any objective or action. Either add one sentence on what the learner should do with this fact, or fold s4-lead and s4-note into s2 after s2-isolate."
+    "s2-table now says 「オフラインのコンテナかVMだけで使う」, while e1-b feedback, e2-b, the e2 explanation and practice-prompt-review ① say 「ネットにつながらない…」. Pick one phrase for the whole lesson. One option: keep the table as is and change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」 so that e2-b stays a paraphrase rather than a copy.",
+    "s5-md2's second paragraph bundles three unrelated facts in front of the table. Consider splitting it so each fact sits next to its row, e.g. keep 「[[エフォート]]（effort）は、考える量の設定です。」 and move 「`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。」 into the row-1 cause cell as 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」.",
+    "s2-layers still leaves out hooks. Add `F[\"リポジトリのフック<br>（サンドボックス外）\"]` inside VMBOX, outside SBOX, with no edge from C. That gives 6 nodes and matches s2-sandbox, e2-c and card-sandbox.",
+    "s2-layers alt mentions 「分類器」 and 「子プロセス」, which the shortened labels no longer show. Either keep the alt in step with the labels or add 「（拒否・確認・分類器）」 back under 「権限ルールと承認」.",
+    "Still open from round 1, in unchanged content: ex-target (s3-steps) gives no reason for its choice. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」",
+    "Still open from round 1: add 「第6回｜CLAUDE.mdで前提を伝える」 and 「第7回｜手順はスキルに、調べものはサブエージェントに」 to prerequisites.",
+    "Still open from round 1: q2's hint 「Claude Code全体を囲めるのはどれか、図で確かめましょう。」 points at the answer. Consider 「フックやMCPサーバーまで囲めるのはどれか、考えましょう。」"
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "The scope check required a full review (exit 1: 32 of 44 blocks changed, 52% of the lesson's parts), so all 13 criteria were scored fresh. All four round-1 must-fix items are gone: e3 now tests `Read(~/.aws/**)`, s3-pitfall teaches `~/` and `//`, e4-c no longer depends on `cat`, and the q3 explanation has no uncited Edit/Write claim. The 7 confirmed audit fixes are also in the text. The biggest strength is aligned, misconception-driven checks plus an authentic audit practice with model answers that agree. The most useful next step is to make q2 and e2 require reasoning rather than recall of the s2-table wording. Mean 3.38, all criteria ≥ 3, no must-fix."
+  "summary": "This is a verification round: review-scope exited 0 with 9 of 44 blocks changed (11%) and sections and objectives unchanged. The previous review had no must-fix items, so `resolved` is empty. All 9 changed blocks were reviewed in full. The `--bare` qualifier in s2-isolate matches the audit quote and relies on 第9回, which is a listed prerequisite. s3-steps and s3-code agree on `config/secret.json`, and nothing else references the old name. The table facts moved into s5-md2 are cited and accurate, and the tables are now 2 columns. No changed block introduces an error or a regression. The remaining points are a wording inconsistency (オフライン vs ネットにつながらない), a dense 「補足」 paragraph, and hooks still missing from the diagram, all in niceToHave. validate and strict lint are clean, and measure.mjs gives est 17.2 min against estMinutes 17. Mean 3.38, every criterion ≥ 3, verdict pass."
 }

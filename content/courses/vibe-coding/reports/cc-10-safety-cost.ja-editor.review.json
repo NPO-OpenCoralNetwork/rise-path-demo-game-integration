@@ -1,69 +1,87 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:c7223f9f160f438c",
+  "lessonHash": "sha256:48733d77bde8508c",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:c7223f9f160f438c",
+    "changed": [
+      "s2-isolate",
+      "s2-layers",
+      "s2-table",
+      "s3-steps",
+      "s3-code",
+      "s5-md2",
+      "s5-table",
+      "practice-case-zshrc",
+      "practice-folder"
+    ],
+    "changedShare": 0.11,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/c7223f9f160f438c/round-1/ja-editor.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The text is warm です・ます throughout, with no pressure phrases. §3 spacing is now consistent: 「Claude Codeに」「autoモード」「MCPサーバー」, and `bypassPermissions` is always inline code. Every card back ends in です・ます (「攻撃です。」「開きます。」). The option forms now match within each question: q2 all end 「試す」, q3 all take the 「…を書く／書かない」 form, e1 all end 「動かす」. Most wrong-option feedback names the misconception first and then the correct idea, in 2 sentences or fewer. What keeps the score at 3 is a few spots that still read loosely: the e2 d feedback has no subject, the s2-layers caption is in plain form, and 「大きな要求」 is vague.",
+      "evidence": "The changed blocks keep です・ます and use no pressure phrases. The s2-layers caption is now a です・ます sentence: 「守りは重ねて使います。VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。」 The s2-layers alt is also in です・ます. Small wording drifts remain and are listed in niceToHave: s2-table now says 「オフラインのコンテナかVM」 while e1 and its explanation say 「ネットにつながらないコンテナやVM」, and 「大きな要求」 in s5-md2 is still vague.",
       "blockIds": [
-        "summary-cards",
-        "s2-check",
-        "s3-check",
-        "check-quiz",
-        "s2-layers"
+        "s2-layers",
+        "s2-table",
+        "s5-md2"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "measure.mjs gives prose 1735 (budget 1,200–2,400), read 2356, est 17.0 min (≤ 20), and estMinutes is 17, which matches. lessons:lint --strict reports 0 errors and 0 warnings. Each segment breaks up its text with a definitions block, a diagram, a table, steps or a check (s2-layers, s2-table, s3-steps, s5-table), and paragraphs stay at 1–3 short sentences.",
+      "score": 3,
+      "evidence": "measure.mjs gives prose 1896 (budget 1,200–2,400), read 2468 and est 17.2 min (≤ 20), which matches estMinutes 17. lessons:lint --strict reports 0 errors and 0 warnings. The second paragraph of s5-md2 now has 4 sentences (「下の表の補足です。」「`-p` では…使われます。」「`/clear` は…大きな要求です。」「[[エフォート]]（effort）は…設定です。」), and §1 allows 3 per paragraph. That one break is why load is not 4 (\"everything within budget\"). Fixing it brings the score back to 4. The tables now have 2 columns and stay readable.",
       "blockIds": [
-        "s2-layers",
-        "s2-table",
-        "s3-steps",
-        "s5-table"
+        "s5-md2",
+        "s5-table",
+        "s2-table"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The prerequisites name cc-02, cc-05, cc-08 and cc-09 by their exact titles. API is now spelled out in hook-b1 (「API（Application Programming Interface）のキーです。」). 「エフォート」 is in the glossary and is glossed where it is first used in s5-table (「高い[[エフォート]]（effort：考える量の設定）」). Each segment introduces at most 3 new terms. One small gap remains: e5 uses 「Console」 without a gloss, while cc-01 introduced it as 「Claude Console」.",
+      "evidence": "エフォート is now glossed in s5-md2 (「[[エフォート]]（effort）は、考える量の設定です。」), before s5-table uses it, which matches the glossary. The renamed file `config/secret.json` is the same in s3-steps and s3-code. s2-isolate adds 「`--bare` なしの `claude -p`」, but nothing in this lesson explains `--bare`. The learner can still follow the point, so this is in niceToHave.",
       "blockIds": [
-        "hook-b1",
-        "s5-table",
-        "check-quiz"
+        "s5-md2",
+        "s3-steps",
+        "s3-code",
+        "s2-isolate"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a single-locale (jp) lesson and nothing is left untranslated. The diagram labels are Japanese and the alt describes the layered structure. Both links name their destination (「セキュリティの公式ドキュメント」「公式の料金ページ」).",
+      "evidence": "This is a single-locale (jp) lesson and nothing is left untranslated. The narrowed s2-layers diagram has Japanese labels. Its alt now describes the parts that the labels shortened (拒否・確認のルール、分類器、子プロセス、MCPサーバー). The link in s5-md2 still names its destination (「公式の料金ページ」).",
       "blockIds": [
         "s2-layers",
-        "s1-md2",
         "s5-md2"
       ]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "check-quiz: e2 d feedback has no subject, so 「LinuxとmacOSでは…拒否します」 can be read as the OS refusing. The audit quote says Claude Code refuses. — 「LinuxとmacOSでは、rootやsudoでの `bypassPermissions` の起動を拒否します。」→「LinuxとmacOSでは、Claude Codeはrootやsudoでの `bypassPermissions` の起動を拒否します。」",
-    "check-quiz: e5 says 「Console」 alone, while cc-01 introduced it as 「Claude Console」. — 「ConsoleからAPIの請求が届きました。」→「Claude ConsoleからAPIの請求が届きました。」",
-    "s2-layers: the caption is a plain-form sentence. Captions can be 体言止め, but a full sentence reads better in です・ます. — 「守りは重ねて使う。サンドボックスが囲むのはシェルコマンドだけ」→「守りは重ねて使います。サンドボックスが囲むのはシェルコマンドだけです」",
-    "s2-layers: the diagram leaves フック out of the outside-the-sandbox node, while s2-sandbox and card-sandbox name it. — 「ファイル操作ツール・MCPサーバー<br>（サンドボックスの外）」→「ファイル操作ツール・フック・MCPサーバー<br>（サンドボックスの外）」",
-    "s5-table / check-quiz / summary-cards: 「大きな要求」 does not say what is large. — 「`/compact` はそれ自体が大きな要求」→「`/compact` はそれ自体が使用量の多い要求」 (do the same in e6 a feedback and card-clear)",
-    "s3-pitfall / s3-check: the pitfall says 「効きません」, but the q3 b and e3 c feedback say 「使われません」 for the same Write rule. — 「Writeのルールは使われません。」→「Writeのルールは効きません。」",
-    "glossary 利用上限: the subject of 「共有します」 is unclear. q4 b feedback uses 「共有されます」. — 「…週の上限があり、Claudeのチャットと共有します。」→「…週の上限があり、Claudeのチャットと共有されます。」",
-    "hook-predict: 「サブスクリプション」 appears with no English in this lesson. If the course has not introduced it with English before, add it. — 「サブスクリプションではなく」→「サブスクリプション（subscription）ではなく」",
-    "s5-check / check-quiz: the prompts of q4 and e5 run to 3 sentences, while §5 asks for a one-sentence question. Shorten the scenario where you can. — e5 「…最も考えられる原因はどれでしょう？」 keep the question, merge 「Maxプランの鈴木さんは、毎晩 `claude -p` のスクリプトを動かしています。」 into 「毎晩 `claude -p` のスクリプトを動かすMaxプランの鈴木さんに、…」",
-    "s1-md2: the link points to /docs/ja/security, while the source cc-security is the en page. The audit fetched the ja page, so this is probably fine, but keep the link and the source consistent (factual doubt, not changed here)."
+  "mustFix": [
+    {
+      "blockId": "s5-md2",
+      "criterion": "load",
+      "issue": "(d) paragraph rule (§1, 3 sentences per paragraph): the new second paragraph has 4 sentences: 「下の表の補足です。」「`-p` では、…使われます。」「`/clear` は…大きな要求です。」「[[エフォート]]（effort）は、考える量の設定です。」",
+      "fix": "「下の表の補足です。`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。」→「`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。」"
+    }
   ],
-  "average": 3.5,
-  "verdict": "pass",
-  "summary": "The scope check required a full review: 32 of 44 blocks changed (52% of the parts), which is above the 30% limit. All 10 must-fix items from my round-1 review are gone. §3 spacing is now consistent across the lesson and bypassPermissions is always inline code. The card backs and summary-next use です・ます. summary-ask now parses. The option forms in q2, q3 and e1 match. API is spelled out and エフォート is glossed. practice-task states Tanaka's API bill. s4-lead says that it is the conversations that may be used for model training. lessons:lint --strict is clean. measure.mjs gives prose 1735 and est 17.0 min, which matches estMinutes 17. No new (a)–(e) errors were found. The remaining items are polish, listed in niceToHave."
+  "niceToHave": [
+    "s2-isolate: `--bare` is not explained anywhere in the lesson. The audit quote (\"Without `--bare`, a `-p` session runs the hooks…\") supports a short gloss. — 「`--bare` なしの `claude -p` では」→「`--bare`（フックなどを読み込まない起動オプション）なしの `claude -p` では」",
+    "s2-table: 「オフラインの」 is a different wording from 「ネットにつながらない」 in check-quiz e1 (feedback, option and explanation). Using the same words helps the learner connect the two. — 「オフラインのコンテナかVMだけで使う」→「ネットにつながらないコンテナかVMだけで使う」",
+    "s2-layers: the label 「ファイル操作・MCP」 shortens 「MCPサーバー」, the name the text uses. フック is also still missing from the outside-the-sandbox node. — 「ファイル操作・MCP<br>（サンドボックス外）」→「ファイル操作・フック<br>MCPサーバー（サンドボックス外）」",
+    "s5-md2: 「大きな要求」 still does not say what is large. This item is carried over from round 1 and now sits in s5-md2. — 「それ自体が大きな要求です。」→「それ自体が使用量の多い要求です。」 (do the same in e6 a feedback and card-clear)",
+    "s5-table: the row 「すぐ上限に届く：[[利用上限]]（5時間と週）をチャットと共有」 has no subject or verb ending. Making it parallel with the other rows' 「症状：原因」 form reads more clearly. — 「[[利用上限]]（5時間と週）をチャットと共有」→「[[利用上限]]（5時間と週）がチャットと共有」",
+    "Carried from round 1 (unchanged text): check-quiz e2 d feedback has no subject, e5 uses 「Console」 alone, the 効きません/使われません wording differs between s3-pitfall and s3-check, the subject of 「共有します」 in the 利用上限 glossary entry is unclear, and 「サブスクリプション」 in hook-predict has no English."
+  ],
+  "average": 3.25,
+  "verdict": "revise",
+  "summary": "Verification round. review-scope.mjs exited 0: 9 of 44 blocks changed (11%). My round-1 review had no must-fix items, so there are no resolved entries. I checked every changed block. The s2-layers caption and alt now use です・ます. エフォート is glossed in s5-md2 before s5-table uses it. `config/secret.json` is the same in s3-steps and s3-code. The tables have 2 columns. One new (d) error came from the changes: the second paragraph of s5-md2 has 4 sentences, and §1 allows 3. Deleting 「下の表の補足です。」 fixes it, and load goes back to 4 (mean 3.5). lessons:lint --strict is clean. measure.mjs gives prose 1896 and est 17.2 min, which matches estMinutes 17."
 }

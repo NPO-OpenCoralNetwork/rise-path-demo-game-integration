@@ -1,27 +1,25 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:054759c1db95b6c4",
+  "lessonHash": "sha256:984f34269dfb6574",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:ae84a43eacd96ce5",
-    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/ae84a43eacd96ce5/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:054759c1db95b6c4",
+    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/054759c1db95b6c4/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "cycle-steps"
+      "dr-table",
+      "ex-steps",
+      "ex-settings",
+      "cycle-flow",
+      "self-check-list",
+      "summary-points"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.09,
     "fullReviewRequired": false
   },
-  "resolved": [
-    {
-      "blockId": "cycle-steps",
-      "criterion": "practice",
-      "status": "resolved",
-      "evidence": "c-explain now reads 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。」. A learner who followed p-more's 「なければ足しません」 can now finish the step and meet its expect."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -50,34 +48,30 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The prerequisites name the exact earlier lessons. dr-table's 「学んだ回」 column ties each part to the lesson that taught it. The only new term, きっかけ, is defined in dr-b1 (「同じ困りごとが繰り返し起きること、つまり[[きっかけ]]です」) and matches the glossary, and the recalled terms link to glossary entries.",
+      "evidence": "dr-table now has 2 columns and keeps the lesson references inside the cells (「CLAUDE.mdに1行足す（第6回）」, 「[[サブエージェント]]（subagent、第7回）」), so each part is still tied to the lesson that taught it. The column header 「足す部品（学んだ回）」 says what the parentheses mean. The only new term, きっかけ, is defined in dr-b1 and matches the glossary.",
       "blockIds": [
-        "dr-b1",
-        "dr-table"
-      ],
-      "carriedOver": true
+        "dr-table",
+        "dr-b1"
+      ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Re-measured after the c-explain change. measure.mjs: 「prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1654 · questions 8 · practice sections 3 · est 18.8 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 still matches the rounded estimate, and lint --strict reports 0 errors and 0 warnings.",
+      "evidence": "Re-measured after this round's changes. measure.mjs: 「prose 1329 (budget 1,200–2,400) · read 1833 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. The new ex-rules sentences are short (「v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。」), and lint --strict reports 0 errors and 0 warnings.",
       "blockIds": [
         "lesson",
-        "cycle-steps"
+        "ex-steps"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "ex-steps has 5 steps with subgoal titles, each step's trigger or reason (「整形の忘れが続いたので」), an expect for each, and full artefacts (ex-prompt-claude-md, ex-settings, ex-prompt-skill), all before practice. ex-b1 now gives the timeline (「①と②は初日に置き、③と④は、きっかけが起きた週に1つずつ足しました」). There is no faded step between the full example and independent practice.",
+      "evidence": "ex-hook now explains the artefact instead of only naming it (「`jq` で編集したファイル名を取り出し、Prettierに渡します。」), and ex-settings highlights the right lines in the reformatted JSON: 3 (ask), 5 and 6 (deny entries), 12 (matcher) and 16 (command). All 5 steps still have subgoal titles, a trigger and an expect, and they come before practice. There is still no faded step between the full example and independent practice.",
       "blockIds": [
-        "ex-b1",
         "ex-steps",
-        "ex-prompt-claude-md",
         "ex-settings",
-        "ex-prompt-skill"
-      ],
-      "carriedOver": true
+        "ex-b1"
+      ]
     },
     {
       "id": "active",
@@ -108,71 +102,61 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "cycle-flow has 5 nodes plus a review loop, and its labels match the cycle-steps titles exactly (「別のコンテキストでレビューする」). Its caption states the takeaway (「レビューで直す指摘があれば、実装と検証に戻る」) and the alt text is complete. dr-table is a real comparison, and there are no decorative images.",
+      "evidence": "cycle-flow only changed a line break (「別のコンテキストで<br>レビューする<br>（サブエージェント）」). It still has 5 nodes plus the review loop, its labels match the cycle-steps titles, and the caption (「レビューで直す指摘があれば、実装と検証に戻る」) and alt text are unchanged and complete. dr-table is still a real comparison table, now in 2 columns, and there are no decorative images.",
       "blockIds": [
         "cycle-flow",
         "dr-table"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "c-explain now works whether or not the learner built the skill (「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます」), which matches p-more's 「なければ足しません」. Every step has an expect, the model answers come after the hints, and self-check-list is the success checklist. c-review and c-commit still have no hint or troubleshoot, so the hint ladder is incomplete.",
+      "evidence": "sc-safety now checks something the learner can verify by looking at the file (「安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました」). Before, it promised a result (「pushの前に確認が入ります」). Every step has an expect, the model answers come after the hints, and self-check-list is the success checklist. c-review and c-commit still have no hint or troubleshoot, so the hint ladder is incomplete.",
       "blockIds": [
+        "self-check-list",
         "cycle-steps",
-        "setup-steps",
-        "setup-prompt-model",
-        "cycle-prompt-plan",
-        "self-check-list"
+        "setup-steps"
       ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "The summary comes after the exam and has 4 points. A reflection prompt follows (「自分で判断した場面を1行で書いておきましょう」), then a next step (「演習3で決めた部品を足していきましょう」) and advice for keeping up with changes. There are 7 flashcards in です・ます and 3 askTutor suggestions.",
+      "evidence": "The summary still comes after the exam and has 4 points. Point 2 now reads 「Claudeの判断に任せたくないことは、権限ルールとフックに置きます。」, the same wording as dr-b2 and the e1 feedback (「Claudeの判断に任せず止める権限ルール」). The reflection prompt, the next step, 7 flashcards and 3 askTutor suggestions are unchanged.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
-      "score": 3,
-      "evidence": "The three audit-confirmed fixes are in: ex-prompt-skill's /reload-skills uses the betterFix text, setup-prompt-model's expect says 「Pythonのスクリプトが開くファイルは防げません」, and card-ask names `git -C . push`. The previous issues are also fixed: e1 now says 「一致した操作を…止めます」 and check-quiz cites cc-memory. Versions are pinned (v2.1.304, v2.1.283). Two places still state more than the docs: sc-safety 「pushの前に確認が入ります」 has no limit attached, and ex-claude-md's expect omits the restart that p-restart says is needed.",
+      "score": 4,
+      "evidence": "Both remaining overstatements from the last round are fixed. ex-claude-md's expect now reads 「起動し直すと、`/context` の「Memory files」に出ます。」, which matches cc-prompt-caching (「The new content loads on the next /clear, /compact, or restart」) and p-restart. sc-safety no longer promises a push prompt. ex-rules now limits the auto-mode default to the right sessions (「ターミナルとVS Codeの対話セッションはautoモードで始まります」), as cross-lesson-facts item 1 says (「for interactive terminal and VS Code sessions only」). The ex-hook command matches the hooks-guide example in facts-cc-11-capstone.md character for character.",
       "blockIds": [
-        "ex-prompt-skill",
-        "setup-prompt-model",
-        "summary-cards",
-        "check-quiz",
+        "ex-steps",
         "self-check-list",
-        "ex-steps"
-      ],
-      "carriedOver": true
+        "ex-settings"
+      ]
     },
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The new c-explain text keeps です・ます and the non-pressuring tone (「作っていれば使い、なければ…頼みます」), and its prompt 「今の差分を説明して」 matches the course's other quoted requests. Elsewhere 「別のコンテキストで」 and 確認ルール/拒否ルール still match the glossary, and lint finds no banned phrase.",
+      "evidence": "The changed text keeps です・ます and a calm tone (「そのため、`git push` は確認ルール（ask）にします。」; 「Claudeの判断に任せたくないことは」). 確認ルール, 拒否ルール and きっかけ still match the glossary, and lint finds no banned phrase.",
       "blockIds": [
-        "cycle-steps",
-        "cycle-flow",
-        "summary-cards"
+        "ex-steps",
+        "summary-points",
+        "self-check-list"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The single declared locale (jp) is complete, including the diagram labels. Plain-text fields hold no markdown: checklist labels use 「/clear」 instead of backticks. The link text is descriptive (「公式ドキュメントの日本語版」), cycle-flow has full alt text, and no text is baked into images.",
+      "evidence": "The new sc-safety label is plain text without backticks (「git pushの確認ルール」), which suits a field that renders without markdown. cycle-flow's alt text is complete, and the extra <br> only narrows the node for mobile. The jp locale is complete.",
       "blockIds": [
         "self-check-list",
-        "cycle-flow",
-        "summary-next"
-      ],
-      "carriedOver": true
+        "cycle-flow"
+      ]
     }
   ],
   "mustFix": [],
@@ -180,13 +164,11 @@
     "c-review (cycle-steps) has no hint or troubleshoot. Add hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
     "c-commit (cycle-steps) has no hint. Add hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
     "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide. Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
-    "Factual doubt: ex-claude-md's expect 「`/context` の「Memory files」に出ます。」 has no condition, but p-restart says 「直したCLAUDE.mdと設定は、起動し直すと読み込まれます」 (cc-prompt-caching: CLAUDE.md loads on the next /clear, /compact or restart). Change it to 「起動し直すと、`/context` の「Memory files」に出ます。」",
-    "sc-safety (self-check-list) restates the guarantee that dr-b2 qualifies (「pushの前に確認が入ります」), and the audit also names this label. Change it to 「安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました」. Labels render as plain text, so use no backticks.",
-    "summary-points[1]: change 「必ず守らせたいことは、権限ルールとフックに置きます。」 to 「Claudeの判断に任せず止めたいことは、権限ルールとフックに置きます。」 to match dr-b2.",
     "sc-b1 calls an unmet checklist item a きっかけ, but the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
+    "ex-hook now prints the full command, which ex-settings repeats on line 16 right below it. To keep the step short, replace 「コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。`jq` で編集したファイル名を取り出し、Prettierに渡します。」 with 「下の設定の16行目では、`jq` で編集したファイル名を取り出し、Prettierに渡します。」",
     "worked (to reach 4): add a faded step before practice-setup. For example, add a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
   ],
-  "average": 3.77,
+  "average": 3.85,
   "verdict": "pass",
-  "summary": "Verification round: review-scope exited 0, and only cycle-steps (c-explain) changed, 2% of the parts. The one open must-fix is resolved. c-explain now gives a fallback (「なければ「今の差分を説明して」と頼みます」), so the step can be completed under p-more's rule. validate and lint --strict are clean. measure.mjs gives est 18.8 min against estMinutes 19 and prose 1,210. Load, practice and voice were re-scored. Every criterion is 3 or higher, the mean is 3.77, and there are no must-fix items. The niceToHave list carries over the earlier suggestions and adds a hint for c-commit."
+  "summary": "Verification round. review-scope exited 0: 6 of 31 blocks changed (9%), with no change to sections or objectives. The previous round had no open must-fix items and no earlier item is still open, so there are no resolved entries. All 6 changed blocks were reviewed in full. The changes apply earlier niceToHave items: ex-claude-md now names the restart, sc-safety no longer overstates the push guard, and summary-points now matches dr-b2. ex-rules limits the auto-mode default to terminal and VS Code sessions, which cross-lesson-facts supports. ex-hook explains the jq command. ex-settings' highlights match the reformatted lines 3, 5, 6, 12 and 16. dr-table is now 2 columns and cycle-flow is narrower. No regressions were found: 判断に任せ is worded the same way in dr-b2, e1 and summary-points. validate and lint --strict are clean. measure.mjs gives prose 1,329 and est 19.1 min against estMinutes 19. Accuracy rises to 4, and prior, load, worked, visual, practice, meta, voice and a11y_l10n were re-scored. Every criterion is 3 or higher, the mean is 3.85, and there are no must-fix items."
 }

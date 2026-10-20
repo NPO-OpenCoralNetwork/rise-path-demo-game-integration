@@ -35,8 +35,8 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
 
 ## 形式 / Format
 - 所要時間 / minutes: 16。コース共通の測り方（`measure.mjs`）の結果:
-  `prose 1585 (budget 1,200–2,400) · read 2405 · practice reading 806 · questions 10 · practice sections 1 · est 15.8 min`
-  （(2,405 + 806) 字 ÷ 450 字/分 = 7.1 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 15.8 分 → 16）。実際の演習は 15 分ほどかかります。
+  `prose 1585 (budget 1,200–2,400) · read 2420 · practice reading 806 · questions 10 · practice sections 1 · est 15.8 min (must be ≤ 20; estMinutes 16)`
+  （(2,420 + 806) 字 ÷ 450 字/分 = 7.2 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 15.8 分 → 16）。実際の演習は 15 分ほどかかります。
 - 難易度 / level: beginner
 - ロケール / locales: jp only（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ `cc-practice`（`git init` 済み）で、Claude に hello world の
@@ -76,11 +76,11 @@ interactive-mode and Japanese glossary pages).
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：貼り付けずに聞いてみる | チャットでは貼って写す。Claude Code は貼らずに聞ける | markdown lead (3 sentences), quiz predict (cite quickstart) | `q0` → o1 (ungraded; distractors: chat, completion, memory) |
-| `loop` | concept | 1-1. チャット・補完・エージェントループ | Claude Code はツールで調べ、変更し、確かめるループで動く | markdown lead, table (chat / completion / Claude Code), definitions (エージェントループ・ツール), diagram (loop, 5 nodes, TD), quiz inline | `q1` → o1 (new situation: a script that fails with an error) |
-| `surfaces` | concept | 1-2. どこで使うか：4つのサーフェス | 場面でサーフェスを選ぶ。エンジンは同じ | markdown lead, definitions (サーフェス with IDE spelled out・クラウドセッション・CLAUDE.md), table (4 surfaces × 場面 × 知っておくこと; CLI spelled out), markdown (same engine), quiz inline | `q2` → o2 (apply: unpushed commits + laptop closed → push, then a cloud session) |
+| `loop` | concept | 1-1. チャット・補完・エージェントループ | Claude Code はツールで調べ、変更し、確かめるループで動く | markdown lead, table (2 columns: 道具 / 見るものと、すること; rows chat / completion / Claude Code), definitions (エージェントループ・ツール), diagram (loop, 5 nodes, TD), quiz inline | `q1` → o1 (new situation: a script that fails with an error) |
+| `surfaces` | concept | 1-2. どこで使うか：4つのサーフェス | 場面でサーフェスを選ぶ。エンジンは同じ | markdown lead, definitions (サーフェス with IDE spelled out・クラウドセッション・CLAUDE.md), table (2 columns: サーフェス / 場面と、知っておくこと; 4 rows; CLI spelled out), markdown (same engine), quiz inline | `q2` → o2 (apply: unpushed commits + laptop closed → push, then a cloud session) |
 | `install` | concept | 1-3. インストールして、確かめる | 必要なものをそろえ、ネイティブインストーラーで入れて `claude --version` で確かめる | markdown lead (version date + Japanese docs link), list check (plan, OS, RAM), markdown (Console account defined + recommended installer), code bash, code powershell, markdown, code bash, callout pitfall (Node.js) | — (assessed in exam `q7`; `session` follows with a quiz, so no 3 content sections run without one) |
 | `session` | concept | 1-4. 起動して、セッションを始める | 新しいセッションはまっさら。引き継ぐのは3つだけ | markdown lead (`cd` + `claude`, login), definitions (セッション・コンテキストウィンドウ・自動メモリ), markdown, list (3 carry-over routes), quiz inline | `q3` → o3 (new day, "continue with yesterday's colours") |
-| `first-session` | example | 1-5. 例題：質問から1コミットまで | 質問 → 小さな変更 → 差分 → 説明 → コミット | markdown lead (quickstart order), definitions (差分), steps worked example (5 steps ①–⑤ with why + expect), code diff (the lines step ③ shows), callout info (auto mode from v2.1.283), callout tip (explanation habit, RCT), quiz inline | `q4` → o3 (apply: "完了しました" before committing) |
+| `first-session` | example | 1-5. 例題：質問から1コミットまで | 質問 → 小さな変更 → 差分 → 説明 → コミット | markdown lead (quickstart order), definitions (差分), steps worked example (5 steps ①–⑤ with why + expect), code diff (the lines step ③ shows; every line ≤ 60 characters), callout info (auto mode from v2.1.283), callout tip (explanation habit, RCT), quiz inline | `q4` → o3 (apply: "完了しました" before committing) |
 | `practice` | practice | 演習：練習用フォルダで1コミットまで | 1-5 を自分の手で、faded（同じ①–⑤のラベル） | markdown task, code bash (`claude --version`, `mkdir`, `cd`, `git init`, `claude`), steps (6, hint → troubleshoot ladder), prompt (page, `{{見出しの言葉}}`), prompt (explain the diff, `{{確かめたいこと}}`, model answer in `expect`), checklist (6 success criteria) | — |
 | `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (5) | `q5` → o1 (colleague: "just smarter autocomplete?"), `q6` → o2 (transfer: colleague new to the terminal, folder not on GitHub, Pro plan), `q7` → o3 (transfer: Windows, Free plan, Node.js), `q8` → o3 (advise a colleague about to ask for a big feature), `q9` → o3 (analyze: an unrequested file in `/diff`) |
 | `summary` | summary | まとめ | 持ち帰る5点、振り返り、次の一歩 | summary (5), markdown (reflection question + next: 第2回), flashcards (7), askTutor (3) | — |
@@ -93,7 +93,7 @@ Every objective has an inline and an exam question. Worked example (5 steps with
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
 Body length: measured with the course-wide `measure.mjs` (see Format): prose **1,585** JP characters (budget 1,200–2,400),
-study reading 2,405, practice reading 806.
+study reading 2,420, practice reading 806.
 
 ## Assumptions
 - Headless run: the outline was not checked in with a person.
@@ -123,3 +123,12 @@ study reading 2,405, practice reading 806.
   assess what o3 says. The round-1 fixes already force a full re-review (objective o2's spacing and most blocks changed).
 - The reader does not shuffle options, so the correct options sit at positions 1–4 across the lesson
   (q0 2, q1 3, q2 4, q3 3, q4 4, q5 1, q6 3, q7 4, q8 2, q9 1).
+- Mobile fit (390 px screens, course-wide rule from visual QA): both tables have 2 columns. `loop-table` merges
+  「見るもの」 and 「すること」 into one sentence per tool (「貼り付けた文章を見て、文章で答えて待つ」); `surfaces-table`
+  merges 「向いている場面」 and 「知っておくこと」 into one cell with the same wording (header 「場面と、知っておくこと」).
+  The facts `q1`, `q2`, `q5` and `q6` rely on are unchanged. `example-diff` splits the long `textContent` line into
+  `const p = …` and `p.textContent = …` so no code line passes 60 characters; the practice commands stay one per line.
+  `loop-diagram` already fits (TD, one node per row, labels ≤ 7 characters).
+- Round-2 ja-editor fixes: `q3` option c now ends like the other options (「昨日の会話は見えないが、伝え直すか開き直せば
+  続けられる」), keeping the audit's point that re-telling or reopening is not the only way (auto memory may carry
+  something); the `q3` explanation is 3 sentences (「…依頼文やCLAUDE.mdに書きます。」).
