@@ -1,10 +1,31 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:5e95f5eafa612ea0",
+  "lessonHash": "sha256:6b93b57324d9ed64",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:5e95f5eafa612ea0",
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/5e95f5eafa612ea0/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "hook-predict",
+      "s1-table",
+      "s3-lead",
+      "s3-defs",
+      "s3-diagram",
+      "s4-table",
+      "practice-setup",
+      "practice-prompt",
+      "practice-checklist",
+      "practice-answer",
+      "summary-next",
+      "lesson.glossary"
+    ],
+    "changedShare": 0.14,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -16,12 +37,13 @@
         "s3-check",
         "s4-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
       "score": 3,
-      "evidence": "hook-b1 sets a concrete problem in 3 sentences (the repeated 「テストは `npm run test:unit` で」, and a 300-line CLAUDE.md with 「`.env` は絶対に読まない」). hook-predict q0 asks an ungraded prediction tied to o3, with no overclaim now (「Claudeの判断に関係なく止められるのはどれ」). The lead promises 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう」, but the prediction covers only how to block `.env`.",
+      "evidence": "hook-predict changed only in its explanation (「Claudeが読むコンテキスト（context）です」); q0 is still an ungraded prediction tied to o3 after the concrete problem in hook-b1. hook-b1 still promises 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう」 while the prediction covers only blocking `.env`.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
@@ -30,9 +52,8 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Prerequisites list 第1回–第5回, and the lesson recalls them where they are needed (「第1回と第5回で見たとおり」 in s1-lead, 「第2回で書いた、ツールの使用を…」 in s4-defs, 第2回 in s4-close). New terms are defined before use (s1-defs, s3-defs, s4-defs). The glossary's AGENTS.md entry now gives the same condition as s3-defs and card-agents (「CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます。これは既定の動きです」).",
+      "evidence": "Prerequisites 第1回–第5回 are recalled where needed (「第1回と第5回で見たとおり」 in s1-lead, 「第2回で書いた…」 in hook-predict and s4-defs). The changed glossary AGENTS.md entry now gives the same condition as s3-defs (「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときに読まれます。`.claude/CLAUDE.md` も、CLAUDE.mdに数えます。」).",
       "blockIds": [
-        "s1-lead",
         "s1-defs",
         "s3-defs",
         "s4-defs"
@@ -41,13 +62,11 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 2398 (budget 1,200–2,400) · questions 9 · est 19.0 min (must be ≤ 20; estMinutes 19)」, so the lesson is within budget and estMinutes matches. Lint --strict reports 0 warnings. But prose is 2 characters under the cap. s3 still holds imports, path-scoped rules, AGENTS.md, a code block, a diagram and a version callout in one segment.",
+      "evidence": "measure.mjs: 「prose 2400 (budget 1,200–2,400) · questions 9 · est 19.0 min (must be ≤ 20; estMinutes 19)」, so prose sits exactly at the cap and estMinutes matches; lint --strict 0 warnings. s3-lead was cut to 「長くなったファイルは分けて整理できます。」, but s3 still carries imports, rules, AGENTS.md, a code block, a diagram and a callout in one segment.",
       "blockIds": [
+        "s3-lead",
         "s3-defs",
-        "s3-code",
-        "s3-diagram",
-        "s3-agents",
-        "s3-info"
+        "s3-diagram"
       ]
     },
     {
@@ -57,7 +76,8 @@
       "blockIds": [
         "s5-lines",
         "s5-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -68,7 +88,8 @@
         "s2-check",
         "s3-check",
         "s4-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -79,89 +100,91 @@
         "s1-check",
         "s4-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
-      "score": 4,
-      "evidence": "s3-diagram has 8 nodes with labels that match the text (「paths: 付きのルール」, 「自動メモリの先頭」). Its caption states the takeaway (「インポートしても、毎回読まれる量は減りません。減らせるのは paths: 付きのルールです。」) and the alt text is full. s1-table, s2-table and s4-table are real comparisons, and there are no decorative images.",
+      "score": 3,
+      "evidence": "s1-table and s4-table are now 2-column comparisons that keep all the information (「プロジェクト：チーム（Gitで共有）」, 「フック（第8回）」). The reworked s3-diagram (6 nodes, caption states the takeaway) now draws `A[\"CLAUDE.md<br>インポート先\"] --> C[\"paths: なしの<br>ルール\"] --> X[コンテキスト]`, a chain that shows CLAUDE.md feeding into the rules, which the text never says.",
       "blockIds": [
         "s3-diagram",
         "s1-table",
-        "s2-table",
         "s4-table"
       ]
     },
     {
       "id": "practice",
       "score": 4,
-      "evidence": "The task is authentic and calls for transfer: the learner sorts 18 lines before prompting, including cases the example did not show (git push, the 「毎回必ず」 format line → 「後でフックにする」). It has a 3-level hint ladder (pr-decide hint → troubleshoot → practice-hint3), a 7-item checklist, a model answer (practice-answer, practice-answer-settings) and a check with /context and /permissions. practice-hint3 now matches s4-table on line 9 (「9行目の「毎回必ず」はフックの候補（第8回）」).",
+      "evidence": "The authentic 18-line task, 3-level hint ladder, 7-item checklist (now in です・ます: 「…確かめました」) and model answer remain. The split lines in practice-setup and practice-answer keep the 18-line file and the `sed -n '12,18p'` before the overwrite, and practice-answer's highlight moved from 4–8 to 5–9, which matches the four kept lines and the HTML comment.",
       "blockIds": [
+        "practice-setup",
         "practice-steps",
         "practice-checklist",
         "practice-hint3",
-        "practice-answer",
-        "practice-answer-settings"
+        "practice-answer"
       ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4 points) comes after the exam. summary-next asks a reflection question (「ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか」) and names the next step (第7回). summary-cards has 7 cards, and summary-ask offers tutor prompts.",
+      "evidence": "summary-points follows the exam; summary-next keeps the reflection question (「ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか」) and now names the next lesson by its real title (「第7回｜手順はスキルに、調べものはサブエージェントに」, the cc-07 draft title). summary-cards has 7 cards.",
       "blockIds": [
         "summary-points",
         "summary-next",
-        "summary-cards",
-        "summary-ask"
+        "summary-cards"
       ]
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "Every audit finding marked confirmed is fixed in the text: s3-defs AGENTS.md matches the checker's betterFix, card-agents adds 「既定では」, the glossary adds 「これは既定の動きです」, and the q4 explanation and card-paths now say 「1つのファイルを `cat` や `head` で見たとき」. s4-close states the limit of deny rules (「`git -C . push` のような別の書き方は止まりません」), which matches cc-02. Versions are pinned (v2.1.304, v2.1.277). Small precision gaps remain: the glossary AGENTS.md entry leaves out 「作業フォルダーとその上」 and the fact that ~/.claude/CLAUDE.md does not count, and pr-permissions expects exact rule strings that Claude may write differently.",
+      "evidence": "s3-defs AGENTS.md (「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。」) and the glossary now match the audit quote 「Count…: a CLAUDE.md, .claude/CLAUDE.md, or CLAUDE.local.md in your working directory or any directory above it」. The table rewrites keep the same facts (`/etc/claude-code/` のCLAUDE.md, 第2回/第7回/第8回 targets).",
       "blockIds": [
         "s3-defs",
-        "s3-check",
-        "s4-close",
-        "summary-cards",
-        "practice-steps"
+        "s1-table",
+        "s4-table"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The text is consistent です・ます, warm and free of pressure (「まず予想してみましょう」, 「迷ったら…確かめましょう」, 「大事なリポジトリでは試さないでください」). Lint finds no banned phrases or long sentences, and katakana terms carry the English on first use (「インポート（import）」, 「分類器（classifier）」). Wording is left to ja-editor.",
+      "evidence": "The changed text keeps です・ます and a warm tone: the checklist labels now read as statements (「…確かめられない行がありません」, 「…確かめました」), the prompt hint says 「18行分を書きます」, and summary-next invites rather than pushes (「置き場所を考えてみましょう」). Lint --strict finds no banned phrase or long sentence; wording is left to ja-editor.",
       "blockIds": [
-        "hook-b1",
-        "s3-info",
-        "practice-task"
+        "practice-checklist",
+        "practice-prompt",
+        "summary-next",
+        "s3-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The only declared locale is jp, and it is complete. s3-diagram has caption and alt, the link text says where it goes (「公式ドキュメント（日本語）」 in s3-info), and no text is baked into images.",
+      "evidence": "The jp locale is complete, s3-diagram has caption and alt, and the link text says where it goes (「公式ドキュメント（日本語）」). But the changed alt describes 「（と自動メモリの先頭）」, which the reworked diagram no longer shows.",
       "blockIds": [
         "s3-diagram",
         "s3-info"
       ]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "Budget guard: measure.mjs reports prose 2398 of the 2,400 cap. Offset any text added by the items below with an equal cut, e.g. drop s3-lead's second sentence 「ただし、分け方で読み込まれるタイミングが変わります。」 (the s3-diagram caption already makes that point).",
-    "hook-b1: so the promise matches the single predict question, replace 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう。」 with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」",
-    "s1-check q2 option c: replace 「矛盾する2行の片方を消して、どちらか1つにそろえる」 with 「どちらか片方の行を消して、1つにそろえる」. That removes the only option that repeats s1-concat's 「矛盾する2行」.",
-    "check-quiz e6 option a: 「IMPORTANT」 is the wrong answer in five items. Replace it with md 「「前のセッションで頼んであるから、もう覚えているよ」」 and feedback 「セッションは毎回まっさらに始まり、前の会話は引き継がれません。止めたい操作は、拒否ルールやフックで決めておきます。」 This tests the brief's 「前回の会話を覚えている」 misconception.",
-    "check-quiz e2: the item repeats s4-table row 2 and practice line 9, so it is recall rather than transfer. Option: change the prompt to 「Claudeが返事を終えるたびに、必ず通知音を鳴らしたいとき、どうしますか？」 and option a's feedback to 「Claudeが音を鳴らすと決めるのと、音が自動で鳴るのは別のことです。毎回必ず起こすならフックです。」 Keep options b, c and d as they are.",
-    "check-quiz e3 option a feedback: the file does get shorter, only the load does not. Replace 「整理にはなっても、短くはなりません。」 with 「整理にはなっても、毎回読まれる量はそのままです。」",
-    "practice-hint3: the hint says 「7・8行目はテストのコマンドの行にまとめます」, but practice-answer keeps two test lines. Replace that clause with 「7行目は「コミットの前に `npm run test:unit` を通す」に直し、8行目は残します」.",
-    "practice-steps pr-permissions expect: Claude may write `Bash(git push:*)` or `Read(.env)`. Replace it with 「拒否ルールとして、`.env` の読み取りと `git push` を止める2行が見つかります（例：`Read(./.env)`、`Bash(git push *)`）。」",
-    "practice-steps pr-context expect: add 「自動メモリがあれば、それも表示されます。」 so a learner with an existing MEMORY.md is not confused by the extra entry.",
-    "objectives.o1: e2 assesses a hook under o1. Consider 「指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール・フック）を、内容に合わせて選べる」. Changing an objective makes the next round a full review.",
-    "glossary AGENTS.md: align it with s3-defs: 「ほかのAIコーディングツールと共有する指示のファイル。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときに読まれます。`~/.claude/CLAUDE.md` は数えません（v2.1.277以降）。」"
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "s3-diagram",
+      "issue": "Regression from the s3-diagram rework. The new code chains `S --> A[\"CLAUDE.md<br>インポート先\"]`, `A --> C[\"paths: なしの<br>ルール\"]`, `C --> X[コンテキスト]`, and A has no edge of its own to X. The rendered diagram shows CLAUDE.md and its imports passing through the unscoped rules into the context, as if rules were loaded by or through CLAUDE.md. s3-defs says rules are separate files read at startup, and import vs rules is the very distinction this segment teaches. The changed alt also describes 「（と自動メモリの先頭）」, which the diagram no longer shows, so screen-reader users get different content than sighted ones.",
+      "fix": "Keep the narrow 2-column layout and merge everything read at startup into one node. Set code to:\nflowchart TD\n  S[セッション開始] --> A[\"CLAUDE.md<br>インポート先<br>paths: なしの<br>ルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\n  A --> X[コンテキスト]\n  E --> X\nThat gives 5 nodes. Set alt to 「セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図」. Keep the caption as it is."
+    }
   ],
-  "average": 3.31,
-  "verdict": "pass",
-  "summary": "The scope check required a full review: objectives.o1 changed, and 37% of the lesson's parts (56% of its blocks) changed. All 9 must-fix items from round 1 are gone: the deny overclaim (q0, q5, card-never, s4-close limit), the glossary AGENTS.md condition, q2 rewritten as a repair item, the line-9 hint, and estMinutes (measure.mjs: est 19.0, estMinutes 19). The audit's confirmed findings are also applied. The biggest strength is the worked example followed by a transfer practice with a full hint ladder, a checklist and a model answer. The most useful next fix is to vary the distractors: 「IMPORTANT」 is the wrong option in five items. Keep within the 2,400-character prose cap while doing so."
+  "niceToHave": [
+    "s3-defs and glossary AGENTS.md: 「ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）」 attaches the version to the file, but the audit quote says 「Reading AGENTS.md directly requires Claude Code v2.1.277 or later」. Consider 「ほかのAIコーディングツールと共有する指示のファイル。Claude Codeはv2.1.277以降で読みます。」 (keep each sentence ≤ 60 chars).",
+    "glossary AGENTS.md: unlike s3-defs, it does not say that `~/.claude/CLAUDE.md` and the managed CLAUDE.md do not count. A learner who reads only the glossary may think a personal CLAUDE.md blocks AGENTS.md. Consider appending 「`~/.claude/CLAUDE.md` は数えません。」",
+    "practice-setup: splitting `mkdir cc-practice-06 && cd cc-practice-06 && git init` into 3 lines drops the guard. If `cd` fails, `cat > CLAUDE.md` overwrites the CLAUDE.md of the current folder. To keep it narrow, consider the first line 「mkdir -p cc-practice-06 && cd cc-practice-06」, then 「git init」.",
+    "hook-b1 (unchanged, carried from the previous review): so the promise matches the single predict question, replace 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう。」 with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」",
+    "check-quiz e6 option a (unchanged, carried from the previous review): 「IMPORTANT」 is still the wrong answer in five items (q0 a, q2 a, q5 a, e3 c, e6 a). Replace e6 a with md 「「前のセッションで頼んであるから、もう覚えているよ」」 and feedback 「セッションは毎回まっさらに始まり、前の会話は引き継がれません。止めたい操作は、拒否ルールやフックで決めておきます。」",
+    "practice-hint3 (unchanged, carried from the previous review): 「7・8行目はテストのコマンドの行にまとめます」 still does not match practice-answer, which keeps two test lines. Replace that clause with 「7行目は「コミットの前に `npm run test:unit` を通す」に直し、8行目は残します」.",
+    "practice-steps pr-permissions expect (unchanged, carried from the previous review): Claude may write `Bash(git push:*)` or `Read(.env)`. Replace it with 「拒否ルールとして、`.env` の読み取りと `git push` を止める2行が見つかります（例：`Read(./.env)`、`Bash(git push *)`）。」",
+    "Budget guard: prose is at 2400 of the 2,400 cap (measure.mjs). Offset any text the fixes add with an equal cut."
+  ],
+  "average": 3.23,
+  "verdict": "revise",
+  "summary": "This is a verification round (review-scope exit 0, 14% of parts changed). The previous review had no open must-fix items. The changed tables, glossary, AGENTS.md definition, practice code and next-lesson pointer are accurate and consistent, and the practice highlight was correctly shifted to lines 5–9. One regression blocks a pass: the narrowed s3-diagram draws CLAUDE.md → paths: なしのルール → コンテキスト as a chain, and its alt mentions auto memory that is no longer drawn. Merge the startup items into one node and align the alt as given."
 }

@@ -1,33 +1,63 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:d8b090b9a8da1f4f",
+  "lessonHash": "sha256:3ebe60f3a0474749",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:d8b090b9a8da1f4f",
+    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/d8b090b9a8da1f4f/round-1/ja-editor.review.json",
+    "changed": [
+      "loop-table",
+      "surfaces-table",
+      "session-check",
+      "example-diff"
+    ],
+    "changedShare": 0.05,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "session-check",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "q3 option c now reads 「昨日の会話は見えないが、伝え直すか開き直せば続けられる」. It ends in a verb like options a, b and d (「続けられる」「読み込まれる」「戻っている」), so its form no longer gives the answer away."
+    },
+    {
+      "blockId": "session-check",
+      "criterion": "load",
+      "status": "resolved",
+      "evidence": "The q3 explanation now has 3 sentences and ends 「続けたいときは `claude --continue` で開き直すか、決めたことを依頼文やCLAUDE.mdに書きます。」. That fits the §1 limit of 3 sentences per paragraph."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses warm です・ます throughout and has no pressure phrases. lessons:lint --strict reports 0 errors and 0 warnings. The round-1 notation issues are gone: no string has a space between 和文 and 英数字, 「Yes」 is in 「」, and every flashcard back ends in です・ます. The naming is now consistent: IDE拡張（VS Code）/IDE拡張（JetBrains）, and クラウドセッション in the definitions, the glossary and the questions. Each worked step gives its reason in one short sentence. The score stays at 3, not 4, because of two things. In q3 (session-check), the correct option c ends 「〜のが確実」, a judgement, while the other three options are verb-ending predictions. A few spots still read stiffly: install-how puts two unrelated ideas together, and loop-lead does not name what is compared.",
+      "evidence": "The q3 options are now parallel verb endings, and the merged table cells in loop-table (「〜を見て、〜」) and surfaces-table read naturally in です・ます-neutral fragments. It stays at 3 because the stiff spots noted in round 1 are unchanged (install-how, loop-lead), and surfaces-table still says 「JetBrains版」 where the questions say 「IDE拡張（JetBrains）」.",
       "blockIds": [
         "session-check",
+        "loop-table",
+        "surfaces-table",
         "install-how",
         "loop-lead"
       ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "measure.mjs: prose 1585 (budget 1,200–2,400), read 2405, practice reading 806, est 15.8 min (≤ 20), and estMinutes 16 matches. Lint is clean. Each segment adds at most 3 defined terms: loop 2, surfaces 3, session 3, first-session 1 (+ permission mode). Every section breaks up its text with a table, diagram, list, code, steps or a check. Wrong-option feedback is at most 2 sentences everywhere. It is not 4 because the q3 explanation (session-check) is one paragraph of 4 sentences. That breaks the §1 limit of 3 sentences per paragraph (see mustFix).",
+      "score": 4,
+      "evidence": "measure.mjs: prose 1585 (budget 1,200–2,400), est 15.8 min (≤ 20, estMinutes 16), and lessons:lint --strict shows 0 errors and 0 warnings. The only thing that kept this below 4 in round 1, the 4-sentence q3 explanation, is fixed, and loop-table and surfaces-table now fit 2 columns on a phone.",
       "blockIds": [
-        "session-check"
+        "session-check",
+        "loop-table",
+        "surfaces-table"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Prerequisites are stated and point to earlier chapters (第3章, 第5章). Every term is now defined before use, with English on first use. 差分 is no longer used in 1-2 (surfaces-table now says 「変更箇所」). ネイティブインストーラー（native installer） gets its English in surfaces-table. IDE（統合開発環境）, CLI（Command Line Interface） and API（Application Programming Interface） are spelled out. The glossary terms match the body. It does not reach 4 because a few working words are never explained for a beginner: push (surfaces-table, q2), エンジン (surfaces-same, summary-points), npm (install-node) and `claude --cloud` (q6 feedback). See niceToHave.",
+      "evidence": "surfaces-table still gives ネイティブインストーラー（native installer） and CLI（Command Line Interface） their English on first use, so merging the columns lost no definition. It stays at 3 because push (surfaces-table, q2), エンジン, npm and `claude --cloud` are still not explained for a beginner (see niceToHave).",
       "blockIds": [
         "surfaces-table",
         "surfaces-same",
@@ -38,37 +68,25 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares jp only, and every string is Japanese, diagram labels included. The mermaid diagram has a specific alt and caption. Both links name their destination: 「公式ドキュメントの日本語版」 (install-lead) and 「インストールのトラブルシューティング」 (practice-steps p-start). Plain-text fields (checklist labels, step titles, askTutor suggestions) contain no markdown."
+      "evidence": "The lesson declares jp only, and every string is Japanese, diagram labels included. The mermaid diagram has a specific alt and caption. Both links name their destination: 「公式ドキュメントの日本語版」 (install-lead) and 「インストールのトラブルシューティング」 (practice-steps p-start). Plain-text fields (checklist labels, step titles, askTutor suggestions) contain no markdown.",
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "session-check",
-      "issue": "(d) option form (§5): the question asks 「どうなるでしょう？」. Options a, b and d predict an outcome and end in a verb: 「続けられる」「読み込まれる」「戻っている」. Only the correct option c ends in the judgement 「〜のが確実」. Its form gives the answer away.",
-      "fix": "q3 option c: 「昨日の会話は見えないので、伝え直すか開き直すのが確実」→「昨日の会話は見えないが、伝え直すか開き直せば続けられる」"
-    },
-    {
-      "criterion": "load",
-      "blockId": "session-check",
-      "issue": "(d) paragraph budget (§1, at most 3 sentences per paragraph): the q3 explanation is one paragraph of 4 sentences: 「セッションは…。自動メモリに残ることもありますが、…。続けたいときは…。何度も使う決まりごとは、CLAUDE.mdに書いておけます。」",
-      "fix": "q3 explanation: 「続けたいときは `claude --continue` で開き直すか、決めたことを依頼文に書きます。何度も使う決まりごとは、CLAUDE.mdに書いておけます。」→「続けたいときは `claude --continue` で開き直すか、決めたことを依頼文やCLAUDE.mdに書きます。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "loop-lead: The sentence does not say what is being compared — 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
-    "surfaces-table: push appears here and in q2 without explanation, and the prerequisites only cover commit. Gloss it at first use — 「GitHubのリポジトリを使う。先にpushする」→「基本はGitHubのリポジトリを使う。先にpush（GitHubへ送る）する」. The 「基本は」 also keeps the cell in line with the q6 feedback, which says a local Git repository can be sent with `claude --cloud`.",
-    "surfaces-table: The IDE row says 「JetBrains版」, but q2, q6 and their feedback say 「IDE拡張（JetBrains）」/「JetBrainsの拡張」. A learner still matches them, but one name reads better — 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」",
-    "surfaces-same: 「エンジン」 is a katakana word with no explanation (summary-points too) — 「どれも同じエンジンなので、」→「どれも中身は同じClaude Codeなので、」",
-    "install-how: The two sentences carry unrelated ideas, and in 「推奨は〜で、自動で更新されます」 the installer sounds like the thing that gets updated — 「推奨はネイティブインストーラーで、自動で更新されます。」→「推奨はネイティブインストーラーです。この方法で入れると、Claude Codeが自動で更新されます。」",
-    "install-how: 「APIを前払いで使えます」 does not tell a beginner how this relates to Claude Code — 「ConsoleアカウントではAPI（Application Programming Interface）を前払いで使えます。」→「Consoleアカウントでは、API（Application Programming Interface）の料金を前払いしてClaude Codeを使えます。」",
-    "install-node: npm appears with no explanation — 「npmで入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
-    "check-quiz: q6 option b feedback introduces `claude --cloud` without saying what it is. A short gloss helps — 「`claude --cloud` で送れます。」→「ターミナルの `claude --cloud` コマンドで送れます。」",
-    "practice-steps: The p-change hint mentions the Esc key in prose only. §3 asks for key presses in `steps[].keys` as well; the body text 「Escキーで止めて」 can stay. PATH in the p-start troubleshoot is not explained either — 「PATHの直し方」→「PATH（コマンドを探す場所の設定）の直し方」",
-    "hook-predict: q0 option d's feedback 「Claude Codeは前回の会話を覚えていません。」 reads as absolute, but session-check later says something may remain in 自動メモリ. A softer wording avoids a seeming contradiction — 「Claude Codeは前回の会話を覚えていません。」→「新しいセッションに、前回の会話は入っていません。」",
-    "practice-steps: Factual doubt: p-start expect 「入力欄の上に `cc-practice` が表示されます。」 is not covered by the audit or facts file. Check it against the current CLI screen or cc-quickstart, or write the expectation more generally (「Claude Codeの入力欄が表示されます。」)."
+    "surfaces-table: The クラウドセッション cell now has three short sentences in a row, and push is still not explained — 「PCを閉じても進めたい。GitHubのリポジトリを使う。先にpushする」→「PCを閉じても進めたい。基本はGitHubのリポジトリを使い、先にpush（GitHubへ送る）する」",
+    "surfaces-table: 「JetBrains版」 differs from 「IDE拡張（JetBrains）」 in q2 and q6. A learner still matches them, but one name reads better — 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」",
+    "loop-table: The Claude Code cell is long, and its two 「、」 lists run together — 「プロジェクトのファイル、ターミナル、Gitを見て、自分で調べ、変更し、確かめる」→「プロジェクトのファイル・ターミナル・Gitを見て、自分で調べ、変更し、確かめる」",
+    "session-check: q3 option c uses the written-style 「〜が、」 inside a spoken-style quiz. 「けれど」 is softer — 「昨日の会話は見えないが、」→「昨日の会話は見えないけれど、」",
+    "loop-lead: (carried from round 1, unchanged text) The sentence does not say what is being compared — 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
+    "surfaces-same: (carried, unchanged text) 「エンジン」 is not explained — 「どれも同じエンジンなので、」→「どれも中身は同じClaude Codeなので、」",
+    "install-how: (carried, unchanged text) 「推奨はネイティブインストーラーで、自動で更新されます。」→「推奨はネイティブインストーラーです。この方法で入れると、Claude Codeが自動で更新されます。」",
+    "install-node: (carried, unchanged text) 「npmで入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
+    "check-quiz: (carried, unchanged text) 「`claude --cloud` で送れます。」→「ターミナルの `claude --cloud` コマンドで送れます。」",
+    "hook-predict: (carried, unchanged text) q0 option d feedback reads as absolute next to the 自動メモリ caveat in session-check — 「Claude Codeは前回の会話を覚えていません。」→「新しいセッションに、前回の会話は入っていません。」",
+    "practice-steps: (carried) Factual doubt: the p-start expectation 「入力欄の上に `cc-practice` が表示されます。」 is not covered by the audit or facts file. A more general wording would be 「Claude Codeの入力欄が表示されます。」"
   ],
-  "average": 3.25,
-  "verdict": "revise",
-  "summary": "The scope check required a full review: 32 of 43 blocks changed, and objectives o2 and o3 changed. Every must-fix item from round 1 is gone. There are no 和文/英数字 spaces, 差分 is not used before 1-5, ネイティブインストーラー（native installer） gets its English in surfaces-table, and IDE, CLI and API are spelled out. サーフェス lists クラウドセッション, and the questions use IDE拡張（VS Code/JetBrains） consistently. q5 option a is one clause, 「Yes」 is quoted, the p-start troubleshoot reads 「それでも見つからないときは」, and the flashcard backs are です・ます. The three audit fixes (q6 b feedback, example-habit, q3 option c) are applied verbatim. Two new must-fix items remain, both in q3 (session-check). The correct option's ending 「〜のが確実」 differs from the other options. The explanation is 4 sentences in one paragraph. The other notes are about clarity for beginners (push, エンジン, npm, `claude --cloud`)."
+  "average": 3.5,
+  "verdict": "pass",
+  "summary": "Verification round: review-scope.mjs exited 0, with 4 of 43 blocks changed (5%). Both round-1 must-fix items in session-check are fixed. q3 option c now ends in a verb like the other options, and the explanation is down to 3 sentences. The merged 2-column tables (loop-table, surfaces-table) and the split line in example-diff add no class (a)–(e) error, and lint --strict is clean. load goes up to 4 because its only blocker is gone. The remaining notes are niceToHave."
 }

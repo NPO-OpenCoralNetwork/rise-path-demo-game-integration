@@ -1,0 +1,71 @@
+{
+  "lessonId": "cc-02-permissions",
+  "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
+  "lessonHash": "sha256:6d79b8134ac7e198",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 2,
+      "evidence": "Desktop looks clean: the tables, code, callouts, steps and the flowchart all render in full (desktop-jp-02..10). At 390 px two things are cut off. The right branch of the rules-diagram flowchart ('許可ルールに一…' and its 'いいえ' outcome) runs past the card edge (mobile-jp-09/10). The second column of modes-table is clipped mid-sentence (mobile-jp-03/04).",
+      "blockIds": [
+        "rules-diagram",
+        "modes-table",
+        "rules-files"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "No text-only screens. Every screen has a heading, table, code, figure or check, and the quizzes break up the concepts. On desktop the flowchart takes about 1.3 screens of height for 8 short nodes (desktop-jp-06/07), and desktop chars per line has a median of 42, above the 30–40 target.",
+      "blockIds": [
+        "rules-diagram"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Everything is in Japanese, including the diagram labels. No English UI strings leak in and no controls sit under the bars. Contrast is good. Long inline code breaks awkwardly: '--' and 'dangerously-skip-permissions' land on separate lines (mobile-jp-06, mobile-jp-22/23), and 'Bash(gh pr create' / '*)\"]' are split in the e6 options (mobile-jp-26).",
+      "blockIds": [
+        "auto-bypass",
+        "check-quiz"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "rules-diagram",
+      "issue": "At 390 px the TD flowchart steps further right with each 'いいえ' branch. The third decision '許可ルールに一致？' is cut at the right edge and its 'いいえ → 権限モードに従う' outcome is off-screen. Learners have to know to tap the expand button to see the last step.",
+      "fix": "Make the diagram narrower. Shorten the decision labels to '拒否ルール？' / '確認ルール？' / '許可ルール？' and the outcomes to '止める' / '確認する' / '実行する' / 'モードに従う'. Also lay the 'いいえ' chain straight down and put the 'はい' outcomes to one side (for example, declare the outcome nodes after the chain), so the width stays at two columns. If it still overflows, replace the diagram with a 4-row steps or table block (拒否→確認→許可→モード).",
+      "screenshot": "pages/mobile-jp-10.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "modes-table",
+      "issue": "On mobile the 2-column mode table is wider than the viewport. The second column ('確認なしで動くものと、向く場面') is cut mid-word in every row ('読み取りだけ。一つずつ確…', 'すべて（裏で安全チェック…'), so the key comparison of the lesson is not readable at 390 px without a horizontal scroll that is not obvious.",
+      "fix": "Turn modes-table into a definitions block (term = mode name, md = what runs without confirmation + when to use it), which stacks well on mobile like auto-defs does. Or keep the table but shorten the cells so each fits the width, for example move '（default）' / '（plan）' out of column 1 and split 'what runs' and 'when to use' into short phrases.",
+      "screenshot": "pages/mobile-jp-04.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "rules-files",
+      "issue": "At 390 px line 3 of the terminal code is cut after 'dummy-not-a-secre'. The redirect '> .env', which is the point of the line, is hidden off-screen.",
+      "fix": "Shorten the line so it fits about 36 monospace characters, for example `echo \"TOKEN=dummy\" > .env`, and update the matching mention in the steps if needed.",
+      "screenshot": "pages/mobile-jp-18.png"
+    }
+  ],
+  "niceToHave": [
+    "rules-prompt / rewind-prompt: the prompt body shows literal backticks (`git push`, `.claude/settings.json`, `rewind-copy.md`) on both mobile and desktop (mobile-jp-20/21, desktop-jp-14/15). Remove them or use 「」 if the raw backticks are not needed for Claude.",
+    "auto-bypass and check-quiz e1: `--dangerously-skip-permissions` breaks after '--' on mobile (mobile-jp-06, mobile-jp-23). Consider putting it on its own line or rewording so the flag starts a line.",
+    "check-quiz e6 options: the long inline-code answers wrap inside the code span on mobile (mobile-jp-26). They are readable but could be shortened, for example drop the outer `\"ask\": [ ]` and show only `Bash(gh pr create *)`.",
+    "reader: desktop JP measure gives a median of 42 chars per line (target 30–40) at 680 px.",
+    "reader: no scroll cue on wide tables and code blocks on mobile.",
+    "reader: the full-length mobile PNG stops at 16000 px, and the end banner says this is the course's last lesson because drafts are not in course.json.",
+    "reader: failed /api/ requests (500 on user/progress, events, notifications) are environment noise."
+  ],
+  "verdict": "revise",
+  "summary": "Hard checks are clean (no overflow, console, mermaid, unknown-block or broken-image failures; no text-only screens; no personal data visible), and the desktop layout reads well with good block variety. Three mobile cut-offs need lesson fixes: the rules-diagram flowchart's right branch runs off the card, the modes-table second column is clipped, and line 3 of the rules-files terminal code hides '> .env'."
+}

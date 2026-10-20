@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:1a611951e0d6a3f3",
+  "lessonHash": "sha256:2597b7828fdf4777",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,50 +9,46 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s3-diagram flowchart TD reads well at 390 px. Its Japanese node and edge labels are legible and nothing is clipped (pages/mobile-jp-09.png, desktop-jp-06.png). The two-column tables s2-table, s3-table, s4-table and pr-answer fit the mobile width without overflow (pages/mobile-jp-06.png, 10, 12-13, 27). The code blocks s2-code and pr-code fit in full, including the echo line (pages/mobile-jp-22.png).",
+      "evidence": "The s3-diagram flowchart TD fits 390 px with readable Japanese labels (pages/mobile-jp-09.png) and is clear on desktop (pages/desktop-jp-06.png). The two-column tables s2-table, s3-table, s4-table and pr-answer wrap cleanly on mobile with nothing clipped (pages/mobile-jp-06.png, 10, 12-13, 27). metrics.json: overflowX false, 0 console, mermaid or image errors, 0 unknown blocks.",
       "blockIds": [
         "s3-diagram",
         "s2-table",
         "s3-table",
         "s4-table",
-        "pr-answer",
-        "s2-code",
-        "pr-code"
+        "pr-answer"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "metrics.json reports textOnlyScreens empty on desktop-jp and mobile-jp. Every screen has a heading, a definitions card, a table, a diagram, code, steps or a quiz, and there are no walls of text or empty gaps. Desktop charsPerLine median is 39, inside the JP target of 30-40.",
+      "score": 3,
+      "evidence": "No text-only screens on either device (textOnlyScreens is empty). Every screen has a definition card, table, figure, step list or quiz, and the desktop median is 39 chars per line, inside the 30-40 target (max 53). The page is long (34 mobile screens), and the practice section stacks a quiz, code, steps, two prompts, a checklist and a table back to back (pages/mobile-jp-19.png to 27).",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s3-defs",
-        "s4-defs",
-        "s5-steps",
-        "pr-steps-compact"
+        "pr-diagnose",
+        "pr-steps-start",
+        "pr-steps-compact",
+        "pr-checklist"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is Japanese only, with lang=ja and no stray English UI text. Katakana terms show their English on first use, for example 「コンテキストウィンドウ（context window）」 in s1-defs. Contrast is good on the callout, the quiz cards and the dark code blocks. Controls such as 答える and この予想で決定 sit clear of the top and bottom bars (pages/mobile-jp-03.png, 07).",
+      "evidence": "The Japanese-only lesson shows Japanese UI and content throughout, with English given in parentheses for katakana terms (セッション（session）, pages/mobile-jp-03.png). The diagram has alt text and a caption, controls are not hidden under the top or bottom bars, and contrast is fine on the callout and quiz cards (pages/mobile-jp-11.png).",
       "blockIds": [
+        "s3-diagram",
         "s1-defs",
-        "s3-pitfall",
-        "hook-predict"
+        "s3-pitfall"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Objective o1 breaks the word 見分け as 見分 / け on mobile and in the reflection card, because 「け、/clear・/compact・サブエージェントから」 wraps as one unit (pages/mobile-jp-01.png, mobile-jp-33.png). Rewording it as 「セッションの失敗パターンを見分けて、/clear・/compact・サブエージェントから対処を選べる」 or moving the command list later would avoid the split.",
-    "In the s2-table, the mobile third row breaks 消し as 消 / し (pages/mobile-jp-06.png). A shorter cell such as 「**自動のコンテキスト圧縮**：上限が近いと、古い出力から消して要約する」 would wrap more cleanly.",
-    "The pr-answer example answers are fully visible right under the pr-checklist (pages/mobile-jp-27.png, desktop-jp-17.png), so learners see the results before they do the exercise. Adding a lead-in line such as 「試し終えたら見比べましょう」 just above the table would help.",
-    "reader: in the pr-predict step, which has a hint and no troubleshoot text, the disclosure is labelled 「うまくいかないときは」 (pages/mobile-jp-24.png, desktop-jp-16.png). A hint label would fit better.",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」. This is known draft behaviour (pages/mobile-jp-34.png, desktop-jp-22.png).",
-    "reader: the mobile full-length PNG is truncated, and 13 /api/ requests failed (500 on user progress, notifications and events). Both are environment noise."
+    "pr-code: at 390 px the 4th line `echo '- <title>は「練習：」で始める' > CLAUDE.md` runs past the code box, and only 'CLAUDE.m' is visible until you scroll sideways (pages/mobile-jp-22.png). The block scrolls and has a copy button, but a shorter line, for example the redirect on its own line or a shorter rule text, would show the whole command.",
+    "lesson objectives (o1): on mobile the objective breaks as '見分 / け、' (pages/mobile-jp-01.png), and the same break shows in ふりかえり (pages/mobile-jp-33.png). Rephrasing it, for example '失敗パターンを見分けて、…から対処を選べる', or shortening it would avoid splitting the word.",
+    "s2-table: on mobile the third row breaks as '消 / し、' (pages/mobile-jp-06.png). This is minor; a shorter cell such as '上限が近いと、古いツールの出力から消える' would avoid it.",
+    "reader: pr-predict's `hint` is rendered behind the 'うまくいかないときは' (troubleshoot) disclosure (pages/mobile-jp-24.png, pages/desktop-jp-16.png). A hint should have its own label such as 'ヒント'.",
+    "reader: the whole first column of every table is rendered in bold, so the **bold** pattern names in s4-table and s2-table do not stand out from the rest of the cell (pages/mobile-jp-12.png).",
+    "reader: known behaviour, not lesson defects. The mobile full-length PNG stops at 16000 px, 13 failed /api/ requests were ignored, and the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png)."
   ],
   "verdict": "pass",
-  "summary": "Nothing in the screenshots needs fixing before this lesson can pass. metrics.json shows no hard failures (no overflow, no console, mermaid, unknown-block or image errors) and no text-only screens, and the hash matches the expected sha256:1a611951e0d6a3f3. The vertical diagram and the two-column tables read clearly at 390 px, and no personal data appears on any screen. The only items are optional: smoothing awkward Japanese line breaks in objective o1 and the s2-table, and adding a short note before the pr-answer table."
+  "summary": "lessonHash sha256:2597b7828fdf4777 from metrics.json matches the expected hash. There are no hard failures, no text-only screens and no personal data on any screen I opened (all 34 mobile-jp and 22 desktop-jp pages). The vertical (TD) compaction diagram and the two-column tables read well at 390 px. Nothing must be fixed. The most useful polish is to shorten the long echo line in pr-code so the whole command shows on mobile without scrolling sideways."
 }

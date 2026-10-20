@@ -1,27 +1,28 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:1a611951e0d6a3f3",
+  "lessonHash": "sha256:2597b7828fdf4777",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:319f5a2007903c95",
+    "reviewedRevision": "sha256:1a611951e0d6a3f3",
     "changed": [
       "pr-code"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/319f5a2007903c95/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/1a611951e0d6a3f3/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Only pr-code changed. Its learner-visible CLAUDE.md line changed from 「- HTMLの<title>は「練習：」で始める」 to 「- titleは「練習：」で始める」. This is an instruction line written into a file, not lesson prose, so plain form is fine there. The pr-checklist label 「about.htmlのtitleが「練習：」で始まるかを確かめました」 already uses the same bare 「title」. The stiff spots in unchanged text are carried over (s5-steps 「よい最初の依頼」, the s5-check option d feedback with no subject). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
+      "evidence": "Only pr-code changed. Its CLAUDE.md line changed from 「- titleは「練習：」で始める」 to 「- <title>は「練習：」で始める」, which applies the previous niceToHave. The line now uses the same form as the expected-result text in pr-prompt-a: 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります。」. The line is an instruction written into a file, so plain form is fine there. Inside single quotes the shell treats `<` as a literal character, so the command still works. pr-checklist still uses the bare form 「about.htmlのtitleが「練習：」で始まるか」. That is a variant the learner will still match, so it goes to niceToHave. The stiff spots in unchanged text are carried over (s5-steps, s5-check). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
       "blockIds": [
         "pr-code",
+        "pr-prompt-a",
         "pr-checklist",
         "s5-steps",
         "s5-check"
@@ -30,7 +31,7 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "Not touched by the change. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289, est 19.8 min (must be ≤ 20), and estMinutes is 20.",
+      "evidence": "The change does not touch load. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289 and est 19.8 min (must be ≤ 20), with estMinutes 20.",
       "blockIds": [
         "pr-code"
       ],
@@ -39,7 +40,7 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Not touched by the change. No new term is introduced. The s4-table English glosses and 「直下のCLAUDE.md」 are unchanged.",
+      "evidence": "The change does not touch prior knowledge, and it introduces no new term.",
       "blockIds": [
         "s4-table",
         "s3-table"
@@ -49,7 +50,7 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Not touched by the change. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
+      "evidence": "The change does not touch a11y_l10n. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
       "blockIds": [
         "s3-diagram"
       ],
@@ -58,7 +59,7 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "pr-code: the new CLAUDE.md line says 「title」, but the expected-result text in the following blocks says 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります。」. The learner will still match them. Using the same form makes the link to 「CLAUDE.mdのとおり」 more visible. — 「- titleは「練習：」で始める」→「- <title>は「練習：」で始める」 (or keep it and accept the variant)",
+    "pr-checklist: pr-code and pr-prompt-a now write 「<title>」, but the checklist still writes the bare 「title」 — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
     "s3-diagram: the alt text lists four items that the diagram no longer shows (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
     "s3-table: the caption quotes only part of the diagram label (carried over) — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
     "s4-table: 「2回でだめなら」 drops the verb that s5 and e1 use (carried over) — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
@@ -66,12 +67,12 @@
     "s5-steps: 「よい最初の依頼」 reads as a calque (carried over) — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
     "s5-steps: タイムゾーン appears without English on first use (carried over) — 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
     "pr-steps-start: the long-vowel mark is used inconsistently (carried over) — 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」",
-    "pr-steps-start: it is vague what to note about CLAUDE.md (carried over) — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
+    "pr-steps-start: it is unclear what to note about CLAUDE.md (carried over) — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
     "check-quiz: the causal link in e4 b's feedback is weak (carried over) — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
-    "hook-predict: options c and d end with a remedy, unlike the others (carried over) — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
+    "hook-predict: options c and d end with a remedy, unlike the other options (carried over) — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
     "lesson: the name for auto-compaction varies (carried over) — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」"
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0 with 1 of 47 blocks changed (2%, pr-code only). The previous review had no open must-fix items, so the resolved list is empty. The CLAUDE.md line in pr-code now reads 「- titleは「練習：」で始める」. It matches the checklist wording and adds no (a)–(e) error. A small form mismatch with 「`<title>`」 in the expected-result text is listed in niceToHave. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
+  "summary": "Verification round: review-scope.mjs exited 0, with 1 of 47 blocks changed (2%, pr-code only). The previous review had no open must-fix items, so the resolved list is empty. pr-code now writes 「<title>」 in the CLAUDE.md line, which matches the expected-result text in pr-prompt-a. The change adds no (a)–(e) error. pr-checklist still writes the bare 「title」, which is listed in niceToHave. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
 }

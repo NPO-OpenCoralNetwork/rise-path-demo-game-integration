@@ -1,20 +1,27 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:1a611951e0d6a3f3",
+  "lessonHash": "sha256:2597b7828fdf4777",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:319f5a2007903c95",
+    "reviewedRevision": "sha256:1a611951e0d6a3f3",
     "changed": [
       "pr-code"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/319f5a2007903c95/round-1/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/1a611951e0d6a3f3/round-1/pedagogy-reviewer.review.json"
   },
-  "resolved": [],
+  "resolved": [
+    {
+      "blockId": "pr-code",
+      "criterion": "practice",
+      "status": "resolved",
+      "evidence": "pr-code changed since the last round. Line 4 went from 「echo '- titleは「練習：」で始める' > CLAUDE.md」 to 「echo '- <title>は「練習：」で始める' > CLAUDE.md」. With the angle brackets, the rule names the HTML <title> element without ambiguity. It now matches the evidence the practice checks: pr-prompt-a expects 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります」 and pr-prompt-b expects 「about.htmlの `<title>` も「練習：」で始まります」. The text is inside single quotes, so bash does not treat `<` as a redirect. The command runs as written. This is the alternative fix the previous review gave, minus the redundant 「HTMLの」, which the brackets make unnecessary."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -57,7 +64,7 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "Measure (this round): 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」. Nothing changed from the previous round. s2-table and s4-table have 2 columns. Strict lint is clean. 5-2 is still dense: /clear, /compact, auto compaction, the focus example and --continue/--resume are all in one segment.",
+      "evidence": "Measure (this round): 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」. The pr-code change did not alter the load. s2-table and s4-table have 2 columns. Strict lint is clean (0 errors, 0 warnings). 5-2 is still dense: /clear, /compact, auto compaction, the focus example and --continue/--resume are all in one segment.",
       "blockIds": [
         "s2-table",
         "s4-table",
@@ -117,7 +124,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Re-scored because pr-code changed. The CLAUDE.md rule went from 「- HTMLの<title>は「練習：」で始める」 to 「- titleは「練習：」で始める」. The structure still holds: one command per line, matching pr-start 「上のコマンドを1行ずつ実行します」. Observable expects remain in pr-prompt-a/b, the pr-checklist criteria and pr-answer as a model answer. The hint ladder is still one level deep. But the practice's central evidence is now less reliable. pr-prompt-a expects 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります」 and pr-prompt-b expects 「about.htmlの `<title>` も「練習：」で始まります」. The rule no longer says it means the HTML <title> element. In a project with index.html, README.md and about.html, 「title」 can also be read as the h1 or the README heading. A learner whose <title> does not start with 「練習：」 could wrongly conclude that CLAUDE.md was not re-read after compaction. That is the opposite of the lesson's point (see mustFix).",
+      "evidence": "Re-scored because pr-code changed. The regression is fixed: the CLAUDE.md rule now reads 「- <title>は「練習：」で始める」. That matches the observable checks in pr-prompt-a (「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります」) and pr-prompt-b (「about.htmlの `<title>` も「練習：」で始まります」). So the post-/compact proof that CLAUDE.md is re-read from disk works again. The task is authentic: a diagnosis of three sessions (p1–p3), then hands-on /context and /compact runs with an ungraded prediction (pr-predict). It has pr-checklist as a self-check and pr-answer as a model answer. It stays at 3 rather than 4 because the hints are one level deep (single hints on p1–p3 and pr-predict), not the 3-level ladder the anchor asks for.",
       "blockIds": [
         "pr-code",
         "pr-steps-start",
@@ -125,7 +132,8 @@
         "pr-steps-compact",
         "pr-prompt-b",
         "pr-checklist",
-        "pr-answer"
+        "pr-answer",
+        "pr-diagnose"
       ]
     },
     {
@@ -180,15 +188,10 @@
       "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "blockId": "pr-code",
-      "criterion": "practice",
-      "issue": "Regression caused by this round's change. The CLAUDE.md rule 「- titleは「練習：」で始める」 no longer says it means the HTML <title> element. Yet pr-prompt-a, pr-prompt-b and pr-answer use that element as the observable proof that CLAUDE.md is re-read after /compact. If Claude reads 「title」 as the h1 or the README heading, the learner's check fails and teaches the opposite conclusion.",
-      "fix": "In pr-code, change the fourth line to: echo '- HTMLのtitleタグは「練習：」で始める' > CLAUDE.md. For consistency, change pr-checklist c-claude-md to 「about.htmlのtitleタグが「練習：」で始まるかを確かめました」 and pr-answer row 1 to 「about.htmlのtitleタグも「練習：」で始まった。圧縮のあと、ディスクから読み直されたため」. Alternatively, restore the previous line 「- HTMLの<title>は「練習：」で始める」."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
+    "Notation consistency with pr-code and pr-prompt-a/b (the meaning is already clear): pr-checklist c-claude-md → 「about.htmlの `<title>` が「練習：」で始まるかを確かめました」; pr-answer row 1, column 2 → 「about.htmlの `<title>` も「練習：」で始まった。圧縮のあと、ディスクから読み直されたため」.",
+    "Practice hint ladder (to reach 4 on practice): give pr-predict a stepped hint. (1) 「5-3の図で、それぞれの指示がたどる矢印を見ます。」 (2) 「直下のCLAUDE.mdは『決まったファイル』に入るかを考えます。」 (3) 「会話だけの指示は、要約に置き換わる側です。」",
     "pr-steps-compact pr-predict hint: s3-diagram no longer names CLAUDE.md. Replace with 「5-3の図と表で、直下のCLAUDE.mdと会話だけの指示がたどる道を見比べます。」.",
     "s3-diagram alt: make it read 「圧縮の前のコンテキストが、会話とツールの出力、決まったファイルの指示の2つに分かれる図。会話は要約に置き換わり、決まったファイルの指示はディスクから読み直されて、どちらも圧縮のあとのコンテキストに入る。中身の一覧は次の表にあります。」.",
     "Term consistency with s2-defs: write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in check-quiz e4 option b feedback, pr-diagnose p2 option d feedback and the p2 explanation.",
@@ -200,6 +203,6 @@
     "pr-steps-start pr-start expect: 「初めてのフォルダなので、フォルダを信頼するかの確認（第1回）が出ます。承認すると、Claude Codeの入力欄が表示されます。」."
   ],
   "average": 3.46,
-  "verdict": "revise",
-  "summary": "Verification round: review-scope exited 0, with 1 of 47 blocks changed (pr-code, 2%) and no section or objective changes. The previous review had no open must-fix items, so resolved is empty. pr-code was reviewed in full and practice was re-scored. The edit shortened the CLAUDE.md rule to 「titleは「練習：」で始める」. It no longer says it means the HTML <title> element, which pr-prompt-a/b and pr-answer use as the proof that CLAUDE.md is re-read after compaction. This regression is a must-fix, with an exact replacement line. Validate and lint --strict are clean. Measure: prose 1945, est 19.8 min against estMinutes 20. All criteria stay at 3 or above (mean 3.46). The verdict is revise only because of the pr-code regression."
+  "verdict": "pass",
+  "summary": "Verification round. review-scope exited 0: 1 of 47 blocks changed (pr-code, 2%), with no section or objective changes. The one open must-fix (pr-code, practice) is resolved. The CLAUDE.md rule now reads 「- <title>は「練習：」で始める」, which names the HTML <title> element and matches the checks in pr-prompt-a/b. The text is single-quoted, so the shell command is safe. The changed block was reviewed in full and practice was re-scored at 3, because the hint ladder is only one level deep. The other criteria are carried over. Validate and lint --strict are clean. Measure: prose 1945, est 19.8 min against estMinutes 20. Every criterion is 3 or above, the mean is 3.46 and there are no must-fix items, so the verdict is pass."
 }

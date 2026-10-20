@@ -1,19 +1,35 @@
 {
   "lessonId": "cc-07-skills-subagents",
   "file": "content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json",
-  "lessonHash": "sha256:41f1a70fd4ffba29",
+  "lessonHash": "sha256:e03f31fdd3519c9b",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:41f1a70fd4ffba29",
+    "previousReview": ".artifacts/review/vibe-coding/cc-07-skills-subagents/41f1a70fd4ffba29/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "s1-diagram",
+      "s2-skill",
+      "s2-steps",
+      "s2-check",
+      "s3-diagram",
+      "s4-table",
+      "s4-check",
+      "summary-next",
+      "lesson.glossary"
+    ],
+    "changedShare": 0.21,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "There are three can-do objectives, and each has 2 or more questions with an objectiveId, at least one of them at apply level or higher: o1 has q2, q3, e1 (apply) and e2 (analyze); o2 has q1, q5 (apply), q6 and e3 (evaluate); o3 has q4, e5 and e6 (analyze). The exam covers all three objectives and has transfer items (e1 「チームで使うスキル」, e3 「ライブラリを入れ替える前に」). The one gap is that o1 is a create objective, but no graded item asks the learner to create anything.",
+      "evidence": "The objectives did not change, and q2, q3 (o1) and q6 (o2) keep their objectiveId and Bloom level after the option edits. Every objective still has 2 or more items, including apply-level or higher ones, and e1 and e3 remain transfer items. As before, o1 is a create objective, but only pr-checklist checks it at that level.",
       "blockIds": [
-        "s1-check",
         "s2-check",
-        "s3-check",
         "s4-check",
         "check-quiz"
       ]
@@ -25,37 +41,33 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Prerequisites give the exact titles of lessons 5 and 6, and the lesson recalls them (s1-lead 「（第6回）」, s3-lead 「（第5回）」). New terms are defined at first use with their English names and match the glossary (s1-defs, s3-defs 「コンテキストウィンドウ（context window）」, s3-bg 「バックグラウンド（background）」, s4-lead 拡張機能).",
+      "evidence": "The glossary entries now end in です (「Claudeが一度に扱える情報の枠です。」), and the terms and aliases have not changed. They still match s1-defs and s3-defs (「コンテキストウィンドウ（context window）」). summary-next now names the exact next lesson, 「第8回｜フックで守らせ、MCPでつなぐ」, which matches the cc-08 draft title.",
       "blockIds": [
         "s1-defs",
         "s3-defs",
-        "s3-bg",
-        "s4-lead",
-        "s1-lead",
-        "s3-lead"
+        "summary-next"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs reports 「prose 1913 (budget 1,200–2,400) · est 17.7 min (must be ≤ 20; estMinutes 18)」, and lint --strict shows 0 warnings. Section 7-3 is trimmed: s3-how is one sentence, s3-legacy is gone, and Explore and `/tasks` are out of s3-bg. 7-1 is still at its limit: it defines スキル, フロントマター and 段階的な読み込み, and also glosses YAML inline in s1-defs.",
+      "evidence": "measure.mjs reports 「prose 1931 (budget 1,200–2,400) · est 17.8 min (must be ≤ 20; estMinutes 18)」, and lint --strict shows 0 errors and 0 warnings. The s1-diagram now has 5 nodes and s4-table has 2 columns. 7-1 is still at its term limit: s1-defs defines 3 terms and also glosses YAML inline.",
       "blockIds": [
         "s1-defs",
-        "subagents",
-        "s3-how",
-        "s3-bg",
-        "s3-defs"
+        "s1-diagram",
+        "s4-table"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s2-skill plus the 5-step s2-steps is a full worked example. Each step has a subgoal label and its reason (①「`/reload-skills` するまで読み込まれないためです」, ②「Claudeは説明文で使うかを決めるので」, ⑤「Claudeの判断を待たずに」), and it comes before practice, which reuses its shape. The subagent half of the practice (pr-before to pr-after, comparing `/context`) is never demonstrated first, and the example is not faded.",
+      "evidence": "The shorter description in s2-skill (「変更を要約し、コミットメッセージの案を出す。何を変えたかを聞かれたときや、コミット前に使う。」) still models both 「何をするか」 and 「いつ使うか」, as ex-description teaches. ex-folder's troubleshoot now runs its commands one at a time (「`mkdir cc-practice` で作り、`cd cc-practice` で移ります」). The subagent half of the practice is still not demonstrated before practice.",
       "blockIds": [
         "s2-skill",
         "s2-steps",
@@ -65,32 +77,27 @@
     {
       "id": "active",
       "score": 3,
-      "evidence": "Each of the 4 content sections ends with an inline quiz that has feedback on every wrong option, and several items ask for application or evaluation (q3, q5, q6). The q1 prompt now rules out the setting case (「設定を何も足さずに」). q2 can still be answered by recalling the key named in s2-invoke just before it (「Claudeが自分の判断で実行しないようにするには」 → `disable-model-invocation: true`).",
+      "evidence": "Wrong options in q2 now also use frontmatter wording (b 「フロントマターの `description` に…」), so 「フロントマター」 no longer points only to the answer. q3's options are closer in length, and every wrong option keeps its feedback. q2 can still be answered by recalling the key that s2-invoke names just before it.",
       "blockIds": [
-        "s1-check",
         "s2-check",
-        "s3-check",
-        "s4-check"
+        "s4-check",
+        "s2-invoke"
       ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "All seven misconceptions in the brief appear as distractors, each with feedback of 2 sentences or fewer that corrects it with a reason: q1 a, q2 b, q4 a/c, q5 b, q6 d (plus s4-pitfall), e1 c and e2 a. Revised feedback such as q5 d (「スキルはふだん今の会話の中で動くため、脇では進みません。」) now gives the correct reason.",
+      "evidence": "The edited distractors still each target one misconception, and their feedback still fits them. q2 c 「実行する前に、必ずユーザーに確認する」 gets 「本文は、スキルを使うと決まってから読まれます」. q3 c 「どんなときも、必ず最初に使ってください」 gets 「強い言葉では、どんな依頼に合うのかがわかりません」. q6 d 「最初に全部登録しようとしている」 gets the s4-pitfall reason.",
       "blockIds": [
-        "hook-predict",
-        "s1-check",
         "s2-check",
-        "s3-check",
         "s4-check",
-        "check-quiz",
         "s4-pitfall"
       ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The two process diagrams have 5–6 nodes and use the lesson's own terms (「名前と説明文だけ読み込む」, 「要約だけ」). Their captions state the takeaway (「読んだ中身はサブエージェント側に残り、メインの会話には要約だけが戻る」), and both have descriptive alt text. The s4-table caption now names both source tables accurately, and there are no decorative images.",
+      "evidence": "s1-diagram (5 nodes) and s3-diagram (5 nodes) are narrower, keep their takeaway captions (「スキルの本文は、使うときだけコンテキストに入る」) and have no decoration. s4-table now has 2 columns (「足すもの：読み込まれ方」) that fit on mobile. The s1-diagram no longer draws the 「本文は読み込まない」 branch, so only the caption and alt carry that contrast now.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
@@ -107,69 +114,65 @@
         "pr-checklist",
         "pr-model-lead",
         "pr-model"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4 points) comes after the exam. summary-next asks a new, lesson-specific reflection question (「スキルにしたい手順と、サブエージェントに任せたい調べものを1つずつ」) and names the next step (第8回). It is followed by 6 flashcards and askTutor suggestions.",
+      "evidence": "summary-points comes after the exam. summary-next keeps the lesson-specific reflection (「スキルにしたい手順と、サブエージェントに任せたい調べものを1つずつ」) and now names the next lesson by its exact title, 「第8回｜フックで守らせ、MCPでつなぐ」. It is followed by 6 flashcards and askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
-        "summary-cards",
-        "summary-ask"
+        "summary-cards"
       ]
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "The auditor found 4 problems, and all of them are fixed in the text: the q5 d feedback, the q2 d feedback (「フロントマターなどの設定で決めます」), the e6 c feedback (「主に」) and the s4-table caption. The audit records 0 unverified claims. Versions are pinned (v2.1.304, v2.1.198), behaviour claims cite official pages, and the worked example runs, because ex-folder's troubleshoot creates a first commit so `git diff HEAD` succeeds.",
+      "evidence": "The changes add no new factual claims. The s2-skill body still checks 「未コミットの変更」 with `git diff HEAD`, and ex-folder still makes the first commit that this command needs. The lesson 8 title in summary-next matches content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json, and the diagram text agrees with s1-run and s3-defs.",
       "blockIds": [
-        "s3-check",
-        "s2-check",
-        "check-quiz",
-        "s4-table",
-        "s3-bg",
-        "s2-steps"
+        "s2-skill",
+        "s2-steps",
+        "summary-next",
+        "s1-diagram",
+        "s3-diagram"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout, including step expects, checklist labels and flashcards (「`description` です。」). It is warm and free of pressure (「練習用フォルダで進めましょう」), and lint finds no banned phrases. Terms stay consistent (説明文／description, メインの会話, まっさら, フォーク). The ja-editor owns the wording.",
+      "evidence": "The glossary entries now use です・ます (「拡張機能…しくみです。」), and lint finds no banned phrases or long sentences. Two small term drifts appear in the changed diagrams: s1-diagram mixes 「全文を読む」 with 「本文を読み込む」, and s3-diagram's label 「自分のコンテキスト」 differs from its alt and s3-defs (「コンテキストウィンドウ」). The ja-editor owns the wording.",
       "blockIds": [
-        "s2-steps",
-        "pr-steps",
-        "pr-checklist",
-        "summary-cards"
+        "s1-diagram",
+        "s3-diagram"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares a single jp locale, and it is complete. Diagram labels are in Japanese with specific alt text. The only link has descriptive text (「公式ドキュメント（日本語版）」 in s2-legacy). Checklist labels no longer depend on markdown that the reader would show raw (pr-c1 「.claude/skills/<名前>/SKILL.md があります」).",
+      "evidence": "The single jp locale is complete, and diagram labels are in Japanese. The s1-diagram alt is now more specific (「それ以外では本文は読み込まれない」), and the s2-legacy link text is descriptive. The 2-column s4-table keeps its header semantics (「足すもの：読み込まれ方」).",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
-        "s2-legacy",
-        "pr-checklist"
+        "s4-table",
+        "s2-legacy"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Previous must-fix check: both round-2 items are gone. (1) 7-3 now has 3 new terms (サブエージェント, フォーク, バックグラウンド): s3-how is 「「サブエージェントを使って〜を調べ、要点だけ報告して」と書けば任せられます。」, s3-legacy is deleted, `/tasks` is only in pr-delegate's hint, and s3-bg cites only cc-whats-new-w27 and cc-changelog. (2) The body is within budget: measure.mjs reports 「prose 1913 (budget 1,200–2,400)」 and 「est 17.7 min」 (estMinutes 18), and the brief's Format line matches.",
-    "hook-predict: hook-q still mostly recalls lesson 6. Consider a predict question on the second problem in hook-b1 that q4 later confirms, e.g. prompt 「Claudeにサブエージェントで40個のファイルを読んでもらうと、メインの会話には何が残ると思いますか？」.",
-    "q2: the answer is the key named in s2-invoke just before it. To test the rule rather than the key name, ask which skill needs it: prompt 「次のスキルのうち、`disable-model-invocation: true` を付けるのがいちばん合うのはどれでしょう？」, with options deploy-prod (本番に反映する, correct), commit-message (案を出すだけ), test-summary and explain-code. Give each wrong option the feedback 「〜は取り消しにくい操作がなく、Claudeが自分で使っても困りません。」.",
-    "s2-invoke: now that 「この例はコミットしません。」 is gone, the paragraph says 「コミットやデプロイのように取り消しにくい手順」 straight after a commit-message skill, and a learner may wonder why the example has no flag. Consider this first paragraph instead: 「この例は案を出すだけですが、コミットやデプロイのように取り消しにくい手順もあります。動かす時期を自分で決めたい手順もあります。」",
-    "summary-points point 2 leaves out the second criterion that pr-decide and pr-model-lead rely on (動かす時期を自分で決めたい). Consider 「スキルの説明文には、何をするかといつ使うかを書きます。取り消しにくい手順や、時期を選びたい手順に `disable-model-invocation: true` を付けます。」, then re-run lint because the second sentence is close to 60 characters.",
-    "The subagent half of the practice (pr-before to pr-after) has no demonstration beforehand. One sentence after s3-diagram would act as a minimal worked example: 「`/context` で前後を比べると、増えるのは主に依頼文と要約のぶんです。」 The body has room (prose 1913 of 2,400).",
-    "pr-write has a single hint before the full model answer. Add a middle rung as troubleshoot: 「説明文は「〜する。〜のときに使う。」の2文で、本文は①②③の番号つきの手順で書きます。」",
-    "ex-auto: the skill runs `git status` and `git diff HEAD`, so the learner may get a permission prompt. Add the troubleshoot 「`git diff` の実行の許可を求められたら、内容を読んで許可します。」",
-    "s1-defs: 7-1 defines 3 terms and also glosses YAML inline in the フロントマター definition. To keep the segment at 3 new terms, consider 「SKILL.mdの先頭で、`---` の行にはさんで書く設定欄です。」 The YAML gloss is not assessed, and s2-skill's `lang: yaml` shows the format.",
-    "o1 is bloom create, but its graded items are apply/analyze, so only pr-checklist checks the create level. Either lower o1 to apply (「繰り返す手順をSKILL.mdに書ける」) in both the lesson and the brief, or say in the brief that pr-checklist assesses the create level."
+    "Verification: the previous review had no mustFix items, and no earlier items are open, so `resolved` is empty. All 9 changed parts were reviewed in full, and none introduces an error or a regression.",
+    "s1-diagram: the edit removed the 「いいえ → 本文は読み込まない」 branch, and q1 tests exactly that contrast. If mobile width allows, restore it with a 6th node: `D -.->|それ以外| F[本文は<br>読み込まない]`. For consistent terms, also change B to `B[CLAUDE.md<br>全文を読み込む]` and C to `C[スキル<br>名前と説明文<br>だけ読み込む]`, so every node uses 読み込む (ja-editor to confirm).",
+    "s3-diagram: the label 「自分のコンテキスト」 no longer matches the defined term in s3-defs and the alt (「自分のコンテキストウィンドウ」). Either use `B[サブエージェント<br>自分の<br>コンテキストウィンドウ]`, or change the alt to 「…サブエージェントが自分のコンテキストでファイルを読んで要約し…」.",
+    "q2 hint: a and b are now both frontmatter edits, so 「スキルを誰が呼べるかを決める項目は、どこに書くのでしたか。」 no longer separates them. Consider 「説明文に書くお願いと、Claudeが呼べなくなる設定項目とでは、どちらが確実に止められるでしょうか。」",
+    "q2 (carried over): the answer is still the key that s2-invoke names just before it. To test the rule rather than the key name, ask 「次のスキルのうち、`disable-model-invocation: true` を付けるのがいちばん合うのはどれでしょう？」, with deploy-prod as the answer and commit-message, test-summary and explain-code as distractors.",
+    "hook-predict (carried over): add a prediction for the second problem in hook-b1 that q4 later confirms, e.g. 「Claudeにサブエージェントで40個のファイルを読んでもらうと、メインの会話には何が残ると思いますか？」",
+    "Worked example for the subagent half (carried over): after s3-diagram, add 「`/context` で前後を比べると、増えるのは主に依頼文と要約のぶんです。」 The body has room (prose 1931 of 2,400).",
+    "pr-write (carried over): add a middle hint rung as troubleshoot: 「説明文は「〜する。〜のときに使う。」の2文で、本文は①②③の番号つきの手順で書きます。」",
+    "o1 bloom (carried over): either lower o1 to apply (「繰り返す手順をSKILL.mdに書ける」) in both the lesson and the brief, or say in the brief that pr-checklist assesses the create level."
   ],
   "average": 3.54,
   "verdict": "pass",
-  "summary": "This is a full review (mode full), because the scope check required one: review-scope.mjs --since sha256:49fdb7d006e71baa exited 1 with 19 of 40 blocks changed (48%). Both previous must-fix items are gone: 7-3 now has 3 new terms, the body measures 「prose 1913 (budget 1,200–2,400)」 at 「est 17.7 min」, and all 4 audit corrections are in the text. The strongest parts are the misconception coverage and a clean 5-step worked example before an authentic two-part practice. The most useful next improvements are a prediction for the subagent problem in the hook, a q2 that tests the rule rather than the key name, and a short demonstration of the `/context` comparison before practice."
+  "summary": "This is a verification round (mode verify): review-scope.mjs exited 0 with 9 of 72 parts changed (21%). The previous review had no must-fix items, and the 9 changed parts (narrower diagrams, a 2-column table, rebalanced q2/q3/q6 options, the exact title of lesson 8 and です・ます glossary entries) add no errors or regressions; lint is clean at 「prose 1931 … est 17.8 min」. The most useful optional fixes are restoring the 「本文は読み込まない」 branch in s1-diagram and aligning s3-diagram's 「自分のコンテキスト」 label with the defined term コンテキストウィンドウ."
 }

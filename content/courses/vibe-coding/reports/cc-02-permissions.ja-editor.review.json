@@ -3,72 +3,87 @@
   "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
-  "lessonHash": "sha256:e9a914f94df54f03",
+  "mode": "verify",
+  "lessonHash": "sha256:6d79b8134ac7e198",
+  "verifies": {
+    "reviewedRevision": "sha256:e9a914f94df54f03",
+    "changed": [
+      "modes-table",
+      "rules-diagram",
+      "rewind-table",
+      "rules-files",
+      "rules-steps",
+      "check-quiz"
+    ],
+    "changedShare": 0.09,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-02-permissions/e9a914f94df54f03/round-1/ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "check-quiz",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "The e5 explanation now reads 「Claudeの判断に関係なく止めるフック（hook）は、第8回で学びます。」 The lesson no longer contains 「MCP」 anywhere (grep finds no match), so the abbreviation that was never spelled out is gone."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The lesson keeps warm, natural です・ます throughout, and the card backs and glossary now end 「…決まります。」「どのモードでも効きます。」. Notation follows §3 (「autoモード」「Claude Codeは」「Shift + Tab」), and spaces appear only beside code names in plain-text fields such as 「/rewind で」. lessons:lint --strict is clean. Wrong-option feedback follows a 誤解→正しい考え pattern within 2 sentences, and the e2 options now share a verb ending (「戻る」「戻らない」「戻らず、会話だけが戻る」).",
+      "evidence": "Carried over from round 1. The changed text keeps です・ます and §3 notation: 「上のコマンドを1行ずつ実行します。」 and 「Claudeの判断に関係なく止めるフック（hook）は、第8回で学びます。」 lessons:lint --strict reports 0 errors and 0 warnings.",
       "blockIds": [
-        "summary-cards",
-        "modes-switch",
         "check-quiz",
-        "auto-lead"
-      ]
+        "rules-steps"
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs reports prose 1827 (budget 1,200–2,400) and est 19.9 min (≤ 20, estMinutes 20). Lint finds no sentence or paragraph over budget, and every concept section has a table, diagram or check. Section 2-3 (rules-defs) still introduces four rule names in one segment: 権限ルール and 許可・確認・拒否ルール.",
+      "evidence": "measure.mjs reports prose 1827 (budget 1,200–2,400) and est 19.9 min (≤ 20, estMinutes 20). Lint is clean. modes-table and rewind-table now have 2 columns, so they fit a phone. The rules-files command is now split into one command per line, and p-files says 「1行ずつ実行します」, which is easier to follow. The score stays at 3 because rules-defs still introduces four rule names in one segment, and that block did not change.",
       "blockIds": [
-        "rules-defs",
         "modes-table",
-        "rules-diagram",
-        "rewind-table"
+        "rewind-table",
+        "rules-files",
+        "rules-defs"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The lesson states its prerequisites and recalls 第1回 in hook-lead. Katakana terms now carry English on first use (セッション（session）, リポジトリ（repository）, スクリプト（script）, リモート（remote、…）, フック（hook）). The text links 安全チェック to 分類器 (「2-1の表で「安全チェック」と呼んだものです」) and lists it as a glossary alias. One abbreviation, MCP, appears in check-quiz e5 without its full name.",
+      "evidence": "The MCP abbreviation is removed from e5. Katakana terms keep their English on first use (セッション（session）, リポジトリ（repository）, フック（hook）), and 安全チェック is tied to 分類器. The score stays at 3 because a few everyday katakana terms (エディタ, データベース, オプション) still appear without English. Those blocks did not change, so that finding stays in niceToHave.",
       "blockIds": [
+        "check-quiz",
         "hook-predict",
-        "auto-lead",
-        "check-quiz"
+        "rewind-table"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is single-locale jp and complete. The rules-diagram labels and alt text are Japanese and describe the whole flow. The hook-version link text 「権限モードの公式ドキュメント（日本語）」 names where it goes.",
+      "evidence": "The lesson is single-locale jp and complete. The new line break in the rules-diagram node (「Claudeが<br>操作しようとする」) keeps the label in Japanese. The alt text still describes the whole flow, and the narrower tables read correctly in 2 columns.",
       "blockIds": [
         "rules-diagram",
-        "hook-version"
+        "modes-table",
+        "rewind-table"
       ]
     }
   ],
   "average": 3.5,
-  "mustFix": [
-    {
-      "criterion": "prior",
-      "blockId": "check-quiz",
-      "issue": "(d) abbreviation §2: in the e5 explanation, 「MCP」 appears for the first time in the lesson, inside the quoted title of lesson 8, and is never spelled out. A beginner cannot tell what it is, and this lesson does not need it.",
-      "fix": "「もっと確実に止めるフック（hook）は、「第8回｜フックで守らせ、MCPでつなぐ」で学びます。」→「もっと確実に止めるフック（hook）は、第8回で学びます。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "rules-defs: 2-3 introduces 権限ルール plus 許可ルール・確認ルール・拒否ルール, four names against the 3-per-segment guideline. 許可ルール is barely used in the body, so it can stay as the label allow — 「許可ルール（allow）・確認ルール（ask）・拒否ルール（deny）があります。」→「確認ルール（ask）・拒否ルール（deny）と、確認なしで通すallowがあります。」",
-    "auto-limit: an ask rule does not stop an operation, it asks first, so 「止めて」 blurs the deny/ask difference this lesson teaches — 「本番に関わる操作は、Manualモードか2-3のルールで止めて、人が見ます。」→「本番に関わる操作は、Manualモードか2-3のルールで確認を挟み、人が見ます。」",
-    "modes-switch: the first sentence holds two ideas (how to switch, where the mode is shown) — 「ターミナルでは **Shift + Tab** で切り替え、いまのモードは画面下に出ます。」→「ターミナルでは **Shift + Tab** で切り替えます。いまのモードは画面下に出ます。」",
-    "rewind-check / rules-steps: the same thing is called 「プロンプト」 in 2-5 and q5 (「作業前のプロンプトを選び」) and 「依頼文」 in the practice. Tie the two once in rules-task — 「2-4の設定と巻き戻しを試します。」→「2-4の設定と巻き戻しを試します。送るプロンプトは「依頼文」として下に用意しました。」",
-    "rewind-check: in the q5 prompt, the Esc shortcut only works on an empty input field (see rewind-how) — 「Escを2回押して」→「空の入力欄でEscを2回押して」",
-    "rules-steps: p-run 「`claude` で依頼文1を送ります」 skips starting Claude Code — 「`claude` で依頼文1を送ります。」→「`claude` を起動し、依頼文1を送ります。」",
-    "rewind-table: 「外への操作」 and 「Claude Codeの外」 both use 外 for different things, which can blur on a small screen — 「外への操作」→「外部への操作」",
-    "check-quiz: in e6, option d is prose while a–c are JSON snippets, so its form stands out. If you keep it, make it parallel in length and ending — 「ルールは足さず、CLAUDE.mdに「作る前に確認して」と書く」→「ルールは足さず、CLAUDE.mdに「作る前に確認」と書く」",
-    "lesson: some everyday katakana terms appear without English on first use: エディタ (rewind-check q5 d), ターミナル (prerequisites), データベース (rewind-table), オプション (check-quiz e5 d feedback). For consistency with §2, e.g. 「自分がエディタで書き換えた」→「自分がエディタ（editor）で書き換えた」",
-    "rules-checklist: the plain-text label puts a space before の but none before Read — 「.env のReadが止まり」→「.envの読み取りが止まり」"
+    "modes-table: merging two columns into one cell makes the 。 inside each cell join two different kinds of content (what runs without confirmation, and the scene it suits). The scene half reads like a fragment. A clear separator keeps the two apart — 「読み取りだけ。一つずつ確かめる作業」→「読み取りだけ／向く場面：一つずつ確かめる作業」 (do the same in every row)",
+    "modes-table / hook-predict: the table no longer says v2.1.283以降, but the hook-predict explanation cites the table for that version: 「v2.1.283以降、…autoモードで始まります（2-1の表）」. Either restore the version in the auto row or drop the reference — 「すべて（裏で安全チェック）。長い作業。ターミナルとVS Codeの既定」→「すべて（裏で安全チェック）。長い作業。v2.1.283以降、ターミナルとVS Codeの既定」",
+    "rewind-table: 「外への操作」 and 「Claude Codeの外」 both use 外 for different things — 「外への操作（push、データベース、デプロイ）」→「外部への操作（push、データベース、デプロイ）」",
+    "rules-defs: 2-3 introduces four rule names, against the 3-per-segment guideline — 「許可ルール（allow）・確認ルール（ask）・拒否ルール（deny）があります。」→「確認ルール（ask）・拒否ルール（deny）と、確認なしで通すallowがあります。」",
+    "auto-limit: an ask rule asks first and does not stop the operation — 「本番に関わる操作は、Manualモードか2-3のルールで止めて、人が見ます。」→「本番に関わる操作は、Manualモードか2-3のルールで確認を挟み、人が見ます。」",
+    "modes-switch: the sentence holds two ideas — 「ターミナルでは **Shift + Tab** で切り替え、いまのモードは画面下に出ます。」→「ターミナルでは **Shift + Tab** で切り替えます。いまのモードは画面下に出ます。」",
+    "rules-steps: p-run skips starting Claude Code — 「`claude` で依頼文1を送ります。」→「`claude` を起動し、依頼文1を送ります。」",
+    "rewind-check: the Esc shortcut only works on an empty input field — 「Escを2回押して」→「空の入力欄でEscを2回押して」",
+    "lesson: some everyday katakana terms appear without English on first use (エディタ, データベース, オプション) — 「自分がエディタで書き換えた」→「自分がエディタ（editor）で書き換えた」",
+    "rules-checklist: the space before の is inconsistent — 「.env のReadが止まり」→「.envの読み取りが止まり」"
   ],
-  "verdict": "revise",
-  "summary": "The scope check required a full review (exit 1): objectives o2 and o3 changed, and 39 of 41 blocks changed. All ten must-fix items from round 1 are gone: §3 spacing, 「Shift + Tab」, plain-form card backs and glossary entries, English on first use for セッション, リポジトリ, スクリプト, リモート and フック, the 安全チェック = 分類器 link plus glossary alias, and parallel endings in the rewind options. lessons:lint --strict is clean. measure.mjs reports prose 1827 and est 19.9 min (estMinutes 20). One new must-fix remains: the abbreviation MCP appears without its full name in the check-quiz e5 explanation. Scores: voice 4, load 3, prior 3, a11y_l10n 4 (mean 3.5). The verdict is fail only because of that one must-fix."
+  "verdict": "pass",
+  "summary": "Verification round: review-scope exited 0, with 6 of 41 blocks changed (9%). The one must-fix from round 1 is resolved: the e5 explanation no longer contains MCP. The changed blocks bring no new (a)–(e) errors: modes-table and rewind-table now have 2 columns, rules-diagram has a line break in one node, rules-files has one command per line, p-files says 1行ずつ, and lint --strict is clean. measure.mjs reports prose 1827 and est 19.9 min (estMinutes 20). Scores: voice 4 (carried over), load 3, prior 3, a11y_l10n 4 (mean 3.5)."
 }

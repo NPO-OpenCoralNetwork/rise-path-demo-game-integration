@@ -1,44 +1,90 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:5e95f5eafa612ea0",
+  "lessonHash": "sha256:6b93b57324d9ed64",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:5e95f5eafa612ea0",
+    "changed": [
+      "hook-predict",
+      "s1-table",
+      "s3-lead",
+      "s3-defs",
+      "s3-diagram",
+      "s4-table",
+      "practice-setup",
+      "practice-prompt",
+      "practice-checklist",
+      "practice-answer",
+      "summary-next",
+      "lesson.glossary"
+    ],
+    "changedShare": 0.14,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/5e95f5eafa612ea0/round-1/ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "s3-defs",
+      "criterion": "load",
+      "status": "resolved",
+      "evidence": "The インポート item now has 3 sentences: 「CLAUDE.mdに `@パス` と書き、別のファイルを取り込むこと。取り込んだ先も起動時に読まれます（入れ子は4段まで）。`@` を付けずに書いたパスは、取り込まれず案内になります。」"
+    },
+    {
+      "blockId": "s3-defs",
+      "criterion": "load",
+      "status": "resolved",
+      "evidence": "The AGENTS.md item now has 3 sentences: 「ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。」"
+    },
+    {
+      "blockId": "lesson",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "lesson.glossary changed. The AGENTS.md entry now carries the folder condition: 「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときに読まれます。`.claude/CLAUDE.md` も、CLAUDE.mdに数えます。」 It no longer suggests that the user CLAUDE.md blocks AGENTS.md, and it agrees with s3-defs."
+    },
+    {
+      "blockId": "hook-predict",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "The q0 explanation now reads 「CLAUDE.mdも依頼文も、Claudeが読むコンテキスト（context）です。」"
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson keeps a warm, natural です・ます tone and has no pressure phrases (lint is clean). The old spacing problems (「Gitで共有」「ReactとTypeScriptで」), the plain-form endings (s3-diagram, card-add-cut) and the option forms are now fixed. One meaning gap is left: the glossary entry for AGENTS.md drops the folder condition that s3-defs states.",
+      "evidence": "The changed text keeps です・ます. The practice-checklist labels now end in 「…ありません」「…消しました」「…あります」, and the practice-prompt hint ends in 「書きます」. The glossary contradiction is fixed. One new meaning problem comes from the s3-diagram rework. The chain S→A→C→X means 「CLAUDE.md インポート先」 has no arrow of its own into コンテキスト, and it seems to lead to paths: なしのルール. The caption and s3-defs say the opposite. The node label without a particle can also be read as only 「CLAUDE.mdのインポート先」.",
       "blockIds": [
-        "s3-defs",
-        "summary-cards",
-        "check-quiz"
+        "s3-diagram",
+        "practice-checklist",
+        "lesson"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs gives prose 2398 (budget 1,200–2,400, right at the top), est 19.0 min (≤ 20) and estMinutes 19, which match. lessons:lint --strict reports 0 findings. But in s3-defs, the インポート and AGENTS.md items each have 4 sentences, against the §1 limit of 3, and the AGENTS.md item packs a version, a default, a condition and an exception into one entry.",
+      "evidence": "measure.mjs: prose 2400 (budget 1,200–2,400, exactly at the top), est 19.0 min (≤ 20), estMinutes 19, which match. lessons:lint --strict: 0 errors, 0 warnings. Both s3-defs items are now within 3 sentences. The 2-column s1-table and s4-table fold a second fact into each cell (scope, lesson reference). This stays readable on a phone. The prose has no room to grow, though.",
       "blockIds": [
-        "s3-defs"
+        "s3-defs",
+        "s1-table",
+        "s4-table"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "セッション（session）, API, E2E, DB and ハンドラー（handler） now carry their English or full forms on first use, and each segment defines its terms before using them. コンテキスト is still the exception: its first plain use in hook-predict and its glossary term have no English.",
+      "evidence": "コンテキスト（context） now has its English on first plain use in hook-predict. Terms are defined before use. The glossary AGENTS.md entry matches s3-defs. The glossary term 「コンテキスト」 still has no English (see niceToHave).",
       "blockIds": [
         "hook-predict",
-        "s2-table",
-        "s2-check",
-        "hook-b1"
+        "lesson"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a single-locale (jp) lesson, so no plain-string findings apply. The diagram labels are Japanese and the alt text is complete. The only link, 「公式ドキュメント（日本語）」 in s3-info, names where it leads.",
+      "evidence": "The lesson is single-locale (jp), so lint has no plain-string findings. The only link, 「公式ドキュメント（日本語）」 in s3-info, names where it leads. The s3-diagram alt text is complete. It still mentions 自動メモリの先頭, which the narrowed diagram no longer shows (niceToHave).",
       "blockIds": [
         "s3-diagram",
         "s3-info"
@@ -47,42 +93,23 @@
   ],
   "mustFix": [
     {
-      "criterion": "load",
-      "blockId": "s3-defs",
-      "issue": "(d) §1 paragraph: the インポート item has 4 sentences (「…取り込むこと。」「取り込んだ先も起動時に読まれます。」「入れ子は4段までです。」「`@` を付けずに…案内になります。」), but the limit is 3 per paragraph.",
-      "fix": "「取り込んだ先も起動時に読まれます。入れ子は4段までです。」→「取り込んだ先も起動時に読まれます（入れ子は4段まで）。」"
-    },
-    {
-      "criterion": "load",
-      "blockId": "s3-defs",
-      "issue": "(d) §1 paragraph: the AGENTS.md item has 4 sentences, but the limit is 3 per paragraph.",
-      "fix": "「ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降の既定では、CLAUDE.mdの代わりに読まれます。作業フォルダーとその上に、CLAUDE.mdもCLAUDE.local.mdもないときです。」→「ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。」 (keep the last sentence 「`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。」 as it is)"
-    },
-    {
       "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(a) meaning: the glossary entry for AGENTS.md says 「CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます」. In s1-table, 'CLAUDE.md' covers all four locations, including the user and organization files. So the glossary suggests that `~/.claude/CLAUDE.md` blocks AGENTS.md, which contradicts s3-defs (「`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます」). The audit's quote from the memory docs says those files 'don't count, and keep loading alongside AGENTS.md'.",
-      "fix": "glossary AGENTS.md md: 「CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます。」→「作業フォルダーとその上に、CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "hook-predict",
-      "issue": "(d) §2 katakana on first use: the q0 explanation is the first plain use of コンテキスト, and it has no English. The only earlier mention is the compound 「コンテキスト圧縮（compaction）」.",
-      "fix": "q0 explanation: 「CLAUDE.mdも依頼文も、Claudeが読むコンテキストです。」→「CLAUDE.mdも依頼文も、Claudeが読むコンテキスト（context）です。」"
+      "blockId": "s3-diagram",
+      "issue": "(a) meaning: this round changed the diagram into the chain S→A→C→X. 「CLAUDE.md インポート先」 now has no arrow into コンテキスト and seems to feed 「paths: なしのルール」. A learner can read it as 'CLAUDE.md is read through the rules', or as 'only the rules reach the context'. s3-defs and the caption say both are read at startup. The label 「CLAUDE.md<br>インポート先」 has no particle, so it can also be read as just 「CLAUDE.mdのインポート先」.",
+      "fix": "code 「S[セッション開始] --> A[\"CLAUDE.md<br>インポート先\"]\\n  A --> C[\"paths: なしの<br>ルール\"]\\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\\n  C --> X[コンテキスト]\\n  E --> X」→「S[セッション開始] --> A[\"CLAUDE.mdと<br>インポート先\"]\\n  S --> C[\"paths: なしの<br>ルール\"]\\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\\n  A --> X[コンテキスト]\\n  C --> X\\n  E --> X」"
     }
   ],
   "niceToHave": [
-    "glossary: 「コンテキスト」 is the only term field without English. Matching the 「カタカナ（English）」 pattern helps the learner tie it to the text — term 「コンテキスト」→「コンテキスト（context）」 (add 「コンテキスト」 to aliases so [[コンテキスト]] in s2-lead still resolves).",
-    "summary-cards: card-agents says 「プロジェクトに」, but s3-defs says 「作業フォルダーとその上に」, and the audit notes that parent folders count too. Using the same condition avoids doubt — 「既定では、プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」→「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」",
-    "practice-hint3: 「ルール」 appears right after 「拒否ルール」 in the same sentence and could be read as a permission rule — 「5・6行目は拒否ルール、10行目はルール、」→「5・6行目は拒否ルール、10行目は `paths:` 付きのルール、」",
-    "check-quiz: in e3 b, 「ルールへ移す」 could also be read as a permission rule — 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」",
-    "check-quiz: the e2 prompt repeats 「実行」 — 「「…`npm run format` を実行する」を確実に実行させたいとき、どうしますか？」→「「…`npm run format` を実行する」を毎回確実に起こしたいとき、どうしますか？」",
-    "s3-check: in q4, option a writes `CLAUDE.md` in backticks, but option c writes CLAUDE.md plain. Use one form across the options — 「CLAUDE.mdから `@` で取り込む別のファイル」→「`CLAUDE.md` から `@` で取り込む別のファイル」",
-    "practice-answer-why: HTML is an abbreviation used without its full name, though most learners know it — 「HTMLコメントは」→「HTML（HyperText Markup Language）のコメントは」",
-    "practice-checklist: these plain-text labels cannot use backticks, so the code tokens sit between spaces (「.env と git push の禁止が、.claude/settings.json の deny にある」). This is readable. Quoting the settings key makes it clearer — 「の deny にある」→「の「deny」にある」",
-    "s3-defs: 「取り込まれず案内になります」 does not say who uses the 案内 — 「`@` を付けずに書いたパスは、取り込まれず案内になります。」→「`@` を付けずに書いたパスは取り込まれず、Claudeが必要なときに開く案内になります。」"
+    "s3-diagram: the alt text mentions an item the narrowed diagram no longer shows. Matching it to the picture keeps screen-reader and sighted readers aligned — 「paths: なしのルール（と自動メモリの先頭）が読まれて」→「paths: なしのルールが読まれて」",
+    "s1-table: the 「置き場所」 column now also holds the scope after a colon (「組織の管理ポリシー：組織の全員」). Naming both in the header helps the reader read the cells — column 「置き場所」→「置き場所：届く範囲」",
+    "glossary: 「コンテキスト」 is still the only term field without English (carried from round 1) — term 「コンテキスト」→「コンテキスト（context）」 (add 「コンテキスト」 to aliases so [[コンテキスト]] still resolves)",
+    "s3-defs: in the AGENTS.md item, 「代わりに」 does not say what it replaces. Naming it makes the definition self-contained — 「ないとき、代わりに読まれます。」→「ないとき、CLAUDE.mdの代わりに読まれます。」",
+    "summary-cards (unchanged, carried): card-agents says 「プロジェクトに」, while s3-defs and the glossary now both say 「作業フォルダーとその上に」 — 「既定では、プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」→「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」",
+    "practice-hint3 (unchanged, carried): 「ルール」 right after 「拒否ルール」 can be read as a permission rule — 「5・6行目は拒否ルール、10行目はルール、」→「5・6行目は拒否ルール、10行目は `paths:` 付きのルール、」",
+    "check-quiz (unchanged, carried): in e3 b, 「ルールへ移す」 could also be read as a permission rule — 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」",
+    "s3-check (unchanged, carried): in q4, option a writes `CLAUDE.md` in backticks but option c writes it plain — 「CLAUDE.mdから `@` で取り込む別のファイル」→「`CLAUDE.md` から `@` で取り込む別のファイル」"
   ],
   "average": 3.25,
   "verdict": "revise",
-  "summary": "The scope check required a full review: o1 changed, and 27 of 48 blocks changed (56%). All 16 must-fix items from round 1 are gone. The glossary AGENTS.md entry now lists `.claude/CLAUDE.md`, the 和文/English spacing is consistent, API, E2E, DB and セッション are spelled out, and the s3-diagram caption and card-add-cut now use です・ます. The two items on option form left with e4 and e5, which were removed. Four new must-fix items remain: two s3-defs definitions run to 4 sentences, the glossary AGENTS.md entry still lacks the folder condition and so suggests that the user CLAUDE.md blocks it, and コンテキスト has no English on first use. Length is within budget (prose 2398, est 19.0 min, estMinutes 19)."
+  "summary": "This is a verification round: review-scope.mjs exited 0 (14% of parts changed, 11 of 47 blocks). All 4 must-fix items from round 1 are resolved. Both s3-defs items are within 3 sentences, the glossary AGENTS.md entry now has the folder condition, and コンテキスト（context） is glossed on first use. The other changed blocks read correctly. The 2-column s1-table and s4-table, the です・ます checklist, the split practice-setup commands with the shifted practice-answer highlight (5–9), and summary-next with the lesson 7 title (it matches cc-07's title) all hold up. One new must-fix comes from this round: the reworked s3-diagram chains CLAUDE.md→paths: なしのルール→コンテキスト, which misstates how the files load. Length: prose 2400 (top of budget), est 19.0 min, estMinutes 19. The mean of 3.25 is below 3.3."
 }

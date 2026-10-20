@@ -1,0 +1,75 @@
+{
+  "lessonId": "cc-07-skills-subagents",
+  "file": "content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json",
+  "lessonHash": "sha256:e03f31fdd3519c9b",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "Both mermaid diagrams (s1-diagram, s3-diagram) use flowchart TD, keep their Japanese labels readable at 390 px and have captions (mobile-jp-04, mobile-jp-12). The s4-table two-column layout wraps cleanly on mobile (mobile-jp-15/16). The three YAML code blocks are the weak spot.",
+      "blockIds": [
+        "s1-diagram",
+        "s3-diagram",
+        "s4-table",
+        "s2-skill",
+        "s3-file",
+        "pr-model"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "metrics.json lists no text-only screens. Desktop chars per line: median 39, max 56, against a 30–40 target. Definitions, steps with 期待される結果 boxes and quizzes alternate steadily with no walls of text (desktop-jp-05/06, mobile-jp-07/08).",
+      "blockIds": [
+        "s1-defs",
+        "s2-steps",
+        "pr-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 2,
+      "evidence": "Japanese breaks well in prose, quizzes and tables, and nothing English is left untranslated. At 390 px, though, most long Japanese lines of the SKILL.md and agent examples are hidden past the right edge of the code box (mobile-jp-06, mobile-jp-13, mobile-jp-23). On desktop the description line is still cut (desktop-jp-04, -09, -15).",
+      "blockIds": [
+        "s2-skill",
+        "s3-file",
+        "pr-model"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "s2-skill",
+      "issue": "At 390 px the commit-message SKILL.md code block cuts off line 3 (description) and lines 8–12 (the numbered steps) mid-sentence at the right edge. Only about 12–20 of each line's characters show, so the worked example a learner should copy can't be read without scrolling sideways line by line. On desktop the description line is cut as well.",
+      "fix": "Fold the description into a YAML block scalar (`description: >-` and then 2–3 indented lines of about 20 full-width characters or fewer). Split each numbered step into a short first line plus an indented continuation line, so no line goes over about 22 full-width characters (e.g. `1. 未コミットの変更を確かめる` / `   （git status と git diff HEAD）`).",
+      "screenshot": "pages/mobile-jp-06.png"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "s3-file",
+      "issue": "At 390 px the researcher.md code block cuts off line 3 (description) and lines 7–8 (the body instructions) at the right edge. On desktop the description line is still cut after 影響範囲の.",
+      "fix": "Write the description as a `>-` block scalar with short indented lines, and break the two body sentences into lines of about 20 full-width characters or fewer (e.g. `わかったことを5行以内で返します。` / `根拠のファイル名をつけます。`).",
+      "screenshot": "pages/mobile-jp-13.png"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "pr-model",
+      "issue": "At 390 px the update-readme model answer cuts off line 3 (description) and lines 9–13 (steps) mid-sentence. On desktop the description line is cut after 使い方やコマンドが変わったあとに使.",
+      "fix": "As for s2-skill: put the description in a `>-` block scalar with 2–3 short lines, and split each numbered step into a short first line plus an indented continuation, keeping every line at about 22 full-width characters or fewer.",
+      "screenshot": "pages/mobile-jp-23.png"
+    }
+  ],
+  "niceToHave": [
+    "s2-check q3 option d starts with `1. `, so it renders as an ordered list inside the option: an indented `1.` marker next to the option number 4 (mobile-jp-11, desktop-jp-07). Start the text with a word, e.g. 「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる」.",
+    "s2-steps item ex-slash: the title 「⑤ /commit-message で呼び出す」 breaks inside the command as '/commit-' / 'message' at 390 px (mobile-jp-08). Shorten it, e.g. 「⑤ 名前で呼び出す」, and keep the command in the body.",
+    "reader: on the 390 px code blocks, nothing shows that the content scrolls sideways (known reader behaviour).",
+    "reader: steps that only have a `hint` (pr-pick, pr-write, pr-after) still show the label 「うまくいかないときは」 (mobile-jp-18, desktop-jp-13). A separate hint label would read better.",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (mobile-jp-30, desktop-jp-21). The mobile full-length PNG stops at 16000 px. Failed /api/ requests are environment noise."
+  ],
+  "verdict": "revise",
+  "summary": "metrics.json has no hard failures: no overflow, console, mermaid, unknown-block or image errors, and no text-only screens. The TD diagrams, two-column table and quizzes read well at 390 px, and none of the opened screens show personal data. The main fix is the three YAML examples (s2-skill, s3-file, pr-model): their long Japanese description and step lines are cut off at 390 px and partly on desktop, so break them into short lines with `>-` block scalars and indented continuations."
+}

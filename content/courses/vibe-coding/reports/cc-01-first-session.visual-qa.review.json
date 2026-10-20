@@ -1,0 +1,67 @@
+{
+  "lessonId": "cc-01-first-session",
+  "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
+  "lessonHash": "sha256:3ebe60f3a0474749",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The tables, the TD mermaid loop diagram, the steps, the prompts and the quizzes all render cleanly at 390 px and 1440 px. On mobile, two code blocks are cut off at the right edge: the curl install line loses its `| bash` (pages/mobile-jp-09.png) and diff lines 4–5 are cut mid-call (pages/mobile-jp-14.png).",
+      "blockIds": [
+        "loop-table",
+        "loop-diagram",
+        "surfaces-table",
+        "install-unix",
+        "example-diff"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "There are no text-only screens and no walls of text. Every desktop and mobile screen holds a heading, table, figure, code block or check. Desktop JP median is 39 chars/line, inside the 30–40 target.",
+      "blockIds": [
+        "hook-problem",
+        "example-steps",
+        "practice-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Diagram labels are Japanese and readable, and the diagram has a caption and an 「図の説明を読む」 disclosure. No mixed-language strings show up and no controls are hidden under the bars. The two code blocks cut off on mobile hide part of the command a learner has to read and run.",
+      "blockIds": [
+        "loop-diagram",
+        "install-unix",
+        "example-diff"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "install-unix",
+      "issue": "At 390 px the command shows as `curl -fsSL https://claude.ai/install.sh | ba`, so `| bash` is cut off. The filename label is also cut to 'terminal (macOS / Linux / WS…'.",
+      "fix": "Split the command over two lines with a shell continuation: `curl -fsSL https://claude.ai/install.sh \\` then `  | bash`. Also shorten `filename` to `macOS・Linux・WSL`.",
+      "screenshot": "pages/mobile-jp-09.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "example-diff",
+      "issue": "At 390 px diff lines 4 and 5 are cut off (`const p = document.getElementById` and `p.textContent = new Date().toLoca`), so the learner cannot read the lines the lesson asks them to check.",
+      "fix": "Keep every diff line to about 34 characters: break after `=` with a 2-space indent, e.g. `+  const p =` / `+    document.getElementById(\"today\");` and `+  p.textContent =` / `+    new Date().toLocaleDateString();`. Alternatively, use a shorter id and variable so each statement fits on one line.",
+      "screenshot": "pages/mobile-jp-14.png"
+    }
+  ],
+  "niceToHave": [
+    "The glossary panel shows 'エージェントループ' twice: once as 'エージェントループ (agentic loop)' and once on its own (pages/desktop-jp-01.png and others). Check whether the definitions term and the glossary entry should be merged, or whether this is reader: behaviour.",
+    "On desktop, one exam option wraps so that a single character sits alone on the next line: q5 option a ends with 「…確かめ／る」 (pages/desktop-jp-15.png) and q7 option b ends with 「…入／れる」 (pages/desktop-jp-16.png). Shortening each by a few characters would avoid this.",
+    "reader: the mobile full-length PNG is cut off at 16000 px (known).",
+    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」 because drafts are not in course.json (known).",
+    "reader: wide code blocks give no horizontal scroll cue on mobile (known)."
+  ],
+  "verdict": "revise",
+  "summary": "The layout is clean and well paced on both viewports: no overflow, no console or mermaid errors, no text-only screens, a readable top-down loop diagram and tables that fit at 390 px. No personal data appears on any screen. Must fix: two code blocks are cut off at 390 px (install-unix loses `| bash`, and example-diff lines 4–5 are cut mid-call). Break those lines so they fit."
+}
