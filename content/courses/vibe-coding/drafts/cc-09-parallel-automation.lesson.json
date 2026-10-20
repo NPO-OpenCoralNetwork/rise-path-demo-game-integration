@@ -116,7 +116,7 @@
             },
             {
               "term": "バックグラウンド実行（background execution）",
-              "md": "待たずに裏で動かすこと。実行中のコマンドは Ctrl + B で裏に回し、セッションごと裏で始めるなら `claude --bg` を使います。"
+              "md": "待たずに裏で動かすこと。実行中のコマンドはCtrl + Bで裏に回し、セッションごと裏で始めるなら `claude --bg` を使います。"
             }
           ]
         },
@@ -154,7 +154,7 @@
           "cite": [
             "cc-agents"
           ],
-          "md": "並べたセッションやサブエージェントの数だけ、トークンを使います。"
+          "md": "並べたセッションやサブエージェントの数だけ、トークン（token、AIが文章を処理する単位）を使います。"
         },
         {
           "id": "s1-check",
@@ -167,33 +167,33 @@
             {
               "id": "q1",
               "kind": "single",
-              "prompt": "機能Aの実装を続けながら、同じリポジトリでバグBの修正も別に進めたいとします。どの方法を選びますか？",
+              "prompt": "ログイン画面の文言の修正と、決済の設定ファイルの変更を、Claudeに並行して頼みます。2つは別々にレビューを受けて取り込みたいとします。どの方法を選びますか？",
               "options": [
                 {
                   "id": "a",
-                  "md": "サブエージェントに、バグBの修正を任せる",
-                  "feedback": "サブエージェントは、そのままでは同じ作業フォルダーを編集します。別々の変更を並べるなら、フォルダーとブランチを分けます。"
+                  "md": "決済の変更を、サブエージェントに任せる",
+                  "feedback": "サブエージェントは、設定しなければ同じ作業フォルダーを編集します。別々の変更を並べるなら、フォルダーとブランチを分けます。"
                 },
                 {
                   "id": "b",
-                  "md": "`claude --worktree` で、バグB用のセッションを別に始める"
+                  "md": "`claude --worktree` で、決済の変更用のセッションを別に始める"
                 },
                 {
                   "id": "c",
-                  "md": "バグBの修正を、Ctrl + B でバックグラウンドに回す",
-                  "feedback": "Ctrl + B は、実行中のコマンドを裏に回す操作です。変更そのものを分けるには、ワークツリーを使います。"
+                  "md": "決済の変更を、Ctrl + Bでバックグラウンドに回す",
+                  "feedback": "Ctrl + Bは、実行中のコマンドを裏に回す操作です。変更そのものを分けるには、ワークツリーを使います。"
                 },
                 {
                   "id": "d",
                   "md": "同じフォルダーで、もう1つセッションを開く",
-                  "feedback": "同じフォルダーの2つのセッションは、同じファイルを書き換えて変更が混ざります。ワークツリーで作業コピーを分けます。"
+                  "feedback": "同じフォルダーでは、2つの変更が同じブランチに混ざり、別々にレビューできません。ワークツリーでブランチを分けます。"
                 }
               ],
               "answer": [
                 "b"
               ],
-              "explanation": "別々の変更を同時に進めるときは、ワークツリーで作業コピーとブランチを分けます。終わったら、それぞれのブランチを本体に取り込みます。",
-              "hint": "2つの作業が、同じファイルを触る可能性を考えましょう。",
+              "explanation": "2つともファイルを編集する作業なので、ワークツリーで作業コピーとブランチを分けます。ブランチが別なので、レビューも取り込みも別々にできます。",
+              "hint": "別々にレビューして取り込むには、何を分ければよいかを考えましょう。",
               "objectiveId": "o1",
               "bloom": "evaluate"
             }
@@ -210,7 +210,7 @@
           "id": "s2-lead",
           "type": "markdown",
           "style": "lead",
-          "md": "機能Aとバグ修正Bを、2つのターミナルで並べます。"
+          "md": "機能Aとバグ修正Bを、2つのターミナルで並べます。練習用リポジトリで試すときは、2つの作業を小さなファイルの追加に置き換えましょう。"
         },
         {
           "id": "s2-code",
@@ -221,7 +221,7 @@
             "cc-worktrees",
             "cc-common-workflows"
           ],
-          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09\ncd cc-practice-09\ngit init\necho \".claude/worktrees/\" > .gitignore  # 本体で未追跡と表示させない\ngit add .gitignore\ngit commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼の確認に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正Bのセッション（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
+          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09\ncd cc-practice-09\ngit init\necho \".claude/worktrees/\" > .gitignore  # 未追跡に出さない\ngit add .gitignore\ngit commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼の確認に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正B（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
           "highlight": [
             11,
             14
@@ -252,7 +252,7 @@
               "id": "ex-setup",
               "title": "それぞれで環境を整える",
               "md": "ワークツリーには、Gitが管理するファイルしかありません。依存パッケージは、各セッションで入れてもらいます。",
-              "expect": "どちらでもテストが動きます。"
+              "expect": "依存パッケージのあるプロジェクトなら、どちらのワークツリーでもテストが動きます。"
             },
             {
               "id": "ex-explain",
@@ -336,7 +336,7 @@
           "cite": [
             "cc-headless"
           ],
-          "md": "CI（Continuous Integration）やスクリプトでは、会話をせずに1回だけ動かします。これを非対話的実行（non-interactive mode）と呼び、`claude -p \"<指示>\"` と書きます。"
+          "md": "CI（Continuous Integration）やスクリプトでは、会話をせずに1回だけ動かします。これを非対話的実行（non-interactive mode）と呼び、`claude -p \"<依頼文>\"` と書きます。"
         },
         {
           "id": "s3-mode",
@@ -356,7 +356,7 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "claude --bare -p \"npm run lint の警告を、ファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
+          "code": "claude --bare -p \\\n  \"npm run lint の警告をファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
         },
         {
           "id": "s3-table",
@@ -369,12 +369,12 @@
           "caption": "安全な claude -p を作る5つのフラグ",
           "columns": [
             "フラグ",
-            "役割と、付けないと"
+            "役割と、付けないとどうなるか"
           ],
           "rows": [
             [
               "`--bare`",
-              "フックやMCP（第8回）、CLAUDE.mdなどを読まない。付けないと、フックが確認なしで動く"
+              "フックやMCP（第8回）などを読まない。付けないと、フックが確認なしで動く"
             ],
             [
               "`--allowedTools`",
@@ -382,7 +382,7 @@
             ],
             [
               "`--permission-mode` `dontAsk`",
-              "確認が要る操作を、聞かずに拒否する（読み取りは動く）。付けないと、設定しだいでモードが変わる"
+              "確認が要る操作を聞かずに拒否（読み取りは動く）。付けないと、設定しだいでモードが変わる"
             ],
             [
               "`--output-format` `json`",
@@ -403,7 +403,7 @@
             "cc-permissions"
           ],
           "title": "許可を広げすぎない",
-          "md": "`--allowedTools \"Bash\"` だと、どのシェルコマンドも確認なしで通ります。`Bash(npm test *)` のように絞りましょう。"
+          "md": "`--allowedTools \"Bash\"` だと、シェル（shell、コマンドを実行するプログラム）のどのコマンドも確認なしで通ります。`Bash(npm test *)` のように絞りましょう。"
         },
         {
           "id": "s3-check",
@@ -453,7 +453,7 @@
     },
     {
       "id": "unattended-where",
-      "title": "4. 無人実行の置き場所を選ぶ",
+      "title": "4. 無人実行を動かす場所",
       "role": "concept",
       "blocks": [
         {
@@ -489,7 +489,7 @@
             "cc-routines",
             "cc-scheduled-tasks"
           ],
-          "caption": "動かす場所と頻度で選ぶ",
+          "caption": "動かす場所と場面で選ぶ",
           "columns": [
             "方法",
             "動く場所と、向いている場面"
@@ -517,7 +517,7 @@
     },
     {
       "id": "unattended",
-      "title": "5. 依頼文の4点で点検する",
+      "title": "5. 依頼文を4点で点検する",
       "role": "concept",
       "blocks": [
         {
@@ -591,8 +591,8 @@
                 },
                 {
                   "id": "d",
-                  "md": "実行する頻度を、毎朝から1時間ごとに増やす設定",
-                  "feedback": "回数を増やしても、読めないまま「何もない」という報告が続きます。失敗を失敗として報告させます。"
+                  "md": "新しい課題がないときは、『新しい課題はありません』と報告させる指示",
+                  "feedback": "それでは、読めなかった日も同じ報告になります。読めなかった情報源を、名前を挙げて報告させます。"
                 },
                 {
                   "id": "a",
@@ -668,7 +668,7 @@
             {
               "id": "p-run",
               "title": "結果を予想してから実行する",
-              "md": "失敗が何件並ぶかを予想してから実行します。API（Application Programming Interface）キーがなければ、`--bare` を外します。",
+              "md": "失敗が何件並ぶかを予想してから実行します。`--bare` には、API（Application Programming Interface）キーが必要です。キーがなければ、`--bare` を外します。",
               "expect": "返ったJSONの `result` に、失敗したテスト1件が入ります。",
               "hint": "予想と違ったら、違いを1行メモします。",
               "troubleshoot": "「実行できなかった」と返ったら、許可のパターンを見直します。"
@@ -682,31 +682,31 @@
           "items": [
             {
               "id": "pc-bare",
-              "label": "--bare を付けている（外したときは、練習用フォルダーで試している）"
+              "label": "--bare を付けています（外したときは、練習用フォルダーで試しています）"
             },
             {
               "id": "pc-allow",
-              "label": "許可しているのは、テストを実行するコマンドだけ（Bash(npm test *) など）"
+              "label": "許可しているのは、テストを実行するコマンドだけです（Bash(npm test *) など）"
             },
             {
               "id": "pc-mode",
-              "label": "--permission-mode dontAsk で、確認が要るほかの操作を拒否している"
+              "label": "--permission-mode dontAsk で、確認が要るほかの操作を拒否しています"
             },
             {
               "id": "pc-json",
-              "label": "--output-format json で、スクリプトから読める形にしている"
+              "label": "--output-format json で、スクリプトから読める形にしています"
             },
             {
               "id": "pc-budget",
-              "label": "--max-budget-usd で、1回の費用に上限を設けている"
+              "label": "--max-budget-usd で、1回の費用に上限を設けています"
             },
             {
               "id": "pc-fail",
-              "label": "テストを実行できなかったときの返し方を、依頼文に書いている"
+              "label": "テストを実行できなかったときの返し方を、依頼文に書いています"
             },
             {
               "id": "pc-predict",
-              "label": "実行の前に結果を予想し、あとで答え合わせした"
+              "label": "実行の前に結果を予想し、あとで答え合わせしました"
             }
           ]
         },
@@ -719,12 +719,12 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p 'npm test を実行し、失敗したテストをJSONの配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\", \"reason\": \"<理由>\"} を返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
+          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p \\\n'npm test を実行し、失敗したテストを\nJSONの配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\", \"reason\": \"<理由>\"}\nを返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
           "highlight": [
-            7,
-            8,
-            9,
-            10
+            10,
+            11,
+            12,
+            13
           ]
         }
       ]
@@ -792,19 +792,19 @@
           "items": [
             {
               "id": "pa-success",
-              "label": "何を、どの形で返せば完了かが書いてある"
+              "label": "何を、どの形で返せば完了かが書いてあります"
             },
             {
               "id": "pa-empty",
-              "label": "0件のときと、読めなかったときの返し方が別になっている"
+              "label": "0件のときと、読めなかったときの返し方が別になっています"
             },
             {
               "id": "pa-readonly",
-              "label": "報告だけの作業に、編集やコミットを頼んでいない"
+              "label": "報告だけの作業に、編集やコミットを頼んでいません"
             },
             {
               "id": "pa-flags",
-              "label": "権限と費用の上限を、コマンドのフラグで決めている"
+              "label": "権限と費用の上限を、コマンドのフラグで決めています"
             }
           ]
         }
@@ -842,8 +842,8 @@
                 },
                 {
                   "id": "c",
-                  "md": "調べものを、Ctrl + B でバックグラウンドに回す",
-                  "feedback": "Ctrl + B は、実行中のコマンドを裏に回す操作です。調べものを別のコンテキストで任せるのは、サブエージェントです。"
+                  "md": "調べものを、Ctrl + Bでバックグラウンドに回す",
+                  "feedback": "Ctrl + Bは、実行中のコマンドを裏に回す操作です。調べものを別のコンテキストで任せるのは、サブエージェントです。"
                 },
                 {
                   "id": "a",
@@ -874,7 +874,7 @@
                 },
                 {
                   "id": "a",
-                  "md": "実行中のサーバーを、Ctrl + B でバックグラウンドに回す"
+                  "md": "実行中のサーバーを、Ctrl + Bでバックグラウンドに回す"
                 },
                 {
                   "id": "c",
@@ -890,7 +890,7 @@
               "answer": [
                 "a"
               ],
-              "explanation": "Ctrl + B で裏に回すと、サーバーは動いたまま、次の指示を出せます。出力はファイルに残り、`/tasks` で様子を確かめられます。",
+              "explanation": "Ctrl + Bで裏に回すと、サーバーは動いたまま、次の指示を出せます。出力はファイルに残り、`/tasks` で様子を確かめられます。",
               "objectiveId": "o1",
               "bloom": "evaluate"
             },
@@ -1063,7 +1063,7 @@
             {
               "id": "card-bg",
               "front": "実行中のコマンドを裏に回すには？",
-              "back": "Ctrl + B を押します。裏の作業の一覧は `/tasks` で見られます。"
+              "back": "Ctrl + Bを押します。裏の作業の一覧は `/tasks` で見られます。"
             },
             {
               "id": "card-manual",
@@ -1073,12 +1073,12 @@
             {
               "id": "card-flags",
               "front": "CI向け `claude -p` の5つのフラグは？",
-              "back": "`--bare`、`--allowedTools`、`--permission-mode dontAsk`、`--output-format json`、`--max-budget-usd`。"
+              "back": "`--bare`、`--allowedTools`、`--permission-mode dontAsk`、`--output-format json`、`--max-budget-usd` の5つです。"
             },
             {
               "id": "card-four",
               "front": "無人実行の依頼で点検する4点は？",
-              "back": "成功の条件、読むだけの権限、費用の上限、失敗の報告。"
+              "back": "成功の条件、読むだけの権限、費用の上限、失敗の報告の4点です。"
             },
             {
               "id": "card-quiet",
@@ -1113,14 +1113,14 @@
     },
     {
       "term": "バックグラウンド実行",
-      "md": "待たずに裏で動かすこと。実行中のコマンドは Ctrl + B で裏に回し、一覧は `/tasks` で見ます。セッションごと裏で始めるなら `claude --bg` を使います。",
+      "md": "待たずに裏で動かすこと。実行中のコマンドはCtrl + Bで裏に回し、一覧は `/tasks` で見ます。セッションごと裏で始めるなら `claude --bg` を使います。",
       "aliases": [
         "background"
       ]
     },
     {
       "term": "非対話的実行",
-      "md": "`claude -p \"<指示>\"` のように、会話をせずに1回だけ動かす使い方。CIやスクリプトで使います。",
+      "md": "`claude -p \"<依頼文>\"` のように、会話をせずに1回だけ動かす使い方。CIやスクリプトで使います。",
       "aliases": [
         "non-interactive mode",
         "claude -p"
@@ -1128,7 +1128,7 @@
     },
     {
       "term": "無人実行",
-      "md": "人が見ていない間に、決まった時刻やイベントをきっかけに動く実行。途中で質問できません。",
+      "md": "人が見ていない間に動く実行。途中で質問できません。",
       "aliases": [
         "unattended run"
       ]
@@ -1187,7 +1187,7 @@
     },
     {
       "id": "cc-permission-modes",
-      "title": "Permission modes",
+      "title": "Choose a permission mode",
       "url": "https://code.claude.com/docs/en/permission-modes",
       "publisher": "Anthropic",
       "checkedAt": "2026-10-20"
