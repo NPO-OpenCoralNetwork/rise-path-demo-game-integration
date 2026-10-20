@@ -4,113 +4,85 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:2416078b9953be33",
+  "lessonHash": "sha256:d622512671de3ba6",
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson is in です・ます throughout and has no pressure phrases. Feedback names the misconception in short sentences, e.g. q3-a 「テストが変わった時点で、「通った」は証拠になりません。」. Some spots still fall short: two flashcard backs end in plain form (card-fresh 「頼む。」, card-explain 「使える。」), p-sort reads two ways (「任意に入れます」), and one e3 option breaks the form of the others.",
+      "evidence": "The lesson uses です・ます throughout, has no pressure phrases, and wrong-option feedback is short and names the misconception (q3-a 「テストが変わった時点で、「通った」は証拠になりません。」). The flashcard backs are now polite (card-fresh 「甘くなるからです。」). One spot still breaks the §5 option form: e4 option c ends in 「無視してよい」 while the other options end in action verbs.",
       "blockIds": [
-        "summary-cards",
-        "p-steps",
         "check-quiz",
-        "s1-table"
+        "summary-cards",
+        "s2-goal"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "`lessons:lint --strict` is clean: no sentence-length, paragraph-length or banned-phrase findings. Every concept section ends in an inline quiz. Section 4-4 is the densest: its s4-defs block adds コンテキスト, サブエージェント and /code-review, and s4-trap adds 過剰設計 inline.",
+      "evidence": "measure.mjs gives prose 1998 (budget 1,200–2,400) and est 19.2 min (≤ 20), and estMinutes 19 matches it. `lessons:lint --strict` is clean, and every concept section ends in a quiz. Two paragraphs now have 4 sentences, against the 3-sentence limit of §1: s1-why, and the first paragraph of s2-goal, which grew when the turn definition and the stop conditions were added.",
       "blockIds": [
-        "s4-defs",
-        "s4-trap"
+        "s1-why",
+        "s2-goal"
       ]
     },
     {
       "id": "prior",
-      "score": 2,
-      "evidence": "The prerequisites are listed and earlier lessons are recalled (第1回のエージェントループ, 詳しくは第5回/第7回). But some terms appear before any definition or English gloss. s2-goal uses 「ターン」, and exam item e2 uses 「リファクタリング」 and 「終了コード0」; none of these is defined in this lesson or in cc-01 to cc-03. Applying the s2-goal and check-quiz (e2) fixes in mustFix lifts this to 3.",
+      "score": 3,
+      "evidence": "Terms from the last round are now defined before use: ターン（turn） in s2-goal, リファクタリング（refactoring） in e2, and 型エラー（値の種類の食い違い） in e4. 過剰設計 and エッジケース are now in the glossary. The lesson recalls earlier lessons (第1回のエージェントループ（agentic loop）, 詳しくは第5回/第7回). エッジケース first appears in s4-prompt with no gloss or recall in the text, so this stays at 3, not 4.",
       "blockIds": [
         "s2-goal",
-        "check-quiz"
+        "check-quiz",
+        "s4-prompt",
+        "s1-why"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "This is a single-locale (jp) lesson with no plain-string lint findings. The s4-sort diagram has Japanese labels, a caption and a full alt text. The s4-names link text 「日本語の公式ドキュメント」 names its destination, though only in general terms.",
+      "evidence": "This is a single-locale (jp) lesson with no plain-string findings. The s4-sort diagram has Japanese labels, a caption and a full alt text. The link texts name their destinations: s1-screenshot-note 「Chromeとの連携」 and s4-names 「日本語の公式ドキュメント」 (the second only in general terms).",
       "blockIds": [
         "s4-sort",
+        "s1-screenshot-note",
         "s4-names"
       ]
     }
   ],
   "mustFix": [
     {
-      "criterion": "prior",
+      "criterion": "load",
+      "blockId": "s1-why",
+      "issue": "(d) §1, at most 3 sentences per paragraph: s1-why is one paragraph of 4 sentences (「そこで…渡します。」「Claudeは…確かめます。」「公式ガイドが…方法です。」「第1回の…回せます。」).",
+      "fix": "「Claudeは合格するまで直しては確かめます。公式ガイドが最初に挙げる方法です。」→「Claudeは合格するまで直しては確かめます。\n\n公式ガイドが最初に挙げる方法です。」 (the block becomes two paragraphs of 2 sentences each)"
+    },
+    {
+      "criterion": "load",
       "blockId": "s2-goal",
-      "issue": "(d) First use (§2): the katakana term 「ターン」 has no English gloss and no definition here or in cc-01 to cc-03. The learner needs it to read the /goal condition 「20ターンで止める」.",
-      "fix": "「ターンごとに別の小さなモデルが判定し、満たすまでClaudeは続けます。」→「ターン（turn：Claudeが1回応答を終えるまでの区切り）ごとに、別の小さなモデルが条件を判定します。満たすまで、Claudeは作業を続けます。」(the paragraph stays at 3 sentences)"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "check-quiz",
-      "issue": "(d) Terms defined before use (§2): exam item e2 brings in 「リファクタリング」 (katakana with no English and no definition) and 「終了コード0」. Neither appears earlier in the lesson, and the correct option and the explanation depend on 「終了コード0」.",
-      "fix": "e2 prompt 「長いリファクタリングを `/goal` で任せます。」→「動きを変えずにコードを整理する、長いリファクタリング（refactoring）を `/goal` で任せます。」; e2 option b 「「`npm test` が終了コード0で終わる。テストのファイルは変更しない。または20ターンで止める」」→「「`npm test` を実行し、失敗が0件になる。テストのファイルは変更しない。または20ターンで止める」」; e2 explanation 「測れる終わりの状態（終了コード0）」→「測れる終わりの状態（失敗が0件）」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s1-table",
-      "issue": "(a) Two readings: in 「撮って元の画像と比べて」, 「元の画像」 can mean the screenshot taken before the change, not the design mockup. q1 needs the second meaning (デザイナーから届いた画像).",
-      "fix": "「「撮って元の画像と比べて」」→「「撮って見本の画像と比べて」」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "p-steps",
-      "issue": "(a) Two readings: in the p-sort troubleshoot, 「任意に入れます」 can be read as 'add them at will (implement them)' instead of 'put them in the optional group'. That is the opposite of the intended instruction.",
-      "fix": "p-sort troubleshoot 「仕様にない入力への備え（負の年、文字列の年など）は、任意に入れます。」→「仕様にない入力への備え（負の年、文字列の年など）は、任意のほうに分けます。」"
+      "issue": "(d) §1, at most 3 sentences per paragraph: the first paragraph now has 4 sentences (the /goal sentence, the ターン definition, the judging sentence and 「進展がないときや…止まります。」). The third sentence also leaves out what is judged (「別の小さなモデルが判定し」).",
+      "fix": "「…ターン（turn）と呼びます。ターンごとに別の小さなモデルが判定し、満たすか無理と判定されるまでClaudeは続けます。」→「…ターン（turn）と呼びます。\n\nターンごとに別の小さなモデルが条件を判定し、満たすか無理と判定されるまでClaudeは続けます。」 (paragraphs of 2, 2 and 2 sentences)"
     },
     {
       "criterion": "voice",
       "blockId": "check-quiz",
-      "issue": "(d) §5, options in the same form: e3 options a–c are noun phrases (「Aのテストの出力」「Bの変更したファイル一覧」「Cの画面の表示」), but d is a clause ending in 「よい」.",
-      "fix": "e3 option d 「どれも証拠があるので、確かめ直さなくてよい」→「どれでもない（どれも証拠がある）」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます (§1): two card backs end in plain-form verbs: card-fresh 「…甘くなるから。…に頼む。」 and card-explain 「…確かめる。…も使える。」",
-      "fix": "card-fresh back 「自分の仕事を自分で採点すると甘くなるから。サブエージェントや `/code-review` に頼む。」→「自分の仕事を自分で採点すると、甘くなるからです。サブエージェントや `/code-review` に頼みます。」; card-explain back 「差分を説明させ、結果を予想してから確かめる。出力スタイルのExplanatory・Learningも使える。」→「差分を説明させ、結果を予想してから確かめます。出力スタイルのExplanatory・Learningも使えます。」"
+      "issue": "(d) §5, options in the same form and ending: in e4, options a, b and d end in action verbs (「受け入れる」「直させる」「受け入れる」), but option c is a judgement ending in 「無視してよい」. This is the same problem that was fixed in e3 option d.",
+      "fix": "e4 option c 「型エラーは開発中だけの話なので、無視してよい」→「型エラーは開発中だけの話なので、設定をそのまま残す」"
     }
   ],
   "niceToHave": [
-    "s1-why: the wordplay 「確かめる」を確かにする is clumsy, and the sentence asks 「方法で」 to carry two ideas. エージェントループ also lacks the English it had in cc-01 (agentic loop) — 「第1回のエージェントループの「結果を確かめる」を確かにする方法で、公式ガイドが最初に挙げています。」→「公式ガイドが最初に挙げる方法で、第1回のエージェントループ（agentic loop）の「結果を確かめる」を確実にします。」",
-    "s1-table: 合うタスク names a symptom, not a task — 「ビルドエラー」→「ビルドエラーの修正」",
-    "s1-table / objectives: ビルド and スクリーンショット are key terms of o1 shown without English — first use 「ビルド」→「ビルド（build）」, 「スクリーンショット比較」→「スクリーンショット（screenshot）比較」",
-    "q2: 「次の報告」 sounds like one report, but the options are four different reports — 「Claudeから次の報告が届きました。」→「Claudeから、次の4つの報告が届きました。」",
-    "s3-pitfall and s4-lead: 「エージェント」 never gets its English gloss — first use 「エージェントに」→「エージェント（agent）に」",
-    "s3-prompt-write expect: the spec is written on one line, so 「1行ごと」 does not fit — 「仕様の1行ごとにテストが1件ずつ書かれ」→「仕様の例1つごとにテストが1件ずつ書かれ」",
-    "s3-steps ex-commit: the reason skips its condition (why committing helps) — 「テストの書き換えに、`git diff` ですぐ気づけます。」→「先にコミットしておけば、テストの書き換えに `git diff` ですぐ気づけます。」",
-    "s3-steps ex-red / s3-prompt-write (factual doubt, not changed): postal.mjs does not exist yet, so node:test may report one import failure for the file instead of 「4件とも失敗します」. Please confirm the actual output.",
-    "s3-steps ex-evidence / p-steps p-evidence / p-checklist p-c3 (factual doubt): a newly created postal.mjs or leap-year.mjs is untracked, so `git diff --stat` will not list it. 「差分は `postal.mjs` だけ」 may not match what the learner sees; consider `git status` as well.",
-    "s4-fresh: the second sentence has no subject — 「差分と渡された基準だけを見ます。」→「サブエージェントは、差分と渡された基準だけを見ます。」",
-    "s4-prompt / s5-prompt / p-checklist: 「エッジケース」 was glossed in cc-03 (めったに起きない場面) but never in this lesson. Add a recall in s4-how and a glossary entry — s4-how 「正しさだけなら `/code-review`、計画と照らすなら次の依頼文です。」→「正しさだけなら `/code-review`、計画と照らすなら次の依頼文です。エッジケース（edge case）は、めったに起きない場面のことでした。」; also add glossary {term:「エッジケース（edge case）」, md:「めったに起きない場面や、境目の入力。」}",
-    "s4-trap / q4 / q5 / e5 / e6: 「過剰設計」 is a key term in five feedbacks but is missing from the glossary, and it is the 4th new term in 4-4 — add glossary {term:「過剰設計」, md:「要件にない備えや抽象化を足しすぎること。」}",
-    "lesson: the same idea is called 「別のコンテキスト」 (title, e5, p-review) and 「新しいコンテキスト」 (s4-fresh, e5 explanation). The meaning is clear, but one name reads better — 「新しいコンテキストのサブエージェント」→「別のコンテキストのサブエージェント」",
-    "s4-sort-intro: say what the diagram shows and in what order (§4) — 「指摘ごとに、2つを問います。」→「指摘ごとに、次の2つを順に問います。」",
-    "s4-check q4 hint: the quoted label does not match the diagram's first question (「正しさの問題？」) — 「図の1つ目の問い「仕様どおりに動かない？」」→「図の1つ目の問い「正しさの問題？」」",
-    "s4-names: name the page, not only the site; the /docs/ja/ URL is also not in sources (factual doubt) — 「[日本語の公式ドキュメント]」→「[公式ドキュメントのベストプラクティス（日本語）]」",
-    "s5-rct: 「群」 is stiff, and 「52人の実験」 drops the relation — 「52人の実験を公開しました」→「52人を対象にした実験を公開しました」; 「自分で書いた群」→「AIを使わずに学んだ群」",
-    "s5-styles / s5-defs: 出力スタイル is used before its definitions block. Move s5-defs above s5-styles (no text change).",
-    "s5-styles / s1-lead / q5-c: §1 prefers dropping 「あなた」 — 「あなたに書いてもらいます」→「自分で書けるようにします」; 「間違いに気づく役はあなたです」→「間違いに気づくのは自分の役目になります」; 「要件を知っているのはあなたなので、決めるのもあなたです」→「要件を知っている自分が決めます」",
-    "p-task: the second sentence reads as a statement of fact, not a request — 「大事なリポジトリでは試しません。」→「大事なリポジトリでは試さないでください。」",
-    "p-model-sort: the caption uses 「仕様」 alone, but the rule taught in s4-sort and card-must is 正しさと要件 — 「仕分けの例：必須は仕様に反するものだけ」→「仕分けの例：必須は正しさと要件に関わるものだけ」; p-prompt-review 「正しさか仕様に関わる問題だけ」→「正しさか要件（この仕様）に関わる問題だけ」",
-    "check-quiz e4: 「型エラー」 and 「型のチェック」 are not introduced anywhere. A short gloss helps — prompt 「型エラーを無視する設定」→「型エラー（値の種類の食い違い）を無視する設定」",
-    "check-quiz e5: option b is clearly longer than the others, which hints at the answer — 「サブエージェントに計画と照らして差分を見させ、正しさと要件の問題だけを報告させる」→「サブエージェントに計画と照らさせ、正しさと要件の問題だけを報告させる」",
-    "summary-cards card-test-first: for consistency with the other backs — 「テストを変えずに、通るまで実装する。」→「テストを変えずに、通るまで実装します。」",
-    "glossary: the register is mixed (/goal 「判定する。」, 出力スタイル 「選びます。」) and /code-review quotes the command in 「」 instead of code format — 「別名は「/review」（v2.1.223から）。」→「別名は `/review`（v2.1.223から）。」; /goal 「ターンごとに別のモデルが条件を判定する。」→「ターンごとに、別のモデルが条件を判定します。」"
+    "s1-why: 「「結果を確かめる」を…回せます」 is a slightly odd verb for one step of the loop — 「「結果を確かめる」を、Claude自身が回せます。」→「「結果を確かめる」まで、Claude自身で進められます。」",
+    "s2-goal: the same evaluator is called 「別の小さなモデル」 and then 「判定役」. Tie the two names together on first use — 「判定役はコマンドを実行せず」→「判定役（この小さなモデル）はコマンドを実行せず」",
+    "s1-table: ビルド and スクリーンショット are key terms of o1 shown without English (carried from round 1) — 「ビルド」→「ビルド（build）」; 「スクリーンショット比較」→「スクリーンショット（screenshot）比較」",
+    "s4-how / s4-prompt: エッジケース first appears in s4-prompt with no gloss in the text, only in the glossary. Add a recall — 「計画と照らすなら次の依頼文です。」→「計画と照らすなら次の依頼文です。エッジケース（edge case）は、めったに起きない場面のことでした。」",
+    "s4-defs: 4-4 introduces コンテキスト, サブエージェント, /code-review and 過剰設計. コンテキスト can count as a recall of cc-01 コンテキストウィンドウ, so say so — 「Claudeがいま見ている会話やファイルの中身。詳しくは第5回。」→「Claudeがいま見ている会話やファイルの中身（第1回のコンテキストウィンドウに入っているもの）。詳しくは第5回。」",
+    "s3-steps ex-commit: the reason leaves out its condition (carried from round 1) — 「テストの書き換えに、`git diff` ですぐ気づけます。」→「先にコミットしておけば、テストの書き換えに `git diff` ですぐ気づけます。」",
+    "p-steps p-write hint: p-task writes the spec on one line, so 「各行」 does not fit — 「仕様の各行に、例の年を1つずつ当てはめてみましょう」→「仕様の決まりごとに、例の年を1つずつ当てはめてみましょう」",
+    "p-prompt-write: 「テストだけを書いてください」 is followed at once by a request for the empty function, which reads as a small contradiction — 「{{テストの道具}}で、テストだけを書いてください。」→「{{テストの道具}}で、テストを書いてください。」 (the next sentences already forbid the implementation)",
+    "summary-cards card-test-first: the arrow chain mixes plain and polite forms — 「テストを書く → 失敗を確かめる → テストを変えずに、通るまで実装します。」→「テストを書き、失敗を確かめてから、テストを変えずに通るまで実装します。」",
+    "s1-check q1: option b is clearly longer than the others, which hints at the answer — 「「直した画面と届いた画像を見比べ、ずれを挙げて直して」」→「「届いた画像と見比べ、ずれを直して」」",
+    "s4-names: name the page, not only the site (carried from round 1) — 「[日本語の公式ドキュメント]」→「[公式ドキュメントのベストプラクティス（日本語）]」",
+    "s1-screenshot-note (factual doubt): the link points to the English page /docs/en/chrome, while s4-names uses a /docs/ja/ page. If a Japanese version of the Chrome page exists, link to it and add it to sources.",
+    "glossary: the register is mixed. Most entries end in a noun (「…こと。」「…道具。」), but /goal, 出力スタイル and others end in です・ます (「判定します。」「選びます。」). Pick one form — /goal 「別のモデルが条件を判定します。」→「別のモデルが条件を判定する。」 is not needed if you keep です・ます. Either way, make all entries match."
   ],
-  "average": 2.75,
+  "average": 3.0,
   "verdict": "revise",
-  "summary": "Overall the Japanese reads naturally and warmly, and wrong-option feedback is short and names the misconception well. The most important fix is the prior criterion: ターン (s2-goal), リファクタリング and 終了コード (e2) are used with no definition or English, which keeps prior at 2. Also fix the two ambiguous phrases (s1-table 「元の画像」, p-sort 「任意に入れます」), the plain-form flashcard backs and the e3 option form."
+  "summary": "I did a full review because the scope check required it: review-scope.mjs exited 1, with 36 of 102 parts and 29 of 57 blocks changed, above the 30% threshold. All six must-fix items from round 1 are gone in the current text: ターン（turn） is defined in s2-goal; e2 glosses リファクタリング and uses 「失敗が0件」; s1-table says 「見本の画像」; p-sort says 「任意のほうに分けます」; e3 option d is 「どれでもない（どれも証拠がある）」; and the card backs are polite. Three errors remain. Two are new: s1-why and the first paragraph of s2-goal each have 4 sentences, against the 3-sentence limit. The third is e4 option c, which ends in 「無視してよい」 while the other options end in action verbs. Otherwise the Japanese reads naturally, and load is within budget (prose 1998, est 19.2 min, estMinutes 19)."
 }

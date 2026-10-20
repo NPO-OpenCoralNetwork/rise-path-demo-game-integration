@@ -1,24 +1,28 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:fa057faba24bd625",
+  "lessonHash": "sha256:32e6d290cf411742",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "align",
-      "score": 3,
-      "evidence": "All three objectives have 2+ items with objectiveId (o1: q1, e1, e2; o2: q2, q3, e3, e4; o3: q4, e5, e6). However, q3 (fix an out-of-scope library step in a plan) is tagged o2 ('プランモードを使うべき場面と省いてよい場面を判断できる') and does not test it. No objective covers the lesson's central skill, reading and correcting a plan before approval, even though the subtitle is '直してから任せる' and there is c1-plan-fix.",
+      "score": 4,
+      "evidence": "All three objectives are can-do statements. Each has 2 or more items with objectiveId and at least one item at apply level or higher: o1 has q1 (apply) and e1 (analyze); o2 has q0, q2, q3 and e4 (evaluate); o3 has q4 and e5 (apply). o2 now reads 「…判断し、承認する前に計画を直せる」, so q3 tests what o2 states. o3 is a create objective but its only questions are apply-level multiple choice; the create step happens in practice-spec.",
       "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s2-check",
         "s3-check",
+        "s4-check",
         "check-quiz"
       ]
     },
     {
       "id": "hook",
-      "score": 3,
-      "evidence": "hook-problem is a concrete 3-sentence scenario ('ボタンがはみ出すのを直すことだけ') and q0 is an ungraded predict item. The keyed option c is the longest and is the only one that combines both lesson ideas, so it is easy to guess rather than predict.",
+      "score": 4,
+      "evidence": "hook-problem is a concrete 2-sentence scenario (「ほしかったのは、スマートフォンでボタンがはみ出すのを直すことだけでした」) with no trivia, and s1-example and s3-steps later solve exactly that problem. q0 is an ungraded predict item. Its key c (「直したいことを具体的に書き、書く前に計画を見る」) is now as long as the other options.",
       "blockIds": [
         "hook-problem",
         "hook-predict"
@@ -27,59 +31,64 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The lesson lists its prerequisites and recalls earlier lessons ('第2回で見た権限モード', '第1回で、コミットの前に確かめたもの'). Terms appear in definitions blocks before use. 'インターフェース（interface）' in s4-good-spec and card-good-spec is never explained for this beginner audience, and the 参照先 perspective is used more broadly than the table defines it (see mustFix).",
+      "evidence": "The prerequisites name 第1回 and 第2回, and the text recalls them (「第2回で見た権限モードの1つです」). Terms are defined in s1-defs, s2-defs and s4-defs before use, and インターフェース is now explained inline in s4-good-spec. Some beginner jargon in s1-table gets only an English gloss: 「モック（mock）」 and 「ウィジェット（widget）」.",
       "blockIds": [
         "s1-defs",
         "s2-defs",
         "s4-defs",
-        "s4-good-spec"
+        "s4-good-spec",
+        "s1-table"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Lint reports 0 warnings, and every segment has a table, diagram, prompt or quiz. s2 is crowded: it covers the 4 phases, 3 ways to enter plan mode, a version callout and when to skip planning. estMinutes is 21, above the contract's 8–20 range.",
+      "evidence": "measure.mjs gives 「prose 2252 (budget 1,200–2,400) · read 3357 · practice reading 1436 · questions 8 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)」, so the lesson is within budget and estMinutes matches. Lint reports 0 warnings. s2 is still crowded: 8 blocks (3 definitions, a diagram, the entry list, the version callout, the skip rule and a quiz). s4 glosses UI/UX, エッジケース and トレードオフ in the prompt on top of 仕様, AskUserQuestion and インターフェース.",
       "blockIds": [
         "s2-defs",
         "s2-enter",
         "s2-version",
-        "s2-when"
+        "s2-when",
+        "s4-interview"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s3-steps is a full worked example before practice, and most steps give a reason ('探索と計画のあいだ、ファイルを変えさせないためです', '現状を知ると、計画を読む物差しになります'). It runs to 7 steps (the contract says 3–6). It never shows the plan text the learner is supposed to read in ex-fix, so the key move of spotting the out-of-scope step is described but not modelled.",
+      "evidence": "s3-steps is a full worked example before practice, and it now models reading the plan. ex-plan's expect shows a 3-step plan, and ex-fix says 「2番目は、頼んでいない共通のスタイルの変更です」. It still has 7 steps where the contract asks for 3–6, and ex-plan and ex-commit give no reason for the step.",
       "blockIds": [
         "s3-steps",
-        "s3-fix-prompt",
-        "s1-example"
+        "s3-fix-prompt"
       ]
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "Every content section has an inline quiz, and q1, q3, e1, e4 and e6 ask for application in new contexts. q2 can be answered by matching words: three options are exactly s2-when's examples ('誤字', 'ログ1行', and 変数名 from the official list), and the key restates its triggers ('初めて触るコード', '3つのファイル'). e2's stem ('言葉で説明するより確実に伝える方法') rules out every verbal option.",
+      "evidence": "Every content section has an inline check. q1, q3 and e4 ask for application in a new context, and the rewritten q2 now needs real judgement: option a 「初めて触るリポジトリで、READMEの誤字」 sets the unfamiliar-repository cue against a one-sentence diff. However, the stem of the only exam item for o3 (e5) contradicts two of its distractors, so e5 is effectively a 2-option item (see mustFix). q4's key is nearly the s4-interview text word for word.",
       "blockIds": [
+        "s1-check",
         "s2-check",
+        "s3-check",
+        "s4-check",
         "check-quiz"
       ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Every misconception in the brief appears as a distractor with reasoned feedback of at most 2 sentences: adjectives (q0 a), Manual mode (q0 b, e4 d), /rewind (q0 d, e4 b), the classifier (e4 c), trusting the plan (q3 c, e6 c), 'always plan' (q2 d), 'files already changed' (q3 d) and the same session (e6 b, e5 d).",
+      "evidence": "The brief's misconceptions appear as distractors, each with reasoned feedback of at most 2 sentences: stronger adjectives (q0 a), Manual mode (q0 b, e4 d), /rewind (q0 d, e4 b: 「Bashで変えたものや外部への操作を戻せません」), the classifier (e4 c), trusting the plan (q3 c), always planning (q2 b), files already changed (q3 d) and Claude remembering (e5 d).",
       "blockIds": [
         "hook-predict",
         "s2-check",
         "s3-check",
+        "s4-check",
         "check-quiz"
       ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s2-flow is a 5-node process diagram whose labels match the text's terms (探索, 計画, 実装, コミット). It shows the key loop '直したい点がある → 計画', its caption states the takeaway and its alt text is descriptive. There are no decorative images, and the tables (s1-table, s4-table) are used for comparison.",
+      "evidence": "s2-flow is a 5-node process diagram. Its labels match the text (探索, 計画, 実装, コミット), it shows the 「直したい点がある」 loop back to 計画, its caption states the takeaway (「計画を読み、直してから承認して実装に進む」) and its alt text is descriptive. There are no decorative images, and s1-table and s4-table are used for comparison.",
       "blockIds": [
         "s2-flow",
         "s1-table",
@@ -89,20 +98,20 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Practice 1 is authentic: a 22-line todo.html that runs as written, 7 steps with expect, hint and troubleshoot on ② and ④, a model answer and a 6-item checklist. Practice 2 has no hints at all. Its fully visible model answer (practice-spec-model, a prompt block whose body is always shown) sits directly under the two-sentence task, before the success criteria, so the 'create' task becomes copying.",
+      "evidence": "Practice 1 is authentic: a 23-line todo.html with a real bug, 7 steps with expect, hint and troubleshoot on ② and ④, a model answer and a 6-item checklist. Practice 2 now has practice-spec-steps with hints and troubleshoot, then the checklist, then a model titled 「（書いてから見比べましょう）」. The hint ladder has 2 levels, not 3. practice-model in practice 1 still sits before its checklist with no 'write first' cue.",
       "blockIds": [
         "practice-steps",
         "practice-model",
         "practice-checklist",
-        "practice-spec-task",
-        "practice-spec-model",
-        "practice-spec-checklist"
+        "practice-spec-steps",
+        "practice-spec-checklist",
+        "practice-spec-model"
       ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (5 points) comes after the exam. summary-next has a reflection prompt ('4つの観点のうち、どれが抜けていたでしょうか') and a concrete next step to 第4回. There are 7 flashcards, and askTutor offers targeted suggestions.",
+      "evidence": "summary-points (5 points) comes after the exam. summary-next has a reflection prompt (「4つの観点のうち、どれが抜けていたでしょうか」) and a concrete next step to 第4回. There are 7 flashcards, and askTutor offers 3 targeted suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -112,29 +121,30 @@
     },
     {
       "id": "accuracy",
-      "score": 3,
-      "evidence": "Tool claims are cited, pinned to 'v2.1.304' / 'v2.1.283 以降' and consistent with cc-02 and the research file. s4-interview is a faithful translation of the official prompt. However, 参照先 is defined in s1-table as '答えを持っている情報源' (the official 'Point to sources', e.g. git history), yet s1-example's note, q1 d, e1 b and practice-model treat the file being fixed (and even the screenshot) as 参照先.",
+      "score": 4,
+      "evidence": "All three confirmed audit findings are applied. s2-version now says 「起動時の指定や設定がなければautoモードで始まります。autoモードが使えない環境では、Manualモードで始まります」, s2-enter-lead says 「主な入り方は3つです」 and card-enter says 「主な3つの方法」. 参照先 is used consistently with s1-table (「読ませたい情報源。@参照するファイル…」) in the s1-example note, q1 d, e1 b and practice-model. Claims are cited and the version is pinned (v2.1.304).",
       "blockIds": [
+        "s2-version",
+        "s2-enter-lead",
+        "summary-cards",
         "s1-table",
         "s1-example",
-        "s1-check",
-        "check-quiz",
         "practice-model"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The prose is consistently in です・ます and warm ('考えなくて大丈夫です', 'まずはこの方法を手で試しましょう'), lint finds no banned phrases, and glossary terms are used consistently. Fine-grained wording is left to the ja-editor.",
+      "evidence": "The prose is consistently in です・ます and warm (「まずは手で試しましょう」, 「大事なリポジトリでは試さないでください」), lint finds no banned phrases, and glossary terms are used consistently. Fine-grained wording is left to the ja-editor.",
       "blockIds": [
-        "s2-check",
-        "s4-community"
+        "s4-community",
+        "practice-task"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp only and complete. The diagram labels are Japanese and s2-flow has an alt text. The only link uses descriptive text ('公式ドキュメント（日本語）'), and no text is baked into images.",
+      "evidence": "The lesson is jp only and complete. The diagram labels are Japanese and s2-flow has descriptive alt text. The only link uses descriptive text (「autoモードが使えない環境」), and no text is baked into images.",
       "blockIds": [
         "s2-flow",
         "s2-version"
@@ -143,54 +153,25 @@
   ],
   "mustFix": [
     {
-      "criterion": "align",
-      "blockId": "s3-check",
-      "issue": "q3 (an unrequested 'package.json にライブラリを追加' step in a plan) is tagged objectiveId o2, but o2 is about judging when to use or skip plan mode; q3 tests correcting a plan before approval. No objective names that skill, though it is the lesson's subtitle and a practice success criterion (c1-plan-fix), so the central skill is assessed under an objective that does not state it.",
-      "fix": "Change objectives[1].text (o2) to 「プランモードを使うべき場面と省いてよい場面を判断し、承認する前に計画を直せる」 and keep bloom 'evaluate'. q3 and e4 (whose key is 'プランモードで計画を読み、直してから承認する') then test o2 as written. Note that changing an objective makes the next review round a full review."
-    },
-    {
-      "criterion": "active",
-      "blockId": "s2-check",
-      "issue": "q2 is answerable by matching words in s2-when, the paragraph just read: the distractors a (README の誤字), d (ログを1行) and b (変数名) are the exact skip examples, and the key c restates the triggers 'よく知らないコード' and '複数のファイル'. It tests recognition, not the evaluate-level judgement o2 asks for.",
-      "fix": "Keep the stem and the option ids and replace the options. a: 「初めて触るリポジトリで、README の誤字を1か所直す」, feedback 「よく知らないリポジトリでも、この差分は1文で言えます。計画の手間のほうが大きいので、直接頼みます。」. b: 「いつも触っている関数で、引数の既定値を 10 から 20 に変える」, feedback 「『念のため毎回計画する』と、手間ばかり増えます。場所と中身が決まった変更は、直接頼んで差分を確かめます。」. c (answer): 「一部の人だけ、ログイン後に画面が真っ白になる。原因はまだわからない」. d: 「設定ファイルにあるポート番号を、3000 から 3007 に変える」, feedback 「設定ファイルでも、差分を1文で言える変更です。大事なファイルかどうかより、進め方が決まっているかで判断します。」. explanation: 「c は原因がわからず、進め方に迷う作業です。探索と計画で原因と方針を確かめると、違う方向へ進むのを防げます。」"
-    },
-    {
       "criterion": "active",
       "blockId": "check-quiz",
-      "issue": "e2's stem 'スマートフォンで表の列が重なって表示されます。言葉で説明するより確実に伝える方法はどれでしょう？' gives the answer away: options b, c and d are all verbal, so 'not words' leaves only a (the screenshot). It is also the item that pushes estMinutes over 20.",
-      "fix": "Delete question e2 from check-quiz. o1 stays assessed by q1 (inline) and e1 (exam transfer). Remove 'cc-common-workflows' from check-quiz.cite, since only e2 relied on it. Then set estMinutes as described in the 'lesson' load item."
-    },
-    {
-      "criterion": "accuracy",
-      "blockId": "s1-table",
-      "issue": "The 参照先 perspective is used inconsistently with its definition and its cited source. s1-table defines it as '答えを持っている情報源' (the official 'Point to sources', example: git history). But the s1-example note says '参照先は、1行目の @参照と画像です'; q1 d feedback and e1 b feedback call the file being fixed (@src/search.ts, @src/import.ts) 参照先; and practice-model never labels a 参照先 even though c1-perspectives requires one. A learner who applies the table's definition to e1 can defensibly pick b (参照先 missing), because @src/import.ts is the target file, not an answer source.",
-      "fix": "In s1-table, change the 参照先 row's 書くこと cell to 「読ませたい情報源。@参照するファイル、ドキュメントの URL、git の履歴など」. In s1-example, change note to 「参照先は、1行目の @参照です。画像は、症状を見せるために貼っています。残りの観点は、見出しを付けて書いています。」. In practice-model, change the first line to 「参照先：@todo.html を読んでください。この TODO 画面を直したいので、まず計画を立ててください。」 so that a learner checking against c1-perspectives can find all four perspectives."
-    },
-    {
-      "criterion": "practice",
-      "blockId": "practice-spec",
-      "issue": "Practice 2 has no hint ladder, and its model answer (practice-spec-model, a prompt block whose body always renders) appears immediately after the two-sentence task and before the success criteria. The model is s4-interview plus one sentence, so the learner copies instead of creating (o3, bloom create).",
-      "fix": "Insert a steps block 'practice-spec-steps' between practice-spec-task and practice-spec-model with 3 items. (1) id 'ps-feature', title 「① 作りたい機能を1文で書く」, md 「期限とリマインダーで、何ができるようにしたいかを書きます。」, expect 「依頼文の1行目に、機能が1文で入ります。」, hint 「例：各項目に期限を付け、期限の前に知らせたい」. (2) id 'ps-ask', title 「② インタビューの頼み方を書く」, md 「使うツールと、聞いてほしい観点を書きます。」, expect 「AskUserQuestion と、観点が3つ以上入ります。」, hint 「TODO 画面なら、データの持ち方や画面が観点になります。」, troubleshoot 「3-4の依頼文の2行目を、TODO 画面に合わせて書き換えます。」. (3) id 'ps-spec', title 「③ 書き出し先と仕様の条件を書く」, md 「SPEC.md と、仕様に入れる3つの条件を足します。」, expect 「関わるファイル・範囲外・確かめる手順が入ります。」, hint 「3-4の『役に立つ仕様』の段落を見直しましょう。」, troubleshoot 「『実装はまだしないでください』も足すと、途中で書き始めません。」. Then move practice-spec-checklist before practice-spec-model and retitle the model 「模範解答：インタビューの依頼文（書いてから見比べましょう）」."
-    },
-    {
-      "criterion": "load",
-      "blockId": "lesson",
-      "issue": "estMinutes is 21, but the lesson contract (§1) requires 8–20 minutes. The brief's own estimate is 20.6.",
-      "fix": "After deleting e2 (10 questions × 40 s = 6.7 min, so 5.3 + 6.7 + 8 ≈ 20.0) and adding practice-spec-steps with at most about 120 visible JP characters (md + expect; hints and troubleshoot are folded), set estMinutes to 20. If the steps add more visible text, cut the last sentence of practice-spec-task (「試すなら、…実装させます。」), which c2-session already covers."
+      "issue": "e5 is the only exam item for o3, and its stem gives away 2 of the 3 distractors. The draft already says 「当たり前の質問はせず」, so option c 「質問は、当たり前のものも含めて全部聞いて。」 contradicts the stem. The draft says 「インタビューして」, so option b 「質問を始める前に、おすすめの仕様で実装を始めて。」 contradicts it too. That leaves a vs d, and key a nearly repeats line 3 of s4-interview.",
+      "fix": "In e5, keep the stem, option a, option d and the explanation, and replace options b and c with misconceptions that do not contradict the draft. Option b md: 「インタビューが終わったら、この会話のまま続けて実装して。」; feedback: 「インタビューの長い会話が残ったままでは、実装に集中しにくくなります。SPEC.mdに書かせ、新しいセッションで読ませます。」. Option c md: 「質問は5問までにして、早めに切り上げて。」; feedback: 「数を先に決めると、難しい部分を掘り下げきれません。すべて話し終えるまで続けてもらいます。」."
     }
   ],
   "niceToHave": [
-    "s3-steps ex-plan: model the plan reading by showing an excerpt. Change expect to 「計画の例：1. Login.tsx のボタンの幅を画面に合わせる　2. 共通のスタイルでボタンの幅を変える　3. 幅375pxで確かめる」 and the start of ex-fix md to 「2番目の手順は、頼んでいない共通のスタイルの変更です。」",
-    "s3-steps: the contract asks for 3–6 worked-example steps; there are 7. Merge ex-enter into ex-explore as 「① プランモードに入り、探索させる」 (keys Shift+Tab; md 「ファイルを変えさせずに調べるためです。2つの画面のファイルを @参照で渡し、『レイアウトの違いを説明して』と頼みます。」).",
-    "s4-good-spec: gloss the jargon for beginners as 「インターフェース（interface、ほかのコードとのつなぎ目になる関数名や引数）」.",
-    "s1-table: 'ExecutionFactory' is an unexplained proper noun from the official example; write 「`ExecutionFactory`（例のクラス名）の git 履歴を調べ…」.",
-    "s2-version: the 'v2.1.283 以降…auto モードで始まります' claim comes from the changelog; add 'cc-changelog' to its cite.",
-    "s3-tip: scope the RCT claim to its setting, e.g. 「Anthropic の研究では、新しいライブラリを AI と学ぶ実験をしました。AI に任せきりの人より、説明を求めた人のほうが理解度テストの点が高くなりました。」",
-    "practice-steps pr-plan: the troubleshoot fallback (「計画の最後に、ブラウザでの確かめ方を足して」) is already in the model prompt, so it rarely helps. Consider 「見つからなければ、確かめ方が具体的か（何をすると何が見えれば直ったか）を見て、足りない点を足してもらいます。」",
-    "check-quiz e5: it is a choose-the-missing-sentence item, so bloom 'create' overstates it; set bloom to 'apply'. e6 tests the post-spec workflow rather than writing the request (o3); that is acceptable but could move to o2-style workflow coverage.",
-    "hook-predict q0: make option c the same length as the others so the prediction is not cued, e.g. 「直したいことを具体的に書き、先に計画を見る」."
+    "s3-steps: the contract asks for 3–6 worked-example steps and there are 7. Merge ex-enter into ex-explore: title 「① プランモードに入り、探索させる」, keys [\"Shift+Tab\"], md 「ファイルを変えさせずに調べるためです。2つの画面のファイルを[[@参照]]で渡し、「レイアウトの違いを説明して」と頼みます。」, expect 「違いが説明されます。ファイルは変わりません。」, and renumber the later titles.",
+    "s3-steps ex-plan: give the reason for the step. Change md to 「3-1の依頼文に「まず計画を立てて」と添えて送ります。書く前に、進め方を読める形にするためです。」. For ex-commit, add 「変更を記録しておくと、あとで戻したり見直したりできます。」.",
+    "practice-model: give it the same 'write first' cue as practice 2. Move practice-checklist before practice-model and retitle the model 「模範解答：書き直した依頼文（書いてから見比べましょう）」.",
+    "practice-steps pr-setup: the order is ambiguous. 「`todo.html` を保存して上のコマンドを実行し」 can lead learners to save the file before the folder exists, and git add then fails. Change md to 「上の3行でフォルダーを作り、その中に `todo.html` を保存してから、残りの2行を実行します。ブラウザで開き、空のまま「追加」を押します。」.",
+    "s4-check q4: key a (「AskUserQuestionツールで私にインタビューし、終わったらSPEC.mdに…」) almost repeats s4-interview, and it is the only option that says インタビュー. Consider making a distractor mention an interview too, e.g. replace c with 「「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」」 with feedback 「決めたことが仕様に残らず、同じ会話のまま実装が始まります。SPEC.mdに書かせ、新しいセッションで読ませます。」.",
+    "s3-check q3: the hint 「その時点で、ファイルはもう変わっているかを考えてみましょう」 only rules out d. Consider 「承認する前と、承認したあとでは、どちらが直しやすいかを考えてみましょう。」.",
+    "practice-spec-steps ps-ask: c2-depth requires 「当たり前の質問はしない」, but no step asks for it. Change expect to 「AskUserQuestionと、観点が3つ以上、「当たり前の質問はしない」が入ります。」.",
+    "practice-spec-checklist c2-session: 「SPEC.mdを読んだあと新しいセッションで頼む」 leaves unclear who reads the file. Consider 「実装は、新しいセッションでSPEC.mdを読ませてから頼むことにしました」.",
+    "s1-table: 「モック（mock）」 and 「ウィジェット（widget）」 get only an English gloss for beginners. Consider 「モック（mock、本物の代わりの仮の部品）」 and 「ウィジェット（widget、画面の部品）」.",
+    "The brief's Assumptions say the lesson tells learners the approval labels (「Yes, manually approve edits」「No, keep planning」) may change, but no such note remains after s2-version was rewritten. Consider adding to ex-fix or s2-version: 「選択肢の表示は、版によって変わることがあります。」."
   ],
-  "average": 3.23,
+  "average": 3.46,
   "verdict": "revise",
-  "summary": "The lesson's strongest point is its misconception work. Every brief misconception (Manual mode, /rewind, the classifier, trusting the plan, the same session) appears as a distractor with reasoned feedback, and the todo.html practice is authentic, with a checklist and a model. The most important fixes are these: make 参照先 consistent between s1-table and its uses (e1 currently has two defensible answers); give the plan-correction skill an objective (q3 is tagged to o2, which it does not test); replace the word-matching q2 and the self-answering e2; and add a hint ladder before the visible model in practice 2. Fixing o2 changes an objective, so the next round must be a full review."
+  "summary": "The scope check required a full review (exit 1: objective o2 changed, and 43 of 44 blocks changed). All six must-fix items from round 1 are gone: o2 now names correcting the plan, q2 needs real judgement, e2 is deleted, 参照先 matches its s1-table definition, practice 2 has steps and a checklist before a 'write first' model, and estMinutes is 20 (measure: est 20.0). The misconception work and the practice are strong. The one fix left is e5, the only exam item for o3: its stem rules out two of its distractors, so they need replacing."
 }

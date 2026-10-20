@@ -4,128 +4,75 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:f87cd45c170202f4",
+  "lessonHash": "sha256:24be3d570c30f448",
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "です・ます is used throughout, with no pressure phrases and short, warm sentences (hook-b1, s3-pitfall, summary-next), and lint --strict is clean. Two explicit rules are broken across the lesson: half-width spaces between 和文 and English (「Claude Code に」「JSON で」「CI や」) and plain-form card backs (summary-cards).",
+      "evidence": "The lesson uses です・ます throughout and has no pressure phrases. Sentences are short and warm (hook-b1, s4-enforce, summary-next), and lint --strict is clean. The round-1 breaks are gone. There are no half-width spaces between 和文 and English (「Claude Codeに」「CIで」「JSONで」), the card backs now use です・ます (summary-cards), and s1-defs now parses (「Ctrl + B で裏に回し、セッションごと裏で始めるなら `claude --bg` を使います」). A few phrases are still stiff: the s3-table header 「役割と、付けないと」 and the section 5 title 「依頼文の4点で点検する」.",
       "blockIds": [
-        "lesson",
         "summary-cards",
-        "s1-defs"
+        "s1-defs",
+        "s3-table"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Sentence and paragraph budgets hold, and every concept section ends in a quiz. s4-table packs four venues and five commands (`/install-github-app`, `claude_args`, `/schedule`, routines, `/loop`) into one screen, and s2-map adds three names in one callout.",
+      "evidence": "measure.mjs reports prose 1521 (budget 1,200–2,400), read 2645, practice reading 1247, 11 questions and est 20.0 min. That is at the 20-minute cap, and estMinutes is 20. Splitting the old section 4 into unattended-where and unattended eases the table-heavy screen. Every concept section is followed by an inline check within 2 sections. Sentence and paragraph budgets hold. The est is at the upper limit, so adding text here would break the time budget.",
       "blockIds": [
         "s4-table",
-        "s2-map"
+        "s3-table",
+        "p2-prompt"
       ]
     },
     {
       "id": "prior",
-      "score": 2,
-      "evidence": "Prerequisites are stated and lessons 2 and 7 are recalled. But CI (o2, s3-lead and the lesson's core scenario) is never spelled out, here or in cc-01 to cc-08. チェックアウト (s2-steps, s2-check, summary-cards) and VM (e4) are used without definition or English. エージェントビュー and リサーチプレビュー have no English. The fixes are in mustFix.",
+      "score": 3,
+      "evidence": "The round-1 gaps are closed. CI is spelled out in s3-lead, チェックアウト is gone, エージェントビュー（agent view） has its English, 試験公開中 replaces リサーチプレビュー, cron becomes 「決まった時刻」, VM becomes 「仮想マシン（VM）」, and PR becomes 「PR（プルリクエスト）」. Two katakana terms still appear for the first time in the course without English: トークン (s1-cost, e1) and シェル (s3-pitfall, e3). Both fixes are in mustFix.",
       "blockIds": [
-        "s3-lead",
-        "s2-steps",
-        "s2-check",
-        "s2-map",
-        "check-quiz"
+        "s1-cost",
+        "s3-pitfall",
+        "s3-lead"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The single declared locale (jp) is complete, with no plain-string or untranslated findings. The one link names its destination: 「公式ドキュメント（非対話的実行）」 in s3-mode. There are no images or diagrams with embedded text.",
+      "evidence": "The single declared locale (jp) is complete, with no plain-string or untranslated findings. The one link names its destination: 「公式ドキュメント（非対話的実行）」 in s3-mode. There are no images or diagrams with embedded text. Plain-text fields such as the checklist labels and var hints contain no markdown.",
       "blockIds": [
-        "s3-mode"
+        "s3-mode",
+        "p1-checklist"
       ]
     }
   ],
   "mustFix": [
     {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(d) notation §3: half-width spaces are put between 和文 and English words or numbers all through the lesson. §3 forbids them, and cc-07/cc-08 write 「JSONで」「PRの」 without them. Spaces are allowed only around inline code and in 「Ctrl + B」.",
-      "fix": "Delete the space between 和文 and English words or numbers everywhere. Keep spaces next to inline code (`…`), in 「Ctrl + B」, and in commands written as plain text (「claude -p」 in subtitle and s3-table caption). Concretely: prerequisites 「Git の commit・branch・merge」→「Gitのcommit・branch・merge」; o2 「CI などで」→「CIなどで」; hook-b1 「Claude Code に」→「Claude Codeに」; hook-predict b 「Claude Code が」→「Claude Codeが」; s2-steps ex-feature expect 「Claude が」→「Claudeが」; s2-check explanation 「Git が」→「Gitが」; s3-lead 「CI や」→「CIや」; s3-mode, s3-check (b feedback, explanation), e3 d feedback, summary-points, card-manual 「v2.1.302 から／以降」→「v2.1.302から／以降」, 「Manual モード」→「Manualモード」, 「auto モード」→「autoモード」, summary-points 「は v2.1.302 から Manual で」→「はv2.1.302からManualで」; s3-table 「フックや MCP、CLAUDE.md などを読まない（API キーが必要）」→「フックやMCP、CLAUDE.mdなどを読まない（APIキーが必要）」, 「結果や費用を JSON で返す」→「結果や費用をJSONで返す」; s3-check and e3 「夜間の CI で」→「夜間のCIで」, e3 c 「無人の CI では」→「無人のCIでは」; s4-table 「旧称 routines」→「旧称routines」 (also in the glossary 定期タスク); s4-intro 「Anthropic は」→「Anthropicは」; s4-enforce 「CLAUDE.md と同じで」→「CLAUDE.mdと同じで」; s4-prompt title 「毎週の TODO 一覧」→「毎週のTODO一覧」, prompt 「の中の TODO コメント」→「の中のTODOコメント」, 「の形の JSON を」→「の形のJSONを」, 「todos の各要素」→「todosの各要素」, 「TODO が1つも」→「TODOが1つも」, 「todos は空の配列」→「todosは空の配列」, 「unreadable に必ず」→「unreadableに必ず」, expect 「TODO がない日は todos が空になり、読めなかった日は unreadable に」→「TODOがない日はtodosが空になり、読めなかった日はunreadableに」; p1-task, p-command, p2-prompt (prompt, var hint and expect), e5 options a, c, d, e6 c 「JSON で／を／の」→「JSONで／を／の」; p1-prompt-setup var hint 「Node.js の node:test（npm test で実行）」→「Node.jsのnode:test（npm testで実行）」, expect 「node:test なら」→「node:testなら」; p2-prompt 「--max-budget-usd などで」→「--max-budget-usdなどで」; e2 「Claude に」「Claude の」→「Claudeに」「Claudeの」; e4 「プロジェクトのフックや MCP サーバー」→「プロジェクトのフックやMCPサーバー」; card-flags front 「CI 向け」→「CI向け」; glossary 非対話的実行 「CI やスクリプト」→「CIやスクリプト」."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s1-defs",
-      "issue": "(c) the sentence does not parse cleanly: in 「実行中のコマンドは Ctrl + B、セッションごとなら `claude --bg` で裏で始めます。」 the verb 始めます also governs Ctrl + B. It says Ctrl + B 'starts' a command, but q1 and e2 describe it as moving a running command to the background (「裏に回す操作」).",
-      "fix": "「実行中のコマンドは Ctrl + B、セッションごとなら `claude --bg` で裏で始めます。」→「実行中のコマンドは Ctrl + B で裏に回し、セッションごと裏で始めるなら `claude --bg` を使います。」"
+      "criterion": "prior",
+      "blockId": "s1-cost",
+      "issue": "(d) §2 katakana terms need English on first use: トークン appears here for the first time in the course without English or explanation. A grep of cc-01 to cc-08 finds no トークン. It returns in the e1 d feedback 「トークンを多く使います」.",
+      "fix": "「並べたセッションやサブエージェントの数だけ、トークンを使います。」→「並べたセッションやサブエージェントの数だけ、トークン（token、AIが処理する文字の単位）を使います。」"
     },
     {
       "criterion": "prior",
-      "blockId": "s3-lead",
-      "issue": "(d) §2 abbreviations: CI first appears in o2 and then at the heart of section 3. It is never spelled out, here or in cc-01 to cc-08 (grep finds no CI there). The learner is only assumed to know Git commit, branch and merge.",
-      "fix": "「CI やスクリプトでは、会話をせずに1回だけ動かします。」→「CI（Continuous Integration）やスクリプトでは、会話をせずに1回だけ動かします。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s2-steps",
-      "issue": "(d) §2 terms defined before use and katakana with English: チェックアウト is used without definition or English in ex-setup, in s2-check (feedback b and c, explanation) and in card-deps. It is not in the prerequisites. Adding it as a fourth new term would also break the 3-per-segment limit, because s2-map already names 3, so these fixes use plain words instead.",
-      "fix": "s2-steps ex-setup md 「新しいチェックアウトなので、依存パッケージを各セッションで入れてもらいます。」→「ワークツリーには、Gitが管理するファイルしかありません。依存パッケージは、各セッションで入れてもらいます。」; s2-check b feedback 「ワークツリーも普通のチェックアウトなので、テストは実行できます。」→「ワークツリーも普通の作業フォルダーなので、テストは実行できます。」; c feedback 「新しいチェックアウトに、依存パッケージがないことを疑います。」→「作ったばかりのワークツリーに、依存パッケージがないことを疑います。」; explanation 「ワークツリーは新しいチェックアウトなので、Git が管理していない依存パッケージは入っていません。」→「ワークツリーには、Gitが管理していない依存パッケージは入っていません。」; card-deps: see the summary-cards item."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s2-map",
-      "issue": "(d) §2 katakana terms need English on first use: エージェントビュー and リサーチプレビュー appear with no English. エージェントチーム（agent teams） and 動的ワークフロー（dynamic workflows） in the same callout have it. リサーチプレビュー comes back in s4-table.",
-      "fix": "「エージェントビュー（`claude agents`）は、裏のセッションの一覧画面です（リサーチプレビュー）。」→「エージェントビュー（agent view、`claude agents`）は、裏のセッションの一覧画面です（試験公開中）。」; in s4-table, replace 「リサーチプレビュー」 with 「試験公開中」 (final text is in the s4-table item)."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s4-table",
-      "issue": "(a) meaning: 「最短1時間」 and 「最短1分」 can be read two ways: a minimum run time, or a minimum interval between runs. The column is 「向いている場面」, so nothing tells the learner it is the interval.",
-      "fix": "Row 2, column 3: 「パソコンを閉じていても動く（最短1時間、リサーチプレビュー）」→「パソコンを閉じていても動く（間隔は最短1時間、試験公開中）」; row 4, column 3: 「作業中の短い見張り（最短1分）」→「作業中の短い見張り（間隔は最短1分）」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s4-table",
-      "issue": "(d) §2 terms defined before use: cron appears with no explanation in row 1 (「PR や cron で動かす」). This course has not taught it, and the learner cannot tell it means running on a schedule.",
-      "fix": "Row 1, column 3: 「PR や cron で動かす。`/install-github-app` で設定し、`claude_args` でフラグを渡す」→「PRや決まった時刻（cron）で動かす。`/install-github-app` で設定し、`claude_args` でフラグを渡す」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "check-quiz",
-      "issue": "(d) §2 abbreviations: VM first appears in the e4 explanation (「専用の VM やクラウドのセッション」) without its full name.",
-      "fix": "e4 explanation 「公式ドキュメントは、専用の VM やクラウドのセッションも勧めています。」→「公式ドキュメントは、専用の仮想マシン（VM）やクラウドのセッションも勧めています。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます §1: card backs end in plain form: 「始める。」「入れる（…）。」「拒否される。」「報告させる。」, plus 「Ctrl + B。裏の作業の一覧は `/tasks`。」. The same issue was a must-fix in cc-07. The list-style backs of card-flags and card-four can stay.",
-      "fix": "card-worktree back →「`claude --worktree <名前>` で、別フォルダー・別ブランチのセッションを始めます。」; card-deps back →「依存パッケージを入れます。ワークツリーには、Gitが管理するファイルしかないためです。」; card-bg back →「Ctrl + B を押します。裏の作業の一覧は `/tasks` で見られます。」; card-manual back →「Manualモードで始まり、承認が必要な操作は拒否されます。」; card-quiet back →「読めなかった情報源を、名前を挙げて報告させます。」"
+      "blockId": "s3-pitfall",
+      "issue": "(d) §2 katakana terms need English on first use: シェル appears here for the first time in the course without English (cc-01 to cc-08 do not use it). It returns in the e3 b feedback.",
+      "fix": "「`--allowedTools \"Bash\"` だと、どのシェルコマンドも確認なしで通ります。」→「`--allowedTools \"Bash\"` だと、どのシェル（shell）コマンドも確認なしで通ります。」"
     }
   ],
   "niceToHave": [
-    "s2-steps: the branch prefix worktree- is never explained, but the code and ex-merge use `git merge worktree-bugfix-b`. A learner may type `git merge bugfix-b` — ex-feature md 「ターミナルごとに名前を変えて、`claude --worktree` を実行します。」→「ターミナルごとに名前を変えて、`claude --worktree` を実行します。ブランチ名は `worktree-<名前>` になります。」 (this makes 3 sentences; you could also merge it with the next sentence)",
-    "s2-steps: 「信頼に答えます」「信頼も済んでいます」 read like a translation, and e4 calls the same dialog 「信頼の確認」 — ex-commit md 「先に `claude` を起動して信頼に答えます。」→「先に `claude` を起動して、信頼の確認に答えます。」; expect 「コミットが1つあり、信頼も済んでいます。」→「コミットが1つあり、信頼の確認も済んでいます。」 (and code comment 「フォルダーの信頼に答え」→「フォルダーの信頼の確認に答え」)",
-    "s2-steps ex-merge: it is unclear what 「終了時」 refers to — 「終了時はワークツリーを残します。」→「セッションを終えるときは、ワークツリーを残します。」",
-    "s2-check q2 d feedback: the pointer 「あの行」 is vague — 「あの行は、ワークツリーの中身を本体で未追跡として出さないためのものです。」→「`.gitignore` の行は、ワークツリーの中身を本体で未追跡として出さないためのものです。」",
-    "s1-table: the caption promises two axes, but the table has no 「何を分けるか」 column — 「誰がまとめるか・何を分けるかで選ぶ」→「誰がまとめるか・どんな作業に向くかで選ぶ」",
-    "s1-table: 「そのままでは」 does not say what it is compared with — 「そのままでは同じフォルダーを編集する」→「設定しなければ、同じフォルダーを編集する」",
-    "s1-defs: the English pair covers only バックグラウンド, not 実行 — 「バックグラウンド実行（background）」→「バックグラウンド実行（background execution）」 (glossary aliases can stay)",
-    "s3-table: 「許可外で確認が要る」 is stiff — 「許可外で確認が要る操作を拒否する」→「許可していない操作を、確認せずに拒否する」. The caption writes 「つくる」 while the body writes 「作ります」 — 「つくる」→「作る」",
-    "s4-enforce: 「CLAUDE.mdと同じで」 can read as 'the same as CLAUDE.md's content' — 「このうち権限と費用の上限は、CLAUDE.md と同じで、依頼文に書いても強制になりません。」→「このうち権限と費用の上限は、CLAUDE.mdの指示と同じく、依頼文に書いても強制にはなりません。」",
-    "s4-four item 3: it is unclear what 「普段」 means — 「（普段の3〜5倍から始める）」→「（普段の1回分の3〜5倍から始める）」",
-    "s4-prompt expect: 「2つの日を取り違えません。」 reads like a translation — →「この2つの日を見分けられます。」",
-    "s4-check q4: 「課題」 can read as homework or a to-do list — 「毎朝の課題の要約が」→「毎朝の課題（issue）の要約が」",
-    "p1-steps-write p-run: the reason for dropping --bare is not given, and サブスクリプション has no context — 「サブスクリプションなら `--bare` を外します。」→「`--bare` はAPIキーが必要なので、サブスクリプション（subscription）で使うなら外します。」",
-    "p1-steps-write p-run expect: `result` has not been introduced — 「`result` に、失敗したテスト1件が入ります。」→「返ったJSONの `result` に、失敗したテスト1件が入ります。」",
-    "lesson: the same thing is called 依頼文 (s4, e5, e6) and 指示 (s3-lead 「<指示>」, p-command 「指示には」, pc-fail 「指示に書いている」). The learner should see that the 4 points apply to the -p string too — p-command 「指示には返す JSON の形と」→「依頼文には返すJSONの形と」; pc-fail 「指示に書いている」→「依頼文に書いている」",
-    "o3: 「成功条件」 here vs 「成功の条件」 in the body — 「成功条件・権限・費用の上限・失敗の報告つきで」→「成功の条件・権限・費用の上限・失敗の報告つきで」",
-    "check-quiz e1: 文脈 and コンテキスト are mixed for one idea in one question (prompt 「文脈を増やしたくありません」, c feedback 「別のコンテキストで」, explanation 「会話の文脈を増やさずに」) — use 「コンテキスト」 in the prompt and the explanation",
-    "check-quiz e2: the question does not end in a form that says what to answer (§5) — 「画面の修正を頼みたいときは？」→「画面の修正を頼みたいとき、どうしますか？」",
-    "check-quiz e5: option a, the correct one, is clearly longer and terser than the others, which hints at the answer — shorten it, e.g. 「「名前・今の版・最新の版をJSONの配列で返して。なければ空の配列。編集はしない。調べられなければ理由を返して」」→「「名前と版をJSONの配列で返して。なければ空の配列で、編集はしないで。調べられなければ理由を返して」」 (keep the meaning; check the length against b–d)",
-    "summary-points: point 1 ends in 体言止め 「バックグラウンドへ。」 while the other three use です・ます, and point 3 drops モード — 「長い処理はバックグラウンドへ。」→「長い処理はバックグラウンドに回します。」; 「Manual で始まります」→「Manualモードで始まります」",
-    "s4-table row 1: PR is used without its full name (first seen in cc-08, also unexpanded there) — 「PRや」→「PR（プルリクエスト）や」 if it is not expanded earlier in the course"
+    "p1-steps-write p-run: s3-table no longer says that `--bare` needs an API key, so the learner cannot see why 「APIキーがなければ、`--bare` を外します」 follows (facts file: --bare 'does not use your subscription login, so ANTHROPIC_API_KEY must be set') — 「API（Application Programming Interface）キーがなければ、`--bare` を外します。」→「`--bare` はAPI（Application Programming Interface）キーでしか動きません。キーがなければ、`--bare` を外します。」",
+    "s3-table: the column header 「役割と、付けないと」 breaks off mid-phrase — 「役割と、付けないと」→「役割と、付けないとどうなるか」",
+    "unattended (section title): 「依頼文の4点で点検する」 reads as if the four points belong to the request text — 「5. 依頼文の4点で点検する」→「5. 依頼文を4点で点検する」 (p2-task 「セクション5の4点で」 still matches)",
+    "s1-cost: 「数だけ、トークンを使います」 does not say that usage grows with the count — 「並べたセッションやサブエージェントの数だけ、トークンを使います。」→「並べるセッションやサブエージェントが増えるほど、トークンの使用量も増えます。」 (combine with the mustFix wording)",
+    "o2: CI appears in the objective before s3-lead spells it out. Learners see objectives first — 「CIなどで使う安全な claude -p コマンドを書ける」→「CI（Continuous Integration）などで使う安全な claude -p コマンドを書ける」 if the objective text may change",
+    "s4-table: the caption promises 頻度, but only two rows mention an interval — 「動かす場所と頻度で選ぶ」→「動かす場所と場面で選ぶ」",
+    "s1-table / s1-check q1 a feedback: the same condition is phrased two ways, 「設定しなければ」 and 「そのままでは」 — q1 a feedback 「サブエージェントは、そのままでは同じ作業フォルダーを編集します。」→「サブエージェントは、設定しなければ同じ作業フォルダーを編集します。」",
+    "lesson: the -p string is still called 指示 in places (glossary 非対話的実行 and s3-lead 「<指示>」, e6 explanation 「依頼文は指示であって」), while sections 4–5 and the practices call it 依頼文. The meaning is clear, but 「<依頼文>」 in s3-lead and the glossary would tie section 3 to the 4-point check",
+    "check-quiz e5: option b is shorter than a, c and d, which share one frame. It is still parallel enough. Optionally start it the same way — 「「更新できるパッケージを調べて、いい感じにまとめて。…」」→「「更新できるパッケージを調べて、いい感じにまとめて。なければそう書いて。編集はしない。調べられなければ理由を返して」」",
+    "s2-steps ex-merge: factual doubt: 「消すと、ブランチごと消えます。」 is not covered by the audit or the facts file I could see. Confirm against the worktrees page that removing the worktree on exit also deletes the branch"
   ],
-  "average": 3.0,
+  "average": 3.25,
   "verdict": "revise",
-  "summary": "The lesson reads like a calm, practical teacher: sentences are short, wrong-option feedback names the misconception in 2 sentences, and lint --strict is clean. The biggest fixes are prior-knowledge gaps: CI (the lesson's core setting), チェックアウト, VM, cron and エージェントビュー/リサーチプレビュー are used without full form, English or a plain explanation. Two lesson-wide notation and です・ます breaks also block the review: spaces between 和文 and English, and plain-form card backs."
+  "summary": "The scope check required a full review (exit 1: new section unattended-where, o2 changed, 57% of parts and 86% of blocks changed). I checked all 9 round-1 must-fix items and every one is gone. Spaces between 和文 and English are removed, s1-defs now parses, and CI, VM and PR are spelled out. チェックアウト and cron were replaced with plain words, エージェントビュー（agent view） has its English with 試験公開中, s4-table states 「間隔は最短…」, and the card backs use です・ます. Two new first-use katakana terms without English still block the review: トークン (s1-cost) and シェル (s3-pitfall). measure.mjs gives prose 1521 and est 20.0 min, at the cap, so fixes should not add length. With the two mustFix items applied and voice or load lifted slightly (e.g. the s3-table header and section 5 title in niceToHave), the lesson can pass."
 }

@@ -4,47 +4,49 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:aa4125dd945c908e",
+  "lessonHash": "sha256:876f9427367ec7c6",
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Most of the text is warm, plain です・ます with short sentences, and the wrong-option feedback is good (s1-check, s3-check, check-quiz). It stays at 3 because a few rule breaks remain: the plain-form card backs in summary-cards, the plain-form scenario in the practice-b-quiz q9 prompt, and spaced 「MCP サーバー」 and 「PreToolUse フック」 (s1-lifecycle, objectives).",
+      "evidence": "The text is warm, plain です・ます. The card backs (summary-cards) and the q9 scenario (practice-b-quiz) now end in です・ます. Wrong-option feedback stays within two sentences and names the misconception (s1-check, s3-check, s5-check, check-quiz). It stays at 3 because a few notation and option-form breaks remain in text that changed this round: the key 「Ctrl+O」 in the p-claude hint, half-width spaces in plain-text fields (s4-scopes caption, practice-checklist, summary-tutor), and q9 option d ending in 「入れてよい」 while the other options end in a verb.",
       "blockIds": [
-        "summary-cards",
-        "practice-b-quiz",
-        "s1-lifecycle",
-        "lesson"
+        "practice-steps",
+        "s4-scopes",
+        "practice-checklist",
+        "summary-tutor",
+        "practice-b-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. Paragraphs have 1–3 sentences, and each section mixes text with a table, code, a diagram or a check (s1-lifecycle, s3-table, s4-scopes, s5-checks).",
+      "evidence": "measure.mjs reports prose 1369 (budget 1,200–2,400), est 15.9 min (≤ 20), and estMinutes 16 matches it. lessons:lint --strict reports 0 errors and 0 warnings. Sections mix short text with a table, code, a diagram or a check (s1-lifecycle, s3-table, s4-scopes, s5-checks, practice-b-model). One paragraph has four sentences (s3-pitfall). It is listed as a must-fix, but it does not change the overall load.",
       "blockIds": [
+        "s3-pitfall",
         "s1-lifecycle",
         "s3-table",
-        "s4-scopes",
-        "s5-checks"
+        "s5-checks",
+        "practice-b-model"
       ]
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Prerequisites are listed and earlier lessons are recalled (s1-lead 「第6回のとおり」, q2 explanation 「第2回の権限ルール」, s5-lead 「第7回」). Each segment's definitions match the glossary. Two gaps keep it at 3: 「トランスクリプト」 in practice-steps p-claude has no English, and summary-points says 「MCPは…追加し」, where the glossary separates MCP from MCP サーバー.",
+      "score": 4,
+      "evidence": "Prerequisites list 第2回, 第6回 and 第7回, and the text recalls them where they matter (s1-lead 「第6回のとおり」, q2 explanation 「第2回の権限ルール」, s5-lead 「第7回」). Each segment introduces at most 3 terms, and the definitions match the glossary word for word (s1-defs, s2-defs, s4-defs, s5-defs). The two gaps from round 1 are closed. 「トランスクリプト（transcript）」 now has its English (practice-steps), and summary-points now writes 「MCPサーバーは `claude mcp add` で追加し」. MCP is spelled out in s4-lead, and 「リンター（linter）」 gets its English in q6.",
       "blockIds": [
-        "practice-steps",
-        "summary-points",
         "s1-defs",
         "s2-defs",
         "s4-defs",
-        "s5-defs"
+        "s5-defs",
+        "practice-steps",
+        "summary-points"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares a single locale (jp) and every string is in it. The diagram has caption and alt in Japanese, and the summary-next link text 「フックの公式ガイド（日本語）」 names its destination.",
+      "evidence": "The lesson declares a single locale (jp), and every string is in Japanese. The diagram has a Japanese caption and alt, and the labels now match the alt (「PreToolUseフック」). The link text in summary-next, 「フックの公式ガイド（日本語）」, names its destination.",
       "blockIds": [
         "s1-lifecycle",
         "summary-next"
@@ -53,76 +55,44 @@
   ],
   "mustFix": [
     {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(d) Notation, style-guide §3: no space between Japanese text and alphanumerics. 「MCP サーバー」 has a half-width space everywhere it appears: glossary term, s4-defs, s4-scopes caption and table, s5-lead, s5-defs, s5-risk, s5-check, practice-b-quiz, check-quiz q8, summary-points, summary-cards card-scopes, summary-tutor and objective o3. Meanwhile 「MCPで」「MCPは」 have no space, so the lesson is inconsistent with itself.",
-      "fix": "Replace every 「MCP サーバー」 with 「MCPサーバー」, including the glossary term 「MCP サーバー」→「MCPサーバー」 and the s4-defs and s5-defs items."
+      "criterion": "load",
+      "blockId": "s3-pitfall",
+      "issue": "(d) Paragraph budget, style-guide §1 (at most 3 sentences per paragraph). The md is one paragraph with four sentences: 「…止まりません。」「…操作は進みます。」「止めるときは `exit 2` です。」「…失敗でも止まります。」",
+      "fix": "「Unixの習慣で `exit 1` を返しても、フックはふつう止まりません。止めないエラーとして扱われ、操作は進みます。止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。」→「Unixの習慣で `exit 1` を返しても、フックはふつう止まりません。止めないエラーとして扱われ、操作は進みます。\n\n止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。」"
     },
     {
       "criterion": "voice",
-      "blockId": "s1-lifecycle",
-      "issue": "(d) Notation, §3: the diagram labels and caption put a space between an English word and 「フック」, which is not inline code: 「PreToolUse フック」「PostToolUse フック」「Stop フック」. The alt of the same block writes 「PreToolUseフック」, so the figure is inconsistent with itself.",
-      "fix": "In code: 「C{PreToolUse フック}」→「C{PreToolUseフック}」, 「E[PostToolUse フック]」→「E[PostToolUseフック]」, 「F[Stop フック]」→「F[Stopフック]」. In caption: 「PreToolUse フックは、ツールの実行を止められる」→「PreToolUseフックは、ツールの実行を止められる」."
+      "blockId": "practice-steps",
+      "issue": "(d) Notation, style-guide §3 (in body text, write keys as 「Ctrl + S」). The p-claude hint writes 「Ctrl+O」, while the rest of the course writes 「Ctrl + V」「Ctrl + G」 (cc-03). The keys array 「Ctrl+O」 can stay as it is.",
+      "fix": "p-claude hint: 「Ctrl+Oで開くトランスクリプト（transcript）画面で」→「Ctrl + Oで開くトランスクリプト（transcript）画面で」"
     },
     {
       "criterion": "voice",
-      "blockId": "o2",
-      "issue": "(d) Notation, §3: objective o2 puts spaces around 「Claude Code」 (「によって Claude Code の動きが」), while the body writes 「Claude Codeの動き」 (s3 title). Objective o1 also writes 「PreToolUse フック」 as plain text instead of the inline code used everywhere else.",
-      "fix": "o2: 「フックの終了コードによって Claude Code の動きがどう変わるかを説明できる」→「フックの終了コードによってClaude Codeの動きがどう変わるかを説明できる」. o1: 「PreToolUse フックで特定の操作を止める設定を書ける」→「`PreToolUse` フックで特定の操作を止める設定を書ける」."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます, §1: four card backs are full sentences in plain form: 「必ず実行する。」 (card-hook-vs-md), 「`exit 2` で終わる。」 (card-block), 「止まらない。…操作は進む。」 (card-exit1), 「取り消されない。…Claudeに届く。」 (card-post).",
-      "fix": "card-hook-vs-md: 「CLAUDE.mdはClaudeが読むお願い。フックはClaude Codeが決まったタイミングで必ず実行する。」→「CLAUDE.mdは、Claudeが読むお願いです。フックは、Claude Codeが決まったタイミングで必ず実行します。」 card-block: 「理由を標準エラー出力に書き、`exit 2` で終わる。」→「理由を標準エラー出力に書き、`exit 2` で終えます。」 card-exit1: 「止まらない。止めないエラーとして通知が出て、操作は進む。」→「止まりません。止めないエラーとして通知が出て、操作は進みます。」 card-post: 「操作は取り消されない。標準エラー出力の文がClaudeに届く。」→「操作は取り消されません。標準エラー出力の文がClaudeに届きます。」"
+      "blockId": "practice-checklist",
+      "issue": "(d) Notation, style-guide §3: no space between Japanese text and alphanumerics, except around inline code. Checklist labels, captions and askTutor suggestions are rendered as plain text, not code, yet they put half-width spaces before particles: 「.env では」「README.md では0」「/hooks の PreToolUse に」「cat .env で」 (practice-checklist), 「（--scope で選ぶ）」 (s4-scopes caption), 「Bashのコマンドでの .env への」 (summary-tutor). Other plain-text fields write 「PreToolUseフック」 with no space (objectives, s3-table caption), so the notation varies within the lesson.",
+      "fix": "pc-manual: 「手で試すと、.env では理由の文と終了コード2、README.md では0が出ました」→「手で試すと、.envでは理由の文と終了コード2、README.mdでは0が出ました」; pc-hooks: 「/hooks の PreToolUse に、新しく足したフックが表示されました」→「/hooksのPreToolUseに、新しく足したフックが表示されました」; pc-env: 「cat .env で、中身が変わっていないことを確かめました」→「cat .envで、中身が変わっていないことを確かめました」; s4-scopes caption: 「MCPサーバーの3つのスコープ（--scope で選ぶ）」→「MCPサーバーの3つのスコープ（--scopeで選ぶ）」; summary-tutor: 「Bashのコマンドでの .env への書き込みも止めるには？」→「Bashのコマンドでの.envへの書き込みも止めるには？」"
     },
     {
       "criterion": "voice",
       "blockId": "practice-b-quiz",
-      "issue": "(d) です・ます, §1: the q9 scenario is written in plain form and noun endings (「毎月更新。」「課題を読むツールだけを持つ。」「…フックで実行する。」), while the rest of the prompt is です・ます.",
-      "fix": "「架空の候補です。A：社内チームが作った課題管理のMCP サーバー。ソースは社内で公開され、毎月更新。課題を読むツールだけを持つ。B：作者不明の「全部入り」プラグイン。READMEは3行で、編集のたびに外部から取ってきたスクリプトをフックで実行する。いちばん適切な判断はどれでしょう？」→「架空の候補です。Aは、社内チームが作った課題管理のMCPサーバーです。ソースは社内で公開され、毎月更新されています。課題を読むツールだけを持ちます。Bは、作者不明の「全部入り」プラグインです。READMEは3行で、編集のたびに外部から取ってきたスクリプトをフックで実行します。いちばん適切な判断はどれでしょう？」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "practice-steps",
-      "issue": "(d) Katakana term without English on first use, §2: 「トランスクリプト」 in p-claude hint appears for the first time in this lesson and in the course, and it has no English and no explanation.",
-      "fix": "p-claude hint: 「トランスクリプトの画面で、`Blocked:` の文を確かめられます。」→「Ctrl + Oで開くトランスクリプト（transcript）の画面で、`Blocked:` の文を確かめられます。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "summary-points",
-      "issue": "(e) Naming vs glossary: 「MCPは `claude mcp add` で追加し」 calls the thing you add 「MCP」. The glossary defines MCP as the standard and MCP サーバー as the program you connect, and s4-add adds a server, so a learner can confuse the two.",
-      "fix": "「MCPは `claude mcp add` で追加し、スコープを選びます。」→「MCPサーバーは `claude mcp add` で追加し、スコープを選びます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s5-checks",
-      "issue": "(e) Naming: the same plugin file is 「`hooks.json`」 in the s5-checks table but 「`hooks/hooks.json`」 in the s5-check q4 explanation. A learner may look for two different files.",
-      "fix": "s5-checks row 実行されるもの: 「`/plugin` の詳細、`hooks.json`、`.mcp.json`」→「`/plugin` の詳細、`hooks/hooks.json`、`.mcp.json`」"
+      "issue": "(d) Option form, style-guide §5 (the same ending for every option). In q9, options a, b and c end in the dictionary form of a verb (「入れない」「入れる」「試す」), but option d ends in the permissive 「入れてよい」.",
+      "fix": "option d: 「どちらも、自動更新を切れば中身を見ずに入れてよい」→「どちらも、自動更新を切ったうえで、中身を見ずに入れる」"
     }
   ],
   "niceToHave": [
-    "lesson: 「auto モード」 (q7 prompt and option d) also has a space before Japanese text. The whole course (cc-02 onward) writes it this way, so fix it course-wide, not only here — 「auto モード」→「autoモード」",
-    "lesson: the same spacing appears as 「MCP サーバー」 in cc-09, cc-10 and cc-11. Apply the same change there so the course stays consistent with this lesson's glossary — 「MCP サーバー」→「MCPサーバー」",
-    "hook-predict: 「確実」 appears twice in one sentence — 「毎回確実に止めたいとき、いちばん確実なのはどれだと思いますか？」→「毎回確実に止めたいとき、いちばん確かな方法はどれだと思いますか？」",
-    "s1-config: name the formatter the code actually runs — 「編集のたびに整形ツールを動かす公式の例です。」→「編集のたびに整形ツールのPrettierを動かす公式の例です。」",
-    "s2-lead / practice-model-intro: 「公式の例がもとです。」 reads abruptly — 「公式の例がもとです。」→「公式ドキュメントの例をもとにしています。」",
-    "s2-steps: in ex-register troubleshoot it is unclear what to restart, and a trailing comma is only one possible cause — 「一覧に出ないときは余計なカンマを直し、再起動します。」→「一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。」",
-    "s2-steps: in ex-test md, 「ただの文字」 is vague — 「中の `rm` はただの文字です。」→「JSONの中の `rm` は文字として渡るだけで、実行はされません。」",
-    "s3-post: for PostToolUse the message is the linter's or script's output rather than a reason for blocking. Align it with q6 and card-post — 「理由がClaudeへの指摘として届きます。」→「標準エラー出力の文が、Claudeへの指摘として届きます。」",
-    "s4-lead: the second sentence has no subject, so 「規格」 floats — 「ツールやデータにつなぐ共通の規格です。」→「MCPは、AIのアプリを外部のツールやデータにつなぐ共通の規格です。」",
-    "s4-transport: `sse` appears without explanation. A short gloss helps — 「`sse` は非推奨です。」→「古い方式の `sse` は非推奨です。」",
+    "practice-b-quiz: the q9 prompt is a single inline paragraph of 8 sentences (about 190 characters). Inline prompts cannot hold paragraph breaks, so merging the two facts about A shortens it — 「課題を読むツールと、課題を閉じるツールを持ちます。課題には社外の人も書き込めます。」→「課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。」",
+    "s2-steps: the ex-register troubleshoot still does not say what to restart, and a trailing comma is only one possible cause — 「一覧に出ないときは余計なカンマを直し、再起動します。」→「一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。」",
+    "s2-steps: in the ex-test md, 「ただの文字」 is vague — 「中の `rm` はただの文字です。」→「JSONの中の `rm` は文字として渡るだけで、実行はされません。」",
     "s4-scopes: in the project row, 「対話では」 is unclear to a learner — 「チーム全員（`.mcp.json`。対話では使う前に承認）」→「チーム全員（`.mcp.json` で共有。使う前に承認の確認が出る）」",
-    "s5-lead: the lead does not say how they are bundled, so the link to plugins only appears in the definitions — 「第7回のスキルやサブエージェントも、フックやMCP サーバーと一緒に配れます。」→「第7回のスキルやサブエージェントは、フックやMCPサーバーと一緒に、プラグインとしてまとめて配れます。」",
-    "s5-risk / s5-check explanation / practice-b-quiz feedback: the style guide prefers dropping the subject to 「あなた」 — 「あなたの権限で任意のコードを実行できます。」→「自分のアカウントの権限で、任意のコードを実行できます。」",
-    "practice-b-task: 「表で書き出して」 is vague. Use the wording of the pc-eval checklist item — 「架空の2候補を8-5の表で書き出してから答えます。」→「架空の2候補を、8-5の表の項目ごとに書き出してから答えます。」",
-    "practice-checklist: the labels end in plain past form (「出た」「表示された」). This is acceptable for a checklist, but a 体言止め form would be safer under §1, e.g. 「`cat .env` で、中身が変わっていないことを確かめた」→「`cat .env` で、中身が変わっていないことを確認」",
-    "check-quiz q8: option a is much longer than the others, which hints at the answer. Options c (「必要はない」) and d (「入れてよい」) also end differently from a and b (verbs) — 「出どころと作者を確かめ、外部の文章が持ち込む指示も考えて、使うツールを権限ルールで絞る」→「出どころと作者を確かめ、使うツールを権限ルールで絞る」; 「前もって確かめる必要はない」→「前もって確かめずに追加する」; 「何も確かめずに入れてよい」→「何も確かめずに追加する」",
-    "s1-lifecycle: the caption is two plain-form sentences. The course does this elsewhere (cc-06, cc-10), but a single noun phrase would read more like a caption — 「フックは、エージェントループの決まった場所で毎回動く。PreToolUseフックは、ツールの実行を止められる」→「エージェントループの決まった場所で毎回動くフック（PreToolUseフックは実行を止められる）」",
-    "summary-next: the link https://code.claude.com/docs/ja/hooks-guide is not in `sources`, and the Japanese page could not be confirmed from the text. Check that it exists, or link the cited English guide (cc-hooks-guide) instead (factual check, not changed here).",
-    "summary-next: 「作業を並べて自動で動かします」 is vague as a preview of 第9回 — 「作業を並べて自動で動かします。」→「複数の作業を並行して動かし、自動化する方法を学びます。」"
+    "s5-lead: the lead still does not say how the parts are bundled, so the link to plugins only appears in the definitions — 「第7回のスキルやサブエージェントも、フックやMCPサーバーと一緒に配れます。」→「第7回のスキルやサブエージェントは、フックやMCPサーバーと一緒に、プラグインとしてまとめて配れます。」",
+    "s5-risk / s5-check explanation: the style guide prefers dropping the subject to writing 「あなた」 — 「あなたの権限で任意のコードを実行できます。」→「自分のアカウントの権限で、任意のコードを実行できます。」",
+    "check-quiz q8: option a is still the longest, which hints at the answer — 「出どころと作者を確かめ、ページに紛れた指示も考えて、ツールを権限ルールで絞る」→「出どころと作者を確かめ、ツールを権限ルールで絞る」",
+    "check-quiz q8: option c chains three 「の」 — 「`project` スコープの承認の確認が出たら、その場で判断して承認する」→「`project` スコープで承認を求められたら、その場で判断して承認する」",
+    "s1-config: name the formatter that the code actually runs — 「編集のたびに整形ツールを動かす公式の例です。」→「編集のたびに整形ツールのPrettierを動かす公式の例です。」",
+    "summary-next: 「作業を並べて自動で動かします」 is vague as a preview of 第9回 — 「次の第9回では、作業を並べて自動で動かします。」→「次の第9回では、複数の作業を並行して動かし、自動化する方法を学びます。」",
+    "lesson: 「autoモード」 (q7) is now written without a space, but cc-02 onward write 「auto モード」 in places. Align the course with this lesson — 「auto モード」→「autoモード」"
   ],
-  "average": 3.5,
+  "average": 3.75,
   "verdict": "revise",
-  "summary": "The Japanese is clear and warm. The 「お願い」 vs 「必ず動く仕組み」 contrast runs consistently from the hook question to the flashcards, and every wrong-option feedback stays within two sentences and names the misconception. The fixes needed before it passes are notation and register: write 「MCPサーバー」 without a space (glossary included), remove the stray spaces in the diagram labels and objectives, turn the plain-form flashcard backs and the q9 scenario into です・ます, and add English to 「トランスクリプト」."
+  "summary": "The scope check required a full review (exit 1: the objectives changed, and 33 of 48 blocks changed). All eight must-fix items from round 1 are gone. The text now writes 「MCPサーバー」 everywhere, including the glossary. The diagram labels and caption read 「PreToolUseフック」 and the objectives no longer have stray spaces. The flashcard backs and the q9 scenario are in です・ます. 「トランスクリプト（transcript）」 has its English, summary-points says 「MCPサーバーは…追加し」, and s5-checks names `hooks/hooks.json`. The Japanese is clear and warm, and the 「お願い」 vs 「必ず動く仕組み」 contrast holds from the hook question to the flashcards. Four small rule fixes remain before the lesson passes: split the four-sentence s3-pitfall paragraph, write the key as 「Ctrl + O」, remove the spaces before particles in plain-text fields (checklist, s4-scopes caption, tutor suggestion), and give q9 option d the same ending as the other options."
 }
