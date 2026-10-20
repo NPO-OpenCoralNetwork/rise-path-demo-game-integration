@@ -1,0 +1,1254 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-09-parallel-automation",
+  "courseId": "vibe-coding",
+  "title": "第9回｜並列で進める・自動で回す",
+  "subtitle": "ワークツリーで作業を並べ、claude -p で安全に自動化する（2026年10月時点・v2.1.304）",
+  "locale": "jp",
+  "level": "intermediate",
+  "estMinutes": 17,
+  "prerequisites": [
+    "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+    "第4回｜検証を任せる：テスト・レビュー・説明",
+    "第7回｜手順はスキルに、調べものはサブエージェントに",
+    "Git の commit・branch・merge の意味がわかる"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "ワークツリー・サブエージェント・バックグラウンド実行から、状況に合う並列化の方法を選べる",
+      "bloom": "evaluate"
+    },
+    {
+      "id": "o2",
+      "text": "CI などで使う安全な `claude -p` コマンドを書ける",
+      "bloom": "apply"
+    },
+    {
+      "id": "o3",
+      "text": "無人で動かす作業の依頼文を、成功条件・権限・費用の上限・失敗の報告つきで設計できる",
+      "bloom": "create"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：機能の途中で、急ぎのバグ修正が来た",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "Claude Code に機能の実装を任せている途中で、急ぎのバグ修正を頼まれました。「毎晩、テストの失敗を報告してほしい」とも言われています。同じフォルダーで2つ目のセッションを開けば、両方とも進むでしょうか。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-worktrees",
+            "cc-common-workflows"
+          ],
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": "同じフォルダーで2つ目のセッションを開き、バグ修正を頼むと、どうなりやすいでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "2つのセッションが同じファイルを書き換え、変更が混ざる"
+                },
+                {
+                  "id": "b",
+                  "md": "Claude Code が自動で別のコピーを作り、変更を分けてくれる",
+                  "feedback": "普通に始めたセッションは、そのフォルダーのファイルをそのまま編集します。分けるには、作業コピーを分ける指定が必要です。"
+                },
+                {
+                  "id": "c",
+                  "md": "2つ目のセッションは、1つ目の作業が終わるまで待つ",
+                  "feedback": "セッションどうしは、互いの作業を待ちません。2つが同じファイルを並行して書き換えることになります。"
+                },
+                {
+                  "id": "d",
+                  "md": "1つ目の会話を引き継ぎ、2つの作業が1つにまとまる",
+                  "feedback": "セッションどうしは会話を共有しません。それぞれが別々に、同じファイルを編集します。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "同じ作業フォルダーを2つのセッションで編集すると、変更がぶつかります。公式ドキュメントは、セッションごとに作業コピーを分ける方法を勧めています。このレッスンでは、作業に合う並べ方と、無人で回すときの書き方を学びます。",
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "parallel",
+      "title": "1. 並列の3つの方法を選び分ける",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "第7回の[[サブエージェント]]のほかに、作業を並べる方法が2つあります。"
+        },
+        {
+          "id": "s1-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-worktrees",
+            "cc-interactive-mode",
+            "cc-agent-view"
+          ],
+          "items": [
+            {
+              "term": "ワークツリー（worktree）",
+              "md": "同じリポジトリから、フォルダーとブランチを分けて作る作業コピー。`claude --worktree <名前>` で作ります。"
+            },
+            {
+              "term": "バックグラウンド実行（background）",
+              "md": "待たずに裏で動かすこと。実行中のコマンドは Ctrl + B、セッションごとなら `claude --bg` で裏で始めます。"
+            }
+          ]
+        },
+        {
+          "id": "s1-table",
+          "type": "table",
+          "cite": [
+            "cc-agents",
+            "cc-worktrees",
+            "cc-interactive-mode"
+          ],
+          "caption": "誰がまとめるか・何を分けるかで選ぶ",
+          "columns": [
+            "方法",
+            "まとめる人",
+            "向いている作業",
+            "気をつけること"
+          ],
+          "rows": [
+            [
+              "[[サブエージェント]]",
+              "Claude（セッション内）",
+              "調べもの・レビュー",
+              "そのままでは同じフォルダーを編集する"
+            ],
+            [
+              "[[ワークツリー]]",
+              "自分（ターミナルごと）",
+              "別々の変更を同時に進める",
+              "依存パッケージを入れ直す"
+            ],
+            [
+              "[[バックグラウンド実行]]",
+              "自分（あとで見る）",
+              "テスト・開発サーバー",
+              "様子は `/tasks` で見る"
+            ]
+          ]
+        },
+        {
+          "id": "s1-cost",
+          "type": "markdown",
+          "cite": [
+            "cc-agents"
+          ],
+          "md": "並べたセッションやサブエージェントの数だけ、トークンを使います。"
+        },
+        {
+          "id": "s1-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-worktrees"
+          ],
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "機能Aの実装を続けながら、同じリポジトリでバグBの修正も別に進めたいとします。どの方法を選びますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "サブエージェントに、バグBの修正を任せる",
+                  "feedback": "サブエージェントは、そのままでは同じ作業フォルダーを編集します。別々の変更を並べるなら、フォルダーとブランチを分けます。"
+                },
+                {
+                  "id": "b",
+                  "md": "`claude --worktree` で、バグB用のセッションを別に始める"
+                },
+                {
+                  "id": "c",
+                  "md": "バグBの修正を、Ctrl + B でバックグラウンドに回す",
+                  "feedback": "Ctrl + B は、実行中のコマンドを裏に回す操作です。変更そのものを分けるには、ワークツリーを使います。"
+                },
+                {
+                  "id": "d",
+                  "md": "同じフォルダーで、もう1つセッションを開く",
+                  "feedback": "同じフォルダーの2つのセッションは、同じファイルを書き換えて変更が混ざります。ワークツリーで作業コピーを分けます。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "別々の変更を同時に進めるときは、ワークツリーで作業コピーとブランチを分けます。終わったら、それぞれのブランチを本体に取り込みます。",
+              "hint": "2つの作業が、同じファイルを触る可能性を考えましょう。",
+              "objectiveId": "o1",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "worktree-example",
+      "title": "2. 例題：ワークツリーで2つの作業を並べる",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "s2-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "機能Aとバグ修正Bを、2つのターミナルで並べます。"
+        },
+        {
+          "id": "s2-code",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "cite": [
+            "cc-worktrees",
+            "cc-common-workflows"
+          ],
+          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09 && cd cc-practice-09 && git init\necho \".claude/worktrees/\" > .gitignore  # 本体で未追跡と表示させない\ngit add .gitignore && git commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正Bのセッション（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
+          "highlight": [
+            8,
+            11
+          ]
+        },
+        {
+          "id": "s2-steps",
+          "type": "steps",
+          "cite": [
+            "cc-worktrees",
+            "cc-common-workflows"
+          ],
+          "items": [
+            {
+              "id": "ex-commit",
+              "title": "準備：コミットと信頼",
+              "md": "ワークツリーは既存のコミットから作ります。初めてのフォルダーでは、先に `claude` を起動して信頼に答えます。",
+              "expect": "コミットが1つあり、信頼も済んでいます。"
+            },
+            {
+              "id": "ex-feature",
+              "title": "2つのセッションを始める",
+              "md": "ターミナルごとに名前を変えて、`claude --worktree` を実行します。別フォルダー・別ブランチなので、変更がぶつかりません。",
+              "expect": "`worktree-feature-a` と `worktree-bugfix-b` で、Claude が1つずつ動きます。",
+              "troubleshoot": "`Failed to resolve base branch` と出たら、コミットがあるか確かめます。"
+            },
+            {
+              "id": "ex-setup",
+              "title": "それぞれで環境を整える",
+              "md": "新しいチェックアウトなので、依存パッケージを各セッションで入れてもらいます。",
+              "expect": "どちらでもテストが動きます。"
+            },
+            {
+              "id": "ex-explain",
+              "title": "差分を説明させてからコミットする",
+              "md": "「この差分を3行で説明して」と頼み、納得したらコミットします。",
+              "expect": "何を直したかを、自分で説明できます。"
+            },
+            {
+              "id": "ex-merge",
+              "title": "本体に取り込む",
+              "md": "終了時はワークツリーを残します。消すと、ブランチごと消えます。",
+              "expect": "本体で `git merge worktree-bugfix-b` すると、修正が入ります。"
+            }
+          ]
+        },
+        {
+          "id": "s2-map",
+          "type": "callout",
+          "variant": "info",
+          "cite": [
+            "cc-agents",
+            "cc-agent-view",
+            "cc-workflows"
+          ],
+          "title": "さらに大きな並列化（今は名前だけで十分です）",
+          "md": "エージェントビュー（`claude agents`）は、裏のセッションの一覧画面です（リサーチプレビュー）。エージェントチーム（agent teams）は、リーダー役が仲間を束ねる実験的な機能です。動的ワークフロー（dynamic workflows）は、`ultracode` で多数のサブエージェントを動かします。"
+        },
+        {
+          "id": "s2-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-worktrees"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "ワークツリーのセッションでテストを流したら、「モジュールが見つからない」で失敗しました。本体では通ります。まず疑うのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "ワークツリーに、依存パッケージが入っていない"
+                },
+                {
+                  "id": "b",
+                  "md": "ワークツリーの中では、テストを実行できない",
+                  "feedback": "ワークツリーも普通のチェックアウトなので、テストは実行できます。足りないのは、入れ直していない依存パッケージです。"
+                },
+                {
+                  "id": "c",
+                  "md": "もう一方のセッションが、同じファイルを書き換えた",
+                  "feedback": "ワークツリーは別フォルダーなので、もう一方の編集は届きません。新しいチェックアウトに、依存パッケージがないことを疑います。"
+                },
+                {
+                  "id": "d",
+                  "md": "`.gitignore` の行のせいで、テストのファイルが消えた",
+                  "feedback": "あの行は、ワークツリーの中身を本体で未追跡として出さないためのものです。テストのファイルは、ワークツリーにもあります。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "ワークツリーは新しいチェックアウトなので、Git が管理していない依存パッケージは入っていません。各ワークツリーで入れ直します。",
+              "hint": "ワークツリーに最初から入っているのは、どんなファイルかを考えましょう。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "headless",
+      "title": "3. 非対話的実行を安全に書く",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-headless"
+          ],
+          "md": "CI やスクリプトでは、会話をせずに1回だけ動かします。これを非対話的実行（non-interactive mode）と呼び、`claude -p \"<指示>\"` と書きます。"
+        },
+        {
+          "id": "s3-mode",
+          "type": "markdown",
+          "cite": [
+            "cc-headless",
+            "cc-permission-modes"
+          ],
+          "md": "v2.1.302 から、モードを指定しない `-p` は Manual モード（第2回）で始まり、承認が要る操作は拒否されます。既定は版で変わるので、[公式ドキュメント（非対話的実行）](https://code.claude.com/docs/ja/headless)で確かめましょう。"
+        },
+        {
+          "id": "s3-code",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "cite": [
+            "cc-headless",
+            "cc-cli-reference"
+          ],
+          "code": "claude --bare -p \"npm run lint を実行し、警告の数をファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
+        },
+        {
+          "id": "s3-table",
+          "type": "table",
+          "cite": [
+            "cc-headless",
+            "cc-cli-reference",
+            "cc-permissions"
+          ],
+          "caption": "安全な claude -p をつくる5つのフラグ",
+          "columns": [
+            "フラグ",
+            "役割",
+            "付けないと"
+          ],
+          "rows": [
+            [
+              "`--bare`",
+              "フックや MCP、CLAUDE.md などを読まない（API キーが必要）",
+              "フォルダーのフックが確認なしで動く"
+            ],
+            [
+              "`--allowedTools`",
+              "使うツールを絞って許可する",
+              "必要な操作まで拒否される"
+            ],
+            [
+              "`--permission-mode dontAsk`",
+              "許可外で確認が要る操作を拒否する",
+              "設定しだいでモードが変わる"
+            ],
+            [
+              "`--output-format json`",
+              "結果や費用を JSON で返す",
+              "スクリプトで読みにくい"
+            ],
+            [
+              "`--max-budget-usd`",
+              "費用の見積もりが上限に届いたら止める",
+              "費用に歯止めがない"
+            ]
+          ]
+        },
+        {
+          "id": "s3-pitfall",
+          "type": "callout",
+          "variant": "pitfall",
+          "cite": [
+            "cc-headless",
+            "cc-permissions"
+          ],
+          "title": "許可を広げすぎない",
+          "md": "`--allowedTools \"Bash\"` だと、どのシェルコマンドも確認なしで通ります。`Bash(npm test *)` のように、必要なコマンドだけに絞りましょう。"
+        },
+        {
+          "id": "s3-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-headless",
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "夜間の CI で、`claude -p \"npm test の失敗をまとめて\"` だけを実行しました（v2.1.304）。何が起きやすいでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "Manual モードで始まり、承認が必要な `npm test` が拒否される"
+                },
+                {
+                  "id": "b",
+                  "md": "対話のときと同じ auto モードで始まり、分類器が判断する",
+                  "feedback": "auto モードで始まるのは、対話のセッションです。v2.1.302 からの `-p` は、指定がなければ Manual モードで始まります。"
+                },
+                {
+                  "id": "c",
+                  "md": "承認の確認が出て、誰かが答えるまで止まったままになる",
+                  "feedback": "答える人がいない `-p` では、確認が必要な操作は待たずに拒否されます。止まるのではなく、テストが動かないまま終わります。"
+                },
+                {
+                  "id": "d",
+                  "md": "無人の実行なので、すべての操作が自動で許可される",
+                  "feedback": "無人だからといって、権限は広がりません。使ってよいツールは、`--allowedTools` で先に許可します。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "v2.1.302 から、モードを指定しない `-p` は Manual モードで始まります。`npm test` は承認が必要なので拒否され、テスト結果のない要約になりかねません。`--allowedTools \"Bash(npm test *)\"` で先に許可します。",
+              "hint": "答える人がいない実行で、承認待ちの操作がどう扱われるかを考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unattended",
+      "title": "4. 無人で回す：置き場所と依頼文の4点",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "夜間のチェックなど、人が見ていない間に動かしたい作業があります。"
+        },
+        {
+          "id": "s4-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-common-workflows",
+            "cc-routines"
+          ],
+          "items": [
+            {
+              "term": "無人実行（unattended run）",
+              "md": "人が見ていない間に動く実行。途中で質問できません。"
+            },
+            {
+              "term": "定期タスク（scheduled task）",
+              "md": "保存した依頼文を、決まった間隔で動かす仕組み。"
+            }
+          ]
+        },
+        {
+          "id": "s4-table",
+          "type": "table",
+          "cite": [
+            "cc-common-workflows",
+            "cc-github-actions",
+            "cc-routines",
+            "cc-scheduled-tasks"
+          ],
+          "caption": "無人実行の置き場所は、動かす場所と頻度で選ぶ",
+          "columns": [
+            "方法",
+            "動く場所",
+            "向いている場面"
+          ],
+          "rows": [
+            [
+              "GitHub Actions（`anthropics/claude-code-action@v1`）",
+              "CI",
+              "PR や cron で動かす。`/install-github-app` で設定し、`claude_args` でフラグを渡す"
+            ],
+            [
+              "クラウドの[[定期タスク]]（`/schedule`、旧称 routines）",
+              "クラウド",
+              "パソコンを閉じていても動く（最短1時間、リサーチプレビュー）"
+            ],
+            [
+              "デスクトップの[[定期タスク]]",
+              "自分のパソコン",
+              "手元のファイルを使う"
+            ],
+            [
+              "`/loop`",
+              "開いているセッション",
+              "作業中の短い見張り（最短1分）"
+            ]
+          ]
+        },
+        {
+          "id": "s4-intro",
+          "type": "markdown",
+          "cite": [
+            "cc-common-workflows",
+            "agent-automations"
+          ],
+          "md": "Anthropic は、無人の作業に次の4点を勧めています。"
+        },
+        {
+          "id": "s4-four",
+          "type": "list",
+          "style": "number",
+          "cite": [
+            "cc-common-workflows",
+            "agent-automations"
+          ],
+          "items": [
+            "成功の条件をはっきり書く（何を、どの形で返せば完了か）",
+            "読むだけの作業には、読み取りの権限だけを渡す",
+            "1回あたりの費用に上限を設ける（普段の3〜5倍から始める）",
+            "読み込みの失敗を「何もなかった」と扱わず、失敗として報告させる"
+          ]
+        },
+        {
+          "id": "s4-enforce",
+          "type": "markdown",
+          "cite": [
+            "cc-headless"
+          ],
+          "md": "このうち権限と費用の上限は、CLAUDE.md と同じで、依頼文に書いても強制になりません。フラグや設定で決めます。"
+        },
+        {
+          "id": "s4-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "依頼文の例（毎週の TODO 一覧。権限と費用はフラグで決める）",
+          "prompt": "{{フォルダー}} の中の TODO コメントを集めて、一覧を作ってください。\n成功の条件：{\"todos\": [...], \"unreadable\": [...]} の形の JSON を返すこと。todos の各要素は、ファイル名・行番号・内容です。\nTODO が1つもなければ、todos は空の配列にしてください。\nファイルの編集やコミットはしないでください。\n読めなかったファイルは、unreadable に必ず挙げてください。",
+          "vars": [
+            {
+              "name": "フォルダー",
+              "hint": "例：src/"
+            }
+          ],
+          "expect": "TODO がない日は todos が空になり、読めなかった日は unreadable に名前が並びます。2つの日を取り違えません。"
+        },
+        {
+          "id": "s4-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "agent-automations"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "毎朝の課題の要約が、5日続けて「新しい課題はありません」と報告しました。実は、課題を読む接続が切れていました。依頼文に足りなかったのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "読めなかった情報源を、名前を挙げて失敗として報告させる指示"
+                },
+                {
+                  "id": "b",
+                  "md": "要約をもっと短く、3行以内にまとめさせる指示",
+                  "feedback": "長さを変えても、読めなかったことは伝わりません。読み込みの失敗を、失敗として報告させます。"
+                },
+                {
+                  "id": "c",
+                  "md": "1回あたりの費用の上限を、もっと低くする設定",
+                  "feedback": "費用の上限は大切ですが、この誤報は防げません。読めなかったときの報告のしかたを決めます。"
+                },
+                {
+                  "id": "d",
+                  "md": "実行する頻度を、毎朝から1時間ごとに増やす設定",
+                  "feedback": "回数を増やしても、読めないまま「何もない」という報告が続きます。失敗を失敗として報告させます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "接続が切れても実行は始まり、何も見えないまま「新しいものはない」と報告されがちです。読めなかった情報源を名前つきで報告させれば、何もない日と読めなかった日を区別できます。",
+              "hint": "「何もない日」と「読めなかった日」を、報告で見分ける方法を考えましょう。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-command",
+      "title": "演習1：夜間チェックのコマンドを書く",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "p1-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "失敗したテストを JSON でまとめる、夜間チェックのコマンドを書きます。`cc-practice-09` で進め、大事なリポジトリでは試しません。"
+        },
+        {
+          "id": "p1-steps-setup",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-project",
+              "title": "練習用のプロジェクトを用意する",
+              "md": "下の依頼文で、テストが2つあり、1つは失敗するプロジェクトを作ってもらいます。",
+              "expect": "1件成功・1件失敗と表示されます。",
+              "hint": "「なぜ失敗するのか説明して」と頼み、中身をつかみます。",
+              "troubleshoot": "全部通ったら、1つ失敗させるよう頼み直します。"
+            }
+          ]
+        },
+        {
+          "id": "p1-prompt-setup",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "練習用のプロジェクトを作ってもらう依頼文",
+          "prompt": "練習用に、小さなプロジェクトを作ってください。\n{{テストの道具}} でテストを2つ書き、1つは通り、1つはわざと失敗するようにしてください。\n最後に、テストを実行するコマンドを1行で教えてください。",
+          "vars": [
+            {
+              "name": "テストの道具",
+              "hint": "例：Node.js の node:test（npm test で実行）"
+            }
+          ],
+          "expect": "node:test なら `package.json` とテストのファイルができ、`npm test` で2件中1件が失敗します。"
+        },
+        {
+          "id": "p1-steps-write",
+          "type": "steps",
+          "cite": [
+            "cc-headless"
+          ],
+          "items": [
+            {
+              "id": "p-command",
+              "title": "夜間チェックのコマンドを書く",
+              "md": "5つのフラグを使い、指示には返す JSON の形と、実行できなかったときの返し方を書きます。",
+              "expect": "5つのフラグがそろったコマンドができます。",
+              "hint": "許可はテストのコマンドだけで足ります。",
+              "troubleshoot": "`\"Bash\"` と書いたら、`Bash(npm test *)` に絞ります。"
+            },
+            {
+              "id": "p-run",
+              "title": "結果を予想してから実行する",
+              "md": "失敗が何件並ぶかを予想してから実行します。サブスクリプションなら `--bare` を外します。",
+              "expect": "`result` に、失敗したテスト1件が入ります。",
+              "hint": "予想と違ったら、違いを1行メモします。",
+              "troubleshoot": "「実行できなかった」と返ったら、許可のパターンを見直します。"
+            }
+          ]
+        },
+        {
+          "id": "p1-checklist",
+          "type": "checklist",
+          "title": "夜間チェックのコマンドのチェックリスト",
+          "items": [
+            {
+              "id": "pc-allow",
+              "label": "許可しているのは、テストを実行するコマンドだけ（`Bash(npm test *)` など）"
+            },
+            {
+              "id": "pc-mode",
+              "label": "`--permission-mode dontAsk` で、ほかの操作を拒否している"
+            },
+            {
+              "id": "pc-json",
+              "label": "`--output-format json` で、スクリプトから読める形にしている"
+            },
+            {
+              "id": "pc-budget",
+              "label": "`--max-budget-usd` で、1回の費用に上限を設けている"
+            },
+            {
+              "id": "pc-fail",
+              "label": "テストを実行できなかったときの返し方を、指示に書いている"
+            },
+            {
+              "id": "pc-predict",
+              "label": "実行の前に結果を予想し、あとで答え合わせした"
+            }
+          ]
+        },
+        {
+          "id": "p1-model",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "cite": [
+            "cc-headless",
+            "cc-cli-reference"
+          ],
+          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p 'npm test を実行し、失敗したテストを JSON の配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく {\"status\": \"error\", \"reason\": \"<理由>\"} を返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
+          "highlight": [
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-audit",
+      "title": "演習2：無人実行の依頼文を点検する",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "p2-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "同僚の次の依頼文を、セクション4の4点で点検して直しましょう。"
+        },
+        {
+          "id": "p2-before",
+          "type": "markdown",
+          "style": "quote",
+          "md": "毎晩テストを流して、結果をいい感じにまとめておいて。失敗していたら直しておいて。"
+        },
+        {
+          "id": "p2-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-audit",
+              "title": "足りない点に印を付ける",
+              "md": "4点それぞれに○か×を付け、理由を1行添えます。",
+              "expect": "×の点と、その理由が書けています。",
+              "hint": "「いい感じ」「直しておいて」が、何を決めていないかを考えます。",
+              "troubleshoot": "実は4点とも×です。条件、権限、費用、報告の順に確かめます。"
+            },
+            {
+              "id": "p-rewrite",
+              "title": "依頼文とコマンドを直す",
+              "md": "依頼文に成功の条件と失敗の報告を書き、権限と費用はフラグで決めます。直したら、下の依頼文で見落としを聞きます。",
+              "expect": "4点がそろい、指摘の採否を自分で決められます。"
+            }
+          ]
+        },
+        {
+          "id": "p2-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "cite": [
+            "cc-common-workflows",
+            "agent-automations"
+          ],
+          "title": "直した依頼文を点検してもらう依頼文",
+          "prompt": "次の依頼文は、夜間に無人で実行する予定です。\n{{直した依頼文}}\n次の4点で点検し、足りない点を理由と一緒に挙げてください。\n1. 成功の条件（何を、どの形で返せば完了か）\n2. 権限（読むだけの作業に、書き込みを許していないか）\n3. 費用の上限（--max-budget-usd などで決めているか）\n4. 失敗の報告（読めなかったときに「何もない」と報告しないか）\n直すかどうかは私が決めるので、指摘だけをお願いします。",
+          "vars": [
+            {
+              "name": "直した依頼文",
+              "hint": "例：npm test を実行し、失敗したテストを JSON の配列で返してください。…"
+            }
+          ],
+          "expect": "4点それぞれに、満たしているかと理由が返ります。下は、直した依頼文の模範解答です。\n\n「`npm test` を実行し、失敗したテストを JSON の配列で返してください。各要素は名前・ファイル・エラーの1行目で、失敗が0件なら空の配列です。ファイルの編集やコミットはしないでください。」\n\n「テストを実行できなかったときは、空の配列ではなく、理由つきのエラーを返してください。」\n\nコマンドでは、ツールを `Bash(npm test *)` に絞り、`dontAsk` でほかを拒否します。費用は `--max-budget-usd` で上限を決めます。「直しておいて」は無人にせず、結果を見てから人が頼みます。"
+        },
+        {
+          "id": "p2-checklist",
+          "type": "checklist",
+          "title": "依頼文の点検チェックリスト",
+          "items": [
+            {
+              "id": "pa-success",
+              "label": "何を、どの形で返せば完了かが書いてある"
+            },
+            {
+              "id": "pa-empty",
+              "label": "0件のときと、読めなかったときの返し方が別になっている"
+            },
+            {
+              "id": "pa-readonly",
+              "label": "報告だけの作業に、編集やコミットを頼んでいない"
+            },
+            {
+              "id": "pa-flags",
+              "label": "権限と費用の上限を、コマンドのフラグで決めている"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-common-workflows",
+            "cc-interactive-mode",
+            "cc-headless",
+            "cc-permissions",
+            "agent-automations"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "大きなリポジトリで、ログインの仕組みがどう動いているかを調べたいとします。今の会話は実装の途中で、文脈を増やしたくありません。どれを選びますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "サブエージェントに調べてもらい、要点だけを受け取る"
+                },
+                {
+                  "id": "b",
+                  "md": "`claude --worktree` で、調べもの用のセッションを別に始める",
+                  "feedback": "別のセッションでも調べられますが、結果を自分で持ち帰る必要があります。編集しない調べものなら、サブエージェントが要点を今の会話に返します。"
+                },
+                {
+                  "id": "c",
+                  "md": "調べものを、Ctrl + B でバックグラウンドに回す",
+                  "feedback": "Ctrl + B は、実行中のコマンドを裏に回す操作です。調べものを別のコンテキストで任せるのは、サブエージェントです。"
+                },
+                {
+                  "id": "d",
+                  "md": "エージェントチームを作り、仲間に手分けさせる",
+                  "feedback": "エージェントチームは実験的で、トークンを多く使います。1つの調べものなら、サブエージェントで足ります。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "サブエージェントは別のコンテキストで調べ、要点だけを返します。今の会話の文脈を増やさずに済みます（第7回）。",
+              "objectiveId": "o1",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e2",
+              "kind": "single",
+              "prompt": "Claude に開発サーバーを起動してもらったら、コマンドが終わらず、Claude の作業が止まったままです。サーバーは動かしたまま、画面の修正を頼みたいときは？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "実行中のサーバーを、Ctrl + B でバックグラウンドに回す"
+                },
+                {
+                  "id": "b",
+                  "md": "サーバーを止めて、修正のあとで起動し直す",
+                  "feedback": "止めると、修正の結果を画面で確かめられません。裏に回せば、動かしたまま次を頼めます。"
+                },
+                {
+                  "id": "c",
+                  "md": "修正だけを、`claude -p` で別に実行する",
+                  "feedback": "`claude -p` は、会話をせずに1回だけ動かす使い方です。今のセッションで続けるなら、コマンドを裏に回します。"
+                },
+                {
+                  "id": "d",
+                  "md": "ワークツリーを作り、そこで修正を始める",
+                  "feedback": "ワークツリーで直しても、本体で動いているサーバーには反映されません。サーバーを動かしたまま頼むなら、裏に回します。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "Ctrl + B で裏に回すと、サーバーは動いたまま、次の指示を出せます。出力はファイルに残り、`/tasks` で様子を確かめられます。",
+              "objectiveId": "o1",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e3",
+              "kind": "single",
+              "prompt": "夜間の CI で、失敗したテストを要約させます。いちばん安全なコマンドはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`claude --bare -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode dontAsk --max-budget-usd 1`"
+                },
+                {
+                  "id": "b",
+                  "md": "`claude -p \"…\" --allowedTools \"Bash\" --permission-mode dontAsk`",
+                  "feedback": "`\"Bash\"` だけだと、どのシェルコマンドも確認なしで通ります。費用の上限もありません。"
+                },
+                {
+                  "id": "c",
+                  "md": "`claude -p \"…\" --permission-mode bypassPermissions`",
+                  "feedback": "`bypassPermissions` は確認を飛ばすので、無人の CI では危険です。必要なコマンドだけを許可します。"
+                },
+                {
+                  "id": "d",
+                  "md": "`claude -p \"…\"`",
+                  "feedback": "v2.1.302 からは Manual モードで始まり、`npm test` が拒否されます。費用の上限もありません。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "必要なコマンドだけを `--allowedTools` で許可し、`dontAsk` でほかを拒否します。`--bare` で手元の設定を読み込まず、`--max-budget-usd` で費用に上限を設けます。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            },
+            {
+              "id": "e4",
+              "kind": "single",
+              "prompt": "よく知らない公開リポジトリをクローンし、中身を確かめる前に `claude -p` で要約させたいとします。まず付けるべきフラグはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`--bare`"
+                },
+                {
+                  "id": "b",
+                  "md": "`--output-format json`",
+                  "feedback": "出力の形は、安全性に関係しません。`--bare` を付けないと、そのリポジトリのフックや `.mcp.json` のサーバーが動きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "`--permission-mode dontAsk`",
+                  "feedback": "`dontAsk` はツールの呼び出しを絞りますが、プロジェクトのフックは止めません。フックを読み込まないのは `--bare` です。"
+                },
+                {
+                  "id": "d",
+                  "md": "何も付けない（`-p` でも信頼の確認が出る）",
+                  "feedback": "`-p` は信頼の確認を出しません。確認なしで、プロジェクトのフックや MCP サーバーが動きます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "`--bare` なしの `-p` は、信頼していないフォルダーでもプロジェクトのフックを実行し、`.mcp.json` のサーバーにつなぎます。知らないリポジトリでは `--bare` を付けます。公式ドキュメントは、専用の VM やクラウドのセッションも勧めています。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            },
+            {
+              "id": "e5",
+              "kind": "single",
+              "prompt": "毎週、依存パッケージの更新を報告させます（権限と費用はフラグで設定済み）。4点が最もそろった依頼文はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「名前・今の版・最新の版を JSON の配列で返して。なければ空の配列。編集はしない。調べられなければ理由を返して」"
+                },
+                {
+                  "id": "b",
+                  "md": "「更新できるパッケージを調べて、いい感じにまとめて。失敗したら教えて」",
+                  "feedback": "「いい感じ」では、何を返せば完了かが決まりません。返す形と、空のときの扱いを書きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "「更新できるパッケージを JSON の配列で返して。必要なら更新とコミットまで済ませて」",
+                  "feedback": "報告だけの作業に、更新やコミットまで頼んでいます。読むだけの作業は、読むだけに絞ります。"
+                },
+                {
+                  "id": "d",
+                  "md": "「更新できるパッケージを JSON の配列で返して。何も見つからなければ空の配列を返して」",
+                  "feedback": "調べられなかったときも空の配列になり、「更新なし」と区別できません。失敗は理由つきで返させます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "成功の条件（返す形と空のとき）、読むだけの範囲、失敗の報告がそろっています。費用の上限は依頼文ではなく、`--max-budget-usd` で決めます。",
+              "objectiveId": "o3",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e6",
+              "kind": "multi",
+              "prompt": "無人実行で、依頼文に書くだけでは守られず、フラグや設定で決めるべきものはどれでしょう？（2つ選ぶ）",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "1回あたりの費用の上限"
+                },
+                {
+                  "id": "b",
+                  "md": "使ってよいツールの範囲"
+                },
+                {
+                  "id": "c",
+                  "md": "成功したときに返す JSON の形",
+                  "feedback": "返す形は、依頼文で伝えるものです。強制が必要なのは、ツールの範囲と費用の上限です。"
+                },
+                {
+                  "id": "d",
+                  "md": "読めなかったときの報告のしかた",
+                  "feedback": "報告のしかたは、依頼文に書いて伝えます。フラグで決めるのは、ツールの範囲と費用です。"
+                }
+              ],
+              "answer": [
+                "a",
+                "b"
+              ],
+              "explanation": "依頼文は指示であって、強制ではありません。ツールは `--allowedTools` と `dontAsk`、費用は `--max-budget-usd` で決めます。",
+              "objectiveId": "o3",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "調べものはサブエージェント、別々の変更はワークツリー、長い処理はバックグラウンドへ。",
+            "ワークツリーでは依存パッケージを入れ直し、取り込むまで残します。",
+            "`claude -p` は v2.1.302 から Manual で始まります。必要なコマンドだけを許可し、`--bare` と費用の上限を付けます。",
+            "無人の依頼は、成功の条件・権限・費用の上限・失敗の報告で点検します。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "毎日くり返す確認を1つ選び、無人で回すときの成功の条件を1文で書いてみましょう。\n\n次の第10回では、安全とコストの管理を学びます。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-worktree",
+              "front": "別々の変更を同時に進めるには？",
+              "back": "`claude --worktree <名前>` で、別フォルダー・別ブランチのセッションを始める。"
+            },
+            {
+              "id": "card-deps",
+              "front": "ワークツリーで最初にすることは？",
+              "back": "依存パッケージを入れる（新しいチェックアウトのため）。"
+            },
+            {
+              "id": "card-bg",
+              "front": "実行中のコマンドを裏に回すには？",
+              "back": "Ctrl + B。裏の作業の一覧は `/tasks`。"
+            },
+            {
+              "id": "card-manual",
+              "front": "v2.1.302 以降、モード指定なしの `claude -p` は？",
+              "back": "Manual モードで始まり、承認が必要な操作は拒否される。"
+            },
+            {
+              "id": "card-flags",
+              "front": "CI 向け `claude -p` の5つのフラグは？",
+              "back": "`--bare`、`--allowedTools`、`--permission-mode dontAsk`、`--output-format json`、`--max-budget-usd`。"
+            },
+            {
+              "id": "card-four",
+              "front": "無人実行の依頼で点検する4点は？",
+              "back": "成功の条件、読むだけの権限、費用の上限、失敗の報告。"
+            },
+            {
+              "id": "card-quiet",
+              "front": "読めなかった日を「何もない日」と誤らないには？",
+              "back": "読めなかった情報源を、名前を挙げて報告させる。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分のリポジトリでは、ワークツリーとサブエージェントのどちらが合う？",
+            "`--allowedTools` に何を書けばよいか、一緒に考えて",
+            "毎朝のレポートの依頼文を、4点で点検して"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "サブエージェント",
+      "md": "本体の会話とは別のコンテキストで調べものなどを引き受け、要点だけを返す補助のエージェント（第7回）。"
+    },
+    {
+      "term": "ワークツリー",
+      "md": "同じリポジトリから、フォルダーとブランチを分けて作る作業コピー。`claude --worktree <名前>` で作ります。",
+      "aliases": [
+        "worktree"
+      ]
+    },
+    {
+      "term": "バックグラウンド実行",
+      "md": "待たずに裏で動かすこと。実行中のコマンドは Ctrl + B、一覧は `/tasks`、セッションごとなら `claude --bg`。",
+      "aliases": [
+        "background"
+      ]
+    },
+    {
+      "term": "非対話的実行",
+      "md": "`claude -p \"<指示>\"` のように、会話をせずに1回だけ動かす使い方。CI やスクリプトで使います。",
+      "aliases": [
+        "non-interactive mode",
+        "claude -p"
+      ]
+    },
+    {
+      "term": "無人実行",
+      "md": "人が見ていない間に、決まった時刻やイベントをきっかけに動く実行。途中で質問できません。",
+      "aliases": [
+        "unattended run"
+      ]
+    },
+    {
+      "term": "定期タスク",
+      "md": "保存した依頼文を、決まった間隔で動かす仕組み。クラウド（`/schedule`、旧称 routines）とデスクトップアプリのものがあります。",
+      "aliases": [
+        "scheduled task",
+        "routines"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-worktrees",
+      "title": "Run parallel sessions with worktrees",
+      "url": "https://code.claude.com/docs/en/worktrees",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-common-workflows",
+      "title": "Common workflows",
+      "url": "https://code.claude.com/docs/en/common-workflows",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-agents",
+      "title": "Run agents in parallel",
+      "url": "https://code.claude.com/docs/en/agents",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-interactive-mode",
+      "title": "Interactive mode",
+      "url": "https://code.claude.com/docs/en/interactive-mode",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-agent-view",
+      "title": "Manage multiple agents with agent view",
+      "url": "https://code.claude.com/docs/en/agent-view",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-workflows",
+      "title": "Orchestrate subagents at scale with dynamic workflows",
+      "url": "https://code.claude.com/docs/en/workflows",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-headless",
+      "title": "Run Claude Code programmatically",
+      "url": "https://code.claude.com/docs/en/headless",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permission-modes",
+      "title": "Permission modes",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permissions",
+      "title": "Configure permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-cli-reference",
+      "title": "CLI reference",
+      "url": "https://code.claude.com/docs/en/cli-reference",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-github-actions",
+      "title": "Claude Code GitHub Actions",
+      "url": "https://code.claude.com/docs/en/github-actions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-routines",
+      "title": "Automate work with scheduled tasks",
+      "url": "https://code.claude.com/docs/en/routines",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-scheduled-tasks",
+      "title": "Run prompts on a schedule",
+      "url": "https://code.claude.com/docs/en/scheduled-tasks",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "agent-automations",
+      "title": "Building effective agent automations (2026-10-08)",
+      "url": "https://claude.dev/blog/building-effective-agent-automations/",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

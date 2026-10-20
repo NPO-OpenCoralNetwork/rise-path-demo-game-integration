@@ -1,0 +1,188 @@
+{
+  "lessonId": "cc-07-skills-subagents",
+  "file": "content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json",
+  "lessonHash": "sha256:ac1d14f8dc7c957a",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "Three can-do objectives, each with 3+ questions and at least one at apply level (o1: q2, q3, e1, e2; o2: q1, q6, e3, e4; o3: q4, q5, e5, e6). But q5 (fork vs ordinary subagent vs /clear vs skill) is a choose-the-tool item tagged o3, 「コンテキストが節約できる理由を説明できる」, which it does not test.",
+      "blockIds": [
+        "s3-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 3,
+      "evidence": "hook-b1 states a concrete problem in 3 sentences (「毎回同じ手順をClaude Codeに貼り付けていませんか」), and hook-predict asks an ungraded prediction that leads into 7-1. The prediction is closer to recall of lesson 6 (CLAUDE.md is loaded in full every session), and it does not touch the second problem the lead raises (research output flooding the conversation).",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites are listed, earlier lessons are recalled (「（第6回）」 in hook-q, 「（第5回）」 in s3-lead), and the new terms are defined in s1-defs and s3-defs with English on first use, matching the glossary. A few words are used without a definition: 「YAMLで書きます」 in s1-defs and 「トークン」 in the e5 explanation.",
+      "blockIds": [
+        "s1-defs",
+        "s3-defs",
+        "s3-lead"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Lint shows 0 budget warnings and every segment has a diagram, table or check. But estMinutes is 21, above the contract's 8–20, and section 7-3 packs five ideas into one segment (subagent, fork, Explore, background default with /tasks, and the .claude/agents/ file with the /agents removal).",
+      "blockIds": [
+        "subagents",
+        "s3-bg",
+        "s3-legacy"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s2-steps is a 6-step worked example with subgoal labels and most of the reasons (②「Claudeは説明文で使うかを決めるので」, ⑤「Claudeの判断を待たずに」), and it comes before practice. ① does not say why the folder must exist before starting Claude Code, and the subagent half of the practice (/context before and after) has no demonstration beforehand.",
+      "blockIds": [
+        "s2-skill",
+        "s2-steps"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Every content section ends with an inline quiz (s1-check, s2-check, s3-check, s4-check) that includes apply and analyze items, with feedback on every wrong option. But q3 can be answered by matching words: option b is the only option written as 「何をするか＋いつ使うか」, which ex-description taught just before, and it is twice as long as the others.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All seven misconceptions in the brief appear as distractors, each with feedback of 2 sentences or fewer that corrects it: q1 a (skills fully loaded), q2 b (「勝手に使わないこと」 in description), q4 a/c (everything or nothing returns), q5 b (subagent remembers), q6 d and s4-pitfall (install everything first), e2 a (more detailed body), e4 (long procedure stays in CLAUDE.md).",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "check-quiz",
+        "s4-pitfall"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "Two process diagrams of 5–6 nodes, with labels in the lesson's own terms (「名前と説明文だけ読み込む」, 「要約だけ」). Each caption states the takeaway (「スキルの本文は、使うときだけコンテキストに入る」), each has a descriptive alt, and there are no decorative images.",
+      "blockIds": [
+        "s1-diagram",
+        "s3-diagram"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "An authentic transfer task (the learner's own repeated procedure turned into a skill, then a /context before-and-after) with expect on every step, hints and troubleshoot, a pr-checklist self-check and a model answer in pr-model. But the rule pr-decide gives for disable-model-invocation (「ファイルの書きかえやコミットを含むなら」) and pr-model-lead's reason (「ファイルを書きかえるので」) contradict the rule taught in s2-invoke (「取り消しにくい手順」), and pr-c3 grades the learner on it.",
+      "blockIds": [
+        "pr-steps",
+        "pr-prompt",
+        "pr-checklist",
+        "pr-model",
+        "pr-decide"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "summary-points (4 points) comes after the exam. summary-next has a reflection question (「この1週間で2回以上同じ説明をした作業は、どこに置くとよいでしょう」) and the next step (第8回), followed by 6 flashcards and askTutor suggestions.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 2,
+      "evidence": "Behaviour claims are cited to official sources and the version is pinned (v2.1.304, v2.1.198). But the fallback in s2-terminal breaks the worked example: after 「mkdir cc-practice && cd cc-practice && git init」 the next line 「cd cc-practice」 fails, and the fresh repo has no commit or file, so step ④ (「ファイルを少し変えてから」) has nothing to change and the skill's `git diff HEAD` fails with an unknown-revision error.",
+      "blockIds": [
+        "s2-terminal",
+        "s2-skill",
+        "s2-steps"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "です・ます throughout, warm and without pressure (「練習用フォルダで進めましょう」), no banned phrases, and terms are consistent (説明文／description, メインの会話, まっさら). A few spots are slightly casual or stiff, e.g. 「それに、スキルの本文も…」 in the e3 feedback; the ja-editor owns the wording.",
+      "blockIds": [
+        "hook-b1",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Single locale jp, complete; diagram labels are in Japanese with descriptive alt text. The only link has descriptive text (「公式ドキュメント（日本語版）」).",
+      "blockIds": [
+        "s1-diagram",
+        "s3-diagram",
+        "s2-legacy"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "accuracy",
+      "blockId": "s2-terminal",
+      "issue": "The fallback in the code comment breaks the worked example. If the learner runs 「mkdir cc-practice && cd cc-practice && git init」, the next line 「cd cc-practice」 fails because they are already inside that folder. The new repo also has no commit and no file, so in step ④ there is nothing to 「少し変えて」, and the skill's `git diff HEAD` fails (HEAD does not exist yet). The brief's Assumptions put this case in a troubleshoot with a first commit.",
+      "fix": "Delete the comment line, so s2-terminal is only `cd cc-practice` and `mkdir -p .claude/skills/commit-message`. Add to step ex-folder: \"troubleshoot\": \"`cc-practice` がないときは、`mkdir cc-practice && cd cc-practice && git init` で作ります。READMEなどのファイルを1つ作って最初のコミットをしてから、`mkdir -p .claude/skills/commit-message` を実行します。\""
+    },
+    {
+      "criterion": "align",
+      "blockId": "s3-check",
+      "issue": "q5 asks the learner to choose a tool (fork / ordinary subagent / /clear / skill) for a side task that needs the conversation history. It does not ask why a subagent saves the main context, yet it is tagged objectiveId o3 (「コンテキストが節約できる理由を説明できる」) with bloom analyze.",
+      "fix": "In q5 set \"objectiveId\": \"o2\" and \"bloom\": \"apply\": it tests the choice among skill, subagent and conversation tools. o3 stays assessed by q4, e5 and e6."
+    },
+    {
+      "criterion": "active",
+      "blockId": "s2-check",
+      "issue": "q3 gives its answer away. Option b is the only option written in the 「何をするか。いつ使うか。」 form that ex-description stated just before, and it is about twice as long as the others; a ('テスト用') and c ('とても大事なスキルです') are throwaways. A learner can answer by matching words without judging what makes a description useful.",
+      "fix": "Replace option a with a near-miss that has the what but not the when: {\"id\": \"a\", \"md\": \"テストを実行し、失敗したものだけを一覧にまとめるスキル。\", \"feedback\": \"何をするかはわかりますが、いつ使うかがありません。Claudeは依頼と見比べるので、使う場面も書きます。\"}. Shorten option b to \"テストを実行し、失敗をまとめる。テスト結果を聞かれたときや、コードを変えた後に使う。\" so the lengths are parallel."
+    },
+    {
+      "criterion": "practice",
+      "blockId": "pr-decide",
+      "issue": "The decision rule for disable-model-invocation is inconsistent. s2-invoke teaches it for 「コミットやデプロイなど取り消しにくい手順」, but pr-decide says 「ファイルの書きかえやコミットを含むなら」 and pr-model-lead says 「ファイルを書きかえるので」. By that rule almost every skill that edits files would be user-only. pr-c3 then grades the learner on a rule the lesson did not teach.",
+      "fix": "Use one rule in all three places, matching cc-skills (side effects, or you want to control the timing). s2-invoke md: \"この例はコミットしません。コミットやデプロイのように取り消しにくい手順や、動かす時期を自分で決めたい手順もあります。そうした手順には、`disable-model-invocation: true` を足します。`/名前` で呼んだときだけ動き、説明文もコンテキストに入りません。\" pr-decide md: \"コミットのように取り消しにくい操作を含むか、動かす時期を自分で決めたいかを考えます。当てはまれば、`disable-model-invocation: true` を足します。\" pr-model-lead md: \"模範解答の例です。`disable-model-invocation: true` を付けています。READMEを直す時期を、自分で決めたいからです。\""
+    },
+    {
+      "criterion": "load",
+      "blockId": "lesson",
+      "issue": "estMinutes is 21, above the contract's limit for one lesson (8–20 minutes). The brief's own estimate is about 8.0 min reading + 13 questions × 40 s (about 8.7 min) + 2 tasks × 2 min, which is about 20.7 min.",
+      "fix": "Delete exam question e4 from check-quiz. Its point (move a long, rarely used procedure from CLAUDE.md to a skill) is already assessed by q6 and e1 option c, and o2 stays in the exam through e3. Then 12 questions × 40 s = 8.0 min; 8.0 + 8.0 + 4 = 20.0, so set \"estMinutes\": 20."
+    }
+  ],
+  "niceToHave": [
+    "s3-defs (fork), q5, card-fork, s3-bg and pr-test cite cc-commands for `/subtask`, `/tasks` and `/reload-skills`. The repo's research notes (doc/brushup-2026/research/claude-code-curriculum.ja.md) confirm only `/tasks` and the v2.1.198 changes, not `/subtask` or `/reload-skills`. Re-check both on the commands page for v2.1.304 before publishing.",
+    "ex-folder: give the reason for the order, for example add \"セッションの途中で作ったスキルのフォルダは、`/reload-skills` するまで読み込まれないためです。\" (cite cc-skills / cc-commands).",
+    "pr-terminal hard-codes `update-readme`, while pr-pick asks for the learner's own task. In pr-write, say \"上のコマンドの `update-readme` は、自分のスキル名に変えます。\"",
+    "Section 7-3 carries five ideas. s3-bg (background default and /tasks) already appears as the hint of pr-delegate, so it could be removed from the segment to keep 7-3 on 'own context, only the summary returns' plus fork.",
+    "The subagent half of the practice (⑤–⑦, /context before and after) has no demonstration. One sentence in s3-how describing what the learner will see (the request and the short report added, not the files read) would act as a minimal worked example.",
+    "hook-predict: options b and c have no feedback (the quiz is ungraded, so lint does not require it). One sentence each would correct 「関係ないと判断して読み飛ばす」 directly.",
+    "o1 has bloom create, but the selected-response items are apply/analyze. Consider tagging pr-checklist items against o1, or lowering o1's bloom to apply in the brief and objective, so the stated level matches what is checked.",
+    "e5: option a is noticeably longer than b–d. Trim it to \"読んだ中身はサブエージェント側に残り、メインには要約だけが戻るから\" to keep the lengths parallel.",
+    "s1-defs: \"YAMLで書きます\" is the only undefined technical term in the segment. Consider \"YAML（設定を書くための書き方の一つ）で書きます\". The e5 explanation uses 「トークン」 without a recall of where it was defined."
+  ],
+  "average": 3.15,
+  "verdict": "revise",
+  "summary": "The biggest strength is how the misconceptions are handled: all seven from the brief appear as distractors with short corrective feedback, the two process diagrams have clear takeaway captions, and there is a solid 6-step worked example before an authentic practice task with a checklist and model answer. The most important fixes are the broken fallback path in s2-terminal (a fresh repo with no commit makes the worked example fail), the contradictory disable-model-invocation rule between s2-invoke and the practice, q3 giving its answer away, q5 tagged to the wrong objective, and estMinutes 21 being above the 20-minute limit."
+}

@@ -1,0 +1,173 @@
+{
+  "lessonId": "cc-06-claude-md",
+  "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
+  "lessonHash": "sha256:77b9fd93b84c6577",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The lesson uses です・ます with a warm, pressure-free tone and has no banned phrases (lint is clean). A few explicit rules still break: spacing between 和文 and English varies across the lesson (「git で共有」 next to 「Linuxでは」「CLAUDE.mdに」), s3-diagram's caption and card-add-cut end in plain form, practice-task uses 「行わないで」, and the glossary entry for AGENTS.md contradicts e1.",
+      "blockIds": [
+        "s1-defs",
+        "s1-check",
+        "s3-diagram",
+        "summary-cards",
+        "practice-task",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "lessons:lint --strict reports 0 findings. Paragraphs are 1 to 3 short sentences, and every concept section ends with an inline check. Tables, a diagram, steps and lists break up the text, so no run of text-only screens appears.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "s5-check"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites are listed and earlier lessons are recalled (「第2回で書いた権限ルール」, 「第1回と第5回で見たとおり」). Each segment's definitions come before use, at 3 terms per segment. Some first uses still lack their full form or English: API and ハンドラー in s2-table, E2E and DB in s2-check, and セッション in hook-b1.",
+      "blockIds": [
+        "hook-b1",
+        "s2-table",
+        "s2-check",
+        "s1-defs",
+        "s3-defs",
+        "s4-defs"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "This is a single-locale lesson (jp), so no plain-string findings apply. Diagram labels are in Japanese and the alt text is complete. The only link text names its destination: 「公式ドキュメント（日本語）」 in s3-info.",
+      "blockIds": [
+        "s3-diagram",
+        "s3-info"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "lesson",
+      "issue": "(a) meaning: the glossary entry for AGENTS.md says 「CLAUDE.mdがないときに読まれます」. That contradicts s3-defs and the correct answer of e1, where a CLAUDE.local.md alone stops AGENTS.md from being read. A learner who checks the glossary will choose the wrong option in e1.",
+      "fix": "glossary AGENTS.md md: 「ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.mdがないときに読まれます（v2.1.277以降）。」→「ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに、代わりに読まれます（v2.1.277以降）。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "lesson",
+      "issue": "(d) notation §3: the lesson puts spaces between 和文 and alphanumerics in the prerequisites and the glossary, but writes 「CLAUDE.mdに」「Linuxでは」 without them elsewhere. The style guide forbids such spaces and asks for one form across the lesson. Git is also written as both 「Git」 and 「git」.",
+      "fix": "prerequisites[5]: 「ターミナルで cd と ls が使える」→「ターミナルで `cd` と `ls` が使える」. prerequisites[6]: 「Git の commit の意味がわかる」→「Gitのcommitの意味がわかる」. glossary CLAUDE.local.md: 「git に入れず、`.gitignore` に書きます。」→「Gitに入れず、`.gitignore` に書きます。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s1-defs",
+      "issue": "(d) notation §3: there is a space between 「git」 and 「に」.",
+      "fix": "「git に入れないよう `.gitignore` に書きます。」→「Gitに入れないよう、`.gitignore` に書きます。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s1-table",
+      "issue": "(d) notation §3: there is a space in 「git で共有」 (row 3, column 3). Row 4 of s4-table has the same problem in 「CLAUDE.local.md か」, which mixes code and plain text.",
+      "fix": "s1-table: 「チーム（git で共有）」→「チーム（Gitで共有）」. s4-table row 5, column 2: 「CLAUDE.local.md か `~/.claude/CLAUDE.md`」→「`CLAUDE.local.md` か `~/.claude/CLAUDE.md`」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s1-check",
+      "issue": "(d) notation §3: q1 has three spaced 「git」 phrases, in feedback a, feedback b and the explanation.",
+      "fix": "q1 a feedback: 「git で共有する」→「Gitで共有する」. q1 b feedback: 「git には入れません」→「Gitには入れません」. q1 explanation: 「プロジェクトのCLAUDE.mdは git でチームと共有され」→「プロジェクトのCLAUDE.mdはGitでチームと共有され」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "s2-table",
+      "issue": "(d) §2 first use: API appears here for the first time without its full name. ハンドラー is a katakana term with no English.",
+      "fix": "「APIのハンドラーは `src/api/handlers/` に置く」→「API（Application Programming Interface）のハンドラー（handler）は `src/api/handlers/` に置く」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "s2-check",
+      "issue": "(d) §2 abbreviations: E2E (q3 option a) and DB (q3 option b) appear without their full forms. Both options also break §3 spacing (「は E2E まで」, 「React と TypeScript で」 in option d).",
+      "fix": "q3 a: 「「テストは `npm run test:unit` で（`npm test` は E2E まで走る）」」→「「テストは `npm run test:unit` で（`npm test` はE2E（End-to-End）テストまで走る）」」. q3 b: 「`docker compose up db` でDBを起動する」→「`docker compose up db` でDB（データベース）を起動する」. q3 d: 「「このアプリは React と TypeScript で書かれている」」→「「このアプリはReactとTypeScriptで書かれている」」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "hook-b1",
+      "issue": "(d) §2 katakana on first use: セッション first appears here without English. The glossary term is 「セッション（session）」.",
+      "fix": "「セッションのたびに、」→「セッション（session）のたびに、」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s3-diagram",
+      "issue": "(d) です・ます §1: the caption is made of plain-form sentences, 「減らない。」 followed by a 体言止め.",
+      "fix": "「インポートしても毎回読まれる量は減らない。減らせるのは paths: 付きのルール」→「インポートしても、毎回読まれる量は減りません。減らせるのは paths: 付きのルールです。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "s5-lines",
+      "issue": "(d) notation §3: item 1 has spaces between 和文 and English.",
+      "fix": "「「このアプリは React と TypeScript で作られています」」→「「このアプリはReactとTypeScriptで作られています」」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "practice-task",
+      "issue": "(d) notation §3: 「行う」 should be written in kana or replaced with another verb.",
+      "fix": "「大事なリポジトリでは行わないでください。」→「大事なリポジトリでは試さないでください。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "practice-steps",
+      "issue": "(d) notation §3: the on-screen label 「Memory files」 in step pr-context is not in 「」.",
+      "fix": "pr-context expect: 「Memory filesに `CLAUDE.md` と」→「「Memory files」に `CLAUDE.md` と」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) notation §3: e1 option d and its feedback, and e6 options a and d plus d's feedback, put spaces around English words. In e6 a, the nested quote also needs 『』.",
+      "fix": "e1 d: 「CLAUDE.local.mdは git に入らないので」→「CLAUDE.local.mdはGitに入らないので」. e1 d feedback: 「git に入るかどうかは」→「Gitに入るかどうかは」. e6 a: 「「IMPORTANT を付けたなら、確実に守られるよ」」→「「『IMPORTANT』を付けたなら、確実に守られるよ」」. e6 d: 「「auto モードなら」→「「autoモードなら」. e6 d feedback: 「auto モードの分類器」→「autoモードの分類器」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) §5 option form, e4: options a, b and d are rewritten CLAUDE.md lines, but option c is an action (「…段落を、冒頭に足す」). Its form does not match the others.",
+      "fix": "e4 c md: 「「テストとは何か」を説明する段落を、冒頭に足す」→「「テストとは、コードが正しく動くかを確かめる作業のこと」」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) §5 option form, e5: options a and c end in a verb (「止める」「変換される」), but b ends in 「書き方なだけ」 and d ends in the noun 「決まり」.",
+      "fix": "e5 b md: 「どちらもClaudeが読む指示で、拒否ルールのほうが強い書き方なだけ」→「どちらもClaudeが読む指示で、拒否ルールは強い言葉で伝える」. e5 d md: 「拒否ルールは提案で、CLAUDE.mdは必ず守られる決まり」→「拒否ルールは提案にとどまり、CLAUDE.mdは必ず守られる」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "summary-cards",
+      "issue": "(d) です・ます §1: the back of card-add-cut ends in plain form (「足す。」「削る。」).",
+      "fix": "card-add-cut back: 「同じ間違いが2回起きたら足す。消しても間違いが増えない行は削る。」→「同じ間違いが2回起きたら足します。消しても間違いが増えない行は削ります。」"
+    }
+  ],
+  "niceToHave": [
+    "hook-b1: in 「守られるのか不安です」 it is unclear whose worry this is (the learner's or the narrator's). Making it a question draws the learner in — 「…とありますが、守られるのか不安です。」→「…とあります。これで本当に守られるのでしょうか。」",
+    "s3-defs: 「案内になります」 does not tell the learner what happens to a path written without @, and the practice depends on this idea — 「`@` を付けずに書いたパスは、取り込まれず案内になります。」→「`@` を付けずに書いたパスは取り込まれず、Claudeが必要なときに開く案内になります。」",
+    "s3-defs / summary-cards: the AGENTS.md condition leaves out `.claude/CLAUDE.md`, which e1's explanation includes. Aligning the wording avoids doubt (factual check for the author) — card-agents back: 「CLAUDE.mdもCLAUDE.local.mdもないとき」→「CLAUDE.md（`.claude/CLAUDE.md` を含む）もCLAUDE.local.mdもないとき」",
+    "s3-code-intro: the text says rules are written as bullets under the header, but s3-code shows only the front matter. Adding one bullet line to the code would match the text, or else change the text — 「その下に、決まりを箇条書きにします。」→「その下に、決まりを箇条書きで足します（上はパスの部分だけの例です）。」",
+    "s4-close: 「本当の守り」 reads like a translation — 「本当の守りは毎回同じように働く「決定的（deterministic）」なものだ、と書いています。」→「確実に守らせるには、毎回同じように働く「決定的（deterministic）」な仕組みが必要だ、と書いています。」",
+    "s5-steps: in ex-local, 「移ります」 differs from 「移します」 in the other steps — 「`CLAUDE.local.md` に移ります。」→「`CLAUDE.local.md` に移します。」",
+    "check-quiz: in the e2 prompt, 「…を実行する」を確実に起こしたい is awkward — 「を確実に起こしたいとき、どうしますか？」→「を毎回確実に実行させたいとき、どうしますか？」",
+    "check-quiz: in e6 c, 「でも」 could mean 'even with' — 「「頼みごとなので、拒否ルールかフックでも止めよう」」→「「頼みごとなので、拒否ルールかフックでも止めておこう」」",
+    "check-quiz: e4's quoted options a and b end in 「こと」, but d ends in 「通す」 — 「「コミットの前に `npm run test:unit` を通す」」→「「コミットの前に `npm run test:unit` を通すこと」」 (keep it in line with the practice answer if the author prefers 「通す」).",
+    "practice-prompt: the copy-paste prompt uses spaced English (「このフォルダーの CLAUDE.md を」) and leaves paths outside backticks. Readers will cope, but the spacing could match the rest of the lesson — 「このフォルダーの CLAUDE.md を整理してください。」→「このフォルダーのCLAUDE.mdを整理してください。」",
+    "practice-answer-why: HTML is an abbreviation used without its full name, though most learners know it — 「HTMLコメントは」→「HTML（HyperText Markup Language）のコメントは」",
+    "glossary: 「コンテキスト」 is the only term without English in its term field. The other entries follow the 「カタカナ（English）」 pattern — term 「コンテキスト」→「コンテキスト（context）」 (keep 「コンテキスト」 as an alias).",
+    "s4-table / s5-steps / check-quiz: 「ルール」 alone names the `.claude/rules/` files, while 「拒否ルール」「許可ルール」 are permission rules. In e3 b, 「ルールへ移す」 could be misread — 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」"
+  ],
+  "average": 3.5,
+  "verdict": "revise",
+  "summary": "The Japanese is warm and natural です・ます, paragraphs are short, the lint is clean, and options and feedback are mostly well formed. The most important fix is the glossary entry for AGENTS.md: it contradicts e1's correct answer. Next, remove the 和文/English spacing that varies across the lesson (「git で」「React と TypeScript で」), spell out API, E2E and DB, and fix the plain-form caption and flashcard plus the option forms in e4 and e5."
+}

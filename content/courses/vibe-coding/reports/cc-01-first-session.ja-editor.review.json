@@ -1,0 +1,136 @@
+{
+  "lessonId": "cc-01-first-session",
+  "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
+  "lessonHash": "sha256:a0e5c8baccf55921",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The body is warm です・ます with no pressure phrases, and lessons:lint --strict is clean. The worked steps give a short reason for each action (ex-ask 「変える前に全体をつかむためです。」), which reads naturally. It does not reach 4 because of the explicit-rule breaks listed in mustFix. There is a space between 和文 and 英数字 throughout the lesson, and the lesson is inconsistent with itself (「PCを閉じても」 vs 「PC を閉じても」). The flashcard backs end in plain form (summary-cards). 「Yes」 is not in 「」 (example-steps). q5 option a is two sentences while the other options are one, and the troubleshoot line in practice-steps can be read two ways.",
+      "blockIds": [
+        "lesson",
+        "summary-cards",
+        "example-steps",
+        "check-quiz",
+        "practice-steps"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. Each segment adds at most 3 new terms (loop 2, surfaces 3, session 3, first-session 2). Every section breaks up its prose with a table, diagram, steps, code, list or check, and wrong-option feedback is at most 2 sentences everywhere."
+    },
+    {
+      "id": "prior",
+      "score": 2,
+      "evidence": "Prerequisites are stated and most terms have a definitions block with English. But 差分 appears in surfaces-table 「エディタで差分を見たい」 and in the q2 feedback (surfaces-check) before it is defined in example-defs. ネイティブインストーラー first appears in surfaces-table without English, which is only given later in install-how. IDE and CLI are never spelled out. The サーフェス definition and the glossary list 「Web」 where the table names クラウドセッション. The mustFix items for surfaces-table, surfaces-check and surfaces-defs lift this to 3.",
+      "blockIds": [
+        "surfaces-table",
+        "surfaces-check",
+        "surfaces-defs",
+        "install-how"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The lesson declares jp only and every string is Japanese, diagram labels included. The diagram has a specific alt and caption, and both links name their destination: 「公式ドキュメントの日本語版」 and 「インストールのトラブルシューティング」."
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "lesson",
+      "issue": "(d) notation (§3): the style guide says 「和文と英数字の間にスペースは入れません」, but the lesson puts a space between Japanese and Latin letters or digits almost everywhere. It is also inconsistent: surfaces-defs and surfaces-table have 「PCを閉じても」 and q2 has 「ノートPCを」, while the q2 feedback has 「PC を閉じても」 and 「自分の PC の上」. Likewise install-lead has 「2026年10月」 but install-needs has 「4GB 以上」.",
+      "fix": "Remove the space between 和文 and 英数字 in every learner-facing string (title, subtitle, prerequisites, objectives, all blocks, glossary). Spaces may stay only around inline code, and the same way everywhere. Examples: 「Claude Code なら」→「Claude Codeなら」, 「Git の commit」→「Gitのコミット」, 「自分の PC の上」→「自分のPCの上」, 「PC を閉じても」→「PCを閉じても」, 「ターミナル CLI」→「ターミナルCLI」, 「IDE 拡張」→「IDE拡張」, 「GitHub のリポジトリ」→「GitHubのリポジトリ」, 「4GB 以上」→「4GB以上」, 「Node.js 22 以上」→「Node.js 22以上」, 「v2.1.283 から」→「v2.1.283から」, 「1-5 の流れ」→「1-5の流れ」, 「Pro プラン」→「Proプラン」, 「auto モード」→「autoモード」. Keep 「`/diff` で」 and 「`claude --version` で」 spaced, as they are now."
+    },
+    {
+      "criterion": "prior",
+      "blockId": "surfaces-table",
+      "issue": "(d) definitions (§2): 差分 is used in the IDE row 「エディタで差分を見たい」, but it is first defined in example-defs (1-5).",
+      "fix": "IDE row, 場面 cell: 「エディタで差分を見たい」→「エディタで変更箇所を見たい」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "surfaces-check",
+      "issue": "(d) definitions (§2): q2 feedback b uses 差分 before it is defined in 1-5.",
+      "fix": "q2 option b feedback: 「VS Code 拡張は、エディタで差分を見ながら進めたいときの入口です。」→「VS Codeの拡張は、エディタで変更箇所を見ながら進めたいときの入口です。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "surfaces-table",
+      "issue": "(d) katakana first use (§2): ネイティブインストーラー first appears in the terminal row without English. The English 「（native installer）」 is only given later, in install-how.",
+      "fix": "Terminal row, 知っておくこと cell: 「ネイティブインストーラーで入れる（1-3）」→「ネイティブインストーラー（native installer）で入れる（1-3）」. In install-how: 「推奨はネイティブインストーラー（native installer）で、」→「推奨はネイティブインストーラーで、」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "surfaces-defs",
+      "issue": "(d) abbreviations (§2): IDE and CLI are never spelled out. (e) naming: the サーフェス definition lists 「Web」, and so does the glossary entry サーフェス. The table, q2 and q6 call that surface クラウドセッション, so a learner may read Web as a fifth surface.",
+      "fix": "In the サーフェス definition: 「ターミナル、IDE、デスクトップアプリ、Web などです。」→「ターミナル、IDE（統合開発環境）、デスクトップアプリ、クラウドセッションなどがあります。」. In surfaces-table, first row: 「ターミナル CLI」→「ターミナルCLI（Command Line Interface）」. In the glossary entry サーフェス: 「ターミナル、IDE、デスクトップアプリ、Web などがあり、」→「ターミナル、IDE、デスクトップアプリ、クラウドセッションなどがあり、」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "surfaces-check",
+      "issue": "(e) naming: the table names one surface 「IDE 拡張（VS Code・JetBrains）」, but q2 offers 「VS Code 拡張」 and 「JetBrains プラグイン」 as two separate options. A learner can take them for surfaces the table did not list, and 「プラグイン」 appears nowhere else.",
+      "fix": "q2 option b: 「VS Code 拡張」→「IDE拡張（VS Code）」. q2 option d: 「JetBrains プラグイン」→「IDE拡張（JetBrains）」. q2 option d feedback: 「JetBrains プラグインは、IDE のターミナルで CLI を動かします。」→「JetBrainsの拡張は、IDEのターミナルでCLIを動かします。」 (option b's feedback is changed by the 差分 fix above)."
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(e) naming: q6 option c 「JetBrains プラグイン」 does not match the table's 「IDE 拡張（VS Code・JetBrains）」.",
+      "fix": "q6 option c: 「JetBrains プラグイン」→「IDE拡張（JetBrains）」. Its feedback: 「JetBrains プラグインは CLI を別に入れる必要があり、」→「JetBrainsの拡張はCLIを別に入れる必要があり、」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) option form (§5): q5 option a (the correct answer) is two sentences 「補完は…提案する。Claude Code は…確かめる」. The other three options are one clause each, so a learner can spot the answer by its form and length.",
+      "fix": "q5 option a: 「補完は開いているファイルの続きを提案する。Claude Code はツールで自分から調べ、変更し、結果を確かめる」→「補完と違い、Claude Codeはツールで自分から調べ、変更し、結果を確かめる」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "example-steps",
+      "issue": "(d) notation (§3): the on-screen label Yes in ex-change expect is not in 「」 (「画面上の文言は「」で囲みます」).",
+      "fix": "ex-change expect: 「読んでから Yes を選びます。」→「読んでから「Yes」を選びます。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "practice-steps",
+      "issue": "(a) meaning: p-start troubleshoot 「`claude` が見つからないときは、新しいターミナルで試します。それでも出るときは、…」 has no subject for 出る. It can be read as 「claude が出る（見つかる）とき」, the opposite of what is meant.",
+      "fix": "p-start troubleshoot: 「それでも出るときは、」→「それでも見つからないときは、」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "summary-cards",
+      "issue": "(d) です・ます (§1): card-loop ends 「繰り返します。」, but the other backs end in plain form or 体言止め: 「確かめられるから。」「成功。」「不要。」「会話だけ。」「先に push する。」. card-version also writes the output in half-width parentheses inside Japanese text: 「(Claude Code) と出れば」.",
+      "fix": "card-tool: 「…変更して確かめられるから。」→「…変更して確かめられるからです。」. card-version: 「`claude --version`。バージョン番号のあとに (Claude Code) と出れば成功。」→「`claude --version` です。バージョン番号のあとに `(Claude Code)` と出れば成功です。」. card-node: 「npm で入れるときだけ（22 以上）。推奨のネイティブインストーラーには不要。」→「npmで入れるときだけです（22以上）。推奨のネイティブインストーラーでは要りません。」. card-carry: 「…開き直した会話だけ。」→「…開き直した会話だけです。」. card-cloud: 「クラウドセッション。GitHub のリポジトリを複製して動くので、先に push する。」→「クラウドセッションです。GitHubのリポジトリを複製して動くので、先にpushしておきます。」"
+    }
+  ],
+  "niceToHave": [
+    "lesson: Objective o2 is the first place CLI and IDE appear. If you want the full names at the true first use, write them there too — 「ターミナル CLI・IDE 拡張」→「ターミナルCLI・IDE（統合開発環境）拡張」",
+    "lesson: The prerequisites write commit in English, but the body always says コミット. This also gives the katakana term its English at first use — 「Git の commit の意味がわかる」→「Gitのコミット（commit）の意味がわかる」",
+    "lesson: 「Console アカウント」 (prerequisites, install-needs, q7) is never explained, so a beginner cannot tell what it is. If the source supports it, add a short gloss — 「Console アカウント」→「Console（API用の管理画面）のアカウント」",
+    "loop-lead: The sentence does not say what is being compared — 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
+    "surfaces-lead: 「も」 assumes the learner already knows the terminal is the default — 「Claude Code は、エディタやアプリからも使えます。」→「Claude Codeは、ターミナルだけでなく、エディタやアプリからも使えます。」",
+    "surfaces-same: 「エンジン」 is a katakana word with no explanation — 「どれも同じエンジンなので、」→「どれも中身は同じなので、」",
+    "install-how: 「推奨は〜で、自動で更新されます」 makes the installer sound like the thing that updates. Split into two sentences — 「推奨はネイティブインストーラー（native installer）で、自動で更新されます。」→「推奨はネイティブインストーラーです。この方法で入れると、Claude Codeが自動で更新されます。」",
+    "install-node: npm appears with no explanation — 「npm で入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
+    "session-defs: 「作業メモリ」 (context window) sits right next to 「自動メモリ」, and install-needs uses 「メモリ」 for RAM. A learner may think they are the same thing — 「セッションの作業メモリです。」→「セッションの作業スペースです。」 (the glossary entry コンテキストウィンドウ likewise)",
+    "session-fresh: One sentence carries two ideas — 「新しいセッションは毎回まっさらな[[コンテキスト]]で始まり、引き継がれるのは次の3つだけです（第5・6回で扱います）。」→「新しいセッションは、毎回まっさらな[[コンテキスト]]で始まります。引き継がれるのは次の3つだけです（第5・6回で扱います）。」",
+    "hook-predict: q0 option d uses 「セッション」 before it is defined in 1-4. Everyday meaning carries it in a predict question, but a plainer word avoids the forward reference — 「前回のセッションで読んだ内容を思い出して答える」→「前回起動したときに読んだ内容を思い出して答える」",
+    "session-check: q3 option c (the correct one) is clearly longer than the others, which hints at the answer — 「昨日の会話は見えないので、配色を伝え直すか、前のセッションを開き直す必要がある」→「昨日の会話は見えないので、伝え直すか開き直す必要がある」",
+    "example-mode: 「③が大切です」 makes the learner look up what ③ was — 「③が大切です」→「③の差分の確認が大切です」",
+    "practice-steps: p-change hint mentions the Esc key in prose only. §3 asks for key presses in `steps[].keys` (「Esc キーで止めて」 can stay in the hint text). PATH in the p-start troubleshoot is not explained either: 「PATH の直し方」→「PATH（コマンドを探す場所の設定）の直し方」",
+    "check-quiz: q7 uses 「Free プラン」 in the prompt and option c, but the feedback and install-needs say 「無料プラン」. A learner still matches them, but one name reads better — 「Free プランのまま」→「無料（Free）プランのまま」 (prompt and option c)",
+    "check-quiz: q9 option c says 「あとで直す」 and its feedback 「後で探す」. Unify the spelling — 「後で探す」→「あとで探す」",
+    "summary-cards: card-carry adds `--resume`, which the body never mentions (session-carry says only 「`claude --continue` などで」). Either drop it or name it in the body — 「`--continue` や `--resume` で開き直した会話だけ」→「`--continue` などで開き直した会話だけです」",
+    "lesson: Glossary entries start with 体言止め (「Claude Code の動き方。」「Claude が実行できる操作。」), while the definitions blocks use です. This is optional for a glossary, but it could match the body — 「Claude Code の動き方。」→「Claude Codeの動き方です。」 (and likewise in the other entries)",
+    "lesson: Factual doubt, not a wording issue: the glossary entry 権限モード says 「ターミナルのセッションは auto モードで始まります」, but example-mode says 「セッションは auto モードという権限モード（permission mode）で始まります」 with no terminal limit. Check cc-glossary and make the two say the same thing.",
+    "example-habit: Factual doubt: check that ai-skills-rct supports 「あとのテストでも高い点を保ちました」 (in particular 「あとの」, a later test) and not only 「テストで高い点だった」. If it does not, write 「テストで高い点をとりました」."
+  ],
+  "average": 3.25,
+  "verdict": "revise",
+  "summary": "The Japanese is warm, plain and well paced: each worked step gives its reason in one short sentence, and lint is clean. The biggest fixes are lesson-wide notation (no space between 和文 and 英数字, now inconsistent even within the lesson) and terms in 1-2 used before their definition or English gloss: 差分, ネイティブインストーラー, IDE and CLI, plus 「Web」 vs クラウドセッション and 「JetBrains プラグイン」 vs 「IDE 拡張」. After that, put the flashcard backs into です・ます. prior is at 2 until the 1-2 fixes are applied."
+}
