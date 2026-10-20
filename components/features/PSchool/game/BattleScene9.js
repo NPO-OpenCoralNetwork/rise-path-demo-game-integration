@@ -137,10 +137,8 @@ export class BattleScene9 extends BattleScene {
   
   // ステージ9専用の敵ターン処理（50ダメージ）
   async enemyTurn() {
-    // 麻痺状態チェック
-    if (this.paralyzeTurns > 0) {
-      this.addLog("敵は麻痺で動けない！");
-      this.decreaseParalyzeEffect();
+    // 麻痺状態チェック（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed("敵は麻痺で動けない！")) {
       return;
     }
 

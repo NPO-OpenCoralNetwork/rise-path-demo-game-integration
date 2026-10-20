@@ -63,6 +63,11 @@ export class BattleScene6 extends BattleScene {
 
   // 敵のターン処理をオーバーライド
   async enemyTurn() {
+    // 麻痺している間は動けない（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
+      return;
+    }
+
     // 毒の玉を吐く（当たってから HP を減らす）
     await this.playAnimation('enemyAttack_poison');
     // 演出を待つ間に画面を離れていたら、何もしない

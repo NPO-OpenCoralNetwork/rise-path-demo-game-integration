@@ -153,6 +153,11 @@ export class BattleScene7 extends BattleScene {
 
   // 敵のターン処理
   async enemyTurn() {
+    // 麻痺している間は動けない（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
+      return;
+    }
+
     // 体当たり：大きく踏み込んでぶつかる
     await this.playAnimation('enemyAttack');
     

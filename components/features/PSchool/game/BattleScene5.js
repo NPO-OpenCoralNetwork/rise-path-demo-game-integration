@@ -65,11 +65,8 @@ export class BattleScene5 extends BattleScene {
 
   // 敵のターン処理をオーバーライド
   async enemyTurn() {
-    // 敵が麻痺状態かチェック
-    if (this.enemy.isParalyzed) {
-      this.addLog(`${this.enemy.name}は麻痺して動けない！`);
-      this.enemy.isParalyzed = false;
-      
+    // 敵が麻痺状態かチェック（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
       // ターンカウントは増やす（麻痺でもターンは消費）
       this.turnCount++;
       this.updateTurnCounter();

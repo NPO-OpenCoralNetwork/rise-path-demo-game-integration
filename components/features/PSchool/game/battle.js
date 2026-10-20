@@ -143,6 +143,11 @@ export class BattleScene extends Phaser.Scene {
     this.hpNumbersReady = false;
     // 何回目の戦いか。やり直したあとで、前の戦いの続きの処理が新しい戦いに触れないようにする
     this.battleId = (this.battleId ?? 0) + 1;
+    // 敵の麻痺は1回の戦いの中だけ（前の戦いで残った麻痺を、次の戦いの敵に引き継がない）
+    this.isEnemyParalyzed = false;
+    this.paralyzeRemainingTurns = 0;
+    this.paralyzeStatusText = null;
+    window.globalParalysisState = null;
 
     // バトル統計の初期化
     this.battleStats = {
@@ -1675,6 +1680,15 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  // 敵が麻痺していたら、このターンは行動しない（残りターンを1減らす）。行動しなかったら true を返す。
+  // 敵のターンを独自に持つステージ（4〜7・9）も、最初にこれを呼ぶ
+  skipTurnIfParalyzed(message = '⚡ 敵は麻痺状態で行動できません') {
+    if (!(this.isEnemyParalyzed && this.paralyzeRemainingTurns > 0)) return false;
+    this.addLog(message);
+    this.decreaseParalyzeEffect();
+    return true;
+  }
+
   // 敵のターン処理（グローバル）
   async enemyTurn() {
     console.log('BattleScene.enemyTurn() called (global)');
@@ -1698,9 +1712,7 @@ export class BattleScene extends Phaser.Scene {
     }
     
     // 麻痺状態チェック
-    if (this.isEnemyParalyzed && this.paralyzeRemainingTurns > 0) {
-      this.addLog('⚡ 敵は麻痺状態で行動できません');
-      this.decreaseParalyzeEffect();
+    if (this.skipTurnIfParalyzed()) {
       console.log('Enemy paralyzed, skipping turn');
       return; // 麻痺中は敵の行動を完全にスキップ
     }
