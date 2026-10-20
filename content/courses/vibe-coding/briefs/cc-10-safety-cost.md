@@ -17,8 +17,8 @@ owner's decision (report §7 「公開時の形」).
 
 ## 範囲 / Scope
 - 扱う / in:
-  - プロンプトインジェクションと、公式ドキュメント（Security）の5つの対策（承認前にコマンドを読む、信頼できない内容をそのまま流し込まない、重要なファイルの変更を確かめる、スクリプトやツールの実行は VM で、`/feedback` で報告）。auto モード（v2.1.283 から対話セッションの既定）でも分類器に見逃しがある（行き過ぎた操作の17%）。
-  - ワークスペースの信頼（許可ルールは承認まで効かない、拒否・確認ルールは承認前から効く、`claude -p` は確認なしでフックや設定を使う）。信頼できないリポジトリには VM かクラウドセッション。`bypassPermissions` はネットにつながらないコンテナや VM だけ。
+  - プロンプトインジェクションと、公式ドキュメント（Security）の5つの対策（承認前にコマンドを読む、信頼できない内容をそのまま流し込まない、重要なファイルの変更を確かめる、スクリプトやツールの実行は VM で、`/feedback` で報告）。auto モード（v2.1.283 からターミナルと VS Code の対話セッションの既定）でも分類器に見逃しがある（2026年3月の公式記事の検証で、行き過ぎた操作の17%）。
+  - ワークスペースの信頼（許可ルールは承認まで効かない、拒否・確認ルールは承認前から効く、`claude -p` は確認なしでリポジトリのフックや `.mcp.json` のサーバーを使う）。信頼できないリポジトリには VM かクラウドセッション。`bypassPermissions` はネットにつながらないコンテナや VM だけ。
   - サンドボックス：既定オフ、`/sandbox`、macOS は Seatbelt、Linux・WSL2 は bubblewrap、ネイティブの Windows は対象外、守るのはシェルコマンドだけ。
   - 拒否ルール：`Read(./.env)`・`Read(./.env.*)`・`Read(./secrets/**)`（公式の例）、gitignore と同じパターン、置き場所（プロジェクトの `.claude/settings.json`）、`/permissions` での確認、効かない書き方（`Write(...)` のパスのルール、`.claudeignore`、先頭 `/` 1つ）、ホームからは `~/`・絶対パスは `//`、届かない経路（自分でファイルを開くスクリプト → サンドボックス）。
   - データの行き先（短く）：隔離しても送る中身は同じ。個人向け（Pro・Max）は学習への利用を本人が選ぶ、法人向け（Team・Enterprise・API）は既定で使われない、手元の `~/.claude/projects/` に会話の記録が平文で既定30日。保存期間と `/privacy-settings` は本文の字数の都合で扱わない。
@@ -34,13 +34,13 @@ owner's decision (report §7 「公開時の形」).
   7. 「`/usage` の金額が請求額」「`/compact` をこまめにすれば節約になる」（e5 b, e6 a）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（契約の式：本文 2,690字 ÷ 450 ≈ 6.0分、問題 11問 × 40秒 ≈ 7.3分、演習 3課題 × 2分 = 6分、合計 19.3分）
+- 所要時間 / minutes: 17（measure.mjs: `cc-10-safety-cost.lesson.json: prose 1735 (budget 1,200–2,400) · read 2356 · practice reading 1072 · questions 11 · practice sections 1 · est 17.0 min (must be ≤ 20; estMinutes 17)`）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（cc-* 共通の決定。英語版は公開するコースが決まってから）
 - 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。
 
 ## 制約 / Constraints
-- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。auto モードが対話セッションの既定になったのは v2.1.283 から。
+- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。auto モードがターミナルと VS Code の対話セッションの既定になったのは v2.1.283 から。
 - OS / environment: macOS・Linux・WSL2 のターミナル。サンドボックスはネイティブの Windows では使えないことを本文で伝える。
 - 使ってはいけないもの / avoid: 価格（料金ページへのリンクだけ）、本物の鍵や `.env` の値、破壊的なコマンド、大事なリポジトリでの演習、確かめていない UI の文言（`/status` や拒否時の表示の文言は書かない）。
 
@@ -48,7 +48,7 @@ owner's decision (report §7 「公開時の形」).
 All checked 2026-10-20 (facts file `facts-cc-10-safety-cost.md`, plus the official pages re-read for the deny-rule syntax).
 - `cc-security` — Security — https://code.claude.com/docs/en/security — Anthropic (five practices, trust dialog, MCP not audited)
 - `cc-permissions` — Configure permissions — https://code.claude.com/docs/en/permissions — Anthropic (Read/Edit patterns, gitignore syntax, `/path` anchoring, what deny rules don't reach, workspace trust, `-p`). Re-read 2026-10-20 for the round-1 fixes; the page says: "`//path` | Absolute path from filesystem root", "`~/path` | Path from home directory", "`/path` | Path relative to the settings source", "`path` or `./path` | Path relative to current directory"; "A deny rule such as `Read(/secrets/**)` in user settings blocks `~/.claude/secrets/**`, not a `secrets` directory in your project. To write a rule in user settings that applies inside every project, use a `//` absolute path or a `~/` home-relative path instead."; "Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee`, and to the targets of Bash redirections … They don't apply to … a Python or Node script that opens files itself."; "A `Read` deny rule also blocks the Edit and Write tools on the same path"; "If your project has a `.claudeignore` file, it has no effect".
-- `cc-permission-modes` — Choose a permission mode — https://code.claude.com/docs/en/permission-modes — Anthropic (auto default v2.1.283, bypassPermissions only in isolated environments, root/sudo refused)
+- `cc-permission-modes` — Choose a permission mode — https://code.claude.com/docs/en/permission-modes — Anthropic (auto default v2.1.283 for interactive terminal and VS Code sessions, bypassPermissions only in isolated environments, start as root/sudo refused on Linux and macOS)
 - `cc-sandboxing` — Configure the sandboxed Bash tool — https://code.claude.com/docs/en/sandboxing — Anthropic
 - `cc-sandbox-environments` — Choose a sandbox environment — https://code.claude.com/docs/en/sandbox-environments — Anthropic (VM or cloud session for untrusted repos; isolation doesn't change what is sent)
 - `cc-settings-reference` — Settings reference — https://code.claude.com/docs/en/settings-reference — Anthropic (paste-ready `permissions.deny` example with `Read(./.env)`, `Read(./.env.*)`, `Read(./secrets/**)`; `cleanupPeriodDays`)
@@ -57,7 +57,7 @@ All checked 2026-10-20 (facts file `facts-cc-10-safety-cost.md`, plus the offici
 - `cc-model-config` — Model configuration — https://code.claude.com/docs/en/model-config — Anthropic (effort: "lets the model decide whether and how much to think on each step … Lower effort is faster and cheaper")
 - `cc-commands` — Commands — https://code.claude.com/docs/en/commands — Anthropic (`/usage` aliases, `/privacy-settings`)
 - `cc-authentication` — Authentication — https://code.claude.com/docs/en/authentication — Anthropic (`ANTHROPIC_API_KEY` precedence, `-p`, `/status`)
-- `auto-mode-eng` — How we built Claude Code auto mode — https://www.anthropic.com/engineering/claude-code-auto-mode — Anthropic (17% false negatives on real overeager actions)
+- `auto-mode-eng` — How we built Claude Code auto mode — https://www.anthropic.com/engineering/claude-code-auto-mode — Anthropic (17% false negatives on real overeager actions, measured on the pipeline described in the March 2026 post)
 - `cc-pro-max-help` — Use Claude Code with your Pro or Max plan — https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan — Anthropic (Claude Help Center) (five-hour and weekly limits, shared with Claude)
 - `pricing` — Claude pricing — https://claude.com/pricing — Anthropic (linked, no prices in the lesson)
 - Japanese pages linked in prose: https://code.claude.com/docs/ja/security
@@ -67,7 +67,7 @@ All checked 2026-10-20 (facts file `facts-cc-10-safety-cost.md`, plus the offici
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：知らないリポジトリと、残ったAPIキー | 知らないリポジトリを clone し、`ANTHROPIC_API_KEY` が残ったまま「README のとおりに準備して」と頼もうとしている | markdown (3 scene sentences, API spelled out, + lead-in question), quiz predict (multi) | `q0` → o1 (ungraded) |
-| `s1` | concept | 10-1. 外の文章に紛れた指示 | 外部の文章は指示になりうる。公式の5つの対策。auto モード（v2.1.283 から対話の既定）も万能ではない | markdown, definitions (プロンプトインジェクション), markdown (docs link, "Claude Code changes often"), list number (5 practices, VM glossed), callout warning (17%), quiz inline | `q1` → o1 (analyze: a web page proposes `curl … \| bash`) |
+| `s1` | concept | 10-1. 外の文章に紛れた指示 | 外部の文章は指示になりうる。公式の5つの対策。auto モード（v2.1.283 からターミナルと VS Code の対話の既定）も万能ではない | markdown, definitions (プロンプトインジェクション), markdown (docs link, "Claude Code changes often"), list number (5 practices, VM glossed), callout warning (17%, dated to the March 2026 official post), quiz inline | `q1` → o1 (analyze: a web page proposes `curl … \| bash`) |
 | `s2` | concept | 10-2. 知らないリポジトリと強い権限は、隔離する | 信頼の確認とサンドボックスの範囲を知り、知らないリポジトリと強い権限は隔離して使う | markdown, definitions (ワークスペースの信頼, サンドボックス), markdown (`/sandbox`, Seatbelt / bubblewrap, not native Windows, hooks and MCP outside), markdown (VM or cloud session, `claude -p`), diagram (layers: VM ⊃ Claude Code ⊃ sandbox around shell commands; 5 nodes, 2 subgraphs), table (場面 → 起きうること → 対策, 3 rows), quiz inline | `q2` → o1 (analyze: how to try an unknown repo) |
 | `s3` | example | 10-3. 秘密情報を読ませない拒否ルールを書く | 拒否ルールのパスで秘密情報を守る（worked example: `config/credentials.json` と `keys/`） | markdown, steps (4 subgoals with the why), code json `.claude/settings.json`, callout pitfall (`Write(...)`, `.claudeignore`; `~/` home, `//` absolute, single `/` is not absolute; scripts → sandbox), quiz inline | `q3` → o2 (apply: `certs/**`) |
 | `s4` | concept | 10-4. データの行き先を知る | VMなどで隔離しても、Anthropicに送られる中身は変わらない。個人向けは会話をモデルの学習に使うかを選べる、法人向けは既定で使われない。手元に暗号化されない記録が30日 | markdown ×2 | — |
@@ -84,10 +84,8 @@ and the why) before practice; practice with checklist, hints (and troubleshoot o
 (rule JSON, review prompt expect); exam covers o1–o3 twice each, with transfer items (e1, e5); every objective also has
 an inline question; summary 3 points; 7 flashcards. One diagram (structure: which layer covers what). No images.
 
-Body length (JP characters without whitespace; markdown, callouts, definitions, list items, table cells, steps md /
-expect / hint / troubleshoot, checklist labels, summary points; quizzes, prompts and code blocks excluded, inline code
-text counted): **2,690** after the round-1 fixes (was 2,390). With inline code also excluded, as contract §3 counts
-"code excluded": 2,231.
+Body length: the course-wide measure (`measure.mjs`, see the Format line) gives prose 1,735 (budget 1,200–2,400)
+and est 17.0 min after the fact-audit fixes.
 
 ## Assumptions
 - Headless run: the outline above was used as is.
@@ -100,8 +98,14 @@ text counted): **2,690** after the round-1 fixes (was 2,390). With inline code a
   The lesson does not claim more about how deep `./`-anchored patterns match than the docs state.
 - Body budget: model answers live in `prompt.expect` and code blocks, which the measurement used for earlier
   vibe-coding lessons does not count as body text.
-- 「auto モードは、v2.1.283 から対話セッションの既定」 shortens the docs' "interactive terminal and VS Code sessions"
-  (HIPAA-configured organisations start in Manual). The callout keeps the short form for the body budget.
+- The callout scopes the auto default to 「ターミナルとVS Codeの対話セッション」 as the docs do (Desktop and cloud
+  sessions are separate; HIPAA-configured organisations start in Manual, not mentioned). The 17% figure is dated to
+  the March 2026 engineering post, which measured an earlier classifier pipeline; the lesson does not claim it for
+  today's classifier.
+- Fact-audit fixes (2026-10-20): `claude -p` is said to run the repository's hooks and `.mcp.json` servers without
+  asking (not "settings": allow rules are not used in `-p`); the project `.claude/settings.json` reaches teammates
+  once committed; the deny-rule check expects Read tool and `cat` reads to be refused (not "Claude cannot read
+  it"); the root/sudo refusal is scoped to starting `bypassPermissions` on Linux and macOS.
 - Round-1 fixes: the hook now spells out API in a third scene sentence, followed by the lead-in question
   「何が起こりうるでしょうか。」. The permissions page (re-read 2026-10-20) supports the original e3 key and the
   `cat`/`head` and Edit/Write claims, but e3 now tests `~/` (taught in s3-pitfall) and e4 and q3 no longer rely on the

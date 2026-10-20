@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:97684549e204b6ab",
+  "lessonHash": "sha256:a5c974718e314f36",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,18 +9,19 @@
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The body text is warm です・ます with no pressure phrases, and `lessons:lint --strict` is clean. Two rule breaks keep it at 3: the flashcards switch to plain form (sum-cards 「作業の前後で見比べる。」「覚えている？」), and the whole lesson puts a half-width space between Japanese and Latin words (「README の手直し」「Claude は」), which §3 forbids.",
+      "evidence": "The lesson is warm です・ます throughout, and the flashcards are now です・ます too (sum-cards 「`/context` です。作業の前後で見比べます。」「覚えていません。」). It has no pressure phrases, and `lessons:lint --strict` is clean (0 errors, 0 warnings). There is no longer a space between Japanese and Latin words in running text (「READMEの手直し」「午後のClaudeは」). Two things keep voice at 3. First, q4 uses 『』 for plain quotes where §3 calls for 「」 (『123-4567』, 『さっき』). Second, a few spots read stiffly: 「よい最初の依頼」 in ex-fix, the subject-less feedback on q4 d, and the weak causal link in the e4 b feedback.",
       "blockIds": [
+        "s5-check",
+        "s5-steps",
+        "check-quiz",
         "sum-cards",
-        "hook-problem",
-        "s1-context",
-        "s3-lead"
+        "hook-problem"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lint reports no sentence-length or paragraph-length findings. Every concept section ends in an inline check, and the dense facts are in tables (s2-table, s3-table, s4-table) and a diagram (s3-diagram), not in long paragraphs.",
+      "evidence": "measure.mjs gives prose 1942 (budget 1,200–2,400), est 19.6 min (≤ 20), and estMinutes is 20, which matches. Lint reports no sentence-length or paragraph-length findings. Each concept section ends with an inline check. The dense facts sit in tables (s2-table, s3-table, s4-table) and a diagram (s3-diagram), not in long paragraphs.",
       "blockIds": [
         "s2-table",
         "s3-table",
@@ -30,101 +31,54 @@
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Prerequisites are listed, earlier lessons are recalled (「第1回で見たコンテキストウィンドウ」, 「（第4回）」), and the definitions match the glossary. Several katakana terms and abbreviations still appear without English or the full name at first use: プランモード (s3-diagram), デプロイ and CSS (p1), リポジトリ (p3), API (s2-focus), CSV (s5-lead), WSL (pr-part2).",
+      "score": 4,
+      "evidence": "All of last round's first-use gaps are fixed: 「プランモード（plan mode）」 (s3-diagram, plus alt), 「デプロイ（deploy）」 (p1, where CSS was replaced by 「ボタンの色の付け方」), 「リポジトリ（repository）」 (p3), 「API（Application Programming Interface）」 (s2-focus), 「CSV（Comma-Separated Values）」 (s5-lead), 「WSL（Windows Subsystem for Linux）」 (pr-part2). The definitions match the glossary terms, earlier lessons are recalled with their numbers, and the prerequisite titles match the cc-01 to cc-04 titles. Only small gaps remain: タイムゾーン in ex-learn, and /btw in the p1 explanation, which is not explained further.",
       "blockIds": [
-        "s1-lead",
-        "s1-defs",
-        "s3-defs",
         "s3-diagram",
-        "p1",
-        "p3",
+        "pr-diagnose",
         "s2-focus",
         "s5-lead",
-        "pr-part2"
+        "pr-part2",
+        "s1-defs",
+        "s3-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is jp only and complete. The diagram has a Japanese caption and a full alt text (s3-diagram). The only link names its destination: 「コンテキストウィンドウの公式ドキュメント（日本語）」 (s3-fix).",
+      "evidence": "The lesson is jp only and complete. The diagram has a Japanese caption and a full alt text that includes 「プランモード（plan mode）」 (s3-diagram). The link text names its destination: 「コンテキストウィンドウの公式ドキュメント（日本語）」 (s3-fix). Plain-text fields such as checklist labels and askTutor suggestions use no markdown.",
       "blockIds": [
         "s3-diagram",
-        "s3-fix"
+        "s3-fix",
+        "pr-checklist",
+        "sum-ask"
       ]
     }
   ],
   "mustFix": [
     {
       "criterion": "voice",
-      "blockId": "sum-cards",
-      "issue": "(d) です・ます: several flashcard fronts and backs are in plain form (「作業の前後で見比べる。」「始める。」「要約する。」「書き直す。」「受け取る。」「どうする？」「覚えている？」「覚えていない。」). The rest of the lesson is です・ます.",
-      "fix": "card-context back 「`/context`。作業の前後で見比べる。」→「`/context` です。作業の前後で見比べます。」; card-clear back 「`/clear` で会話を空にしてから始める。」→「`/clear` で会話を空にしてから始めます。」; card-compact back 「焦点を付けた `/compact` で要約する。」→「焦点を付けた `/compact` で要約します。」; card-corrections back 「`/clear` し、学んだことを入れて最初の依頼を書き直す。」→「`/clear` し、学んだことを入れて最初の依頼を書き直します。」; card-subagent front 「範囲の広い調べものは、どうする？」→「範囲の広い調べものは、どうしますか？」, back 「範囲を絞るか、サブエージェントに任せて要約だけ受け取る。」→「範囲を絞るか、サブエージェントに任せて要約だけを受け取ります。」; card-session front 「新しいセッションは、前の会話を覚えている？」→「新しいセッションは、前の会話を覚えていますか？」, back 「覚えていない。続きは `claude --continue` か `claude --resume` で開き直す。」→「覚えていません。続きは `claude --continue` か `claude --resume` で開き直します。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(d) notation §3: throughout the lesson there is a half-width space between Japanese and Latin letters or digits outside inline code (「README の手直し」「Claude は」「CLAUDE.md を」「CSV ファイル」「セッション A」). §3 says 和文と英数字の間にスペースは入れません; only inline code may keep spaces. The lesson is also inconsistent within itself: 「セッション A」 (p1–p3) but 「依頼文A」 (pr-prompt-a, pr-compact).",
-      "fix": "In every learner-facing string except inside code, prompt bodies and inline code, delete the space between Japanese and Latin letters or digits. Examples: 「README の手直し」→「READMEの手直し」, 「午後の Claude は」→「午後のClaudeは」, 「Claude Code の不具合」→「Claude Codeの不具合」, 「プロジェクト直下の CLAUDE.md を編集しても」→「プロジェクト直下のCLAUDE.mdを編集しても」, 「CSV ファイル」→「CSVファイル」, 「セッション A：」→「セッションA：」 (and B, C), 「Git の commit」→「Gitのcommit」. Keep the spaces around inline code (「`/context` を実行」 stays as is) and use them the same way everywhere. If the cc series decides to keep spaces as its convention, change §3 of style-guide.ja.md instead and record that decision."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s3-diagram",
-      "issue": "(d) katakana term without English at first use (§2): 「プランモード」 first appears in the s3-diagram label and then in s3-table, both times with no English. The sibling lesson cc-02 writes 「プランモード（plan mode）」.",
-      "fix": "s3-diagram node C label 「自動メモリ・プランモードの計画」→「自動メモリ・プランモード（plan mode）の計画」. Do the same in alt and nowhere else. Later uses stay 「プランモード」."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "p1",
-      "issue": "(d) katakana term without English at first use (§2): 「デプロイの手順」. §2 uses this exact word as its example (デプロイ（deploy）). (d) abbreviation not spelled out at first use (§2): 「CSS」, which only appears here and in the explanation.",
-      "fix": "prompt 「今度はデプロイの手順も質問しました。」→「今度はデプロイ（deploy）の手順も質問しました。」; prompt 「「この CSS の書き方は古い？」と聞きました。」→「「このボタンの色の付け方は古い？」と聞きました。」; explanation 「CSS のようなその場の質問は」→「ボタンの色のようなその場の質問は」. This keeps the point that the question is unrelated to the task."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "p3",
-      "issue": "(d) katakana term without English at first use (§2): 「リポジトリ」 appears only here, with no English.",
-      "fix": "「「このリポジトリが遅い理由を調べて」とだけ頼みました。」→「「このリポジトリ（repository）が遅い理由を調べて」とだけ頼みました。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s2-focus",
-      "issue": "(d) abbreviation not spelled out at first use (§2): 「API」 first appears in the focus example and later in e4, and is never written out.",
-      "fix": "「焦点は、`/compact API の変更を中心に残して` のように書きます。」→「焦点は、`/compact API の変更を中心に残して` のように書きます。API（Application Programming Interface）の変更点を、要約に残すよう頼む例です。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s5-lead",
-      "issue": "(d) abbreviation not spelled out at first use (§2): 「CSV」.",
-      "fix": "「CSV ファイルを読み込む関数を頼んだ場面です。」→「CSV（Comma-Separated Values）ファイルを読み込む関数を頼んだ場面です。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "pr-part2",
-      "issue": "(d) abbreviation not spelled out at first use (§2): 「WSL」.",
-      "fix": "「コマンドは macOS・Linux・WSL のターミナルの例です。」→「コマンドは macOS・Linux・WSL のターミナルの例です。WSL（Windows Subsystem for Linux）は、Windows で Linux を動かす仕組みです。」"
+      "blockId": "s5-check",
+      "issue": "(d) notation §3: quoted phrases and on-screen wording go in 「」, but q4 uses 『』 even where nothing is nested (prompt 『123-4567』, option c feedback 『さっき』). The rest of the lesson uses 「」 for the same kind of quote (q1 d 「どれくらい使った？」).",
+      "fix": "prompt 「郵便番号を『123-4567』の形に整える関数を」→「郵便番号を「123-4567」の形に整える関数を」; option a 「郵便番号を『123-4567』の形に整える関数を、今度こそ」→「郵便番号を「123-4567」の形に整える関数を、今度こそ」; option b 「郵便番号を『123-4567』の形に整える関数を作って。」→「郵便番号を「123-4567」の形に整える関数を作って。」; option c feedback 「『さっき』では何も伝わりません。」→「「さっき」では何も伝わりません。」"
     }
   ],
   "niceToHave": [
-    "s1-lead: the comma breaks the clause in an awkward place — 「第1回で見たコンテキストウィンドウが、埋まると何が起きるかを確かめます。」→「第1回で見たコンテキストウィンドウが埋まると、何が起きるかを確かめます。」",
-    "s1-lead: factual doubt; I cannot confirm the version string. Check it against the release notes before publishing — 「（Claude Code v2.1.304）」→ the version you actually checked",
-    "s1-context: 「グリッド」 is a katakana word with no English, and plain Japanese is clearer — 「色分けしたグリッドで使用量が表示され」→「色分けしたマス目で使用量が表示され」",
-    "q1: the lesson mixes 「後」 and 「あと」 (「読ませた後に」 here, 「圧縮のあと」「そのあと」 elsewhere) — 「読ませた後に一度だけ」→「読ませたあとに一度だけ」, 「読ませる前と後に」→「読ませる前とあとに」, 「読ませた後に、Claude に」→「読ませたあとに、Claude に」",
-    "s2-cost: 「利用量」 sits next to 「使用量」 (the context usage) and could be read as the same thing. Name the cost side directly — 「長いセッションほど利用量も増えます。」→「長いセッションほど、料金や利用枠の消費も増えます。」",
-    "hook-predict: the option endings are mixed: a/b explain a cause in the past tense, c/d end 「〜すれば直る」. Align them as causes — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Code の不具合なので、入れ直せば直る」→「Claude Code の不具合が起きていた」 (the feedback still fits)",
-    "q2 / p1 / p2 / e6: the 「そのまま／何もしない」 distractors have two sentences while the other options have one. Fold each into one clause, for example q2 b 「そのまま頼む。前の会話が多いほど、翻訳もうまくいく」→「前の会話が多いほど翻訳もうまくいくので、そのまま頼む」",
-    "s3-diagram: node C says 「CLAUDE.md」 in general, but s3-table says subfolder CLAUDE.md is not read back right away. Match the table — 「CLAUDE.md・paths: のないルール」→「直下の CLAUDE.md・paths: のないルール」",
-    "s3-fix: 「版」 reads stiff in a software context — 「残るものは、版によって変わることがあります。」→「残るものは、バージョンによって変わることがあります。」",
-    "q3: redundant wording in option a — 「CLAUDE.md をもう一度作り直す」→「CLAUDE.md を作り直す」",
-    "lesson: compaction-related names vary but clearly mean the same things: 「会話だけの指示」「会話の中だけで伝えた指示」「会話の中だけの指示」「会話の指示」 (pr-compact), and 「自動のコンテキスト圧縮」 / 「自動の圧縮」. Settling on one form reads more cleanly — pr-compact 「会話の指示を焦点に入れないのは」→「会話だけの指示を焦点に入れないのは」",
-    "s4-prompt / s3-table / pr-lead: 「フォルダー」 (s4-prompt hint) and 「フォルダ」 (サブフォルダ, 練習用フォルダ) are mixed — 「src/auth/ フォルダー」→「src/auth/ フォルダ」",
-    "ex-pattern: 「決まります」 sounds odd for a diagnosis — 「修正の繰り返しだと決まります。」→「修正の繰り返しだとわかります。」",
-    "q4: 「くり返し」 here and 「繰り返し」 in the pattern name (s4-table) — 「同じ失敗をくり返しにくくなります」→「同じ失敗を繰り返しにくくなります」",
-    "pr-prompt-b: 「このページ」 is vague after compaction (which page?) — 「このページについて説明する about.html を追加してください。」→「このサイトについて説明する about.html を追加してください。」",
-    "e1: 「公式は」 shortens the name used everywhere else, and 「きれいなセッション」 is a calque of 'clean session' — c feedback 「公式は、2回失敗したら」→「公式のガイドは、2回失敗したら」; explanation 「きれいなセッションで始め直すほうが」→「新しい会話で始め直すほうが」",
-    "sum-cards: card-constraint front adds 「いちばん大きな」, which s1-why does not say (it says the tips come from one constraint) — 「公式のガイドが挙げる、いちばん大きな制約は？」→「公式のガイドが、使い方のコツの多くのもとだと説明する制約は？」",
-    "s3-lead: 「ディスク」 is a plain katakana word some learners may not picture — 「ファイルに書いた指示は、ディスクから読み直されます。」→「ファイルに書いた指示は、保存されたファイルから読み直されます。」 (or keep ディスク and use it the same way in the diagram and tables)"
+    "hook-predict: kept from round 1. The option forms are mixed: a/b state a cause in the past tense, while c/d end with a remedy 「〜すれば直る」. Make them all causes — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
+    "s5-steps: 「よい最初の依頼」 is a calque of 'a better initial prompt' — ex-fix 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
+    "s5-steps: タイムゾーン appears here for the first time without English. It is an everyday word, but adding the English is safer — ex-learn 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
+    "s5-check: option d's feedback has no subject, so the first sentence reads abruptly — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
+    "check-quiz: in e4 b's feedback, the link between 「上限に近づくと起きる」 and 「漏れやすい」 is unclear. The audit's fix states it more directly — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
+    "pr-steps-start: 「CLAUDE.mdの読み込みをメモします」 is vague about what to note — pr-context-1 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
+    "pr-steps-start: the long-vowel mark is used inconsistently: 「エディター」 here, but 「フォルダ」「サブフォルダ」 elsewhere. Pick one style — pr-start troubleshoot 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」 (or use フォルダー everywhere)",
+    "pr-steps-start: factual doubt: the pr-code line chains commands with `&&`, which older Windows PowerShell (5.1) does not support. The troubleshoot covers only creating CLAUDE.md. Consider 「PowerShellでは、コマンドを1つずつ実行し、CLAUDE.mdはエディタで作って引用符の中の文を書きます。」",
+    "pr-steps-compact: 「圧縮後」 here vs 「圧縮のあと」 everywhere else — pr-predict 「圧縮後に残るのは」→「圧縮のあとに残るのは」",
+    "s4-prompt: the var hint has a space between a Latin path and Japanese, outside code (§3 prefers no space) — 「例：src/auth/ フォルダ」→「例：src/authフォルダ」",
+    "lesson: the auto-compaction name varies between 「自動のコンテキスト圧縮」 (s2-defs, s2-table, q3, e3) and 「自動の圧縮」 (p2 d, e4 b). It clearly means the same thing, but one form reads more cleanly — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」",
+    "pr-diagnose: /btw appears only in the p1 explanation, with no further explanation. The learner may wonder what it is — 「`/btw` で聞くと会話の履歴に残りません。」→「`/btw` を付けて聞くと、その質問は会話の履歴に残りません。」 (only if this matches the cc-commands source)",
+    "sum-cards: card-constraint's front is wordy — 「公式のガイドが、使い方のコツの多くのもとだと説明する制約は？」→「公式のガイドが、多くのコツのもとだという制約は？」"
   ],
-  "average": 3.5,
+  "average": 3.75,
   "verdict": "revise",
-  "summary": "The Japanese is warm, clear です・ます throughout the explanations and quizzes, wrong-option feedback stays within two sentences, and the tables and diagram keep the load light. Before it passes, put the flashcards into です・ます, give English or the full name at first use for プランモード, デプロイ, リポジトリ, API, CSV, CSS and WSL, and remove the space between Japanese and Latin words that §3 forbids (or have the owner change §3 if the cc series keeps spaces on purpose)."
+  "summary": "The scope check required a full review: 45 of 48 blocks and objectives o1 and o3 changed since sha256:97684549e204b6ab. All eight must-fix items from round 1 are gone. The flashcards are です・ます, there is no space between Japanese and Latin words outside code, and プランモード, デプロイ, リポジトリ, API, CSV and WSL get English or the full name at first use (CSS was dropped). Lint is clean, and measure.mjs gives prose 1942 and est 19.6 min, with estMinutes 20. One rule break remains: q4 (s5-check) uses 『』 for plain quotes where §3 calls for 「」. After that fix, the Japanese passes."
 }
