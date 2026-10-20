@@ -14,8 +14,8 @@ export class BattleScene8 extends BattleScene {
     
     // シールドゴブリンの盾状態管理
     this.shieldActive = true; // 盾が有効か
-    this.shieldHP = 9; // 盾HP（物理攻撃3ダメージ × 3回で破壊）
-    this.shieldMaxHP = 9;
+    this.shieldMaxHP = 8; // 盾の耐久（物理攻撃1回で1減り、8回で壊れる。2回繰り返す×3段 = 8回）
+    this.shieldHP = this.shieldMaxHP;
   }
 
   create() {
