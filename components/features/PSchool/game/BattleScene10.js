@@ -29,6 +29,13 @@ export class BattleScene10 extends BattleScene {
       stageNumber: 10
     };
 
+    // 1回の戦いの状態（create でも毎回戻す）
+    this.resetBattleState();
+  }
+
+  // 1回の戦いの状態を最初に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、
+  // 前の戦いのフェーズ・シールド・チャージ攻撃・麻痺を引き継がない）。オブジェクトや配列は毎回新しく作る
+  resetBattleState() {
     // ダークナイトのフェーズ情報
     this.knightPhase = {
       current: 1,
@@ -56,6 +63,9 @@ export class BattleScene10 extends BattleScene {
   }
 
   create() {
+    // 前の戦いの状態を引き継がないよう、最初に戻す
+    this.resetBattleState();
+
     super.create();
     
     // ステージ10の設定（強化版ダークナイト）
@@ -81,8 +91,7 @@ export class BattleScene10 extends BattleScene {
     
     // ボス戦専用UI
     this.createBossUI();
-    // 物理シールド耐久を初期化して表示
-    this.knightPhase.physicalShieldHP = this.knightPhase.physicalShieldMaxHP;
+    // 物理シールド耐久を表示（耐久は resetBattleState で最大に戻してある）
     this.updatePhysicalShieldText();
     this.createDarkAura();
     

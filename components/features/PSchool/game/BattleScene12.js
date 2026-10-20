@@ -18,6 +18,12 @@ export class BattleScene12 extends BattleScene {
   }
 
   create() {
+    // 連続攻撃の記録は戦いごとに元に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、前の戦いの連続回数を引き継がない）
+    this.beastState = {
+      lastAttackType: null,
+      consecutiveSameAttack: 0
+    };
+
     super.create();
     
     // カスタム変数とリストの初期化（ステージ12用）
