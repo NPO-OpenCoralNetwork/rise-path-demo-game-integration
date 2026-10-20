@@ -14,6 +14,7 @@
 // ====================================================================================
 
 import { delay } from "./utils";
+import { HEAL_POWER } from "./player";
 import { BattleScene } from "./BattleScene";
 import { BattleScene2 } from "./BattleScene2";
 import { BattleScene3 } from "./BattleScene3";
@@ -488,22 +489,17 @@ async function executeGameAction(action, game, ui) {
       }
       break;
       
-    case "Heal":
-      const healAmount = parameters.amount || 10;
-      // Use scene's handlePlayerAction if available (for BattleScene5, BattleScene6, etc.)
+    case "Heal": {
+      const healAmount = parameters.amount || HEAL_POWER;
+      ui.log("💚 回復魔法！");
+      // ステージが回復を独自に扱うならそちら（扱わないときは false が返る。ステージ13は攻撃だけを扱う）
       if (game.scene && typeof game.scene.handlePlayerAction === 'function') {
         console.log("Using scene's handlePlayerAction for Heal");
-        try {
-          await game.scene.handlePlayerAction("Heal", { amount: healAmount });
-        } catch (e) {
-          console.error("Error calling scene's handlePlayerAction for Heal:", e);
-          // Fallback to player's heal method
-          await game.player.heal(healAmount);
-        }
-      } else {
-        await game.player.heal(healAmount);
+        if (await game.scene.handlePlayerAction("Heal", { amount: healAmount })) break;
       }
+      await game.player.heal(healAmount);
       break;
+    }
         case "Wait":
       const seconds = parameters.seconds || 1;
       ui.log(`${seconds}秒間待機中...`);
@@ -1328,6 +1324,14 @@ function evaluateAstJs(parsedAst) {
         actions.push({
           action_type: "Attack",
           parameters: {}
+        });
+        break;
+
+      case "heal_magic":
+        // 回復魔法のブロック（回復魔法の手の振りと同じだけ回復する）
+        actions.push({
+          action_type: "Heal",
+          parameters: { amount: HEAL_POWER }
         });
         break;
         

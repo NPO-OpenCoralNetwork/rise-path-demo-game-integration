@@ -1,3 +1,6 @@
+// 回復魔法で回復する HP
+export const HEAL_POWER = 30;
+
 export class Player {
     constructor(scene, ui, level = 1) {
       this.scene = scene;
@@ -68,18 +71,7 @@ export class Player {
     // 回復魔法の特別処理
     if (type === 'HEALING') {
       this.ui.log('💚 回復魔法を詠唱中...');
-      
-      const healPower = 30;
-      const maxHp = this.maxHp || 100; // デフォルト最大HP
-      const oldHp = this.hp;
-      this.hp = Math.min(maxHp, this.hp + healPower);
-      
-      if (this.scene && typeof this.scene.playAnimation === 'function') {
-        await this.scene.playAnimation('healing');
-      }
-      
-      this.ui.log(`✨ HPが${healPower}回復しました！ (HP: ${this.hp}/${maxHp})`);
-      this.ui.updateHP(this.hp, this.scene.enemy.hp);
+      await this.heal(HEAL_POWER);
       return;
     }
     // 氷の盾の処理
@@ -129,6 +121,18 @@ export class Player {
     this.ui.updateHP(this.hp, this.scene.enemy.hp);
     }
   
+    // HP を amount だけ回復する（最大HPまで）。回復の光が出てから HP を増やし、HP の表示を更新する。
+    // 回復魔法（手の振り 左→右→左）と、回復魔法のブロック（heal_magic）で使う
+    async heal(amount) {
+      const maxHp = this.maxHp || 100; // デフォルト最大HP
+      if (this.scene && typeof this.scene.playAnimation === 'function') {
+        await this.scene.playAnimation('healing');
+      }
+      this.hp = Math.min(maxHp, this.hp + amount);
+      this.ui.log(`✨ HPが${amount}回復しました！ (HP: ${this.hp}/${maxHp})`);
+      this.ui.updateHP(this.hp, this.scene.enemy.hp);
+    }
+
     // HP取得メソッド
     getHP() {
       return this.hp;
