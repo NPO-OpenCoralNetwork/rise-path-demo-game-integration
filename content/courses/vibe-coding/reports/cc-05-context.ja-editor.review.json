@@ -1,42 +1,28 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:319f5a2007903c95",
+  "lessonHash": "sha256:1a611951e0d6a3f3",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:ad13e1245e9cc670",
+    "reviewedRevision": "sha256:319f5a2007903c95",
     "changed": [
-      "s2-table",
-      "s3-diagram",
-      "s3-table",
-      "s3-check",
-      "s4-table",
-      "s4-prompt",
-      "pr-diagnose",
-      "pr-code",
-      "pr-prompt-a",
-      "pr-prompt-b",
-      "pr-checklist",
-      "check-quiz",
-      "sum-points"
+      "pr-code"
     ],
-    "changedShare": 0.16,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/ad13e1245e9cc670/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/319f5a2007903c95/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text keeps です・ます. The pr-checklist labels now end in です・ます (「比べました」「確かめました」「説明できます」), where before they ended in plain form. s4-prompt now follows the notation rule: 「例：src/authフォルダ」. pr-prompt-a and pr-prompt-b no longer put spaces around Latin words: 「index.htmlと、その説明を書いたREADME.mdを作ってください」. `lessons:lint --strict` is clean (0 errors, 0 warnings). The stiff spots in unchanged text are still there: 「よい最初の依頼」 in s5-steps, and option d's feedback in s5-check q4, which has no subject. So the score stays at 3.",
+      "evidence": "Only pr-code changed. Its learner-visible CLAUDE.md line changed from 「- HTMLの<title>は「練習：」で始める」 to 「- titleは「練習：」で始める」. This is an instruction line written into a file, not lesson prose, so plain form is fine there. The pr-checklist label 「about.htmlのtitleが「練習：」で始まるかを確かめました」 already uses the same bare 「title」. The stiff spots in unchanged text are carried over (s5-steps 「よい最初の依頼」, the s5-check option d feedback with no subject). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
       "blockIds": [
+        "pr-code",
         "pr-checklist",
-        "s4-prompt",
-        "pr-prompt-a",
-        "pr-prompt-b",
         "s5-steps",
         "s5-check"
       ]
@@ -44,53 +30,48 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 1945 (budget 1,200–2,400) and est 19.8 min (≤ 20), and estMinutes is 20. The tables are now 2 columns (s2-table 「道具：起きること／向いている場面」, s4-table 「パターンと症状／対処」), which fits a phone screen. The s3-diagram nodes are shorter and break with <br>. Lint reports no budget findings.",
+      "evidence": "Not touched by the change. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289, est 19.8 min (must be ≤ 20), and estMinutes is 20.",
       "blockIds": [
-        "s2-table",
-        "s4-table",
-        "s3-diagram",
-        "s3-table"
-      ]
+        "pr-code"
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The merged s4-table cells keep the English for each term: 「**何でも入りのセッション**（kitchen sink session）」「**修正の繰り返し**（correcting over and over）」「**終わらない探索**（infinite exploration）」. s3-table keeps 「プランモード（plan mode）」. The p1 hint was updated to the new column name: 「5-4の表の「パターンと症状」と見比べてみましょう。」 The CLAUDE.md placement is now named the same way everywhere: 「直下のCLAUDE.md」 in q3 b, e4 b and sum-points, matching s3-table row 1.",
+      "evidence": "Not touched by the change. No new term is introduced. The s4-table English glosses and 「直下のCLAUDE.md」 are unchanged.",
       "blockIds": [
         "s4-table",
-        "s3-table",
-        "pr-diagnose",
-        "s3-check",
-        "check-quiz",
-        "sum-points"
-      ]
+        "s3-table"
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The s3-diagram label 「決まった<br>ファイルの<br>指示」 still matches the caption 「決まったファイルの指示はディスクから戻る」. The four items it covers now appear as row 1 of s3-table, under the caption 「図の「決まったファイル」と、そのほかのファイル」. The alt text is complete and still describes both branches. This is a single-locale lesson, so there are no locale gaps.",
+      "evidence": "Not touched by the change. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
       "blockIds": [
-        "s3-diagram",
-        "s3-table"
-      ]
+        "s3-diagram"
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s3-diagram: the alt text still lists the four items (直下のCLAUDE.md, …), but the diagram no longer shows them, so the alt text says more than the picture. Point to the table instead — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
-    "s3-table: the caption quotes only part of the diagram label 「決まったファイルの指示」 — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
-    "s4-table: the shortened 「2回でだめなら」 drops the verb; s5 and e1 say 「2回直してだめなら」 — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
-    "s2-table: the first column is now 「道具：起きること」, but only the auto-compaction row's tool name is bold. Mark the other two rows the same way (the code is already visually distinct, so this is optional) — 「**自動のコンテキスト圧縮**：」 is fine as it is; just check that it looks consistent on screen",
+    "pr-code: the new CLAUDE.md line says 「title」, but the expected-result text in the following blocks says 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります。」. The learner will still match them. Using the same form makes the link to 「CLAUDE.mdのとおり」 more visible. — 「- titleは「練習：」で始める」→「- <title>は「練習：」で始める」 (or keep it and accept the variant)",
+    "s3-diagram: the alt text lists four items that the diagram no longer shows (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
+    "s3-table: the caption quotes only part of the diagram label (carried over) — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
+    "s4-table: 「2回でだめなら」 drops the verb that s5 and e1 use (carried over) — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
     "s5-check: option d's feedback has no subject (carried over) — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
-    "s5-steps: 「よい最初の依頼」 is a calque (carried over) — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
+    "s5-steps: 「よい最初の依頼」 reads as a calque (carried over) — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
     "s5-steps: タイムゾーン appears without English on first use (carried over) — 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
-    "pr-steps-start: the long-vowel mark is used inconsistently (エディター vs フォルダ) — 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」",
+    "pr-steps-start: the long-vowel mark is used inconsistently (carried over) — 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」",
     "pr-steps-start: it is vague what to note about CLAUDE.md (carried over) — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
-    "check-quiz: in e4 b's feedback, the causal link is weak (carried over) — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
-    "hook-predict: the option forms are mixed (carried over): c/d end with a remedy 「〜すれば直る」 — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
-    "lesson: the auto-compaction name varies (「自動のコンテキスト圧縮」 / 「自動の圧縮」) — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」"
+    "check-quiz: the causal link in e4 b's feedback is weak (carried over) — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
+    "hook-predict: options c and d end with a remedy, unlike the others (carried over) — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
+    "lesson: the name for auto-compaction varies (carried over) — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」"
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0, with 13 of 47 blocks changed (16%). The previous review had no open must-fix items, so nothing needed resolving. All the changed blocks were checked. The 2-column table merges keep the English for each term, the p1 hint matches the new column name, the checklist labels are now です・ます, and spaces around Latin words in prompts and hints are fixed. 「直下のCLAUDE.md」 is used the same way in q3, e4, sum-points and s3-table. The changes introduce no (a)–(e) error. Two small new points are in niceToHave: the s3-diagram alt text lists items that the diagram no longer shows, and s4-table's 「2回でだめなら」 is shorter than the wording used elsewhere. Lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores 3/4/4/4 (mean 3.75) with mustFix empty, so the lesson passes."
+  "summary": "Verification round. review-scope.mjs exited 0 with 1 of 47 blocks changed (2%, pr-code only). The previous review had no open must-fix items, so the resolved list is empty. The CLAUDE.md line in pr-code now reads 「- titleは「練習：」で始める」. It matches the checklist wording and adds no (a)–(e) error. A small form mismatch with 「`<title>`」 in the expected-result text is listed in niceToHave. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
 }

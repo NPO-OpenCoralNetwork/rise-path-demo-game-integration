@@ -244,9 +244,9 @@
             "cc-sandboxing",
             "cc-sandbox-environments"
           ],
-          "code": "flowchart TD\n  A[\"外部の文章<br>README・Issue・Web\"]\n  subgraph VMBOX[\" \"]\n    B[\"Claudeが<br>次の操作を決める\"]\n    C[\"権限ルールと承認\"]\n    E[\"シェルコマンド<br>（サンドボックス内）\"]\n    D[\"ファイル操作・MCP<br>（サンドボックス外）\"]\n    V[\"この枠がVM・<br>クラウドセッション\"]\n  end\n  A --> B\n  B --> C\n  C --> E\n  C --> D\n  E ~~~ V\n  D ~~~ V",
+          "code": "flowchart TD\n  A[\"外部の文章<br>README・Issue・Web\"]\n  B[\"Claudeが<br>次の操作を決める\"]\n  C[\"権限ルールと承認\"]\n  E[\"シェルコマンド\"]\n  D[\"ファイル操作<br>MCP\"]\n  A --> B\n  B --> C\n  C -->|サンドボックスの中| E\n  C -->|サンドボックスの外| D",
           "caption": "守りは重ねて使います。VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。",
-          "alt": "外部の文章（README・Issue・Webページ）が、Claudeの判断に入る図です。判断は権限ルールと承認（拒否・確認のルール、分類器）を通り、シェルコマンドとファイル操作に分かれます。サンドボックスはOSの機能でシェルコマンドと子プロセスだけを囲み、ファイル操作ツールとMCPサーバーはその外で動きます。全体を囲む枠がVM・クラウドセッションで、Claude Code全体を囲みます。"
+          "alt": "外部の文章（README・Issue・Webページ）が、Claudeの判断に入る図です。判断は権限ルールと承認（拒否・確認のルール、分類器）を通り、シェルコマンドとファイル操作に分かれます。シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。VM・クラウドセッションは、この図の全体（Claude Code全体）を囲みます。"
         },
         {
           "id": "s2-table",

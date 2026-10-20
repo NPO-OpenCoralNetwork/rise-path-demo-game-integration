@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:4b13c12f53aeb2f8",
+  "lessonHash": "sha256:ba8eeb1a7115a66b",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,7 +9,7 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "Both tables (s2-table, s5-table) stay readable at 390 px as two columns, and the code blocks, steps and prompt blocks render cleanly. In the s2-layers diagram, though, the edges are drawn through the subgraph titles 「VM・クラウドセッション」 and 「サンドボックス」 (pages/desktop-jp-04.png, desktop-jp-05.png, mobile-jp-06.png, mobile-jp-07.png).",
+      "evidence": "Tables s2-table and s5-table, the code blocks and the quizzes are clean at 390 px and 1440 px (mobile-jp-07/08/13/14, desktop-jp-05/09). The one defect is the s2-layers diagram: on mobile its right branch node is cut off at the edge (mobile-jp-07). On desktop it fits (desktop-jp-04/05).",
       "blockIds": [
         "s2-layers",
         "s2-table",
@@ -20,18 +20,20 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "No screen is text-only (textOnlyScreens is empty), and a check, table, diagram or code block appears on almost every screen. s5-md2 packs four facts into one paragraph block (mobile-jp-13.png). The desktop median of 44 chars per line is above the 30–40 target, and that comes from the reader's measure.",
+      "evidence": "No screen is plain text only (textOnlyScreens is empty for both devices), and every section breaks up its text with definitions, lists, tables, code or a check. The practice section runs about 5 mobile screens (mobile-jp-15 to 20). It is chunked, but it shows three separate one-step 'steps' blocks, each one headed '手順 1ステップ中 0 完了' and numbered 1.",
       "blockIds": [
-        "s5-md2",
-        "practice-task"
+        "practice-steps",
+        "practice-steps-deny",
+        "practice-steps-bill"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 4,
-      "evidence": "All visible text, including the diagram labels, is Japanese, with no stray English UI. Text contrast is good, and no line breaks inside Japanese words were seen. Quiz options and buttons stay clear of the top and bottom bars on mobile (mobile-jp-05.png, mobile-jp-25.png).",
+      "score": 3,
+      "evidence": "The lesson is in Japanese only and no English UI strings leak into it. Contrast is good, the diagram has alt text and a caption, and inline code in the quiz options stays readable. There are a few awkward mobile line breaks: an orphaned 'ない' in s1-practices item 2 (mobile-jp-04) and 'claude -' / 'p' split across lines in e5 (mobile-jp-24, known reader wrapping).",
       "blockIds": [
         "s2-layers",
+        "s1-practices",
         "check-quiz"
       ]
     }
@@ -40,18 +42,18 @@
     {
       "criterion": "visual",
       "blockId": "s2-layers",
-      "issue": "Mermaid draws edges straight through the subgraph titles. The arrow from 「外部の文章」 to 「Claudeが次の操作を決める」 cuts through 「VM・クラウドセッション」, and the arrow into 「シェルコマンド」 cuts through 「サンドボックス」, with the arrowhead landing on the label. This happens on desktop and on mobile.",
-      "fix": "Remove the nested SBOX subgraph and put the layer in the node text instead: E[\"シェルコマンド<br>（サンドボックス内）\"], next to D \"（サンドボックス外）\". For the VM frame, point A at the subgraph border (A --> VMBOX), or add a small title node inside VMBOX such as V[\"VM・クラウドセッション<br>（全体を囲む）\"] and leave the subgraph title empty, so no edge crosses text. Re-run lessons:preview and check that no label is crossed.",
-      "screenshot": "pages/mobile-jp-06.png"
+      "issue": "At 390 px the mermaid diagram is wider than its card. The right branch node 'ファイル操作・MCP（サンドボックス外）' is cut off at the right edge, so only 'ファイル操' and '（サンドボ' show. The learner cannot read the key contrast between the inside and the outside of the sandbox.",
+      "fix": "Make the two side-by-side nodes narrower so the whole diagram fits in about 340 px. Break the labels into short lines, for example E[\"シェル<br>コマンド<br>（内側）\"] and D[\"ファイル操作<br>・MCP<br>（外側）\"]. State 'サンドボックスの内側/外側' once in the caption. Alternatively, chain them vertically (C --> E, C --> D with D placed under E) so nothing sits side by side. Re-run lessons:preview and check mobile-jp-07.",
+      "screenshot": "pages/mobile-jp-07.png"
     }
   ],
   "niceToHave": [
-    "The glossary panel shows duplicate chips: 「プロンプトインジェクション（prompt injection）」 and 「プロンプトインジェクション」, and the same for ワークスペースの信頼 and サンドボックス (pages/desktop-jp-02.png). One fix in the lesson is to match the definitions terms in s1-defs and s2-defs to the glossary terms. Otherwise, reader: dedupe definitions against glossary entries.",
-    "reader: the glossary panel never shows 「エフォート」, although it is in the glossary and linked in s5-md2 (pages/desktop-jp-09.png).",
-    "reader: the desktop JP measure (680 px at 18.7 px) gives a median of 44 chars per line, above the 30–40 target.",
-    "reader: inline code wraps mid-token on mobile, for example `claude -p` breaking after '-' in e5 (pages/mobile-jp-24.png). This is known behaviour.",
-    "Known reader behaviour, not a lesson defect: the mobile full-length PNG is truncated, and the end banner says this is the course's last lesson, because the draft is not in course.json."
+    "The practice section uses three separate single-item steps blocks (practice-steps, practice-steps-deny, practice-steps-bill). Each one renders its own '手順 1ステップ中 0 完了' header and the number 1 (mobile-jp-16, mobile-jp-18, desktop-jp-11/13). Number them visibly in the titles (for example '1. 点検する', '2. 拒否ルールを書いて試す', '3. 請求の理由を説明する') so the sequence is clear.",
+    "s1-practices item 2 '信頼できない内容を、そのまま流し込まない' leaves 'ない' alone on the next line on mobile (mobile-jp-04). A slightly shorter wording such as '信頼できない内容は流し込まない' would fit on one line.",
+    "reader: the glossary side panel lists プロンプトインジェクション, ワークスペースの信頼 and サンドボックス twice, once with the English and once without (desktop-jp-01 onward), because the definitions blocks and the glossary entries both feed it. Merge the entries in the reader. A lesson-side workaround is to drop the glossary entries that duplicate definitions terms, wherever no [[...]] link needs them.",
+    "reader: desktop JP charsPerLine median is 44 (max 56) against the 30-40 target, measured at 680 px. The reader's measure is too wide for Japanese.",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (known)."
   ],
   "verdict": "revise",
-  "summary": "lessonHash matches metrics.json (sha256:4b13c12f53aeb2f8). There are no hard failures (no overflow, no console, mermaid or image errors, no unknown blocks), and no personal data appears on any screen. The layout reads well on mobile and desktop: both tables stay readable at 390 px, and code, steps and quizzes render cleanly. The one must-fix is the s2-layers diagram, where edges cross the subgraph titles 「VM・クラウドセッション」 and 「サンドボックス」. Restructure it so no arrow crosses a label."
+  "summary": "metrics.json has no hard failures (no overflow, no console, mermaid or image errors, no unknown blocks), the lessonHash matches sha256:ba8eeb1a7115a66b, and no screen shows personal data. Tables, code, prompts and quizzes are clean on both devices. The one must-fix is the s2-layers diagram: on the 390 px screen its right node 'ファイル操作・MCP（サンドボックス外）' is cut off (pages/mobile-jp-07.png). Shorten or stack those labels."
 }

@@ -1,30 +1,18 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:319f5a2007903c95",
+  "lessonHash": "sha256:1a611951e0d6a3f3",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:ad13e1245e9cc670",
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/ad13e1245e9cc670/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:319f5a2007903c95",
     "changed": [
-      "s2-table",
-      "s3-diagram",
-      "s3-table",
-      "s3-check",
-      "s4-table",
-      "s4-prompt",
-      "pr-diagnose",
-      "pr-code",
-      "pr-prompt-a",
-      "pr-prompt-b",
-      "pr-checklist",
-      "check-quiz",
-      "sum-points"
+      "pr-code"
     ],
-    "changedShare": 0.16,
-    "fullReviewRequired": false
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/319f5a2007903c95/round-1/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
@@ -39,7 +27,8 @@
         "s2-check",
         "s5-check",
         "s1-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -55,26 +44,28 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Recalls carried over from earlier lessons are unchanged (s1-lead 「第1回で見たコンテキストウィンドウ」, s3-defs （第1回）, s4-defs （第4回）). New terms are defined before use. The s3-diagram rewrite moved 「プランモード（plan mode）」 into the first row of s3-table. It still appears there, in e3 and in card-survive without a recall. 「信頼の確認」 in pr-start is still not recalled either.",
+      "evidence": "Recalls carried over from earlier lessons are unchanged (s1-lead 「第1回で見たコンテキストウィンドウ」, s3-defs （第1回）, s4-defs （第4回）). New terms are defined before use. 「プランモード（plan mode）」 appears in s3-table row 1, in e3 and in card-survive without a recall. 「信頼の確認」 in pr-start is not recalled either.",
       "blockIds": [
         "s1-lead",
         "s3-defs",
         "s4-defs",
         "s3-table",
         "pr-steps-start"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Measure: 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」, so estMinutes 20 matches. s2-table and s4-table now have 2 columns (「道具：起きること」, 「パターンと症状」), which fit mobile. Strict lint is clean. 5-2 is still dense: /clear, /compact, auto compaction, the focus example and --continue/--resume are all in one segment.",
+      "evidence": "Measure (this round): 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」. Nothing changed from the previous round. s2-table and s4-table have 2 columns. Strict lint is clean. 5-2 is still dense: /clear, /compact, auto compaction, the focus example and --continue/--resume are all in one segment.",
       "blockIds": [
         "s2-table",
         "s4-table",
         "s2-focus",
         "s2-session",
         "s2-code"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -90,7 +81,7 @@
     {
       "id": "active",
       "score": 4,
-      "evidence": "The changed questions keep apply/analyze demand and give feedback on every wrong option. In q3, only option b's feedback changed (「指示が直下のCLAUDE.mdにあれば、圧縮のあとも戻ってきます。」). The p1 hint now matches the renamed column (「5-4の表の「パターンと症状」と見比べてみましょう。」), so it points to the right place without naming the answer. In e4, only option b's feedback changed. Inline checks still appear in every concept section.",
+      "evidence": "The questions keep apply/analyze demand and give feedback on every wrong option. The p1 hint 「5-4の表の「パターンと症状」と見比べてみましょう。」 points to the right place without naming the answer. Inline checks appear in every concept section.",
       "blockIds": [
         "s3-check",
         "pr-diagnose",
@@ -98,32 +89,35 @@
         "s1-check",
         "s2-check",
         "s5-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "The misconception coverage is unchanged and still complete: more context is better (q2-b, p1-d), reopening empties the session (q2-d, p2-c, p3-d), compaction removes all or nothing (q3-a, q3-c, e3-b, e3-d), stronger words fix it (q0-c, q4-a, e5-a). The edited feedback is more precise and still two sentences long: q3-b 「圧縮は会話を要約するだけで、設定は変えません。指示が直下のCLAUDE.mdにあれば…」 and e4-b 「…直下のCLAUDE.mdに書けば、圧縮のあとに自動で読み直されます。」.",
+      "evidence": "Every misconception is covered: more context is better (q2-b, p1-d), reopening empties the session (q2-d, p2-c, p3-d), compaction removes all or nothing (q3-a, q3-c, e3-b, e3-d), stronger words fix it (q0-c, q4-a, e5-a). Feedback stays within two sentences.",
       "blockIds": [
         "s3-check",
         "check-quiz",
         "pr-diagnose"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s3-diagram now has 6 short, wrapped nodes (C[決まった<br>ファイルの<br>指示], E[読み直された<br>指示]) for mobile fit. Its labels match s3-lead (「決まったファイルの指示はディスクから読み直されます」) and the caption 「会話は要約に置き換わり、決まったファイルの指示はディスクから戻る」. The list that left the diagram now leads s3-table, whose caption 「図の「決まったファイル」と、そのほかのファイル」 ties the two together. There are no decorative images.",
+      "evidence": "s3-diagram has 6 short, wrapped nodes. Its labels match s3-lead (「決まったファイルの指示はディスクから読み直されます」) and the caption 「会話は要約に置き換わり、決まったファイルの指示はディスクから戻る」. s3-table's caption 「図の「決まったファイル」と、そのほかのファイル」 ties the table to the diagram. There are no decorative images.",
       "blockIds": [
         "s3-diagram",
         "s3-table",
         "s3-lead"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "pr-code is now one command per line (mkdir / cd / git init / echo '- HTMLの<title>は「練習：」で始める' > CLAUDE.md / claude), which matches pr-start 「上のコマンドを1行ずつ実行します」. pr-prompt-a/b keep their expect text, including the self-report warning 「Claudeの分け方は自己申告なので、この2点で確かめましょう」. The pr-checklist success criteria remain observable and are now in ます form (「/context を3回実行し、使用量の変化を比べました」). pr-answer gives the model answer. The hint ladder is still one level deep. The pr-predict hint 「5-3の図で、それぞれの指示がたどる矢印を見ます」 now points to a diagram that no longer names CLAUDE.md, so the learner has to bridge through s3-table.",
+      "evidence": "Re-scored because pr-code changed. The CLAUDE.md rule went from 「- HTMLの<title>は「練習：」で始める」 to 「- titleは「練習：」で始める」. The structure still holds: one command per line, matching pr-start 「上のコマンドを1行ずつ実行します」. Observable expects remain in pr-prompt-a/b, the pr-checklist criteria and pr-answer as a model answer. The hint ladder is still one level deep. But the practice's central evidence is now less reliable. pr-prompt-a expects 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります」 and pr-prompt-b expects 「about.htmlの `<title>` も「練習：」で始まります」. The rule no longer says it means the HTML <title> element. In a project with index.html, README.md and about.html, 「title」 can also be read as the h1 or the README heading. A learner whose <title> does not start with 「練習：」 could wrongly conclude that CLAUDE.md was not re-read after compaction. That is the opposite of the lesson's point (see mustFix).",
       "blockIds": [
         "pr-code",
         "pr-steps-start",
@@ -137,65 +131,75 @@
     {
       "id": "meta",
       "score": 4,
-      "evidence": "The summary comes after the exam. sum-points[2] is narrowed to 「圧縮のあと、直下のCLAUDE.mdや自動メモリはディスクから戻りますが…」 and is still a takeaway, not a copy of the text. sum-hook, sum-next (a reflection plus the next step to 第6回), 8 flashcards and sum-ask are unchanged.",
+      "evidence": "The summary comes after the exam. sum-points[2] 「圧縮のあと、直下のCLAUDE.mdや自動メモリはディスクから戻りますが…」 is a takeaway, not a copy of the text. sum-hook, sum-next (a reflection plus the next step to 第6回), 8 flashcards and sum-ask are present.",
       "blockIds": [
         "sum-hook",
         "sum-points",
         "sum-next",
         "sum-cards",
         "sum-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The three wordings flagged earlier as a factual doubt are now narrowed to the audited cc-context-window table (「Project-root CLAUDE.md and unscoped rules | Re-injected from disk」): q3-b 「指示が直下のCLAUDE.mdにあれば」, e4-b 「直下のCLAUDE.mdに書けば」 and sum-points 「直下のCLAUDE.mdや自動メモリ」. s3-table row 1 lists exactly the four re-injected items, and row 2 says path-scoped rules come back on demand. The pinned version is unchanged. The generic 「ファイルに書いて残します」 remains in e4-d, and sum-points[2] ends 「いつも守らせたいことはファイルに書きます」, which path-scoped rules contradict. That keeps this criterion at 3.",
+      "evidence": "q3-b, e4-b and sum-points match the audited cc-context-window table (「Project-root CLAUDE.md and unscoped rules | Re-injected from disk」). s3-table row 1 lists the four re-injected items, and row 2 says path-scoped rules come back on demand. Two generic wordings remain: 「ファイルに書いて残します」 in e4-d, and 「いつも守らせたいことはファイルに書きます」 in sum-points[2]. The pr-code change does not affect any factual claim.",
       "blockIds": [
         "s3-check",
         "check-quiz",
         "sum-points",
         "s3-table",
         "s3-diagram"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "です・ます is used throughout, and the checklist labels are now in polite form (「…比べました」「…説明できます」). There are no banned phrases. Terms still drift: s2-defs defines 「自動のコンテキスト圧縮」 and s2-table now bolds it, but the changed e4-b feedback still says 「自動の圧縮は、コンテキストが上限に近づくと起きるので」, and so do p2-d and the p2 explanation.",
+      "evidence": "です・ます is used throughout. There are no banned phrases. Terms still drift: s2-defs defines 「自動のコンテキスト圧縮」, but e4-b, p2-d and the p2 explanation say 「自動の圧縮」.",
       "blockIds": [
         "s2-defs",
         "s2-table",
         "pr-checklist",
         "pr-diagnose",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp-only and complete. The diagram labels are Japanese, and the diagram has a caption and alt text. The only link has descriptive text. The checklist labels and captions are plain text without markdown. The s3-diagram alt still lists 「直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画」, which the visible diagram no longer shows. This is harmless because s3-table carries the same list, but the alt is no longer an exact equivalent.",
+      "evidence": "The lesson is jp-only and complete. The diagram labels are Japanese, and the diagram has a caption and alt text. The only link has descriptive text. The s3-diagram alt still lists items that the visible diagram no longer shows. s3-table carries the same list.",
       "blockIds": [
         "s3-diagram",
         "s3-fix",
         "pr-checklist",
         "sum-ask"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [],
+  "mustFix": [
+    {
+      "blockId": "pr-code",
+      "criterion": "practice",
+      "issue": "Regression caused by this round's change. The CLAUDE.md rule 「- titleは「練習：」で始める」 no longer says it means the HTML <title> element. Yet pr-prompt-a, pr-prompt-b and pr-answer use that element as the observable proof that CLAUDE.md is re-read after /compact. If Claude reads 「title」 as the h1 or the README heading, the learner's check fails and teaches the opposite conclusion.",
+      "fix": "In pr-code, change the fourth line to: echo '- HTMLのtitleタグは「練習：」で始める' > CLAUDE.md. For consistency, change pr-checklist c-claude-md to 「about.htmlのtitleタグが「練習：」で始まるかを確かめました」 and pr-answer row 1 to 「about.htmlのtitleタグも「練習：」で始まった。圧縮のあと、ディスクから読み直されたため」. Alternatively, restore the previous line 「- HTMLの<title>は「練習：」で始める」."
+    }
+  ],
   "niceToHave": [
     "pr-steps-compact pr-predict hint: s3-diagram no longer names CLAUDE.md. Replace with 「5-3の図と表で、直下のCLAUDE.mdと会話だけの指示がたどる道を見比べます。」.",
-    "s3-diagram alt: drop the sentence the diagram no longer shows, so the alt reads 「圧縮の前のコンテキストが、会話とツールの出力、決まったファイルの指示の2つに分かれる図。会話は要約に置き換わり、決まったファイルの指示はディスクから読み直されて、どちらも圧縮のあとのコンテキストに入る。中身の一覧は次の表にあります。」.",
-    "s2-table / s4-table: column 0 renders as a row header <th> at font-weight 600 (components/lesson/reader.css .rp-table tbody th), so the **bold** pattern names barely stand out from the symptom text after 「：」. Also, only row 3 of s2-table is bolded. Either drop the ** in s2-table row 3 for consistency or leave it to visual-qa to confirm on the screenshot.",
-    "Term consistency with s2-defs (still open; e4 was edited this round): write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in check-quiz e4 option b feedback, pr-diagnose p2 option d feedback and the p2 explanation.",
+    "s3-diagram alt: make it read 「圧縮の前のコンテキストが、会話とツールの出力、決まったファイルの指示の2つに分かれる図。会話は要約に置き換わり、決まったファイルの指示はディスクから読み直されて、どちらも圧縮のあとのコンテキストに入る。中身の一覧は次の表にあります。」.",
+    "Term consistency with s2-defs: write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in check-quiz e4 option b feedback, pr-diagnose p2 option d feedback and the p2 explanation.",
     "factual doubt (residual generic wording): check-quiz e4 option d feedback 「決まりはファイルに書いて残します。」 → 「決まりは直下のCLAUDE.mdに書いて残します。」; sum-points[2] last sentence 「いつも守らせたいことはファイルに書きます。」 → 「いつも守らせたいことは直下のCLAUDE.mdに書きます。」.",
-    "s5-prompt (still open): ex-learn promises three conditions, but the prompt fills in only two. Replace the third line with 「前に試したときは、{{ずれた行の例}} の日付が1日ずれました。」 and add var {\"name\": \"ずれた行の例\", \"hint\": \"例：2026-10-20,1200 の行\"}.",
-    "プランモード still has no recall (now in s3-table row 1, e3 and card-survive). In s3-table row 1, write 「プランモード（plan mode、第3回）の計画」.",
-    "e4 applies o2 in a new team setting. Set its bloom to \"apply\" so that o2 also has an apply-level item (still open).",
-    "5-2 holds two ideas (choosing /clear or /compact, and reopening a session). Consider moving s2-session and s2-code into 5-1 after s1-defs (still open).",
-    "pr-steps-start pr-start expect (still open): 「初めてのフォルダなので、フォルダを信頼するかの確認（第1回）が出ます。承認すると、Claude Codeの入力欄が表示されます。」."
+    "s5-prompt: ex-learn promises three conditions, but the prompt fills in only two. Replace the third line with 「前に試したときは、{{ずれた行の例}} の日付が1日ずれました。」 and add var {\"name\": \"ずれた行の例\", \"hint\": \"例：2026-10-20,1200 の行\"}.",
+    "プランモード has no recall. In s3-table row 1, write 「プランモード（plan mode、第3回）の計画」.",
+    "e4 applies o2 in a new team setting. Set its bloom to \"apply\" so that o2 also has an apply-level item.",
+    "5-2 holds two ideas (choosing /clear or /compact, and reopening a session). Consider moving s2-session and s2-code into 5-1 after s1-defs.",
+    "pr-steps-start pr-start expect: 「初めてのフォルダなので、フォルダを信頼するかの確認（第1回）が出ます。承認すると、Claude Codeの入力欄が表示されます。」."
   ],
   "average": 3.46,
-  "verdict": "pass",
-  "summary": "Verification round: the scope check exited 0, with 13 of 47 blocks changed (16%) and no section or objective changes. The previous review had no open must-fix items, so resolved is empty. All 13 changed blocks were reviewed in full. The tables now have 2 columns, s3-diagram has short wrapped nodes, and the fixed-file list moved into s3-table row 1 under a caption that ties it to the diagram. The factual-doubt wordings (q3-b, e4-b, sum-points[2]) are narrowed to 直下のCLAUDE.md, the p1 hint follows the renamed column, pr-code is one command per line, and the checklist is in ます form. None of these introduces an error or a regression that needs a must-fix. Small follow-ons are in niceToHave: the pr-predict hint still points only to the diagram, and the diagram alt lists items the diagram no longer shows. validate and lint --strict are clean, and the measure reports prose 1945 and est 19.8 min against estMinutes 20. Every criterion is at 3 or above (mean 3.46)."
+  "verdict": "revise",
+  "summary": "Verification round: review-scope exited 0, with 1 of 47 blocks changed (pr-code, 2%) and no section or objective changes. The previous review had no open must-fix items, so resolved is empty. pr-code was reviewed in full and practice was re-scored. The edit shortened the CLAUDE.md rule to 「titleは「練習：」で始める」. It no longer says it means the HTML <title> element, which pr-prompt-a/b and pr-answer use as the proof that CLAUDE.md is re-read after compaction. This regression is a must-fix, with an exact replacement line. Validate and lint --strict are clean. Measure: prose 1945, est 19.8 min against estMinutes 20. All criteria stay at 3 or above (mean 3.46). The verdict is revise only because of the pr-code regression."
 }
