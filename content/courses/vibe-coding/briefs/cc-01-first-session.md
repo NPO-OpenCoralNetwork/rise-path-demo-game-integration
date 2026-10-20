@@ -8,13 +8,13 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: VS Code を使ったことがあり、Git のコミットの意味がわかる人（バイブコーディング第3章・第5章の程度）。Claude Code は初めて。チャットAIにコードを貼って相談した経験はある。
 - すでに知っていること（前提） / prior knowledge: ターミナルで `cd` と `ls` が使える。`git init`・`git commit`・`git config` の意味がわかる（第5章）。チャットAIとエディタの補完を使ったことがある。
-- 前のレッスン / previous lesson: なし（コースの第1回）。次は第2回「権限モードと巻き戻し」。
+- 前のレッスン / previous lesson: なし（コースの第1回）。次は「第2回｜任せる範囲を決める：権限モードと巻き戻し」。
 
 ## 到達目標 / Outcome (必須)
 このレッスンの後、学習者は次のことができる / After this lesson the learner can:
 - o1 (bloom: understand): チャットや補完とエージェントループの違いを説明できる
-- o2 (bloom: apply): 状況に合うサーフェス（ターミナル CLI・IDE 拡張・デスクトップアプリ・クラウドセッション）を選べる
-- o3 (bloom: apply): 質問 → 小さな変更 → 差分の確認 → コミット の流れで最初のセッションを実行できる
+- o2 (bloom: apply): 状況に合うサーフェス（ターミナルCLI・IDE拡張・デスクトップアプリ・クラウドセッション）を選べる
+- o3 (bloom: apply): Claude Codeを入れて起動し、質問 → 小さな変更 → 差分の確認 → コミットの流れで最初のセッションを実行できる
 
 ## 範囲 / Scope
 - 扱う / in: エージェントループとツール（チャット・補完との比較）、4つのサーフェスの選び方（同じエンジン）、
@@ -34,8 +34,8 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
   5. 「完了しました、と言えば完了」→ 差分を自分で見て、説明できる変更だけコミットする（q4, q9）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（本文 2,394 字 + 依頼文・ヒント・チェックリスト・カード 1,374 字を 450 字/分で 8.4 分、
-  問題 10 問 × 40 秒で 6.7 分、演習 1 つで 2 分）。本文だけで数えると 14.0 分。実際の演習は 15 分ほどかかります。
+- 所要時間 / minutes: 17（本文 2,400 字 + 依頼文・ヒント・チェックリスト・カード 1,407 字 = 3,807 字を 450 字/分で 8.5 分、
+  問題 10 問 × 40 秒で 6.7 分、演習 1 つで 2 分、計 17.1 分）。本文だけで数えると 14.0 分。実際の演習は 15 分ほどかかります。
 - 難易度 / level: beginner
 - ロケール / locales: jp only（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ `cc-practice`（`git init` 済み）で、Claude に hello world の
@@ -75,13 +75,13 @@ interactive-mode and Japanese glossary pages).
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：貼り付けずに聞いてみる | チャットでは貼って写す。Claude Code は貼らずに聞ける | markdown lead (3 sentences), quiz predict (cite quickstart) | `q0` → o1 (ungraded; distractors: chat, completion, memory) |
-| `loop` | concept | 1-1. チャット・補完・エージェントループ | Claude Code はツールで調べ、変更し、確かめるループで動く | markdown lead, table (chat / completion / Claude Code), definitions (エージェントループ・ツール), diagram (loop, 5 nodes, TD), quiz inline | `q1` → o1 (new situation: a button that does nothing) |
-| `surfaces` | concept | 1-2. どこで使うか：4つのサーフェス | 場面でサーフェスを選ぶ。エンジンは同じ | markdown lead, definitions (サーフェス・クラウドセッション・CLAUDE.md), table (4 surfaces × 場面 × 知っておくこと), markdown (same engine), quiz inline | `q2` → o2 (apply: keep working with the laptop closed) |
-| `install` | concept | 1-3. インストールして、確かめる | 必要なものをそろえ、ネイティブインストーラーで入れて `claude --version` で確かめる | markdown lead (version date + Japanese docs link), list check (plan, OS, RAM), markdown, code bash, code powershell, markdown, code bash, callout pitfall (Node.js) | — (assessed in exam `q7`; `session` follows with a quiz, so no 3 content sections run without one) |
+| `loop` | concept | 1-1. チャット・補完・エージェントループ | Claude Code はツールで調べ、変更し、確かめるループで動く | markdown lead, table (chat / completion / Claude Code), definitions (エージェントループ・ツール), diagram (loop, 5 nodes, TD), quiz inline | `q1` → o1 (new situation: a script that fails with an error) |
+| `surfaces` | concept | 1-2. どこで使うか：4つのサーフェス | 場面でサーフェスを選ぶ。エンジンは同じ | markdown lead, definitions (サーフェス with IDE spelled out・クラウドセッション・CLAUDE.md), table (4 surfaces × 場面 × 知っておくこと; CLI spelled out), markdown (same engine), quiz inline | `q2` → o2 (apply: unpushed commits + laptop closed → push, then a cloud session) |
+| `install` | concept | 1-3. インストールして、確かめる | 必要なものをそろえ、ネイティブインストーラーで入れて `claude --version` で確かめる | markdown lead (version date + Japanese docs link), list check (plan, OS, RAM), markdown (Console account defined + recommended installer), code bash, code powershell, markdown, code bash, callout pitfall (Node.js) | — (assessed in exam `q7`; `session` follows with a quiz, so no 3 content sections run without one) |
 | `session` | concept | 1-4. 起動して、セッションを始める | 新しいセッションはまっさら。引き継ぐのは3つだけ | markdown lead (`cd` + `claude`, login), definitions (セッション・コンテキストウィンドウ・自動メモリ), markdown, list (3 carry-over routes), quiz inline | `q3` → o3 (new day, "continue with yesterday's colours") |
-| `first-session` | example | 1-5. 例題：質問から1コミットまで | 質問 → 小さな変更 → 差分 → 説明 → コミット | markdown lead (quickstart order), definitions (差分), steps worked example (5 steps ①–⑤ with why + expect), callout info (auto mode from v2.1.283), callout tip (explanation habit, RCT), quiz inline | `q4` → o3 (apply: "完了しました" before committing) |
+| `first-session` | example | 1-5. 例題：質問から1コミットまで | 質問 → 小さな変更 → 差分 → 説明 → コミット | markdown lead (quickstart order), definitions (差分), steps worked example (5 steps ①–⑤ with why + expect), code diff (the lines step ③ shows), callout info (auto mode from v2.1.283), callout tip (explanation habit, RCT), quiz inline | `q4` → o3 (apply: "完了しました" before committing) |
 | `practice` | practice | 演習：練習用フォルダで1コミットまで | 1-5 を自分の手で、faded（同じ①–⑤のラベル） | markdown task, code bash (`claude --version`, `mkdir`, `cd`, `git init`, `claude`), steps (6, hint → troubleshoot ladder), prompt (page, `{{見出しの言葉}}`), prompt (explain the diff, `{{確かめたいこと}}`, model answer in `expect`), checklist (6 success criteria) | — |
-| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (5) | `q5` → o1 (colleague: "just smarter autocomplete?"), `q6` → o2 (transfer: colleague without terminal, Pro plan), `q7` → o3 (transfer: Windows, Free plan, Node.js), `q8` → o3 (order), `q9` → o3 (analyze: an unrequested file in `/diff`) |
+| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (5) | `q5` → o1 (colleague: "just smarter autocomplete?"), `q6` → o2 (transfer: colleague new to the terminal, folder not on GitHub, Pro plan), `q7` → o3 (transfer: Windows, Free plan, Node.js), `q8` → o3 (advise a colleague about to ask for a big feature), `q9` → o3 (analyze: an unrequested file in `/diff`) |
 | `summary` | summary | まとめ | 持ち帰る5点、振り返り、次の一歩 | summary (5), markdown (reflection question + next: 第2回), flashcards (7), askTutor (3) | — |
 
 Contract check: hook 3 sentences + predict; 5 segments (4 concept + 1 example), one idea each; new terms per segment:
@@ -92,8 +92,8 @@ Every objective has an inline and an exam question. Worked example (5 steps with
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
 Body length (prose, definitions, table cells, steps md and expect, summary points, diagram description; the method of
-`reports/vibe-ch2.md`): **2,394** JP characters (budget 1,200–2,400). Prompt text, model answers, hints, troubleshoot,
-checklist and cards add 1,374.
+`reports/vibe-ch2.md`): **2,400** JP characters (budget 1,200–2,400). Prompt text, model answers, hints, troubleshoot,
+checklist and cards add 1,407.
 
 ## Assumptions
 - Headless run: the outline was not checked in with a person.
@@ -112,3 +112,11 @@ checklist and cards add 1,374.
 - Desktop app and cloud session plan details (which Team/Enterprise seats) are left out of the body; the table says
   only "有料プランが必要" for Desktop. Cloud-session availability is cited to `cc-cloud`.
 - `/powerup` and asking Claude Code about itself were left out for the body budget; they could go in a later lesson.
+- Round-1 fixes: 「Consoleアカウント」 is defined from the quickstart wording ("API access with pre-paid credits") as
+  「APIの料金を前払いして使うアカウント」, without the reviewer's 「開発者向け」, which the source does not say.
+- The diff in `example-diff` is an invented teaching example; it matches the model answer in `practice-prompt-explain`
+  and is labelled as an example, not as the `/diff` screen.
+- o3 now names installing and starting Claude Code, so that `q3` (fresh context) and `q7` (plan, installer, Node.js)
+  assess what o3 says. The round-1 fixes already force a full re-review (objective o2's spacing and most blocks changed).
+- The reader does not shuffle options, so the correct options sit at positions 1–4 across the lesson
+  (q0 2, q1 3, q2 4, q3 3, q4 4, q5 1, q6 3, q7 4, q8 2, q9 1).
