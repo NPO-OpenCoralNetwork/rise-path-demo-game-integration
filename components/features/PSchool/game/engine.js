@@ -580,7 +580,7 @@ async function executeGameAction(action, game, ui) {
         }
       }
       // ステージ8での魔法処理（シールドに弾かれる）
-      // 回復魔法と麻痺魔法はダメージを与える魔法ではないので、ここを通さず下の処理にまかせる
+      // 回復魔法と麻痺魔法は盾に弾かれないので、ここを通さず下の処理にまかせる
       // （回復は主人公を回復し、麻痺は盾があっても敵を動けなくする）
       else if (game.scene && game.scene.settings && game.scene.settings.stageNumber === 8 &&
                typeof game.scene.playerMagicAttack === 'function' &&

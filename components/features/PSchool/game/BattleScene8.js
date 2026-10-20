@@ -26,7 +26,7 @@ export class BattleScene8 extends BattleScene {
       backgroundColor: 0x4a3728, // ゴブリン要塞の茶色
       enemyTint: 0x228b22, // ゴブリンの緑色
       enemyHp: 30,
-      startMessage: `ステージ8「行動の繰り返し」が始まりました！\n🛡️ シールドゴブリンの盾は攻撃魔法が効かない！\n⚔️ 物理攻撃を8回繰り返して盾を破壊せよ！`,
+      startMessage: `ステージ8「行動の繰り返し」が始まりました！\n🛡️ シールドゴブリンの盾は魔法を弾く！（麻痺魔法は効く）\n⚔️ 物理攻撃を8回繰り返して盾を破壊せよ！`,
       availableBlocks: ['attack_basic', 'heal_magic', 'repeat_2x', 'repeat_3x', 'wave_left_hand', 'wave_right_hand', 'cast_magic', 'wait']
     });
     
@@ -127,7 +127,7 @@ export class BattleScene8 extends BattleScene {
   // 魔法攻撃を処理（盾に無効）
   async playerMagicAttack(spellName, damage) {
     if (this.shieldActive) {
-      this.addLog(`🛡️ ${spellName}は盾に弾かれた！魔法は効かない！`);
+      this.addLog(`🛡️ ${spellName}は盾に弾かれた！盾がある間は効かない！`);
       
       // 弾かれるエフェクト
       const spark = this.add.graphics();
@@ -148,7 +148,7 @@ export class BattleScene8 extends BattleScene {
       this.addLog(`🔮 ${spellName}発動！${damage}ダメージ！`);
       
       // 魔法エフェクトを再生（魔法名から選ぶ。氷の盾は主人公の前に氷の壁を出す）
-      // 回復魔法はここに来ない（engine.js が主人公の回復にする）
+      // 回復魔法と麻痺魔法はここに来ない（engine.js が主人公の回復と敵の麻痺にする）
       const animationType = spellName === '氷の盾' ? 'ice_shield' : spellAnimation(spellName, 'magic_fire');
       await this.playAnimation(animationType);
       if (this.isBattleOver()) return 0;

@@ -1601,6 +1601,8 @@ export class BattleScene extends Phaser.Scene {
     console.log('Applying paralyze effect to enemy (global)');
     // 電気の輪が敵を締めつけてから、麻痺の状態と表示を出す
     await this.playAnimation('magic_paralyze');
+    // 同じ実行の前の行動で勝負がついていたら、麻痺の表示を勝利画面に出さない
+    if (this.isBattleOver()) return;
     console.log('Before paralysis application:', {
       isEnemyParalyzed: this.isEnemyParalyzed,
       paralyzeRemainingTurns: this.paralyzeRemainingTurns

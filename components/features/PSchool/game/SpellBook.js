@@ -296,7 +296,7 @@ export class SpellBook {
         category: ['incantation', 'magic', 'control'],
         pattern: '左手 → 右手 → 左手 → 右手 → 左手 → 右手 → 左手 → 右手',
         description: '敵を麻痺状態にして行動を封じる制御魔法',
-        effect: '敵を2ターン麻痺状態にする',
+        effect: '敵を3ターン麻痺状態にする（ダークナイトは2ターン）',
         notes: [
           '8回の手振りが必要な高度な魔法',
           '左右交互のパターンを正確に詠唱',
