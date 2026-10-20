@@ -1,0 +1,134 @@
+{
+  "lessonId": "cc-02-permissions",
+  "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "lessonHash": "sha256:44ecfdc66d172d2b",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 2,
+      "evidence": "The register is warm and natural です・ます. There are no pressure phrases (lessons:lint --strict is clean), and the wrong-option feedback follows the 誤解→正しい考え pattern well. But §3 notation is broken across the whole lesson: half-width spaces sit between Japanese and Latin letters or digits outside inline code (「push の前」「auto モード」「Claude Code は」「v2.1.283 以降」), keys are written 「Shift+Tab」, card backs and glossary entries end in plain form, and 「安全チェック」 and 「分類器」 name the same thing without being tied together.",
+      "blockIds": [
+        "lesson",
+        "modes-switch",
+        "summary-cards",
+        "hook-predict",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Every sentence and paragraph is within budget (lint clean), and every concept section ends in a check with a table or diagram. In 2-3, rules-defs brings in 権限ルール plus 許可・確認・拒否ルール, which is four related names in one segment.",
+      "blockIds": [
+        "rules-defs",
+        "modes-table",
+        "rules-diagram"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "The lesson states its prerequisites (第1回, cd/ls, Git commit/push) and recalls 第1回 in hook-lead. 権限モード, 分類器, 権限ルール and チェックポイント are defined before [[link]] use and match the glossary. Several katakana terms are missing English on first use (リポジトリ, セッション, リモート, スクリプト, フック), and 「安全チェック」 appears in hook-predict and modes-table before 分類器 is defined and is never linked to it.",
+      "blockIds": [
+        "hook-predict",
+        "modes-table",
+        "auto-check",
+        "rules-steps",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson is single-locale jp and complete. The mermaid labels and alt in rules-diagram are Japanese and descriptive. The hook-version link text 「公式ドキュメント（日本語）」 names the destination only in general terms.",
+      "blockIds": [
+        "rules-diagram",
+        "hook-version"
+      ]
+    }
+  ],
+  "average": 2.75,
+  "mustFix": [
+    {
+      "criterion": "voice",
+      "blockId": "lesson",
+      "issue": "(d) notation §3: style-guide says 「和文と英数字の間にスペースは入れません」; only inline code may keep surrounding spaces. Throughout the lesson (title, subtitle, prerequisites, body, prompts, options, feedback, summary, flashcards, glossary terms and aliases), a half-width space separates Japanese from Latin letters or digits outside inline code, e.g. 「push まで」「auto モード」「Manual モード」「Claude Code は」「Claude が」「Git の commit」「v2.1.283 以降」「v2.1.200 で改名」「Anthropic の評価」「Bash のコマンド」「AI モデル」「CLAUDE.md に」「force push や」「2-3 のルール」.",
+      "fix": "Delete the space between Japanese and Latin letters or digits everywhere except next to inline code. Examples: 「push まで知らないうちに」→「pushまで知らないうちに」, 「auto モード」→「autoモード」, 「Manual モード」→「Manualモード」 (also the glossary term and the 「default モード」 alias →「defaultモード」), 「Claude Code は」→「Claude Codeは」, 「Claude が」→「Claudeが」, 「Git の commit と push の意味がわかる」→「Gitのcommitとpushの意味がわかる」, 「v2.1.283 以降の Claude Code を」→「v2.1.283以降のClaude Codeを」, 「v2.1.200 で改名」→「v2.1.200で改名」, 「Anthropic の評価では」→「Anthropicの評価では」, 「Bash のコマンド」→「Bashのコマンド」, 「別の AI モデル」→「別のAIモデル」, 「CLAUDE.md に」→「CLAUDE.mdに」, 「2-3 のルール」→「2-3のルール」. Spaces next to `…` inline code (「`/rewind` で」) may stay."
+    },
+    {
+      "criterion": "voice",
+      "blockId": "modes-switch",
+      "issue": "(d) notation §3: key combinations are to be written in the body like 「Ctrl + S」. The lesson writes 「Shift+Tab」 in modes-switch, check-quiz e2 (options a and c, explanation), summary-points and card-switch.",
+      "fix": "「**Shift+Tab**」→「**Shift + Tab**」 (modes-switch). Replace 「Shift+Tab」 with 「Shift + Tab」 in the same way in e2 option a 「Shift + Tabを1回押して」, e2 option c 「Shift + Tabを何回か押して」, the e2 explanation, summary-points 「（Shift + Tab）」 and card-switch."
+    },
+    {
+      "criterion": "voice",
+      "blockId": "summary-cards",
+      "issue": "(d) です・ます §1: three card backs end in plain-form verbs: card-switch 「…の順に進む。」, card-auto 「分類器も見逃すから（…）。本番に関わる操作は人が見る。」, card-order 「最初に一致したもので決まる。」.",
+      "fix": "card-switch: 「Shift+Tab。auto から押すと Manual → `acceptEdits` → プランモードの順に進む。」→「Shift + Tabです。autoから押すと、Manual → `acceptEdits` → プランモードの順に進みます。」 card-auto: 「分類器も見逃すから（Anthropic の評価で17%）。本番に関わる操作は人が見る。」→「分類器も見逃すからです（Anthropicの評価で17%）。本番に関わる操作は人が見ます。」 card-order: 「最初に一致したもので決まる。」→「最初に一致したもので決まります。」"
+    },
+    {
+      "criterion": "voice",
+      "blockId": "lesson",
+      "issue": "(d) です・ます §1: glossary definitions end in plain-form verbs, while the matching definitions blocks (auto-defs, rules-defs) use です・ます: 分類器 「危ない操作を止めるが、見逃すこともある。」, 権限ルール 「…の順に調べられる。」, 確認ルール 「auto モードでも確認が出る。」, 拒否ルール 「どのモードでも効く。」.",
+      "fix": "分類器: 「危ない操作を止めるが、見逃すこともある。」→「危ない操作を止めますが、見逃すこともあります。」 権限ルール: 「拒否 → 確認 → 許可の順に調べられる。」→「拒否 → 確認 → 許可の順に調べられます。」 確認ルール: 「auto モードでも確認が出る。」→「autoモードでも確認が出ます。」 拒否ルール: 「どのモードでも効く。」→「どのモードでも効きます。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "hook-predict",
+      "issue": "(d) katakana §2: 「リポジトリ」 (first use in q0 option b feedback) and 「セッション」 (first use in q0 option a feedback, 「いまの対話セッション」) appear without English on first use.",
+      "fix": "q0 option a feedback: 「いまの対話セッションは別のモードで始まり」→「いまの対話セッション（session）は別のモードで始まり」. q0 option b feedback: 「作業中のリポジトリへのふつうの push は」→「作業中のリポジトリ（repository）へのふつうのpushは」."
+    },
+    {
+      "criterion": "prior",
+      "blockId": "auto-check",
+      "issue": "(d) katakana §2: 「スクリプト」 appears for the first time in the q2 prompt without English.",
+      "fix": "「本番サーバーの設定を書き換えるスクリプトを実行する」→「本番サーバーの設定を書き換えるスクリプト（script）を実行する」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "rules-steps",
+      "issue": "(d) katakana §2: 「リモート」 appears for the first time in the p-run hint without English. The learner may not know it means the remote repository on GitHub and similar services.",
+      "fix": "「練習用フォルダにはリモートがないので」→「練習用フォルダにはリモート（remote、送り先のリポジトリ）がないので」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "check-quiz",
+      "issue": "(d) katakana §2: 「フック」 appears for the first time in the e5 explanation without English.",
+      "fix": "「第8回のフックで学びます。」→「第8回のフック（hook）で学びます。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "auto-lead",
+      "issue": "(e) naming: hook-predict (q0 option b and its feedback), modes-table (「すべて（裏で安全チェック）」), auto-bypass, q1, ps1, ps3, e1 and e2 call the auto-mode checker 「安全チェック」. 2-2 and the glossary call it 「分類器」 and never say they are the same thing. A learner may take 安全チェック for a separate mechanism that exists in every mode, e.g. reading 「確認も安全チェックもなくなる」 in q1 d as if Manual mode had one.",
+      "fix": "auto-lead: 「auto モードでは、この確認を分類器（classifier）が引き受けます。」→「autoモードでは、この確認を分類器（classifier）が引き受けます。この表で「安全チェック」と呼んだものです。」 Also add 「安全チェック」 to the aliases of the glossary entry 分類器."
+    },
+    {
+      "criterion": "voice",
+      "blockId": "check-quiz",
+      "issue": "(d) options §5: the e3 options do not share an ending. a and b end in verbs (「元に戻る」「戻らない」), c ends in a noun (「`config.js` はそのまま」) and d ends in a noun phrase (「戻せるのは会話だけ」).",
+      "fix": "e3 option c: 「消えたログだけが戻り、`config.js` はそのまま」→「消えたログだけが戻り、`config.js` は戻らない」. e3 option d: 「どちらも戻らない。戻せるのは会話だけ」→「どちらも戻らず、会話だけが戻る」."
+    }
+  ],
+  "niceToHave": [
+    "modes-switch: 「もう一度で戻ります」 does not say where it returns to; the e2 explanation implies auto — 「もう一度で戻ります。」→「もう一度押すとautoに戻ります。」",
+    "hook-predict: the q0 explanation cites 「（2-2）」 for the default-mode claim, but that fact is in the 2-1 table (「v2.1.283 以降の既定」). 2-2 explains what auto does — 「auto モードで始まります（2-2）。」→「autoモードで始まります（2-1の表）。」",
+    "rules-order: 「守らせるのはモデルではなく Claude Code です。」 has no object, so it is unclear what is enforced — 「守らせるのはモデルではなく Claude Code です。」→「ルールを守らせるのは、モデルではなくClaude Codeの仕組みです。」",
+    "example-pitfall: two topic markers in a row (「`Read(./.env)` も、…読み取りは」) make the second sentence read awkwardly — 「`Read(./.env)` も、一部のコマンドやスクリプトの読み取りは止められません。」→「`Read(./.env)` を書いても、一部のコマンドやスクリプトによる読み取りは止められません。」",
+    "rules-steps: pw-restore repeats 選んで…選びます — 「依頼文2を選んで「Restore code」を選びます。」→「依頼文2を選び、「Restore code」を押します。」",
+    "example-steps: in ex-pattern, the space inside 「 *」 is easy to miss on a phone — 「末尾の「 *」は」→「末尾の「空白＋`*`」は」",
+    "check-quiz: e4 option d (the correct answer) is about twice as long as a–c, which gives it away. Shorten it — 「要る。Bash での変更や外への操作は戻らず、長く残す履歴やチームでの共有にも使えないから」→「要る。`/rewind` では戻らない変更があり、チームでの共有にも使えないから」",
+    "sort-quiz: §5 asks for a single-sentence question. ps1–ps3 are two sentences (scene + 「どのモードを選びますか？」). This is acceptable for scenario items. Consider folding them, e.g. ps1 「…自動で実行させたい。どのモードを選びますか？」→「…自動で実行させたいとき、どのモードを選びますか？」",
+    "lesson: 「Git」 (prerequisites) and 「git」 (rewind-git, q5, e4) are mixed, and so are 「commit」 (prerequisites) and 「コミット」 (body). Use 「Git」 for the tool and keep `git` only in code — 「区切りごとに git でコミットしましょう。」→「区切りごとにGitでコミットしましょう。」",
+    "lesson: other katakana terms appear without English on first use, though they are well known: ターミナル (prerequisites / q0), エディタ (q5 d), データベース (rewind-table), オプション (e5 d feedback). Adding English would make the lesson consistent with §2, e.g. 「エディタで書き換えた」→「エディタ（editor）で書き換えた」",
+    "rules-defs: 2-3 introduces 権限ルール plus 許可ルール・確認ルール・拒否ルール, which is four names against the 3-per-segment guideline. 許可ルール is used only once in the body, so it could stay as the label 「allow」 — 「許可ルール（allow）・確認ルール（ask）・拒否ルール（deny）があります。」→「確認ルール（ask）・拒否ルール（deny）と、確認なしで通す allow があります。」",
+    "hook-version: the link text could name the page — 「[公式ドキュメント（日本語）]」→「[権限モードの公式ドキュメント（日本語）]」. Factual doubt for the author: the link goes to /docs/ja/permission-modes, but sources list only /docs/en/permission-modes. Confirm that the ja URL exists or cite it.",
+    "glossary: 権限モード lists 「auto」 without backticks, while modes-table and card-modes use 「`auto`」 and the body uses plain 「auto モード」. Pick one form for the mode name, e.g. 「・auto・」→「・`auto`・」 in the glossary entry.",
+    "rewind-lead: factual doubt for the author: 「セッションごとに直近100回分が残ります」 — check this number against the Checkpointing page (cc-checkpointing). As far as I know, the docs describe retention by age across sessions, not a 100-prompt cap. The same claim appears in the e4 option c feedback."
+  ],
+  "verdict": "revise",
+  "summary": "The biggest strength is the voice. The です・ます register is warm and natural, every piece of wrong-option feedback names the misconception and then the right idea in two sentences, and lint is clean. The most important fix is §3 notation across the whole lesson: remove the half-width spaces between Japanese and Latin letters outside inline code, write keys as 「Shift + Tab」, and turn the plain-form endings in the flashcards and glossary into です・ます. Also tie 「安全チェック」 to 「分類器」 and add English to the first use of リポジトリ, セッション, スクリプト, リモート and フック."
+}

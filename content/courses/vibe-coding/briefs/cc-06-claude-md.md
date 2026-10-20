@@ -11,7 +11,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 
 ## 到達目標 / Outcome (必須)
 このレッスンの後、学習者は次のことができる / After this lesson the learner can:
-- o1 (bloom: apply): 指示の置き場所（CLAUDE.md・`.claude/rules/`・CLAUDE.local.md・権限ルール）を、内容に合わせて選べる
+- o1 (bloom: apply): 指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール）を、内容に合わせて選べる
 - o2 (bloom: evaluate): 長すぎる CLAUDE.md を、短く具体的で確かめられる指示に改善できる
 - o3 (bloom: understand): CLAUDE.md に書いても強制にはならない理由を説明できる
 
@@ -34,7 +34,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
   - IMPORTANT を付ければ確実（→ 強調は 1 行ずつ。強制にはならない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 23（計算は下の Assumptions）。
+- 所要時間 / minutes: 20（計算は下の Assumptions）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 練習用フォルダー `cc-practice-06` に、膨らんだ見本の CLAUDE.md（18 行、ヒアドキュメントで作成）を置く。自分で行き先を決めてから Claude Code に書き直しを頼み、差分を説明させ、再起動後に `/context` と `/permissions` で確かめる。具体的な行は残し、手順は `docs/add-screen.md`（第7回のスキル候補）、`src/api/` の決まりは `paths:` 付きルール、「絶対に〜しない」は拒否ルール、好みは CLAUDE.local.md へ。チェックリスト、3 段のヒント、模範解答つき。
@@ -57,11 +57,11 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 - steering-post — Steering Claude Code: when to use CLAUDE.md, skills, hooks, and subagents（2026-06-18）— https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more
 
 ## Assumptions
-- 第1回〜第5回のタイトルは課題文の短い形（「第2回｜権限モードと巻き戻し」など）で前提に書いた。公開時に各レッスンの正式タイトルとそろえる。
+- 前提の第1回〜第5回は、コース共通の正式タイトル（「第2回｜任せる範囲を決める：権限モードと巻き戻し」など）で書いた。
 - 権限ルールの書式（`Read(./.env)`、`Bash(git push *)`）と `/permissions` が規則と出どころのファイルを表示する点は、第2回用の検証済み facts（docs-15, safety-9）から使った。
 - 「auto モードの分類器も見逃しがゼロではない」は第2回用 facts（permission-modes: "does not guarantee safety"）による。
-- estMinutes: 問題を除く読む文字（本文・表・定義・リスト・見出し・カード）約 5,340 字 ÷ 450 ≈ 11.9 分 + 問題 13 問（予想 1・確認 6・テスト 6）× 40 秒 ≈ 8.7 分 + 演習 1 つ 2 分 ≈ 22.5 分 → 23 分。
-- 本文の長さ（vibe-ch2 のレポートと同じ数え方：prose のうちプロンプトの expect と手順の hint/troubleshoot を除く）は 2,355 字。prose 全体では 2,470 字。
+- estMinutes: 問題を除く画面上の読む文字（タイトル・見出し・本文・表・定義・リスト・手順・図の説明・まとめ・カード。リンクの URL やマークダウンの記号は数えない）約 5,380 字 ÷ 450 ≈ 12.0 分 + 問題 9 問（予想 1・確認 4・テスト 4）× 40 秒 = 6.0 分 + 演習 1 つ 2 分 ≈ 20.0 分 → 20 分。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
+- 本文の長さ（vibe-ch2 のレポートと同じ数え方：prose のうちプロンプトの expect と手順の hint/troubleshoot を除く）は初版で 2,355 字、prose 全体で 2,470 字。レビュー後の修正（拒否ルールの限界の2文、ヒントの9行目、略語の正式名など）で約 200 字増えた。
 - 演習の見本と模範解答はスクラッチで実際に実行し、18 行の CLAUDE.md、`sed -n '12,18p'` での手順の切り出し、`.gitignore` への追記、settings.json の JSON として正しいことを確かめた。
 
 ## Outline
@@ -69,11 +69,11 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | hook | hook | はじめに：毎回の説明と、守られない決まり | 同じ説明のくり返しと「守られるのか」の不安を、置き場所と書き方で解く | markdown, quiz(predict) | q0（predict, o3） |
-| s1 | concept | 6-1. CLAUDE.mdは毎回最初に読まれる | CLAUDE.md は毎回の始めに読まれる指示。4 つの置き場所はつながって読まれる。自動メモリは Claude が書く | markdown, definitions(CLAUDE.md, CLAUDE.local.md, 自動メモリ), markdown(/init), table(4 つの置き場所), markdown, quiz(inline) | q1 → o1（apply）、q2 → o2（understand） |
+| s1 | concept | 6-1. CLAUDE.mdは毎回最初に読まれる | CLAUDE.md は毎回の始めに読まれる指示。4 つの置き場所はつながって読まれる。自動メモリは Claude が書く | markdown, definitions(CLAUDE.md, CLAUDE.local.md, 自動メモリ), markdown(/init), table(4 つの置き場所), markdown, quiz(inline) | q2 → o2（evaluate: 矛盾する2行を直す） |
 | s2 | concept | 6-2. 短く、具体的に、確かめられるように | 200 行未満、確かめられる形、2 回間違えたら足し、消しても困らない行は削る | markdown, table(あいまい→具体), markdown, markdown, list(書かないもの), callout(pitfall: 途中の編集), quiz(inline) | q3 → o2（evaluate） |
 | s3 | concept | 6-3. 分けて育てる：インポートとルール | `@` は整理だけで毎回読まれる。減らせるのは `paths:` 付きのルール。AGENTS.md の扱い | markdown, definitions(インポート, ルール, AGENTS.md), markdown, code(yaml frontmatter), diagram(起動時 vs 必要なとき), markdown, callout(info: 版と公式ドキュメント), quiz(inline) | q4 → o1（apply） |
 | s4 | concept | 6-4. 書いても強制にはならない | CLAUDE.md はコンテキストで頼みごと。確実さは権限ルールとフック、手順はスキル | markdown, markdown, definitions(権限ルール, フック, スキル), table(5 つのつまずきと移す先), markdown, quiz(inline) | q5 → o3（understand） |
-| s5 | example | 6-5. 例題：気になる6行を仕分ける | 6 行を 6 つの手順で仕分ける（理由つき） | markdown, list(6 行), steps(6, expect つき), quiz(inline) | q7 → o2（evaluate） |
+| s5 | example | 6-5. 例題：気になる6行を仕分ける | 6 行を 6 つの手順で仕分ける（理由つき） | markdown, list(6 行), steps(6, expect つき) | — |
 | practice | practice | 演習：膨らんだCLAUDE.mdを書き直す | 自分で行き先を決めてから頼み、差分を説明させ、読み込みを確かめる | markdown, code(bash 見本), steps(6, hint/troubleshoot), prompt(claude-code), checklist(7), callout(tip: 答えに近いヒント), markdown, code(bash 模範解答), code(json settings), markdown | — |
-| check | check | 理解度チェック | 全目標を新しい場面で | quiz(exam) | e1 → o1（analyze, 転移: AGENTS.md と CLAUDE.local.md）、e2 → o1（apply, 転移: 毎回の整形）、e3 → o2（evaluate: 240 行）、e4 → o2（evaluate: 書き直し）、e5 → o3（understand）、e6 → o3（apply, 転移: 同僚への説明） |
+| check | check | 理解度チェック | 全目標を新しい場面で | quiz(exam) | e1 → o1（analyze, 転移: AGENTS.md と CLAUDE.local.md）、e2 → o1（apply, 転移: 毎回の整形）、e3 → o2（evaluate: 240 行）、e6 → o3（apply, 転移: 同僚への説明） |
 | summary | summary | まとめ | 4 点 + 次の一歩とふりかえり + 7 枚のカード + AI先生 | summary, markdown, flashcards, askTutor | — |
