@@ -1,62 +1,61 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:31ca899dd855ae10",
+  "lessonHash": "sha256:4f85040f9e462bb2",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:ba8eeb1a7115a66b",
+    "reviewedRevision": "sha256:31ca899dd855ae10",
     "changed": [
-      "s2-layers"
+      "s2-check",
+      "lesson.glossary"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.05,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/ba8eeb1a7115a66b/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "I re-scored voice because s2-layers changed. The new edge labels 「サンドボックスの中」 and 「サンドボックスの外」 are natural and parallel in form. The new alt sentences end in です・ます: 「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」 and 「VM・クラウドセッションは、この図の全体（Claude Code全体）を囲みます。」 Neither has a grammar error. The rest of the lesson is unchanged, so voice stays at 3.",
+      "evidence": "I re-scored voice because the s2-check q2 hint changed. The new hint is 「フックやMCPサーバーまで囲めるのはどれか、10-2の本文で確かめましょう。」 It is in です・ます form, has no grammar error and names a section that exists (10-2). The 10-2 body backs it up: s2 says 「フックやMCPサーバーは、サンドボックスの外で動きます。」 and 「公式は、知らないリポジトリにはVMか[[クラウドセッション]]…を勧めます」. The rest of the lesson is unchanged, so voice stays at 3.",
       "blockIds": [
-        "s2-layers"
+        "s2-check"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. measure.mjs gives prose 1887 (budget 1,200–2,400), read 2459 and est 17.2 min (must be ≤ 20; estMinutes 17). para-sentences.mjs reports 0 paragraphs over 3 sentences. The s2-layers diagram is now a flat chart of 5 nodes with no subgraph, which makes it simpler.",
-      "blockIds": [
-        "s2-layers"
-      ]
+      "evidence": "Carried over. lessons:lint --strict still reports 0 errors and 0 warnings. measure.mjs gives prose 1887 (budget 1,200–2,400), read 2459 and est 17.2 min (must be ≤ 20; estMinutes 17). para-sentences.mjs reports 0 paragraphs over 3 sentences.",
+      "blockIds": [],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Carried over from the previous round. The change in s2-layers adds no new terms. `--bare` in s2-isolate is still not explained; this is in niceToHave.",
+      "evidence": "I re-scored prior because the glossary changed. Three entries now have aliases: プロンプトインジェクション gets 「prompt injection」 and 「プロンプトインジェクション（prompt injection）」, ワークスペースの信頼 gets 「workspace trust」, and サンドボックス gets 「sandbox」. With these, the glossary matches the first-use forms in the text that carry English. No new terms were added. `--bare` in s2-isolate is still not explained (unchanged text, niceToHave), so prior stays at 3.",
       "blockIds": [
         "s2-isolate"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "I re-scored a11y_l10n because the alt changed. The alt names every node and both edge labels (サンドボックスの中/外). It also says clearly that VM・クラウドセッション is not drawn but surrounds the whole figure: 「この図の全体（Claude Code全体）を囲みます」. The lesson has a single locale (jp).",
+      "evidence": "Carried over. The lesson has a single locale (jp). The s2-layers alt still names every node and both edge labels.",
       "blockIds": [
         "s2-layers"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-layers: the VM frame was removed from the diagram, but the caption still begins with VM. A learner may look for a VM element in the diagram and not find it. — 「VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。」→「サンドボックスはシェルコマンドだけを囲みます。VMやクラウドセッションは、この図全体（Claude Code全体）を外から囲みます。」",
-    "s2-layers: the node label shortens MCPサーバー to 「MCP」, while the alt says 「MCPサーバー」. — 「ファイル操作<br>MCP」→「ファイル操作<br>MCPサーバー」",
-    "Carried over from earlier rounds (unchanged text): s5-md2 lead-in 「`-p` では、環境変数の」→「表の補足として、`-p` では環境変数の」; 「大きな要求」→「使用量の多い要求」; `--bare` in s2-isolate has no explanation; 「オフラインの」 in s2-table vs 「ネットにつながらない」 in e1; the 利用上限 row in s5-table has no verb ending; the e2 d feedback has no subject; e5 uses 「Console」 alone; s3-pitfall says 効きません but s3-check says 使われません; the subject of 「共有します」 in the 利用上限 glossary entry is unclear; 「サブスクリプション」 in hook-predict has no English."
+    "s2-check: the new hint points to the 10-2 body. A learner reading on a phone may not know which paragraph to look at. Naming the table makes it easier to find. — 「フックやMCPサーバーまで囲めるのはどれか、10-2の本文で確かめましょう。」→「フックやMCPサーバーまで囲めるのはどれか、10-2の図と表で確かめましょう。」",
+    "Carried over from earlier rounds (unchanged text): the s2-layers caption begins with VM, but the diagram has no VM element (「VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。」→「サンドボックスはシェルコマンドだけを囲みます。VMやクラウドセッションは、この図全体（Claude Code全体）を外から囲みます。」); the s2-layers node 「ファイル操作<br>MCP」→「ファイル操作<br>MCPサーバー」; s5-md2 lead-in 「`-p` では、環境変数の」→「表の補足として、`-p` では環境変数の」; 「大きな要求」→「使用量の多い要求」; `--bare` in s2-isolate has no explanation; 「オフラインの」 in s2-table vs 「ネットにつながらない」 in e1; the 利用上限 row in s5-table has no verb ending; the e2 d feedback has no subject; e5 uses 「Console」 alone; s3-pitfall says 効きません but s3-check says 使われません; the subject of 「共有します」 in the 利用上限 glossary entry is unclear; 「サブスクリプション」 in hook-predict has no English."
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0. Only s2-layers changed (1 of 44 blocks, 2%), in its code and alt. The diagram is now flat, and edge labels mark what is inside and outside the sandbox. The previous review had no open must-fix items, so there are no resolved entries. I checked every string in the changed block and found no (a)–(e) errors. lessons:lint --strict is clean, measure.mjs gives prose 1887 and est 17.2 min, and no paragraph has more than 3 sentences. Scores: voice 3, load 4, prior 3 (carried over), a11y_l10n 4. The mean is 3.5 and the verdict is pass."
+  "summary": "Verification round: review-scope.mjs exited 0. Two things changed: the s2-check q2 hint, and aliases on 3 glossary entries (1 of 44 blocks, 5% of parts). The previous review had no open must-fix items, so there are no resolved entries. I checked the changed strings and found no (a)–(e) errors. The new hint is です・ます and matches the 10-2 body, and the aliases bring the glossary in line with the text. lessons:lint --strict is clean, and measure.mjs gives prose 1887 and est 17.2 min. Scores: voice 3, load 4 (carried over), prior 3, a11y_l10n 4 (carried over). The mean is 3.5 and the verdict is pass."
 }

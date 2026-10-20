@@ -1,20 +1,28 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:31ca899dd855ae10",
+  "lessonHash": "sha256:4f85040f9e462bb2",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:ba8eeb1a7115a66b",
+    "reviewedRevision": "sha256:31ca899dd855ae10",
     "changed": [
-      "s2-layers"
+      "s2-check",
+      "lesson.glossary"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.05,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/ba8eeb1a7115a66b/round-1/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/round-1/pedagogy-reviewer.review.json"
   },
-  "resolved": [],
+  "resolved": [
+    {
+      "blockId": "s2-check",
+      "criterion": "active",
+      "status": "resolved",
+      "evidence": "q2's hint changed in s2-check. It was 「Claude Code全体を囲めるのはどれか、図で確かめましょう。」 and is now 「フックやMCPサーバーまで囲めるのはどれか、10-2の本文で確かめましょう。」. The hint no longer points at s2-layers, which shows no enclosure. It now points at prose that holds the needed fact: s2-sandbox says 「フックやMCPサーバーは、サンドボックスの外で動きます。」. That rules out distractor b without naming answer a. 10-2 is this section's own title (「10-2. 知らないリポジトリと強い権限は、隔離する」), so the reference is correct."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -52,12 +60,13 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "Re-scored because s2-layers changed. measure.mjs (hash 31ca899dd855ae10) reports 「prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1072 · questions 11 · est 17.2 min (must be ≤ 20; estMinutes 17)」. para-sentences reports 「0 paragraph(s) over 3 sentences」, and strict lint gives 0 warnings. The diagram has dropped from 6 nodes to 5 and adds no prose. s5-md2's second paragraph still packs three unrelated facts, and s2 is still 7 blocks long.",
+      "evidence": "measure.mjs (hash 31ca899dd855ae10) reports 「prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1072 · questions 11 · est 17.2 min (must be ≤ 20; estMinutes 17)」. para-sentences reports 「0 paragraph(s) over 3 sentences」, and strict lint gives 0 warnings. The diagram has dropped from 6 nodes to 5 and adds no prose. s5-md2's second paragraph still packs three unrelated facts, and s2 is still 7 blocks long.",
       "blockIds": [
         "s2-layers",
         "s5-md2",
         "s5-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -73,11 +82,11 @@
     {
       "id": "active",
       "score": 3,
-      "evidence": "Re-scored because q2's hint depends on s2-layers. Density is met: q1–q4 run inline across s1, s2, s3 and s5, and the exam follows. Feedback is given on every wrong option. q2 can still be answered by matching words. Its hint 「Claude Code全体を囲めるのはどれか、図で確かめましょう。」 now points at a drawing that no longer shows any enclosure (see mustFix). Only the caption still says 「VMやクラウドセッションはClaude Code全体を…囲みます」.",
+      "evidence": "Re-scored because q2's hint changed. The regression is fixed: the new hint 「フックやMCPサーバーまで囲めるのはどれか、10-2の本文で確かめましょう。」 sends the learner to s2-sandbox and s2-isolate rather than to a drawing with no enclosure. Density is unchanged: q1–q4 run inline across s1, s2, s3 and s5, the exam follows, and every wrong option has feedback. q2 is still partly word matching: s2-isolate states the answer outright, 「そのため公式は、知らないリポジトリにはVMか[[クラウドセッション]]…を勧めます。」, and the prompt asks 「公式ドキュメントが勧める方法」. That keeps the score at 3, not 4.",
       "blockIds": [
         "s2-check",
-        "s2-layers",
-        "check-quiz"
+        "s2-isolate",
+        "s2-sandbox"
       ]
     },
     {
@@ -97,10 +106,11 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "Re-scored against the current screenshots (metrics.json lessonHash sha256:31ca899dd855ae10, mermaidErrors 0, overflowX false). The visual-qa defect is fixed. On mobile-jp-07, both 「シェルコマンド」 and 「ファイル操作 MCP」 show in full, and the edge labels 「サンドボックスの中」 and 「サンドボックスの外」 are readable. desktop-jp-05 is clean too. There are 5 nodes, the labels match the text's terms, and the caption states the takeaway. The change also removed the VM frame (the old VMBOX and node V). The drawing now shows no layers at all: the caption's 「守りは重ねて」 and 「VMやクラウドセッションはClaude Code全体を…囲みます」 are carried by text alone. Hooks are still not drawn. Flowchart edge labels can also read as branch conditions rather than enclosures.",
+      "evidence": "Scored against the screenshots of the previous round (metrics.json lessonHash sha256:31ca899dd855ae10, mermaidErrors 0, overflowX false). On mobile-jp-07 the nodes and the 「サンドボックスの中／外」 edge labels fit. The caption states the takeaway. The VM layer and hooks are carried by text, not by the drawing.",
       "blockIds": [
         "s2-layers"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -130,18 +140,22 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Re-scored for the changed block. The s2-layers claims match s2-sandbox and s2-defs: the edge labels 「サンドボックスの中」 to 「シェルコマンド」 and 「サンドボックスの外」 to 「ファイル操作 MCP」, and the alt's 「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」. The block still cites cc-sandboxing and cc-sandbox-environments. The audit file has no finding against this block. Elsewhere, s5-md2 still cites cc-costs, pricing, cc-authentication and cc-model-config.",
+      "evidence": "The s2-layers claims match s2-sandbox and s2-defs, and the block cites cc-sandboxing and cc-sandbox-environments. s5-md2 cites cc-costs, pricing, cc-authentication and cc-model-config. The new q2 hint adds no new claim: it restates s2-sandbox, which is cited. q2-c feedback already reads 「リポジトリのフックや `.mcp.json` のサーバーが使われます」, in line with the audit's narrowing.",
       "blockIds": [
         "s2-layers",
-        "s5-md2"
-      ]
+        "s5-md2",
+        "s2-check"
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored for the changed alt. It is in plain です・ます, and the repeated 囲む of the previous round is gone: 「VM・クラウドセッションは、この図の全体（Claude Code全体）を囲みます。」. s5-md2 still reads as a list of loose notes. s2-table's 「オフライン」 still differs from the 「ネットにつながらない」 used in e1-b, e2-b and practice-prompt-review ①.",
+      "evidence": "Re-scored because the glossary changed. Glossary aliases now match the definition-block terms: 「プロンプトインジェクション（prompt injection）」 (line 108, s1), 「ワークスペースの信頼（workspace trust）」 and 「サンドボックス（sandbox）」 (s2-defs). The English first-use form and the glossary entries now line up. The new hint is plain です・ます and non-pressuring. Still open: s5-md2 reads as a list of loose notes, and s2-table's 「オフライン」 differs from the 「ネットにつながらない」 used in e1-b, e2-b and practice-prompt-review ①.",
       "blockIds": [
-        "s2-layers",
+        "s2-check",
+        "s1-defs",
+        "s2-defs",
         "s5-md2",
         "s2-table"
       ]
@@ -149,32 +163,27 @@
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Re-scored. The s2-layers alt now matches the drawing: 「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」 describes the two labelled edges. The previous round's mismatch, a sandbox enclosure the drawing did not show, is gone. The alt still names 「分類器」, which no label shows. Its last sentence describes a VM enclosure that is not drawn, but it is phrased as context (「この図の全体を囲みます」). The only locale, jp, is complete, and the 2-column tables fit mobile (mobile-jp-07).",
+      "evidence": "The s2-layers alt matches the drawing (「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」). It still names 「分類器」, which no label shows. The only locale, jp, is complete, and the 2-column tables fit mobile (mobile-jp-07).",
       "blockIds": [
         "s2-layers",
         "s2-table",
         "s5-table"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "active",
-      "blockId": "s2-check",
-      "issue": "This is a regression caused by the s2-layers change, which removed the VMBOX frame and the node V 「この枠がVM・クラウドセッション」. q2's hint still reads 「Claude Code全体を囲めるのはどれか、図で確かめましょう。」, but the drawing no longer shows anything that encloses Claude Code. A learner who looks at the figure finds only 「サンドボックスの中／外」 edge labels. That points toward distractor b, the sandbox. The answer survives only in the caption, which states it outright.",
-      "fix": "In s2-check q2, replace the hint with 「フックやMCPサーバーまで囲めるのはどれか、10-2の本文で確かめましょう。」. Then the hint no longer refers to a drawn enclosure and does not name the answer. Alternatively, restore a drawn VM frame in s2-layers (see niceToHave) and keep the current hint."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s2-layers: draw the outer layer again in a mobile-safe way so that 「守りは重ねて」 is visible. For example, wrap B, C, E and D in `subgraph VMBOX[\"VM・クラウドセッション（全体を囲む）\"]` with `direction TD` and keep A outside. Then re-run lessons:preview, and have visual-qa check that the A-->B edge does not cross the subgraph title and that mobile-jp-07 still fits.",
-    "s2-layers: the edge labels 「サンドボックスの中」 and 「サンドボックスの外」 can read as if-conditions in a flowchart. Writing the place in the node text is clearer, for example `E[\"シェルコマンド<br>（中）\"]` and `D[\"ファイル操作・MCP<br>（外）\"]` with the edge `C -->|サンドボックスの| E`. Another option is to keep the edges unlabelled and add 「サンドボックスがオンのとき」 to the caption, because the sandbox is off by default (s2-defs 「既定はオフです」).",
-    "s2-layers still leaves out hooks, which s2-sandbox, e2-c and card-sandbox say run outside the sandbox. Add `F[\"リポジトリのフック\"]` next to D with `C -->|サンドボックスの外| F`, giving 6 nodes, and check the width at 390 px.",
-    "s5-md2: move each fact next to its row. Change the cause cell of s5-table row 1 to 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」. Change the action cell of row 2 to 「作業の切れ目で `/clear`（費用なし）。`/compact` はそれ自体が大きな要求。調べものはサブエージェントへ」. Keep 「[[エフォート]]（effort）は、考える量の設定です。」 in s5-md2.",
+    "s2-check q2: to make it test analysis rather than recall of s2-isolate's sentence, reframe the prompt as a scenario. For example, 「知らない人の公開リポジトリに `.claude/settings.json` のフックと `.mcp.json` が入っていました。手元のファイルを守りながら試すには、どれが合うでしょう？」. Keep the options and feedback.",
+    "s2-layers: draw the outer layer again in a mobile-safe way so that 「守りは重ねて」 is visible. For example, wrap B, C, E and D in `subgraph VMBOX[\"VM・クラウドセッション（全体を囲む）\"]` with `direction TD` and keep A outside. Then re-run lessons:preview and have visual-qa check mobile-jp-07.",
+    "s2-layers: the edge labels 「サンドボックスの中」 and 「サンドボックスの外」 can read as if-conditions in a flowchart. Put the place in the node text instead (`E[\"シェルコマンド<br>（中）\"]`, `D[\"ファイル操作・MCP<br>（外）\"]`), or add 「サンドボックスがオンのとき」 to the caption.",
+    "s2-layers still leaves out hooks, which s2-sandbox, e2-c and card-sandbox say run outside the sandbox. Add `F[\"リポジトリのフック\"]` with `C -->|サンドボックスの外| F` (6 nodes) and check the width at 390 px.",
+    "s5-md2: move each fact next to its row. Change the cause cell of s5-table row 1 to 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」. Change the action cell of row 2 to 「作業の切れ目で `/clear`（費用なし）。`/compact` はそれ自体が大きな要求。調べものはサブエージェントへ」.",
     "Use one phrase for the offline case across the lesson. For example, change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」 to match s2-table. Wording is for ja-editor.",
     "Still open from earlier rounds: ex-target (s3-steps) gives no reason for its choice. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」",
     "Still open from earlier rounds: add 「第6回｜CLAUDE.mdで前提を伝える」 and 「第7回｜手順はスキルに、調べものはサブエージェントに」 to prerequisites."
   ],
   "average": 3.38,
-  "verdict": "revise",
-  "summary": "Verification round: review-scope exited 0, with 1 of 44 blocks changed (2%, s2-layers) and sections and objectives unchanged. The previous pedagogy review had no open must-fix items, so resolved is empty. The change fixes visual-qa's mobile defect: on mobile-jp-07 both branch nodes and the edge labels 「サンドボックスの中／外」 fit, with 5 nodes and no mermaid errors. The alt now matches the drawing. The change also removed the VM frame, so q2's hint 「…図で確かめましょう」 now sends the learner to a drawing with no enclosure. That regression is the single must-fix: change the hint in s2-check, or restore a drawn VM frame. Re-scored criteria: load 3, active 3, visual 3, accuracy 4, voice 3, a11y_l10n 3; the others are carried over. validate and strict lint are clean, measure.mjs gives est 17.2 min against estMinutes 17, and no paragraph has more than 3 sentences. Mean 3.38 with every criterion ≥ 3; the verdict is revise because of the must-fix. Files: /home/user/rise-path-demo-game-integration/content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json, /home/user/rise-path-demo-game-integration/.artifacts/preview/vibe-coding/cc-10-safety-cost/pages/mobile-jp-07.png, /home/user/rise-path-demo-game-integration/.artifacts/preview/vibe-coding/cc-10-safety-cost/pages/desktop-jp-05.png"
+  "verdict": "pass",
+  "summary": "Verification round: review-scope exited 0. The changes since 31ca899dd855ae10 are s2-check (q2 hint) and lesson.glossary (aliases): 5% of parts, 1 of 44 blocks, sections and objectives unchanged. The single open must-fix (s2-check, active) is resolved. The hint now points to the 10-2 prose about hooks and MCP servers, not to a drawing without an enclosure, and it does not name the answer. The glossary aliases match the definition-block terms with English on first use; this is an improvement and causes no regression. Re-scored: active 3 (q2 is still partly answerable from s2-isolate's sentence; niceToHave) and voice 3. The other criteria are carried over. validate shows 0 errors and strict lint 0 warnings. measure.mjs gives est 17.2 min against estMinutes 17, and no paragraph has more than 3 sentences. Every criterion is ≥ 3, the mean is 3.38 and there are no must-fix items, so the verdict is pass. File: /home/user/rise-path-demo-game-integration/content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json"
 }

@@ -1,31 +1,29 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:31ca899dd855ae10",
+  "lessonHash": "sha256:4f85040f9e462bb2",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The s2-layers flowchart TD fits at 390 px with readable Japanese labels and a caption (mobile-jp-06/07). Both 2-column tables (s2-table, s5-table) wrap cleanly with nothing cut off (mobile-jp-07, mobile-jp-13/14), and the code blocks fit without sideways scrolling. On every desktop screen the glossary panel lists プロンプトインジェクション, ワークスペースの信頼 and サンドボックス twice each.",
+      "score": 4,
+      "evidence": "The s2-layers flowchart TD fits 390 px with readable Japanese labels (mobile-jp-06/07). The two-column tables s2-table and s5-table wrap cleanly with nothing cut off (mobile-jp-07, mobile-jp-13/14). Every code block (s3-code, practice-case-settings, practice-case-zshrc, practice-folder, practice-answer-rule) shows in full without sideways scrolling.",
       "blockIds": [
         "s2-layers",
         "s2-table",
         "s5-table",
         "s3-code",
         "practice-folder",
-        "s1-defs",
-        "s2-defs"
+        "practice-answer-rule"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "No text-only screens (metrics textOnlyScreens empty). Each section has a figure, table, code block or check close by. s5-md2 is the densest paragraph run: 3 facts in a row before the table (mobile-jp-13). The practice section has three one-step 'steps' blocks, each with its own '手順 1ステップ中 0 完了' header, which reads as repetitive (mobile-jp-16, mobile-jp-18).",
+      "evidence": "No screen is text-only (textOnlyScreens is empty on both devices), and the concept sections alternate prose, definitions, a diagram, tables and checks. The practice section is long on mobile (mobile-jp-15 to mobile-jp-20). It uses three separate one-step steps blocks, and each one restarts at '1' with '1ステップ中 0 完了'.",
       "blockIds": [
-        "s5-md2",
         "practice-steps",
         "practice-steps-deny",
         "practice-steps-bill"
@@ -33,33 +31,24 @@
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The UI and all content are in Japanese with no stray English UI. The diagram has alt text, and the controls stay clear of the top and bottom bars. Line breaks inside Japanese words are rare (practice-steps-deny breaks '作/り、' before inline code on mobile-jp-16). The doubled glossary chips (with and without the English gloss) make the term list ambiguous for learners.",
+      "score": 4,
+      "evidence": "All learner-facing text is Japanese, as is everything in the reader UI and the diagram labels. English appears only in terms glossed on first use, such as 'プロンプトインジェクション（prompt injection）', and in code. Text contrast is good on the warning and pitfall callouts (s1-auto, s3-pitfall). No awkward line breaks inside Japanese words were seen.",
       "blockIds": [
-        "s2-layers",
-        "practice-steps-deny",
         "s1-defs",
-        "s2-defs"
+        "s2-defs",
+        "s1-auto",
+        "s3-pitfall"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "lesson",
-      "issue": "The desktop glossary panel ('用語・このレッスン') shows three terms twice: 'プロンプトインジェクション（prompt injection）' and 'プロンプトインジェクション', 'ワークスペースの信頼（workspace trust）' and 'ワークスペースの信頼', 'サンドボックス（sandbox）' and 'サンドボックス'. The definitions-block terms in s1-defs and s2-defs do not match the glossary entries.",
-      "fix": "Make each definitions `term` in s1-defs and s2-defs match its glossary `term` exactly. For example, use 'プロンプトインジェクション' as the term, put '(prompt injection)' at the start of the md or in the glossary entry's `aliases`, and do the same for ワークスペースの信頼 and サンドボックス, so the panel lists each concept once.",
-      "screenshot": "pages/desktop-jp-01.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "Merge practice-steps, practice-steps-deny and practice-steps-bill into a clearer sequence, or give each step a distinct title. Right now three separate '手順 1ステップ中 0 完了' headers, each numbered 1, appear in a row (mobile-jp-16, mobile-jp-18).",
-    "s5-md2: split the second paragraph or move the /clear vs /compact sentence next to the s5-table row so the run before the table is shorter (mobile-jp-13).",
-    "reader: the glossary panel shows 10 chips and leaves out the lesson's 8th glossary term エフォート (desktop-jp-09); it may be capped.",
-    "reader: desktop JP chars-per-line median is 44, above the 30–40 target (measure 680 px at 18.7 px).",
-    "reader: inline code wraps mid-token on mobile ('claude -' / 'p' in e5, '-' / 'p' in option 4, mobile-jp-24). This is known reader behaviour.",
-    "reader: the mobile full-length PNG is truncated at 16000 px, and the end banner says this is the course's last lesson because drafts are not in course.json. Both are known."
+    "practice-steps / practice-steps-deny / practice-steps-bill: three one-step steps blocks each show the number '1' and '1ステップ中 0 完了' (mobile-jp-16, mobile-jp-18, desktop-jp-11, desktop-jp-13). That reads like three separate procedures. Merge them into one 3-step steps block where the code and prompt blocks in between allow it, or give each block a title that tells them apart.",
+    "reader: desktop-jp charsPerLine median is 44 (max 56) against the 30–40 JP target at a 680 px measure. The lesson can't fix this; narrowing the reader's text column would.",
+    "reader: inline code wraps mid-token on mobile, e.g. 'claude -' / 'p' in the e5 prompt and '-' / 'p' in option 4 (mobile-jp-24). This is known reader behaviour.",
+    "reader: the end banner says this is the course's last lesson (mobile-jp-28, desktop-jp-19). This happens because drafts are not in course.json.",
+    "reader: the mobile full-length PNG is truncated at 16000px (truncated: true). All 28 per-screen PNGs were reviewed instead."
   ],
-  "verdict": "revise",
-  "summary": "The screenshots show lesson hash sha256:31ca899dd855ae10, as expected. There are no hard failures (no overflow, console, mermaid, unknown-block or image errors) and no personal data on any screen; the bottom-left 'JP' is the language toggle. The layout holds up well at 390 px: the TD flowchart, both 2-column tables and all code blocks are readable and nothing is cut off. The one must-fix is the duplicated glossary chips on desktop: make the definitions terms in s1-defs and s2-defs match the glossary entries so each term appears once."
+  "verdict": "pass",
+  "summary": "I checked the screenshots of lesson hash sha256:4f85040f9e462bb2 (it matches the expected hash). metrics.json shows no hard failures: no overflow, no console, mermaid or unknown-block errors, and no broken images. The diagram, both tables and all code blocks are fully readable at 390 px. No personal data is on any screen: the zshrc example uses a placeholder key. The only suggestion is optional: merge the three one-step practice steps blocks so the repeated '1' numbering doesn't read as three separate procedures."
 }
