@@ -1,25 +1,17 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:48733d77bde8508c",
+  "lessonHash": "sha256:4b13c12f53aeb2f8",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:c7223f9f160f438c",
-    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/c7223f9f160f438c/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:48733d77bde8508c",
+    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/48733d77bde8508c/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s2-isolate",
-      "s2-layers",
-      "s2-table",
-      "s3-steps",
-      "s3-code",
-      "s5-md2",
-      "s5-table",
-      "practice-case-zshrc",
-      "practice-folder"
+      "s5-md2"
     ],
-    "changedShare": 0.11,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -50,9 +42,8 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The new qualifier in s2-isolate, 「`--bare` なしの `claude -p`」, is not glossed here. It is taught in 第9回, which is a listed prerequisite (cc-09 practice and its exam use `claude --bare -p`), so it is fair prior knowledge. s5-md2 now defines 「[[エフォート]]（effort）は、考える量の設定です。」 before s5-table uses it. The 第6回 and 第7回 gap (CLAUDE.md, スキル, サブエージェント) is unchanged.",
+      "evidence": "s5-md2 still defines 「[[エフォート]]（effort）は、考える量の設定です。」 before s5-table uses 「高いエフォート」, and `ANTHROPIC_API_KEY` is introduced in s5-md2 before s5-table row 1 uses it. The edit only removed 「下の表の補足です。」. The 第6回 and 第7回 gap (CLAUDE.md, スキル, サブエージェント are used in s5-table without being listed as prerequisites) is unchanged.",
       "blockIds": [
-        "s2-isolate",
         "s5-md2",
         "s5-table"
       ]
@@ -60,9 +51,8 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 1896 (budget 1,200–2,400) · read 2468 · practice reading 1072 · questions 11 · est 17.2 min (must be ≤ 20; estMinutes 17)」, so estMinutes 17 still matches, and strict lint reports 0 warnings. The 2-column tables (s2-table, s5-table) are lighter to scan. s5-md2's second paragraph now packs three unrelated facts (`-p` and the key, `/clear` vs `/compact`, the definition of エフォート) in front of the table as a 「補足」. s2 is still 7 blocks long.",
+      "evidence": "measure.mjs gives 「prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1072 · questions 11 · est 17.2 min (must be ≤ 20; estMinutes 17)」, so estMinutes 17 still matches. para-sentences reports 「0 paragraph(s) over 3 sentences」, and strict lint reports 0 warnings. With 「下の表の補足です。」 removed, s5-md2's second paragraph is three sentences, but it still packs three unrelated facts (`-p` and the key, `/clear` vs `/compact`, the definition of エフォート). It now also lacks any signal that they belong to the s5-table rows that follow. s2 is still 7 blocks long.",
       "blockIds": [
-        "s2-table",
         "s5-md2",
         "s5-table"
       ]
@@ -75,7 +65,8 @@
         "s3-steps",
         "s3-code",
         "practice-steps-deny"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -85,7 +76,8 @@
         "s2-table",
         "s2-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -107,7 +99,8 @@
       "evidence": "s2-layers keeps 5 nodes and 2 subgraphs, and its labels are shorter for mobile (「シェル<br>コマンド」, 「ファイル操作・MCP<br>（サンドボックス外）」). The caption now states the takeaway in two sentences: 「VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。」 Hooks are still missing from the diagram, although s2-sandbox, e2-c and card-sandbox say they run outside the sandbox.",
       "blockIds": [
         "s2-layers"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -119,7 +112,8 @@
         "practice-steps-deny",
         "practice-answer-rule",
         "practice-prompt-review"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -136,20 +130,16 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "The new s2-isolate qualifier matches the audit quote 「Without `--bare`, a `-p` session runs the hooks in a project's `.claude/settings.json` and connects the servers in its `.mcp.json`」. The facts that moved into s5-md2 (`-p` uses `ANTHROPIC_API_KEY` without approval; 「`/clear` は費用がかかりませんが、`/compact` は…それ自体が大きな要求です」) match facts-cc-10 line 210, and s5-md2 now cites cc-authentication and cc-model-config. The s2-table cell 「オフラインのコンテナかVM」 matches 「containers, VMs, or dev containers without internet access」.",
+      "evidence": "The only change deletes the framing sentence 「下の表の補足です。」. No factual claim changed. 「`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。」 and 「`/clear` は費用がかかりませんが、`/compact` は…それ自体が大きな要求です」 still match the audited facts, and s5-md2 still cites cc-costs, pricing, cc-authentication and cc-model-config. 「約13ドル（公式の目安）」 is unchanged and cited to cc-costs.",
       "blockIds": [
-        "s2-isolate",
-        "s2-table",
-        "s5-md2",
-        "s5-table"
+        "s5-md2"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The s2-layers caption and alt now use です・ま す (「守りは重ねて使います。」, 「…に入る図です。」), and s5-md2 stays in です・ます. Table cells use plain form, which is acceptable. 「下の表の補足です。」 is serviceable but flat, and s2-table's 「オフライン」 differs from the 「ネットにつながらない」 used in e1-b, e2-b and practice-prompt-review ①.",
+      "evidence": "s5-md2 stays in です・ます (「…承認なしで使われます。」, 「…考える量の設定です。」), and the flat 「下の表の補足です。」 is gone. The paragraph now opens straight on 「`-p` では、…」 with no lead-in, so it reads as a list of loose notes. s2-table's 「オフライン」 still differs from the 「ネットにつながらない」 used in e1-b, e2-b and practice-prompt-review ①.",
       "blockIds": [
-        "s2-layers",
         "s5-md2",
         "s2-table"
       ]
@@ -162,13 +152,14 @@
         "s2-layers",
         "s2-table",
         "s5-table"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-table now says 「オフラインのコンテナかVMだけで使う」, while e1-b feedback, e2-b, the e2 explanation and practice-prompt-review ① say 「ネットにつながらない…」. Pick one phrase for the whole lesson. One option: keep the table as is and change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」 so that e2-b stays a paraphrase rather than a copy.",
-    "s5-md2's second paragraph bundles three unrelated facts in front of the table. Consider splitting it so each fact sits next to its row, e.g. keep 「[[エフォート]]（effort）は、考える量の設定です。」 and move 「`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。」 into the row-1 cause cell as 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」.",
+    "s5-md2: removing 「下の表の補足です。」 left the second paragraph without any link to s5-table. Better still, move each fact next to its row. Keep 「[[エフォート]]（effort）は、考える量の設定です。」 in s5-md2. Change s5-table row 1's cause cell to 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」. Change row 2's action cell to 「作業の切れ目で `/clear`（費用なし）。`/compact` はそれ自体が大きな要求。調べものはサブエージェントへ」.",
+    "s2-table now says 「オフラインのコンテナかVMだけで使う」, while e1-b feedback, e2-b, the e2 explanation and practice-prompt-review ① say 「ネットにつながらない…」. Pick one phrase for the whole lesson. One option: change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」.",
     "s2-layers still leaves out hooks. Add `F[\"リポジトリのフック<br>（サンドボックス外）\"]` inside VMBOX, outside SBOX, with no edge from C. That gives 6 nodes and matches s2-sandbox, e2-c and card-sandbox.",
     "s2-layers alt mentions 「分類器」 and 「子プロセス」, which the shortened labels no longer show. Either keep the alt in step with the labels or add 「（拒否・確認・分類器）」 back under 「権限ルールと承認」.",
     "Still open from round 1, in unchanged content: ex-target (s3-steps) gives no reason for its choice. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」",
@@ -177,5 +168,5 @@
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "This is a verification round: review-scope exited 0 with 9 of 44 blocks changed (11%) and sections and objectives unchanged. The previous review had no must-fix items, so `resolved` is empty. All 9 changed blocks were reviewed in full. The `--bare` qualifier in s2-isolate matches the audit quote and relies on 第9回, which is a listed prerequisite. s3-steps and s3-code agree on `config/secret.json`, and nothing else references the old name. The table facts moved into s5-md2 are cited and accurate, and the tables are now 2 columns. No changed block introduces an error or a regression. The remaining points are a wording inconsistency (オフライン vs ネットにつながらない), a dense 「補足」 paragraph, and hooks still missing from the diagram, all in niceToHave. validate and strict lint are clean, and measure.mjs gives est 17.2 min against estMinutes 17. Mean 3.38, every criterion ≥ 3, verdict pass."
+  "summary": "This is a verification round. review-scope exited 0 with 1 of 44 blocks changed (2%: s5-md2), and sections and objectives are unchanged. The previous review and the full review before it had no must-fix items, so `resolved` is empty. The one change deletes 「下の表の補足です。」 from s5-md2. It changes no facts, terms or references, and nothing else depended on the sentence, so there is no regression. One side effect: the paragraph no longer signals that its three facts annotate s5-table. That is a niceToHave with a concrete relocation. prior, load, accuracy and voice were re-scored and are unchanged. validate and strict lint are clean. measure.mjs gives est 17.2 min against estMinutes 17, and no paragraph has more than 3 sentences. Mean 3.38, every criterion ≥ 3, verdict pass."
 }

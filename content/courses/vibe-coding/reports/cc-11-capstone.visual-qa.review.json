@@ -1,0 +1,50 @@
+{
+  "lessonId": "cc-11-capstone",
+  "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
+  "lessonHash": "sha256:984f34269dfb6574",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The cycle-flow diagram (pages/mobile-jp-16.png, mobile-jp-17.png) is a readable top-down flowchart with Japanese labels and a caption. The step lists, prompts and code blocks render cleanly. On mobile, dr-table (pages/mobile-jp-03.png) is wider than 390 px and its second column is clipped until you scroll sideways. Line 16 of ex-settings is clipped on both mobile and desktop (pages/mobile-jp-09.png, desktop-jp-06.png).",
+      "blockIds": [
+        "cycle-flow",
+        "dr-table",
+        "ex-settings"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on both desktop and mobile. Every section mixes headings, steps, prompts, a figure or a check, and none of the 30 mobile screens is a wall of text. On desktop the measured median is 42 chars per line against a 30–40 target. That comes from the reader's 680 px measure, not the lesson.",
+      "blockIds": [
+        "ex-steps",
+        "setup-steps",
+        "cycle-steps",
+        "self-check-list"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "All screens are Japanese with lang=ja. Glossary terms are underlined, and key presses render as keycaps (Shift+Tab, Ctrl+G in c-plan, pages/mobile-jp-18.png). Contrast is good throughout. There are no awkward breaks inside Japanese words, and no control is hidden under the top or bottom bars.",
+      "blockIds": [
+        "c-plan",
+        "summary-cards"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "dr-table: at 390 px the second column ('足す部品（学んだ回）') runs past the screen edge and is clipped until you scroll sideways (pages/mobile-jp-03.png, mobile-jp-04.png). Shorten the column 2 cells (for example 'スキル（第7回）' without the English gloss) and the header (for example '足す部品'), or turn the table into a list so it fits without scrolling.",
+    "ex-settings: line 16, the long hook \"command\" string, is clipped at the right edge on desktop and mobile (pages/desktop-jp-06.png, pages/mobile-jp-09.png). The command is spelled out in ex-hook, so nothing is lost, but a shorter command or a comment pointing to step ③ would avoid the cut.",
+    "reader: wide tables and code blocks have no scroll cue (known behaviour).",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (known behaviour).",
+    "reader: on desktop the median is 42 chars per line against a 30–40 target, set by the 680 px measure."
+  ],
+  "verdict": "pass",
+  "summary": "metrics.json has no hard failures: no horizontal overflow, console errors, mermaid errors, unknown blocks or broken images. No screen is text-only, and no personal data shows on any screen I opened. The lesson reads well on both mobile and desktop, with a clear flowchart, well-chunked steps and copyable prompts. The only visual weak spots are dr-table and line 16 of ex-settings, which need sideways scrolling at 390 px; shortening them would remove that."
+}

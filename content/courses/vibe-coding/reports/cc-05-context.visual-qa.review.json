@@ -1,0 +1,62 @@
+{
+  "lessonId": "cc-05-context",
+  "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
+  "lessonHash": "sha256:319f5a2007903c95",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The s3-diagram flowchart (図1) uses a TD layout with readable Japanese labels at 390 px (pages/mobile-jp-09.png). The two-column tables s2-table, s3-table, s4-table and pr-answer fit at 390 px with no sideways overflow (pages/mobile-jp-06.png, 10, 12-13, 27). One code line in pr-code is cut off at 390 px (pages/mobile-jp-22.png).",
+      "blockIds": [
+        "s3-diagram",
+        "s2-table",
+        "s3-table",
+        "s4-table",
+        "pr-answer",
+        "pr-code"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "metrics.json reports textOnlyScreens [] for desktop and mobile. Every screen has a heading, definition table, figure, code, steps or a check. The desktop median is 39 characters per line, inside the 30-40 target (max 53). There are no walls of text: paragraphs are 2-4 lines on desktop (pages/desktop-jp-03.png, 07).",
+      "blockIds": [
+        "s1-why",
+        "s3-lead",
+        "s5-steps",
+        "pr-steps-compact"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson is Japanese-only, and every screen shows consistent Japanese with English glosses for terms (セッション（session）, サブエージェント（subagent）) and lang=ja. Contrast is fine throughout. The reader wraps a few lines inside words at 390 px, for example 見分/け in the objectives (pages/mobile-jp-01.png) and 圧/縮 in s2-table (pages/mobile-jp-06.png).",
+      "blockIds": [
+        "s1-defs",
+        "s2-table"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "pr-code",
+      "issue": "At 390 px the echo line of the practice terminal block is cut off at the right edge after '> CL'. Learners cannot see that the command writes CLAUDE.md, even though the next step says 'CLAUDE.mdは起動前に作ります'.",
+      "fix": "Shorten the line so it fits about 40 monospace characters, e.g. `echo '- titleは「練習：」で始める' > CLAUDE.md`. Or split it into two lines: a short comment `# ルールを1行書いたCLAUDE.mdを作る` followed by a shorter echo command.",
+      "screenshot": "pages/mobile-jp-22.png"
+    }
+  ],
+  "niceToHave": [
+    "reader: the mobile full-length PNG stops at 16000px (known).",
+    "reader: the end banner says 'このコースの最後のレッスンまで読み終えました。' because drafts are not in course.json (pages/mobile-jp-34.png, pages/desktop-jp-22.png).",
+    "reader: line breaks inside words at 390 px (見分/け in the objectives on pages/mobile-jp-01.png and pages/mobile-jp-33.png; 圧/縮 in s2-table on pages/mobile-jp-06.png). Consider BudouX or word-break: keep-all for Japanese.",
+    "reader: wide code blocks have no scroll cue on mobile (pages/mobile-jp-22.png).",
+    "In s2-focus the inline code `/compact API の変更を中心に残して` wraps across two lines on desktop and mobile (pages/mobile-jp-06.png). Showing it as its own short code line or a prompt block would read more cleanly.",
+    "Desktop charsPerLine max is 53, above the 30-40 target. The median of 39 is fine."
+  ],
+  "verdict": "revise",
+  "summary": "The lessonHash in metrics.json matches the expected sha256:319f5a2007903c95. The hard-failure counts are all 0: overflowX false, consoleErrors 0, mermaidErrors 0, unknownBlocks 0, brokenImages 0. The layout is clean and well paced on mobile and desktop: the flowchart and two-column tables read well at 390 px, there are no text-only screens, and no screen shows personal data. One fix is needed: the echo line in pr-code is cut off at 390 px, which hides the CLAUDE.md target. Shorten or split that line."
+}
