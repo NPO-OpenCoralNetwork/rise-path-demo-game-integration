@@ -1,0 +1,189 @@
+{
+  "lessonId": "cc-10-safety-cost",
+  "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
+  "lessonHash": "sha256:8c4567a466d38ec7",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "Three can-do objectives (o1 結びつけられる, o2 書ける, o3 特定できる). Each has an inline and an exam question (o1: q1, q2, e1, e2; o2: q3, e3, e4; o3: q4, e5, e6). But o2 (apply, 書ける) has no exam item where the learner writes or chooses a rule for a new case: e3 and e4 only interpret existing rules, and e3 tests `/`-anchoring that the lesson never teaches.",
+      "blockIds": [
+        "s3-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 sets a concrete scene in three sentences: an unknown repository, 「README のとおりに準備して」 and a leftover `ANTHROPIC_API_KEY`. The ungraded multi-select predict q0 sets up both o1 and o3, and its explanation points ahead to 10-1, 10-2 and 10-5. There is no trivia or statistic.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites name 第2回・第5回・第8回・第9回. New terms are defined before use: プロンプトインジェクション in s1-defs, VM in s1-practices, ワークスペースの信頼 and サンドボックス in s2-defs, クラウドセッション glossed in s2-isolate. But `--dangerously-skip-permissions` (e1-b) and the `//` absolute form (e3-b feedback) never appear in this lesson's body, and `/compact` cost appears only in feedback and a flashcard.",
+      "blockIds": [
+        "s1-defs",
+        "s2-defs",
+        "s2-isolate",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Lint is clean (0 warnings) and every content section has a heading, a figure, a table or a check. s2 is dense: two definitions, Seatbelt/bubblewrap/Windows support, `claude -p` behaviour, a diagram, a three-row table and a quiz. s4 is a two-block fragment (「隔離しても、送る中身は同じです。」) that has no check and no objective.",
+      "blockIds": [
+        "s2-defs",
+        "s2-sandbox",
+        "s2-isolate",
+        "s4-lead",
+        "s4-note"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "Before practice, s3-steps works an example in four labelled subgoals (守るものを決める → 置き場所を選ぶ → パターンを書く → 効いているか確かめる), with reasons such as 「git で共有され、全員に効きます」 and the meaning of `./` and `**`, plus s3-code. The practice step p-deny then fades it with the hint 「10-3の `keys/**` と同じ形です」. The ex-target step gives no reason for its choice.",
+      "blockIds": [
+        "s3-steps",
+        "s3-code",
+        "practice-steps-deny"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Every content section except s4 has an inline scenario quiz (q1–q4), so the density rule is met. But q2 (「公式ドキュメントが勧める方法はどれでしょう？」) and e2-b (「ネットにつながらないコンテナや VM の中で使う」) can be answered by matching words from the s2-table rows. e5 repeats the practice case (nightly `claude -p`, API bill) with a new name.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 3,
+      "evidence": "The distractors map to the brief's misconceptions, each with feedback of two sentences or fewer. Examples: q1-d 「CLAUDE.md は助言で、強制ではありません」, q2-b (the sandbox covers shell commands only), q3-b (`Write(...)` path rules are unused), q4-b/c (shared limits vs the API key), e6-a (`/compact`). Two corrections rest on unverified or untaught facts: the e4-c claim about `cat`/`head`, and the e3 anchoring.",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "s2-layers is a structural diagram with 5 nodes and 2 subgraphs. Its caption states the takeaway (「サンドボックスが囲むのはシェルコマンドだけ」) and its alt text is specific. There are no images. The diagram leaves out hooks, although s2-sandbox, e2-c and card-sandbox all name hooks as outside the sandbox.",
+      "blockIds": [
+        "s2-layers"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "The practice is an authentic audit of 田中さん's settings: three tasks (p-audit, p-deny, p-bill), each with expect and hint (troubleshoot on two of them), a safe dummy folder, model answers (practice-answer-rule, practice-prompt-review expect) and a four-item checklist. The hints have two levels at most, and transfer to the learner's own repository is deferred to 第11回.",
+      "blockIds": [
+        "practice-steps",
+        "practice-steps-deny",
+        "practice-folder",
+        "practice-answer-rule",
+        "practice-steps-bill",
+        "practice-prompt-review",
+        "practice-checklist"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 3,
+      "evidence": "summary-points (3 points) comes after the exam. summary-next gives the next step (第11回) and summary-cards has 7 cards, plus askTutor. There is no explicit reflection question, and card-clear reviews `/compact` cost, which the body never teaches (it appears only in e6-a feedback).",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 2,
+      "evidence": "Sources are dated and cited per block, and the version is pinned in the subtitle (v2.1.304). Three permission-rule claims, though, are not backed by the brief's facts and conflict with the permissions page as I know it. e3 keys `Read(/secrets/**)` in user settings to `~/.claude/secrets/`, where the docs have described `/path` as relative to the project root. e4-c feedback says deny rules cover `cat`/`head`, where the docs have said Read deny rules do not stop `cat .env` in Bash. The q3 explanation says a Read deny also stops edits and writes.",
+      "blockIds": [
+        "check-quiz",
+        "s3-check"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "Prose is です・ます (e.g. 「本番の変更は自分で確かめます。」), lint finds no banned phrases, and terms are consistent with the glossary. Definitions, table cells and summary points use plain form, which is acceptable. The tone is terse rather than warm in places; the ja-editor owns wording.",
+      "blockIds": [
+        "s1-auto",
+        "s3-lead",
+        "summary-points"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson is jp only and complete. Diagram labels are Japanese with specific alt text. The links have descriptive text (「セキュリティの公式ドキュメント」, 「公式の料金ページ」), and no text is baked into images.",
+      "blockIds": [
+        "s1-md2",
+        "s2-layers",
+        "s5-md2"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "accuracy",
+      "blockId": "check-quiz",
+      "issue": "e3 asks what `Read(/secrets/**)` in `~/.claude/settings.json` blocks and keys the answer to c (`~/.claude/secrets/`), with b's feedback introducing `//`. There are two problems. (1) The lesson never teaches what a single leading `/` anchors to, or the `//` absolute form: s3-pitfall only says it 「絶対パスではありません」. So the item tests content that was not taught. (2) The permissions page has described `/path` as 'relative to project root', which would make option a correct. The brief's facts do not quote the current wording, so the key cannot be trusted.",
+      "fix": "Replace e3 with an o2 apply/transfer item that does not depend on `/`-anchoring. Keep id e3, objectiveId o2, and set bloom to apply. Prompt: 「自分のパソコンのどのプロジェクトでも、ホームの `.aws/` の中を Claude に読ませたくありません。ユーザー設定 `~/.claude/settings.json` の `deny` に書くルールとして正しいのはどれでしょう？」 Option a (answer): 「`Read(~/.aws/**)`」. Option b: 「`Read(/.aws/**)`」, feedback 「先頭が `/` 1つのパスは、絶対パスでもホームからのパスでもありません。ホームから数えるときは `~/` で始めます。」 Option c: 「`Write(~/.aws/**)`」, feedback 「パスのルールで確かめられるのは Read と Edit で、Write のルールは使われません。読ませないなら Read の拒否ルールを書きます。」 Option d: 「`Read(./.aws/**)`」, feedback 「`./` は今のフォルダーが起点なので、開いたプロジェクトの中の `.aws/` だけを指します。ホームの `.aws/` は `~/` で書きます。」 Explanation: 「ホームから数えるパスは `~/` で始めます。ユーザー設定に `Read(~/.aws/**)` と書くと、どのプロジェクトで作業していても、ホームの `.aws/` の中は読めません。」 Teach the forms in s3-pitfall at the same time (see the next item)."
+    },
+    {
+      "criterion": "prior",
+      "blockId": "s3-pitfall",
+      "issue": "The revised e3 needs `~/`, and the body never says how to write a home or absolute path. The current s3-pitfall only says what a single `/` is not.",
+      "fix": "Replace s3-pitfall md with three sentences, keeping the cite to cc-permissions: 「`Write(...)` のパスのルールと `.claudeignore` は使われません。ホームからは `~/`、根からの絶対パスは `//` で始め、`/` 1つでは絶対パスになりません。自分でファイルを開くスクリプトには効かないので、サンドボックスも使います。」"
+    },
+    {
+      "criterion": "accuracy",
+      "blockId": "check-quiz",
+      "issue": "e4 option c is marked wrong on the strength of its feedback 「拒否ルールは、`cat` や `head` のように Claude Code が見分けられるコマンドにも効きます」, and the explanation repeats that deny rules apply to 「`cat` などのコマンド」. Neither the brief's facts nor the lesson quote this. The permissions page has stated the opposite: Read/Edit deny rules apply to built-in file tools, not Bash subprocesses, with `cat .env` as the example that is not blocked. If that still holds, c is a second correct answer.",
+      "fix": "Rewrite e4 so the key does not depend on `cat` behaviour. Change option c md to 「拒否ルールは、ユーザー設定に書いたときだけ効く」, with feedback 「プロジェクトの `.claude/settings.json` の拒否ルールも効きます。効かなかったのは、スクリプトが自分でファイルを開く経路だったからです。」 Change the explanation to 「拒否ルールは Claude Code が確かめる操作に効きますが、スクリプトが自分で開くファイルには届きません。OS のレベルで止めるには、サンドボックスを有効にします。」 Keep the `cat`/`head` claim only if the current permissions page states it word for word, and record that sentence in the brief's sources notes."
+    },
+    {
+      "criterion": "accuracy",
+      "blockId": "s3-check",
+      "issue": "The q3 explanation adds 「同じパスへの編集や書き込みも止まります。」 It is a non-obvious claim (a Read deny also blocking Edit/Write) that is not in the brief's facts for cc-permissions. It is also unnecessary for the item.",
+      "fix": "Replace the q3 explanation with: 「`Read` の拒否ルールに `./certs/**` と書くと、`certs/` の下の階層まで読めなくなります。例題の `keys/**` と同じ形です。」"
+    }
+  ],
+  "niceToHave": [
+    "e5 is labelled a transfer item in the brief, but it repeats the practice case almost word for word (nightly `claude -p`, `~/.zshrc` key, API bill; practice-prompt-review expect even states the answer). Consider moving it to a new context for o3. For example, one project's `.envrc` (direnv) exports `ANTHROPIC_API_KEY`, and only sessions started in that folder bill to the API.",
+    "q2 and e2 can be answered by matching the s2-table wording (「VM かクラウドセッションで開く」, 「ネットにつながらないコンテナや VM だけで使う」). The q2 hint 「Claude Code 全体を囲めるのはどれか、図で確かめましょう」 also points straight to the answer. Consider making q2 an analysis item. For example, give a scenario (a repository with a `.claude/settings.json` that defines a SessionStart hook) and ask which layer stops the hook, with the answer 'VM・クラウドセッション'.",
+    "s4 (data destination) has no objective, no check, and an unexplained opener 「隔離しても、送る中身は同じです。」. Either add one sentence saying what is sent (「VM の中でも、Claude が読んだファイルの中身は Anthropic に送られます。」) and why `~/.claude/projects/` matters (e.g. a read `.env` value stays in the transcript), or fold it into s2/s5.",
+    "e1 option b names `--dangerously-skip-permissions`, a flag that appears nowhere in this lesson. It was taught in 第2回, but a short reminder helps: 「止まらないように、`--dangerously-skip-permissions`（bypassPermissions と同じ）を付けて動かす」.",
+    "The body never teaches `/compact`'s cost; it appears only in e6-a feedback and card-clear. Either add 「`/compact` は要約のための要求になるので、関係のない作業に移るなら `/clear` を使います。」 to s5 (e.g. in the s5-table row 「使用量の減りが早い」), or replace card-clear with a card about content the body teaches.",
+    "e6 option b mixes the fix for the stated cause (`/clear`) with an unrelated one (effort). Consider shortening it to 「関係のない作業に移るたびに `/clear` する」 so the item tests the diagnosis.",
+    "The s2-layers diagram omits hooks, but the text, e2-c and card-sandbox all say hooks run outside the sandbox. Consider relabelling node D 「ファイル操作ツール・フック・MCP サーバー<br>（サンドボックスの外）」.",
+    "Model answer ③ in practice-prompt-review lists only `Read(./.env)` and `Read(./secrets/**)`, while practice-answer-rule also has `Read(./.env.*)`. Align them so the two model answers agree.",
+    "p-deny says 「起動したら」 but the practice-folder code never shows starting Claude Code. Consider adding `claude` as the last line of the block.",
+    "Consider a one-line reflection question before askTutor (e.g. 「自分の環境で、田中さんと同じ状態になっているものはありますか。」) to complete the metacognition set."
+  ],
+  "average": 3.0,
+  "verdict": "revise",
+  "summary": "The lesson is well built: a concrete three-sentence hook with a predict, an inline check in every assessed segment, distractors and feedback that carry the brief's real misconceptions, and an authentic audit practice with model answers and a checklist. The must-fix items are all in the deny-rule material. e3 tests `/`-anchoring that the lesson never teaches and whose answer key may contradict the current permissions docs, e4's `cat`/`head` correction is unverified, and the q3 explanation adds an uncited claim. Replace e3 with the `~/.aws` item, teach `~/` and `//` in s3-pitfall, and hedge e4 as specified. Mean 3.0 (accuracy 2)."
+}
