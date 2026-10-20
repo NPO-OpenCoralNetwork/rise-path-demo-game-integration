@@ -4,44 +4,46 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:ac1d14f8dc7c957a",
+  "lessonHash": "sha256:49fdb7d006e71baa",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "本文・解説は温かいです・ます調で、禁止表現も翻訳調もほぼない（s1-lead「毎回守ってほしい前提に向きます」）。ただし手順の expect（s2-steps・pr-steps）と復習カード（summary-cards）が常体・体言止めで、前回までの cc レッスンの です・ます とも揃っていない。",
+      "score": 4,
+      "evidence": "The lesson is now in です・ます throughout, including the steps expects (s2-steps「フォルダができます。」, pr-steps「報告が届きます。」) and the flashcard backs (summary-cards「返すからです。」). The tone is warm, the sentences are short and there are no pressure phrases. What is left is small wording polish: q1 option d, the redundant last sentence of e5, and 「今まで通り」.",
       "blockIds": [
         "s2-steps",
         "pr-steps",
-        "summary-cards"
+        "summary-cards",
+        "hook-b1"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lint --strict は警告0件。各セクションに図・表・コード・確認問題があり、新出用語は skill-basics で3つ（スキル・フロントマター・段階的な読み込み）、subagents で2つに収まっている。",
+      "evidence": "lint --strict finds nothing. Each segment has a diagram, table or code plus a check, and no segment adds more than 3 new terms (skill-basics: スキル, フロントマター, 段階的な読み込み; subagents: サブエージェント, フォーク). One troubleshoot text (s2-steps ex-folder) has 4 sentences, one over the §1 limit. It is listed in mustFix.",
       "blockIds": [
         "s1-defs",
         "s3-defs",
-        "s1-diagram",
-        "s4-table"
+        "s4-table",
+        "s2-steps"
       ]
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "前提と第5回・第6回の想起（hook-predict「（第6回）」、s3-lead「（第5回）」）があり、主要用語は definitions と glossary で一致している。ただし「拡張機能」（s4-lead）、「YAML」（s1-defs）、「バックグラウンド」（s3-bg）、「トークン」（check-quiz e5）が定義・英語併記・正式名なしで出てくる。",
+      "score": 4,
+      "evidence": "Every round-1 term problem is fixed. 拡張機能 is defined in s4-lead, YAML is explained in s1-defs, s3-bg now reads「バックグラウンド（background）」, and トークン was removed from e5. Terms from earlier lessons point back to them (第5回, 第6回); フック（hook） and デプロイ（deploy） were introduced in cc-06 and cc-02.",
       "blockIds": [
         "s4-lead",
         "s1-defs",
         "s3-bg",
-        "check-quiz"
+        "check-quiz",
+        "hook-predict"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "宣言ロケールは jp のみで欠けがなく、2つの図に caption と具体的な alt があり、リンク文「公式ドキュメント（日本語版）」が行き先を示している（s2-legacy）。",
+      "evidence": "jp is the only declared locale and nothing is missing. Both diagrams have a caption and a concrete alt (s1-diagram, s3-diagram). The link text「公式ドキュメント（日本語版）」 names where it goes (s2-legacy).",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
@@ -51,62 +53,22 @@
   ],
   "mustFix": [
     {
-      "criterion": "voice",
+      "criterion": "load",
       "blockId": "s2-steps",
-      "issue": "(d) です・ます: 手順の expect がすべて常体で終わっている（「フォルダができる。」「保存できた。」「返ってくる。」）。本文と pr-prompt の expect（「届きます。」）は です・ます で、第5回・第6回の steps も です・ます。",
-      "fix": "ex-folder「`.claude/skills/commit-message/` フォルダができる。」→「`.claude/skills/commit-message/` フォルダができます。」／ex-description「`---` の間に `name` と `description` がある。」→「`---` の間に `name` と `description` があります。」／ex-body「上のSKILL.mdと同じ内容で保存できた。」→「上のSKILL.mdと同じ内容で保存できています。」／ex-auto「変更の要点と、メッセージの案が3つ返ってくる。」→「変更の要点と、メッセージの案が3つ返ってきます。」／ex-slash「④と同じ形の答えが返ってくる。」→「④と同じ形の答えが返ってきます。」／ex-explain「要約が実際の変更と合っているかを、自分で説明できる。」→「要約が実際の変更と合っているかを、自分で説明できます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "pr-steps",
-      "issue": "(d) です・ます: 演習の expect がすべて常体で終わっている（「リストができる。」「比べられた。」「報告が届く。」）。",
-      "fix": "pr-pick「手順のリストができる。」→「手順のリストができます。」／pr-write「`SKILL.md` が保存されている。」→「`SKILL.md` が保存されています。」／pr-decide「付けた、または付けなかった理由を1文で言える。」→「付けた、または付けなかった理由を1文で言えます。」／pr-test「予想と結果を比べられた。`/名前` では手順どおりに動く。」→「予想と結果を比べられます。`/名前` では手順どおりに動きます。」／pr-before「色分けされたグリッドで、使用量が表示される。」→「色分けされたグリッドで、使用量が表示されます。」／pr-delegate「ファイル名つきの短い報告が届く。」→「ファイル名つきの短い報告が届きます。」／pr-after「増えたのは依頼文と報告のぶんだと説明できる。」→「増えたのは依頼文と報告のぶんだと説明できます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます: カードの裏が常体（「書く。」「動く。」「返すから。」「始める。」）や体言止めの連続（「毎回全文。」「本文は使うとき。」）で終わっている。",
-      "fix": "card-load「CLAUDE.mdは毎回全文。スキルは名前と説明文だけが毎回で、本文は使うとき。」→「CLAUDE.mdは毎回全文が読み込まれます。スキルは名前と説明文だけが毎回で、本文は使うときに読み込まれます。」／card-description「`description`。何をするかと、いつ使うかを書く。」→「`description` です。何をするかと、いつ使うかを書きます。」／card-user-only「フロントマターに `disable-model-invocation: true`。`/名前` で呼んだときだけ動く。」→「フロントマターに `disable-model-invocation: true` を書きます。`/名前` で呼んだときだけ動きます。」／card-saving「自分のコンテキストで読み、メインの会話には要約だけを返すから。」→「自分のコンテキストで読み、メインの会話には要約だけを返すからです。」／card-fork「`/subtask 頼みたいこと` でフォークを始める。」→「`/subtask 頼みたいこと` でフォークを始めます。」／card-trigger「最初に全部ではなく、困りごとのきっかけが来たとき。」→「最初に全部ではなく、困りごとのきっかけが来たときです。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s4-lead",
-      "issue": "(d) 用語は使う前に定義（§2）: 「拡張機能」が定義なしで初出し、7-4・q6・まとめ・card-trigger の軸になっている。何を指すか（スキル・サブエージェント・フックなど）が書かれておらず、エディターやブラウザーの拡張機能と取り違えるおそれがある。",
-      "fix": "「拡張機能は最初から全部そろえず、きっかけが来たら1つずつ足します。」→「スキルやサブエージェントのように、Claude Codeに機能を足すしくみを拡張機能と呼びます。拡張機能は最初から全部そろえず、きっかけが来たら1つずつ足します。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s3-bg",
-      "issue": "(d) カタカナ語の初出に英語併記（§2）: 「バックグラウンド」が英語も意味の説明もなく初出している（第1〜6回にも出てこない）。e6 の選択肢 c はこの意味がわかる前提になっている。",
-      "fix": "「Claudeが起動したサブエージェントは、v2.1.198から既定でバックグラウンドで動きます。」→「v2.1.198から、Claudeが起動したサブエージェントは既定でバックグラウンド（background）で動きます。待つあいだも、メインの会話を続けられます。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "check-quiz",
-      "issue": "(d) カタカナ語の初出に英語併記・使う前に定義（§2）: e5 の explanation に「トークン」が定義も英語もなく出てくる（第1〜6回にも出てこない用語で、コストは第10回の範囲）。",
-      "fix": "e5 explanation「なお、サブエージェントの作業にも、そのぶんのトークンは使われます。」→「なお、サブエージェントが読むぶんの処理は、全体としては減りません。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s1-defs",
-      "issue": "(d) 略語は初出で正式名か中身を書く（§2）: フロントマターの定義に「YAMLで書きます。」とあるが、YAMLの説明がない（第1〜6回にも出てこない）。",
-      "fix": "「YAMLで書きます。」→「YAML（「項目名: 値」の形で設定を書く書式）で書きます。」"
+      "issue": "(d) at most 3 sentences per paragraph (§1): the troubleshoot of ex-folder has 4 sentences (「先に作ります。」「git init` を実行します。」「最初のコミットをします。」「を実行します。」). lint does not count sentences, but this breaks the explicit rule in §1.",
+      "fix": "ex-folder troubleshoot「`cc-practice` がないときは、先に作ります。`mkdir cc-practice && cd cc-practice && git init` を実行します。READMEなどのファイルを1つ作り、最初のコミットをします。そのあと、`mkdir -p .claude/skills/commit-message` を実行します。」→「`cc-practice` がないときは、`mkdir cc-practice && cd cc-practice && git init` で先に作ります。READMEなどのファイルを1つ作り、最初のコミットをします。そのあと、`mkdir -p .claude/skills/commit-message` を実行します。」"
     }
   ],
   "niceToHave": [
-    "hook-b1: 「読んだ」の主語があいまいで、学習者が自分で読んだようにも読める — 「読んだファイルの中身で会話があふれたこともあるでしょう。」→「Claudeが読んだファイルの中身で会話があふれたこともあるでしょう。」",
-    "s1-run: 「〜か、〜ます」で並列が崩れていて、2つの方法として読みにくい — 「`/名前` で自分で呼ぶか、依頼が説明文に合うときにClaudeが使います。」→「`/名前` で自分で呼ぶか、依頼が説明文に合うときにClaudeが使うかです。」",
-    "s1-check: q1 の選択肢 c だけ述語で終わっていて、ほかの名詞句と形がずれている — 「何も入っていない」→「どのスキルの情報もない」",
-    "s3-check: q4 の選択肢 c だけ述語で終わっていて、ほかの名詞句と形がずれている — 「何も増えない」→「何もない（増えるものはない）」",
-    "s2-lead: 例は動的な部分を外した手直し版で、ただの翻訳ではない — 「公式ドキュメントの例を日本語にしたものです。」→「公式ドキュメントの例をもとに、日本語の手順にしたものです。」",
-    "s2-check: q2 の hint の「動かせる人」は、Claudeを人として数えるようで少し引っかかる — 「スキルを「動かせる人」を決める項目は、どこに書くのでしたか。」→「スキルを誰が呼べるかを決める項目は、どこに書くのでしたか。」",
-    "s3-how: Explore が何をするものかを一言添えると、ブリーフの「読み取り専用」も伝わる — 「組み込みの「Explore」が使われることがあります。」→「読み取り専用の組み込みサブエージェント「Explore」が使われることがあります。」",
-    "s4-main: フォークは会話を引き継ぐので、「集め直す」のはふつうのサブエージェントだけ — 「[[サブエージェント]]は、情報を集め直すところから始まるからです。」→「ふつうの[[サブエージェント]]は、情報を集め直すところから始まるからです。」",
-    "pr-task: 何の増え方かを明示する — 「`/context` で増え方を確かめます。」→「`/context` でコンテキストの増え方を確かめます。」",
-    "pr-steps: pr-delegate の語順だと、送ってから予想するように読める — 「下の依頼文を送り、使用量の増え方を予想します。」→「使用量の増え方を予想してから、下の依頼文を送ります。」",
-    "pr-steps: pr-test の troubleshoot の「一覧」がどの画面かわからない（表示の細部は事実として確かめてから書く） — 「一覧に出てこないときは、`/reload-skills` を実行します。」→「`/名前` で呼べないときは、`/reload-skills` を実行します。」"
+    "s1-check: in q1 option d,「前回」 and 「いちばん最近」 say the same thing twice — 「前回いちばん最近使った1個の本文」→「前のセッションで最後に使った1個の本文」",
+    "s3-check: q4 option c is still the only option that ends in a verb; the others are noun phrases (carried over from round 1) — 「何も増えない」→「ゼロ（何も増えない）」",
+    "check-quiz: the last sentence of the e5 explanation repeats the sentence before it (「全体で読む量が同じでも」) — 「なお、サブエージェントが読むぶんの処理は、全体としては減りません。」→ delete this sentence, or replace it with「ただし、サブエージェントが読む作業そのものは減りません。」",
+    "s2-legacy: write 「どおり」 in kana to match 「手順どおり」 elsewhere in the lesson — 「今まで通り動きます」→「今までどおり動きます」",
+    "s4-check: q6 option d feedback says 「拡張」 but s4-lead defines 「拡張機能」; use the same name — 「きっかけのない拡張は」→「きっかけのない拡張機能は」",
+    "lesson: 拡張機能 is defined in s4-lead and used in the summary and card-trigger, but it is not in glossary; adding it would let learners look it up — add a glossary entry: term「拡張機能」, md「スキルやサブエージェント、フックのように、Claude Codeに機能を足すしくみ。」",
+    "s3-check: the q5 option a feedback is missing, as it should be for the correct answer; the hint in q4 is also missing. Adding a hint to q4 would make it gentler — add hint「ファイルを読んだのは、どちらのコンテキストだったかを考えましょう。」"
   ],
-  "average": 3.5,
+  "average": 4,
   "verdict": "revise",
-  "summary": "本文は短い文の温かいです・ます調で、CLAUDE.md・スキル・サブエージェントの読み込み方の対比が、図・表・問題の言葉まで一貫しています。直すべき点は2つです。1つは、手順の expect と復習カードが常体になっていることです。もう1つは、「拡張機能」「バックグラウンド」「トークン」「YAML」が定義や英語併記なしで出てくることです。"
+  "summary": "This is a full review (round 2). review-scope.mjs --since sha256:ac1d14f8dc7c957a exited 1 (41% changed), so a verification round was not possible and I reviewed the whole lesson again. All 7 round-1 must-fix items are gone. The steps expects and flashcards are now です・ます, 拡張機能 is defined, YAML is explained, バックグラウンド has its English, and トークン was removed. The Japanese is warm, short and consistent: the text, glossary, diagrams and options use the same names. One must-fix is left: the troubleshoot in ex-folder has 4 sentences, one over the §1 limit. The rest is minor polish."
 }

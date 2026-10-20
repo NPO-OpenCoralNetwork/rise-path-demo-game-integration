@@ -1,0 +1,189 @@
+{
+  "lessonId": "cc-02-permissions",
+  "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
+  "lessonHash": "sha256:44ecfdc66d172d2b",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "All three objectives are can-do statements with Bloom levels, and each has 2+ questions with objectiveId (o1: q1, q2, ps1-ps3, e1, e2; o2: q5, e3, e4; o3: q0, q3, q4, e5, e6). Two things hold it below 4. o3 「書ける」 is only ever assessed by picking a written rule (q4, e6). And e1 rewards auto mode for 「中身をよく知らないリポジトリを…調べてもらいます」, where q1 taught プランモード for the same situation.",
+      "blockIds": [
+        "modes-check",
+        "check-quiz",
+        "example-check"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 3,
+      "evidence": "hook-lead names a concrete problem (「push まで知らないうちに進んだら困ります」) that leads to o3. The ungraded predict q0 is about this exact problem. q0 has a test-wise cue: the correct option c is the only hedged one (「…ことがある」), while a and b say 「必ず」.",
+      "blockIds": [
+        "hook-lead",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites are listed, and hook-lead recalls lesson 1. Terms are defined before use in definitions blocks and match the glossary (分類器, 権限ルール, 確認ルール, 拒否ルール, チェックポイント). Some things are never explained for a learner who only knows commit/push: force push and `git reset --hard` (auto-defaults) and `gh` (e6). The table's 「安全チェック」 is never tied to 分類器.",
+      "blockIds": [
+        "prerequisites",
+        "auto-defaults",
+        "auto-defs",
+        "rules-defs",
+        "modes-table"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 2,
+      "evidence": "estMinutes is 22, outside the contract's 8-20 range. The brief also puts the always-visible body at 2,634 chars, over the 2,400 budget unless inline code is excluded. Segments are heavy too: modes introduces 権限モード plus six named modes, and rules introduces 権限ルール plus 許可・確認・拒否ルール. Sentence and paragraph budgets do pass lint.",
+      "blockIds": [
+        "modes-table",
+        "rules-defs",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "rules-example comes before the practice. example-steps has subgoal labels (確認か拒否かを決める / ルールの形に書く / 読み込まれたか確かめる), a reason for each step (「push は中身を見たいので確認ルール」) and an expect, then example-code. practice-rules p-rule then asks for the same file written 「2-4 を見ずに」. There is no faded intermediate step, so this is not a 4.",
+      "blockIds": [
+        "example-steps",
+        "example-code",
+        "rules-steps"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Every content section ends in an inline quiz (modes-check, auto-check, rules-check, example-check, rewind-check), and most items are apply/analyze with feedback on each option. Several items can be answered by matching words. ps1-ps3 reuse the table cells (「差分を見ながら」「人が見ない」「長い」), e2 repeats ps3's scenario, and e4's correct option d is the only long, fully argued one.",
+      "blockIds": [
+        "sort-quiz",
+        "check-quiz",
+        "auto-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 3,
+      "evidence": "Every misconception in the brief appears as a distractor with corrective feedback: q2 a (auto is safe), q3 a (allow overrides ask), q4 c/d and e6 a/c (ask vs deny, placement of `*`), e5 (`git -C . push`), e4 a (rewind replaces git), e6 d and e1 c (CLAUDE.md or the prompt as enforcement). e1's key contradicts q1's mode advice, which plants a new confusion.",
+      "blockIds": [
+        "auto-check",
+        "rules-check",
+        "example-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "rules-diagram is a process flow: 8 nodes, Japanese labels that match the text (拒否ルール/確認ルール/許可ルール), a caption that states the takeaway, and a full alt. modes-table and rewind-table are comparisons with captions, and there are no images. The diagram restates the first paragraph of rules-order almost line by line, so text and figure are redundant.",
+      "blockIds": [
+        "rules-diagram",
+        "modes-table",
+        "rewind-table"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "practice-rules is authentic and safe (dummy `.env`, a folder with no remote, 「大事なリポジトリでは試さないでください」). Each step has an expect, plus a hint → troubleshoot → 2-4 model answer ladder, a predict-first instruction and a checklist with a transfer item. The rules-prompt expect promises 「中身は表示されません」, which the lesson's own example-pitfall contradicts (`Read(./.env)` does not stop some command/script reads).",
+      "blockIds": [
+        "rules-steps",
+        "rules-prompt",
+        "rewind-prompt",
+        "rules-checklist"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 3,
+      "evidence": "summary-points (4 points) comes after the exam, followed by summary-next with a next step (第3回), 7 flashcards and askTutor suggestions. The reflection line 「ほかに確認したい操作を1つ選び、ルールの形で書いてみましょう」 is an action, not a reflection question.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "The version is pinned (hook-version: v2.1.304, and v2.1.283 / v2.1.200 inline). Non-obvious claims cite official sources (17% → auto-mode-eng; deny→ask→allow, ` *` and `git -C . push` → cc-permissions; 100 checkpoints → cc-checkpointing), and they match doc/brushup-2026/research/claude-code-curriculum.ja.md §2.3. Three things need checking against the sources: the table's dontAsk cell 「読み取りと、事前に許可したものだけ」 vs ps1's 「事前に許可したツールだけを動かし、ほかはすべて拒否」; e2's untaught indicator string `⏸ manual mode on`; and the rules-prompt expect (see mustFix).",
+      "blockIds": [
+        "hook-version",
+        "auto-limit",
+        "modes-table",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The body is consistently です・ます, warm and non-pressuring (「まず予想してみましょう」「大事なリポジトリでは試さないでください」). There are no banned phrases, and katakana terms carry the English on first use (分類器（classifier）, チェックポイント（checkpoint）). The same mechanism has two names, 「安全チェック」 and 「分類器」.",
+      "blockIds": [
+        "hook-lead",
+        "auto-lead",
+        "modes-table"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "jp is the only declared locale and it is complete. rules-diagram has a Japanese caption and a full alt. The link text in hook-version is descriptive (「公式ドキュメント（日本語）」), and both tables have captions.",
+      "blockIds": [
+        "rules-diagram",
+        "hook-version"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "load",
+      "blockId": "lesson",
+      "issue": "estMinutes is 22; the lesson contract allows 8-20. The brief's own estimate (2,634/450 + 15 questions × 40 s + 3 tasks × 2 min = 21.9) counts practice-sort twice, once as 3 questions and again as a 2-minute task. It also includes e2, whose scenario 「長いテスト修正を、危ない操作だけ止めてもらいながら」→ auto repeats ps3 (「時間のかかるテスト修正…危ない操作は止めてほしい」→ auto).",
+      "fix": "Delete question e2 from check-quiz (o1 stays assessed in the exam by e1). Count practice-sort as its 3 quiz questions only, not also as a task. Recompute: 2,634/450 = 5.85 min + 14 questions × 40 s = 9.33 min + 2 hands-on tasks in practice-rules (rules, rewind) × 2 min = 4 min ≈ 19.2. Set \"estMinutes\": 19 and update the brief's Format line to match."
+    },
+    {
+      "criterion": "align",
+      "blockId": "check-quiz",
+      "issue": "e1 (the o1 transfer item) contradicts q1. q1 teaches that for 「初めて触るリポジトリで、まず構成を調べて」 the right first mode is プランモード. e1 sets the same situation (「中身をよく知らないリポジトリを…調べてもらいます」) and keys option a, 「auto モードで進め」. A learner who applies q1 correctly finds that answer ruled out, and the item rewards a mode the lesson said was wrong for investigation.",
+      "fix": "Change the e1 prompt to an editing task so auto + ask rules is the consistent answer: 「中身をよく知らないリポジトリで、自分のノートPCの Claude Code に長い修正作業を任せます。確認を減らしたくて、`--dangerously-skip-permissions` を付けるか迷っています。最も適切な判断はどれでしょう？」. Keep the options, answer a and the explanation."
+    },
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "In e4 the correct option d (「要る。Bash での変更や外への操作は戻らず、長く残す履歴やチームでの共有にも使えないから」, about 45 chars, two reasons) is the only long, fully argued option. a, b and c are 20-30 chars with one reason each. The reader shows options in order without shuffling, so a test-wise learner picks d without knowing the content.",
+      "fix": "Shorten d to 「要る。Bash での変更や push は、`/rewind` では戻らないから」. Move the extra reasons into the explanation: 「チェックポイントは、セッション中にすばやくやり直すための仕組みで、バージョン管理の代わりではありません。長く残す履歴やチームでの共有にも使えないので、区切りごとに git でコミットしておきます。」."
+    },
+    {
+      "criterion": "practice",
+      "blockId": "rules-prompt",
+      "issue": "The prompt asks Claude to 「中身を読んで、表示してください」. The expect states as certain 「1つめは拒否ルールで止められ、中身は表示されません」. But example-pitfall itself (cited cc-permissions) says `Read(./.env)` does not stop some command/script reads, and the session runs in auto mode. If Claude retries with Bash `cat .env`, the dummy value is shown and the learner concludes the rule failed or that they wrote it wrongly. The checklist item pr-env (「`.env` が読めず」) and the p-run expect (「`.env` は読めず」) repeat the over-claim.",
+      "fix": "In rules-prompt, change line 1 to 「1. `{{読ませないファイル}}` を、ファイルを読むツールで読んで表示してください。」. Replace the first expect sentence with 「1つめは Read が拒否ルールで止められます。Claude が Bash の `cat` などで読み直そうとしたら、それが 2-4 の注意にある限界です。」. Change the p-run expect to 「`.env` の Read は拒否ルールで止まり、push の前に確認が出ます。」 and pr-env to 「`.env` の Read が止まり、push の前に確認が出た」."
+    }
+  ],
+  "niceToHave": [
+    "hook-predict q0: remove the absolute/hedge cue so c is not the only hedged option. a → 「確認の画面が出て、あなたの許可を待つ」, b → 「裏で動く安全チェックが、危険とみなして止める」.",
+    "auto-defs: tie the table's wording to the term. Change the definition to 「Claude の操作を実行の前に確かめる、別の AI モデル。2-1 の表の「安全チェック」はこれです。危ない操作を止めます。」.",
+    "modes-table: the dontAsk cell 「読み取りと、事前に許可したものだけ」 does not match ps1's explanation (「事前に許可したツールだけを動かし、ほかはすべて拒否します」) or e2 b's feedback. Check cc-permission-modes; if the source says only pre-approved tools, change the cell to 「事前に許可したものだけ」.",
+    "auto-defaults: gloss the dangerous operations for a learner who only knows commit/push: 「既定で止めるのは、force push や `git reset --hard`（どちらも履歴や変更を消せる操作）、本番へのデプロイ（deploy）などです。」.",
+    "rules-order: the first paragraph (「ルールは拒否 → 確認 → 許可の順に…権限モードに従います。」) is repeated by rules-diagram and its caption. Shorten it to 「調べる順番は下の図のとおりです。」 to cut always-visible text toward the 2,400-char budget (2,634 counted in the brief, 386 of them inline code).",
+    "sort-quiz: ps1-ps3 reuse the table cells word for word (「人が見ない」「差分を見ながら」「長い」), so they test cued recall of the table rather than choosing a mode. E.g. ps2 → 「場面2：ボタンの文言を1か所ずつ直し、そのたびに自分で差分を確かめたい。テストの実行など、ほかのコマンドは確認したい。どのモードを選びますか？」.",
+    "check-quiz e2 (if kept rather than deleted): its indicator strings (`⏸ manual mode on`, `⏵⏵ accept edits on`, `⏵⏵ auto mode on`) are never shown in modes-switch and are not checkable against a quoted source. Either show them in modes-switch with cite cc-permission-modes or drop them from the item.",
+    "check-quiz e5: the key is the exact string example-pitfall just showed (`git -C . push`), and it is the only option that does not start with `git push`. A verified variant not quoted in the text would test the idea rather than the example.",
+    "rewind-prompt: make the edit-tool path explicit so the rewind outcome is predictable: 「`rewind-practice.md` の最後に「{{足す1行}}」という1行を、ファイル編集ツールで足してください。」.",
+    "rules-files: the dummy `.env` will be swept into lesson 1's commit habit. Append ` && echo \".env\" >> .gitignore` before `&& ls -a`.",
+    "check-quiz e6: gloss `gh` for beginners: 「Claude が GitHub のコマンドラインツール `gh` でプルリクエスト（pull request）を作る前に…」.",
+    "summary-next: make the first line a real reflection question: 「第1回の演習をふり返ると、確認なしで進んで困りそうな操作はありましたか。1つ選び、ルールの形で書いてみましょう。」.",
+    "rules-checklist pr-transfer: give an example and a check, e.g. 「応用：`npm publish` など自分のコマンドを1つ確認ルールにし、`/permissions` に出ることを確かめた」.",
+    "Answer positions: the five segment inline checks are keyed a, b, b, a, a (never c or d), and d is correct in only 2 of 15 items. Rebalance by reordering options in q1, q4 or q5.",
+    "Segment load: modes introduces 権限モード plus six named modes, and rules introduces four rule terms (権限ルール, 許可, 確認, 拒否). Consider bolding the four modes used day to day (Manual, acceptEdits, プラン, auto) in modes-table so the two special-purpose rows read as secondary."
+  ],
+  "average": 2.92,
+  "verdict": "revise",
+  "summary": "Strong, well-sourced lesson: every content section ends in an apply/analyze check, every misconception in the brief is a distractor with corrective feedback, and the hands-on practice (dummy `.env`, predict-then-try, Restore code) is safe and authentic. Most important fixes: bring estMinutes from 22 into the 8-20 range by dropping e2, which duplicates ps3; rewrite e1 so it no longer contradicts q1's plan-mode advice; remove the length cue in e4; and stop the practice expect from promising that `Read(./.env)` makes `.env` unreadable, which the lesson's own pitfall says is not guaranteed."
+}
