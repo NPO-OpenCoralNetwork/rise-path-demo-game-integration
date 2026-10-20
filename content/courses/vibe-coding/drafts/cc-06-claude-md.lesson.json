@@ -86,7 +86,7 @@
               "answer": [
                 "b"
               ],
-              "explanation": "CLAUDE.mdも依頼文も、Claudeが読むコンテキストです。第2回で書いた権限ルール（permission rule）の拒否ルールは、Claudeの判断と関係なく止めます。ただし、止まるのはルールに一致する操作だけです（6-4）。",
+              "explanation": "CLAUDE.mdも依頼文も、Claudeが読むコンテキスト（context）です。第2回で書いた権限ルール（permission rule）の拒否ルールは、Claudeの判断と関係なく止めます。ただし、止まるのはルールに一致する操作だけです（6-4）。",
               "objectiveId": "o3",
               "bloom": "understand"
             }
@@ -143,32 +143,27 @@
           "cite": [
             "cc-memory"
           ],
-          "caption": "CLAUDE.mdの4つの置き場所（広い順）",
+          "caption": "CLAUDE.mdの4つの置き場所と届く範囲（広い順）",
           "columns": [
             "置き場所",
-            "ファイル",
-            "届く範囲"
+            "ファイル"
           ],
           "rows": [
             [
-              "組織の管理ポリシー",
-              "Linuxでは `/etc/claude-code/CLAUDE.md` など",
-              "組織の全員"
+              "組織の管理ポリシー：組織の全員",
+              "Linuxでは `/etc/claude-code/` のCLAUDE.mdなど"
             ],
             [
-              "ユーザー",
-              "`~/.claude/CLAUDE.md`",
-              "自分（すべてのプロジェクト）"
+              "ユーザー：自分（すべてのプロジェクト）",
+              "`~/.claude/CLAUDE.md`"
             ],
             [
-              "プロジェクト",
-              "`./CLAUDE.md` か `./.claude/CLAUDE.md`",
-              "チーム（Gitで共有）"
+              "プロジェクト：チーム（Gitで共有）",
+              "`./CLAUDE.md` か `./.claude/CLAUDE.md`"
             ],
             [
-              "ローカル",
-              "`./CLAUDE.local.md`",
-              "自分（このプロジェクトだけ）"
+              "ローカル：自分（このプロジェクトだけ）",
+              "`./CLAUDE.local.md`"
             ]
           ]
         },
@@ -361,7 +356,7 @@
           "id": "s3-lead",
           "type": "markdown",
           "style": "lead",
-          "md": "長くなったファイルは分けて整理できます。ただし、分け方で読み込まれるタイミングが変わります。"
+          "md": "長くなったファイルは分けて整理できます。"
         },
         {
           "id": "s3-defs",
@@ -373,7 +368,7 @@
           "items": [
             {
               "term": "インポート（import）",
-              "md": "CLAUDE.mdに `@パス` と書き、別のファイルを取り込むこと。取り込んだ先も起動時に読まれます。入れ子は4段までです。`@` を付けずに書いたパスは、取り込まれず案内になります。"
+              "md": "CLAUDE.mdに `@パス` と書き、別のファイルを取り込むこと。取り込んだ先も起動時に読まれます（入れ子は4段まで）。`@` を付けずに書いたパスは、取り込まれず案内になります。"
             },
             {
               "term": "ルール（rules）",
@@ -381,7 +376,7 @@
             },
             {
               "term": "AGENTS.md",
-              "md": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降の既定では、CLAUDE.mdの代わりに読まれます。作業フォルダーとその上に、CLAUDE.mdもCLAUDE.local.mdもないときです。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。"
+              "md": "ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。"
             }
           ]
         },
@@ -410,9 +405,9 @@
           "cite": [
             "cc-memory"
           ],
-          "code": "flowchart TD\n  S[セッション開始] --> A[4つのCLAUDE.md]\n  S --> B[インポートしたファイル]\n  S --> C[\"paths: なしのルール\"]\n  S --> D[自動メモリの先頭]\n  W[一致するファイルを扱う] --> E[\"paths: 付きのルール\"]\n  A --> X[コンテキスト]\n  B --> X\n  C --> X\n  D --> X\n  E --> X",
+          "code": "flowchart TD\n  S[セッション開始] --> A[\"CLAUDE.md<br>インポート先\"]\n  A --> C[\"paths: なしの<br>ルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\n  C --> X[コンテキスト]\n  E --> X",
           "caption": "インポートしても、毎回読まれる量は減りません。減らせるのは paths: 付きのルールです。",
-          "alt": "セッション開始時に4つのCLAUDE.md、インポートしたファイル、paths: なしのルール、自動メモリの先頭が読まれ、paths: 付きのルールだけは一致するファイルを扱うときに読まれて、どれもコンテキストに入る図"
+          "alt": "セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルール（と自動メモリの先頭）が読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図"
         },
         {
           "id": "s3-agents",
@@ -528,37 +523,31 @@
           "cite": [
             "steering-post"
           ],
-          "caption": "公式ブログが挙げる5つのつまずきと、移す先",
+          "caption": "CLAUDE.mdに書きがちな5つのつまずきと、移す先（公式ブログより）",
           "columns": [
-            "CLAUDE.mdに書きがちなこと",
-            "移す先",
-            "詳しく"
+            "書きがちなこと",
+            "移す先"
           ],
           "rows": [
             [
               "「`.env` は絶対に読まない」のような禁止",
-              "権限ルールの拒否ルール（deny）",
-              "第2回"
+              "権限ルールの拒否ルール（deny、第2回）"
             ],
             [
               "「編集したら毎回必ず整形する」",
-              "フック",
-              "第8回"
+              "フック（第8回）"
             ],
             [
               "30行の作業手順",
-              "スキル",
-              "第7回"
+              "スキル（第7回）"
             ],
             [
               "`src/api/` だけの決まり",
-              "`paths:` 付きのルール",
-              "6-3"
+              "`paths:` 付きのルール（6-3）"
             ],
             [
               "自分だけの好み",
-              "`CLAUDE.local.md` か `~/.claude/CLAUDE.md`",
-              "6-1"
+              "`CLAUDE.local.md` か `~/.claude/CLAUDE.md`（6-1）"
             ]
           ]
         },
@@ -705,7 +694,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-practice-06 && cd cc-practice-06 && git init\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\nこのアプリは React と TypeScript で作られています。\nsrc/ にソース、tests/ にテストがあります。\nコードはきれいに、読みやすく書いてください。\nIMPORTANT: .env は絶対に読まないこと。\nIMPORTANT: git push は絶対にしないこと。\nテストはちゃんと実行してください。\nテストは npm run test:unit で実行（npm test は E2E まで走って遅い）。\nファイルを編集したら、毎回必ず npm run format を実行すること。\nsrc/api/ の関数は、入力を検証してから使うこと。\n返事は短く、箇条書きでお願いします（私の好み）。\n## 画面を追加する手順\n1. src/pages/ に新しいファイルを作る\n2. src/routes.ts に新しい画面を登録する\n3. 見出しの文言を locales/ja.json に足す\n4. tests/pages/ にテストを足す\n5. npm run test:unit で確かめる\n6. スクリーンショットを撮って PR に貼る\nEOF"
+          "code": "mkdir cc-practice-06\ncd cc-practice-06\ngit init\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\nこのアプリは React と TypeScript で作られています。\nsrc/ にソース、tests/ にテストがあります。\nコードはきれいに、読みやすく書いてください。\nIMPORTANT: .env は絶対に読まないこと。\nIMPORTANT: git push は絶対にしないこと。\nテストはちゃんと実行してください。\nテストは npm run test:unit で実行（npm test は E2E まで走って遅い）。\nファイルを編集したら、毎回必ず npm run format を実行すること。\nsrc/api/ の関数は、入力を検証してから使うこと。\n返事は短く、箇条書きでお願いします（私の好み）。\n## 画面を追加する手順\n1. src/pages/ に新しいファイルを作る\n2. src/routes.ts に新しい画面を登録する\n3. 見出しの文言を locales/ja.json に足す\n4. tests/pages/ にテストを足す\n5. npm run test:unit で確かめる\n6. スクリーンショットを撮って PR に貼る\nEOF"
         },
         {
           "id": "practice-steps",
@@ -764,7 +753,7 @@
           "vars": [
             {
               "name": "行き先のメモ",
-              "hint": "例：2行目→消す、8行目→残す（18行分を書く）"
+              "hint": "例：2行目→消す、8行目→残す（18行分を書きます）"
             }
           ],
           "expect": "変えたファイルと、行き先の表が返ってきます。表が自分のメモと合っているかを確かめます。"
@@ -776,31 +765,31 @@
           "items": [
             {
               "id": "pc-vague",
-              "label": "CLAUDE.mdに「ちゃんと」「きれいに」のような、確かめられない行がない"
+              "label": "CLAUDE.mdに「ちゃんと」「きれいに」のような、確かめられない行がありません"
             },
             {
               "id": "pc-derive",
-              "label": "コードを読めばわかる行（言語、フォルダーの構成）を消した"
+              "label": "コードを読めばわかる行（言語、フォルダーの構成）を消しました"
             },
             {
               "id": "pc-deny",
-              "label": ".env と git push の禁止が、.claude/settings.json の deny にある"
+              "label": ".env と git push の禁止が、.claude/settings.json の deny にあります"
             },
             {
               "id": "pc-rules",
-              "label": "src/api/ の決まりが、paths: 付きの .claude/rules/api.md にある"
+              "label": "src/api/ の決まりが、paths: 付きの .claude/rules/api.md にあります"
             },
             {
               "id": "pc-procedure",
-              "label": "手順はCLAUDE.mdの外にあり、@ なしのパスで案内している"
+              "label": "手順はCLAUDE.mdの外にあり、@ なしのパスで案内しています"
             },
             {
               "id": "pc-local",
-              "label": "好みはCLAUDE.local.mdにあり、.gitignore に入っている"
+              "label": "好みはCLAUDE.local.mdにあり、.gitignore に入っています"
             },
             {
               "id": "pc-check",
-              "label": "再起動後の /context と /permissions で、読み込みと拒否ルールを確かめた"
+              "label": "再起動後の /context と /permissions で、読み込みと拒否ルールを確かめました"
             }
           ]
         },
@@ -821,13 +810,13 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir -p docs && sed -n '12,18p' CLAUDE.md > docs/add-screen.md\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\n- テストは `npm run test:unit` で実行する（`npm test` は E2E まで走って遅い）\n- コミットの前に `npm run test:unit` を通す\n- 整形は `npm run format` で行う\n- 画面を追加するときは `docs/add-screen.md` の手順に従う\n<!-- 編集のたびの整形は、第8回でフックにする -->\nEOF\nmkdir -p .claude/rules\ncat > .claude/rules/api.md <<'EOF'\n---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- src/api/ の関数は、入力を検証してから使う\nEOF\ncat > CLAUDE.local.md <<'EOF'\n- 返事は短く、箇条書きで書く\nEOF\necho \"CLAUDE.local.md\" >> .gitignore",
+          "code": "mkdir -p docs\nsed -n '12,18p' CLAUDE.md > docs/add-screen.md\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\n- テストは `npm run test:unit` で実行する（`npm test` は E2E まで走って遅い）\n- コミットの前に `npm run test:unit` を通す\n- 整形は `npm run format` で行う\n- 画面を追加するときは `docs/add-screen.md` の手順に従う\n<!-- 編集のたびの整形は、第8回でフックにする -->\nEOF\nmkdir -p .claude/rules\ncat > .claude/rules/api.md <<'EOF'\n---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- src/api/ の関数は、入力を検証してから使う\nEOF\ncat > CLAUDE.local.md <<'EOF'\n- 返事は短く、箇条書きで書く\nEOF\necho \"CLAUDE.local.md\" >> .gitignore",
           "highlight": [
-            4,
             5,
             6,
             7,
-            8
+            8,
+            9
           ]
         },
         {
@@ -1019,7 +1008,7 @@
         {
           "id": "summary-next",
           "type": "markdown",
-          "md": "ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか。6-4の表で、置き場所を考えてみましょう。\n\n第7回では、外に出した手順をスキルにまとめます。"
+          "md": "ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか。6-4の表で、置き場所を考えてみましょう。\n\n次は「第7回｜手順はスキルに、調べものはサブエージェントに」です。外に出した手順を、スキルにまとめます。"
         },
         {
           "id": "summary-cards",
@@ -1109,7 +1098,7 @@
     },
     {
       "term": "AGENTS.md",
-      "md": "ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます。これは既定の動きです（v2.1.277以降）。"
+      "md": "ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときに読まれます。`.claude/CLAUDE.md` も、CLAUDE.mdに数えます。"
     },
     {
       "term": "権限ルール（permission rule）",

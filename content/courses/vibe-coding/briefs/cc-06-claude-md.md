@@ -34,7 +34,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
   - IMPORTANT を付ければ確実（→ 強調は 1 行ずつ。強制にはならない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（コース共通の measure.mjs：`cc-06-claude-md.lesson.json: prose 2398 (budget 1,200–2,400) · read 3737 · practice reading 1198 · questions 9 · practice sections 1 · est 19.0 min (must be ≤ 20; estMinutes 19)`。(3,737 + 1,198) ÷ 450 ≈ 10.97分 + 問題9問 × 40秒 = 6.0分 + 演習1セクション × 2分 = 2分、計 19.0分 → 19）。
+- 所要時間 / minutes: 19（コース共通の measure.mjs：`cc-06-claude-md.lesson.json: prose 2400 (budget 1,200–2,400) · read 3743 · practice reading 1211 · questions 9 · practice sections 1 · est 19.0 min (must be ≤ 20; estMinutes 19)`。(3,743 + 1,211) ÷ 450 ≈ 11.01分 + 問題9問 × 40秒 = 6.0分 + 演習1セクション × 2分 = 2分、計 19.0分 → 19）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 練習用フォルダー `cc-practice-06` に、膨らんだ見本の CLAUDE.md（18 行、ヒアドキュメントで作成）を置く。自分で行き先を決めてから Claude Code に書き直しを頼み、差分を説明させ、再起動後に `/context` と `/permissions` で確かめる。具体的な行は残し、手順は `docs/add-screen.md`（第7回のスキル候補）、`src/api/` の決まりは `paths:` 付きルール、「絶対に〜しない」は拒否ルール、好みは CLAUDE.local.md へ。チェックリスト、3 段のヒント、模範解答つき。
@@ -62,18 +62,21 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 - 「auto モードの分類器も見逃しがゼロではない」は第2回用 facts（permission-modes: "does not guarantee safety"）による。
 - estMinutes: コース共通の measure.mjs で 19.0 分 → 19（Format の行）。問題は 9 問（予想 1・確認 4・テスト 4）。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
 - 本文の長さ（vibe-ch2 のレポートと同じ数え方：prose のうちプロンプトの expect と手順の hint/troubleshoot を除く）は初版で 2,355 字、prose 全体で 2,470 字。レビュー後の修正（拒否ルールの限界の2文、ヒントの9行目、略語の正式名など）で約 200 字増えた。
-- 演習の見本と模範解答はスクラッチで実際に実行し、18 行の CLAUDE.md、`sed -n '12,18p'` での手順の切り出し、`.gitignore` への追記、settings.json の JSON として正しいことを確かめた。
+- 演習の見本と模範解答はスクラッチで実際に実行し、18 行の CLAUDE.md、`sed -n '12,18p'` での手順の切り出し、`.gitignore` への追記、settings.json の JSON として正しいことを確かめた（コマンドを1行に1つにした後も再実行して確認）。
+- スマートフォン幅（390 px）に合わせた変更：表はすべて2列にした（s1-table は届く範囲を置き場所のセルへ「ユーザー：自分（すべてのプロジェクト）」の形で移し、管理ポリシーは「Linuxでは `/etc/claude-code/` のCLAUDE.mdなど」と短いコードにした。s4-table は詳しい回・節を移す先のセルへ「フック（第8回）」の形で移した）。見出しは短くし、表の内容と問題が頼る行は変えていない。s3-diagram は横に並ぶノードを2つまでにし（CLAUDE.md・インポート先 → paths: なしのルール、一致するファイルを扱うとき → paths: 付きのルール、どちらもコンテキストへ）、自動メモリの先頭は alt に移した。演習の見本と模範解答のコマンドは `&&` でつながず1行に1つにした（模範解答の強調行は 5〜9 行目）。
+- 第2ラウンドの ja-editor の指摘で、s3-defs のインポートと AGENTS.md を3文以内にし、用語集の AGENTS.md に「作業フォルダーとその上に」の条件を入れた（1文が60字を超えるため、`.claude/CLAUDE.md` は別の文にした）。q0 の解説でコンテキストに英語（context）を添えた。
+- まとめの次回の案内は正式タイトル（「第7回｜手順はスキルに、調べものはサブエージェントに」）で書き、本文の予算に収めるため s3-lead の2文目（図のキャプションと同じ内容）を削った。チェックリストの項目はです・ます形にした。
 
 ## Outline
 
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | hook | hook | はじめに：毎回の説明と、守られない決まり | 同じ説明のくり返しと「守られるのか」の不安を、置き場所と書き方で解く | markdown, quiz(predict) | q0（predict, o3） |
-| s1 | concept | 6-1. CLAUDE.mdは毎回最初に読まれる | CLAUDE.md は毎回の始めに読まれる指示。4 つの置き場所はつながって読まれる。自動メモリは Claude が書く | markdown, definitions(CLAUDE.md, CLAUDE.local.md, 自動メモリ), markdown(/init), table(4 つの置き場所), markdown, quiz(inline) | q2 → o2（evaluate: 矛盾する2行を直す） |
+| s1 | concept | 6-1. CLAUDE.mdは毎回最初に読まれる | CLAUDE.md は毎回の始めに読まれる指示。4 つの置き場所はつながって読まれる。自動メモリは Claude が書く | markdown, definitions(CLAUDE.md, CLAUDE.local.md, 自動メモリ), markdown(/init), table(2 列: 置き場所と届く範囲 / ファイル), markdown, quiz(inline) | q2 → o2（evaluate: 矛盾する2行を直す） |
 | s2 | concept | 6-2. 短く、具体的に、確かめられるように | 200 行未満、確かめられる形、2 回間違えたら足し、消しても困らない行は削る | markdown, table(あいまい→具体), markdown, markdown, list(書かないもの), callout(pitfall: 途中の編集), quiz(inline) | q3 → o2（evaluate） |
-| s3 | concept | 6-3. 分けて育てる：インポートとルール | `@` は整理だけで毎回読まれる。減らせるのは `paths:` 付きのルール。AGENTS.md の扱い | markdown, definitions(インポート, ルール, AGENTS.md), markdown, code(yaml frontmatter), diagram(起動時 vs 必要なとき), markdown, callout(info: 版と公式ドキュメント), quiz(inline) | q4 → o1（apply） |
-| s4 | concept | 6-4. 書いても強制にはならない | CLAUDE.md はコンテキストで頼みごと。確実さは権限ルールとフック、手順はスキル | markdown, markdown, definitions(権限ルール, フック, スキル), table(5 つのつまずきと移す先), markdown, quiz(inline) | q5 → o3（understand） |
+| s3 | concept | 6-3. 分けて育てる：インポートとルール | `@` は整理だけで毎回読まれる。減らせるのは `paths:` 付きのルール。AGENTS.md の扱い | markdown, definitions(インポート, ルール, AGENTS.md), markdown, code(yaml frontmatter), diagram(起動時 vs 必要なとき、横 2 つまで), markdown, callout(info: 版と公式ドキュメント), quiz(inline) | q4 → o1（apply） |
+| s4 | concept | 6-4. 書いても強制にはならない | CLAUDE.md はコンテキストで頼みごと。確実さは権限ルールとフック、手順はスキル | markdown, markdown, definitions(権限ルール, フック, スキル), table(2 列: 書きがちなこと / 移す先と詳しい回・節), markdown, quiz(inline) | q5 → o3（understand） |
 | s5 | example | 6-5. 例題：気になる6行を仕分ける | 6 行を 6 つの手順で仕分ける（理由つき） | markdown, list(6 行), steps(6, expect つき) | — |
-| practice | practice | 演習：膨らんだCLAUDE.mdを書き直す | 自分で行き先を決めてから頼み、差分を説明させ、読み込みを確かめる | markdown, code(bash 見本), steps(6, hint/troubleshoot), prompt(claude-code), checklist(7), callout(tip: 答えに近いヒント), markdown, code(bash 模範解答), code(json settings), markdown | — |
+| practice | practice | 演習：膨らんだCLAUDE.mdを書き直す | 自分で行き先を決めてから頼み、差分を説明させ、読み込みを確かめる | markdown, code(bash 見本、1 行に 1 コマンド), steps(6, hint/troubleshoot), prompt(claude-code), checklist(7), callout(tip: 答えに近いヒント), markdown, code(bash 模範解答), code(json settings), markdown | — |
 | check | check | 理解度チェック | 全目標を新しい場面で | quiz(exam) | e1 → o1（analyze, 転移: AGENTS.md と CLAUDE.local.md）、e2 → o1（apply, 転移: 毎回の整形）、e3 → o2（evaluate: 240 行）、e6 → o3（apply, 転移: 同僚への説明） |
 | summary | summary | まとめ | 4 点 + 次の一歩とふりかえり + 7 枚のカード + AI先生 | summary, markdown, flashcards, askTutor | — |

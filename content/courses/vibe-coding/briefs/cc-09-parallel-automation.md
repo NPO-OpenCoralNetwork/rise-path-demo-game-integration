@@ -44,8 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1521 (budget 1,200–2,400) · read 2645 · practice reading 1247 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
-  est = (2,645 + 1,247) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.98 → 20。
+- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1583 (budget 1,200–2,400) · read 2654 · practice reading 1232 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
+  est = (2,654 + 1,232) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.97 → 20。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
 - 演習の題材 / practice task idea: 練習用リポジトリ `cc-practice-09` に、1件だけわざと失敗するテストのある小さなプロジェクトを作り、
@@ -72,7 +72,7 @@ on 2026-10-20 for the exact wording used below.
 - `cc-interactive-mode` Interactive mode — https://code.claude.com/docs/en/interactive-mode
 - `cc-agent-view` Manage multiple agents with agent view — https://code.claude.com/docs/en/agent-view
 - `cc-headless` Run Claude Code programmatically — https://code.claude.com/docs/en/headless
-- `cc-permission-modes` Permission modes — https://code.claude.com/docs/en/permission-modes
+- `cc-permission-modes` Choose a permission mode — https://code.claude.com/docs/en/permission-modes
 - `cc-permissions` Configure permissions — https://code.claude.com/docs/en/permissions
 - `cc-security` Security — https://code.claude.com/docs/en/security
 - `cc-cli-reference` CLI reference — https://code.claude.com/docs/en/cli-reference
@@ -86,12 +86,12 @@ on 2026-10-20 for the exact wording used below.
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：機能の途中で、急ぎのバグ修正が来た | 同じフォルダーの2つのセッションは変更がぶつかる。夜間の報告も頼まれている | markdown (3 sentences), quiz predict | `q0` → o1 (ungraded) |
-| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), table (3 methods, 2 columns: method + who coordinates / fits + caution), markdown (sessions and subagents multiply tokens), quiz inline | `q1` → o1 (evaluate: feature A + bugfix B) |
-| `worktree-example` | example | 2. 例題：ワークツリーで2つの作業を並べる | 準備（コミットと信頼）→ 2つのセッション → 環境 → 差分の説明 → 取り込み | markdown lead, code (terminal), steps (5, subgoal + why + expect), callout info (map, names only: agent view = 試験公開中, agent teams = experimental), quiz inline | `q2` → o1 (analyze: missing deps in a worktree) |
-| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry), markdown (v2.1.302 + recall 第2回 + docs link), code (lint example), table (5 flags, 2 columns: flag / role + without it), callout pitfall (`"Bash"` too broad), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
-| `unattended-where` | concept | 4. 無人実行の置き場所を選ぶ | 動かす場所と頻度で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), table (4 places, 2 columns: method / where it runs + fits) | — (no quiz; the neighbouring sections have one) |
-| `unattended` | concept | 5. 依頼文の4点で点検する | 依頼文は成功の条件と失敗の報告、権限と費用の上限はフラグや設定で | markdown + list (the 4 points), markdown (enforcement, recall CLAUDE.md), prompt (weekly TODO example, expect maps it to the 4 points), quiz inline | `q4` → o3 (analyze: failed read reported as quiet day) |
-| `practice-command` | practice | 演習1：夜間チェックのコマンドを書く | 失敗したテストを JSON にまとめる `claude -p` を書き、予想してから実行 | markdown task, steps (p-project), prompt (setup), steps (p-command, p-run; hint → troubleshoot; p-run spells out API and says to drop `--bare` without an API key), checklist (7, incl. `--bare`), code model answer (labelled by a comment) | — |
+| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), table (3 methods, 2 columns: method + who coordinates / fits + caution), markdown (sessions and subagents multiply tokens; トークン（token） glossed), quiz inline | `q1` → o1 (evaluate, new context: login text fix + payment config change, reviewed and merged separately) |
+| `worktree-example` | example | 2. 例題：ワークツリーで2つの作業を並べる | 準備（コミットと信頼）→ 2つのセッション → 環境 → 差分の説明 → 取り込み | markdown lead (says to replace the two tasks with small file additions in the practice repo), code (terminal), steps (5, subgoal + why + expect; ex-setup expect conditional on a project with dependencies), callout info (map, names only: agent view = 試験公開中, agent teams = experimental), quiz inline | `q2` → o1 (analyze: missing deps in a worktree) |
+| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry), markdown (v2.1.302 + recall 第2回 + docs link), code (lint example), table (5 flags, 2 columns: flag / role + without it), callout pitfall (`"Bash"` too broad; シェル（shell） glossed), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
+| `unattended-where` | concept | 4. 無人実行を動かす場所 | 動かす場所と場面で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), table (4 places, 2 columns: method / where it runs + fits) | — (no quiz; the neighbouring sections have one) |
+| `unattended` | concept | 5. 依頼文を4点で点検する | 依頼文は成功の条件と失敗の報告、権限と費用の上限はフラグや設定で | markdown + list (the 4 points), markdown (enforcement, recall CLAUDE.md), prompt (weekly TODO example, expect maps it to the 4 points), quiz inline | `q4` → o3 (analyze: failed read reported as quiet day) |
+| `practice-command` | practice | 演習1：夜間チェックのコマンドを書く | 失敗したテストを JSON にまとめる `claude -p` を書き、予想してから実行 | markdown task, steps (p-project), prompt (setup), steps (p-command, p-run; hint → troubleshoot; p-run says `--bare` needs an API (spelled out) key and to drop it without one), checklist (7, incl. `--bare`), code model answer (labelled by a comment) | — |
 | `practice-audit` | practice | 演習2：無人実行の依頼文を点検する | 弱い依頼文を4点で点検して直し、Claude に見落としを聞く | markdown task, markdown quote (weak prompt), steps (p-audit with hint → troubleshoot, p-rewrite with hint), prompt (audit; model answer in expect), checklist (4) | — |
 | `check` | check | 理解度チェック | 3つの目標を新しい場面で | quiz exam (6) | `e1` → o1 (research → subagent, transfer), `e2` → o1 (dev server → Ctrl + B), `e3` → o2 (safest CI command), `e4` → o2 (unknown repo → `--bare`, transfer), `e5` → o3 (best weekly prompt), `e6` → o3 (multi: what flags enforce, transfer) |
 | `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next), flashcards (7), askTutor (3) | — |
@@ -128,3 +128,17 @@ predict before running (p-run).
 - Mobile fit (390 px): s1-table, s3-table and s4-table have 2 columns (merged cells); long flags in s3-table are split
   into two code spans so the cell can wrap; `anthropics/claude-code-action@v1` was dropped from s4-table (table code
   does not wrap). s2-code runs one command per line (no `&&`), and long lines in s3-code and p1-model were shortened.
+  Round 2: every table cell is ≤ 40 JP chars (s3-table `--bare` and `dontAsk` rows shortened; the `--bare` row no longer
+  names CLAUDE.md, 「など」 covers it); s3-code and p1-model put the prompt on its own lines so every code line is ≤ 60
+  columns; two s2-code comments were shortened. The lesson has no diagram.
+- Round 2 reviews (pedagogy, ja-editor): q1 moved to a new context (login text + payment config, reviewed separately);
+  s2-lead and ex-setup make the worked example reachable in the empty practice repo; トークン（token） and シェル（shell）
+  get English and a short gloss at first use (s1-cost, s3-pitfall). Small niceToHave items applied: q4 d is now a
+  near-miss prompt instruction, section 4 and 5 titles, s3-table header, s4-table caption, 「設定しなければ」 in q1 a,
+  `<依頼文>` in s3-lead and the glossary, the 無人実行 glossary entry matches s4-defs, p-run says why `--bare` needs a key,
+  source title 「Choose a permission mode」. Course style: no space in 「Ctrl + Bで」, です・ます in checklist labels and
+  card backs. To keep est ≤ 20, the s2-map callout, s4-prompt title, s4-enforce, s4-lead and practice titles were
+  tightened and 「旧称routines」 left s4-table (the glossary keeps it).
+- Checked 2026-10-20 on Configure permissions: 「`Bash(ls *)` matches `ls`」 (a trailing ` *` also matches the bare
+  command), so `Bash(npm test *)` covers a bare `npm test`. On worktrees: "Removing deletes the worktree directory and
+  its branch" (ex-merge).
