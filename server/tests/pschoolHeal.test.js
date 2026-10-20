@@ -15,7 +15,7 @@ function setup(hp) {
   const player = new Player(scene, ui, 1);
   console.log = log;
   player.hp = hp;
-  return { player, seen };
+  return { player, seen, scene };
 }
 
 describe('P-School healing', () => {
@@ -27,10 +27,30 @@ describe('P-School healing', () => {
     assert.deepEqual(seen.shown, [[10 + HEAL_POWER, 40]]);
   });
 
-  it('never heals past the maximum HP', async () => {
-    const { player } = setup(45);
+  it('never heals past the maximum HP, and says how much it really healed', async () => {
+    const { player, seen } = setup(45);
     await player.heal(HEAL_POWER);
     assert.equal(player.hp, player.maxHp);
+    assert.equal(seen.logs.at(-1), `✨ HPが${player.maxHp - 45}回復しました！ (HP: ${player.maxHp}/${player.maxHp})`);
+  });
+
+  it('does not heal once the battle is over (an earlier action already won or lost it)', async () => {
+    const { player, seen, scene } = setup(10);
+    scene.isBattleOver = () => true;
+    await player.heal(HEAL_POWER);
+    assert.equal(player.hp, 10);
+    assert.deepEqual(seen.shown, [], 'no HP update and no number');
+    assert.deepEqual(seen.logs, []);
+  });
+
+  it('does not heal when the battle ends during the heal animation', async () => {
+    const { player, seen, scene } = setup(10);
+    let over = false;
+    scene.isBattleOver = () => over;
+    scene.playAnimation = async () => { over = true; return true; };
+    await player.heal(HEAL_POWER);
+    assert.equal(player.hp, 10);
+    assert.deepEqual(seen.shown, []);
   });
 
   it('casts the healing spell (left, right, left) as the same heal, by its English or Japanese name', async () => {

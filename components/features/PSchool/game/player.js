@@ -124,12 +124,17 @@ export class Player {
     // HP を amount だけ回復する（最大HPまで）。回復の光が出てから HP を増やし、HP の表示を更新する。
     // 回復魔法（手の振り 左→右→左）と、回復魔法のブロック（heal_magic）で使う
     async heal(amount) {
+      // 勝ち負けが決まったあと（同じ実行の前の攻撃で敵を倒したときなど）は回復しない
+      const battleOver = () => typeof this.scene?.isBattleOver === 'function' && this.scene.isBattleOver();
+      if (battleOver()) return;
       const maxHp = this.maxHp || 100; // デフォルト最大HP
       if (this.scene && typeof this.scene.playAnimation === 'function') {
         await this.scene.playAnimation('healing');
       }
+      if (battleOver()) return;
+      const before = this.hp;
       this.hp = Math.min(maxHp, this.hp + amount);
-      this.ui.log(`✨ HPが${amount}回復しました！ (HP: ${this.hp}/${maxHp})`);
+      this.ui.log(`✨ HPが${this.hp - before}回復しました！ (HP: ${this.hp}/${maxHp})`);
       this.ui.updateHP(this.hp, this.scene.enemy.hp);
     }
 

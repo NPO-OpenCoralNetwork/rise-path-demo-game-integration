@@ -491,6 +491,8 @@ async function executeGameAction(action, game, ui) {
       
     case "Heal": {
       const healAmount = parameters.amount || HEAL_POWER;
+      // 前の行動で勝ち負けが決まっていたら、回復しない
+      if (typeof game.scene?.isBattleOver === 'function' && game.scene.isBattleOver()) break;
       ui.log("💚 回復魔法！");
       // ステージが回復を独自に扱うならそちら（扱わないときは false が返る。ステージ13は攻撃だけを扱う）
       if (game.scene && typeof game.scene.handlePlayerAction === 'function') {
