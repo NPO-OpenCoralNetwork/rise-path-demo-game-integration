@@ -580,8 +580,10 @@ async function executeGameAction(action, game, ui) {
         }
       }
       // ステージ8での魔法処理（シールドに弾かれる）
+      // 回復魔法は敵に向ける魔法ではないので、ここを通さず下の共通処理で主人公を回復する
       else if (game.scene && game.scene.settings && game.scene.settings.stageNumber === 8 &&
-               typeof game.scene.playerMagicAttack === 'function') {
+               typeof game.scene.playerMagicAttack === 'function' &&
+               (parameters.type || parameters.spell) !== 'HEALING') {
         const spellType = parameters.type || parameters.spell;
         const spellName = getSpellDisplayName(spellType);
         const damage = getSpellDamage(spellType);
