@@ -10,9 +10,11 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Lessons: `npm run lessons:validate|lint|catalog|schema` · `npm run lessons:preview -- <course> <lesson>`
   (needs the dev server) · `npm run lessons:mcp-smoke`
 - MCP: `npm run mcp` (stdio; profile via `--profile` or `RISE_PATH_MCP_PROFILE`) — see `.mcp.json`
-- CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests, `lessons:validate`,
-  `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references `--check`, and
-  `build:prod` with dummy keys that must not appear in the bundle. Run them before opening a PR.
+- CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests (`lint:arch` included),
+  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references
+  `--check`, change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for
+  `check-assets.mjs`: credits in `assets/credits.json` for assets over 1 MiB), and `build:prod`
+  with dummy keys that must not appear in the bundle. Run them before opening a PR.
 
 ## Where things live
 - Learning material (教材): `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json`
