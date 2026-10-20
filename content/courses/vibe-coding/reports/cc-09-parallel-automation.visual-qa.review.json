@@ -1,0 +1,88 @@
+{
+  "lessonId": "cc-09-parallel-automation",
+  "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:d960aa01a4d029e9",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 2,
+      "evidence": "On desktop every table and code block is readable. At 390 px the s1-table and s3-table cut off their right column mid-sentence (mobile-jp-04, -10, -11), and s2-code, s3-code and p1-model cut off long lines (mobile-jp-06, -10, -20).",
+      "blockIds": [
+        "s1-table",
+        "s3-table",
+        "s2-code",
+        "s3-code",
+        "p1-model"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on both devices, and every screen has a heading, table, code, steps or a check. Inline checks q1–q4 come between sections, so there is no wall of text.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson is Japanese only, and no English UI or content leaks into the JP screenshots. The link text is specific (「公式ドキュメント（非対話的実行）」 in s3-mode), and the code blocks and tables have filenames and captions.",
+      "blockIds": [
+        "s3-mode"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "s1-table",
+      "issue": "At 390 px the second column runs past the card edge. The text breaks off mid-sentence (「調べもの・レビュー。設」, 「別々の変更を同時に進め」), and the header 「向いている作業と、気をつけること」 is cut off. s4-table, which has short headers, fits.",
+      "fix": "Shorten the headers to 「方法」 and 「向く作業・注意点」, and put the owner in the cell (for example 「[[サブエージェント]]（Claude）」 as is). Or replace the table with three short definition-style rows so the second column wraps inside 358 px.",
+      "screenshot": "pages/mobile-jp-04.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s3-table",
+      "issue": "At 390 px the right column of the flags table is cut off: the header 「役割と、付けないとどうなるか」 and the cell texts end mid-word (「確認が要る操作を聞かずに」, 「付けないと、必要な操作」). The nowrap flag chips such as `--permission-mode` take up the width.",
+      "fix": "Shorten the second header to 「役割／付けないと」. Split each cell into two short sentences of about 20 chars, or turn the table into a list of five flag + explanation items so nothing has to fit side by side at 390 px.",
+      "screenshot": "pages/mobile-jp-10.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s2-code",
+      "issue": "At 390 px the Japanese trailing comments run off the code block: line 1 「…最初のコミットを用意する」, line 5 「# 未追跡に出さない」, line 8 「# 一度起動して…終了する」 and line 13 「（cc-practice-09 で実行）」 are cut off.",
+      "fix": "Move the trailing comments onto their own lines above the command, and keep each comment to 16 JP chars or fewer (for example 「# 練習用リポジトリを作る」, 「# 信頼の確認に答えて終了」).",
+      "screenshot": "pages/mobile-jp-06.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s3-code",
+      "issue": "At 390 px line 2 (the prompt string 「npm run lint の警告をファイルごとに数えてください。」) and line 3 (`--allowedTools \"Bash(npm run lint *)\"`) are cut off at the right edge.",
+      "fix": "Shorten the prompt string to about 14 JP chars (for example \"lint の警告を数えて\"). Or split it across two lines, so each line stays within about 34 monospace columns.",
+      "screenshot": "pages/mobile-jp-10.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "p1-model",
+      "issue": "At 390 px lines 5 and 8 of the model answer are cut off. The closing brace of {\"status\": \"error\", \"reason\": \"<理由>\"} disappears, so the JSON shape looks incomplete.",
+      "fix": "Break line 8 into two lines ({\"status\": \"error\", / \"reason\": \"<理由>\"}), and shorten line 5 (for example 「各要素は name・file・error。」).",
+      "screenshot": "pages/mobile-jp-20.png"
+    }
+  ],
+  "niceToHave": [
+    "reader: inline code breaks mid-token on mobile: `--bare` splits into 「--」/「bare」 in the p-run step (mobile-jp-18) and in summary-points (mobile-jp-29), and `--worktree` splits in ex-feature (mobile-jp-07). Inline code should not break at the hyphen.",
+    "reader: the lesson subtitle breaks 「claude -」/「p」 across lines on mobile (mobile-jp-01). The author could also reword it so `claude -p` sits mid-line.",
+    "reader: the desktop JP measure has a median of 41 chars per line (max 51) against the 30–40 target (metrics.json charsPerLine).",
+    "reader: there is no scroll cue on wide tables and code blocks at 390 px (known).",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (known).",
+    "reader: the mobile full-length PNG stops at 16000px (known); the per-screen PNGs cover the whole lesson."
+  ],
+  "verdict": "revise",
+  "summary": "The screenshots show lessonHash sha256:d960aa01a4d029e9 (copied from metrics.json). There are no hard failures (no overflowX, console, mermaid, unknown-block or broken-image errors), no text-only screens and no personal data on any screen. Desktop renders cleanly. The most important fix is mobile at 390 px: s1-table and s3-table cut off their right column mid-sentence, and s2-code, s3-code and p1-model cut off long lines. Shorter headers and cells, and comments on their own lines, would fix this."
+}

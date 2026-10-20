@@ -783,7 +783,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-context-practice\ncd cc-context-practice\ngit init\necho '- <title>は「練習：」で始める' > CLAUDE.md\nclaude"
+          "code": "mkdir cc-context-practice\ncd cc-context-practice\ngit init\necho '- <title>は「練習：」から' > CLAUDE.md\nclaude"
         },
         {
           "id": "pr-steps-start",

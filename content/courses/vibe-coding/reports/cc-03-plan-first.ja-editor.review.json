@@ -1,26 +1,28 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:32e6d290cf411742",
+  "lessonHash": "sha256:c61b1076cf96439d",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "The lesson keeps です・ます throughout, and the warm, natural tone holds up. Wrong-option feedback follows the pattern of naming the misconception in sentence 1 and the right idea in sentence 2 (s2-check, s3-check, check-quiz). Text no longer puts spaces between Japanese and alphanumerics, and option forms now match (q1, e4). Three spots still mislead the learner: 「まずは手で試しましょう」 in s4-community can be read two ways, the setup order in pr-setup of practice-steps is wrong, and 「観点」 in practice-spec-steps is used for two different things.",
+      "score": 4,
+      "evidence": "The lesson uses warm, natural です・ます throughout. Wrong-option feedback stays within 2 sentences and names the misconception first (q0, q2, q3, q4, e1, e4, e5). All three meaning errors from round 1 are now fixed: s4-community reads 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」, pr-setup gives the right order (「上のコマンドの順にフォルダーを作り、`todo.html` を保存してコミットします。」), and the arrows in s4-flow and s4-table no longer have spaces. Options are parallel in form (q3, q4, e4, e5).",
       "blockIds": [
         "s4-community",
         "practice-steps",
-        "practice-spec-steps",
-        "practice-spec-checklist"
+        "s4-flow",
+        "s3-check",
+        "s4-check",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings. The measure script gives prose 2252 (budget 1,200–2,400), est 20.0 min (≤ 20) and estMinutes 20, so all three are within budget. Each segment adds at most 3 new terms (s1-defs 2, s2-defs 3, s4-defs 2). Every screen has a table, diagram, steps or a check (s1-table, s2-flow, s3-steps, s4-table).",
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2275 (budget 1,200–2,400) · est 20.0 min (must be ≤ 20; estMinutes 20)」, so the lesson is within budget and estMinutes matches. New terms per segment stay at 3 or fewer (s1-defs 2, s2-defs 3, s4-defs 2), and every screen has a table, diagram, steps or a check.",
       "blockIds": [
         "s1-defs",
         "s2-defs",
@@ -31,67 +33,38 @@
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Prerequisites list lessons 1 and 2, and s2-defs recalls lesson 2 (「第2回で見た権限モード」). Katakana terms now get English on first use (フェーズ（phase）, ステータスバー（status bar）, リポジトリ（repository）, ライブラリ（library）), and abbreviations are spelled out (WSL, UI/UX, CSV). Two gaps keep this at 3. 「観点」, part of the glossary term 「4つの観点」, now also names interview topics in practice-spec-steps and practice-spec-checklist. Register is mixed within glossary entries.",
+      "score": 4,
+      "evidence": "「観点」 is now used only for the glossary term 「4つの観点」. The interview topics are called 「話題」 throughout (ps-ask md, expect and hint, and c2-depth). Glossary entries now all end in です・ます (「権限モードの1つです。」), and the 仕様 entry matches s4-defs (「何を作るか、作らないか、どう確かめるか」). Katakana terms and abbreviations get English or a spelled-out form on first use (フェーズ（phase）, セッション（session）, CSV（Comma-Separated Values）).",
       "blockIds": [
-        "s2-defs",
-        "s2-lead",
-        "s2-check",
-        "s3-tip",
         "practice-spec-steps",
-        "practice-spec-checklist"
+        "practice-spec-checklist",
+        "s4-defs",
+        "s2-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The only declared locale is jp, and every string in it is filled. The diagram labels are Japanese, and the alt text describes the flow and the arrow back to the plan (s2-flow). The s2-version link has descriptive text, not 「こちら」.",
+      "evidence": "The lesson declares only jp, and every string in that locale is filled. The diagram labels in s2-flow are Japanese, and its alt text describes the arrow back to the plan. The s2-version link text names its topic, not 「こちら」.",
       "blockIds": [
         "s2-flow",
         "s2-version"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "s4-community",
-      "issue": "(a) meaning: 「公式の機能ではないので、まずは手で試しましょう。」 has no object, so it can be read two ways: try cc-sdd by hand, or build the spec by hand with the method in 3-4. The intended meaning is the second.",
-      "fix": "「公式の機能ではないので、まずは手で試しましょう。」→「公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-steps",
-      "issue": "(a) meaning: the order in pr-setup is wrong. 「`todo.html` を保存して上のコマンドを実行し」 tells the learner to save the file first, but practice-setup runs mkdir, cd and git init before saving. A learner who saves first puts the file outside cc-practice-03, and git add fails.",
-      "fix": "「`todo.html` を保存して上のコマンドを実行し、ブラウザで空のまま「追加」を押します。」→「上のコマンドの順にフォルダーを作り、`todo.html` を保存してコミットします。ブラウザで開き、空のまま「追加」を押します。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "practice-spec-steps",
-      "issue": "(e) naming: in ps-ask, 「観点」 means the topics the interview should cover. The glossary term 「4つの観点」 (範囲・参照先・既存のパターン・症状) uses the same word. 「AskUserQuestionと、観点が3つ以上入ります」 can be read as 'include 3 of the 4つの観点'.",
-      "fix": "ps-ask md「使うツールと、聞いてほしい観点を書きます。」→「使うツールと、聞いてほしい話題を書きます。」. ps-ask expect「AskUserQuestionと、観点が3つ以上入ります。」→「AskUserQuestionと、聞いてほしい話題が3つ以上入ります。」. ps-ask hint「TODO画面なら、データの持ち方や画面が観点になります。」→「TODO画面なら、データの持ち方や画面が話題になります。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "practice-spec-checklist",
-      "issue": "(e) naming: c2-depth has the same collision with the glossary term 「4つの観点」 (「聞いてほしい観点」). It should use the same word as ps-ask after that fix.",
-      "fix": "c2-depth「聞いてほしい観点と「当たり前の質問はしない」を入れました」→「聞いてほしい話題と「当たり前の質問はしない」を入れました」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s4-good-spec: the subject and predicate do not match, because the document 仕様 is the subject of 「書きます」. Change the step 3 hint too — 「役に立つ仕様は、関わるファイルと」→「役に立つ仕様には、関わるファイルと」, and in ps-spec hint of practice-spec-steps 「3-4の「役に立つ仕様は」で始まる段落」→「3-4の「役に立つ仕様には」で始まる段落」",
-    "s3-steps: in ex-fix the plan's change to the shared style is something the learner explicitly asked to leave alone in the 3-1 prompt, so 「頼んでいない」 understates it — 「2番目は、頼んでいない共通のスタイルの変更です。」→「2番目は、変えないでと頼んだ共通のスタイルの変更です。」",
-    "s3-steps: the ex-fix expect line reads awkwardly — 「変えるのがログイン画面だけの計画に直ります。」→「ログイン画面だけを変える計画に直ります。」",
-    "practice-model: the delete button's 直った状態 (what happens when you press it) is missing, and 「付けます」 does not say whether the user or Claude adds it — 「各項目に「{{ボタンの文言}}」ボタンも付けます。」→「各項目に「{{ボタンの文言}}」ボタンも付け、押すとその項目が消えるようにしてください。」",
-    "s2-version: the link text names a topic, not the destination page — 「[autoモードが使えない環境](…)では」→「[autoモードが使えない環境（権限モードの公式ドキュメント）](…)では」",
-    "s2-version: in the same sequence, mode names are written two ways: Manual in plain text and `acceptEdits` as code — 「Manual → `acceptEdits` → プランモード」→「Manual → acceptEdits → プランモード」",
-    "s4-flow / s4-table: arrows are written without spaces in s2 (「探索→計画」) and with spaces here (「インタビュー → `SPEC.md`」). Make them the same — 「インタビュー → `SPEC.md` に書かせる → 新しいセッション（session）で実装」→「インタビュー→`SPEC.md` に書かせる→新しいセッション（session）で実装」",
-    "s4-flow: factual doubt: a new session still loads CLAUDE.md and similar files, so 「仕様だけを」 says a little more than the official 'clean context focused on implementation' — 「[[仕様]]だけを手がかりに実装に集中できます。」→「[[仕様]]を手がかりに実装に集中できます。」",
-    "practice-spec-task: 「リマインダー」 appears without English on first use (it is a common word, so the learner still reads it correctly) — 「「期限とリマインダー」」→「「期限とリマインダー（reminder）」」",
-    "glossary: register is mixed within entries, plain noun phrases next to です・ます (「@参照」「プランモード」). Make them the same — 「権限モードの1つ。ファイルを読み、調べて計画を書きますが、承認するまでソースを編集しません。」→「権限モードの1つです。ファイルを読み、調べて計画を書きますが、承認するまでソースを編集しません。」",
-    "glossary: the 仕様 entry and s4-defs phrase the definition slightly differently — 「何を作るか、何を作らないか、どう確かめるか」→「何を作るか、作らないか、どう確かめるか」"
+    "s2-version: the link text names a topic, not the destination page (carried over from round 1) — 「[autoモードが使えない環境](…)では」→「[autoモードが使えない環境（権限モードの公式ドキュメント）](…)では」",
+    "summary-cards: card-good-spec says 「役に立つ」, but s4-good-spec and the ps-spec hint now say 「役立つ仕様には」. Use one form — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
+    "practice-spec-model / practice-spec-steps: s4-good-spec and card-good-spec name 「関わるファイルとインターフェース」 as the first condition, but the model answer and the ps-spec expect line leave out the interface. Add it — practice-spec-model「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとインターフェース、範囲外のこと、」; ps-spec expect「関わるファイル・範囲外・確かめる手順が入ります。」→「関わるファイルとインターフェース・範囲外・確かめる手順が入ります。」",
+    "practice-model: the delete button is a feature request, not a scope limit, but the model answer puts it under 範囲 next to the line about scope. Move it to its own line so the 4つの観点 stay distinct — 「範囲：変えるのはtodo.htmlだけです。各項目に「{{ボタンの文言}}」ボタンも付け、押すとその項目が消えるようにしてください。ライブラリと保存機能は今回は足しません。」→「範囲：変えるのはtodo.htmlだけです。ライブラリと保存機能は今回は足しません。\n追加：各項目に「{{ボタンの文言}}」ボタンを付け、押すとその項目が消えるようにしてください。」",
+    "s3-steps: in ex-explore, 「知った現状が、計画を読む物差しになります。」 reads like a translation — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」",
+    "s4-community: 「手で仕様を作って」 could suggest the learner writes SPEC.md alone, but the lesson has Claude write it through an interview — 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」→「まずはスキル集を使わず、3-4の依頼文で仕様を作ってみましょう。」",
+    "s4-check: option c has two sentences while a, b and d have one each. Join them — 「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」→「AskUserQuestionツールで私にインタビューし、決まったらそのまま実装まで進めて。」",
+    "practice-spec-task: 「リマインダー」 still has no English on first use (carried over from round 1; it is a common word, so the learner reads it correctly) — 「「期限とリマインダー」」→「「期限とリマインダー（reminder）」」",
+    "s1-table: rows[0][0] ends in a bare noun after the full stop, which reads as a fragment — 「どのファイルの、どんな場面か。テストの方針」→「どのファイルの、どんな場面か。テストの方針も」"
   ],
-  "average": 3.5,
-  "verdict": "revise",
-  "summary": "The scope check required a full review (exit 1: objective o2 changed, and 43 of 44 blocks, 65% of the parts, changed). All 12 must-fix items from the previous review are gone: the spaces between Japanese and alphanumerics, the plain-form flashcards, the option forms in q1 and e4, the missing English for katakana terms, and the unexpanded abbreviations. The biggest strength is the warm, natural です・ます style and wrong-option feedback that names each misconception. The most important fixes are the order of the pr-setup step, the ambiguous 「手で試しましょう」 in s4-community, and 「観点」 being used both for the 4つの観点 and for interview topics."
+  "average": 4.0,
+  "verdict": "pass",
+  "summary": "review-scope.mjs exited 1, so this is a full review. 17 of 44 blocks changed (39%), which is over the 30% limit; sections and objectives are unchanged. All 4 must-fix items from round 1 are fixed in the current text. s4-community now names what to try by hand. pr-setup gives the right order: make the folder, save the file, then commit. The interview topics are now 「話題」 in ps-ask and c2-depth, so they no longer collide with 「4つの観点」. Most round-1 nice-to-haves were applied too: glossary register, the 仕様 definition, the arrow spacing, the mode-name notation and the delete button's 直った状態. The lint is clean, and measure.mjs gives prose 2275 and est 20.0 min, both within budget. No new (a)–(e) errors were found. What remains is polish: the link text, 役立つ vs 役に立つ, and the interface missing from the model answer of 演習2."
 }

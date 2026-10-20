@@ -1,0 +1,66 @@
+{
+  "lessonId": "cc-03-plan-first",
+  "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
+  "lessonHash": "sha256:c61b1076cf96439d",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The s2-flow diagram is a vertical flowchart with readable Japanese labels at 390 px (mobile-jp-08) and on desktop (desktop-jp-05). The tables s1-defs, s1-table and s4-table are two columns and fit at 390 px. Two problems remain: a Japanese comment cut off at 390 px in practice-setup (mobile-jp-20), and single-character line wraps in s4-table on desktop (desktop-jp-12).",
+      "blockIds": [
+        "s2-flow",
+        "s1-table",
+        "s4-table",
+        "practice-setup"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty for desktop-jp and mobile-jp. Every screen has a heading, table, figure, prompt, steps or check. The desktop median is 38 characters per line, inside the 30–40 target, and the full-length PNGs show no walls of text or empty gaps.",
+      "blockIds": [
+        "s1-defs",
+        "s3-steps",
+        "practice-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Japanese text is consistent throughout. Contrast is good, the bars hide no controls, and keyboard hints are shown. English terms have glosses, for example 「Windows Subsystem for Linux」 and 「edge case、めったに起きない場面」. Part of the Japanese instruction in practice-setup is hidden past the edge at 390 px (mobile-jp-20).",
+      "blockIds": [
+        "practice-setup",
+        "s1-rich"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "practice-setup",
+      "issue": "At 390 px the Japanese comment on line 4 of the terminal block, 「# todo.html を保存してから、次の2行で記録す…」, runs past the right edge. The learner sees only part of the instruction and gets no cue to scroll.",
+      "fix": "Take the comment out of the code. Put 「todo.html を保存してから、最後の2行で記録します」 in the practice-task prose or in the pr-setup step, and keep only the commands in the code block. Otherwise shorten the comment to about 12 characters, for example 「# 保存後に記録」.",
+      "screenshot": "pages/mobile-jp-20.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s4-table",
+      "issue": "On desktop the s4-table cells wrap with a single character left on its own line: 「よく知らないコー／ド」 and 「新しいセッショ／ン」. Both breaks fall inside the word.",
+      "fix": "Shorten the cells so they fit on one line or break between words. For example, change 「迷う・複数のファイル・よく知らないコード」 to 「迷う・複数ファイル・不慣れなコード」 and 「インタビュー→`SPEC.md`→新しいセッション」 to 「インタビュー→`SPEC.md`→新セッション」.",
+      "screenshot": "pages/desktop-jp-12.png"
+    }
+  ],
+  "niceToHave": [
+    "practice-starter: at 390 px, lines 5, 9, 10, 13, 18 and 19 of todo.html run past the visible width (mobile-jp-20, mobile-jp-21). This is normal horizontal scrolling for code, but shorter lines (for example the placeholder text, or splitting getElementById calls) would make more of it readable without scrolling, within the 25-line budget.",
+    "s2-flow: on desktop the edge label 「直したい点がある」 overlaps the curved return arrow slightly (desktop-jp-05). It is still readable.",
+    "s2-enter: on mobile the inline code `claude --permission-mode plan` reaches the right margin before it wraps (mobile-jp-09). It is not clipped.",
+    "reader: there is no scroll cue on wide code blocks at 390 px (known).",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (known).",
+    "reader: the mobile full-length PNG is truncated at 16000px (known). The per-screen PNGs cover the whole page."
+  ],
+  "verdict": "revise",
+  "summary": "lessonHash sha256:c61b1076cf96439d is copied from metrics.json, and there are no hard failures (overflowX false, 0 console, mermaid, unknown-block and broken-image errors). The layout is clean at both widths: the vertical flowchart and the two-column tables read well at 390 px, no screen is text-only, and no personal data appears on any PNG. Two fixes are needed. Move or shorten the Japanese comment that is cut off at 390 px in the practice-setup terminal block (mobile-jp-20). Shorten the s4-table cells that leave a single character on its own line on desktop (desktop-jp-12)."
+}

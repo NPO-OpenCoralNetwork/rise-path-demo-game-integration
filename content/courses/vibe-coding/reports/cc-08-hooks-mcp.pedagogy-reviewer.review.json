@@ -1,15 +1,15 @@
 {
   "lessonId": "cc-08-hooks-mcp",
   "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:876f9427367ec7c6",
+  "lessonHash": "sha256:4e07cfeed4cb390f",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "align",
-      "score": 3,
-      "evidence": "Three can-do objectives now match their Bloom levels (o3 「…入れてよいかを判断できる」, evaluate), and each has at least 3 questions with objectiveId (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8), with q1 and q5 at apply level. But q9, the o3 practice item, can be answered by rejecting B alone (see mustFix), and q7 tests the difference between a hook and CLAUDE.md more than exit codes.",
+      "score": 4,
+      "evidence": "There are three can-do objectives with Bloom levels. Each one has at least 3 questions with objectiveId (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8), and q1 and q5 are at apply level. The rewritten q9 now makes the learner judge both A and B, because options b and c also reject B, so the o3 practice item tests the evaluation it claims to test.",
       "blockIds": [
         "s1-check",
         "s2-check",
@@ -21,8 +21,8 @@
     },
     {
       "id": "hook",
-      "score": 3,
-      "evidence": "hook-problem is a concrete 2-sentence problem (「CLAUDE.mdに『.env は編集しないこと』と書いたのに…」) plus the version line. hook-predict is ungraded, and the new option d (「権限モードをManualモードにして…」) is a plausible near-miss. Option c still reuses the prompt's 「毎回確実に」 as 「必ず動く」, so the prediction is easy to guess.",
+      "score": 4,
+      "evidence": "hook-problem sets out a concrete problem in 2 sentences (「CLAUDE.mdに「`.env` は編集しないこと」と書いたのに、Claudeが `.env` を書き換えようとしました。」) and adds the version line. In the ungraded hook-predict, option c now reads 「編集の直前に動くプログラムで、書き込みを止める」, so the answer no longer repeats the prompt's 「毎回確実に」. Option d (Manualモード) is a real near-miss.",
       "blockIds": [
         "hook-problem",
         "hook-predict"
@@ -30,41 +30,45 @@
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "The prerequisites now list jq (「jq（JSONから値を取り出すコマンド）が入っている」), and s2-setup starts with `jq --version`. The lesson recalls lessons 6, 7 and 2 (s1-lead 「第6回のとおり」, s5-lead, the q2 explanation), and s4-transport now describes `sse` as 「古い方式」. One small gap: s1-prettier pipes `.tool_input.file_path` through jq before s2-defs explains that a hook receives JSON on stdin.",
+      "score": 4,
+      "evidence": "The prerequisites list lessons 2, 6 and 7, jq and JSON editing, and s2-setup starts with `jq --version`. The lesson recalls earlier lessons (s1-lead 「第6回のとおり」, s5-lead 「第7回のスキルやサブエージェントは」). s1-config now explains the Prettier command and the incoming JSON before the code (「フックに届くJSONから編集したファイルのパスを取り出し…（8-2で詳しく）」). Definitions match the glossary word for word, and トランスクリプト（transcript） is glossed where it first appears.",
       "blockIds": [
+        "s1-config",
+        "s1-lead",
         "s2-setup",
-        "s1-prettier",
         "s2-defs",
-        "s4-transport"
+        "practice-steps"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs gives 「prose 1369 (budget 1,200–2,400) · est 15.9 min (must be ≤ 20; estMinutes 16)」, lint reports 0 warnings, and each segment has at most 3 defined terms and a figure, table, code block or check. The exception is s3-pitfall, which has 4 sentences; the contract allows at most 3 per callout, and the lint does not check this.",
+      "evidence": "measure.mjs prints 「prose 1705 (budget 1,200–2,400) · … est 16.9 min (must be ≤ 20; estMinutes 17)」, and estMinutes 17 matches. Lint reports 0 warnings, every segment has at most 3 defined terms, and s3-pitfall is now 3 sentences. The practice section is still heavy, though: 13 blocks covering two separate tasks (build the .env hook, then evaluate two candidates).",
       "blockIds": [
         "s3-pitfall",
-        "s4-lead",
+        "s1-defs",
+        "s2-defs",
         "s4-defs",
-        "s5-defs"
+        "s5-defs",
+        "practice"
       ]
     },
     {
       "id": "worked",
-      "score": 3,
-      "evidence": "s2 is a complete worked example before the faded practice. It has three subgoal steps (①スクリプトを書く ②許可を付けて登録する ③予想してから、手で試す), and s2-test now shows `chmod +x .claude/hooks/block-rm.sh` with a troubleshoot for `Permission denied`. Step ① still gives no reason for `exit 2` and `>&2`, and its expect (「それ以外は `exit 0` で通します。」) is an instruction rather than a result the learner can observe.",
+      "score": 4,
+      "evidence": "s2 is a complete worked example with subgoal titles, and each step now says why: ex-script 「`exit 2` は「止める」の合図で、標準エラー出力の文が理由としてClaudeに届きます」, ex-register explains `$CLAUDE_PROJECT_DIR`, ex-test says 「JSONの中の `rm` は文字として渡るだけ」. Each step has an observable expect. The practice then fades it (same structure, different matcher and field), and q5 in the exam asks for the same skill on `config/production.yml`.",
       "blockIds": [
         "s2-steps",
         "s2-test",
         "s2-script",
-        "practice-task"
+        "practice-task",
+        "practice-steps"
       ]
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "There are inline checks in s1, s2, s3, s5 and the practice. q1 (apply) and q2 (analyze, with the `rmdir` / `cd docs && rm` near-misses) ask for real application. But in the rewritten q9 every wrong option installs or tries B (b 「Bは…入れる」, c 「Bは…試す」, d 「どちらも…入れてよい」), so rejecting B is enough to find a. q3 also comes right after s3-pitfall's near-identical sentence.",
+      "score": 4,
+      "evidence": "Inline checks appear in s1, s2, s3, s5 and the practice. q1 is apply, q2 is analyze (`rmdir old` and `cd docs && rm notes.txt`), and q9 is evaluate with a 2×2 option set (A all / A read-only / A none × B in / B out), so rejecting B alone no longer finds the answer. Every wrong option has feedback. One soft spot remains: q3 b repeats the s3-table cell 「ふつうは進み、「hook error」の通知が出る」 almost word for word.",
       "blockIds": [
         "s1-check",
         "s2-check",
@@ -76,40 +80,46 @@
     {
       "id": "miscon",
       "score": 3,
-      "evidence": "Each of the brief's misconceptions is a distractor with feedback of 2 sentences or fewer: CLAUDE.md as a guarantee (q0 a/b, q1 a, q7 b), exit 1 blocks (q3 a/c, q5 b), not blocked means approved (q3 d), PostToolUse undoes the edit (q6 b), the condition catches everything (q2 a/b/d), and 「公式なら安全」 (q4 d, q8 b). Misconception 3 (「`exit 0` は許可」) is still only a table cell, and q9 c (「Bは人気があるので試す」) is a weak distractor.",
+      "evidence": "Every misconception in the brief except one appears as a distractor with feedback of 2 sentences or fewer: CLAUDE.md as a guarantee (q0 a/b, q1 a, q7 b), exit 1 blocks (q3 a/c, q5 b), PostToolUse undoes the edit (q6 b), the condition catches everything (q2 a/b/d), 公式なら安全 (q4 d, q8 b) and 社内製なら全部許す (q9 b). The exception is misconception 3 (「`exit 0` は許可」): it appears only as the s3-table cell 「（許可ではない）」 and the diagram edge, with no reason and no question. Also, q8 d's feedback asks the learner to 「ツールを絞ります」 for a server that has no write tool.",
       "blockIds": [
         "s3-check",
         "check-quiz",
         "s2-check",
         "s5-check",
+        "practice-b-quiz",
         "s3-table"
       ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s1-lifecycle is a 6-node process diagram with Japanese labels that match the text (「PreToolUseフック」「止める」「通す」). Its caption states the takeaway (「PreToolUseフックは、ツールの実行を止められます。」), and the alt text describes the blocked path. There are no decorative images.",
+      "evidence": "s1-lifecycle is a 6-node process diagram with Japanese labels that match the text. The edge 「通す（権限の確認へ）」 now agrees with s3-table's 「許可ではない」. The caption states the takeaway, and the alt text now covers both paths (「通すと、ふだんの権限の確認へ進みます。」). All tables have 2 columns, and there are no decorative images.",
       "blockIds": [
-        "s1-lifecycle"
+        "s1-lifecycle",
+        "s3-table",
+        "s4-scopes",
+        "practice-b-model",
+        "practice-b-model-b"
       ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The practice is authentic and faded: protect `.env` with `Edit|Write` and `file_path`. Every step has an expect, the prompt block has an expect and an honest note about Bash writes, there is a model answer (practice-model-script/-settings) and a 5-item checklist, and the evaluate half now has a model table (practice-b-model). Gaps: p-predict has no hint for building the test JSON, and the evaluate half's only check (q9) can be solved by elimination.",
+      "evidence": "The task is authentic and faded. Each step has an expect, and there is a hint ladder (step hints, ex-register troubleshoot, model answer), model answers for both halves (practice-model-script/-settings, practice-b-model, practice-b-model-b) and a 5-item self-check. But the new p-predict hint only says to change `tool_input`, so a learner who follows it pipes the JSON to block-rm.sh and sees `0` instead of the promised `2` (see mustFix).",
       "blockIds": [
         "practice-steps",
         "practice-prompt",
         "practice-model-script",
         "practice-b-quiz",
         "practice-b-model",
+        "practice-b-model-b",
         "practice-checklist"
       ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4 points) comes after the exam. summary-next has a reflection question (「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」), the next step (第9回) and a descriptive link. There are 7 flashcards, including card-before-install, which matches s5-checks, and askTutor suggestions that go past the lesson.",
+      "evidence": "summary-points (4 points) comes after the exam. summary-next has a reflection question (「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」), the next step (第9回) and a descriptive link. There are 7 flashcards, and card-before-install lists the same 6 items as s5-checks. The askTutor suggestions go beyond the lesson (Bash writes, deny rules).",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -120,29 +130,30 @@
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "Every confirmed audit finding is applied: 「ふつう」 plus the `onFailure` exception in s3-pitfall, card-exit1, summary-points and q3 c; q6 d scoped to 「`PostToolUse` の `exit 2`」; q6 now says 「指摘を標準エラー出力に書いて」; s1-config reads 「処理（ここではコマンド）」; the /hooks expect no longer promises a matcher. The version is pinned (v2.1.304), and `hooks/hooks.json` is now the same in s5-checks and q4. A small tension remains: s1-lifecycle goes straight from 「通す」 to 「ツールを実行する」, while s3-table says exit 0 is 「許可ではなく、通常の権限確認へ」.",
+      "evidence": "The claims I checked agree with the fetched pages. hooks.md says 「On events such as `PreToolUse`, you see a `<hook name> hook error` notice」 (s3-table), hooks-guide says exit 0 「doesn't approve it」 and 「PreToolUse hooks fire before any permission-mode check」 (s3-zero, q7 d), and mcp.md says it 「prompts for approval in interactive sessions before using project-scoped servers」 (s4-scopes). The version is pinned to v2.1.304, and the brief records the code being run. Two small precision points remain: s5-risk 「自分のアカウントの権限」 for the source's 「your user privileges」, and the claim in hook-predict and s1-lead that hooks are the way to enforce a rule, which leaves out lesson 2's deny rules.",
       "blockIds": [
-        "s3-pitfall",
-        "check-quiz",
-        "s1-config",
-        "practice-steps",
-        "s1-lifecycle",
-        "s3-table"
+        "s3-table",
+        "s3-zero",
+        "s4-scopes",
+        "s5-risk",
+        "hook-predict",
+        "s1-lead"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout, warm and without pressure (「結果を先に予想しましょう」), with no banned phrases. Terms match the course (「Manualモード」「autoモード」 as in cc-02) and the glossary. A few lines are stiff, such as q8 c 「承認の確認が出たら」; the ja-editor owns the wording.",
+      "evidence": "The lesson uses です・ます throughout, the tone is warm and does not pressure the learner (「結果を先に予想しましょう」), there are no banned phrases, and terms match the glossary and the course (Manualモード, autoモード). q8 c now reads 「承認を求められたら」. The ja-editor owns the wording.",
       "blockIds": [
         "hook-predict",
-        "check-quiz"
+        "check-quiz",
+        "s2-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The only locale (jp) is complete, the diagram labels are Japanese, the alt text is descriptive, and the single link has descriptive text (「フックの公式ガイド（日本語）」). Plain-text fields such as the checklist labels carry no markdown.",
+      "evidence": "The only locale (jp) is complete, the diagram labels are Japanese, the alt text describes both paths, and the one link has descriptive text (「フックの公式ガイド（日本語）」). Plain-text fields such as the checklist labels and the table captions carry no markdown.",
       "blockIds": [
         "s1-lifecycle",
         "summary-next",
@@ -152,32 +163,24 @@
   ],
   "mustFix": [
     {
-      "criterion": "active",
-      "blockId": "practice-b-quiz",
-      "issue": "Rewritten q9 (the o3 evaluate item of the practice) can be answered by elimination. B is plainly unsafe (「作者の情報はなく…外部から取ってきたスクリプトをフックで実行」), and every distractor installs or tries B: b 「Bはスター数が多いので入れる」, c 「Bは人気があるので試す」, d 「どちらも…入れてよい」. Option a is the only one that rejects B, so the learner never has to weigh A's rows (outsiders write into the issues, so allow only the read tool). That weighing is the point of the item and of practice-b-model.",
-      "fix": "Keep the prompt, option a, the answer [\"a\"], the explanation and the hint. Replace option b with md \"Aは社内製なので全部のツールを許し、Bは入れない\" and feedback \"社内製でも、課題には社外の人が書いた文章が混ざります。閉じるツールは外し、読むツールだけで試します。\". Replace option c with md \"Aは閉じるツールがあるので入れず、Bも入れない\" and feedback \"閉じるツールは、権限ルールで外せます。出どころと作者がわかるAは、読むツールだけで試せます。\". Keep d. Then two distractors reject B, and the learner has to judge A."
-    },
-    {
-      "criterion": "load",
-      "blockId": "s3-pitfall",
-      "issue": "s3-pitfall has 4 sentences (「…ふつう止まりません。」「止めないエラーとして扱われ、操作は進みます。」「止めるときは `exit 2` です。」「…失敗でも止まります。」), which breaks the contract budget 「Callouts … each ≤ 3 sentences」. The lint does not count callout sentences, so it passes anyway.",
-      "fix": "Set s3-pitfall md to: \"Unixの習慣で `exit 1` を返しても、フックはふつう止まらず、操作は進みます。止めるときは `exit 2` です。`onFailure` を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\" (s3-table already says 「止めないエラー」, so nothing is lost)."
+      "criterion": "practice",
+      "blockId": "practice-steps",
+      "issue": "The new p-predict hint (「例題のテストのコマンドで、`tool_input` を `{\"file_path\":\".env\"}` に変えます。」) says to change only `tool_input`. The example test command (s2-test) pipes the JSON to `.claude/hooks/block-rm.sh`, which reads `.tool_input.command`, gets an empty value and exits 0. A learner who follows the hint literally sees `0` where the expect promises 「理由の文と `2` が出ます」, and may conclude that their protect-files.sh is broken.",
+      "fix": "Set the p-predict hint to: \"例題のテストのコマンドを使います。`tool_input` を `{\\\"file_path\\\":\\\".env\\\"}` に、渡す先を `.claude/hooks/protect-files.sh` に変えます。\""
     }
   ],
   "niceToHave": [
-    "s2-steps ex-script: give the reason at the point of use. Set expect to \"`rm` で始まると理由の文が出て `exit 2` で終わり、それ以外は `exit 0` で終わります。\" and append to md \"`exit 2` は「止める」の合図で、標準エラー出力の文が理由としてClaudeに届きます（8-3で詳しく）。\"",
-    "practice-steps p-predict: add a hint, \"例題のテストのコマンドで、`tool_input` を `{\\\"file_path\\\":\\\".env\\\"}` に変えます。\" Also change the expect so it does not assume the model answer's wording: \"理由の文と `2` が出ます。`README.md` なら `0` です。\"",
-    "s1-lifecycle: so the diagram agrees with s3-table (exit 0 is not an approval), change the edge label to `C -->|通す（権限の確認へ）| D`.",
-    "s2-steps ex-register: the worked example never says to start Claude Code in the practice folder before using `/hooks`. Add to md \"`cc-hooks-practice` で `claude` を起動し、\" before the `/hooks` check.",
-    "s1-prettier uses `jq -r '.tool_input.file_path'` before s2-defs explains the stdin JSON. One clause in s1-config (\"コマンドには、編集したファイルの情報がJSONで届きます（8-2で詳しく）。\") would remove the forward reference.",
-    "s4 (claude mcp add, scopes) is still not covered by any objective or question, yet summary point 3 and card-scopes are about it. Tie it to o3 (for example, a q8 option about committing `.mcp.json` at `project` scope rather than `local`) or shorten the summary point.",
-    "s3-check q3 still closely follows s3-pitfall. Asking it as a log to interpret (「`exit 1` のフックを書いたのに、hook error の通知が出て `.env` が書き換わりました。原因は？」) would make it retrieval rather than recognition.",
-    "check-quiz q8: option a is still the longest and the only one that combines several checks. Shortening it to \"出どころと作者を確かめ、ツールを権限ルールで絞る\" (the explanation already covers the injection point) would make the lengths parallel.",
-    "practice-b-model row 出どころ, column B: 「不明」 sits oddly with q9's 「スター数の多い」, which implies a public repository. Use \"公開リポジトリだが作者不明\".",
-    "hook-predict option c: 「必ず動くプログラムで」 echoes the prompt's 「毎回確実に」. Use \"編集の直前に動くプログラムで、書き込みを止める\" so the prediction is less obvious.",
-    "Wording for the ja-editor: q8 c 「承認の確認が出たら」 could read \"承認を求められたら、その場で判断して承認する\"."
+    "hook-predict q0 explanation (and s1-lead): lesson 2's deny rules are also a mechanism that blocks regardless of Claude's judgement (cross-lesson fact 4: Read/Edit deny rules cover the built-in file tools and recognized Bash file commands). Replace the last sentence of the explanation with \"このレッスンでは、その仕組みのひとつ、フックを作ります。第2回の拒否ルールも、仕組みで止める方法です。\"",
+    "s3-zero: misconception 3 (「`exit 0` は許可」) is never corrected with a reason. Set md to \"`exit 0` は止めないだけで、許可ではありません。`exit 2` は、どの権限モードでも操作を止めます。\"",
+    "check-quiz q8 option d: the feedback's remedy 「ツールを絞ります」 does not help with a server that has no write tool. The check that d leaves out is the origin and the author. Use \"読むだけでも、Webページに紛れた指示を取り込むことがあります。出どころと作者も確かめてから入れます。\"",
+    "factual doubt: s5-risk 「自分のアカウントの権限で」 (and the q4 explanation) paraphrases plugins/security 「with your user privileges」, which refers to the OS user, not a Claude account. Consider \"プラグインは、あなたのPCのユーザー権限で、任意のコードを実行できます。\"",
+    "practice-steps p-script: it has no troubleshoot, although registering the second hook can fail the same way as the first. Add troubleshoot \"`/hooks` に出ないときは、例題の②と同じく、JSONのカンマと `chmod +x` を確かめます。\"",
+    "s2-steps ex-script: the lesson never says to create the file. Prepend to md \"エディターで `.claude/hooks/block-rm.sh` を作り、上のスクリプトを保存します。\"",
+    "s4 (claude mcp add, scopes) is still not covered by any objective or question, yet summary point 3 and card-scopes are about it. Tie it to o3 (for example, a q8 option about committing to `.mcp.json` at `project` scope rather than `local`) or shorten the summary point.",
+    "s3-check q3: option b repeats the s3-table cell. Asking it as a log to read (「`exit 1` のフックを書いたのに、hook error の通知が出て `.env` が書き換わりました。原因は？」) would turn it into retrieval rather than recognition.",
+    "practice holds two ideas (build the .env hook, then evaluate two candidates) in 13 blocks. If the section structure is revisited later, splitting the candidate evaluation into its own practice section would ease the load. This would be a structural change and would need a full review."
   ],
-  "average": 3.15,
+  "average": 3.54,
   "verdict": "revise",
-  "summary": "The scope check required a full review: the objectives changed and 33 of 48 blocks (69%) changed. All five round-1 must-fix items are gone (o3 now reads 「判断できる」; q8 distractors are partial checks; q9 is rewritten and practice-b-model is added; jq is in the prerequisites and s2-setup; s2-test shows `chmod +x`), and every confirmed audit finding is applied. The lesson's spine is strong: the official worked example fades into the .env practice, and q2 tests the limits of a hook well. Two fixes remain: q9 can still be solved by rejecting B alone, so the A-side judgment is never tested, and s3-pitfall is over the 3-sentence callout budget."
+  "summary": "This is a full review: review-scope.mjs exited 1 because 22 of 49 blocks changed (45%, over 30%). Both round-1 must-fix items are gone. q9 now crosses A's and B's judgements, so a learner cannot answer by rejecting B alone, and s3-pitfall is down to 3 sentences. Most round-1 suggestions were applied (reasons in the steps, the diagram edge 「通す（権限の確認へ）」, the s1-config explanation, practice-b-model-b). One fix remains: the new p-predict hint sends the learner's test JSON to block-rm.sh, which prints 0 instead of the expected 2; the hint must also say to pipe to protect-files.sh."
 }

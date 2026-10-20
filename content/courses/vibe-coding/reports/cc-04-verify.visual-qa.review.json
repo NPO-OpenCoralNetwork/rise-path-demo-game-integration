@@ -1,0 +1,71 @@
+{
+  "lessonId": "cc-04-verify",
+  "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
+  "lessonHash": "sha256:f72c755010e86821",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "No hard failures (overflowX false, 0 console, mermaid, unknown-block or image errors) and no text-only screens. The s4-sort flowchart TD is readable at 390 px (pages/mobile-jp-17.png, 18.png). At 390 px the two tables break inside words: s1-table splits 処/理, 統/一 and ビル/ド (pages/mobile-jp-04.png), and p-model-sort splits 入/力 (pages/mobile-jp-29.png).",
+      "blockIds": [
+        "s4-sort",
+        "s1-table",
+        "p-model-sort"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "Every concept is followed by a prompt, steps or a check within a screen or two. Inline checks 1/5 to 5/5 come at regular intervals and there are no walls of text (pages/desktop-jp-04.png, 06.png, 09.png, 14.png). Desktop line length has a median of 40 characters (target 30–40, max 49), at the top of the range.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "s5-check",
+        "s3-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "Japanese throughout: diagram labels, captions and quiz options are all in Japanese, and nothing is hidden under the top or bottom bars. Prompt blocks show raw backticks (`postal.test.mjs`, /goal `node --test`) next to rendered inline code, and the table cells break mid-word on mobile (pages/mobile-jp-04.png, pages/desktop-jp-05.png).",
+      "blockIds": [
+        "s3-prompt-write",
+        "s3-prompt-green",
+        "s2-goal-prompt",
+        "s1-table"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "s1-table",
+      "issue": "At 390 px the first column wraps inside words: 「関数や処/理」, 「ビル/ドエラーの修正」, 「書き方の統/一」. The words are split across lines in the key comparison table.",
+      "fix": "Shorten the first-column cells so each fits on one line or breaks at the colon, e.g. 「自動テスト：関数」「ビルド：ビルドエラー」「リンター：書き方」「画面比較：見た目」. Mention screenshot (スクリーンショット) in the text below instead of in the cell. Shortening the second column (「テストを実行して」「ビルドを確かめて」) also gives the first column more room.",
+      "screenshot": "pages/mobile-jp-04.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "p-model-sort",
+      "issue": "At 390 px the cells wrap inside words: 「扱いがな/い」, 「仕様にない入/力」, 「1行にでき/る」.",
+      "fix": "Shorten the cells, e.g. 「負の年の扱いがない」 to 「負の年が未対応」, 「仕様にない入力」 to 「仕様外の入力」, 「`if` 文を1行にできる」 to 「`if` を1行に」, so each fits in the column or breaks at a natural boundary.",
+      "screenshot": "pages/mobile-jp-29.png"
+    }
+  ],
+  "niceToHave": [
+    "s3-code / p-model-code: at 390 px the assertion lines scroll sideways, and the expected values (true/false) are off-screen (pages/mobile-jp-12.png, 13.png, 28.png, 29.png). Consider breaking each assert across two lines so the expected value is visible without scrolling.",
+    "s3-prompt-write, s3-prompt-green, s2-goal-prompt, p-prompt-write, p-prompt-green, p-prompt-review: backticks show as raw characters in the prompt text (pages/desktop-jp-08.png, 09.png). Consider dropping them in the prompts or using 「」 instead.",
+    "s3-steps / p-steps: the step titles repeat the numbering (①–⑧) next to the reader's numbered circles (pages/mobile-jp-09.png, 23.png). The prompt titles refer to ①/④, so this is acceptable, but it is visually redundant.",
+    "reader: the flashcard hint says 「クリックまたはスペースキーでめくる」 on mobile, where there is no keyboard (pages/mobile-jp-36.png).",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (pages/mobile-jp-37.png, desktop-jp-25.png). Known behaviour.",
+    "reader: code blocks and tables have no scroll cue on mobile. Known behaviour.",
+    "Desktop line length: median 40, max 49, at the upper edge of the 30–40 target."
+  ],
+  "verdict": "revise",
+  "summary": "All hard checks pass and no screen shows personal data. The lesson has a steady rhythm of concept, prompt and check, and the review flowchart is readable at 390 px. The fixes needed are visual: on mobile the s1-table and p-model-sort cells break inside words, so shorten those cells."
+}

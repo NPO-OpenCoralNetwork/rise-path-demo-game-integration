@@ -1,79 +1,76 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:2597b7828fdf4777",
+  "lessonHash": "sha256:e51506cc1e6117ed",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:2597b7828fdf4777",
+    "changed": [
+      "hook-predict"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/2597b7828fdf4777/round-1/ja-editor.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The whole lesson is in です・ます form, with warm, plain sentences, no pressure phrases, and wrong-option feedback that names the misconception within 2 sentences (q0–q4, p1–p3, e1–e5). The options of almost every question share one form. Examples are q2 (all end in 「頼む」), q3 (「〜た。〜する」) and p1 (「分ける／まとめる／任せる／続ける」). The exception is hook-predict, where a and b end in the past tense (「癖がついた」「落ちたりした」) and c and d end in a remedy (「〜ので、〜すれば直る」). That breaks style guide §5 and is in mustFix. A few spots read stiffly but stay clear: 「よい最初の依頼」 (s5-steps), the feedback with no subject in s5-check d, and the weak 「起きるので」 link in e4 b. 「自動の圧縮」 and 「自動のコンテキスト圧縮」 are used side by side (p2 d, e4 b), but they clearly name the same thing. `lessons:lint --strict` reports 0 errors and 0 warnings.",
+      "evidence": "Only hook-predict q0 changed. Options c and d no longer end with a remedy. They are now 「伝え方が弱く、言葉の強さが足りなかった」 and 「Claude Codeに不具合が起きていた」. All four options now share the same form: a cause stated in the plain past (「癖がついた」「落ちたりした」「足りなかった」「起きていた」). This applies the previous niceToHave and meets §5. Option d's feedback still says 「入れ直しても、同じ使い方なら同じことが起きます。」, but the option no longer mentions reinstalling. The learner still reads this correctly, so it is listed in niceToHave. The changed text has no grammar, meaning or rule error. The stiff spots in unchanged text are carried over (s5-steps, s5-check). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
       "blockIds": [
         "hook-predict",
         "s5-steps",
-        "s5-check",
-        "check-quiz",
-        "pr-diagnose"
+        "s5-check"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289, practice reading 1126, 12 questions and est 19.8 min (must be ≤ 20), with estMinutes 20. lint --strict finds no sentence-length or paragraph-length issue. para-sentences.mjs flags only two quiz stems with 4 sentences (p2 and p3 in pr-diagnose), and marks them advisory. Each stem sets up a scenario that the question needs. Every concept segment adds at most 3 new terms: 5-1 adds セッション and コンテキストウィンドウ, 5-2 adds コンテキスト圧縮, 5-3 adds ルール, 自動メモリ and プランモード (CLAUDE.md comes from 第1回), and 5-4 adds サブエージェント. Tables keep to 2 columns.",
+      "evidence": "The change does not touch load. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289 and est 19.8 min (must be ≤ 20), with estMinutes 20.",
       "blockIds": [
-        "pr-diagnose",
-        "s3-defs",
-        "s3-table"
-      ]
+        "hook-predict"
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Every term is defined before it is used, in a definitions block that matches the glossary, and later uses link with [[…]] (s2-session, s3-lead, s3-fix, s4-why). Katakana terms get English on first use: セッション（session）, デプロイ（deploy）, リポジトリ（repository）, プランモード（plan mode）, the three pattern names in s4-table. Abbreviations are spelled out: API, CSV, WSL. Terms carried over from earlier lessons are marked with their lesson (第1回, 第4回). タイムゾーン in s5-steps has no English, but it is an everyday word and not a lesson term (niceToHave).",
+      "evidence": "The change does not touch prior knowledge, and it introduces no new term.",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s3-defs",
-        "s4-defs",
         "s4-table",
         "s3-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a single-locale lesson (`locale: \"jp\"`) with plain strings, so no locale is missing. The s3-diagram has a caption and alt text, and its labels match the text: 「決まったファイルの指示」, 「ディスクから読み直す」. The link text in s3-fix names its destination: 「コンテキストウィンドウの公式ドキュメント（日本語）」. The alt text lists four items that the diagram itself does not show (niceToHave).",
+      "evidence": "The change does not touch a11y_l10n. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
       "blockIds": [
-        "s3-diagram",
-        "s3-fix"
-      ]
+        "s3-diagram"
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "blockId": "hook-predict",
-      "criterion": "voice",
-      "issue": "(d) §5 options with the same form and ending: options a and b state a past cause (「自己流の癖がついた」「要約で落ちたりした」). Options c and d end with a remedy in a different form (「〜ので、強い言葉で言い直せば直る」「〜なので、入れ直せば直る」). The existing feedback still fits the rewritten options.",
-      "fix": "c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」; d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeに不具合が起きていた」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "pr-checklist: pr-code and pr-prompt-a write 「<title>」, but the checklist writes the bare 「title」 — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
-    "pr-answer: same variant as pr-checklist — 「about.htmlのtitleも「練習：」で始まった。」→「about.htmlの `<title>` も「練習：」で始まった。」",
-    "s3-diagram: the alt text lists four items that the diagram does not show — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、図の下の表に示す。」",
-    "s3-table: the caption quotes only part of the diagram label — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
-    "s4-table: 「2回でだめなら」 drops the verb that s5-steps, e1 and the flashcards use — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
-    "s5-check: option d's feedback has no subject — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
-    "s5-steps: 「よい最初の依頼」 reads as a calque — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
-    "s5-steps: タイムゾーン appears without English on first use (an everyday word, not a lesson term) — 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
-    "pr-steps-start: it is unclear what to note about CLAUDE.md — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
-    "check-quiz: the causal link in e4 b's feedback is weak — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
-    "lesson: s2-defs names the automatic case 「自動のコンテキスト圧縮」, but p2 d and e4 b shorten it — p2 d 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」; e4 b 「自動の圧縮は、」→「自動のコンテキスト圧縮は、」",
-    "pr-diagnose: the p2 and p3 stems run to 4 sentences (para-sentences.mjs, advisory), and the setup sentences could merge — p2 「方針は固まり、まだ同じ作業が残っています。」→「方針は固まり、同じ作業がまだ残っています。」 (keep it, but join the first two sentences: 「セッションB：1つの機能の実装を2時間続け、方針は固まりました。」)"
+    "hook-predict: option d no longer mentions reinstalling, but its feedback still starts from it — 「入れ直しても、同じ使い方なら同じことが起きます。」→「入れ直しても、同じ使い方なら同じことが起きます。原因は会話の状態にあります。」 or more simply 「同じ使い方なら、入れ直しても同じことが起きます。」",
+    "pr-checklist: pr-code and pr-prompt-a write 「<title>」, but the checklist still writes the bare 「title」 (carried over) — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
+    "s3-diagram: the alt text lists four items that the diagram no longer shows (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
+    "s3-table: the caption quotes only part of the diagram label (carried over) — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
+    "s4-table: 「2回でだめなら」 drops the verb that s5 and e1 use (carried over) — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
+    "s5-check: option d's feedback has no subject (carried over) — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
+    "s5-steps: 「よい最初の依頼」 reads as a calque (carried over) — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
+    "s5-steps: タイムゾーン appears without English on first use (carried over) — 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
+    "pr-steps-start: the long-vowel mark is used inconsistently (carried over) — 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」",
+    "pr-steps-start: it is unclear what to note about CLAUDE.md (carried over) — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
+    "check-quiz: the causal link in e4 b's feedback is weak (carried over) — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
+    "lesson: the name for auto-compaction varies (carried over) — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」"
   ],
   "average": 3.75,
-  "verdict": "revise",
-  "summary": "Full review of the current version, as the task instructed. The hash is sha256:2597b7828fdf4777, the same version the earlier verification round read, but this review is independent of that chain. lessons:lint --strict is clean. measure.mjs gives prose 1945 (budget 1,200–2,400) and est 19.8 min (must be ≤ 20), with estMinutes 20. Only two quiz stems are over 3 sentences, and both are advisory. The Japanese is warm, です・ます throughout, and terms are defined with English on first use. One explicit §5 rule is broken. In hook-predict, options c and d end in a remedy (「〜すれば直る」) while a and b state a past cause, so their form and ending differ. That is the one mustFix, and the exact replacement is given. The rest is niceToHave: <title> variants, alt text, the caption, a few calques and the shortened 「自動の圧縮」. Scores are 3/4/4/4 (mean 3.75), but mustFix is not empty, so the verdict is revise."
+  "verdict": "pass",
+  "summary": "Verification round: review-scope.mjs exited 0, with 1 of 47 blocks changed (2%, hook-predict q0 only). The previous review had no open must-fix items, so the resolved list is empty. Options c and d now state a cause in the plain past, like options a and b. This applies the previous niceToHave and makes the four options parallel. The change adds no (a)–(e) error. Option d's feedback still mentions reinstalling (「入れ直しても」), which is listed in niceToHave. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
 }

@@ -4,95 +4,66 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:876f9427367ec7c6",
+  "lessonHash": "sha256:4e07cfeed4cb390f",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "The text is warm, plain です・ます. The card backs (summary-cards) and the q9 scenario (practice-b-quiz) now end in です・ます. Wrong-option feedback stays within two sentences and names the misconception (s1-check, s3-check, s5-check, check-quiz). It stays at 3 because a few notation and option-form breaks remain in text that changed this round: the key 「Ctrl+O」 in the p-claude hint, half-width spaces in plain-text fields (s4-scopes caption, practice-checklist, summary-tutor), and q9 option d ending in 「入れてよい」 while the other options end in a verb.",
+      "score": 4,
+      "evidence": "The whole lesson uses warm です・ます, and the card backs, the q9 scenario and the checklist labels all end politely. The four round-1 breaks are fixed: the p-claude hint now writes 「Ctrl + Oで開くトランスクリプト（transcript）画面で」, the plain-text fields no longer put a space before particles (「.envでは」「/hooksのPreToolUseに」「（--scopeで選ぶ）」), and every q9 option ends in a verb (d: 「…Bは作者とソースがわかるので入れる」). Each piece of wrong-option feedback is at most two sentences and names the misconception (s1-check, s3-check, s5-check, practice-b-quiz, check-quiz).",
       "blockIds": [
         "practice-steps",
-        "s4-scopes",
         "practice-checklist",
+        "s4-scopes",
         "summary-tutor",
-        "practice-b-quiz"
+        "practice-b-quiz",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs reports prose 1369 (budget 1,200–2,400), est 15.9 min (≤ 20), and estMinutes 16 matches it. lessons:lint --strict reports 0 errors and 0 warnings. Sections mix short text with a table, code, a diagram or a check (s1-lifecycle, s3-table, s4-scopes, s5-checks, practice-b-model). One paragraph has four sentences (s3-pitfall). It is listed as a must-fix, but it does not change the overall load.",
+      "evidence": "measure.mjs reports 「prose 1705 (budget 1,200–2,400) · est 16.9 min (must be ≤ 20; estMinutes 17)」, so estMinutes matches. lessons:lint --strict reports 0 errors and 0 warnings. s3-pitfall is now three sentences. The sections mix short text with tables, code, a diagram and checks, and the new practice-b-model-b table splits the A and B write-ups into two narrow tables.",
       "blockIds": [
         "s3-pitfall",
-        "s1-lifecycle",
         "s3-table",
-        "s5-checks",
-        "practice-b-model"
+        "s4-scopes",
+        "practice-b-model",
+        "practice-b-model-b"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Prerequisites list 第2回, 第6回 and 第7回, and the text recalls them where they matter (s1-lead 「第6回のとおり」, q2 explanation 「第2回の権限ルール」, s5-lead 「第7回」). Each segment introduces at most 3 terms, and the definitions match the glossary word for word (s1-defs, s2-defs, s4-defs, s5-defs). The two gaps from round 1 are closed. 「トランスクリプト（transcript）」 now has its English (practice-steps), and summary-points now writes 「MCPサーバーは `claude mcp add` で追加し」. MCP is spelled out in s4-lead, and 「リンター（linter）」 gets its English in q6.",
+      "evidence": "The prerequisites list 第2回, 第6回 and 第7回, and the text recalls each one where it matters (s1-lead 「第6回のとおり」, q2 explanation 「第2回の権限ルール」, s5-lead 「第7回のスキルやサブエージェントは…プラグインとしてまとめて配れます」). No segment introduces more than three terms, and the definitions match the glossary word for word (s1-defs, s2-defs, s4-defs, s5-defs). MCP is spelled out in s4-lead, and 「リンター（linter）」 and 「トランスクリプト（transcript）」 have their English on first use.",
       "blockIds": [
+        "s1-lead",
+        "s5-lead",
         "s1-defs",
         "s2-defs",
         "s4-defs",
-        "s5-defs",
-        "practice-steps",
-        "summary-points"
+        "s5-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares a single locale (jp), and every string is in Japanese. The diagram has a Japanese caption and alt, and the labels now match the alt (「PreToolUseフック」). The link text in summary-next, 「フックの公式ガイド（日本語）」, names its destination.",
+      "evidence": "The lesson declares one locale (jp), and every string, including the diagram labels, caption and alt, is in Japanese. The diagram labels match the alt (「PreToolUseフック」). The summary-next link text 「フックの公式ガイド（日本語）」 names its destination.",
       "blockIds": [
         "s1-lifecycle",
         "summary-next"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "load",
-      "blockId": "s3-pitfall",
-      "issue": "(d) Paragraph budget, style-guide §1 (at most 3 sentences per paragraph). The md is one paragraph with four sentences: 「…止まりません。」「…操作は進みます。」「止めるときは `exit 2` です。」「…失敗でも止まります。」",
-      "fix": "「Unixの習慣で `exit 1` を返しても、フックはふつう止まりません。止めないエラーとして扱われ、操作は進みます。止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。」→「Unixの習慣で `exit 1` を返しても、フックはふつう止まりません。止めないエラーとして扱われ、操作は進みます。\n\n止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-steps",
-      "issue": "(d) Notation, style-guide §3 (in body text, write keys as 「Ctrl + S」). The p-claude hint writes 「Ctrl+O」, while the rest of the course writes 「Ctrl + V」「Ctrl + G」 (cc-03). The keys array 「Ctrl+O」 can stay as it is.",
-      "fix": "p-claude hint: 「Ctrl+Oで開くトランスクリプト（transcript）画面で」→「Ctrl + Oで開くトランスクリプト（transcript）画面で」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-checklist",
-      "issue": "(d) Notation, style-guide §3: no space between Japanese text and alphanumerics, except around inline code. Checklist labels, captions and askTutor suggestions are rendered as plain text, not code, yet they put half-width spaces before particles: 「.env では」「README.md では0」「/hooks の PreToolUse に」「cat .env で」 (practice-checklist), 「（--scope で選ぶ）」 (s4-scopes caption), 「Bashのコマンドでの .env への」 (summary-tutor). Other plain-text fields write 「PreToolUseフック」 with no space (objectives, s3-table caption), so the notation varies within the lesson.",
-      "fix": "pc-manual: 「手で試すと、.env では理由の文と終了コード2、README.md では0が出ました」→「手で試すと、.envでは理由の文と終了コード2、README.mdでは0が出ました」; pc-hooks: 「/hooks の PreToolUse に、新しく足したフックが表示されました」→「/hooksのPreToolUseに、新しく足したフックが表示されました」; pc-env: 「cat .env で、中身が変わっていないことを確かめました」→「cat .envで、中身が変わっていないことを確かめました」; s4-scopes caption: 「MCPサーバーの3つのスコープ（--scope で選ぶ）」→「MCPサーバーの3つのスコープ（--scopeで選ぶ）」; summary-tutor: 「Bashのコマンドでの .env への書き込みも止めるには？」→「Bashのコマンドでの.envへの書き込みも止めるには？」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-b-quiz",
-      "issue": "(d) Option form, style-guide §5 (the same ending for every option). In q9, options a, b and c end in the dictionary form of a verb (「入れない」「入れる」「試す」), but option d ends in the permissive 「入れてよい」.",
-      "fix": "option d: 「どちらも、自動更新を切れば中身を見ずに入れてよい」→「どちらも、自動更新を切ったうえで、中身を見ずに入れる」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "practice-b-quiz: the q9 prompt is a single inline paragraph of 8 sentences (about 190 characters). Inline prompts cannot hold paragraph breaks, so merging the two facts about A shortens it — 「課題を読むツールと、課題を閉じるツールを持ちます。課題には社外の人も書き込めます。」→「課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。」",
-    "s2-steps: the ex-register troubleshoot still does not say what to restart, and a trailing comma is only one possible cause — 「一覧に出ないときは余計なカンマを直し、再起動します。」→「一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。」",
-    "s2-steps: in the ex-test md, 「ただの文字」 is vague — 「中の `rm` はただの文字です。」→「JSONの中の `rm` は文字として渡るだけで、実行はされません。」",
-    "s4-scopes: in the project row, 「対話では」 is unclear to a learner — 「チーム全員（`.mcp.json`。対話では使う前に承認）」→「チーム全員（`.mcp.json` で共有。使う前に承認の確認が出る）」",
-    "s5-lead: the lead still does not say how the parts are bundled, so the link to plugins only appears in the definitions — 「第7回のスキルやサブエージェントも、フックやMCPサーバーと一緒に配れます。」→「第7回のスキルやサブエージェントは、フックやMCPサーバーと一緒に、プラグインとしてまとめて配れます。」",
-    "s5-risk / s5-check explanation: the style guide prefers dropping the subject to writing 「あなた」 — 「あなたの権限で任意のコードを実行できます。」→「自分のアカウントの権限で、任意のコードを実行できます。」",
-    "check-quiz q8: option a is still the longest, which hints at the answer — 「出どころと作者を確かめ、ページに紛れた指示も考えて、ツールを権限ルールで絞る」→「出どころと作者を確かめ、ツールを権限ルールで絞る」",
-    "check-quiz q8: option c chains three 「の」 — 「`project` スコープの承認の確認が出たら、その場で判断して承認する」→「`project` スコープで承認を求められたら、その場で判断して承認する」",
-    "s1-config: name the formatter that the code actually runs — 「編集のたびに整形ツールを動かす公式の例です。」→「編集のたびに整形ツールのPrettierを動かす公式の例です。」",
-    "summary-next: 「作業を並べて自動で動かします」 is vague as a preview of 第9回 — 「次の第9回では、作業を並べて自動で動かします。」→「次の第9回では、複数の作業を並行して動かし、自動化する方法を学びます。」",
-    "lesson: 「autoモード」 (q7) is now written without a space, but cc-02 onward write 「auto モード」 in places. Align the course with this lesson — 「auto モード」→「autoモード」"
+    "s4-scopes: in the project row, 「使う前に承認」 does not say who approves — 「このプロジェクト・チーム全員。対話セッションでは、使う前に承認」→「このプロジェクト・チーム全員。対話セッションでは、使う前に承認の確認が出る」",
+    "s3-table: the table writes 「ふだんの権限確認へ」 while the diagram, the diagram alt and the q3 feedback write 「権限の確認」. Use one form — 「進む。表示はなく、ふだんの権限確認へ（許可ではない）」→「進む。表示はなく、ふだんの権限の確認へ（許可ではない）」",
+    "practice-b-model-b: the 出どころ row describes the source code, not where B is distributed from (s5-checks defines it as 「どこから配られているか」) — 「ソースが公開されている」→「公開されたソースから配られている」",
+    "hook-predict: q0 option d repeats 「モード」 — 「権限モードをManualモードにして、毎回自分で確認する」→「権限モードをManualにして、毎回自分で確認する」",
+    "practice-steps: the p-predict hint changes only tool_input, while the JSON in the example test still says 「\"tool_name\":\"Bash\"」. The script never reads tool_name, so the test still works, but a learner may wonder about it — 「`tool_input` を `{\"file_path\":\".env\"}` に変えます。」→「`tool_name` を `Edit` に、`tool_input` を `{\"file_path\":\".env\"}` に変えます。」",
+    "practice-b-quiz: the q9 prompt is still a long inline paragraph of six sentences. Inline prompts cannot hold paragraph breaks, so the closing question could move up front — 「架空の候補です。」→「架空の2候補について、いちばん適切な判断を選びます。」 (then drop the final 「いちばん適切な判断はどれでしょう？」 and end with 「どれを選びますか？」)"
   ],
-  "average": 3.75,
-  "verdict": "revise",
-  "summary": "The scope check required a full review (exit 1: the objectives changed, and 33 of 48 blocks changed). All eight must-fix items from round 1 are gone. The text now writes 「MCPサーバー」 everywhere, including the glossary. The diagram labels and caption read 「PreToolUseフック」 and the objectives no longer have stray spaces. The flashcard backs and the q9 scenario are in です・ます. 「トランスクリプト（transcript）」 has its English, summary-points says 「MCPサーバーは…追加し」, and s5-checks names `hooks/hooks.json`. The Japanese is clear and warm, and the 「お願い」 vs 「必ず動く仕組み」 contrast holds from the hook question to the flashcards. Four small rule fixes remain before the lesson passes: split the four-sentence s3-pitfall paragraph, write the key as 「Ctrl + O」, remove the spaces before particles in plain-text fields (checklist, s4-scopes caption, tutor suggestion), and give q9 option d the same ending as the other options."
+  "average": 4,
+  "verdict": "pass",
+  "summary": "The scope check required a full review (exit 1: 22 of 49 blocks changed, 45%, more than 30%). I did a full review of the current version (sha256:4e07cfeed4cb390f). All four must-fix items from round 1 are fixed. s3-pitfall is three sentences, the hint writes 「Ctrl + O」, the plain-text fields no longer put a space before particles, and every q9 option ends in a verb. The round-1 suggestions were also applied: the ex-register troubleshoot, the ex-test wording, 「Prettier」 in s1-config, the s5-lead sentence on plugins, the 「あなた」 wording in s5-risk, the q8 option lengths and wording, and the preview of 第9回, which now matches the cc-09 title 「第9回｜並列で進める・自動で回す」. The changed text has no new errors in classes (a)–(e): lessons:lint --strict is clean, the terms match the glossary, and the measured length (prose 1705, est 16.9 min) matches estMinutes 17. The remaining items are small wording choices (niceToHave)."
 }

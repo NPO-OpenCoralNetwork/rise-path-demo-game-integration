@@ -248,12 +248,12 @@
           ],
           "rows": [
             [
-              "ターミナルCLI（Command Line Interface）",
-              "基本の入口。演習で使う。ネイティブインストーラー（native installer）で入れる"
+              "ターミナルCLI",
+              "基本の入口で、演習で使う。CLIはCommand Line Interfaceの略"
             ],
             [
-              "IDE拡張（VS Code・JetBrains）",
-              "エディタで変更箇所を見たい。JetBrains版はCLIが別に必要"
+              "IDE拡張",
+              "VS Code・JetBrainsで変更箇所を見たい。JetBrains版はCLIが別に必要"
             ],
             [
               "デスクトップアプリ",
@@ -350,17 +350,17 @@
             "cc-setup",
             "cc-quickstart"
           ],
-          "md": "ConsoleアカウントではAPI（Application Programming Interface）を前払いで使えます。推奨はネイティブインストーラーで、自動で更新されます。"
+          "md": "ConsoleアカウントではAPI（Application Programming Interface）を前払いで使えます。推奨はネイティブインストーラー（native installer）で、自動で更新されます。macOS・Linux・WSL用は、2行で1つのコマンドです。"
         },
         {
           "id": "install-unix",
           "type": "code",
           "lang": "bash",
-          "filename": "terminal (macOS / Linux / WSL)",
+          "filename": "macOS・Linux・WSL",
           "cite": [
             "cc-setup"
           ],
-          "code": "curl -fsSL https://claude.ai/install.sh | bash"
+          "code": "curl -fsSL https://claude.ai/install.sh \\\n  | bash"
         },
         {
           "id": "install-win",
@@ -575,7 +575,7 @@
           "type": "code",
           "lang": "diff",
           "filename": "差分の例（index.html）",
-          "code": "   <h1>hello world</h1>\n+  <p id=\"today\"></p>\n+  <script>\n+    const p = document.getElementById(\"today\");\n+    p.textContent = new Date().toLocaleDateString();\n+  </script>"
+          "code": " <h1>hello world</h1>\n+<p id=\"today\"></p>\n+<script>\n+const p =\n+  document.getElementById(\"today\");\n+p.textContent =\n+  new Date().toLocaleDateString();\n+</script>"
         },
         {
           "id": "example-mode",

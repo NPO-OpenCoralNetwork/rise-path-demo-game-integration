@@ -4,22 +4,22 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:24be3d570c30f448",
+  "lessonHash": "sha256:d960aa01a4d029e9",
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout and has no pressure phrases. Sentences are short and warm (hook-b1, s4-enforce, summary-next), and lint --strict is clean. The round-1 breaks are gone. There are no half-width spaces between 和文 and English (「Claude Codeに」「CIで」「JSONで」), the card backs now use です・ます (summary-cards), and s1-defs now parses (「Ctrl + B で裏に回し、セッションごと裏で始めるなら `claude --bg` を使います」). A few phrases are still stiff: the s3-table header 「役割と、付けないと」 and the section 5 title 「依頼文の4点で点検する」.",
+      "evidence": "The lesson uses です・ます throughout. There are no pressure phrases, and lessons:lint --strict reports 0 errors and 0 warnings. The round-1 stiff spots are fixed: the s3-table header is now 「役割と、付けないとどうなるか」, the section 5 title is 「依頼文を4点で点検する」, and q1 a feedback now matches s1-table with 「設定しなければ」. Hook, feedback and practice text read warmly and naturally. A few terse table cells keep the score from 4. 「依存パッケージを入れ直す」 (s1-table) reads like a feature, not a caution. 「付けないと、モードは設定しだい」 (s3-table) is clipped. s4-prompt mixes the plain form 「返すこと」 into a です・ます prompt.",
       "blockIds": [
-        "summary-cards",
-        "s1-defs",
-        "s3-table"
+        "s1-table",
+        "s3-table",
+        "s4-prompt"
       ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "measure.mjs reports prose 1521 (budget 1,200–2,400), read 2645, practice reading 1247, 11 questions and est 20.0 min. That is at the 20-minute cap, and estMinutes is 20. Splitting the old section 4 into unattended-where and unattended eases the table-heavy screen. Every concept section is followed by an inline check within 2 sections. Sentence and paragraph budgets hold. The est is at the upper limit, so adding text here would break the time budget.",
+      "score": 4,
+      "evidence": "measure.mjs: prose 1583 (budget 1,200–2,400), read 2654, practice reading 1232, questions 11, practice sections 2, est 20.0 min (must be ≤ 20; estMinutes 20). Everything is within budget, though est is at the cap. Lint reports no sentence-length or paragraph-length findings. Every section has a heading and a table, code block, list or check. Inline checks follow sections 1, 2, 3 and 5, and section 4 (unattended-where) is a short definitions + table screen.",
       "blockIds": [
         "s4-table",
         "s3-table",
@@ -29,17 +29,18 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The round-1 gaps are closed. CI is spelled out in s3-lead, チェックアウト is gone, エージェントビュー（agent view） has its English, 試験公開中 replaces リサーチプレビュー, cron becomes 「決まった時刻」, VM becomes 「仮想マシン（VM）」, and PR becomes 「PR（プルリクエスト）」. Two katakana terms still appear for the first time in the course without English: トークン (s1-cost, e1) and シェル (s3-pitfall, e3). Both fixes are in mustFix.",
+      "evidence": "The prerequisites are stated and earlier lessons are recalled (第2回, 第7回, 第8回). Both round-1 must-fix items are fixed. s1-cost now has 「トークン（token、AIが文章を扱う単位）」 and s3-pitfall has 「シェル（shell、コマンドを実行するプログラム）」. Glossary terms match the text and the table labels (ワークツリー, バックグラウンド実行, 定期タスク, 無人実行). 分類器 was defined in cc-02. One abbreviation still comes before its definition: objective o2 uses CI before s3-lead spells it out as 「CI（Continuous Integration）」. No earlier lesson (cc-01 to cc-08) spells it out (grep). That fix is in mustFix.",
       "blockIds": [
+        "lesson",
+        "s3-lead",
         "s1-cost",
-        "s3-pitfall",
-        "s3-lead"
+        "s3-pitfall"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The single declared locale (jp) is complete, with no plain-string or untranslated findings. The one link names its destination: 「公式ドキュメント（非対話的実行）」 in s3-mode. There are no images or diagrams with embedded text. Plain-text fields such as the checklist labels and var hints contain no markdown.",
+      "evidence": "The one declared locale (jp) is complete. Lint reports no locale-plain-string findings. The only link names where it goes: 「公式ドキュメント（非対話的実行）」 (s3-mode). The lesson has no images and no diagrams with embedded text. Plain-text fields (checklist labels, var hints, askTutor suggestions) contain no markdown.",
       "blockIds": [
         "s3-mode",
         "p1-checklist"
@@ -49,30 +50,21 @@
   "mustFix": [
     {
       "criterion": "prior",
-      "blockId": "s1-cost",
-      "issue": "(d) §2 katakana terms need English on first use: トークン appears here for the first time in the course without English or explanation. A grep of cc-01 to cc-08 finds no トークン. It returns in the e1 d feedback 「トークンを多く使います」.",
-      "fix": "「並べたセッションやサブエージェントの数だけ、トークンを使います。」→「並べたセッションやサブエージェントの数だけ、トークン（token、AIが処理する文字の単位）を使います。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s3-pitfall",
-      "issue": "(d) §2 katakana terms need English on first use: シェル appears here for the first time in the course without English (cc-01 to cc-08 do not use it). It returns in the e3 b feedback.",
-      "fix": "「`--allowedTools \"Bash\"` だと、どのシェルコマンドも確認なしで通ります。」→「`--allowedTools \"Bash\"` だと、どのシェル（shell）コマンドも確認なしで通ります。」"
+      "blockId": "lesson",
+      "issue": "(d) §2 abbreviations are spelled out on first use. Objective o2 shows CI to the learner before s3-lead spells it out as 「CI（Continuous Integration）」. No earlier course lesson (cc-01 to cc-08) spells it out. Round 1 listed this as niceToHave. It is an explicit style-guide rule (line 28: 「略語は初出で正式名を書きます」), so it is upgraded here.",
+      "fix": "objectives o2: 「CIなどで使う安全な claude -p コマンドを書ける」→「CI（Continuous Integration）などで使う安全な claude -p コマンドを書ける」"
     }
   ],
   "niceToHave": [
-    "p1-steps-write p-run: s3-table no longer says that `--bare` needs an API key, so the learner cannot see why 「APIキーがなければ、`--bare` を外します」 follows (facts file: --bare 'does not use your subscription login, so ANTHROPIC_API_KEY must be set') — 「API（Application Programming Interface）キーがなければ、`--bare` を外します。」→「`--bare` はAPI（Application Programming Interface）キーでしか動きません。キーがなければ、`--bare` を外します。」",
-    "s3-table: the column header 「役割と、付けないと」 breaks off mid-phrase — 「役割と、付けないと」→「役割と、付けないとどうなるか」",
-    "unattended (section title): 「依頼文の4点で点検する」 reads as if the four points belong to the request text — 「5. 依頼文の4点で点検する」→「5. 依頼文を4点で点検する」 (p2-task 「セクション5の4点で」 still matches)",
-    "s1-cost: 「数だけ、トークンを使います」 does not say that usage grows with the count — 「並べたセッションやサブエージェントの数だけ、トークンを使います。」→「並べるセッションやサブエージェントが増えるほど、トークンの使用量も増えます。」 (combine with the mustFix wording)",
-    "o2: CI appears in the objective before s3-lead spells it out. Learners see objectives first — 「CIなどで使う安全な claude -p コマンドを書ける」→「CI（Continuous Integration）などで使う安全な claude -p コマンドを書ける」 if the objective text may change",
-    "s4-table: the caption promises 頻度, but only two rows mention an interval — 「動かす場所と頻度で選ぶ」→「動かす場所と場面で選ぶ」",
-    "s1-table / s1-check q1 a feedback: the same condition is phrased two ways, 「設定しなければ」 and 「そのままでは」 — q1 a feedback 「サブエージェントは、そのままでは同じ作業フォルダーを編集します。」→「サブエージェントは、設定しなければ同じ作業フォルダーを編集します。」",
-    "lesson: the -p string is still called 指示 in places (glossary 非対話的実行 and s3-lead 「<指示>」, e6 explanation 「依頼文は指示であって」), while sections 4–5 and the practices call it 依頼文. The meaning is clear, but 「<依頼文>」 in s3-lead and the glossary would tie section 3 to the 4-point check",
-    "check-quiz e5: option b is shorter than a, c and d, which share one frame. It is still parallel enough. Optionally start it the same way — 「「更新できるパッケージを調べて、いい感じにまとめて。…」」→「「更新できるパッケージを調べて、いい感じにまとめて。なければそう書いて。編集はしない。調べられなければ理由を返して」」",
-    "s2-steps ex-merge: factual doubt: 「消すと、ブランチごと消えます。」 is not covered by the audit or the facts file I could see. Confirm against the worktrees page that removing the worktree on exit also deletes the branch"
+    "s2-steps ex-merge: factual doubt: 「消すと、ブランチごと消えます。」 is still not covered by the facts file. It only says 'A worktree with changes prompts you to keep or remove it'. Confirm against the worktrees page that removing a worktree on exit also deletes its branch, or soften it — 「消すと、ブランチごと消えます。」→「消すと、作業コピーがなくなります。」",
+    "s1-table: the ワークツリー cell reads like a feature, not a caution — 「別々の変更を同時に進める。依存パッケージを入れ直す」→「別々の変更を同時に進める。依存パッケージの入れ直しが要る」",
+    "s1-table: the header 「方法（まとめる人）」 does not say what is being gathered — 「方法（まとめる人）」→「方法（結果をまとめる人）」",
+    "s3-table: the dontAsk cell is clipped — 「付けないと、モードは設定しだい」→「付けないと、モードは設定や既定で決まる」",
+    "s4-prompt: the prompt mixes the plain form 「返すこと」 into です・ます sentences — 「成功の条件：{\"todos\": [...], \"unreadable\": [...]} の形のJSONを返すこと。」→「成功の条件：{\"todos\": [...], \"unreadable\": [...]} の形のJSONを返してください。」",
+    "p1-checklist pc-bare: the condition for removing --bare (no API key) is left out, so 「外すのは練習用フォルダーだけ」 reads as a general rule — 「--bare を付けています（外すのは練習用フォルダーだけです）」→「--bare を付けています（APIキーがなくて外すのは、練習用フォルダーだけです）」",
+    "check-quiz e5: option b is shorter than a, c and d, which share one frame. It is still parallel enough — 「「更新できるパッケージを調べて、いい感じにまとめて。編集はしない。調べられなければ理由を返して」」→「「更新できるパッケージを調べて、いい感じにまとめて。なければそう書いて。編集はしない。調べられなければ理由を返して」」"
   ],
-  "average": 3.25,
+  "average": 3.5,
   "verdict": "revise",
-  "summary": "The scope check required a full review (exit 1: new section unattended-where, o2 changed, 57% of parts and 86% of blocks changed). I checked all 9 round-1 must-fix items and every one is gone. Spaces between 和文 and English are removed, s1-defs now parses, and CI, VM and PR are spelled out. チェックアウト and cron were replaced with plain words, エージェントビュー（agent view） has its English with 試験公開中, s4-table states 「間隔は最短…」, and the card backs use です・ます. Two new first-use katakana terms without English still block the review: トークン (s1-cost) and シェル (s3-pitfall). measure.mjs gives prose 1521 and est 20.0 min, at the cap, so fixes should not add length. With the two mustFix items applied and voice or load lifted slightly (e.g. the s3-table header and section 5 title in niceToHave), the lesson can pass."
+  "summary": "I did a full review. review-scope.mjs exited 1: 27 of 42 blocks (64%) and 33 of 82 parts had changed. Both round-1 must-fix items are fixed: トークン（token、…） in s1-cost and シェル（shell、…） in s3-pitfall. Most round-1 niceToHave items were applied too (s3-table header, section 5 title, s4-table caption, 「設定しなければ」 in q1, <依頼文> in s3-lead and the glossary, the API-key reason in p-run). lessons:lint --strict is clean. measure.mjs gives prose 1583 and est 20.0 min, at the cap, so no fix should add length. One must-fix remains: objective o2 uses CI before it is spelled out (style guide §2). Round 1 rated this niceToHave; it is upgraded because the rule is explicit. Once it is applied, the scores (3/4/3/4, mean 3.5) pass the bar."
 }
