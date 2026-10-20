@@ -15,8 +15,8 @@ design tokens only: no hex colors, no `slate-*`, no `rounded-[…]`, nothing bel
 
 ## Why `components/ui/` and not `components/common/ui/`
 
-`components/common/ui/` already holds three chat-era components (`ChatInterface`, `MessageBubble`,
-`StatsCard`) styled with the old palette. New primitives go here instead, so that:
+`components/common/ui/` already holds two chat-era components (`ChatInterface`, `MessageBubble`)
+styled with the old palette. New primitives go here instead, so that:
 
 - this folder contains only token-based components that follow the design-system rules, which a
   future lint rule can check folder by folder;

@@ -1,6 +1,6 @@
 ---
 name: visual-qa
-description: "Inspects Rise Path lesson preview screenshots (.artifacts/preview/<course>/<lesson>/) and metrics.json for layout and readability problems, and returns review.v1 JSON. Use after npm run lessons:preview. Read-only."
+description: "Inspects Rise Path lesson preview screenshots (.artifacts/preview/<course>/<lesson>/) and metrics.json for layout, readability and privacy problems, and returns review.v1 JSON. Use after npm run lessons:preview. Read-only."
 tools: Read, Glob, Grep
 model: inherit
 effort: medium
@@ -29,13 +29,38 @@ refuses the review and the author re-runs the preview and you). Only when metric
    diagrams unreadable at 390 px; diagram labels too small or in the wrong language; broken or
    missing images; long runs of plain text; awkward line breaks inside Japanese words; low
    contrast; untranslated Japanese in the EN screenshots (or the reverse); controls hidden under
-   the bars.
+   the bars; personal data on any screen (see "Privacy" below).
 4. Score only what you can judge visually: `visual`, `load`, `a11y_l10n` (0–4, anchors in
    `content/schema/rubric.v1.json`). For each problem add a `mustFix` item with the `blockId` (from
    the lesson JSON, matched by the text you see), the issue, a concrete fix to the **lesson
    content** (shorter label, `flowchart TD` instead of LR, split the table, …), and `screenshot`
    (for example `pages/mobile-jp-04.png`). If the problem is in the reader itself rather than the
-   lesson, put it in `niceToHave` prefixed with `reader:`.
+   lesson, put it in `niceToHave` prefixed with `reader:`. Privacy findings are the exception:
+   always `mustFix` (see "Privacy").
+
+## Privacy
+
+Screenshots are attached to pull requests and reviews, so they must not show personal data. On
+every PNG you open, look for:
+
+- account names, user names or email addresses (an account menu, a signed-in header, a profile);
+- titles of private projects, workspaces, chats or conversations (a recent-chats sidebar, a
+  project list);
+- local file paths (a home folder in a terminal, an editor title bar or a breadcrumb);
+- API keys, tokens or other credentials, even partly masked ones;
+- cost, usage or billing screens.
+
+Sample values made for the lesson (a placeholder name, `example.com`, a demo project) are fine.
+Every finding is a `mustFix`, in a full check and in a verification round, whatever changed. Use
+criterion `visual` and the `screenshot` that shows it; start `issue` with `privacy:` and name the
+kind of data and where it is, never the value itself ("an email address in the top bar", not the
+address).
+
+- In the lesson (an image, a code block, text): `blockId` of that block; the fix recaptures the
+  image with a demo account and sample project, crops it, or replaces the value with a sample.
+- From the reader or the preview environment (the signed-in account, a browser or OS window):
+  `blockId` `"lesson"`; the fix re-runs `lessons:preview` with a demo account and sample data.
+  Say in `summary` that these screenshots must not be shared until then.
 
 ## Verification rounds
 
@@ -45,7 +70,7 @@ list names the changed blocks). If you are told the scope check exited 1, or `ve
 `"fullReviewRequired": true`, do a full check with `"mode": "full"`. Otherwise:
 
 - Read `metrics.json` in full every round: its hard failures are global, and any of them is a
-  `mustFix` whatever changed.
+  `mustFix` whatever changed. So is a privacy finding on any screen you open ("Privacy").
 - **(a)** For every open must-fix item of your previous review (its `mustFix`, plus the items still
   open from earlier rounds), open the screen that showed it and add a `resolved` entry, `resolved`
   or `unresolved`, whose evidence names the PNG and what it shows now. An item is resolved only by

@@ -1,6 +1,7 @@
-# CI for pull requests and main: typecheck, unit tests, lesson gates, and a production build
-# whose output is scanned for leaked server keys. Run the same commands locally before a PR
-# (AGENTS.md, "Commands").
+# CI for pull requests and main: typecheck, change guards (secrets and personal paths, credits
+# for large assets), unit tests (architecture boundaries included), lesson gates, and a
+# production build whose output is scanned for leaked server keys. Run the same commands
+# locally before a PR (AGENTS.md, "Commands").
 name: CI
 
 on:
@@ -33,6 +34,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # Full history, so the change guards below can find the merge base with the diff base.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -46,6 +49,41 @@ jobs:
       # Each check below runs even when an earlier one failed, so one run reports every problem.
       - name: Typecheck
         run: npm run typecheck
+
+      # The change guards (scripts/ci/, no dependencies) check only what this run changes: a PR
+      # against its base branch, a push against the commit before it. A new branch has no
+      # previous commit (all-zero sha), and a manual run has none at all: both use main. They run
+      # before the tests, so files a later step writes are never part of the diff.
+      - name: Find the diff base for the change guards
+        id: diff-base
+        if: ${{ !cancelled() }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.base_ref }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$PR_BASE_REF" ]; then
+            base="origin/$PR_BASE_REF"
+          elif [ -n "${PUSH_BEFORE//0/}" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            base="$PUSH_BEFORE"
+          else
+            base="origin/main"
+          fi
+          git rev-parse --verify --quiet "$base^{commit}" > /dev/null || { echo "::error title=Diff base missing::$base is not in the checkout"; exit 1; }
+          echo "Diff base: $base"
+          echo "ref=$base" >> "$GITHUB_OUTPUT"
+
+      - name: No secrets or personal paths in changed files
+        if: ${{ !cancelled() && steps.diff-base.outcome == 'success' }}
+        env:
+          DIFF_BASE: ${{ steps.diff-base.outputs.ref }}
+        run: node scripts/ci/scan-secrets.mjs --diff "$DIFF_BASE" --format github
+
+      - name: Large changed assets have credits
+        if: ${{ !cancelled() && steps.diff-base.outcome == 'success' }}
+        env:
+          DIFF_BASE: ${{ steps.diff-base.outputs.ref }}
+        run: node scripts/ci/check-assets.mjs --diff "$DIFF_BASE" --format github
 
       - name: Unit tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

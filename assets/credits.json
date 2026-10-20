@@ -1,0 +1,5 @@
+{
+  "$comment": "Credits for binary assets (images, audio, video, fonts, 3D models, PDFs, archives) larger than 1 MiB, checked by scripts/ci/check-assets.mjs on every PR. One entry per file or glob: path (repo-relative, or a glob such as public/audio/pack/**), source (URL, or how it was made, e.g. generated with a named tool), license (SPDX id such as CC-BY-4.0, or the license name), author (optional) and notes (optional). Smaller assets do not need an entry but may have one.",
+  "version": 1,
+  "assets": []
+}

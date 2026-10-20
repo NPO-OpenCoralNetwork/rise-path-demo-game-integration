@@ -2737,18 +2737,6 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
   return normalizeGeneratedCourse(payload);
 };
 
-export const saveGeneratedCourse = async (course: GeneratedCourse): Promise<void> => {
-  const response = await fetch('/api/curricula', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ course }),
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error || 'Failed to save curriculum.');
-  }
-};
-
 // --- V2 AI Chat & Decision ---
 
 // /ai/generate and /ai/drafts require auth in strict mode, so they go through apiFetch (Bearer
