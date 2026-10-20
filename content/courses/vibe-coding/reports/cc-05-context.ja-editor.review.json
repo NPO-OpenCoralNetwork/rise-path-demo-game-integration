@@ -1,84 +1,89 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:a5c974718e314f36",
+  "lessonHash": "sha256:ad13e1245e9cc670",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:a5c974718e314f36",
+    "changed": [
+      "s3-diagram",
+      "s5-check"
+    ],
+    "changedShare": 0.03,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/a5c974718e314f36/round-1/ja-editor.review.json"
+  },
+  "resolved": [
+    {
+      "blockId": "s5-check",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "In q4, every plain quote now uses 「」. Prompt: 「郵便番号を「123-4567」の形に整える関数を2回直してもらいましたが」. Option a: 「郵便番号を「123-4567」の形に整える関数を、今度こそ正しく書いて。」. Option b: 「郵便番号を「123-4567」の形に整える関数を作って。」. Option c feedback: 「「さっき」では何も伝わりません。」. 『』 no longer appears anywhere in the lesson file (0 occurrences)."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson is warm です・ます throughout, and the flashcards are now です・ます too (sum-cards 「`/context` です。作業の前後で見比べます。」「覚えていません。」). It has no pressure phrases, and `lessons:lint --strict` is clean (0 errors, 0 warnings). There is no longer a space between Japanese and Latin words in running text (「READMEの手直し」「午後のClaudeは」). Two things keep voice at 3. First, q4 uses 『』 for plain quotes where §3 calls for 「」 (『123-4567』, 『さっき』). Second, a few spots read stiffly: 「よい最初の依頼」 in ex-fix, the subject-less feedback on q4 d, and the weak causal link in the e4 b feedback.",
+      "evidence": "The 『』 notation break in q4 (s5-check) is fixed, and the changed q4 text keeps です・ます in its feedback. `lessons:lint --strict` is clean (0 errors, 0 warnings). Two stiff spots stay in unchanged text, so the score stays at 3: 「よい最初の依頼」 in s5-steps, and the q4 d feedback, which starts with no subject (「失敗したやり方まで持ち込みます。」).",
       "blockIds": [
         "s5-check",
         "s5-steps",
-        "check-quiz",
-        "sum-cards",
-        "hook-problem"
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 1942 (budget 1,200–2,400), est 19.6 min (≤ 20), and estMinutes is 20, which matches. Lint reports no sentence-length or paragraph-length findings. Each concept section ends with an inline check. The dense facts sit in tables (s2-table, s3-table, s4-table) and a diagram (s3-diagram), not in long paragraphs.",
+      "evidence": "measure.mjs gives prose 1942 (budget 1,200–2,400) and est 19.6 min (≤ 20), and estMinutes is 20. Lint reports no budget findings. Unchanged since the previous review.",
       "blockIds": [
         "s2-table",
         "s3-table",
         "s3-diagram",
         "s4-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "All of last round's first-use gaps are fixed: 「プランモード（plan mode）」 (s3-diagram, plus alt), 「デプロイ（deploy）」 (p1, where CSS was replaced by 「ボタンの色の付け方」), 「リポジトリ（repository）」 (p3), 「API（Application Programming Interface）」 (s2-focus), 「CSV（Comma-Separated Values）」 (s5-lead), 「WSL（Windows Subsystem for Linux）」 (pr-part2). The definitions match the glossary terms, earlier lessons are recalled with their numbers, and the prerequisite titles match the cc-01 to cc-04 titles. Only small gaps remain: タイムゾーン in ex-learn, and /btw in the p1 explanation, which is not explained further.",
+      "evidence": "The first-use definitions are unchanged since the previous review. The changed diagram keeps 「プランモード（plan mode）」 in both the code and the alt text.",
       "blockIds": [
         "s3-diagram",
-        "pr-diagnose",
         "s2-focus",
         "s5-lead",
-        "pr-part2",
-        "s1-defs",
-        "s3-defs"
-      ]
+        "pr-part2"
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is jp only and complete. The diagram has a Japanese caption and a full alt text that includes 「プランモード（plan mode）」 (s3-diagram). The link text names its destination: 「コンテキストウィンドウの公式ドキュメント（日本語）」 (s3-fix). Plain-text fields such as checklist labels and askTutor suggestions use no markdown.",
+      "evidence": "The s3-diagram label and alt text now say 「決まったファイルの指示」, the same words as the caption (「決まったファイルの指示はディスクから戻る」) and the body text (「プロジェクト直下のCLAUDE.mdなど、決まったファイルの指示はディスクから」). Before this change, the label said 「ファイルに書いた指示」, which did not match the caption. The alt text is complete and describes both branches.",
       "blockIds": [
-        "s3-diagram",
-        "s3-fix",
-        "pr-checklist",
-        "sum-ask"
+        "s3-diagram"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "s5-check",
-      "issue": "(d) notation §3: quoted phrases and on-screen wording go in 「」, but q4 uses 『』 even where nothing is nested (prompt 『123-4567』, option c feedback 『さっき』). The rest of the lesson uses 「」 for the same kind of quote (q1 d 「どれくらい使った？」).",
-      "fix": "prompt 「郵便番号を『123-4567』の形に整える関数を」→「郵便番号を「123-4567」の形に整える関数を」; option a 「郵便番号を『123-4567』の形に整える関数を、今度こそ」→「郵便番号を「123-4567」の形に整える関数を、今度こそ」; option b 「郵便番号を『123-4567』の形に整える関数を作って。」→「郵便番号を「123-4567」の形に整える関数を作って。」; option c feedback 「『さっき』では何も伝わりません。」→「「さっき」では何も伝わりません。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "hook-predict: kept from round 1. The option forms are mixed: a/b state a cause in the past tense, while c/d end with a remedy 「〜すれば直る」. Make them all causes — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
-    "s5-steps: 「よい最初の依頼」 is a calque of 'a better initial prompt' — ex-fix 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
-    "s5-steps: タイムゾーン appears here for the first time without English. It is an everyday word, but adding the English is safer — ex-learn 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
     "s5-check: option d's feedback has no subject, so the first sentence reads abruptly — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
-    "check-quiz: in e4 b's feedback, the link between 「上限に近づくと起きる」 and 「漏れやすい」 is unclear. The audit's fix states it more directly — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
-    "pr-steps-start: 「CLAUDE.mdの読み込みをメモします」 is vague about what to note — pr-context-1 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
-    "pr-steps-start: the long-vowel mark is used inconsistently: 「エディター」 here, but 「フォルダ」「サブフォルダ」 elsewhere. Pick one style — pr-start troubleshoot 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」 (or use フォルダー everywhere)",
-    "pr-steps-start: factual doubt: the pr-code line chains commands with `&&`, which older Windows PowerShell (5.1) does not support. The troubleshoot covers only creating CLAUDE.md. Consider 「PowerShellでは、コマンドを1つずつ実行し、CLAUDE.mdはエディタで作って引用符の中の文を書きます。」",
-    "pr-steps-compact: 「圧縮後」 here vs 「圧縮のあと」 everywhere else — pr-predict 「圧縮後に残るのは」→「圧縮のあとに残るのは」",
-    "s4-prompt: the var hint has a space between a Latin path and Japanese, outside code (§3 prefers no space) — 「例：src/auth/ フォルダ」→「例：src/authフォルダ」",
-    "lesson: the auto-compaction name varies between 「自動のコンテキスト圧縮」 (s2-defs, s2-table, q3, e3) and 「自動の圧縮」 (p2 d, e4 b). It clearly means the same thing, but one form reads more cleanly — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」",
-    "pr-diagnose: /btw appears only in the p1 explanation, with no further explanation. The learner may wonder what it is — 「`/btw` で聞くと会話の履歴に残りません。」→「`/btw` を付けて聞くと、その質問は会話の履歴に残りません。」 (only if this matches the cc-commands source)",
+    "hook-predict: the option forms are mixed: a/b state a cause, while c/d end with a remedy 「〜すれば直る」. Make them all causes — c 「伝え方が弱かったので、強い言葉で言い直せば直る」→「伝え方が弱く、言葉の強さが足りなかった」, d 「Claude Codeの不具合なので、入れ直せば直る」→「Claude Codeの不具合が起きていた」",
+    "s5-steps: 「よい最初の依頼」 is a calque of 'a better initial prompt' — 「よい最初の依頼でやり直すよう勧めています。」→「最初の依頼を書き直してやり直すよう勧めています。」",
+    "s5-steps: タイムゾーン appears without English on first use — 「どのタイムゾーンの日付として扱うかです。」→「どのタイムゾーン（time zone）の日付として扱うかです。」",
+    "check-quiz: in e4 b's feedback, the causal link is weak — 「自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。」→「自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。」",
+    "pr-steps-start: it is vague what to note about CLAUDE.md — 「全体の使用量とCLAUDE.mdの読み込みをメモします。」→「全体の使用量と、CLAUDE.mdが読み込まれているかをメモします。」",
+    "pr-steps-start: the long-vowel mark is used inconsistently (エディター vs フォルダ) — 「エディターでCLAUDE.mdを作り」→「エディタでCLAUDE.mdを作り」",
+    "pr-steps-start: factual doubt: `&&` does not work in Windows PowerShell 5.1. Consider 「PowerShellでは、コマンドを1つずつ実行し、CLAUDE.mdはエディタで作って引用符の中の文を書きます。」",
+    "pr-steps-compact: 「圧縮のあと」 is the form used everywhere else — 「圧縮後に残るのは」→「圧縮のあとに残るのは」",
+    "s4-prompt: there is a space between a Latin path and Japanese outside code — 「例：src/auth/ フォルダ」→「例：src/authフォルダ」",
+    "lesson: the auto-compaction name varies (「自動のコンテキスト圧縮」 / 「自動の圧縮」) — p2 d feedback 「自動の圧縮は、何が大事かを」→「自動のコンテキスト圧縮は、何が大事かを」",
+    "pr-diagnose: /btw is not explained further — 「`/btw` で聞くと会話の履歴に残りません。」→「`/btw` を付けて聞くと、その質問は会話の履歴に残りません。」 (only if this matches the cc-commands source)",
     "sum-cards: card-constraint's front is wordy — 「公式のガイドが、使い方のコツの多くのもとだと説明する制約は？」→「公式のガイドが、多くのコツのもとだという制約は？」"
   ],
   "average": 3.75,
-  "verdict": "revise",
-  "summary": "The scope check required a full review: 45 of 48 blocks and objectives o1 and o3 changed since sha256:97684549e204b6ab. All eight must-fix items from round 1 are gone. The flashcards are です・ます, there is no space between Japanese and Latin words outside code, and プランモード, デプロイ, リポジトリ, API, CSV and WSL get English or the full name at first use (CSS was dropped). Lint is clean, and measure.mjs gives prose 1942 and est 19.6 min, with estMinutes 20. One rule break remains: q4 (s5-check) uses 『』 for plain quotes where §3 calls for 「」. After that fix, the Japanese passes."
+  "verdict": "pass",
+  "summary": "Verification round. review-scope.mjs exited 0: 2 of 47 blocks changed (s3-diagram, s5-check), 3% of the parts. The one open must-fix item, 『』 in q4, is resolved: q4 now uses 「」 throughout, and 『』 no longer appears anywhere in the lesson. The s3-diagram rename to 「決まったファイルの指示」 matches the caption and the body text, so the change creates no naming conflict. Lint --strict is clean, and measure.mjs gives prose 1942 and est 19.6 min, with estMinutes 20. The scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
 }

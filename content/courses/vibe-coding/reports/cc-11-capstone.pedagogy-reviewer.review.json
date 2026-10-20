@@ -1,27 +1,28 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:a0a5e3162b6d70c5",
+  "lessonHash": "sha256:ae84a43eacd96ce5",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "align",
-      "score": 3,
-      "evidence": "Both objectives are can-do statements, and each has 2 or more questions with objectiveId (o1: q1, q2, e1, e2; o2: q3, q4, e3, e4). But e4 (a command from an old article is not found) never asks the learner to use the checklist or decide what to add next, so it does not test o2. The create-level o1 is assessed only by selected-response items.",
+      "score": 4,
+      "evidence": "Both objectives are can-do statements with Bloom verbs (設計できる, 判断できる). o1 is assessed by q1, q2, e1 and e2, and o2 by q3, q4 and e3, with apply/evaluate items in each set. The off-objective e4 is gone. The create-level o1 is performed in practice-setup, and the scored items for it are selected-response.",
       "blockIds": [
-        "check-quiz",
         "dr-quiz",
         "ex-quiz",
         "cycle-quiz",
-        "sc-quiz"
+        "sc-quiz",
+        "check-quiz",
+        "practice-setup"
       ]
     },
     {
       "id": "hook",
-      "score": 3,
-      "evidence": "hook-b1 gives a concrete 3-sentence scenario (「初日にスキル（skill）5つとフック（hook）3つを一度に入れようとして、手が止まりました」) and hook-predict is an ungraded predict item tied to o1. The keyed answer 「CLAUDE.mdだけで始め」 is later contradicted when ex-steps ② and e1 add permission rules on day 1, and the lesson never explains why.",
+      "score": 4,
+      "evidence": "hook-b1 is a concrete 3-sentence scenario (「初日にスキル（skill）5つとフック（hook）3つを一度に入れようとして、手が止まりました」) and is followed by the ungraded pq0. pq0's explanation now states the day-1 exception (「ただし、秘密情報とpushの守りは例外で、初日から置きます」), so the rule no longer contradicts the example.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
@@ -30,7 +31,7 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The prerequisites name lessons 1–10. dr-table has a 「学んだ回」 column that links each part back to the lesson that taught it. The only new term, きっかけ, is defined in dr-b1 and matches the glossary, and the recalled terms (スキル, フック, 権限ルール, プランモード, サブエージェント) link to glossary entries.",
+      "evidence": "The prerequisites name the exact earlier lessons. dr-table's 「学んだ回」 column ties each part to the lesson that taught it. The only new term, きっかけ, is defined in dr-b1 (「同じ困りごとが繰り返し起きること、つまり[[きっかけ]]です」) and matches the glossary, and the recalled terms link to glossary entries.",
       "blockIds": [
         "dr-b1",
         "dr-table"
@@ -38,26 +39,28 @@
     },
     {
       "id": "load",
-      "score": 2,
-      "evidence": "Sentence and paragraph lint passes and every section has a table, diagram or check. But two lesson-level budgets are broken: estMinutes is 23 against the contract's 8–20, and the brief's own count of body text is 2,440 JP chars including sc-list, against the 2,400 limit. The estimate also counts the self-check checklist as a third 2-minute hands-on task.",
+      "score": 4,
+      "evidence": "measure.mjs: 「prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1621 · questions 8 · practice sections 3 · est 18.7 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. Lint passes sentence and paragraph limits, there is one new term in the lesson, and every section has a table, diagram, steps or check.",
       "blockIds": [
-        "self-check",
-        "check-quiz"
+        "lesson"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "ex-steps has 5 steps with subgoal titles, the trigger (why) of each and an expect, followed by the full artefacts (ex-prompt-claude-md, ex-settings, ex-prompt-skill), all before practice-setup. But nothing says that the steps were added over time. Shown as one sequence, they look like the 「全部一度に」 setup that the hook warns against.",
+      "evidence": "ex-steps has 5 steps with subgoal titles, each step's trigger or reason (「整形の忘れが続いたので」), an expect for each, and full artefacts (ex-prompt-claude-md, ex-settings, ex-prompt-skill), all before practice. ex-b1 now gives the timeline (「①と②は初日に置き、③と④は、きっかけが起きた週に1つずつ足しました」). There is no faded step between the full example and independent practice.",
       "blockIds": [
         "ex-b1",
-        "ex-steps"
+        "ex-steps",
+        "ex-prompt-claude-md",
+        "ex-settings",
+        "ex-prompt-skill"
       ]
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "There are inline checks in 4 of the 5 content sections (q1–q4), at apply/evaluate level, with feedback on every wrong option. But q4's stem 「点検で、コンテキストの項目に当てはまりませんでした」 points the learner at self-check-list item sc-context 「作業の切れ目で /clear している」, so the answer can be found by matching words.",
+      "score": 4,
+      "evidence": "4 of the 5 content sections end in an inline check (q1–q4), never 2 in a row without one. The checks are apply/evaluate items set in new situations, with feedback on every wrong option. q4's stem now describes a symptom (「Claudeが、前の作業の前提を混ぜ始めました」) rather than naming the checklist item.",
       "blockIds": [
         "dr-quiz",
         "ex-quiz",
@@ -67,20 +70,21 @@
     },
     {
       "id": "miscon",
-      "score": 3,
-      "evidence": "All 7 misconceptions from the brief map to distractors, each with feedback of 2 sentences or fewer (e.g. q2 b 「拒否すると、package.jsonを変えたときにも入れられなくなります」, q3 d about over-eager reviewers). But dr-b2 states the rule as 「CLAUDE.mdだけで始め」 without saying that safety rules are set on day 1, which creates a new misconception the lesson then contradicts.",
+      "score": 4,
+      "evidence": "All 7 misconceptions in the brief map to distractors. Each feedback is 2 sentences or fewer and gives a reason (q2 b 「拒否すると、package.jsonを変えたときにも入れられなくなります」; q3 d about reviewers asked to find faults). dr-b2 now gives both the day-1 exception and the limit of the rules (「`git -C . push` のような別の書き方のpushは、止まりません」).",
       "blockIds": [
-        "hook-predict",
         "dr-b2",
+        "dr-quiz",
         "ex-quiz",
         "cycle-quiz",
+        "sc-quiz",
         "check-quiz"
       ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "cycle-flow has 5 nodes plus the review loop, Japanese labels that match the cycle-steps titles (「新しい目でレビューする」, 「差分を説明してもらう」), a caption that states the takeaway (「レビューで直す指摘があれば、実装と検証に戻る」) and full alt text. dr-table is a real comparison, and there are no decorative images.",
+      "evidence": "cycle-flow has 5 nodes plus a review loop, and its labels match the cycle-steps titles exactly (「別のコンテキストでレビューする」). Its caption states the takeaway (「レビューで直す指摘があれば、実装と検証に戻る」) and the alt text is complete. dr-table is a real comparison, and there are no decorative images.",
       "blockIds": [
         "cycle-flow",
         "dr-table"
@@ -89,7 +93,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The practice is an authentic transfer task in the learner's own repository. Steps have expect plus hint/troubleshoot, there are model answers (setup-prompt-model, setup-settings-model, cycle-prompt-plan with the expected plan), and self-check-list is the self-check. The hint ladder is uneven: c-review, c-explain and c-commit have neither hint nor troubleshoot.",
+      "evidence": "The practice is an authentic transfer task in the learner's own repository. Every step has an expect plus a hint or troubleshoot, and the model answers come after the hints (setup-prompt-model, setup-settings-model, cycle-prompt-plan). self-check-list is the success checklist. But c-explain now says only 「`/explain-diff` で説明を受け」, a skill the learner has only if a trigger made them add it under p-more (「なければ足しません」). c-review, c-explain and c-commit have no hint.",
       "blockIds": [
         "setup-steps",
         "setup-prompt-model",
@@ -101,7 +105,7 @@
     {
       "id": "meta",
       "score": 4,
-      "evidence": "The summary comes after the exam and has 4 points, followed by a reflection prompt (「自分で判断した場面を1行で書いておきましょう」) and a next step (「演習3で決めた部品を足していきましょう」). There are 7 flashcards and 3 askTutor suggestions.",
+      "evidence": "The summary comes after the exam and has 4 points. A reflection prompt follows (「自分で判断した場面を1行で書いておきましょう」), then a next step (「演習3で決めた部品を足していきましょう」) and advice for keeping up with changes. There are 7 flashcards in です・ます and 3 askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -111,88 +115,56 @@
     },
     {
       "id": "accuracy",
-      "score": 2,
-      "evidence": "Versions are pinned (subtitle v2.1.304; ex-steps ② v2.1.283) and the settings and hook code match the course's cc-02/cc-08. But e1 option c's feedback 「鍵の読み取りとpushを確実に止めるのは、権限ルールです」 overclaims: cc-02 teaches that 「`Read(./.env)` も、一部のコマンドやスクリプトの読み取りは止められません」 and that `git -C . push` does not match `Bash(git push *)`. Also, e3's 「公式の目安（200行以内）」 is not backed by any source in check-quiz.cite.",
+      "score": 3,
+      "evidence": "The three audit-confirmed fixes are in: ex-prompt-skill's /reload-skills uses the betterFix text, setup-prompt-model's expect says 「Pythonのスクリプトが開くファイルは防げません」, and card-ask names `git -C . push`. The previous issues are also fixed: e1 now says 「一致した操作を…止めます」 and check-quiz cites cc-memory. Versions are pinned (v2.1.304, v2.1.283). Two places still state more than the docs: sc-safety 「pushの前に確認が入ります」 has no limit attached, and ex-claude-md's expect omits the restart that p-restart says is needed.",
       "blockIds": [
+        "ex-prompt-skill",
+        "setup-prompt-model",
+        "summary-cards",
         "check-quiz",
-        "dr-b2"
+        "self-check-list",
+        "ex-steps"
       ]
     },
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "です・ます throughout, warm and non-pressuring (「なければ足しません」, 「迷ったときの考え方は？」), no banned phrases (lint clean), and terms are consistent with the glossary (確認ルール/拒否ルール as aliases). A few phrases read as translated, such as 「新しい目でレビューする」.",
+      "score": 4,
+      "evidence": "です・ます throughout, warm and without pressure (「なければ足しません」, 「迷ったときの考え方は？」), and lint finds no banned phrase. The translated 「新しい目で」 is now 「別のコンテキストで」, the flashcards are in です・ます, and 確認ルール/拒否ルール match the glossary aliases.",
       "blockIds": [
         "cycle-steps",
-        "cycle-flow"
+        "cycle-flow",
+        "summary-cards"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The single declared locale (jp) is complete, including the diagram labels. cycle-flow has descriptive alt text, the link text is specific (「公式ドキュメントの日本語版」, 「What's new」) and no text is baked into images.",
+      "score": 4,
+      "evidence": "The single declared locale (jp) is complete, including the diagram labels. Plain-text fields hold no markdown: checklist labels use 「/clear」 instead of backticks. The link text is descriptive (「公式ドキュメントの日本語版」), cycle-flow has full alt text, and no text is baked into images.",
       "blockIds": [
+        "self-check-list",
         "cycle-flow",
-        "sc-list"
+        "summary-next"
       ]
     }
   ],
   "mustFix": [
     {
-      "criterion": "load",
-      "blockId": "lesson",
-      "issue": "estMinutes is 23, above the contract's 8–20 minutes. The brief's own count puts the body at 2,440 JP chars including sc-list, above the 2,400 limit. The estimate counts 3 practice tasks × 2 min, but self-check-list is the success-criteria checklist of the other two tasks, as the brief says, not a third hands-on task.",
-      "fix": "(1) Delete e4 from check-quiz (see the align item), leaving 8 questions × 40 s = 5.3 min. (2) Delete blocks sc-b3 and sc-list. Append 「Claude Codeは頻繁に更新されます。動かないときは、[公式ドキュメントの日本語版](https://code.claude.com/docs/ja/overview)で確かめましょう。」 to summary-next's md and add \"cc-champion-kit\" to its cite. Change card-update's back to 「公式ドキュメントの日本語版で、今の書き方を確かめる。」 Remove cc-whats-new and cc-common-workflows from sources if nothing else cites them. (3) Delete hook-b1's second paragraph 「最初に何をそろえるとよいでしょうか。予想してみましょう。」, because hook-predict's title and stem already ask it. (4) Delete the MCP row from dr-table. (5) Trim the model-answer prose: delete the second paragraph of ex-prompt-claude-md's expect; replace the second paragraph of setup-prompt-model's expect with 「CLAUDE.mdは19行です。個人のデータは、頼むだけでなく下の設定で読み取りを拒否しています。」; delete the 「今の仕組み：…表示しています。」 paragraph of cycle-prompt-plan's expect. (6) Recompute with the contract formula: 450 JP chars/min over body + prompt texts + flashcards, 40 s per question, and 2 min for each of the 2 hands-on tasks (practice-setup, practice-cycle). Body text, counting list items and the sentences added by the other fixes, must be ≤ 2,400. Set estMinutes to the result, which must be ≤ 20, and update the brief's Format and Measured lines."
-    },
-    {
-      "criterion": "align",
-      "blockId": "check-quiz",
-      "issue": "e4 (「半年前の記事に書かれたコマンドを打つと、見つからないと表示されました」, objectiveId o2) tests keeping up with updates. It never asks the learner to evaluate their environment or working process against the checklist, or to decide what to add next, so it does not test o2. Neither objective covers this content.",
-      "fix": "Delete question e4 from check-quiz. o2 stays assessed by q3, q4 and the exam item e3, and the update advice stays in summary-next, summary point 4 and card-update."
-    },
-    {
-      "criterion": "miscon",
-      "blockId": "dr-b2",
-      "issue": "The design rule says to start with CLAUDE.md only and add parts when a trigger repeats (dr-b1, hook-predict's answer b). Yet ex-steps ②, setup-steps p-rules and the keyed answer of e1 add deny and ask rules on day 1 with no repeated trouble. The lesson never says why, so a learner who applies the rule as taught would leave secrets unprotected until a leak happens twice. dr-b2 also calls the parts 「Claude Codeが強制する」 without the limit taught in cc-02.",
-      "fix": "Replace dr-b2's md with 「CLAUDE.mdとスキルは「お願い」で、保証はありません。Claudeの判断に任せず止めたいことは、フックと[[権限ルール]]（permission rule）に置きます。ただし、秘密情報の読み取りとpushは、1回で困るので、きっかけを待たずに初日から権限ルールで守ります。」 and add \"cc-permissions\" to dr-b2's cite. Append 「ただし、秘密情報とpushの守りは例外で、初日から置きます（次のセクション）。」 to pq0's explanation in hook-predict."
-    },
-    {
-      "criterion": "worked",
-      "blockId": "ex-b1",
-      "issue": "ex-steps presents the five additions as one setup sequence with no timeline. The worked example therefore looks like what the hook warns against (installing everything on day 1). Its own triggers (「整形を忘れることが続いたので」, 「作業のたびに…打っていたので」) only make sense after weeks of use.",
-      "fix": "Replace ex-b1's md with 「題材は、佐藤さんのToDoアプリ（Node.js、テストは `npm test`）です。①と②は初日に置き、③と④は、きっかけが起きた週に1つずつ足しました。」"
-    },
-    {
-      "criterion": "accuracy",
-      "blockId": "check-quiz",
-      "issue": "e1 option c's feedback says 「鍵の読み取りとpushを確実に止めるのは、権限ルールです」 and e1's explanation says 「Claude Codeが強制します」. The course's cc-02 teaches that `Read(./.env)` does not stop some commands and scripts from reading the file, and that `git -C . push` does not match `Bash(git push *)`. The cc-06 review already removed this same overclaim.",
-      "fix": "Change e1 option c's feedback to 「スキルの中身も、Claudeへのお願いです。鍵の読み取りとpushを、Claudeの判断に任せず止めるのは権限ルールです。」 In e1's explanation, replace 「Claude Codeが強制します。」 with 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」"
-    },
-    {
-      "criterion": "accuracy",
-      "blockId": "check-quiz",
-      "issue": "e3 option a's feedback cites a number, 「公式の目安（200行以内）」, but check-quiz.cite does not include the source that states it (cc-memory, How Claude remembers your project).",
-      "fix": "Add \"cc-memory\" to check-quiz's cite array."
-    },
-    {
-      "criterion": "active",
-      "blockId": "sc-quiz",
-      "issue": "q4's stem opens with 「点検で、コンテキストの項目に当てはまりませんでした。」 This points the learner at self-check-list's sc-context label 「CLAUDE.mdは短く、作業の切れ目で /clear している」, a few blocks above, so option a can be picked by matching `/clear`. The learner never has to diagnose the problem.",
-      "fix": "Change q4's prompt to 「1つの会話でバグを直したあと、別の機能追加を続けています。Claudeが、前の作業の前提を混ぜ始めました。次にすることとして、最も合うのはどれでしょう？」 and change its hint to 「点検リストのどの観点の問題かを、まず考えましょう。」"
+      "criterion": "practice",
+      "blockId": "cycle-steps",
+      "issue": "This round changed c-explain from 「`/explain-diff` などで説明を受け」 to 「`/explain-diff` で説明を受け」. /explain-diff exists only in the worked example's repository. In practice-setup, p-more tells the learner to add a part only when its trigger has come (「なければ足しません」), and creating this skill is never a step. A learner who follows the rule as taught types /explain-diff and finds no such skill, so the step and its success criterion (「なぜその変更をしたかを、画面を見ずに言えます」) cannot be completed.",
+      "fix": "Replace c-explain's md with 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。」"
     }
   ],
   "niceToHave": [
-    "c-plan (cycle-steps): the session starts in auto mode, so one Shift+Tab lands in Manual mode (cc-02, cc-03). Replace the first sentence of c-plan's md with 「Shift + Tabを、`⏸ plan mode on` と出るまで押して[[プランモード]]（plan mode）にし、下の依頼文を送ります。」",
-    "setup-steps: p-rules expects the rules in `/permissions` before p-restart says settings load after a restart. Change p-rules' expect to 「JSONとして正しく書けています。」 and p-restart's expect to 「`/context` にCLAUDE.mdが、`/permissions` に書いたルールが出ます。」",
-    "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback says 40 lines is fine under the official 200-line guide. Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
-    "e1: option a is the longest and the only one that splits the three cases, which hints at the answer. Lengthen b to 「3つともCLAUDE.mdに「必ず」「絶対に」と書き、毎回読み込ませる」 and c to 「3つそれぞれにスキルを作り、作業の前に毎回呼び出す」.",
     "c-review (cycle-steps) has no hint or troubleshoot. Add hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
-    "summary-points[1]: change 「必ず守らせたいことは、権限ルールとフックに置きます。」 to 「Claudeの判断に任せず止めたいことは、権限ルールとフックに置きます。」 to match the accuracy fix.",
-    "card-deny's back could add the limit from cc-02/cc-10: 「`permissions.deny` に `Read(./.env)` などの拒否ルールを書く。スクリプトが自分で開く読み取りは止まらない。」",
-    "Prerequisites: add 第2回 権限ルール and 第7回 スキル to the 「とくに」 list, because dr-table, ex-steps and e1/e2 depend on them.",
-    "ja-editor: 「新しい目でレビューする」 (cycle-flow, c-review, cycle-prompt-review title) reads as a translation of 'fresh eyes'. Consider 「別のコンテキストでレビューする」, which matches self-check-list's sc-review."
+    "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide. Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
+    "Factual doubt: ex-claude-md's expect 「`/context` の「Memory files」に出ます。」 has no condition, but p-restart says 「直したCLAUDE.mdと設定は、起動し直すと読み込まれます」 (cc-prompt-caching: CLAUDE.md loads on the next /clear, /compact or restart). Change it to 「起動し直すと、`/context` の「Memory files」に出ます。」",
+    "sc-safety (self-check-list) restates the guarantee that dr-b2 qualifies (「pushの前に確認が入ります」); the audit also names this label. Change it to 「安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました」. Labels render as plain text, so no backticks.",
+    "summary-points[1]: change 「必ず守らせたいことは、権限ルールとフックに置きます。」 to 「Claudeの判断に任せず止めたいことは、権限ルールとフックに置きます。」 to match dr-b2.",
+    "sc-b1 calls an unmet checklist item a きっかけ, but the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
+    "worked (to reach 4): add a faded step before practice-setup, for example a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
   ],
-  "average": 3.08,
+  "average": 3.77,
   "verdict": "revise",
-  "summary": "The capstone is well built: a design rule that recalls earlier lessons (dr-table with 「学んだ回」), a worked example whose every step names its trigger, and two authentic practices with model answers and a self-check list. The most important fix is the core rule. As taught (「CLAUDE.mdだけで始め」), it contradicts the lesson's own day-1 deny/ask rules, and the exam overclaims that permission rules 「確実に止める」. State the safety exception and its limits in dr-b2 and ex-b1, then delete the off-objective e4, fix q4's give-away stem, add the missing cc-memory citation, and cut the lesson back within the 20-minute and 2,400-character budgets."
+  "summary": "The scope check required a full review: 27 of 33 blocks and 51% of the parts changed. All 7 must-fix items from round 1 are gone: estMinutes 19 (est 18.7, prose 1,210), e4 is removed, dr-b2 states the day-1 exception and the rules' limits, ex-b1 gives the timeline, e1's overclaim is fixed, check-quiz cites cc-memory, and q4's stem no longer gives the answer away. One must-fix remains, and this round's change caused it: c-explain now requires /explain-diff, which a learner who followed p-more's 「なければ足しません」 does not have, so add a fallback prompt."
 }

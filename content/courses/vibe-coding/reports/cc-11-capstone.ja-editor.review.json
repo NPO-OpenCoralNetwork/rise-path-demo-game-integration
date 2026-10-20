@@ -4,12 +4,12 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:a0a5e3162b6d70c5",
+  "lessonHash": "sha256:ae84a43eacd96ce5",
   "scores": [
     {
       "id": "voice",
-      "score": 3,
-      "evidence": "The body is warm です・ます with short sentences and no pressure phrases (lessons:lint --strict is clean). Most wrong-option feedback follows the pattern 誤解→正しい考え (dr-quiz, ex-quiz, check-quiz). It does not reach 4 because of local rule breaks. Every flashcard back ends in plain form (summary-cards). e1 gives its situation in plain sentences. There are spacing slips (「Ctrl + G で」「auto モード」「MCP サーバー」「/init の下書き」), and 「計画と差分を照らす」 misuses the verb (c-review).",
+      "score": 4,
+      "evidence": "Every learner-facing string is now です・ます. The flashcard backs (summary-cards) and the e1 situation (check-quiz) were fixed. lessons:lint --strict reports 0 errors and 0 warnings, so there are no banned phrases. The spacing slips are gone: 「Ctrl + Gで」「autoモード」「MCP（Model Context Protocol）サーバー」, with backticks on paths and commands in setup-prompt-model and cycle-prompt-plan. The 照らす misuse is now 照らし合わせる (cycle-steps, cycle-prompt-review, card-review, q3 hint). Wrong-option feedback follows 誤解→正しい考え in two sentences or fewer throughout. A few small phrasings remain as niceToHave (「起動時が」「各行に聞く」「検証が空いている」).",
       "blockIds": [
         "summary-cards",
         "check-quiz",
@@ -22,22 +22,23 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "Every sentence and paragraph is within budget (lint clean). Each section opens with a one- or two-sentence lead (ex-b1, setup-task, cycle-task, sc-b1), and the steps carry one action per item with an expect line. Every screen has a heading, table, diagram, steps or a check.",
+      "evidence": "The course measure gives prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1621 · questions 8 · practice sections 3 · est 18.7 min (must be ≤ 20; estMinutes 19). estMinutes matches est rounded. Sentence and paragraph budgets are clean (lint). Every section opens with a short lead (ex-b1, setup-task, cycle-task, sc-b1). Every screen carries a table, diagram, steps or a check.",
       "blockIds": [
         "dr-table",
         "ex-steps",
         "setup-steps",
         "cycle-flow",
-        "cycle-steps"
+        "cycle-steps",
+        "self-check-list"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The prerequisites name lessons 1–10, and the lesson recalls them (「第3回」「第6回」「第8回」 in dr-table and cycle-task). The glossary terms match the text: 権限ルール has the aliases 確認ルール and 拒否ルール. A few first uses lack the gloss the style guide requires: 「API」 (ex-rules), 「JSON」 (setup-steps) and 「コンテキスト」 (dr-quiz). The glossary entry サブエージェント can also be read the wrong way (「自分のコンテキストウィンドウ」).",
+      "evidence": "The prerequisites list lessons 2–10, and the text recalls them (「第3回」「第6回」「第7回」「第8回」 in dr-table, pq0 and cycle-task). コンテキスト is now glossed at first use (q1 option d 「別のコンテキスト（context）」). API and JSON are gone from the text. The glossary サブエージェント now reads 「メインの会話とは別のコンテキストウィンドウ」, and the glossary terms match the text, diagram and options. It does not reach 4 for two reasons. c-explain asks the learner to run `/explain-diff`, a skill only 佐藤さん built in the example, while p-more tells learners to add parts only when they have a trigger. And `jq` appears in ex-hook without any explanation.",
       "blockIds": [
+        "cycle-steps",
         "ex-steps",
-        "setup-steps",
         "dr-quiz",
         "lesson"
       ]
@@ -45,110 +46,30 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a single-locale (jp) lesson, so no strings are missing. The cycle-flow diagram has Japanese labels, a caption and a full alt. The link texts name their destinations (sc-list: 「公式ドキュメントの日本語版」「What's new」).",
+      "evidence": "The lesson is single-locale (jp) and no strings are missing. The cycle-flow labels are in Japanese, match the step titles in cycle-steps, and come with a caption and a full alt. The link text in summary-next names its destination (「公式ドキュメントの日本語版」).",
       "blockIds": [
         "cycle-flow",
-        "sc-list"
+        "summary-next"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます §1: Every flashcard back ends in plain form or 体言止め (「1つずつ足す。」「保証はない。」「甘くなりがちだから。」「Claude Codeに聞く。」 and so on). Two fronts are plain questions (「何から始める？」「どこに置く？」). card-review also misuses 照らす (「計画と差分を照らしてもらう」).",
-      "fix": "card-start front 「何から始める？」→「何から始めますか？」; back 「CLAUDE.md。ほかの部品は、きっかけが来たら1つずつ足す。」→「CLAUDE.mdです。ほかの部品は、きっかけが来たら1つずつ足します。」. card-twice back 「CLAUDE.mdに1行足す。」→「CLAUDE.mdに1行足します。」. card-every front 「例外なく毎回起きてほしいことは、どこに置く？」→「例外なく毎回起きてほしいことは、どこに置きますか？」; back 「フック。CLAUDE.mdとスキルはお願いで、保証はない。」→「フックです。CLAUDE.mdとスキルはお願いで、保証はありません。」. card-deny back 「…などの拒否ルールを書く。」→「…などの拒否ルールを書きます。」. card-ask back 「…の確認ルールを書く。」→「…の確認ルールを書きます。」. card-review back 「自分の作業の採点は甘くなりがちだから。サブエージェントに計画と差分を照らしてもらう。」→「自分の作業の採点は、甘くなりがちだからです。サブエージェントに、計画と差分を照らし合わせてもらいます。」. card-update back 「…確かめるか、Claude Codeに聞く。」→「…確かめるか、Claude Codeに聞きます。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) です・ます §1: The e1 prompt states the situation in three plain-form sentences inside a です・ます question: 「Claudeがテストのコマンドを2回まちがえた。`secrets/` に鍵のファイルがある。本番へのpushの前に、必ず人が見たい。」.",
-      "fix": "「Claudeがテストのコマンドを2回まちがえた。`secrets/` に鍵のファイルがある。本番へのpushの前に、必ず人が見たい。」→「Claudeがテストのコマンドを2回まちがえました。`secrets/` に鍵のファイルがあります。本番へのpushの前には、必ず人が確認したいと考えています。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "cycle-steps",
-      "issue": "(d) 表記 §3: c-plan puts a space between a key name and the particle (「Ctrl + G で」). The same step writes 「Shift + Tabで」 without one, so the lesson is inconsistent with itself.",
-      "fix": "「Ctrl + G で計画を直して承認します。」→「Ctrl + Gで計画を直してから、承認します。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "ex-steps",
-      "issue": "(d) 表記 §3: ex-rules has a space between the English word and the katakana (「auto モード」).",
-      "fix": "「「auto モード」で始まるので」→「「autoモード」で始まるので」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) 表記 §3: e3 option b writes 「MCP サーバー」 with a space. dr-table writes 「MCP（Model Context Protocol）サーバー」 without one.",
-      "fix": "「MCP サーバーを足して、使える道具を増やす」→「MCPサーバーを足して、使える道具を増やす」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "setup-prompt-model",
-      "issue": "(d) 表記 §3: The expect text puts a space between a non-code command and 和文 (「/init の下書き」). Spaces are allowed only around inline code, and other expect texts in this lesson do use backticks.",
-      "fix": "「Claudeが、/init の下書きとの差分を見せながら書き直します。」→「Claudeが、`/init` の下書きとの差分を見せながら書き直します。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "cycle-prompt-plan",
-      "issue": "(d) 表記 §3: The expect text puts spaces around file names and a command that are not inline code (「kakeibo/summary.py にあり」「summary.py に」「python -m pytest がすべて」).",
-      "fix": "「集計は kakeibo/summary.py にあり」→「集計は `kakeibo/summary.py` にあり」; 「summary.py に前月との差」→「`summary.py` に前月との差」; 「python -m pytest がすべて通る」→「`python -m pytest` のテストがすべて通る」; 「CSVの読み込み（kakeibo/io.py）」→「CSVの読み込み（`kakeibo/io.py`）」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "ex-steps",
-      "issue": "(d) 略語 §2: 「API」 first appears in ex-rules (「APIキー」) without its full name.",
-      "fix": "「`.env` にAPIキーがあるので」→「`.env` にAPI（Application Programming Interface）キーがあるので」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "setup-steps",
-      "issue": "(d) 略語 §2: 「JSON」 first appears in learner text in the p-rules troubleshoot line without its full name.",
-      "fix": "「JSONの末尾のカンマなどを確かめます。」→「JSON（JavaScript Object Notation）の末尾のカンマなどを確かめます。」"
-    },
-    {
-      "criterion": "prior",
-      "blockId": "dr-quiz",
-      "issue": "(d) カタカナ語 §2: 「コンテキスト」 is used throughout the lesson (q1 feedback d, cycle-prompt-review, q3, one of the four checklist headings, card-review) but never with English. The lesson glosses スキル, フック, サブエージェント and プランモード at first use, so it should gloss this term too. The first use is q1 option d feedback.",
-      "fix": "「サブエージェントは、横道の作業を別のコンテキストで進める仕組みです。」→「サブエージェントは、横道の作業を別のコンテキスト（context）で進める仕組みです。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(a) meaning: The glossary entry サブエージェント says 「自分のコンテキストウィンドウで作業し」. Throughout this lesson 「自分」 means the learner (「自分のリポジトリ」「自分が決めます」), so a learner can read it as 'works in your context window'. That is the opposite of the point the lesson makes (「別のコンテキスト」).",
-      "fix": "glossary サブエージェント: 「自分のコンテキストウィンドウで作業し、結果の要約だけを返す補助のエージェント。」→「メインの会話とは別のコンテキストウィンドウで作業し、結果の要約だけを返す補助のエージェント。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "cycle-steps",
-      "issue": "(c) grammar: c-review says 「計画と差分を照らしてもらいます」. 照らす does not take 「AとBを」. The word that means comparing the two is 照らし合わせる.",
-      "fix": "「[[サブエージェント]]に計画と差分を照らしてもらいます。」→「[[サブエージェント]]に、計画と差分を照らし合わせてもらいます。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "dr-b1: 「困りごとが繰り返す」 reads as a transitive verb used intransitively. The table header and glossary use 「繰り返し起きる」 — 「同じ困りごとが繰り返すこと」→「同じ困りごとが繰り返し起きること」",
-    "check-quiz / self-check: the lesson mixes 「繰り返す」 (dr-b1, dr-table, e2) and 「くり返す」 (q4 option d). Pick one — 「`/compact` を何度もくり返す」→「`/compact` を何度も繰り返す」",
-    "lesson (glossary フック): it writes 「編集の後」, while the body opens the word as 「あと」 (q1 option a 「編集のあとに」) — 「ファイルの編集の後など」→「ファイルの編集のあとなど」",
-    "ex-steps: in ex-claude-md it is unclear who made the mistake twice — 「テストのコマンドを2回まちがえたのがきっかけです。」→「Claudeがテストのコマンドを2回まちがえたのが、きっかけです。」",
-    "ex-steps: in ex-rules, what 「で始まる」 refers to is unclear (it could be read as the version name) — 「v2.1.283以降は「autoモード」で始まるので」→「v2.1.283以降はClaude Codeが「autoモード」で起動するので」. Factual doubt: please confirm the version and the default mode against cc-permission-modes.",
-    "dr-b2: フック is not linked while 権限ルール is — 「Claude Codeが強制するフックと」→「Claude Codeが強制する[[フック]]と」",
-    "lesson (glossary きっかけ): the definition 「同じ困りごとが繰り返し起きること」 does not quite fit the table rows 「別のリポジトリでも同じ設定を使う」 and 「例外なく毎回起きてほしいことがある」 — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」",
-    "setup-steps: in the p-claude-md hint, 「各行に聞く」 is odd (the learner asks themself about each line) — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
-    "setup-prompt-model: the CLAUDE.md in the prompt never asks Claude 「読まないで」. It says 「読み取りは設定で拒否している」, so the expect text describes something the file does not say — 「個人のデータは「読まないで」と頼むだけでなく、下の設定で読み取りを拒否しています。」→「個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定で読み取りを拒否しています。」",
-    "self-check-list: the labels are plain text, so 「/clear」「/usage」「/status」 appear with surrounding spaces and without code formatting, while the body uses `/clear`. Either drop the spaces or quote the commands — 「作業の切れ目で /clear している」→「作業の切れ目で「/clear」している」; 「/usage で使用量を、/status で認証のしかたを」→「「/usage」で使用量を、「/status」で認証のしかたを」",
-    "cycle-steps: in c-review, the subject of the expect text is unclear (the subagent or the learner?) — 「直す指摘と見送る指摘を、理由つきで分けています。」→「返ってきた指摘を、直すものと見送るものに理由つきで分けています。」",
-    "cycle-prompt-review: the prompt the learner copies has the same 照らす misuse — 「計画と照らしながら今の差分をレビューしてください。」→「計画と照らし合わせながら、今の差分をレビューしてください。」",
-    "cycle-quiz: q3 calls it 「新しいコンテキストのレビュー」, while the steps and diagram say 「新しい目でレビューする」 and the checklist says 「別のコンテキストで」. One name helps — 「新しいコンテキストのレビューで」→「別のコンテキストでのレビューで」",
-    "cycle-quiz: the hint brings in 「成功の基準」, which appears nowhere else. The lesson says 「計画の要件」 — 「成功の基準に照らして、どの指摘が「要件」に当たるかを考えましょう。」→「計画と照らし合わせて、どの指摘が「要件」に当たるかを考えましょう。」",
-    "cycle-quiz: in q3, 「粗」 alone may be misread as そ, and 「防御のコード」 is jargon — 「粗を探すよう頼まれたレビュアーは」→「あらを探すよう頼まれたレビュアーは」; 「余計な抽象化や防御のコードが増えます。」→「余計な抽象化や念のためのチェックが増えます。」",
-    "cycle-prompt-plan: the expect text repeats itself (「確かめ方：…確かめます」) — 「確かめ方：python -m pytest がすべて通ることを確かめます。」→「確かめ方：`python -m pytest` のテストがすべて通ること。」",
-    "ex-quiz: one sentence in the q2 option d feedback carries two ideas — 「呼び出す手間が増えるうえ、抜けているのは「依存は入っている」という前提です。」→「抜けているのは、「依存は入っている」という前提です。」",
-    "sc-b3: 「記事どおり」 could mean this lesson or an outside article — 「記事どおりに動かないときは」→「この教材やほかの記事のとおりに動かないときは」",
-    "check-quiz: the e3 prompt asks for 「次に足すもの」, but options a (削る) and c (聞き直す) do not add anything — 「次に足すものとして、最も優先すべきはどれでしょう？」→「次にすることとして、最も優先すべきはどれでしょう？」",
-    "self-check-list: factual doubt, not a wording issue. Please confirm that `/usage` exists as written in the cited cc-costs page for v2.1.304."
+    "cycle-steps: c-explain assumes the learner has the example's `/explain-diff` skill, but p-more adds parts only when there is a trigger. Give a fallback — 「`/explain-diff` で説明を受け、1か所を自分の言葉で言い直します。」→「`/explain-diff`（例題のスキル）か「差分を説明して」という依頼で説明を受け、1か所を自分の言葉で言い直します。」",
+    "ex-steps: in ex-hook, `jq` appears with no word on what it does — 「（`jq` も使います）」→「（編集したファイル名を取り出すのに `jq` を使います）」",
+    "ex-steps: in ex-rules, 「起動時が「autoモード」」 reads a little oddly — 「v2.1.283以降は起動時が「autoモード」なので」→「v2.1.283以降は起動時のモードが「autoモード」なので」. Factual doubt: the version and the default mode are not quoted in the audit or the facts file. Please confirm them against cc-permission-modes.",
+    "ex-steps: in ex-claude-md, the subject of 推測 is left implicit — 「推測できないことだけを書きます。」→「Claudeが推測できないことだけを書きます。」",
+    "setup-steps: in the p-claude-md hint, 「各行に聞く」 is odd, since the learner is asking themself about each line (carried over from round 1) — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
+    "setup-steps / check-quiz: p-claude-md sets a 25-line target, while e3 says 40 lines is within the official guide of 200 or fewer. A learner may wonder which number counts — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行以内）。」",
+    "cycle-steps: the c-build hint leaves the quoted request without 「」, while c-plan quotes its request (「最初の1歩だけに絞って」と頼みます) — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
+    "dr-b2: 「1回で困る」 is terse — 「秘密情報とpushは1回で困るので」→「秘密情報とpushは1回の失敗でも困るので」",
+    "sc-b2: the second sentence links its parts loosely — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
+    "summary-cards / check-quiz: 「自分の作業」 can be read as the learner's own work, but the point is Claude grading itself (card-review back, e3 option c feedback) — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」; 「自分の作業を採点すると、甘くなりがちです。」→「Claudeが自分の作業を採点すると、甘くなりがちです。」",
+    "check-quiz: in the e3 explanation, 「検証が空いている」 is unusual — 「検証が空いている今は、ここを最初に埋めます。」→「完了を確かめる手段がない今は、ここを最初に埋めます。」",
+    "check-quiz: in the e1 explanation, 「止めます」 also covers the ask rule, which pauses for confirmation rather than blocking — 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」→「一致した操作は、Claudeの判断に関係なく、Claude Codeが拒否するか確認を求めます。」",
+    "lesson (glossary きっかけ): the definition still does not fit the rows 「別のリポジトリでも同じ設定を使う」 and 「例外なく毎回起きてほしいことがある」 (carried over from round 1) — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
   ],
-  "average": 3.5,
-  "verdict": "revise",
-  "summary": "The Japanese is warm, short and well paced. Each step gives its reason in one sentence, and the wrong-option feedback mostly follows 誤解→正しい考え in two sentences. Before passing, put the flashcard backs and the e1 situation into です・ます. Also fix the spacing slips (「Ctrl + G で」「auto モード」「MCP サーバー」 and non-code paths), gloss API, JSON and コンテキスト at first use, and reword the glossary 「自分のコンテキストウィンドウ」 so it cannot be read as the learner's own context."
+  "average": 3.75,
+  "verdict": "pass",
+  "summary": "review-scope.mjs exited 1 (38 of 75 parts changed, 51%; 27 of 33 blocks), so the scope check required a full review. All 12 must-fix items from round 1 are gone. The flashcards and e1 are now in です・ます. The spacing slips (Ctrl + G, auto, MCP, /init, paths) are fixed. API and JSON were removed, and コンテキスト is glossed at first use. The glossary サブエージェント reads 「メインの会話とは別のコンテキストウィンドウ」, and 照らし合わせる replaces 照らす everywhere. I found no new (a)–(e) errors. lessons:lint --strict is clean, and the measure gives prose 1210, est 18.7, estMinutes 19. The remaining points are niceToHave. The main ones are the `/explain-diff` assumption in c-explain, the unexplained `jq`, and a factual doubt about the v2.1.283 autoモード claim."
 }
