@@ -214,6 +214,12 @@ export class BattleScene15 extends BattleScene {
   }
 
   async playerCastSpell(spellElement) {
+    // 回復魔法は敵へのダメージではなく、主人公の HP を回復する（攻撃ではないので、敵の追加の反撃もない）
+    if (spellElement === 'HEALING') {
+      await this.player.castSpell('HEALING');
+      return;
+    }
+
     let damage = 20;
     let effectiveness = 1.0;
     const currentElement = this.shifterState.currentElement;
@@ -232,9 +238,8 @@ export class BattleScene15 extends BattleScene {
     const finalDamage = Math.floor(damage * effectiveness);
     this.variables.spell_effectiveness = effectiveness;
     
-    // 魔法が当たってから HP を減らす。この面ではどの魔法も敵へのダメージになるので、回復の演出は使わず属性のない光にする
-    const spellFx = spellAnimation(spellElement, 'magic_flash');
-    await this.playAnimation(spellFx === 'healing' ? 'magic_flash' : spellFx);
+    // 魔法が当たってから HP を減らす
+    await this.playAnimation(spellAnimation(spellElement, 'magic_flash'));
     if (this.isBattleOver()) return;
     
     const newHP = Math.max(0, this.enemy.getHP() - finalDamage);
