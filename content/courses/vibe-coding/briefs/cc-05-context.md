@@ -24,17 +24,17 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
   - 圧縮のあとに残るもの（プロジェクト直下の CLAUDE.md・`paths:` のないルール・自動メモリ・プランモードの計画はディスクから読み直し、Claude が読んだり編集したりしたファイルは最近変更されたものから5つまで再読、`paths:` 付きルールとサブフォルダの CLAUDE.md は必要時に再読）と、失われうるもの（会話の中だけの指示）。対処：CLAUDE.md に書く、`/compact` の焦点、CLAUDE.md の圧縮指示。
   - 途中で編集した CLAUDE.md は次の `/clear`・`/compact`・再起動まで反映されない（pitfall）。
   - 公式の失敗パターンのうちコンテキストに関わる3つ：何でも入りのセッション → `/clear`、修正の繰り返し → 2回失敗したら `/clear` して最初の依頼を書き直す、終わらない探索 → 範囲を絞るかサブエージェント（要約だけ返る）。`/btw` は演習 p1 の解説で1文だけ。
-  - セッションは毎回まっさら、`claude --continue` / `--resume` で開き直すと元のコンテキストのまま。
+  - セッションは毎回まっさら、`claude --continue` / `--resume` で開き直すと前の会話の履歴が戻る。
 - 扱わない（別レッスン） / out: CLAUDE.md の書き方と置き場所（第6回）、サブエージェントの作成・フロントマター（第7回）、スキル本文の再注入・SessionStart フック（第7・8回）、`/autocompact`・1M コンテキスト・idle compaction・プロンプトキャッシュと料金、長いセッションの利用量（第10回）、`/rewind` の「Summarize from here」（第2回の範囲を超える詳細なので省略）。
 - 学習者がよく持つ誤解 / likely misconceptions（report §6 と facts から）:
   1. 「長い会話を続けるほど文脈が増えて賢くなる」— 埋まるほど性能が落ちる。関係のない会話は雑音。
-  2. 「前回の会話を覚えている／開き直せば空になる」— 新しいセッションはまっさら。`--continue`/`--resume` は同じ会話をそのまま開く。
-  3. 「圧縮すると全部消える／全部残る」— 会話は要約、ファイルの指示はディスクから戻る。会話だけの指示は失われうる。
+  2. 「前回の会話を覚えている／開き直せば空になる」— 新しいセッションはまっさら。`--continue`/`--resume` は前の会話の履歴を開き直す。
+  3. 「圧縮すると全部消える／全部残る」— 会話は要約、直下の CLAUDE.md など決まったファイルの指示はディスクから戻る。会話だけの指示は失われうる。
   4. 「強く言い直せば直る」— 修正を重ねると失敗したやり取りがたまる。2回でだめなら `/clear` して依頼を書き直す。
   5. 「Claude に聞けば使用量がわかる」— 測るのは `/context`。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（読む部分 3,900字 ÷ 450 ≈ 8.7分〔本文 2,379字 + 表・定義・要点・図のキャプション 1,521字〕 + 問題13問 × 40秒 ≈ 8.7分 + 手を動かす演習1つ × 2分 = 19.3分）。本文は、markdown・callout・list と steps（title・md・expect・hint・troubleshoot）の文字数（空白とインライン記法を除く）。依頼文ブロックの title・expect・note とチェックリスト（計522字）は演習の2分に含めて数えない。含めても 20.5分で、20分の上限に収まる。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。
+- 所要時間 / minutes: 20（course-wide measure, round 2: `cc-05-context.lesson.json: prose 1942 (budget 1,200–2,400) · read 3229 · practice reading 1115 · questions 12 · practice sections 1 · est 19.7 min (must be ≤ 20; estMinutes 20)`。(3,229 + 1,115) ÷ 450 ≈ 9.65分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.65分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英訳は公開先のコースが決まってから）
 - 演習の題材 / practice task idea: 前半は3つのセッション（A 何でも入り、B 同じ作業が長く続く、C 範囲のない調査）を文章で読み、`/clear`・`/compact`・サブエージェントから対処を選ぶ。後半は練習用フォルダ（`cc-context-practice`、`git init`）で CLAUDE.md に1行のルールを書いてから起動し、会話だけの指示を1つ伝えて作業 → `/context` を3回（起動直後・作業後・圧縮後）→ 予想 → 焦点付き `/compact` → 何が残ったかを確かめる。チェックリストと解答例の表つき。
@@ -54,6 +54,7 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
 - (`cc-costs` was dropped in round 1 with block `s2-cost`; usage of long sessions is left to 第10回.)
 - `cc-prompt-caching` — How Claude Code uses prompt caching — https://code.claude.com/docs/en/prompt-caching — Anthropic — checked 2026-10-20 (facts file practice-15). Used for: edits to the project-root CLAUDE.md mid-session load on the next `/clear`, `/compact` or restart.
 - `cc-sub-agents` — Create custom subagents — https://code.claude.com/docs/en/sub-agents — Anthropic — checked 2026-10-20. Used for: subagents run in their own context window and return only a summary.
+- `cc-security` — Security — https://code.claude.com/docs/en/security — Anthropic — checked 2026-10-20 (fact audit, round 2). Used for: "In an interactive session, Claude Code shows the workspace trust dialog when you start it in a folder you haven't trusted." (`pr-steps-start`).
 - Repository: `doc/brushup-2026/research/claude-code-curriculum.ja.md` §2.2, §2.4, §6, §7, §11; facts file `facts-cc-05-context.md` (verified 2026-10-20).
 
 ## Outline
@@ -63,11 +64,11 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
 | `hook` | hook | はじめに：午後になると、朝の指示が効かなくなる | 長い会話で、会話だけで伝えた指示が効かなくなる | markdown (problem, 3 sentences + 予想の促し), quiz predict | `q0` → o2 (ungraded) |
 | `5-1` | concept | 5-1. コンテキストは埋まるほど効きが落ちる | 入れ物はすぐ埋まり、埋まるほど性能が落ちる。`/context` で前後を比べて測る | markdown lead (版), definitions (セッション・コンテキストウィンドウ), markdown (制約, cite), markdown (`/context`, cite), quiz inline | `q1` → o3 (apply: ログを読ませる前後で比べる) |
 | `5-2` | concept | 5-2. 区切るか、要約するか | 関係のない次の作業なら `/clear`、同じ作業を続けるなら `/compact 焦点`。自動でも圧縮される。開き直すと同じ会話 | markdown lead, definitions (コンテキスト圧縮), table (`/clear`・`/compact`・自動), markdown (焦点の例), markdown + code (`--continue`/`--resume`), quiz inline | `q2` → o1 (apply: ログイン修正とコミットのあと → README を英語に翻訳) |
-| `5-3` | concept | 5-3. 圧縮のあとに残るもの、失われうるもの | 会話は要約、ファイルに書いた指示はディスクから戻る。残したい指示はファイルへ | markdown lead, definitions (CLAUDE.md・ルール・自動メモリ), diagram (圧縮の前 → 後), table (図にない2行：`paths:` 付きルールとサブフォルダの CLAUDE.md、読んだり編集したりしたファイル), markdown (対処 + 公式ドキュメント日本語版リンク), callout pitfall (途中編集の CLAUDE.md), quiz inline | `q3` → o2 (understand: 日本語コメントの指示が圧縮後に落ちた) |
+| `5-3` | concept | 5-3. 圧縮のあとに残るもの、失われうるもの | 会話は要約、直下の CLAUDE.md など決まったファイルの指示はディスクから戻る。残したい指示はファイルへ | markdown lead, definitions (CLAUDE.md・ルール・自動メモリ), diagram (圧縮の前 → 後), table (図にない2行：`paths:` 付きルールとサブフォルダの CLAUDE.md、読んだり編集したりしたファイル), markdown (対処 + 公式ドキュメント日本語版リンク), callout pitfall (途中編集の CLAUDE.md), quiz inline | `q3` → o2 (understand: 日本語コメントの指示が圧縮後に落ちた) |
 | `5-4` | concept | 5-4. コンテキストに関わる3つの失敗パターン | 何でも入り・修正の繰り返し・終わらない探索を症状で見分け、対処を結ぶ | markdown lead, definitions (サブエージェント), table (パターン・症状・対処), markdown (要約だけ戻る), prompt (サブエージェントで調べる, note=要約を自分で確かめる) | — (quiz density: next section and practice) |
 | `5-5` | example | 5-5. 例題：言い直しの続く会話を立て直す | 症状 → パターン → 対処 → 学んだこと → 書き直した最初の依頼 | markdown lead, list (セッションの流れ4行), steps worked example (5 steps with subgoals and why), prompt (書き直した依頼、テスト先行と原因の説明), quiz inline | `q4` → o1 (apply: 郵便番号の関数で、`/clear` 後の最初の依頼文を4つから選ぶ) |
 | `practice` | practice | 演習：セッションを診断し、圧縮を試す | 前半：3つのセッションを診断（faded）。後半：練習用フォルダで `/context`×3 と焦点付き `/compact`、予想してから確かめる | markdown lead, quiz inline ×3 (hints), markdown (安全), code bash (`terminal`), steps (2), prompt A, steps (4, hint/troubleshoot), prompt B, checklist (6), table (解答の例：CLAUDE.md のルールと会話だけの指示の2行) | `p1` → o1 (A 何でも入り → `/clear`), `p2` → o1 (B 同じ作業 → `/compact` 焦点), `p3` → o1 (C 終わらない探索 → サブエージェント) |
-| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (5) | `e1` → o1 (transfer: フォームの入力チェック、修正の繰り返し), `e2` → o1 (transfer: 新しいプロジェクトの調査), `e3` → o2 (multi: 圧縮の直後にディスクから自動で読み直されるもの), `e4` → o2 (transfer: チームの CHANGELOG ルール), `e5` → o3 (CLAUDE.md が読まれていない？ → `/context`). (`e6` was removed in round 1: same scenario and options as `p2`.) |
+| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (4) | `e1` → o1 (transfer: フォームの入力チェック、修正の繰り返し), `e3` → o2 (multi: 圧縮の直後にディスクから自動で読み直されるもの), `e4` → o2 (transfer: チームの CHANGELOG ルール), `e5` → o3 (CLAUDE.md が読まれていない？ → `/context`). (`e6` was removed in round 1: same scenario and options as `p2`; `e2` was removed in round 2 for length: same scenario and options as `p3`.) |
 | `summary` | summary | まとめ | 冒頭の場面の答え、4つの要点、振り返りと次の一歩 | markdown (冒頭の答え), summary (4), markdown (振り返り + 第6回), flashcards (8), askTutor (3) | — |
 
 Contract check: hook = 3-sentence problem + predict; 5 segments (4 concept + 1 example), one idea each; new terms per segment ≤ 3.
@@ -75,10 +76,10 @@ Recalled from earlier lessons (re-defined briefly so the glossary is complete): 
 (第1回), サブエージェント (第4回), プランモード (第3回). New here: コンテキスト圧縮 (5-2), ルール (5-3).
 Body (round 1, same method as above: markdown, callouts, lists and steps with hints and troubleshooting): **2,379** JP
 characters (budget 2,400); tables, definitions, summary points and the diagram caption add 1,521. Inline quiz density: 5 of 6
-content sections (5-4 has none; 5-3 and 5-5 around it do). Answer positions of the 12 single-choice questions: 3 each in
+content sections (5-4 has none; 5-3 and 5-5 around it do). Answer positions of the 11 single-choice questions: 3, 3, 2 and 3 in
 positions 1–4 (e3, multi, at 2 and 4).
 Worked example (5-5 steps) → faded diagnosis (practice A) → hands-on (practice B) → exam. Every objective has an inline and an
-exam question (o1: q2, q4, p1–p3, e1, e2; o2: q3, e3, e4; o3: q1, e5). Comprehension habits: predict before `/compact`
+exam question (o1: q2, q4, p1–p3, e1; o2: q3, e3, e4; o3: q1, e5). Comprehension habits: predict before `/compact`
 (practice step), ask Claude to explain the cause (5-5 prompt), check one file of a subagent summary yourself (5-4 note).
 One diagram (state change in compaction), no images.
 
@@ -99,8 +100,10 @@ One diagram (state change in compaction), no images.
   the learner can observe what survives. Whether the chat-only instruction survives depends on the summary; the lesson says so
   instead of promising either result.
 - The `/compact` focus in the practice is written in Japanese; the official examples are in English, but the focus is free text.
-- estMinutes 19 from the formula (see Format): reading includes tables, definitions and summary points, not flashcards,
-  quizzes, prompt blocks or the checklist; 13 questions; one practice task (the hands-on half).
+- estMinutes 20 from the course-wide measure (see Format): 12 questions, one practice task (the hands-on half). Round 2 removed
+  `e2` to keep est ≤ 20 (it repeated `p3`; o1 is still assessed by q2, q4, p1–p3 and e1).
+- The first launch in the new practice repository shows the workspace trust dialog (cc-security: trust dialog in a folder you
+  haven't trusted; a new git repository root is not covered by earlier trust), so `pr-start`'s expect tells the learner to accept it.
 - Japanese and Latin letters or digits are written without a space (style guide §3); the half-width space around inline code
   is kept everywhere, and in plain-text fields (checklist, askTutor, objectives) command names such as /context keep the same
   spacing. Prompt bodies and code are unchanged.
