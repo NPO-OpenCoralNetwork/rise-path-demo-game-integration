@@ -76,7 +76,7 @@ export const BATTLE_STAGES = [
     difficulty: 'Normal',
     params: {
       background: 'metalcavern',
-      enemy: 'metalslime',
+      enemy: 'armoredchimera',
       stageNumber: 7,
       scratchMode: true
     }
