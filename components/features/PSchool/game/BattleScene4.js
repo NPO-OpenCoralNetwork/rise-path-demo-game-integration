@@ -61,10 +61,8 @@ export class BattleScene4 extends BattleScene {
 
   // 敵のターン処理をオーバーライド（氷の盾チェックを追加）
   async enemyTurn() {
-    // 敵が麻痺状態かチェック
-    if (this.enemy.isParalyzed) {
-      this.addLog(`${this.enemy.name}は麻痺して動けない！`);
-      this.enemy.isParalyzed = false;
+    // 敵が麻痺状態かチェック（麻痺魔法の残りターンを1減らす）
+    if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
       return;
     }
 
