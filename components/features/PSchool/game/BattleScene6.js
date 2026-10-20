@@ -65,6 +65,10 @@ export class BattleScene6 extends BattleScene {
   async enemyTurn() {
     // 麻痺している間は動けない（麻痺魔法の残りターンを1減らす）
     if (this.skipTurnIfParalyzed(`${this.enemy.name}は麻痺して動けない！`)) {
+      // 主人公にかかった毒は、敵が動けなくても毎ターンまわる
+      if (this.playerPoisoned) {
+        await this.applyPoisonDamage();
+      }
       return;
     }
 
