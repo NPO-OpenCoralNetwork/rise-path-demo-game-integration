@@ -1,0 +1,213 @@
+{
+  "lessonId": "cc-09-parallel-automation",
+  "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:f87cd45c170202f4",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "All three objectives are can-do statements and each has several questions with objectiveId (o1: q1, q2, e1, e2; o2: q3, e3, e4; o3: q4, e5, e6). But o2 「書ける」 and o3 「設計できる」 are assessed only by selection items; writing and designing happen only in the self-checked practice, so this is not a 4.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 is a concrete scenario in 3 sentences (「機能の実装を任せている途中で、急ぎのバグ修正を頼まれました…」). It leads straight to the ungraded predict q0, which targets misconception 1. There is no trivia.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 2,
+      "evidence": "prerequisites lists 第2回, 第4回 and 第7回, but the lesson depends on 第8回 (フック, MCP, `.mcp.json` in s3-table and e4) and 第6回 (CLAUDE.md in s3-table and s4-enforce). 「チェックアウト」 is used 5 times (ex-setup, q2, card-deps) without a definition, and the branch name `worktree-bugfix-b` in s2-code is never explained.",
+      "blockIds": [
+        "s1-defs",
+        "s2-code",
+        "s2-steps",
+        "s3-table",
+        "s4-enforce",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 2,
+      "evidence": "Counted without inline code (table cells and step text included), the segments run parallel ≈349, headless ≈399 and unattended ≈501 JP chars against the 300-char budget. The brief's own count gives a body of ≈2,420 chars, over the 2,400 limit. `unattended` holds two ideas (「置き場所と依頼文の4点」): two definitions, a 4-row table with unexplained names (`claude_args`, cron, `/loop`, `/schedule`), a list, two paragraphs, a prompt and a quiz.",
+      "blockIds": [
+        "s4-lead",
+        "s4-defs",
+        "s4-table",
+        "s4-four",
+        "s4-enforce",
+        "s2-map"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s2-code plus s2-steps form a full worked example. Each step has a subgoal title, a reason (「ワークツリーは既存のコミットから作ります」, 「新しいチェックアウトなので…」) and an expect, and it comes before practice. s3-code with the s3-table 「役割／付けないと」 column models the practice-1 command. However, s4-prompt is not annotated against the 4 points it models.",
+      "blockIds": [
+        "s2-code",
+        "s2-steps",
+        "s3-code",
+        "s3-table",
+        "s4-prompt"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 2,
+      "evidence": "Density is met (one inline quiz in each of the 4 content sections), but the correct answer is the first option in 10 of 11 questions: q0, q2, q3, q4, every exam item e1–e5 is 「a」, and e6 is a+b. QuizCheckBlock renders options in authored order with no shuffle, so position gives the answers away. e3 and e5 can also be answered by picking the longest, most complete-looking option.",
+      "blockIds": [
+        "hook-predict",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 3,
+      "evidence": "All 7 misconceptions in the brief appear as distractors with feedback of 2 sentences or fewer, e.g. q3-c 「止まるのではなく、テストが動かないまま終わります」 and e4-d 「`-p` は信頼の確認を出しません」, and s3-pitfall corrects `\"Bash\"`. Some distractors are filler rather than real beliefs (q4-d 「1時間ごとに増やす」, q2-b 「テストを実行できない」), and e3/e5 distractors are not parallel to the answer.",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s3-check",
+        "s3-pitfall",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "There are no images and no decoration; the comparisons are tables with captions that state the rule (s1-table 「誰がまとめるか・何を分けるかで選ぶ」, s4-table). Leaving out a diagram is acceptable, although the folder and branch layout of worktrees would benefit from one.",
+      "blockIds": [
+        "s1-table",
+        "s3-table",
+        "s4-table"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "Both tasks are authentic: write a nightly `claude -p` and predict before running it, then audit a colleague's weak prompt. Each has a checklist, a hint followed by troubleshoot, and a model answer (p1-model, p2-prompt expect). The hint ladder has only 2 levels, p-rewrite has no hint, and p1-checklist has no item for `--bare`, one of the 「5つのフラグ」 that p-command requires.",
+      "blockIds": [
+        "p1-steps-write",
+        "p1-checklist",
+        "p1-model",
+        "p2-steps",
+        "p2-prompt",
+        "p2-checklist"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "The summary (4 points) comes after the exam. summary-next has a reflection task (「無人で回すときの成功の条件を1文で書いてみましょう」) and the next step (第10回). There are 7 flashcards that ask for retrieval, plus askTutor suggestions.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "The version is pinned (v2.1.304 in the subtitle, v2.1.302 for the `-p` default), sources are official and claims match the course research notes. In check-quiz, e1-d 「エージェントチームは…トークンを多く使います」 and e4's 「専用の VM やクラウドのセッションも勧めています」 have no supporting source in the block's cite list. The quoted error text 「Failed to resolve base branch」 appears in neither the brief nor the research notes.",
+      "blockIds": [
+        "check-quiz",
+        "s2-steps",
+        "s4-four"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The text is consistently です・ます, warm and non-pressuring (「大事なリポジトリでは試しません」, 「今は名前だけで十分です」), with no banned phrases, and terms match the glossary. A few spots are stiff, e.g. s4-enforce 「CLAUDE.md と同じで、依頼文に書いても強制になりません」, and リサーチプレビュー and エージェントビュー appear without English on first use.",
+      "blockIds": [
+        "s4-enforce",
+        "s2-map"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The single declared locale (jp) is complete, there are no images or baked-in text, and the only prose link has descriptive text (「公式ドキュメント（非対話的実行）」 in s3-mode).",
+      "blockIds": [
+        "s3-mode"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "The correct answer is the first option in every exam item (e1–e5 answer \"a\", e6 \"a\"+\"b\") and in q0, q2, q3 and q4 too. The reader (components/lesson/blocks/QuizCheckBlock.tsx) renders options in array order without shuffling, so a learner can score by position.",
+      "fix": "Reorder each options array without changing option ids or answer arrays. New order by id: q0 [b,c,a,d]; q2 [c,d,a,b]; q3 [b,a,c,d]; q4 [b,c,d,a]; e1 [b,c,a,d]; e2 [b,a,c,d]; e3 [b,c,d,a] (after the rewrite below); e4 unchanged; e5 [b,d,a,c]; e6 [c,a,d,b]. q1 stays as is."
+    },
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "e3 gives its answer away by length and completeness: option a is the only one with several safety flags and is 2–3 times longer than b–d (d is just `claude -p \"…\"`). The learner can pick it without telling the flags apart.",
+      "fix": "Give all four options the same skeleton, each differing in one element. a (answer): `claude --bare -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode dontAsk --max-budget-usd 1`. b: `claude --bare -p \"…\" --allowedTools \"Bash\" --permission-mode dontAsk --max-budget-usd 1`, feedback 「`\"Bash\"` だけだと、どのシェルコマンドも確認なしで通ります。`Bash(npm test *)` のように絞ります。」. c: `claude --bare -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode bypassPermissions --max-budget-usd 1`, feedback 「`bypassPermissions` は確認を飛ばすので、無人の CI では危険です。許可外を拒否するのは `dontAsk` です。」. d: `claude -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode dontAsk --max-budget-usd 1`, feedback 「`--bare` がないと、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。」."
+    },
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "In e5, option a is clearly the longest and the only one with four clauses, so 「4点が最もそろった」 can be answered by length. The distractors each lack several points, not the one point that tests the objective.",
+      "fix": "Make the options parallel near-misses. a unchanged. b: 「更新できるパッケージを調べて、いい感じにまとめて。編集はしない。調べられなければ理由を返して」 (keep its feedback). c: 「名前・今の版・最新の版を JSON の配列で返して。なければ空の配列。必要なら更新とコミットも。調べられなければ理由を返して」 (keep its feedback). d: 「名前・今の版・最新の版を JSON の配列で返して。なければ空の配列。編集はしない。調べられなくても空の配列で返して」 (keep its feedback)."
+    },
+    {
+      "criterion": "prior",
+      "blockId": "lesson",
+      "issue": "The lesson relies on 第8回 (フック, MCP, `.mcp.json` in the s3-table `--bare` row and in e4) and on 第6回 (CLAUDE.md in s3-table and s4-enforce 「CLAUDE.md と同じで」), but neither is listed in prerequisites.",
+      "fix": "Add 「第6回｜CLAUDE.mdで前提を伝える」 and 「第8回｜フックで守らせ、MCPでつなぐ」 to prerequisites. In the s3-table `--bare` row, change 「フックや MCP、CLAUDE.md などを読まない（API キーが必要）」 to 「フックや MCP（第8回）、CLAUDE.md などを読まない（API キーが必要）」."
+    },
+    {
+      "criterion": "prior",
+      "blockId": "s1-defs",
+      "issue": "Several names are used before they are defined. 「チェックアウト」 drives the key reasoning of q2 (ex-setup, q2 feedback c, q2 explanation, card-deps) but is never defined, and the learner knows only commit/branch/merge. The worktree folder `.claude/worktrees/<名前>/` (the s2-code `.gitignore` line) and the branch name `worktree-<名前>` (`git merge worktree-bugfix-b`) are never stated. A learner adapting the example to their own repo cannot know which branch to merge.",
+      "fix": "In s1-defs, replace the ワークツリー md with 「同じリポジトリから、フォルダーとブランチを分けて作る作業コピー（チェックアウト）。`claude --worktree <名前>` で `.claude/worktrees/<名前>/` に作られ、ブランチは `worktree-<名前>` になります。」 and mirror it in the glossary entry. In s2-steps ex-feature, change the expect to 「ブランチ `worktree-feature-a` と `worktree-bugfix-b` で、Claude が1つずつ動きます。」."
+    },
+    {
+      "criterion": "load",
+      "blockId": "unattended",
+      "issue": "The section carries two ideas (where to run it, and the 4 points of a prompt) in ≈501 JP chars against the 300-char segment budget. It adds names that are never explained or used again (`claude_args`, cron in s4-table), and the lesson body (≈2,420 chars by the brief's own count) exceeds the 2,400-char limit.",
+      "fix": "Split the section. Create a new section `unattended-where` (role concept, title 「4. 無人実行の置き場所を選ぶ」) holding s4-lead, s4-defs and s4-table, and retitle `unattended` to 「5. 依頼文の4点で点検する」 (s4-intro through s4-check). Inline density stays met because the neighbouring sections have quizzes. In s4-table, change the GitHub Actions cell to 「PR や決まった時刻に動かす。設定は `/install-github-app`」. Shorten s2-map to one sentence: 「ほかに、エージェントビュー（`claude agents`）・エージェントチーム・動的ワークフロー（`ultracode`）がありますが、プレビューや実験的な段階です。」. Recount so the body is at most 2,400 chars."
+    },
+    {
+      "criterion": "accuracy",
+      "blockId": "check-quiz",
+      "issue": "Some non-obvious claims in the exam have no supporting source in the block's cite list: e1-d 「エージェントチームは実験的で、トークンを多く使います」 (from cc-agents), e3-c on `bypassPermissions` (from cc-permission-modes), and e4's explanation 「公式ドキュメントは、専用の VM やクラウドのセッションも勧めています」 (from Anthropic's security guidance, which is not in sources).",
+      "fix": "Add \"cc-agents\" and \"cc-permission-modes\" to check-quiz.cite. For e4, either add the security page that the cc-10 brief already uses (https://code.claude.com/docs/en/security, after checking it says this) as a source and cite it, or delete the sentence 「公式ドキュメントは、専用の VM やクラウドのセッションも勧めています。」."
+    }
+  ],
+  "niceToHave": [
+    "s1-check q1 restates the hook's scenario and the s1-table row 「別々の変更を同時に進める」, so it is close to recognition. Give it a new context instead, e.g. 「README の誤字直しと、決済の設定変更を同時に Claude に進めてもらう」, so the learner must see that the two tasks are separate edits.",
+    "p1-checklist: add an item 「`--bare` を付けている（サブスクリプションで外したときは、練習用フォルダーで試している）」. This matches p-command's 「5つのフラグ」 and the s3-table.",
+    "p2-steps p-rewrite has no hint. Add 「依頼文に書くことと、フラグで決めることを分けて考えます。」 to complete the ladder (hint → troubleshoot → model answer).",
+    "s2-steps ex-setup troubleshoot quotes the exact error 「Failed to resolve base branch」, which is in neither the brief nor the research notes. Check it verbatim against cc-worktrees, or paraphrase it as 「ブランチを作れないというエラーが出たら」.",
+    "s4-four item 3 「普段の3〜5倍から始める」 comes from a Managed Agents blog post (see the brief's Assumptions), and a learner automating for the first time has no 「普段」. Consider 「ふだん1回にかかる費用の3〜5倍から始める」 and scoping the source in the cite.",
+    "s4-enforce: say outright that the scope is written in the prompt and enforced by flags. s4-prompt and the p2 model answer both put 「ファイルの編集やコミットはしないでください」 in the prompt, which can look like it contradicts e6. Suggested text: 「依頼文に「編集しない」と書くのはよいことですが、守らせるのは権限のフラグです。費用の上限も同じです。」",
+    "s4-prompt: add a short note mapping lines to the 4 points (成功の条件 = JSON の形, 失敗の報告 = unreadable), and show the matching command flags (e.g. read-only tools and `--max-budget-usd`), so it works as a worked example for practice 2.",
+    "s3-table `--permission-mode dontAsk` row: 「設定しだいでモードが変わる」 leaves unclear why `dontAsk` is needed when `-p` already starts in Manual. Consider 「設定ファイルの既定モード（auto など）が使われることがある」.",
+    "Consider a small diagram (one repository → two folders under `.claude/worktrees/` → two branches → merge) with caption and alt in `worktree-example`; worktrees are structural and the lesson currently explains them only in text.",
+    "s2-map sits between the steps and the check of the worked example and splits attention. If it is kept, move it after s1-table or into summary-next."
+  ],
+  "average": 2.92,
+  "verdict": "revise",
+  "summary": "The lesson's main strength is its scenario-driven design: a crisp hook, distractors that cover all seven misconceptions from the brief, and two authentic practice tasks with checklists and model answers. The most important fix is the answer key: the correct option is first in 10 of 11 questions and the reader does not shuffle, and e3/e5 also give their answers away by length. Reorder and rewrite those questions. Then list 第6回 and 第8回 as prerequisites, define チェックアウト and the worktree folder and branch names, split the overloaded section 4, and complete the exam citations."
+}
