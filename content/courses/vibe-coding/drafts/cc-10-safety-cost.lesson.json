@@ -1,0 +1,1157 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-10-safety-cost",
+  "courseId": "vibe-coding",
+  "title": "第10回｜安全とコストを管理する",
+  "subtitle": "外から紛れ込む指示、秘密情報、想定外の請求に備える（2026年10月時点、Claude Code v2.1.304）",
+  "locale": "jp",
+  "level": "intermediate",
+  "estMinutes": 19,
+  "prerequisites": [
+    "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+    "第5回｜コンテキストを管理する",
+    "第8回｜フックで守らせ、MCP でつなぐ",
+    "第9回｜並列で進める・自動で回す",
+    "ターミナルで cd と ls が使え、JSON の設定ファイルを編集できる"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "危ない場面（信頼できないリポジトリ、外部の文章、強い権限）と、それぞれに合う対策を結びつけられる",
+      "bloom": "analyze"
+    },
+    {
+      "id": "o2",
+      "text": "秘密情報のファイルを読ませない拒否ルール（deny）を書ける",
+      "bloom": "apply"
+    },
+    {
+      "id": "o3",
+      "text": "想定外の使用量や請求の原因を特定できる",
+      "bloom": "analyze"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：知らないリポジトリと、残った API キー",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "知らないリポジトリを clone し、Claude Code に「README のとおりに準備して」と頼むつもりです。ターミナルには、前に設定した `ANTHROPIC_API_KEY` が残っています。\n\n何が起こりうるでしょうか。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-security",
+            "cc-authentication"
+          ],
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "multi",
+              "prompt": "このまま始めたときに起こりうることを、すべて選んでください。",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "README の文章が、Claude への指示として働くことがある"
+                },
+                {
+                  "id": "b",
+                  "md": "キーの使用を承認すると、サブスクリプションではなく API の料金になる"
+                },
+                {
+                  "id": "c",
+                  "md": "公開されているリポジトリなので、中身は Anthropic が確かめている",
+                  "feedback": "公開リポジトリの中身を、Anthropic が審査することはありません。信頼してよいかは、自分で判断します。"
+                },
+                {
+                  "id": "d",
+                  "md": "auto モードの分類器が、危ない操作をすべて止めてくれる",
+                  "feedback": "分類器にも見逃しがあります。場面に合わせて、ほかの対策と組み合わせます。"
+                }
+              ],
+              "answer": [
+                "a",
+                "b"
+              ],
+              "explanation": "Claude が読んだ README の文章は、次の操作を決める材料になります。また、環境変数の API キーの使用を承認すると、請求先が API に変わります。10-1と10-2で文章とリポジトリの守り方を、10-5で請求の確かめ方を見ていきます。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s1",
+      "title": "10-1. 外の文章にまぎれた指示",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "Claude は README や Issue、Web ページ、MCP の結果を読んで動きます。そこに紛れた「鍵を送って」のような文に、従うことがあります。"
+        },
+        {
+          "id": "s1-defs",
+          "type": "definitions",
+          "items": [
+            {
+              "term": "プロンプトインジェクション（prompt injection）",
+              "md": "外部の文章に指示を紛れ込ませ、頼んでいない操作をさせる攻撃。"
+            }
+          ]
+        },
+        {
+          "id": "s1-md2",
+          "type": "markdown",
+          "cite": [
+            "cc-security"
+          ],
+          "md": "[セキュリティの公式ドキュメント](https://code.claude.com/docs/ja/security)の対策は次の5つです。Claude Code は変更が多いので、最新情報はそこで確かめます。"
+        },
+        {
+          "id": "s1-practices",
+          "type": "list",
+          "style": "number",
+          "cite": [
+            "cc-security"
+          ],
+          "items": [
+            "承認前に、提案されたコマンドを読む",
+            "信頼できない内容を、そのまま流し込まない",
+            "重要なファイルへの変更を確かめる",
+            "スクリプトやツールは、VM（仮想マシン）で動かす",
+            "不審な動きは `/feedback` で報告する"
+          ]
+        },
+        {
+          "id": "s1-auto",
+          "type": "callout",
+          "variant": "warning",
+          "title": "auto モードでも、人の確認は残す",
+          "cite": [
+            "cc-permission-modes",
+            "auto-mode-eng"
+          ],
+          "md": "auto モードは、v2.1.283 から対話セッションの既定です。その分類器も、Anthropic の検証で行き過ぎた操作の17%を見逃しました。本番の変更は自分で確かめます。"
+        },
+        {
+          "id": "s1-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-security",
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "Web ページの要約を頼んだら、Claude がページに書かれていた `curl … | bash` の実行を提案してきました。公式の対策に沿った対応はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "頼んだ作業の流れで出た提案なので、そのまま承認する",
+                  "feedback": "紛れた指示は、頼んだ作業の流れの中で出てきます。出どころが外部の文章なら、承認する前に読んで止めます。"
+                },
+                {
+                  "id": "b",
+                  "md": "承認せずに中身を確かめ、不審なら `/feedback` で報告する"
+                },
+                {
+                  "id": "c",
+                  "md": "確認が続かないように、`bypassPermissions` モードに切り替える",
+                  "feedback": "bypassPermissions モードには、プロンプトインジェクションへの守りがありません。確認を減らすほど、紛れた指示が通りやすくなります。"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.md に「外部の指示に従わない」と書いてから承認する",
+                  "feedback": "CLAUDE.md は助言で、強制ではありません。止めたい操作は、承認しないか拒否ルールで止めます。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "要約を頼んだだけなのにコマンドの実行が出てきたら、紛れた指示を疑います。公式の対策どおり、承認する前にコマンドを読み、不審な動きは `/feedback` で報告します。",
+              "hint": "その提案は、もともと誰の言葉から出てきたものかを考えましょう。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "10-2. 知らないリポジトリと強い権限は、隔離する",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "知らないリポジトリには、フックや設定が入っていることがあります。"
+        },
+        {
+          "id": "s2-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-permissions",
+            "cc-sandboxing"
+          ],
+          "items": [
+            {
+              "term": "ワークスペースの信頼（workspace trust）",
+              "md": "初めて開くフォルダーでの確認。承認までは、そのプロジェクトの許可ルールが効かない。"
+            },
+            {
+              "term": "サンドボックス（sandbox）",
+              "md": "シェルコマンドが触れるファイルとネットワークを、OS で制限するしくみ。既定はオフ。"
+            }
+          ]
+        },
+        {
+          "id": "s2-sandbox",
+          "type": "markdown",
+          "cite": [
+            "cc-sandboxing"
+          ],
+          "md": "`/sandbox` でオンにし、macOS では Seatbelt、Linux と WSL2 では bubblewrap で動きます。ネイティブの Windows は対象外です。フックや MCP サーバーは外で動きます。"
+        },
+        {
+          "id": "s2-isolate",
+          "type": "markdown",
+          "cite": [
+            "cc-sandbox-environments",
+            "cc-permissions"
+          ],
+          "md": "そのため公式は、知らないリポジトリには VM か[[クラウドセッション]]（Anthropic が管理する VM）を勧めます。`claude -p` では、確認なしでリポジトリのフックや設定が動きます。"
+        },
+        {
+          "id": "s2-layers",
+          "type": "diagram",
+          "engine": "mermaid",
+          "cite": [
+            "cc-sandboxing",
+            "cc-sandbox-environments"
+          ],
+          "code": "flowchart TD\n  A[\"外部の文章<br>README・Issue・Web ページ\"]\n  subgraph VMBOX[\"VM・クラウドセッション：Claude Code 全体を隔離\"]\n    B[\"Claude が次の操作を決める\"]\n    C[\"権限ルールと承認<br>拒否・確認・分類器\"]\n    D[\"ファイル操作ツール・MCP サーバー<br>（サンドボックスの外）\"]\n    subgraph SBOX[\"サンドボックス：OS が制限\"]\n      E[\"シェルコマンドと子プロセス\"]\n    end\n  end\n  A --> B\n  B --> C\n  C --> D\n  C --> E",
+          "caption": "守りは重ねて使う。サンドボックスが囲むのはシェルコマンドだけ",
+          "alt": "外部の文章が Claude の判断に入り、権限ルールと承認を通って、ファイル操作ツール側とシェルコマンド側に分かれる図。サンドボックスはシェルコマンドだけを囲み、VM・クラウドセッションは Claude Code 全体を囲む。"
+        },
+        {
+          "id": "s2-table",
+          "type": "table",
+          "cite": [
+            "cc-security",
+            "cc-sandbox-environments",
+            "cc-permission-modes"
+          ],
+          "caption": "危ない場面と、合う対策",
+          "columns": [
+            "場面",
+            "起きうること",
+            "合う対策"
+          ],
+          "rows": [
+            [
+              "外部の文章",
+              "紛れた指示に従う",
+              "承認前に読む。そのまま流し込まない"
+            ],
+            [
+              "知らないリポジトリ",
+              "フックや設定が動く",
+              "VM かクラウドセッションで開く"
+            ],
+            [
+              "強い権限（`bypassPermissions`）",
+              "確認なしで何でも動く",
+              "ネットにつながらないコンテナや VM だけで使う"
+            ]
+          ]
+        },
+        {
+          "id": "s2-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-sandbox-environments",
+            "cc-permissions",
+            "cc-sandboxing"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "知らない人の公開リポジトリを試したいとき、公式ドキュメントが勧める方法はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "VM かクラウドセッションの中で開いて試す"
+                },
+                {
+                  "id": "b",
+                  "md": "手元でサンドボックスをオンにすれば、それで足りる",
+                  "feedback": "サンドボックスが守るのはシェルコマンドだけです。リポジトリのフックや MCP サーバーは、サンドボックスの外で動きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "`claude -p` で動かし、確認の画面を出さないようにする",
+                  "feedback": "`-p` では信頼の確認が出ないまま、リポジトリのフックや設定が使われます。確認が出ないのは、守りが1つ減った状態です。"
+                },
+                {
+                  "id": "d",
+                  "md": "信頼の確認で承認すれば、中身の安全も確かめられる",
+                  "feedback": "信頼の確認は、そのフォルダーの設定を有効にするかを自分で決める画面です。中身が安全だと保証するものではありません。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "知らないリポジトリには、フックや設定が入っていることがあります。公式は、Claude Code ごと隔離できる VM かクラウドセッションを勧めています。",
+              "hint": "Claude Code 全体を囲めるのはどれか、図で確かめましょう。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "10-3. 秘密情報を読ませない拒否ルールを書く",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "s3-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-permissions"
+          ],
+          "md": "鍵やパスワードの入ったファイルは、[[拒否ルール]]で守ります。CLAUDE.md の「読まないで」は助言にすぎません。"
+        },
+        {
+          "id": "s3-steps",
+          "type": "steps",
+          "cite": [
+            "cc-permissions",
+            "cc-settings-reference"
+          ],
+          "items": [
+            {
+              "id": "ex-target",
+              "title": "守るものを決める",
+              "md": "漏れると困る鍵のファイルを挙げます。",
+              "expect": "`config/credentials.json` と `keys/` に決まります。"
+            },
+            {
+              "id": "ex-place",
+              "title": "置き場所を選ぶ",
+              "md": "プロジェクトの `.claude/settings.json` に書きます。git で共有され、全員に効きます。",
+              "expect": "書く場所が決まります。"
+            },
+            {
+              "id": "ex-pattern",
+              "title": "パターンを書く",
+              "md": "gitignore と同じ書き方で、`./` は今のフォルダーから、`**` は下の階層すべてです。",
+              "expect": "下の設定になります。"
+            },
+            {
+              "id": "ex-verify",
+              "title": "効いているか確かめる",
+              "md": "`/permissions` で確かめ、Claude に読むよう頼んでみます。",
+              "expect": "Claude は中身を読めません。"
+            }
+          ]
+        },
+        {
+          "id": "s3-code",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-settings-reference"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Read(./config/credentials.json)\",\n      \"Read(./keys/**)\"\n    ]\n  }\n}"
+        },
+        {
+          "id": "s3-pitfall",
+          "type": "callout",
+          "variant": "pitfall",
+          "title": "効かない書き方と、届かない経路",
+          "cite": [
+            "cc-permissions"
+          ],
+          "md": "`Write(...)` のパスのルールと `.claudeignore` は使われません。先頭が `/` 1つのパスは、絶対パスではありません。自分でファイルを開くスクリプトには効かないので、サンドボックスも使います。"
+        },
+        {
+          "id": "s3-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-permissions"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "プロジェクトの `certs/` フォルダーの中身を、下の階層も含めて Claude に読ませたくありません。プロジェクトの `.claude/settings.json` の書き方として正しいのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`deny` に `Read(./certs/**)` を書く"
+                },
+                {
+                  "id": "b",
+                  "md": "`deny` に `Write(./certs/**)` を書く",
+                  "feedback": "パスのルールで確かめられるのは Read と Edit だけで、Write のルールは使われません。読ませないなら Read の拒否ルールを書きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "`allow` に何も書かなければ、読まれることはない",
+                  "feedback": "作業フォルダーの中の読み取りは、許可ルールがなくても確認なしで動きます。止めたいものは、拒否ルールに書きます。"
+                },
+                {
+                  "id": "d",
+                  "md": "`deny` に `Read(/Users/me/app/certs/**)` を書く",
+                  "feedback": "先頭が `/` 1つのパスは、絶対パスではありません。プロジェクトの設定では作業フォルダーが起点なので、`./certs/**` と書きます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "`Read` の拒否ルールに `./certs/**` と書くと、`certs/` の下の階層まで読めなくなります。同じパスへの編集や書き込みも止まります。",
+              "hint": "例題の `keys/` と同じ形で書けるか考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "10-4. データの行き先を知る",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-sandbox-environments",
+            "cc-data-usage"
+          ],
+          "md": "隔離しても、送る中身は同じです。個人向けの Pro・Max は、学習に使うかを本人が選べます。法人向けの Team・Enterprise・API は、既定で学習に使われません。"
+        },
+        {
+          "id": "s4-note",
+          "type": "markdown",
+          "cite": [
+            "cc-data-usage",
+            "cc-settings-reference"
+          ],
+          "md": "会話の記録は、既定で30日間、`~/.claude/projects/` に平文で残ります。"
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "10-5. 使用量と請求の原因を突き止める",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s5-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-commands",
+            "cc-costs"
+          ],
+          "md": "`/usage`（別名 `/cost`・`/stats`）で、推定コストとプランの使い具合を見られます。金額は手元の見積もりで、請求書ではありません。"
+        },
+        {
+          "id": "s5-md2",
+          "type": "markdown",
+          "cite": [
+            "cc-costs",
+            "pricing"
+          ],
+          "md": "企業での平均は、開発者1人・稼働1日あたり約13ドルです（公式の目安）。料金は[公式の料金ページ](https://claude.com/pricing)で確かめます。"
+        },
+        {
+          "id": "s5-table",
+          "type": "table",
+          "cite": [
+            "cc-authentication",
+            "cc-costs",
+            "cc-pro-max-help"
+          ],
+          "caption": "症状から原因と対策をたどる",
+          "columns": [
+            "症状",
+            "考えられる原因",
+            "確かめ方と対策"
+          ],
+          "rows": [
+            [
+              "API の請求が届いた",
+              "`ANTHROPIC_API_KEY` を承認した（`-p` は承認なしで使う）",
+              "`/status` で確かめ、キーを外す"
+            ],
+            [
+              "使用量の減りが早い",
+              "長いセッションで、履歴を毎回送り直す",
+              "作業の切れ目で `/clear`。調べものはサブエージェントへ"
+            ],
+            [
+              "1回の使用量が多い",
+              "重いモデルと effort、長い CLAUDE.md",
+              "モデルと effort を作業に合わせる。CLAUDE.md は200行以内"
+            ],
+            [
+              "すぐ上限に届く",
+              "[[利用上限]]（5時間と週）をチャットと共有",
+              "`/usage` で使い具合を見る"
+            ]
+          ]
+        },
+        {
+          "id": "s5-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-pro-max-help",
+            "cc-costs"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "Pro プランの佐藤さんは、午前中に Claude のチャットで長い資料をたくさん要約しました。午後に Claude Code を使い始めると、すぐに上限のメッセージが出ました。最も考えられる原因はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "チャットと Claude Code で、同じ利用上限を使っている"
+                },
+                {
+                  "id": "b",
+                  "md": "Claude Code の上限は、チャットとは別に毎朝リセットされる",
+                  "feedback": "上限は5時間のセッション上限と週の上限で、チャットと共有です。毎朝リセットされる仕組みではありません。"
+                },
+                {
+                  "id": "c",
+                  "md": "環境変数 `ANTHROPIC_API_KEY` が設定されている",
+                  "feedback": "API キーで動くと、プランの上限ではなく API の料金になります。上限のメッセージとは症状が違います。"
+                },
+                {
+                  "id": "d",
+                  "md": "午前中に `/clear` を何度も使った",
+                  "feedback": "`/clear` 自体は費用がかからず、使用量を増やしません。増えるのは、長い履歴を送り直すときです。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "Pro と Max の利用上限は、Claude のチャットと Claude Code で共有されます。`/usage` で、プランの使い具合を確かめられます。",
+              "hint": "午前中のチャットと午後の Claude Code が、どこでつながっているかを考えましょう。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "演習：田中さんの使い方を点検して直す",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "Max プランの田中さんの設定と習慣を点検します。下の2つは田中さんのファイルで、写す必要はありません。"
+        },
+        {
+          "id": "practice-case-settings",
+          "type": "code",
+          "lang": "json",
+          "filename": "~/.claude/settings.json",
+          "code": "{\n  \"permissions\": {\n    \"defaultMode\": \"bypassPermissions\"\n  }\n}"
+        },
+        {
+          "id": "practice-case-zshrc",
+          "type": "code",
+          "lang": "bash",
+          "filename": "~/.zshrc",
+          "code": "# 副業のプロジェクト用\nexport ANTHROPIC_API_KEY=\"（副業用のキー。ここでは省略）\""
+        },
+        {
+          "id": "practice-case-habits",
+          "type": "list",
+          "style": "bullet",
+          "items": [
+            "知らないリポジトリも手元で開く",
+            "`.env` と `secrets/` に拒否ルールがない",
+            "毎晩 `claude -p` のスクリプトを動かす",
+            "1日じゅう同じセッションを使う"
+          ]
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-audit",
+              "title": "点検する",
+              "md": "問題を3つ以上、直し方つきで書き出します。",
+              "expect": "3組以上そろいます。",
+              "hint": "10-2と10-5の表から、当てはまる行を探します。"
+            }
+          ]
+        },
+        {
+          "id": "practice-steps-deny",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-deny",
+              "title": "拒否ルールを書いて試す",
+              "md": "下のコマンドでダミーを作り、`.claude/settings.json` に拒否ルールを書きます。起動したら、結果を予想して依頼文を送ります。",
+              "expect": "Claude は中身を読めず、`/permissions` にルールが出ます。",
+              "hint": "10-3の `keys/**` と同じ形です。",
+              "troubleshoot": "中身が出たら、パスと JSON を直して起動し直します。"
+            }
+          ]
+        },
+        {
+          "id": "practice-folder",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "mkdir cc-practice && cd cc-practice && git init\nmkdir secrets .claude\necho \"PRACTICE_TOKEN=dummy\" > .env\necho \"dummy\" > secrets/dummy.txt"
+        },
+        {
+          "id": "practice-prompt-read",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "拒否ルールを確かめる依頼文",
+          "cite": [
+            "cc-permissions"
+          ],
+          "prompt": "{{ファイル}} の中身を表示してください。\n読めないときは別の方法は試さずに、読めなかった理由と、効いている設定を説明してください。",
+          "vars": [
+            {
+              "name": "ファイル",
+              "hint": "例：.env または secrets/dummy.txt"
+            }
+          ],
+          "expect": "Claude は、拒否ルールのため読めなかったと答えます。言い方は版によって違います。\n\n効いている設定として、`.claude/settings.json` の `deny` のルールを挙げます。`dummy` という中身は表示されません。"
+        },
+        {
+          "id": "practice-answer-note",
+          "type": "markdown",
+          "md": "模範解答です。`.env.*` で `.env.local` も守ります。"
+        },
+        {
+          "id": "practice-answer-rule",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-settings-reference"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Read(./.env)\",\n      \"Read(./.env.*)\",\n      \"Read(./secrets/**)\"\n    ]\n  }\n}"
+        },
+        {
+          "id": "practice-steps-bill",
+          "type": "steps",
+          "items": [
+            {
+              "id": "p-bill",
+              "title": "請求の理由を説明する",
+              "md": "先月の API の請求の原因・確かめ方・直し方を書き、依頼文で見直してもらいます。",
+              "expect": "3つがそろい、直すかを自分で決められます。",
+              "hint": "毎晩のスクリプトに注目します。",
+              "troubleshoot": "`-p` では、`ANTHROPIC_API_KEY` があると承認なしで使われます。"
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt-review",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "点検と説明を見直してもらう依頼文",
+          "cite": [
+            "cc-authentication",
+            "cc-permission-modes",
+            "cc-sandbox-environments"
+          ],
+          "prompt": "同僚の Claude Code の使い方を点検し、届いた API の請求の理由も説明しました。\nClaude Code の公式ドキュメントに照らして、誤りや足りない観点を指摘してください。\n直すかどうかは私が決めるので、指摘だけをお願いします。\n\n{{点検結果と説明}}",
+          "vars": [
+            {
+              "name": "点検結果と説明",
+              "hint": "例：bypassPermissions をふだんのパソコンで使っている → 紛れた指示も確認なしで動く → 隔離した環境だけで使う"
+            }
+          ],
+          "expect": "模範解答の例です。指摘と見比べ、足りなかった観点を書き足します。\n\n① `bypassPermissions` をふだんのパソコンで使っている。紛れた指示も確認なしで動くので、既定から外し、ネットにつながらないコンテナや VM の中だけで使う。\n\n② 知らないリポジトリを手元で開いている。フックや設定が手元で動くので、VM かクラウドセッションで開く。\n\n③ `.env` と `secrets/` に拒否ルールがない。読まれて外へ送られうるので、`Read(./.env)` と `Read(./secrets/**)` を `deny` に書く。\n\n④ 1日じゅう同じセッションを使っている。毎回、履歴全体を送り直すので、作業の切れ目で `/clear` する。\n\n請求の説明の例です。`~/.zshrc` のキーが、毎晩の `claude -p` で承認なしに使われ、API の料金になりました。`/status` で認証を確かめ、`~/.zshrc` からキーを消して確かめ直します。"
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": "演習のチェックリスト",
+          "items": [
+            {
+              "id": "pc-audit",
+              "label": "問題を3つ以上、直し方つきで挙げた"
+            },
+            {
+              "id": "pc-rule",
+              "label": "`.env` と `secrets/` に拒否ルールを書いた"
+            },
+            {
+              "id": "pc-test",
+              "label": "ダミーの `.env` が読めないと確かめた"
+            },
+            {
+              "id": "pc-bill",
+              "label": "請求の原因・確かめ方・直し方を書いた"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-security",
+            "cc-permission-modes",
+            "auto-mode-eng",
+            "cc-sandbox-environments",
+            "cc-permissions",
+            "cc-authentication",
+            "cc-costs",
+            "pricing",
+            "cc-pro-max-help"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "外部の人も自由に書ける GitHub の Issue の本文を `claude -p` に渡し、自動で修正させる仕組みを作ります。まず考えるべき対策はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "本文を信頼できない内容とし、隔離した環境で操作を絞って動かす"
+                },
+                {
+                  "id": "b",
+                  "md": "止まらないように、`--dangerously-skip-permissions` を付けて動かす",
+                  "feedback": "確認を止めると、Issue に紛れた指示もそのまま実行されかねません。このフラグは、ネットにつながらない隔離環境でだけ使います。"
+                },
+                {
+                  "id": "c",
+                  "md": "auto モードの分類器があるので、本文はそのまま渡してよい",
+                  "feedback": "分類器にも見逃しがあり、人のレビューの代わりにはなりません。外部の文章をそのまま流し込まないのが、公式の対策です。"
+                },
+                {
+                  "id": "d",
+                  "md": "書いた人のアカウントが本物なら、本文の内容も信頼してよい",
+                  "feedback": "アカウントが本物でも、本文に何が書かれているかは別の問題です。外部の人が自由に書ける文章は、信頼できない内容として扱います。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "Issue の本文は外部の文章なので、プロンプトインジェクションの入り口になります。そのまま流し込まず、隔離した環境で、できる操作を絞って動かします。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e2",
+              "kind": "single",
+              "prompt": "確認なしで長い作業を任せたいので、`bypassPermissions` モードを使いたいと考えています。公式の勧めに合う使い方はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "自分のリポジトリなら、ふだんのパソコンで使う",
+                  "feedback": "自分のリポジトリでも、読み込んだ外部の文章に指示が紛れることがあります。このモードには、プロンプトインジェクションへの守りがありません。"
+                },
+                {
+                  "id": "b",
+                  "md": "ネットにつながらないコンテナや VM の中で使う"
+                },
+                {
+                  "id": "c",
+                  "md": "サンドボックスをオンにして、ふだんのパソコンで使う",
+                  "feedback": "サンドボックスが守るのはシェルコマンドだけで、ファイル操作ツールやフックは外で動きます。Claude Code 全体をコンテナや VM に入れます。"
+                },
+                {
+                  "id": "d",
+                  "md": "sudo で起動し、強い権限でまとめて動かす",
+                  "feedback": "Claude Code は、root や sudo での bypassPermissions を拒否します。権限を強めるほど、間違いの影響も大きくなります。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "公式ドキュメントは、bypassPermissions を隔離環境だけで使うよう求めています。たとえば、ネットにつながらないコンテナや VM です。プロンプトインジェクションや意図しない操作への守りがないためです。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e3",
+              "kind": "single",
+              "prompt": "ユーザー設定 `~/.claude/settings.json` の `deny` に `Read(/secrets/**)` と書きました。読めなくなるのはどこでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "いま開いているプロジェクトの `secrets/` の中",
+                  "feedback": "先頭が `/` 1つのパスは、ルールを書いた設定の場所が起点です。ユーザー設定では `~/.claude` から数えます。"
+                },
+                {
+                  "id": "b",
+                  "md": "ファイルシステムの根にある `/secrets/` の中",
+                  "feedback": "根からの絶対パスは、`//secrets/**` のように `/` を2つ書きます。1つだけだと、設定の場所が起点になります。"
+                },
+                {
+                  "id": "c",
+                  "md": "`~/.claude/secrets/` の中"
+                },
+                {
+                  "id": "d",
+                  "md": "どのフォルダーにある `secrets/` の中も",
+                  "feedback": "先頭の `/` で起点が決まるので、どこでも一致するわけではありません。プロジェクトの中を守るなら、プロジェクトの設定に `Read(./secrets/**)` と書きます。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "`/` 1つで始まるパスは、ルールを書いた設定の場所が起点です。ユーザー設定なら `~/.claude/secrets/` を指します。プロジェクトの `secrets/` は、プロジェクトの設定に `Read(./secrets/**)` と書いて守ります。",
+              "objectiveId": "o2",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e4",
+              "kind": "single",
+              "prompt": "拒否ルールに `Read(./.env)` を書きました。それでも、Claude が作った Python スクリプトが `.env` を開いて値を表示しました。正しい説明はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "書き方が違い、`Read(.env)` と書けばスクリプトも止まった",
+                  "feedback": "書き方を変えても、スクリプトが自分で開くファイルには拒否ルールは効きません。届かない経路は、サンドボックスで OS から止めます。"
+                },
+                {
+                  "id": "b",
+                  "md": "auto モードでは、拒否ルールが無視される",
+                  "feedback": "拒否ルールは、どの権限モードでも効きます。効かなかったのは、スクリプトという別の経路だったからです。"
+                },
+                {
+                  "id": "c",
+                  "md": "拒否ルールは Read ツールだけを止め、`cat` にも効かない",
+                  "feedback": "拒否ルールは、`cat` や `head` のように Claude Code が見分けられるコマンドにも効きます。効かないのは、自分でファイルを開くスクリプトなどです。"
+                },
+                {
+                  "id": "d",
+                  "md": "拒否ルールはスクリプトが開くファイルに効かず、サンドボックスが要る"
+                }
+              ],
+              "answer": [
+                "d"
+              ],
+              "explanation": "拒否ルールは、Claude のファイル操作ツールと `cat` などのコマンドに効きます。スクリプトが自分で開くファイルには効かないため、OS のレベルで止めるにはサンドボックスを有効にします。",
+              "objectiveId": "o2",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e5",
+              "kind": "single",
+              "prompt": "Max プランの鈴木さんは、毎晩 `claude -p` のスクリプトを動かしています。対話では API キーを承認していないのに、Console から API の請求が届きました。最も考えられる原因はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`-p` で動かすと、いつも API の料金になる",
+                  "feedback": "`-p` でも、サブスクリプションのログインで動かせます。API の料金になったのは、環境に API キーがあったからです。"
+                },
+                {
+                  "id": "b",
+                  "md": "`/usage` に出ていた金額が、そのまま請求された",
+                  "feedback": "`/usage` の金額は手元の見積もりで、請求書ではありません。Console からの請求は、API キーで使った分です。"
+                },
+                {
+                  "id": "c",
+                  "md": "環境の `ANTHROPIC_API_KEY` が、`-p` で承認なしに使われた"
+                },
+                {
+                  "id": "d",
+                  "md": "Claude Code の利用分が、Max の月額とは別に上乗せされた",
+                  "feedback": "Claude Code は有料プランに含まれています。Console からの請求は、API キーで使った分です。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "`-p` では、`ANTHROPIC_API_KEY` があると承認なしでそのキーが使われます。`/status` で認証を確かめ、不要なキーは `unset ANTHROPIC_API_KEY` で外します。シェルの設定ファイルからも消します。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e6",
+              "kind": "single",
+              "prompt": "1日じゅう同じセッションで、関係のない作業を次々に頼んでいます。使用量の減りが早い原因に合った対策はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "履歴を残すため、`/compact` を数分おきに実行する",
+                  "feedback": "`/compact` は、それ自体が大きな要求です。関係のない作業に移るなら、費用のかからない `/clear` を使います。"
+                },
+                {
+                  "id": "b",
+                  "md": "作業の切れ目で `/clear` し、単純な作業は effort を下げる"
+                },
+                {
+                  "id": "c",
+                  "md": "今日の作業内容を、CLAUDE.md にすべて書き足しておく",
+                  "feedback": "CLAUDE.md はセッションの始めに読み込まれるので、長いほど使用量が増えます。200行以内に保ち、専門の手順はスキルに移します。"
+                },
+                {
+                  "id": "d",
+                  "md": "モデルを Opus に、effort を max に固定しておく",
+                  "feedback": "性能の高いモデルや大きな effort は、使う量を増やします。ふだんは Sonnet、難しい推論だけ Opus が公式の目安です。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "長いセッションでは、毎回それまでの履歴全体を送り直すので使用量が増えます。関係のない作業の間は `/clear` で空にし、単純な作業は effort を下げます。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "外部の文章は指示になりうる。承認前に読み、知らないリポジトリと強い権限は隔離する。",
+            "秘密情報は `Read(./.env)` のような拒否ルールで守る。",
+            "`/usage` は見積もり。想定外の請求は `/status` で認証を確かめる。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "第11回では、自分のリポジトリでこの点検を行います。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-injection",
+              "front": "プロンプトインジェクションとは？",
+              "back": "外部の文章に紛れた指示で、頼んでいない操作をさせる攻撃。"
+            },
+            {
+              "id": "card-untrusted-repo",
+              "front": "知らないリポジトリを試すときの公式の勧めは？",
+              "back": "VM かクラウドセッションの中で開く。"
+            },
+            {
+              "id": "card-sandbox",
+              "front": "サンドボックスが守る範囲は？",
+              "back": "シェルコマンドとその子プロセスだけ。ファイル操作ツール・フック・MCP サーバーは外。"
+            },
+            {
+              "id": "card-deny",
+              "front": "`.env` と `secrets/` を読ませない拒否ルールは？",
+              "back": "`deny` に `Read(./.env)` と `Read(./secrets/**)` を書く。"
+            },
+            {
+              "id": "card-usage",
+              "front": "`/usage` の金額は請求額？",
+              "back": "いいえ。定価から手元で計算した見積もり。"
+            },
+            {
+              "id": "card-api-key",
+              "front": "プランなのに API の請求が届いたら？",
+              "back": "`ANTHROPIC_API_KEY` を疑い、`/status` で認証を確かめる。"
+            },
+            {
+              "id": "card-clear",
+              "front": "`/clear` と `/compact`、費用がかからないのは？",
+              "back": "`/clear`。`/compact` はそれ自体が大きな要求。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分のプロジェクトで、拒否ルールで守るべきファイルの見つけ方は？",
+            "サンドボックスと VM は、どう使い分ければいい？",
+            "`/usage` の表示を、例を使って読み方を教えて"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "プロンプトインジェクション",
+      "md": "外部の文章に指示を紛れ込ませ、頼んでいない操作をさせる攻撃。"
+    },
+    {
+      "term": "仮想マシン",
+      "md": "パソコンの中に作る、別のコンピューター。VM とも呼ぶ。元の環境から切り離して使える。",
+      "aliases": [
+        "VM"
+      ]
+    },
+    {
+      "term": "ワークスペースの信頼",
+      "md": "初めて開くフォルダーでの確認。承認までは、そのプロジェクトの許可ルールが効かない。拒否と確認のルールは、承認の前から効く。"
+    },
+    {
+      "term": "サンドボックス",
+      "md": "シェルコマンドが触れるファイルとネットワークを、OS で制限するしくみ。既定はオフ。`/sandbox` でオンにする。"
+    },
+    {
+      "term": "クラウドセッション",
+      "md": "Anthropic が管理する、隔離された VM で動く Claude Code のセッション。"
+    },
+    {
+      "term": "拒否ルール",
+      "md": "権限ルールのうち、ツールの使い方を止めるもの（deny）。どの権限モードでも効く。"
+    },
+    {
+      "term": "利用上限",
+      "md": "Pro・Max で使える量の上限。5時間のセッション上限と週の上限があり、Claude のチャットと共有する。"
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-security",
+      "title": "Security",
+      "url": "https://code.claude.com/docs/en/security",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permissions",
+      "title": "Configure permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permission-modes",
+      "title": "Choose a permission mode",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-sandboxing",
+      "title": "Configure the sandboxed Bash tool",
+      "url": "https://code.claude.com/docs/en/sandboxing",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-sandbox-environments",
+      "title": "Choose a sandbox environment",
+      "url": "https://code.claude.com/docs/en/sandbox-environments",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-settings-reference",
+      "title": "Settings reference",
+      "url": "https://code.claude.com/docs/en/settings-reference",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-data-usage",
+      "title": "Data usage",
+      "url": "https://code.claude.com/docs/en/data-usage",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-costs",
+      "title": "Manage costs effectively",
+      "url": "https://code.claude.com/docs/en/costs",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-commands",
+      "title": "Commands",
+      "url": "https://code.claude.com/docs/en/commands",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-authentication",
+      "title": "Authentication",
+      "url": "https://code.claude.com/docs/en/authentication",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "auto-mode-eng",
+      "title": "How we built Claude Code auto mode: a safer way to skip permissions",
+      "url": "https://www.anthropic.com/engineering/claude-code-auto-mode",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-pro-max-help",
+      "title": "Use Claude Code with your Pro or Max plan",
+      "url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+      "publisher": "Anthropic (Claude Help Center)",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "pricing",
+      "title": "Claude pricing",
+      "url": "https://claude.com/pricing",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}
