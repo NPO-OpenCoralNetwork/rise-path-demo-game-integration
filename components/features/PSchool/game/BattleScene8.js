@@ -19,8 +19,12 @@ export class BattleScene8 extends BattleScene {
   }
 
   create() {
+    // 盾は戦いごとに元に戻す（もう一度戦う・再入場でも同じインスタンスが使われるので、前の戦いで壊した盾を引き継がない）
+    this.shieldActive = true;
+    this.shieldHP = this.shieldMaxHP;
+
     super.create();
-    
+
     // ステージ8の設定
     this.setupStageCommon({
       backgroundColor: 0x4a3728, // ゴブリン要塞の茶色
