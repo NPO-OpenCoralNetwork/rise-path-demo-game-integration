@@ -353,46 +353,6 @@ export const getLifeJournalAnalysis = async (
   return parseResponse<LifeJournalAnalysisResult>(res, '/life-journal/analysis');
 };
 
-export interface LifeJournalWeeklySummary extends LifeJournalAnalysisSummary {
-  record_rate_pct: number;
-  total_days: number;
-}
-
-export interface LifeJournalWeeklyAdviceResult {
-  ok: boolean;
-  from: string;
-  to: string;
-  timezone?: string;
-  summary: LifeJournalWeeklySummary;
-  advice: LifeJournalAdvice[];
-  patterns?: LifeJournalPattern[];
-  metrics?: LifeJournalAnalysisMetrics;
-  insufficient_data?: boolean;
-  days_logged?: number;
-  data_quality?: LifeJournalAnalysisResult['data_quality'];
-}
-
-export const getLifeJournalAdvice = async (
-  from: string,
-  to: string,
-  timezone = resolveClientTimezone(),
-): Promise<LifeJournalWeeklyAdviceResult> => {
-  assertRangeSpan(from, to);
-
-  if (shouldUseDemo()) {
-    const range = await getLifeJournalRange(from, to, timezone);
-    const { buildWeeklyAdviceFromDays } = await import('../tools/core/lifeJournalWeekly.js');
-    return buildWeeklyAdviceFromDays(range.days, { from, to, timezone }) as LifeJournalWeeklyAdviceResult;
-  }
-
-  const qs = new URLSearchParams({ timezone });
-  const res = await apiFetch(`/life-journal/advice?${qs.toString()}`, {
-    method: 'POST',
-    body: JSON.stringify({ from, to }),
-  });
-  return parseResponse<LifeJournalWeeklyAdviceResult>(res, '/life-journal/advice');
-};
-
 export const clearLifeJournalDemoStore = () => {
   localStorage.removeItem(STORAGE_KEY);
 };

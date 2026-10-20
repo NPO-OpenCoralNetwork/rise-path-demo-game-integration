@@ -222,7 +222,7 @@ It also builds the production bundle (`npm run build:prod`) with dummy values in
 ├── public/              # Static assets
 ├── server/              # Node.js Express Backend
 │   ├── graph/           # LangGraph Multi-Agent Workflows
-│   ├── geminiBackendService.js # AI Generation Logic
+│   ├── geminiBackendService.js # Gemini image generation (/api/v2/image)
 │   ├── ragService.js    # RAG Ingestion & Retrieval
 │   └── jobWorker.js     # Async Job Queue Worker
 ├── scripts/             # Utility scripts (Seeding, Migrations)

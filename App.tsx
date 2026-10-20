@@ -4,7 +4,6 @@ import { ViewState, GeneratedCourse, Course } from './types';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { fetchGeneratedCourseById, saveGeneratedCourse } from './services/curriculumApi';
 import { VIEW_PATHS } from './navigation/viewPaths';
 import { features } from './config/features';
 
@@ -92,55 +91,10 @@ import {
   AidjCurriculumView,
 } from './components/routes/lazyRoutes';
 
-import { User, Settings, Bell, Shield } from 'lucide-react';
-
 /** sessionStorage key for the page to open after sign-in. */
 const RETURN_TO_KEY = 'rp:returnTo';
 /** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
 const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
-
-// Profile Placeholder (kept for reference or usage)
-const ProfilePlaceholder: React.FC = () => (
-  <div className="p-8 max-w-2xl mx-auto">
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="h-32 bg-indigo-600"></div>
-      <div className="px-8 pb-8">
-        <div className="relative -top-12 mb-[-12px] flex justify-between items-end">
-          <div className="w-24 h-24 bg-white rounded-full p-1 shadow-md">
-            <div className="w-full h-full bg-slate-200 rounded-full overflow-hidden">
-              <img src="https://picsum.photos/200" alt="Avatar" className="w-full h-full object-cover" />
-            </div>
-          </div>
-          <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800">Edit Profile</button>
-        </div>
-
-        <h1 className="text-2xl font-bold text-slate-900 mt-4">Alex Johnson</h1>
-        <p className="text-slate-500">Passionate Learner • Level 12</p>
-
-        <div className="mt-8 space-y-2">
-          <div className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600"><Settings size={20} /></div>
-              <span className="font-medium text-slate-700">Account Settings</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Bell size={20} /></div>
-              <span className="font-medium text-slate-700">Notifications</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-50 p-2 rounded-lg text-green-600"><Shield size={20} /></div>
-              <span className="font-medium text-slate-700">Privacy & Security</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
@@ -198,19 +152,6 @@ const AppContent: React.FC = () => {
   };
 
   const handleNavigate = (view: ViewState) => {
-    if (view === ViewState.LESSON) {
-      const currentCourseId = sessionStorage.getItem('current_course_id');
-      // Simple heuristic: Generated IDs are usually UUIDs (>30 chars), static IDs are shorter
-      if (currentCourseId && currentCourseId.length > 30) {
-        navigate(`/generated-lesson/${currentCourseId}`);
-        return;
-      }
-      if (currentCourseId) {
-        navigate(`/lesson/${currentCourseId}`);
-        return;
-      }
-    }
-
     const path = VIEW_PATHS[view];
     if (path) {
       navigate(path);
@@ -407,10 +348,14 @@ const AppContent: React.FC = () => {
               {/* P-School */}
               <Route path="/p-school" element={<PSchoolView />} />
 
-              {/* Demos */}
-              <Route path="/demo/multi" element={<MultiFormatLessonView onBack={() => navigate('/')} />} />
-              <Route path="/demo/checklist-gen" element={<BlenderChecklistGeneratorView onBack={() => navigate('/')} />} />
-              <Route path="/demo/:kind" element={<DemoBlockViewWrapper />} />
+              {/* Design-sample demos. Dev builds only, like their nav group; production sends /demo/* to "/". */}
+              {import.meta.env.DEV && (
+                <>
+                  <Route path="/demo/multi" element={<MultiFormatLessonView onBack={() => navigate('/')} />} />
+                  <Route path="/demo/checklist-gen" element={<BlenderChecklistGeneratorView onBack={() => navigate('/')} />} />
+                  <Route path="/demo/:kind" element={<DemoBlockViewWrapper />} />
+                </>
+              )}
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
