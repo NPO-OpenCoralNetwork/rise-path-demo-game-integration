@@ -11,7 +11,7 @@ export class BattleScene7 extends BattleScene {
       stageNumber: 7
     };
     
-    // メタルスライムの装甲状態管理
+    // アーマードキメラの装甲状態管理
     this.armorMode = true; // 装甲が有効か
     this.armorHealth = 1; // 装甲HP（ライデン1回で破壊）
   }
@@ -22,9 +22,9 @@ export class BattleScene7 extends BattleScene {
     // ステージ7の設定
     this.setupStageCommon({
       backgroundColor: 0x404040, // 金属洞窟の灰色
-      enemyTint: 0xc0c0c0, // メタルスライムの銀色
+      enemyTint: 0xc0c0c0, // 旧画像（ドット絵）用の銀色。新しい画像のステージでは塗らない
       enemyHp: 40,
-      startMessage: `ステージ7「雷の力」が始まりました！\n⚡ メタルスライムの装甲を破壊せよ！`,
+      startMessage: `ステージ7「雷の力」が始まりました！\n⚡ ${this.settings.enemy}の装甲を破壊せよ！`,
       availableBlocks: ['attack_basic', 'heal_magic', 'wave_left_hand', 'wave_right_hand', 'cast_magic', 'wait']
     });
     
@@ -88,7 +88,7 @@ export class BattleScene7 extends BattleScene {
       if (this.armorHealth <= 0) {
         this.armorMode = false;
         this.addLog('⚡💥 ライデンが装甲を破壊した！');
-        this.addLog('✅ メタルスライムに通常ダメージが通るようになった！');
+        this.addLog(`✅ ${this.settings.enemy}に通常ダメージが通るようになった！`);
         // this.updateArmorDisplay();
         
         // 装甲破壊エフェクト
