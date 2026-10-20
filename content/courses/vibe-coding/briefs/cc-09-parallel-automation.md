@@ -28,7 +28,7 @@ the course it is published in is the owner's decision.
   - 非対話的実行：`claude -p`、終了コード、`--bare`（推奨、API キーが必要、プロジェクトのフックと `.mcp.json` を読まない）、
     `--allowedTools`（`Bash(npm test *)` のように絞る）、`--permission-mode dontAsk`、`--output-format json`、
     `--max-budget-usd`。v2.1.302 からモード指定なしの `-p` は Manual で始まり、承認が必要な呼び出しは拒否される。
-  - 無人実行の置き場所：GitHub Actions（`anthropics/claude-code-action@v1`）、
+  - 無人実行の置き場所：GitHub Actions、
     クラウドの定期タスク（`/schedule`、旧称 routines）、デスクトップの定期タスク、`/loop`。
   - 公式の4点：成功の条件、読むだけなら読み取りだけ、1回の費用の上限、読み込みの失敗を「何もない」にしない。
     権限と費用は依頼文ではなく設定で決める。
@@ -44,8 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1521 (budget 1,200–2,400) · read 2643 · practice reading 1247 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
-  est = (2,643 + 1,247) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.98 → 20。
+- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1521 (budget 1,200–2,400) · read 2645 · practice reading 1247 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
+  est = (2,645 + 1,247) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.98 → 20。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
 - 演習の題材 / practice task idea: 練習用リポジトリ `cc-practice-09` に、1件だけわざと失敗するテストのある小さなプロジェクトを作り、
@@ -86,10 +86,10 @@ on 2026-10-20 for the exact wording used below.
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：機能の途中で、急ぎのバグ修正が来た | 同じフォルダーの2つのセッションは変更がぶつかる。夜間の報告も頼まれている | markdown (3 sentences), quiz predict | `q0` → o1 (ungraded) |
-| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), table (3 methods × who coordinates / fits / caution), markdown (sessions and subagents multiply tokens), quiz inline | `q1` → o1 (evaluate: feature A + bugfix B) |
+| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), table (3 methods, 2 columns: method + who coordinates / fits + caution), markdown (sessions and subagents multiply tokens), quiz inline | `q1` → o1 (evaluate: feature A + bugfix B) |
 | `worktree-example` | example | 2. 例題：ワークツリーで2つの作業を並べる | 準備（コミットと信頼）→ 2つのセッション → 環境 → 差分の説明 → 取り込み | markdown lead, code (terminal), steps (5, subgoal + why + expect), callout info (map, names only: agent view = 試験公開中, agent teams = experimental), quiz inline | `q2` → o1 (analyze: missing deps in a worktree) |
-| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry), markdown (v2.1.302 + recall 第2回 + docs link), code (lint example), table (5 flags × role / without it), callout pitfall (`"Bash"` too broad), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
-| `unattended-where` | concept | 4. 無人実行の置き場所を選ぶ | 動かす場所と頻度で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), table (4 places) | — (no quiz; the neighbouring sections have one) |
+| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry), markdown (v2.1.302 + recall 第2回 + docs link), code (lint example), table (5 flags, 2 columns: flag / role + without it), callout pitfall (`"Bash"` too broad), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
+| `unattended-where` | concept | 4. 無人実行の置き場所を選ぶ | 動かす場所と頻度で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), table (4 places, 2 columns: method / where it runs + fits) | — (no quiz; the neighbouring sections have one) |
 | `unattended` | concept | 5. 依頼文の4点で点検する | 依頼文は成功の条件と失敗の報告、権限と費用の上限はフラグや設定で | markdown + list (the 4 points), markdown (enforcement, recall CLAUDE.md), prompt (weekly TODO example, expect maps it to the 4 points), quiz inline | `q4` → o3 (analyze: failed read reported as quiet day) |
 | `practice-command` | practice | 演習1：夜間チェックのコマンドを書く | 失敗したテストを JSON にまとめる `claude -p` を書き、予想してから実行 | markdown task, steps (p-project), prompt (setup), steps (p-command, p-run; hint → troubleshoot; p-run spells out API and says to drop `--bare` without an API key), checklist (7, incl. `--bare`), code model answer (labelled by a comment) | — |
 | `practice-audit` | practice | 演習2：無人実行の依頼文を点検する | 弱い依頼文を4点で点検して直し、Claude に見落としを聞く | markdown task, markdown quote (weak prompt), steps (p-audit with hint → troubleshoot, p-rewrite with hint), prompt (audit; model answer in expect), checklist (4) | — |
@@ -125,3 +125,6 @@ predict before running (p-run).
   `dontAsk` is described as denying what would otherwise prompt; reads in the working folders still run (s3-table,
   e3, pc-mode, p2 expect). The summary point keeps the condition 「モードを指定しない」. `/install-github-app` was
   dropped from s4-table to stay within est ≤ 20.
+- Mobile fit (390 px): s1-table, s3-table and s4-table have 2 columns (merged cells); long flags in s3-table are split
+  into two code spans so the cell can wrap; `anthropics/claude-code-action@v1` was dropped from s4-table (table code
+  does not wrap). s2-code runs one command per line (no `&&`), and long lines in s3-code and p1-model were shortened.

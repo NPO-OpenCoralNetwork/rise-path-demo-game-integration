@@ -4,71 +4,65 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:49fdb7d006e71baa",
+  "lessonHash": "sha256:41f1a70fd4ffba29",
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The lesson is now in です・ます throughout, including the steps expects (s2-steps「フォルダができます。」, pr-steps「報告が届きます。」) and the flashcard backs (summary-cards「返すからです。」). The tone is warm, the sentences are short and there are no pressure phrases. What is left is small wording polish: q1 option d, the redundant last sentence of e5, and 「今まで通り」.",
+      "evidence": "Every learner-facing string is in です・ます, including the steps expects (s2-steps「フォルダができます。」), the flashcard backs (summary-cards「返すからです。」) and the feedback. The tone is warm and the sentences are short, with no pressure phrases. The rewritten feedback reads naturally: q5 option d「スキルはふだん今の会話の中で動くため、脇では進みません。」 and q2 option d「フロントマターなどの設定で決めます。」. What is left is small polish: 残 is repeated in the e3 and e5 explanations, and the first sentence of the e6 option c feedback is a little stiff.",
       "blockIds": [
         "s2-steps",
-        "pr-steps",
         "summary-cards",
-        "hook-b1"
+        "s3-check",
+        "s2-check",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lint --strict finds nothing. Each segment has a diagram, table or code plus a check, and no segment adds more than 3 new terms (skill-basics: スキル, フロントマター, 段階的な読み込み; subagents: サブエージェント, フォーク). One troubleshoot text (s2-steps ex-folder) has 4 sentences, one over the §1 limit. It is listed in mustFix.",
+      "evidence": "lint --strict is clean (0 errors, 0 warnings). measure.mjs reports prose 1913 (budget 1,200–2,400) and est 17.7 min (≤ 20), which matches estMinutes 18. No paragraph has more than 3 sentences: the ex-folder troubleshoot is now 3 sentences. Each segment adds no more than 3 new terms (skill-basics: スキル, フロントマター, 段階的な読み込み; subagents: サブエージェント, フォーク).",
       "blockIds": [
+        "s2-steps",
         "s1-defs",
-        "s3-defs",
-        "s4-table",
-        "s2-steps"
+        "s3-defs"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Every round-1 term problem is fixed. 拡張機能 is defined in s4-lead, YAML is explained in s1-defs, s3-bg now reads「バックグラウンド（background）」, and トークン was removed from e5. Terms from earlier lessons point back to them (第5回, 第6回); フック（hook） and デプロイ（deploy） were introduced in cc-06 and cc-02.",
+      "evidence": "Terms are defined before they are used, and the text, glossary, diagrams and options use the same names. 拡張機能 is defined in s4-lead and now has a glossary entry. 説明文（description）, YAML, API（Application Programming Interface）, MCP（Model Context Protocol） and バックグラウンド（background） are explained on first use. Terms from earlier lessons point back to them (第5回, 第6回).",
       "blockIds": [
-        "s4-lead",
         "s1-defs",
+        "s4-lead",
         "s3-bg",
         "check-quiz",
-        "hook-predict"
+        "summary-next"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "jp is the only declared locale and nothing is missing. Both diagrams have a caption and a concrete alt (s1-diagram, s3-diagram). The link text「公式ドキュメント（日本語版）」 names where it goes (s2-legacy).",
+      "evidence": "jp is the only declared locale and nothing is missing. Both diagrams have a caption and a concrete alt (s1-diagram, s3-diagram). The link text「公式ドキュメント（日本語版）」 names where it goes (s2-legacy). The plain-text fields (checklist labels, step titles) contain no markdown.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
-        "s2-legacy"
+        "s2-legacy",
+        "pr-checklist"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "load",
-      "blockId": "s2-steps",
-      "issue": "(d) at most 3 sentences per paragraph (§1): the troubleshoot of ex-folder has 4 sentences (「先に作ります。」「git init` を実行します。」「最初のコミットをします。」「を実行します。」). lint does not count sentences, but this breaks the explicit rule in §1.",
-      "fix": "ex-folder troubleshoot「`cc-practice` がないときは、先に作ります。`mkdir cc-practice && cd cc-practice && git init` を実行します。READMEなどのファイルを1つ作り、最初のコミットをします。そのあと、`mkdir -p .claude/skills/commit-message` を実行します。」→「`cc-practice` がないときは、`mkdir cc-practice && cd cc-practice && git init` で先に作ります。READMEなどのファイルを1つ作り、最初のコミットをします。そのあと、`mkdir -p .claude/skills/commit-message` を実行します。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s1-check: in q1 option d,「前回」 and 「いちばん最近」 say the same thing twice — 「前回いちばん最近使った1個の本文」→「前のセッションで最後に使った1個の本文」",
-    "s3-check: q4 option c is still the only option that ends in a verb; the others are noun phrases (carried over from round 1) — 「何も増えない」→「ゼロ（何も増えない）」",
-    "check-quiz: the last sentence of the e5 explanation repeats the sentence before it (「全体で読む量が同じでも」) — 「なお、サブエージェントが読むぶんの処理は、全体としては減りません。」→ delete this sentence, or replace it with「ただし、サブエージェントが読む作業そのものは減りません。」",
-    "s2-legacy: write 「どおり」 in kana to match 「手順どおり」 elsewhere in the lesson — 「今まで通り動きます」→「今までどおり動きます」",
-    "s4-check: q6 option d feedback says 「拡張」 but s4-lead defines 「拡張機能」; use the same name — 「きっかけのない拡張は」→「きっかけのない拡張機能は」",
-    "lesson: 拡張機能 is defined in s4-lead and used in the summary and card-trigger, but it is not in glossary; adding it would let learners look it up — add a glossary entry: term「拡張機能」, md「スキルやサブエージェント、フックのように、Claude Codeに機能を足すしくみ。」",
-    "s3-check: the q5 option a feedback is missing, as it should be for the correct answer; the hint in q4 is also missing. Adding a hint to q4 would make it gentler — add hint「ファイルを読んだのは、どちらのコンテキストだったかを考えましょう。」"
+    "check-quiz: the e5 explanation uses 残 twice in one sentence — 「メインには途中の中身が残らないので、あとの作業に使える余裕が残ります。」→「メインには途中の中身が残らないので、あとの作業に使える余裕ができます。」",
+    "check-quiz: the e3 explanation also repeats 残る — 「メインの会話には一覧（要約）だけが残り、計画に使える余裕が残ります。」→「メインの会話には一覧（要約）だけが残り、計画に使える余裕ができます。」",
+    "check-quiz: the first sentence of the e6 option c feedback is a little hard to parse (「バックグラウンドで変わるのは」) — 「バックグラウンドで変わるのは、主に待つあいだに会話を続けられるかです。」→「バックグラウンドで動かして変わるのは、主に待つあいだに会話を続けられる点です。」",
+    "s2-legacy: the sentence reads more clearly if it says that the old folder still works as before — 「`.claude/commands/` も動きます。」→「`.claude/commands/` も今までどおり動きます。」",
+    "s4-check: q6 option d is the only option that states a wish (「〜しておきたい」); the others describe a situation. Make it describe a situation too — 「便利そうなので、思いつく手順を最初に全部登録しておきたい」→「便利そうなので、思いつく手順を最初に全部登録しようとしている」",
+    "s3-lead: the subject of 「埋まる」 is left out, so a learner may not see that it is the context that fills up — 「その中身はコンテキストに残り、埋まるほど作業の質が落ちます（第5回）。」→「その中身はコンテキストに残ります。コンテキストが埋まるほど、作業の質が落ちます（第5回）。」",
+    "pr-steps: グリッド is a katakana term with no English; add it once — 「色分けされたグリッドで、使用量が表示されます。」→「色分けされたグリッド（grid）で、使用量が表示されます。」"
   ],
   "average": 4,
-  "verdict": "revise",
-  "summary": "This is a full review (round 2). review-scope.mjs --since sha256:ac1d14f8dc7c957a exited 1 (41% changed), so a verification round was not possible and I reviewed the whole lesson again. All 7 round-1 must-fix items are gone. The steps expects and flashcards are now です・ます, 拡張機能 is defined, YAML is explained, バックグラウンド has its English, and トークン was removed. The Japanese is warm, short and consistent: the text, glossary, diagrams and options use the same names. One must-fix is left: the troubleshoot in ex-folder has 4 sentences, one over the §1 limit. The rest is minor polish."
+  "verdict": "pass",
+  "summary": "This is a full review (round 3). The scope check required it: review-scope.mjs --since sha256:49fdb7d006e71baa exited 1 because 19 of 40 blocks changed (48%, over 30%), so a verification round was not possible. The one round-2 must-fix is gone: the ex-folder troubleshoot in s2-steps now has 3 sentences (「…`mkdir cc-practice && cd cc-practice` で作ります。`git init` を実行し、…最初のコミットをします。そのあと、…を実行します。」). The 4 fixes from the facts audit are applied word for word (q5 option d, q2 option d, e6 option c, s4-table caption). Most of the round-2 suggestions were also applied: q1 option d, q4 option c, the q4 hint, 拡張機能 in q6 option d, and a glossary entry for 拡張機能. lint --strict is clean, and measure.mjs gives prose 1913 and est 17.7 min (estMinutes 18). The Japanese is です・ます, warm and consistent, with no must-fix left. Only minor polish remains in niceToHave."
 }

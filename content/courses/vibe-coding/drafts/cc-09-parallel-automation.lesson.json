@@ -130,29 +130,21 @@
           ],
           "caption": "誰がまとめるか・どんな作業に向くかで選ぶ",
           "columns": [
-            "方法",
-            "まとめる人",
-            "向いている作業",
-            "気をつけること"
+            "方法（まとめる人）",
+            "向いている作業と、気をつけること"
           ],
           "rows": [
             [
-              "[[サブエージェント]]",
-              "Claude（セッション内）",
-              "調べもの・レビュー",
-              "設定しなければ、同じフォルダーを編集する"
+              "[[サブエージェント]]（Claude）",
+              "調べもの・レビュー。設定しなければ、同じフォルダーを編集する"
             ],
             [
-              "[[ワークツリー]]",
-              "自分（ターミナルごと）",
-              "別々の変更を同時に進める",
-              "依存パッケージを入れ直す"
+              "[[ワークツリー]]（自分）",
+              "別々の変更を同時に進める。依存パッケージを入れ直す"
             ],
             [
-              "[[バックグラウンド実行]]",
-              "自分（あとで見る）",
-              "テスト・開発サーバー",
-              "様子は `/tasks` で見る"
+              "[[バックグラウンド実行]]（自分）",
+              "テスト・開発サーバー。様子は `/tasks` で見る"
             ]
           ]
         },
@@ -229,10 +221,10 @@
             "cc-worktrees",
             "cc-common-workflows"
           ],
-          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09 && cd cc-practice-09 && git init\necho \".claude/worktrees/\" > .gitignore  # 本体で未追跡と表示させない\ngit add .gitignore && git commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼の確認に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正Bのセッション（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
+          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09\ncd cc-practice-09\ngit init\necho \".claude/worktrees/\" > .gitignore  # 本体で未追跡と表示させない\ngit add .gitignore\ngit commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼の確認に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正Bのセッション（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
           "highlight": [
-            8,
-            11
+            11,
+            14
           ]
         },
         {
@@ -364,7 +356,7 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "claude --bare -p \"npm run lint を実行し、警告の数をファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
+          "code": "claude --bare -p \"npm run lint の警告を、ファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
         },
         {
           "id": "s3-table",
@@ -377,34 +369,28 @@
           "caption": "安全な claude -p を作る5つのフラグ",
           "columns": [
             "フラグ",
-            "役割",
-            "付けないと"
+            "役割と、付けないと"
           ],
           "rows": [
             [
               "`--bare`",
-              "フックやMCP（第8回）、CLAUDE.mdなどを読まない",
-              "フォルダーのフックが確認なしで動く"
+              "フックやMCP（第8回）、CLAUDE.mdなどを読まない。付けないと、フックが確認なしで動く"
             ],
             [
               "`--allowedTools`",
-              "使うツールを絞って許可する",
-              "必要な操作まで拒否される"
+              "使うツールを絞って許可する。付けないと、必要な操作まで拒否される"
             ],
             [
-              "`--permission-mode dontAsk`",
-              "確認が要る操作を、聞かずに拒否する（読み取りは動く）",
-              "設定しだいでモードが変わる"
+              "`--permission-mode` `dontAsk`",
+              "確認が要る操作を、聞かずに拒否する（読み取りは動く）。付けないと、設定しだいでモードが変わる"
             ],
             [
-              "`--output-format json`",
-              "結果や費用をJSONで返す",
-              "スクリプトで読みにくい"
+              "`--output-format` `json`",
+              "結果や費用をJSONで返す。付けないと、スクリプトで読みにくい"
             ],
             [
               "`--max-budget-usd`",
-              "費用の見積もりが上限に届いたら止める",
-              "費用に歯止めがない"
+              "費用の見積もりが上限に届いたら止める。付けないと、費用に歯止めがない"
             ]
           ]
         },
@@ -506,29 +492,24 @@
           "caption": "動かす場所と頻度で選ぶ",
           "columns": [
             "方法",
-            "動く場所",
-            "向いている場面"
+            "動く場所と、向いている場面"
           ],
           "rows": [
             [
-              "GitHub Actions（`anthropics/claude-code-action@v1`）",
-              "CI",
-              "PR（プルリクエスト）や決まった時刻に動かす"
+              "GitHub Actions",
+              "CIで、PR（プルリクエスト）や決まった時刻に動かす"
             ],
             [
               "クラウドの[[定期タスク]]（`/schedule`、旧称routines）",
-              "クラウド",
-              "パソコンを閉じていても動く（間隔は最短1時間、試験公開中）"
+              "クラウドで、パソコンを閉じていても動く（間隔は最短1時間、試験公開中）"
             ],
             [
               "デスクトップの[[定期タスク]]",
-              "自分のパソコン",
-              "手元のファイルを使う"
+              "自分のパソコンで、手元のファイルを使って動く"
             ],
             [
               "`/loop`",
-              "開いているセッション",
-              "作業中の短い見張り（間隔は最短1分）"
+              "開いているセッションで、作業中の短い見張りに使う（間隔は最短1分）"
             ]
           ]
         }
@@ -738,12 +719,12 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p 'npm test を実行し、失敗したテストをJSONの配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく {\"status\": \"error\", \"reason\": \"<理由>\"} を返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
+          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p 'npm test を実行し、失敗したテストをJSONの配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\", \"reason\": \"<理由>\"} を返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
           "highlight": [
-            6,
             7,
             8,
-            9
+            9,
+            10
           ]
         }
       ]

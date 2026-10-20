@@ -34,13 +34,13 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
   5. 「Claude に聞けば使用量がわかる」— 測るのは `/context`。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（course-wide measure, round 2: `cc-05-context.lesson.json: prose 1942 (budget 1,200–2,400) · read 3229 · practice reading 1115 · questions 12 · practice sections 1 · est 19.7 min (must be ≤ 20; estMinutes 20)`。(3,229 + 1,115) ÷ 450 ≈ 9.65分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.65分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
+- 所要時間 / minutes: 20（course-wide measure, round 3 after the mobile-fit fixes: `cc-05-context.lesson.json: prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)`。(3,289 + 1,126) ÷ 450 ≈ 9.81分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.81分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英訳は公開先のコースが決まってから）
 - 演習の題材 / practice task idea: 前半は3つのセッション（A 何でも入り、B 同じ作業が長く続く、C 範囲のない調査）を文章で読み、`/clear`・`/compact`・サブエージェントから対処を選ぶ。後半は練習用フォルダ（`cc-context-practice`、`git init`）で CLAUDE.md に1行のルールを書いてから起動し、会話だけの指示を1つ伝えて作業 → `/context` を3回（起動直後・作業後・圧縮後）→ 予想 → 焦点付き `/compact` → 何が残ったかを確かめる。チェックリストと解答例の表つき。
 
 ## 制約 / Constraints
-- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026年10月時点）。auto モードが対話セッションの既定（v2.1.283〜）なので、演習のファイル作成は確認なしで進む場合がある。
+- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026年10月時点）。auto モードがターミナルと VS Code の対話セッションの既定（v2.1.283〜）なので、演習のファイル作成は確認なしで進む場合がある。
 - OS / environment: macOS・Linux・WSL のターミナル（bash/zsh）。Windows PowerShell はエディターで CLAUDE.md を作る（troubleshoot に記載）。
 - 使ってはいけないもの / avoid: 価格・トークン数の具体値、確かめていないコマンド出力の文言、`/compact` の内部仕様の推測。大事なリポジトリでの演習。破壊的なコマンド。
 
@@ -63,11 +63,11 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：午後になると、朝の指示が効かなくなる | 長い会話で、会話だけで伝えた指示が効かなくなる | markdown (problem, 3 sentences + 予想の促し), quiz predict | `q0` → o2 (ungraded) |
 | `5-1` | concept | 5-1. コンテキストは埋まるほど効きが落ちる | 入れ物はすぐ埋まり、埋まるほど性能が落ちる。`/context` で前後を比べて測る | markdown lead (版), definitions (セッション・コンテキストウィンドウ), markdown (制約, cite), markdown (`/context`, cite), quiz inline | `q1` → o3 (apply: ログを読ませる前後で比べる) |
-| `5-2` | concept | 5-2. 区切るか、要約するか | 関係のない次の作業なら `/clear`、同じ作業を続けるなら `/compact 焦点`。自動でも圧縮される。開き直すと同じ会話 | markdown lead, definitions (コンテキスト圧縮), table (`/clear`・`/compact`・自動), markdown (焦点の例), markdown + code (`--continue`/`--resume`), quiz inline | `q2` → o1 (apply: ログイン修正とコミットのあと → README を英語に翻訳) |
-| `5-3` | concept | 5-3. 圧縮のあとに残るもの、失われうるもの | 会話は要約、直下の CLAUDE.md など決まったファイルの指示はディスクから戻る。残したい指示はファイルへ | markdown lead, definitions (CLAUDE.md・ルール・自動メモリ), diagram (圧縮の前 → 後), table (図にない2行：`paths:` 付きルールとサブフォルダの CLAUDE.md、読んだり編集したりしたファイル), markdown (対処 + 公式ドキュメント日本語版リンク), callout pitfall (途中編集の CLAUDE.md), quiz inline | `q3` → o2 (understand: 日本語コメントの指示が圧縮後に落ちた) |
-| `5-4` | concept | 5-4. コンテキストに関わる3つの失敗パターン | 何でも入り・修正の繰り返し・終わらない探索を症状で見分け、対処を結ぶ | markdown lead, definitions (サブエージェント), table (パターン・症状・対処), markdown (要約だけ戻る), prompt (サブエージェントで調べる, note=要約を自分で確かめる) | — (quiz density: next section and practice) |
+| `5-2` | concept | 5-2. 区切るか、要約するか | 関係のない次の作業なら `/clear`、同じ作業を続けるなら `/compact 焦点`。自動でも圧縮される。開き直すと同じ会話 | markdown lead, definitions (コンテキスト圧縮), table (2 columns 「道具：起きること」「向いている場面」: `/clear`・`/compact`・自動), markdown (焦点の例), markdown + code (`--continue`/`--resume`), quiz inline | `q2` → o1 (apply: ログイン修正とコミットのあと → README を英語に翻訳) |
+| `5-3` | concept | 5-3. 圧縮のあとに残るもの、失われうるもの | 会話は要約、直下の CLAUDE.md など決まったファイルの指示はディスクから戻る。残したい指示はファイルへ | markdown lead, definitions (CLAUDE.md・ルール・自動メモリ), diagram (圧縮の前 → 後; short labels, node 「決まった／ファイルの／指示」), table (3 rows: 図の「決まったファイル」= 直下の CLAUDE.md・`paths:` のないルール・自動メモリ・プランモードの計画、`paths:` 付きルールとサブフォルダの CLAUDE.md、読んだり編集したりしたファイル), markdown (対処 + 公式ドキュメント日本語版リンク), callout pitfall (途中編集の CLAUDE.md), quiz inline | `q3` → o2 (understand: 日本語コメントの指示が圧縮後に落ちた) |
+| `5-4` | concept | 5-4. コンテキストに関わる3つの失敗パターン | 何でも入り・修正の繰り返し・終わらない探索を症状で見分け、対処を結ぶ | markdown lead, definitions (サブエージェント), table (2 columns 「パターンと症状」「対処」; English names in （）), markdown (要約だけ戻る), prompt (サブエージェントで調べる, note=要約を自分で確かめる) | — (quiz density: next section and practice) |
 | `5-5` | example | 5-5. 例題：言い直しの続く会話を立て直す | 症状 → パターン → 対処 → 学んだこと → 書き直した最初の依頼 | markdown lead, list (セッションの流れ4行), steps worked example (5 steps with subgoals and why), prompt (書き直した依頼、テスト先行と原因の説明), quiz inline | `q4` → o1 (apply: 郵便番号の関数で、`/clear` 後の最初の依頼文を4つから選ぶ) |
-| `practice` | practice | 演習：セッションを診断し、圧縮を試す | 前半：3つのセッションを診断（faded）。後半：練習用フォルダで `/context`×3 と焦点付き `/compact`、予想してから確かめる | markdown lead, quiz inline ×3 (hints), markdown (安全), code bash (`terminal`), steps (2), prompt A, steps (4, hint/troubleshoot), prompt B, checklist (6), table (解答の例：CLAUDE.md のルールと会話だけの指示の2行) | `p1` → o1 (A 何でも入り → `/clear`), `p2` → o1 (B 同じ作業 → `/compact` 焦点), `p3` → o1 (C 終わらない探索 → サブエージェント) |
+| `practice` | practice | 演習：セッションを診断し、圧縮を試す | 前半：3つのセッションを診断（faded）。後半：練習用フォルダで `/context`×3 と焦点付き `/compact`、予想してから確かめる | markdown lead, quiz inline ×3 (hints), markdown (安全), code bash (`terminal`, one command per line), steps (2), prompt A, steps (4, hint/troubleshoot), prompt B, checklist (6), table (解答の例：CLAUDE.md のルールと会話だけの指示の2行) | `p1` → o1 (A 何でも入り → `/clear`), `p2` → o1 (B 同じ作業 → `/compact` 焦点), `p3` → o1 (C 終わらない探索 → サブエージェント) |
 | `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (4) | `e1` → o1 (transfer: フォームの入力チェック、修正の繰り返し), `e3` → o2 (multi: 圧縮の直後にディスクから自動で読み直されるもの), `e4` → o2 (transfer: チームの CHANGELOG ルール), `e5` → o3 (CLAUDE.md が読まれていない？ → `/context`). (`e6` was removed in round 1: same scenario and options as `p2`; `e2` was removed in round 2 for length: same scenario and options as `p3`.) |
 | `summary` | summary | まとめ | 冒頭の場面の答え、4つの要点、振り返りと次の一歩 | markdown (冒頭の答え), summary (4), markdown (振り返り + 第6回), flashcards (8), askTutor (3) | — |
 
@@ -106,4 +106,11 @@ One diagram (state change in compaction), no images.
   haven't trusted; a new git repository root is not covered by earlier trust), so `pr-start`'s expect tells the learner to accept it.
 - Japanese and Latin letters or digits are written without a space (style guide §3); the half-width space around inline code
   is kept everywhere, and in plain-text fields (checklist, askTutor, objectives) command names such as /context keep the same
-  spacing. Prompt bodies and code are unchanged.
+  spacing. Prompt bodies follow the same rule (「index.htmlと」「CLAUDE.mdから」); `{{…}}` placeholders keep their spaces.
+- Mobile fit (390 px, round 3): every table has 2 columns (`s2-table` merges the tool and what happens, `s4-table` merges the
+  pattern, its English name and the symptom), so p1's hint now points at 「パターンと症状」. `s3-diagram` keeps 2 nodes side by side with
+  labels of at most 7 JP characters per line (natural width 344 px); the four files that are re-read from disk moved from node C into the first row of `s3-table` (the alt
+  text still lists them). `pr-code` runs mkdir, cd and git init on separate lines (pr-start says 1行ずつ), and the CLAUDE.md rule
+  line is shortened to 「- HTMLの<title>は「練習：」で始める」 to keep the line short. Checklist labels use です・ます.
+- Feedback that says a file instruction survives compaction names the project-root CLAUDE.md (q3 b, e4 b, sum-points), because
+  path-scoped rules and nested CLAUDE.md files come back only on demand (cross-lesson fact 7).

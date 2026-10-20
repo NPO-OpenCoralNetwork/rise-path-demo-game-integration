@@ -112,34 +112,28 @@
           "caption": "きっかけと、足す部品（公式ドキュメントの対応表から）",
           "columns": [
             "きっかけ（繰り返す困りごと）",
-            "足す部品",
-            "学んだ回"
+            "足す部品（学んだ回）"
           ],
           "rows": [
             [
               "規約やコマンドを2回まちがえる",
-              "CLAUDE.mdに1行足す",
-              "第6回"
+              "CLAUDE.mdに1行足す（第6回）"
             ],
             [
               "同じ依頼文や手順を何度も貼る",
-              "[[スキル]]",
-              "第7回"
+              "[[スキル]]（第7回）"
             ],
             [
               "横道の調べもので会話が埋まる",
-              "[[サブエージェント]]（subagent）",
-              "第7回"
+              "[[サブエージェント]]（subagent、第7回）"
             ],
             [
               "例外なく毎回起きてほしいことがある",
-              "[[フック]]",
-              "第8回"
+              "[[フック]]（第8回）"
             ],
             [
               "別のリポジトリでも同じ設定を使う",
-              "プラグイン",
-              "第8回"
+              "プラグイン（第8回）"
             ]
           ]
         },
@@ -227,18 +221,18 @@
               "id": "ex-claude-md",
               "title": "① CLAUDE.mdを短く書く",
               "md": "Claudeがテストのコマンドを2回まちがえたのが、きっかけです。推測できないことだけを書きます。",
-              "expect": "`/context` の「Memory files」に出ます。"
+              "expect": "起動し直すと、`/context` の「Memory files」に出ます。"
             },
             {
               "id": "ex-rules",
               "title": "② 秘密情報とpushに権限ルールを置く",
-              "md": "`.env` には秘密情報があるので、拒否ルール（deny）にします。v2.1.283以降は起動時が「autoモード」なので、`git push` は確認ルール（ask）にします。",
+              "md": "`.env` には秘密情報があるので、拒否ルール（deny）にします。v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。そのため、`git push` は確認ルール（ask）にします。",
               "expect": "`/permissions` に、ルールと設定ファイルの場所が並びます。"
             },
             {
               "id": "ex-hook",
               "title": "③ 整形をフックにする",
-              "md": "整形の忘れが続いたので、編集のたびにPrettierを走らせます（`jq` も使います）。",
+              "md": "整形の忘れが続いたので、編集のたびにPrettierを走らせます。コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。`jq` で編集したファイル名を取り出し、Prettierに渡します。",
               "expect": "編集したファイルが、毎回整形されます。"
             },
             {
@@ -278,12 +272,13 @@
             "cc-settings",
             "cc-hooks-guide"
           ],
-          "code": "{\n  \"permissions\": {\n    \"ask\": [\"Bash(git push *)\"],\n    \"deny\": [\"Read(./.env)\", \"Read(./.env.*)\"]\n  },\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Edit|Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"jq -r '.tool_input.file_path' | xargs npx prettier --write\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+          "code": "{\n  \"permissions\": {\n    \"ask\": [\"Bash(git push *)\"],\n    \"deny\": [\n      \"Read(./.env)\",\n      \"Read(./.env.*)\"\n    ]\n  },\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Edit|Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"jq -r '.tool_input.file_path' | xargs npx prettier --write\"\n          }\n        ]\n      }\n    ]\n  }\n}",
           "highlight": [
             3,
-            4,
-            9,
-            13
+            5,
+            6,
+            12,
+            16
           ]
         },
         {
@@ -448,7 +443,7 @@
           "id": "cycle-flow",
           "type": "diagram",
           "engine": "mermaid",
-          "code": "flowchart TD\n  A[\"探索して計画する<br>（プランモード）\"] --> B[\"実装して検証する<br>（テストの出力を見る）\"]\n  B --> C[\"別のコンテキストでレビューする<br>（サブエージェント）\"]\n  C -- 直す指摘がある --> B\n  C -- 直す指摘がない --> D[\"差分を説明してもらう\"]\n  D --> E[\"コミットする\"]",
+          "code": "flowchart TD\n  A[\"探索して計画する<br>（プランモード）\"] --> B[\"実装して検証する<br>（テストの出力を見る）\"]\n  B --> C[\"別のコンテキストで<br>レビューする<br>（サブエージェント）\"]\n  C -- 直す指摘がある --> B\n  C -- 直す指摘がない --> D[\"差分を説明してもらう\"]\n  D --> E[\"コミットする\"]",
           "caption": "1サイクルの流れ：レビューで直す指摘があれば、実装と検証に戻る",
           "alt": "探索して計画する、実装して検証する、別のコンテキストでレビューする、差分を説明してもらう、コミットするの5段階が上から下へ並び、レビューから実装と検証へ戻る矢印がある図"
         },
@@ -602,7 +597,7 @@
           "items": [
             {
               "id": "sc-safety",
-              "label": "安全：秘密情報は拒否ルールで守り、pushの前に確認が入ります"
+              "label": "安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました"
             },
             {
               "id": "sc-verify",
@@ -809,7 +804,7 @@
           "type": "summary",
           "points": [
             "CLAUDE.mdから始め、きっかけが来たら、合う部品を1つずつ足します。",
-            "CLAUDE.mdとスキルはお願いです。必ず守らせたいことは、権限ルールとフックに置きます。",
+            "CLAUDE.mdとスキルはお願いです。Claudeの判断に任せたくないことは、権限ルールとフックに置きます。",
             "計画からコミットまでの段階を順に通し、完了は実行結果という証拠で判断します。",
             "4つの観点で点検し、次に足すものを決めます。"
           ]

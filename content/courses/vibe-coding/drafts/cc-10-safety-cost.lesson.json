@@ -234,7 +234,7 @@
             "cc-sandbox-environments",
             "cc-permissions"
           ],
-          "md": "そのため公式は、知らないリポジトリにはVMか[[クラウドセッション]]（Anthropicが管理するVM）を勧めます。`claude -p` では、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。"
+          "md": "そのため公式は、知らないリポジトリにはVMか[[クラウドセッション]]（Anthropicが管理するVM）を勧めます。`--bare` なしの `claude -p` では、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。"
         },
         {
           "id": "s2-layers",
@@ -244,9 +244,9 @@
             "cc-sandboxing",
             "cc-sandbox-environments"
           ],
-          "code": "flowchart TD\n  A[\"外部の文章<br>README・Issue・Webページ\"]\n  subgraph VMBOX[\"VM・クラウドセッション：Claude Code全体を隔離\"]\n    B[\"Claudeが次の操作を決める\"]\n    C[\"権限ルールと承認<br>拒否・確認・分類器\"]\n    D[\"ファイル操作ツール・MCPサーバー<br>（サンドボックスの外）\"]\n    subgraph SBOX[\"サンドボックス：OSが制限\"]\n      E[\"シェルコマンドと子プロセス\"]\n    end\n  end\n  A --> B\n  B --> C\n  C --> D\n  C --> E",
-          "caption": "守りは重ねて使う。サンドボックスが囲むのはシェルコマンドだけ",
-          "alt": "外部の文章がClaudeの判断に入り、権限ルールと承認を通って、ファイル操作ツール側とシェルコマンド側に分かれる図。サンドボックスはシェルコマンドだけを囲み、VM・クラウドセッションはClaude Code全体を囲む。"
+          "code": "flowchart TD\n  A[\"外部の文章<br>README・Issue・Web\"]\n  subgraph VMBOX[\"VM・クラウドセッション\"]\n    B[\"Claudeが<br>次の操作を決める\"]\n    C[\"権限ルールと承認\"]\n    D[\"ファイル操作・MCP<br>（サンドボックス外）\"]\n    subgraph SBOX[\"サンドボックス\"]\n      E[\"シェル<br>コマンド\"]\n    end\n  end\n  A --> B\n  B --> C\n  C --> E\n  C --> D\n  E ~~~ D",
+          "caption": "守りは重ねて使います。VMやクラウドセッションはClaude Code全体を、サンドボックスはシェルコマンドだけを囲みます。",
+          "alt": "外部の文章（README・Issue・Webページ）が、Claudeの判断に入る図です。判断は権限ルールと承認（拒否・確認のルール、分類器）を通り、シェルコマンドとファイル操作に分かれます。サンドボックスはOSの機能でシェルコマンドと子プロセスだけを囲み、ファイル操作ツールとMCPサーバーはその外で動きます。VM・クラウドセッションの枠は、Claude Code全体を囲みます。"
         },
         {
           "id": "s2-table",
@@ -258,25 +258,21 @@
           ],
           "caption": "危ない場面と、合う対策",
           "columns": [
-            "場面",
-            "起きうること",
+            "場面と起きうること",
             "合う対策"
           ],
           "rows": [
             [
-              "外部の文章",
-              "紛れた指示に従う",
+              "外部の文章：紛れた指示に従う",
               "承認前に読む。そのまま流し込まない"
             ],
             [
-              "知らないリポジトリ",
-              "フックやMCPサーバーが動く",
+              "知らないリポジトリ：フックやMCPサーバーが動く",
               "VMかクラウドセッションで開く"
             ],
             [
-              "強い権限（`bypassPermissions`）",
-              "確認なしで何でも動く",
-              "ネットにつながらないコンテナやVMだけで使う"
+              "強い権限（`bypassPermissions`）：確認なしで何でも動く",
+              "オフラインのコンテナかVMだけで使う"
             ]
           ]
         },
@@ -353,7 +349,7 @@
               "id": "ex-target",
               "title": "守るものを決める",
               "md": "漏れると困る鍵のファイルを挙げます。",
-              "expect": "`config/credentials.json` と `keys/` に決まります。"
+              "expect": "`config/secret.json` と `keys/` に決まります。"
             },
             {
               "id": "ex-place",
@@ -383,7 +379,7 @@
           "cite": [
             "cc-settings-reference"
           ],
-          "code": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Read(./config/credentials.json)\",\n      \"Read(./keys/**)\"\n    ]\n  }\n}"
+          "code": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Read(./config/secret.json)\",\n      \"Read(./keys/**)\"\n    ]\n  }\n}"
         },
         {
           "id": "s3-pitfall",
@@ -486,9 +482,11 @@
           "type": "markdown",
           "cite": [
             "cc-costs",
-            "pricing"
+            "pricing",
+            "cc-authentication",
+            "cc-model-config"
           ],
-          "md": "企業での平均の費用は、開発者1人・稼働1日あたり約13ドルです（公式の目安）。料金は[公式の料金ページ](https://claude.com/pricing)で確かめます。"
+          "md": "企業での平均の費用は、開発者1人・稼働1日あたり約13ドルです（公式の目安）。料金は[公式の料金ページ](https://claude.com/pricing)で確かめます。\n\n下の表の補足です。`-p` では、環境変数の `ANTHROPIC_API_KEY` が承認なしで使われます。`/clear` は費用がかかりませんが、`/compact` は会話を読み直して要約するので、それ自体が大きな要求です。[[エフォート]]（effort）は、考える量の設定です。"
         },
         {
           "id": "s5-table",
@@ -501,29 +499,24 @@
           ],
           "caption": "症状から原因と対策をたどる",
           "columns": [
-            "症状",
-            "考えられる原因",
+            "症状と原因",
             "確かめ方と対策"
           ],
           "rows": [
             [
-              "APIの請求が届いた",
-              "`ANTHROPIC_API_KEY` を承認した（`-p` は承認なしで使う）",
+              "APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した",
               "`/status` で確かめ、キーを外す"
             ],
             [
-              "使用量の減りが早い",
-              "長いセッションで、履歴を毎回送り直す",
-              "作業の切れ目で `/clear`（`/compact` はそれ自体が大きな要求）。調べものはサブエージェントへ"
+              "使用量の減りが早い：長いセッションで、履歴を毎回送り直す",
+              "作業の切れ目で `/clear`。調べものはサブエージェントへ"
             ],
             [
-              "1回の使用量が多い",
-              "重いモデルと高い[[エフォート]]（effort：考える量の設定）、長いCLAUDE.md",
+              "1回の使用量が多い：重いモデル、高いエフォート、長いCLAUDE.md",
               "モデルとエフォートを作業に合わせる。CLAUDE.mdは200行以内"
             ],
             [
-              "すぐ上限に届く",
-              "[[利用上限]]（5時間と週）をチャットと共有",
+              "すぐ上限に届く：[[利用上限]]（5時間と週）をチャットと共有",
               "`/usage` で使い具合を見る"
             ]
           ]
@@ -597,7 +590,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "~/.zshrc",
-          "code": "# 副業のプロジェクト用\nexport ANTHROPIC_API_KEY=\"（副業用のキー。ここでは省略）\""
+          "code": "# 副業のプロジェクト用\nexport ANTHROPIC_API_KEY=\"（副業用のキー）\""
         },
         {
           "id": "practice-case-habits",
@@ -642,7 +635,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-practice && cd cc-practice && git init\nmkdir secrets .claude\necho \"PRACTICE_TOKEN=dummy\" > .env\necho \"dummy\" > secrets/dummy.txt"
+          "code": "mkdir cc-practice\ncd cc-practice\ngit init\nmkdir secrets .claude\necho \"PRACTICE_TOKEN=dummy\" > .env\necho \"dummy\" > secrets/dummy.txt"
         },
         {
           "id": "practice-prompt-read",

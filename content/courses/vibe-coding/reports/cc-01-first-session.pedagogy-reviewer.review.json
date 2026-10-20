@@ -1,25 +1,27 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:a0e5c8baccf55921",
+  "lessonHash": "sha256:d8b090b9a8da1f4f",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "align",
-      "score": 3,
-      "evidence": "Every objective has a question with objectiveId: o1 is tested by q0, q1 and q5, o2 by q2 and q6, and o3 by q3, q4, q7, q8 and q9. However, q3 (fresh context) and q7 (plan, installer, Node.js) are tagged o3 even though o3 is only 「質問 → 小さな変更 → 差分の確認 → コミット の流れ」. The install and session segments have no objective of their own, and both o2 items are keyword matches (see active).",
+      "score": 4,
+      "evidence": "o3 now reads 「Claude Codeを入れて起動し、質問 → 小さな変更 → 差分の確認 → コミットの流れで…実行できる」, so q3 (fresh session) and q7 (plan, installer, Node.js) assess what it says. Each objective has 2 or more graded questions with objectiveId (o1: q1, q5; o2: q2, q6; o3: q3, q4, q7, q8, q9), and o2 and o3 have apply- or analyze-level items (q2, q6, q7, q9).",
       "blockIds": [
+        "loop-check",
         "surfaces-check",
         "session-check",
+        "example-check",
         "check-quiz"
       ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-problem is three sentences with a concrete pain (「ファイルを貼り付け、答えを書き写す」) and the lesson's goal. It is followed by an ungraded predict q0 whose distractors are chat, completion and memory, three misconceptions the lesson later corrects.",
+      "evidence": "hook-problem gives a concrete pain in three sentences (「ファイルを貼り付け、答えを書き写すことになりがちです」) and states the lesson's goal. The ungraded predict q0 uses chat, completion and memory as distractors, and the lesson corrects all three later.",
       "blockIds": [
         "hook-problem",
         "hook-predict"
@@ -27,70 +29,71 @@
     },
     {
       "id": "prior",
-      "score": 2,
-      "evidence": "Prerequisites are explicit, and most terms are defined before use (loop-defs, surfaces-defs, session-defs, example-defs) and match the glossary. 「Console アカウント」 is never defined, yet it appears in prerequisites, install-needs and the correct answer of q7. A beginner cannot tell whether they have one.",
+      "score": 3,
+      "evidence": "Prerequisites are explicit. Terms are defined before the checks that use them (loop-defs, surfaces-defs, session-defs, example-defs), and 「Consoleアカウント」 is now explained in install-how (「ConsoleアカウントではAPI…を前払いで使えます」) and in the glossary. 「ネイティブインストーラー（native installer）」 first appears in surfaces-table and is never defined. q2 also depends on push, which the prerequisites do not name (they mention only commit).",
       "blockIds": [
-        "install-needs",
-        "check-quiz",
-        "loop-defs",
-        "session-defs"
+        "install-how",
+        "surfaces-table",
+        "surfaces-check"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Lint is clean on sentence and paragraph budgets, each segment has one idea and at most 3 defined terms, and every content section except install ends in a check. The body (2,394 chars by the brief's count) sits at the top of the 2,400 budget, and in practice-steps the learner must scroll past the steps to find the two prompt blocks they refer to.",
+      "evidence": "measure.mjs reports 「prose 1585 (budget 1,200–2,400) · read 2405 · practice reading 806 · questions 10 · est 15.8 min (must be ≤ 20; estMinutes 16)」, and lint is clean. The surfaces segment defines 3 terms but also brings in IDE, CLI and 「ネイティブインストーラー」 in its table, which puts it over the 3-new-terms budget in practice.",
       "blockIds": [
-        "install",
-        "practice-steps",
-        "practice-prompt-page"
+        "surfaces-defs",
+        "surfaces-table"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "example-steps comes before practice and gives 5 labelled steps (①–⑤), each with its reason (「頼んでいない変更を見つけるためです」) and an expect. practice-steps reuses the same labels with hints, which fades the support. The example only describes the outcome (「日付を表示する数行が増えています」) and never shows a diff, so the learner has not seen what they will read in ③.",
+      "evidence": "example-steps gives 5 labelled steps (①–⑤), each with its reason (「頼んでいない変更を見つけるためです」) and an expect. The new example-diff shows the exact lines step ③ produces, and practice-steps fades the same labels. The example never shows why the starting page is committed first, so p-base arrives unexplained, and there is only one level of fading.",
       "blockIds": [
         "example-steps",
+        "example-diff",
         "practice-steps"
       ]
     },
     {
       "id": "active",
-      "score": 2,
-      "evidence": "The density rule is met (q1–q4). q2 can be answered by matching words: its prompt 「ノートPCを閉じて出かけている間も進めてほしい」 echoes the table cell 「PCを閉じても進めたい」 and the definition 「PCを閉じても作業が続きます」 just above it, and its hint gives the answer away. q1's options b and c restate the table rows, its hint points to the 「すること」 column, and q4's hint names steps ③④. Only q3 needs real application.",
+      "score": 3,
+      "evidence": "The density rule is met (q1–q4), and q2 now requires applying the 「先にpushする」 constraint to unpushed commits, while q3 and q4 need real application. q1's answer a (「実行してエラーを読み、直してから、もう一度実行して確かめる」) restates the loop-diagram description almost word for word, and option d is the only other option that mentions acting, so the item can be answered by matching words.",
       "blockIds": [
-        "surfaces-check",
         "loop-check",
-        "example-check",
-        "session-check"
+        "surfaces-check",
+        "session-check",
+        "example-check"
       ]
     },
     {
       "id": "miscon",
-      "score": 3,
-      "evidence": "All five misconceptions in the brief are tested and corrected: chat or completion (q0, q1, q5), memory (q3, q5-d), Node.js (install-node, q7-a), the Free plan (q7-c) and 「完了しました」 (q4-a, q9-a). Every wrong option has feedback of 2 sentences or fewer. A few distractors are strawmen, such as q9-d 「Claude Code を使うのをやめる」, q4-d 「自分で最初から書き直す」 and q4-c.",
+      "score": 4,
+      "evidence": "All five misconceptions in the brief are corrected with a reason: chat and completion (q0, q1, q5), memory (q3, q5-d), Node.js (install-node 「npmで入れる場合の手順です」, q7-a), the Free plan (q7-c) and 「完了しました」 (q4-a, q9-a). Every wrong option has feedback of 2 sentences or fewer, and q9-d is now a real misconception (「理由は聞かずに、自分で `about.html` を戻して…」).",
       "blockIds": [
         "hook-predict",
+        "loop-check",
         "session-check",
-        "check-quiz",
-        "install-node"
+        "install-node",
+        "check-quiz"
       ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "loop-diagram is a process diagram with 5 nodes whose labels match the definition (情報を集める → 行動する → 結果を確かめる). Its caption states the point (「確かめて足りなければ、情報を集める段階に戻る」) and its alt text is complete. The two comparison tables carry the contrasts, and there are no decorative images.",
+      "evidence": "loop-diagram is a 5-node process diagram whose labels match the definition. Its caption states the point (「確かめて足りなければ、情報を集める段階に戻る」) and its alt text is complete. The two tables carry the comparisons, example-diff shows the real artefact, and there are no decorative images.",
       "blockIds": [
         "loop-diagram",
         "loop-table",
-        "surfaces-table"
+        "surfaces-table",
+        "example-diff"
       ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "This is an authentic hands-on task in a throwaway folder. practice-steps gives every step an expect, every step but p-commit a hint, and p-start, p-base and p-change a troubleshoot rung. practice-prompt-explain has a model answer, and practice-checklist has 6 observable criteria. The hint ladder has at most two rungs, and the learner commits Claude's first page in p-base without reviewing it.",
+      "evidence": "The task is authentic and runs in a throwaway folder. Every step has an expect, p-base now checks the heading before the first commit, practice-prompt-explain carries a model answer, and practice-checklist has 6 observable criteria. The hint ladder has at most two rungs (hint, then troubleshoot on p-start, p-base and p-change), and p-commit has no hint.",
       "blockIds": [
         "practice-steps",
         "practice-prompt-explain",
@@ -99,30 +102,31 @@
     },
     {
       "id": "meta",
-      "score": 3,
-      "evidence": "summary-points (5 points) comes after the exam, summary-next asks a reflection question and names 第2回, and summary-cards has 7 cards plus askTutor. Some cards teach facts the body never stated (card-version 「(Claude Code) と出れば成功」, card-carry 「--resume」), and summary point 2 「迷ったらターミナル CLI から始めます」 is advice the lesson never gave.",
+      "score": 4,
+      "evidence": "summary-points (5 points) comes after the exam. summary-next asks a reflection question tied to the practice (「演習で、確認なしで進んだ操作はありましたか。」) and names 第2回. The 7 cards in summary-cards now match the body (card-version 「バージョン番号が出れば成功です」, card-carry without --resume) and are cited, and askTutor follows.",
       "blockIds": [
         "summary-points",
         "summary-next",
-        "summary-cards"
+        "summary-cards",
+        "summary-ask"
       ]
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The version is pinned (「2026年10月時点（v2.1.304）」, auto mode from v2.1.283), the installer commands match cc-setup, and key behavioural claims are cited. Two non-obvious claims sit in blocks without the backing cite: the Esc shortcut in practice-steps (p-change hint), and the version-output and --resume facts in summary-cards, which has no cite.",
+      "evidence": "The version is pinned (「2026年10月時点（v2.1.304）」, auto mode from v2.1.283), the installer commands match cc-setup, and the three audit corrections are applied: q6-b 「コミットのあるGitリポジトリなら `claude --cloud` で送れます」, example-habit 「頼りきった人より直後のテストの点が高めでした」, and q3-c 「…のが確実」. The Esc hint and the flashcards are now cited. One UI detail is still untraceable: the p-start expect 「入力欄の上に `cc-practice` が表示されます」.",
       "blockIds": [
-        "install-unix",
-        "install-win",
+        "install-lead",
         "example-mode",
-        "practice-steps",
-        "summary-cards"
+        "example-habit",
+        "check-quiz",
+        "practice-steps"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout in a warm, non-pressuring tone (「大切なプロジェクトには影響しません」) with no banned phrases, and katakana terms carry English on first use (「サーフェス（surface）」). One term wavers: example-mode says 「セッションは auto モード」 while the glossary says 「ターミナルのセッションは auto モード」.",
+      "evidence": "The lesson uses です・ます throughout in a warm tone (「大切なプロジェクトには影響しません」), with no banned phrases and English on katakana terms at first use. The auto-mode scope is now the same in example-mode and the glossary (「ターミナルとVS Codeの対話セッション」).",
       "blockIds": [
         "example-mode",
         "practice-task"
@@ -131,56 +135,29 @@
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Only jp is declared and it is complete. The diagram has full alt text and Japanese labels, and the links are descriptive (「公式ドキュメントの日本語版」, 「インストールのトラブルシューティング」).",
+      "evidence": "Only jp is declared, and it is complete. The diagram has Japanese labels and full alt text, the links are descriptive (「公式ドキュメントの日本語版」, 「インストールのトラブルシューティング」), and the plain-text checklist labels no longer use markdown.",
       "blockIds": [
         "loop-diagram",
         "install-lead",
-        "practice-steps"
+        "practice-checklist"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "active",
-      "blockId": "surfaces-check",
-      "issue": "q2 is answered by matching words, not by choosing. The prompt 「ノートPCを閉じて出かけている間も進めてほしい」 restates the table cell 「PCを閉じても進めたい」 and the definition 「PCを閉じても作業が続きます」 read seconds earlier, and the hint 「自分の PC の外で動くか」 gives it away. The contract says to ask for application in a new context, not recognition of the sentence just read, and q2 is the only inline item for o2.",
-      "fix": "Rewrite q2 so the learner has to apply the 「知っておくこと」 column. prompt: 「手元のフォルダで作業していて、まだ push していないコミットが2つあります。この続きを、ノートPCを閉じて出かけている間に進めてほしいとき、どうしますか？」. Options: a 「そのままクラウドセッションを始めて、続きを頼む」 (feedback 「クラウドセッションは GitHub のリポジトリを複製して動くので、push していないコミットは見えません。先に push します。」); b 「コミットを push してから、クラウドセッションで続きを頼む」 (answer); c 「ターミナル CLI で続きを頼んでから、PCを閉じる」 (feedback 「ターミナル CLI は自分の PC の上で動くので、PC を閉じると止まります。PC の外で動く使い方を選びます。」); d 「VS Code 拡張で続きを頼んでから、PCを閉じる」 (feedback 「VS Code 拡張も自分の PC の上で動きます。PC を閉じると作業も止まります。」). answer [\"b\"]. explanation 「クラウドセッションはクラウド上で動くので、PC を閉じても続きます。GitHub のリポジトリを複製して使うため、手元のコミットは先に push します。」. hint 「クラウドセッションが、どこからコードを持ってくるかを考えましょう。」. Keep objectiveId o2, bloom apply and cite cc-cloud."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "install-needs",
-      "issue": "「Console アカウント」 is used in prerequisites, install-needs, q7-b and the q7 explanation, but it is never defined. A beginner cannot check the first requirement, and q7's correct answer depends on the term.",
-      "fix": "Define it where it is first needed. Change the install-how md to 「Console アカウントは、API の料金を前払いして使う開発者向けのアカウントです。推奨はネイティブインストーラー（native installer）で、自動で更新されます。」 and add \"cc-quickstart\" to install-how's cite. Add a glossary entry {term: 「Console アカウント」, md: 「Claude Console で作る開発者向けのアカウント。API の料金を前払いして Claude Code を使えます。」, aliases: [\"Console account\"]}."
-    },
-    {
-      "criterion": "accuracy",
-      "blockId": "practice-steps",
-      "issue": "The p-change hint states a keyboard behaviour (「Esc キーで止めて訂正を送ります」), but practice-steps cites only cc-quickstart and cc-terminal-guide. According to the brief, the Esc and correction behaviour comes from cc-how-it-works.",
-      "fix": "Add \"cc-how-it-works\" to practice-steps.cite, giving [\"cc-quickstart\", \"cc-terminal-guide\", \"cc-how-it-works\"]. If cc-how-it-works does not state that Esc interrupts Claude, remove the second sentence of the p-change hint."
-    },
-    {
-      "criterion": "accuracy",
-      "blockId": "summary-cards",
-      "issue": "Two cards assert facts that no lesson text states, and the flashcards block has no cite. card-version says 「バージョン番号のあとに (Claude Code) と出れば成功」, while install-verify says only 「バージョン番号が出れば成功」. card-carry names `--resume`, which the body never mentions (session-carry says only `claude --continue` など). Cards should review what was taught, with backing sources.",
-      "fix": "Add \"cite\": [\"cc-quickstart\", \"cc-setup\", \"cc-memory\"] to summary-cards. Change card-version.back to 「`claude --version`。バージョン番号が出れば成功。」 and card-carry.back to 「CLAUDE.md、自動メモリ、`claude --continue` などで開き直した会話だけ。」. Alternatively, keep the card text and add the same facts to install-verify and session-carry."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "loop-check q1: Claude Code cannot click a button in a browser by default, so the answer 「直したあとで動きを確かめてから報告する」 and the explanation 「結果を確かめる（動きを見る）」 suggest a check that may not happen, which is the 「完了しました」 belief the lesson fights. Use the source's own case instead: prompt 「練習用のプロジェクトで「失敗しているテストを直して」と頼みました。…」 and answer a 「関係するファイルを読んで直し、テストを実行して通ることを確かめてから報告する」. Also replace the hint 「表の「すること」の列を思い出しましょう。」 with 「ループの最後の段階が何だったかを思い出しましょう。」 so it does not point at the answer row.",
-    "example-check q4: the hint 「例題の③と④が、何のための手順だったかを思い出しましょう。」 points at the answer, and option b paraphrases steps ③④. Make it a concrete case that needs reading: describe a diff where the date lines plus one changed `<title>` line appear after 「見出しの下に日付を表示して」, and ask which line needs a question before committing. Or, at minimum, change the hint to 「「完了しました」は、誰が確かめた結果かを考えましょう。」.",
-    "check-quiz q6: the prompt 「ターミナルを使ったことがない」 matches the table cell 「ターミナルなしで始めたい」 word for word. Add a competing condition so the learner must weigh the 「知っておくこと」 column. Example: the colleague's code is not on GitHub, so クラウドセッション fails for a reason, not just because a keyword is missing.",
-    "Objective o3: q3 (fresh context) and q7 (plan, installer, Node.js) assess content that o3's text does not cover. Consider changing o3 to 「Claude Code を入れて起動し、質問 → 小さな変更 → 差分の確認 → コミット の流れで最初のセッションを実行できる」. This changes an objective, so the next round will be a full review.",
-    "check-quiz q8: the prompt asks for 「このレッスンで学んだ進め方」, which is recall, so set bloom to \"remember\". Or make it apply-level with a situation, e.g. a colleague who wants to start by asking for a whole new feature.",
-    "summary-points point 2 「サーフェスは場面で選び、迷ったらターミナル CLI から始めます。」 adds advice the body never gave, and it sits uneasily with q6, which recommends the desktop app to terminal beginners. Replace it with 「サーフェスは場面で選びます。どれも同じエンジンで動きます。」.",
-    "session-fresh: 「引き継がれるのは次の3つだけです」 overstates the case, because settings, skills and the files on disk also persist (q3-d relies on the files). Suggested text: 「新しいセッションは毎回まっさらな[[コンテキスト]]で始まります。前回の内容を引き継ぐ道は、次の3つです（第5・6回で扱います）。」.",
-    "example-mode says 「セッションは auto モードという権限モード（permission mode）で始まります」 and the 権限モード glossary entry says 「ターミナルのセッションは auto モードで始まります」. Use the same scope in both, following the research note 「対話セッションの開始時の既定」.",
-    "practice: practice-steps refers to 「ページを作る依頼文」 and 「差分を説明してもらう依頼文」, but those blocks come after the steps. Move practice-prompt-page and practice-prompt-explain above practice-steps, or write 「下の「ページを作る依頼文」を送り…」 in p-base and p-explain.",
-    "p-start expect 「入力欄の上に `cc-practice` が出ます。」 is an uncited UI claim. Check it against cc-quickstart, or use a safer expect: 「Claude Code が起動し、入力欄が表示されます。」.",
-    "example-steps step ③: add a short `code` block (lang \"diff\", filename \"/diff の例\") with the 2–3 added lines for the date, so the learner has seen what a diff looks like before reading their own in practice.",
-    "p-base: the starting page is committed without a look. Add to the p-base md: 「コミットの前に、`index.html` をダブルクリックして見出しを確かめます。」, which keeps the 「確かめてからコミット」 habit from the first commit on.",
-    "check-quiz q9-d 「変更をすべて捨てて、Claude Code を使うのをやめる」 is a strawman. A real misconception is better: 「自分で `about.html` を元に戻し、Claude には伝えずにコミットする」, with feedback that Claude may redo the change it believes was needed unless asked why."
+    "loop-check q1: option a repeats the loop-diagram description (「実行してエラーを読み、直して、また実行します」). To make the learner use the 確かめる stage instead of matching words, give option d the same opening. d md: 「実行してエラーを読み、直したところで完了と報告する」. d feedback: 「直しただけでは、ループの「結果を確かめる」段階が抜けています。もう一度実行して確かめてから報告します。」",
+    "loop-diagram: `description` holds an example instead of a text description of the figure, and the reader puts it in a collapsed <details>, so most learners never see the source's failing-tests example. Move 「「失敗するテストを直して」なら、実行してエラーを読み、直して、また実行します。」 into a visible markdown block after the diagram, and either drop `description` (alt already covers the figure) or make it describe the figure.",
+    "surfaces-table: the CLI row's 「ネイティブインストーラー（native installer）で入れる」 uses the term before 1-3 and never defines it. Change the cell to 「1-3の方法で入れる」. Change install-how's second sentence to 「推奨は、公式のインストール用コマンドで入れるネイティブインストーラー（native installer）で、自動で更新されます。」.",
+    "prerequisites: q2 and surfaces-table depend on push. Change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」; vibe-ch5 covers 5-2 commit / push / clone.",
+    "install-needs: write 「[[Consoleアカウント]]」 so the glossary entry appears at the term's first use in the body.",
+    "example-lead: the example never says the page is already committed, so ③ only works because of a state the practice sets up in p-base. Use 「公式のクイックスタートの順に進めます。題材は、コミット済みの「hello world」の1ページです。」.",
+    "practice p-change: Claude made the page in this same session, so ①「このプロジェクトは何をするもの？」 is answered from context, not by reading files. Add to the p-base md: 「コミットしたら `exit` で終え、もう一度 `claude` を起動します。」 (`exit` is in cc-terminal-guide). This also replays the fresh-session idea from 1-4.",
+    "factual doubt: the p-start expect 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail. A first start in a new folder may also show a folder-trust prompt that the hint does not mention. Safer expect: 「Claude Codeが起動し、入力欄が表示されます。」.",
+    "check-quiz q8: 「このレッスンの進め方に沿って」 asks the learner to recall the order, so set bloom to \"understand\" rather than \"apply\".",
+    "check-quiz q7-a: the feedback corrects only the Node.js belief, but the scenario also has the Free plan. Suggested feedback: 「Node.jsが要るのはnpmで入れる場合だけで、無料プランのままでは使えません。有料プランかConsoleアカウントを用意し、ネイティブインストーラーで入れます。」",
+    "practice-steps p-commit has no hint. Add one: 「1つしか並ばないときは、「まだコミットしていない変更はある？」と聞いて、残りをコミットしてもらいます。」"
   ],
-  "average": 3.0,
-  "verdict": "revise",
-  "summary": "The lesson's main strength is a clear arc. A concrete hook with a predict question leads to a worked example with the reason for each step, then a faded hands-on practice with a checklist, and every misconception in the brief is tested with real feedback. The most important fix is q2 (surfaces-check): it can be answered by matching words from the table just above, so rewrite it to apply the push-before-cloud constraint. Also define 「Console アカウント」, and cite the Esc hint and the flashcard facts or bring them in line with the body. Mean 3.0, with prior and active at 2."
+  "average": 3.38,
+  "verdict": "pass",
+  "summary": "The scope check required a full review: objectives o2 and o3 changed, 32 of 43 blocks changed and 52% of the parts changed. All four round-1 must-fix items are gone: q2 now applies push-before-cloud, Consoleアカウント is explained in install-how and the glossary, practice-steps cites cc-how-it-works, and summary-cards is cited and matches the body. The arc is strong (hook, worked example with a real diff, faded practice, transfer exam); the most useful remaining change is making q1 discriminate on the 確かめる stage instead of matching the diagram description."
 }

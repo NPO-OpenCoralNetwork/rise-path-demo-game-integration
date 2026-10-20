@@ -114,12 +114,12 @@
           "type": "table",
           "cite": ["cc-best-practices"],
           "caption": "4つの観点と、公式ガイドの書き直し例",
-          "columns": ["観点", "書くこと", "書き直した例"],
+          "columns": ["観点：書くこと", "書き直した例"],
           "rows": [
-            ["範囲", "どのファイルの、どんな場面か。テストの方針", "`foo.py` のテストを書く。ログアウト中の場合を扱う。モック（mock）は使わない"],
-            ["参照先", "読ませたい情報源。@参照するファイル、ドキュメントのURL（ページのアドレス）、Gitの履歴など", "`ExecutionFactory`（例のコード名）のGitの履歴を調べ、今の呼び出し方に決まった経緯を要約する"],
-            ["既存のパターン", "まねしてほしい既存のコード", "ホーム画面の既存のウィジェット（widget）の作りに合わせて、カレンダーを作る"],
-            ["症状", "起きていること、場所の見当、直った状態", "タイムアウト後にログインが失敗する。`src/auth/` を確かめ、再現するテストを書いてから直す"]
+            ["**範囲**：どのファイルの、どんな場面か。テストの方針", "`foo.py` のテストを書く。ログアウト中の場合を扱う。モック（mock）は使わない"],
+            ["**参照先**：読ませたい情報源。@参照するファイル、URL（ページのアドレス）、Gitの履歴", "`ExecutionFactory`（例のクラス名）のGitの履歴から、今の作りの経緯を要約する"],
+            ["**既存のパターン**：まねしてほしい既存のコード", "ホーム画面の既存のウィジェット（widget）の作りに合わせて、カレンダーを作る"],
+            ["**症状**：起きていること、場所の見当、直った状態", "タイムアウト後にログインが失敗する。`src/auth/` を調べ、再現テストを書いてから直す"]
           ]
         },
         {
@@ -475,11 +475,11 @@
           "type": "table",
           "cite": ["cc-best-practices"],
           "caption": "変更の大きさで、準備の度合いを選ぶ",
-          "columns": ["変更の大きさ", "進め方", "例"],
+          "columns": ["変更の大きさ", "進め方"],
           "rows": [
-            ["差分を1文で説明できる", "計画を省いて直接頼む", "誤字の修正、変数名の変更"],
-            ["迷う・複数のファイル・よく知らないコード", "プランモードで計画してから実装", "3-3のログイン画面"],
-            ["決めることが多い大きめの機能", "インタビュー → `SPEC.md` → 新しいセッション", "TODOの期限とリマインダー"]
+            ["差分を1文で説明できる", "計画を省いて直接頼む"],
+            ["迷う・複数のファイル・よく知らないコード", "プランモードで計画してから実装"],
+            ["決めることが多い大きめの機能", "インタビュー → `SPEC.md` → 新しいセッション"]
           ]
         },
         {
@@ -555,7 +555,7 @@
           "lang": "html",
           "filename": "todo.html",
           "highlight": [12, 13, 14, 15, 16],
-          "code": "<!doctype html>\n<meta charset=\"utf-8\">\n<title>TODO</title>\n<h1>TODO</h1>\n<input id=\"new-item\" placeholder=\"やること\">\n<button id=\"add\">追加</button>\n<ul id=\"list\"></ul>\n<script>\n  const input = document.getElementById('new-item');\n  const list = document.getElementById('list');\n\n  function addItem(text) {\n    const li = document.createElement('li');\n    li.textContent = text;\n    list.appendChild(li);\n  }\n\n  document.getElementById('add').addEventListener('click', () => {\n    addItem(input.value);\n    input.value = '';\n  });\n</script>"
+          "code": "<!doctype html>\n<meta charset=\"utf-8\">\n<title>TODO</title>\n<h1>TODO</h1>\n<input id=\"new-item\" placeholder=\"やること\">\n<button id=\"add\">追加</button>\n<ul id=\"list\"></ul>\n<script>\n  const input = document.getElementById('new-item');\n  const list = document.getElementById('list');\n\n  function addItem(text) {\n    const li = document.createElement('li');\n    li.textContent = text;\n    list.appendChild(li);\n  }\n\n  const addButton = document.getElementById('add');\n  addButton.addEventListener('click', () => {\n    addItem(input.value);\n    input.value = '';\n  });\n</script>"
         },
         {
           "id": "practice-steps",

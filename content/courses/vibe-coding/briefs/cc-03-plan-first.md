@@ -17,7 +17,7 @@
 ## 範囲 / Scope
 - 扱う / in:
   - 公式の 4 つのフェーズ（探索 → 計画 → 実装 → コミット）。探索と計画はプランモードで、承認してから実装する。
-  - プランモードに入る 3 つの方法（Shift+Tab で `⏸ plan mode on` まで、`/plan`、`claude --permission-mode plan`）、承認の選択肢、計画の直し方（「No, keep planning」、Ctrl+G）。
+  - プランモードに入る主な 3 つの方法（Shift+Tab で `⏸ plan mode on` まで、`/plan`、`claude --permission-mode plan`）、承認の選択肢、計画の直し方（「No, keep planning」、Ctrl+G）。
   - 依頼を具体的にする 4 つの観点（範囲・参照先・既存のパターン・症状）と、材料の渡し方（`@` 参照、画像の貼り付け、URL）。探索中はあいまいな質問も役に立つこと。
   - 計画を省いてよい場面（差分を 1 文で言える変更）と、計画が最も役立つ場面（進め方が不確か・複数ファイル・不慣れなコード）。
   - 大きめの機能：AskUserQuestion でインタビュー → `SPEC.md` → 新しいセッションで実装。役に立つ仕様の 3 条件。
@@ -35,13 +35,13 @@
   - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（常に表示される本文 2,548 字 ÷ 450 ≒ 5.7 分 + 問題 10 問 × 40 秒 ≒ 6.7 分 + 演習 4 課題 × 2 分 = 8 分 → 20.3 分）。本文は markdown・callout の md と steps の md・expect。折りたたみ表示のテキスト（prompt の expect・note、steps の hint・troubleshoot）を含む本文は 3,268 字。
+- 所要時間 / minutes: 20（コース共通の measure.mjs：`cc-03-plan-first.lesson.json: prose 2252 (budget 1,200–2,400) · read 3357 · practice reading 1436 · questions 8 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`。(3,357 + 1,436) ÷ 450 ≒ 10.65 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.99 分）。
 - 難易度 / level: beginner
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）
-- 演習の題材 / practice task idea: 新しい練習用フォルダーに 22 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
+- 演習の題材 / practice task idea: 新しい練習用フォルダーに 23 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
 
 ## 制約 / Constraints
-- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。対話セッションは v2.1.283 以降 auto モードで始まり、Shift+Tab で Manual → acceptEdits → プランモードの順に変わる。
+- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。v2.1.283 以降、ターミナルと VS Code の対話セッションは、起動時の指定（`--permission-mode`）や設定（`permissions.defaultMode`）がなければ auto モードで始まり、auto モードが使えない環境では Manual で始まる。auto モードから Shift+Tab で Manual → acceptEdits → プランモードの順に変わる。
 - OS / environment: macOS・Linux・Windows（WSL 含む）。画像の貼り付けは Ctrl+V（Windows と WSL は Alt+V）。ブラウザでローカルの HTML を開ける。
 - 使ってはいけないもの / avoid: 大事なリポジトリでの演習、破壊的なコマンド、秘密情報、料金の記載、プレビュー機能を必須の手順にすること。
 
@@ -62,7 +62,9 @@
 - 演習の `todo.html` は Chromium（headless）で動作を確認した（空の入力で空の `li` が増える）。
 - 新しいセッションの始め方は「`/clear` で会話を空にするか、`claude` を起動し直す」とした（公式は "start a fresh session"）。
 - 承認の選択肢の英語表記（「Yes, manually approve edits」「No, keep planning」）は 2026-10-20 の公式ページのまま。表示が変わりうる旨をレッスン内に書いた。
-- 演習の課題数は、演習1を 3 課題（依頼の書き直し、計画と修正、実装・確認・コミット）、演習2を 1 課題として所要時間を計算した。
+- 所要時間はコース共通の measure.mjs で数える（演習は 1 セクション 2 分）。20 分以内にするため、exam の e3（o2）と e6（o3）を削除した。o2 は q2・q3・e4、o3 は q4・e5 で評価する（どの目標も inline と exam に 1 問以上）。
+- 390px の画面に収めるため、表は 2 列にした（s1-table は「観点：書くこと｜書き直した例」、s4-table は例の列を外した）。s1-table の `ExecutionFactory` の例は、公式の "summarize how its api came to be" を「今の作りの経緯を要約する」と言い換えた。
+- 演習の `todo.html` は、1 行が 60 字を超えないよう `addButton` の行を 2 行に分けた（23 行）。動作は Chromium（headless）で再確認した。
 
 ## Outline
 
@@ -75,5 +77,5 @@
 | s4 | concept | 3-4. 大きめの機能は仕様から始める | インタビュー → SPEC.md → 新しいセッション。準備の度合いを変更の大きさで選ぶ | markdown, definitions, markdown, prompt（インタビュー）, markdown, table, callout(note), quiz(inline) | q4 → o3 |
 | practice | practice | 演習1：TODO画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), prompt（模範解答）, checklist | — |
 | practice-spec | practice | 演習2：仕様インタビューの依頼文を作る | 期限とリマインダーのためのインタビュー依頼文を書く | markdown, steps(3, hint/troubleshoot), checklist, prompt（模範解答、書いてから見比べる） | — |
-| check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e3 → o2, e4 → o2（転移）, e5 → o3, e6 → o3（e2 は削除） |
+| check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e4 → o2（転移）, e5 → o3（e2・e3・e6 は削除） |
 | summary | summary | まとめ | 要点・振り返り・次の一歩・復習 | summary(5), markdown, flashcards(7), askTutor | — |
