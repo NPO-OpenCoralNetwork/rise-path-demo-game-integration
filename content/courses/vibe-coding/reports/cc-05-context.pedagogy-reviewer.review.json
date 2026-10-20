@@ -1,25 +1,25 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:e51506cc1e6117ed",
+  "lessonHash": "sha256:7a183d3f582412d5",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:2597b7828fdf4777",
+    "reviewedRevision": "sha256:e51506cc1e6117ed",
     "changed": [
-      "hook-predict"
+      "pr-code"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/2597b7828fdf4777/round-1/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/e51506cc1e6117ed/round-1/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "The objectives are unchanged. q0 keeps objectiveId o2 / understand, and it is an ungraded predict question, so it does not count toward assessment. o1 is assessed by q2, q4, p1–p3 and e1. o2 is assessed by q3, e3 and e4. o3 is assessed by q1 and e5. e1 and e4 are transfer items.",
+      "evidence": "Not changed since the last round. q0 keeps objectiveId o2 / understand, and it is an ungraded predict question, so it does not count toward assessment. o1 is assessed by q2, q4, p1–p3 and e1. o2 is assessed by q3, e3 and e4. o3 is assessed by q1 and e5. e1 and e4 are transfer items.",
       "blockIds": [
         "hook-predict",
         "s3-check",
@@ -34,17 +34,18 @@
     {
       "id": "hook",
       "score": 4,
-      "evidence": "Re-scored because hook-predict changed. hook-problem is still a concrete scenario: 「朝に『テストは `npm test` で実行して』と伝えたのに、午後のClaudeは別のコマンドを試します。言い直しても、しばらくするとまたずれます。」 The ungraded predict q0 follows it. The distractors are now diagnoses of the cause that match the prompt 「この会話で起きていることとして」: c 「伝え方が弱く、言葉の強さが足りなかった」 and d 「Claude Codeに不具合が起きていた」. Before, they mixed a cause with a remedy (「強い言葉で言い直せば直る」, 「入れ直せば直る」). So b no longer stands out as the only diagnosis. Each option still encodes a misconception: learning (a), word strength (c), a bug (d). sum-hook answers the scenario at the end.",
+      "evidence": "Not changed since the last round. hook-problem gives a concrete scenario: 「朝に『テストは `npm test` で実行して』と伝えたのに、午後のClaudeは別のコマンドを試します。」 The ungraded predict q0 follows it, and its options are parallel diagnoses of the cause. sum-hook answers the scenario at the end.",
       "blockIds": [
         "hook-problem",
         "hook-predict",
         "sum-hook"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "This criterion is unchanged. Earlier lessons are recalled in s1-lead (「第1回で見たコンテキストウィンドウ」), s3-defs (（第1回）) and s4-defs (（第4回）). 「プランモード（plan mode）」 in s3-table row 1 and 「信頼の確認」 in pr-start still have no recall.",
+      "evidence": "Not changed since the last round. Earlier lessons are recalled in s1-lead (「第1回で見たコンテキストウィンドウ」), s3-defs (（第1回）) and s4-defs (（第4回）). 「プランモード（plan mode）」 in s3-table row 1 and 「信頼の確認」 in pr-start still have no recall.",
       "blockIds": [
         "s1-lead",
         "s3-defs",
@@ -57,20 +58,20 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "Measure (this round): 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」. The change shortened q0 options c and d and did not change the load. para-sentences reports only two advisory quiz stems with 4 sentences (p2, p3). Strict lint is clean. 5-2 is still dense.",
+      "evidence": "Re-checked because pr-code changed. The measure script reports the same result as last round: 「prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1126 · questions 12 · practice sections 1 · est 19.8 min (must be ≤ 20; estMinutes 20)」. The echo line is 3 characters shorter, so the load does not change. para-sentences still lists only two advisory quiz stems with 4 sentences (p2, p3). Strict lint is clean. Section 5-2 is still dense.",
       "blockIds": [
+        "pr-code",
         "s2-table",
         "s4-table",
         "s2-focus",
         "s2-session",
         "s2-code"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "This criterion is unchanged. s5-steps is a five-step worked example placed before practice, and it ends in s5-prompt. It has no faded step, and ex-learn's 「ずれた行の例」 is still not a concrete condition in s5-prompt.",
+      "evidence": "Not changed since the last round. s5-steps is a five-step worked example that comes before practice and ends in s5-prompt. It has no faded step, and 「ずれた行の例」 from ex-learn is still not a concrete condition in s5-prompt.",
       "blockIds": [
         "s5-log",
         "s5-steps",
@@ -81,7 +82,7 @@
     {
       "id": "active",
       "score": 4,
-      "evidence": "This criterion is unchanged. The questions keep apply/analyze demand, every wrong option has feedback, and there are inline checks in every concept section.",
+      "evidence": "Not changed since the last round. The questions keep apply/analyze demand, every wrong option has feedback, and every concept section has an inline check.",
       "blockIds": [
         "s3-check",
         "pr-diagnose",
@@ -95,18 +96,19 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored because q0 changed. q0-c 「伝え方が弱く、言葉の強さが足りなかった」 states the word-strength misconception directly. Its feedback names the misconception and corrects it: 「問題は言葉の強さより、会話の状態です。」 The 「言い直しを重ねると」 opening ties back to 「言い直しても」 in hook-problem. The feedback for q0-a (「変わったのは、Claudeが見ている情報のほうです」) and q0-d (「不具合ではなく、長い会話で起きやすいふるまいです」) still names the misconception, and each stays within two sentences. The q0-d feedback now opens its second sentence with 「入れ直しても」, which the option no longer mentions (see niceToHave). Coverage elsewhere is unchanged (q2-b, p1-d, q3-a/c, e3-b/d, q4-a, e5-a).",
+      "evidence": "Not changed since the last round. The feedback on q0-a, q0-c and q0-d names its misconception (learning, word strength, a bug). Coverage elsewhere is unchanged (q2-b, p1-d, q3-a/c, e3-b/d, q4-a, e5-a).",
       "blockIds": [
         "hook-predict",
         "s3-check",
         "check-quiz",
         "pr-diagnose"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "This criterion is unchanged. s3-diagram has 6 short nodes, its caption matches s3-lead, s3-table is tied to the diagram, and there are no decorative images.",
+      "evidence": "Not changed since the last round. s3-diagram has 6 short nodes and its caption matches s3-lead. s3-table is tied to the diagram, and there are no decorative images.",
       "blockIds": [
         "s3-diagram",
         "s3-table",
@@ -117,7 +119,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "This criterion is unchanged. The task is authentic: a diagnosis (p1–p3), then hands-on /context and /compact runs with pr-predict, plus pr-checklist and pr-answer. The CLAUDE.md rule in pr-code still matches pr-prompt-a/b. The hints are one level deep, not a 3-level ladder.",
+      "evidence": "Re-scored because pr-code changed. The CLAUDE.md rule is now 「echo '- <title>は「練習：」から' > CLAUDE.md」, which used to read 「…で始める」. Read with its context, 「〜から」 still means \"starts with\": pr-prompt-a's expect says 「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります」, and pr-prompt-b, c-claude-md and pr-answer row 1 all check 「「練習：」で始まる」. So the observable outcome the practice depends on is unchanged, and nothing regressed. The rule is terser than the instruction style the lesson models elsewhere (see niceToHave). The hints are still one level deep, not a 3-level ladder. The success criteria are still pr-checklist and pr-answer.",
       "blockIds": [
         "pr-code",
         "pr-steps-start",
@@ -127,13 +129,12 @@
         "pr-checklist",
         "pr-answer",
         "pr-diagnose"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "This criterion is unchanged. The summary comes after the exam and includes sum-hook, sum-points, sum-next, 8 flashcards and sum-ask.",
+      "evidence": "Not changed since the last round. The summary comes after the exam and holds sum-hook, sum-points, sum-next, 8 flashcards and sum-ask.",
       "blockIds": [
         "sum-hook",
         "sum-points",
@@ -146,7 +147,7 @@
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "This criterion is unchanged. The q0 rewording makes no new factual claim, and q0's cite (cc-best-practices) still covers the explanation. The generic wordings in e4-d and sum-points[2] remain.",
+      "evidence": "Not changed since the last round. The pr-code change makes no factual claim. The generic wordings in e4-d and sum-points[2] remain.",
       "blockIds": [
         "s3-check",
         "check-quiz",
@@ -159,7 +160,7 @@
     {
       "id": "voice",
       "score": 3,
-      "evidence": "This criterion is unchanged. The new q0 options use plain declarative clauses that match the style of options a and b. The 「自動の圧縮」 vs 「自動のコンテキスト圧縮」 drift remains.",
+      "evidence": "Not changed since the last round. The term still drifts between 「自動の圧縮」 and 「自動のコンテキスト圧縮」.",
       "blockIds": [
         "s2-defs",
         "s2-table",
@@ -172,7 +173,7 @@
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "This criterion is unchanged. The lesson is jp-only and complete. The s3-diagram alt still lists items the visible diagram no longer shows.",
+      "evidence": "Not changed since the last round. The lesson is jp-only and complete. The s3-diagram alt still lists items the visible diagram no longer shows.",
       "blockIds": [
         "s3-diagram",
         "s3-fix",
@@ -184,20 +185,20 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "hook-predict q0 option d feedback: since the option no longer says 「入れ直せば直る」, the second sentence 「入れ直しても、同じ使い方なら同じことが起きます。」 answers a remedy the learner did not choose. Replace the feedback with 「不具合ではなく、長い会話で起きやすいふるまいです。会話がたまるほど、前の指示が埋もれやすくなります。」.",
-    "Practice hint ladder (to reach 4 on practice): give pr-predict a stepped hint. (1) 「5-3の図で、それぞれの指示がたどる矢印を見ます。」 (2) 「直下のCLAUDE.mdは『決まったファイル』に入るかを考えます。」 (3) 「会話だけの指示は、要約に置き換わる側です。」",
-    "Notation consistency with pr-code: pr-checklist c-claude-md → 「about.htmlの `<title>` が「練習：」で始まるかを確かめました」; pr-answer row 1, column 2 → 「about.htmlの `<title>` も「練習：」で始まった。圧縮のあと、ディスクから読み直されたため」.",
-    "pr-steps-compact pr-predict hint: replace it with 「5-3の図と表で、直下のCLAUDE.mdと会話だけの指示がたどる道を見比べます。」.",
-    "s3-diagram alt: make it read 「圧縮の前のコンテキストが、会話とツールの出力、決まったファイルの指示の2つに分かれる図。会話は要約に置き換わり、決まったファイルの指示はディスクから読み直されて、どちらも圧縮のあとのコンテキストに入る。中身の一覧は次の表にあります。」.",
-    "Term consistency with s2-defs: write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in check-quiz e4 option b feedback, pr-diagnose p2 option d feedback and the p2 explanation.",
-    "factual doubt (residual generic wording): check-quiz e4 option d feedback 「決まりはファイルに書いて残します。」 → 「決まりは直下のCLAUDE.mdに書いて残します。」; sum-points[2] 「いつも守らせたいことはファイルに書きます。」 → 「いつも守らせたいことは直下のCLAUDE.mdに書きます。」.",
+    "pr-code: the elliptical 「- <title>は「練習：」から」 works, but it models a terse CLAUDE.md rule. If the 390 px width allows one more character, use 「- <title>は「練習：」始まり」. Otherwise keep it, since pr-prompt-a's expect spells out 「「練習：」で始まります」. The brief note (Format, mobile fit) still quotes 「- HTMLの<title>は「練習：」で始める」. Update it to the current line.",
+    "hook-predict q0 option d feedback: replace it with 「不具合ではなく、長い会話で起きやすいふるまいです。会話がたまるほど、前の指示が埋もれやすくなります。」.",
+    "Practice hint ladder (to reach 4 on practice): give pr-predict three hints. (1) 「5-3の図で、それぞれの指示がたどる矢印を見ます。」 (2) 「直下のCLAUDE.mdは『決まったファイル』に入るかを考えます。」 (3) 「会話だけの指示は、要約に置き換わる側です。」",
+    "Notation consistency with pr-code: change pr-checklist c-claude-md to 「about.htmlの `<title>` が「練習：」で始まるかを確かめました」, and pr-answer row 1, column 2 to 「about.htmlの `<title>` も「練習：」で始まった。圧縮のあと、ディスクから読み直されたため」.",
+    "s3-diagram alt: 「圧縮の前のコンテキストが、会話とツールの出力、決まったファイルの指示の2つに分かれる図。会話は要約に置き換わり、決まったファイルの指示はディスクから読み直されて、どちらも圧縮のあとのコンテキストに入る。中身の一覧は次の表にあります。」.",
+    "Term consistency with s2-defs: write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in the check-quiz e4 option b feedback, the pr-diagnose p2 option d feedback and the p2 explanation.",
+    "factual doubt (residual generic wording): in the check-quiz e4 option d feedback, change 「決まりはファイルに書いて残します。」 to 「決まりは直下のCLAUDE.mdに書いて残します。」. In sum-points[2], change 「いつも守らせたいことはファイルに書きます。」 to 「いつも守らせたいことは直下のCLAUDE.mdに書きます。」.",
     "s5-prompt: replace the third line with 「前に試したときは、{{ずれた行の例}} の日付が1日ずれました。」 and add var {\"name\": \"ずれた行の例\", \"hint\": \"例：2026-10-20,1200 の行\"}.",
     "s3-table row 1: write 「プランモード（plan mode、第3回）の計画」 so the term has a recall.",
     "check-quiz e4: set bloom to \"apply\" so that o2 also has an apply-level item.",
-    "5-2 holds two ideas. Consider moving s2-session and s2-code into 5-1 after s1-defs.",
+    "Section 5-2 holds two ideas. Consider moving s2-session and s2-code into 5-1, after s1-defs.",
     "pr-steps-start pr-start expect: 「初めてのフォルダなので、フォルダを信頼するかの確認（第1回）が出ます。承認すると、Claude Codeの入力欄が表示されます。」."
   ],
   "average": 3.46,
   "verdict": "pass",
-  "summary": "Verification round. review-scope exited 0: 1 of 47 blocks changed (hook-predict, 2%), with no section or objective changes. The previous review had no open must-fix items, so there are no resolved entries. I reviewed hook-predict in full. q0 options c and d are now parallel diagnoses of the cause instead of cause-plus-remedy, which fits the prompt better and removes b as the only diagnosis. Hook stays at 4 and miscon stays at 4. One loose end: the q0-d feedback still says 「入れ直しても」 (niceToHave with replacement text). The other criteria are carried over. Validate and lint --strict are clean (0 errors, 0 warnings). Measure: prose 1945, est 19.8 min against estMinutes 20. Every criterion is 3 or above, the mean is 3.46 and there are no must-fix items, so the verdict is pass."
+  "summary": "Verification round. review-scope exited 0: 1 of 47 blocks changed (pr-code, 2%), and no section or objective changed. The previous review had no open must-fix items, so there are no resolved entries. I reviewed pr-code in full. The CLAUDE.md rule was shortened from 「…で始める」 to 「- <title>は「練習：」から」 to fit 390 px. In context it still means \"starts with\", and it matches what pr-prompt-a/b, c-claude-md and pr-answer check, so there is no regression. One niceToHave suggests a less elliptical wording and notes that the brief quotes the old line. I re-scored practice (3) and load (3); the other criteria are carried over. Validate and lint --strict are clean (0 errors, 0 warnings). Measure: prose 1945, est 19.8 min against estMinutes 20. Every criterion is 3 or above, the mean is 3.46 and there are no must-fix items, so the verdict is pass."
 }

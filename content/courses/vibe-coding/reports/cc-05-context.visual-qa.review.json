@@ -1,58 +1,56 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:e51506cc1e6117ed",
+  "lessonHash": "sha256:7a183d3f582412d5",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The s3-diagram flowchart TD fits 390 px and its Japanese labels are readable (pages/mobile-jp-09.png). The three 2-column tables (s2-table, s3-table, s4-table) wrap cleanly with no overflow (pages/mobile-jp-06.png, 10.png, 12-13.png). One code line in pr-code is cut off at 390 px, right in the middle of the filename CLAUDE.md (pages/mobile-jp-22.png).",
+      "score": 4,
+      "evidence": "The s3-diagram flowchart TD has five short Japanese labels that stay readable at 390 px (pages/mobile-jp-09.png). The two-column tables s2-table, s3-table, s4-table and pr-answer fit the phone width without clipping, and s2-code and pr-code show every line on mobile (pages/mobile-jp-07.png, pages/mobile-jp-22.png).",
       "blockIds": [
         "s3-diagram",
         "s2-table",
         "s3-table",
         "s4-table",
+        "pr-answer",
+        "s2-code",
         "pr-code"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "textOnlyScreens is empty on desktop and mobile. Every screen has a heading, table, figure, code, steps or a check, and there are no walls of text or empty gaps. Desktop JP charsPerLine median is 39 (target 30-40).",
+      "score": 3,
+      "evidence": "No screen is text-only, and the desktop line length has a median of 39 characters (target 30-40, max 53). In the practice section, two steps lists, two prompts, a checklist and a table come one after another and fill about eight phone screens (pages/mobile-jp-21.png to pages/mobile-jp-27.png) with no heading to break them up.",
       "blockIds": [
-        "s1-defs",
-        "s5-steps",
-        "pr-steps-compact"
+        "pr-steps-start",
+        "pr-prompt-a",
+        "pr-steps-compact",
+        "pr-prompt-b",
+        "pr-checklist",
+        "pr-answer"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "All text and diagram labels are Japanese, English is given on first use (e.g. kitchen sink session), contrast is fine and no controls are hidden under the bars. The narrow table columns and the long inline code in objective o1 cause some breaks inside words on mobile, such as セッショ/ン and 見分/け (pages/mobile-jp-12.png, pages/mobile-jp-01.png).",
+      "score": 4,
+      "evidence": "All text, diagram labels and UI copy are Japanese, as expected for a JP-only lesson. Contrast is good on the callout, quiz and prompt cards, s3-diagram has an alt text, and no controls sit under the top or bottom bars (pages/mobile-jp-11.png, pages/mobile-jp-19.png).",
       "blockIds": [
-        "s4-table",
-        "lesson"
+        "s3-diagram",
+        "s3-pitfall"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "pr-code",
-      "issue": "At 390 px the line echo '- <title>は「練習：」で始める' > CLAUDE.md is cut off at 'CLAUDE.m'. The final 'd' is hidden. pr-start tells learners to type the commands line by line, so anyone copying what they see creates CLAUDE.m and the exercise silently fails because the rules file is never loaded.",
-      "fix": "Shorten the line so it fits about 38 monospace columns. For example, write the rule as echo '- titleは「練習：」から' > CLAUDE.md, and change pr-prompt-a, pr-prompt-b and pr-answer to match. Another option is to also name the file in pr-start md: 「ファイル名は CLAUDE.md です」.",
-      "screenshot": "pages/mobile-jp-22.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s4-table: on mobile the first column is narrow, so words break mid-word (セッショ/ン, 関/係, 読み続/ける). Shorter bold labels, or moving the English names into the second line, would help (pages/mobile-jp-12.png, pages/mobile-jp-13.png).",
-    "s2-table: the row 自動のコンテキスト圧縮 breaks 消/し on mobile. Shortening the cell (e.g. 「上限が近いと古い出力から消し、要約する」) would avoid it (pages/mobile-jp-06.png).",
-    "Objective o1: the unbreakable /clear・/compact・サブエージェント run forces 見分/け onto two lines on mobile in the objectives box and in ふりかえり (pages/mobile-jp-01.png, pages/mobile-jp-33.png). Putting spaces or 「、」 between the three tools would let the line break naturally.",
-    "reader: the end banner says this is the course's last lesson, and the mobile full-length PNG stops at 16000px. Both are known draft-preview behaviour."
+    "Objective o1 breaks as 「見分」/「け、」 at 390 px in the objectives card and again in the reflection card, because 「/clear・/compact・サブエージェント」 has no break point (pages/mobile-jp-01.png, pages/mobile-jp-33.png). Writing it as 「/clear、/compact、サブエージェントのどれで対処するかを選べる」 would give the line more places to wrap.",
+    "The practice section (pr-steps-start to pr-answer) runs about eight phone screens with no subheading. A short markdown line such as 「後半：/context と /compact を試す」 before pr-code would mark where the second half starts (pages/mobile-jp-21.png).",
+    "pr-answer comes straight after the checklist with only its caption to explain it. A one-line lead such as 「終わったら、下の例と比べましょう」 would make clear it is the answer key (pages/mobile-jp-27.png).",
+    "reader: the end banner says this is the last lesson of the course because drafts are not in course.json (pages/mobile-jp-34.png). This is a known preview artifact.",
+    "reader: the mobile full-length PNG stops at 16000 px and 13 /api/ requests failed. Both are environment noise; the per-screen PNGs cover the whole page."
   ],
-  "verdict": "revise",
-  "summary": "metrics.json has no hard failures and the lessonHash matches sha256:e51506cc1e6117ed. The layout is clean and visually varied: the vertical compaction diagram, tables and prompt blocks all read well at 390 px, and there are no text-only screens or privacy issues. One must-fix: in pr-code, the echo line is cut off at 'CLAUDE.m' on mobile (pages/mobile-jp-22.png), so learners typing it would create the wrong file. Shorten that line."
+  "verdict": "pass",
+  "summary": "metrics.json shows no hard failures (no overflow, console, mermaid, unknown-block or broken-image errors), and its lessonHash matches the expected sha256:7a183d3f582412d5. No screen shows personal data, and the diagram, tables, code and quizzes all read cleanly at 390 px and 1440 px, so there are no must-fix items. The most useful polish is to mark the second half of the long practice section and to reword objective o1 so it does not break inside 見分け on mobile."
 }

@@ -1,27 +1,27 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:e51506cc1e6117ed",
+  "lessonHash": "sha256:7a183d3f582412d5",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:2597b7828fdf4777",
+    "reviewedRevision": "sha256:e51506cc1e6117ed",
     "changed": [
-      "hook-predict"
+      "pr-code"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/2597b7828fdf4777/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/e51506cc1e6117ed/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Only hook-predict q0 changed. Options c and d no longer end with a remedy. They are now 「伝え方が弱く、言葉の強さが足りなかった」 and 「Claude Codeに不具合が起きていた」. All four options now share the same form: a cause stated in the plain past (「癖がついた」「落ちたりした」「足りなかった」「起きていた」). This applies the previous niceToHave and meets §5. Option d's feedback still says 「入れ直しても、同じ使い方なら同じことが起きます。」, but the option no longer mentions reinstalling. The learner still reads this correctly, so it is listed in niceToHave. The changed text has no grammar, meaning or rule error. The stiff spots in unchanged text are carried over (s5-steps, s5-check). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
+      "evidence": "Only pr-code changed. Its CLAUDE.md line went from 「- <title>は「練習：」で始める」 to 「- <title>は「練習：」から」. This is code, and its meaning still matches the expect text in pr-steps-start (「`<title>` は、CLAUDE.mdのとおり「練習：」で始まります。」) and the about.html expect, so it adds no (a)–(e) error. The shorter rule leaves out its verb, but the learner still reads it correctly, so it goes in niceToHave only. The stiff spots in unchanged text are carried over (s5-steps, s5-check). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
       "blockIds": [
-        "hook-predict",
+        "pr-code",
         "s5-steps",
         "s5-check"
       ]
@@ -31,7 +31,7 @@
       "score": 4,
       "evidence": "The change does not touch load. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289 and est 19.8 min (must be ≤ 20), with estMinutes 20.",
       "blockIds": [
-        "hook-predict"
+        "pr-code"
       ],
       "carriedOver": true
     },
@@ -57,7 +57,8 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "hook-predict: option d no longer mentions reinstalling, but its feedback still starts from it — 「入れ直しても、同じ使い方なら同じことが起きます。」→「入れ直しても、同じ使い方なら同じことが起きます。原因は会話の状態にあります。」 or more simply 「同じ使い方なら、入れ直しても同じことが起きます。」",
+    "pr-code: the new CLAUDE.md rule leaves out its verb, while the expect texts and the checklist say 「で始まる」. This is code, so the author decides — 「- <title>は「練習：」から」→「- <title>は「練習：」で始める」",
+    "hook-predict: option d no longer mentions reinstalling, but its feedback still starts from it (carried over) — 「入れ直しても、同じ使い方なら同じことが起きます。」→「同じ使い方なら、入れ直しても同じことが起きます。」",
     "pr-checklist: pr-code and pr-prompt-a write 「<title>」, but the checklist still writes the bare 「title」 (carried over) — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
     "s3-diagram: the alt text lists four items that the diagram no longer shows (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
     "s3-table: the caption quotes only part of the diagram label (carried over) — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
@@ -72,5 +73,5 @@
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0, with 1 of 47 blocks changed (2%, hook-predict q0 only). The previous review had no open must-fix items, so the resolved list is empty. Options c and d now state a cause in the plain past, like options a and b. This applies the previous niceToHave and makes the four options parallel. The change adds no (a)–(e) error. Option d's feedback still mentions reinstalling (「入れ直しても」), which is listed in niceToHave. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
+  "summary": "Verification round: review-scope.mjs exited 0, with 1 of 47 blocks changed (2%, pr-code only). The previous review had no open must-fix items, so the resolved list is empty. The CLAUDE.md line in pr-code was shortened to 「<title>は「練習：」から」. Its meaning still matches the expect texts, so it adds no (a)-(e) error. Keeping the verb is suggested in niceToHave only. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.8 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
 }
