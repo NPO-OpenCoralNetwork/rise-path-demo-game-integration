@@ -73,29 +73,53 @@ export function ensureFxTextures(scene) {
   }
 }
 
-/** シーンの時計で ms 待つ。シーンが止まって時計が進まなくても、少し後には先へ進む。 */
+/** 画面を離れて（シーンが終わって）演出を続けられないことを表す。playBattleAnimation が受け止める。 */
+export class SceneEndedError extends Error {
+  constructor() {
+    super('scene ended');
+    this.name = 'SceneEndedError';
+  }
+}
+
+// シーンが終わったか（Phaser.Scenes.SHUTDOWN = 8 以降）。終わったシーンに足した表示物は、次にそのステージに入ったときに出てしまう
+const ended = (scene) => Boolean(scene.sys?.settings) && scene.sys.settings.status >= 8;
+
+/** シーンの時計で ms 待つ。シーンが止まって時計が進まなくても、少し後には先へ進む（シーンが終わっていたら SceneEndedError）。 */
 export function wait(scene, ms) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const timeScale = scene.time?.timeScale || 1;
-    const fallback = setTimeout(resolve, ms / timeScale + 400);
-    scene.time.delayedCall(ms, () => {
+    let fallback;
+    const finish = () => {
       clearTimeout(fallback);
-      resolve();
-    });
+      if (ended(scene)) reject(new SceneEndedError());
+      else resolve();
+    };
+    fallback = setTimeout(finish, ms / timeScale + 400);
+    scene.time.delayedCall(ms, finish);
   });
 }
 
-/** tween を Promise で待つ（終わるか止まったら resolve。シーンが止まっても保険の時間で進む）。 */
+/** tween を Promise で待つ（終わるか止まったら resolve。シーンが止まっても保険の時間で進む。シーンが終わっていたら SceneEndedError）。 */
 export function animate(scene, config) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const timeScale = scene.tweens.timeScale || 1;
     const total = (config.duration ?? 0) * ((config.repeat ?? 0) + 1) * (config.yoyo ? 2 : 1) + (config.delay ?? 0);
-    const fallback = setTimeout(resolve, total / timeScale + 400);
+    let fallback;
     const done = () => {
       clearTimeout(fallback);
-      resolve();
+      if (ended(scene)) reject(new SceneEndedError());
+      else resolve();
     };
+    fallback = setTimeout(done, total / timeScale + 400);
     scene.tweens.add({ ...config, onComplete: done, onStop: done });
+  });
+}
+
+/** 待たずに流す演出（斬撃など）が、途中でシーンが終わって止まっても、エラーにしない。 */
+function quietly(promise, cleanup) {
+  return promise.catch((error) => {
+    cleanup?.();
+    if (!(error instanceof SceneEndedError)) throw error;
   });
 }
 
@@ -241,7 +265,8 @@ export async function slashArc(scene, x, y, {
       g.strokePath();
     });
   };
-  await progress(scene, { duration, ease: 'Cubic.easeOut', onUpdate: (p) => draw(p) });
+  await quietly(progress(scene, { duration, ease: 'Cubic.easeOut', onUpdate: (p) => draw(p) }), () => g.destroy());
+  if (!g.scene) return g;
   scene.tweens.addCounter({
     from: 1, to: 0, duration: 200,
     onUpdate: (tween) => draw(1, tween.getValue()),
@@ -269,7 +294,8 @@ export async function clawMarks(scene, x, y, { size = 80, color = 0xff4d4d, dura
       });
     });
   };
-  await progress(scene, { duration, onUpdate: (p) => draw(p) });
+  await quietly(progress(scene, { duration, onUpdate: (p) => draw(p) }), () => g.destroy());
+  if (!g.scene) return;
   scene.tweens.addCounter({
     from: 1, to: 0, duration: 220,
     onUpdate: (tween) => draw(1, tween.getValue()),
@@ -292,7 +318,8 @@ export async function beam(scene, from, to, { color = 0x9fe8ff, width = 18, dura
       g.lineBetween(from.x, from.y, x, y);
     });
   };
-  await progress(scene, { duration, ease: 'Quad.easeOut', onUpdate: (p) => draw(p) });
+  await quietly(progress(scene, { duration, ease: 'Quad.easeOut', onUpdate: (p) => draw(p) }), () => g.destroy());
+  if (!g.scene) return;
   scene.tweens.addCounter({
     from: 1, to: 0, duration: hold + 180,
     onUpdate: (tween) => {

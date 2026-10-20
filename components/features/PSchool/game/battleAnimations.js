@@ -8,7 +8,7 @@
 import { castPose, dodge, hitReact, lunge, restoreTint } from './characterMotion.js';
 import {
   beam, burst, clawMarks, dimScreen, drawLightning, ensureFxTextures, fadeAndDestroy, flashScreen, glowPop,
-  magicCircle, orb, progress, projectile, reducedMotion, shake, shockRing, slashArc, stopTrail, trail, wait,
+  magicCircle, orb, progress, projectile, reducedMotion, SceneEndedError, shake, shockRing, slashArc, stopTrail, trail, wait,
 } from './battleEffects.js';
 
 const FIRE = [0xff8c1a, 0xffc93a, 0xff4a12];
@@ -39,6 +39,8 @@ function anchors(scene, opts = {}) {
   const py = P?.y ?? height * 0.67;
   const ex = E?.x ?? width * 0.75;
   const ey = E?.y ?? height * 0.6;
+  // 地面の高さは足元の影から取る（宙に浮く敵は、絵の下端より影のほうが下にある）
+  const groundOf = (role) => scene.shadows?.find((shadow) => shadow.role === role)?.shape?.y;
   return {
     P, E, ph, pw, eh, ew,
     dodge: Boolean(opts.dodge),
@@ -46,8 +48,8 @@ function anchors(scene, opts = {}) {
     enemy: { x: ex, y: ey },
     // 杖の先（主人公の絵は右手で杖を掲げている）
     hand: { x: px + pw * 0.28, y: py - ph * 0.22 },
-    heroFeet: { x: px, y: py + ph * 0.46 },
-    enemyFeet: { x: ex, y: ey + eh * 0.46 },
+    heroFeet: { x: px, y: groundOf('player') ?? py + ph * 0.46 },
+    enemyFeet: { x: ex, y: groundOf('enemy') ?? ey + eh * 0.46 },
     // 盾を出す位置（主人公の前）
     guard: { x: px + pw * 0.62, y: py },
     // 敵の口や手（主人公側の端）
@@ -361,7 +363,11 @@ export const BATTLE_ANIMATIONS = {
     endSpell(scene, charge);
     const old = scene.iceShieldWall;
     scene.iceShieldWall = null;
-    if (old?.g?.scene) fadeAndDestroy(scene, old.g, { duration: 160 });
+    if (old?.g?.scene) {
+      // 前の盾のゆらめき（くり返しの tween）を止めてから消す
+      scene.tweens.killTweensOf(old.g);
+      fadeAndDestroy(scene, old.g, { duration: 160 });
+    }
     const wall = iceWall(scene, a);
     wall.g.setScale(1, 0.05);
     burst(scene, a.guard.x, a.guard.y + wall.h / 2, {
@@ -843,6 +849,8 @@ export async function playBattleAnimation(scene, type) {
   try {
     await run(scene, { dodge: dodges });
   } catch (error) {
+    // 画面を離れたら、残りの演出は出さずに終える
+    if (error instanceof SceneEndedError) return false;
     // 演出の失敗で戦闘を止めない
     console.warn(`[battleAnimations] ${type}`, error);
   }

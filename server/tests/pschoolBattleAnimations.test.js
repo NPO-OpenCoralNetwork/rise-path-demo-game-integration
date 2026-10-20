@@ -158,6 +158,24 @@ describe('P-School battle animations', () => {
     assert.equal(await flinches('playerAttack', () => false), 1, 'a normal enemy flinches');
   });
 
+  it('stops quietly, adding nothing more, when the scene shuts down mid-animation', async () => {
+    for (const type of ['magic_fire', 'magic_thunder', 'enemyAttack_poison', 'playerAttack']) {
+      const scene = fakeScene();
+      scene.sys = { settings: { status: 5 } };
+      const run = playBattleAnimation(scene, type);
+      // let the wind-up start, then leave the battle (Phaser.Scenes.SHUTDOWN = 8); shutdown destroys the sprites
+      await new Promise((resolve) => setImmediate(resolve));
+      scene.sys.settings.status = 8;
+      scene.playerSprite.destroy();
+      scene.enemySprite.destroy();
+      const createdAtShutdown = scene.created.length;
+      await run;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.deepEqual(warnings, [], `${type} stops without errors`);
+      assert.equal(scene.created.length, createdAtShutdown, `${type} adds nothing to the ended scene`);
+    }
+  });
+
   it('keeps the ice shield up on a stage that blocks with it, then shatters it', async () => {
     const scene = fakeScene();
     scene.keepsIceShield = true;

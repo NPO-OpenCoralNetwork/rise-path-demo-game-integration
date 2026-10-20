@@ -148,7 +148,9 @@ export class BattleScene8 extends BattleScene {
       this.addLog(`🔮 ${spellName}発動！${damage}ダメージ！`);
       
       // 魔法エフェクトを再生（魔法名から選ぶ。氷の盾は主人公の前に氷の壁を出す）
-      const animationType = spellName === '氷の盾' ? 'ice_shield' : spellAnimation(spellName, 'magic_fire');
+      // ダメージが負の魔法（回復魔法など）は敵の HP が増えるので、主人公の回復の光は出さず、敵に当たる光にする
+      const spellFx = spellAnimation(spellName, 'magic_fire');
+      const animationType = spellName === '氷の盾' ? 'ice_shield' : (damage < 0 || spellFx === 'healing' ? 'magic_flash' : spellFx);
       await this.playAnimation(animationType);
       if (this.isBattleOver()) return 0;
 

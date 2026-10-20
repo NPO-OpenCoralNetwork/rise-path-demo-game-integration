@@ -9,6 +9,14 @@ import { defeat, settled, startIdle, stopIdle, victory } from "./characterMotion
 import { playBattleAnimation } from "./battleAnimations";
 import { floatingNumber } from "./battleEffects";
 
+// 前の戦いの続きの処理を止めるための例外（BattleScene.assertSameBattle が投げ、engine.js が受け止める）
+export class BattleRestartedError extends Error {
+  constructor() {
+    super('battle restarted');
+    this.name = 'BattleRestartedError';
+  }
+}
+
 export class BattleScene extends Phaser.Scene {
   constructor(config) {
     // 継承クラスからconfigが渡された場合はそれを使用し、なければデフォルトのkeyを設定
@@ -127,9 +135,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create() {
-    // 勝ち負けの状態（restart では同じインスタンスが使われるので、ここで毎回戻す）
+    // 1回の戦いの状態（restart や同じステージへの再入場では同じインスタンスが使われるので、ここで毎回戻す）
     this.battleEnded = false;
     this.resultShown = false;
+    // HP の数字の基準（前の戦いの HP との差を数字にしない）
+    this.shownHP = null;
+    this.hpNumbersReady = false;
+    // 何回目の戦いか。やり直したあとで、前の戦いの続きの処理が新しい戦いに触れないようにする
+    this.battleId = (this.battleId ?? 0) + 1;
 
     // バトル統計の初期化
     this.battleStats = {
@@ -843,12 +856,26 @@ export class BattleScene extends Phaser.Scene {
   // アニメーション再生（演出の中身は battleAnimations.js）
   async playAnimation(animationType) {
     console.log(`Playing animation: ${animationType}`);
+    const battleId = this.battleId;
 
     // 前の演出（のけぞりなど）が終わってから始める。重なると位置がずれていくため
     await settled(this.playerSprite, this.enemySprite);
-    // 待つ間に戦闘が終わって画面を離れていたら、何も出さない
-    if (this.sys.settings.status >= Phaser.Scenes.SHUTDOWN) return false;
-    return playBattleAnimation(this, animationType);
+    this.assertSameBattle(battleId);
+    // 勝ち負けが決まったあと（画面を離れたあとも）は、もう演出を出さない
+    if (this.isBattleOver()) return false;
+    const played = await playBattleAnimation(this, animationType);
+    this.assertSameBattle(battleId);
+    return played;
+  }
+
+  // 演出を待つ間に「もう一度戦う」でやり直していたら、前の戦いの続きの処理を止める（engine.js が受け止める）
+  assertSameBattle(battleId) {
+    if (this.battleId !== battleId) throw new BattleRestartedError();
+  }
+
+  // engine.js 用：run を始めたときの戦いが、まだ画面で続いているか
+  isCurrentBattle(battleId) {
+    return this.battleId === battleId && this.sys.settings.status < Phaser.Scenes.SHUTDOWN;
   }
 
   // 敵へのダメージ処理

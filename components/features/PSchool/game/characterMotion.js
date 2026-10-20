@@ -109,7 +109,8 @@ export function lunge(scene, sprite, { direction = 1, distance = 90, onImpact } 
       targets: sprite, x: x + direction * reach, angle: angle + direction * 6, scaleX: scaleX * 1.05,
       duration: reduced ? 80 : 130, ease: 'Quad.easeIn',
     });
-    onImpact?.();
+    // 踏み込みの間に画面を離れていたら（スプライトが捨てられていたら）、斬撃などは出さない
+    if (isSprite(sprite)) onImpact?.();
     await play(scene, { targets: sprite, x, angle, scaleX, duration: reduced ? 120 : 220, ease: 'Quad.easeOut' });
   });
 }

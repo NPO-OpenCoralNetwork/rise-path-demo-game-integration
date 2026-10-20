@@ -312,7 +312,9 @@ export class BattleScene10 extends BattleScene {
     const finalDamage = Math.floor(damage * effectiveness);
     
     // エフェクト再生（ライデンと回復もここに来るので、魔法名から選ぶ）
-    const animationType = spellAnimation(spell, null);
+    // この処理ではどの魔法も敵へのダメージになるので、回復の光ではなく属性のない光にする（ステージ15と同じ）
+    const spellFx = spellAnimation(spell, null);
+    const animationType = spellFx === 'healing' ? 'magic_flash' : spellFx;
 
     // 魔法が当たってから HP を減らす
     if (animationType) {
