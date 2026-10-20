@@ -28,7 +28,7 @@ the course it is published in is the owner's decision.
   - 非対話的実行：`claude -p`、終了コード、`--bare`（推奨、API キーが必要、プロジェクトのフックと `.mcp.json` を読まない）、
     `--allowedTools`（`Bash(npm test *)` のように絞る）、`--permission-mode dontAsk`、`--output-format json`、
     `--max-budget-usd`。v2.1.302 からモード指定なしの `-p` は Manual で始まり、承認が必要な呼び出しは拒否される。
-  - 無人実行の置き場所：GitHub Actions（`anthropics/claude-code-action@v1`、`/install-github-app`）、
+  - 無人実行の置き場所：GitHub Actions（`anthropics/claude-code-action@v1`）、
     クラウドの定期タスク（`/schedule`、旧称 routines）、デスクトップの定期タスク、`/loop`。
   - 公式の4点：成功の条件、読むだけなら読み取りだけ、1回の費用の上限、読み込みの失敗を「何もない」にしない。
     権限と費用は依頼文ではなく設定で決める。
@@ -44,10 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（本文 約2,390字 ≈ 5.3分 + 問題11問 ≈ 7.3分 + 演習2つ × 2分 = 16.6 → 17）。
-  本文の数え方：markdown・callout・definitions（用語名を含む）・list・表のセル・steps（md/expect）・summary の
-  文字数（空白なし）。インラインコードは除く（契約の「code excluded」）。steps の hint/troubleshoot（約240字）は
-  折りたたみの「つまずいたら」（StepsBlock の details）にあるので本文に数えない。含めると約2,630字 ≈ 17.2分 → 17。
+- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1521 (budget 1,200–2,400) · read 2643 · practice reading 1247 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
+  est = (2,643 + 1,247) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.98 → 20。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
 - 演習の題材 / practice task idea: 練習用リポジトリ `cc-practice-09` に、1件だけわざと失敗するテストのある小さなプロジェクトを作り、
@@ -122,3 +120,8 @@ predict before running (p-run).
   repository with no commits, the command fails with `Failed to resolve base branch "HEAD": git rev-parse failed`."
 - The e4 sentence on VMs follows the Security page (checked 2026-10-20), best practices for untrusted content:
   "Use virtual machines (VMs) to run scripts and make tool calls". Source `cc-security` was added for it.
+- Fact audit (2026-10-20, Run agents in parallel / Choose a permission mode): s1-lead now introduces worktrees and
+  background execution as tools that help parallel work (the docs count five ways to run agents, not three).
+  `dontAsk` is described as denying what would otherwise prompt; reads in the working folders still run (s3-table,
+  e3, pc-mode, p2 expect). The summary point keeps the condition 「モードを指定しない」. `/install-github-app` was
+  dropped from s4-table to stay within est ≤ 20.

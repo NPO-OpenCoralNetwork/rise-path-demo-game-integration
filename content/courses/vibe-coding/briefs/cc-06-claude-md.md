@@ -21,7 +21,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
   - 4 つの置き場所（管理ポリシー・ユーザー `~/.claude/CLAUDE.md`・プロジェクト `./CLAUDE.md`・ローカル `./CLAUDE.local.md`）。上書きではなく、つながって読まれる。矛盾は Claude がどちらかを選ぶ。
   - 公式の書き方：1 ファイル 200 行未満、具体的で確かめられる指示、同じ間違いが 2 回で 1 行足す、消しても間違いが増えない行は削る、書かないもの。
   - 途中の編集は `/clear`・`/compact`・再起動のあとに反映。
-  - `@path` インポート（4 段まで、起動時に読まれるのでコンテキストは減らない）、`.claude/rules/` と `paths:`、AGENTS.md（v2.1.277 以降、CLAUDE.md も CLAUDE.local.md もないとき。`@AGENTS.md` で共有）。
+  - `@path` インポート（4 段まで、起動時に読まれるのでコンテキストは減らない）、`.claude/rules/` と `paths:`、AGENTS.md（v2.1.277 以降の既定では、作業フォルダーとその上に CLAUDE.md も CLAUDE.local.md もないとき。`~/.claude/CLAUDE.md` や組織の CLAUDE.md は数えない。`@AGENTS.md` で共有）。
   - 自動メモリ（Claude が書くメモ、`MEMORY.md` の最初の 200 行か 25KB）。
   - CLAUDE.md は助言でありコンテキスト。強制は権限ルール（第2回）とフック（第8回）。公式ブログ（steering post）の 5 つのつまずきと移す先。
 - 扱わない（別レッスン） / out: スキルの書き方（第7回）、フックの書き方（第8回）、権限ルールの細かい書式と評価順（第2回）、`/doctor prompt-audit` や `CLAUDE_CODE_NEW_INIT`、モノレポの `claudeMdExcludes`。
@@ -34,7 +34,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
   - IMPORTANT を付ければ確実（→ 強調は 1 行ずつ。強制にはならない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（計算は下の Assumptions）。
+- 所要時間 / minutes: 19（コース共通の measure.mjs：`cc-06-claude-md.lesson.json: prose 2398 (budget 1,200–2,400) · read 3737 · practice reading 1198 · questions 9 · practice sections 1 · est 19.0 min (must be ≤ 20; estMinutes 19)`。(3,737 + 1,198) ÷ 450 ≈ 10.97分 + 問題9問 × 40秒 = 6.0分 + 演習1セクション × 2分 = 2分、計 19.0分 → 19）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 練習用フォルダー `cc-practice-06` に、膨らんだ見本の CLAUDE.md（18 行、ヒアドキュメントで作成）を置く。自分で行き先を決めてから Claude Code に書き直しを頼み、差分を説明させ、再起動後に `/context` と `/permissions` で確かめる。具体的な行は残し、手順は `docs/add-screen.md`（第7回のスキル候補）、`src/api/` の決まりは `paths:` 付きルール、「絶対に〜しない」は拒否ルール、好みは CLAUDE.local.md へ。チェックリスト、3 段のヒント、模範解答つき。
@@ -60,7 +60,7 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 - 前提の第1回〜第5回は、コース共通の正式タイトル（「第2回｜任せる範囲を決める：権限モードと巻き戻し」など）で書いた。
 - 権限ルールの書式（`Read(./.env)`、`Bash(git push *)`）と `/permissions` が規則と出どころのファイルを表示する点は、第2回用の検証済み facts（docs-15, safety-9）から使った。
 - 「auto モードの分類器も見逃しがゼロではない」は第2回用 facts（permission-modes: "does not guarantee safety"）による。
-- estMinutes: 問題を除く画面上の読む文字（タイトル・見出し・本文・表・定義・リスト・手順・図の説明・まとめ・カード。リンクの URL やマークダウンの記号は数えない）約 5,380 字 ÷ 450 ≈ 12.0 分 + 問題 9 問（予想 1・確認 4・テスト 4）× 40 秒 = 6.0 分 + 演習 1 つ 2 分 ≈ 20.0 分 → 20 分。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
+- estMinutes: コース共通の measure.mjs で 19.0 分 → 19（Format の行）。問題は 9 問（予想 1・確認 4・テスト 4）。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
 - 本文の長さ（vibe-ch2 のレポートと同じ数え方：prose のうちプロンプトの expect と手順の hint/troubleshoot を除く）は初版で 2,355 字、prose 全体で 2,470 字。レビュー後の修正（拒否ルールの限界の2文、ヒントの9行目、略語の正式名など）で約 200 字増えた。
 - 演習の見本と模範解答はスクラッチで実際に実行し、18 行の CLAUDE.md、`sed -n '12,18p'` での手順の切り出し、`.gitignore` への追記、settings.json の JSON として正しいことを確かめた。
 

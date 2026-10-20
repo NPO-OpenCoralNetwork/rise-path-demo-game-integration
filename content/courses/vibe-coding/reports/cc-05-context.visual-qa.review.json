@@ -1,0 +1,71 @@
+{
+  "lessonId": "cc-05-context",
+  "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
+  "lessonHash": "sha256:ad13e1245e9cc670",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 2,
+      "evidence": "On desktop the diagram, tables, code, prompts and steps all render cleanly (desktop-jp-04, -06, -09, -14). At 390 px, three of the lesson's key visuals are cut off at the right edge with no sign that they scroll: s2-table (mobile-jp-05/06), s3-diagram (mobile-jp-09) and s4-table (mobile-jp-12/13).",
+      "blockIds": [
+        "s2-table",
+        "s3-diagram",
+        "s4-table"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "Desktop JP characters per line have a median of 39 (target 30-40, max 53). No screen is text-only. Every section breaks up its text with definitions, tables, steps or a check (desktop-jp-10, -13, -16). The practice section is long but evenly paced (mobile-jp-19 to -27).",
+      "blockIds": [
+        "practice",
+        "s5-steps",
+        "pr-steps-compact"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The Japanese is consistent throughout, diagram labels are in Japanese, contrast is fine, and quizzes show keyboard hints (desktop-jp-02). At 390 px some important content sits in clipped columns or a clipped diagram, which touch users cannot see without a hidden sideways scroll (mobile-jp-06, -09).",
+      "blockIds": [
+        "s2-table",
+        "s3-diagram",
+        "s4-table"
+      ]
+    }
+  ],
+  "mustFix": [
+    {
+      "criterion": "visual",
+      "blockId": "s2-table",
+      "issue": "At 390 px the third column '向いている場面' is cut off at the right edge: cells read '関係のないのタスクにるとき' and '同じ作業をけたいが、きが少ない'. The narrow middle column wraps to 5-6 lines per cell.",
+      "fix": "Make it a 2-column table: '道具' and '向いている場面'. Shorten '何が起きるか' to one clause per tool (for example '会話を空にする' or '会話を要約に置き換える') and put it in the first cell after the tool name, or move it into s2-defs or s2-lead.",
+      "screenshot": "pages/mobile-jp-06.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s3-diagram",
+      "issue": "At 390 px the right branch is cut off. Node C ('決まったファイルの指示…plan mode') and node E ('ファイルの内容が読み込まれる') show only their left halves, and the edge label 'ディスクから読み直す' is truncated, so the half of the figure about what survives compaction cannot be read inline.",
+      "fix": "Narrow node C to a short label such as \"決まったファイルの指示<br>（CLAUDE.md・ルールなど）\" and list the four items in s3-table or the caption instead. Shorten E to '読み直された指示' so the two branches fit side by side at 358 px.",
+      "screenshot": "pages/mobile-jp-09.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "s4-table",
+      "issue": "At 390 px the '対処' column is cut off ('関係のないタスクの間で /clear す…', '2回直してだめなら /clear…'), so the remedy, which is the point of the table, is hidden. The English names make the first column wrap to 4-5 lines.",
+      "fix": "Use 2 columns: 'パターンと症状' and '対処'. Put the English name in the first cell after a line break, or drop it to the glossary, and keep each 対処 to about 20 characters (for example '2回でだめなら /clear して依頼を書き直す').",
+      "screenshot": "pages/mobile-jp-12.png"
+    }
+  ],
+  "niceToHave": [
+    "pr-code: on mobile the first and second lines run off the right edge of the code block (mobile-jp-22). pr-start also says to run the commands '1行ずつ', but line 1 chains three commands with &&. Split it into 'mkdir cc-context-practice', 'cd cc-context-practice' and 'git init' on separate lines.",
+    "s3-diagram: on desktop, node E wraps awkwardly as '読み込まれ / る' (desktop-jp-06). A shorter label such as '読み直された指示' avoids the orphaned kana.",
+    "reader: the closing banner says 'このコースの最後のレッスンまで読み終えました。' for this draft (desktop-jp-22, mobile-jp-33), probably because drafts are not listed in course.json. This lesson is not the last one in the course.",
+    "reader: wide tables and the mermaid figure scroll sideways on mobile with no visible scroll cue or fade. Only the figure has an expand button (mobile-jp-10)."
+  ],
+  "verdict": "revise",
+  "summary": "No hard failures in metrics.json (lessonHash sha256:ad13e1245e9cc670 matches). No personal data is visible on any screen, and the desktop layout is clean and well paced with diagrams, tables, steps and checks. The fix that matters most is the 390 px view: s2-table, s4-table and the right half of s3-diagram are cut off on mobile. Turn the tables into 2 columns with shorter cells, and shorten node C and node E of the diagram."
+}

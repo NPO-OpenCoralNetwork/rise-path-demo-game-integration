@@ -6,7 +6,7 @@
   "subtitle": "毎回の説明をやめて、短く確かめられる指示を、合う場所に置く",
   "locale": "jp",
   "level": "intermediate",
-  "estMinutes": 20,
+  "estMinutes": 19,
   "prerequisites": [
     "第1回｜最初のタスクを任せる",
     "第2回｜任せる範囲を決める：権限モードと巻き戻し",
@@ -86,7 +86,7 @@
               "answer": [
                 "b"
               ],
-              "explanation": "CLAUDE.mdも依頼文も、Claudeが読むコンテキストです。第2回で書いた権限ルール（permission rule）の拒否ルールは、Claudeの判断と関係なくClaude Codeが止めます。6-4で詳しく見ます。",
+              "explanation": "CLAUDE.mdも依頼文も、Claudeが読むコンテキストです。第2回で書いた権限ルール（permission rule）の拒否ルールは、Claudeの判断と関係なく止めます。ただし、止まるのはルールに一致する操作だけです（6-4）。",
               "objectiveId": "o3",
               "bloom": "understand"
             }
@@ -381,7 +381,7 @@
             },
             {
               "term": "AGENTS.md",
-              "md": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降、CLAUDE.mdもCLAUDE.local.mdもないときに、代わりに読まれます。"
+              "md": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降の既定では、CLAUDE.mdの代わりに読まれます。作業フォルダーとその上に、CLAUDE.mdもCLAUDE.local.mdもないときです。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。"
             }
           ]
         },
@@ -468,7 +468,7 @@
               "answer": [
                 "b"
               ],
-              "explanation": "`paths:` 付きのルールは、Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときに読まれます。`cat` などのコマンドで中身を見たときも同じです。ほかの作業のコンテキストは増やしません。",
+              "explanation": "`paths:` 付きのルールは、Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときに読まれます。1つのファイルを `cat` や `head` で見たときも同じです。ほかの作業のコンテキストは増やしません。",
               "objectiveId": "o1",
               "bloom": "apply"
             }
@@ -569,7 +569,7 @@
             "steering-post",
             "cc-permissions"
           ],
-          "md": "同じ記事によれば、本当に守らせる仕組みは、毎回同じように働く「決定的（deterministic）」なものです。ただし拒否ルールが止めるのは、ルールに一致するツールの使用です。`Read(./.env)` があっても、スクリプトが自分で開く読み取りは止まりません（第2回）。"
+          "md": "同じ記事によれば、本当に守らせる仕組みは、毎回同じように働く「決定的（deterministic）」なものです。ただし拒否ルールが止めるのは、一致する操作だけです。スクリプトが自分で開く `.env` の読み取りや、`git -C . push` のような別の書き方は止まりません（第2回）。"
         },
         {
           "id": "s4-check",
@@ -608,7 +608,7 @@
               "answer": [
                 "c"
               ],
-              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守るかどうかはClaudeの判断に委ねられます。Claudeの判断に任せず止めたいなら、`Bash(git push *)` の拒否ルールを使います。",
+              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守るかどうかはClaudeの判断に委ねられます。Claudeの判断に任せず止めたいなら、`Bash(git push *)` の拒否ルールを使います。ただし、`git -C . push` のような別の書き方には一致しません。",
               "objectiveId": "o3",
               "bloom": "understand"
             }
@@ -993,7 +993,7 @@
               "answer": [
                 "c"
               ],
-              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守る保証はありません。本当に止めたい操作は、Claude Codeが毎回同じように止める拒否ルールやフックに任せます。",
+              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守る保証はありません。本当に止めたい操作は、毎回同じように働く拒否ルールやフックに任せます。ただし拒否ルールが止めるのは、一致する操作だけです。",
               "objectiveId": "o3",
               "bloom": "apply"
             }
@@ -1048,17 +1048,17 @@
             {
               "id": "card-paths",
               "front": "`paths:` 付きのルールが読まれるのは？",
-              "back": "Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。`cat` などで中身を見たときも読まれます。"
+              "back": "Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。1つのファイルを `cat` や `head` で見たときも読まれます。"
             },
             {
               "id": "card-never",
               "front": "「絶対に〜しない」を、Claudeの判断に任せず止めるには？",
-              "back": "CLAUDE.mdではなく、権限ルールの拒否ルール（deny）に書きます。"
+              "back": "CLAUDE.mdではなく、権限ルールの拒否ルール（deny）に書きます。止まるのは、ルールに一致する操作だけです。"
             },
             {
               "id": "card-agents",
               "front": "AGENTS.mdが読まれるのは？",
-              "back": "CLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。共有するなら、CLAUDE.mdに `@AGENTS.md` と書きます。"
+              "back": "既定では、プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。共有するなら、CLAUDE.mdに `@AGENTS.md` と書きます。"
             }
           ]
         },
@@ -1109,7 +1109,7 @@
     },
     {
       "term": "AGENTS.md",
-      "md": "ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに、代わりに読まれます（v2.1.277以降）。"
+      "md": "ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます。これは既定の動きです（v2.1.277以降）。"
     },
     {
       "term": "権限ルール（permission rule）",
