@@ -20,7 +20,7 @@ const POISON = [0xb04dff, 0x7dff6a, 0x8a2be2];
 const SHADOW = [0x6b2fb3, 0x2a0f4d, 0xb07dff];
 const ARCANE = [0xc77dff, 0x7de3ff, 0xf0c8ff];
 const WIND = [0x9dffcf, 0xe6fff4, 0x5fe0a8];
-const EARTH = [0x9b7b52, 0xc9a77a, 0x6b5235];
+const EARTH = [0x7a5a38, 0xa8865a, 0x4e3a24];
 const DIGITAL = [0x39ff88, 0x2ad1ff, 0xd6ffe6];
 
 /**
@@ -678,13 +678,13 @@ export const BATTLE_ANIMATIONS = {
       const x = a.enemyFeet.x + (a.heroFeet.x - a.enemyFeet.x) * (i / steps);
       dust(scene, x, a.heroFeet.y, a.sp);
       burst(scene, x, a.heroFeet.y, {
-        texture: 'fx-rock', count: 3, speed: [80, 180], angle: [240, 300], lifespan: [300, 500], scale: [0.7 * a.sp, 0.4], tint: EARTH, gravityY: 900, blend: 'NORMAL', rotate: true,
+        texture: 'fx-rock', count: 5, speed: [100, 220], angle: [240, 300], lifespan: [350, 550], scale: [1.3 * a.sp, 0.6], tint: EARTH, gravityY: 900, blend: 'NORMAL', rotate: true,
       });
       await wait(scene, 60);
     }
     shockRing(scene, a.heroFeet.x, a.heroFeet.y, { radius: a.pw * 0.5, color: EARTH[1], flatten: 0.3, duration: 480, alpha: 0.8 });
     burst(scene, a.heroFeet.x, a.heroFeet.y, {
-      texture: 'fx-rock', count: 16, speed: scaled([260, 520], a.sp), angle: [240, 300], lifespan: [500, 800], scale: [1.4 * a.sp, 0.6], tint: EARTH, gravityY: 1200, blend: 'NORMAL', rotate: true,
+      texture: 'fx-rock', count: 20, speed: scaled([280, 560], a.sp), angle: [240, 300], lifespan: [550, 850], scale: [2.4 * a.sp, 1], tint: EARTH, gravityY: 1200, blend: 'NORMAL', rotate: true,
     });
     heroHit(scene, a, { colors: [EARTH[1], 0xffe0a8], tint: 0xc9a77a, sparks: 10, distance: 18, shakeMs: 200, shakeAmount: 0.016 });
     await wait(scene, 160);
