@@ -1,5 +1,20 @@
 import { BattleScene } from './battle.js';
 
+// 薬ごとの演出（回復・解毒は緑の光、耐性薬は守りの壁）
+const POTION_ANIMATIONS = {
+  antidote: 'healing',
+  healing_potion: 'healing',
+  resist_potion: 'ice_shield',
+  cure_all: 'healing'
+};
+
+// プレーグドクターの技ごとの演出（瘴気は毒のしぶきと泡、針の一撃は剣の斬撃で表す、病魔の一撃は闇の玉と紫の爪）
+const PLAGUE_ATTACK_ANIMATIONS = {
+  '疫病の瘴気': 'enemyAttack_poison',
+  '感染の針': 'enemyAttack_sword',
+  '病魔の一撃': 'enemyAttack_shadow'
+};
+
 // ステージ18「薬の合成レシピ」用のバトルシーン
 export class BattleScene18 extends BattleScene {
   constructor() {
@@ -209,10 +224,16 @@ export class BattleScene18 extends BattleScene {
     this.updateVariableDisplay();
   }
 
-  usePotion(potionType) {
+  async usePotion(potionType) {
     if (this.potions[potionType] < 1) {
       this.addLog(`❌ ${potionType}がありません！`);
       return;
+    }
+    
+    // 薬の演出が終わってから効果を出し、HP を増やす
+    if (POTION_ANIMATIONS[potionType]) {
+      await this.playAnimation(POTION_ANIMATIONS[potionType]);
+      if (this.isBattleOver()) return;
     }
     
     this.potions[potionType]--;
@@ -283,7 +304,7 @@ export class BattleScene18 extends BattleScene {
     this.updateStatusDisplay();
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     // 状態異常ダメージの処理
@@ -303,6 +324,10 @@ export class BattleScene18 extends BattleScene {
     
     const attacks = ['疫病の瘴気', '感染の針', '病魔の一撃'];
     const attackName = attacks[Math.floor(Math.random() * attacks.length)];
+    
+    // 技の演出が当たってから状態異常と攻撃名を出し、HP を減らす
+    await this.playAnimation(PLAGUE_ATTACK_ANIMATIONS[attackName]);
+    if (this.isBattleOver()) return;
     
     // 新しい状態異常付与の判定
     if (Math.random() < 0.3) {

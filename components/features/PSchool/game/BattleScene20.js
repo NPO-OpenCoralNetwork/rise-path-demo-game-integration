@@ -1,5 +1,12 @@
 import { BattleScene } from './battle.js';
 
+// コードイーターのフェーズごとの技の演出（シンタックスエラーはコードの破片、ロジック破壊はためた光線、コード無効化は赤い気の十字斬り）
+const PHASE_ATTACK_ANIMATIONS = {
+  1: 'enemyAttack_digital',
+  2: 'enemyAttack_beam',
+  3: 'enemyAttack_boss'
+};
+
 // ステージ20「初級最終ボス」用のバトルシーン
 export class BattleScene20 extends BattleScene {
   constructor() {
@@ -171,20 +178,20 @@ export class BattleScene20 extends BattleScene {
     }
   }
 
-  adaptiveStrategy() {
+  async adaptiveStrategy() {
     // 適応戦略 - ボスの状態に応じて最適な行動を選択
     const strategy = this.calculateOptimalStrategy();
     this.addLog(`🎯 適応戦略を実行！戦略: ${strategy}`);
     
     switch (strategy) {
       case 'aggressive':
-        this.executeAggressiveStrategy();
+        await this.executeAggressiveStrategy();
         break;
       case 'defensive':
-        this.executeDefensiveStrategy();
+        await this.executeDefensiveStrategy();
         break;
       case 'balanced':
-        this.executeBalancedStrategy();
+        await this.executeBalancedStrategy();
         break;
     }
   }
@@ -203,37 +210,59 @@ export class BattleScene20 extends BattleScene {
     }
   }
 
-  executeAggressiveStrategy() {
+  async executeAggressiveStrategy() {
     const damage = 35;
+    // 十字の二連撃が当たってから HP を減らす
+    await this.playAnimation('playerAttack_combo');
+    if (this.isBattleOver()) return;
+    
     const newHP = Math.max(0, this.enemy.getHP() - damage);
     this.enemy.setHP(newHP);
     this.addLog(`⚔️ 攻撃的戦略！大ダメージ: ${damage}！`);
     this.updateHP(this.player.getHP(), this.enemy.getHP());
   }
 
-  executeDefensiveStrategy() {
+  async executeDefensiveStrategy() {
     const healAmount = 25;
+    // 回復の光が出てから HP を増やす
+    await this.playAnimation('healing');
+    if (this.isBattleOver()) return;
+    
     const newHP = Math.min(100, this.player.getHP() + healAmount);
     this.player.setHP(newHP);
     this.addLog(`🛡️ 防御的戦略！回復: ${healAmount}！`);
     this.updateHP(this.player.getHP(), this.enemy.getHP());
   }
 
-  executeBalancedStrategy() {
+  async executeBalancedStrategy() {
     const damage = 20;
     const healAmount = 10;
+    
+    // 斬撃が当たってから敵の HP を減らし、続く回復の光のあとで HP を増やす
+    await this.playAnimation('playerAttack');
+    if (this.isBattleOver()) return;
     const newEnemyHP = Math.max(0, this.enemy.getHP() - damage);
+    this.enemy.setHP(newEnemyHP);
+    this.updateHP(this.player.getHP(), this.enemy.getHP());
+    
+    await this.playAnimation('healing');
+    if (this.isBattleOver()) return;
     const newPlayerHP = Math.min(100, this.player.getHP() + healAmount);
     
-    this.enemy.setHP(newEnemyHP);
     this.player.setHP(newPlayerHP);
     this.addLog(`⚖️ バランス戦略！攻撃: ${damage} & 回復: ${healAmount}！`);
     this.updateHP(this.player.getHP(), this.enemy.getHP());
   }
 
-  finalStrike() {
+  async finalStrike() {
     if (this.variables.concepts_mastered >= 4) {
       const finalDamage = 80;
+      // 必殺技：水と雷の合わせ技で包み、十字の二連撃でとどめを刺してから HP を減らす
+      await this.playAnimation('magic_raiden');
+      if (this.isBattleOver()) return;
+      await this.playAnimation('playerAttack_combo');
+      if (this.isBattleOver()) return;
+      
       const newHP = Math.max(0, this.enemy.getHP() - finalDamage);
       this.enemy.setHP(newHP);
       
@@ -287,10 +316,14 @@ export class BattleScene20 extends BattleScene {
     this.updateVariableDisplay();
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     this.checkPhaseTransition();
+    
+    // 今のフェーズの技の演出が当たってから、無効化・攻撃名を出して HP を減らす
+    await this.playAnimation(PHASE_ATTACK_ANIMATIONS[this.bossState.phase] || 'enemyAttack_digital');
+    if (this.isBattleOver()) return;
     
     // フェーズ別攻撃パターン
     let damage = 15;

@@ -85,19 +85,15 @@ export class BattleScene9 extends BattleScene {
     return super.dealDamageToEnemy(damage);
   }
 
-  // 回避エフェクトを表示
+  // 攻撃の演出で、影の獣がよけるかどうか（dealDamageToEnemy と同じ条件。閃光魔法だけは当たる）
+  // よける攻撃では、のけぞる代わりに薄くなって横へすべる（battleAnimations.js）
+  enemyDodges(animationType) {
+    return this.shadowBeastEvades && /^(playerAttack|magic_(fire|ice|thunder|water|raiden))/.test(animationType);
+  }
+
+  // 回避エフェクトを表示（敵が薄くなってよける動きは攻撃の演出の中で出る）
   playEvasionEffect() {
     if (this.enemySprite) {
-      // 敵が一瞬消える演出
-      this.tweens.add({
-        targets: this.enemySprite,
-        alpha: 0,
-        duration: 150,
-        yoyo: true,
-        repeat: 1,
-        ease: 'Power2'
-      });
-      
       // 影のエフェクト
       const shadowClone = this.add.graphics();
       shadowClone.fillStyle(0x000000, 0.5);

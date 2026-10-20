@@ -5,6 +5,8 @@ import { BattleScene } from './battle';
 export class BattleScene2 extends BattleScene {
   constructor() {
     super({ key: 'Stage2Battle' });
+    // 敵の攻撃の演出（ケミカルゴリラは毒の薬品を投げつける）
+    this.enemyAttackAnimation = 'enemyAttack_poison';
     this.settings = {
       background: 'labo',
       enemy: 'ケミカルゴリラ',

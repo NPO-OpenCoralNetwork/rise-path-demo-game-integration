@@ -76,7 +76,7 @@ export class BattleScene5 extends BattleScene {
       
       // ターン数超過チェック
       if (this.turnCount >= this.maxTurns) {
-        this.timeOver();
+        await this.timeOver();
         return;
       }
       return;
@@ -88,12 +88,14 @@ export class BattleScene5 extends BattleScene {
     
     // ターン数超過で強制敗北
     if (this.turnCount >= this.maxTurns) {
-      this.timeOver();
+      await this.timeOver();
       return;
     }
     
-    // 攻撃実行
-    await this.playAnimation('enemyAttack');
+    // 攻撃実行（魔法陣から紫の光弾。当たってから HP を減らす）
+    await this.playAnimation('enemyAttack_magic');
+    // 演出を待つ間に画面を離れていたら、何もしない
+    if (this.isBattleOver()) return;
     
     const damage = 12;
     this.addLog(`${this.enemy.name}の攻撃！${damage}ダメージ！`);
@@ -127,10 +129,14 @@ export class BattleScene5 extends BattleScene {
     }
   }
 
-  timeOver() {
+  async timeOver() {
     // 時間切れ演出
     this.addLog('💀💀💀 時間切れ！タイムイーターに時間を奪われた！ 💀💀💀');
     this.addLog('⏰ 5ターン以内に倒せませんでした...');
+    
+    // とどめの一撃（当たってから HP をゼロにする）
+    await this.playAnimation('enemyAttack_boss');
+    if (this.isBattleOver()) return;
     
     // プレイヤーのHPをゼロにする
     this.player.hp = 0;

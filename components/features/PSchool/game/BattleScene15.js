@@ -1,4 +1,13 @@
 import { BattleScene } from './battle.js';
+import { spellAnimation } from './battleAnimations.js';
+import { settled } from './characterMotion.js';
+
+// 敵の属性ごとの技の演出
+const ELEMENT_ATTACK_ANIMATIONS = {
+  FIRE: 'enemyAttack_fire',
+  WATER: 'enemyAttack_water',
+  THUNDER: 'enemyAttack_thunder'
+};
 
 // ステージ15「属性の有効活用」用のバトルシーン
 export class BattleScene15 extends BattleScene {
@@ -168,6 +177,11 @@ export class BattleScene15 extends BattleScene {
     
     // 敵スプライトの色も変更
     this.enemySprite.setTint(color);
+    // のけぞりの途中で変わると、のけぞりが前の色に戻してしまう。動きが終わったら今の属性の色を付け直す
+    settled(this.enemySprite).then(() => {
+      if (this.isBattleOver() || !this.enemySprite?.scene) return;
+      this.enemySprite.setTint(this.shifterState.elementColors[this.shifterState.currentElement]);
+    });
     
     // 変数表示を更新
     this.updateVariableDisplay();
@@ -199,7 +213,7 @@ export class BattleScene15 extends BattleScene {
     this.updateVariableDisplay();
   }
 
-  playerCastSpell(spellElement) {
+  async playerCastSpell(spellElement) {
     let damage = 20;
     let effectiveness = 1.0;
     const currentElement = this.shifterState.currentElement;
@@ -218,6 +232,11 @@ export class BattleScene15 extends BattleScene {
     const finalDamage = Math.floor(damage * effectiveness);
     this.variables.spell_effectiveness = effectiveness;
     
+    // 魔法が当たってから HP を減らす。この面ではどの魔法も敵へのダメージになるので、回復の演出は使わず属性のない光にする
+    const spellFx = spellAnimation(spellElement, 'magic_flash');
+    await this.playAnimation(spellFx === 'healing' ? 'magic_flash' : spellFx);
+    if (this.isBattleOver()) return;
+    
     const newHP = Math.max(0, this.enemy.getHP() - finalDamage);
     this.enemy.setHP(newHP);
     
@@ -233,7 +252,7 @@ export class BattleScene15 extends BattleScene {
     this.time.delayedCall(1000, () => this.enemyAction());
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     const currentElement = this.shifterState.currentElement;
@@ -248,8 +267,12 @@ export class BattleScene15 extends BattleScene {
     
     const attackName = elementAttacks[currentElement] || `${currentElement}属性攻撃`;
     
-    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.setName('エレメンタルシフター');
+    // 今の属性の技の演出が当たってから攻撃名を出し、HP を減らす
+    await this.playAnimation(ELEMENT_ATTACK_ANIMATIONS[currentElement] || 'enemyAttack_magic');
+    if (this.isBattleOver()) return;
+    
+    // enemy.jsのdisplayAttackメソッドを使用
     this.enemy.displayAttack(attackName, damage);
     
     const newPlayerHP = Math.max(0, this.player.getHP() - damage);

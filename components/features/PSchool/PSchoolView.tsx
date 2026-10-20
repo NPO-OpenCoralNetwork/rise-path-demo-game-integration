@@ -241,13 +241,13 @@ const PSchoolView: React.FC = () => {
 
     // Logic from index.js executeCommands
     try {
-        const { getAvailableBlocksByLevel } = await import('./game/levelBlockRestrictions.js');
+        const { getLockedBlocks } = await import('./game/levelBlockRestrictions.js');
         // Mock getUserLevel for now
         const getUserLevel = async () => 20; 
         const userLevel = await getUserLevel();
-        const availableBlocks = getAvailableBlocksByLevel(userLevel);
         const usedBlocks = workspace.getAllBlocks().map((block: any) => block.type);
-        const unauthorizedBlocks = usedBlocks.filter((blockType: string) => !availableBlocks.includes(blockType));
+        // Only blocks that the level table unlocks can be locked; spell blocks such as cast_magic are not in it
+        const unauthorizedBlocks = getLockedBlocks(usedBlocks, userLevel);
 
         if (unauthorizedBlocks.length > 0) {
              alert(`Level ${userLevel} restricted blocks: ${unauthorizedBlocks.join(', ')}`);

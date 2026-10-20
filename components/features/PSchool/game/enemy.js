@@ -14,7 +14,8 @@ export class Enemy {
       
       // 敵攻撃アニメーションを再生
       if (this.scene && typeof this.scene.playAnimation === 'function') {
-        await this.scene.playAnimation('enemyAttack');
+        // ステージが enemyAttackAnimation で敵らしい攻撃の演出を選べる（なければ爪の攻撃）
+        await this.scene.playAnimation(this.scene.enemyAttackAnimation ?? 'enemyAttack');
       } else if (this.sprite) {
         // フォールバック: シンプルなエフェクト
         this.sprite.setTint(0xff0000);
@@ -57,7 +58,8 @@ export class Enemy {
   }
   
   // 攻撃を実行してダメージを与えるメソッド（ステージ11以降用）
-  async performAttack(attackName, damage) {
+  // animationType で技に合った演出を選べる（battleAnimations.js の種類。省略すると爪の攻撃）
+  async performAttack(attackName, damage, animationType = 'enemyAttack') {
     // システム変数「敵の技名」を更新
     if (!this.scene.customVariables) {
       this.scene.customVariables = {};
@@ -66,7 +68,7 @@ export class Enemy {
     
     // 敵攻撃アニメーションを再生
     if (this.scene && typeof this.scene.playAnimation === 'function') {
-      await this.scene.playAnimation('enemyAttack');
+      await this.scene.playAnimation(animationType);
     }
     
     // 攻撃名を表示

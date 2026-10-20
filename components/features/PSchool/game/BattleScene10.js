@@ -3,6 +3,20 @@
 import Phaser from "phaser";
 import { BattleScene } from "./battle";
 import { releaseMotion } from "./characterMotion";
+import { spellAnimation } from "./battleAnimations";
+
+// ダークナイトの技ごとの演出（battleAnimations.js の種類。並べた順に再生する）
+const KNIGHT_ATTACK_ANIMATIONS = {
+  '闇の剣撃': ['enemyAttack_sword'],
+  '魔力放射': ['enemyAttack_beam'],
+  'シャドウスラッシュ': ['enemyAttack_shadow'],
+  '連続斬撃': ['enemyAttack_sword', 'enemyAttack_sword'],
+  '闇の波動': ['enemyAttack_magic'],
+  'ダークブレード': ['enemyAttack_sword'],
+  '狂戦士の一撃': ['enemyAttack_boss'],
+  '絶望の咆哮': ['enemyAttack_roar'],
+  '滅びの剣': ['enemyAttack_sword']
+};
 
 // ステージ10「初級ボス戦」用のバトルシーン
 // これまでの魔法（閃光魔法、麻痺魔法、回復魔法、属性魔法）をすべて駆使して戦う
@@ -200,6 +214,15 @@ export class BattleScene10 extends BattleScene {
   // 攻撃処理
   // ====================================
 
+  // 演出の再生。物理シールドがあるあいだの通常攻撃は、盾に弾かれる演出にする
+  // （通常攻撃は player.attack() が演出のあとで dealDamageToEnemy を呼ぶ）
+  async playAnimation(animationType) {
+    if (animationType === 'playerAttack' && this.knightPhase.physicalShield) {
+      animationType = 'playerAttack_blocked';
+    }
+    return super.playAnimation(animationType);
+  }
+
   // 通常攻撃（物理シールドに阻まれる）
   dealDamageToEnemy(damage, attackType = 'normal') {
     if (this.battleEnded) return;
@@ -258,7 +281,7 @@ export class BattleScene10 extends BattleScene {
   }
 
   // 属性魔法の処理
-  playerCastSpell(spell) {
+  async playerCastSpell(spell) {
     if (this.battleEnded) return;
 
     // 基本ダメージ設定
@@ -288,16 +311,15 @@ export class BattleScene10 extends BattleScene {
 
     const finalDamage = Math.floor(damage * effectiveness);
     
-    // エフェクト再生
-    const effectMap = {
-      'FIRE': 'magic_fire',
-      'ICE': 'magic_ice',
-      'THUNDER': 'magic_thunder',
-      'WATER': 'magic_water'
-    };
-    
-    if (effectMap[spell]) {
-      this.playAnimation(effectMap[spell]);
+    // エフェクト再生（ライデンと回復もここに来るので、魔法名から選ぶ）
+    // この処理ではどの魔法も敵へのダメージになるので、回復の光ではなく属性のない光にする（ステージ15と同じ）
+    const spellFx = spellAnimation(spell, null);
+    const animationType = spellFx === 'healing' ? 'magic_flash' : spellFx;
+
+    // 魔法が当たってから HP を減らす
+    if (animationType) {
+      await this.playAnimation(animationType);
+      if (this.isBattleOver()) return;
     }
     
     // ダメージ適用
@@ -331,9 +353,9 @@ export class BattleScene10 extends BattleScene {
 
     this.addLog("⚡✨ 閃光魔法発動！");
     
-    // 閃光エフェクト
+    // 閃光エフェクト（画面の白い光も magic_flash が出す）
     await this.playFlashAnimation();
-    this.cameras.main.flash(500, 255, 255, 255);
+    if (this.isBattleOver()) return;
 
     // シールド破壊効果
     let shieldBroken = false;
@@ -391,10 +413,13 @@ export class BattleScene10 extends BattleScene {
   }
 
   // 麻痺魔法（チャージ攻撃阻止 - 重要）
-  applyParalyzeEffect() {
+  async applyParalyzeEffect() {
     if (this.battleEnded) return;
 
     this.addLog("⚡💫 麻痺魔法発動！");
+    // 電気の輪が締めつける
+    await this.playAnimation('magic_paralyze');
+    if (this.isBattleOver()) return;
     
     // 麻痺効果
     this.paralyzeTurns = 2;
@@ -410,17 +435,6 @@ export class BattleScene10 extends BattleScene {
       this.chargeText.setText('');
       this.cameras.main.flash(300, 0, 255, 0);
       this.updateHint("💡 ナイス！今のうちに攻撃だ！");
-    }
-    
-    // 麻痺エフェクト
-    if (this.enemySprite) {
-      this.tweens.add({
-        targets: this.enemySprite,
-        alpha: 0.5,
-        duration: 200,
-        yoyo: true,
-        repeat: 3
-      });
     }
   }
 
@@ -583,12 +597,13 @@ export class BattleScene10 extends BattleScene {
           this.cameras.main.shake(100, 0.01);
           return;
         } else {
-          // 即死攻撃発動
+          // 即死攻撃発動（赤い気をため、十字に斬ってから倒れる。画面の揺れも演出が出す）
           this.addLog("💀💀💀 破滅の剣！即死攻撃！💀💀💀");
+          await this.playAnimation('enemyAttack_boss');
+          if (this.isBattleOver()) return;
           this.addLog("麻痺魔法で阻止するべきだった...");
           this.knightPhase.chargeAttackPreparing = false;
           this.chargeText.setText('');
-          this.cameras.main.shake(500, 0.05);
           this.gameOver(false);
           return;
         }
@@ -613,9 +628,7 @@ export class BattleScene10 extends BattleScene {
       }
     }
 
-    // 通常攻撃
-    await this.playAnimation('enemyAttack_boss');
-    
+    // 通常攻撃（ダメージと技を先に決め、技に合った演出のあとで HP を減らす）
     // フェーズに応じたダメージ
     const baseDamage = {
       1: 15,
@@ -634,6 +647,13 @@ export class BattleScene10 extends BattleScene {
     }[this.knightPhase.current];
     
     const attack = attacks[Math.floor(Math.random() * attacks.length)];
+
+    // 技の演出（連続斬撃は2回斬る）
+    for (const animationType of KNIGHT_ATTACK_ANIMATIONS[attack] || ['enemyAttack_boss']) {
+      await this.playAnimation(animationType);
+      if (this.isBattleOver()) return;
+    }
+
     this.addLog(`⚔️ ダークナイトの${attack}！`);
     
     // ダメージ適用

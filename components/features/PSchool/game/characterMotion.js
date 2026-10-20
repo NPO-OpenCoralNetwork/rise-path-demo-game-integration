@@ -109,9 +109,16 @@ export function lunge(scene, sprite, { direction = 1, distance = 90, onImpact } 
       targets: sprite, x: x + direction * reach, angle: angle + direction * 6, scaleX: scaleX * 1.05,
       duration: reduced ? 80 : 130, ease: 'Quad.easeIn',
     });
-    onImpact?.();
+    // 踏み込みの間に画面を離れていたら（スプライトが捨てられていたら）、斬撃などは出さない
+    if (isSprite(sprite)) onImpact?.();
     await play(scene, { targets: sprite, x, angle, scaleX, duration: reduced ? 120 : 220, ease: 'Quad.easeOut' });
   });
+}
+
+/** 色を元に戻す（kept が null なら色なし）。 */
+export function restoreTint(sprite, kept) {
+  if (kept === null || kept === undefined) sprite.clearTint();
+  else sprite.setTint(kept);
 }
 
 /** 攻撃を受けてのけぞる。白く光ってから tint の色になり、direction の向きへ押される。 */
@@ -120,6 +127,8 @@ export function hitReact(scene, sprite, { direction = 1, distance = 22, tint = 0
   return withoutIdle(scene, sprite, async () => {
     const reduced = reducedMotion();
     const { x, angle } = sprite;
+    // ステージが付けている色（装甲が壊れた灰色など）は、のけぞりのあとに戻す
+    const kept = sprite.isTinted && !sprite.tintFill ? sprite.tintTopLeft : null;
     // 押される間は白く光り、戻る間は tint の色。色の切り替えも同じ流れの中で行う（別のタイマーにしない）
     sprite.setTintFill(0xffffff);
     await play(scene, {
@@ -128,7 +137,18 @@ export function hitReact(scene, sprite, { direction = 1, distance = 22, tint = 0
     });
     if (isSprite(sprite)) sprite.setTint(tint);
     await play(scene, { targets: sprite, x, angle, duration: reduced ? 120 : 260, ease: 'Back.easeOut' });
-    if (isSprite(sprite)) sprite.clearTint();
+    if (isSprite(sprite)) restoreTint(sprite, kept);
+  });
+}
+
+/** 攻撃をよける：薄くなって direction の向きへすべり、元の位置に戻る。 */
+export function dodge(scene, sprite, { direction = 1, distance = 60 } = {}) {
+  if (!isSprite(sprite)) return Promise.resolve();
+  return withoutIdle(scene, sprite, async () => {
+    const reduced = reducedMotion();
+    const { x, alpha } = sprite;
+    await play(scene, { targets: sprite, x: x + direction * (reduced ? distance * 0.3 : distance), alpha: alpha * 0.3, duration: 120, ease: 'Quad.easeOut' });
+    await play(scene, { targets: sprite, x, alpha, duration: reduced ? 160 : 320, ease: 'Sine.easeInOut' });
   });
 }
 

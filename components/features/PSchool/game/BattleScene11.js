@@ -83,8 +83,15 @@ export class BattleScene11 extends BattleScene {
     // 敵の攻撃名を記録
     this.attackReflectionSystem.lastEnemyAttack = action;
     
-    // enemy.jsのperformAttackメソッドを使用
-    this.enemy.performAttack(action, damage);
+    // 技ごとの演出（幻影の矢は魔法陣からの光弾、魔力の奔流は光線、神秘の衝撃は衝撃の輪）
+    const animations = {
+      '幻影の矢': 'enemyAttack_magic',
+      '魔力の奔流': 'enemyAttack_beam',
+      '神秘の衝撃': 'enemyAttack_roar'
+    };
+    
+    // enemy.jsのperformAttackメソッドを使用（演出が当たってから HP が減る。待てるように Promise を返す）
+    return this.enemy.performAttack(action, damage, animations[action]);
   }
 
   // ===============================
@@ -159,6 +166,9 @@ export class BattleScene11 extends BattleScene {
     // 攻撃名が正しいかチェック
     if (attackName === this.attackReflectionSystem.lastEnemyAttack) {
       const damage = 35; // 強力な反射ダメージ
+      // 跳ね返した魔力が光になって敵を撃つ（当たってから HP を減らす）
+      await this.playAnimation('magic_flash');
+      if (this.isBattleOver()) return { success: false, damage: 0, expBonus: 0 };
       this.enemy.hp -= damage;
       this.updateHP(this.player.hp, this.enemy.hp);
       

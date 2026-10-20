@@ -4,6 +4,8 @@ import { BattleScene } from './battle.js';
 export class BattleScene17 extends BattleScene {
   constructor() {
     super({ key: 'Stage17Battle' });
+    // 敵の HP の表示が、敵全体の HP と出ているスケルトンの合計で入れかわるので、敵の上には数字を出さない
+    this.showEnemyHPNumbers = false;
     this.settings = {
       background: 'graveyard',
       enemy: 'skeletonarmy',
@@ -162,16 +164,17 @@ export class BattleScene17 extends BattleScene {
     }
   }
 
-  callFunction(functionName) {
+  async callFunction(functionName) {
     if (this.customFunctions[functionName]) {
       this.armyState.functionUsageCount++;
       this.variables.function_calls++;
       
       this.addLog(`🔧 関数「${functionName}」を実行！`);
       
-      // 関数の実行（ここでは攻撃と回復のセット）
+      // 関数の実行（ここでは攻撃と回復のセット）。演出が終わって倒した数が決まってから効率を計算する
       if (functionName === 'attackAndHeal') {
-        this.executeAttackAndHeal();
+        await this.executeAttackAndHeal();
+        if (this.isBattleOver()) return;
       }
       
       this.updateVariableDisplay();
@@ -181,12 +184,16 @@ export class BattleScene17 extends BattleScene {
     }
   }
 
-  executeAttackAndHeal() {
+  async executeAttackAndHeal() {
     // 攻撃フェーズ
     const damage = 20;
     let target = this.armyState.activeSkeletons.find(s => s.active);
     
     if (target) {
+      // 斬撃が当たってから HP を減らす
+      await this.playAnimation('playerAttack');
+      if (this.isBattleOver()) return;
+      
       target.hp -= damage;
       this.addLog(`⚔️ スケルトン${target.id}に ${damage} のダメージ！`);
       
@@ -194,20 +201,28 @@ export class BattleScene17 extends BattleScene {
         target.active = false;
         this.armyState.defeatedCount++;
         this.addLog(`💀 スケルトン${target.id}を倒しました！`);
-        
-        // 次の波のスケルトンをスポーン
-        if (this.armyState.defeatedCount % this.armyState.skeletonsPerWave === 0 && 
-            this.armyState.waveNumber < this.armyState.maxWaves) {
-          this.armyState.waveNumber++;
-          this.spawnSkeleton();
-          this.spawnSkeleton();
-        }
+      }
+      
+      // 当たった瞬間に HP の表示を減らす（増援が出る前の値）
+      this.updateHP(this.player.getHP(), this.calculateTotalEnemyHP());
+      
+      // 次の波のスケルトンをスポーン
+      if (target.hp <= 0 &&
+          this.armyState.defeatedCount % this.armyState.skeletonsPerWave === 0 && 
+          this.armyState.waveNumber < this.armyState.maxWaves) {
+        this.armyState.waveNumber++;
+        this.spawnSkeleton();
+        this.spawnSkeleton();
       }
     }
     
     // 回復フェーズ
     if (this.player.getHP() < 60) {
       const healAmount = 15;
+      // 回復の光が出てから HP を増やす
+      await this.playAnimation('healing');
+      if (this.isBattleOver()) return;
+      
       const newHP = Math.min(80, this.player.getHP() + healAmount);
       this.player.setHP(newHP);
       this.addLog(`💚 HPを ${healAmount} 回復！`);
@@ -232,10 +247,10 @@ export class BattleScene17 extends BattleScene {
       .reduce((total, s) => total + s.hp, 0);
   }
 
-  attackAndHeal() {
+  async attackAndHeal() {
     // 関数の直接実行版
     this.addLog('🔄 攻撃＆回復コンボを実行！');
-    this.executeAttackAndHeal();
+    await this.executeAttackAndHeal();
   }
 
   checkHealth() {
@@ -271,7 +286,7 @@ export class BattleScene17 extends BattleScene {
     this.updateVariableDisplay();
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) return;
     
     // アクティブなスケルトンが攻撃
@@ -280,9 +295,19 @@ export class BattleScene17 extends BattleScene {
     
     const attacks = ['骨の剣撃', 'アンデッドラッシュ', '集団突撃'];
     const attackName = attacks[Math.floor(Math.random() * attacks.length)];
+    // 技ごとの演出（骨の剣は斬撃、アンデッドの突進は闇の爪、集団突撃は地面を揺らす足音と岩）
+    const attackAnimations = {
+      '骨の剣撃': 'enemyAttack_sword',
+      'アンデッドラッシュ': 'enemyAttack_shadow',
+      '集団突撃': 'enemyAttack_earth'
+    };
+    
+    this.enemy.setName(`スケルトンアーミー（${activeSkeletons.length}体）`);
+    // 技の演出が当たってから攻撃名を出し、HP を減らす
+    await this.playAnimation(attackAnimations[attackName]);
+    if (this.isBattleOver()) return;
     
     // enemy.jsのdisplayAttackメソッドを使用
-    this.enemy.setName(`スケルトンアーミー（${activeSkeletons.length}体）`);
     this.enemy.displayAttack(attackName, damage);
     
     const newPlayerHP = Math.max(0, this.player.getHP() - damage);

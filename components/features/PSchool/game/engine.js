@@ -207,6 +207,9 @@ function getSpellDamage(spellType) {
 }
 
 export async function runGameWithCommands(ast, game, ui) {
+  // 実行の途中で「もう一度戦う」でやり直したり画面を離れたりしたら、前の戦いの判定を新しい戦いに出さない
+  const battleId = game.scene?.battleId;
+  const replaced = () => typeof game.scene?.isCurrentBattle === 'function' && !game.scene.isCurrentBattle(battleId);
   try {
     // 処理前にASTをチェック
     console.log("Original AST:", JSON.stringify(ast, null, 2));
@@ -278,6 +281,7 @@ export async function runGameWithCommands(ast, game, ui) {
     // アクションの実行（actionsが空配列の場合は何も実行されない）
     for (const action of actions) {
       await executeGameAction(action, game, ui);
+      if (replaced()) return;
       
       // 各アクション後にプレイヤー敗北のみチェック（勝利判定はターン終了後に行う）
       if (game.player.hp <= 0) {
@@ -291,10 +295,12 @@ export async function runGameWithCommands(ast, game, ui) {
     
     // プレイヤーアクション実行後の待ち時間
     await delay(800);
+    if (replaced()) return;
     
     // プレイヤーターン終了後の処理（ステージ固有の処理を実行）
     if (game.scene && typeof game.scene.afterPlayerTurn === 'function') {
       await game.scene.afterPlayerTurn();
+      if (replaced()) return;
     }
     
     // プレイヤーターン終了後に勝利判定（1回のみ）
@@ -319,6 +325,7 @@ export async function runGameWithCommands(ast, game, ui) {
     
     // 敵のターン前の待ち時間
     await delay(1000);
+    if (replaced()) return;
     
     // 敵のターン（敵が生存している場合のみ実行）
     if (game.scene && typeof game.scene.enemyTurn === 'function') {
@@ -331,6 +338,7 @@ export async function runGameWithCommands(ast, game, ui) {
     
     // 敵のターン後の待ち時間
     await delay(800);
+    if (replaced()) return;
     
     // 敵のターン後の勝敗チェック
     if (game.player.hp <= 0) {
@@ -341,6 +349,8 @@ export async function runGameWithCommands(ast, game, ui) {
       return;
     }
   } catch (error) {
+    // やり直した戦いの続きは、黙って止める
+    if (error?.name === 'BattleRestartedError' || replaced()) return;
     console.error("Error running game commands:", error);
     ui.log("エラーが発生しました: " + error.message);
   }
@@ -568,7 +578,7 @@ async function executeGameAction(action, game, ui) {
         ui.log("⚡ ライデンを詠唱中...");
         
         if (game.scene.applyRaidenEffect) {
-          game.scene.applyRaidenEffect();
+          await game.scene.applyRaidenEffect();
         }
       }
       // ステージ8での魔法処理（シールドに弾かれる）
@@ -587,7 +597,7 @@ async function executeGameAction(action, game, ui) {
         
         // BattleSceneの麻痺処理を呼び出し（グローバル化済み）
         if (game.scene && game.scene.applyParalyzeEffect) {
-          game.scene.applyParalyzeEffect();
+          await game.scene.applyParalyzeEffect();
         } else {
           ui.log("🔮 麻痺魔法成功！敵を3ターン麻痺させます");
           console.warn('applyParalyzeEffect method not found');
@@ -600,19 +610,20 @@ async function executeGameAction(action, game, ui) {
         
         // 閃光魔法の効果（回避不可の大ダメージ）
         if (game.scene && game.scene.applyFlashEffect) {
-          game.scene.applyFlashEffect();
+          await game.scene.applyFlashEffect();
         } else {
           // デフォルトの閃光魔法効果
           const damage = 25; // 高威力の固定ダメージ
           ui.log(`⚡ 閃光魔法発動！回避不可の${damage}ダメージ！`);
           
           if (game.enemy) {
+            // 光が当たってから HP を減らす（ダメージの数字が命中と同時に出るように）
+            if (game.scene && typeof game.scene.playAnimation === 'function') {
+              await game.scene.playAnimation('magic_flash');
+            }
             game.enemy.hp -= damage;
             if (game.scene && typeof game.scene.updateHP === 'function') {
               game.scene.updateHP(game.player.hp, game.enemy.hp);
-            }
-            if (game.scene && typeof game.scene.playAnimation === 'function') {
-              await game.scene.playAnimation('magic_flash');
             }
           }
         }

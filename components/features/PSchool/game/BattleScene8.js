@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { BattleScene } from "./battle";
+import { spellAnimation } from "./battleAnimations";
 
 // ステージ8「行動の繰り返し」用のバトルシーン
 export class BattleScene8 extends BattleScene {
@@ -80,6 +81,10 @@ export class BattleScene8 extends BattleScene {
   // プレイヤーの物理攻撃を処理
   async playerAttack(damage) {
     if (this.shieldActive) {
+      // 斬撃が盾に弾かれて火花が散る（敵はびくともしない）
+      await this.playAnimation('playerAttack_blocked');
+      if (this.isBattleOver()) return 0;
+
       // 盾にダメージ
       this.shieldHP--;
       this.addLog(`⚔️ 盾に攻撃！残り耐久: ${this.shieldHP}/${this.shieldMaxHP}`);
@@ -103,7 +108,10 @@ export class BattleScene8 extends BattleScene {
       this.updateShieldDisplay();
       return 0; // 盾があるためダメージなし
     } else {
-      // 盾破壊後は通常ダメージ
+      // 盾破壊後は通常ダメージ（斬撃が当たってから HP を減らす）
+      await this.playAnimation('playerAttack');
+      if (this.isBattleOver()) return 0;
+
       this.addLog(`⚔️ 攻撃！${damage}ダメージ！`);
       this.enemy.hp -= damage;
       this.updateHP(this.player.hp, this.enemy.hp);
@@ -118,18 +126,6 @@ export class BattleScene8 extends BattleScene {
 
   // 魔法攻撃を処理（盾に無効）
   async playerMagicAttack(spellName, damage) {
-    // 魔法名からアニメーションタイプを取得
-    const getAnimationType = (name) => {
-      const animationMap = {
-        '炎の魔法': 'magic_fire',
-        '氷の盾': 'magic_ice',
-        '雷の魔法': 'magic_thunder',
-        '水の魔法': 'magic_water',
-        'ライデン': 'magic_thunder'
-      };
-      return animationMap[name] || 'magic_fire';
-    };
-    
     if (this.shieldActive) {
       this.addLog(`🛡️ ${spellName}は盾に弾かれた！魔法は効かない！`);
       
@@ -151,12 +147,13 @@ export class BattleScene8 extends BattleScene {
       // 盾破壊後は通常の魔法ダメージ
       this.addLog(`🔮 ${spellName}発動！${damage}ダメージ！`);
       
-      // 魔法エフェクトを再生
-      const animationType = getAnimationType(spellName);
-      if (typeof this.playAnimation === 'function') {
-        await this.playAnimation(animationType);
-      }
-      
+      // 魔法エフェクトを再生（魔法名から選ぶ。氷の盾は主人公の前に氷の壁を出す）
+      // ダメージが負の魔法（回復魔法など）は敵の HP が増えるので、主人公の回復の光は出さず、敵に当たる光にする
+      const spellFx = spellAnimation(spellName, 'magic_fire');
+      const animationType = spellName === '氷の盾' ? 'ice_shield' : (damage < 0 || spellFx === 'healing' ? 'magic_flash' : spellFx);
+      await this.playAnimation(animationType);
+      if (this.isBattleOver()) return 0;
+
       this.enemy.hp -= damage;
       this.updateHP(this.player.hp, this.enemy.hp);
       
@@ -168,20 +165,8 @@ export class BattleScene8 extends BattleScene {
     }
   }
 
-  // 盾へのヒットエフェクト
+  // 盾へのヒットエフェクト（火花と画面の揺れは playerAttack_blocked が出す）
   playShieldHitEffect() {
-    const impact = this.add.graphics();
-    impact.fillStyle(0xffffff, 0.8);
-    impact.fillCircle(this.enemySprite.x - 40, this.enemySprite.y, 15);
-    
-    this.tweens.add({
-      targets: impact,
-      alpha: 0,
-      scale: 2,
-      duration: 200,
-      onComplete: () => impact.destroy()
-    });
-    
     // 盾の揺れ
     this.tweens.add({
       targets: this.shieldSprite,
@@ -190,13 +175,12 @@ export class BattleScene8 extends BattleScene {
       yoyo: true,
       repeat: 2
     });
-    
-    this.cameras.main.shake(100, 0.005);
   }
 
   // 敵のターン処理
   async enemyTurn() {
-    await this.playAnimation('enemyAttack');
+    // 棍棒を振り下ろす
+    await this.playAnimation('enemyAttack_sword');
     
     const damage = 40;
     this.addLog(`${this.enemy.name}の攻撃！${damage}ダメージ！`);

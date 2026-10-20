@@ -124,8 +124,21 @@ export class BattleScene13 extends BattleScene {
       return;
     }
 
+    // 結果に合った斬撃を選ぶ（判定は演出のあとでこれまでどおり行う）
+    // ガードが残る一撃は弾かれ、ガードを砕く一撃と関数の中の連続攻撃は十字斬り
+    const breaksGuard = this.guardActive && Boolean(this.executingFunctionName) && this.currentFunctionHits + 1 >= this.comboGoal;
+    let animationType = 'playerAttack';
+    if (this.guardActive && !breaksGuard) {
+      animationType = 'playerAttack_blocked';
+    } else if (breaksGuard || this.executingFunctionName) {
+      animationType = 'playerAttack_combo';
+    }
+
     if (typeof this.playAnimation === 'function') {
-      await this.playAnimation('playerAttack');
+      await this.playAnimation(animationType);
+      if (this.isBattleOver()) {
+        return;
+      }
     }
 
     if (this.guardActive) {
@@ -161,23 +174,30 @@ export class BattleScene13 extends BattleScene {
     }
   }
 
-  enemyAction() {
+  async enemyAction() {
     if (this.battleEnded) {
       return;
     }
 
     this.resetDualGuard();
 
+    // 技ごとの演出（双剣は斜めの斬撃、十字の反撃は大技、回転突進は風の刃）
     const patterns = [
-      { name: 'Twin Slash', damage: 18 },
-      { name: 'Cross Guard Counter', damage: 22 },
-      { name: 'Spiral Dash', damage: 20 }
+      { name: 'Twin Slash', damage: 18, animation: 'enemyAttack_sword' },
+      { name: 'Cross Guard Counter', damage: 22, animation: 'enemyAttack_boss' },
+      { name: 'Spiral Dash', damage: 20, animation: 'enemyAttack_wind' }
     ];
     const pattern = patterns[Math.floor(Math.random() * patterns.length)];
 
+    let attack;
     if (this.enemy && typeof this.enemy.performAttack === 'function') {
-      this.enemy.performAttack(pattern.name, pattern.damage);
+      // 演出が当たってから HP が減る。下の HP 確認はこれまでどおり待たずに行い、Promise は呼び出し元へ返す
+      attack = this.enemy.performAttack(pattern.name, pattern.damage, pattern.animation);
     } else {
+      await this.playAnimation(pattern.animation);
+      if (this.isBattleOver()) {
+        return;
+      }
       const newHP = Math.max(0, this.player.hp - pattern.damage);
       this.player.setHP(newHP);
       this.updateHP(this.player.hp, this.enemy.hp);
@@ -190,5 +210,6 @@ export class BattleScene13 extends BattleScene {
     if (this.player.getHP() <= 0) {
       this.gameOver(false);
     }
+    return attack;
   }
 }

@@ -123,6 +123,19 @@ export function getAvailableBlocksByLevel(level) {
 }
 
 /**
+ * 実行前のチェック用：そのレベルではまだ使えないブロックを返す。
+ * レベル表に出てこないブロック（魔法の詠唱や手を振るブロックなど）は制限しない。
+ * @param {Array<string>} blockTypes - ワークスペースのブロックの種類
+ * @param {number} level - プレイヤーのレベル
+ * @returns {Array<string>} 使えないブロックの種類（重複なし）
+ */
+export function getLockedBlocks(blockTypes, level) {
+  const leveled = new Set(Object.values(LEVEL_BLOCK_UNLOCKS).flatMap((config) => config.unlockedBlocks));
+  const available = new Set(getAvailableBlocksByLevel(level));
+  return [...new Set(blockTypes)].filter((type) => leveled.has(type) && !available.has(type));
+}
+
+/**
  * 新しくアンロックされたブロックを取得
  * @param {number} level - プレイヤーのレベル
  * @returns {Array} 新しくアンロックされたブロックタイプの配列
