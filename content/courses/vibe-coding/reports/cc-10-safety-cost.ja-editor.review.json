@@ -1,52 +1,48 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:8c4567a466d38ec7",
+  "lessonHash": "sha256:c7223f9f160f438c",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "voice",
-      "score": 2,
-      "evidence": "The tone is warm です・ます with no pressure phrases, and most feedback follows the 'misconception, then correct idea' pattern (q1, q2, e3). But §3 spacing is broken throughout (「Claude Code に」「auto モード」「MCP サーバー」), all seven card backs end in plain form, summary-next uses 「行います」, and the option forms in q2, q3 and e1 do not match.",
+      "score": 3,
+      "evidence": "The text is warm です・ます throughout, with no pressure phrases. §3 spacing is now consistent: 「Claude Codeに」「autoモード」「MCPサーバー」, and `bypassPermissions` is always inline code. Every card back ends in です・ます (「攻撃です。」「開きます。」). The option forms now match within each question: q2 all end 「試す」, q3 all take the 「…を書く／書かない」 form, e1 all end 「動かす」. Most wrong-option feedback names the misconception first and then the correct idea, in 2 sentences or fewer. What keeps the score at 3 is a few spots that still read loosely: the e2 d feedback has no subject, the s2-layers caption is in plain form, and 「大きな要求」 is vague.",
       "blockIds": [
-        "lesson",
         "summary-cards",
-        "summary-next",
-        "summary-ask",
         "s2-check",
         "s3-check",
         "check-quiz",
-        "s4-lead",
-        "practice-task"
+        "s2-layers"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "lessons:lint --strict is clean (0 errors, 0 warnings). Every section breaks its text up with a definitions block, a diagram, a table or a check (s2-layers, s2-table, s5-table), and paragraphs stay at 1–3 short sentences.",
+      "evidence": "measure.mjs gives prose 1735 (budget 1,200–2,400), read 2356, est 17.0 min (≤ 20), and estMinutes is 17, which matches. lessons:lint --strict reports 0 errors and 0 warnings. Each segment breaks up its text with a definitions block, a diagram, a table, steps or a check (s2-layers, s2-table, s3-steps, s5-table), and paragraphs stay at 1–3 short sentences.",
       "blockIds": [
         "s2-layers",
         "s2-table",
+        "s3-steps",
         "s5-table"
       ]
     },
     {
       "id": "prior",
-      "score": 2,
-      "evidence": "The prerequisites list earlier lessons and the new terms are defined in s1-defs and s2-defs, with at most 3 per segment. However, 「effort」 is used in s5-table and e6 without any explanation, and no lesson in cc-01 to cc-09 defines it either. 「API」 is never spelled out on first use (hook title, hook-predict).",
+      "score": 3,
+      "evidence": "The prerequisites name cc-02, cc-05, cc-08 and cc-09 by their exact titles. API is now spelled out in hook-b1 (「API（Application Programming Interface）のキーです。」). 「エフォート」 is in the glossary and is glossed where it is first used in s5-table (「高い[[エフォート]]（effort：考える量の設定）」). Each segment introduces at most 3 new terms. One small gap remains: e5 uses 「Console」 without a gloss, while cc-01 introduced it as 「Claude Console」.",
       "blockIds": [
+        "hook-b1",
         "s5-table",
-        "check-quiz",
-        "hook",
-        "hook-predict"
+        "check-quiz"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a single-locale (jp) lesson and nothing is left untranslated. The diagram labels are Japanese and the alt describes the structure. Both links name where they go (「セキュリティの公式ドキュメント」「公式の料金ページ」).",
+      "evidence": "This is a single-locale (jp) lesson and nothing is left untranslated. The diagram labels are Japanese and the alt describes the layered structure. Both links name their destination (「セキュリティの公式ドキュメント」「公式の料金ページ」).",
       "blockIds": [
         "s2-layers",
         "s1-md2",
@@ -54,100 +50,20 @@
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(d) 表記 §3: the style guide says 「和文と英数字の間にスペースは入れません」, and only inline code is an exception. This lesson puts a half-width space between Japanese text and Latin letters or numbers almost everywhere outside inline code: title, subtitle, prerequisites, body, diagram labels, caption, alt, table cells, options, feedback, glossary and flashcards. Examples are 「Claude Code に」「README の文章」「残った API キー」「auto モード」「MCP サーバー」「VM か」「v2.1.283 から」「macOS では Seatbelt」「GitHub の Issue」「Python スクリプト」「Max プラン」「OS で制限」. The lesson also contradicts itself: 「10-1と10-2で」「17%を」「約13ドル」 have no space. In q1 c feedback, e2 d feedback and the e2 explanation, 「bypassPermissions」 is plain text, but everywhere else it is inline code.",
-      "fix": "Outside inline code (`…`), delete every half-width space between Japanese text and alphanumerics. Examples: 「Claude Code に」→「Claude Codeに」, 「README の文章」→「READMEの文章」, 「残った API キー」→「残ったAPIキー」, 「API の料金」→「APIの料金」, 「auto モード」→「autoモード」, 「MCP サーバー」→「MCPサーバー」 (also in the diagram label 「ファイル操作ツール・MCPサーバー」), 「VM か[[クラウドセッション]]」→「VMか[[クラウドセッション]]」, 「v2.1.283 から」→「v2.1.283から」, 「macOS では Seatbelt、Linux と WSL2 では bubblewrap で動きます」→「macOSではSeatbelt、LinuxとWSL2ではbubblewrapで動きます」, 「GitHub の Issue の本文」→「GitHubのIssueの本文」, 「Python スクリプト」→「Pythonスクリプト」, 「Max プラン」→「Maxプラン」, 「OS で制限する」→「OSで制限する」, 「effort を下げる」→「effortを下げる」. Make the plain 「bypassPermissions」 inline code: 「bypassPermissions モードには」→「`bypassPermissions` モードには」 (q1 c), 「root や sudo での bypassPermissions を」→「rootやsudoでの `bypassPermissions` を」 (e2 d), 「bypassPermissions を隔離環境だけで」→「`bypassPermissions` を隔離環境だけで」 (e2 explanation)."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-cards",
-      "issue": "(d) です・ます §1: every card back ends in plain form or a noun: 「攻撃。」「開く。」「シェルコマンドとその子プロセスだけ。…外。」「書く。」「見積もり。」「確かめる。」「`/compact` はそれ自体が大きな要求。」. The same issue was a must-fix in cc-08, cc-09 and cc-11.",
-      "fix": "card-injection 「…頼んでいない操作をさせる攻撃。」→「…頼んでいない操作をさせる攻撃です。」. card-untrusted-repo 「VM かクラウドセッションの中で開く。」→「VMかクラウドセッションの中で開きます。」. card-sandbox 「シェルコマンドとその子プロセスだけ。ファイル操作ツール・フック・MCP サーバーは外。」→「シェルコマンドとその子プロセスだけです。ファイル操作ツール・フック・MCPサーバーは外で動きます。」. card-deny 「…を書く。」→「…を書きます。」. card-usage 「いいえ。定価から手元で計算した見積もり。」→「いいえ。定価から手元で計算した見積もりです。」. card-api-key 「…`/status` で認証を確かめる。」→「…`/status` で認証を確かめます。」. card-clear 「`/clear`。`/compact` はそれ自体が大きな要求。」→「`/clear` です。`/compact` は、それ自体が大きな要求です。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-next",
-      "issue": "(d) 表記 §3: §3 says to write 「行う」 in kana (「おこなう／する」). This block writes 「この点検を行います。」.",
-      "fix": "「第11回では、自分のリポジトリでこの点検を行います。」→「第11回では、自分のリポジトリでこの点検をします。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "summary-ask",
-      "issue": "(c) grammar: 「`/usage` の表示を、例を使って読み方を教えて」 has two を objects for one verb, so the sentence does not parse cleanly.",
-      "fix": "「`/usage` の表示を、例を使って読み方を教えて」→「`/usage` の表示の読み方を、例を使って教えて」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s2-check",
-      "issue": "(d) §5 option form: the q2 prompt asks for a method (「勧める方法はどれでしょう？」). Options a and c are actions (「試す」「する」), but b and d are judgements (「それで足りる」「確かめられる」).",
-      "fix": "b 「手元でサンドボックスをオンにすれば、それで足りる」→「手元でサンドボックスをオンにして試す」. d 「信頼の確認で承認すれば、中身の安全も確かめられる」→「信頼の確認で承認してから、手元で試す」. The current feedback still fits both."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s3-check",
-      "issue": "(d) §5 option form: in q3, options a, b and d all take the form 「`deny` に … を書く」. Option c is a conditional statement instead: 「`allow` に何も書かなければ、読まれることはない」.",
-      "fix": "c 「`allow` に何も書かなければ、読まれることはない」→「`allow` にも `deny` にも何も書かない」. The current feedback still fits."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) §5 option form: in e1, options a and b are actions ending in 「動かす」, but c and d are judgements ending in 「よい」 (「本文はそのまま渡してよい」「本文の内容も信頼してよい」).",
-      "fix": "e1 c 「auto モードの分類器があるので、本文はそのまま渡してよい」→「autoモードの分類器に任せ、本文をそのまま渡して動かす」. e1 d 「書いた人のアカウントが本物なら、本文の内容も信頼してよい」→「書いた人のアカウントが本物か確かめ、本文をそのまま渡して動かす」."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "s5-table",
-      "issue": "(d) §2 terms defined before use: 「effort」 appears in s5-table (「重いモデルと effort」「モデルと effort を作業に合わせる」) and is then used in e6 (options b and d, feedback d, explanation) with no explanation. No lesson from cc-01 to cc-09 introduces it either (grep finds no effort or エフォート in those drafts), so the learner cannot tell what lowering it means.",
-      "fix": "row 3 「重いモデルと effort、長い CLAUDE.md」→「重いモデルと高いeffort（考える量の設定）、長いCLAUDE.md」. Check the gloss against cc-costs and adjust the wording if the docs describe effort differently."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "hook",
-      "issue": "(d) §2 abbreviations: 「API」 first appears in the hook title (「残った API キー」) and hook-predict option b, and it is never spelled out, here or earlier in the course (grep finds no 「Application Programming Interface」 in cc-01 to cc-09). The same issue was a must-fix in cc-11.",
-      "fix": "hook-b1 「ターミナルには、前に設定した `ANTHROPIC_API_KEY` が残っています。」→「ターミナルには、前に設定した `ANTHROPIC_API_KEY` が残っています。API（Application Programming Interface）のキーです。」 (「何が起こりうるでしょうか。」 stays as its own paragraph)."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-task",
-      "issue": "(a) meaning: p-bill asks the learner to explain 「先月の API の請求」, and practice-prompt-review assumes 「届いた API の請求」. But the case description never says that Tanaka received an API bill. The learner meets a premise that was never stated.",
-      "fix": "「Max プランの田中さんの設定と習慣を点検します。下の2つは田中さんのファイルで、写す必要はありません。」→「Maxプランの田中さんに、先月APIの請求が届きました。田中さんの設定と習慣を点検します。下の2つは田中さんのファイルで、写す必要はありません。」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "s4-lead",
-      "issue": "(a) meaning: 「学習に使うかを本人が選べます」 and 「既定で学習に使われません」 name neither the object (the conversations) nor whose learning is meant. In a learning app, 「学習」 can be read as the learner's own study, not model training.",
-      "fix": "「個人向けの Pro・Max は、学習に使うかを本人が選べます。」→「個人向けのPro・Maxでは、会話をモデルの学習に使うかを本人が選べます。」. 「法人向けの Team・Enterprise・API は、既定で学習に使われません。」→「法人向けのTeam・Enterprise・APIの会話は、既定ではモデルの学習に使われません。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s4-lead: 「隔離しても、送る中身は同じです。」 does not say where the content goes. — 「隔離しても、送る中身は同じです。」→「VMなどで隔離しても、Anthropicに送られる中身は変わりません。」",
-    "s1: the title writes 「まぎれた」 in kana, but the body writes 「紛れた」「紛れ込ませ」 in kanji. Pick one spelling. — 「10-1. 外の文章にまぎれた指示」→「10-1. 外の文章に紛れた指示」",
-    "s1-auto: 「その分類器も」 reads oddly because nothing else was said to miss things before it. — 「その分類器も、Anthropic の検証で行き過ぎた操作の17%を見逃しました。」→「ただし、その分類器はAnthropicの検証で、行き過ぎた操作の17%を見逃しました。」",
-    "s2-sandbox: the subject changes inside one sentence, from 'you turn it on' to 'it runs', and 「外で」 does not say outside of what. — 「`/sandbox` でオンにし、macOS では…で動きます。」→「サンドボックスは `/sandbox` でオンにします。macOSではSeatbelt、LinuxとWSL2ではbubblewrapで動きます。」 and 「フックや MCP サーバーは外で動きます。」→「フックやMCPサーバーは、サンドボックスの外で動きます。」 (the paragraph then has 4 sentences, so merge the Windows sentence into the second: 「…bubblewrapで動き、ネイティブのWindowsは対象外です。」)",
-    "s2-defs / s2-check: the glossary term is 「ワークスペースの信頼」, but the body and q2 say 「信頼の確認」 and never link to the term. Tie them together once. — q2 d feedback 「信頼の確認は、そのフォルダーの…」→「信頼の確認（[[ワークスペースの信頼]]）は、そのフォルダーの…」",
-    "ex-pattern: 「gitignore と同じ書き方で」 dangles in front of two definitions, so it carries two ideas in one sentence. — 「gitignore と同じ書き方で、`./` は今のフォルダーから、`**` は下の階層すべてです。」→「書き方はgitignoreと同じです。`./` は今のフォルダー、`**` は下の階層すべてを表します。」",
-    "s3-pitfall: 「使われません」 can be read as 'nobody uses them', and the third sentence has no subject. — 「`Write(...)` のパスのルールと `.claudeignore` は使われません。」→「`Write(...)` のパスのルールと `.claudeignore` は効きません。」. 「自分でファイルを開くスクリプトには効かないので」→「拒否ルールは、自分でファイルを開くスクリプトには効かないので」",
-    "s3-check: the second sentence of q3 d feedback says the working folder is the base in project settings. Per e3, though, a single leading `/` is anchored to the settings file, and it is `./` that starts from the working folder. Please check the facts. — 「プロジェクトの設定では作業フォルダーが起点なので、`./certs/**` と書きます。」→「作業フォルダーから数えるなら、`./certs/**` と書きます。」",
-    "s3-check: the example path 「/Users/me/app/certs/**」 is a fictional macOS home path. AGENTS.md bans absolute personal paths under /Users in commits, so confirm that scan-secrets accepts it, or use a neutral path. — 「`Read(/Users/me/app/certs/**)`」→「`Read(/home/me/app/certs/**)`」",
-    "check-quiz: in e3 b, 「ファイルシステムの根」 is uncommon wording for the root directory. — 「ファイルシステムの根にある `/secrets/` の中」→「ファイルシステムのいちばん上にある `/secrets/` の中」, and in the feedback 「根からの絶対パスは」→「いちばん上からの絶対パスは」",
-    "check-quiz: in e4 c, 「`cat` にも効かない」 sounds unnatural with にも before a negative, and option a is in the past tense while the others are present. — 「拒否ルールは Read ツールだけを止め、`cat` にも効かない」→「拒否ルールはReadツールだけを止め、`cat` には効かない」. 「…と書けばスクリプトも止まった」→「…と書けばスクリプトも止まる」",
-    "check-quiz: 「大きな要求」 in e6 a feedback and card-clear does not say what is large. — 「`/compact` は、それ自体が大きな要求です。」→「`/compact` は、それ自体が多くの使用量を使う要求です。」",
-    "s5-check: in q4 b feedback, 「チャットと共有です」 is clipped. — 「…週の上限で、チャットと共有です。」→「…週の上限で、チャットと共有されます。」",
-    "s5-md2: 「企業での平均は」 does not say an average of what. — 「企業での平均は、開発者1人・稼働1日あたり約13ドルです（公式の目安）。」→「企業での平均の費用は、開発者1人・稼働1日あたり約13ドルです（公式の目安）。」",
-    "s4-note: 「平文」 may be unfamiliar. — 「`~/.claude/projects/` に平文で残ります。」→「`~/.claude/projects/` に暗号化されないまま残ります。」",
-    "hook-b1 / hook-predict: 「環境変数」 first appears in the explanation, but the scenario only says the key 「残っています」 in the terminal. — 「ターミナルには、前に設定した `ANTHROPIC_API_KEY` が残っています。」→「ターミナルには、前に設定した環境変数 `ANTHROPIC_API_KEY` が残っています。」",
-    "s2-layers / summary-cards: 「子プロセス」 is not explained. — 「シェルコマンドとその子プロセスだけ」→「シェルコマンドと、そこから起動されるプログラムだけ」",
-    "practice-steps-deny: 「起動したら」 does not say what is started. — 「起動したら、結果を予想して依頼文を送ります。」→「Claude Codeを起動したら、結果を予想して依頼文を送ります。」",
-    "practice-steps-bill: the のの chain is heavy. — 「先月の API の請求の原因・確かめ方・直し方を書き」→「先月届いたAPI請求について、原因・確かめ方・直し方を書き」",
-    "practice-prompt-review: in the expect model answer, ①–④ are plain form (「使っている。…使う。」), while the paragraph after them is です・ます (「請求の説明の例です。…なりました。」). Make them match. — 「…ネットにつながらないコンテナや VM の中だけで使う。」→「…ネットにつながらないコンテナやVMの中だけで使います。」 (same for ②–④)",
-    "summary-points: the points are full plain-form sentences (「隔離する。」「確かめる。」). Lists may use 体言止め, but full sentences read better in です・ます. — 「…知らないリポジトリと強い権限は隔離する。」→「…知らないリポジトリと強い権限は隔離します。」",
-    "s5-check / check-quiz: the prompts of q4 and e5 run to three sentences, while §5 asks for a one-sentence question. Move the scenario into a lead-in, or shorten it.",
-    "s1-md2: the link points to /docs/ja/security, while the source cc-security is /docs/en/security. Check that the Japanese page exists (factual doubt, not changed here)."
+    "check-quiz: e2 d feedback has no subject, so 「LinuxとmacOSでは…拒否します」 can be read as the OS refusing. The audit quote says Claude Code refuses. — 「LinuxとmacOSでは、rootやsudoでの `bypassPermissions` の起動を拒否します。」→「LinuxとmacOSでは、Claude Codeはrootやsudoでの `bypassPermissions` の起動を拒否します。」",
+    "check-quiz: e5 says 「Console」 alone, while cc-01 introduced it as 「Claude Console」. — 「ConsoleからAPIの請求が届きました。」→「Claude ConsoleからAPIの請求が届きました。」",
+    "s2-layers: the caption is a plain-form sentence. Captions can be 体言止め, but a full sentence reads better in です・ます. — 「守りは重ねて使う。サンドボックスが囲むのはシェルコマンドだけ」→「守りは重ねて使います。サンドボックスが囲むのはシェルコマンドだけです」",
+    "s2-layers: the diagram leaves フック out of the outside-the-sandbox node, while s2-sandbox and card-sandbox name it. — 「ファイル操作ツール・MCPサーバー<br>（サンドボックスの外）」→「ファイル操作ツール・フック・MCPサーバー<br>（サンドボックスの外）」",
+    "s5-table / check-quiz / summary-cards: 「大きな要求」 does not say what is large. — 「`/compact` はそれ自体が大きな要求」→「`/compact` はそれ自体が使用量の多い要求」 (do the same in e6 a feedback and card-clear)",
+    "s3-pitfall / s3-check: the pitfall says 「効きません」, but the q3 b and e3 c feedback say 「使われません」 for the same Write rule. — 「Writeのルールは使われません。」→「Writeのルールは効きません。」",
+    "glossary 利用上限: the subject of 「共有します」 is unclear. q4 b feedback uses 「共有されます」. — 「…週の上限があり、Claudeのチャットと共有します。」→「…週の上限があり、Claudeのチャットと共有されます。」",
+    "hook-predict: 「サブスクリプション」 appears with no English in this lesson. If the course has not introduced it with English before, add it. — 「サブスクリプションではなく」→「サブスクリプション（subscription）ではなく」",
+    "s5-check / check-quiz: the prompts of q4 and e5 run to 3 sentences, while §5 asks for a one-sentence question. Shorten the scenario where you can. — e5 「…最も考えられる原因はどれでしょう？」 keep the question, merge 「Maxプランの鈴木さんは、毎晩 `claude -p` のスクリプトを動かしています。」 into 「毎晩 `claude -p` のスクリプトを動かすMaxプランの鈴木さんに、…」",
+    "s1-md2: the link points to /docs/ja/security, while the source cc-security is the en page. The audit fetched the ja page, so this is probably fine, but keep the link and the source consistent (factual doubt, not changed here)."
   ],
-  "average": 3.0,
-  "verdict": "revise",
-  "summary": "The lesson reads warmly and teaches clearly. Most wrong-option feedback names the misconception and then gives the correct idea, and lint is clean. The most important fixes are the §3 spacing between Japanese and English across the whole lesson and the plain-form flashcard backs. Also explain 「effort」 and spell out API, match the option forms in q2, q3 and e1, and state Tanaka's API bill in practice-task."
+  "average": 3.5,
+  "verdict": "pass",
+  "summary": "The scope check required a full review: 32 of 44 blocks changed (52% of the parts), which is above the 30% limit. All 10 must-fix items from my round-1 review are gone. §3 spacing is now consistent across the lesson and bypassPermissions is always inline code. The card backs and summary-next use です・ます. summary-ask now parses. The option forms in q2, q3 and e1 match. API is spelled out and エフォート is glossed. practice-task states Tanaka's API bill. s4-lead says that it is the conversations that may be used for model training. lessons:lint --strict is clean. measure.mjs gives prose 1735 and est 17.0 min, which matches estMinutes 17. No new (a)–(e) errors were found. The remaining items are polish, listed in niceToHave."
 }
