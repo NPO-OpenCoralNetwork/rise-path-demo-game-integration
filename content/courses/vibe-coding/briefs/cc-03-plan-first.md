@@ -35,7 +35,7 @@
   - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（コース共通の measure.mjs：`cc-03-plan-first.lesson.json: prose 2252 (budget 1,200–2,400) · read 3357 · practice reading 1436 · questions 8 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`。(3,357 + 1,436) ÷ 450 ≒ 10.65 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.99 分）。
+- 所要時間 / minutes: 20（コース共通の measure.mjs：`cc-03-plan-first.lesson.json: prose 2275 (budget 1,200–2,400) · read 3353 · practice reading 1442 · questions 8 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`。(3,353 + 1,442) ÷ 450 ≒ 10.66 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.99 分）。
 - 難易度 / level: beginner
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダーに 23 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
@@ -61,10 +61,13 @@
 - 例題（3-3）のログイン画面のプロジェクト（`src/pages/Login.tsx`・`src/pages/Signup.tsx`）は架空で、読むだけの例。手を動かすのは演習の `todo.html`。
 - 演習の `todo.html` は Chromium（headless）で動作を確認した（空の入力で空の `li` が増える）。
 - 新しいセッションの始め方は「`/clear` で会話を空にするか、`claude` を起動し直す」とした（公式は "start a fresh session"）。
-- 承認の選択肢の英語表記（「Yes, manually approve edits」「No, keep planning」）は 2026-10-20 の公式ページのまま。表示が変わりうる旨をレッスン内に書いた。
+- 承認の選択肢の英語表記（「Yes, manually approve edits」「No, keep planning」）は 2026-10-20 の公式ページ（v2.1.304）のまま。レッスンでは s2-enter-lead で版（v2.1.304 時点）を示し、表示が変わりうる旨の注記は所要時間の上限のため入れていない。
 - 所要時間はコース共通の measure.mjs で数える（演習は 1 セクション 2 分）。20 分以内にするため、exam の e3（o2）と e6（o3）を削除した。o2 は q2・q3・e4、o3 は q4・e5 で評価する（どの目標も inline と exam に 1 問以上）。
-- 390px の画面に収めるため、表は 2 列にした（s1-table は「観点：書くこと｜書き直した例」、s4-table は例の列を外した）。s1-table の `ExecutionFactory` の例は、公式の "summarize how its api came to be" を「今の作りの経緯を要約する」と言い換えた。
+- 390px の画面に収めるため、表は 2 列にした（s1-table は「観点：書くこと｜書き直した例」、s4-table は例の列を外した）。s1-table の `ExecutionFactory` の例は、公式の "summarize how its api came to be" を「（クラス名）の経緯を、Gitの履歴から要約する」と言い換えた。各セルは 40 字以内にし（既存のパターンの例から「ホーム画面の」を外し、症状の例は名詞句にした）、モック・ウィジェットには短い説明を添えた。表と図は 2 列・`flowchart TD`、コードは 1 行 60 字以内・1 行 1 コマンド。
 - 演習の `todo.html` は、1 行が 60 字を超えないよう `addButton` の行を 2 行に分けた（23 行）。動作は Chromium（headless）で再確認した。
+- autoモードで始まる条件は、コース共通の事実（cross-lesson facts 1）に合わせて「ターミナルとVS Codeで対話するとき」と書いた（対話セッションのみ）。
+- 例題の手順は契約の 3–6 手順に合わせて 6 手順にした（ex-enter を ex-explore に統合。ex-enter の id はなくなった）。各手順に理由を添えた（ex-plan・ex-commit に追加）。
+- プロンプト中の `@ファイル名` の後ろには半角スペースを置く（Claude Code がパスの終わりをスペースで判断するため）。それ以外は日本語と英数字のあいだにスペースを入れない。
 
 ## Outline
 
@@ -73,9 +76,9 @@
 | hook | hook | はじめに：「いい感じにして」の行き先 | あいまいな依頼だと、Claude が推測で範囲を決めて書き換えが広がる | markdown, quiz(predict) | q0 → o2（採点なし） |
 | s1 | concept | 3-1. 依頼を4つの観点で具体的にする | 範囲・参照先・既存のパターン・症状で書き直し、材料は @参照・画像・URL で渡す | markdown, definitions, table, markdown, prompt（書き直しの例）, quiz(inline) | q1 → o1 |
 | s2 | concept | 3-2. 探索→計画→実装→コミット | 調べて計画する段階（プランモード）と実装を分ける。差分を1文で言えるなら計画は省く | markdown, definitions, diagram, markdown, list, callout(info), markdown, quiz(inline) | q2 → o2 |
-| s3 | example | 3-3. 例題：ログイン画面を4つのフェーズで直す | 計画を読んで範囲外の変更を直してから承認し、差分を説明させてコミットする（計画の例を示す） | markdown, steps(7), prompt（計画を直す依頼）, callout(tip), quiz(inline) | q3 → o2（承認の前に計画を直す） |
+| s3 | example | 3-3. 例題：ログイン画面を4つのフェーズで直す | 計画を読んで範囲外の変更を直してから承認し、差分を説明させてコミットする（計画の例を示す） | markdown, steps(6), prompt（計画を直す依頼）, callout(tip), quiz(inline) | q3 → o2（承認の前に計画を直す） |
 | s4 | concept | 3-4. 大きめの機能は仕様から始める | インタビュー → SPEC.md → 新しいセッション。準備の度合いを変更の大きさで選ぶ | markdown, definitions, markdown, prompt（インタビュー）, markdown, table, callout(note), quiz(inline) | q4 → o3 |
-| practice | practice | 演習1：TODO画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), prompt（模範解答）, checklist | — |
+| practice | practice | 演習1：TODO画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), checklist, prompt（模範解答、書いてから見比べる） | — |
 | practice-spec | practice | 演習2：仕様インタビューの依頼文を作る | 期限とリマインダーのためのインタビュー依頼文を書く | markdown, steps(3, hint/troubleshoot), checklist, prompt（模範解答、書いてから見比べる） | — |
 | check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e4 → o2（転移）, e5 → o3（e2・e3・e6 は削除） |
 | summary | summary | まとめ | 要点・振り返り・次の一歩・復習 | summary(5), markdown, flashcards(7), askTutor | — |

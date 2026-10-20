@@ -33,7 +33,7 @@
   7. 使われないスキルは本文を詳しくすれば使われる → 判断に使われるのは description。
 
 ## 形式 / Format
-- 所要時間 / minutes: 18（コース共通の measure.mjs：`prose 1913 (budget 1,200–2,400) · read 2549 · practice reading 931 · questions 12 · practice sections 1 · est 17.7 min (must be ≤ 20; estMinutes 18)`。(2,549 + 931) ÷ 450 ＝ 7.7分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習1セクション × 2分 ＝ 2分、計 17.7分 → 18）
+- 所要時間 / minutes: 18（コース共通の measure.mjs：`prose 1931 (budget 1,200–2,400) · read 2575 · practice reading 931 · questions 12 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)`。(2,575 + 931) ÷ 450 ＝ 7.8分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習1セクション × 2分 ＝ 2分、計 17.8分 → 18）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語は公開先が決まってから）
 - 演習の題材 / practice task idea: 自分が繰り返している手順（なければ「README の更新手順」）を `.claude/skills/<名前>/SKILL.md` にし、自然な依頼と `/名前` の2通りで試す（使われるかを先に予想）。続けて、サブエージェントに調べものを任せ、`/context` の前後でメインのコンテキストの増え方を比べ、理由を自分の言葉で説明する。
@@ -55,11 +55,12 @@
 - agent-skills-post — Equipping agents for the real world with Agent Skills — https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
 
 ## Assumptions
-- 練習用フォルダは第1回から使っている `cc-practice`（コミットが1つ以上ある）。ない場合は `mkdir cc-practice && cd cc-practice && git init` で作り、ファイルを1つ作って最初のコミットをしてからスキルのフォルダを作る、と①（ex-folder）の troubleshoot に書く（コミットがないと `git diff HEAD` が失敗するため）。
+- 練習用フォルダは第1回から使っている `cc-practice`（コミットが1つ以上ある）。ない場合は `mkdir cc-practice`、`cd cc-practice`、`git init` を1つずつ実行して作り、ファイルを1つ作って最初のコミットをしてからスキルのフォルダを作る、と①（ex-folder）の troubleshoot に書く（コミットがないと `git diff HEAD` が失敗するため）。
 - スキルのフォルダは Claude Code を起動する前に作る（起動後に新しく作った `.claude/skills/` は `/reload-skills` するまで読み込まれないため。①に理由も書く）。`/名前` で呼べないときの対処として `/reload-skills` を示す。`/subtask`・`/tasks`・`/reload-skills` は公式の Commands ページに載っていることを確認済み（2026-10-20）。
 - `disable-model-invocation: true` を付ける基準は公式どおり「取り消しにくい（副作用のある）手順か、動かす時期を自分で決めたい手順」。7-2・演習③・模範解答で同じ基準を使う。
 - `/context` の表示（色分けされたグリッド）の細部は版で変わるので、数字や項目名は固定しない。
 - 例の SKILL.md は公式の summarize-changes の例を日本語の手順にしたもの（`!` による動的コンテキスト注入は扱わず、本文で `git diff HEAD` を確かめる手順にした）。
+- スマートフォン（390px、本文の幅358px）で横にはみ出さないよう、表は2列、図は `flowchart TD` で横並び2つまで・ラベルは1行12字以内、コードの行は60字以内にする。7-4の表は「足すもの：読み込まれ方」を1つの列にまとめ、図1は「いいえ」の分岐を図の説明（alt）に移し、横幅を2列に収めた。
 
 ## Outline
 
@@ -69,7 +70,7 @@
 | skill-basics | concept | 7-1. スキル：手順は使うときだけ読み込む | スキルは名前と説明文だけが毎回、本文は使うとき（段階的な読み込み）。だから手順はスキルへ | markdown, definitions（スキル・フロントマター・段階的な読み込み）, diagram, markdown, quiz inline | q1 → o2 (understand) |
 | skill-example | example | 7-2. 例題：コミットメッセージの手順をスキルにする | 置き場所 → description → 本文 → 2通りで試す（worked example）。取り消しにくい手順・動かす時期を決めたい手順には `disable-model-invocation`。旧カスタムコマンド | markdown, code bash, code yaml (SKILL.md), steps ×5, markdown, callout info, quiz inline | q2 → o1 (apply), q3 → o1 (apply) |
 | subagents | concept | 7-3. サブエージェント：調べものを別のコンテキストで | 自分のコンテキストで読み、要約だけを返す。フォークは会話を引き継ぐ。バックグラウンド既定、`.claude/agents/` | markdown, definitions（サブエージェント・フォーク）, diagram, markdown ×3, code yaml (agent), quiz inline | q4 → o3 (understand), q5 → o2 (apply) |
-| choose | concept | 7-4. どこに置く？ 足すのは「きっかけ」が来てから | 公式の「少しずつ育てる」：きっかけ → 足すもの。メインの会話のほうが向く場面 | markdown, table, markdown, callout pitfall, quiz inline | q6 → o2 (evaluate) |
+| choose | concept | 7-4. どこに置く？ 足すのは「きっかけ」が来てから | 公式の「少しずつ育てる」：きっかけ → 足すもの。メインの会話のほうが向く場面 | markdown, table（2列：きっかけ／足すもの：読み込まれ方）, markdown, callout pitfall, quiz inline | q6 → o2 (evaluate) |
 | practice | practice | 演習：自分の手順をスキルにし、調べものを任せる | 自分の手順をスキルにして2通りで試し、サブエージェントの前後で `/context` を比べる | markdown, code bash, steps ×7 (hint/troubleshoot), prompt (claude-code), checklist, markdown, code yaml (模範解答) | — |
 | check | check | 確認テスト | 全目標の総まとめ（転移2問） | quiz exam ×5 | e1 → o1 (apply, transfer: チーム共有), e2 → o1 (analyze), e3 → o2 (evaluate, transfer: ライブラリ入れ替え前の洗い出し), e5 → o3 (understand), e6 → o3 (analyze) |
 | summary | summary | まとめ | 要点4つ、振り返りと次回（第8回）、復習カード6枚、AI先生 | summary, markdown, flashcards, askTutor | — |

@@ -22,7 +22,7 @@
   - `bypassPermissions`（`--dangerously-skip-permissions`）は隔離したコンテナや仮想マシンだけ。
   - 権限ルール（allow / ask / deny）、`.claude/settings.json` の書き方、評価順（拒否 → 確認 → 許可、最初に一致したもの）、守らせるのは Claude Code でモデルではない（CLAUDE.md や依頼文は強制にならない）。`Bash(… *)` の末尾 ` *` の意味、`git -C . push` が一致しない限界、`Read(./.env)` の限界。
   - チェックポイントと `/rewind`（Esc 2 回）：戻るのは Claude のファイル編集ツールでの変更だけ。Bash（`rm`・`mv`・`cp`）、外への操作（push・DB・デプロイ）、Claude Code の外での編集は戻らない。バージョン管理の代わりではない。
-- 扱わない（別レッスン） / out: プランモードの使い方の詳細と承認の選択肢（第3回）、CLAUDE.md の書き方（第6回）、フックで確実に止める方法（第8回で予告のみ）、`claude -p` と CI での `dontAsk` + `--allowedTools`（第9回）、秘密情報の扱いとサンドボックス・`autoMode.environment`・`/auto-mode-setup`（第10回）、保護されたパス、ワークスペースの信頼、mods。
+- 扱わない（別レッスン） / out: プランモードの使い方の詳細と承認の選択肢（第3回）、CLAUDE.md の書き方（第6回）、Claudeの判断に関係なく止めるフック（第8回で予告のみ。e5 の解説は「第8回で学びます」とだけ書き、MCP には触れない）、`claude -p` と CI での `dontAsk` + `--allowedTools`（第9回）、秘密情報の扱いとサンドボックス・`autoMode.environment`・`/auto-mode-setup`（第10回）、保護されたパス、ワークスペースの信頼、mods。
 - 学習者がよく持つ誤解 / likely misconceptions（誤答の選択肢に使用）:
   - auto モードなら何をさせても安全（report §6）→ 分類器の見逃しは 17%。本番に関わる操作は人が見る（q2・e1）。
   - `/rewind` があるから git は要らない（report §6）→ Bash や外への操作は戻らず、長く残す履歴にもならない（q5・e3・e4）。
@@ -34,7 +34,7 @@
   - `bypassPermissions` を短時間だけノート PC で使うのは平気（e1）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20。コース共通の measure.mjs の出力：`cc-02-permissions.lesson.json: prose 1827 (budget 1,200–2,400) · read 2481 · practice reading 796 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)`。内訳：(2,481 + 796) ÷ 450 ≒ 7.3 分 + 問題 13 問（predict 1、inline 7、exam 5）× 40 秒 ≒ 8.7 分 + 演習 2 セクション × 2 分 = 4 分 → 19.9 分。
+- 所要時間 / minutes: 20。コース共通の measure.mjs の出力：`cc-02-permissions.lesson.json: prose 1827 (budget 1,200–2,400) · read 2476 · practice reading 800 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)`。内訳：(2,476 + 800) ÷ 450 ≒ 7.28 分 + 問題 13 問（predict 1、inline 7、exam 5）× 40 秒 ≒ 8.67 分 + 演習 2 セクション × 2 分 = 4 分 → 19.95 分（19.947）。
 - 本文の長さ：measure.mjs の prose（lesson-contract §3 の本文予算）で 1,827 字。予算 1,200〜2,400 字の範囲内。
 - 難易度 / level: beginner
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）
@@ -61,13 +61,13 @@
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：確認は減らしたい、でも push は止めたい | 確認なしで進むのは便利だが、push まで勝手に進むのは困る | markdown（第1回の想起＋問題、3 文）、callout note（v2.1.304 時点・公式ドキュメント日本語）、quiz predict | `q0` → o3（ungraded：auto の既定で push は通る） |
-| `modes` | concept | 2-1. 権限モードで、確認なしに進める範囲を選ぶ | 6 つのモードは「確認なしで動く範囲」が違う。Shift+Tab で切り替える | markdown lead（権限モードの定義）、table（6 モード × 動くもの × 場面）、markdown（Shift+Tab の順、画面下の表示、旧名 default） | `q1` → o1（初めてのリポジトリを調べる → プランモード） |
+| `modes` | concept | 2-1. 権限モードで、確認なしに進める範囲を選ぶ | 6 つのモードは「確認なしで動く範囲」が違う。Shift+Tab で切り替える | markdown lead（権限モードの定義）、table（2 列：モード／確認なしで動くものと向く場面。auto の行は「ターミナルとVS Codeの既定」）、markdown（Shift+Tab の順、画面下の表示、旧名 default） | `q1` → o1（初めてのリポジトリを調べる → プランモード） |
 | `auto-mode` | concept | 2-2. auto モードに任せてよいこと、よくないこと | auto は分類器が確認を引き受けるが、見逃しもある | markdown lead（承認疲れ）、definitions（分類器）、markdown（既定で止めるもの・通す push）、markdown（17%、本番は人が見る）、callout warning（bypassPermissions は隔離環境だけ） | `q2` → o1（本番サーバーのスクリプト → Manual に切り替え） |
 | `rules` | concept | 2-3. 権限ルールで「この操作だけは」を決める | ルールは拒否 → 確認 → 許可の順で、守らせるのは Claude Code | markdown lead、definitions（権限ルール・確認ルール・拒否ルール）、markdown（順番は図で示す、守らせるのはモデルではなく Claude Code の仕組み）、diagram（判定の流れ、8 ノード） | `q3` → o3（`Bash(git *)` 許可 + `Bash(git push *)` 確認 → 確認が出る） |
 | `rules-example` | example | 2-4. 例題：push の前に確認を挟む設定を書く | 確認か拒否かを決め、ルールの形に書き、読み込まれたか確かめる | markdown、steps（3 ステップ・目的ラベル・理由・expect）、code `.claude/settings.json`、callout pitfall（`git -C . push`、`Read` の限界） | `q4` → o3（npm test は allow、push は ask：`*` の有無と ask/deny） |
-| `rewind` | concept | 2-5. チェックポイントと `/rewind`：戻せるもの、戻せないもの | 戻るのは Claude の編集ツールでの変更だけ。git の代わりではない | markdown lead（チェックポイントの定義、100 回分）、markdown（Esc 2 回 / `/rewind`、戻すものを選ぶ）、table（変え方 × 例 × 戻るか）、markdown（バージョン管理の代わりではない） | `q5` → o2（4 つの変更のうち戻るのは編集ツールの変更） |
+| `rewind` | concept | 2-5. チェックポイントと `/rewind`：戻せるもの、戻せないもの | 戻るのは Claude の編集ツールでの変更だけ。git の代わりではない | markdown lead（チェックポイントの定義、100 回分）、markdown（Esc 2 回 / `/rewind`、戻すものを選ぶ）、table（2 列：どうやって変えたか（例）／`/rewind` で戻るか）、markdown（バージョン管理の代わりではない） | `q5` → o2（4 つの変更のうち戻るのは編集ツールの変更） |
 | `practice-sort` | practice | 演習1：場面ごとに権限モードを選ぶ | 表を見ずに場面からモードを選ぶ（想起） | markdown、quiz inline（2 場面） | `ps1` → o1（`dontAsk`）、`ps2` → o1（`acceptEdits`） |
-| `practice-rules` | practice | 演習2：ルールを試し、巻き戻しも確かめる | 自分でルールを書き、予想してから試す。巻き戻しで戻るものを体験する | markdown、code（terminal：`.claude`・ダミー `.env`・`.gitignore` に `.env`・`rewind-practice.md`）、steps（4：hint → troubleshoot → 2-4 のコードが模範解答）、prompt 依頼文1（`{{読ませないファイル}}`、expect）、prompt 依頼文2（`{{足す1行}}`、expect）、checklist（4、応用 1 つ） | — |
+| `practice-rules` | practice | 演習2：ルールを試し、巻き戻しも確かめる | 自分でルールを書き、予想してから試す。巻き戻しで戻るものを体験する | markdown、code（terminal、1 行に 1 コマンドで 1 行ずつ実行：`.claude`・ダミー `.env`・`.gitignore` に `.env`・`rewind-practice.md`）、steps（4：hint → troubleshoot → 2-4 のコードが模範解答）、prompt 依頼文1（`{{読ませないファイル}}`、expect）、prompt 依頼文2（`{{足す1行}}`、expect）、checklist（4、応用 1 つ） | — |
 | `check` | check | 理解度チェック | 全目標の確認（転移を含む） | quiz exam（5） | `e1` → o1（転移：知らないリポジトリでの長い修正作業と `--dangerously-skip-permissions`）、`e3` → o2（`rm` と編集の混在 → Restore code）、`e4` → o2（「git は要らない」への返答）、`e5` → o3（autoモードで `git -C . push` は確認ルールに一致しない）、`e6` → o3（転移：`gh pr create` の ask） |
 | `summary` | summary | まとめ | 持ち帰る 4 点、振り返り、次の一歩 | summary（4）、markdown（振り返り＋第3回へ）、flashcards（7）、askTutor（3） | — |
 
@@ -81,6 +81,7 @@ Contract check: hook は問題 3 文 + predict。セグメント 5（concept 4�
 - 承認疲れの数字（確認の 93% が許可される）は本文の長さの都合で載せなかった。17% は「頼んだ範囲を超えた実際の操作」に対する見逃しとして、2026年3月の engineering post の測定であることを明記して書いた（real overeager actions、n=52。いまの分類器の値とは書かない）。
 - 第3回・第8回・第10回への予告は、コース計画（report §7）の各回の範囲に合わせた。
 - 確認ルールが「必ず」確認を出すとは書かない。`Bash(git push *)` は `git -C . push` などに一致せず、`dontAsk` モードでは確認せずに拒否される（permissions・permission-modes、2026-10-20 のファクト監査）。一致しないコマンドの扱いはモードで変わるので、「確認が出ない」と書く問題・解説は autoモードを前提に明記した。
-- autoモードが既定で始まるのは v2.1.283 以降のターミナルと VS Code の対話セッション（permission-modes）。表と q0 の解説はこの範囲で書いた。
+- autoモードが既定で始まるのは v2.1.283 以降のターミナルと VS Code の対話セッション（permission-modes）。表と q0 の解説はこの範囲で書いた。2-1 の表の auto の行は「ターミナルとVS Codeの既定」とだけ書き、v2.1.283 は q0 の問いと解説で示す（セルを 40 字前後に収めるため）。
+- 390 px 幅の画面に収めるため（visual QA のコース共通ルール）、表はすべて 2 列（modes-table は「動くもの」と「場面」を 1 セルに、rewind-table は「例」を左の列の括弧に）、図のラベルは 1 行 12 字以内（rules-diagram の最初のノードを「Claudeが／操作しようとする」で改行）、演習の準備コマンドは `&&` でつながず 1 行に 1 コマンドにした。表の意味と、問題が頼る語（安全チェック、差分を見ながらの編集、人が見ない自動実行、どうやって変えたか）は変えていない。
 - 演習の依頼文1は「ファイルを読むツールで」と指定した。`Read(./.env)` の拒否は `cat` など Claude Code が認識するコマンドにも効くが、自分でファイルを開くスクリプトには効かない（permissions）ので、expect はスクリプトの場合だけを限界として挙げた。
 - 演習の準備コマンドで `.env` を `.gitignore` に足し、第1回のコミットの習慣でダミーの `.env` がコミットされないようにした。
