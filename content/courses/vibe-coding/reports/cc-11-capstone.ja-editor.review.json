@@ -3,73 +3,72 @@
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
-  "lessonHash": "sha256:ae84a43eacd96ce5",
+  "mode": "verify",
+  "lessonHash": "sha256:054759c1db95b6c4",
+  "verifies": {
+    "reviewedRevision": "sha256:ae84a43eacd96ce5",
+    "changed": [
+      "cycle-steps"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/ae84a43eacd96ce5/round-1/ja-editor.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Every learner-facing string is now です・ます. The flashcard backs (summary-cards) and the e1 situation (check-quiz) were fixed. lessons:lint --strict reports 0 errors and 0 warnings, so there are no banned phrases. The spacing slips are gone: 「Ctrl + Gで」「autoモード」「MCP（Model Context Protocol）サーバー」, with backticks on paths and commands in setup-prompt-model and cycle-prompt-plan. The 照らす misuse is now 照らし合わせる (cycle-steps, cycle-prompt-review, card-review, q3 hint). Wrong-option feedback follows 誤解→正しい考え in two sentences or fewer throughout. A few small phrasings remain as niceToHave (「起動時が」「各行に聞く」「検証が空いている」).",
+      "evidence": "Carried over from the previous review. Only cycle-steps / c-explain changed. Its new text 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。」 is です・ます, natural Japanese, and has a backtick on the command. Its quoting matches c-plan's quoted request.",
       "blockIds": [
-        "summary-cards",
-        "check-quiz",
-        "cycle-steps",
-        "ex-steps",
-        "setup-prompt-model",
-        "cycle-prompt-plan"
-      ]
+        "cycle-steps"
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "The course measure gives prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1621 · questions 8 · practice sections 3 · est 18.7 min (must be ≤ 20; estMinutes 19). estMinutes matches est rounded. Sentence and paragraph budgets are clean (lint). Every section opens with a short lead (ex-b1, setup-task, cycle-task, sc-b1). Every screen carries a table, diagram, steps or a check.",
+      "evidence": "Re-measured after the change: prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1654 · questions 8 · practice sections 3 · est 18.8 min (must be ≤ 20; estMinutes 19, which matches est rounded). lessons:lint --strict gives 0 errors and 0 warnings, so the sentence and paragraph budgets hold.",
       "blockIds": [
-        "dr-table",
-        "ex-steps",
-        "setup-steps",
-        "cycle-flow",
-        "cycle-steps",
-        "self-check-list"
+        "cycle-steps"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The prerequisites list lessons 2–10, and the text recalls them (「第3回」「第6回」「第7回」「第8回」 in dr-table, pq0 and cycle-task). コンテキスト is now glossed at first use (q1 option d 「別のコンテキスト（context）」). API and JSON are gone from the text. The glossary サブエージェント now reads 「メインの会話とは別のコンテキストウィンドウ」, and the glossary terms match the text, diagram and options. It does not reach 4 for two reasons. c-explain asks the learner to run `/explain-diff`, a skill only 佐藤さん built in the example, while p-more tells learners to add parts only when they have a trigger. And `jq` appears in ex-hook without any explanation.",
+      "evidence": "Re-scored because the change touches it. c-explain no longer assumes the example's skill: 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。」. This fits p-more's rule of adding parts only when there is a trigger. The score stays at 3 rather than 4 because ex-steps (ex-hook) still uses `jq` without saying what it does. That spot is unchanged, so it is in niceToHave.",
       "blockIds": [
         "cycle-steps",
-        "ex-steps",
-        "dr-quiz",
-        "lesson"
+        "ex-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is single-locale (jp) and no strings are missing. The cycle-flow labels are in Japanese, match the step titles in cycle-steps, and come with a caption and a full alt. The link text in summary-next names its destination (「公式ドキュメントの日本語版」).",
+      "evidence": "Carried over from the previous review. The lesson is single-locale jp, and the changed c-explain text is present and complete. The cycle-flow labels still match the step titles in cycle-steps (the c-explain title 「差分を説明してもらう」 is unchanged).",
       "blockIds": [
-        "cycle-flow",
-        "summary-next"
-      ]
+        "cycle-steps",
+        "cycle-flow"
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "cycle-steps: c-explain assumes the learner has the example's `/explain-diff` skill, but p-more adds parts only when there is a trigger. Give a fallback — 「`/explain-diff` で説明を受け、1か所を自分の言葉で言い直します。」→「`/explain-diff`（例題のスキル）か「差分を説明して」という依頼で説明を受け、1か所を自分の言葉で言い直します。」",
-    "ex-steps: in ex-hook, `jq` appears with no word on what it does — 「（`jq` も使います）」→「（編集したファイル名を取り出すのに `jq` を使います）」",
+    "ex-steps: in ex-hook, `jq` appears with no word on what it does (unchanged text, carried over) — 「（`jq` も使います）」→「（編集したファイル名を取り出すのに `jq` を使います）」",
     "ex-steps: in ex-rules, 「起動時が「autoモード」」 reads a little oddly — 「v2.1.283以降は起動時が「autoモード」なので」→「v2.1.283以降は起動時のモードが「autoモード」なので」. Factual doubt: the version and the default mode are not quoted in the audit or the facts file. Please confirm them against cc-permission-modes.",
     "ex-steps: in ex-claude-md, the subject of 推測 is left implicit — 「推測できないことだけを書きます。」→「Claudeが推測できないことだけを書きます。」",
-    "setup-steps: in the p-claude-md hint, 「各行に聞く」 is odd, since the learner is asking themself about each line (carried over from round 1) — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
-    "setup-steps / check-quiz: p-claude-md sets a 25-line target, while e3 says 40 lines is within the official guide of 200 or fewer. A learner may wonder which number counts — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行以内）。」",
-    "cycle-steps: the c-build hint leaves the quoted request without 「」, while c-plan quotes its request (「最初の1歩だけに絞って」と頼みます) — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
+    "setup-steps: in the p-claude-md hint, 「各行に聞く」 is odd, since the learner is asking themself about each line — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
+    "setup-steps / check-quiz: p-claude-md sets a 25-line target, while e3 says 40 lines is within the official guide of 200 or fewer — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行以内）。」",
+    "cycle-steps: the c-build hint leaves its quoted request without 「」, while c-plan and now c-explain quote theirs — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
     "dr-b2: 「1回で困る」 is terse — 「秘密情報とpushは1回で困るので」→「秘密情報とpushは1回の失敗でも困るので」",
-    "sc-b2: the second sentence links its parts loosely — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
-    "summary-cards / check-quiz: 「自分の作業」 can be read as the learner's own work, but the point is Claude grading itself (card-review back, e3 option c feedback) — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」; 「自分の作業を採点すると、甘くなりがちです。」→「Claudeが自分の作業を採点すると、甘くなりがちです。」",
+    "sc-b2: the parts of the sentence are only loosely linked — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
+    "summary-cards / check-quiz: 「自分の作業」 can be read as the learner's own work, but the point is Claude grading itself — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」; 「自分の作業を採点すると、甘くなりがちです。」→「Claudeが自分の作業を採点すると、甘くなりがちです。」",
     "check-quiz: in the e3 explanation, 「検証が空いている」 is unusual — 「検証が空いている今は、ここを最初に埋めます。」→「完了を確かめる手段がない今は、ここを最初に埋めます。」",
     "check-quiz: in the e1 explanation, 「止めます」 also covers the ask rule, which pauses for confirmation rather than blocking — 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」→「一致した操作は、Claudeの判断に関係なく、Claude Codeが拒否するか確認を求めます。」",
-    "lesson (glossary きっかけ): the definition still does not fit the rows 「別のリポジトリでも同じ設定を使う」 and 「例外なく毎回起きてほしいことがある」 (carried over from round 1) — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
+    "lesson (glossary きっかけ): the definition does not fit the rows 「別のリポジトリでも同じ設定を使う」 and 「例外なく毎回起きてほしいことがある」 — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "review-scope.mjs exited 1 (38 of 75 parts changed, 51%; 27 of 33 blocks), so the scope check required a full review. All 12 must-fix items from round 1 are gone. The flashcards and e1 are now in です・ます. The spacing slips (Ctrl + G, auto, MCP, /init, paths) are fixed. API and JSON were removed, and コンテキスト is glossed at first use. The glossary サブエージェント reads 「メインの会話とは別のコンテキストウィンドウ」, and 照らし合わせる replaces 照らす everywhere. I found no new (a)–(e) errors. lessons:lint --strict is clean, and the measure gives prose 1210, est 18.7, estMinutes 19. The remaining points are niceToHave. The main ones are the `/explain-diff` assumption in c-explain, the unexplained `jq`, and a factual doubt about the v2.1.283 autoモード claim."
+  "summary": "Verification round. review-scope.mjs exited 0: 1 of 71 parts changed (2%), and only cycle-steps / c-explain changed. The previous review had no open must-fix items, so there is nothing to resolve. The c-explain change applies my round-1 niceToHave: it now gives a fallback to `/explain-diff` (「今の差分を説明して」). The new text has no (a)–(e) error. lessons:lint --strict is clean, and the measure gives prose 1210, est 18.8, estMinutes 19. I re-scored load and prior; prior stays at 3 because `jq` in ex-hook is still unexplained. voice and a11y_l10n are carried over. The remaining points are niceToHave."
 }

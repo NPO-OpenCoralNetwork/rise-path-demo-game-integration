@@ -1,10 +1,27 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:ae84a43eacd96ce5",
+  "lessonHash": "sha256:054759c1db95b6c4",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:ae84a43eacd96ce5",
+    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/ae84a43eacd96ce5/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "cycle-steps"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "cycle-steps",
+      "criterion": "practice",
+      "status": "resolved",
+      "evidence": "c-explain now reads 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。」. A learner who followed p-more's 「なければ足しません」 can now finish the step and meet its expect."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -17,7 +34,8 @@
         "sc-quiz",
         "check-quiz",
         "practice-setup"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -26,7 +44,8 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -35,14 +54,16 @@
       "blockIds": [
         "dr-b1",
         "dr-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs: 「prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1621 · questions 8 · practice sections 3 · est 18.7 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. Lint passes sentence and paragraph limits, there is one new term in the lesson, and every section has a table, diagram, steps or check.",
+      "evidence": "Re-measured after the c-explain change. measure.mjs: 「prose 1210 (budget 1,200–2,400) · read 1703 · practice reading 1654 · questions 8 · practice sections 3 · est 18.8 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 still matches the rounded estimate, and lint --strict reports 0 errors and 0 warnings.",
       "blockIds": [
-        "lesson"
+        "lesson",
+        "cycle-steps"
       ]
     },
     {
@@ -55,7 +76,8 @@
         "ex-prompt-claude-md",
         "ex-settings",
         "ex-prompt-skill"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -66,7 +88,8 @@
         "ex-quiz",
         "cycle-quiz",
         "sc-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -79,7 +102,8 @@
         "cycle-quiz",
         "sc-quiz",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -88,16 +112,17 @@
       "blockIds": [
         "cycle-flow",
         "dr-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The practice is an authentic transfer task in the learner's own repository. Every step has an expect plus a hint or troubleshoot, and the model answers come after the hints (setup-prompt-model, setup-settings-model, cycle-prompt-plan). self-check-list is the success checklist. But c-explain now says only 「`/explain-diff` で説明を受け」, a skill the learner has only if a trigger made them add it under p-more (「なければ足しません」). c-review, c-explain and c-commit have no hint.",
+      "evidence": "c-explain now works whether or not the learner built the skill (「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます」), which matches p-more's 「なければ足しません」. Every step has an expect, the model answers come after the hints, and self-check-list is the success checklist. c-review and c-commit still have no hint or troubleshoot, so the hint ladder is incomplete.",
       "blockIds": [
+        "cycle-steps",
         "setup-steps",
         "setup-prompt-model",
-        "cycle-steps",
         "cycle-prompt-plan",
         "self-check-list"
       ]
@@ -111,7 +136,8 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
@@ -124,12 +150,13 @@
         "check-quiz",
         "self-check-list",
         "ex-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
       "score": 4,
-      "evidence": "です・ます throughout, warm and without pressure (「なければ足しません」, 「迷ったときの考え方は？」), and lint finds no banned phrase. The translated 「新しい目で」 is now 「別のコンテキストで」, the flashcards are in です・ます, and 確認ルール/拒否ルール match the glossary aliases.",
+      "evidence": "The new c-explain text keeps です・ます and the non-pressuring tone (「作っていれば使い、なければ…頼みます」), and its prompt 「今の差分を説明して」 matches the course's other quoted requests. Elsewhere 「別のコンテキストで」 and 確認ルール/拒否ルール still match the glossary, and lint finds no banned phrase.",
       "blockIds": [
         "cycle-steps",
         "cycle-flow",
@@ -144,27 +171,22 @@
         "self-check-list",
         "cycle-flow",
         "summary-next"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "practice",
-      "blockId": "cycle-steps",
-      "issue": "This round changed c-explain from 「`/explain-diff` などで説明を受け」 to 「`/explain-diff` で説明を受け」. /explain-diff exists only in the worked example's repository. In practice-setup, p-more tells the learner to add a part only when its trigger has come (「なければ足しません」), and creating this skill is never a step. A learner who follows the rule as taught types /explain-diff and finds no such skill, so the step and its success criterion (「なぜその変更をしたかを、画面を見ずに言えます」) cannot be completed.",
-      "fix": "Replace c-explain's md with 「`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
     "c-review (cycle-steps) has no hint or troubleshoot. Add hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
+    "c-commit (cycle-steps) has no hint. Add hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
     "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide. Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
     "Factual doubt: ex-claude-md's expect 「`/context` の「Memory files」に出ます。」 has no condition, but p-restart says 「直したCLAUDE.mdと設定は、起動し直すと読み込まれます」 (cc-prompt-caching: CLAUDE.md loads on the next /clear, /compact or restart). Change it to 「起動し直すと、`/context` の「Memory files」に出ます。」",
-    "sc-safety (self-check-list) restates the guarantee that dr-b2 qualifies (「pushの前に確認が入ります」); the audit also names this label. Change it to 「安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました」. Labels render as plain text, so no backticks.",
+    "sc-safety (self-check-list) restates the guarantee that dr-b2 qualifies (「pushの前に確認が入ります」), and the audit also names this label. Change it to 「安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました」. Labels render as plain text, so use no backticks.",
     "summary-points[1]: change 「必ず守らせたいことは、権限ルールとフックに置きます。」 to 「Claudeの判断に任せず止めたいことは、権限ルールとフックに置きます。」 to match dr-b2.",
     "sc-b1 calls an unmet checklist item a きっかけ, but the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
-    "worked (to reach 4): add a faded step before practice-setup, for example a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
+    "worked (to reach 4): add a faded step before practice-setup. For example, add a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
   ],
   "average": 3.77,
-  "verdict": "revise",
-  "summary": "The scope check required a full review: 27 of 33 blocks and 51% of the parts changed. All 7 must-fix items from round 1 are gone: estMinutes 19 (est 18.7, prose 1,210), e4 is removed, dr-b2 states the day-1 exception and the rules' limits, ex-b1 gives the timeline, e1's overclaim is fixed, check-quiz cites cc-memory, and q4's stem no longer gives the answer away. One must-fix remains, and this round's change caused it: c-explain now requires /explain-diff, which a learner who followed p-more's 「なければ足しません」 does not have, so add a fallback prompt."
+  "verdict": "pass",
+  "summary": "Verification round: review-scope exited 0, and only cycle-steps (c-explain) changed, 2% of the parts. The one open must-fix is resolved. c-explain now gives a fallback (「なければ「今の差分を説明して」と頼みます」), so the step can be completed under p-more's rule. validate and lint --strict are clean. measure.mjs gives est 18.8 min against estMinutes 19 and prose 1,210. Load, practice and voice were re-scored. Every criterion is 3 or higher, the mean is 3.77, and there are no must-fix items. The niceToHave list carries over the earlier suggestions and adds a hint for c-commit."
 }
