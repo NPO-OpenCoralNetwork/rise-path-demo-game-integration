@@ -1,0 +1,79 @@
+# Brief: vibe-coding/cc-03-plan-first
+
+「第3回｜探索→計画→実装→コミット」。Claude Code コース（cc-*）モジュール 2「頼み方と進め方」の 1 本目、全 11 回中の第 3 回。
+下書きはプレビューのため `vibe-coding` コースに置く（公開先はオーナーが決める。`next` なし）。
+
+## 学習者 / Learner (必須)
+- 誰が読むか / who: Claude Code を使い始めた人。バイブコーディングコース第3章（VS Code）・第5章（GitHub）程度の基礎がある人、または他の AI コーディングツールの経験者。
+- すでに知っていること（前提） / prior knowledge: 第1回で質問 → 小さな変更 → 差分確認 → コミットを 1 回通した。第2回で権限モード（Manual・`acceptEdits`・プランモード・auto）と `/rewind` を学び、プランモードが「調べて計画するだけのモード」だと知っている。ターミナルで `cd`・`ls` が使え、Git の commit の意味がわかる。
+- 前のレッスン / previous lesson: 第2回｜権限モードと巻き戻し。次は第4回｜検証を任せる。
+
+## 到達目標 / Outcome (必須)
+このレッスンの後、学習者は次のことができる / After this lesson the learner can:
+- o1 (bloom: apply): あいまいな依頼を、範囲・参照先・既存のパターン・症状の4つの観点で具体的に書き直せる
+- o2 (bloom: evaluate): プランモードを使うべき場面と省いてよい場面を判断できる
+- o3 (bloom: create): 大きめの機能のために、仕様をインタビューしてもらう依頼文を作れる
+
+## 範囲 / Scope
+- 扱う / in:
+  - 公式の 4 つのフェーズ（探索 → 計画 → 実装 → コミット）。探索と計画はプランモードで、承認してから実装する。
+  - プランモードに入る 3 つの方法（Shift+Tab で `⏸ plan mode on` まで、`/plan`、`claude --permission-mode plan`）、承認の選択肢、計画の直し方（「No, keep planning」、Ctrl+G）。
+  - 依頼を具体的にする 4 つの観点（範囲・参照先・既存のパターン・症状）と、材料の渡し方（`@` 参照、画像の貼り付け、URL）。探索中はあいまいな質問も役に立つこと。
+  - 計画を省いてよい場面（差分を 1 文で言える変更）と、計画が最も役立つ場面（進め方が不確か・複数ファイル・不慣れなコード）。
+  - 大きめの機能：AskUserQuestion でインタビュー → `SPEC.md` → 新しいセッションで実装。役に立つ仕様の 3 条件。
+  - コミュニティの仕様駆動ツール（cc-sdd）は 1 回だけ名前を出す（必須にしない）。
+  - 実装のあとに差分を説明させ、予想してから確かめる習慣（学習科学、report §6）。
+- 扱わない（別レッスン） / out: テストや `/code-review` による検証の設計（第4回）、`/clear`・`/compact` とコンテキスト圧縮（第5回）、CLAUDE.md（第6回）、サブエージェント（第7回）、`defaultMode` 設定やフック（第8回）、PR 作成（練習用フォルダーにリモートがないため扱わない）。
+- 学習者がよく持つ誤解 / likely misconceptions:
+  - 形容詞を強めれば（「すごくおしゃれに」）伝わる。→ 範囲・症状などの情報が要る。
+  - Manual モードで編集を 1 つずつ承認すれば計画はいらない。→ 方向の違いに気づくのが書き換えの後になる。
+  - `/rewind` で戻せるから計画はいらない。→ Bash や外部への変更は戻らない。同じ依頼からやり直すだけ（report §6、第2回）。
+  - auto モードの分類器が意図と違う変更も止める。→ 止めるのは危険に見える操作だけ（report §6）。
+  - Claude が立てた計画・仕様はそのまま承認してよい。→ 推測が混ざる。承認前に読んで直す（trust-then-verify gap）。
+  - 小さな変更も念のため毎回計画する。→ 計画には手間がかかる。差分を 1 文で言えるなら省く。
+  - プランモードの段階でファイルがもう変わっている。→ 承認までソースは編集されない。
+  - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
+
+## 形式 / Format
+- 所要時間 / minutes: 21（常に表示される本文 2,391 字 ÷ 450 ≒ 5.3 分 + 問題 11 問 × 40 秒 ≒ 7.3 分 + 演習 4 課題 × 2 分 = 8 分 → 20.6 分）。折りたたみ表示のテキスト（prompt の expect・note、steps の hint・troubleshoot）を含む本文は 2,903 字。
+- 難易度 / level: beginner
+- ロケール / locales: jp のみ（英語版は公開先が決まってから）
+- 演習の題材 / practice task idea: 新しい練習用フォルダーに 22 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
+
+## 制約 / Constraints
+- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。対話セッションは v2.1.283 以降 auto モードで始まり、Shift+Tab で Manual → acceptEdits → プランモードの順に変わる。
+- OS / environment: macOS・Linux・Windows（WSL 含む）。画像の貼り付けは Ctrl+V（Windows と WSL は Alt+V）。ブラウザでローカルの HTML を開ける。
+- 使ってはいけないもの / avoid: 大事なリポジトリでの演習、破壊的なコマンド、秘密情報、料金の記載、プレビュー機能を必須の手順にすること。
+
+## 資料 / Sources
+- cc-best-practices — Best practices for Claude Code（Explore first, then plan, then code / Provide specific context / Provide rich content / Let Claude interview you）https://code.claude.com/docs/en/best-practices
+- cc-permission-modes — Permission modes（plan mode、承認の選択肢、Ctrl+G、Shift+Tab のモードの順）https://code.claude.com/docs/en/permission-modes
+- cc-commands — Commands（`/plan [description]`）https://code.claude.com/docs/en/commands
+- cc-common-workflows — Common workflows（画像の貼り付け、`@` 参照）https://code.claude.com/docs/en/common-workflows
+- cc-tools-reference — Tools reference（AskUserQuestion は選択肢つきの質問をするツール）https://code.claude.com/docs/en/tools-reference
+- cc-changelog — Claude Code CHANGELOG（v2.1.304 時点）https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md
+- ai-skills-rct — How AI assistance impacts the formation of coding skills（2026-01-29）https://www.anthropic.com/research/AI-assistance-coding-skills
+- cc-sdd — gotalab/cc-sdd（コミュニティ）https://github.com/gotalab/cc-sdd
+- 事実ファイル（検証済み 2026-10-20）：practice-4, practice-5, practice-7, practice-8, learning-23, learning-24, docs-13, learning-33。Best practices・Permission modes・Commands・Common workflows・Tools reference は 2026-10-20 に WebFetch で本文を確認。
+
+## Assumptions
+- 第1回・第2回のタイトルは「第1回｜最初のタスクを任せる」「第2回｜権限モードと巻き戻し」とした（コース計画の並びから）。
+- 例題（3-3）のログイン画面のプロジェクト（`src/pages/Login.tsx`・`src/pages/Signup.tsx`）は架空で、読むだけの例。手を動かすのは演習の `todo.html`。
+- 演習の `todo.html` は Chromium（headless）で動作を確認した（空の入力で空の `li` が増える）。
+- 新しいセッションの始め方は「`/clear` で会話を空にするか、`claude` を起動し直す」とした（公式は "start a fresh session"）。
+- 承認の選択肢の英語表記（「Yes, manually approve edits」「No, keep planning」）は 2026-10-20 の公式ページのまま。表示が変わりうる旨をレッスン内に書いた。
+- 演習の課題数は、演習1を 3 課題（依頼の書き直し、計画と修正、実装・確認・コミット）、演習2を 1 課題として所要時間を計算した。
+
+## Outline
+
+| section id | role | title | the one idea | blocks | questions → objective |
+|---|---|---|---|---|---|
+| hook | hook | はじめに：「いい感じにして」の行き先 | あいまいな依頼だと、Claude が推測で範囲を決めて書き換えが広がる | markdown, quiz(predict) | q0 → o2（採点なし） |
+| s1 | concept | 3-1. 依頼を4つの観点で具体的にする | 範囲・参照先・既存のパターン・症状で書き直し、材料は @参照・画像・URL で渡す | markdown, definitions, table, markdown, prompt（書き直しの例）, quiz(inline) | q1 → o1 |
+| s2 | concept | 3-2. 探索→計画→実装→コミット | 調べて計画する段階（プランモード）と実装を分ける。差分を1文で言えるなら計画は省く | markdown, definitions, diagram, markdown, list, callout(info), markdown, quiz(inline) | q2 → o2 |
+| s3 | example | 3-3. 例題：ログイン画面を4つのフェーズで直す | 計画を読んで範囲外の変更を直してから承認し、差分を説明させてコミットする | markdown, steps(7), prompt（計画を直す依頼）, callout(tip), quiz(inline) | q3 → o2 |
+| s4 | concept | 3-4. 大きめの機能は仕様から始める | インタビュー → SPEC.md → 新しいセッション。準備の度合いを変更の大きさで選ぶ | markdown, definitions, markdown, prompt（インタビュー）, markdown, table, callout(note), quiz(inline) | q4 → o3 |
+| practice | practice | 演習1：TODO 画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), prompt（模範解答）, checklist | — |
+| practice-spec | practice | 演習2：仕様インタビューの依頼文を作る | 期限とリマインダーのためのインタビュー依頼文を書く | markdown, prompt（模範解答）, checklist | — |
+| check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e2 → o1, e3 → o2, e4 → o2（転移）, e5 → o3, e6 → o3 |
+| summary | summary | まとめ | 要点・振り返り・次の一歩・復習 | summary(5), markdown, flashcards(7), askTutor | — |
