@@ -29,19 +29,21 @@ decides where it is published.
   7. `/goal` の判定役がテストを実行してくれる — 判定役はコマンドを実行せず、会話に出た結果だけを読む（goal docs）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19 — body 2,390字 ÷ 450 ≈ 5.3分 + 問題12問 × 40秒 = 8分 + 演習3課題（テストから作る・レビューを仕分ける・説明させて予想する）× 2分 = 6分。
-  Body is counted as in the vibe-ch2 report: markdown, callouts, definitions, step text and expected results, table cells and summary points; prompt text, prompt `expect` (collapsed model answers, 679字), step hints and troubleshoots (collapsed, 375字), quizzes and code are left out.
+- 所要時間 / minutes: 20 — body 2,557字 ÷ 450 ≈ 5.68分 + 問題12問 × 40秒 = 8分 + 演習3課題（テストから作る・レビューを仕分ける・説明させて予想する）× 2分 = 6分 → 19.68分。
+  Body is counted as in the vibe-ch2 report: markdown, callouts, definitions, step text and expected results, table cells and summary points, whitespace and inline code spans removed; prompt text, prompt `expect` (collapsed model answers), step hints and troubleshoots (collapsed), quizzes and code are left out.
+  Round-1 fixes (the browser note in 4-1, the definition of ターン, the empty-function step) put the body about 160字 over the contract's 2,400字 budget; niceToHave wording that only added length was left out to keep it there.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only（コースの公開先が決まってから英訳する）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ（`cc-practice-verify`、`git init`）で、うるう年を判定する関数 `isLeapYear` をテストから作らせる。テストをコミット → テストを変えずに実装 → 自分でテストを実行 → 別のコンテキストでレビュー → 指摘を必須と任意に仕分け → 差分を説明させて予想を確かめる。チェックリスト・段階的なヒント・模範解答（テストのコードと仕分けの表）つき。
 
 ## 制約 / Constraints
-- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026年10月時点）。`/review` は v2.1.223 から `/code-review` の別名。Node.js 22 で例のコード（`postal.test.mjs`、`leap-year.test.mjs`）を `node --test` で実行して確認済み（実装前は fail 4、実装後は pass 4）。
+- ツールとバージョン / tools and versions: Claude Code v2.1.304（2026年10月時点）。`/review` は v2.1.223 から `/code-review` の別名。Node.js 22（v22.22.0）で例のコード（`postal.test.mjs`、`leap-year.test.mjs`）を `node --test` で実行して確認済み（2026-10-20）：実装のファイルがない（または export がない）と読み込みで止まり「tests 1 / fail 1」、空の関数（`export function isPostalCode() {}`）なら「fail 4」、実装後は「pass 4 / fail 0」。テストと空の関数をコミットしたあとなら、実装後の `git diff --stat` に出るのは実装のファイルだけ（テストだけをコミットすると、新しい実装のファイルは追跡外で `git diff --stat` に出ない）。
 - OS / environment: macOS・Linux・WSL のターミナル。Node.js（`node:test` は組み込みで、追加のインストールは不要）。
 - 使ってはいけないもの / avoid: 料金、確かめていない数字や機能、大事なリポジトリでの演習、破壊的なコマンド、秘密情報。プレビュー段階の機能（ultrareview など）は扱わない。
 
 ## 資料 / Sources
 - `cc-best-practices` — Best practices for Claude Code — https://code.claude.com/docs/en/best-practices — Anthropic — checked 2026-10-20 (WebFetch). Used for: "Give Claude a way to verify its work" (Claude stops when the work looks done; a check that returns pass/fail; tests, build exit code, linter, screenshot compared against a design; before/after prompts incl. validateEmail and "address the root cause, don't suppress the error"); "Have Claude show evidence rather than asserting success"; gating the stop in one prompt / `/goal` / Stop hook / second opinion; "Add an adversarial review step" (fresh subagent sees only the diff and criteria; `/code-review` for correctness; the review prompt against PLAN.md; the over-engineering callout); "have one Claude write tests, then another write code to pass them".
+- `cc-chrome` — Use Claude Code with Chrome — https://code.claude.com/docs/en/chrome — Anthropic — checked 2026-10-20 (WebFetch). Used for: the best-practices page links its "browser screenshot" to this page; Claude Code connects to Chrome (Chrome integration, the Claude in Chrome extension) to drive the browser and take screenshots. Cited by the 4-1 note that a screenshot check needs browser access.
 - `cc-goal` — Keep Claude working toward a goal — https://code.claude.com/docs/en/goal — Anthropic — checked 2026-10-20 (WebFetch). Used for: the evaluator checks after each turn; it doesn't run commands or read files; a good condition has one measurable end state, a stated check and constraints; `or stop after 20 turns`; `/goal` shows status, `/goal clear` removes it.
 - `cc-code-review-local` — Review locally with /code-review — https://code.claude.com/docs/en/code-review-local — Anthropic — checked 2026-10-20 (WebFetch). Used for: `/code-review` reviews branch and uncommitted changes for correctness bugs in a subagent with its own context; `/review` is an alias since v2.1.223 (before, a separate PR review command).
 - `cc-output-styles` — Output styles — https://code.claude.com/docs/en/output-styles — Anthropic — checked 2026-10-20 (WebFetch). Used for: an output style sets role, tone and format for the whole session; Explanatory adds `★ Insight` blocks; Learning also leaves `TODO(human)` for the learner and waits; `/output-style <style>` and `/config` → Output style.
@@ -58,31 +60,33 @@ decides where it is published.
 
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
-| `hook` | hook | はじめに：「完了しました」のあとで | 「正しく動作します」の報告を信じたら翌日エラー。何があれば防げた？ | markdown lead (`hook-lead`, problem in 2 sentences + 1 question), quiz predict | `q0` → o2 (ungraded) |
-| `4-1` | concept | 4-1. 確かめる手段を渡す | Claude が自分で実行でき、合否がわかる確認を渡すと、通るまで繰り返す（検証） | markdown lead (cite), markdown (`s1-why`: mechanism, recall of the 第1回 agentic loop, "first item of the official guide"), definitions (検証・自動テスト・リンター), table (確認 × 合うタスク × 依頼文に足す一言, cite), prompt (validateEmail-style request with test cases, cite) | `q1` → o1 (apply: ヘッダーをデザイン画像どおりに → スクリーンショット比較) |
-| `4-2` | concept | 4-2. 「完了しました」より証拠を | 報告は主張。コマンドと出力などの証拠を見せてもらう。長い作業は `/goal` の条件にする | markdown lead (cite), definitions (証拠), markdown + prompt (依頼文の最後に足す一言, cite best practices + Opus 5.5 playbook), markdown (`/goal`: evaluator reads only the transcript; end state, check, constraints; cite), prompt (`/goal` の条件の例) | `q2` → o2 (analyze: どの報告に証拠があるか) |
-| `4-3` | example | 4-3. テストを先に書かせる | テストを書く → 失敗を確かめる → テストをコミット → テストを変えずに実装 → 証拠を自分で確かめる | markdown lead (cite), definitions (テストファースト), steps worked example (5 subgoals, each with its why and `expect`, cite Willison), prompt ①, code `postal.test.mjs` (run with Node.js 22), prompt ④, callout pitfall (テストを書き換えて通す, cite) | `q3` → o2 (analyze: 期待値が書き換わった「全部通りました」) |
+| `hook` | hook | はじめに：「完了しました」のあとで | 「正しく動作します」の報告を信じたら翌日エラー。何があれば防げた？ | markdown lead (`hook-lead`, problem in 2 sentences + 1 question), quiz predict | `q0` → o1 (ungraded; which check to give) |
+| `4-1` | concept | 4-1. 確かめる手段を渡す | Claude が自分で実行でき、合否がわかる確認を渡すと、通るまで繰り返す（検証） | markdown lead (cite), markdown (`s1-why`: mechanism, recall of the 第1回 agentic loop, "first item of the official guide"), definitions (検証・自動テスト・リンター), table (確認 × 合うタスク × 依頼文に足す一言, cite), markdown (`s1-screenshot-note`: a screenshot check needs Claude to drive a browser; link to Chrome integration, cite best practices + chrome), prompt (validateEmail-style request with test cases, cite) | `q1` → o1 (apply: ヘッダーをデザイン画像どおりに → スクリーンショット比較) |
+| `4-2` | concept | 4-2. 「完了しました」より証拠を | 報告は主張。コマンドと出力などの証拠を見せてもらう。長い作業は `/goal` の条件にする | markdown lead (cite), definitions (証拠), markdown + prompt (依頼文の最後に足す一言, cite best practices + Opus 5.5 playbook), markdown (`/goal`: defines ターン（turn）= Claude finishing one response; evaluator reads only the transcript; end state, check, constraints; cite), prompt (`/goal` の条件の例) | `q2` → o2 (analyze: どの報告に証拠があるか) |
+| `4-3` | example | 4-3. テストを先に書かせる | テストを書く → 失敗を確かめる → テストをコミット → テストを変えずに実装 → 証拠を自分で確かめる | markdown lead (cite), definitions (テストファースト), steps worked example (5 subgoals, each with its why and `expect`; ① writes the tests plus an empty exported function so ② shows 「fail 4」, ③ commits both, ⑤ `git diff --stat` then lists only `postal.mjs`; cite Willison), prompt ①, code `postal.test.mjs` (run with Node.js 22), prompt ④, callout pitfall (テストを書き換えて通す, cite) | `q3` → o2 (analyze: 期待値が書き換わった「全部通りました」) |
 | `4-4` | concept | 4-4. 別のコンテキストでレビューする | 自己採点は甘い。新しいコンテキストのレビュー役に、正しさと要件の問題だけを報告させ、指摘を必須と任意に分ける | markdown lead (cite harness design), definitions (コンテキスト・サブエージェント・/code-review), markdown (fresh context sees only diff + criteria), markdown (`/code-review` vs 自作の依頼文), prompt (review against the plan, cite), callout warning (過剰設計 and the fix, cite), markdown + diagram (仕分けの2つの問い), callout info (`/review` は v2.1.223 から別名; docs change often → Japanese official docs link) | `q4` → o3 (evaluate: 送料無料の境目の指摘だけが必須) |
-| `4-5` | concept | 4-5. 説明させて、理解を残す | 説明できなければ次に直せない。差分を説明させて予想で確かめる。出力スタイル Explanatory・Learning | markdown lead, markdown (RCT, cite), prompt (差分の説明 + エッジケースの予想), markdown (Explanatory・Learning, cite), definitions (出力スタイル) | `q5` → o3 (evaluate: 判断できない指摘 → 説明させて要件と照らす) |
-| `practice` | practice | 演習：テストから作り、別の目で確かめる | 練習用フォルダで isLeapYear をテストファースト → 自分で確かめる → レビュー → 仕分け → 説明と予想 | markdown lead (task + spec + safety), code bash (`terminal`: new folder + `git init` + `claude`), steps (8 subgoals; hints and troubleshoots, incl. the Learning style), prompts 1–3 (`expect` = model answers), checklist (7 success criteria), model answer: markdown + code (`leap-year.test.mjs`, run) + table (仕分けの例) | — |
+| `4-5` | concept | 4-5. 説明させて、理解を残す | 説明できなければ次に直せない。差分を説明させて予想で確かめる。出力スタイル Explanatory・Learning | markdown lead, markdown (RCT, cite), prompt (差分の説明 + エッジケースの予想), definitions (出力スタイル), markdown (Explanatory・Learning, cite) | `q5` → o3 (evaluate: 意味のわからない指摘 → 説明させて意味をつかみ、要件と照らして仕分ける) |
+| `practice` | practice | 演習：テストから作り、別の目で確かめる | 練習用フォルダで isLeapYear をテストファースト → 自分で確かめる → レビュー → 仕分け → 説明と予想 | markdown lead (task + spec + safety), code bash (`terminal`: new folder + `git init` + `claude`), steps (8 subgoals; tests + empty `isLeapYear` committed first; hints and troubleshoots, incl. the Learning style), prompts 1–3 (`expect` = model answers), checklist (7 success criteria), model answer: markdown + code (`leap-year.test.mjs`, run) + table (仕分けの例) | — |
 | `check` | check | 理解度チェック | 全目標、転移問題つき | quiz exam (6) | `e1` → o1 (transfer: CSV の集計ミス), `e2` → o1 (transfer: `/goal` の条件), `e3` → o2 (報告のどこに証拠がないか), `e4` → o2 (transfer: エラーを無視する設定でビルドが通った), `e5` → o3 (レビューの頼み方), `e6` → o3 (transfer, multi: クーポンの指摘から必須を選ぶ) |
 | `summary` | summary | まとめ | 持ち帰る5点、振り返りと次の回、復習カード | summary (5), markdown (reflection question + next: 第5回), flashcards (7), askTutor (3) | — |
 
 Contract check: hook = problem + predict; 5 segments (4 concept + 1 example), each with an inline quiz (density 5/6
-content sections; practice has none); new terms per segment: 4-1 検証・自動テスト・リンター / 4-2 証拠・/goal /
+content sections; practice has none); new terms per segment: 4-1 検証・自動テスト・リンター / 4-2 証拠・/goal・ターン /
 4-3 テストファースト / 4-4 コンテキスト・サブエージェント・/code-review / 4-5 出力スタイル (Explanatory and
 Learning are the two style names, in the glossary); worked example (4-3 steps + prompts + code) before the practice,
 which repeats the same subgoals on a new function with fewer step explanations; every objective has an inline and
 two exam questions; exam has transfer items (e1, e2, e4, e6); summary 5 points; 7 flashcards; one process diagram
-(sorting findings); no images; ≤ 2 callouts per section; ≤ 3 sentences per paragraph; body 2,390字.
+(sorting findings); no images; ≤ 2 callouts per section; ≤ 3 sentences per paragraph; body 2,557字 (see minutes). Correct options are spread over positions 1–4 (the reader
+numbers options by position, so explanations name the content, not the option letter).
 
 ## Assumptions
 - Headless run: nobody answered the outline check-in, so the outline above was used as is.
 - Prerequisite titles of 第1回〜第3回 are taken from the course order in the spec (「最初のタスクを任せる」「探索→計画→実装→コミット」) and from the 第2回 draft already in `drafts/` (「任せる範囲を決める：権限モードと巻き戻し」); they may need a touch-up if the other drafts end with different titles.
-- The lesson assumes 第1回 introduced the agentic loop and the word ターン. コンテキスト and サブエージェント are defined here briefly and pointed to 第5回 and 第7回.
+- The lesson assumes 第1回 introduced the agentic loop. コンテキスト and サブエージェント are defined here briefly and pointed to 第5回 and 第7回.
 - The worked example (`isPostalCode`) and the practice (`isLeapYear`) use Node.js's built-in test runner so nothing has to be installed; the practice allows any language's test tool.
 - Stop hooks are left to 第8回 and not named here, to keep the new-term budget. `/simplify`, ultrareview and `/verify` are not named either (body budget; `/verify` needs a running app).
 - The version note (2026年10月時点・Claude Code v2.1.304) lives in the subtitle; the "Claude Code changes often" note with the Japanese docs link is in the 4-4 info callout, next to the renamed `/review`.
-- 「ターン」 is used in 4-2 without a definition, on the assumption that 第1回 introduced it with the agentic loop.
-- 「過剰設計」 appears once as a label in parentheses inside the 4-4 warning callout, which describes it in the same sentence; it is not counted as a defined term.
+- 「ターン（turn）」 is defined in 4-2 (s2-goal) and in the glossary, because cc-01 to cc-03 do not define it (round-1 review).
+- 「エッジケース（edge case）」 was glossed in 第3回; here it has a glossary entry only (no new body text, to stay near the body budget).
+- 「過剰設計」 appears once as a label in parentheses inside the 4-4 warning callout, which describes it in the same sentence; it is not counted as a defined term, but it has a glossary entry because several feedback texts use it.
 - Spacing follows style guide §3: no space between Japanese and plain alphanumerics (「Claudeが」「AIを」), half-width spaces only around inline code, used the same way throughout. Identifiers in prompts are in backticks for that reason.

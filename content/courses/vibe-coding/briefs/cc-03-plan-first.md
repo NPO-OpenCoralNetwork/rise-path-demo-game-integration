@@ -6,12 +6,12 @@
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を使い始めた人。バイブコーディングコース第3章（VS Code）・第5章（GitHub）程度の基礎がある人、または他の AI コーディングツールの経験者。
 - すでに知っていること（前提） / prior knowledge: 第1回で質問 → 小さな変更 → 差分確認 → コミットを 1 回通した。第2回で権限モード（Manual・`acceptEdits`・プランモード・auto）と `/rewind` を学び、プランモードが「調べて計画するだけのモード」だと知っている。ターミナルで `cd`・`ls` が使え、Git の commit の意味がわかる。
-- 前のレッスン / previous lesson: 第2回｜権限モードと巻き戻し。次は第4回｜検証を任せる。
+- 前のレッスン / previous lesson: 第2回｜任せる範囲を決める：権限モードと巻き戻し。次は第4回｜検証を任せる：テスト・レビュー・説明。
 
 ## 到達目標 / Outcome (必須)
 このレッスンの後、学習者は次のことができる / After this lesson the learner can:
 - o1 (bloom: apply): あいまいな依頼を、範囲・参照先・既存のパターン・症状の4つの観点で具体的に書き直せる
-- o2 (bloom: evaluate): プランモードを使うべき場面と省いてよい場面を判断できる
+- o2 (bloom: evaluate): プランモードを使うべき場面と省いてよい場面を判断し、承認する前に計画を直せる
 - o3 (bloom: create): 大きめの機能のために、仕様をインタビューしてもらう依頼文を作れる
 
 ## 範囲 / Scope
@@ -35,7 +35,7 @@
   - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 21（常に表示される本文 2,391 字 ÷ 450 ≒ 5.3 分 + 問題 11 問 × 40 秒 ≒ 7.3 分 + 演習 4 課題 × 2 分 = 8 分 → 20.6 分）。折りたたみ表示のテキスト（prompt の expect・note、steps の hint・troubleshoot）を含む本文は 2,903 字。
+- 所要時間 / minutes: 20（常に表示される本文 2,548 字 ÷ 450 ≒ 5.7 分 + 問題 10 問 × 40 秒 ≒ 6.7 分 + 演習 4 課題 × 2 分 = 8 分 → 20.3 分）。本文は markdown・callout の md と steps の md・expect。折りたたみ表示のテキスト（prompt の expect・note、steps の hint・troubleshoot）を含む本文は 3,268 字。
 - 難易度 / level: beginner
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダーに 22 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
@@ -57,7 +57,7 @@
 - 事実ファイル（検証済み 2026-10-20）：practice-4, practice-5, practice-7, practice-8, learning-23, learning-24, docs-13, learning-33。Best practices・Permission modes・Commands・Common workflows・Tools reference は 2026-10-20 に WebFetch で本文を確認。
 
 ## Assumptions
-- 第1回・第2回のタイトルは「第1回｜最初のタスクを任せる」「第2回｜権限モードと巻き戻し」とした（コース計画の並びから）。
+- 第1回・第2回・第4回のタイトルは、コース共通の正式タイトル「第1回｜最初のタスクを任せる」「第2回｜任せる範囲を決める：権限モードと巻き戻し」「第4回｜検証を任せる：テスト・レビュー・説明」を使う。
 - 例題（3-3）のログイン画面のプロジェクト（`src/pages/Login.tsx`・`src/pages/Signup.tsx`）は架空で、読むだけの例。手を動かすのは演習の `todo.html`。
 - 演習の `todo.html` は Chromium（headless）で動作を確認した（空の入力で空の `li` が増える）。
 - 新しいセッションの始め方は「`/clear` で会話を空にするか、`claude` を起動し直す」とした（公式は "start a fresh session"）。
@@ -71,9 +71,9 @@
 | hook | hook | はじめに：「いい感じにして」の行き先 | あいまいな依頼だと、Claude が推測で範囲を決めて書き換えが広がる | markdown, quiz(predict) | q0 → o2（採点なし） |
 | s1 | concept | 3-1. 依頼を4つの観点で具体的にする | 範囲・参照先・既存のパターン・症状で書き直し、材料は @参照・画像・URL で渡す | markdown, definitions, table, markdown, prompt（書き直しの例）, quiz(inline) | q1 → o1 |
 | s2 | concept | 3-2. 探索→計画→実装→コミット | 調べて計画する段階（プランモード）と実装を分ける。差分を1文で言えるなら計画は省く | markdown, definitions, diagram, markdown, list, callout(info), markdown, quiz(inline) | q2 → o2 |
-| s3 | example | 3-3. 例題：ログイン画面を4つのフェーズで直す | 計画を読んで範囲外の変更を直してから承認し、差分を説明させてコミットする | markdown, steps(7), prompt（計画を直す依頼）, callout(tip), quiz(inline) | q3 → o2 |
+| s3 | example | 3-3. 例題：ログイン画面を4つのフェーズで直す | 計画を読んで範囲外の変更を直してから承認し、差分を説明させてコミットする（計画の例を示す） | markdown, steps(7), prompt（計画を直す依頼）, callout(tip), quiz(inline) | q3 → o2（承認の前に計画を直す） |
 | s4 | concept | 3-4. 大きめの機能は仕様から始める | インタビュー → SPEC.md → 新しいセッション。準備の度合いを変更の大きさで選ぶ | markdown, definitions, markdown, prompt（インタビュー）, markdown, table, callout(note), quiz(inline) | q4 → o3 |
-| practice | practice | 演習1：TODO 画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), prompt（模範解答）, checklist | — |
-| practice-spec | practice | 演習2：仕様インタビューの依頼文を作る | 期限とリマインダーのためのインタビュー依頼文を書く | markdown, prompt（模範解答）, checklist | — |
-| check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e2 → o1, e3 → o2, e4 → o2（転移）, e5 → o3, e6 → o3 |
+| practice | practice | 演習1：TODO画面を4つのフェーズで直す | 自分で書き直し → プランモード → 計画を1か所直す → 実装 → 説明 → コミット | markdown, code(bash), code(html), steps(7, hint/troubleshoot), prompt（模範解答）, checklist | — |
+| practice-spec | practice | 演習2：仕様インタビューの依頼文を作る | 期限とリマインダーのためのインタビュー依頼文を書く | markdown, steps(3, hint/troubleshoot), checklist, prompt（模範解答、書いてから見比べる） | — |
+| check | check | 理解度チェック | 全目標の確認（転移を含む） | quiz(exam) | e1 → o1（転移）, e3 → o2, e4 → o2（転移）, e5 → o3, e6 → o3（e2 は削除） |
 | summary | summary | まとめ | 要点・振り返り・次の一歩・復習 | summary(5), markdown, flashcards(7), askTutor | — |
