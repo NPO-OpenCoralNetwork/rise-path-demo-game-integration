@@ -2,7 +2,7 @@
 
 正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md) / フロント（Vercel）と切り替え手順: [`deploy/vercel/README.md`](../vercel/README.md)
 
-2026-10-21 に、オーナーが GCP の `risepath-vm` を削除しました。新しい VM は下のクイックスタートで作り、DB は空から始まります。全体の順番（Cloudflare のゾーンを最初に始める、など）と Cloudflare・Vercel・Supabase の作業は、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」に沿って進めます。
+2026-10-21 に、オーナーが GCP の `risepath-vm` を削除しました。新しい VM は下のクイックスタートで作り、DB は空から始まります。全体の順番（Cloudflare のゾーン追加を最初に始める、など）と Cloudflare・Vercel・Supabase の作業は、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」に沿って進めます。
 
 ## 運用方針
 
@@ -14,7 +14,7 @@
 | DB | `pgvector/pgvector:0.8.7-pg16`（Postgres 16 + pgvector。タグと digest を固定）。新しい空のボリュームでは RAG のベクトル検索が有効です |
 | 公開 | API は Cloudflare Tunnel の `https://api.<domain>` だけ。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
 | Mac | `npm run dev` + Tailscale で VM の db/mcp/hermes/kokoro に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
-| Hermes | Compose **`--profile full`**（`nousresearch/hermes-agent`）。Mac 単体開発は `hermes -p rise-path gateway` も可 |
+| Hermes | Compose **`--profile full`**（`nousresearch/hermes-agent`）。使わないなら `COMPOSE_PROFILES=tts`。Mac 単体開発は `hermes -p rise-path gateway` も可 |
 
 ### マシンタイプ
 
@@ -33,20 +33,22 @@
 | `stack.env.example` | 秘密なしテンプレ → `stack.env` |
 | `tunnel.env.example` | Cloudflare Tunnel のトークン用テンプレ → `tunnel.env`（`cloudflared` だけが読む） |
 | `scripts/provision-gce.sh` | GCP VM 作成（夜間停止は `NIGHT_STOP=1` のときだけ） |
-| `scripts/bootstrap-vm.sh` | VM 初回セットアップ（Docker、4 GB の swap、`stack.env`、systemd、初回デプロイ） |
+| `scripts/bootstrap-vm.sh` | VM 初回セットアップ（Docker、4 GB の swap、`stack.env`、初回デプロイ、デプロイが通ったあとに systemd） |
 | `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env` と tunnel のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
 | `hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP） |
 | `systemd/risepath-stack.service` | VM 起動時に compose up |
 
 ## クイックスタート
 
-新しい VM を作る手順です。始める前に、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」にある次の 3 つを済ませます。
+新しい VM を作る手順です。始める前に、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」にある次の 3 つを始めておきます（ゾーンが Active になるのを待つ必要はありません）。
 
 - Cloudflare にドメインを追加し、ネームサーバーを切り替える（Active まで最大 48 時間かかるので最初に始める）
 - GCP の予算アラートを作り、残っていれば `risepath-dev-schedule` を消す
 - Tailscale の管理画面（Machines）で旧 `risepath-vm` を Remove し、Mac で `ssh-keygen -R risepath-vm` を実行する
 
 ### 1. GCP で VM 作成（Mac から）
+
+Mac のリポジトリ直下で、`main` を pull してから実行します（`gcloud auth login` 済みであること）。
 
 ```bash
 export GCP_PROJECT=your-project-id
@@ -78,7 +80,7 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 exit
 ```
 
-旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧機をあとで消しても、名前は戻りません。すでに `-1` になったら、旧機を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。Tailscale ACL に旧 VM の 100.x アドレスを書いていたら、新しいアドレスに直します。
+旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧 `risepath-vm` をあとで消しても、名前は戻りません。すでに `-1` になったら、旧 `risepath-vm` を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。Tailscale ACL に旧 VM の 100.x アドレスを書いていたら、新しいアドレスに直します。
 
 1 回目のあとは、いったん `exit` して SSH し直します。`docker` グループへの追加は、新しいログインから効くためです。同じセッションのまま 2 回目を実行すると、`bootstrap-vm.sh` は `docker group not active yet` と表示して止まります。
 
@@ -95,14 +97,14 @@ exit
 | `ANTHROPIC_API_KEY` | Anthropic の API キー。チューターなど LLM ゲートウェイが使います。`GEMINI_API_KEY` と両方空だと、チューターは 503 を返します |
 | `GEMINI_API_KEY` | Gemini の API キー。コース生成、画像生成、教材の索引づけ（RAG の埋め込み）に要ります |
 | `HERMES_API_KEY` | `openssl rand -hex 32` の値（16 文字以上）。`init-hermes-profile.sh` と Compose が Hermes の `API_SERVER_KEY` に写します。ほかに Hermes のキーは要りません |
-| `OPENROUTER_API_KEY` | OpenRouter の API キー（Hermes のモデル）。`change-me` のままだと、Hermes の初期化と smoke を飛ばします |
+| `OPENROUTER_API_KEY` | OpenRouter の API キー（Hermes のモデル）。`COMPOSE_PROFILES` に `full` があると必須で、`change-me` のままだと `deploy-stack.sh` が止まります。Hermes を使わないときは `COMPOSE_PROFILES=tts` にします（`hermes` コンテナを起動しません。kokoro は動きます） |
 | `RISE_PATH_BRIDGE_TOKEN` | `openssl rand -hex 32` の値（Hermes → MCP の認証） |
 | `MEMANTO_SECRET_KEY` | Memanto を使うときだけ。`openssl rand -hex 32` の値 |
 | `MEMANTO_ENABLED` | Memanto を使うときだけ `true`。起動時の systemd ユニットがこの値を読みます。秘密を入れて `false` のままだと、`deploy-stack.sh` が止まります |
-| `COMPOSE_PROFILES` | `full` のまま（Memanto を使うなら `full,memory`）。`tunnel` はトンネルを作ってから（下の「Cloudflare Tunnel」） |
+| `COMPOSE_PROFILES` | `full` のまま（Memanto を使うなら `full,memory`）。Hermes を使わないなら `tts`（Memanto も使うなら `tts,memory`）。`tunnel` はトンネルを作ってから（下の「Cloudflare Tunnel」） |
 | `ORIGIN_SECRET`・`TRUST_PROXY`・`LLM_ALLOWED_ORIGINS` | まだ入れません。トンネルを作るときに入れます |
 
-`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`OPENROUTER_API_KEY` を入れたときは、`HERMES_API_KEY` も確かめます。`ANTHROPIC_API_KEY` と `GEMINI_API_KEY` は確かめないので、入れたかを自分で見ます。
+`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`COMPOSE_PROFILES` に `full` があるときは、`OPENROUTER_API_KEY` と `HERMES_API_KEY`（16 文字以上）も確かめます。`ANTHROPIC_API_KEY` と `GEMINI_API_KEY` は確かめないので、入れたかを自分で見ます。
 
 #### 2 回目の実行
 
@@ -111,10 +113,10 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: systemd 登録 → build → db 起動 → migration 000–012 → api → up → healthy を待つ → smoke
+# 2 回目: build → db 起動 → migration 000–012 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
-最後に `api` コンテナ内の smoke が通れば、スタックは動いています。
+最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
 新しい VM の DB は空から始まります。この初回デプロイで、migration 000–012 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が有効です（埋め込みには `GEMINI_API_KEY` が要ります）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
@@ -135,9 +137,9 @@ ssh-keygen -R risepath-vm   # 旧 VM に 100.x アドレスで接続していた
 tailscale ping risepath-vm
 ```
 
-`stack.env` に `ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由の smoke を流しておきます（下の「手動でスタック操作」の `npm run smoke:vm`）。
+`stack.env` に `ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由の smoke を流しておきます（下の「[手動でスタック操作](#4-手動でスタック操作vm-上)」の `npm run smoke:vm -- --base …`。引数なしだと Mac の 127.0.0.1 を見ます）。
 
-API を VM 経由にする場合は Vite プロキシまたは `VITE_API_BASE_URL` を調整。ただし `stack.env` に `ORIGIN_SECRET` があると、VM の :3006 は `x-origin-secret` の無いリクエストに 403 を返します。そのときは Mac のローカル API（`npm run dev`）を使います。
+API を VM 経由にする場合は Vite プロキシまたは `VITE_API_BASE_URL` を調整します。ただし `stack.env` に `ORIGIN_SECRET` があると、VM の :3006 は `x-origin-secret` の無いリクエストに 403 を返します。そのときは Mac のローカル API（`npm run dev`）を使います。
 
 ### 4. 手動でスタック操作（VM 上）
 
@@ -158,8 +160,11 @@ docker compose --env-file stack.env exec -T api node scripts/smoke-vm-stack.mjs 
 Mac から Tailscale 経由で検証できるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけです。
 
 ```bash
-npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100
+npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100 \
+  --kokoro http://risepath-vm:8880 --hermes http://risepath-vm:8642
 ```
+
+Mac のリポジトリ直下で流します。引数なしだと Mac の 127.0.0.1 を見るので、VM は確かめられません。
 
 `npm run smoke:prod:e2e`（`E2E_API_URL=http://risepath-vm:3006`）と `npm run smoke:hermes:e2e:vm` も、Tailscale 経由で使えるのは `ORIGIN_SECRET` を設定する前だけです。設定したあとは 403 で失敗します（`scripts/setup-vm-ssh.sh` はこの E2E を飛ばします）。learner-memory の smoke は `api` コンテナ内で流せます（Bridge Token は `stack.env` から入ります）。
 
@@ -174,11 +179,11 @@ docker compose --env-file stack.env exec -T api node scripts/smoke-learner-memor
 PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge
 ```
 
-コース追加などのコンテンツデプロイ後は、`claude-code` ポータル（migration 011 で追加、012 で説明文を更新）、`/claude-code`、`/api/v2/llm/status` の行も確認します。
+コース追加などのコンテンツデプロイ後は、smoke の `claude-code` ポータルの行（migration 011 で追加、012 で説明文を更新）と `/api/v2/llm/status` の行を確認します。`/claude-code` のページは Vercel の `https://app.<domain>/claude-code` で開きます。
 
 ### 5. 管理者にする（初回サインインのあと）
 
-空の DB には管理者がいません。プロフィールは役割 `learner` で作られます。`https://app.<domain>` で一度サインインしてから、VM で自分の役割を `admin` にします。
+空の DB には管理者がいません。プロフィールは役割 `learner` で作られます。`https://app.<domain>` で一度サインインし、設定画面（`/settings`）を開きます。ここでプロフィールの行が作られます。そのあと、VM で自分の役割を `admin` にします。
 
 ```bash
 cd /opt/risepath/deploy/risepath-vm
@@ -186,7 +191,7 @@ docker compose --env-file stack.env exec db psql -U risepath_app -d risepath \
   -c "UPDATE user_profiles SET role='admin' WHERE user_id='<Supabase の user id>'"
 ```
 
-user id は、Supabase ダッシュボードの Authentication → Users に出る UID です。`UPDATE 1` と出れば正しい。`UPDATE 0` なら、まだサインインしていないか、id が違います（プロフィールの行は、サインイン後の最初の読み込みで作られます）。
+user id は、Supabase ダッシュボードの Authentication → Users に出る UID です。`UPDATE 1` と出れば成功です。ページを再読み込みすると、設定画面に管理者の項目が出ます。`UPDATE 0` なら、設定画面をまだ開いていないか、id が違います。
 
 ## Cloudflare Tunnel（公開エッジ）
 
@@ -198,7 +203,7 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
    ```bash
    cd /opt/risepath/deploy/risepath-vm
    cp tunnel.env.example tunnel.env && chmod 600 tunnel.env
-   nano tunnel.env   # TUNNEL_TOKEN= の後ろに貼る
+   nano tunnel.env   # TUNNEL_TOKEN= の後ろに、eyJ で始まるトークンだけを貼る（cloudflared service install は実行しない）
    ```
 
 3. `stack.env` の Public edge ブロックを埋めます（`stack.env.example` 参照）。
@@ -208,6 +213,8 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
    TRUST_PROXY=1
    LLM_ALLOWED_ORIGINS=https://app.<domain>
    COMPOSE_PROFILES=full,tunnel
+   # Memanto を使うなら COMPOSE_PROFILES=full,memory,tunnel
+   # Hermes を使わないなら COMPOSE_PROFILES=tts,tunnel
    # RISE_PATH_PUBLIC_URL は設定しない
    ```
 
@@ -223,7 +230,7 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
    docker compose --env-file stack.env --profile tunnel rm -sf cloudflared
    ```
 
-2. `stack.env` の `ORIGIN_SECRET` を空にし、`COMPOSE_PROFILES` から `tunnel` を外します（`COMPOSE_PROFILES=full`）。
+2. `stack.env` の `ORIGIN_SECRET` を空にし、`COMPOSE_PROFILES` から `tunnel` だけを外します（例: `full,tunnel` → `full`、`tts,tunnel` → `tts`）。
 3. `./scripts/deploy-stack.sh` を実行します。
 
 `ORIGIN_SECRET` が空のあいだも、Cloudflare を通ってきたリクエスト（`cf-ray`・`cf-connecting-ip` ヘッダー、`cloudflare` を含む `cdn-loop` ヘッダー）には API が 403 を返します。`COMPOSE_PROFILES` に `tunnel` があるのに `ORIGIN_SECRET` が空なら、`api` は起動しません。それ以外のリクエストには、スタックは今までどおりに動きます。
