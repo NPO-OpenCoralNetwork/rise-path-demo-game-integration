@@ -144,4 +144,107 @@ describe('deploy-stack.sh', () => {
     assert.match(script, /compose exec -T api env[\s\S]*node scripts\/smoke-vm-stack\.mjs --target container/);
     assert.ok(!script.includes('--target host'));
   });
+
+  it('refuses template values before the first compose call, naming variables only', () => {
+    const at = script.indexOf('PLACEHOLDERS=()');
+    const firstCompose = script.search(/^\s*compose \w/m);
+    assert.ok(at > guardAt, 'after the tunnel guard');
+    assert.ok(firstCompose > at, 'before the first compose call');
+    assert.ok(script.indexOf('init-hermes-profile.sh"') > at, 'before Hermes gets the keys');
+    const guard = script.slice(at, firstCompose);
+    const names = /for name in ([A-Z0-9_ ]+); do/.exec(guard);
+    assert.ok(names, 'for name in … loop');
+    for (const name of ['POSTGRES_PASSWORD', 'DATABASE_URL_PHASE1', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RISE_PATH_BRIDGE_TOKEN']) {
+      assert.ok(names[1].split(' ').includes(name), name);
+    }
+    assert.ok(guard.includes('*change-me*') && guard.includes('*your-project*'));
+    assert.match(guard, /HERMES_API_KEY[\s\S]*-lt 16/);
+    assert.ok(guard.includes('exit 1'));
+    for (const line of guard.split('\n').filter((l) => /^\s*(echo|printf)\b/.test(l))) {
+      assert.ok(!line.includes('${value') && !line.includes('${!'), `prints no value: ${line.trim()}`);
+    }
+  });
+
+  it('refuses Memanto unless stack.env sets MEMANTO_ENABLED=true (the boot unit reads it)', () => {
+    const check = script.indexOf('"${MEMANTO_ENABLED:-}" != "true"');
+    assert.ok(check > 0 && check < script.indexOf('COMPOSE_FILES+=(-f docker-compose.memanto.yml)'));
+    assert.ok(!script.includes('export MEMANTO_ENABLED=true'));
+  });
+
+  it('has no `compose volume` call (not a compose subcommand)', () => {
+    assert.ok(!script.includes('compose volume'));
+  });
+
+  it('waits for exactly the services the smoke requires before the smoke', () => {
+    for (const [flag, service] of [['memanto', 'memanto'], ['kokoro', 'kokoro-tts'], ['hermes', 'hermes']]) {
+      assert.match(script, new RegExp(`SMOKE_FLAGS\\+=\\(--require-${flag}\\)\\n\\s*WAIT\\+=\\(${service}\\)`), service);
+    }
+    const wait = script.indexOf('compose up -d --wait "${WAIT[@]}"');
+    assert.ok(wait > script.indexOf('init-memanto-ollama.sh'), 'after the Ollama pull');
+    assert.ok(wait < script.indexOf('node scripts/smoke-vm-stack.mjs'), 'before the smoke');
+    assert.ok(!/compose up -d --wait\s*$/m.test(script), 'no wait on every service');
+  });
+});
+
+describe('init-hermes-profile.sh', () => {
+  const script = read(path.join(STACK, 'scripts/init-hermes-profile.sh'));
+
+  it('writes API_SERVER_KEY from HERMES_API_KEY, the key the api sends', () => {
+    assert.match(script, /^API_SERVER_KEY=\$\{HERMES_API_KEY:-\}$/m);
+  });
+
+  it('writes as root and hands every file to the hermes UID', () => {
+    assert.match(script, /H_UID="\$\{HERMES_UID:-1000\}"/);
+    assert.match(script, /sudo install -d -o "\$\{H_UID\}" -g "\$\{H_GID\}"/);
+    assert.match(script, /sudo install -m 644 -o "\$\{H_UID\}" -g "\$\{H_GID\}"[^\n]*\n?[^\n]*config\.yaml/);
+    for (const target of ['/profiles/default/.env', '/.env']) {
+      assert.ok(script.includes(`sudo install -m 600 -o "\${H_UID}" -g "\${H_GID}" "\${tmp}" "\${DATA_DIR}${target}"`), target);
+    }
+    assert.ok(!/^\s*(cp|mkdir|chmod)\b/m.test(script), 'no plain cp, mkdir or chmod into hermes-data');
+    assert.ok(!/>\s*"\$\{DATA_DIR\}/.test(script), 'no plain redirect into hermes-data');
+  });
+});
+
+describe('bootstrap-vm.sh', () => {
+  const script = read(path.join(STACK, 'scripts/bootstrap-vm.sh'));
+
+  it('adds /swapfile once and never a second fstab line', () => {
+    assert.match(script, /if swapon --show=NAME --noheadings \| grep -x \/swapfile/);
+    assert.ok(script.includes('sudo fallocate -l 4G /swapfile'));
+    assert.match(script, /if ! grep -q '\^\/swapfile ' \/etc\/fstab; then/);
+  });
+
+  it('stops before the systemd unit and deploy until the docker group is active', () => {
+    const check = script.indexOf('docker info >/dev/null 2>&1');
+    assert.ok(check > 0 && check < script.indexOf('systemctl enable'));
+  });
+
+  it('runs deploy-stack.sh from INSTALL_DIR, where the systemd unit points', () => {
+    assert.ok(script.includes('bash "${STACK_DIR}/scripts/deploy-stack.sh"'));
+  });
+});
+
+describe('provision-gce.sh', () => {
+  const script = read(path.join(STACK, 'scripts/provision-gce.sh'));
+  const steps = script.slice(script.indexOf('Next steps'));
+
+  it('lists Tailscale before the clone and bootstrap, and creates /opt/risepath with sudo', () => {
+    const tailscale = steps.indexOf('tailscale up --hostname=risepath-vm');
+    const install = steps.indexOf('sudo install -d');
+    const clone = steps.indexOf('git clone');
+    assert.ok(tailscale > 0 && tailscale < install && install < clone, 'tailscale, sudo install -d, git clone');
+    assert.ok(clone < steps.indexOf('./bootstrap-vm.sh'));
+    assert.ok(steps.includes('"\\$(id -un)"'), 'escaped so it runs on the VM, not when the heredoc prints');
+  });
+});
+
+describe('Dockerfile: api stage', () => {
+  const dockerfile = read(path.join(STACK, 'Dockerfile'));
+  const api = dockerfile.split(/^FROM /m).find((stage) => /^\S+ AS api\s*$/m.test(stage)) || '';
+
+  it('exists and copies no front-end build (Vercel serves the front end)', () => {
+    assert.ok(api, 'api stage');
+    assert.ok(!api.includes('/app/dist'), 'no /app/dist');
+    assert.ok(!api.includes('--from=builder'), 'nothing from the builder stage');
+  });
 });

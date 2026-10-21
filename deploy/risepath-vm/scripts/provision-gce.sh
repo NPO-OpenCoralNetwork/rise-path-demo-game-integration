@@ -7,6 +7,7 @@
 #   export GCP_PROJECT=your-project
 #   export GCP_ZONE=asia-northeast1-b
 #   ./provision-gce.sh
+#   MACHINE_TYPE=e2-standard-2 ./provision-gce.sh   # with the Memanto overlay (8 GB)
 #   NIGHT_STOP=1 ./provision-gce.sh   # dev only: stop the VM at night
 set -euo pipefail
 
@@ -62,9 +63,17 @@ cat <<EOF
 VM provisioned. Next steps:
 
 1. SSH:  gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE}
-2. On VM: clone repo and run deploy/risepath-vm/scripts/bootstrap-vm.sh
-3. Tailscale: curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --hostname=risepath-vm
-4. Mac: tailscale ping risepath-vm
+2. Tailscale: first remove the old risepath-vm in the admin console (Machines), or the new
+   machine becomes risepath-vm-1. Then, on the VM:
+     curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --hostname=risepath-vm
+     tailscale status   # this machine must be listed as risepath-vm
+3. On the VM: clone into /opt/risepath and run bootstrap (run 1 installs Docker and swap, then
+   stops at stack.env):
+     sudo install -d -o "\$(id -un)" -g "\$(id -gn)" /opt/risepath
+     git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git /opt/risepath
+     cd /opt/risepath/deploy/risepath-vm/scripts && ./bootstrap-vm.sh
+   Then exit, SSH in again (docker group), fill stack.env and run ./bootstrap-vm.sh again.
+4. Mac: ssh-keygen -R risepath-vm; tailscale ping risepath-vm
 
 Firewall: no inbound rule is needed. Mac access goes over Tailscale, and the public API leaves
 through Cloudflare Tunnel (egress TCP/UDP 7844 must stay allowed). Do NOT open

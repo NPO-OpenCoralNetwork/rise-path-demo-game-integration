@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, up, smoke)
+# Redeploy Rise Path stack on risepath-vm (pull, check stack.env, build, migrate, up, wait, smoke)
 # Usage (on VM): ./deploy-stack.sh
 set -euo pipefail
 
@@ -32,13 +32,10 @@ if [[ -d "${REPO_ROOT}/.git" ]]; then
 fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
-  echo "==> init Hermes profile (full stack)"
-  "${SCRIPT_DIR}/init-hermes-profile.sh"
-fi
-
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
+  HERMES_KEYED=1
   COMPOSE_PROFILES="${COMPOSE_PROFILES:-full}"
 else
+  HERMES_KEYED=0
   echo "⚠️  OPENROUTER_API_KEY unset — skipping hermes profile (set in stack.env to enable)"
   COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 fi
@@ -46,9 +43,14 @@ fi
 COMPOSE_FILES=(-f docker-compose.yml)
 MEMANTO_STACK=0
 if [[ -n "${MEMANTO_SECRET_KEY:-}" && "${MEMANTO_SECRET_KEY}" != "change-me-memanto-secret" ]]; then
+  # The boot unit (systemd/risepath-stack.service) reads stack.env only: with false there, a reboot
+  # recreates api and mcp with learner memory off.
+  if [[ "${MEMANTO_ENABLED:-}" != "true" ]]; then
+    echo "❌ MEMANTO_SECRET_KEY is set: set MEMANTO_ENABLED=true in stack.env (the boot unit reads it)"
+    exit 1
+  fi
   COMPOSE_FILES+=(-f docker-compose.memanto.yml)
   MEMANTO_STACK=1
-  export MEMANTO_ENABLED=true
   if [[ ",${COMPOSE_PROFILES}," != *",memory,"* ]]; then
     COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}memory"
   fi
@@ -89,20 +91,39 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* ]]; then
   echo "==> Public edge: tunnel profile enabled (origin gate on)"
 fi
 
+# Template values deploy green and then break sign-in (Supabase), keep a known DB password and
+# bridge token, or give Hermes a key it refuses (under 16 characters). Refuse them before anything
+# is built. Prints variable names only, never their values.
+PLACEHOLDERS=()
+for name in POSTGRES_PASSWORD DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RISE_PATH_BRIDGE_TOKEN; do
+  value="${!name:-}"
+  if [[ -z "${value}" || "${value,,}" == *change-me* || "${value,,}" == *your-project* ]]; then
+    PLACEHOLDERS+=("${name}")
+  fi
+done
+if [[ "${HERMES_KEYED}" -eq 1 ]]; then
+  value="${HERMES_API_KEY:-}"
+  if [[ ${#value} -lt 16 || "${value,,}" == *change-me* ]]; then
+    PLACEHOLDERS+=("HERMES_API_KEY (at least 16 characters: openssl rand -hex 32)")
+  fi
+fi
+unset value
+if [[ ${#PLACEHOLDERS[@]} -gt 0 ]]; then
+  echo "❌ stack.env still has empty or template values:"
+  printf '   %s\n' "${PLACEHOLDERS[@]}"
+  echo "   Fill them (see stack.env.example). POSTGRES_PASSWORD is fixed at the db volume's first"
+  echo "   start: set it now (openssl rand -hex 24) and use the same value in DATABASE_URL_PHASE1."
+  exit 1
+fi
+
+if [[ "${HERMES_KEYED}" -eq 1 ]]; then
+  echo "==> init Hermes profile (full stack)"
+  "${SCRIPT_DIR}/init-hermes-profile.sh"
+fi
+
 compose() {
   docker compose --env-file stack.env "${COMPOSE_FILES[@]}" "$@"
 }
-
-if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
-  echo "==> Memanto data volume permissions (uid 1001)"
-  MEMANTO_VOL="$(compose volume ls -q 2>/dev/null | grep risepath_memanto_data | head -1 || true)"
-  if [[ -n "${MEMANTO_VOL}" ]]; then
-    MEMANTO_MP="$(docker volume inspect "${MEMANTO_VOL}" --format '{{.Mountpoint}}' 2>/dev/null || true)"
-    if [[ -n "${MEMANTO_MP}" && -d "${MEMANTO_MP}" ]]; then
-      sudo chown -R 1001:1001 "${MEMANTO_MP}" 2>/dev/null || true
-    fi
-  fi
-fi
 
 echo "==> docker compose build (profiles=${COMPOSE_PROFILES:-default})"
 compose build
@@ -129,18 +150,27 @@ if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   "${SCRIPT_DIR}/init-memanto-ollama.sh" || echo "⚠️  Ollama pull failed — retry: deploy/risepath-vm/scripts/init-memanto-ollama.sh"
 fi
 
-echo "==> stack smoke"
+# `up -d` returns once the containers start, and the smoke checks each service once (hermes has a
+# 90 s start_period). Wait for exactly the services the smoke requires, under the same conditions:
+# naming a service on `up` starts it even when no active profile runs it.
 SMOKE_FLAGS=(--require-mcp)
+WAIT=(mcp)
 if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   SMOKE_FLAGS+=(--require-memanto)
+  WAIT+=(memanto)
 fi
 if [[ "${COMPOSE_PROFILES:-}" == *tts* || "${COMPOSE_PROFILES:-}" == *full* ]]; then
   SMOKE_FLAGS+=(--require-kokoro)
+  WAIT+=(kokoro-tts)
 fi
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
+if [[ "${HERMES_KEYED}" -eq 1 && ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then
   SMOKE_FLAGS+=(--require-hermes)
+  WAIT+=(hermes)
 fi
+echo "==> wait until healthy: ${WAIT[*]}"
+compose up -d --wait "${WAIT[@]}"
 
+echo "==> stack smoke"
 # Always from inside the api container: there 127.0.0.1 is loopback, which the origin gate exempts.
 # From the host, the published port does not arrive as loopback (403 once ORIGIN_SECRET is set).
 compose exec -T api env \
