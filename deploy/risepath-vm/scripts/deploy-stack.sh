@@ -21,7 +21,14 @@ set +a
 
 if [[ -d "${REPO_ROOT}/.git" ]]; then
   echo "==> git pull"
+  HEAD_BEFORE="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   git -C "${REPO_ROOT}" pull --ff-only
+  # The pull may replace this file, but bash keeps reading the copy it opened. Re-run once so
+  # the steps below always come from the pulled version.
+  if [[ "$(git -C "${REPO_ROOT}" rev-parse HEAD)" != "${HEAD_BEFORE}" && -z "${RISEPATH_DEPLOY_REEXEC:-}" ]]; then
+    echo "==> HEAD moved — re-running the pulled deploy-stack.sh"
+    RISEPATH_DEPLOY_REEXEC=1 exec "${BASH}" "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$@"
+  fi
 fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
@@ -78,6 +85,11 @@ compose up -d --wait db
 
 echo "==> db:migrate (new api image, one-off container)"
 compose run --rm --no-deps -T api npm run db:migrate
+
+# An api left unhealthy by an earlier failed run keeps that status when `up` finds nothing to
+# change, and `up` then stops on mcp's depends_on at once. Recreate it and wait for healthy.
+echo "==> api up (recreate, wait until healthy)"
+compose up -d --no-deps --force-recreate --wait api
 
 echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
 compose up -d

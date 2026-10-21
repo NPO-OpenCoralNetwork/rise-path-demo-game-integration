@@ -81,6 +81,8 @@ docker compose --env-file stack.env up -d
 
 `/api/v2/health` は未適用の migration が 1 つでもあると 503 を返し、`api` の healthcheck はこれを見る。`mcp` は `api` の healthy を、`hermes` は `mcp` を待つ。新しい migration を含むイメージを先に起動すると、`up` が unhealthy で止まり、`mcp` と `hermes` が更新されない。
 
+前の失敗で unhealthy な `api` が残っていると、設定もイメージも同じなので `up -d` はそれを作り直さず、`mcp` の依存待ちですぐ止まる。そのときは migrate のあと `docker compose --env-file stack.env up -d --no-deps --force-recreate --wait api` を挟んでから `up -d` する（`deploy-stack.sh` は毎回挟む）。
+
 ### 2.2 リポジトリ内の予定ファイル
 
 | パス | 内容 |
@@ -165,11 +167,26 @@ git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integratio
 cd /opt/risepath/deploy/risepath-vm
 cp stack.env.example stack.env   # 実値を入れる。deploy/risepath-vm/.gitignore で除外済み
 chmod 600 stack.env
-./scripts/deploy-stack.sh        # pull → build → db 起動 → db:migrate → up -d → smoke
+./scripts/deploy-stack.sh        # pull → build → db 起動 → db:migrate → api 作り直し → up -d → smoke
 docker compose --env-file stack.env exec api npm run env:check -- --db
 ```
 
 既存の `/opt/risepath` の取得元確認と clone し直しの手順: [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md)
+
+#### 既存の VM で、この版のスクリプトを初めて使うデプロイ
+
+`deploy-stack.sh` は pull で HEAD が進むと、pull したあとの自分自身を 1 回だけ実行し直す（`RISEPATH_DEPLOY_REEXEC`）。ただし VM にあるのが古い版なら、pull するのも古いスクリプトで、bash は読み込んだ古い本体（`up -d --build` のあとに migrate）を最後まで続ける。新しい `api` が未適用の migration で unhealthy になり、`up` が止まって migrate は流れない。
+
+- **最初の 1 回だけは、先に pull してからスクリプトを実行する。** VM の `deploy-stack.sh` に `RISEPATH_DEPLOY_REEXEC` の行が無ければ古い版。
+
+  ```bash
+  git -C /opt/risepath pull --ff-only
+  cd /opt/risepath/deploy/risepath-vm
+  ./scripts/deploy-stack.sh
+  ```
+
+- **古い順序で走って失敗したら**、pull 済みの新しい `./scripts/deploy-stack.sh` をもう一度実行する。migrate のあと `api` を作り直して healthy を待つので、前回の unhealthy な `api` が残っていても止まらない。
+- `scripts/deploy-from-mac.sh` は先に ssh で pull するので、この手順は要らない。
 
 **main へのマージだけではデプロイされない。** レッスンと `/claude-code` などの画面はビルド時に `api` イメージ（`dist/`）へ、MCP の `lesson-get` が読む `content/` は `mcp` イメージへ焼き込まれる。学習者に届くのは `deploy-stack.sh` で両方を再ビルドしたあと（Vercel のフロントは [`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。
 
@@ -258,9 +275,15 @@ COMPOSE_PROFILES=full,memory
 ```bash
 cd /opt/risepath/deploy/risepath-vm
 ./scripts/deploy-stack.sh
-# または手動:
+# または手動（§2.1 と同じ順。migrate は新しい api の起動前）:
 docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
-  --env-file stack.env --profile full --profile memory up -d --build
+  --env-file stack.env --profile full --profile memory build
+docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
+  --env-file stack.env --profile full --profile memory up -d --wait db
+docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
+  --env-file stack.env --profile full --profile memory run --rm --no-deps api npm run db:migrate
+docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
+  --env-file stack.env --profile full --profile memory up -d
 ./scripts/init-memanto-ollama.sh   # nomic-embed-text を pull
 ```
 

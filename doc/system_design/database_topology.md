@@ -2,7 +2,7 @@
 
 > 更新日: 2026-06-23  
 > 方針: **Supabase = 認証のみ** / **アプリデータ = 専用 VM `risepath-vm` 上の PostgreSQL `risepath`（Docker）** / **バイナリ = GCS（計画）**  
-> デプロイ正本: [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)
+> デプロイ正本: [`risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md)
 
 ## なぜ分けるか
 
@@ -10,7 +10,7 @@
 |------|------|
 | ai-note-meet / auto-grants 等との混在 | **専用 VM `risepath-vm`**。`nexloom-gce` は変更しない |
 | auto-grants など別 DB への誤接続 | DB 名 `risepath` + ロール `risepath_app` のみ |
-| LLM / MCP が別プロダクトを触る | Rise Path 専用 Hermes + MCP allowlist（[`hermes/README.md`](../hermes/README.md)） |
+| LLM / MCP が別プロダクトを触る | Rise Path 専用 Hermes + MCP allowlist（[`hermes/README.md`](../../hermes/README.md)） |
 | Supabase Postgres と混在 | データ用 URI に **Supabase pooler を使わない** |
 
 ## 目標構成図（本番）
@@ -53,7 +53,7 @@ Tailscale 内前提なら `sslmode=disable` が多い。インターネット公
 
 ## VM 上での初回セットアップ（推奨: Docker）
 
-**正本手順:** [`risepath_vm_deployment.md`](./risepath_vm_deployment.md) §4
+**正本手順:** [`risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4
 
 ```bash
 cd deploy/risepath-vm
@@ -114,13 +114,13 @@ npm run env:check -- --db
 | ジャーナル・診断・進捗 | Postgres `risepath` |
 | プロフィール画像・教材 PDF 等 | GCS |
 
-Nexloom 教室向け添付は別バケット（[`portable_deployment.md`](./portable_deployment.md)）。
+Nexloom 教室向け添付は別バケット（[`portable_deployment.md`](../guides/portable_deployment.md)）。
 
 ## 関連
 
-- [`risepath_vm_deployment.md`](./risepath_vm_deployment.md) — **専用 VM + Docker 正本**
-- [`architecture_v3_hermes_agent.md`](./architecture_v3_hermes_agent.md)
-- [`env_local_setup_issue15.md`](./env_local_setup_issue15.md)
-- [`portable_deployment.md`](./portable_deployment.md)
+- [`risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) — **専用 VM + Docker 正本**
+- [`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md)
+- [`env_local_setup_issue15.md`](../guides/env_local_setup_issue15.md)
+- [`portable_deployment.md`](../guides/portable_deployment.md)
 - `deploy/risepath-vm/stack.env.example`
 - `scripts/vm/postgres_risepath_bootstrap.sql`（レガシー）

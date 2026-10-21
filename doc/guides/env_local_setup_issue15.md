@@ -177,7 +177,7 @@ curl -s http://localhost:3006/api/v2/curricula
    | Email プロバイダ | ON | ON |
    | Confirm email | OFF 推奨（即ログイン） | ON 推奨 |
 
-   仕様: [`phase18_user_registration_spec.md`](./phase18_user_registration_spec.md)
+   仕様: [`phase18_user_registration_spec.md`](../phases/phase18_user_registration_spec.md)
 
 ## 10. migration 適用（Issue #16）
 
@@ -187,7 +187,7 @@ npm run db:migrate          # risepath-vm（または暫定 nexloom-gce）/ rise
 npm run env:check -- --db
 ```
 
-詳細: [`server/migrations/README.md`](../server/migrations/README.md)
+詳細: [`server/migrations/README.md`](../../server/migrations/README.md)
 
 ## 11. 次の Issue
 

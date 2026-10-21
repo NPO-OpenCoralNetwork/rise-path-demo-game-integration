@@ -183,17 +183,22 @@ async function main() {
     ok = false;
   } else if (llm.res.status === 200 && llm.body) {
     const { providers, tasks, mock, forced_provider: forced } = llm.body;
-    const usable = llm.body.ok === true && mock !== true;
+    // `ok` only says some key (or the mock) exists; a pinned provider without a key leaves the
+    // tutor task with no route, and those calls answer 503 no_provider.
+    const tutorProvider = tasks?.['tutor.chat']?.provider;
+    const usable = llm.body.ok === true && mock !== true && Boolean(tutorProvider);
     const state = [
       `anthropic=${providers?.anthropic?.configured === true}`,
       `gemini=${providers?.gemini?.configured === true}`,
       `mock=${mock === true}`,
       ...(forced ? [`forced=${forced}`] : []),
-      `tutor=${tasks?.['tutor.chat']?.provider ?? 'none'}`,
+      `tutor=${tutorProvider ?? 'none'}`,
     ].join(' ');
     console.log(`${usable ? '✅' : '⚠️ '} LLM /api/v2/llm/status → 200 (${state})`);
     if (llm.body.ok !== true) {
       console.log('   No LLM provider configured — AI tutor calls answer 503 (set ANTHROPIC_API_KEY or GEMINI_API_KEY in stack.env)');
+    } else if (!tutorProvider) {
+      console.log(`   No provider for tutor.chat — AI tutor calls answer 503 (check LLM_PROVIDER${forced ? `=${forced}` : ''} and LLM_TASK_TUTOR_CHAT against ANTHROPIC_API_KEY / GEMINI_API_KEY in stack.env)`);
     } else if (mock === true) {
       console.log('   The built-in mock answers AI tutor calls (no provider key, or LLM_PROVIDER=mock)');
     }

@@ -85,6 +85,20 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 ./deploy-stack.sh
 ```
 
+`deploy-stack.sh` は pull で HEAD が進むと、pull したあとの自分自身を 1 回だけ実行し直します。そのあと build → db 起動 → `db:migrate` → `api` の作り直し（healthy まで待つ）→ `up -d` → smoke の順に進みます。
+
+**この版のスクリプトが VM に入る最初のデプロイだけ**は、先に `git pull` してからスクリプトを実行します。VM の `deploy-stack.sh` に `RISEPATH_DEPLOY_REEXEC` の行が無ければ古い版です。
+
+```bash
+git -C /opt/risepath pull --ff-only
+cd /opt/risepath/deploy/risepath-vm/scripts
+./deploy-stack.sh
+```
+
+pull するのは実行中の古いスクリプトで、bash は読み込んだ古い本体を最後まで続けます。古い本体は `up -d --build` で新しい `api` を先に起動し、migrate はそのあとです。新しい `api` は未適用の migration があると unhealthy になるので、`up` がそこで止まり、migrate は流れません。
+
+古い順序で走って失敗したときは、pull 済みの新しい `./deploy-stack.sh` をもう一度実行します。migrate を流してから `api` を作り直すので、前回の unhealthy な `api` が残っていても止まりません。`scripts/deploy-from-mac.sh` は先に ssh で pull するので、この手順は要りません。
+
 Mac から検証:
 
 ```bash
