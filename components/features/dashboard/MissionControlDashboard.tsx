@@ -257,7 +257,9 @@ const ContinueCard: React.FC = () => {
 
   const title = resolveLText(lesson?.title ?? entry?.ref.title, locale, fallbackLocale);
   const estMinutes = lesson?.estMinutes ?? entry?.ref.estMinutes;
-  const trackBadge = target.courseSlug === 'vibe-coding' ? trackCopy('vibe', language, course).title : resolveLText(course.title, locale, fallbackLocale).value;
+  // The course title keeps its own lang (a Japanese-only course in the English UI).
+  const vibeTrack = target.courseSlug === 'vibe-coding' ? trackCopy('vibe', language, course) : null;
+  const trackBadge = vibeTrack ? { value: vibeTrack.title, lang: vibeTrack.lang } : resolveLText(course.title, locale, fallbackLocale);
   const world = course.world ?? 'vibe';
 
   const meta: string[] = [];
@@ -290,7 +292,7 @@ const ContinueCard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-world-soft px-2.5 py-0.5 text-caption font-semibold text-world">
             <span aria-hidden="true" className="size-2 rounded-full bg-world" />
-            {target.fromLast ? trackBadge : t.startKicker}
+            {target.fromLast ? <span lang={trackBadge.lang}>{trackBadge.value}</span> : t.startKicker}
           </span>
           {target.fromLast ? <span className="text-caption text-fg-3">{t.continueKicker}</span> : null}
         </div>
