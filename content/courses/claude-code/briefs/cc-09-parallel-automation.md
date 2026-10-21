@@ -44,8 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: `cc-09-parallel-automation.lesson.json: prose 2265 (budget 1,200–2,400) · read 2653 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`）。
-  est = (2,653 + 1,246) / 450 + 11 × 40秒 + 2 × 2分 = 8.66 + 7.33 + 4 = 19.998 → 20。prose rose from 1,583 because the three
+- 所要時間 / minutes: 20（`measure.mjs`: `cc-09-parallel-automation.lesson.json: prose 2262 (budget 1,200–2,400) · read 2650 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`）。
+  est = (2,650 + 1,246) / 450 + 11 × 40秒 + 2 × 2分 = 8.66 + 7.33 + 4 = 19.99 → 20。prose rose from 1,583 because the three
   tables became lists (measure.mjs counts lists as prose, tables only as reading).
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
@@ -170,3 +170,4 @@ predict before running (p-run).
 
 ### After publishing (2026-10-21)
 - After publishing, a full pedagogy review found e3 and e5 answerable by convergence: each flag or condition now appears in exactly two options (answers unchanged). s4-check option c uses 「」 instead of 『』 (ja-editor).
+- English on first use for フラグ（flag）, 依存パッケージ（package） and クローン（clone） (ja-editor); s1-lead, s4-lead, s4-enforce and ex-merge trimmed slightly so est stays ≤ 20 (19.99).

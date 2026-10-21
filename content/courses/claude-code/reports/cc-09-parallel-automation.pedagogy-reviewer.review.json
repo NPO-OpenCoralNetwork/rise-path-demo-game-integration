@@ -1,22 +1,42 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:c5dc598ce3ba8cf6",
+  "lessonHash": "sha256:262fc82916e86736",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:c5dc598ce3ba8cf6",
+    "previousReview": ".artifacts/review/claude-code/cc-09-parallel-automation/c5dc598ce3ba8cf6/round-2/pedagogy-reviewer.review.json",
+    "changed": [
+      "s4-check",
+      "check-quiz"
+    ],
+    "changedShare": 0.03,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "check-quiz",
+      "criterion": "active",
+      "status": "resolved",
+      "evidence": "e3 is now b 「`--bare` ＋ `Bash` ＋ `bypassPermissions`」, c 「`Bash(npm test *)` ＋ `bypassPermissions`」, d 「`Bash` ＋ `dontAsk`」 and a 「`--bare` ＋ `Bash(npm test *)` ＋ `dontAsk`」. `--bare`, `Bash(npm test *)`, `Bash`, `bypassPermissions` and `dontAsk` each appear in exactly 2 options, so no majority path points to the key. The answer stays [\"a\"], and every feedback names both faults (「`--bare` がないとフックや `.mcp.json` が動き、`Bash` は全コマンドを通します。」)."
+    },
+    {
+      "blockId": "check-quiz",
+      "criterion": "active",
+      "status": "resolved",
+      "evidence": "In e5 the JSON format and 「いい感じ」 each appear in 2 options (d, a / b, c), and so do 「編集はしない」 and 「更新とコミット」 (b, a / d, c). The failure clause is 「理由」 in a and c, 『更新なし』 in b and 「空の配列」 in d. The key can no longer be found by taking the majority in every slot; the learner has to apply the 4 points. The answer stays [\"a\"], and each feedback names both flaws (「報告だけの作業に更新やコミットを頼み、調べられない日も空の配列になります。」)."
+    }
+  ],
   "scores": [
     {
       "id": "align",
       "score": 3,
-      "evidence": "There are 3 can-do objectives with Bloom levels, and each has questions with objectiveId: o1 has q0–q2, e1 and e2; o2 has q3, e3 and e4; o3 has q4, e5 and e6. The writing in o2 (「書ける」) and the design in o3 (「設計できる」) are only produced in the practice sections with self-checks (p1-checklist, p2-checklist). The exam only asks the learner to choose, and two of its items can be answered by convergence (see active).",
+      "evidence": "There are 3 objectives, and each is still assessed (o1: q0–q2, e1, e2; o2: q3, e3, e4; o3: q4, e5, e6). The rebalanced e3 and e5 now discriminate and no longer give their answers away. The writing in o2 (「書ける」) and the design in o3 (「設計できる」) are still produced only in the practice sections, which have self-checks (p1-checklist, p2-checklist). The exam only asks the learner to select.",
       "blockIds": [
-        "hook-predict",
-        "s1-check",
-        "s2-check",
-        "s3-check",
-        "s4-check",
         "check-quiz",
+        "s4-check",
         "p1-checklist",
         "p2-checklist"
       ]
@@ -28,7 +48,8 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -43,7 +64,8 @@
         "s3-pitfall",
         "s4-defs",
         "p1-steps-write"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
@@ -53,7 +75,8 @@
         "headless",
         "s3-table",
         "unattended-where"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -65,12 +88,13 @@
         "s3-code",
         "s3-table",
         "s4-prompt"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "Four of the five segments have an inline check, and each check applies the idea to a new case: q1 (login text vs payment config), q2 (「モジュールが見つからない」), q3 (bare `-p` in CI) and q4 (5 quiet days). Each has hints and per-option feedback. But exam items e3 and e5 can be answered by convergence: each distractor changes exactly one part, so the option that shares the majority part in every slot is the key (must-fix).",
+      "score": 4,
+      "evidence": "Four of the five segments end with an inline check that applies the idea to a new case: q1 (login text vs payment config), q2 (「モジュールが見つからない」), q3 (bare `-p` in CI) and q4 (5 quiet days). Each has a hint and per-option feedback. The exam items can no longer be solved by convergence: in e3 and e5 every flag or clause appears in exactly 2 options, so the learner must apply the flags and the 4 points.",
       "blockIds": [
         "s1-check",
         "s2-check",
@@ -82,16 +106,14 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "All 7 misconceptions in the brief are addressed by distractors or text: same folder (q0, q1 d), dependencies (q2), the `-p` default (q3 b/c/d), broad `Bash` (s3-pitfall, e3 b), the trust prompt (e4 d), prompts are not enforcement (s4-enforce, e6), and a quiet day vs a failed read (q4 d). Every feedback fixes the error in 2 sentences or fewer and gives a reason (「autoモードで始まるのは、ターミナルやVS Codeの対話セッションです。」).",
+      "evidence": "The 7 misconceptions in the brief are still covered: broad `Bash` and `bypassPermissions` (e3 b, d: 「`Bash` は全コマンドを通し、`bypassPermissions` は確認を飛ばします。」), a missing `--bare` (e3 c, d), and a quiet day vs a failed read (q4 d, e5 b 「読めない日も「更新なし」になります」, e5 d). The rewritten feedback is one sentence each, but it now names what is wrong without the corrective next step the earlier version gave. The explanation supplies that step.",
       "blockIds": [
         "hook-predict",
-        "s1-check",
-        "s2-check",
         "s3-check",
-        "s3-pitfall",
-        "s4-enforce",
         "s4-check",
-        "check-quiz"
+        "check-quiz",
+        "s3-pitfall",
+        "s4-enforce"
       ]
     },
     {
@@ -103,7 +125,8 @@
         "s3-table",
         "s4-table",
         "s2-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -117,7 +140,8 @@
         "p2-steps",
         "p2-prompt",
         "p2-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -128,28 +152,28 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The 3 findings confirmed in audit-cc-09-parallel-automation.json are fixed in the current text: s1-lead (「並列の作業を助ける道具を2つ紹介します」), s3-table (「確認が要る操作を、聞かずに拒否します（読み取りは動きます）」) and summary-points (「モードを指定しない `claude -p` は」). Other claims match facts-cc-09-parallel-automation.md and cross-lesson fact 8, are cited, and are pinned to versions (v2.1.302, v2.1.304). The section title 「並列の3つの方法」 still counts methods, which the docs do not support (niceToHave).",
+      "evidence": "The new e3 feedback repeats claims the lesson already cites and the earlier text made: without `--bare`, `-p` runs hooks and `.mcp.json` servers (e4 explanation), `bypassPermissions` skips prompts, and a bare `Bash` allows every shell command (s3-pitfall). check-quiz still cites cc-headless, cc-permission-modes and cc-permissions. The section title 「並列の3つの方法」 still counts methods, which the docs do not support (niceToHave).",
       "blockIds": [
-        "s1-lead",
-        "s3-table",
-        "summary-points",
-        "s4-table",
-        "check-quiz"
+        "check-quiz",
+        "s3-pitfall",
+        "s1-lead"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson keeps です・ます, is warm (「名前だけで十分です」) and has no banned phrases. Two terms vary: the permission prompt is 「承認が要る」 in s3-mode and q3 but 「確認が要る」 in s3-table, e3 and pc-mode, and the practice place is 「練習用リポジトリ」 in s2-code but 「練習用フォルダー」 in p1-task.",
+      "evidence": "The changed text keeps です・ます and a neutral tone. q4 d now uses 「新しい課題はありません」 for a quote that is not nested, and e5 b correctly keeps 『更新なし』 nested inside 「…」. The terminology split from the last round is unchanged: 「承認が要る」 in s3-mode and q3 vs 「確認が要る」 in s3-table, e3 and pc-mode, and 「練習用リポジトリ」 in s2-code vs 「練習用フォルダー」 in p1-task.",
       "blockIds": [
+        "s4-check",
+        "check-quiz",
         "s3-mode",
         "s3-table",
-        "s3-check",
         "s2-code",
         "p1-task"
       ]
@@ -163,36 +187,22 @@
         "p1-checklist",
         "p2-checklist",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "active",
-      "blockId": "check-quiz",
-      "issue": "e3 can be answered by convergence without knowing the flags. Each distractor changes one part of the key (b: `Bash`, c: `bypassPermissions`, d: no `--bare`). `--bare`, `Bash(npm test *)` and `dontAsk` each appear in 3 of 4 options, so a test-wise learner picks a, the only option made of all three majority parts. The item gives its answer away.",
-      "fix": "Keep the ids, array order (b, c, d, a), answer [\"a\"] and option a. Balance the parts so each value appears in exactly 2 options. Option b: md 「`--bare` ＋ `Bash` ＋ `bypassPermissions`」, feedback 「`Bash` は全コマンドを通し、`bypassPermissions` は確認を飛ばします。」. Option c: md 「`Bash(npm test *)` ＋ `bypassPermissions`」, feedback 「`--bare` がないとフックや `.mcp.json` が動き、`bypassPermissions` は確認を飛ばします。」. Option d: md 「`Bash` ＋ `dontAsk`」, feedback 「`--bare` がないとフックや `.mcp.json` が動き、`Bash` は全コマンドを通します。」. Then re-run lint (sentence length) and measure.mjs (est must stay ≤ 20)."
-    },
-    {
-      "criterion": "active",
-      "blockId": "check-quiz",
-      "issue": "e5 has the same convergence cue. b differs from the key only in success (「いい感じ」), d only in failure (「調べられなくても空の配列」), and c only in permission (「更新とコミットも」). JSON format, 「編集はしない」 and 「理由を返して」 each appear in 3 of 4 options, so a is the only all-majority option, and the o3 exam item can be answered without applying the 4 points.",
-      "fix": "Keep the ids, array order (b, d, a, c), answer [\"a\"] and option a. Option b: md 「「更新できるパッケージを調べて、いい感じにまとめて。編集はしない。調べられなければ『更新なし』と返して」」, feedback 「「いい感じ」では完了の形が決まらず、読めない日も「更新なし」になります。」. Option d: md 「「名前・今の版・最新の版をJSONの配列で返して。なければ空の配列。必要なら更新とコミットも。調べられなくても空の配列で返して」」, feedback 「報告だけの作業に更新やコミットを頼み、調べられない日も空の配列になります。」. Option c: md 「「更新できるパッケージを調べて、いい感じにまとめて。必要なら更新とコミットも。調べられなければ理由を返して」」, feedback 「「いい感じ」では完了の形が決まらず、報告だけの作業に更新やコミットを頼んでいます。」. Each value then appears in exactly 2 options. Re-run measure.mjs (est ≤ 20)."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "factual doubt / consistency, section parallel: the title 「1. 並列の3つの方法を選び分ける」 contradicts s1-lead 「並列の作業を助ける道具を2つ紹介します」. The docs count five ways to run agents and call worktrees and background commands supporting tools (audit-cc-09-parallel-automation.json, s1-lead verdict). Suggest the title 「1. 作業に合わせて並べ方を選ぶ」.",
-    "practice-audit p2-before: the weak prompt is the same nightly-test task as practice 1, so the learner can copy p1-model and does not transfer the 4 points. Consider another domain, e.g. 「毎朝ログを見て、エラーをいい感じにまとめておいて。原因がわかったら直しておいて。」, and adapt the p2-prompt expect model answer to match. Offset the added text so est stays ≤ 20.",
-    "p2-prompt: the prompt asks Claude to check 「費用の上限（--max-budget-usdなどで決めているか）」 and permissions, but the only variable is 「直した依頼文」, so Claude cannot see the flags and will always report them missing. Rename the variable to 「直した依頼文とコマンド」 (in both the prompt and vars[0].name) with hint 「例：claude --bare -p '…' --allowedTools \"Bash(npm test *)\" …」.",
-    "s3-check q3 option a (「Manualモードで始まり、承認が必要な `npm test` が拒否される」) nearly repeats s3-mode. Set its md to 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
-    "s3-code: the prompt 「リンターの警告を数えてください。」 does not name the allowed command. Replace line 2 with `  \"npm run lint の警告を数えてください。\" \\` so the prompt and `--allowedTools` visibly match.",
-    "unattended-where: no objective covers s4-table (GitHub Actions, クラウド・デスクトップの定期タスク, `/loop`) and no question assesses it, yet it adds 2 terms. Either add one inline question (「パソコンを閉じている夜間に毎日動かしたい」 → クラウドの定期タスク) after a matching cut, or shorten it to one sentence inside unattended.",
-    "Visual: a 4–5 node diagram of the worktree layout (cc-practice-09 → `.claude/worktrees/feature-a` / `bugfix-b`, branches `worktree-feature-a` / `worktree-bugfix-b`, merge back), with caption and alt, would support s2-steps on mobile.",
-    "Terminology (the ja-editor decides): use one term for the permission prompt (s3-mode and q3 「承認が要る」 vs s3-table, e3 and pc-mode 「確認が要る」), and one name for the practice place (s2-code 「練習用リポジトリ」 vs p1-task 「練習用フォルダー」).",
-    "p1-steps-write p-run: 「プランでなくAPIの料金です（第10回）。」 is terse, and 「プラン」 can be confused with プランモード. Consider 「Pro・Maxなどのプランではなく、APIの料金がかかります（第10回）。」, if est allows.",
-    "Load is at the cap (measure.mjs est 20.0, estMinutes 20). Any addition, including the e3 and e5 fixes, needs a matching cut."
+    "check-quiz e3/e5: the rewritten feedback now only diagnoses. To give the corrective step back where sentence length allows, e3 b could read 「`Bash` は全コマンドを通し、`bypassPermissions` は確認を飛ばします。`Bash(npm test *)` と `dontAsk` に絞ります。」 (the ja-editor decides the wording; keep each feedback to 2 sentences or fewer).",
+    "Still open from the last round, unchanged content: the section title 「1. 並列の3つの方法を選び分ける」 conflicts with s1-lead 「並列の作業を助ける道具を2つ紹介します」. Suggest 「1. 作業に合わせて並べ方を選ぶ」.",
+    "Still open: p2-before reuses the nightly-test task from practice 1, so it is not a transfer task. Consider a log-summary task (「毎朝ログを見て、エラーをいい感じにまとめておいて。原因がわかったら直しておいて。」) and update the model in the p2-prompt expect to match.",
+    "Still open: the p2-prompt variable should be 「直した依頼文とコマンド」 so Claude can check `--max-budget-usd` and the permission flags.",
+    "Still open: s3-code line 2 → `  \"npm run lint の警告を数えてください。\" \\`; q3 option a → 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
+    "Still open: unattended-where (s4-table) is neither assessed nor practiced. Add one inline item or shorten it to one sentence.",
+    "Still open: a 4–5 node worktree diagram with caption and alt would support s2-steps.",
+    "Load is still at the cap (measure.mjs est 20.0, estMinutes 20). Any addition needs a matching cut."
   ],
-  "average": 3.31,
-  "verdict": "revise",
-  "summary": "This is a full review. The lesson moved to content/courses/claude-code/lessons/ and its courseId changed, and the review gate no longer accepts the earlier review chain recorded under the vibe-coding path. validate reports 0 errors and lint --strict 0 warnings, and measure.mjs reports prose 2265 and est 20.0, which matches estMinutes 20. The biggest strength is a clear arc with strong misconception work: hook → worktree example → safe `claude -p` → the 4-point prompt, and every distractor targets a misconception from the brief, with short corrective feedback. The audit's three confirmed accuracy fixes are in place. Two items must be fixed: exam items e3 (o2) and e5 (o3) can be answered by convergence, because each distractor changes one part of the key. Rebalance their options as specified. The mean is 3.31, and every criterion scores 3 or higher."
+  "average": 3.38,
+  "verdict": "pass",
+  "summary": "This is a verification round. review-scope.mjs exited 0: 2 of 42 blocks changed (s4-check, check-quiz), 3% of the parts. validate reports 0 errors and lint --strict 0 warnings, and measure.mjs is unchanged (prose 2265, est 20.0, estMinutes 20). Both must-fix items from the previous round are resolved. In e3 and e5 each flag or clause now appears in exactly 2 options, the answers and array order are unchanged, and every distractor's feedback names its two flaws. The q4 quote fix is correct and introduces no regression. The changed blocks raise no new must-fix. active rises to 4, every criterion is 3 or higher, and the mean is 3.38."
 }

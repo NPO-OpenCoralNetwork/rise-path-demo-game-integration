@@ -1,14 +1,32 @@
 {
   "lessonId": "cc-07-skills-subagents",
   "file": "content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json",
-  "lessonHash": "sha256:f8e6497346002dd9",
+  "lessonHash": "sha256:0ffacf7c3db87313",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:f8e6497346002dd9",
+    "previousReview": ".artifacts/review/claude-code/cc-07-skills-subagents/f8e6497346002dd9/round-2/pedagogy-reviewer.review.json",
+    "changed": [
+      "s4-check"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "s4-check",
+      "criterion": "active",
+      "status": "resolved",
+      "evidence": "q6 now uses the four option texts the previous review gave. a: 「決まったテストのコマンドではなく、別のコマンドをClaudeが今日も実行した」. b: 「リリース前の12ステップの確認を、毎週チャットで一から説明し直している」. c: 「ログの原因調査を頼んだら、もう読まない出力で会話の大半が埋まった」. d: 「まだ困っていないが、思いつく作業を今のうちにすべてスキルにしておく」. None of them repeats the key phrase of its s4-table item (「2回まちがえたら」「何度も貼っている」「会話にあふれる」) or of the s4-pitfall title (「最初に全部」), so a learner has to map each situation to its trigger. The ids, the order, answer [\"b\"], the feedback on a, c and d, objectiveId o2 and bloom evaluate are unchanged."
+    }
+  ],
   "scores": [
     {
       "id": "align",
       "score": 4,
+      "carriedOver": true,
       "evidence": "The 3 objectives use observable verbs (まとめられる / 判断できる / 説明できる). Each has 2 or more questions with objectiveId: o1 has q2, q3, e1 and e2; o2 has q1, q5, q6 and e3; o3 has q4, e5 and e6. Both e1 (team sharing) and e3 (finding old code before swapping a library) are apply-or-higher transfer items. The create level of o1 is checked only by pr-checklist (「説明文に「何をするか」と「いつ使うか」が書いてあります」).",
       "blockIds": [
         "s1-check",
@@ -22,6 +40,7 @@
     {
       "id": "hook",
       "score": 3,
+      "carriedOver": true,
       "evidence": "hook-b1 sets a concrete problem in 3 sentences (「コミットの前に、毎回同じ手順をClaude Codeに貼り付けていませんか。」), and the ungraded hook-q leads into 7-1. But hook-q mostly asks learners to recall lesson 6 (its explanation says 「（第6回）」). The second problem in hook-b1, research output flooding the conversation, gets no prediction.",
       "blockIds": [
         "hook-b1",
@@ -31,6 +50,7 @@
     {
       "id": "prior",
       "score": 4,
+      "carriedOver": true,
       "evidence": "The prerequisites name lessons 5 and 6, and the text recalls them where they are used (「（第6回）」 in s1-lead and hook-q, 「（第5回）」 in s3-lead). The new terms are defined with their English in s1-defs (スキル, フロントマター, 段階的な読み込み) and s3-defs (サブエージェント, フォーク), and 拡張機能 is defined in s4-lead. These definitions match the glossary. YAML is glossed inline (「「項目名: 値」の形で設定を書く書式」).",
       "blockIds": [
         "s1-defs",
@@ -43,7 +63,8 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs reports 「prose 2167 (budget 1,200–2,400) · est 17.8 min (must be ≤ 20; estMinutes 18)」, and lint --strict gives 0 errors and 0 warnings. Section 7-3 is the densest: subagent, fork, background default and the agent file come in 7 blocks before its check. The unexplained `>-` sentence in ex-description also adds load.",
+      "carriedOver": true,
+      "evidence": "measure.mjs still reports 「prose 2167 (budget 1,200–2,400) · est 17.8 min (must be ≤ 20; estMinutes 18)」, and lint --strict gives 0 errors and 0 warnings after the q6 change. Section 7-3 is the densest: subagent, fork, background default and the agent file come in 7 blocks before its check. The unexplained `>-` sentence in ex-description also adds load.",
       "blockIds": [
         "s3-defs",
         "s3-bg",
@@ -54,6 +75,7 @@
     {
       "id": "worked",
       "score": 3,
+      "carriedOver": true,
       "evidence": "7-2 is a full worked example before practice. s2-steps has 5 labelled steps, each with its reason (「起動後に `.claude/skills/` を新しく作ると、`/reload-skills` するまで読み込まれないためです」, 「Claudeは説明文で使うかを決めるので」), plus a prediction in ex-auto. There is no faded example. The subagent half of the practice is shown only as s3-how's one-line phrasing.",
       "blockIds": [
         "s2-skill",
@@ -63,11 +85,12 @@
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "Every content section has an inline quiz, and q1, q3, q4 and q5 need inference. But q6 (bloom evaluate) can be solved by matching words from s4-table right above it: 「Claudeが2回まちがえた」 vs 「Claudeが2回まちがえたら」, 「毎週チャットに貼っている」 vs 「何度も貼っている」, 「出力が会話にあふれた」 vs 「出力が会話にあふれる」. q2's answer is the key that s2-invoke names just before it.",
+      "score": 4,
+      "evidence": "Every content section has an inline quiz, and q1, q3, q4, q5 and now q6 need inference. q6 (evaluate) can no longer be solved by matching words: option b (「毎週チャットで一から説明し直している」) has to be recognised as the 「同じ依頼文や手順書を何度も貼っている」 trigger in s4-table, and c (「もう読まない出力で会話の大半が埋まった」) as the subagent trigger. Option d (「すべてスキルにしておく」) is a fair lure because it echoes the prompt's 「スキルにする」, and s4-pitfall is what refutes it. Every wrong option has feedback. One weakness remains: q2's answer is the key that s2-invoke names just before it.",
       "blockIds": [
         "s4-check",
         "s4-table",
+        "s4-pitfall",
         "s2-check",
         "s2-invoke"
       ]
@@ -75,8 +98,9 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "All 7 misconceptions in the brief appear as distractors whose feedback corrects them in 2 sentences or fewer. Examples: q2 b (「説明文に書いたお願いは、確実に止めるしくみではありません。」), q4 c (「ゼロではありませんが、ふつうはファイルの中身よりずっと小さくなります。」), q5 b, e2 a (「使うかどうかの判断には、説明文が使われます。」) and q6 d. s4-pitfall names the 「最初に全部そろえる」 mistake.",
+      "evidence": "The q6 feedback still fits the rewritten options. a's feedback 「規約やコマンドのまちがいは、CLAUDE.mdに足すきっかけです。」 corrects the 'a repeated command error needs a skill' idea, and c's 「あとで見返さない出力で会話が埋まるのは、サブエージェントのきっかけです。」 matches the new c. d's 「きっかけのない拡張機能は、説明文のぶんだけコンテキストを使い続けます。」 corrects the 'set everything up now' idea. Elsewhere unchanged: all 7 misconceptions in the brief appear as distractors with corrective feedback of 2 sentences or fewer (q2 b, q4 c, q5 b, e2 a), and s4-pitfall names the 「最初に全部そろえる」 mistake.",
       "blockIds": [
+        "s4-check",
         "s2-check",
         "s3-check",
         "check-quiz",
@@ -86,6 +110,7 @@
     {
       "id": "visual",
       "score": 3,
+      "carriedOver": true,
       "evidence": "s1-diagram (5 nodes) and s3-diagram (4 nodes) show a process, and their captions state the takeaway (「読んだ中身はサブエージェント側に残り、メインの会話には要約だけが戻る」). There are no decorative images. But the s1-diagram labels say 「読む」 while the lesson's term is 読み込む (段階的な読み込み). Its alt also describes a branch the diagram does not draw (「それ以外では本文は読み込まれない」), and that is the contrast q1 tests.",
       "blockIds": [
         "s1-diagram",
@@ -95,6 +120,7 @@
     {
       "id": "practice",
       "score": 3,
+      "carriedOver": true,
       "evidence": "The task is authentic: the learner turns their own repeated work into a skill, then compares `/context` before and after delegating. All 7 pr-steps have an expect, pr-prompt gives the delegation text, pr-checklist sets 5 success criteria and pr-model/pr-model-lead give a model answer with its reason. pr-write has only one hint rung (「7-2の `commit-message` を手本に、中身を入れ替えます。」) before the full model answer.",
       "blockIds": [
         "pr-steps",
@@ -107,6 +133,7 @@
     {
       "id": "meta",
       "score": 4,
+      "carriedOver": true,
       "evidence": "summary-points (4 points) comes after the exam. summary-next has a lesson-specific reflection (「スキルにしたい手順と、サブエージェントに任せたい調べものを1つずつ挙げてみましょう」) and names the next lesson by its exact title. It is followed by 6 flashcards and 3 askTutor suggestions.",
       "blockIds": [
         "summary-points",
@@ -118,7 +145,8 @@
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The 4 confirmed findings in audit-cc-07-skills-subagents.json are all applied: q5 d (「スキルはふだん今の会話の中で動くため、脇では進みません。」), q2 d (「フロントマターなどの設定で決めます」), e6 c (「主に」), and the s4 caption is gone. s4-main matches sub-agents.md (\"A subagent that isn't a fork starts fresh and may need time to gather context\"), and the versions are pinned (v2.1.304, v2.1.198). Not scored 4: nothing shows that the folded `description: >-` in s2-skill, s3-file and pr-model loads as written. The saved pages show no folded description, and the commit-message folder in audit-repro-cc-07-skills-subagents is empty.",
+      "carriedOver": true,
+      "evidence": "The 4 confirmed findings in audit-cc-07-skills-subagents.json are all applied: q5 d (「スキルはふだん今の会話の中で動くため、脇では進みません。」), q2 d (「フロントマターなどの設定で決めます」), e6 c (「主に」), and the s4 caption is gone. s4-main matches sub-agents.md (\"A subagent that isn't a fork starts fresh and may need time to gather context\"), and the versions are pinned (v2.1.304, v2.1.198). Not scored 4: nothing shows that the folded `description: >-` in s2-skill, s3-file and pr-model loads as written. The saved pages show no folded description, and the commit-message folder in audit-repro-cc-07-skills-subagents is empty. The q6 rewrite adds no new factual claim.",
       "blockIds": [
         "s3-check",
         "s2-check",
@@ -132,6 +160,7 @@
     {
       "id": "voice",
       "score": 3,
+      "carriedOver": true,
       "evidence": "The text uses です・ます and is warm (「まず予想してみましょう」), and lint finds no banned phrases or long sentences. Katakana terms carry their English on first use (サブエージェント（subagent）, バックグラウンド（background）). Minor inconsistency: s1-diagram's 「読む」 vs 「読み込まれる」 in the text. The ja-editor owns the wording.",
       "blockIds": [
         "hook-b1",
@@ -142,6 +171,7 @@
     {
       "id": "a11y_l10n",
       "score": 4,
+      "carriedOver": true,
       "evidence": "The lesson is jp only and complete, including the diagram labels. Both diagrams have alt text, and the s2-legacy link text is descriptive (「公式ドキュメント（日本語版）」). s4-table is a semantic list of self-contained sentences that fits mobile.",
       "blockIds": [
         "s1-diagram",
@@ -151,15 +181,9 @@
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "active",
-      "blockId": "s4-check",
-      "issue": "q6 (o2, bloom evaluate) can be answered by matching words, which breaks contract §4 (「not recognition of the sentence just read」). Each option paraphrases the s4-table item or s4-pitfall title shown just above it: a 「Claudeが2回まちがえた」, b 「チャットに貼っている」, c 「出力が会話にあふれた」, d 「最初に全部」. A learner can find the answer by searching for 「貼っている」 without judging which tool fits.",
-      "fix": "In q6, keep the ids, the order, the answer (b) and the existing feedback for a, c and d, and rewrite the option text so it describes each situation without the list's wording. a: 「決まったテストのコマンドではなく、別のコマンドをClaudeが今日も実行した」. b: 「リリース前の12ステップの確認を、毎週チャットで一から説明し直している」. c: 「ログの原因調査を頼んだら、もう読まない出力で会話の大半が埋まった」. d: 「まだ困っていないが、思いつく作業を今のうちにすべてスキルにしておく」."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
+    "s4-check q6 explanation: it still quotes the list wording (「何度も貼っている複数ステップの手順は」), while option b now says 「一から説明し直している」. To show the learner the mapping, consider 「毎週一から説明し直している複数ステップの手順は、「何度も貼っている」と同じくスキルにするきっかけです。本文は使うときだけ読み込まれるので、CLAUDE.mdを長くせずにすみます。」 (wording: ja-editor).",
     "factual doubt: none of the saved official pages (skills.md, sub-agents.md) shows a folded `description: >-`, and the commit-message folder in audit-repro-cc-07-skills-subagents is empty. Reproduce s2-skill once in cc-practice and confirm that `/commit-message` appears and loads. If it does not, use single-line descriptions in s2-skill, s3-file and pr-model.",
     "s2-steps ex-description: the `>-` sentence says how to write it but not what it does. Replace with 「長い説明文は、`>-` のあとで改行し、同じ幅で字下げして続けます。数行が1つの説明文になります。1行で書いてもかまいません。」",
     "s1-diagram: add the branch that the alt and q1 rely on, `D -.->|それ以外| F[本文は<br>読み込まない]`. Also change the labels 「全文を読む」/「だけを読む」/「本文を読む」 to 読み込む so they match the term 段階的な読み込み, as far as the mobile width allows.",
@@ -167,9 +191,9 @@
     "hook-predict: add a second ungraded prediction for the other problem in hook-b1, e.g. 「Claudeにサブエージェントで40個のファイルを読んでもらうと、メインの会話には何が残ると思いますか？」",
     "s2-check q2: the answer is the key that s2-invoke names just before it. To make it less of a recall item, consider asking which of three skills (deploy-prod, summarize-changes, test-report) should get `disable-model-invocation: true`.",
     "s3-file-lead: `tools: Read, Grep, Glob` is not explained, but e6 d relies on it (「読み取り用にしぼっていた」). Change the end to 「`tools` でツールをしぼれます（例は、読み取りと検索だけ）。」",
-    "Brief content/courses/claude-code/briefs/cc-07-skills-subagents.md is stale. Its heading still says vibe-coding/cc-07-skills-subagents, and its Format line quotes 「prose 1975」, but measure.mjs now reports 「prose 2167」. Update both so later rounds read the right baseline."
+    "The brief content/courses/claude-code/briefs/cc-07-skills-subagents.md is still stale. Line 1 reads 「# Brief: vibe-coding/cc-07-skills-subagents」, and the minutes line quotes 「prose 1975 … read 2613 … est 17.9 min」, but measure.mjs now reports 「prose 2167 … read 2594 … est 17.8 min」. Update both so later rounds read the right baseline."
   ],
-  "average": 3.38,
-  "verdict": "revise",
-  "summary": "Full review: the earlier review chain was recorded under the old vibe-coding/drafts path, and the content (lessonHash sha256:f8e6497346002dd9) has not changed since. Validate and lint --strict are clean, and measure.mjs reports 「prose 2167 (budget 1,200–2,400) · est 17.8 min」. The lesson's strengths are a well-reasoned worked example in 7-2, distractors built from real misconceptions with corrective feedback, and an authentic practice task with a checklist and a model answer. One must-fix remains: q6, the only inline evaluate item for o2, can be answered by matching words from s4-table. Rewrite its options as given above. Every criterion scores 3 or more and the mean is 3.38, so the verdict is revise only because of this item."
+  "average": 3.46,
+  "verdict": "pass",
+  "summary": "Verification round: review-scope.mjs exited 0, and only s4-check (q6) changed, 1 of 39 blocks (2%). The one open must-fix is resolved. q6's options now describe situations without the s4-table and s4-pitfall wording, so the evaluate item needs judgment instead of word matching. The ids, order, answer b and feedback are unchanged, and the feedback still fits each new option. Validate and lint --strict are clean, and measure.mjs reports 「prose 2167 (budget 1,200–2,400) · est 17.8 min (must be ≤ 20; estMinutes 18)」. active moves from 3 to 4 and miscon was re-scored at 4. The other scores are carried over. Every criterion is 3 or more, the mean is 3.46 and there is no must-fix, so the verdict is pass. The remaining items are niceToHave."
 }

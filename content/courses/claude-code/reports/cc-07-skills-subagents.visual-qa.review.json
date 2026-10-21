@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-07-skills-subagents",
   "file": "content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json",
-  "lessonHash": "sha256:f8e6497346002dd9",
+  "lessonHash": "sha256:0ffacf7c3db87313",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,27 +9,46 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Both mermaid figures (図1 skill loading, 図2 subagent round trip) are flowchart TD with short Japanese labels that stay readable at 390 px (pages/mobile-jp-04.png, pages/mobile-jp-12.png, pages/mobile-jp-13.png). The term tables, code blocks with highlighted frontmatter lines, steps, prompt and checklist all render cleanly with no overflow on mobile or desktop."
+      "evidence": "Both mermaid flowcharts (s1-diagram, s3-diagram) use flowchart TD and are readable at 390 px with Japanese labels and captions (pages/mobile-jp-04.png, pages/mobile-jp-12.png, pages/mobile-jp-13.png). The code blocks s2-skill, s3-file and pr-model fit with their highlights visible (pages/mobile-jp-06.png, pages/mobile-jp-14.png, pages/mobile-jp-23.png). metrics.json shows no overflow, broken images, mermaid errors or unknown blocks.",
+      "blockIds": [
+        "s1-diagram",
+        "s3-diagram",
+        "s2-skill",
+        "s3-file",
+        "pr-model"
+      ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "metrics.json shows textOnlyScreens empty on both devices and a desktop median of 39 chars per line, inside the 30–40 target. Every screen pairs prose with a table, figure, code, steps or a check, so there are no walls of text and no empty gaps."
+      "evidence": "textOnlyScreens is empty on both desktop-jp and mobile-jp. Text alternates with definitions, diagrams, code, steps and quizzes, with no walls of text (pages/mobile-jp-03.png to pages/mobile-jp-21.png). Desktop JP charsPerLine median is 39, inside the 30–40 target.",
+      "blockIds": [
+        "s1-defs",
+        "s2-steps",
+        "pr-steps",
+        "s4-table"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The Japanese-only lesson shows no stray untranslated UI strings, and the diagram labels are in Japanese. Contrast is good across callouts, quizzes and code. Controls stay clear of the 56 px top bar and 60 px bottom bar (pages/mobile-jp-10.png, pages/mobile-jp-31.png), and no screen shows personal data."
+      "evidence": "The lesson is Japanese-only and every screen shows consistent Japanese text. Diagram labels are in Japanese and large enough to read, contrast is good on code and callouts (pages/mobile-jp-17.png), and the bottom bar hides no control: each Answer button is reachable on the next screen. No personal data appears on any screen: the desktop sidebar shows only the EN/JP switch and icons (pages/desktop-jp-01.png).",
+      "blockIds": [
+        "s1-diagram",
+        "s3-diagram",
+        "s4-pitfall"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "On pages/mobile-jp-24.png, exam question 1 options 1 and 2 wrap the paths ~/.claude/skills/api-guide/SKILL.md and .claude/skills/api-guide/SKILL.md inside their chips at 'api-'. Both break at the same point, so the paths can still be compared. If the author wants them on one line, shortening the skill name (for example 'api') would keep each chip whole.",
-    "On pages/mobile-jp-18.png, the practice heading '演習：自分の手順をスキルにし、調べものを任せる' breaks as 'スキルに / し、' at 390 px. A slightly shorter heading (for example '演習：手順をスキルにし、調べものを任せる') would avoid the break inside 'にし'.",
-    "reader: on pages/mobile-jp-06.png, the soft-wrapped continuation of SKILL.md line 12 ('で、') starts at the code column with no visible hanging indent past the list marker. This is readable but differs from the hanging indent the reader is meant to apply.",
-    "reader: the full-length mobile-jp.png is cut off at 16000 px (pageHeight 22217); this review used the per-screen PNGs instead. 14 failed /api/ requests were ignored as environment noise."
+    "check-quiz (e1): at 390 px the path chips `~/.claude/skills/api-guide/SKILL.md` and `.claude/skills/api-guide/SKILL.md` wrap at the hyphen as \"api-\" / \"guide/SKILL.md\", which makes them a little harder to compare with option 4 `.claude/skills/api-guide.md` (pages/mobile-jp-24.png, pages/mobile-jp-25.png). They are still readable. Possible fix: put the difference in plain text, for example 「ホームフォルダの `~/.claude/skills/` に置く」 and 「プロジェクトの `.claude/skills/<名前>/SKILL.md` に置いてコミットする」, or use a shorter skill name.",
+    "section practice title: at 390 px 「演習：自分の手順をスキルに / し、調べものを任せる」 breaks between 「に」 and 「し」 (pages/mobile-jp-18.png). A shorter title such as 「演習：手順をスキルにし、調べものを任せる」 or 「演習：スキル作りと調べものの依頼」 would break more cleanly.",
+    "s2-skill: at 390 px source line 12 soft-wraps so that only 「で、」 sits on the continuation row (pages/mobile-jp-06.png). It is still readable; moving 「で、」 to line 13 in the source would avoid the orphan.",
+    "s4-check (q6) option 1: on desktop the last character 「た」 sits alone on the second line (pages/desktop-jp-12.png). Shortening it slightly (e.g. 「決まったテストのコマンドではなく、別のコマンドをClaudeが今日も使った」 to 「…今日も実行」 or similar) would avoid the orphan.",
+    "reader: the full-length mobile PNG stops at 16000 px (pageHeight 22293), so only the per-screen PNGs show the whole page; 14 failed /api/ requests were ignored as environment noise."
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "The screenshots match the lesson under review (lessonHash sha256:f8e6497346002dd9 from metrics.json), and every hard-failure count in metrics.json is zero (overflow, console, mermaid, unknown-block and broken-image). The biggest strength is the steady visual rhythm: each concept comes with a term table or a vertical diagram, a highlighted code example and a check, and all of it stays readable at 390 px. Nothing needs fixing; the only minor polish is the long path chips in exam question 1 and one heading line break on mobile."
+  "summary": "The screenshots show the lesson at lessonHash sha256:0ffacf7c3db87313 (copied from metrics.json). There are no hard failures, and both flowcharts and all code blocks are readable at 390 px. The lesson alternates text, diagrams, code, steps and quizzes on every screen. Only small line-break nits remain, the main one being the long path chips in exam question e1 wrapping at the hyphen on mobile. No personal data appears on any screen."
 }

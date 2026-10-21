@@ -77,3 +77,4 @@
 
 ### After publishing (2026-10-21)
 - After publishing, a full pedagogy review found q6 answerable by matching words: its four options now describe situations without the s4 list wording (answer, ids and feedback unchanged).
+- q6 option endings unified to 「〜ている」 (ja-editor).

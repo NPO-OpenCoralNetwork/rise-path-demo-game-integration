@@ -1,17 +1,18 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:262fc82916e86736",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
-  "lessonHash": "sha256:c5dc598ce3ba8cf6",
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout. Wrong-option feedback stays within 2 sentences, and the options in each question share the same form. One notation rule is broken: in s4-check, option c quotes the report text with 『』 rather than 「」, while the prompt quotes the same text with 「新しい課題はありません」. A few lines are clipped: p1-steps-write (p-run) has 「プランでなくAPIの料金です（第10回）。」, s2-lead has 「追加にします」 and the s2-code comment reads 「# 未追跡に出さない」. These are still readable, so the score is 3.",
+      "evidence": "The lesson uses です・ます throughout and has no pressure phrases. Every piece of wrong-option feedback is at most 2 sentences. The s4-check fix holds: option c now reads 「新しい課題がないときは、「新しい課題はありません」と報告させる指示」, so all quotes use 「」. In e5 option b, 『更新なし』 sits inside the option's 「」, which is correct nesting. The rebalanced options are parallel in form. In e3 each item appears in exactly two options: --bare, Bash, Bash(npm test *), bypassPermissions and dontAsk. In e5 all four options end in 「…返して」. A few lines are still clipped but readable: in p1-steps-write (p-run), 「プランでなくAPIの料金です（第10回）。」; in s2-lead, 「追加にします」; in the s2-code comment, 「# 未追跡に出さない」.",
       "blockIds": [
         "s4-check",
+        "check-quiz",
         "p1-steps-write",
         "s2-lead",
         "s2-code"
@@ -20,27 +21,29 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 2265 (budget 1,200–2,400), read 2653, practice reading 1246, 11 questions, 2 practice sections and est 20.0 min (must be ≤ 20). estMinutes is 20, so they match. lessons:lint --strict reports 0 errors and 0 warnings. Each segment adds at most 3 new terms: s1-defs adds ワークツリー and バックグラウンド実行, s3-lead adds 非対話的実行, and s4-defs adds 無人実行 and 定期タスク. Long material is split into lists: s3-table and s4-four.",
+      "evidence": "measure.mjs reports prose 2265 (budget 1,200–2,400), read 2653, practice reading 1246, 11 questions, 2 practice sections and est 20.0 min (must be ≤ 20). This matches estMinutes 20. lessons:lint --strict reports 0 errors and 0 warnings. Each segment adds at most 3 defined terms: s1-defs adds ワークツリー and バックグラウンド実行, s3-lead adds 非対話的実行, and s4-defs adds 無人実行 and 定期タスク. The flag explanations and the four checks are split into lists (s3-table, s4-four). Every screen has a heading, a list, code or a check.",
       "blockIds": [
         "lesson",
         "s1-defs",
         "s3-table",
-        "s4-defs"
+        "s4-four"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The terms are defined before they are used. Katakana terms get English on first use: ワークツリー（worktree）, バックグラウンド実行（background execution）, トークン（token…）, シェル（shell…）, エージェントビュー（agent view…）. API is spelled out in p1-steps-write. The 第N回 references match content/courses/claude-code/course.json: 第2・4・6・7・8・10回. 分類器 and 信頼の確認 come from 第1・2回. Small gaps: in objective o2, 継続的インテグレーション has no English. In check-quiz e1, 「今の会話」 differs from the glossary's 「メインの会話」. Neither is likely to confuse the learner.",
+      "evidence": "Prerequisites are listed, and the 第N回 back-references match the course. Defined terms come before use and match the glossary. Most katakana terms get English on first use: ワークツリー（worktree）, トークン（token…）, シェル（shell…）, エージェントビュー（agent view…）; API is spelled out. Three katakana terms appear for the first time in the course without English, against §2. I searched cc-01 to cc-08 and found none of them. フラグ first appears in s3-mode and is central to the lesson: it appears 12 times, including in card-flags. 依存パッケージ first appears in s1-table. クローン appears in check-quiz e4. Smaller gaps: in objective o2, 継続的インテグレーション has no English. In e1, 「今の会話」 differs from the glossary's 「メインの会話」.",
       "blockIds": [
-        "lesson",
-        "check-quiz"
+        "s3-mode",
+        "s1-table",
+        "check-quiz",
+        "lesson"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The one declared locale (jp) is complete. Lint reports no locale-plain-string findings. The only link, in s3-mode, names its destination: 「公式ドキュメント（非対話的実行）」. There are no diagram labels to localize.",
+      "evidence": "The only declared locale, jp, is complete. Lint reports no locale-plain-string findings. The only link, in s3-mode, names its destination: 「公式ドキュメント（非対話的実行）」. The lesson has no diagram labels.",
       "blockIds": [
         "s3-mode"
       ]
@@ -48,22 +51,34 @@
   ],
   "mustFix": [
     {
-      "criterion": "voice",
-      "blockId": "s4-check",
-      "issue": "(d) Notation (style-guide §3, quotes in 「」): option c quotes the report text with 『』, which is not nested inside another 「」. The prompt and the explanation quote the same kind of report with 「」.",
-      "fix": "「新しい課題がないときは、『新しい課題はありません』と報告させる指示」→「新しい課題がないときは、「新しい課題はありません」と報告させる指示」"
+      "criterion": "prior",
+      "blockId": "s3-mode",
+      "issue": "(d) §2 katakana with English on first use: this is the first use of 「フラグ」 in the course (it is not in cc-01 to cc-08), and it has no English or gloss. The term is used 12 times in this lesson, including the objective-level card-flags.",
+      "fix": "「下の例は、5つのフラグで安全にしています。」→「下の例は、5つのフラグ（flag、`--` で始まる指定）で安全にしています。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "s1-table",
+      "issue": "(d) §2 katakana with English on first use: this is the first use of 「パッケージ」 in the course, in 「依存パッケージ」, and it has no English. The term comes back in s2-steps, s2-check and card-deps.",
+      "fix": "「依存パッケージを入れ直し、取り込みは自分でします。」→「依存パッケージ（package、プログラムが使う部品）を入れ直し、取り込みは自分でします。」"
+    },
+    {
+      "criterion": "prior",
+      "blockId": "check-quiz",
+      "issue": "(d) §2 katakana with English on first use: e4 uses 「クローン」 with no English. It does not appear in earlier lessons, and the Git prerequisite covers only commit, branch and merge.",
+      "fix": "「よく知らない公開リポジトリをクローンし、中身を確かめる前に `claude -p` で要約させたいとします。」→「よく知らない公開リポジトリを、手元にクローン（clone）しました。中身を確かめる前に `claude -p` で要約させたいとします。」"
     }
   ],
   "niceToHave": [
     "lesson: (o2) The katakana part of the expanded abbreviation has no English — 「CI（継続的インテグレーション）などで使う安全な claude -p コマンドを書ける」→「CI（continuous integration、継続的インテグレーション）などで使う安全な claude -p コマンドを書ける」",
-    "p1-steps-write: (p-run) The sentence has no subject, and 「プラン」 is shorter than the course's term 「有料プラン」 (cc-01) — 「プランでなくAPIの料金です（第10回）。」→「料金は有料プランでなく、APIの従量課金になります（第10回）。」",
+    "p1-steps-write: (p-run) The sentence has no subject, and 「プラン」 is shorter than the course term 「有料プラン」 — 「プランでなくAPIの料金です（第10回）。」→「料金は有料プランでなく、APIの従量課金になります（第10回）。」",
     "s2-lead: 「追加にします」 is clipped — 「練習では、2つの作業を小さなファイルの追加にします。」→「練習では、2つの作業を小さなファイルの追加に置き換えます。」",
-    "check-quiz: (e1) Match the glossary term 「メインの会話」 — 「今の会話に入るのは、依頼文と要点だけです（第7回）。」→「メインの会話に入るのは、依頼文と要点だけです（第7回）。」",
-    "check-quiz: (e3) Explain the shorthand before the question — 「`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
+    "check-quiz: (e1) Use the glossary term 「メインの会話」 — 「今の会話に入るのは、依頼文と要点だけです（第7回）。」→「メインの会話に入るのは、依頼文と要点だけです（第7回）。」",
+    "check-quiz: (e3) Explain the shorthand before asking — 「`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
     "p1-task: Use the same word as s2-code — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
     "s2-code: The code comment is terse — 「# 未追跡に出さない」→「# ワークツリーを未追跡ファイルに出さない」"
   ],
   "average": 3.5,
-  "verdict": "fail",
-  "summary": "Full review of the published file (hash sha256:c5dc598ce3ba8cf6). lessons:lint --strict is clean. measure.mjs gives prose 2265 and est 20.0 min, with estMinutes 20. The scores are voice 3, load 4, prior 3 and a11y_l10n 4, so the mean is 3.5. The verdict is fail because there is one must-fix. It is a notation break (d): in s4-check, option c uses 『』 where §3 asks for 「」. Earlier rounds did not catch it. Changing the two characters is enough to pass. The niceToHave items from earlier rounds are still open and are optional. audit-cc-09-parallel-automation.json lists no claim that still needs a fix."
+  "verdict": "revise",
+  "summary": "Full review of hash sha256:262fc82916e86736. lessons:lint --strict is clean. measure.mjs reports prose 2265 and est 20.0 min, which matches estMinutes 20. The previous fixes are in place: s4-check now uses 「」, and the e3 and e5 options are balanced and parallel. Scores: voice 3, load 4, prior 3, a11y_l10n 4. The mean is 3.5. The verdict is revise because of three (d) §2 must-fix items that earlier rounds missed: 「フラグ」 (s3-mode), 「依存パッケージ」 (s1-table) and 「クローン」 (check-quiz e4) are katakana terms used for the first time in the course without English. Each fix is a one-line insertion. The niceToHave items carried over from earlier rounds are optional. audit-cc-09-parallel-automation.json lists no claim that needs a fix."
 }
