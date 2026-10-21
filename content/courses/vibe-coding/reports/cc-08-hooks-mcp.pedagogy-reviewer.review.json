@@ -1,10 +1,33 @@
 {
   "lessonId": "cc-08-hooks-mcp",
   "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:542dc5e44070249d",
+  "lessonHash": "sha256:01fa366fee4752fb",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:542dc5e44070249d",
+    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/542dc5e44070249d/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "s1-config",
+      "s2-script",
+      "s2-steps",
+      "s2-test",
+      "s4-add",
+      "practice-steps",
+      "practice-model-script"
+    ],
+    "changedShare": 0.08,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "practice-steps",
+      "criterion": "practice",
+      "status": "resolved",
+      "evidence": "The p-script troubleshoot now reads 「`/hooks` に出ないときは、例題の②と同じく、JSONの余計なカンマなどを直し、Claude Codeを再起動します。手で試して `Permission denied` と出たら、`chmod +x` を実行します。」 It says the same as the ex-register troubleshoot and keeps the missing-from-list failure apart from the permission failure."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -18,7 +41,8 @@
         "s5-check",
         "practice-b-quiz",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -27,7 +51,8 @@
       "blockIds": [
         "hook-problem",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -40,13 +65,15 @@
         "s4-defs",
         "s5-defs",
         "s3-pitfall"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs prints 「prose 1852 (budget 1,200–2,400) · read 2838 · practice reading 1092 · questions 10 · practice sections 1 · est 17.4 min (must be ≤ 20; estMinutes 17)」, and estMinutes 17 matches; lint shows 0 warnings and every segment has at most 3 terms. The load is still uneven: the practice section holds two tasks in 11 blocks, the q9 stem is one paragraph of about 190 characters, and s3 says 「exit 0 は許可ではない」 twice (s3-table and s3-zero).",
+      "evidence": "measure.mjs prints 「prose 1892 (budget 1,200–2,400) · read 2878 · practice reading 1093 · questions 10 · practice sections 1 · est 17.5 min (must be ≤ 20; estMinutes 17)」. Unrounded, the estimate is 17.49, so estMinutes 17 still matches. s1-config now takes the pipe apart in two sentences (「`jq -r '.tool_input.file_path'` が…取り出します。`xargs npx prettier --write` が、そのパスをPrettierに渡します」), which lowers the load. Lint shows 0 warnings. The unchanged load issues remain: two tasks in the practice section, a q9 stem of about 190 characters, and 「許可ではない」 said twice in s3.",
       "blockIds": [
+        "s1-config",
         "practice",
         "practice-b-quiz",
         "s3-table",
@@ -56,13 +83,11 @@
     {
       "id": "worked",
       "score": 4,
-      "evidence": "s2 is a complete worked example with subgoal titles, and each step gives its reason: ex-script says 「`exit 2` は「止める」の合図で…」, ex-register explains `$CLAUDE_PROJECT_DIR`, ex-test says 「JSONの中の `rm` は文字として渡るだけ」. Every step has an observable expect. The practice then fades it (「例題と違うのは、マッチャーと取り出す項目です」), and q5 transfers it.",
+      "evidence": "The s2 worked example is still complete and now more precise. ex-test says 「下の③の最初の4行は1つのコマンドで」, which matches the reformatted s2-test (4 lines up to `.claude/hooks/block-rm.sh`, then `echo $?`). Its expect names what to swap (「`rm notes.txt` を `ls` に変えると `0` です」). The practice fades it with the same JSON layout (p-predict: 「`\"command\": \"rm notes.txt\"` は、`\"file_path\": \".env\"` にします」).",
       "blockIds": [
-        "s2-steps",
         "s2-script",
-        "s2-settings",
+        "s2-steps",
         "s2-test",
-        "practice-task",
         "practice-steps"
       ]
     },
@@ -76,7 +101,8 @@
         "s3-check",
         "s5-check",
         "practice-b-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -90,7 +116,8 @@
         "check-quiz",
         "s5-check",
         "practice-prompt"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -103,18 +130,18 @@
         "s5-checks",
         "practice-b-model",
         "practice-b-model-b"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
-      "score": 3,
-      "evidence": "The task is authentic and faded. Each step has an expect, the hints build up (step hint → troubleshoot → model answer), there are model answers for both halves and a 5-item self-check, and the p-predict hint now says 「渡す先は `.claude/hooks/protect-files.sh` にします」. The new p-script troubleshoot is misleading, though: it says to check `chmod +x` when the hook does not appear in `/hooks`, and it leaves out the restart that 「例題の②と同じく」 points to (see mustFix).",
+      "score": 4,
+      "evidence": "The task is authentic and faded, and each step has an observable expect. The hints build up from step hint to troubleshoot to model answer, and the troubleshoot is now correct (「…JSONの余計なカンマなどを直し、Claude Codeを再起動します。手で試して `Permission denied` と出たら、`chmod +x` を実行します。」). The p-predict hint can now be applied without guessing (「`\"Bash\"` を `\"Edit\"` に変えます」), and practice-checklist gives 5 success criteria. practice-model-script still produces the message the practice-prompt expect quotes (「Blocked: …/.env matches protected pattern '.env'」).",
       "blockIds": [
         "practice-steps",
         "practice-prompt",
         "practice-model-script",
         "practice-model-settings",
-        "practice-b-quiz",
         "practice-checklist"
       ]
     },
@@ -127,19 +154,20 @@
         "summary-next",
         "summary-cards",
         "summary-tutor"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
-      "score": 3,
-      "evidence": "All 5 audit findings are fixed in the text. s3-pitfall now says 「ふつう止まらず」 and names `onFailure`. q3 says 「`onFailure` は設定していません」. q6's prompt mentions stderr, and its d feedback now says 「`PostToolUse` の `exit 2` で」. s1-config reads 「処理（ここではコマンド）」, and the p-script expect no longer says the matcher appears. s5-risk now reads 「あなたのPCのユーザー権限」, the version is pinned to v2.1.304, and the brief records re-running every script. The troubleshoot imprecision is listed under practice.",
+      "score": 4,
+      "evidence": "The changed code is still correct. s4-add `claude mcp add --transport http \\ notion https://mcp.notion.com/mcp` matches the documented form 「`claude mcp add --transport http <name> <url>`」 (facts-cc-08-hooks-mcp.md). Dropping `// empty` in s2-script and practice-model-script changes nothing for the `Bash` and `Edit|Write` matchers, because those keys are always present. Following the p-predict hint, a `.env` path gives exit 2 and `README.md` gives exit 0, as the expect says. All earlier audit findings stay fixed.",
       "blockIds": [
-        "s3-pitfall",
-        "s3-check",
-        "check-quiz",
-        "s1-config",
+        "s2-script",
+        "s2-test",
+        "s4-add",
+        "practice-model-script",
         "practice-steps",
-        "s5-risk"
+        "s1-config"
       ]
     },
     {
@@ -151,7 +179,8 @@
         "practice-b-model",
         "summary-cards",
         "s2-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -162,28 +191,21 @@
         "summary-next",
         "practice-checklist",
         "practice-prompt"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "practice",
-      "blockId": "practice-steps",
-      "issue": "The new p-script troubleshoot (「`/hooks` に出ないときは、例題の②と同じく、JSONのカンマと `chmod +x` を確かめます。」) mixes up two failures. `/hooks` is a read-only list of configured hooks (audit quote from hooks.md), so a missing `chmod +x` makes the hook fail to start; it does not hide it from the list. ex-register, which this troubleshoot points to, says exactly this (「許可がないとフックは起動せず、何も止まりません。一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。」). A learner whose hook is missing because the settings were not reloaded checks commas and chmod, finds both fine, and is not told to restart.",
-      "fix": "Set p-script troubleshoot to: \"`/hooks` に出ないときは、例題の②と同じく、JSONの余計なカンマなどを直し、Claude Codeを再起動します。手で試して `Permission denied` と出たら、`chmod +x` を実行します。\""
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s3-check q3: answer b (「フックでは止まらず、「hook error」の通知が出て編集が進む」) repeats the s3-table cell 「止めないエラー。ふつうは進み、「hook error」の通知が出る」, so a learner can pick it by the phrase 「hook error」. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\". Then the learner must know what exit 1 does, and b still contrasts with d (「確認なしで編集が許可される」).",
-    "s4 (`claude mcp add`, scopes) is covered by no objective and no question, yet summary-points[2] and card-scopes are about it. Either tie it to o3 (for example a q8 distractor about committing to `.mcp.json` at `project` scope instead of trying it at `local` scope first) or cut summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
-    "s3-zero repeats the s3-table cell 「（許可ではない）」. Make the table cell \"進む。表示はなく、ふだんの権限の確認へ\", and let s3-zero carry the correction plus its consequence: \"`exit 0` は止めないだけで、許可ではありません。Manualモードなら、ふだんどおり確認が出ます。`exit 2` は、どの権限モードでも操作を止めます。\"",
-    "s3-pitfall: `onFailure` appears without a gloss. Use \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
-    "practice-steps p-predict hint: the example JSON keeps `\"tool_name\":\"Bash\"` while it carries a `file_path`. The script ignores the tool name, but a test that looks like an edit is clearer: \"例題のテストのコマンドを使います。`tool_name` を `\\\"Edit\\\"` に、`tool_input` を `{\\\"file_path\\\":\\\".env\\\"}` に変えます。渡す先は `.claude/hooks/protect-files.sh` にします。\"",
-    "check-quiz q8: q4 taught that what runs (実行内容) is the first thing to check, but q8's explanation names only the origin, the author and the permission rules. Add to the explanation: \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\"",
-    "practice-b-quiz q9: the stem is one paragraph of about 190 characters, over the 160 paragraph budget, which lint does not check in stems. Move the two candidate descriptions into practice-b-task (one sentence group for A, one for B) and keep the stem as \"架空の2候補について、いちばん適切な判断はどれでしょう？\".",
-    "The practice section holds two separate tasks (build the .env hook, then evaluate two candidates) in 11 blocks. Splitting the evaluation into its own practice section would ease the load. This is a structural change and would need a full review."
+    "s4-add (changed): the comment now reads `# claude mcp add <名前> -- <コマンド>`, but the s4 prose says 「`--` の後に起動コマンドを書きます」. If the code width allows, set it to \"# claude mcp add <名前> -- <起動コマンド>\" so the two use the same term.",
+    "s3-check q3 (unchanged): option b repeats the s3-table phrase 「hook error」, so a learner can pick it by that phrase alone. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\".",
+    "s4 (unchanged): no objective or question covers scopes, yet summary-points[2] and card-scopes are about them. Either tie scopes to o3 with a q8 distractor about committing to `.mcp.json` at `project` scope before trying the server at `local` scope, or cut summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
+    "s3-zero (unchanged): it repeats the table cell 「（許可ではない）」. Make the s3-table cell \"進む。表示はなく、ふだんの権限の確認へ\".",
+    "s3-pitfall (unchanged): gloss `onFailure` on first use: \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
+    "check-quiz q8 (unchanged): add to the explanation \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\" so q8 also names what runs, which q4 taught as the first check.",
+    "practice-b-quiz q9 (unchanged): the stem is about 190 characters, over the 160-character paragraph budget. Move the two candidate descriptions into practice-b-task and keep the stem as \"架空の2候補について、いちばん適切な判断はどれでしょう？\"."
   ],
-  "average": 3.62,
-  "verdict": "revise",
-  "summary": "Full review: review-scope.mjs exited 1 (25 of 49 blocks changed, 51%, over 30%). The previous must-fix is fixed: the p-predict hint now pipes the JSON to protect-files.sh. All 5 audit findings and most earlier suggestions are applied (`onFailure` exception, 「処理（ここではコマンド）」, 「あなたのPCのユーザー権限」, the deny-rule mention in q0 and s1-lead), and the worked example → faded practice → transfer exam chain is strong. One fix remains: the new p-script troubleshoot says to check `chmod +x` when a hook is missing from `/hooks` and leaves out the restart. It should match ex-register."
+  "average": 3.77,
+  "verdict": "pass",
+  "summary": "Verification round: review-scope.mjs exited 0 (7 of 49 blocks changed, 8%). The one open must-fix is resolved: the p-script troubleshoot now matches ex-register (restart for a missing hook, `chmod +x` for `Permission denied`). I reviewed all 7 changed blocks in full and found no new errors. ex-test's 「最初の4行」 matches the reformatted s2-test, the p-predict hint applies the earlier suggestion, and the scripts still produce the outputs the lesson expects. validate and lint --strict are clean. measure.mjs shows est 17.5 (17.49 unrounded), which matches estMinutes 17. Every criterion is 3 or higher, and the mean is 3.77."
 }

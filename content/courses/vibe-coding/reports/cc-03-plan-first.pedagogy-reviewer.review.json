@@ -1,30 +1,18 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:2a26cb723101d339",
+  "lessonHash": "sha256:a69e9dc117810e75",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:c61b1076cf96439d",
-    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/c61b1076cf96439d/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:2a26cb723101d339",
     "changed": [
-      "s1-lead",
-      "s1-table",
-      "s1-rich",
-      "s2-enter",
-      "s4-lead",
-      "s4-good-spec",
-      "s4-table",
-      "s4-community",
-      "practice-setup",
-      "practice-starter",
-      "practice-steps",
-      "summary-points",
-      "lesson.estMinutes"
+      "practice-starter"
     ],
-    "changedShare": 0.17,
-    "fullReviewRequired": false
+    "changedShare": 0.02,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/2a26cb723101d339/round-1/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
@@ -61,13 +49,15 @@
         "s1-table",
         "s4-defs",
         "s3-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs prints 「prose 2399 (budget 1,200–2,400) · read 3065 · practice reading 1452 · questions 8 · practice sections 2 · est 19.4 min (must be ≤ 20; estMinutes 19)」. So estMinutes now matches the rounded estimate, but body prose sits 1 char under the cap: turning the two tables into sentence lists added prose. Lint shows 0 warnings. s2 still holds 8 blocks.",
+      "evidence": "measure.mjs still prints 「prose 2399 (budget 1,200–2,400) · read 3065 · practice reading 1452 · questions 8 · practice sections 2 · est 19.4 min (must be ≤ 20; estMinutes 19)」, so the code-only change to practice-starter did not move the budget. It stays at 25 lines (the cap): splitting `const li =` over 2 lines offsets the removed blank line. Lint --strict shows 0 errors and 0 warnings. Body prose is still 1 char under the cap, and s2 still holds 8 blocks.",
       "blockIds": [
+        "practice-starter",
         "s1-table",
         "s4-table",
         "s2-defs",
@@ -115,21 +105,21 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s2-flow is still a 5-node process diagram with the 「直したい点がある」 loop, a takeaway caption and descriptive alt text. Turning s1-table and s4-table into short bullet lists fits their content, since each item is one rule and needs no second column. practice-starter's highlight [14–18] now matches the addItem function after the lines were rewrapped (line 14 is 「function addItem(text) {」 and line 18 is its closing brace). There are no decorative images.",
+      "evidence": "practice-starter's new highlight [13–18] matches addItem exactly: line 13 is 「  function addItem(text) {」, lines 14–15 are the split 「const li =」 / 「document.createElement('li');」, and line 18 is the closing brace. This points the learner to the 既存のパターン that pr-rewrite's troubleshoot (「`todo.html` で項目を作っている関数です」) and practice-model (「今あるaddItem関数」) rely on. s2-flow is unchanged: a 5-node process diagram with the 「直したい点がある」 loop, a takeaway caption and descriptive alt text. There are no decorative images.",
       "blockIds": [
+        "practice-starter",
         "s2-flow",
         "s1-table",
-        "s4-table",
-        "practice-starter"
+        "s4-table"
       ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The setup is now unambiguous. practice-setup has 「# ここでtodo.htmlを保存」 between git init and git add, and pr-setup says 「最初の3行でフォルダーを作り、その中に `todo.html` を保存します。最後の2行でコミットしてから…」. The checklist, the model marked 「書いてから見比べましょう」, and expect, hint and troubleshoot on ② and ④ are unchanged. As before, the hint ladder has 2 levels, not 3, and ps-ask's expect leaves out 「当たり前の質問はしない」, which c2-depth requires.",
+      "evidence": "The starter still supports every step. Pressing 追加 with an empty input still calls addItem('') and adds an empty li, so pr-setup's expect 「空の行が増えます。」 holds. addItem is still the only item builder, so practice-model's 「ボタンもaddItemの中で作ってください」 and its expect 「addItemの中でボタンを作る手順」 still apply. Switching to `addBtn.onclick` changes nothing that pr-explore or pr-explain depend on. As before, the checklist and the model marked 「書いてから見比べましょう」 are in place, the hint ladder has 2 levels rather than 3, and ps-ask's expect leaves out 「当たり前の質問はしない」, which c2-depth requires.",
       "blockIds": [
-        "practice-setup",
         "practice-starter",
+        "practice-setup",
         "practice-steps",
         "practice-checklist",
         "practice-model",
@@ -146,7 +136,8 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
@@ -158,7 +149,8 @@
         "s4-lead",
         "s2-enter",
         "summary-cards"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -168,7 +160,8 @@
         "s4-community",
         "s4-table",
         "s1-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -183,8 +176,9 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s1-table: turning it into a list removed the official per-perspective rewrite examples (for example 「`foo.py` のテストで、ログアウト中の場合を扱う」), so o1 now has one worked rewrite (s1-example) before q1. If prose allows, add a short example to the 症状 item, which q1 tests: 「**症状**には、起きていること、場所の見当、直った状態を書きます（例：タイムアウト後にログインできない。`src/auth/` を調べて直す）。」. Prose is at 2399 of 2,400, so trim the same amount elsewhere.",
-    "s1-lead: the change dropped the reason the 4 perspectives matter (「依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。」). The lead now only says Claude cannot read minds. Consider restoring the dropped sentence, or append 「だから、範囲や症状を言葉で渡します。」.",
+    "practice-starter (new): dropping placeholder=\"やること\" leaves the practice page with an unlabeled text box beside 追加. If line width allows, restore it as `<input id=\"item\" placeholder=\"やること\">`, or leave it as is, since pr-setup only asks the learner to press 追加 with an empty input.",
+    "s1-table: turning it into a list removed the official per-perspective rewrite examples (for example 「`foo.py` のテストで、ログアウト中の場合を扱う」), so o1 has only one worked rewrite (s1-example) before q1. If prose allows, add a short example to the 症状 item, which q1 tests: 「**症状**には、起きていること、場所の見当、直った状態を書きます（例：タイムアウト後にログインできない。`src/auth/` を調べて直す）。」. Prose is at 2399 of 2,400, so trim the same amount elsewhere.",
+    "s1-lead: an earlier change dropped the reason the 4 perspectives matter (「依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。」). The lead now only says Claude cannot read minds. Consider restoring the dropped sentence, or append 「だから、範囲や症状を言葉で渡します。」.",
     "summary-points point 3: the shortened text drops 複数のファイル, and 「迷う変更」 is vaguer than s2-when's 「進め方に迷うとき」. Consider 「差分を1文で説明できる変更は直接頼み、進め方に迷う変更や、複数のファイル・よく知らないコードを変えるときは計画します。」.",
     "pr-setup: 「最初の3行でフォルダーを作り」 also covers git init, which does not create a folder. Consider 「最初の3行でフォルダーを作ってGitを始め、その中に `todo.html` を保存します。」.",
     "check-quiz e5 (carried over): the item reuses the s4 scenario (家計簿アプリの予算), so it is not a new context for o3. Change the stem's feature to 「読書記録アプリに、本の貸し出しの機能を足したい。」.",
@@ -196,5 +190,5 @@
   ],
   "average": 3.54,
   "verdict": "pass",
-  "summary": "This is a verification round: review-scope exited 0, with 12 of 44 blocks changed (17%) and sections and objectives unchanged. The round-1 review had no must-fix items, so no resolved entries are needed. I reviewed every changed block in full and found no new error and no regression. The tables became lists, practice-starter's highlight still matches addItem, the setup order is clearer, and estMinutes 19 matches the estimate of 19.4. Body prose is now 2399 of 2,400, so any further additions need trimming elsewhere. The carried-over suggestions (a new scenario for e5, the ps-ask expect) are still the most useful improvements."
+  "summary": "Verification round: review-scope exited 0, with 1 of 44 blocks changed (practice-starter, 2%) and sections and objectives unchanged. The previous round had no open must-fix items, so there are no resolved entries. I reviewed practice-starter in full and found no error and no regression. The new highlight [13–18] covers exactly the addItem function. The code is still 25 lines, and the empty-input bug, the addItem pattern and every step's expect still hold. Validate shows 0 errors, lint --strict shows 0 warnings, and measure.mjs is unchanged (prose 2399, est 19.4, estMinutes 19). I re-scored load, visual and practice; the other scores carry over. The only new note is a niceToHave about the removed input placeholder."
 }

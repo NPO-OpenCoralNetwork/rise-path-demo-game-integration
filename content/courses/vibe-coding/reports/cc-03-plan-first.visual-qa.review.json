@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:2a26cb723101d339",
+  "lessonHash": "sha256:a69e9dc117810e75",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,53 +9,65 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "The flowchart (s2-flow) is a vertical TD chart with readable Japanese labels at both 390px and 1440px, and the defs tables, prompt cards, steps and checklists render cleanly. However, the todo.html starter code (practice-starter) is clipped at 390px on lines 5, 15 and 21, and lines 14-18 are the highlighted ones (mobile-jp-19/20).",
+      "evidence": "Nothing overflows or is clipped at 390 px or 1440 px. The s2-flow diagram has readable Japanese labels at both widths (mobile-jp-07/08, desktop-jp-05), and the definition tables and todo.html code read well (mobile-jp-19/20). Every steps block shows its number twice, though: the reader's green circle plus a ① in the title (mobile-jp-10, desktop-jp-07, desktop-jp-14, desktop-jp-17).",
       "blockIds": [
         "s2-flow",
+        "s1-table",
         "practice-starter",
-        "s1-defs",
-        "s2-defs",
-        "s4-defs"
-      ]
-    },
-    {
-      "id": "load",
-      "score": 3,
-      "evidence": "The lesson is long (35 mobile screens, 23 desktop screens), but there are no text-only screens and every section breaks up its prose with a defs table, a prompt card, steps or an inline check. Paragraphs stay short and no screen is a wall of text.",
-      "blockIds": [
         "s3-steps",
         "practice-steps",
         "practice-spec-steps"
       ]
     },
     {
+      "id": "load",
+      "score": 3,
+      "evidence": "There are no text-only screens. Each segment gets a table, figure, prompt or check within one mobile screen. The longest dense run is s4-interview: about 13 lines of prompt text on mobile-jp-16. Desktop chars per line: median 39, max 46, against a 30–40 target.",
+      "blockIds": [
+        "s4-interview",
+        "practice-spec-model"
+      ]
+    },
+    {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is Japanese only. Diagram labels, buttons and checklists are all in Japanese, and English terms appear only as glossed loanwords. Contrast is good throughout, nothing is hidden under the top or bottom bars, and the desktop JP chars-per-line median is 39 (target 30-40).",
+      "evidence": "All Japanese, with the English term given in brackets on first use. Contrast is good on the callouts and the code. Keyboard hints show on the checks (desktop-jp-02). Nothing is hidden under the mobile top or bottom bars. No personal data appears on any screen.",
       "blockIds": [
-        "s2-flow",
-        "lesson"
+        "s2-version",
+        "check-quiz"
       ]
     }
   ],
   "mustFix": [
     {
       "criterion": "visual",
-      "blockId": "practice-starter",
-      "issue": "At 390px the todo.html code block cuts off on the right. Line 5 shows `placeholder=\"やるこ`, highlighted line 15 ends at `document.createElement(`, and line 21 ends at `() =`. The learner cannot see the end of the highlighted addItem body or the click handler without scrolling a box that gives no cue that it scrolls.",
-      "fix": "Keep every line at 40 columns or fewer while staying within the 25-line cap. Delete blank line 13. Split line 15 into `const li =` and `  document.createElement('li');`, as lines 9-12 already do, and widen the highlight range to match. Replace line 21 with `addBtn.onclick = () => {` and its closing `});` with `};`. Shorten line 5 to `<input id=\"new-item\">`, or move `placeholder=\"やること\"` onto its own indented line if a line is still free.",
-      "screenshot": "pages/mobile-jp-20.png"
+      "blockId": "s3-steps",
+      "issue": "Each step is numbered twice. The reader draws a numbered circle, and each title starts again with ①–⑥ ('1  ① プランモードに入り、探索させる'). This adds noise and makes the narrow mobile title wrap ('⑤ 差分を説明させ、/予想してから確かめる').",
+      "fix": "Remove the leading circled numbers from the step titles of ex-explore through ex-commit (for example 'プランモードに入り、探索させる').",
+      "screenshot": "pages/mobile-jp-12.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "practice-steps",
+      "issue": "The same double numbering appears in practice 1: the circles 1–7 plus ①–⑦ at the start of each title (pr-setup through pr-commit).",
+      "fix": "Remove the leading ①–⑦ from the titles of pr-setup, pr-rewrite, pr-explore, pr-plan, pr-implement, pr-explain and pr-commit.",
+      "screenshot": "pages/desktop-jp-14.png"
+    },
+    {
+      "criterion": "visual",
+      "blockId": "practice-spec-steps",
+      "issue": "The same double numbering appears in practice 2: the circles 1–3 plus ①–③ in the titles of ps-feature, ps-ask and ps-spec.",
+      "fix": "Remove the leading ①–③ from the three step titles.",
+      "screenshot": "pages/mobile-jp-26.png"
     }
   ],
   "niceToHave": [
-    "s2-flow: on desktop (desktop-jp-05.png) the edge label 「直したい点がある」 sits right on the two curved loop arrows between 計画 and 計画を読む. A shorter label such as 「直す」 would keep the arrows clear. On mobile it reads fine.",
-    "s4-table: on mobile, the bold 「直接頼みます」 breaks as 「直接頼みま／す。」 (mobile-jp-17.png). Shortening the item to 「…変更は、**直接頼む**。」 would avoid the orphaned character.",
-    "desktop charsPerLine max is 46, above the 30-40 target. The median is 39, so this is minor.",
-    "reader: the todo.html and terminal code blocks give no scroll cue when they are wider than the screen on mobile (known reader behaviour).",
-    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (mobile-jp-35.png, desktop-jp-23.png). Known reader behaviour.",
-    "reader: the full-length mobile PNG stops at 16000px, and 13 /api/ requests failed in the preview environment (known, not counted as console errors)."
+    "On mobile the reflection line for objective o1 leaves a single 'る' on its own line ('…具体的に書き直せ / る', mobile-jp-34, and the same on desktop-jp-23). A slightly shorter objective text, such as dropping '具体的に', would avoid this.",
+    "s4-interview is one dense block of about 13 lines on mobile (mobile-jp-16). Splitting its second paragraph so each topic sits on its own line would make it easier to scan.",
+    "reader: the model-answer prompt blocks (practice-model, practice-spec-model) are fully visible even though their titles say '書いてから見比べましょう' (write first, then compare) (desktop-jp-16, desktop-jp-18). A collapsed or reveal state would support the write-first instruction.",
+    "reader: the end banner says this is the course's last lesson. That is expected for a draft that is not in course.json.",
+    "reader: the full-length mobile PNG is truncated at 16000px. All 35 per-screen PNGs were reviewed."
   ],
-  "average": 3.33,
   "verdict": "revise",
-  "summary": "metrics.json has no hard failures: no overflow, no console, mermaid, unknown-block or broken-image errors, and no text-only screens. The layout is clean on desktop and mobile, the TD flowchart is legible at 390px, and no screen shows personal data. The one must-fix is the todo.html starter code (practice-starter), which is cut off on the right at 390px, including the highlighted addItem lines. Rewrap it so every line fits in 40 columns."
+  "summary": "The lesson renders cleanly at 390 px and 1440 px. There are no overflows, errors or privacy findings, the plan-mode flowchart is legible in Japanese, and the code, tables, keycaps and checks all read well. The only must-fix is cosmetic and quick: drop the ①② numbers from the step titles in s3-steps, practice-steps and practice-spec-steps, because the reader already numbers each step."
 }

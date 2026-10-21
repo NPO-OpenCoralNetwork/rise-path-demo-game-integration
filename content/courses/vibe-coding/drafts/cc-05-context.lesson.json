@@ -783,7 +783,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-context-practice\ncd cc-context-practice\ngit init\necho '- <title>は「練習：」から' > CLAUDE.md\nclaude"
+          "code": "mkdir cc-context-practice\ncd cc-context-practice\ngit init\necho '- <title>は「練習：」から' \\\n  > CLAUDE.md\nclaude"
         },
         {
           "id": "pr-steps-start",
@@ -796,7 +796,7 @@
             {
               "id": "pr-start",
               "title": "フォルダを用意して起動する",
-              "md": "上のコマンドを1行ずつ実行します。CLAUDE.mdは起動前に作ります。",
+              "md": "上のコマンドを1行ずつ実行します。`\\` で終わる行は、次の行と合わせて1つのコマンドです。CLAUDE.mdは起動前に作ります。",
               "expect": "初めてのフォルダなので、信頼の確認が出ます。承認すると、Claude Codeの入力欄が表示されます。",
               "troubleshoot": "PowerShellでは、エディターでCLAUDE.mdを作り、引用符の中の文を書きます。"
             },

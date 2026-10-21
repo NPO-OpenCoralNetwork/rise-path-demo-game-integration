@@ -6,7 +6,7 @@
   "subtitle": "「お願い」では足りないルールを必ず動く仕組みで守り、外のツールは確かめてからつなぐ",
   "locale": "jp",
   "level": "intermediate",
-  "estMinutes": 17,
+  "estMinutes": 18,
   "prerequisites": [
     "第2回｜任せる範囲を決める：権限モードと巻き戻し",
     "第6回｜CLAUDE.mdで前提を伝える",
@@ -276,7 +276,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "md": "フックは設定ファイルに、イベント → マッチャー → 処理（ここではコマンド）の3段で書きます。下は、編集のたびに整形ツールのPrettierを動かす公式の例です。\n\nコマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。フックに届くJSONから編集したファイルのパスを取り出し、Prettierに渡します（8-2で詳しく）。"
+          "md": "フックは設定ファイルに、イベント → マッチャー → 処理（ここではコマンド）の3段で書きます。下は、編集のたびに整形ツールのPrettierを動かす公式の例です。\n\nコマンドは、2つの部分を `|` でつないでいます。`jq -r '.tool_input.file_path'` が、フックに届くJSONから編集したファイルのパスを取り出します。`xargs npx prettier --write` が、そのパスをPrettierに渡します（8-2で詳しく）。"
         },
         {
           "id": "s1-prettier",
@@ -389,7 +389,7 @@
           "cite": [
             "cc-hooks"
           ],
-          "code": "#!/bin/bash\n# rmで始まるコマンドを止める\nINPUT=$(cat)\nCOMMAND=$(echo \"$INPUT\" |\n  jq -r '.tool_input.command // empty')\n\nif [[ \"$COMMAND\" == rm* ]]; then\n  echo \"Blocked: rm is not allowed\" >&2\n  exit 2\nfi\n\nexit 0",
+          "code": "#!/bin/bash\n# rmで始まるコマンドを止める\nINPUT=$(cat)\nCOMMAND=$(echo \"$INPUT\" |\n  jq -r '.tool_input.command')\n\nif [[ \"$COMMAND\" == rm* ]]; then\n  echo \"Blocked: rm not allowed\" >&2\n  exit 2\nfi\n\nexit 0",
           "highlight": [
             3,
             4,
@@ -430,16 +430,16 @@
             },
             {
               "id": "ex-register",
-              "title": "② 許可を付けて登録する",
+              "title": "② 実行を許可して登録する",
               "md": "macOSとLinuxでは `chmod +x` で実行を許可し、`PreToolUse` にマッチャー `Bash` で登録します。コマンドは `\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-rm.sh` です。`$CLAUDE_PROJECT_DIR` は、プロジェクトのフォルダーを指します。",
               "expect": "`cc-hooks-practice` で `claude` を起動し、`/hooks` を開くと、`PreToolUse` の下に表示されます。",
-              "troubleshoot": "許可がないとフックは起動せず、何も止まりません。一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。"
+              "troubleshoot": "実行の許可がないとフックは起動せず、何も止まりません。一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。"
             },
             {
               "id": "ex-test",
               "title": "③ 予想してから、手で試す",
-              "md": "下の③の3行は1つのコマンドで、フックにJSONを渡します。JSONの中の `rm` は文字として渡るだけで、実行はされません。結果を先に予想しましょう。",
-              "expect": "理由の文と `2` が出ます。`ls` に変えると `0` です。",
+              "md": "下の③の最初の4行は1つのコマンドで、フックにJSONを渡します。JSONの中の `rm` は文字として渡るだけで、実行はされません。結果を先に予想しましょう。",
+              "expect": "理由の文と `2` が出ます。`rm notes.txt` を `ls` に変えると `0` です。",
               "troubleshoot": "`Permission denied` と出たら、②の `chmod +x` を実行します。`jq: command not found` なら、jqを入れるまで何も止まりません。"
             }
           ]
@@ -452,7 +452,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "code": "# ② 実行を許可する\nchmod +x .claude/hooks/block-rm.sh\n\n# ③ JSONを渡して試す\necho '{\"tool_name\":\"Bash\",\"tool_input\":\n  {\"command\":\"rm notes.txt\"}}' |\n  .claude/hooks/block-rm.sh\necho $?"
+          "code": "# ② 実行を許可する\nchmod +x .claude/hooks/block-rm.sh\n\n# ③ JSONを渡して試す\necho '{\"tool_name\": \"Bash\",\n  \"tool_input\": {\n    \"command\": \"rm notes.txt\"}}' |\n  .claude/hooks/block-rm.sh\necho $?"
         },
         {
           "id": "s2-check",
@@ -649,7 +649,7 @@
           "cite": [
             "cc-mcp"
           ],
-          "code": "# ネット越しのサーバー\nclaude mcp add --transport http notion \\\n  https://mcp.notion.com/mcp\n\n# 手元のサーバーの書き方\n# claude mcp add <名前> -- <起動コマンド>\n\n# 追加したサーバーの一覧\nclaude mcp list",
+          "code": "# ネット越しのサーバー\nclaude mcp add --transport http \\\n  notion https://mcp.notion.com/mcp\n\n# 手元のサーバーの書き方\n# claude mcp add <名前> -- <コマンド>\n\n# 追加したサーバーの一覧\nclaude mcp list",
           "highlight": [
             2,
             3
@@ -851,17 +851,17 @@
             {
               "id": "p-script",
               "title": "① スクリプトを書いて登録する",
-              "md": "`.claude/hooks/protect-files.sh` を作って許可を付け、`PreToolUse` の配列に足します。",
+              "md": "`.claude/hooks/protect-files.sh` を作って実行を許可し、`PreToolUse` の配列に足します。",
               "expect": "`/hooks` の `PreToolUse` の下に、新しいフックが出ます。選ぶと、実行するコマンドを確かめられます。",
               "hint": "編集のツールは `Edit` と `Write`、パスは `tool_input.file_path` です。",
-              "troubleshoot": "`/hooks` に出ないときは、例題の②と同じく、JSONのカンマと `chmod +x` を確かめます。"
+              "troubleshoot": "`/hooks` に出ないときは、例題の②と同じく、JSONの余計なカンマなどを直し、Claude Codeを再起動します。手で試して `Permission denied` と出たら、`chmod +x` を実行します。"
             },
             {
               "id": "p-predict",
               "title": "② 予想してから、手で試す",
               "md": "`.env` のパスを入れたJSONを渡す前に、結果をメモします。",
               "expect": "理由の文と `2` が出ます。`README.md` なら `0` です。",
-              "hint": "例題のテストのコマンドを使います。`tool_input` を `{\"file_path\":\".env\"}` に変えます。渡す先は `.claude/hooks/protect-files.sh` にします。"
+              "hint": "例題のテストのコマンドで、`\"Bash\"` を `\"Edit\"` に変えます。`\"command\": \"rm notes.txt\"` は、`\"file_path\": \".env\"` にします。渡す先は `.claude/hooks/protect-files.sh` です。"
             },
             {
               "id": "p-claude",
@@ -909,7 +909,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "code": "#!/bin/bash\n# .envなどへの書き込みを止める\nINPUT=$(cat)\nFILE_PATH=$(echo \"$INPUT\" |\n  jq -r '.tool_input.file_path // empty')\n\nPROTECTED_PATTERNS=(\n  \".env\" \"package-lock.json\" \".git/\"\n)\n\nfor pat in \"${PROTECTED_PATTERNS[@]}\"; do\n  if [[ \"$FILE_PATH\" == *\"$pat\"* ]]; then\n    echo \"Blocked: $FILE_PATH matches\" \\\n      \"protected pattern '$pat'\" >&2\n    exit 2\n  fi\ndone\n\nexit 0",
+          "code": "#!/bin/bash\n# .envなどへの書き込みを止める\nINPUT=$(cat)\nFILE=$(echo \"$INPUT\" |\n  jq -r '.tool_input.file_path')\n\nPATTERNS=(\n  \".env\" \"package-lock.json\" \".git/\"\n)\n\nfor pat in \"${PATTERNS[@]}\"; do\n  if [[ \"$FILE\" == *\"$pat\"* ]]; then\n    echo \"Blocked: $FILE matches\" \\\n      \"protected pattern '$pat'\" >&2\n    exit 2\n  fi\ndone\n\nexit 0",
           "highlight": [
             4,
             5,
@@ -935,7 +935,7 @@
         {
           "id": "practice-b-task",
           "type": "markdown",
-          "md": "後半は、架空の2候補を、8-5の表の項目ごとに書き出してから答えます。"
+          "md": "後半は、架空の2候補を、8-5の表の項目ごとに書き出してから答えます。\n\n- Aは、社内チームの課題管理MCPサーバーです。ソースは社内で公開され、毎月更新されています。課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。\n- Bは、作者がわかり、ソースも公開されている「全部入り」プラグインです。ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。"
         },
         {
           "id": "practice-b-quiz",
@@ -949,7 +949,7 @@
             {
               "id": "q9",
               "kind": "single",
-              "prompt": "架空の2候補について、いちばん適切な判断を選びます。Aは社内チームの課題管理MCPサーバーで、ソースは社内で公開され、毎月更新されています。課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。Bは作者がわかり、ソースも公開されている「全部入り」プラグインです。ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。どれを選びますか？",
+              "prompt": "AとBについて、いちばん適切な判断はどれでしょう？",
               "options": [
                 {
                   "id": "a",

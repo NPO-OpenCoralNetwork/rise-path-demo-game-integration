@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:2bf364c299299ca6",
+  "lessonHash": "sha256:174374fa262b8b76",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,69 +9,45 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "metrics.json reports no hard failures: overflowX false, 0 console errors, 0 Mermaid errors, 0 unknown blocks and 0 broken images. The page is varied, with tables (s1-defs, s4-defs), terminal blocks (s2-code, s3-code, p1-model), steps, prompts, checklists and quizzes, and no screen is text-only. However, long inline code breaks at '--' or a hyphen in check-quiz e3, p1-task, summary-points and s1-defs (pages/mobile-jp-25.png, desktop-jp-17.png).",
+      "evidence": "The lesson has no decorative images and no diagrams. Code blocks s2-code (20 lines) and p1-model (16 lines) fit at 390 px without wrapping, and their highlighted lines are easy to see (pages/mobile-jp-06.png, pages/mobile-jp-20.png). The comparison of the three ways to run work in parallel (s1-table) and the flags (s3-table) are shown as lists, not as a figure or table.",
       "blockIds": [
-        "check-quiz",
-        "p1-task",
-        "summary-points",
-        "s1-defs"
+        "s2-code",
+        "p1-model",
+        "s3-code",
+        "s1-table",
+        "s3-table"
       ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "Desktop JP is at a median of 38 characters per line, inside the 30–40 target, with a maximum of 51. Sections are short and each one ends in a check. The exam options in e3 are four nearly identical long commands that wrap over 3–4 lines at 390 px, which makes it hard to compare the flags that differ (pages/mobile-jp-25.png).",
+      "score": 4,
+      "evidence": "metrics.json lists no text-only screens on desktop-jp or mobile-jp. Every screen has a heading, code block, steps, prompt or check. Desktop JP chars per line has a median of 37 (target 30–40). The longest prose block is s3-mode, which runs about 6 lines on mobile (pages/mobile-jp-10.png).",
       "blockIds": [
-        "check-quiz"
+        "s3-mode",
+        "s1-defs",
+        "s4-defs"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "This is a JP-only lesson. Labels are in Japanese, contrast is good, and no controls sit under the top or bottom bars. Code tokens split across lines ('--' / 'bare' in summary-points, 'cc-' / 'practice-09' in p1-task) hurt readability and copyability, especially for screen-magnifier users.",
+      "score": 4,
+      "evidence": "The lesson is JP-only and every screen is fully in Japanese, with English terms in parentheses on first use (s1-defs, s4-defs). The link text is specific: 「公式ドキュメント（非対話的実行）」 in s3-mode (pages/desktop-jp-07.png). No text is baked into images.",
       "blockIds": [
-        "summary-points",
-        "p1-task"
+        "s3-mode",
+        "s1-defs",
+        "s4-defs"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "check-quiz",
-      "issue": "In exam question e3 the four options are full one-line commands as inline code. They wrap in the middle of flags ('--' / 'allowedTools', '--max-' / 'budget-usd', '--' / 'permission-mode') on mobile, and option 2 and option 4 break after '--' even on desktop. The differences the learner must spot (--bare present or not, bypassPermissions vs dontAsk) are hard to compare.",
-      "fix": "Shorten each option to its distinguishing part. For example, state the shared part once in the stem ('共通: claude -p \"…\" --max-budget-usd 1') and make the options short sets like '`--bare` ＋ `--allowedTools \"Bash\"` ＋ `dontAsk`'. Alternatively, put the four full commands in a code block with one flag per line and let the options refer to them as A–D.",
-      "screenshot": "pages/mobile-jp-25.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "p1-task",
-      "issue": "The inline code `cc-practice-09` breaks at its hyphen into 'cc-' / 'practice-09' on both mobile and desktop.",
-      "fix": "Move the folder name to the start of a sentence, or put it on its own clause so it does not fall at a line end (for example 「練習用フォルダー `cc-practice-09` で進めます。」 as a separate sentence). Alternatively, rephrase so the code token comes earlier in the line.",
-      "screenshot": "pages/mobile-jp-16.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "summary-points",
-      "issue": "In summary point 3 the inline code `--bare` splits into '--' / 'bare' across two lines on mobile.",
-      "fix": "Reword point 3 so `--bare` is not near the end of a line on narrow screens. For example, split it into two sentences: 「必要なコマンドだけを許可します。`--bare` と費用の上限も付けます。」",
-      "screenshot": "pages/mobile-jp-29.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "s1-defs",
-      "issue": "The worktree definition row splits code tokens: on mobile `claude --worktree <名前>` breaks after 'claude --', and on desktop `worktree-<名前>` breaks as 'worktree-<名' / '前>'.",
-      "fix": "Shorten the definition cell, and move the path and branch-name details into a short list or into the s1-table/s2 steps, so each code token sits on its own line. For example: 「作業コピー。作り方: `claude --worktree <名前>`」 and keep the path and branch name for the example section.",
-      "screenshot": "pages/desktop-jp-02.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "The trailing comments '# 上限の金額は例' in s3-code line 7 and p1-model line 15 reach the right edge of the code block at 390 px (pages/mobile-jp-10.png, pages/mobile-jp-20.png). Consider putting the comment on its own line above the flag.",
-    "reader: the mobile full-length PNG stops at 16000px (the per-screen PNGs cover the whole page).",
-    "reader: the end banner says this is the course's last lesson, because drafts are not listed in course.json.",
-    "reader: 14 failed /api/ requests (500) are environment noise and are not counted as console errors.",
-    "No privacy findings: no account names, emails, private project titles, local paths, credentials or billing screens appear on any screen opened."
+    "check-quiz e3 option d (`Bash(npm test *)` ＋ `dontAsk` だけ): on mobile, the trailing 「だけ」 breaks into だ / け (pages/mobile-jp-25.png). Rephrasing it as a full phrase, for example 「`--bare` を付けず、`Bash(npm test *)` ＋ `dontAsk`」, would avoid a split word.",
+    "p1-checklist labels show flags and patterns (--bare, Bash(npm test *), --permission-mode dontAsk) as bold proportional text, not as code (pages/mobile-jp-19.png, pages/desktop-jp-13.png). This makes them harder to match against the p1-model command. Shorter Japanese labels, or reader support for inline code, would help. reader: checklist labels do not render inline code.",
+    "The '用語・このレッスン' sidebar lists each term twice, for example 「ワークツリー（worktree）」 next to 「ワークツリー」 and 「バックグラウンド実行（background execution）」 next to 「バックグラウンド実行」 (pages/desktop-jp-01.png). It merges terms from the definitions blocks with the glossary. Making the s1-defs/s4-defs terms match the glossary entries would remove the duplicates; otherwise the reader should dedupe them (reader:).",
+    "reader: the p2-steps step 2 (p-rewrite) shows a 「うまくいかないときは」 toggle although the step has no troubleshoot text (pages/mobile-jp-21.png, pages/desktop-jp-14.png). Check what it opens.",
+    "reader: the full-length mobile-jp.png stops at 16000 px. Pages 01–31 cover the whole lesson. The end banner says this is the course's last lesson (expected for a draft). The failed /api/ requests are environment noise."
   ],
-  "verdict": "revise",
-  "summary": "The layout is clean and varied: no overflow, console errors or broken images, every screen has a heading, table, code block or check, and desktop line length is on target. The main fix is long inline code that breaks inside flags and names, worst in exam question e3, where the four near-identical commands are hard to compare at 390 px; shorten those options and reword p1-task, summary-points and s1-defs so code tokens are not split."
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "No hard failures in metrics.json (no sideways overflow, no console, mermaid or image errors, no unknown blocks), and no screen shows personal data. Both code blocks and all quizzes are fully readable at 390 px with nothing cut off, and the steps and prompt blocks keep the rhythm varied. The remaining items are minor: a word split in exam option e3 on mobile, flags shown as plain text in p1-checklist, and duplicate glossary chips in the sidebar."
 }

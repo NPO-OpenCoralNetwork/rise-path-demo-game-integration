@@ -3,38 +3,62 @@
   "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
-  "lessonHash": "sha256:2bf364c299299ca6",
+  "mode": "verify",
+  "lessonHash": "sha256:174374fa262b8b76",
+  "verifies": {
+    "reviewedRevision": "sha256:2bf364c299299ca6",
+    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/2bf364c299299ca6/round-1/ja-editor.review.json",
+    "changed": [
+      "s1-defs",
+      "s1-table",
+      "s2-steps",
+      "p1-task",
+      "p1-model",
+      "check-quiz",
+      "summary-points"
+    ],
+    "changedShare": 0.09,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "s1-table",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "The worktree item in s1-table now reads 「依存パッケージを入れ直し、取り込みは自分でします。」, so 「行います」 is gone, as the §3 notation rule asks."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout. There are no pressure phrases, and lessons:lint --strict reports 0 errors and 0 warnings. The round-1 terse spots are fixed. s3-table (now a list) reads 「付けないと、モードは設定や既定で決まります。」 and s4-prompt uses 「…JSONを返してください。」. Hook, feedback and practice text read warmly. One explicit §3 notation break remains: 「取り込みは自分で行います。」 in s1-table. A few lines are still clipped: 「付けないと、どちらも確認なしで動きます」 after 「フックやMCPサーバー…など」 in s3-table, and the code comment 「# 未追跡に出さない」 in s2-code. These keep the score at 3.",
+      "evidence": "です・ます holds in every changed block, and lessons:lint --strict reports 0 errors and 0 warnings. The §3 break in s1-table is fixed. summary-points now splits the long point into two sentences: 「必要なコマンドだけを許可します。`--bare` と費用の上限も付けます。」. The rewritten e3 options break the §5 parallel-form rule in one place: option d alone ends in 「だけ」. The clipped lines noted in the previous round (s3-table, s2-code) are unchanged, so the score stays at 3.",
       "blockIds": [
+        "check-quiz",
         "s1-table",
-        "s3-table",
-        "s2-code"
+        "summary-points"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives: prose 2224 (budget 1,200–2,400), read 2658, practice reading 1217, 11 questions, 2 practice sections, est 19.9 min (cap 20; estMinutes 20). Everything is within budget. Prose grew from 1583 to 2224 and is near the ceiling, so no fix should add length. Lint finds no sentence-length or paragraph-length problems. Each s3-table item has 2 short sentences. Every section has a heading and a list, code block, steps or check. Inline checks follow sections 1, 2, 3 and 5.",
+      "evidence": "measure.mjs gives prose 2260 (budget 1,200–2,400), read 2648, practice reading 1225, 11 questions, 2 practice sections and est 19.9 min (cap 20; estMinutes 20). The e3 options now list only the flags that differ, which makes the comparison easier on a phone than four long command lines. Prose is close to the ceiling (2224 → 2260), so further fixes should not add length.",
       "blockIds": [
-        "s3-table",
-        "s1-table",
-        "p1-model"
+        "check-quiz",
+        "p1-model",
+        "s2-steps"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Prerequisites are stated, and the text recalls earlier lessons: 第2回 (Manualモード), 第7回 (サブエージェント), 第8回 (フック・MCP). CI is now spelled out on first use, in objective o2: 「CI（継続的インテグレーション）」. Other new terms get English on first use: トークン（token、…）, シェル（shell、…）, API（Application Programming Interface）, 課題（issue）, 仮想マシン（VM）. Glossary terms match the text and the list labels. Two small gaps keep this at 3. The katakana 継続的インテグレーション has no English. s1-lead calls the tools 「道具」, while the section title and list call them 「方法」.",
+      "evidence": "s1-defs no longer gives the folder and branch naming. s2-steps ex-feature now introduces the folder with 「`.claude/worktrees/` の下に、フォルダーが2つできます。」, and the glossary still gives both `.claude/worktrees/<名前>/` and `worktree-<名前>`, so the branch names in ex-feature and ex-merge stay traceable. e3 now explains its shorthand before the options: 「`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」. The earlier small gaps remain (継続的インテグレーション without English; 「道具」 vs 「方法」 in s1-lead), which keeps this at 3.",
       "blockIds": [
+        "s1-defs",
+        "s2-steps",
+        "check-quiz",
         "lesson",
-        "s1-lead",
-        "s3-lead",
-        "p1-steps-write"
+        "s1-lead"
       ]
     },
     {
@@ -44,28 +68,26 @@
       "blockIds": [
         "s3-mode",
         "p1-checklist"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [
     {
       "criterion": "voice",
-      "blockId": "s1-table",
-      "issue": "(d) §3 notation: the style guide says to write 「行う」 in kana (「おこなう／する」). The worktree item says 「取り込みは自分で行います。」.",
-      "fix": "「依存パッケージを入れ直し、取り込みは自分で行います。」→「依存パッケージを入れ直し、取り込みは自分でします。」"
+      "blockId": "check-quiz",
+      "issue": "(d) §5 options parallel in form: in the rewritten e3, options a, b and c are bare flag lists joined by ＋, but option d adds the word 「だけ」 (「`Bash(npm test *)` ＋ `dontAsk` だけ」). That gives it a different ending, and it points straight at what is missing. The prompt already says these flags come in addition to the shared base, so the list alone is clear.",
+      "fix": "「`Bash(npm test *)` ＋ `dontAsk` だけ」→「`Bash(npm test *)` ＋ `dontAsk`」"
     }
   ],
   "niceToHave": [
-    "lesson (objectives o2): 継続的インテグレーション is a katakana term with no English. CI already gives the English abbreviation, so this does not block — 「CI（継続的インテグレーション）などで使う」→「CI（Continuous Integration、継続的インテグレーション）などで使う」",
-    "s1-lead: the lead says 「道具」 but the section title and list say 「方法」 (the audit noted this too). The lead also does not introduce the list below it (§4) — 「第7回の[[サブエージェント]]に加えて、並列の作業を助ける道具を2つ紹介します。」→「第7回の[[サブエージェント]]に加えて、ここでは作業を並べる方法を2つ扱います。」",
-    "s3-table: 「どちらも」 does not fit after 「フックやMCPサーバー（第8回）など」, and it hides that these are the repository's settings — 「付けないと、どちらも確認なしで動きます。」→「付けないと、リポジトリのフックやサーバーが確認なしで動きます。」",
-    "s4-table: 「PRや決まった時刻に動かす」 is compressed. It means on each PR or at set times — 「CIで、PR（プルリクエスト）や決まった時刻に動かすなら」→「CIで、PR（プルリクエスト）のたびや決まった時刻に動かすなら」",
-    "s2-steps ex-merge: factual doubt: 「消すと、ブランチごと消えます。」 is still not backed by the facts file. It only says 'A worktree with changes prompts you to keep or remove it'. Confirm against the worktrees page, or soften — 「消すと、ブランチごと消えます。」→「消すと、作業コピーがなくなります。」",
-    "p1-checklist pc-bare: the reason to drop --bare (no API key, p-run) is left out. On its own, the label reads like a general rule — 「--bare を付けています（外すのは練習用フォルダーだけです）」→「--bare を付けています（APIキーがなくて外すのは、練習用フォルダーだけです）」",
-    "p2-prompt: inline flags elsewhere have a space before the particle (「--bare を」). This one has none — 「--max-budget-usdなどで決めているか」→「--max-budget-usd などで決めているか」",
-    "check-quiz e5: option a is shorter than b, c and d, which share one frame. It is still parallel enough — 「「更新できるパッケージを調べて、いい感じにまとめて。編集はしない。調べられなければ理由を返して」」→「「更新できるパッケージを調べて、いい感じにまとめて。なければそう書いて。編集はしない。調べられなければ理由を返して」」"
+    "check-quiz: In e3 the key that explains the shorthand comes after the question, so the learner reads the question before learning how to read the options. Put the key first — 「夜間のCIで、失敗したテストを要約させます。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「夜間のCIで、失敗したテストを要約させます。選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
+    "p1-task: s2-code calls cc-practice-09 「練習用リポジトリ」, and this sentence contrasts it with 「大事なリポジトリ」. The same word reads more smoothly — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
+    "s1-defs: The worktree definition no longer says where the copy is created or how its branch is named. Learners meet both only in s2-steps and the glossary. If length allows, add the branch name back so that 「worktree-feature-a」 in s2-steps is not a surprise — 「`claude --worktree <名前>` で作ります。」→「`claude --worktree <名前>` で作ります。ブランチ名は `worktree-<名前>` です。」",
+    "s3-table (unchanged): A clipped clause remains from the previous round — 「付けないと、どちらも確認なしで動きます」 after 「フックやMCPサーバー…など」 could name its subject — 「付けないと、どちらも確認なしで動きます」→「付けないと、フックもMCPサーバーも確認なしで動きます」",
+    "s2-code (unchanged): The code comment is terse — 「# 未追跡に出さない」→「# ワークツリーを未追跡ファイルに出さない」"
   ],
   "average": 3.5,
   "verdict": "revise",
-  "summary": "I did a full review because review-scope.mjs exited 1: objective o2 changed (11 of 42 blocks and 13 of 82 parts changed). The round-1 must-fix is resolved. o2 now reads 「CI（継続的インテグレーション）などで使う安全な claude -p コマンドを書ける」, so CI is spelled out on first use. The audit fixes are applied. s1-lead now says 「並列の作業を助ける道具を2つ紹介します」. s3-table now says dontAsk 「確認が要る操作を聞かずに拒否します（読み取りは動きます）」, and its sibling texts say 「確認が要るほかの操作」. summary-points now has 「モードを指定しない `claude -p`」. Most round-1 niceToHave items were applied too: s3-table, s4-prompt and p-run. lessons:lint --strict is clean. measure.mjs gives prose 2224 and est 19.9 min, near the cap, so no fix should add length. One new must-fix: 「取り込みは自分で行います」 in s1-table breaks the §3 rule on writing 行う in kana. Once it is fixed, the scores (3/4/3/4, mean 3.5) pass the bar."
+  "summary": "This is a verification round. review-scope.mjs exited 0: 7 of 42 blocks and 7 of 82 parts changed (9%), and sections and objectives are unchanged. The previous must-fix (「行います」 in s1-table) is resolved; the item now reads 「取り込みは自分でします。」. I checked the changed blocks in full: s1-defs, s1-table, s2-steps, p1-task, p1-model, check-quiz and summary-points. lessons:lint --strict is clean. measure.mjs gives prose 2260 and est 19.9 min, still within budget and near the cap. The e3 rewrite into short flag lists with a key reads better on a phone. It brings one new (d) must-fix: option d alone ends in 「だけ」, which breaks the §5 parallel-form rule and hints at the answer. Scores are voice 3, load 4, prior 3 and a11y_l10n 4 (carried over), mean 3.5. The verdict is revise until the e3 option is fixed."
 }

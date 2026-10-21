@@ -343,7 +343,7 @@
             {
               "id": "q3",
               "kind": "single",
-              "prompt": "設定ファイルの許可ルールに `Bash(git *)`、確認ルールに `Bash(git push *)` があります。Claudeが `git push origin main` を実行しようとすると、どうなるでしょう？",
+              "prompt": "許可ルールは `Bash(git *)`、確認ルールは `Bash(git push *)` です。Claudeが `git push origin main` を実行しようとすると、どうなるでしょう？",
               "options": [
                 {
                   "id": "a",
@@ -447,33 +447,33 @@
             {
               "id": "q4",
               "kind": "single",
-              "prompt": "`npm test` は確認なしで実行させ、`git push` の前だけは必ず確認したいと考えています。`permissions` に書く内容として、最も適切なのはどれでしょう？",
+              "prompt": "`npm test` は、許可ルールの `Bash(npm test)` で確認なしにしてあります。`git push` の前だけは、必ず確認したいと考えています。足すルールとして、最も適切なのはどれでしょう？",
               "options": [
                 {
                   "id": "b",
-                  "md": "`\"allow\": [\"Bash(npm test)\", \"Bash(git push *)\"]`",
-                  "feedback": "allowに入れると、pushは確認なしで実行されます。必ず確認したい操作はaskに入れます。"
+                  "md": "許可ルールに `Bash(git push *)`",
+                  "feedback": "許可ルールに入れると、pushは確認なしで実行されます。必ず確認したい操作は、確認ルールに入れます。"
                 },
                 {
                   "id": "c",
-                  "md": "`\"allow\": [\"Bash(npm test)\"]` と `\"deny\": [\"Bash(git push *)\"]`",
-                  "feedback": "denyは確認ではなく、pushそのものを止めます。止めずに確認を挟みたいならaskです。"
+                  "md": "拒否ルールに `Bash(git push *)`",
+                  "feedback": "拒否ルールは確認ではなく、pushそのものを止めます。止めずに確認を挟みたいなら、確認ルールです。"
                 },
                 {
                   "id": "d",
-                  "md": "`\"allow\": [\"Bash(npm test)\"]` と `\"ask\": [\"Bash(git push)\"]`",
+                  "md": "確認ルールに `Bash(git push)`",
                   "feedback": "`*` がないと、`git push` だけの完全一致になります。`git push origin main` には一致せず、autoモードでは確認なしで通ることがあります。"
                 },
                 {
                   "id": "a",
-                  "md": "`\"allow\": [\"Bash(npm test)\"]` と `\"ask\": [\"Bash(git push *)\"]`"
+                  "md": "確認ルールに `Bash(git push *)`"
                 }
               ],
               "answer": [
                 "a"
               ],
-              "explanation": "確認なしで任せたい操作はallowに、必ず確認したい操作はaskに入れます。`Bash(git push *)` は、`git push` のあとに何が続いても一致します。",
-              "hint": "askとdenyの違いと、`*` があるかないかの2点を確かめましょう。",
+              "explanation": "確認なしで任せたい操作は許可ルール（allow）に、必ず確認したい操作は確認ルール（ask）に入れます。`Bash(git push *)` は、`git push` のあとに何が続いても一致します。",
+              "hint": "確認ルールと拒否ルールの違いと、`*` があるかないかの2点を確かめましょう。",
               "objectiveId": "o3",
               "bloom": "apply"
             }
@@ -676,7 +676,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "cd cc-practice\nmkdir -p .claude\necho \"TOKEN=dummy\" > .env\necho \".env\" >> .gitignore\necho \"# 練習メモ\" > rewind-practice.md\nls -a"
+          "code": "cd cc-practice\nmkdir -p .claude\necho \"TOKEN=dummy\" > .env\necho \".env\" >> .gitignore\necho \"# メモ\" > rewind-practice.md\nls -a"
         },
         {
           "id": "rules-steps",
@@ -761,7 +761,7 @@
             },
             {
               "id": "pr-env",
-              "label": ".envの読み取りが止まり、pushの前に確認が出ました"
+              "label": ".env の読み取りが止まり、pushの前に確認が出ました"
             },
             {
               "id": "pw-c-reason",
@@ -794,7 +794,7 @@
             {
               "id": "e1",
               "kind": "single",
-              "prompt": "中身をよく知らないリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。確認を減らしたくて、`--dangerously-skip-permissions` を付けるか迷っています。最も適切な判断はどれでしょう？",
+              "prompt": "中身をよく知らないリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。確認を減らしたいと考えています。`--dangerously-skip-permissions` を付けて起動するかどうか、最も適切な判断はどれでしょう？",
               "options": [
                 {
                   "id": "a",
@@ -890,7 +890,7 @@
             {
               "id": "e5",
               "kind": "single",
-              "prompt": "autoモードで作業中です。`.claude/settings.json` の `ask` に `Bash(git push *)` だけを書きました。Claudeが次のコマンドを実行しようとしたとき、確認の画面が出ないのはどれでしょう？",
+              "prompt": "autoモードで作業中です。確認ルールは `Bash(git push *)` の1つだけです。Claudeが次のコマンドを実行しようとしたとき、確認の画面が出ないのはどれでしょう？",
               "options": [
                 {
                   "id": "a",
@@ -922,32 +922,32 @@
             {
               "id": "e6",
               "kind": "single",
-              "prompt": "ClaudeがGitHubのコマンドラインツール `gh` で、プルリクエスト（pull request）を作るとします。その前に、必ず確認を挟みたいと考えています。`permissions` に足すものとして、最も適切なのはどれでしょう？",
+              "prompt": "ClaudeがGitHubのコマンドラインツール `gh` で、プルリクエスト（pull request）を作るとします。その前に、必ず確認を挟みたいと考えています。どこに何を書くのが最も適切でしょう？",
               "options": [
                 {
                   "id": "a",
-                  "md": "`\"deny\": [\"Bash(gh pr create *)\"]`",
-                  "feedback": "denyは確認ではなく、作ることそのものを止めます。確認を挟んで進めたいならaskです。"
+                  "md": "`deny` に `Bash(gh pr create *)`",
+                  "feedback": "拒否ルール（deny）は確認ではなく、作ることそのものを止めます。確認を挟んで進めたいなら、確認ルール（ask）です。"
                 },
                 {
                   "id": "b",
-                  "md": "`\"ask\": [\"Bash(gh pr create *)\"]`"
+                  "md": "`ask` に `Bash(gh pr create *)`"
                 },
                 {
                   "id": "c",
-                  "md": "`\"ask\": [\"Bash(gh * create)\"]`",
+                  "md": "`ask` に `Bash(gh * create)`",
                   "feedback": "`*` を途中に置くと、最後が `create` で終わるコマンドにしか一致しません。`gh pr create --title …` のように続きがあると一致せず、確認が出ないことがあります。"
                 },
                 {
                   "id": "d",
-                  "md": "ルールは足さず、CLAUDE.mdに「作る前に確認して」と書く",
-                  "feedback": "CLAUDE.mdはClaudeへの助言で、Claude Codeが守らせるルールではありません。必ず確認したいならaskルールにします。"
+                  "md": "CLAUDE.mdに「作る前に確認して」",
+                  "feedback": "CLAUDE.mdはClaudeへの助言で、Claude Codeが守らせるルールではありません。必ず確認したいなら、確認ルールにします。"
                 }
               ],
               "answer": [
                 "b"
               ],
-              "explanation": "必ず確認したい操作は、`ask` に「コマンドの始まり＋空白＋`*`」の形で書きます。`Bash(gh pr create *)` なら、autoモードでも確認が出ます。",
+              "explanation": "必ず確認したい操作は、確認ルール（`ask`）に「コマンドの始まり＋空白＋`*`」の形で書きます。`Bash(gh pr create *)` なら、autoモードでも確認が出ます。",
               "objectiveId": "o3",
               "bloom": "apply"
             }
@@ -1021,8 +1021,8 @@
           "type": "askTutor",
           "suggestions": [
             "自分の作業に合う権限モードを、一緒に選んで",
-            "git -C . pushのような抜け道は、どう防げばいい？",
-            "/rewindとGitの使い分けを、例で教えて"
+            "git -C . push のような抜け道は、どう防げばいい？",
+            "/rewind とGitの使い分けを、例で教えて"
           ]
         }
       ]

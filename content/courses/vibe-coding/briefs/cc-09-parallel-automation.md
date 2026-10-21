@@ -44,8 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 2224 (budget 1,200–2,400) · read 2658 · practice reading 1217 · questions 11 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)）。
-  est = (2,658 + 1,217) / 450 + 11 × 40秒 + 2 × 2分 = 8.61 + 7.33 + 4 = 19.94 → 20。prose rose from 1,583 because the three
+- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 2260 (budget 1,200–2,400) · read 2648 · practice reading 1225 · questions 11 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)）。
+  est = (2,648 + 1,225) / 450 + 11 × 40秒 + 2 × 2分 = 8.61 + 7.33 + 4 = 19.94 → 20。prose rose from 1,583 because the three
   tables became lists (measure.mjs counts lists as prose, tables only as reading).
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
@@ -94,7 +94,7 @@ on 2026-10-20 for the exact wording used below.
 | `unattended` | concept | 5. 依頼文を4点で点検する | 依頼文は成功の条件と失敗の報告、権限と費用の上限はフラグや設定で | markdown + list (the 4 points), markdown (enforcement, recall CLAUDE.md), prompt (weekly TODO example, expect maps it to the 4 points), quiz inline | `q4` → o3 (analyze: failed read reported as quiet day) |
 | `practice-command` | practice | 演習1：夜間チェックのコマンドを書く | 失敗したテストを JSON にまとめる `claude -p` を書き、予想してから実行 | markdown task, steps (p-project), prompt (setup), steps (p-command, p-run; hint → troubleshoot; p-run says `--bare` needs an API (spelled out) key and to drop it without one), checklist (7, incl. `--bare`), code model answer (labelled by a comment) | — |
 | `practice-audit` | practice | 演習2：無人実行の依頼文を点検する | 弱い依頼文を4点で点検して直し、Claude に見落としを聞く | markdown task, markdown quote (weak prompt), steps (p-audit with hint → troubleshoot, p-rewrite with hint), prompt (audit; model answer in expect), checklist (4) | — |
-| `check` | check | 理解度チェック | 3つの目標を新しい場面で | quiz exam (6) | `e1` → o1 (research → subagent, transfer), `e2` → o1 (dev server → Ctrl + B), `e3` → o2 (safest CI command), `e4` → o2 (unknown repo → `--bare`, transfer), `e5` → o3 (best weekly prompt), `e6` → o3 (multi: what flags enforce, transfer) |
+| `check` | check | 理解度チェック | 3つの目標を新しい場面で | quiz exam (6) | `e1` → o1 (research → subagent, transfer), `e2` → o1 (dev server → Ctrl + B), `e3` → o2 (safest CI command: the shared `claude -p` part in the stem, options are short flag sets), `e4` → o2 (unknown repo → `--bare`, transfer), `e5` → o3 (best weekly prompt), `e6` → o3 (multi: what flags enforce, transfer) |
 | `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next), flashcards (7), askTutor (3) | — |
 
 Contract check: hook ≤ 3 sentences + predict; 5 segments + 2 practice sections, inline quizzes in 4 of the 5 segments
@@ -150,6 +150,17 @@ predict before running (p-run).
   source title 「Choose a permission mode」. Course style: no space in 「Ctrl + Bで」, です・ます in checklist labels and
   card backs. To keep est ≤ 20, the s2-map callout, s4-prompt title, s4-enforce, s4-lead and practice titles were
   tightened and 「旧称routines」 left s4-table (the glossary keeps it).
+- Round 4 (visual QA at 390 px, reader update of 2026-10-21; the reader now keeps inline code chips whole and soft-wraps
+  long code lines): e3 states the shared part (`claude -p "…"`, `--max-budget-usd 1`) once in the stem and says which
+  flag each value belongs to; the options are short sets such as `--bare` ＋ `Bash(npm test *)` ＋ `dontAsk` (ids,
+  answer and feedback meaning unchanged). The s1-defs worktree entry keeps the definition and the command; the folder
+  (`.claude/worktrees/`) and the branch names move to the ex-feature expect (the glossary keeps the full entry).
+  p1-task names 「練習用フォルダー」 before `cc-practice-09`; summary point 3 is three short sentences. p1-model: the
+  `--allowedTools` value sits on its own line and the error line is shorter, so no line wraps at 390 px; the highlight
+  marks all five flag lines (2, 12–16). ja-editor must-fix: s1-table says 「取り込みは自分でします」.
 - Checked 2026-10-20 on Configure permissions: 「`Bash(ls *)` matches `ls`」 (a trailing ` *` also matches the bare
   command), so `Bash(npm test *)` covers a bare `npm test`. On worktrees: "Removing deletes the worktree directory and
   its branch" (ex-merge).
+
+### Last fix round (2026-10-21)
+- check-quiz e3 option d: 「だけ」 removed so the four options share one form (ja-editor).

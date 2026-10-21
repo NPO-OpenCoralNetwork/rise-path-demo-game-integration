@@ -1,81 +1,54 @@
 {
   "lessonId": "cc-02-permissions",
   "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
-  "lessonHash": "sha256:95d0a505f30641a5",
+  "lessonHash": "sha256:53b74995ba36c9df",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "No hard failures in metrics.json: overflowX is false, and console, mermaid, unknown-block and broken-image counts are 0. The rules-diagram flowchart (TD) is readable at 390 px (mobile-jp-09) and on desktop (desktop-jp-06), and the code blocks fit without scrolling. In several questions, inline code chips break in the middle of the rule pattern being tested, for example 'Bash(git push' / '*)' in check-quiz e5 on desktop-jp-17.",
+      "score": 4,
+      "evidence": "The rules-diagram flowchart TD stays readable at 390 px. Its Japanese labels are legible and the arrows are clear (pages/mobile-jp-09.png). The example-code and rules-files code blocks fit without wrapping (pages/mobile-jp-12.png, pages/mobile-jp-17.png). The mode list (modes-table) and the rewind list (rewind-table) are bullet lists rather than wide tables, so nothing sticks out sideways (overflowX false).",
       "blockIds": [
         "rules-diagram",
         "example-code",
-        "check-quiz",
-        "rules-check"
+        "rules-files",
+        "modes-table",
+        "rewind-table"
       ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "Each section is chunked into a heading, a short list or definitions, a callout and a check, and on desktop no screen is text-only. On mobile, screen 14 (rewind-lead, rewind-how, rewind-table) is the only text-only screen, and its bullet list keeps it from being a wall of text. On desktop the median is 41 characters per line, just above the 30–40 target (reader measure, 680 px).",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on both desktop and mobile. Every screen has a heading, a check, a code block, the diagram or steps. Paragraphs are short and a quiz follows every concept section, so there are no walls of text in pages/mobile-jp-01.png to pages/mobile-jp-29.png.",
       "blockIds": [
-        "rewind-lead",
-        "rewind-how",
-        "rewind-table"
+        "modes-check",
+        "auto-check",
+        "rules-check",
+        "example-check",
+        "rewind-check"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The UI and lesson text are entirely Japanese, with English terms given in parentheses. Contrast is fine, and every control sits clear of the top and bottom bars (mobile bottomBar is 60 px and buttons stay visible). Two things hurt readability: the flag splits as '--' / 'dangerously-skip-permissions' (mobile-jp-22), and a stray line break splits '2-' / '1' (mobile-jp-16).",
+      "evidence": "The lesson is all Japanese with no stray English UI. Contrast is good and controls clear the top and bottom bars. Inline code chips stay whole (for example the --dangerously-skip-permissions chip in pages/mobile-jp-06.png and pages/mobile-jp-22.png). Minor points: desktop charsPerLine has a median of 41 and a max of 54, against a target of 30–40. The prompt blocks show raw backticks, and one file name splits across lines (pages/mobile-jp-21.png).",
       "blockIds": [
-        "check-quiz",
-        "sort-task"
+        "rules-prompt",
+        "rewind-prompt"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "check-quiz",
-      "issue": "In exam question 4 (e5) the rule under test, `Bash(git push *)`, wraps as 'Bash(git push' / '*)' on desktop (desktop-jp-17). The same split appears on mobile (mobile-jp-24). The trailing ' *' is exactly what the question tests, and it is cut off from the rest of the pattern.",
-      "fix": "Shorten the stem so the chip does not land at the end of a line. For example: 「autoモードです。`ask` には `Bash(git push *)` だけを書きました。確認の画面が出ないのはどれでしょう？」. Start a new sentence right before the chip, and drop `.claude/settings.json` from the stem: section 2-4 already names that file.",
-      "screenshot": "pages/desktop-jp-17.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "check-quiz",
-      "issue": "In exam question 5 (e6), options a and b (`\"deny\": [\"Bash(gh pr create *)\"]`) wrap at 390 px and leave '*)\"]' alone on the second line (mobile-jp-25). The three code options are hard to compare because their wildcards end up in different places.",
-      "fix": "Drop the JSON wrapper so each option fits on one line at 390 px: `deny: Bash(gh pr create *)`, `ask: Bash(gh pr create *)`, `ask: Bash(gh * create)`. Alternatively, put \"ask\"/\"deny\" in plain text: 「確認ルールに `Bash(gh pr create *)`」.",
-      "screenshot": "pages/mobile-jp-25.png"
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "check-quiz",
-      "issue": "In exam question 1 (e1), the flag `--dangerously-skip-permissions` breaks after its leading '--' at 390 px. The '--' is left at the end of one line and 'dangerously-skip-permissions' starts the next (mobile-jp-22), which reads like two separate tokens in a command the learner could copy.",
-      "fix": "Put the flag at the start of its own sentence so it begins a line: 「確認を減らしたくて迷っています。`--dangerously-skip-permissions` を付けて起動してよいでしょうか？最も適切な判断はどれでしょう？」. Or refer to it as 「bypassPermissions と同じ起動オプション」 and keep the literal flag only in the explanation.",
-      "screenshot": "pages/mobile-jp-22.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "rules-check",
-      "issue": "In check 3/6 (q3), the allow rule `Bash(git *)` wraps as 'Bash(git' / '*)' at 390 px, and `git push origin main` also breaks across lines (mobile-jp-10). The learner has to rebuild both rules in their head to compare them.",
-      "fix": "Shorten the stem and give each rule its own short sentence: 「許可ルールは `Bash(git *)`、確認ルールは `Bash(git push *)` です。`git push origin main` はどうなるでしょう？」. If it still wraps, move the two rules into a two-line list before the question.",
-      "screenshot": "pages/mobile-jp-10.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "sort-task: on mobile, '2-1の一覧' breaks as '2-' / '1の一覧' (mobile-jp-16). Rephrase so the number does not fall at the end of a line, e.g. 「一覧（2-1）を見ずに答えてから、確かめましょう。」.",
-    "auto-bypass: `--dangerously-skip-permissions` splits at a hyphen as '--dangerously-' / 'skip-permissions' on mobile (mobile-jp-06) and on desktop (desktop-jp-04). It still reads as one token, but putting it at the start of a sentence would keep it whole.",
-    "auto-defaults: `git reset --hard` splits as 'git reset' / '--hard' on mobile (mobile-jp-06).",
-    "rules-prompt / rewind-prompt: the prompt text shows literal backticks around file names and commands (mobile-jp-20, mobile-jp-21, desktop-jp-14), and `rewind-copy.md` breaks across lines on mobile. Pasting the backticks is harmless, but plain 「」 would read more cleanly.",
-    "reader: example-steps step 1 starts a line with '、' right after the glossary-linked 確認ルール (mobile-jp-11). This is line-break (kinsoku) handling around inline elements.",
-    "reader: desktop JP median is 41 characters per line (max 54), just above the 30–40 target, with a 680 px measure.",
-    "reader: known behaviour, not lesson defects. The full-length mobile PNG is truncated at 16000 px. Failed /api/ requests are ignored (14). The end banner says this is the course's last lesson (the draft is not in course.json). Wide elements have no scroll cue."
+    "rewind-prompt / rules-prompt: the prompt text shows literal backticks (`git push`, `.claude/settings.json`, `rewind-practice.md`). On mobile, `rewind-copy.md` breaks into 'rewind-' / 'copy.md' (pages/mobile-jp-20.png, pages/mobile-jp-21.png). Consider 「」 quotes instead of backticks in the prompt text, so learners read the file names as names.",
+    "sort-task: on mobile, '2-1の一覧' breaks between '2-' and '1' (pages/mobile-jp-15.png). Rephrase as '前の一覧（2-1）' or put '2-1' later in the sentence.",
+    "reader: desktop charsPerLine has a median of 41 and a max of 54, against a target of 30–40. The 680 px measure at 18.7 px is slightly wide for Japanese body text.",
+    "reader: the mobile full-length PNG stops at 16000 px (truncated), and the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-29.png, pages/desktop-jp-20.png).",
+    "reader: 14 failed /api/ requests (500 on user/progress, events, notifications) are environment noise and are not counted as console errors."
   ],
-  "verdict": "revise",
-  "summary": "Full check of the fresh preview (lessonHash sha256:95d0a505f30641a5): no hard failures, no personal data on any screen, a clear and readable flowchart, and code blocks that fit at 390 px. The main problem is inline code chips that break in the middle of the rule patterns the questions test, such as 'Bash(git push' / '*)' and '--' / 'dangerously-skip-permissions'. It shows in check-quiz e1, e5 and e6 and in rules-check q3. Fix it by shortening the stems so each chip stays on one line and by dropping the JSON wrapper from the e6 options."
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "There are no hard failures (overflowX, console, mermaid, unknown-block and broken-image counts are all 0) and no personal data on any screen. The flowchart, code blocks and quizzes are all readable at 390 px, and every screen has a structural element. Only polish remains: the raw backticks in the two prompt blocks, the broken '2-1' on mobile, and the reader's slightly wide desktop line length."
 }

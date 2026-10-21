@@ -112,7 +112,7 @@
           "items": [
             {
               "term": "ワークツリー（worktree）",
-              "md": "同じリポジトリから、フォルダーとブランチを分けて作る作業コピー。`claude --worktree <名前>` で作ります。場所は `.claude/worktrees/<名前>/`、ブランチは `worktree-<名前>` です。"
+              "md": "同じリポジトリから、フォルダーとブランチを分けて作る作業コピー。`claude --worktree <名前>` で作ります。"
             },
             {
               "term": "バックグラウンド実行（background execution）",
@@ -126,7 +126,7 @@
           "style": "bullet",
           "items": [
             "調べものやレビューなら、[[サブエージェント]]に任せます。要点だけが会話に戻ります。設定しなければ、同じフォルダーを編集します。",
-            "別々の変更を同時に進めるなら、[[ワークツリー]]を使います。依存パッケージを入れ直し、取り込みは自分で行います。",
+            "別々の変更を同時に進めるなら、[[ワークツリー]]を使います。依存パッケージを入れ直し、取り込みは自分でします。",
             "長いテストや開発サーバーなら、[[バックグラウンド実行]]に回します。様子は `/tasks` で見ます。"
           ],
           "cite": [
@@ -232,7 +232,7 @@
               "id": "ex-feature",
               "title": "2つのセッションを始める",
               "md": "`claude --worktree` を、ターミナルごとに名前を変えて実行します。別フォルダー・別ブランチなので、変更がぶつかりません。",
-              "expect": "ブランチ `worktree-feature-a` と `worktree-bugfix-b` で、Claudeが1つずつ動きます。",
+              "expect": "`.claude/worktrees/` の下に、フォルダーが2つできます。ブランチ `worktree-feature-a` と `worktree-bugfix-b` で、Claudeが1つずつ動きます。",
               "troubleshoot": "`Failed to resolve base branch` と出たら、コミットがあるか確かめます。"
             },
             {
@@ -572,7 +572,7 @@
           "id": "p1-task",
           "type": "markdown",
           "style": "lead",
-          "md": "失敗したテストをJSONでまとめる、夜間チェックのコマンドを書きます。`cc-practice-09` で進め、大事なリポジトリでは試しません。"
+          "md": "失敗したテストをJSONでまとめる、夜間チェックのコマンドを書きます。練習用フォルダー `cc-practice-09` で進め、大事なリポジトリでは試しません。"
         },
         {
           "id": "p1-steps-setup",
@@ -671,12 +671,14 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "# 模範解答（見比べる用）\nclaude --bare -p \\\n'npm test を実行し、失敗したテストを\nJSONの配列で返してください。\n各要素は name・file・error で、\nerror はエラーの1行目です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\",\n \"reason\": \"<理由>\"}\nを返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
+          "code": "# 模範解答（見比べる用）\nclaude --bare -p \\\n'npm test を実行し、失敗したテストを\nJSONの配列で返してください。\n各要素は name・file・error で、\nerror はエラーの1行目です。\n失敗が0件なら [] を返してください。\nテストを実行できなければ、[] ではなく\n{\"status\": \"error\",\n \"reason\": \"<理由>\"}\nを返してください。' \\\n  --allowedTools \\\n    \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
           "highlight": [
+            2,
             12,
             13,
             14,
-            15
+            15,
+            16
           ]
         }
       ]
@@ -849,26 +851,26 @@
             {
               "id": "e3",
               "kind": "single",
-              "prompt": "夜間のCIで、失敗したテストを要約させます。いちばん安全なコマンドはどれでしょう？",
+              "prompt": "夜間のCIで、失敗したテストを要約させます。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。",
               "options": [
                 {
                   "id": "b",
-                  "md": "`claude --bare -p \"…\" --allowedTools \"Bash\" --permission-mode dontAsk --max-budget-usd 1`",
-                  "feedback": "`\"Bash\"` だけだと、どのシェルコマンドも確認なしで通ります。`Bash(npm test *)` のように絞ります。"
+                  "md": "`--bare` ＋ `Bash` ＋ `dontAsk`",
+                  "feedback": "`Bash` だけだと、どのシェルコマンドも確認なしで通ります。`Bash(npm test *)` のように絞ります。"
                 },
                 {
                   "id": "c",
-                  "md": "`claude --bare -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode bypassPermissions --max-budget-usd 1`",
+                  "md": "`--bare` ＋ `Bash(npm test *)` ＋ `bypassPermissions`",
                   "feedback": "`bypassPermissions` は確認を飛ばすので、無人のCIでは危険です。確認が要る操作を拒否するのは `dontAsk` です。"
                 },
                 {
                   "id": "d",
-                  "md": "`claude -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode dontAsk --max-budget-usd 1`",
+                  "md": "`Bash(npm test *)` ＋ `dontAsk`",
                   "feedback": "`--bare` がないと、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。"
                 },
                 {
                   "id": "a",
-                  "md": "`claude --bare -p \"…\" --allowedTools \"Bash(npm test *)\" --permission-mode dontAsk --max-budget-usd 1`"
+                  "md": "`--bare` ＋ `Bash(npm test *)` ＋ `dontAsk`"
                 }
               ],
               "answer": [
@@ -989,7 +991,7 @@
           "points": [
             "調べものはサブエージェント、別々の変更はワークツリー、長い処理はバックグラウンドに回します。",
             "ワークツリーでは依存パッケージを入れ直し、取り込むまで残します。",
-            "モードを指定しない `claude -p` は、v2.1.302からManualモードで始まります。必要なコマンドだけを許可し、`--bare` と費用の上限を付けます。",
+            "モードを指定しない `claude -p` は、v2.1.302からManualモードで始まります。必要なコマンドだけを許可します。`--bare` と費用の上限も付けます。",
             "無人の依頼は、成功の条件・権限・費用の上限・失敗の報告で点検します。"
           ]
         },

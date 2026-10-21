@@ -26,7 +26,7 @@ Claude Code course (plan: `doc/brushup-2026/research/claude-code-curriculum.ja.m
   6. 「MCPサーバーやプラグインは公式が安全を確認している」→ AnthropicはMCPサーバーを監査していない。プラグインはあなたの権限で任意のコードを実行できる。マーケットプレイスの名前は出し手を示すだけ。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（コース共通の measure.mjs：`cc-08-hooks-mcp.lesson.json: prose 1852 (budget 1,200–2,400) · read 2838 · practice reading 1092 · questions 10 · practice sections 1 · est 17.4 min (must be ≤ 20; estMinutes 17)`。(2,838 + 1,092) ÷ 450 ≈ 8.7分 + 問題10問 × 40秒 ≈ 6.7分 + 演習1セクション × 2分 = 2分、計 17.4分 → 17）。
+- 所要時間 / minutes: 18（コース共通の measure.mjs：`cc-08-hooks-mcp.lesson.json: prose 1892 (budget 1,200–2,400) · read 2878 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)`。(2,878 + 1,249) ÷ 450 ≈ 9.2分 + 問題10問 × 40秒 ≈ 6.7分 + 演習1セクション × 2分 = 2分、計 17.8分 → 18）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 例題と同じ練習用フォルダー（`cc-hooks-practice`）で、`.env` への書き込みを止める `PreToolUse` フック（`Edit|Write`、`tool_input.file_path`、`exit 2`）を作り、手で試す → Claudeに頼んで止まることを確かめ、理由を説明させる。後半は架空の2候補（社内の課題管理MCPサーバー／作者がわかりソースも公開された「全部入り」プラグイン。どちらにも強みと弱みが1つずつある）を8-5の表の項目ごとに書き出して見極め、書き出しの例（A は `practice-b-model`、B は `practice-b-model-b`）と比べる。
@@ -39,7 +39,7 @@ Claude Code course (plan: `doc/brushup-2026/research/claude-code-curriculum.ja.m
 ## 資料 / Sources
 All checked 2026-10-20 (facts file `facts-cc-08-hooks-mcp.md` plus the official pages re-read with WebFetch/curl).
 - `cc-hooks-guide` — Automate actions with hooks — https://code.claude.com/docs/en/hooks-guide — Anthropic. Used for: event → matcher → handler JSON; the Prettier `PostToolUse` example; the protect-files.sh example (`.env`, `package-lock.json`, `.git/`, `exit 2`, `"$CLAUDE_PROJECT_DIR"`); `chmod +x`; `/hooks`; file watcher / restart; no trailing commas; testing by piping JSON and `echo $?`; stdin fields `tool_name`, `tool_input`; exit 0 is not an approval; a hook's deny holds in every permission mode (PreToolUse fires before permission-mode checks); `Edit|Write` does not see Bash writes; Ctrl+O transcript view.
-- `cc-hooks` — Hooks reference — https://code.claude.com/docs/en/hooks. Used for: the `rm*` example (the lesson shortens its message to `Blocked: rm is not allowed` so the line fits 390 px); stderr reaches Claude as the tool's error; exit-code-2 behaviour per event (PostToolUse: "Shows stderr to Claude; the tool already ran"); exit 1 is non-blocking; a hook that cannot start is non-blocking; `${CLAUDE_PROJECT_DIR}` is the project root where the session started.
+- `cc-hooks` — Hooks reference — https://code.claude.com/docs/en/hooks. Used for: the `rm*` example (the lesson shortens its message to `Blocked: rm not allowed` so the `echo … >&2` line fits 390 px); stderr reaches Claude as the tool's error; exit-code-2 behaviour per event (PostToolUse: "Shows stderr to Claude; the tool already ran"); exit 1 is non-blocking; a hook that cannot start is non-blocking; `${CLAUDE_PROJECT_DIR}` is the project root where the session started.
 - `cc-features-overview` — Extend Claude Code — https://code.claude.com/docs/en/features-overview. "An instruction like 'never edit .env' in CLAUDE.md or a skill is a request, not a guarantee."
 - `cc-memory` — How Claude remembers your project — https://code.claude.com/docs/en/memory. CLAUDE.md is context, not enforced configuration.
 - `steering-post` — Steering Claude Code (2026-06-18) — https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more. "Every time X, do Y" belongs in hooks; "The model choosing to run a formatter is different from the formatter running automatically."
@@ -65,18 +65,26 @@ Re-run after the round-3 mobile changes (bash 5, jq 1.7, Linux; every code block
 `Blocked: .env matches protected pattern '.env'` + `2`, `README.md` → `0`; `.git/config` and `package-lock.json` → `2`; the
 old hint (piping to `block-rm.sh`) → `0`, which was the pedagogy must-fix; without `jq` → `jq: command not found` + `0`;
 the three JSON blocks parse with `jq`.
+Re-run after the round-4 mobile changes (bash 5, jq 1.7, Linux; every code block extracted from the lesson JSON into a
+scratch folder): `s2-setup` as written; `s2-test` as written (`chmod +x`, then the 4-line test) → `Blocked: rm not allowed`
++ `2`, with `rm notes.txt` → `ls` → `0`; before `chmod +x` → `Permission denied` + `126`; q2 commands → 2 / 2 / 0 / 2; the
+p-predict hint (`"Bash"` → `"Edit"`, `"command": "rm notes.txt"` → `"file_path": ".env"`, piped to
+`.claude/hooks/protect-files.sh`) → `Permission denied` + `126` before `chmod +x`, then
+`Blocked: .env matches protected pattern '.env'` + `2`, `README.md` → `0`; `.git/config`, `package-lock.json` and an
+absolute `…/.env` path → `2`; input without the field (`.tool_input.file_path` or `.command` missing, `jq` prints `null`) → `0`;
+without `jq` → `jq: command not found` + `0`; the three JSON blocks parse; `s4-add` passes `bash -n`.
 
 ## Outline
 
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：「.envは編集しないで」が守られない | CLAUDE.mdの「〜しないで」は守られる保証がない | markdown (problem, 2 sentences + version line), quiz predict | `q0` → o1 (understand, ungraded) |
-| `s1` | concept | 8-1. フック：お願いではなく、必ず動く仕組み | フックはClaudeの判断と関係なく決まったタイミングで必ず動く；設定は イベント → マッチャー → 処理（ここではコマンド） | markdown lead (第6回の想起; 毎回守らせることは第2回の権限ルールやフックに任せる), definitions (フック・イベント・マッチャー), diagram (lifecycle, 6 nodes, labels split at word boundaries for 390 px; edge 「通す（権限の確認へ）」; the edge into the PreToolUse diamond has no label, so 「止める」 is the only label between the two nodes — visual QA round 3), markdown (also states the hook command in text and that the hook gets JSON), code (Prettier `PostToolUse`), quiz inline | `q1` → o1 (apply: 編集のたびにテスト → `PostToolUse`) |
-| `s2` | example | 8-2. 例題：rmで始まるコマンドを止める | `PreToolUse` フックの作り方：スクリプト → 許可と登録 → 予想してから手で試す | markdown lead, definitions (標準入力・標準エラー出力・終了コード), code (setup: `jq --version` で確かめてから作る、1行に1コマンド、comments ≤ 12 JP chars), code (`block-rm.sh`, the `jq` line split after the pipe), code (`settings.json`), steps (3, subgoal titles + why + expect + troubleshoot, `Permission denied` → `chmod +x`; ex-script names the save path, ex-register writes the full hook command, ex-test says the ③ lines are one command), code (② `chmod +x` + ③ test, the test command over 3 short lines), quiz inline | `q2` → o1 (analyze: 条件の外 `cd docs && rm` は止まらない。`rm notes.txt && ls` は止まる) |
+| `s1` | concept | 8-1. フック：お願いではなく、必ず動く仕組み | フックはClaudeの判断と関係なく決まったタイミングで必ず動く；設定は イベント → マッチャー → 処理（ここではコマンド） | markdown lead (第6回の想起; 毎回守らせることは第2回の権限ルールやフックに任せる), definitions (フック・イベント・マッチャー), diagram (lifecycle, 6 nodes, labels split at word boundaries for 390 px; edge 「通す（権限の確認へ）」; the edge into the PreToolUse diamond has no label, so 「止める」 is the only label between the two nodes — visual QA round 3), markdown (states the two halves of the hook command in text, `jq -r '.tool_input.file_path'` and `xargs npx prettier --write`, and that the hook gets JSON), code (Prettier `PostToolUse`), quiz inline | `q1` → o1 (apply: 編集のたびにテスト → `PostToolUse`) |
+| `s2` | example | 8-2. 例題：rmで始まるコマンドを止める | `PreToolUse` フックの作り方：スクリプト → 許可と登録 → 予想してから手で試す | markdown lead, definitions (標準入力・標準エラー出力・終了コード), code (setup: `jq --version` で確かめてから作る、1行に1コマンド、comments ≤ 12 JP chars), code (`block-rm.sh`, the `jq` line split after the pipe, every line ≤ 36 characters), code (`settings.json`), steps (3, subgoal titles + why + expect + troubleshoot, `Permission denied` → `chmod +x`; ex-script names the save path, ex-register writes the full hook command, ex-register is titled 「実行を許可して登録する」 (実行の許可 for `chmod +x`, apart from tool permissions); ex-test says the first 4 lines of ③ are one command), code (② `chmod +x` + ③ test, the test command over 4 short lines), quiz inline | `q2` → o1 (analyze: 条件の外 `cd docs && rm` は止まらない。`rm notes.txt && ls` は止まる) |
 | `s3` | concept | 8-3. 終了コードで、Claude Codeの動きが変わる | 0 は進む（許可ではない）、2 は止めて理由が届く、1 などは止めないエラー；`PostToolUse` の 2 は取り消しではない | markdown lead, table (3 rows, 2 columns: 終了コード／結果), markdown, callout pitfall (exit 1, 3 sentences), markdown, quiz inline | `q3` → o2 (understand: `onFailure` なしの `exit 1` の `.env` ガード) |
-| `s4` | concept | 8-4. MCPで外のツールにつなぐ | MCPで外部ツールをつなぎ、スコープで使える範囲を決める | markdown lead (MCP の定義を含む), definitions (MCP サーバー・スコープ), code (`claude mcp add` / `list`, the notion line split with `\`, short comments), markdown (http 推奨・SSE 非推奨; the stdio form `--` moved here from a code comment), table (scopes, 2 columns: スコープ／使える範囲; the first column is the scope name only) | — (density: s3 and s5 have checks) |
+| `s4` | concept | 8-4. MCPで外のツールにつなぐ | MCPで外部ツールをつなぎ、スコープで使える範囲を決める | markdown lead (MCP の定義を含む), definitions (MCP サーバー・スコープ), code (`claude mcp add` / `list`, the notion line split with `\` before the name and URL, short comments; the local-server template reads `<名前> -- <コマンド>`), markdown (http 推奨・SSE 非推奨; the stdio form `--` moved here from a code comment), table (scopes, 2 columns: スコープ／使える範囲; the first column is the scope name only) | — (density: s3 and s5 have checks) |
 | `s5` | concept | 8-5. プラグインは、入れる前に確かめる | プラグインもMCPサーバーもあなたの権限で動く；入れる前の6項目 | markdown lead (第7回の想起), definitions (プラグイン・マーケットプレイス・プロンプトインジェクション), markdown (risk), table (6 checks labelled 出どころ・作者・実行内容・外部連携・権限・更新; 権限の行に「フックは対象外」), callout pitfall (公式の場所＝安全ではない), quiz inline | `q4` → o3 (evaluate: 何が実行されるかを最優先) |
-| `practice` | practice | 演習：.envを守るフックを作り、つなぐ候補を見極める | 例題を `.env` 用に作り変え（マッチャーと取り出す項目）、予想 → 手で試す → Claudeで確かめ説明させる；2候補を見極める | markdown (task), steps (3, hints + troubleshoot), prompt (claude-code, `{{追加する行}}`, expect, note), markdown (also writes the full protect-files command) + code ×2 (model answer: protect-files.sh wrapped to ≤ 44 columns, combined settings.json), markdown, quiz inline (2 candidates), table ×2 (`practice-b-model` for A, `practice-b-model-b` for B: model of the written-out table, 2 columns each), checklist (5) | `q9` → o3 (evaluate: 架空の2候補。どちらも出どころと作者はわかる。Aの弱み（社外の文章を読み、閉じるツールがある）は権限ルールで外せ、Bの弱み（フックが毎回外から取ってきたスクリプトを実行）は前もって確かめられず権限ルールでも絞れない → Aは読むツールだけ許して試し、Bは入れない。誤答は A を全部許す／A も入れない／B も入れる) |
+| `practice` | practice | 演習：.envを守るフックを作り、つなぐ候補を見極める | 例題を `.env` 用に作り変え（マッチャーと取り出す項目）、予想 → 手で試す → Claudeで確かめ説明させる；2候補を見極める | markdown (task), steps (3, hints + troubleshoot; the p-script troubleshoot matches ex-register: fix the JSON and restart when the hook is missing from `/hooks`, `chmod +x` on `Permission denied`), prompt (claude-code, `{{追加する行}}`, expect, note), markdown (also writes the full protect-files command) + code ×2 (model answer: protect-files.sh with every line ≤ 36 characters, combined settings.json), markdown, quiz inline (2 candidates), table ×2 (`practice-b-model` for A, `practice-b-model-b` for B: model of the written-out table, 2 columns each), checklist (5) | `q9` → o3 (evaluate: 架空の2候補。どちらも出どころと作者はわかる。Aの弱み（社外の文章を読み、閉じるツールがある）は権限ルールで外せ、Bの弱み（フックが毎回外から取ってきたスクリプトを実行）は前もって確かめられず権限ルールでも絞れない → Aは読むツールだけ許して試し、Bは入れない。誤答は A を全部許す／A も入れない／B も入れる) |
 | `check` | check | 理解度チェック | 全目標の確認、転移問題を含む | quiz exam (4) | `q5` → o1 (apply, transfer: `config/production.yml`), `q6` → o2 (transfer: lint の `PostToolUse` + `exit 2`), `q7` → o2 (CLAUDE.md とフック、autoモード), `q8` → o3 (evaluate, transfer: Webページ要約のMCPサーバー。誤答はどれも「一部だけ確かめる」) |
 | `summary` | summary | まとめ | 持ち帰る4点、振り返りの問い、次の一歩 | summary (4), markdown (reflection + next + official docs link), flashcards (7), askTutor (3) | — |
 
@@ -86,10 +94,13 @@ Contract check: hook problem in 2 sentences + predict; 5 segments (s1–s5), inl
 インジェクション; worked example (s2, 3 steps with subgoals, why and expect) → faded practice (same structure,
 different matcher and field, hint ladder: step hints → troubleshoot → model answer) → exam; every objective has
 inline and exam questions (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8); summary 4 points; 7 flashcards;
-one diagram (6 nodes), no images. Body: prose 1,705 by the course-wide measure.mjs (budget 1,200–2,400; see Format).
+one diagram (6 nodes), no images. Body: prose 1,892 by the course-wide measure.mjs (budget 1,200–2,400; see Format).
 Mobile fit (390 px): every table has 2 columns (cells ≤ 40 JP chars) and a first column of ≤ 4 JP characters or one
 short inline code; diagram-width.mjs measures the diagram at 344 px (limit 362); code-width.mjs leaves only the four JSON
 `command` strings over 44 columns (see Assumptions); para-sentences.mjs reports only the q9 stem (advisory).
+The browser check at 390 px (code-wrap.sh, reader of 2026-10-21) finds no split chip and no cut-off line; it soft-wraps
+only the four JSON `command` lines, and lists the two `"$CLAUDE_PROJECT_DIR"/.claude/hooks/…` path chips (ex-register,
+practice-model-intro) as longer than a line (kept: a plain path in a sentence that reads well).
 Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
 
 ## Assumptions
@@ -105,16 +116,23 @@ Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
   「PreToolUseフック」), except around inline code. Plain-text fields (prerequisites, captions, checklist labels, askTutor)
   carry no code font, so command and file names there have no space either (「cat .envで」「/hooksのPreToolUseに」
   「--scopeで選ぶ」; ja-editor round 2).
-- Length follows the course-wide measure.mjs (prose 1,705, est 16.9 → 17 minutes), which replaced the earlier
+- Length follows the course-wide measure.mjs (prose 1,892, est 17.8 → 18 minutes), which replaced the earlier
   per-lesson character count.
 - Mobile fit (round 3): every code line is ≤ 44 columns except the four JSON `command` strings (s1-prettier line 9,
   s2-settings line 9, practice-model-settings lines 9 and 18). A JSON string cannot be wrapped, and the path string alone
   (`"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-rm.sh"`, 51 columns) is wider than the code box, so the layout stays as in
   the hooks guide (cc-11 keeps its Prettier line the same way). The full commands are written in prose instead: the
   Prettier command in s1-config, the block-rm command in ex-register, the protect-files command in practice-model-intro.
-  The scripts are wrapped: the `jq` lines break after the pipe, `PROTECTED_PATTERNS` is a multi-line array, the loop
+  The scripts are wrapped: the `jq` lines break after the pipe, the patterns array spans 3 lines, the loop
   variable is `pat` (the guide's `pattern` made two lines 45 columns wide), the protect-files message is passed to `echo`
-  as two arguments (same output as the guide), and block-rm.sh prints the shorter `Blocked: rm is not allowed`.
+  as two arguments (same output as the guide), and block-rm.sh prints a shorter message.
+- Mobile fit (round 4, visual QA at 390 px fits about 36 code characters per line): block-rm.sh prints
+  `Blocked: rm not allowed` (the guide: `Blocked: rm commands are not allowed`) so `>&2` stays on the `echo` line; both
+  scripts use `jq -r '.tool_input.<field>'` without the guide's `// empty` (a missing field gives `null`, which matches
+  no pattern, so nothing changes; it also matches the Prettier command); protect-files.sh names its variables `FILE` and
+  `PATTERNS` (the guide: `FILE_PATH`, `PROTECTED_PATTERNS`), with the same output. The s2-test JSON spans 4 lines with
+  spaces after the colons, so the p-predict hint can name the exact text to change. s1-config gives the Prettier
+  command as its two halves instead of one long chip.
   Comments in code are ≤ 12 JP characters; what they used to say is in the step text (ex-test, s4-transport).
 - Table labels (visual QA round 3): s5-checks, practice-b-model and practice-b-model-b use 出どころ・作者・実行内容・
   外部連携・権限・更新 (≤ 4 characters, so 390 px does not split 「実行されるもの」 or 「外とのやり取り」); card-before-install
@@ -135,3 +153,6 @@ Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
   names `onFailure` once in s3-pitfall as the exception, and q3's prompt states that `onFailure` is not set.
 - `/hooks` lists hooks grouped by event and shows the command when a hook is selected; no page says the list shows the
   matcher, so the practice expect and checklist only ask the learner to find the new hook under `PreToolUse`.
+
+### Last fix round (2026-10-21)
+- q9: the two candidates A and B moved from the question into practice-b-task as a two-item list; the question is one short line (visual QA, load). estMinutes 17 → 18 (est 17.8).
