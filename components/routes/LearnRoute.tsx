@@ -30,6 +30,7 @@ import { resolveLText, type ContentLocale } from '../lesson/model';
 /** Where "back" goes for each course; courses without a hub go to the learning hub. */
 const COURSE_HOME: Record<string, string> = {
   'vibe-coding': '/vibe',
+  'claude-code': '/claude-code',
 };
 
 const copy = {

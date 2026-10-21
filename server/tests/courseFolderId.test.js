@@ -68,13 +68,14 @@ describe('track totals read progress by course slug', () => {
     });
 
     it('every app call site passes the folder slug (not course.id) to courseTotals', () => {
-        const files = ['components/features/programming/VibePathView.tsx', 'components/features/dashboard/MissionControlDashboard.tsx'];
+        const files = ['components/features/programming/CoursePathView.tsx', 'components/features/dashboard/MissionControlDashboard.tsx'];
         let calls = 0;
         for (const file of files) {
             const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
             for (const [call] of source.matchAll(/courseTotals\([^;]*?\)/g)) {
                 calls += 1;
-                assert.match(call, /courseTotals\(\s*\w+\s*,\s*readLessonSummary\s*,\s*[A-Z_]+\s*\)/, `${file}: ${call}`);
+                // A slug constant, or the course page's courseSlug prop (the folder name, as in its /learn links).
+                assert.match(call, /courseTotals\(\s*\w+\s*,\s*readLessonSummary\s*,\s*(?:[A-Z_]+|courseSlug)\s*\)/, `${file}: ${call}`);
             }
         }
         assert.equal(calls, 2);

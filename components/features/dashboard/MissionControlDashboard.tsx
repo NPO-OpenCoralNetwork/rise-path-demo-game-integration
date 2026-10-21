@@ -26,7 +26,7 @@ interface DashboardProps {
 }
 
 /** Track page for a course slug (the reader's own outline lives there). */
-const COURSE_HOME: Record<string, string> = { 'vibe-coding': '/vibe' };
+const COURSE_HOME: Record<string, string> = { 'vibe-coding': '/vibe', 'claude-code': '/claude-code' };
 
 const copy = {
   en: {

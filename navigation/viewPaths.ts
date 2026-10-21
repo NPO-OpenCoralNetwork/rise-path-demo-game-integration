@@ -75,6 +75,9 @@ export const VIEW_PATHS: Record<ViewState, string> = {
 
   // Vibe Coding. The chapters render in the lesson reader (/vibe/chapter-N redirects there too).
   [ViewState.VIBE_PATH]: '/vibe',
+
+  // Claude Code (lesson-reader course; lessons open at /learn/claude-code/<id>).
+  [ViewState.CLAUDE_CODE]: '/claude-code',
   [ViewState.VIBE_PROLOGUE]: '/vibe/prologue',
   [ViewState.VIBE_CHAPTER_0]: '/learn/vibe-coding/vibe-ch0',
   [ViewState.VIBE_CHAPTER_1]: '/learn/vibe-coding/vibe-ch1',
@@ -154,6 +157,7 @@ const LEARNING_PREFIXES = [
   '/preview',
   '/library',
   '/vibe',
+  '/claude-code',
   '/unity',
   '/blender',
   '/programming',
