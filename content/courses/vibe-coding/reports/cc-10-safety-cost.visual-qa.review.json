@@ -9,46 +9,44 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s2-layers flowchart TD fits 390 px with readable Japanese labels (mobile-jp-06/07). The two-column tables s2-table and s5-table wrap cleanly with nothing cut off (mobile-jp-07, mobile-jp-13/14). Every code block (s3-code, practice-case-settings, practice-case-zshrc, practice-folder, practice-answer-rule) shows in full without sideways scrolling.",
+      "evidence": "The s2-layers flowchart (TD) has readable Japanese labels and a caption at 390 px (pages/mobile-jp-06.png, pages/mobile-jp-07.png). The s2-table and s5-table stay 2 columns and wrap cleanly on mobile (pages/mobile-jp-07.png, pages/mobile-jp-13.png). Nothing sticks out sideways, overlaps, is clipped or breaks.",
       "blockIds": [
         "s2-layers",
         "s2-table",
         "s5-table",
         "s3-code",
-        "practice-folder",
         "practice-answer-rule"
       ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "No screen is text-only (textOnlyScreens is empty on both devices), and the concept sections alternate prose, definitions, a diagram, tables and checks. The practice section is long on mobile (mobile-jp-15 to mobile-jp-20). It uses three separate one-step steps blocks, and each one restarts at '1' with '1ステップ中 0 完了'.",
+      "score": 4,
+      "evidence": "metrics.json lists no text-only screens on desktop or mobile. Every content stretch breaks into definitions, a numbered list, a callout, steps, code or a check, and every section ends with a 確認しよう card (pages/desktop-jp-03.png, pages/desktop-jp-05.png, pages/desktop-jp-08.png, pages/desktop-jp-10.png).",
       "blockIds": [
-        "practice-steps",
-        "practice-steps-deny",
-        "practice-steps-bill"
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All learner-facing text is Japanese, as is everything in the reader UI and the diagram labels. English appears only in terms glossed on first use, such as 'プロンプトインジェクション（prompt injection）', and in code. Text contrast is good on the warning and pitfall callouts (s1-auto, s3-pitfall). No awkward line breaks inside Japanese words were seen.",
+      "evidence": "All visible text is Japanese, with the English kept for key terms (プロンプトインジェクション (prompt injection), サンドボックス (sandbox)). The diagram labels are Japanese, contrast is fine in the callouts and the dark code blocks, and no control is hidden under the top or bottom bars (pages/mobile-jp-03.png, pages/mobile-jp-11.png, pages/mobile-jp-28.png).",
       "blockIds": [
         "s1-defs",
         "s2-defs",
-        "s1-auto",
-        "s3-pitfall"
+        "s2-layers"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-steps / practice-steps-deny / practice-steps-bill: three one-step steps blocks each show the number '1' and '1ステップ中 0 完了' (mobile-jp-16, mobile-jp-18, desktop-jp-11, desktop-jp-13). That reads like three separate procedures. Merge them into one 3-step steps block where the code and prompt blocks in between allow it, or give each block a title that tells them apart.",
-    "reader: desktop-jp charsPerLine median is 44 (max 56) against the 30–40 JP target at a 680 px measure. The lesson can't fix this; narrowing the reader's text column would.",
-    "reader: inline code wraps mid-token on mobile, e.g. 'claude -' / 'p' in the e5 prompt and '-' / 'p' in option 4 (mobile-jp-24). This is known reader behaviour.",
-    "reader: the end banner says this is the course's last lesson (mobile-jp-28, desktop-jp-19). This happens because drafts are not in course.json.",
-    "reader: the mobile full-length PNG is truncated at 16000px (truncated: true). All 28 per-screen PNGs were reviewed instead."
+    "The answer options in q3 (`deny` に `Write(./certs/**)` を書く, and option d with Read(./certs/**)) wrap so that only く is left on the second line at 390 px (pages/mobile-jp-11.png, pages/mobile-jp-12.png). Shortening them to 〜と書く, or moving を書く before the chip, would avoid the one-character line.",
+    "reader: desktop charsPerLine median is 44 (max 56) against the JP target of 30–40. This comes from the reader's 680 px text width, not the lesson.",
+    "reader: the end banner on draft previews says this is the course's last lesson (このコースの最後のレッスンまで読み終えました) (pages/mobile-jp-28.png, pages/desktop-jp-19.png). This is expected because drafts are not in course.json.",
+    "reader: metrics.json marks the mobile full-length PNG as truncated (16000 px cap). The per-screen pages/mobile-jp-01..28 still cover the whole lesson."
   ],
   "verdict": "pass",
-  "summary": "I checked the screenshots of lesson hash sha256:4f85040f9e462bb2 (it matches the expected hash). metrics.json shows no hard failures: no overflow, no console, mermaid or unknown-block errors, and no broken images. The diagram, both tables and all code blocks are fully readable at 390 px. No personal data is on any screen: the zshrc example uses a placeholder key. The only suggestion is optional: merge the three one-step practice steps blocks so the repeated '1' numbering doesn't read as three separate procedures."
+  "summary": "This preview shows the lesson under review (lessonHash sha256:4f85040f9e462bb2), and metrics.json has no hard failures: no sideways overflow, console, Mermaid or image errors, and no unknown blocks. The diagram, both tables and all code blocks are readable at 390 px, quizzes or checks break up the text often, and no screen shows personal data. The only suggestion is to stop the one-character line wraps in q3's answer options."
 }

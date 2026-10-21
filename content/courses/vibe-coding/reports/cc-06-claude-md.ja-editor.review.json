@@ -1,74 +1,67 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:a2581804ebc9fe6d",
+  "lessonHash": "sha256:0913750984346c84",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:6b93b57324d9ed64",
+    "reviewedRevision": "sha256:a2581804ebc9fe6d",
     "changed": [
+      "hook-b1",
       "s1-table",
-      "s2-table",
-      "s3-diagram",
-      "s4-table",
+      "s3-defs",
       "practice-setup",
       "practice-steps",
-      "practice-prompt",
       "practice-hint3",
       "practice-answer",
-      "practice-answer-why"
+      "check-quiz",
+      "summary-cards",
+      "lesson.glossary"
     ],
     "changedShare": 0.12,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/6b93b57324d9ed64/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/a2581804ebc9fe6d/round-1/ja-editor.review.json"
   },
-  "resolved": [
-    {
-      "blockId": "s3-diagram",
-      "criterion": "voice",
-      "status": "resolved",
-      "evidence": "The chain is gone. The code now reads 「S[セッション開始] --> A[\"CLAUDE.mdと<br>インポート先、<br>paths: なしのルール\"]」 and 「A --> X[コンテキスト]」 / 「E --> X」. All three startup sources are in one node with its own arrow into コンテキスト. The particle 「と」 makes the label read as a list. The alt text agrees: 「4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り…」."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The s3-diagram meaning error is fixed. The changed prose keeps です・ます: practice-hint3 「…移します。」「…まとめます。」「…残します。」, pr-decide 「…行の書き出しの言葉でメモします。」. The plain-form lines in practice-setup are the sample CLAUDE.md that the learner rewrites, so they are on purpose. The counts in the new text all agree: the sample file has 19 lines, which matches 「19行」 in pr-setup, pr-decide and the practice-prompt hint. The answer keeps 4 list items, matching 「残した4つの項目」. The 3+3 line groups in practice-hint3 match the sample. Some wording is still a little uneven: 「ルール」 next to 「拒否ルール」, and the terse s4-table cells (see niceToHave). So the score stays at 3.",
+      "evidence": "The changed prose still uses です・ます. hook-b1 now ends with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」, which matches the hook-predict question q0. The previous niceToHave for practice-hint3 is done: 「`src/api/` の行は `paths:` 付きのルール」. Its new line 「「ちゃんと」の行は「コミットの前に `npm run test:unit` を通す」に直し」 uses the 直す destination from pr-decide and matches the answer. The sample in practice-setup now mixes plain form, こと and ください, but that is the messy file the learner rewrites, so it is on purpose. The sample still has 19 lines, which matches 「19行」 in pr-setup and pr-decide. A few spots are still uneven: the new e6 option a, the forms in the s1-table first column, and s4-table (see niceToHave).",
       "blockIds": [
-        "s3-diagram",
+        "hook-b1",
         "practice-hint3",
         "practice-setup",
-        "practice-answer-why",
-        "s4-table"
+        "check-quiz",
+        "s1-table"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs: prose 2400 (budget 1,200–2,400), est 19.1 min (≤ 20), estMinutes 19, which match. lessons:lint --strict: 0 errors, 0 warnings. Every section has a table, a diagram, steps or a quiz between its paragraphs. This round makes the dense cells lighter: s4-table's first column is now short labels (「禁止」「長い手順」), s2-table's vague column is a single verb, and practice-hint3 is split into two paragraphs of 2 and 3 sentences. These address what held load at 3 last round. The lesson is still at the top of its prose budget.",
+      "evidence": "measure.mjs: prose 2399 (budget 1,200–2,400), est 19.3 min (must be ≤ 20), estMinutes 19. These match. lessons:lint --strict: 0 errors, 0 warnings. practice-answer now splits the long commit item over two lines (「- コミットの前に」/「`npm run test:unit` を通す」), which suits a phone. The highlight is lines 6–12, which is exactly the new CLAUDE.md body. The answer still keeps 4 items, matching 「残した4つの項目」 in practice-answer-why.",
       "blockIds": [
-        "s1-table",
-        "s2-table",
-        "s4-table",
+        "practice-answer",
+        "practice-answer-why",
         "practice-hint3"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "Carried over from round 2. The changes do not touch where terms are defined. The glossary term 「コンテキスト」 still has no English, and card-agents still says 「プロジェクトに」 (both in niceToHave).",
+      "evidence": "I re-scored this because the glossary and card-agents changed. The glossary entry for AGENTS.md now says 「`.claude/CLAUDE.md` はCLAUDE.mdに数え、`~/.claude/CLAUDE.md` は数えません。」. That agrees with s3-defs and with audit-cc-06-claude-md.json (\"Don't count… your `~/.claude/CLAUDE.md`\"). card-agents now reads 「v2.1.277以降、既定では作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです。」, which closes the carried niceToHave. The glossary term 「コンテキスト」 still has no English (niceToHave), so the score stays at 3.",
       "blockIds": [
         "lesson",
-        "summary-cards"
+        "summary-cards",
+        "s3-defs"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is single-locale (jp), and lint has no plain-string findings. The s3-diagram alt text no longer mentions 自動メモリの先頭, so it now matches the picture: 「4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれて…」. The link in s3-info names where it leads.",
+      "carriedOver": true,
+      "evidence": "Carried over from round 1 of this revision. The lesson is single-locale (jp), and lint has no plain-string findings. The changes add no links or diagrams.",
       "blockIds": [
         "s3-diagram",
         "s3-info"
@@ -77,17 +70,17 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s1-table: the caption says 「広い順」, but now that the first column holds only the audience, it reads 「組織の全員 / 自分 / チーム / 自分」. 自分 before チーム looks out of order, because the breadth note 「（すべてのプロジェクト）」 moved to the second column. Putting it back in the first column keeps the order readable — 「自分」(row 2)→「自分（全プロジェクト）」, 「自分」(row 4)→「自分（このプロジェクト）」",
-    "s4-table: the column 「書きがちなこと」 now mixes a noun (「禁止」), an adverb (「毎回必ず」) and a compound (「API専用」). Matching the form helps on a phone — 「毎回必ず」→「「毎回必ず」の指示」, 「API専用」→「API専用の決まり」",
-    "practice-hint3 (changed; carried from earlier rounds): 「ルール」 right after 「拒否ルール」 can be read as a permission rule — 「`src/api/` の行はルール、」→「`src/api/` の行は `paths:` 付きのルール、」",
-    "s3-diagram: the node says 「インポート先」, while the alt text says 「インポートしたファイル」. Both name the same thing clearly. Using one wording keeps them aligned — alt 「インポートしたファイル」→「インポート先」",
-    "glossary (unchanged, carried): 「コンテキスト」 is still the only term without English — term 「コンテキスト」→「コンテキスト（context）」 (add 「コンテキスト」 to aliases)",
-    "s3-defs (unchanged, carried): 「ないとき、代わりに読まれます。」→「ないとき、CLAUDE.mdの代わりに読まれます。」",
-    "summary-cards (unchanged, carried): card-agents 「既定では、プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」→「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。」",
-    "check-quiz (unchanged, carried): e3 b 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」",
+    "check-quiz: e6 option a 「前のセッションで頼んであるから、もう覚えているよ」 does not answer what the colleague said. The colleague wrote the rule in CLAUDE.md, and CLAUDE.md is read at the start of every session. The feedback 「セッションは毎回まっさらに始まり…」 could make a learner think CLAUDE.md is not carried over either. A distractor about the same premise works better: 「「前のセッションで頼んであるから、もう覚えているよ」」→「「何度も書いて強調すれば、確実に守られるよ」」, with feedback 「くり返しても、守るかどうかはClaudeの判断のままです。止めたい操作は、拒否ルールやフックで決めておきます。」",
+    "s1-table: the first column now mixes nouns (「組織全体」「チーム」) and adverbs (「どこでも」「ここだけ」). On their own, 「どこでも」 and 「ここだけ」 do not say whose scope they are. Using the same form helps: 「どこでも」→「自分の全プロジェクト」, 「ここだけ」→「自分のこのプロジェクト」",
+    "practice-answer: 「- テストは `npm run test:unit` で」 stops at the particle で. That is fine for the hook's quote, but a CLAUDE.md line reads more clearly as a full instruction: 「- テストは `npm run test:unit` で」→「- テストは `npm run test:unit` で実行する」 (adds no line, so the highlight 6–12 stays correct)",
+    "s4-table (unchanged, carried): the column 「書きがちなこと」 mixes a noun, an adverb and a compound. 「毎回必ず」→「「毎回必ず」の指示」, 「API専用」→「API専用の決まり」",
+    "s3-diagram (unchanged, carried): the node says 「インポート先」, but the alt text says 「インポートしたファイル」. Use one wording: alt 「インポートしたファイル」→「インポート先」",
+    "glossary (carried): 「コンテキスト」 is the only term without English. Term 「コンテキスト」→「コンテキスト（context）」, and add 「コンテキスト」 to aliases",
+    "s3-defs (changed; carried): 「ないとき、代わりに読まれます。」→「ないとき、CLAUDE.mdの代わりに読まれます。」",
+    "check-quiz (carried): e3 b 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」, which matches the new wording in practice-hint3",
     "s3-check (unchanged, carried): q4 option c 「CLAUDE.mdから `@` で取り込む別のファイル」→「`CLAUDE.md` から `@` で取り込む別のファイル」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0 (12% of parts changed, 10 of 47 blocks). The one open must-fix is resolved. s3-diagram now feeds コンテキスト from a single startup node, 「CLAUDE.mdと…paths: なしのルール」, and the alt text matches it. The other changed blocks read correctly: the 19-line sample matches the 19行 counts, the hint groups match the sample, the sed range and the highlight (6–11) match the answer, and 4 items are kept. No new must-fix. The leftover points are wording only: the 「自分 / チーム」 order in the s1-table, the uneven s4-table labels, and 「ルール」 in practice-hint3. Length: prose 2400, est 19.1 min, estMinutes 19. Lint is clean."
+  "summary": "Verification round: review-scope.mjs exited 0 (12% of parts changed, 9 of 47 blocks plus the glossary). The previous review had no open must-fix, so there are no resolved entries. All changed text reads correctly. hook-b1 now leads into the predict question. The hint, the 19-line sample, the answer (4 items, highlight 6–12) and the 「残す・直す…」 destinations all agree. The AGENTS.md wording in the glossary, s3-defs and card-agents matches audit-cc-06-claude-md.json. Two carried niceToHave items are closed: card-agents and the 「`paths:` 付きのルール」 wording in practice-hint3. No new must-fix. The new e6 option a misses the colleague's premise; it is listed in niceToHave. Length: prose 2399, est 19.3 min, estMinutes 19. Lint is clean."
 }

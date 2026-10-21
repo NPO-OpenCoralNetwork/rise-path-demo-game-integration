@@ -41,20 +41,20 @@
 Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
   lesson content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json (sha256:4f85040f9e462bb2)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:31ca899dd855ae10 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/lesson.json) · 1 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, load, worked, miscon, visual, practice, meta, accuracy, a11y_l10n · previous .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/round-1/pedagogy-reviewer.review.json and 4 earlier rounds checked
+  pedagogy-reviewer: verification of sha256:31ca899dd855ae10 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/lesson.json) · 1 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, worked, miscon, visual, practice, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/round-1/pedagogy-reviewer.review.json and 4 earlier rounds checked
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer carried)
   ✓ hook       4  (pedagogy-reviewer carried)
   ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
-  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer carried)
   ✓ active     3  (pedagogy-reviewer)
   ✓ miscon     4  (pedagogy-reviewer carried)
   ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
   ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       4  (pedagogy-reviewer carried)
-  ✓ accuracy   4  (pedagogy-reviewer carried)
+  ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer carried, visual-qa)
   resolved [active] s2-check (pedagogy-reviewer)
@@ -91,6 +91,8 @@ An auditor with web access checked 76 claims (pages: 22); a second checker tried
 - cc-10 ja-editor final-round verify review: verdict "fail" set to "revise" (1 must-fix).
 - cc-10 snapshot 48733d77bde8508c/round-1/ja-editor.review.json taken before the verdict fix; applied the same fix to the snapshot copy.
   criterion fill, cc-10 and cc-02 verdict fail->revise, plus their snapshot copies) are superseded by fresh FULL
+- 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
+- cc-10-safety-cost pedagogy-reviewer: the committed verification review had an absolute local path in its summary (server/tests/docPaths.test.js failed). The review was not edited; the same verification (of 31ca899dd855ae10) was re-run with an instruction to use repository-relative paths, and the new review replaced it.
 
 ## Course-wide conventions used
 

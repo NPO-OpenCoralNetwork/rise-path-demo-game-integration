@@ -1,67 +1,60 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:a2581804ebc9fe6d",
+  "lessonHash": "sha256:0913750984346c84",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "No hard failures in metrics.json (overflowX false, 0 console, mermaid, unknown-block or broken-image errors). The s3-diagram flowchart TD has readable Japanese labels at 390 px (mobile-jp-10/11), and the tables and code read cleanly on desktop. On mobile, lines 6 and 8 of the practice-answer code reach the right edge, and the end of line 8 is cut off (mobile-jp-25).",
+      "score": 4,
+      "evidence": "Nothing overflows, no console, mermaid or image errors, and no screen is text-only. At 390 px the four-row s1-table, the two-column s2-table and s4-table and the s3-diagram (flowchart TD) are all readable, and so are the code blocks: the 24-line practice-setup and the 25-line practice-answer with lines 6-12 highlighted. No code line wraps in a way that is hard to follow (pages/mobile-jp-19.png, pages/mobile-jp-25.png).",
       "blockIds": [
-        "s3-diagram",
         "s1-table",
         "s2-table",
         "s4-table",
-        "practice-answer"
+        "s3-diagram",
+        "practice-setup",
+        "practice-answer",
+        "practice-answer-settings"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "No text-only screens on either device (textOnlyScreens is empty). Each section mixes definitions, a table or code with an inline check, so there are no walls of text. Desktop charsPerLine has a median of 42 (34–50), above the JP target of 30–40. The practice section is long on mobile (about 9 screens, mobile-jp-18 to 26), but steps and code break it up.",
+      "evidence": "The lesson is long: 22 desktop screens and 33 mobile screens. Still, every screen has a heading, table, code block, steps or check, and the walls of text are broken up by definitions, tables and inline quizzes. The densest stretch is the practice section, where steps, a prompt, a checklist, a hint, two code blocks and a closing paragraph run for about 8 mobile screens (pages/mobile-jp-18.png to pages/mobile-jp-26.png).",
       "blockIds": [
-        "practice-setup",
         "practice-steps",
+        "practice-prompt",
+        "practice-checklist",
+        "practice-hint3",
         "practice-answer"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "This is a Japanese-only lesson, and no stray English UI shows on the JP screens. Contrast is fine throughout, and no controls are hidden under the top or bottom bars. In the s1-table on mobile, the row label 「組織の全員」 breaks inside the word as 「組織の全／員」 (mobile-jp-04).",
+      "score": 4,
+      "evidence": "This is a Japanese-only lesson, and the UI and content are all in Japanese. Diagram labels are Japanese and large enough at 390 px. Inline code chips stay whole and do not break Japanese words (for example `~/.claude/CLAUDE.md` in s1-table, pages/mobile-jp-04.png). Contrast is fine on the callouts and on the expected-result boxes, and no control is hidden under the top or bottom bars.",
       "blockIds": [
-        "s1-table"
+        "s1-table",
+        "s3-diagram",
+        "s2-pitfall",
+        "s5-steps"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "practice-answer",
-      "issue": "At 390 px the model-answer code lines are wider than the code block. Line 8 「- コミットの前に `npm run test:unit` を通す」 is cut off after 「を通」. Lines 6 (「…で実行する」) and 19 (「…入力を検証してから使う」) run to the very edge, and nothing tells the learner the block scrolls.",
-      "fix": "Keep each line within about 34 full-width columns, as already done for lines 6–7. For example, split line 8 into 「- コミットの前に」 and 「  `npm run test:unit` を通す」. Shorten line 6 to 「- テストは `npm run test:unit`」. Change line 19 to 「- 入力を検証してから使う」 (the file already applies only to src/api/). Then update `highlight` to match the new line numbers.",
-      "screenshot": "pages/mobile-jp-25.png"
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "s1-table",
-      "issue": "In the narrow first column on mobile, the row label 「組織の全員」 wraps inside the word as 「組織の全／員」.",
-      "fix": "Shorten the label so it fits on one line in the 届く範囲 column, for example 「組織全体」 or 「組織」 (the other labels are 「自分」 and 「チーム」).",
-      "screenshot": "pages/mobile-jp-04.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "The step titles in s5-steps and practice-steps start with ①–⑥, but the reader already shows a numbered circle next to each step, so each number appears twice (mobile-jp-16, desktop-jp-11). Removing the circled numbers from the titles would declutter them.",
-    "In practice-hint3 on mobile, the inline code `docs/add-screen.md` wraps at the hyphen (「docs/add-」/「screen.md」, mobile-jp-24). Moving it to the start of a sentence would help it stay on one line.",
-    "Several practice-checklist labels on mobile wrap awkwardly around inline paths, for example 「好みはCLAUDE.local.mdにあ／り」 (mobile-jp-23). Shorter labels or a different word order would avoid this.",
-    "The practice-prompt shows literal backticks around paths (`.claude/settings.json`). This is acceptable for text to paste, but plain quotes would read more cleanly (desktop-jp-15).",
-    "reader: desktop charsPerLine has a median of 42, above the JP target of 30–40, at a 680 px measure.",
-    "reader: the end banner says this is the course's last lesson (expected for a draft), and the mobile full-length PNG is truncated. Both are known behaviour.",
-    "reader: wide code blocks give no visible cue that they scroll sideways on mobile."
+    "s5-steps / practice-steps: each step title starts with a circled digit (① ...) right next to the reader's own numbered circle, so every number appears twice (pages/mobile-jp-16.png, pages/desktop-jp-11.png). Drop the circled digits from the titles.",
+    "practice-prompt: the prompt shows literal backticks around `.claude/settings.json`, `permissions.deny`, `CLAUDE.local.md` and `@` (pages/mobile-jp-22.png). That is fine as text to copy, but the result looks busy on mobile. Consider plain paths without backticks.",
+    "lesson (prerequisites): the prerequisite line takes about 6 lines of small grey text at 390 px before the objectives (pages/mobile-jp-01.png). Consider listing only the closest prerequisites, or shorter labels such as 第1-5回.",
+    "s4-table: at 390 px the `paths:` chip sits alone on its line and 付きのルール（6-3） wraps under it (pages/mobile-jp-14.png). This is readable, but the cell would read more cleanly as plain text, for example 「paths: 付きのルール（6-3）」, or as a reworded cell.",
+    "reader: desktop-jp charsPerLine median is 42 (max 50), against a target of 30-40, at a measure of 680 px. This is a reader layout setting, not a lesson problem.",
+    "reader: the end banner says 'このコースの最後のレッスンまで読み終えました' because drafts are not in course.json (pages/mobile-jp-33.png, pages/desktop-jp-22.png).",
+    "reader: metrics.json marks the mobile full-length PNG as truncated (it stops at 16000px), and 13 /api/ requests failed in the preview environment."
   ],
-  "verdict": "revise",
-  "summary": "The screenshots match lessonHash sha256:a2581804ebc9fe6d, there are no hard failures in metrics.json, and no personal data appears on any screen. The layout is clean and varied: every section has a table, definitions, code or a diagram plus an inline check, and the TD flowchart is readable at 390 px. The most important fix is the practice-answer code block, whose longest Japanese lines are cut off on mobile; the other is the 「組織の全員」 label in s1-table, which breaks mid-word."
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "The lesson's visual structure is its biggest strength: every screen has a table, diagram, code block, steps or check. The tables, the flowchart TD diagram and the long code blocks all stay readable at 390 px, there are no hard failures in metrics.json, and no screen shows personal data. Nothing must be fixed; the most worthwhile cleanup is removing the doubled numbering (① next to the reader's step circle) in s5-steps and practice-steps."
 }

@@ -80,6 +80,10 @@ An auditor with web access checked 62 claims (pages: 19); a second checker tried
 
 `npm run lessons:preview -- vibe-coding cc-07-skills-subagents --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-07-skills-subagents/` (gitignored). The visual-qa review above was made from these screenshots.
 
+## Orchestrator notes
+
+- 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
+
 ## Course-wide conventions used
 
 See `doc/brushup-2026/research/claude-code-curriculum.ja.md` §9.2: body length by the course measure, 2-column tables, narrow diagrams, no markdown in plain-text fields, answer positions spread.
