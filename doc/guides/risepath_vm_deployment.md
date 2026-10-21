@@ -1,7 +1,7 @@
 # Rise Path 専用 VM デプロイ（`risepath-vm`）
 
 > 更新日: 2026-10-21  
-> ステータス: **GCP `risepath-vm` 稼働中**（db/api/mcp + Memanto overlay、50GB ディスク）/ Hermes・kokoro は `--profile full` で起動  
+> ステータス: 2026-10-21 時点で、オーナーの報告では **VM は使っていない**。再開手順は §4.5（公開エッジへの切り替えは [`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。構成は db/api/mcp + Memanto overlay、50GB ディスク / Hermes・kokoro は `--profile full` で起動  
 > 目的: **ai-note-meet / nexloom-gce の既存スタックを変更せず**、Rise Path を DB〜Hermes まで一式で再現・運用する。
 
 ---
@@ -32,7 +32,8 @@
 | コンポーネント | 配置 | 理由 |
 |----------------|------|------|
 | **Supabase Auth** | SaaS | 認証のみ。データ DB は VM |
-| **フロント（Vite ビルド）** | Vercel 等（推奨） | 静的配信。API は VM 向け |
+| **フロント（Vite ビルド）** | Vercel（`https://app.<domain>`） | 静的配信。`/api/*` などは `vercel.json` の routes が VM へ転送する |
+| **公開エッジ** | Cloudflare（DNS + Tunnel） | API は Cloudflare Tunnel 経由の `https://api.<domain>` だけで公開する。インターネット向けの受信ポートは開けない |
 | **GCS** | GCP | 大きいファイル（計画） |
 
 ---
@@ -41,9 +42,15 @@
 
 ```text
 [Browser]
-   │ Supabase Auth (JWT)
+   │ Supabase Auth (JWT)。API は同一オリジンの /api/v2 だけを呼ぶ
    ▼
-[Vercel 等]  静的フロント ──HTTPS──► [risepath-vm / Tailscale]
+[Vercel app.<domain>]  静的フロント + vercel.json routes
+   │ /api/*・/audio/cache/*・/generated/img_* を転送し、x-origin-secret を付ける
+   ▼
+[Cloudflare api.<domain>]
+   │ Cloudflare Tunnel（VM から外向きに張る接続。インターネット向けの受信ポートは要らない）
+   ▼
+[risepath-vm]  cloudflared（profile tunnel、edge ネットワーク）──► api:3006
                                          │
                     ┌────────────────────┴────────────────────┐
                     │  docker compose (Rise Path stack)         │
@@ -55,8 +62,13 @@
                     │       └──────────┴────────┴────────┘    │
                     └───────────────────────────────────────────┘
 
+[Mac / Tailscale]  db:5432・mcp:3100・hermes:8642・kokoro:8880 は今までどおり。
+                   api:3006 は ORIGIN_SECRET の設定後、x-origin-secret が要る
+
 [nexloom-gce]  … 変更しない（ai-note-meet, auto-grants, gemini5 Hermes 等）
 ```
+
+`api` の最初のミドルウェアは origin gate（`server/middleware/originGate.js`）。`stack.env` に `ORIGIN_SECRET` があると、`api` コンテナ内の loopback 以外から来て正しい `x-origin-secret` を持たないリクエストに 403 を返す。通ったリクエストは edge 扱いで、Bridge Token は使えず、edge のパスにしか届かない。`ORIGIN_SECRET` が空なら gate は動かない。
 
 ### 2.1 Compose サービス（目標）
 
@@ -66,7 +78,7 @@
 | `api` | リポジトリ `Dockerfile` | 3006 | Express `server.js` |
 | `mcp` | 同上 | 3100 | MCP SSE（本番は stdio 非推奨） |
 | `hermes` | Hermes 公式 or カスタム | 8642 | `rise-path` プロファイル、API Server |
-| `proxy` | caddy / traefik（任意） | 443 | TLS 終端 |
+| `cloudflared` | `cloudflare/cloudflared`（タグ + digest 固定、profile `tunnel`） | なし | `api.<domain>` → `http://api:3006`。TLS は Cloudflare で終端。`tunnel.env` だけを読む |
 
 Postgres ロールは **`risepath_app`** に統一（`deploy/risepath-vm/stack.env.example` の `POSTGRES_USER`、Mac `.env.local`、レガシー bootstrap SQL と一致）。
 
@@ -87,11 +99,12 @@ docker compose --env-file stack.env up -d
 
 | パス | 内容 |
 |------|------|
-| `deploy/risepath-vm/docker-compose.yml` | VM スタック（**db + api + mcp**） |
-| `deploy/risepath-vm/scripts/provision-gce.sh` | GCP VM + 09:00–23:00 JST スケジュール |
+| `deploy/risepath-vm/docker-compose.yml` | VM スタック（**db + api + mcp**。`cloudflared` は profile `tunnel`） |
+| `deploy/risepath-vm/scripts/provision-gce.sh` | GCP VM（24 時間稼働。`NIGHT_STOP=1` のときだけ 09:00–23:00 JST スケジュール） |
 | `deploy/risepath-vm/stack.env.example` | 変数名テンプレ（秘密なし） |
+| `deploy/risepath-vm/tunnel.env.example` | Cloudflare Tunnel の `TUNNEL_TOKEN` テンプレ（`tunnel.env` は Git 管理外） |
 | `deploy/risepath-vm/hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP + allowlist） |
-| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ（build → migrate → up → `smoke:vm`） |
+| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ（tunnel のガード → build → migrate → up → `api` コンテナ内で smoke） |
 | `docker-compose.yml`（ルート） | **ローカル開発用**（`db` + **`app`** のみ。本番 Compose はサービス名 `api`） |
 | `hermes/config.example.yaml` | Hermes `rise-path` プロファイルテンプレ |
 
@@ -134,11 +147,11 @@ stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../arc
 
 ## 4. セットアップ手順（目標）
 
-### 4.1 VM プロビジョニング（開発期: 夜間停止）
+### 4.1 VM プロビジョニング（24 時間稼働）
 
 **推奨スペック:** `e2-medium`（2 vCPU / 4 GB）+ 30 GB `pd-balanced` + Ubuntu 24.04 + `asia-northeast1`
 
-**開発期スケジュール:** 毎日 **09:00 起動 / 23:00 停止**（Asia/Tokyo）→ 月額 **約 ¥3,000–3,500**
+**稼働:** 公開 API が VM に載るので、既定は 24 時間稼働。開発期の夜間停止（09:00 起動 / 23:00 停止、Asia/Tokyo）は既定ではなくなった。戻すときだけ `NIGHT_STOP=1 ./provision-gce.sh`。月額は要再見積もり（旧目安の約 ¥3,000–3,500 は 14 時間/日の値で、24 時間では増える）。
 
 ```bash
 export GCP_PROJECT=your-project-id
@@ -149,14 +162,16 @@ cd deploy/risepath-vm/scripts
 手動の場合:
 
 1. GCP で VM 作成（`risepath-vm`）
-2. インスタンススケジュールをアタッチ（上記スクリプト参照）
+2. インスタンススケジュールは付けない（夜間停止が要るときだけ `NIGHT_STOP=1` でスクリプトを使う）
 3. Tailscale に参加（`--hostname=risepath-vm`）
 4. `scripts/bootstrap-vm.sh` で Docker + compose + systemd
-5. ファイアウォール: **5432/3006/3100 を 0.0.0.0/0 に開放しない**（Tailscale 経由のみ）
+5. ファイアウォール: アプリ用の受信ルールは作らない。**5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。Cloudflare Tunnel 用に外向きの TCP/UDP 7844 を許可したままにする
 
 #### Mac から接続
 
-`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` を VM 内で公開。Tailscale の `100.x` 経由で `risepath-vm:5432` 等に接続する。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
+`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` / `8642` / `8880` を VM 内で公開する（ポートの公開は変えていない）。Tailscale の `100.x` 経由で `risepath-vm:5432` 等に接続する。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
+
+`stack.env` に `ORIGIN_SECRET` を設定したあとは、api（3006）だけ `x-origin-secret` ヘッダーが要る。付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届かない。VM の :3006 が配信するフロント（`dist/`）も Tailscale からは開けない。db・mcp・hermes・kokoro は今までどおり。
 
 **Hermes（開発期）:** VM には載せず **Mac ローカル**で `hermes -p rise-path gateway`。DB/MCP は VM 向け。
 
@@ -204,7 +219,7 @@ HERMES_API_URL=http://risepath-vm:8642
 HERMES_API_KEY=***
 ```
 
-フロントは引き続き `npm run dev`（:3007）で、API は Tailscale 経由で VM またはローカル proxy。
+フロントは引き続き `npm run dev`（:3007）で、API はローカル（:3006）。VM の API を Tailscale 経由で使えるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけ（§4.1「Mac から接続」）。
 
 ### 4.4 ローカル Docker のみ（VM なしで試す場合）
 
@@ -219,6 +234,28 @@ docker compose --env-file stack.env up -d
 ```
 
 ルートの `docker-compose.yml` は簡易版（`db` + **`app`**）。migration は `docker compose exec app npm run db:migrate`。フルスタックは `deploy/risepath-vm/`（サービス名 `api`）が正本。
+
+### 4.5 停止中の VM を再開する
+
+2026-10-21 時点で、オーナーの報告では VM は使っていない。再開と公開エッジへの切り替えの全手順（Cloudflare・Vercel・Supabase・確認チェックリスト）は [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の「オーナー作業」。VM 側の要点:
+
+```bash
+gcloud compute instances describe risepath-vm --zone=asia-northeast1-b --format='value(status,resourcePolicies)'
+gcloud compute instances start risepath-vm --zone=asia-northeast1-b
+# 夜間停止を外す（24 時間稼働）
+gcloud compute instances remove-resource-policies risepath-vm \
+  --resource-policies=risepath-dev-schedule --zone=asia-northeast1-b
+```
+
+VM に入ったら、**先に pull してから** `deploy-stack.sh` を実行する（§4.2「既存の VM で、この版のスクリプトを初めて使うデプロイ」と同じ理由。古い本体には tunnel のガードも無い）。
+
+```bash
+git -C /opt/risepath pull --ff-only
+cd /opt/risepath/deploy/risepath-vm
+./scripts/deploy-stack.sh
+```
+
+公開エッジを有効にするときは、その前に `tunnel.env`（`TUNNEL_TOKEN`）と `stack.env` の `ORIGIN_SECRET`・`TRUST_PROXY=1`・`LLM_ALLOWED_ORIGINS=https://app.<domain>`・`COMPOSE_PROFILES=full,tunnel` を入れる（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「Cloudflare Tunnel」）。`tunnel` プロファイルで値が足りないと、`deploy-stack.sh` は足りない変数名だけを表示して止まる。
 
 ---
 
@@ -253,6 +290,10 @@ pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
 - [ ] MCP SSE は本番で Bridge Token または Supabase JWT 必須（`NODE_ENV=production` で匿名不可）
 - [ ] `RISE_PATH_BRIDGE_TOKEN` を `mcp` と Hermes `config.yaml` で同値に揃える
 - [ ] Tailscale ACL で `risepath-vm` へのアクセスを限定
+- [ ] `ORIGIN_SECRET` は `stack.env` と Vercel Production env の 2 か所だけ（`VITE_` 変数にしない）
+- [ ] `tunnel.env` は `chmod 600` で Git に無い。`TUNNEL_TOKEN` を読むのは `cloudflared` だけ
+- [ ] `curl -s -o /dev/null -w '%{http_code}\n' https://api.<domain>/api/v2/health` が `403`
+- [ ] GCP ファイアウォールにアプリ用の受信ルールが無い（公開は Cloudflare Tunnel の外向き接続だけ）
 
 ---
 
@@ -298,11 +339,11 @@ docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
 ### 7.3 スモーク
 
 ```bash
-# VM host (loopback + published ports)
-node scripts/smoke-vm-stack.mjs --target host --require-mcp --require-memanto
-
-# From api container (Compose service DNS — deploy-stack.sh uses this when host has no node)
+# From api container (Compose service DNS; loopback passes the origin gate). deploy-stack.sh always uses this
 docker compose exec api node scripts/smoke-vm-stack.mjs --target container --require-mcp --require-memanto
+
+# VM host (published ports): only while stack.env has no ORIGIN_SECRET (the host does not reach api as loopback)
+node scripts/smoke-vm-stack.mjs --target host --require-mcp --require-memanto
 ```
 
 ---
@@ -316,11 +357,12 @@ docker compose exec api node scripts/smoke-vm-stack.mjs --target container --req
 | Express agent proxy + Life Journal API | ✅ 完了 |
 | `deploy/risepath-vm/docker-compose.yml` | ✅ db + api + mcp + kokoro-tts + hermes（healthcheck 付き） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |
-| GCP スケジュール + provision スクリプト | ✅ `scripts/provision-gce.sh` |
+| provision スクリプト | ✅ `scripts/provision-gce.sh`（24 時間稼働が既定。夜間停止は `NIGHT_STOP=1`） |
+| 公開エッジ（Vercel routes + Cloudflare Tunnel + origin gate） | 🔄 リポジトリ側は実装済み。SSE のバッファ、Authorization の転送、ボディ上限は初回デプロイで確認（[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の確認チェックリスト） |
 | `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線（migrate は新しい api の起動前） |
 | Hermes 本番 `config.yaml`（SSE） | ✅ `deploy/risepath-vm/hermes/config.yaml` |
 | Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可 |
-| `risepath-vm` GCP 実機プロビジョニング | 🔄 DB 接続済み（Tailscale）。フル stack は `deploy-stack.sh` で更新 |
+| `risepath-vm` GCP 実機プロビジョニング | ⏸ 2026-10-21 時点で使っていない（オーナー報告）。再開は §4.5。DB 接続は Tailscale、フル stack は `deploy-stack.sh` で更新 |
 
 ---
 
