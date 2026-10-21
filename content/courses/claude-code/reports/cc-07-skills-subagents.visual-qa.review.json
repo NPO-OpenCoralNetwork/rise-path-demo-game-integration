@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-07-skills-subagents",
   "file": "content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json",
-  "lessonHash": "sha256:2679f127d93ca803",
+  "lessonHash": "sha256:735836d64d5beaab",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,45 +9,43 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Both Mermaid diagrams (s1-diagram, s3-diagram) are flowchart TD with short Japanese labels. At 390 px they are readable and nothing is clipped (mobile-jp-04.png, mobile-jp-12/13.png). The 2-column definition tables s1-defs and s3-defs stack cleanly on mobile (mobile-jp-03.png, mobile-jp-12.png). Code blocks s2-skill, s3-file and pr-model show the frontmatter highlights and fit inside the frame (mobile-jp-06.png, mobile-jp-14.png, mobile-jp-23.png).",
+      "evidence": "Both mermaid diagrams (s1-diagram, s3-diagram) are flowchart TD, and their Japanese labels are readable at 390 px (pages/mobile-jp-04.png, pages/mobile-jp-12.png, pages/mobile-jp-13.png). The definition tables s1-defs and s3-defs stack cleanly on mobile. No overflow, broken images or mermaid errors.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
         "s1-defs",
-        "s3-defs",
-        "s2-skill",
-        "s3-file",
-        "pr-model"
+        "s3-defs"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty on both desktop-jp and mobile-jp. Every screen has a heading, a figure, a table, code, steps or a question. Desktop JP charsPerLine median is 39, inside the 30–40 target (max 56). The rhythm alternates concept, diagram, code and check with no long walls of text (desktop-jp-03 to desktop-jp-12.png).",
+      "evidence": "No text-only screens on desktop or mobile. Prose is broken up by definitions, diagrams, code, steps and an inline check in every segment (pages/mobile-jp-05.png, pages/mobile-jp-10.png, pages/mobile-jp-17.png). Desktop JP median is 39 chars per line, inside the 30-40 target.",
       "blockIds": [
-        "s2-steps",
-        "pr-steps",
-        "s4-main"
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All diagram labels, captions, step titles and question options are in Japanese, as the JP-only lesson requires. Terms that need English show it next to the Japanese, for example サブエージェント（subagent） in s3-defs. Inline chips such as disable-model-invocation: true stay whole and readable at 390 px (mobile-jp-10.png, mobile-jp-25.png). No controls are hidden under the top or bottom bars, and contrast is fine throughout.",
+      "evidence": "All learner-visible text is Japanese, and English appears only as glossed terms and code. Contrast is good on the light cards and on the dark code blocks. The long chips (disable-model-invocation: true, .claude/skills/<名前>/SKILL.md) stay whole and readable at 390 px (pages/mobile-jp-09.png, pages/mobile-jp-10.png, pages/mobile-jp-24.png). Controls are not hidden under the top or bottom bars.",
       "blockIds": [
-        "s3-defs",
+        "s2-invoke",
         "q2",
-        "e2"
+        "pr-steps"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz (e1): at 390 px the path chips in options b and a wrap inside their boxes between 'api-' and 'guide/SKILL.md' (pages/mobile-jp-24.png). The leading ~/ that separates the two options is still visible, but a short lead such as 'ホームの ~/.claude/skills/ に置く' versus 'プロジェクトの .claude/skills/ に置いてコミットする', with the full path in feedback, would make them easier to compare.",
-    "s2-skill: at 390 px, source line 12 ('1. `git status` と `git diff HEAD` で、') soft-wraps so that 'で、' sits alone on its own row (pages/mobile-jp-06.png). Moving 'で、' to the start of line 13 would avoid the orphaned fragment.",
-    "reader: the mobile full-length PNG stops at 16000px (pageHeight 22318). The per-screen PNGs cover the whole lesson.",
-    "reader: 14 failed /api/v2/user/* requests (500) in the preview environment were ignored as environment noise."
+    "s2-skill: at 390 px, source line 12 (`git status` と `git diff HEAD` で、) soft-wraps so that only 「で、」 sits on a continuation row (pages/mobile-jp-06.png). The text stays readable. Moving 「で、」 to the start of line 13 would avoid the orphan.",
+    "practice: on mobile the section heading 「演習：自分の手順をスキルにし、調べものを任せる」 breaks after 「スキルに」, leaving 「し、」 at the start of line 2 (pages/mobile-jp-18.png). A shorter title such as 「演習：手順をスキルに、調べものを任せる」 would break more naturally.",
+    "pr-after: the step title 「⑦ もう一度 /context を見て比べる」 wraps after /context next to the 完了 checkbox on mobile (pages/mobile-jp-21.png). This is minor; 「⑦ /context で再確認する」 would fit on one line.",
+    "reader: the mobile full-length PNG is truncated at 16000px, so the per-screen PNGs were used. 14 failed /api/ requests were ignored as environment noise."
   ],
   "verdict": "pass",
-  "summary": "metrics.json has no hard failures: no horizontal overflow, 0 console, Mermaid, unknown-block or broken-image errors, and no text-only screens. Desktop JP line length is on target (median 39). Both diagrams, the definition tables and the SKILL.md code blocks are readable at 390 px and 1440 px. The screens show no personal data. There are no must-fix items. The only small issues are the wrapped api-guide path chips in exam question e1 on mobile and an orphaned 'で、' on a wrapped code line in s2-skill."
+  "summary": "Clean visual run: no overflow, console, mermaid, block or image errors, and no text-only screens. Both TD diagrams and the definition tables are readable at 390 px, and the reworked code blocks and inline chips wrap readably. No personal data on any screen. Nothing must be fixed; only small mobile line-break tweaks in s2-skill, the practice heading and step pr-after are suggested."
 }

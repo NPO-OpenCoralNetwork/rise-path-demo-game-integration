@@ -132,7 +132,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                 claudeCode: {
                     title: 'Claude Code in Practice',
                     subtitle: 'AI agent',
-                    description: 'Hand research, planning, fixes and checks to an AI agent in your terminal. 11 lessons, in Japanese.'
+                    description: '11 lessons in Japanese. The exercises need a paid plan with Claude Code or a Console account.'
                 },
             },
             bannerTitle: 'Learning Path Diagnosis',
@@ -178,7 +178,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                 claudeCode: {
                     title: 'Claude Code 実践',
                     subtitle: 'AIエージェント',
-                    description: '調べる・計画する・直す・確かめるを、ターミナルのAIエージェントに任せる方法を11回で学びます。'
+                    description: '全11回です。演習には、Claude Codeが使える有料プランかConsoleアカウントが必要です。'
                 },
             },
             bannerTitle: '学習パス診断',

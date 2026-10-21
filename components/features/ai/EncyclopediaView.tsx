@@ -50,7 +50,6 @@ const EncyclopediaView: React.FC = () => {
 
   useEffect(() => {
     if (!courseId) return;
-    // apiFetch sends the user's token: the route only returns the caller's own curricula.
     apiFetch(`/curricula/${courseId}/encyclopedia`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setData(d); })

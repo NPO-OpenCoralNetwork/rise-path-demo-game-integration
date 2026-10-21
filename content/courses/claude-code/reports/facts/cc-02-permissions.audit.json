@@ -1,0 +1,216 @@
+{
+  "lessonId": "cc-02-permissions",
+  "checkedCount": 74,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/permission-modes",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://code.claude.com/docs/en/auto-mode-config.md",
+    "https://code.claude.com/docs/en/checkpointing.md",
+    "https://code.claude.com/docs/en/changelog.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/cli-reference.md",
+    "https://code.claude.com/docs/en/best-practices.md",
+    "https://code.claude.com/docs/en/settings.md",
+    "https://code.claude.com/docs/ja/permission-modes",
+    "https://www.anthropic.com/engineering/claude-code-auto-mode",
+    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  ],
+  "confirmed": [
+    {
+      "blockId": "check-quiz",
+      "where": "e5.prompt (answer c)",
+      "claim": "`.claude/settings.json` の `ask` に `Bash(git push *)` だけを書きました。Claude が次のコマンドを実行しようとしたとき、確認の画面が出ないのはどれでしょう？",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "| `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main` | Your other rules and the permission mode decide the commands in the last column.",
+      "fix": "autoモードで作業中です。`.claude/settings.json` の `ask` に `Bash(git push *)` だけを書きました。Claudeが次のコマンドを実行しようとしたとき、確認の画面が出ないのはどれでしょう？",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"| `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main` | Your other rules and the permission mode decide the commands in the last column.\" Same page, Manual-mode table: \"| Bash commands | Shell execution | Yes, except a built-in set of read-only commands |\". permission-modes page, auto mode \"Allowed by default\": \"Pushing to any branch of the repository you're working in, including the default branch.\"",
+        "reason": "The finding stands. The lesson's matching claim is correct: the docs confirm that `git -C . push origin main` does not match `Bash(git push *)`. The problem is the conclusion. e5 says no mode, yet it asks which command shows no confirmation screen. The docs say that for an unmatched command, \"your other rules and the permission mode decide.\" In Manual mode, every non-read-only Bash command still needs approval, so option c would prompt too and no option would be correct. Answer c is only right in auto mode. There, the classifier lets pushes to the working repo through by default, including to the default branch, and even a classifier block shows a notification, not a confirmation screen. The lesson does say elsewhere that v2.1.283+ starts in auto mode, but the exam item never sets the mode, and its explanation blames string matching alone, which goes further than the docs. The auditor's fix states auto mode up front, which makes c the only correct answer: a, b and d still match the ask rule, and the docs say ask rules force a prompt even in auto mode. So the proposed fix is accurate and no betterFix is needed. One note: the same overstatement appears in the example-pitfall callout (\"`git -C . push` は `git push` で始まらないので、確認が出ません。\"). It is outside this finding, but it would need the same mode qualifier.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "example-pitfall",
+      "where": "md, first sentence",
+      "claim": "`git -C . push` は `git push` で始まらないので、確認が出ません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "Your other rules and the permission mode decide the commands in the last column. (permission-modes, Manual mode: \"Claude Code stops and asks you before most actions that edit files, run shell commands, or reach the network.\")",
+      "fix": "`git -C . push` は `git push` で始まらないので、確認ルールに一致しません。autoモードでは、確認なしで通ることがあります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions#bash-rule-limits",
+        "evidenceQuote": "permissions: \"These rules in `deny` or `ask` stop the first form and not the others: | `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, ... | Your other rules and the permission mode decide the commands in the last column.\" The same page's table says Bash commands need approval \"Yes, except a built-in set of read-only commands\". permission-modes: \"In Manual mode, Claude Code stops and asks you before most actions that edit files, run shell commands, or reach the network.\" Also: \"Pushing to any branch of the repository you're working in and creating a pull request that matches your request run without a prompt, unless the push or pull request falls under the blocked list\" (auto mode). And: \"if the classifier blocks an action 3 times in a row or 20 times total, auto mode pauses and Claude Code resumes prompting.\"",
+        "reason": "The official page supports only the first half of the claim: the `ask` rule `Bash(git push *)` does not match `git -C . push`. The lesson goes further and says flatly that no prompt appears (\"確認が出ません\"). The docs say the permission mode and other rules decide what happens to an unmatched command. In Manual (`default`) mode, any Bash command outside the read-only set still prompts, and `git -C . push` is not read-only. So a prompt does appear in Manual mode. In auto mode, which the lesson says is the starting mode since v2.1.283, the classifier usually lets pushes to the working repository through without a prompt. It can still block a push, though, and repeated blocks bring prompts back. So \"no prompt\" holds only some of the time, and only in auto mode. The lesson's own flowchart even says unmatched operations \"権限モードに従う\". The proposed fix is accurate. It says the command does not match the 確認ルール, and that in auto mode it may pass without a prompt. \"ことがあります\" is the right hedge given the classifier's blocked list, and the fix has no space between Japanese and alphanumerics, so no betterFix is needed. Side note, outside this finding's scope: quiz e5 asks which command produces no prompt, with answer c `git -C . push origin main`. It has the same unstated assumption that the session is in auto mode.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "rules-defs",
+      "where": "items[確認ルール].md",
+      "claim": "一致した操作の前に、必ず確認を求めます。auto モードでも同じです。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "Claude Code denies calls matching your explicit ask rules rather than prompting.",
+      "fix": "一致した操作の前に、確認を求めます。autoモードでも同じです。`dontAsk` モードでは、確認せずに拒否します。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes#allow-only-pre-approved-tools-with-dontask-mode",
+        "evidenceQuote": "\"Claude Code denies calls matching your explicit `ask` rules rather than prompting.\" (dontAsk section). Also on https://code.claude.com/docs/en/permissions: \"If you set `dontAsk` mode ... In `dontAsk` mode, which never prompts, Claude Code denies the call instead.\"",
+        "reason": "Part of the lesson is right. Two official sentences back its second sentence about auto mode: \"Explicit ask rules still force a prompt\" (auto mode section) and \"If an explicit ask rule matches the command, Claude Code asks you instead, even in `auto` mode\". The permissions page also says \"**Ask** rules prompt for confirmation whenever Claude Code tries to use the specified tool.\" The first sentence goes too far, though. It says the rule asks for confirmation every time (「必ず確認を求めます」), with no exceptions. The permission-modes page says dontAsk mode never prompts. In that mode, a call that matches an ask rule is denied instead of asked about. That page is one of the three sources this block cites (cc-permission-modes). The lesson also teaches dontAsk in 2-1 and in the CI question, so learners may well apply this definition to that mode. There are two smaller exceptions, neither needed for a beginner lesson. An installed mod can approve an ask-rule call without a prompt. A bare `Bash` ask rule is skipped for commands run in the sandbox with autoAllowBashIfSandboxed. So the claim is stronger than the docs, and the finding stands. The proposed fix is accurate. It drops 「必ず」, keeps the auto-mode statement, and says dontAsk denies without asking, which matches the quoted sentence. No better fix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "glossary",
+      "where": "glossary[確認ルール].md",
+      "claim": "一致した操作の前に、必ず確認を求める権限ルール（ask）。auto モードでも確認が出る。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "Claude Code denies calls matching your explicit ask rules rather than prompting.",
+      "fix": "一致した操作の前に確認を求める権限ルール（ask）。autoモードでも確認が出る。`dontAsk` モードでは拒否される。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes#allow-only-pre-approved-tools-with-dontask-mode",
+        "evidenceQuote": "Claude Code denies calls matching your explicit [`ask` rules](/docs/en/permissions#manage-permissions) rather than prompting.",
+        "reason": "The page partly supports the lesson. The permissions page (https://code.claude.com/docs/en/permissions) says \"Ask rules prompt for confirmation whenever Claude Code tries to use the specified tool.\" For auto mode, permission-modes says \"Explicit ask rules still force a prompt.\" So the definition and the \"auto モードでも確認が出る\" part are correct. The word 必ず is the problem, because the same official pages list exceptions. In dontAsk mode, a call that matches an ask rule is denied without a prompt, as the quote above says. The permissions page names two more cases where you are not prompted: \"you aren't prompted when the mod approves a call that an ask rule ... would prompt for\", and with sandbox auto-allow, \"sandboxed Bash commands run without prompting even if your permissions include a bare `Bash` ask rule\". The \"Actions no mode auto-approves\" list says ask-rule matches are never auto-approved, and that what happens instead depends on the mode. Prompting is one outcome and denial is another. This lesson teaches dontAsk as one of the six modes and recommends it for CI, so a learner who reads 必ず could expect an ask-rule prompt in dontAsk. The lesson states this more strongly than the docs do, so the finding stands. The proposed fix is accurate: it removes 必ず, keeps the auto-mode statement, and adds the dontAsk denial. It also matches the plain style the other glossary entries use, such as 拒否ルール \"どのモードでも効く。\" So no betterFix is needed. The body definition at line 337 (\"一致した操作の前に、必ず確認を求めます。auto モードでも同じです。\") makes the same 必ず claim, so the same correction should be made there.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "rewind-check",
+      "where": "q5.options[c].feedback",
+      "claim": "push の前に確認ルールで止めるのが確実です。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/auto-mode-config",
+      "evidenceQuote": "A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed.",
+      "fix": "pushの前に、確認ルールで確認を挟んでおきます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions#bash-rule-limits",
+        "evidenceQuote": "\"It doesn't match the same program invoked in a different form, so a deny or ask rule covers the invocation Claude usually produces and isn't a security boundary around the program. ... | `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main` |\" Also auto-mode-config: \"A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed. For a checkpoint that inspects the full command text, add a PreToolUse hook.\"",
+        "reason": "The first half of the feedback is supported. The checkpointing page says only edits made with Claude's file editing tools are tracked, and that checkpoints don't replace version control. The problem is the second sentence: it calls an ask rule the 確実 (reliable, sure) way to stop a push. Two official pages say otherwise. The permissions page says an ask rule only covers the form of the command Claude usually writes and \"isn't a security boundary around the program\". The auto mode page says `git -C <dir> push` and `git -c <key>=<value> push` don't match `Bash(git push *)`, and points to a PreToolUse hook when you need a firmer checkpoint. The lesson even contradicts itself: section 2-4 and q-final both say `git -C . push` doesn't trigger a confirmation, and the q-final explanation says a more reliable method comes in lesson 8 with hooks. Calling the ask rule 確実 here states it more strongly than the docs do, so the auditor's finding stands. The proposed fix (pushの前に、確認ルールで確認を挟んでおきます。) drops 確実 and only claims that an ask rule puts a confirmation in front of a push. The docs support that for the usual command form, it is in です・ます, and it follows the style-guide rule of no space between Japanese and alphanumerics. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "hook-predict",
+      "where": "q0.explanation, last sentence",
+      "claim": "push の前に必ず止める書き方は、2-4 で学びます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/auto-mode-config",
+      "evidenceQuote": "These rules match commands that begin with `git push` or `gh pr create`. A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed.",
+      "fix": "pushの前に確認を挟む書き方は、2-4で学びます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/auto-mode-config",
+        "evidenceQuote": "\"These rules match commands that begin with `git push` or `gh pr create`. A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed. For a checkpoint that inspects the full command text, add a PreToolUse hook.\" Also https://code.claude.com/docs/en/permissions#bash-rule-limits: \"a deny or ask rule covers the invocation Claude usually produces and isn't a security boundary around the program.\" Its table lists `Bash(git push *)` as not matching `git -C . push origin main`, `git -c push.default=current push origin main` or `git 'push' origin main`.",
+        "reason": "The finding stands. What section 2-4 teaches is the ask rule `Bash(git push *)`. The auto-mode-config page calls this a \"human checkpoint\" (確認を挟む) for commands that begin with `git push`. It also says a push written another way \"isn't checkpointed\". The permissions page adds that such a rule \"isn't a security boundary around the program\". So the hook-predict explanation says more than the docs do when it promises 2-4 will teach a way to stop before push 「必ず」. The lesson also disagrees with itself. Section 2-4's own pitfall callout says `git -C . push` gets no confirmation. The final quiz says a more reliable method comes with hooks in lesson 8. The ask rule does force a prompt even in auto mode, but only for commands that match it. The proposed fix drops 「必ず」 and says 確認を挟む, which fits the docs and the 2-4 title 「push の前に確認を挟む設定を書く」. It also follows the no-space style rule, so no betterFix is needed. I made no edits to any file.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "summary-cards",
+      "where": "card-ask.front",
+      "claim": "push の前に必ず確認を挟むルールは？",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/auto-mode-config",
+      "evidenceQuote": "A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed.",
+      "fix": "pushの前に確認を挟むルールは？",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions#bash-rule-limits",
+        "evidenceQuote": "\"It doesn't match the same program invoked in a different form, so a deny or ask rule covers the invocation Claude usually produces and isn't a security boundary around the program.\" Table row: `Bash(git push *)` stops `git push origin main`, doesn't stop `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main`. Also https://code.claude.com/docs/en/auto-mode-config: \"A push Claude writes another way, such as `git -C <dir> push` or `git -c <key>=<value> push`, doesn't match the rule, so it isn't checkpointed.\"",
+        "reason": "I tried to defend the card and couldn't. The docs do say \"always\" about ask rules: auto-mode-config says content-scoped ask rules \"always force a permission prompt, even in auto mode.\" But that applies only to commands that match the rule. The lesson's own glossary and section 2-3 word it that way (\"一致した操作の前に、必ず確認を求めます\"). The flashcard front is broader. It says the rule puts a confirmation before every push (\"push の前に必ず確認を挟む\"), and its answer is `\"ask\": [\"Bash(git push *)\"]`. Both official pages say this rule does not catch `git -C . push`, `git -c ... push` or `git 'push'`. The permissions page also says an ask rule \"isn't a security boundary around the program.\" So \"必ず\" claims more than the docs support. It also contradicts the lesson's own caveat in 2-4 and the quiz item where `git -C . push origin main` gets no prompt. A flashcard is studied on its own, without that context, so this is not a case of the auditor misreading. The proposed fix \"pushの前に確認を挟むルールは？\" removes the overclaim and still matches the back of the card and objective wording (\"`git push` の前に確認を挟む確認ルール（ask）を書ける\"). No better fix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "example-check",
+      "where": "q4.options[d].feedback, second sentence",
+      "claim": "`git push origin main` には一致せず、確認が出ません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "A rule with no `*` matches one exact command. ... Your other rules and the permission mode decide the commands in the last column.",
+      "fix": "`git push origin main` には一致せず、autoモードでは確認なしで通ることがあります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"A rule with no `*` matches one exact command.\" ... \"Your other rules and the permission mode decide the commands in the last column.\" ... Permission system table (Manual mode): \"Bash commands | Shell execution | Yes, except a built-in set of read-only commands\". Also https://code.claude.com/docs/en/auto-mode-config: \"Auto mode allows pushes to any branch of the repository you're working in, including the default branch, and pull request creation by default.\"",
+        "reason": "The first half of the sentence is correct. `Bash(git push)` has no `*`, so it is an exact match and does not match `git push origin main`. The second half, 確認が出ません, goes too far. A command that matches no rule is decided by the permission mode, and the lesson says so itself in rules-order and q3 (どれにも一致しなければ、権限モードに従います). The official pages show the outcome changes with the mode:\n- Manual (`default`) mode: Bash commands require approval unless they are built-in read-only commands, so `git push origin main` would still prompt.\n- `dontAsk` mode: the push is denied.\n- auto mode: pushes to any branch of the working repository, including the default branch, are allowed by default. The push only \"runs without a prompt\" in auto mode (since v2.1.283 auto is the starting mode in interactive terminal sessions) and in `bypassPermissions`.\n\nSo the absolute claim is contradicted for Manual mode, and the auditor read the context correctly. The real lesson is that an ask rule without `*` no longer guarantees a prompt. The proposed fix is accurate and hedged (\"ことがあります\"), matching the auto-mode-config quote. It is one sentence, so the feedback stays within the two-sentence limit, and it already writes autoモード with no space as the rules require. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "e6.options[c].feedback, second sentence",
+      "claim": "`gh pr create --title …` のように続きがあると、確認が出ません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/auto-mode-config",
+      "evidenceQuote": "Auto mode allows pushes to any branch of the repository you're working in, including the default branch, and pull request creation by default. (permissions: \"Your other rules and the permission mode decide the commands in the last column.\")",
+      "fix": "`gh pr create --title …` のように続きがあると一致せず、確認が出ないことがあります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"Bash rules match the whole command text, with `*` standing in for any text.\" ... (rules in deny/ask that don't match a form) \"Your other rules and the permission mode decide the commands in the last column.\" Modes table: \"`default` | Prompts for permission on first use of each tool. Labeled Manual...\" Also https://code.claude.com/docs/en/auto-mode-config: \"Auto mode allows pushes to any branch of the repository you're working in, including the default branch, and pull request creation by default.\"",
+        "reason": "The first sentence (a mid-pattern `*` means the rule only matches commands ending in `create`) is supported by the permissions page: Bash rules match the whole command text, and `Bash(git * main)` does not match `git log`. But the second sentence says unconditionally that no confirmation appears. Per the docs, when a rule doesn't match, the other rules and the permission mode decide. In Manual (default) mode, a non-read-only Bash command such as `gh pr create --title …` still prompts. Only in auto mode (where PR creation is allowed by default) or bypassPermissions does it run without asking. The question fixes no mode, and the lesson's own section 2-3 says \"どれにも一致しなければ、権限モードに従います\". So \"確認が出ません\" is stronger than the docs support. The proposed hedge \"一致せず、確認が出ないことがあります\" is accurate and keeps the feedback at two sentences.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "e2.options[a].feedback, second sentence",
+      "claim": "コマンドのたびに確認も出ます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "In addition to file edits, `acceptEdits` mode auto-approves common filesystem Bash commands: `mkdir`, `touch`, `rm`, `rmdir`, `mv`, `cp`, and `sed`. ... and all other Bash commands except the built-in read-only set still prompt.",
+      "fix": "テストなど多くのコマンドでは、確認も出ます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"In addition to file edits, `acceptEdits` mode auto-approves common filesystem Bash commands: `mkdir`, `touch`, `rm`, `rmdir`, `mv`, `cp`, and `sed`. ... Paths outside that scope, writes to protected paths, `rm` and `rmdir` removals targeting a critical path, and all other Bash commands except the built-in read-only set still prompt.\" Also https://code.claude.com/docs/en/permissions#read-only-commands: \"Claude Code recognizes a built-in set of Bash commands as read-only and runs them without a permission prompt in every mode ... The set includes `ls`, `cat`, `echo`, `pwd`, `head`, `tail`, `grep`, `find`, `wc`, `which`, `diff`, `stat`, `du`, `cd`, and read-only forms of `git`.\"",
+        "reason": "The feedback is for e2 option a, where the learner picks acceptEdits for a long test-fixing task. Its sentence 「コマンドのたびに確認も出ます」 says every command prompts. I fetched both official pages, and they contradict that. acceptEdits auto-approves mkdir/touch/rm/rmdir/mv/cp/sed for paths inside the working directory, and the built-in read-only set (ls, cat, grep, read-only git, and others) runs without a prompt in every mode. Only the other commands prompt. The lesson's own explanation in an earlier quiz already says this correctly: 「ファイル編集と `mkdir`・`mv` などのファイル操作が確認なしで進みます。それ以外のコマンドでは確認が出ます。」 So the e2 feedback states more than the docs do and also disagrees with the rest of the lesson. The proposed fix 「テストなど多くのコマンドでは、確認も出ます。」 is accurate. Test runners such as npm test or pytest are in neither the filesystem auto-approve list nor the read-only set, so they prompt. 「多くの」 also leaves room for the auto-approved file commands and the read-only set. It fits the scenario (a long test fix) and stays within the two-sentence feedback limit. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "sort-quiz",
+      "where": "ps2.explanation, second sentence",
+      "claim": "それ以外のコマンドでは確認が出ます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "Claude Code recognizes a built-in set of Bash commands as read-only and runs them without a permission prompt in every mode",
+      "fix": "読み取り専用のコマンドを除き、ほかのコマンドでは確認が出ます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"Claude Code recognizes a built-in set of Bash commands as read-only and runs them without a permission prompt in every mode ... The set includes `ls`, `cat`, `echo`, `pwd`, `head`, `tail`, `grep`, `find`, `wc`, `which`, `diff`, `stat`, `du`, `cd`, and read-only forms of `git`.\" The acceptEdits row in the mode table at https://code.claude.com/docs/en/permission-modes says the same: \"Reads, file edits, and common filesystem commands (`mkdir`, `touch`, `mv`, `cp`, etc.)\"",
+        "reason": "I tried to defend the lesson and couldn't. The ps2 explanation says acceptEdits approves file edits and mkdir/mv-style file operations without asking. It then says every other command prompts (「それ以外のコマンドでは確認が出ます」). Both official pages contradict that. The permissions page says built-in read-only commands such as ls, cat, grep and read-only git run without a prompt in every mode. The permission-modes table lists \"Reads\" first in what acceptEdits runs without asking. The lesson's own 2-1 table gets this right (acceptEdits: 「読み取り、ファイル編集、`mkdir` など」), so the explanation sentence is the only place that leaves reads out. The context doesn't save it: 「それ以外」 means everything other than edits and file operations, and that includes read-only commands. The question prompt's 「テストの実行など」 doesn't narrow the explanation, which is written as a general rule. The proposed fix is accurate at the level of mode defaults, which is the level the docs' mode table uses. Allow rules can still pre-approve more commands, but the lesson covers those separately, so I don't think the fix needs to mention them. I'm leaving betterFix empty.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "sort-quiz",
+      "where": "ps1.explanation, first sentence",
+      "claim": "`dontAsk` モードは、事前に許可したツールだけを動かし、ほかはすべて拒否します。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "| `dontAsk` | File reads inside your working directories and pre-approved tools; anything that would prompt is denied, though a mod you installed can still approve some of those calls | Locked-down CI and scripts |",
+      "fix": "`dontAsk` モードは、読み取りと事前に許可したものだけを動かし、確認が要る操作は拒否します。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes#allow-only-pre-approved-tools-with-dontask-mode",
+        "evidenceQuote": "\"If you set `dontAsk` mode, Claude Code auto-denies every tool call that would otherwise prompt you, though a mod you installed can still approve some of those calls. ... Claude still runs actions that need no approval in Manual mode, such as file reads inside your working directories and read-only Bash commands. Actions matching your `permissions.allow` rules and calls approved by a PreToolUse hook run too.\" The modes table row says the same: \"| `dontAsk` | File reads inside your working directories and pre-approved tools; anything that would prompt is denied, though a mod you installed can still approve some of those calls | Locked-down CI and scripts |\"",
+        "reason": "I tried to defend the lesson and couldn't. The section heading on the official page, \"Allow only pre-approved tools with dontAsk mode\", sounds like the lesson's wording, but the body of that section says more runs than that. Calls that need no approval in Manual mode still run in dontAsk mode without being pre-approved: file reads inside the working directories and read-only Bash commands. dontAsk denies only calls that would otherwise prompt, and an installed mod can still approve some of those. So 「事前に許可したツールだけを動かし、ほかはすべて拒否します」 says more than the page supports. The lesson also disagrees with itself here: its own modes table (modes-table, dontAsk row) already says 「読み取りと、事前に許可したものだけ」, so ps1.explanation goes against the lesson's earlier table. The proposed fix 「`dontAsk` モードは、読み取りと事前に許可したものだけを動かし、確認が要る操作は拒否します。」 is accurate. It matches the page (\"File reads ... and pre-approved tools; anything that would prompt is denied\") and the lesson's own table, and at about 50 characters it stays under the 60-character sentence limit. It leaves out the mod caveat, which is acceptable at this level because the lesson's table leaves it out too. No better fix is needed. Separately, two option feedbacks in the same lesson use similar wording: line 296 「許可していない操作をすべて拒否します」 and line 922 「事前に許可していない操作をすべて拒否します」. Both are slightly stronger than the page, though those are distractor feedback rather than the block I was asked to check.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [],
+  "unverified": 0
+}

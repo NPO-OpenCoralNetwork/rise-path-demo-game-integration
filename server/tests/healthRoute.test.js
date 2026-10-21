@@ -4,14 +4,21 @@ import express from 'express';
 import healthRoutes from '../routes/health.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 
-const buildApp = () => {
+const buildApp = ({ edge = false } = {}) => {
     const app = express();
+    // What the origin gate (server/middleware/originGate.js) sets for a request through the edge.
+    if (edge) {
+        app.use((req, _res, next) => {
+            req.originGate = 'edge';
+            next();
+        });
+    }
     app.use('/api/v2', healthRoutes);
     return app;
 };
 
-const withServer = async (handler) => {
-    const app = buildApp();
+const withServer = async (handler, options) => {
+    const app = buildApp(options);
     const server = await new Promise((resolve) => {
         const s = app.listen(0, () => resolve(s));
     });
@@ -66,6 +73,21 @@ describe('GET /api/v2/health', () => {
             assert.equal(payload.supabase.status, 'not_configured');
             assert.equal(payload.ready_for_prod_data, false);
         });
+    });
+
+    it('answers an edge request with only ok and status, and a status code that matches ok', async () => {
+        delete process.env.SUPABASE_URL;
+        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        process.env.VITE_DEMO_MODE = 'false';
+
+        await withServer(async (baseUrl) => {
+            const response = await fetch(`${baseUrl}/api/v2/health`);
+            assert.equal(response.status, 503);
+            const payload = await response.json();
+            // Exactly these keys: no database, auth_policy, frontend, hermes, kokoro or message.
+            assert.deepEqual(Object.keys(payload).sort(), ['ok', 'status']);
+            assert.deepEqual(payload, { ok: false, status: 'degraded' });
+        }, { edge: true });
     });
 
     it('reports ready_for_prod_data when DB is connected and demo mode is off', async () => {

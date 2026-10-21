@@ -76,7 +76,6 @@ const LearningInsightsWidget: React.FC<LearningInsightsWidgetProps> = ({ curricu
       return;
     }
 
-    // apiFetch sends the user's token: these routes only return the caller's own curricula.
     Promise.allSettled([
       apiFetch(`/curricula/${curriculumId}/weekly-digest`).then(r => r.ok ? r.json() : null),
       apiFetch(`/curricula/${curriculumId}/weekly-load`, {

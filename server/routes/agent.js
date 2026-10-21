@@ -14,6 +14,41 @@ import { resolveIncludeDiaryExcerpts } from '../services/lifeJournalPrivacyServi
 
 const router = express.Router();
 
+/**
+ * Keeps an SSE proxy alive through idle Hermes pauses: every intervalMs with nothing forwarded,
+ * writes the comment frame ': ping' (as llm.js does), so the Vercel (120 s) and Cloudflare
+ * (125 s) idle windows do not cut the stream. It pings only between events: the text forwarded so
+ * far must end with a blank line (or nothing was forwarded yet), so a ping never splits an event.
+ * @param {import('express').Response} res
+ * @param {{ intervalMs?: number }} [options]
+ * @returns {{ write: (text: string) => boolean, stop: () => void }}
+ */
+export function startSseHeartbeat(res, { intervalMs = 15000 } = {}) {
+    let started = false;
+    let tail = '';
+    let sentSinceTick = false;
+
+    const atEventBoundary = () => !started || tail.endsWith('\n\n') || tail.endsWith('\r\n\r\n');
+    const timer = setInterval(() => {
+        if (!sentSinceTick && atEventBoundary() && !res.writableEnded) res.write(': ping\n\n');
+        sentSinceTick = false;
+    }, intervalMs);
+
+    return {
+        write(text) {
+            if (text) {
+                started = true;
+                sentSinceTick = true;
+                tail = (tail + text).slice(-4);
+            }
+            return res.write(text);
+        },
+        stop() {
+            clearInterval(timer);
+        },
+    };
+}
+
 router.get('/agent/health', (_req, res) => {
     const cfg = getHermesConfig();
     res.json({
@@ -70,6 +105,8 @@ router.post('/agent/chat', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Conversation-Key', streamResult.conversation);
         res.flushHeaders?.();
+        const heartbeat = startSseHeartbeat(res);
+        res.on('close', heartbeat.stop);
 
         const reader = streamResult.body.getReader();
         const decoder = new TextDecoder();
@@ -78,7 +115,7 @@ router.post('/agent/chat', async (req, res) => {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                res.write(decoder.decode(value, { stream: true }));
+                heartbeat.write(decoder.decode(value, { stream: true }));
             }
             res.end();
         } catch (err) {
@@ -88,6 +125,8 @@ router.post('/agent/chat', async (req, res) => {
             } else {
                 res.end();
             }
+        } finally {
+            heartbeat.stop();
         }
         return;
     }

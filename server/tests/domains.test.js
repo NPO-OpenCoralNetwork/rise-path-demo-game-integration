@@ -1,5 +1,5 @@
-// Learning domains (tools/core/domains.js): the vibe-coding stage count follows its course.json,
-// so mastery reaches 1 only when every published lesson is complete.
+// Learning domains (tools/core/domains.js): the vibe-coding and claude-code stage counts follow their
+// course.json, so mastery reaches 1 only when every published lesson is complete.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,6 +10,9 @@ import { COURSES_DIR, DOMAINS, DOMAIN_MAX_STAGES, calculateMastery, countCourseL
 const vibeCourseFile = path.join(COURSES_DIR, 'vibe-coding', 'course.json');
 const vibeCourse = JSON.parse(fs.readFileSync(vibeCourseFile, 'utf8'));
 const vibeLessonCount = vibeCourse.modules.reduce((sum, module) => sum + module.lessons.length, 0);
+const ccCourseFile = path.join(COURSES_DIR, 'claude-code', 'course.json');
+const ccCourse = JSON.parse(fs.readFileSync(ccCourseFile, 'utf8'));
+const ccLessonCount = ccCourse.modules.reduce((sum, module) => sum + module.lessons.length, 0);
 
 describe('domains', () => {
     it('vibe-coding maxStages equals the lesson count in course.json', () => {
@@ -25,6 +28,18 @@ describe('domains', () => {
         assert.ok(calculateMastery(12, 'vibe-coding') < 1);
         assert.ok(calculateMastery(vibeLessonCount - 1, 'vibe-coding') < 1);
         assert.equal(calculateMastery(vibeLessonCount, 'vibe-coding'), 1);
+    });
+
+    it('claude-code maxStages equals the lesson count in course.json', () => {
+        assert.ok(ccLessonCount >= 11, `course lists ${ccLessonCount} lessons`);
+        assert.equal(countCourseLessons(ccCourseFile), ccLessonCount);
+        const cc = DOMAINS.find((d) => d.id === 'claude-code');
+        assert.ok(cc, 'claude-code domain exists (served by content://domains)');
+        assert.equal(cc.maxStages, ccLessonCount);
+        assert.equal(DOMAIN_MAX_STAGES['claude-code'], ccLessonCount);
+        assert.equal(Object.hasOwn(cc, 'courseSlug'), false, 'internal courseSlug is not exposed');
+        assert.ok(calculateMastery(5, 'claude-code') < 1);
+        assert.equal(calculateMastery(ccLessonCount, 'claude-code'), 1);
     });
 
     it('countCourseLessons returns null for a missing, invalid or empty course file', (t) => {

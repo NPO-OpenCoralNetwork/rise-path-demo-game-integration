@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Brain, Sparkles, Target, Shield, BookOpen, Zap } from 'lucide-react';
 import { useLanguage } from '../../../../context/LanguageContext';
+import { apiFetch } from '../../../../services/apiClient';
 
 interface LearningMirrorViewProps {}
 
@@ -78,7 +79,7 @@ const LearningMirrorView: React.FC<LearningMirrorViewProps> = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch('/api/v2/learner-profiles/latest');
+        const res = await apiFetch('/learner-profiles/latest');
         if (res.ok) {
           const data = await res.json();
           setDerived(data.derived_learning_profile || null);

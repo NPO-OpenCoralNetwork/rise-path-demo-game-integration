@@ -6,6 +6,9 @@
  * Usage:
  *   node scripts/prep-mcp-memory-test-user.mjs
  *   E2E_API_URL=http://risepath-vm:3006 node scripts/prep-mcp-memory-test-user.mjs
+ *
+ * Over Tailscale this works only while the VM's stack.env has no ORIGIN_SECRET. Once it is set, the
+ * VM run no longer works: :3006 answers 403, and the api image has no .env.local to run it inside.
  */
 
 import fs from 'fs/promises';

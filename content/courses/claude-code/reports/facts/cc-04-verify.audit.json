@@ -1,0 +1,108 @@
+{
+  "lessonId": "cc-04-verify",
+  "checkedCount": 54,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/best-practices",
+    "https://code.claude.com/docs/en/goal",
+    "https://code.claude.com/docs/en/code-review-local",
+    "https://code.claude.com/docs/en/output-styles",
+    "https://code.claude.com/docs/en/chrome",
+    "https://code.claude.com/docs/en/prompt-library",
+    "https://code.claude.com/docs/en/prompt-library.md",
+    "https://code.claude.com/docs/en/commands",
+    "https://code.claude.com/docs/en/sub-agents",
+    "https://code.claude.com/docs/en/how-claude-code-works",
+    "https://code.claude.com/docs/ja/best-practices",
+    "https://www.anthropic.com/engineering/harness-design-long-running-apps",
+    "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
+    "https://www.anthropic.com/research/AI-assistance-coding-skills",
+    "https://claude.dev/blog/getting-the-most-out-of-opus-5-5/",
+    "https://simonwillison.net/guides/agentic-engineering-patterns/red-green-tdd/",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s1-why",
+      "where": "md, third sentence",
+      "claim": "公式ガイドが最初に挙げる方法で、第1回のエージェントループ（agentic loop）の「結果を確かめる」を確実にします。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/best-practices",
+      "evidenceQuote": "As a deterministic gate: a Stop hook runs your check as a script and blocks the turn from ending until it passes. ... Each step trades setup for attention. The prompt version works on any task today. The `/goal` and Stop hook versions are what let an unattended run finish correctly without you.",
+      "fix": "公式ガイドが最初に挙げる方法です。第1回のエージェントループ（agentic loop）の「結果を確かめる」を、Claude自身が回せます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/best-practices",
+        "evidenceQuote": "\"Give Claude something that produces a pass or fail, and the loop closes on its own. Claude does the work, runs the check, reads the result, and iterates until the check passes.\" ... \"Once the check exists, decide how hard it gates the stop: In one prompt: ask Claude to run the check and iterate in the same message ... As a deterministic gate: a Stop hook runs your check as a script and blocks the turn from ending until it passes. ... Each step trades setup for attention. The prompt version works on any task today. The `/goal` and Stop hook versions are what let an unattended run finish correctly without you.\"",
+        "reason": "Two parts of the sentence hold up. \"公式ガイドが最初に挙げる方法\" is correct: \"Give Claude a way to verify its work\" is the first section of the best-practices page. The reference to lesson 1 is also correct: how-claude-code-works names the loop's three phases as \"gather context, take action, and verify results\", and cc-01 uses 「結果を確かめる」 for the last one. The problem is 「…を確実にします」, which says that handing Claude a check guarantees the verify step happens. The guide says less than that. It says a check lets \"the loop close on its own\", meaning Claude can verify without you. It then makes how firmly the check stops Claude a separate choice. Asking in the prompt is the weakest option. Only the Stop hook is called a \"deterministic gate\", and only /goal and the Stop hook \"let an unattended run finish correctly without you\". In s1, the lesson is describing the prompt-level check (see s1-prompt), so 「確実」 claims more than the page does for that case. The proposed fix (「…を、Claude自身が回せます」) matches \"the loop closes on its own\" and the contrast with \"you become the verification loop\". It is accurate and fits the style rules, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s2-goal",
+      "where": "md, first paragraph, third sentence",
+      "claim": "ターンごとに別の小さなモデルが判定し、満たすまでClaudeは続けます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/goal",
+      "evidenceQuote": "The goal clears automatically once the condition is met, if the model judges the condition impossible to satisfy, or if a turn fails on an error you have to fix. ... If Claude keeps answering the evaluator without making progress (no tool use for several turns in a row), Claude Code stops the loop, prints a warning, and returns control to you with the goal still set.",
+      "fix": "ターンごとに別の小さなモデルが判定し、満たすか無理と判定されるまでClaudeは続けます。進展がないときや、直す必要のあるエラーでも止まります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/goal",
+        "evidenceQuote": "\"Set a completion condition with /goal and Claude keeps working until it's met, a model judges it impossible, or an error you have to fix clears the goal.\" ... \"Impossible: the evaluator judged that the condition can never be satisfied. Claude Code clears the goal ...\" ... \"If Claude keeps answering the evaluator without making progress (no tool use for several turns in a row), Claude Code stops the loop, prints a warning, and returns control to you with the goal still set.\"",
+        "reason": "I fetched the official /goal page. It supports the first half of the sentence: a small fast model checks after each turn, and if the verdict is \"not yet met\", Claude starts another turn. But the page's own one-line summary gives three ways the goal ends, not one: the condition is met, the model judges it impossible, or a turn fails on an error you have to fix. The \"How evaluation works\" section adds that Claude Code also stops the loop when Claude makes no progress (no tool use for several turns). The lesson's 「満たすまでClaudeは続けます」 names only the \"met\" exit, so it reads as if Claude keeps going until the condition is met no matter what. That is stronger than the page. The rest of the lesson does not fix this: the prompt block's 「20ターンで止める」 is a limit the user writes into the condition, and its expect text mentions only `/goal clear`. The auditor's proposed fix matches the page. 「無理と判定」 matches the \"Impossible\" verdict, 「進展がないとき」 matches \"without making progress\", and 「直す必要のあるエラー」 matches \"an error you have to fix\". 「止まります」 is true in both of those cases (no progress stops the loop with the goal still set, and an error you have to fix clears the goal). Each sentence stays under 60 characters and the paragraph under 160, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s2-goal-prompt",
+      "where": "expect, first sentence",
+      "claim": "Claudeがテストを実行しては直し、出力に「fail 0」が出るまで続けます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/goal",
+      "evidenceQuote": "To bound how long a goal runs, include a turn or time clause in the condition, such as `or stop after 20 turns`. Claude reports progress against that clause each turn and the evaluator judges it from the conversation.",
+      "fix": "Claudeがテストを実行しては直し、出力に「fail 0」が出るか、20ターンに達するまで続けます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/goal",
+        "evidenceQuote": "\"To bound how long a goal runs, include a turn or time clause in the condition, such as `or stop after 20 turns`. Claude reports progress against that clause each turn and the evaluator judges it from the conversation.\" Also: \"The goal clears automatically once the condition is met, if the model judges the condition impossible to satisfy, or if a turn fails on an error you have to fix.\"",
+        "reason": "The finding stands. I fetched the official /goal page (the lesson's own cited source, cc-goal). The example prompt in the same block ends with 「または20ターンで止める」. That turn clause is how the page says to bound a goal, and the evaluator treats it as part of the condition. So the condition is met, and the goal ends, either when 「fail 0」 appears or when 20 turns have passed. The lesson's expect text only says it continues 「「fail 0」が出るまで」. That leaves out the stop clause the learner's own prompt sets, and it makes the outcome sound stronger than the page does: the goal can end at 20 turns without fail 0, and it can also end if the evaluator judges the goal impossible. The auditor read the context correctly. The proposed fix matches what the page says (a turn clause bounds the run) and what the prompt says, so I am not offering a different fix.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s4-trap",
+      "where": "md, first sentence",
+      "claim": "穴を探すよう頼まれたレビュー役は、健全な作業にも指摘を返します。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/best-practices",
+      "evidenceQuote": "A reviewer prompted to find gaps will usually report some, even when the work is sound, because that is what it was asked to do.",
+      "fix": "穴を探すよう頼まれたレビュー役は、健全な作業にもたいてい指摘を返します。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/best-practices",
+        "evidenceQuote": "A reviewer prompted to find gaps will usually report some, even when the work is sound, because that is what it was asked to do. (JA page https://code.claude.com/docs/ja/best-practices: 「ギャップを見つけるようにプロンプトされたレビュアーは、作業が健全であっても、通常はいくつかを報告します。」)",
+        "reason": "I tried to defend the lesson and could not. The English official page (\"Add an adversarial review step\" section) hedges the claim with \"usually\". So does the Japanese page that the lesson itself links to (「通常は」). The lesson drops the hedge and says it as a fixed rule: 健全な作業にも指摘を返します. That is stronger than the source. The lesson also argues against itself: the s4-prompt block just before it says 「問題がなければ、ないと報告します」, which an unconditional claim would contradict. The auditor read the context correctly. The proposed fix, 「健全な作業にもたいてい指摘を返します」, restores the hedge and matches both pages. It is about 36 JP characters, well under the 60-character limit, and keeps です・ます, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "s3-pitfall",
+      "where": "md, second sentence",
+      "claim": "Anthropicもエージェント（agent）に、テストの削除や編集は「許されない」と指示しています。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
+      "evidenceQuote": "Feature list ... we prompted the initializer agent to write a comprehensive file of feature requirements ... We prompt coding agents to edit this file only by changing the status of a passes field, and we use strongly-worded instructions like “It is unacceptable to remove or edit tests because this could lead to missing or buggy functionality.”",
+      "fix": "Anthropicも長時間作業の実験で、エージェント（agent）に指示を出しました。機能一覧にあるテストの削除や編集は「許されない」という指示です。",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
+        "evidenceQuote": "We prompt coding agents to edit this file only by changing the status of a passes field, and we use strongly-worded instructions like “It is unacceptable to remove or edit tests because this could lead to missing or buggy functionality.”",
+        "reason": "I downloaded the cited Anthropic post and read the passage myself. It backs the sentence almost word for word. The subject is Anthropic (\"We\"), the target is coding agents, and the verb is present tense (\"We prompt\"), which matches 指示しています. \"unacceptable\" translates fairly as 「許されない」, and the post's own word is \"tests\", so 「テストの削除や編集」 is accurate. The sentence also carries cite \"long-running-harness\" pointing to that same post, so the reader can see the scope. The lesson does not say this is a Claude Code built-in, a system-prompt rule, or a rule for every agent, and it does not add any strength the source lacks. The rationale matches too: the post says editing tests leads to \"missing or buggy functionality\", which is the lesson's pitfall that a wrong implementation can be made to \"pass\". The auditor's fix would add context (the long-running experiment, the feature-list file). That makes the sentence more specific, but the current text is not an overclaim. I also checked https://code.claude.com/docs/en/best-practices. It has no similar general instruction, but it does not contradict the lesson either.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}
