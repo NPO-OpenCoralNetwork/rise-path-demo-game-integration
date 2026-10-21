@@ -3,6 +3,16 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App';
+import { claimChunkReload, markChunkReloadStarted, sessionStorageOrNull } from './components/common/chunkReload';
+
+// After a redeploy, a tab on the old build asks for chunk files that no longer exist. Reload once
+// to pick up the new build; a repeat within the guard window falls through to ErrorBoundary.
+window.addEventListener('vite:preloadError', (event) => {
+  if (!claimChunkReload(sessionStorageOrNull())) return;
+  event.preventDefault();
+  markChunkReloadStarted();
+  window.location.reload();
+});
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
