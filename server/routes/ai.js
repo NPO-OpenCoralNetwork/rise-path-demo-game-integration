@@ -12,6 +12,7 @@
  */
 import express from 'express';
 import { getPool } from '../db.js';
+import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import { getKit, writeCurriculumVersion } from '../../tools/core/curriculum.js';
 import {
   adaptCurriculumDraftForSave,
@@ -218,7 +219,8 @@ export async function saveDraftVersion(pool, { curriculumId, userId, curriculum,
     await client.query('COMMIT');
     return saved.curriculumVersionId;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // A lost connection makes ROLLBACK throw too; keep the original error.
+    await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();
@@ -453,6 +455,7 @@ router.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request parameters' });
 
   } catch (err) {
+    if (respondIfDbUnavailable(res, err)) return;
     console.error('[AI Generate] Error:', err);
 
     // Gemini-specific errors
@@ -486,6 +489,7 @@ router.get('/drafts', async (req, res) => {
     );
     return res.json({ drafts: result.rows });
   } catch (err) {
+    if (respondIfDbUnavailable(res, err)) return;
     console.error('[AI Drafts] Error:', err);
     return res.status(500).json({ error: 'Failed to load drafts' });
   }

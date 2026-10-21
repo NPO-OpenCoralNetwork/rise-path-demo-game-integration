@@ -2,7 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { MODEL_IDS } from "./llm/models.config.js";
 
 const getApiKey = () => {
-  const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  // Server key only: VITE_* variables are meant for the browser bundle.
+  const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.warn("GEMINI_API_KEY is not set in environment variables.");
     return "";

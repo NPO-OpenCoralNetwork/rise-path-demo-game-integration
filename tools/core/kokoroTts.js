@@ -297,7 +297,9 @@ export async function loadUserTtsPreferences(userId) {
         const pool = getPool?.();
         if (!pool) return null;
         const { getUserTtsPreferences } = await import('../../server/services/userPreferences.js');
-        return getUserTtsPreferences(pool, userId);
+        // await inside the try: a database error falls back to the default voice instead of
+        // failing the whole synthesis with the driver message.
+        return await getUserTtsPreferences(pool, userId);
     } catch (err) {
         console.warn('[kokoroTts] loadUserTtsPreferences failed:', err.message);
         return null;

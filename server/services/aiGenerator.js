@@ -41,8 +41,8 @@ export async function getCachedKit(userId, getKitFn) {
 let _genAI = null;
 function getGenAI() {
   if (_genAI) return _genAI;
-  // Support both server-side and Vite-prefixed env vars
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  // Server key only: VITE_* variables are meant for the browser bundle.
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
   _genAI = new GoogleGenAI({ apiKey });
   return _genAI;

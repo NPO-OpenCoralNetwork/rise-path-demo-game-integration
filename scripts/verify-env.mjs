@@ -46,7 +46,6 @@ const TTS_RECOMMENDED = [
 
 const OPTIONAL = [
   'GEMINI_API_KEY',
-  'VITE_GEMINI_API_KEY',
 ];
 
 const PLACEHOLDER_PATTERNS = [
@@ -374,6 +373,9 @@ async function main() {
   for (const key of OPTIONAL) {
     const status = classify(key, env[key]);
     console.log(`${statusIcon(status)} ${key}: ${status}`);
+  }
+  if (classify('VITE_GEMINI_API_KEY', env.VITE_GEMINI_API_KEY) === 'SET') {
+    console.log('⚠️  VITE_GEMINI_API_KEY is set: the server does not read it, and VITE_* values can end up in the browser bundle. Use GEMINI_API_KEY.');
   }
 
   if (env.VITE_DEMO_MODE === 'false') {

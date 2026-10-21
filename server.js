@@ -30,30 +30,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Environment ---
-const loadEnvFile = async (filename) => {
-    const envPath = path.join(__dirname, filename);
-    try {
-        const raw = await fs.readFile(envPath, 'utf8');
-        raw.split(/\r?\n/).forEach((line) => {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith('#')) return;
-            const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
-            const separatorIndex = normalized.indexOf('=');
-            if (separatorIndex === -1) return;
-            const key = normalized.slice(0, separatorIndex).trim();
-            if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) return;
-            let value = normalized.slice(separatorIndex + 1).trim();
-            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-                value = value.slice(1, -1);
-            }
-            process.env[key] = value;
-        });
-    } catch (error) {
-        if (error?.code !== 'ENOENT') console.warn(`Failed to load ${filename}:`, error);
-    }
-};
+// One loader with the MCP server (tools/core/env.js); main() passes force: [] so the deployment's
+// own environment always wins over .env.local.
+import { loadEnv } from './tools/core/env.js';
 // Legacy Learning Portals read the Phase 1 pool directly (see the route in createApp).
 import { getPool } from './server/db.js';
+import { dbUnavailableErrorHandler, respondIfDbUnavailable } from './server/dbUnavailable.js';
 
 /**
  * Builds the Express app: middleware, rate limits and every route, in mount order. No listen,
@@ -186,6 +168,7 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
             }));
             res.json({ ok: true, portals });
         } catch (e) {
+            if (respondIfDbUnavailable(res, e)) return;
             console.error("Legacy Portal Error", e);
             res.status(500).json({ error: "Legacy Error" });
         }
@@ -214,12 +197,16 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         app.use(express.static(path.join(__dirname, 'public')));
     }
 
+    // Last: a database outage no route caught (e.g. pool.connect() before a route's try) still
+    // answers 503 JSON instead of Express's HTML 500.
+    app.use(dbUnavailableErrorHandler);
+
     return app;
 }
 
 // --- Server Start (only when run as `node server.js`, not when imported by tests) ---
 async function main() {
-    await loadEnvFile('.env.local');
+    await loadEnv({ force: [] });
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
 

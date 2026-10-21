@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ingestMaterial } from '../ragService.js';
 import { getPool } from '../db.js';
+import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import { isUuid } from '../../tools/core/ids.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
@@ -69,6 +70,7 @@ router.get('/curricula', async (req, res) => {
         );
         res.json({ ok: true, curricula: result.rows });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[Content API] List Error:', error.message, error.stack);
         res.status(500).json({ error: 'Failed to load curricula', detail: error.message });
     }
@@ -101,6 +103,7 @@ router.get('/curricula/:id', async (req, res) => {
             }
         });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[Content API] Detail Error:', error.message);
         res.status(500).json({ error: 'Failed to load curriculum', detail: error.message });
     }
@@ -133,6 +136,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             res.json({ ok: true, material_id: materialId, status: 'uploaded' });
         }
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('Upload Error:', error);
         res.status(500).json({ error: 'Upload failed' });
     }
@@ -218,6 +222,7 @@ router.post('/rag/index', async (req, res) => {
         );
         res.json({ job_id: result.rows[0].id, status: 'queued' });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('Job Queue Error:', error);
         res.status(500).json({ error: 'Failed to queue job' });
     }
@@ -238,6 +243,7 @@ router.get('/jobs/:id', async (req, res) => {
         if (result.rowCount === 0) return res.status(404).json({ error: 'Job not found' });
         res.json(result.rows[0]);
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         res.status(500).json({ error: 'Failed to check job' });
     }
 });
