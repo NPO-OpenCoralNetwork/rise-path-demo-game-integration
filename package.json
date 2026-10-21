@@ -22,6 +22,7 @@
     "tunnel:memanto": "bash scripts/start-memanto-tunnel.sh",
     "prep:mcp-memory-user": "node scripts/prep-mcp-memory-test-user.mjs",
     "smoke:vm": "node scripts/smoke-vm-stack.mjs",
+    "smoke:edge": "node scripts/smoke-public-edge.mjs",
     "smoke:tts": "node scripts/smoke-kokoro-tts.mjs",
     "smoke:tts:api": "node scripts/smoke-kokoro-tts.mjs --api",
     "vercel:link": "vercel link --yes --project rise-path-demo-game-integration",

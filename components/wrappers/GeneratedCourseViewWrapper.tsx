@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchGeneratedCourseById } from '../../services/curriculumApi';
+import { apiFetch } from '../../services/apiClient';
 import GeneratedCourseView from '../features/ai/GeneratedCourseView';
 import type { ResumeCardData } from '../features/ai/GeneratedCourseView';
 import { GeneratedCourse } from '../../types';
@@ -51,7 +52,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
       .finally(() => setLoading(false));
 
     // Fetch resume card (best-effort)
-    fetch(`/api/v2/curricula/${courseId}/resume`)
+    apiFetch(`/curricula/${courseId}/resume`)
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data?.resume_card) setResumeCard(data.resume_card); })
       .catch(() => {});

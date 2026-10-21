@@ -128,6 +128,8 @@
 ```
 
 ### POST /api/generate-audio
+> 2026-10-21 に削除済み（呼び出し元なし）。TTS は現行の `/api/v2` ルート（`POST /api/v2/tts/synthesize`）を使う。
+
 **目的**: 音声生成（lesson単位でStorage保存）
 **補足**: `jobs.type=audio` を作成し、Worker が処理する
 
