@@ -4,15 +4,14 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:a3c0929a6fa09460",
+  "lessonHash": "sha256:735836d64d5beaab",
   "verifies": {
-    "reviewedRevision": "c6817ae",
-    "previousReview": "c6817ae:content/courses/claude-code/reports/cc-07-skills-subagents.ja-editor.review.json",
+    "reviewedRevision": "a0c0ded",
+    "previousReview": "a0c0ded:content/courses/claude-code/reports/cc-07-skills-subagents.ja-editor.review.json",
     "changed": [
-      "s2-steps",
-      "pr-steps"
+      "check-quiz"
     ],
-    "changedShare": 0.03,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -20,49 +19,48 @@
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Both changed strings use です・ます, parse cleanly and have no pressure phrases. ex-description now says what `>-` does: 「長い説明文は、`>-` のあとで改行し、同じ幅で字下げして続けると、1つの説明文になります。」. The pr-after hint 「差は、サブエージェントが読んだファイルの量ではなく、依頼文と報告の長さで決まります。」 now explains the /context difference correctly. Two small points remain: the hint says 「決まります」 with no 「主に」, while the step's expect and the objective label say 「主に」, and the second hint sentence does not say what to compare. Both are in niceToHave. Everything else is unchanged from the previous round.",
+      "evidence": "Only the e1 options in check-quiz changed: the skill name `api-guide` is now `api` in options b, a and d (「`~/.claude/skills/api/SKILL.md` に置く」, 「`.claude/skills/api/SKILL.md` に置いてコミットする」, 「`.claude/skills/api.md` に置いてコミットする」). The options keep the same form and ending as before. The feedback for b and d still fits the new paths. The name `api` matches the prompt 「API（Application Programming Interface）の呼び方」. No other block names api-guide, so no naming drift appears. The rest of the lesson is unchanged from the previous round.",
       "blockIds": [
-        "s2-steps",
-        "pr-steps"
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "`lessons:lint --strict` reports 「1 lesson file: 0 errors, 0 warnings.」. measure.mjs reports 「prose 2183 (budget 1,200–2,400) · … · est 17.9 min (must be ≤ 20; estMinutes 18)」, which is within budget and still matches estMinutes. The changed items have 3 and 2 sentences, and they add no new terms.",
+      "evidence": "`lessons:lint --strict` reports 「1 lesson file: 0 errors, 0 warnings.」. measure.mjs reports 「prose 2183 (budget 1,200–2,400) · … · est 17.9 min (must be ≤ 20; estMinutes 18)」, the same as last round. The change is shorter path strings only, and it adds no sentences or terms.",
       "blockIds": []
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Prerequisites name 第5回 and 第6回 and the shell and Git skills the lesson needs. Every new term is defined with its English on first use (「フロントマター（frontmatter）」, 「段階的な読み込み（progressive disclosure）」). The glossary terms match the body text and the diagram labels.",
+      "evidence": "Prerequisites name 第5回 and 第6回 and the shell and Git skills the lesson needs. New terms get their English on first use (「フロントマター（frontmatter）」, 「段階的な読み込み（progressive disclosure）」). The glossary matches the text and the diagram labels.",
       "blockIds": [],
       "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares only `jp`, and every string is a plain jp string, so no locale is missing. Both diagrams have a caption and an alt text. The only link names its destination: 「公式ドキュメント（日本語版）」 in s2-legacy. Notation is consistent.",
+      "evidence": "The lesson declares only `jp`, and every string is plain jp. Both diagrams have a caption and alt text. The only link names its destination (「公式ドキュメント（日本語版）」). Notation is consistent.",
       "blockIds": [],
       "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "pr-steps (pr-after hint): the hint says 「決まります」 with no qualifier, while this step's expect and the objective label say 「主に依頼文と報告のぶん」. Hedge the same way so the learner does not expect an exact match — 「依頼文と報告の長さで決まります。」→「主に依頼文と報告の長さで決まります。」",
-    "pr-steps (pr-after hint): the second sentence does not say what to compare with the file count — 「報告に挙がったファイルの数と見比べてみましょう。」→「差の大きさを、報告に挙がったファイルの数と見比べてみましょう。」",
-    "s4-check q6: the explanation still uses the old wording 「貼っている」, while option b says 「一から説明し直している」 — 「何度も貼っている複数ステップの手順は、スキルにするきっかけです。」→「毎回一から説明し直している複数ステップの手順は、スキルにするきっかけです。」",
+    "pr-steps (pr-after hint): the hint has no qualifier, while this step's expect and the objective label say 「主に」 — 「依頼文と報告の長さで決まります。」→「主に依頼文と報告の長さで決まります。」",
+    "pr-steps (pr-after hint): the sentence does not say what to compare with the file count — 「報告に挙がったファイルの数と見比べてみましょう。」→「差の大きさを、報告に挙がったファイルの数と見比べてみましょう。」",
+    "s4-check q6: the explanation keeps the old wording, while option b says 「一から説明し直している」 — 「何度も貼っている複数ステップの手順は、スキルにするきっかけです。」→「毎回一から説明し直している複数ステップの手順は、スキルにするきっかけです。」",
     "s2-invoke: デプロイ has no English in this lesson — 「コミットやデプロイのように」→「コミットやデプロイ（deploy）のように」",
     "pr-steps (pr-before): グリッド has no English on first use — 「色分けされたグリッドで」→「色分けされたグリッド（grid）で」",
     "s3-lead: 埋まる has no subject — 「その中身はコンテキストに残り、埋まるほど作業の質が落ちます（第5回）。」→「その中身はコンテキストに残ります。コンテキストが埋まるほど、作業の質が落ちます（第5回）。」",
     "check-quiz e3: the explanation uses 残 twice — 「計画に使える余裕が残ります。」→「計画に使える余裕ができます。」",
     "check-quiz e5: the explanation uses 残 twice — 「あとの作業に使える余裕が残ります。」→「あとの作業に使える余裕ができます。」",
-    "s2-check q3: option d is the only one without a final 句点 — 「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる」→「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる。」",
+    "s2-check q3: option d is the only option without a final 句点 — 「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる」→「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる。」",
     "s4-table: the subagent row does not say where the reading happens — 「要約だけが戻ります。」→「別のコンテキストで読み、要約だけが戻ります。」",
-    "s4-table: 「フックにします」 does not say what the learner actually does — 「**フック**にします（第8回で扱います）。」→「**フック**で自動にします（第8回で扱います）。」",
-    "s2-steps (ex-description): this step should name the folder — 「できたフォルダに、エディターで `SKILL.md` を作ります。」→「できたフォルダ（`.claude/skills/commit-message/`）に、エディターで `SKILL.md` を作ります。」"
+    "s4-table: 「フックにします」 does not say what the learner does — 「**フック**にします（第8回で扱います）。」→「**フック**で自動にします（第8回で扱います）。」",
+    "s2-steps (ex-description): this step could name the folder — 「できたフォルダに、エディターで `SKILL.md` を作ります。」→「できたフォルダ（`.claude/skills/commit-message/`）に、エディターで `SKILL.md` を作ります。」"
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "This is a verification round: review-scope.mjs exited 0, with 2 of 39 blocks changed (s2-steps, pr-steps). The previous review had no must-fix items, so nothing needed resolving. Both changed strings have no (a)–(e) errors. The previous niceToHave on `>-` is now applied, and the pr-after hint ties the /context difference to the request and the report. lint --strict is clean, and measure.mjs gives prose 2183 and est 17.9 min (estMinutes 18). One niceToHave: add 「主に」 to the new hint so it matches the step's expect."
+  "summary": "Verification round: review-scope.mjs exited 0, with 1 of 39 blocks changed (check-quiz, question e1). The previous review had no must-fix items, so there is nothing to resolve. The e1 options now use the skill name `api` in place of `api-guide`. They stay parallel in form, still match their feedback and the prompt, and no other block uses the old name. There are no (a)–(e) errors. lint --strict is clean, and measure.mjs gives prose 2183 and est 17.9 min (estMinutes 18). The niceToHave items from the last round are carried over unchanged."
 }
