@@ -215,11 +215,14 @@ flowchart TB
   are not in `local_postgres_phase1.sql`; they are added by `scripts/migrate_curricula.js`.
 - `server/routes/content.js` tries a legacy fallback `SELECT content FROM curricula`,
   which depends on the `content` column added by the migration script.
-- `curricula.visibility` and `curricula.ui_template_id` exist in SQL but are not read by API routes.
+- `curricula.visibility` exists in SQL but is not read by API routes. `GET /api/v2/curricula`
+  returns `total_lessons`, `status` and `ui_template_id`, and leaves out generations still in
+  progress (`draft_requirements` / `draft_roadmap` without a current version).
 - `curriculum_versions.content_mix`, `assessment_mix`, `ui_hints`, `created_by` are not referenced
   in runtime code.
 
 ## UI boundary (current)
-- UI uses `services/curriculumApi.ts` for `/api/v2/*`.
-- UI uses `services/learningPortalApi.ts` for `/api/learning-portals` and PATCH endpoints,
-  but the server currently only implements the GET endpoint.
+- UI calls `/api/v2/*` only through `apiFetch` (`services/apiClient.ts`), which sends the user's
+  token; `server/tests/apiClientUsage.test.js` fails on any other `/api/v2` URL in the front end.
+- UI uses `services/learningPortalApi.ts` for the public `GET /api/learning-portals` only (there are
+  no endpoints to edit portals).

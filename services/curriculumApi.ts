@@ -4,7 +4,6 @@ import { getCourseProgress } from './progressService';
 import { AIDJ_DEMO_DATA } from './aidjDemoData';
 import { apiFetch } from './apiClient';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v2';
 const USE_DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'; // Set VITE_DEMO_MODE=false for production
 
 type CurriculumListResponse = {
@@ -2680,16 +2679,21 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
     });
   }
 
-  // Real DB fetch (skipped in demo mode)
+  // Real DB fetch (skipped in demo mode). A 401 is thrown (with its status) so the library can ask
+  // the user to sign in again instead of showing an empty list.
   let curricula: any[] = [];
+  let response: Response | null = null;
   try {
-    const response = await fetch(`${API_BASE}/curricula`);
-    if (response.ok) {
-      const payload: CurriculumListResponse = await response.json();
-      curricula = payload.curricula || [];
-    }
+    response = await apiFetch('/curricula');
   } catch (err) {
     console.warn("Failed to fetch curricula from DB", err);
+  }
+  if (response?.status === 401) {
+    throw aiHttpError('Sign-in required to load your generated courses.', 401);
+  }
+  if (response?.ok) {
+    const payload: CurriculumListResponse = await response.json();
+    curricula = payload.curricula || [];
   }
 
   return curricula.map(row => ({
@@ -2727,9 +2731,9 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
     return normalizeGeneratedCourse(PYTHON_DEMO_DATA);
   }
 
-  const response = await fetch(`${API_BASE}/curricula/${id}`);
+  const response = await apiFetch(`/curricula/${id}`);
   if (!response.ok) {
-    throw new Error('Failed to load curriculum.');
+    throw aiHttpError('Failed to load curriculum.', response.status);
   }
   const payload: CurriculumDetailResponse = await response.json();
   if (!payload.curriculum && !payload.course) throw new Error(payload.error || 'Curriculum not found.');
@@ -2937,7 +2941,7 @@ export const fetchAiDrafts = async (): Promise<{drafts: {id: string, title: stri
 export const uploadFile = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+  const response = await apiFetch('/upload', { method: 'POST', body: formData });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.error || 'Upload failed.');
@@ -2949,9 +2953,8 @@ export const generateImagePreview = async (
   prompt: string,
   options?: { aspectRatio?: string; imageSize?: string }
 ) => {
-  const response = await fetch(`${API_BASE}/image`, {
+  const response = await apiFetch('/image', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt,
       aspect_ratio: options?.aspectRatio,

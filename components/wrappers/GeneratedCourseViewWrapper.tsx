@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchGeneratedCourseById } from '../../services/curriculumApi';
+import { apiFetch } from '../../services/apiClient';
+import { parseResumeCard } from '../../services/resumeCard';
+import SignInRequiredNotice from '../common/SignInRequiredNotice';
 import GeneratedCourseView from '../features/ai/GeneratedCourseView';
 import type { ResumeCardData } from '../features/ai/GeneratedCourseView';
 import { GeneratedCourse } from '../../types';
@@ -34,6 +37,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
   const [resumeCard, setResumeCard] = useState<ResumeCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'noCourseId' | 'loadFailed' | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
 
   useEffect(() => {
     if (!courseId) {
@@ -47,13 +51,19 @@ const GeneratedCourseViewWrapper: React.FC = () => {
 
     fetchGeneratedCourseById(courseId)
       .then((data) => setCourse(data))
-      .catch(() => setError('loadFailed'))
+      .catch((err) => {
+        if ((err as { status?: number } | null)?.status === 401) setSignInRequired(true);
+        else setError('loadFailed');
+      })
       .finally(() => setLoading(false));
 
-    // Fetch resume card (best-effort)
-    fetch(`/api/v2/curricula/${courseId}/resume`)
+    // Fetch resume card (best-effort). The route answers { ok, ...card }.
+    apiFetch(`/curricula/${courseId}/resume`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data?.resume_card) setResumeCard(data.resume_card); })
+      .then((data) => {
+        const card = parseResumeCard<ResumeCardData>(data);
+        if (card) setResumeCard(card);
+      })
       .catch(() => {});
   }, [courseId]);
 
@@ -65,6 +75,14 @@ const GeneratedCourseViewWrapper: React.FC = () => {
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-500 font-medium">{t.loading}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (signInRequired) {
+    return (
+      <div className="mx-auto w-full max-w-form px-4 py-12">
+        <SignInRequiredNotice />
       </div>
     );
   }

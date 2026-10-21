@@ -59,10 +59,15 @@ router.get('/curricula', async (req, res) => {
     const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
 
     try {
+        // A finished generated course is status 'draft'; 'draft_requirements' / 'draft_roadmap' are
+        // generations still in progress (resumed from the generator), so the library leaves them
+        // out unless they already have content.
         const result = await pool.query(
-            `select id, title, description, current_version_id, created_at, category, thumbnail, color
+            `select id, title, description, current_version_id, created_at, category, thumbnail, color,
+                    total_lessons, status, ui_template_id
              from curricula
              where user_id = CAST($1 AS uuid)
+               and (coalesce(status, '') not like 'draft\\_%' or current_version_id is not null)
              order by created_at desc
              limit $2 offset $3`,
             [req.userId, limit, offset]
