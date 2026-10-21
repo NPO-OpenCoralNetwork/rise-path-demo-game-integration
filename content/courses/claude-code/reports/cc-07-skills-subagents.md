@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-07-skills-subagents (draft)
+# Report: claude-code/cc-07-skills-subagents (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:d414e3e1a2e0ec5b.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:2679f127d93ca803.**
 
 - Title: 第7回｜手順はスキルに、調べものはサブエージェントに
-- Draft: `content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-07-skills-subagents.md`
-- Level: intermediate · estMinutes 18 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json` · brief: `content/courses/claude-code/briefs/cc-07-skills-subagents.md`
+- Level: intermediate · estMinutes 18 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -38,27 +38,27 @@
 
 ```
 Review of cc-07-skills-subagents by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json (sha256:d414e3e1a2e0ec5b)
-  ja-editor: verification of sha256:97075ebd0299de71 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-07-skills-subagents/97075ebd0299de71/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-07-skills-subagents/97075ebd0299de71/round-1/ja-editor.review.json and 2 earlier rounds checked
-  pedagogy-reviewer: verification of sha256:97075ebd0299de71 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-07-skills-subagents/97075ebd0299de71/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, worked, miscon, practice, meta · previous .artifacts/review/vibe-coding/cc-07-skills-subagents/97075ebd0299de71/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
+  lesson content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json (sha256:2679f127d93ca803)
+  ja-editor: full review
+  pedagogy-reviewer: verification of sha256:0ffacf7c3db87313 (previous review cross-checked; scope recomputed from .artifacts/review/claude-code/cc-07-skills-subagents/0ffacf7c3db87313/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, load, worked, visual, practice, meta, accuracy, a11y_l10n · previous .artifacts/review/claude-code/cc-07-skills-subagents/0ffacf7c3db87313/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
   visual-qa: full review
-  mean 3.54 (needs ≥ 3.3) · every criterion ≥ 3
+  mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer carried)
   ✓ hook       3  (pedagogy-reviewer carried)
   ✓ prior      4  (ja-editor, pedagogy-reviewer carried)
-  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
   ✓ worked     3  (pedagogy-reviewer carried)
-  ✓ active     3  (pedagogy-reviewer)
-  ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer, visual-qa)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
   ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       4  (pedagogy-reviewer carried)
-  ✓ accuracy   4  (pedagogy-reviewer)
+  ✓ accuracy   3  (pedagogy-reviewer carried)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  4  (ja-editor carried, pedagogy-reviewer, visual-qa)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer carried, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-07-skills-subagents/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-07-skills-subagents/`)
 
 1. `ac1d14f8dc7c957a`: ja-editor full revise (mean 3.50, must-fix 7); pedagogy-reviewer full revise (mean 3.15, must-fix 5)
 2. `49fdb7d006e71baa`: ja-editor full revise (mean 4.00, must-fix 1); pedagogy-reviewer full revise (mean 3.38, must-fix 2)
@@ -66,6 +66,9 @@ Review of cc-07-skills-subagents by ja-editor, pedagogy-reviewer, visual-qa: PAS
 4. `e03f31fdd3519c9b`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
 5. `97075ebd0299de71`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
 6. `d414e3e1a2e0ec5b`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+7. `f8e6497346002dd9`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+8. `0ffacf7c3db87313`: ja-editor verify fail (mean 4.00, must-fix 1); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+9. `2679f127d93ca803`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -78,11 +81,12 @@ An auditor with web access checked 62 claims (pages: 19); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-07-skills-subagents --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-07-skills-subagents/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-07-skills-subagents --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-07-skills-subagents/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 
 - 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
+- Publication (2026-10-21): the 11 lessons moved to content/courses/claude-code/lessons/ with courseId claude-code. Visual QA (full, fresh preview in the new course) and pedagogy-reviewer/ja-editor re-ran. The gate accepts only review chains recorded under the lesson's current course, so pedagogy-reviewer and ja-editor reviewed every lesson in full under claude-code. Those full reviews raised new must-fix items in cc-03-plan-first (load), cc-07-skills-subagents (q6 recognition) and cc-09-parallel-automation (e3/e5 convergence; 『』 in s4-check); the orchestrator applied the reviewers' fix texts and the three lessons were re-reviewed. cc-03-plan-first's first pedagogy output was invalid JSON and cc-09-parallel-automation's ja-editor output used verdict "fail"; neither was edited, both were re-run.
 
 ## Course-wide conventions used
 
