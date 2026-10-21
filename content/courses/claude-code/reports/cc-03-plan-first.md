@@ -59,16 +59,17 @@ Review of cc-03-plan-first by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-03-plan-first/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-03-plan-first/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `fa057faba24bd625`: ja-editor full revise (mean 3.50, must-fix 12); pedagogy-reviewer full revise (mean 3.23, must-fix 6)
-2. `32e6d290cf411742`: ja-editor full revise (mean 3.50, must-fix 4); pedagogy-reviewer full revise (mean 3.46, must-fix 1)
-3. `a69e9dc117810e75`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 3)
-4. `2a26cb723101d339`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
-5. `8ad1a10792b712d4`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `c61b1076cf96439d`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
-7. `a0ee84f2b69dd0e5`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.31, must-fix 2); visual-qa full pass (mean 4.00, must-fix 0)
-8. `50da68311b84aa11`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `fa057faba24bd625/round-1`: ja-editor full revise (mean 3.50, must-fix 12); pedagogy-reviewer full revise (mean 3.23, must-fix 6)
+2. `32e6d290cf411742/round-1`: ja-editor full revise (mean 3.50, must-fix 4); pedagogy-reviewer full revise (mean 3.46, must-fix 1)
+3. `a69e9dc117810e75/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 3)
+4. `2a26cb723101d339/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+5. `8ad1a10792b712d4/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `c61b1076cf96439d/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
+7. `a0ee84f2b69dd0e5/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.31, must-fix 2); visual-qa full pass (mean 4.00, must-fix 0)
+8. `50da68311b84aa11/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `50da68311b84aa11/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -77,6 +78,8 @@ An auditor with web access checked 50 claims (pages: 19); a second checker tried
 - [overclaim] `s2-version` (md, first sentence): v2.1.283以降、対話セッション（session）はautoモードで始まります。 — https://code.claude.com/docs/en/permission-modes
 - [overclaim] `s2-enter-lead` (md): [[プランモード]]への入り方は3つです（2026年10月、v2.1.304時点）。 — https://code.claude.com/docs/en/permission-modes
 - [overclaim] `summary-cards` (cards[card-enter].front): プランモードに入る3つの方法は？ — https://code.claude.com/docs/en/permission-modes
+
+Records: `content/courses/claude-code/reports/facts/cc-03-plan-first.audit.json` and `cc-03-plan-first.facts.md`.
 
 ## Screenshots
 

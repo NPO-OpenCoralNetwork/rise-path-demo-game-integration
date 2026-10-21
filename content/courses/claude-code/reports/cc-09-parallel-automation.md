@@ -60,18 +60,21 @@ Review of cc-09-parallel-automation by ja-editor, pedagogy-reviewer, visual-qa: 
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-09-parallel-automation/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-09-parallel-automation/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `f87cd45c170202f4`: ja-editor full revise (mean 3.00, must-fix 9); pedagogy-reviewer full revise (mean 2.92, must-fix 7)
-2. `24be3d570c30f448`: ja-editor full revise (mean 3.25, must-fix 2); pedagogy-reviewer full revise (mean 3.23, must-fix 2)
-3. `e66b60d1da0710f0`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-4. `174374fa262b8b76`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `2bf364c299299ca6`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
-6. `6da74e7b888a7ddb`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-7. `d960aa01a4d029e9`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 5)
-8. `c5dc598ce3ba8cf6`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-9. `262fc82916e86736`: ja-editor full revise (mean 3.50, must-fix 3); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
-10. `5b14d7bb36e8d118`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `f87cd45c170202f4/round-1`: ja-editor full revise (mean 3.00, must-fix 9); pedagogy-reviewer full revise (mean 2.92, must-fix 7)
+2. `24be3d570c30f448/round-1`: ja-editor full revise (mean 3.25, must-fix 2); pedagogy-reviewer full revise (mean 3.23, must-fix 2)
+3. `e66b60d1da0710f0/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+4. `174374fa262b8b76/round-1`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `2bf364c299299ca6/round-1`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
+6. `6da74e7b888a7ddb/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `d960aa01a4d029e9/round-1`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 5)
+8. `c5dc598ce3ba8cf6/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `c5dc598ce3ba8cf6/round-2`: ja-editor full fail (mean 3.50, must-fix 1); pedagogy-reviewer full revise (mean 3.31, must-fix 2); visual-qa full pass (mean 3.67, must-fix 0)
+10. `262fc82916e86736/round-1`: ja-editor full revise (mean 3.50, must-fix 3); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
+11. `5b14d7bb36e8d118/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+12. `5b14d7bb36e8d118/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+13. `5b14d7bb36e8d118/round-3`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.31, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -80,6 +83,8 @@ An auditor with web access checked 70 claims (pages: 20); a second checker tried
 - [wrong] `s1-lead` (md): 第7回の[[サブエージェント]]のほかに、作業を並べる方法が2つあります。 — https://code.claude.com/docs/en/agents
 - [overclaim] `s3-table` (rows[2][1] (--permission-mode dontAsk の「役割」。同じ言い方が check-quiz e3 explanation「dontAsk でほかを拒否します」、p1-checklist pc-mode、p2-prompt expect にもあります)): 許可していない操作を、確認せずに拒否する — https://code.claude.com/docs/en/permission-modes
 - [overclaim] `summary-points` (points[2]): `claude -p` はv2.1.302からManualモードで始まります。 — https://code.claude.com/docs/en/permission-modes
+
+Records: `content/courses/claude-code/reports/facts/cc-09-parallel-automation.audit.json` and `cc-09-parallel-automation.facts.md`.
 
 ## Screenshots
 

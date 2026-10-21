@@ -59,15 +59,17 @@ Review of cc-01-first-session by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-01-first-session/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-01-first-session/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `a0e5c8baccf55921`: ja-editor full revise (mean 3.25, must-fix 11); pedagogy-reviewer full revise (mean 3.00, must-fix 4)
-2. `d8b090b9a8da1f4f`: ja-editor full revise (mean 3.25, must-fix 2); pedagogy-reviewer full pass (mean 3.38, must-fix 0)
-3. `eb6d40faa5d6fe69`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 3)
-4. `83c7a256e5bf982c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `3ebe60f3a0474749`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
-6. `9251fd0014082e5c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-7. `1767d55f356db7d2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+1. `a0e5c8baccf55921/round-1`: ja-editor full revise (mean 3.25, must-fix 11); pedagogy-reviewer full revise (mean 3.00, must-fix 4)
+2. `d8b090b9a8da1f4f/round-1`: ja-editor full revise (mean 3.25, must-fix 2); pedagogy-reviewer full pass (mean 3.38, must-fix 0)
+3. `eb6d40faa5d6fe69/round-1`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 3)
+4. `83c7a256e5bf982c/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `3ebe60f3a0474749/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
+6. `9251fd0014082e5c/round-2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+7. `9251fd0014082e5c/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+8. `1767d55f356db7d2/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+9. `1767d55f356db7d2/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -76,6 +78,8 @@ An auditor with web access checked 85 claims (pages: 29); a second checker tried
 - [wrong] `check-quiz` (q6 option b feedback): クラウドセッションはGitHubのリポジトリを複製して動くので、GitHubにないフォルダでは使えません。手元のフォルダなら、デスクトップアプリが近道です。 — https://code.claude.com/docs/en/claude-code-on-the-web
 - [overclaim] `example-habit` (md): Anthropicの研究では、AIに説明を求めて学んだ人は、あとのテストでも高い点を保ちました。 — https://www.anthropic.com/research/AI-assistance-coding-skills
 - [overclaim] `session-check` (q3 option c (the correct answer)): 昨日の会話は見えないので、伝え直すか開き直す必要がある — https://code.claude.com/docs/en/memory
+
+Records: `content/courses/claude-code/reports/facts/cc-01-first-session.audit.json` and `cc-01-first-session.facts.md`.
 
 ## Screenshots
 

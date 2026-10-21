@@ -57,16 +57,20 @@ Review of cc-11-capstone by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-11-capstone/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-11-capstone/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `a0a5e3162b6d70c5`: ja-editor full revise (mean 3.50, must-fix 12); pedagogy-reviewer full revise (mean 3.08, must-fix 7)
-2. `ae84a43eacd96ce5`: ja-editor full pass (mean 3.75, must-fix 0); pedagogy-reviewer full revise (mean 3.77, must-fix 1)
-3. `054759c1db95b6c4`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0)
-4. `984f34269dfb6574`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0)
-5. `c9d22545bc0d23db`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `3122649e3d005674`: ja-editor verify fail (mean 3.75, must-fix 1); pedagogy-reviewer verify revise (mean 3.77, must-fix 1); visual-qa full pass (mean 3.67, must-fix 0)
-7. `423d9258076f1516`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
-8. `cf71ff2e805d17bc`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `a0a5e3162b6d70c5/round-1`: ja-editor full revise (mean 3.50, must-fix 12); pedagogy-reviewer full revise (mean 3.08, must-fix 7)
+2. `ae84a43eacd96ce5/round-1`: ja-editor full pass (mean 3.75, must-fix 0); pedagogy-reviewer full revise (mean 3.77, must-fix 1)
+3. `054759c1db95b6c4/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0)
+4. `984f34269dfb6574/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0)
+5. `984f34269dfb6574/round-3`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full revise (mean 3.00, must-fix 1)
+6. `984f34269dfb6574/round-2`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `c9d22545bc0d23db/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+8. `c9d22545bc0d23db/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `3122649e3d005674/round-1`: ja-editor verify fail (mean 3.75, must-fix 1); pedagogy-reviewer verify revise (mean 3.77, must-fix 1); visual-qa full pass (mean 3.67, must-fix 0)
+10. `423d9258076f1516/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
+11. `cf71ff2e805d17bc/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+12. `cf71ff2e805d17bc/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.69, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -75,6 +79,8 @@ An auditor with web access checked 60 claims (pages: 22); a second checker tried
 - [overclaim] `ex-prompt-skill` (expect (and the same claim in ex-steps item ex-skill.expect)): `/explain-diff` と打つと、今の差分にもとづく説明が返ります。 — https://code.claude.com/docs/en/skills
 - [overclaim] `setup-prompt-model` (expect): 個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定で読み取りを拒否しています。 — https://code.claude.com/docs/en/permissions
 - [overclaim] `summary-cards` (card-ask (front and back)): `git push` の前に必ず人が見るための設定は？ / `permissions.ask` に `Bash(git push *)` の確認ルールを書きます。 — https://code.claude.com/docs/en/permissions
+
+Records: `content/courses/claude-code/reports/facts/cc-11-capstone.audit.json` and `cc-11-capstone.facts.md`.
 
 ## Screenshots
 

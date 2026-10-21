@@ -1,6 +1,6 @@
 # Report: claude-code/cc-10-safety-cost (published)
 
-**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:5f607bd73eb54e78.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:acb5aef2ac3d7210.**
 
 - Title: 第10回｜安全とコストを管理する
 - Lesson: `content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json` · brief: `content/courses/claude-code/briefs/cc-10-safety-cost.md`
@@ -33,15 +33,15 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 1887 (budget 1,200–2,400) · read 2467 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`
+- course length measure: `prose 1887 (budget 1,200–2,400) · read 2474 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json (sha256:5f607bd73eb54e78)
-  ja-editor: verification of fdffcc2 (previous review cross-checked; scope recomputed from fdffcc2:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: a11y_l10n · previous fdffcc2:content/courses/claude-code/reports/cc-10-safety-cost.ja-editor.review.json
-  pedagogy-reviewer: verification of fdffcc2 (previous review cross-checked; scope recomputed from fdffcc2:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, load, worked, active, miscon, meta, a11y_l10n · previous fdffcc2:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json
+  lesson content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json (sha256:acb5aef2ac3d7210)
+  ja-editor: verification of c6817ae (previous review cross-checked; scope recomputed from c6817ae:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: a11y_l10n · previous c6817ae:content/courses/claude-code/reports/cc-10-safety-cost.ja-editor.review.json and 1 earlier round checked
+  pedagogy-reviewer: verification of c6817ae (previous review cross-checked; scope recomputed from c6817ae:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, load, worked, active, miscon, practice, meta, a11y_l10n · previous c6817ae:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json and 1 earlier round checked
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer carried)
@@ -52,25 +52,30 @@ Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ active     3  (pedagogy-reviewer carried)
   ✓ miscon     4  (pedagogy-reviewer carried)
   ✓ visual     3  (pedagogy-reviewer, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer)
+  ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       4  (pedagogy-reviewer carried)
   ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
   ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-10-safety-cost/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-10-safety-cost/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `8c4567a466d38ec7`: ja-editor full revise (mean 3.00, must-fix 11); pedagogy-reviewer full revise (mean 3.00, must-fix 4)
-2. `c7223f9f160f438c`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0)
-3. `48733d77bde8508c`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0)
-4. `18da014f91a89678`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `4b13c12f53aeb2f8`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
-6. `ba8eeb1a7115a66b`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 1)
-7. `31ca899dd855ae10`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify revise (mean 3.38, must-fix 1); visual-qa full revise (mean 3.00, must-fix 1)
-8. `4f85040f9e462bb2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-9. `8a9d7701d14a41d6`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-10. `5f607bd73eb54e78`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+1. `8c4567a466d38ec7/round-1`: ja-editor full revise (mean 3.00, must-fix 11); pedagogy-reviewer full revise (mean 3.00, must-fix 4)
+2. `c7223f9f160f438c/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0)
+3. `48733d77bde8508c/round-1`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0)
+4. `18da014f91a89678/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `18da014f91a89678/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `4b13c12f53aeb2f8/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+7. `ba8eeb1a7115a66b/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 1)
+8. `31ca899dd855ae10/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify revise (mean 3.38, must-fix 1); visual-qa full revise (mean 3.00, must-fix 1)
+9. `4f85040f9e462bb2/round-3`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+10. `4f85040f9e462bb2/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+11. `4f85040f9e462bb2/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+12. `8a9d7701d14a41d6/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+13. `8a9d7701d14a41d6/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.31, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+14. `5f607bd73eb54e78/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+15. `acb5aef2ac3d7210/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -83,6 +88,9 @@ An auditor with web access checked 76 claims (pages: 22); a second checker tried
 - [overclaim] `s3-steps` (step ex-place md): プロジェクトの `.claude/settings.json` に書きます。gitで共有され、全員に効きます。 — https://code.claude.com/docs/en/settings
 - [overclaim] `s3-steps` (step ex-verify expect): Claudeは中身を読めません。 — https://code.claude.com/docs/en/permissions
 - [overclaim] `check-quiz` (e2 option d feedback): Claude Codeは、rootやsudoでの `bypassPermissions` を拒否します。 — https://code.claude.com/docs/en/permission-modes
+- Refuted, changed later: `s2-table` (row 3 (強い権限), column 起きうること): 2026-10-21: the text was changed after all, prompted by the pedagogy review (its factual doubt: the cell contradicted the glossary and e4, which say deny rules apply in every mode), not by this audit. First to 「拒否ルール以外は、ほぼ確認なしで動く」 (commit fa2c6a2); then, because this verdict and both reviewers read that wording as if deny-ruled actions prompt, to the ja-editor wording 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」 (deny rules block outright; ask rules and critical-path rm still prompt, hence 「ほぼ」).
+
+Records: `content/courses/claude-code/reports/facts/cc-10-safety-cost.audit.json` and `cc-10-safety-cost.facts.md`.
 
 ## Screenshots
 

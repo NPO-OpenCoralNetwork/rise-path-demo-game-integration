@@ -1,18 +1,17 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:5f607bd73eb54e78",
+  "lessonHash": "sha256:acb5aef2ac3d7210",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "fdffcc2",
-    "previousReview": "fdffcc2:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json",
+    "reviewedRevision": "c6817ae",
+    "previousReview": "c6817ae:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json",
     "changed": [
-      "s2-table",
-      "practice-steps-deny"
+      "s2-table"
     ],
-    "changedShare": 0.03,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -105,7 +104,7 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "Re-scored because s2-table changed. The table still has 2 columns, and the longer row 3 cell (「強い権限（`bypassPermissions`）：拒否ルール以外は、ほぼ確認なしで動く」) is a single short clause that fits a mobile column. The s2-layers issues from the previous round are unchanged: the caption 「VMやクラウドセッションはClaude Code全体を…囲みます」 describes a layer that is not drawn, and the edge label 「サンドボックスの中」 hides 「既定はオフです」 (s2-defs).",
+      "evidence": "Re-scored because s2-table changed. The table still has 2 columns. The new row 3 cell (「強い権限（`bypassPermissions`）：拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」) is a few characters longer but is still one clause that fits a mobile column, and its column 2 cell is unchanged. The s2-layers issues are unchanged: the caption 「VMやクラウドセッションはClaude Code全体を…囲みます」 describes a layer that is not drawn, and the edge label 「サンドボックスの中」 hides 「既定はオフです」 (s2-defs).",
       "blockIds": [
         "s2-layers",
         "s2-table",
@@ -115,7 +114,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Re-scored because practice-steps-deny changed. Its new expect 「Claudeの読み取りが拒否され、`/permissions` にルールが出ます。」 is observable and matches practice-prompt-read's expect 「拒否ルールのため読めなかったと答えます」 and the troubleshoot 「中身が出たら、パスとJSONを直して…」. It no longer implies that the file cannot be read by any route, which e4 contradicts. The rest is unchanged: an authentic audit of 田中さん's setup, a 4-item checklist and model answers. The hint ladder is still shallow (p-audit has one hint, and p-bill's troubleshoot gives the answer), and practice-case-habits still says 「`.env` と `secrets/` に拒否ルールがない」 outright.",
+      "evidence": "Unchanged since the previous round. practice-steps-deny's expect 「Claudeの読み取りが拒否され、`/permissions` にルールが出ます。」 is observable and matches practice-prompt-read's expect 「拒否ルールのため読めなかったと答えます」. There is an authentic audit of 田中さん's setup, a 4-item checklist and model answers. The hint ladder is still shallow (p-audit has one hint, and p-bill's troubleshoot gives the answer), and practice-case-habits still says 「`.env` と `secrets/` に拒否ルールがない」 outright.",
       "blockIds": [
         "practice-steps",
         "practice-steps-deny",
@@ -123,7 +122,8 @@
         "practice-steps-bill",
         "practice-prompt-review",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -140,18 +140,16 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Re-scored because of the s2-table change. Row 3 now reads 「拒否ルール以外は、ほぼ確認なしで動く」. This removes the internal contradiction with the glossary entry 拒否ルール (「どの権限モードでも効きます」) and with e4's feedback (「拒否ルールは、どの権限モードでも効きます。」). It matches reports/facts/cc-10-safety-cost.facts.md [safety-1] 'Deny rules still block in every mode, including bypassPermissions', and 「ほぼ」 covers [safety-14] (explicit ask rules and critical-path rm/rmdir still stop). The block cites cc-permission-modes. The practice-steps-deny expect 「Claudeの読み取りが拒否され」 is accurate where the old 「中身を読めず」 overclaimed, given s3-pitfall and e4 (a script that opens the file itself is not blocked). The version is pinned in the subtitle (v2.1.304), and earlier audit fixes are still in place. One reading risk remains (see niceToHave).",
+      "evidence": "Re-scored because s2-table changed. Row 3 now reads 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」. This says that deny-ruled actions are stopped, not prompted, and so removes the misreading that the previous niceToHave and the audit raised about 「拒否ルール以外は」. It matches reports/facts/cc-10-safety-cost.facts.md [safety-1] 'Deny rules still block in every mode, including bypassPermissions', and 「ほぼ」 covers [safety-14] (explicit ask rules and critical-path rm/rmdir still stop). It agrees with the glossary entry 拒否ルール and with e4's feedback 「拒否ルールは、どの権限モードでも効きます。」. The block still cites cc-permission-modes. The audit's dropped finding carries a matching laterChanged note (reports/facts/cc-10-safety-cost.audit.json).",
       "blockIds": [
         "s2-table",
-        "practice-steps-deny",
-        "s3-pitfall",
         "check-quiz"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored because s2-table changed. The new cell is plain and calm, and the glossary term 拒否ルール is used consistently. The offline case is still worded three ways: 「オフラインのコンテナかVMだけで使う」 (s2-table, unchanged column), 「ネットにつながらないコンテナやVMの中で使う」 (e2-b) and 「ネットにつながらない隔離環境」 (e1-b).",
+      "evidence": "Re-scored because s2-table changed. The new cell is plain and calm, です・ます is not needed in a table cell, and the glossary term 拒否ルール is used consistently. 「止めた操作」 matches the lesson's verb elsewhere (q1-d 「拒否ルールで止めます」). The offline case is still worded three ways: 「オフラインのコンテナかVMだけで使う」 (s2-table, unchanged column), 「ネットにつながらないコンテナやVMの中で使う」 (e2-b) and 「ネットにつながらない隔離環境」 (e1-b).",
       "blockIds": [
         "s2-table",
         "check-quiz",
@@ -173,10 +171,9 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-table row 3: a learner can read 「拒否ルール以外は、ほぼ確認なしで動く」 as 'deny-ruled actions ask for confirmation', but deny rules block outright (audit-cc-10-safety-cost.json raised this about the same wording). Consider 「強い権限（`bypassPermissions`）：拒否ルールで止めたもの以外は、ほぼ確認なしで動く」 (wording for ja-editor).",
-    "Still open from the previous round (unchanged blocks): make s2-check q2 a scenario instead of a lookup in s2-table row 2; make check-quiz e6 test the cause in line with o3; fix the s2-layers caption, alt and edge 「サンドボックスの中」 (for example 「サンドボックス（オン時）の中」); explain `/status` in s5-table row 1; spread the s5-md2 asides into their table rows; make practice-case-habits a neutral observation (「プロジェクトに `.env` と `secrets/` があり、`.claude/settings.json` は置いていない」); add `cd ~` as the first line of practice-folder; give ex-target a reason; use one phrase for the offline case across s2-table, e1-b, e2-b and practice-prompt-review ①."
+    "Still open from earlier rounds (unchanged blocks): make s2-check q2 a scenario instead of a lookup in s2-table row 2; make check-quiz e6 test the cause in line with o3; fix the s2-layers caption, alt and edge 「サンドボックスの中」 (for example 「サンドボックス（オン時）の中」); explain `/status` in s5-table row 1; spread the s5-md2 asides into their table rows; make practice-case-habits a neutral observation (「プロジェクトに `.env` と `secrets/` があり、`.claude/settings.json` は置いていない」); add `cd ~` as the first line of practice-folder; give ex-target a reason; use one phrase for the offline case across s2-table, e1-b, e2-b and practice-prompt-review ①."
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: 2 of 44 blocks changed (s2-table, practice-steps-deny), and the previous review had no must-fix items, so nothing was carried open. Both changes are correct and cited. s2-table row 3 no longer contradicts the glossary and e4 ([safety-1], [safety-14]). The p-deny expect no longer overclaims, given e4's script route. Accuracy goes up from 3 to 4. Visual, practice and voice were re-scored and are unchanged. validate and lint --strict are clean. measure.mjs gives prose 1887 and est 17.3 min, which matches estMinutes 17. No regressions were found. The only new note is a niceToHave to remove one possible misreading in the new s2-table wording."
+  "summary": "Verification round. review-scope.mjs exited 0: 1 of 44 blocks changed (s2-table row 3), and the previous review had no open must-fix items. The new wording 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」 is correct and cited ([safety-1], [safety-14]). It removes the misreading noted in the previous niceToHave, so that item is dropped. Visual, accuracy and voice were re-scored and are unchanged at 3, 4 and 3. validate and lint --strict are clean. measure.mjs gives prose 1887 and est 17.3 min, which matches estMinutes 17. No regressions were found."
 }
