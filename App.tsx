@@ -5,6 +5,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { VIEW_PATHS } from './navigation/viewPaths';
+import { trackViewForPath, withoutTrailingSlash } from './navigation/pathViews';
+import { RETURN_TO_KEY, isInAppPath, authReturnTarget } from './navigation/authReturn';
 import { features } from './config/features';
 
 // Common Components
@@ -92,11 +94,6 @@ import {
   AidjCurriculumView,
 } from './components/routes/lazyRoutes';
 
-/** sessionStorage key for the page to open after sign-in. */
-const RETURN_TO_KEY = 'rp:returnTo';
-/** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
-const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
-
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
   const { isLoggedIn, isLoading: authLoading, logout } = useAuth();
@@ -110,7 +107,7 @@ const AppContent: React.FC = () => {
   // Derive current view from location for Layout highlight
   // This is a simple mapping for the Layout's navigation prop
   const getCurrentViewState = (): ViewState => {
-    const path = location.pathname;
+    const path = withoutTrailingSlash(location.pathname);
     if (path === '/') return ViewState.DASHBOARD;
     if (path === '/learning-hub') return ViewState.LEARNING_HUB;
     if (path.startsWith('/courses')) return ViewState.COURSES;
@@ -140,10 +137,11 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/course-generator')) return ViewState.COURSE_GENERATOR;
     if (path.startsWith('/characters') || path.startsWith('/character')) return ViewState.AI_CHARACTERS;
     if (path.startsWith('/blender')) return ViewState.BLENDER;
-    if (path.startsWith('/programming')) return ViewState.PROGRAMMING;
+    // /programming and /vibe: light or dark shell to match each page.
+    const trackView = trackViewForPath(path);
+    if (trackView) return trackView as ViewState;
     if (path.startsWith('/art')) return ViewState.ART_MUSEUM;
     if (path.startsWith('/sonic')) return ViewState.SONIC_LAB;
-    if (path.startsWith('/vibe')) return ViewState.PROGRAMMING_VIBE;
     if (path.startsWith('/claude-code')) return ViewState.CLAUDE_CODE;
     if (path.startsWith('/unity')) return ViewState.UNITY_AI_GAME_DEV;
     if (path === '/library') return ViewState.LIBRARY;
@@ -192,11 +190,13 @@ const AppContent: React.FC = () => {
     navigate(`/generated-course/${course.id}`);
   };
 
-  // In-app path to open after sign-in (the landing's "read chapter 1" CTA when guest access
-  // is off). sessionStorage, so it survives the OAuth redirect through /auth/callback.
+  // In-app path to open after sign-in: the landing's "read chapter 1" CTA when guest access is
+  // off, or else the page the visitor opened (a shared lesson link shows the landing at that URL).
+  // sessionStorage, so it survives the OAuth redirect through /auth/callback.
   const openAuth = (mode: AuthMode, returnTo?: string) => {
+    const target = authReturnTarget(returnTo, location);
     try {
-      if (returnTo && isInAppPath(returnTo)) sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+      if (target) sessionStorage.setItem(RETURN_TO_KEY, target);
       else sessionStorage.removeItem(RETURN_TO_KEY);
     } catch {
       // Storage blocked: sign-in still works and lands on the dashboard.

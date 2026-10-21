@@ -15,7 +15,7 @@
  */
 
 export const CHUNK_RELOAD_KEY = 'rp:chunkReload';
-/** Same key as context/LanguageContext.tsx. */
+/** Same key as context/languageStorage.ts (copied, since this file has no imports). */
 export const LANGUAGE_STORAGE_KEY = 'risepath:language';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;

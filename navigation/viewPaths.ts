@@ -1,4 +1,5 @@
 import { ViewState } from '../types';
+import { startsWithSegment, withoutTrailingSlash } from './pathViews';
 
 /**
  * ViewState → URL. Every ViewState must have an entry (Record enforces it), so
@@ -144,9 +145,6 @@ export type NavKey =
   | 'demoReflection'
   | 'devBlocks';
 
-const startsWithSegment = (pathname: string, prefix: string) =>
-  pathname === prefix || pathname.startsWith(`${prefix}/`);
-
 // Track hubs, readers and catalogs all highlight "Learning content".
 const LEARNING_PREFIXES = [
   '/learning-hub',
@@ -179,7 +177,7 @@ const DEMO_KEYS: Record<string, NavKey> = {
 
 /** Which sidebar entry the URL belongs to, or null when none should be highlighted. */
 export function pathToNavKey(pathname: string): NavKey | null {
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  const path = withoutTrailingSlash(pathname);
 
   if (path === '/' || path === '') return 'dashboard';
   if (startsWithSegment(path, '/course-generator')) return 'generator';
