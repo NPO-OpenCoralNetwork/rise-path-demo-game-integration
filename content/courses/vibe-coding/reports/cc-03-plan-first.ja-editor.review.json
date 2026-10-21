@@ -1,36 +1,41 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:a69e9dc117810e75",
+  "lessonHash": "sha256:8ad1a10792b712d4",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:2a26cb723101d339",
+    "reviewedRevision": "sha256:a69e9dc117810e75",
     "changed": [
-      "practice-starter"
+      "s3-steps",
+      "practice-steps",
+      "practice-spec-steps"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.04,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/2a26cb723101d339/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/a69e9dc117810e75/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Only practice-starter changed. Its only Japanese string is the button label 「追加」, which still matches pr-setup (「空のまま「追加」を押します」). The rename from new-item to item, the removed placeholder 「やること」 and the switch to onclick do not affect any prose. No step text refers to the old id, the placeholder or addEventListener. pr-rewrite, pr-explore and practice-model still name addItem, and the code still defines 「function addItem(text)」. The new highlight (13–18) covers lines 「function addItem(text) {」 through the closing 「}」. That fits the troubleshoot line 「既存のパターンは、`todo.html` で項目を作っている関数です。」 No new (a)–(e) errors.",
+      "evidence": "The only change is in the step titles of s3-steps, practice-steps and practice-spec-steps, where the circled numbers were removed. For example, 「① プランモードに入り、探索させる」 is now 「プランモードに入り、探索させる」 and 「⑦ コミットする」 is now 「コミットする」. A jq diff against the snapshot shows no other changed string. All md, expect, hint and troubleshoot text is the same. No prose anywhere in the lesson refers to a step by its circled number (no ①–⑦ remain). The one ordinal left, 「2番目は、変えないでと頼んだ共通のスタイルの変更です。」 in ex-fix, refers to the second step of Claude's plan in ex-plan, not to a lesson step, so it still reads correctly. The titles keep the same verb-final form (「〜させる」「〜する」「〜書く」), so they stay parallel. I found no new (a)–(e) errors.",
       "blockIds": [
-        "practice-starter",
-        "practice-steps"
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "`lessons:lint --strict`: 0 errors, 0 warnings. measure.mjs prints 「prose 2399 (budget 1,200–2,400) · est 19.4 min (must be ≤ 20; estMinutes 19)」. Both are unchanged from the previous round and within budget, and estMinutes still matches. The starter is one line shorter now that the blank line is gone. The long createElement line is wrapped to fit a phone.",
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2393 (budget 1,200–2,400) · est 19.3 min (must be ≤ 20; estMinutes 19)」. Removing the numbers made the titles a little shorter. Both values are within budget, and estMinutes still matches.",
       "blockIds": [
-        "practice-starter"
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps"
       ]
     },
     {
@@ -47,7 +52,7 @@
       "id": "a11y_l10n",
       "score": 4,
       "carriedOver": true,
-      "evidence": "Carried over from the previous review. The lesson declares only jp, and the changed code block has no locale strings.",
+      "evidence": "Carried over from the previous review. The lesson declares only jp, and the changed titles are plain jp strings with no locale gap.",
       "blockIds": [
         "s2-flow",
         "s2-version"
@@ -65,9 +70,9 @@
     "practice-spec-model / practice-spec-steps: the interface condition from s4-good-spec is missing (carried over) — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとインターフェース、範囲外のこと、」",
     "practice-model: the delete-button request sits under 範囲 (carried over) — move 「各項目に「{{ボタンの文言}}」ボタンも付け、…」 to its own line, starting with 「追加：」",
     "s4-check: option c has two sentences while the other options have one each (carried over) — 「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」→「AskUserQuestionツールで私にインタビューし、決まったらそのまま実装まで進めて。」",
-    "s3-steps: ex-explore reads like a translation (carried over) — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」"
+    "s3-steps: ex-explore reads like a translation (carried over; unchanged text) — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」"
   ],
   "average": 4.0,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0. Only 1 of 44 blocks changed (2%), and sections and objectives are unchanged. The previous review had no open must-fix items, so there are no resolved entries. Only the practice-starter code block changed. The id is now item, the placeholder is gone, the code uses onclick, and the highlight runs from 13 to 18. The highlight now covers the whole addItem function. The button label 「追加」 and the addItem name still match the step text, and no prose refers to the removed id or placeholder. Lint is clean. measure.mjs gives prose 2399 and est 19.4 min, matching estMinutes 19. I found no (a)–(e) errors. The nice-to-haves are carried over from the previous round."
+  "summary": "Verification round. review-scope.mjs exited 0: 3 of 44 blocks changed (4%), and sections and objectives are unchanged. The previous review had no open must-fix items, so there are no resolved entries. The only change is that the circled numbers (①–⑦) were removed from the step titles in s3-steps, practice-steps and practice-spec-steps. All other strings are the same. No text refers to a step by number. The 「2番目」 in ex-fix refers to the plan's own step, not to a lesson step. Lint is clean, and measure.mjs gives prose 2393 and est 19.3 min, which matches estMinutes 19. I found no (a)–(e) errors. The nice-to-haves are carried over from the previous round."
 }

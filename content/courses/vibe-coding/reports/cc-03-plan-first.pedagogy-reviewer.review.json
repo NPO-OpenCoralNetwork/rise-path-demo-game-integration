@@ -1,18 +1,20 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:a69e9dc117810e75",
+  "lessonHash": "sha256:8ad1a10792b712d4",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:2a26cb723101d339",
+    "reviewedRevision": "sha256:a69e9dc117810e75",
     "changed": [
-      "practice-starter"
+      "s3-steps",
+      "practice-steps",
+      "practice-spec-steps"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.04,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/2a26cb723101d339/round-1/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/a69e9dc117810e75/round-1/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
@@ -55,11 +57,12 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs still prints 「prose 2399 (budget 1,200–2,400) · read 3065 · practice reading 1452 · questions 8 · practice sections 2 · est 19.4 min (must be ≤ 20; estMinutes 19)」, so the code-only change to practice-starter did not move the budget. It stays at 25 lines (the cap): splitting `const li =` over 2 lines offsets the removed blank line. Lint --strict shows 0 errors and 0 warnings. Body prose is still 1 char under the cap, and s2 still holds 8 blocks.",
+      "evidence": "measure.mjs now prints 「prose 2393 (budget 1,200–2,400) · read 3059 · practice reading 1442 · questions 8 · practice sections 2 · est 19.3 min (must be ≤ 20; estMinutes 19)」. Removing the circled numbers from the 16 step titles cut prose by 6 characters (it was 2399), and est still matches estMinutes 19. Lint --strict shows 0 errors and 0 warnings. Prose is still close to the cap, s2 still holds 8 blocks, and practice-starter is still at the 25-line cap.",
       "blockIds": [
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps",
         "practice-starter",
-        "s1-table",
-        "s4-table",
         "s2-defs",
         "s2-enter",
         "s2-version",
@@ -69,12 +72,11 @@
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s3-steps now has 6 steps, within the contract's 3–6. Each step has a subgoal title and a reason: ex-explore 「ファイルを変えずに調べられます」, ex-plan 「書く前に、進め方を読める形にするためです」, ex-commit 「記録すれば、あとで戻せます」. ex-fix models reading the plan against the stated scope. It goes from the full example straight to practice, with no faded step in between.",
+      "evidence": "s3-steps is unchanged apart from its titles, which now read 「プランモードに入り、探索させる」 … 「コミットする」 with no ① to ⑥ prefixes. StepsBlock.tsx numbers each item itself (`rp-step-num` shows `i + 1`), so the order the learner sees is unchanged and the step numbers are no longer shown twice. The 6 steps (within 3–6) keep their subgoal titles and reasons, for example ex-explore 「ファイルを変えずに調べられます」, ex-plan 「書く前に、進め方を読める形にするためです」 and ex-commit 「記録すれば、あとで戻せます」. ex-fix still models checking the plan against the stated scope. The example still goes straight to practice, with no faded step in between.",
       "blockIds": [
         "s3-steps",
         "s3-fix-prompt"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "active",
@@ -105,26 +107,26 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "practice-starter's new highlight [13–18] matches addItem exactly: line 13 is 「  function addItem(text) {」, lines 14–15 are the split 「const li =」 / 「document.createElement('li');」, and line 18 is the closing brace. This points the learner to the 既存のパターン that pr-rewrite's troubleshoot (「`todo.html` で項目を作っている関数です」) and practice-model (「今あるaddItem関数」) rely on. s2-flow is unchanged: a 5-node process diagram with the 「直したい点がある」 loop, a takeaway caption and descriptive alt text. There are no decorative images.",
+      "evidence": "Signaling is better now. Before, StepsBlock showed its own rail number next to a title that began with ①, so each step showed two numbers, and the rail swaps its number for a check mark when a step is done. The titles now carry only the subgoal (for example 「計画を作らせ、1か所直す」), so the rail is the only number shown. A search finds no ①–⑦ left in the lesson, and no prose refers to a step by its circled number. practice-starter's highlight [13–18] still covers addItem. s2-flow is a 5-node diagram with a caption and alt text, and the lesson has no decorative images.",
       "blockIds": [
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps",
         "practice-starter",
-        "s2-flow",
-        "s1-table",
-        "s4-table"
+        "s2-flow"
       ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The starter still supports every step. Pressing 追加 with an empty input still calls addItem('') and adds an empty li, so pr-setup's expect 「空の行が増えます。」 holds. addItem is still the only item builder, so practice-model's 「ボタンもaddItemの中で作ってください」 and its expect 「addItemの中でボタンを作る手順」 still apply. Switching to `addBtn.onclick` changes nothing that pr-explore or pr-explain depend on. As before, the checklist and the model marked 「書いてから見比べましょう」 are in place, the hint ladder has 2 levels rather than 3, and ps-ask's expect leaves out 「当たり前の質問はしない」, which c2-depth requires.",
+      "evidence": "In practice-steps and practice-spec-steps, only the title prefixes changed. Every md, expect, hint and troubleshoot is identical to the previous revision. For example, pr-plan still has hint 「頼んでいない保存機能やライブラリの追加がないかを見ます。」 and the troubleshoot about 確かめ方, and pr-explain still has expect 「空のまま押しても行が増えず、各項目の削除ボタンで、その項目が消えます。」. The rail numbering keeps the order (7 and 3 steps). Nothing in the text referred to the old circled numbers: troubleshoot points to sections (「3-4の依頼文の2行目」), not to steps. The checklist and the model marked 「書いてから見比べましょう」 are still in place. The earlier gaps stay: the hint ladder has 2 levels rather than 3, and ps-ask's expect leaves out 「当たり前の質問はしない」, which c2-depth requires.",
       "blockIds": [
-        "practice-starter",
-        "practice-setup",
         "practice-steps",
+        "practice-spec-steps",
         "practice-checklist",
         "practice-model",
-        "practice-spec-steps",
-        "practice-spec-checklist"
+        "practice-spec-checklist",
+        "practice-starter"
       ]
     },
     {
@@ -176,13 +178,14 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-starter (new): dropping placeholder=\"やること\" leaves the practice page with an unlabeled text box beside 追加. If line width allows, restore it as `<input id=\"item\" placeholder=\"やること\">`, or leave it as is, since pr-setup only asks the learner to press 追加 with an empty input.",
-    "s1-table: turning it into a list removed the official per-perspective rewrite examples (for example 「`foo.py` のテストで、ログアウト中の場合を扱う」), so o1 has only one worked rewrite (s1-example) before q1. If prose allows, add a short example to the 症状 item, which q1 tests: 「**症状**には、起きていること、場所の見当、直った状態を書きます（例：タイムアウト後にログインできない。`src/auth/` を調べて直す）。」. Prose is at 2399 of 2,400, so trim the same amount elsewhere.",
-    "s1-lead: an earlier change dropped the reason the 4 perspectives matter (「依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。」). The lead now only says Claude cannot read minds. Consider restoring the dropped sentence, or append 「だから、範囲や症状を言葉で渡します。」.",
-    "summary-points point 3: the shortened text drops 複数のファイル, and 「迷う変更」 is vaguer than s2-when's 「進め方に迷うとき」. Consider 「差分を1文で説明できる変更は直接頼み、進め方に迷う変更や、複数のファイル・よく知らないコードを変えるときは計画します。」.",
-    "pr-setup: 「最初の3行でフォルダーを作り」 also covers git init, which does not create a folder. Consider 「最初の3行でフォルダーを作ってGitを始め、その中に `todo.html` を保存します。」.",
-    "check-quiz e5 (carried over): the item reuses the s4 scenario (家計簿アプリの予算), so it is not a new context for o3. Change the stem's feature to 「読書記録アプリに、本の貸し出しの機能を足したい。」.",
-    "check-quiz e5 option c (carried over): 「早めに切り上げて」 can be ruled out from the stem alone. Consider md 「質問は、技術的な実装についてだけにして。」 with feedback 「話題を絞ると、画面やエッジケースの判断が仕様に残りません。UI/UXやトレードオフも聞いてもらいます。」.",
+    "s3-steps ex-fix: the lesson's steps now show only rail numbers 1–6, so 「2番目は、…」 (meaning the plan's second item) could be read as the lesson's step 2. Consider 「計画の2番目は、変えないでと頼んだ共通のスタイルの変更です。」.",
+    "practice-starter: dropping placeholder=\"やること\" leaves the practice page with an unlabeled text box beside 追加. If line width allows, restore it as `<input id=\"item\" placeholder=\"やること\">`.",
+    "s1-table: o1 has only one worked rewrite (s1-example) before q1. If prose allows, add a short example to the 症状 item: 「**症状**には、起きていること、場所の見当、直った状態を書きます（例：タイムアウト後にログインできない。`src/auth/` を調べて直す）。」, and trim the same amount elsewhere (prose is 2393 of 2,400).",
+    "s1-lead: consider restoring 「依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。」 or appending 「だから、範囲や症状を言葉で渡します。」.",
+    "summary-points point 3: consider 「差分を1文で説明できる変更は直接頼み、進め方に迷う変更や、複数のファイル・よく知らないコードを変えるときは計画します。」.",
+    "practice-steps pr-setup: 「最初の3行でフォルダーを作り」 also covers git init. Consider 「最初の3行でフォルダーを作ってGitを始め、その中に `todo.html` を保存します。」.",
+    "check-quiz e5 (carried over): the item reuses the s4 scenario (家計簿アプリの予算). Change the stem's feature to 「読書記録アプリに、本の貸し出しの機能を足したい。」.",
+    "check-quiz e5 option c (carried over): consider md 「質問は、技術的な実装についてだけにして。」 with feedback 「話題を絞ると、画面やエッジケースの判断が仕様に残りません。UI/UXやトレードオフも聞いてもらいます。」.",
     "practice-spec-steps ps-ask (carried over): change expect to 「AskUserQuestionと、聞いてほしい話題が3つ以上、「当たり前の質問はしない」が入ります。」 so that it matches c2-depth.",
     "factual doubt (carried over): s3-tip 「説明を求めた人は、任せきりの人より理解度テストの点が高くなりました」 reads as causal. Consider 「…点が高い傾向がありました。」.",
     "s3-check q3 (carried over): gloss package.json at its first use: 「package.json（使うライブラリを書くファイル）」.",
@@ -190,5 +193,5 @@
   ],
   "average": 3.54,
   "verdict": "pass",
-  "summary": "Verification round: review-scope exited 0, with 1 of 44 blocks changed (practice-starter, 2%) and sections and objectives unchanged. The previous round had no open must-fix items, so there are no resolved entries. I reviewed practice-starter in full and found no error and no regression. The new highlight [13–18] covers exactly the addItem function. The code is still 25 lines, and the empty-input bug, the addItem pattern and every step's expect still hold. Validate shows 0 errors, lint --strict shows 0 warnings, and measure.mjs is unchanged (prose 2399, est 19.4, estMinutes 19). I re-scored load, visual and practice; the other scores carry over. The only new note is a niceToHave about the removed input placeholder."
+  "summary": "Verification round: review-scope exited 0, with 3 of 44 blocks changed (s3-steps, practice-steps, practice-spec-steps; 4%) and sections and objectives unchanged. The previous review had no open must-fix items, so there are no resolved entries. The only change is that the circled-number prefixes (①–⑦) were removed from the step titles. StepsBlock already numbers each step on its rail, so this removes a duplicate number and is not a regression. All md, expect, hint and troubleshoot text is unchanged, and no prose refers to the old numbers. Validate shows 0 errors and lint --strict shows 0 warnings. measure.mjs now prints prose 2393 and est 19.3 (estMinutes 19). I re-scored load, worked, visual and practice with unchanged scores; the other scores carry over. The only new note is a niceToHave about the wording of 「2番目」 in ex-fix."
 }

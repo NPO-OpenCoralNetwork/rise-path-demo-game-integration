@@ -1,73 +1,50 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:a69e9dc117810e75",
+  "lessonHash": "sha256:8ad1a10792b712d4",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "Nothing overflows or is clipped at 390 px or 1440 px. The s2-flow diagram has readable Japanese labels at both widths (mobile-jp-07/08, desktop-jp-05), and the definition tables and todo.html code read well (mobile-jp-19/20). Every steps block shows its number twice, though: the reader's green circle plus a ① in the title (mobile-jp-10, desktop-jp-07, desktop-jp-14, desktop-jp-17).",
+      "score": 4,
+      "evidence": "The s2-flow diagram uses flowchart TD. Its Japanese labels are readable at 390 px and nothing is cut off (pages/mobile-jp-07.png, pages/mobile-jp-08.png). The todo.html code (practice-starter) fits at 390 px with no soft-wraps, and the highlight on lines 13–18 is clear (pages/mobile-jp-20.png). No overflow, broken images or console errors.",
       "blockIds": [
         "s2-flow",
-        "s1-table",
         "practice-starter",
-        "s3-steps",
-        "practice-steps",
-        "practice-spec-steps"
+        "practice-setup"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "There are no text-only screens. Each segment gets a table, figure, prompt or check within one mobile screen. The longest dense run is s4-interview: about 13 lines of prompt text on mobile-jp-16. Desktop chars per line: median 39, max 46, against a 30–40 target.",
+      "evidence": "No textOnlyScreens on either device. Desktop JP chars per line has a median of 39, inside 30–40. Every screen has a heading, prompt, steps, check or code. The lesson is long (35 mobile screens), but each part is broken into definitions, steps with expected results, and checks (pages/mobile-jp-11.png to pages/mobile-jp-14.png).",
       "blockIds": [
-        "s4-interview",
-        "practice-spec-model"
+        "s1-defs",
+        "s3-steps",
+        "practice-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All Japanese, with the English term given in brackets on first use. Contrast is good on the callouts and the code. Keyboard hints show on the checks (desktop-jp-02). Nothing is hidden under the mobile top or bottom bars. No personal data appears on any screen.",
+      "evidence": "Everything is in Japanese, including the diagram labels and the figure caption. The UI strings in English (Yes, manually approve edits; No, keep planning) are product terms quoted on purpose. Contrast is good on the light cards and the dark code blocks. Inline code chips (/rewind, claude --permission-mode plan, SPEC.md) stay whole, and controls stay clear of the top and bottom bars (pages/mobile-jp-08.png, pages/mobile-jp-30.png).",
       "blockIds": [
-        "s2-version",
-        "check-quiz"
+        "s2-enter",
+        "check-quiz",
+        "s2-flow"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "s3-steps",
-      "issue": "Each step is numbered twice. The reader draws a numbered circle, and each title starts again with ①–⑥ ('1  ① プランモードに入り、探索させる'). This adds noise and makes the narrow mobile title wrap ('⑤ 差分を説明させ、/予想してから確かめる').",
-      "fix": "Remove the leading circled numbers from the step titles of ex-explore through ex-commit (for example 'プランモードに入り、探索させる').",
-      "screenshot": "pages/mobile-jp-12.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "practice-steps",
-      "issue": "The same double numbering appears in practice 1: the circles 1–7 plus ①–⑦ at the start of each title (pr-setup through pr-commit).",
-      "fix": "Remove the leading ①–⑦ from the titles of pr-setup, pr-rewrite, pr-explore, pr-plan, pr-implement, pr-explain and pr-commit.",
-      "screenshot": "pages/desktop-jp-14.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "practice-spec-steps",
-      "issue": "The same double numbering appears in practice 2: the circles 1–3 plus ①–③ in the titles of ps-feature, ps-ask and ps-spec.",
-      "fix": "Remove the leading ①–③ from the three step titles.",
-      "screenshot": "pages/mobile-jp-26.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "On mobile the reflection line for objective o1 leaves a single 'る' on its own line ('…具体的に書き直せ / る', mobile-jp-34, and the same on desktop-jp-23). A slightly shorter objective text, such as dropping '具体的に', would avoid this.",
-    "s4-interview is one dense block of about 13 lines on mobile (mobile-jp-16). Splitting its second paragraph so each topic sits on its own line would make it easier to scan.",
-    "reader: the model-answer prompt blocks (practice-model, practice-spec-model) are fully visible even though their titles say '書いてから見比べましょう' (write first, then compare) (desktop-jp-16, desktop-jp-18). A collapsed or reveal state would support the write-first instruction.",
-    "reader: the end banner says this is the course's last lesson. That is expected for a draft that is not in course.json.",
-    "reader: the full-length mobile PNG is truncated at 16000px. All 35 per-screen PNGs were reviewed."
+    "check-quiz e1/e5 and s3-check: the quoted draft request sits in the same bold prompt text as the question (pages/mobile-jp-29.png, pages/mobile-jp-31.png), so the question and the quote run together at 390 px. Put the quote on its own line after a line break, or move the question sentence after the quote, so the text to compare stands apart.",
+    "s2-enter: the pause glyph in the `⏸ plan mode on` chip renders as a small, unclear mark in the monospace font (pages/mobile-jp-08.png, pages/desktop-jp-05.png). Consider describing it in words (for example 「⏸（一時停止の記号）」) so learners can recognize it on their status bar.",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-35.png, pages/desktop-jp-23.png).",
+    "reader: the mobile full-length PNG stops at 16000px (metrics truncated: true). The per-screen PNGs cover the whole lesson.",
+    "reader: failed /api/v2/user/* requests (500) in this preview environment are ignored as environment noise."
   ],
-  "verdict": "revise",
-  "summary": "The lesson renders cleanly at 390 px and 1440 px. There are no overflows, errors or privacy findings, the plan-mode flowchart is legible in Japanese, and the code, tables, keycaps and checks all read well. The only must-fix is cosmetic and quick: drop the ①② numbers from the step titles in s3-steps, practice-steps and practice-spec-steps, because the reader already numbers each step."
+  "verdict": "pass",
+  "summary": "Clean on both mobile and desktop JP: there is no overflow, no clipped text and no hard failure in metrics.json. The TD flowchart, the code blocks and the prompt cards are readable at 390 px, and no screen shows personal data. Nothing must be fixed. The main optional fix is to separate the quoted draft requests from the question text in check-quiz so they are easier to compare."
 }

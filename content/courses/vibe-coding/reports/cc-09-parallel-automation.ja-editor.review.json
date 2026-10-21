@@ -4,90 +4,72 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:174374fa262b8b76",
+  "lessonHash": "sha256:6da74e7b888a7ddb",
   "verifies": {
-    "reviewedRevision": "sha256:2bf364c299299ca6",
-    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/2bf364c299299ca6/round-1/ja-editor.review.json",
+    "reviewedRevision": "sha256:174374fa262b8b76",
+    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/round-1/ja-editor.review.json",
     "changed": [
-      "s1-defs",
-      "s1-table",
-      "s2-steps",
-      "p1-task",
-      "p1-model",
-      "check-quiz",
-      "summary-points"
+      "check-quiz"
     ],
-    "changedShare": 0.09,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [
     {
-      "blockId": "s1-table",
+      "blockId": "check-quiz",
       "criterion": "voice",
       "status": "resolved",
-      "evidence": "The worktree item in s1-table now reads 「依存パッケージを入れ直し、取り込みは自分でします。」, so 「行います」 is gone, as the §3 notation rule asks."
+      "evidence": "In e3, option d now reads 「`Bash(npm test *)` ＋ `dontAsk`」 with no trailing 「だけ」. Like options a, b and c, it is a bare flag list joined by ＋, so the four options are parallel in form (§5) and d no longer hints at what is missing."
     }
   ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "です・ます holds in every changed block, and lessons:lint --strict reports 0 errors and 0 warnings. The §3 break in s1-table is fixed. summary-points now splits the long point into two sentences: 「必要なコマンドだけを許可します。`--bare` と費用の上限も付けます。」. The rewritten e3 options break the §5 parallel-form rule in one place: option d alone ends in 「だけ」. The clipped lines noted in the previous round (s3-table, s2-code) are unchanged, so the score stays at 3.",
+      "evidence": "The only change since the last round is option d of e3, which is now the bare list 「`Bash(npm test *)` ＋ `dontAsk`」. Its feedback (「`--bare` がないと、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。」) is one sentence and uses です・ます. lessons:lint --strict reports 0 errors and 0 warnings. The small clipped lines in the unchanged s3-table and s2-code remain, so voice stays at 3.",
       "blockIds": [
         "check-quiz",
-        "s1-table",
-        "summary-points"
+        "s3-table",
+        "s2-code"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 2260 (budget 1,200–2,400), read 2648, practice reading 1225, 11 questions, 2 practice sections and est 19.9 min (cap 20; estMinutes 20). The e3 options now list only the flags that differ, which makes the comparison easier on a phone than four long command lines. Prose is close to the ceiling (2224 → 2260), so further fixes should not add length.",
+      "evidence": "measure.mjs gives prose 2260 (budget 1,200–2,400), read 2648, practice reading 1225, 11 questions, 2 practice sections and est 19.9 min (cap 20). estMinutes is 20. Removing 「だけ」 does not change the prose count. The prose is still close to the ceiling.",
       "blockIds": [
-        "check-quiz",
-        "p1-model",
-        "s2-steps"
+        "check-quiz"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "s1-defs no longer gives the folder and branch naming. s2-steps ex-feature now introduces the folder with 「`.claude/worktrees/` の下に、フォルダーが2つできます。」, and the glossary still gives both `.claude/worktrees/<名前>/` and `worktree-<名前>`, so the branch names in ex-feature and ex-merge stay traceable. e3 now explains its shorthand before the options: 「`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」. The earlier small gaps remain (継続的インテグレーション without English; 「道具」 vs 「方法」 in s1-lead), which keeps this at 3.",
+      "evidence": "Carried over: this round changed nothing that affects prior. The small gaps from earlier rounds remain (継続的インテグレーション has no English; s1-lead uses both 「道具」 and 「方法」).",
       "blockIds": [
-        "s1-defs",
-        "s2-steps",
-        "check-quiz",
         "lesson",
         "s1-lead"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The one declared locale (jp) is complete. Lint reports no locale-plain-string findings. The only link names its destination: 「公式ドキュメント（非対話的実行）」 (s3-mode). There are no images, and no diagrams with embedded text. Plain-text fields (checklist labels, var hints, askTutor suggestions) contain no markdown.",
+      "evidence": "Carried over: the one declared locale (jp) is complete, lint reports no locale-plain-string findings, and the only link names its destination (「公式ドキュメント（非対話的実行）」 in s3-mode).",
       "blockIds": [
-        "s3-mode",
-        "p1-checklist"
+        "s3-mode"
       ],
       "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) §5 options parallel in form: in the rewritten e3, options a, b and c are bare flag lists joined by ＋, but option d adds the word 「だけ」 (「`Bash(npm test *)` ＋ `dontAsk` だけ」). That gives it a different ending, and it points straight at what is missing. The prompt already says these flags come in addition to the shared base, so the list alone is clear.",
-      "fix": "「`Bash(npm test *)` ＋ `dontAsk` だけ」→「`Bash(npm test *)` ＋ `dontAsk`」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "check-quiz: In e3 the key that explains the shorthand comes after the question, so the learner reads the question before learning how to read the options. Put the key first — 「夜間のCIで、失敗したテストを要約させます。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「夜間のCIで、失敗したテストを要約させます。選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
-    "p1-task: s2-code calls cc-practice-09 「練習用リポジトリ」, and this sentence contrasts it with 「大事なリポジトリ」. The same word reads more smoothly — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
-    "s1-defs: The worktree definition no longer says where the copy is created or how its branch is named. Learners meet both only in s2-steps and the glossary. If length allows, add the branch name back so that 「worktree-feature-a」 in s2-steps is not a surprise — 「`claude --worktree <名前>` で作ります。」→「`claude --worktree <名前>` で作ります。ブランチ名は `worktree-<名前>` です。」",
-    "s3-table (unchanged): A clipped clause remains from the previous round — 「付けないと、どちらも確認なしで動きます」 after 「フックやMCPサーバー…など」 could name its subject — 「付けないと、どちらも確認なしで動きます」→「付けないと、フックもMCPサーバーも確認なしで動きます」",
+    "check-quiz: In e3 the key that explains the shorthand comes after the question. Put it before the question so the learner knows how to read the options first — 「`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
+    "p1-task (unchanged): s2-code calls cc-practice-09 a 「練習用リポジトリ」. Using the same word here reads more smoothly — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
+    "s1-defs (unchanged): The worktree definition does not give the branch name, so 「worktree-feature-a」 in s2-steps comes as a surprise. Add it if length allows — 「`claude --worktree <名前>` で作ります。」→「`claude --worktree <名前>` で作ります。ブランチ名は `worktree-<名前>` です。」",
+    "s3-table (unchanged): 「どちらも」 could name its subject — 「付けないと、どちらも確認なしで動きます」→「付けないと、フックもMCPサーバーも確認なしで動きます」",
     "s2-code (unchanged): The code comment is terse — 「# 未追跡に出さない」→「# ワークツリーを未追跡ファイルに出さない」"
   ],
   "average": 3.5,
-  "verdict": "revise",
-  "summary": "This is a verification round. review-scope.mjs exited 0: 7 of 42 blocks and 7 of 82 parts changed (9%), and sections and objectives are unchanged. The previous must-fix (「行います」 in s1-table) is resolved; the item now reads 「取り込みは自分でします。」. I checked the changed blocks in full: s1-defs, s1-table, s2-steps, p1-task, p1-model, check-quiz and summary-points. lessons:lint --strict is clean. measure.mjs gives prose 2260 and est 19.9 min, still within budget and near the cap. The e3 rewrite into short flag lists with a key reads better on a phone. It brings one new (d) must-fix: option d alone ends in 「だけ」, which breaks the §5 parallel-form rule and hints at the answer. Scores are voice 3, load 4, prior 3 and a11y_l10n 4 (carried over), mean 3.5. The verdict is revise until the e3 option is fixed."
+  "verdict": "pass",
+  "summary": "This is a verification round. review-scope.mjs exited 0: 1 of 42 blocks changed (check-quiz, question e3), 2% of the parts, and sections and objectives are unchanged. The open must-fix from the last round is resolved: option d of e3 now reads 「`Bash(npm test *)` ＋ `dontAsk`」 without 「だけ」, so all four options have the same form. The change adds no new (a)–(e) issue. lessons:lint --strict is clean. measure.mjs gives prose 2260 and est 19.9 min, with estMinutes 20. Scores are voice 3, load 4, prior 3 (carried over) and a11y_l10n 4 (carried over), a mean of 3.5. mustFix is empty, so the verdict is pass. The remaining items are in niceToHave."
 }

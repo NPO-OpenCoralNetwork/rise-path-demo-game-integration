@@ -1,83 +1,74 @@
 {
   "lessonId": "cc-02-permissions",
   "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
-  "lessonHash": "sha256:53b74995ba36c9df",
+  "lessonHash": "sha256:fc6282d1f851b02f",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:95d0a505f30641a5",
-    "changed": [
-      "rules-check",
-      "example-check",
-      "rules-files",
-      "rules-checklist",
-      "check-quiz",
-      "summary-ask"
-    ],
-    "changedShare": 0.09,
-    "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-02-permissions/95d0a505f30641a5/round-1/ja-editor.review.json"
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Re-scored because voice is the criterion the changed quiz text touches. The changed text stays in です・ます and reads naturally. The q3 prompt is now shorter: 「許可ルールは `Bash(git *)`、確認ルールは `Bash(git push *)` です。」. The q4 options now share one form (「許可ルールに `Bash(git push *)`」「拒否ルールに …」「確認ルールに …」). The e6 feedback glosses each term: 「拒否ルール（deny）は確認ではなく…確認ルール（ask）です。」. One new form break remains in e6. Options a–c are noun phrases ending in a code token (「`ask` に `Bash(gh pr create *)`」), but option d ends in a verb (「CLAUDE.mdに「確認して」と書く」). It is listed in mustFix. The rest of the lesson is unchanged and still reads at 4.",
+      "evidence": "Every learner-facing string uses です・ます, with 体言止め only in table rows, options and checklist labels. The text reads naturally, without 翻訳調 or pressure phrases. Wrong-option feedback stays within 2 sentences and follows the guide's pattern: it names the misconception, then gives the right idea, for example q3 c 「止めるのは拒否ルール（deny）です。確認ルールは止めずに、あなたに確認を求めます。」. Options are parallel in every question. e6 option d now matches a–c (「CLAUDE.mdに「作る前に確認して」」 next to 「`ask` に `Bash(gh pr create *)`」), which closes last round's only must-fix. Code tokens are spaced the same way throughout. The link text 「権限モードの公式ドキュメント（日本語）」 names its destination. One minor wobble is the loose use of 止める for an ask rule (e1 a, auto-limit, rules-lead). It is listed in niceToHave.",
       "blockIds": [
+        "hook-predict",
         "rules-check",
-        "example-check",
-        "check-quiz"
+        "check-quiz",
+        "hook-version",
+        "auto-limit"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Carried over. The changes are small rewordings. measure.mjs still reports prose 2222 (budget 1,200–2,400) and est 19.9 min (≤ 20, estMinutes 20). lessons:lint --strict is clean.",
+      "evidence": "measure.mjs reports prose 2222 (budget 1,200–2,400), est 19.9 min (≤ 20, estMinutes 20), 13 questions and 2 practice sections. lessons:lint --strict is clean, so every sentence and paragraph is within budget. The lesson sits near the top of both the prose budget and the time budget. 2-1 brings in all 6 modes at once in modes-table, and rules-defs adds three rule terms (plus 許可ルール) in one segment. rewind-how packs two steps into its first sentence. The lesson is workable on a phone but dense, so load stays at 3.",
       "blockIds": [
+        "modes-table",
         "rules-defs",
         "rewind-how"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Carried over. In the changed blocks, the q4 explanation and the e6 feedback now pair each rule name with its key (許可ルール（allow）, 確認ルール（ask）, 拒否ルール（deny）), so they still match the glossary. The loanwords flagged in the previous round are in unchanged blocks and are still open as niceToHave: データベース, エディタ, and 対話セッション in hook-predict.",
+      "evidence": "Each core term is defined before use and matches the glossary, with English on first use: 権限モード（permission mode）, 分類器（classifier）, 権限ルール（permission rule）, チェックポイント（checkpoint）. The diagram labels (拒否ルール/確認ルール/許可ルール) match rules-defs and the glossary. auto-lead links 分類器 to the 「安全チェック」 label used in 2-1. Some first uses still lack English. 「リポジトリ」 first appears visibly in the q0 explanation and the q1 prompt, while its gloss sits only in the hidden q0 b feedback. 「データベース」 in rewind-table and 「エディタ」 in rewind-check have no English. 「プランモード」 first appears in modes-table with only `plan`, and its English 「plan mode」 comes one block later. All of these are common loanwords and the learner still reads them correctly, so they are listed in niceToHave.",
       "blockIds": [
-        "example-check",
-        "check-quiz",
+        "hook-predict",
+        "modes-check",
+        "modes-table",
+        "modes-switch",
         "rewind-table",
-        "rewind-check"
-      ],
-      "carriedOver": true
+        "rewind-check",
+        "rules-defs"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over. The lesson has one locale (jp) and it is complete. The changed plain-text fields now space code tokens the same way the objectives do (summary-ask 「git -C . push のような」「/rewind とGitの」, rules-checklist 「.env の読み取り」).",
+      "evidence": "The lesson declares one locale, jp, and every field has Japanese text. The diagram has a full Japanese alt text and caption. Plain-text fields (summary-ask, the rules-checklist labels) carry no markdown and space code tokens as the objectives do (「git -C . push のような」「.env の読み取り」). The link text names its destination. lessons:lint --strict reports no locale-plain-string findings.",
       "blockIds": [
+        "rules-diagram",
         "summary-ask",
-        "rules-checklist"
-      ],
-      "carriedOver": true
+        "rules-checklist",
+        "hook-version"
+      ]
     }
   ],
   "average": 3.5,
-  "mustFix": [
-    {
-      "blockId": "check-quiz",
-      "criterion": "voice",
-      "issue": "(d) Options with the same form and ending (style-guide §5): in e6, options a–c are 「<key> に <rule>」 noun phrases (「`deny` に `Bash(gh pr create *)`」「`ask` に `Bash(gh pr create *)`」「`ask` に `Bash(gh * create)`」). Option d ends in a verb, 「CLAUDE.mdに「確認して」と書く」. That makes it stand out as the odd one, and it no longer fits the prompt 「どこに何を書くのが」. The option text changed in this round.",
-      "fix": "e6 option d: 「CLAUDE.mdに「確認して」と書く」→「CLAUDE.mdに「作る前に確認して」」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "check-quiz: e1 is changed, but option a still uses 止める for an ask rule, while q3 says 「確認ルールは止めずに」 — 「付けない。autoモードで進め、止めたい操作は確認ルールにする」→「付けない。autoモードで進め、確認したい操作は確認ルールにする」, and in the explanation 「止めたい操作はルールで止めます」→「確認したい操作はルールで確認を挟みます」",
-    "check-quiz: e6 option keys (`deny`/`ask`) differ from the q4 option wording (「拒否ルールに」「確認ルールに」). Both are clear, but the same wording in both questions reads more smoothly — 「`deny` に `Bash(gh pr create *)`」→「拒否ルールに `Bash(gh pr create *)`」, and the same for options b and c (「`ask` に」→「確認ルールに」)",
-    "Still open from the previous round, in unchanged blocks: rewind-how first sentence holds two steps — 「…`/rewind` を実行し、戻す時点と、…を選びます。」→「…`/rewind` を実行します。戻す時点と、…を選びます。」; rewind-table 「データベース」→「データベース（database）」; rewind-check 「エディタ」→「エディタ（editor）」; hook-predict 「対話セッションは」→「対話セッション（session）は」; auto-limit 「2-3のルールで止めて、人が見ます。」→「2-3のルールで確認を挟み、人が見ます。」"
+    "check-quiz: e1 option a uses 止める for an ask rule, but q3 c says 「確認ルールは止めずに」. Option a: 「付けない。autoモードで進め、止めたい操作は確認ルールにする」→「付けない。autoモードで進め、確認したい操作は確認ルールにする」. Explanation: 「止めたい操作はルールで止めます」→「確認したい操作はルールで確認を挟みます」",
+    "auto-limit: the same loose 止める for rules that include ask: 「2-3のルールで止めて、人が見ます。」→「2-3のルールで確認を挟み、人が見ます。」",
+    "check-quiz: e6 names the rules by key (「`deny` に」「`ask` に」), while q4 uses the rule names (「拒否ルールに」「確認ルールに」). Both read correctly, but one wording in both questions is smoother: 「`deny` に `Bash(gh pr create *)`」→「拒否ルールに `Bash(gh pr create *)`」, and the same for options b and c (「`ask` に」→「確認ルールに」)",
+    "rewind-how: the first sentence holds two steps. 「入力欄が空のときにEscを2回押すか `/rewind` を実行し、戻す時点と、コード・会話・両方のどれを戻すかを選びます。」→「入力欄が空のときにEscを2回押すか、`/rewind` を実行します。戻す時点と、コード・会話・両方のどれを戻すかを選びます。」",
+    "modes-check: リポジトリ is first glossed only in hidden feedback (q0 b). Give it English where every learner sees it, in the q1 prompt: 「初めて触るリポジトリで」→「初めて触るリポジトリ（repository）で」",
+    "rewind-table: a katakana term without English on first use. 「（push、データベース、デプロイ）」→「（push、データベース（database）、デプロイ）」",
+    "rewind-check: a katakana term without English on first use. 「自分がエディタで書き換えた」→「自分がエディタ（editor）で書き換えた」",
+    "hook-predict: the q0 explanation is the first place everyone sees セッション, and the gloss is only in the hidden option a feedback. 「ターミナルとVS Codeの対話セッションは」→「ターミナルとVS Codeの対話セッション（session）は」",
+    "modes-table: プランモード appears here before its English (modes-switch). 「**プランモード**（`plan`）」→「**プランモード**（plan mode、`plan`）」, and in modes-switch 「プランモード（plan mode）と進みます」→「プランモードと進みます」",
+    "example-steps: ex-pattern reads a little stiffly. 「続きが何でも、なくても一致します。」→「続きに何があっても、なくても一致します。」",
+    "hook-lead: a nominal fragment in body text. 「どこまで任せ、どこで止めるか。まず予想してみましょう。」→「どこまで任せ、どこで止めるかを、まず予想してみましょう。」"
   ],
-  "verdict": "fail",
-  "summary": "Verification round: review-scope.mjs exited 0, with 6 of 41 blocks changed (9%). There were no open must-fix items from round 1, so there is nothing to resolve. lessons:lint --strict is clean. measure.mjs reports prose 2222 (budget 1,200–2,400) and est 19.9 min (estMinutes 20). The changes apply several round-1 niceToHave points: q4 and e5 now name the rules in words, the code tokens in summary-ask and rules-checklist are spaced like the objectives, and the q3 and e1 prompts are tighter. One new must-fix in changed text: e6 option d ends in a verb (「…と書く」) while a–c are 「<key> に <rule>」 phrases, a §5 option-form break. Scores: voice 4, load 3, prior 3, a11y_l10n 4 (mean 3.5). The verdict is fail only because of that one must-fix."
+  "verdict": "pass",
+  "summary": "Full review of sha256:fc6282d1f851b02f. Since the last round, only e6 option d in check-quiz changed: it now reads 「CLAUDE.mdに「作る前に確認して」」, in the same form as options a–c, which closes last round's only must-fix. lessons:lint --strict is clean. measure.mjs reports prose 2222 (budget 1,200–2,400) and est 19.9 min (estMinutes 20). Re-checking every learner-facing string found no (a)–(e) errors. The remaining points are niceToHave: the loose 止める for ask rules (e1, auto-limit), a few loanwords without English on first visible use (リポジトリ, データベース, エディタ, セッション), and rhythm in rewind-how. Scores: voice 4, load 3, prior 3, a11y_l10n 4 (mean 3.5). Verdict: pass."
 }

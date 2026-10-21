@@ -1,53 +1,52 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:174374fa262b8b76",
+  "lessonHash": "sha256:6da74e7b888a7ddb",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The lesson has no decorative images and no diagrams. Code blocks s2-code (20 lines) and p1-model (16 lines) fit at 390 px without wrapping, and their highlighted lines are easy to see (pages/mobile-jp-06.png, pages/mobile-jp-20.png). The comparison of the three ways to run work in parallel (s1-table) and the flags (s3-table) are shown as lists, not as a figure or table.",
+      "score": 4,
+      "evidence": "No hard failures in metrics.json: overflowX false, 0 console, mermaid, unknown-block and broken-image errors, and no textOnlyScreens. At 390 px both code blocks fit without wrapping: s2-code in pages/mobile-jp-05/06.png, and p1-model lines 1-16 in pages/mobile-jp-20.png with the highlighted flag lines readable. Answer options made of chips stay whole (check-quiz e3 in pages/mobile-jp-25.png), and the definitions blocks stack cleanly (pages/mobile-jp-03.png, pages/mobile-jp-12/13.png).",
       "blockIds": [
         "s2-code",
-        "p1-model",
         "s3-code",
-        "s1-table",
-        "s3-table"
+        "p1-model",
+        "check-quiz",
+        "s1-defs",
+        "s4-defs"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "metrics.json lists no text-only screens on desktop-jp or mobile-jp. Every screen has a heading, code block, steps, prompt or check. Desktop JP chars per line has a median of 37 (target 30–40). The longest prose block is s3-mode, which runs about 6 lines on mobile (pages/mobile-jp-10.png).",
+      "score": 3,
+      "evidence": "Plain text is broken up by headings, definitions, lists, a callout, a step list or a quiz about every one or two screens. desktop-jp median is 37 chars per line (target 30-40), but the max is 51. The longest plain run is section 3 (s3-mode plus the 5-item s3-table) in pages/mobile-jp-10/11.png, and each item there starts with a code chip.",
       "blockIds": [
         "s3-mode",
-        "s1-defs",
-        "s4-defs"
+        "s3-table",
+        "s4-four"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is JP-only and every screen is fully in Japanese, with English terms in parentheses on first use (s1-defs, s4-defs). The link text is specific: 「公式ドキュメント（非対話的実行）」 in s3-mode (pages/desktop-jp-07.png). No text is baked into images.",
+      "evidence": "The whole page is in Japanese (lang ja, contentLocale jp, no locale fallback), and English terms appear only as glosses in parentheses. Contrast is good on the dark code blocks, the pitfall callout and the expect boxes. The 1-4 key hints and Enter to answer are visible on desktop, and no control is hidden under the bottom bar on mobile (pages/mobile-jp-31.png).",
       "blockIds": [
-        "s3-mode",
-        "s1-defs",
-        "s4-defs"
+        "s3-pitfall",
+        "s2-steps"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz e3 option d (`Bash(npm test *)` ＋ `dontAsk` だけ): on mobile, the trailing 「だけ」 breaks into だ / け (pages/mobile-jp-25.png). Rephrasing it as a full phrase, for example 「`--bare` を付けず、`Bash(npm test *)` ＋ `dontAsk`」, would avoid a split word.",
-    "p1-checklist labels show flags and patterns (--bare, Bash(npm test *), --permission-mode dontAsk) as bold proportional text, not as code (pages/mobile-jp-19.png, pages/desktop-jp-13.png). This makes them harder to match against the p1-model command. Shorter Japanese labels, or reader support for inline code, would help. reader: checklist labels do not render inline code.",
-    "The '用語・このレッスン' sidebar lists each term twice, for example 「ワークツリー（worktree）」 next to 「ワークツリー」 and 「バックグラウンド実行（background execution）」 next to 「バックグラウンド実行」 (pages/desktop-jp-01.png). It merges terms from the definitions blocks with the glossary. Making the s1-defs/s4-defs terms match the glossary entries would remove the duplicates; otherwise the reader should dedupe them (reader:).",
-    "reader: the p2-steps step 2 (p-rewrite) shows a 「うまくいかないときは」 toggle although the step has no troubleshoot text (pages/mobile-jp-21.png, pages/desktop-jp-14.png). Check what it opens.",
-    "reader: the full-length mobile-jp.png stops at 16000 px. Pages 01–31 cover the whole lesson. The end banner says this is the course's last lesson (expected for a draft). The failed /api/ requests are environment noise."
+    "p1-checklist: the flags in the checklist labels (--bare, --permission-mode dontAsk, Bash(npm test *)) show as plain bold text, not code, because checklist labels are plain text (pages/mobile-jp-19.png, pages/desktop-jp-13.png). If clarity matters more, shorten the labels to name the purpose (for example 「--bare（フックを読まない）」) or accept this as reader behaviour.",
+    "s2-steps ex-feature: inside the expect box, the inline code (.claude/worktrees/, worktree-feature-a, worktree-bugfix-b) has almost the same background as the box, so the chips are hard to tell apart (pages/mobile-jp-07.png). reader: give inline code inside expect boxes a separate background.",
+    "reader: the glossary side panel lists each term twice, the definitions-block form (ワークツリー（worktree）) and the glossary form (ワークツリー), for example in pages/desktop-jp-04.png. Merge entries that share a term.",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-31.png, pages/desktop-jp-21.png). This is a known draft-preview artifact.",
+    "reader: the mobile full-length PNG stops at 16000px, and 13 failed /api/ requests are environment noise, not lesson defects."
   ],
-  "average": 3.67,
   "verdict": "pass",
-  "summary": "No hard failures in metrics.json (no sideways overflow, no console, mermaid or image errors, no unknown blocks), and no screen shows personal data. Both code blocks and all quizzes are fully readable at 390 px with nothing cut off, and the steps and prompt blocks keep the rhythm varied. The remaining items are minor: a word split in exam option e3 on mobile, flags shown as plain text in p1-checklist, and duplicate glossary chips in the sidebar."
+  "summary": "I found nothing a learner would struggle with on either mobile or desktop: no hard failures, no text-only screens, and both code blocks fit at 390 px without awkward wrapping. No personal data appears on any screen. The remaining notes are optional: the flags in the checklist show as plain text, and a few things are reader behaviour."
 }

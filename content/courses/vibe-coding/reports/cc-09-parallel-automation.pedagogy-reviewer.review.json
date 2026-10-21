@@ -1,23 +1,17 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:174374fa262b8b76",
+  "lessonHash": "sha256:6da74e7b888a7ddb",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:2bf364c299299ca6",
-    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/2bf364c299299ca6/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:174374fa262b8b76",
+    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s1-defs",
-      "s1-table",
-      "s2-steps",
-      "p1-task",
-      "p1-model",
-      "check-quiz",
-      "summary-points"
+      "check-quiz"
     ],
-    "changedShare": 0.09,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -32,7 +26,8 @@
         "s4-check",
         "p1-checklist",
         "p2-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -54,7 +49,8 @@
         "s2-steps",
         "s3-mode",
         "s3-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
@@ -65,7 +61,8 @@
         "s2-steps",
         "headless",
         "unattended-where"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -75,24 +72,25 @@
         "s2-code",
         "s2-steps",
         "s3-code"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "Every content segment except the orientation section unattended-where has an inline check (q1–q4), each with a hint. The exam varies answer positions (e3 answer is option 4, e4 is option 1). In the rewritten e3, each distractor changes exactly one part of the answer, so the answer is the option whose parts appear most often. In option d, 「…だけ」 also hints that something is missing. q3 option a still nearly repeats s3-mode.",
+      "evidence": "Re-scored for the e3 change. Option d now reads 「`Bash(npm test *)` ＋ `dontAsk`」, so the 「だけ」 cue that hinted at a missing part is gone. Every content segment except the orientation section unattended-where still has an inline check (q1–q4), each with a hint, and the exam still varies answer positions (e3 answer is option 4, e4 is option 1). In e3, each distractor still changes exactly one part of the answer. `--bare`, `Bash(npm test *)` and `dontAsk` each appear in 3 of the 4 options, so a learner who picks the most common part in each slot gets option a without knowing why. q3 option a still nearly repeats s3-mode.",
       "blockIds": [
+        "check-quiz",
         "s1-check",
         "s2-check",
         "s3-check",
-        "s4-check",
-        "check-quiz"
+        "s4-check"
       ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "In the rewritten e3, each wrong option targets one misconception, and each has feedback of 2 sentences or fewer that gives a reason. Option b, which allows all of `Bash`, gets 「どのシェルコマンドも確認なしで通ります」. Option c, which uses `bypassPermissions`, gets 「無人のCIでは危険です」. Option d, which leaves out `--bare`, gets 「リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます」. The other questions are unchanged, and all 7 brief misconceptions remain as distractors.",
+      "evidence": "Re-scored for the e3 change. Option d changed only in its md, and its feedback still names the misconception it targets: 「`--bare` がないと、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。」 Options b (「どのシェルコマンドも確認なしで通ります」) and c (「無人のCIでは危険です。確認が要る操作を拒否するのは `dontAsk` です」) are unchanged. Each feedback is 2 sentences or fewer and gives a reason. All 7 brief misconceptions are still used as distractors across hook-predict, q1–q4 and the exam.",
       "blockIds": [
         "check-quiz",
         "hook-predict",
@@ -110,7 +108,8 @@
         "s1-table",
         "s3-table",
         "s4-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -122,7 +121,8 @@
         "p1-checklist",
         "p1-steps-write",
         "p2-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -133,7 +133,8 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
@@ -145,7 +146,8 @@
         "p1-model",
         "check-quiz",
         "summary-points"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -157,7 +159,8 @@
         "check-quiz",
         "p1-task",
         "s2-lead"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -168,12 +171,13 @@
         "check-quiz",
         "p1-checklist",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz e3: each distractor changes exactly one part of the answer, so a test-wise learner can pick a as the option whose parts appear most often. In option d, 「だけ」 also hints that a part is missing. At minimum, set d's md to 「`Bash(npm test *)` ＋ `dontAsk`」 (drop 「だけ」).",
+    "check-quiz e3 (changed block, still open in part): removing 「だけ」 from option d fixed one of the two cues. The other cue is still there: each distractor changes exactly one part, so option a is the one whose parts appear most often. To break this pattern, make one distractor change two parts. For example, set option d's md to 「`Bash(npm test *)` ＋ `bypassPermissions`」 and its feedback to 「`--bare` がないとリポジトリのフックや `.mcp.json` のサーバーが動き、`bypassPermissions` は確認を飛ばします。無人のCIでは `--bare` と `dontAsk` を付けます。」",
     "s2-code line 5: the location `.claude/worktrees/` used to be explained in s1-defs and now first appears in the s2-steps ex-feature expect. The `.gitignore` line in the code therefore comes before the learner knows what that folder is. Change the comment `# 未追跡に出さない` to `# ワークツリーの置き場を未追跡に出さない` (40 columns, highlight lines unchanged).",
     "p1-task 「練習用フォルダー `cc-practice-09`」 vs s2-lead and s2-code 「練習用リポジトリ」: use one name for the same folder (the ja-editor decides which).",
     "Still open from round 1, s3-code: the prompt 「リンターの警告を数えてください。」 does not name the command that `--allowedTools \"Bash(npm run lint *)\"` allows. Replace line 2 with `  \"npm run lint の警告を数えてください。\" \\`.",
@@ -185,5 +189,5 @@
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0 (7 of 42 blocks changed, 9%), and the previous review had no must-fix items, so there are no resolved entries. Validate reports 0 errors and lint --strict 0 warnings. code-width.mjs reports 0 lines over 44 columns, and measure.mjs reports prose 2260 and est 19.9 (estMinutes 20). I reviewed the changed blocks in full. s1-defs now defines less, and the worktree location moved into the s2-steps expect, which matches the facts. p1-model now highlights all five flags, which resolves a round-1 nice-to-have. The rewritten e3 has feedback on every wrong option, but its one-part-changed distractors and 「だけ」 make the answer easy to guess. No new must-fix."
+  "summary": "Verification round. review-scope.mjs exited 0: 1 of 42 blocks changed (check-quiz, question e3), 2% of the lesson. The previous review and the full review before it had no must-fix items, so there are no resolved entries. Validate reports 0 errors and lint --strict 0 warnings. measure.mjs reports prose 2260 and est 19.9 (estMinutes 20). The only change drops 「だけ」 from e3 option d, which fixes one of the two cues from the previous nice-to-have. The other cue is still there: each distractor changes one part, so the answer is the option whose parts appear most often. That stays a nice-to-have, and a concrete fix is given. I re-scored active (3) and miscon (4) and carried over the other scores. No new must-fix."
 }

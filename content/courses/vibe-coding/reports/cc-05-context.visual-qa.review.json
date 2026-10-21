@@ -1,64 +1,51 @@
 {
   "lessonId": "cc-05-context",
   "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:7a183d3f582412d5",
+  "lessonHash": "sha256:ab90c2fa7a4e7fe9",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The s3-diagram flowchart TD is readable at 390 px. Its labels are Japanese and break cleanly, and s3-table right below names the 決まったファイル (pages/mobile-jp-09.png, pages/mobile-jp-10.png). The tables, steps, prompts and quizzes do not overflow on any screen (overflowX false). One code line the learner has to type wraps in a misleading way on mobile (pr-code, pages/mobile-jp-22.png).",
+      "score": 4,
+      "evidence": "The s3-diagram flowchart is TD and fits 390 px with readable Japanese labels (pages/mobile-jp-09.png). The two-column tables s2-table, s3-table, s4-table and pr-answer read cleanly on mobile and desktop without sideways scrolling (pages/mobile-jp-06.png, -10.png, -12.png, -13.png, -27.png). metrics.json reports overflowX false, 0 mermaid errors, 0 broken images and 0 unknown blocks.",
       "blockIds": [
         "s3-diagram",
-        "s3-table",
         "s2-table",
+        "s3-table",
         "s4-table",
-        "pr-code"
+        "pr-answer"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty on both devices. A heading, definitions, a table, a figure or a check appears on every screen, and an inline check closes each of 5-1 to 5-5 (pages/mobile-jp-04.png, -07, -11, -17). Desktop charsPerLine median is 39, inside the 30–40 target.",
+      "evidence": "textOnlyScreens is empty on both devices. Every section breaks up its prose with a definitions card, table, diagram, steps or a check. Desktop JP median is 39 characters per line (target 30–40, max 53).",
       "blockIds": [
-        "s1-check",
-        "s2-check",
-        "s3-check",
-        "s5-check",
-        "pr-diagnose"
+        "s1-defs",
+        "s5-steps",
+        "pr-steps-compact"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a Japanese-only lesson and no stray English UI shows. Terms carry their English on first use (セッション（session）, コンテキスト圧縮（compaction）), and the diagram has Japanese labels and an alt text. Contrast is fine on the callout, the quiz cards and the dark code blocks, and no controls are hidden under the top or bottom bars (pages/mobile-jp-11.png, pages/mobile-jp-34.png).",
+      "evidence": "All screens show Japanese only, with no stray English UI or untranslated strings, and English terms appear in parentheses on first use (for example 「コンテキスト圧縮（compaction）」). Text contrast is good, and no control is hidden under the 56 px top bar or the 60 px bottom bar (pages/mobile-jp-30.png, pages/mobile-jp-34.png).",
       "blockIds": [
-        "s1-defs",
         "s2-defs",
-        "s3-diagram",
-        "s3-pitfall"
+        "pr-diagnose"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "pr-code",
-      "issue": "At 390 px the line `echo '- <title>は「練習：」から' > CLAUDE.md` soft-wraps right after `>`. `CLAUDE.md` then sits alone on the next row with only a small indent, and no line number shows that it continues the line above. The step above it (pr-start) tells learners to run the commands 1行ずつ, so a learner typing from a phone can enter `echo ... >` and `CLAUDE.md` as two commands.",
-      "fix": "Make every line in the block fit in about 36 columns on mobile. One way is to move the CLAUDE.md content into its own code block (filename `CLAUDE.md`, one line `- <title>は「練習：」から`) and have the terminal block create it with a short command, or have the learner create the file in an editor, as the PowerShell troubleshoot already does. Another way is to shorten the echo text so the whole command stays on one line.",
-      "screenshot": "pages/mobile-jp-22.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "The first objective (o1) breaks inside a word on mobile, as 見分 / け、/clear・/compact・…, because the run of slash commands is kept together (pages/mobile-jp-01.png, pages/mobile-jp-33.png). Rewording it so the commands come later (for example 「/clear・/compact・サブエージェントから、失敗パターンに合う対処を選べる」) would avoid the break.",
-    "s5-check option b: on desktop the full-width example number splits across lines as １２３ / ４５６７ (pages/desktop-jp-12.png). Shortening the option or moving the example to the end of the sentence would keep the number on one line.",
-    "s4-table: on mobile, the long bold first-column cells (pattern name + English + symptom) form heavy bold blocks in a narrow column (pages/mobile-jp-12.png, pages/mobile-jp-13.png). Making only the pattern name bold and keeping the symptom in regular weight, or putting the symptom in the second column, would read more easily.",
-    "s2-table row 3, right column: on mobile the cell breaks unevenly (起 / きたら、指示が / 残っている…) (pages/mobile-jp-06.png). A shorter cell such as 「自動で起きる。指示が残ったか確かめる」 would wrap more evenly.",
-    "reader: the desktop charsPerLine max is 53, over the 40 target, though the median of 39 is in range. The column width is set by the reader.",
-    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png, pages/desktop-jp-22.png). 13 failed /api/ requests were ignored as environment noise, and the mobile full-length PNG is truncated. None of these come from the lesson."
+    "pr-steps-compact (step pr-compact): on mobile, the inline chip `/compact 作ったファイルとその役割を中心に残して` is too long for one line and wraps inside its own box (pages/mobile-jp-25.png). It is still readable. If you want the learner to copy it exactly, consider moving the command into a short code block or a prompt block.",
+    "reader: in the s2-table cell 「自動で起きる。起きたら、指示が残っているかを確かめる」, the mobile line break leaves 「起きたら、指示が」 short with a visible gap before 「残っているか」 (pages/mobile-jp-06.png). This comes from the phrase-wrapping and is not a lesson defect.",
+    "reader: the end banner says this is the last lesson of the course (pages/mobile-jp-34.png, pages/desktop-jp-22.png). That only happens because drafts are not listed in course.json.",
+    "reader: the mobile full-length PNG stops at 16000 px. The per-screen pages still cover the whole 24129 px page.",
+    "reader: 13 failed /api/v2/user/* requests (500) were ignored as environment noise."
   ],
-  "verdict": "revise",
-  "summary": "The screens are well paced: every screen has a heading, figure, table or check, and the 5-3 flowchart (TD) is readable at 390 px. The main fix is the practice setup command (pr-code): on mobile it wraps after the `>` redirect, and a learner told to run commands 1行ずつ could type it as two commands. The metrics have no hard failures, and no personal data appears on any screen."
+  "verdict": "pass",
+  "summary": "I opened every mobile-jp and desktop-jp screen. All layouts are clean: there are no hard failures in metrics.json, no content is cut off at 390 px, the tables and the TD flowchart are readable, the code-block line numbers and wrapping work, and no screen shows personal data. Nothing must be fixed; the only lesson-side suggestion is to move the long /compact chip in pr-compact into a code or prompt block."
 }
