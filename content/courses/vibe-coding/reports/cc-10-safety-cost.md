@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-10-safety-cost (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:4f85040f9e462bb2.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:18da014f91a89678.**
 
 - Title: 第10回｜安全とコストを管理する
 - Draft: `content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-10-safety-cost.md`
@@ -33,31 +33,30 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1072 · questions 11 · practice sections 1 · est 17.2 min (must be ≤ 20; estMinutes 17)`
+- course length measure: `prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json (sha256:4f85040f9e462bb2)
+  lesson content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json (sha256:18da014f91a89678)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:31ca899dd855ae10 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/lesson.json) · 1 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, worked, miscon, visual, practice, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-10-safety-cost/31ca899dd855ae10/round-1/pedagogy-reviewer.review.json and 4 earlier rounds checked
+  pedagogy-reviewer: verification of sha256:4f85040f9e462bb2 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-10-safety-cost/4f85040f9e462bb2/lesson.json) · 0 resolved, 0 unresolved · 7 changed · carried over: align, hook, visual, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-10-safety-cost/4f85040f9e462bb2/round-3/pedagogy-reviewer.review.json and 5 earlier rounds checked
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer carried)
   ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ worked     3  (pedagogy-reviewer)
   ✓ active     3  (pedagogy-reviewer)
-  ✓ miscon     4  (pedagogy-reviewer carried)
+  ✓ miscon     4  (pedagogy-reviewer)
   ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer carried)
+  ✓ practice   3  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer carried)
   ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer carried, visual-qa)
-  resolved [active] s2-check (pedagogy-reviewer)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-10-safety-cost/`)
@@ -69,6 +68,7 @@ Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
 5. `ba8eeb1a7115a66b`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 1)
 6. `31ca899dd855ae10`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify revise (mean 3.38, must-fix 1); visual-qa full revise (mean 3.00, must-fix 1)
 7. `4f85040f9e462bb2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+8. `18da014f91a89678`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -93,6 +93,7 @@ An auditor with web access checked 76 claims (pages: 22); a second checker tried
   criterion fill, cc-10 and cc-02 verdict fail->revise, plus their snapshot copies) are superseded by fresh FULL
 - 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
 - cc-10-safety-cost pedagogy-reviewer: the committed verification review had an absolute local path in its summary (server/tests/docPaths.test.js failed). The review was not edited; the same verification (of 31ca899dd855ae10) was re-run with an instruction to use repository-relative paths, and the new review replaced it.
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 

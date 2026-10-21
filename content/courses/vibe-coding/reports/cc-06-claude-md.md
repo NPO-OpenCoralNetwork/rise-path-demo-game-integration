@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-06-claude-md (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:0913750984346c84.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:2b49a5e74f15af83.**
 
 - Title: 第6回｜CLAUDE.mdで前提を伝える
 - Draft: `content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-06-claude-md.md`
@@ -39,15 +39,15 @@
 
 ```
 Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json (sha256:0913750984346c84)
-  ja-editor: verification of sha256:a2581804ebc9fe6d (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-06-claude-md/a2581804ebc9fe6d/lesson.json) · 0 resolved, 0 unresolved · 10 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-06-claude-md/a2581804ebc9fe6d/round-1/ja-editor.review.json and 2 earlier rounds checked
+  lesson content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json (sha256:2b49a5e74f15af83)
+  ja-editor: verification of sha256:0913750984346c84 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: voice, load, a11y_l10n · previous .artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/round-1/ja-editor.review.json and 3 earlier rounds checked
   pedagogy-reviewer: full review
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      3  (pedagogy-reviewer)
   ✓ hook       4  (pedagogy-reviewer)
   ✓ prior      3  (ja-editor, pedagogy-reviewer)
-  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ load       3  (ja-editor carried, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer)
   ✓ active     3  (pedagogy-reviewer)
   ✓ miscon     3  (pedagogy-reviewer)
@@ -55,7 +55,7 @@ Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ practice   4  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   4  (pedagogy-reviewer)
-  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ voice      3  (ja-editor carried, pedagogy-reviewer)
   ✓ a11y_l10n  4  (ja-editor carried, pedagogy-reviewer, visual-qa)
 ```
 
@@ -66,6 +66,7 @@ Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
 3. `6b93b57324d9ed64`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify revise (mean 3.23, must-fix 1); visual-qa full revise (mean 2.67, must-fix 4)
 4. `a2581804ebc9fe6d`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 2)
 5. `0913750984346c84`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `2b49a5e74f15af83`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -84,6 +85,7 @@ An auditor with web access checked 60 claims (pages: 14); a second checker tried
 ## Orchestrator notes
 
 - cc-06-claude-md: the gate mean was 3.15 with carried pedagogy scores. After the fixes aimed at those criteria, a FULL pedagogy review re-scored every criterion (mean 3.38 at the gate).
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 

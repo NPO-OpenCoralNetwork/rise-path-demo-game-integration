@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-02-permissions (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:fc6282d1f851b02f.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:b119e1c419d1e206.**
 
 - Title: 第2回｜任せる範囲を決める：権限モードと巻き戻し
 - Draft: `content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-02-permissions.md`
@@ -40,9 +40,9 @@
 
 ```
 Review of cc-02-permissions by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json (sha256:fc6282d1f851b02f)
+  lesson content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json (sha256:b119e1c419d1e206)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:53b74995ba36c9df (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-02-permissions/53b74995ba36c9df/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: hook, prior, load, worked, active, visual, practice, meta, accuracy, a11y_l10n · previous .artifacts/review/vibe-coding/cc-02-permissions/53b74995ba36c9df/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
+  pedagogy-reviewer: verification of sha256:fc6282d1f851b02f (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: hook, prior, load, worked, active, miscon, visual, practice, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer)
@@ -51,11 +51,11 @@ Review of cc-02-permissions by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
   ✓ worked     3  (pedagogy-reviewer carried)
   ✓ active     3  (pedagogy-reviewer carried)
-  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer carried)
   ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
   ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       3  (pedagogy-reviewer carried)
-  ✓ accuracy   4  (pedagogy-reviewer carried)
+  ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer carried, visual-qa)
 ```
@@ -68,6 +68,7 @@ Review of cc-02-permissions by ja-editor, pedagogy-reviewer, visual-qa: PASS
 4. `95d0a505f30641a5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
 5. `53b74995ba36c9df`: ja-editor verify fail (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 6. `fc6282d1f851b02f`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `b119e1c419d1e206`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -97,6 +98,7 @@ An auditor with web access checked 74 claims (pages: 14); a second checker tried
   criterion fill, cc-10 and cc-02 verdict fail->revise, plus their snapshot copies) are superseded by fresh FULL
 - cc-02-permissions ja-editor verification of 53b74995ba36c9df returned verdict "fail" (not a schema value). It was not edited; after the fix a fresh FULL ja-editor review of the final version was run instead.
 - Last small fixes made by the orchestrator from the reviewers' exact fix texts (cc-02 e6 d, cc-03 step titles, cc-05 pr-code, cc-08 q9 and practice-b-task, cc-09 e3 d, cc-11 dr-table), then re-reviewed by visual-qa, pedagogy-reviewer and ja-editor.
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 
