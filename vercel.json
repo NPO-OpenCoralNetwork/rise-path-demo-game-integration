@@ -3,9 +3,34 @@
   "buildCommand": "npm run build:prod",
   "outputDirectory": "dist",
   "framework": "vite",
+  "routes": [
+    {
+      "src": "^/api/.*$",
+      "headers": {
+        "x-vercel-enable-rewrite-caching": "0"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/(api/.*|audio/cache/[a-f0-9]{64}[.](?:mp3|wav)|generated/img_[a-f0-9]{64}[.](?:png|jpg|webp))$",
+      "dest": "${API_ORIGIN}/$1",
+      "env": ["API_ORIGIN"],
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": {
+            "key": "x-origin-secret"
+          },
+          "args": "$ORIGIN_SECRET",
+          "env": ["ORIGIN_SECRET"]
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|assets/|audio/cache/|generated/).*)",
       "destination": "/index.html"
     }
   ],
