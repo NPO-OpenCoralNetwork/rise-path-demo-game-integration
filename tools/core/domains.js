@@ -16,6 +16,7 @@ export const COURSES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.u
 
 const DOMAIN_DEFS = [
     { id: 'vibe-coding', name: 'Vibe Coding', description: '物語駆動型コーディング', maxStages: 13, courseSlug: 'vibe-coding' },
+    { id: 'claude-code', name: 'Claude Code', description: 'AIエージェントとの開発', maxStages: 11, courseSlug: 'claude-code' },
     { id: 'blender-3d', name: 'Blender 3D', description: '3Dモデリング', maxStages: 5 },
     { id: 'art-atelier', name: 'Art Atelier', description: '美術史・工芸', maxStages: 15 },
     { id: 'programming-web', name: 'Web Dev', description: 'HTML/CSS/WebInspector', maxStages: 8 },

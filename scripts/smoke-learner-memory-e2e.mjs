@@ -5,6 +5,9 @@
  * Usage:
  *   node scripts/smoke-learner-memory-e2e.mjs
  *   E2E_API_URL=http://risepath-vm:3006 node scripts/smoke-learner-memory-e2e.mjs
+ *
+ * Over Tailscale this works only while the VM's stack.env has no ORIGIN_SECRET; after that, run it in
+ * the api container: docker compose --env-file stack.env exec -T api node scripts/smoke-learner-memory-e2e.mjs
  */
 
 import fs from 'fs/promises';

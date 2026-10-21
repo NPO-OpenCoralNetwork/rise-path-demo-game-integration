@@ -59,15 +59,17 @@ Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-06-claude-md/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-06-claude-md/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `77b9fd93b84c6577`: ja-editor full revise (mean 3.50, must-fix 16); pedagogy-reviewer full revise (mean 3.08, must-fix 9)
-2. `5e95f5eafa612ea0`: ja-editor full revise (mean 3.25, must-fix 4); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
-3. `0913750984346c84`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-4. `2b49a5e74f15af83`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `a2581804ebc9fe6d`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 2)
-6. `6b93b57324d9ed64`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify revise (mean 3.23, must-fix 1); visual-qa full revise (mean 2.67, must-fix 4)
-7. `e4875adb69003830`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `77b9fd93b84c6577/round-1`: ja-editor full revise (mean 3.50, must-fix 16); pedagogy-reviewer full revise (mean 3.08, must-fix 9)
+2. `5e95f5eafa612ea0/round-1`: ja-editor full revise (mean 3.25, must-fix 4); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
+3. `0913750984346c84/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+4. `2b49a5e74f15af83/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `2b49a5e74f15af83/round-2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `a2581804ebc9fe6d/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 2)
+7. `6b93b57324d9ed64/round-1`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify revise (mean 3.23, must-fix 1); visual-qa full revise (mean 2.67, must-fix 4)
+8. `e4875adb69003830/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `e4875adb69003830/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -78,6 +80,8 @@ An auditor with web access checked 60 claims (pages: 14); a second checker tried
 - [overclaim] `glossary` (glossary[AGENTS.md].md): ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに、代わりに読まれます（v2.1.277以降）。 — https://code.claude.com/docs/en/memory
 - [overclaim] `s3-check` (questions[q4].explanation (2nd sentence)): `cat` などのコマンドで中身を見たときも同じです。 — https://code.claude.com/docs/en/tools-reference
 - [overclaim] `summary-cards` (cards[card-paths].back): Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。`cat` などで中身を見たときも読まれます。 — https://code.claude.com/docs/en/memory
+
+Records: `content/courses/claude-code/reports/facts/cc-06-claude-md.audit.json` and `cc-06-claude-md.facts.md`.
 
 ## Screenshots
 

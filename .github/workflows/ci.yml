@@ -142,6 +142,8 @@ jobs:
           HERMES_API_KEY: ci-leak-sentinel-HERMES_API_KEY
           RISE_PATH_BRIDGE_TOKEN: ci-leak-sentinel-RISE_PATH_BRIDGE_TOKEN
           DATABASE_URL_PHASE1: ci-leak-sentinel-DATABASE_URL_PHASE1
+          ORIGIN_SECRET: ci-leak-sentinel-ORIGIN_SECRET
+          TUNNEL_TOKEN: ci-leak-sentinel-TUNNEL_TOKEN
         run: npm run build:prod -- --outDir "$RUNNER_TEMP/dist" --emptyOutDir
 
       - name: Fail if a sentinel key reached the bundle

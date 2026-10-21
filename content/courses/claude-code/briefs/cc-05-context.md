@@ -1,7 +1,9 @@
-# Brief: vibe-coding/cc-05-context
+# Brief: claude-code/cc-05-context
 
 第5回｜コンテキストを管理する — Claude Code course (cc-*), module 2 「頼み方と進め方」, lesson 5 of 11.
-Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for preview, Japanese only, no `next`.
+Published 2026-10-21 by the owner's decision in the course `claude-code`:
+`content/courses/claude-code/lessons/cc-05-context.lesson.json`, `next` = `cc-06-claude-md`. Japanese only.
+Until then it was a draft (`drafts/cc-05-context.lesson.json`, `courseId: "vibe-coding"` for preview, no `next`).
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を使い始めた開発者・学習者。他の AI コーディングツールの経験がある人も含む。
@@ -34,9 +36,9 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
   5. 「Claude に聞けば使用量がわかる」— 測るのは `/context`。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（course-wide measure, round 3 after the mobile-fit fixes: `cc-05-context.lesson.json: prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1152 · questions 12 · practice sections 1 · est 19.9 min (must be ≤ 20; estMinutes 20)`。(3,289 + 1,126) ÷ 450 ≈ 9.81分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.81分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
+- 所要時間 / minutes: 20（course-wide measure `scripts/lessons/measure.mjs`, round 3 after the mobile-fit fixes: `cc-05-context.lesson.json: prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1152 · questions 12 · practice sections 1 · est 19.9 min (must be ≤ 20; estMinutes 20)`。(3,289 + 1,152) ÷ 450 ≈ 9.87分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.87分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
 - 難易度 / level: intermediate
-- ロケール / locales: jp のみ（英訳は公開先のコースが決まってから）
+- ロケール / locales: jp のみ（英訳をいつするかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 前半は3つのセッション（A 何でも入り、B 同じ作業が長く続く、C 範囲のない調査）を文章で読み、`/clear`・`/compact`・サブエージェントから対処を選ぶ。後半は練習用フォルダ（`cc-context-practice`、`git init`）で CLAUDE.md に1行のルールを書いてから起動し、会話だけの指示を1つ伝えて作業 → `/context` を3回（起動直後・作業後・圧縮後）→ 予想 → 焦点付き `/compact` → 何が残ったかを確かめる。チェックリストと解答例の表つき。
 
 ## 制約 / Constraints
@@ -55,7 +57,7 @@ Draft only (`drafts/cc-05-context.lesson.json`), `courseId: "vibe-coding"` for p
 - `cc-prompt-caching` — How Claude Code uses prompt caching — https://code.claude.com/docs/en/prompt-caching — Anthropic — checked 2026-10-20 (facts file practice-15). Used for: edits to the project-root CLAUDE.md mid-session load on the next `/clear`, `/compact` or restart.
 - `cc-sub-agents` — Create custom subagents — https://code.claude.com/docs/en/sub-agents — Anthropic — checked 2026-10-20. Used for: subagents run in their own context window and return only a summary.
 - `cc-security` — Security — https://code.claude.com/docs/en/security — Anthropic — checked 2026-10-20 (fact audit, round 2). Used for: "In an interactive session, Claude Code shows the workspace trust dialog when you start it in a folder you haven't trusted." (`pr-steps-start`).
-- Repository: `doc/brushup-2026/research/claude-code-curriculum.ja.md` §2.2, §2.4, §6, §7, §11; facts file `facts-cc-05-context.md` (verified 2026-10-20).
+- Repository: `doc/brushup-2026/research/claude-code-curriculum.ja.md` §2.2, §2.4, §6, §7, §11; facts file `content/courses/claude-code/reports/facts/cc-05-context.facts.md` (verified 2026-10-20).
 
 ## Outline
 
@@ -85,8 +87,8 @@ One diagram (state change in compaction), no images.
 
 ## Assumptions
 - Headless run: the outline above was used without a check-in.
-- Terms already defined in the parallel drafts of 第1回 (セッション、コンテキストウィンドウ、CLAUDE.md、自動メモリ) and 第4回
-  (サブエージェント) get a short recall definition here, marked （第1回）／（第4回）, so the lesson also reads on its own.
+- Terms already defined in 第1回 (セッション、コンテキストウィンドウ、CLAUDE.md、自動メモリ) and 第4回
+  (サブエージェント), written in parallel with this lesson, get a short recall definition here, marked （第1回）／（第4回）, so the lesson also reads on its own.
 - `/btw` is named once, in the explanation of practice question p1 (moved out of `s4-why` in round 1 to keep 5-4 within three
   new terms); the `/compact` focus is shown in `s2-focus`. `/rewind`'s 「Summarize from here」, `/autocompact`, idle compaction and
   the 1M window are left out to keep the load down.
@@ -113,7 +115,7 @@ One diagram (state change in compaction), no images.
   text still lists them). `pr-code` runs mkdir, cd and git init on separate lines (pr-start says 1行ずつ), and the CLAUDE.md rule
   line is shortened to 「- HTMLの<title>は「練習：」で始める」 to keep the line short. Checklist labels use です・ます.
 - Feedback that says a file instruction survives compaction names the project-root CLAUDE.md (q3 b, e4 b, sum-points), because
-  path-scoped rules and nested CLAUDE.md files come back only on demand (cross-lesson fact 7).
+  path-scoped rules and nested CLAUDE.md files come back only on demand (cross-lesson fact 7 in `content/courses/claude-code/reports/facts/cross-lesson-facts.md`).
 
 ### Last fix round (2026-10-21)
 - pr-code: the echo line is split with ` \` so it fits 390 px; pr-start says that a line ending in `\` continues on the next line (visual QA).

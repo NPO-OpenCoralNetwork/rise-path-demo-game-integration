@@ -5,7 +5,6 @@ import { realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg'; // For legacy pool if needed, or remove
-import { generateAudioContent } from './scripts/kokoro_tts_node.js';
 import ttsRoutes, { ttsHealthHandler } from './server/routes/tts.js';
 import { jobWorker } from './server/jobWorker.js';
 
@@ -23,6 +22,7 @@ import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
+import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit from 'express-rate-limit';
 
 // ESM dirname equivalent
@@ -40,10 +40,13 @@ import { dbUnavailableErrorHandler, respondIfDbUnavailable } from './server/dbUn
 /**
  * Builds the Express app: middleware, rate limits and every route, in mount order. No listen,
  * no job worker and no env loading, so tests (server/tests/llmRoute.test.js) run the real stack.
- * @param {{ serveStatic?: boolean }} [options]  serveStatic: dist/ + public/ (off in tests)
+ * @param {{ serveStatic?: boolean, originGate?: Parameters<typeof createOriginGate>[0] }} [options]
+ *   serveStatic: dist/ + public/ (off in tests); originGate: options for the origin gate
+ *   (server/middleware/originGate.js; tests pass exemptLoopback: false)
  */
-export async function createApp({ serveStatic = true } = {}) {
+export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     const app = express();
+    app.disable('x-powered-by');
 
     // Behind a reverse proxy, TRUST_PROXY (hop count, or true/false) makes req.ip the client IP, so
     // the per-IP limits below key on real addresses.
@@ -54,6 +57,18 @@ export async function createApp({ serveStatic = true } = {}) {
     }
 
     // --- Middleware ---
+    // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
+    // get 403 before CORS, body parsing, logging or the limiters run (and before a 50 MB body is read).
+    // Without it, only requests that came through Cloudflare get 403.
+    app.use(createOriginGate({ ...originGate }));
+    // Every response: no MIME sniffing. API responses: not cached by Vercel, Cloudflare or the
+    // browser unless a route sets its own Cache-Control later (llm.js, agent.js streams).
+    app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+        next();
+    });
+
     // CORS: open for the existing API, but the LLM gateway answers only the app's own origins
     // (server/llm/guestAccess.js), so other sites cannot use visitors' browsers as a model proxy.
     const isAllowedLlmOrigin = createOriginPolicy();
@@ -62,13 +77,14 @@ export async function createApp({ serveStatic = true } = {}) {
     app.use((req, res, next) => (req.path.startsWith('/api/v2/llm') ? llmCors : openCors)(req, res, next));
     app.use(express.json({ limit: '50mb' }));
 
-    // Logging Middleware (Phase 8: includes authMethod)
+    // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
+    // path when a scoped middleware (e.g. /api/v2/agent auth) answers.
     app.use((req, res, next) => {
         const start = Date.now();
         res.on('finish', () => {
             const ms = Date.now() - start;
             const auth = req.authMethod || '-';
-            console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${res.statusCode} ${ms}ms auth=${auth}`);
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms auth=${auth}`);
         });
         next();
     });
@@ -111,60 +127,19 @@ export async function createApp({ serveStatic = true } = {}) {
     // serves /api/v2/ai/* (generation-kit, curriculum-drafts…) with bridge-token auth further down.
     app.use(['/api/v2/ai/generate', '/api/v2/ai/drafts'], requireAuth);
     app.use('/api/v2/ai', aiLimiter, aiRoutes);              // AI rate limit (keyed by req.userId once authed)
-    app.use('/api/v2/image', requireAuth, aiLimiter);        // AI rate limit for image generation
+    // AI rate limit for image generation, uploads and RAG indexing (served by contentRoutes below).
+    app.use(['/api/v2/image', '/api/v2/upload', '/api/v2/rag'], requireAuth, aiLimiter);
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     app.use('/api/v2', chatgptCurriculumRoutes);             // uses own Bridge/JWT auth (§4.6)
     app.use('/api/v2', lifeJournalRoutes);                   // Phase 16: life journal (Bridge/JWT auth)
     app.use('/api/v2', learnerMemoryRoutes);                 // Phase 19: learner semantic memory (Bridge/JWT auth)
-    app.use('/api/v2', requireBridgeOrAuth, aiLimiter, agentRoutes); // Phase 16-6d: auth before AI rate limit
+    app.use('/api/v2/agent', requireBridgeOrAuth, aiLimiter); // Phase 16-6d: auth before AI rate limit
+    app.use('/api/v2', agentRoutes);
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
     app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
     app.use('/api/v2', optionalAuth, aiLimiter, ttsRoutes);  // Issue #3: Kokoro TTS (+ user prefs when authed)
 
     // --- Legacy / Other Routes (Keeping for compatibility) ---
-
-    // Audio Generation (could be moved to content.js but keeping here for simplicity)
-    app.post('/api/generate-audio', async (req, res) => {
-        const courseData = req.body;
-        const courseId = courseData.id;
-        if (!courseId) return res.status(400).json({ error: 'Course ID is missing' });
-
-        res.json({ message: 'Audio generation started (Kokoro TTS)', courseId, engine: 'kokoro-82m-onnx' });
-        console.log(`Starting Kokoro TTS for course: ${courseId}`);
-
-        // Background process
-        (async () => {
-            try {
-                const baseDir = path.join(__dirname, 'public/data/audio', courseId);
-                await fs.mkdir(baseDir, { recursive: true });
-                const chapters = courseData.chapters || [];
-                for (let chIdx = 0; chIdx < chapters.length; chIdx++) {
-                    const slides = chapters[chIdx].slides || [];
-                    for (let sIdx = 0; sIdx < slides.length; sIdx++) {
-                        const slide = slides[sIdx];
-                        let text = slide.speechScript;
-                        if (!text || text.trim().length === 0) {
-                            const bullets = slide.bullets || [];
-                            text = bullets.length > 0 ? bullets.join(". ") : slide.title;
-                        }
-                        if (!text) continue;
-                        const filename = `${chIdx}_${sIdx}.mp3`;
-                        const filepath = path.join(baseDir, filename);
-                        try {
-                            const audioBase64 = await generateAudioContent(text, { language: 'ja' });
-                            const audioBuffer = Buffer.from(audioBase64, 'base64');
-                            await fs.writeFile(filepath, audioBuffer);
-                        } catch (err) {
-                            console.error(`Audio Error ${filename}:`, err);
-                        }
-                    }
-                }
-                console.log(`Audio generation done for: ${courseId}`);
-            } catch (error) {
-                console.error(`Audio Fatal Error:`, error);
-            }
-        })();
-    });
 
     // Legacy Learning Portals (Using Phase 1 Pool directly here for read compatibility)
     // Note: Frontend mostly uses /api/v2 now, but LearningHub might still hit /api/learning-portals
@@ -234,6 +209,15 @@ async function main() {
     await loadEnv({ force: [] });
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
+
+    // Checked before createApp so a weak value stops startup with a clear error; never logs values.
+    const originSecrets = readOriginSecrets(process.env).length;
+    // COMPOSE_PROFILES reaches the api through stack.env: a tunnel without the gate stops here.
+    if (tunnelProfileWithoutSecret(process.env)) {
+        console.error('[OriginGate] COMPOSE_PROFILES lists tunnel but ORIGIN_SECRET is not set; refusing to start.');
+        process.exit(1);
+    }
+    console.log(originSecrets > 0 ? `[OriginGate] on (${originSecrets} accepted secrets)` : '[OriginGate] off');
 
     const app = await createApp();
     const PORT = Number.parseInt(process.env.PORT, 10) || 3006;

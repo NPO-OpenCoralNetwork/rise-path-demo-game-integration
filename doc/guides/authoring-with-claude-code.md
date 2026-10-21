@@ -34,6 +34,15 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
   blocks all changed. Rules: `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
   only when the owner asks.
+- Before publishing (moving to `lessons/`, or opening a PR to publish), every verification on the
+  lesson's chain names a committed previous round (`<commit id>:<reports path>`, with a commit id
+  as `reviewedRevision`), or that reviewer reviews in full: a snapshot copy exists only in the
+  checkout that made it, so the gate fails in any other clone.
+  `server/tests/reviewChainsDurable.test.js` enforces this for published lessons.
+- After the PR is merged, rebuild and redeploy the front end: lessons are bundled at build time,
+  so a merge alone does not reach learners (VM: [risepath_vm_deployment.md](risepath_vm_deployment.md),
+  §4.2; Vercel: [deploy/vercel/README.md](../../deploy/vercel/README.md)). A new course also needs
+  the seed migration for its Learning Hub card (e.g. `server/migrations/011_seed_claude_code_portal.sql`).
 
 ## Migrated chapters and `lessons:lint --strict`
 

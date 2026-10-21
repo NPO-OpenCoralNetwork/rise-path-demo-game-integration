@@ -1,6 +1,6 @@
 # ポータブルデプロイ（Docker + GCS + env 引っ越し）
 
-> 更新日: 2026-06-23  
+> 更新日: 2026-10-21  
 > ステータス: Active（設計・運用手順）  
 > **Nexloom ストレージ・GCS・VM 移行の運用正本**は ai-note-meet リポジトリ:  
 > `docs/ops/runbooks/STORAGE_GCS_SUPABASE_GCP_MIGRATION.md` と `deploy/nexloom-gce/`  
@@ -13,9 +13,9 @@
 - **結論**:
   - **Nexloom**: ページ・メタは Supabase Postgres、**大きいファイルは GCS**（`ASSET_STORAGE_PROVIDER=aws_s3` + GCS S3 互換 HMAC）。
   - **Rise Path**: 構造化データは **専用 VM `risepath-vm` の `risepath` Postgres（Docker）**、**ファイルは GCS**（実装は順次）。
-  - **一発起動** = `deploy/risepath-vm/docker-compose.yml` + `stack.env` + `db:migrate`（Compose 実装は未着手）。
+  - **一発起動** = `deploy/risepath-vm/docker-compose.yml` + `stack.env` + `db:migrate`（実装済み。`deploy/risepath-vm/scripts/deploy-stack.sh`）。
   - **nexloom-gce への risepath 追加は行わない** — ai-note-meet を壊さないため。
-- **次アクション**: `risepath-vm` プロビジョニング → Compose 実装 → GCS バケット → `nexloom-gce` からの pg_dump 移行（データがある場合）。
+- **次アクション**: GCS バケット → `nexloom-gce` からの pg_dump 移行（データがある場合）。
 
 ---
 
@@ -45,7 +45,7 @@
 
 環境変数（将来のサーバー実装用・テンプレ）: `secrets.inventory.template` / `env.local.template` の GCS 節を参照。
 
-詳細トポロジ: [`database_topology.md`](./database_topology.md)
+詳細トポロジ: [`database_topology.md`](../system_design/database_topology.md)
 
 ---
 
@@ -68,13 +68,14 @@
 Rise Path は **`risepath-vm`** 上で単独スタックを動かす。
 
 ```text
-# deploy/risepath-vm/docker-compose.yml（目標・未作成）
+# deploy/risepath-vm/docker-compose.yml（実装済み）
 services:
-  db        # Postgres risepath
-  api       # Express server.js :3006
-  mcp       # MCP SSE :3100
-  hermes    # rise-path profile :8642
-  proxy     # 任意: caddy / traefik
+  db          # Postgres risepath
+  api         # Express server.js :3006（ビルド済みフロント dist/ も配信）
+  mcp         # MCP SSE :3100
+  kokoro-tts  # TTS :8880（profile tts / full）
+  hermes      # rise-path profile :8642（profile full）
+# Memanto は docker-compose.memanto.yml（profile memory）。proxy（caddy / traefik）は未導入
 ```
 
 詳細: [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)
@@ -141,7 +142,7 @@ Nexloom `ALLOWED_PROVIDERS`: `aws_s3`, `supabase_storage`（GCS 専用名は無�
 | ファイル | 内容 |
 |----------|------|
 | [`env_migration_safety.md`](./env_migration_safety.md) | env 引っ越し詳細 |
-| [`database_topology.md`](./database_topology.md) | Auth / risepath / GCS |
+| [`database_topology.md`](../system_design/database_topology.md) | Auth / risepath / GCS |
 | [`prod_readiness_plan.md`](./prod_readiness_plan.md) | Issue #15〜 |
 | `secrets.inventory.template` | 変数名一覧 |
 | `~/Works/_ops/nexloom-gce/docker/README.md` | Compose 運用 |

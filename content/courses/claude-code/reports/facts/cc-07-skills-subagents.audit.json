@@ -1,0 +1,93 @@
+{
+  "lessonId": "cc-07-skills-subagents",
+  "checkedCount": 62,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/skills",
+    "https://code.claude.com/docs/en/skills.md",
+    "https://code.claude.com/docs/en/sub-agents",
+    "https://code.claude.com/docs/en/sub-agents.md",
+    "https://code.claude.com/docs/en/features-overview",
+    "https://code.claude.com/docs/en/features-overview.md",
+    "https://code.claude.com/docs/en/commands",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/best-practices",
+    "https://code.claude.com/docs/en/best-practices.md",
+    "https://code.claude.com/docs/en/whats-new/2026-w27",
+    "https://code.claude.com/docs/en/whats-new/2026-w27.md",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/en/context-window.md",
+    "https://code.claude.com/docs/en/agent-view.md",
+    "https://code.claude.com/docs/ja/skills",
+    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md",
+    "https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s3-check",
+      "where": "q5 option d feedback",
+      "claim": "スキルは繰り返す手順の置き場所で、今回の設計の話は入っていません。今の会話を引き継ぐのはフォークです。",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/features-overview",
+      "evidenceQuote": "Skills can run in your current conversation or in an isolated context via subagents. / (Skill vs Subagent table, Context window impact) Adds to your main window",
+      "fix": "スキルはふだん今の会話の中で動くので、脇で進める形になりません。脇道の作業を任せるなら、フォークを使います。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/skills",
+        "evidenceQuote": "\"This content runs inline so Claude can use it alongside your conversation context.\" / \"When you or Claude invoke a skill, the rendered SKILL.md content enters the conversation as a single message and stays there across later turns.\" / \"Add context: fork ... The subagent doesn't see your conversation history ... When the task depends on that history, fork the conversation instead of using context: fork.\" (features-overview: Skill \"Context window impact: Adds to your main window\"; \"Skills can run in your current conversation or in an isolated context via subagents.\")",
+        "reason": "I checked this against the context of q5. The question asks for a way to hand off test drafting \"脇で\" (on the side) without explaining the design discussion again. The feedback's second sentence is supported: the sub-agents page says a fork \"inherits the entire conversation so far\" and the skills page says \"fork the conversation\" when the task depends on that history.\n\nThe first sentence teaches the wrong reason, though. Saying \"今回の設計の話は入っていません\" tells learners that a skill cannot see the design discussion. By default a skill is the opposite. The skills page says it runs inline, \"alongside your conversation context,\" and features-overview says it \"Adds to your main window.\" So an ordinary /name skill could use the design discussion. Option d is wrong for a different reason: the skill runs in the main conversation, not on the side. If it is made to run on the side with context: fork, it then cannot see the conversation history. Both halves are on the skills page.\n\nThe auditor read the context correctly, and the finding stands. The proposed fix gets the inline point right, but its second sentence goes too far. \"脇道の作業を任せるなら、フォークを使います\" conflicts with the lesson's own s4-table row and the official trigger table: an ordinary subagent is the tool for a side task that doesn't need the history. A fork is the answer here only because the side task must carry over the discussion. The betterFix below keeps that condition and stays within 2 sentences of 60 characters or fewer.",
+        "betterFix": "スキルはふだん今の会話の中で動くため、脇では進みません。設計の話を引き継いだまま脇で任せられるのはフォークです。"
+      }
+    },
+    {
+      "blockId": "s2-check",
+      "where": "q2 option d feedback",
+      "claim": "誰が呼べるかを決めるのは、フロントマターの設定です。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/skills",
+      "evidenceQuote": "To keep a personal or project skill but stop Claude from invoking it on its own, set disable-model-invocation: true in its frontmatter, or \"user-invocable-only\" in skillOverrides when you don't want to edit the file.",
+      "fix": "名前に「manual」と入れても、Claudeが使えなくなるわけではありません。誰が呼べるかは、フロントマターなどの設定で決めます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/skills",
+        "evidenceQuote": "\"Three ways to control which skills Claude can invoke: **Disable all skills** by denying the Skill tool in `/permissions` ... **Allow or deny specific skills** using permission rules ... # Deny specific skills Skill(deploy *) ... **Hide individual skills** by adding `disable-model-invocation: true` to their frontmatter.\" Also: \"To keep a personal or project skill but stop Claude from invoking it on its own, set disable-model-invocation: true in its frontmatter, or \"user-invocable-only\" in skillOverrides when you don't want to edit the file.\" and \"The `skillOverrides` setting controls skill visibility from your settings instead of the skill's own frontmatter.\"",
+        "reason": "I tried to show the lesson is right, and part of it is. The page's \"Control who invokes a skill\" section says \"Two frontmatter fields let you restrict this\". So frontmatter is the main control and the right answer to q2. That covers the lesson's message that a skill's name does nothing and a setting does the work. The trouble is the cleft sentence 「誰が呼べるかを決めるのは、フロントマターの設定です」. It names frontmatter as the one thing that decides who can invoke a skill. The same official page says otherwise. Its \"Restrict Claude's skill access\" section lists \"Three ways to control which skills Claude can invoke\", and two of them are permission rules (deny `Skill`, `Skill(deploy *)`). The page also offers the `skillOverrides` setting value \"user-invocable-only\", \"instead of the skill's own frontmatter\". So the lesson says it more strongly than the page does, and the auditor read the context correctly. The lesson's other sections only mention frontmatter, so nothing else in the lesson corrects this. The proposed fix is accurate. 「フロントマターなどの設定で決めます」 keeps frontmatter as the main way and leaves room for skillOverrides and permission rules. It keeps the point about the name, follows the length and です・ます rules, and has no space between Japanese and alphanumerics. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "e6 option c feedback",
+      "claim": "バックグラウンドかどうかは、待つあいだに会話を続けられるかの違いです。メインに戻る中身の量は変わりません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/sub-agents",
+      "evidenceQuote": "Background subagents run with a smaller built-in tool set than foreground subagents, except for conversation forks and resumed foreground subagents.",
+      "fix": "バックグラウンドで変わるのは、主に待つあいだに会話を続けられるかです。メインに戻る中身の量は変わりません。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/sub-agents",
+        "evidenceQuote": "\"Foreground subagents block the main conversation until complete. Permission prompts are passed through to you as they come up.\" / \"Background subagents run concurrently while you continue working.\" ... Under \"Tools, permissions, and results of background subagents\": \"Background subagents run with a smaller built-in tool set than foreground subagents, except for conversation forks and resumed foreground subagents.\" and \"Background subagents surface every permission prompt in your main session.\" and \"A background subagent's results reach Claude as a completion notification in a later turn.\"",
+        "reason": "The lesson context is check-quiz e6, which asks why the main context grew. Option c's feedback describes background and foreground as differing only in whether you can keep talking while you wait (「…の違いです」). The official sub-agents page does give blocking versus running concurrently as the main distinction. It also lists other differences under its own heading, \"Tools, permissions, and results of background subagents\": a smaller built-in tool set (\"the same definition can resolve to different tools in the foreground and the background\"), permission prompts that show up in the main session, and results that arrive as a completion notification in a later turn. So the lesson claims more than the page does. The second sentence, that the amount returned to the main conversation is the same, is not contradicted: the page never says background results are shorter, cut off, or a different size, so that sentence can stay. The proposed fix hedges with 「主に」 and keeps the second sentence. It is accurate, fits the page, has 2 sentences in です・ます, and stays within the length budget, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s4-table",
+      "where": "caption",
+      "claim": "きっかけが来たら足す（公式の「少しずつ育てる」表から一部を抜粋）",
+      "problem": "unsupported",
+      "evidenceUrl": "https://code.claude.com/docs/en/features-overview",
+      "evidenceQuote": "Build your setup over time table has only the columns \"| Trigger | Add |\"; the loading info comes from the separate \"Context cost by feature\" table, e.g. \"Descriptions at start, full content when used\"",
+      "fix": "きっかけが来たら足す（公式の「少しずつ育てる」表と、読み込み方の表から抜粋）",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/features-overview",
+        "evidenceQuote": "### Build your setup over time ... | Trigger | Add | ... | Claude gets a convention or command wrong twice | Add it to CLAUDE.md | ... | A side task floods your conversation with output you won't reference again | Route it through a subagent | ... (separately) ### Context cost by feature | Feature | When it loads | What loads | Context cost | ... | **Skills** | Session start + when used | Descriptions at start, full content when used | Low (descriptions every request)* | ... | **Subagents** | When spawned | Fresh context with specified skills ... | Isolated from main session |",
+        "reason": "I tried to show the caption is right and could not. The lesson's s4-table has three columns: きっかけ, 足すもの and 読み込まれ方. The caption says the whole table is an excerpt from the official 「少しずつ育てる」 table. I fetched that page in English and in Japanese (/docs/ja/features-overview, section 「セットアップを時間をかけて構築する」). In both, the \"Build your setup over time\" table has only two columns, \"Trigger | Add\" (「トリガー | 追加」). The rows in the lesson's first two columns do come from it: \"Claude gets a convention or command wrong twice\", the two skill rows merged into one, the subagent row and the hook row. The 読み込まれ方 column does not. Its values (毎回、全文 / 説明文は毎回、本文は使うとき / 別のコンテキスト) come from a different table on the same page, \"Context cost by feature\" (「機能別のコンテキストコスト」). The hook row's 「第8回で扱います」 is the lesson's own pointer to a later lesson, not an excerpt from either table. The `cite` (cc-features-overview) covers both tables, so the content itself is supported. Only the caption's claim about where the columns come from is too strong. The auditor read the page correctly. The proposed fix names both tables and says both were excerpted, so it is accurate. 「読み込み方の表」 is a fair description of a table the page introduces as \"Each feature has a different loading strategy and context cost\", so no better fix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [],
+  "unverified": 0
+}

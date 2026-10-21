@@ -1,9 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
-import agentRoutes from '../routes/agent.js';
+import agentRoutes, { startSseHeartbeat } from '../routes/agent.js';
 
 const optedInPool = {
     query: async () => ({
@@ -168,6 +168,38 @@ describe('POST /api/v2/agent/chat diary excerpt gate', () => {
             else process.env.RISE_PATH_BRIDGE_TOKEN = prevBridge;
             if (prevHermesKey === undefined) delete process.env.HERMES_API_KEY;
             else process.env.HERMES_API_KEY = prevHermesKey;
+        }
+    });
+});
+
+describe('startSseHeartbeat', () => {
+    it('pings only while idle and between events, and stops on stop()', () => {
+        mock.timers.enable({ apis: ['setInterval'] });
+        const writes = [];
+        const res = { writableEnded: false, write: (text) => { writes.push(text); return true; } };
+        const pings = () => writes.filter((text) => text === ': ping\n\n').length;
+        try {
+            const heartbeat = startSseHeartbeat(res, { intervalMs: 1000 });
+            mock.timers.tick(1000);
+            assert.equal(pings(), 1, 'an idle tick before the first chunk pings');
+
+            heartbeat.write('data: {"a":');
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            assert.equal(pings(), 1, 'no ping inside an unfinished event');
+
+            heartbeat.write('1}\n\n');
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            assert.equal(pings(), 2, 'a ping follows the closing blank line within two ticks');
+            assert.deepEqual(writes.slice(1, 3), ['data: {"a":', '1}\n\n'], 'chunks are forwarded unchanged');
+
+            heartbeat.stop();
+            mock.timers.tick(5000);
+            assert.equal(pings(), 2, 'no ping after stop()');
+        } finally {
+            mock.timers.reset();
         }
     });
 });

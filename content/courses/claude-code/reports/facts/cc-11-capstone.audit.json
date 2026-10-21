@@ -1,0 +1,113 @@
+{
+  "lessonId": "cc-11-capstone",
+  "checkedCount": 60,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/features-overview.md",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/en/best-practices.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://code.claude.com/docs/en/settings.md",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/hooks-guide.md",
+    "https://code.claude.com/docs/en/hooks.md",
+    "https://code.claude.com/docs/en/skills.md",
+    "https://code.claude.com/docs/en/sub-agents.md",
+    "https://code.claude.com/docs/en/prompt-caching.md",
+    "https://code.claude.com/docs/en/champion-kit.md",
+    "https://code.claude.com/docs/en/costs.md",
+    "https://code.claude.com/docs/en/authentication.md",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/context-window.md",
+    "https://code.claude.com/docs/en/common-workflows.md",
+    "https://code.claude.com/docs/ja/overview",
+    "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more",
+    "https://www.anthropic.com/engineering/harness-design-long-running-apps",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  ],
+  "confirmed": [
+    {
+      "blockId": "ex-prompt-skill",
+      "where": "expect (and the same claim in ex-steps item ex-skill.expect)",
+      "claim": "`/explain-diff` と打つと、今の差分にもとづく説明が返ります。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/skills",
+      "evidenceQuote": "If you create a top-level skills directory that didn't exist when the session started, run [`/reload-skills`](/docs/en/commands#all-commands) to pick up the skills you put there. Claude Code isn't watching that directory yet, so run `/reload-skills` again after each later change there.",
+      "fix": "`!` で始まる行は、スキルを使うたびに `git diff HEAD` の結果に置きかわります。\n\n`.claude/skills/` を今回はじめて作ったときは、先に `/reload-skills` を実行します。そのあと `/explain-diff` と打つと、今の差分にもとづく説明が返ります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/skills",
+        "evidenceQuote": "\"When you add, edit, or remove a skill under `~/.claude/skills/`, the project `.claude/skills/`, or a `.claude/skills/` inside an `--add-dir` directory, Claude Code picks up the change within the current session, without a restart. If you create a top-level skills directory that didn't exist when the session started, run `/reload-skills` to pick up the skills you put there. Claude Code isn't watching that directory yet, so run `/reload-skills` again after each later change there.\" (Commands page: \"/reload-skills — Re-scan skill and command directories so skills added or changed on disk during the session become available without restarting.\")",
+        "reason": "The finding stands. In the lesson's example, Sato's repo has only CLAUDE.md and .claude/settings.json (steps ① and ②). Step ④ is the repo's first skill, and Claude writes `.claude/skills/explain-diff/SKILL.md` partway through the session. That means `.claude/skills/` most likely did not exist when the session started. The skills page says Claude Code is not watching a directory like that, so `/explain-diff` stays unavailable until you run `/reload-skills`. The lesson's expect says, with no condition, that typing `/explain-diff` returns the explanation. That is stronger than the docs allow.\n\nThe old CHANGELOG hot-reload entry (\"skills created or modified in ... .claude/skills are now immediately available\") does not override this. The current docs narrow it explicitly, and I found no later CHANGELOG entry that removes the caveat.\n\nThe course's own cc-07 draft already teaches the same caveat: 「起動後に `.claude/skills/` を新しく作ると、`/reload-skills` するまで読み込まれない」. The `!` line description is correct; the skills page says Claude Code \"runs the command and replaces the line with its output before Claude sees the skill content\".\n\nThe proposed fix is basically right. Its trigger, 「今回はじめて作ったとき」, is looser than the docs' condition, which is \"didn't exist when the session started\". betterFix uses 「起動後に…新しく作ったとき」 instead, which matches the docs and the cc-07 wording. The same caveat also applies to ex-steps item ex-skill.expect. A short note there would help, such as a troubleshoot line: 「呼べないときは `/reload-skills` を実行します。」",
+        "betterFix": "`!` で始まる行は、スキルを使うたびに `git diff HEAD` の結果に置きかわります。\n\n起動後に `.claude/skills/` を新しく作ったときは、先に `/reload-skills` を実行します。そのあと `/explain-diff` と打つと、今の差分にもとづく説明が返ります。"
+      }
+    },
+    {
+      "blockId": "setup-prompt-model",
+      "where": "expect",
+      "claim": "個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定で読み取りを拒否しています。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee`, and to the targets of Bash redirections such as `> file` and `< file`. They don't apply to a command that reads files without naming them, such as `grep -r pattern .` run from the directory that holds the file, or to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself.",
+      "fix": "Claudeが、`/init` の下書きとの差分を見せながら書き直します。\n\nCLAUDE.mdは19行です。個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定でも読み取りを拒否しています。ただし、拒否できるのはClaudeのファイル操作で、Pythonのスクリプトが開くファイルは防げません。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"To block Claude's file tools from reading a file or directory, add a `Read` deny rule for its path, such as `Read(./.env)` or `Read(./secrets/**)`\" ... \"Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee`, and to the targets of Bash redirections such as `> file` and `< file`. They don't apply to a command that reads files without naming them, such as `grep -r pattern .` run from the directory that holds the file, or to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself. For OS-level enforcement that blocks all processes from accessing a path, enable the sandbox.\"",
+        "reason": "I fetched the permissions page myself and it backs the auditor. The lesson says, with no limit attached, that the settings block reading of the personal data (下の設定で読み取りを拒否しています). The page is narrower. A Read deny rule blocks only Claude's file tools, the Bash file commands Claude Code recognizes, and redirection targets. The page says plainly that it does not cover a Python script that opens files itself, or `grep -r` run from inside the folder. Nothing elsewhere in the lesson adds this limit. The glossary and the exam explanation say only that the rules apply to matching operations, and checklist item sc-safety repeats the strong version (秘密情報は拒否ルールで守り). The context makes the gap matter. The worked example is a Python tool whose CLAUDE.md tells Claude to run `python -m kakeibo summary data/...`, and that is exactly the kind of subprocess the page says the deny rule does not stop. So the lesson claims more than the page supports. The proposed fix is accurate. 「拒否できるのはClaudeのファイル操作」 matches the page's \"Claude's file tools\", and 「Pythonのスクリプトが開くファイルは防げません」 matches \"a Python or Node script that opens files itself\". The 19-line count checks out (19 lines including blank lines). The new sentence is about 51 characters, within the 60-character limit, and the paragraph stays under 160 characters. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "summary-cards",
+      "where": "card-ask (front and back)",
+      "claim": "`git push` の前に必ず人が見るための設定は？ / `permissions.ask` に `Bash(git push *)` の確認ルールを書きます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "It doesn't match the same program invoked in a different form, so a deny or ask rule covers the invocation Claude usually produces and isn't a security boundary around the program. ... | `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main` |",
+      "fix": "front: `git push` の前に人が確認するための設定は？ / back: `permissions.ask` に `Bash(git push *)` の確認ルールを書きます。`git -C . push` のような別の書き方には一致しません。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"A Bash rule matches the command text Claude writes, after Claude Code splits compound commands and strips wrappers. It doesn't match the same program invoked in a different form, so a deny or ask rule covers the invocation Claude usually produces and isn't a security boundary around the program. ... | `Bash(git push *)` | `git push origin main` | `git -C . push origin main`, `git -c push.default=current push origin main`, `git 'push' origin main` |\" and, under Wildcard patterns: \"A push written another way, such as `git -C . push`, isn't matched\"",
+        "reason": "The finding holds. The lesson is right that `permissions.ask` with `Bash(git push *)` is the setting to use. The docs back that rule as the tool for the job. permission-modes, \"Actions no mode auto-approves\", says: \"Claude Code doesn't auto-approve the following in any mode, including `bypassPermissions` ... Tools matched by an explicit ask rule\". The sandboxing section adds that \"Content-scoped ask rules like `Bash(git push *)` still force a prompt\". So a command that matches the rule prompts in every mode.\n\nThe problem is the word 必ず on the card's front (\"always, before any `git push`\"). That promises a guarantee the official page denies. The permissions page says the rule only matches the form Claude usually writes and \"isn't a security boundary around the program\". It names `git -C . push`, `git -c ... push` and `git 'push'` as push commands the rule doesn't catch. The page also notes another gap: with no managed settings and no Team or Enterprise login, an installed mod can approve a call that an ask rule would prompt for. Nothing else in the lesson mentions these limits; the e1 explanation only says \"一致した操作\" (matching operations). Read as a whole, the card says more than the page does.\n\nThe proposed fix is accurate. It drops 必ず and adds the limit using the docs' own example (\"A push written another way, such as `git -C . push`, isn't matched\"). It keeps です・ます and puts no space between Japanese and alphanumerics outside inline code. No betterFix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "summary-cards",
+      "where": "card-deny (back)",
+      "claim": "`.env` を読ませないための設定は？ / `permissions.deny` に `Read(./.env)` などの拒否ルールを書きます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "To block Claude's file tools from reading a file or directory, add a `Read` deny rule for its path, such as `Read(./.env)` or `Read(./secrets/**)` ... They don't apply to ... arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself. For OS-level enforcement that blocks all processes from accessing a path, enable the sandbox.",
+      "fix": "`permissions.deny` に `Read(./.env)` などの拒否ルールを書きます。スクリプトが開くファイルまでは防げません。",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/settings-reference",
+        "evidenceQuote": "\"This example approves `npm run` commands without asking, prompts before `git push`, blocks reads of `.env`, and starts sessions in `acceptEdits`: ... \"deny\": [\"Read(./.env)\"]\" and, under `permissions.deny`: \"List the tool uses Claude Code blocks. Use it for files that hold API keys, secrets, or environment values: Claude Code excludes matching files from file discovery and search results, denies reads of them, and blocks the Edit and Write tools on the matching paths.\" The permissions page agrees: \"To block Claude's file tools from reading a file or directory, add a `Read` deny rule for its path, such as `Read(./.env)`\" (https://code.claude.com/docs/en/permissions).",
+        "reason": "The finding does not hold. The card is a recall prompt. Its question is \"which setting keeps `.env` from being read?\" and its answer names that setting: a `Read(./.env)` rule in `permissions.deny`. The official settings reference uses the same wording for the same config: its example says `\"deny\": [\"Read(./.env)\"]` \"blocks reads of `.env`\". The `permissions.deny` entry also tells readers to use this key for files that hold secrets or environment values, because Claude Code \"denies reads of them\".\n\nThe card never claims the protection is complete. It says nothing like 完全に, どんな方法でも or 必ず. It stays at the level the docs themselves use, so it is not stated more strongly than the page.\n\nThe limit the auditor quotes is real: deny rules don't cover a Python or Node script that opens files itself, or commands like `grep -r` that read files without naming them. But that limit is extra detail, not something that contradicts the card. The docs also say these rules do cover `cat`, `head`, `tail`, `sed`, `tee` and redirections. So the card's answer is the setting the docs recommend for this exact purpose.\n\nAdding the auditor's sentence would be fine as a wording choice, but the card is not inaccurate without it.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "setup-steps",
+      "where": "p-restart.md",
+      "claim": "直したCLAUDE.mdと設定は、起動し直すと読み込まれます。",
+      "problem": "outdated",
+      "evidenceUrl": "https://code.claude.com/docs/en/settings",
+      "evidenceQuote": "Claude Code watches your settings files and reloads them when they change, so it applies most edits to the running session without a restart, including edits to `permissions`, `hooks`, and credential helpers such as `apiKeyHelper`. (CLAUDE.md, per https://code.claude.com/docs/en/prompt-caching: \"The new content loads on the next `/clear`, `/compact`, or restart.\")",
+      "fix": "直したCLAUDE.mdは、起動し直すと読み込まれます。設定ファイルの変更は、保存すると反映されます。",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/prompt-caching",
+        "evidenceQuote": "prompt-caching: \"Your project-root and user-level CLAUDE.md files are read once at session start and held in memory. ... The new content loads on the next `/clear`, `/compact`, or restart.\" settings (https://code.claude.com/docs/en/settings): \"Claude Code reads some keys only once, at session start, so an edit to one of them doesn't reach the running session.\" and \"After you save, run `/status` inside Claude Code to confirm the file loaded\".",
+        "reason": "The lesson sentence is literally true and the docs support it. It says the edited CLAUDE.md and settings are loaded when you restart. It does not say settings load only on restart. A restart does load both: the prompt-caching page says CLAUDE.md loads on the next /clear, /compact or restart, and settings files are read at session start. Some keys, such as model and effortLevel, are read only then, so a restart is the one action that is sure to pick up every edit in this step. The auditor's quote (\"applies most edits to the running session without a restart\") adds an extra way settings can apply. It does not contradict the claim that a restart loads them.\n\nThe auditor also misread the context. The step before this one (p-rules) already expects the new rules to show in `/permissions` right after they are written, before any restart. That matches live reload, so the lesson as a whole does not teach that settings need a restart. p-restart is one combined \"restart and check\" step. It is needed for CLAUDE.md anyway, and both kinds of file are then checked in `/context` and `/status`, which matches the settings page's own advice to run /status after saving. The troubleshoot line (\"start at the repository root\") also matches the docs: the shared settings are read from the primary working directory. Nothing here is outdated or contradicted, and nothing is stated more strongly than the docs. An optional clarification would be harmless but is not required.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

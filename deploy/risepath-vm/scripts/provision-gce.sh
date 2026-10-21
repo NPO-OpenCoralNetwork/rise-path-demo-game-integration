@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Create risepath-vm on GCP + dev schedule (09:00–23:00 Asia/Tokyo)
+# Create risepath-vm on GCP. It runs 24 h a day: the public API (Cloudflare Tunnel) needs it up.
+# NIGHT_STOP=1 opts in to the old dev schedule (start 09:00 / stop 23:00 Asia/Tokyo).
 # Prereqs: gcloud auth, billing enabled, project set
 #
 # Usage:
 #   export GCP_PROJECT=your-project
 #   export GCP_ZONE=asia-northeast1-b
 #   ./provision-gce.sh
+#   NIGHT_STOP=1 ./provision-gce.sh   # dev only: stop the VM at night
 set -euo pipefail
 
 : "${GCP_PROJECT:?Set GCP_PROJECT}"
@@ -15,6 +17,7 @@ VM_NAME="${VM_NAME:-risepath-vm}"
 MACHINE_TYPE="${MACHINE_TYPE:-e2-medium}"
 DISK_SIZE="${DISK_SIZE:-50GB}"
 SCHEDULE_NAME="${SCHEDULE_NAME:-risepath-dev-schedule}"
+NIGHT_STOP="${NIGHT_STOP:-0}"
 
 gcloud config set project "${GCP_PROJECT}"
 
@@ -33,21 +36,26 @@ else
   echo "==> VM ${VM_NAME} already exists"
 fi
 
-if ! gcloud compute resource-policies describe "${SCHEDULE_NAME}" --region="${GCP_REGION}" >/dev/null 2>&1; then
-  echo "==> Creating instance schedule ${SCHEDULE_NAME} (start 09:00 / stop 23:00 JST)"
-  gcloud compute resource-policies create instance-schedule "${SCHEDULE_NAME}" \
-    --region="${GCP_REGION}" \
-    --vm-start-schedule="0 9 * * *" \
-    --vm-stop-schedule="0 23 * * *" \
-    --timezone=Asia/Tokyo
-else
-  echo "==> Schedule ${SCHEDULE_NAME} already exists"
-fi
+if [[ "${NIGHT_STOP}" == "1" ]]; then
+  if ! gcloud compute resource-policies describe "${SCHEDULE_NAME}" --region="${GCP_REGION}" >/dev/null 2>&1; then
+    echo "==> Creating instance schedule ${SCHEDULE_NAME} (start 09:00 / stop 23:00 JST)"
+    gcloud compute resource-policies create instance-schedule "${SCHEDULE_NAME}" \
+      --region="${GCP_REGION}" \
+      --vm-start-schedule="0 9 * * *" \
+      --vm-stop-schedule="0 23 * * *" \
+      --timezone=Asia/Tokyo
+  else
+    echo "==> Schedule ${SCHEDULE_NAME} already exists"
+  fi
 
-echo "==> Attaching schedule to ${VM_NAME}"
-gcloud compute instances add-resource-policies "${VM_NAME}" \
-  --zone="${GCP_ZONE}" \
-  --resource-policies="https://www.googleapis.com/compute/v1/projects/${GCP_PROJECT}/regions/${GCP_REGION}/resourcePolicies/${SCHEDULE_NAME}"
+  echo "==> Attaching schedule to ${VM_NAME} (NIGHT_STOP=1: the public API is down 23:00–09:00 JST)"
+  gcloud compute instances add-resource-policies "${VM_NAME}" \
+    --zone="${GCP_ZONE}" \
+    --resource-policies="https://www.googleapis.com/compute/v1/projects/${GCP_PROJECT}/regions/${GCP_REGION}/resourcePolicies/${SCHEDULE_NAME}"
+else
+  echo "==> No night stop (NIGHT_STOP=1 opts in). If an earlier run attached ${SCHEDULE_NAME}, detach it:"
+  echo "    gcloud compute instances remove-resource-policies ${VM_NAME} --resource-policies=${SCHEDULE_NAME} --zone=${GCP_ZONE}"
+fi
 
 cat <<EOF
 
@@ -58,7 +66,10 @@ VM provisioned. Next steps:
 3. Tailscale: curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --hostname=risepath-vm
 4. Mac: tailscale ping risepath-vm
 
-Firewall: do NOT open 5432/3006/3100 to 0.0.0.0/0. Use Tailscale only.
+Firewall: no inbound rule is needed. Mac access goes over Tailscale, and the public API leaves
+through Cloudflare Tunnel (egress TCP/UDP 7844 must stay allowed). Do NOT open
+5432/3006/3100/8642/8880 to 0.0.0.0/0.
 
-Estimated cost (scheduled 14h/day): ~¥3,000–3,800/month incl. 50GB disk
+Cost: ${MACHINE_TYPE} running 24 h a day plus the ${DISK_SIZE} pd-balanced disk (more than the old
+14 h/day schedule); check the GCP pricing calculator. NIGHT_STOP=1 brings back the night stop.
 EOF
