@@ -1,22 +1,22 @@
-# Report: vibe-coding/vibe-ch2-practice (draft)
+# Report: vibe-coding/vibe-ch2-practice (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Verification round (2026-10-19): PASS,
-`check-review.mjs` exits 0. Waiting for vibe-ch2, because both are published together. See "Verification round
-(2026-10-19)" at the end of this report; it supersedes the final-gate status below.**
+**Status: PUBLISHED in course `vibe-coding` (lessons/ and course.json, together with vibe-ch2, on the owner's approval,
+2026-10-19). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa; mean 3.69). Lesson hash
+sha256:d7c528c2bebfd7fe. The current gate is "Gate under the hash-anchored check-review (2026-10-19)" at the end of
+this report; the sections before it record the draft rounds, the publishing and the gate re-runs in order.**
 
 - Title: 第2章 演習｜自分のアイデアで1枚企画書をつくる / Chapter 2 practice: your own one-page plan.
-- Draft: `content/courses/vibe-coding/drafts/vibe-ch2-practice.lesson.json`.
+- Lesson: `content/courses/vibe-coding/lessons/vibe-ch2-practice.lesson.json`.
 - Brief: `content/courses/vibe-coding/briefs/vibe-ch2-practice.md` (outline, assumptions, round notes).
-- Split off from `vibe-ch2` in round 4. Listing and publishing it is the owner's call.
+- Split off from `vibe-ch2` in round 4. `course.json` lists it between vibe-ch2 and vibe-ch3.
 - Provenance: author `claude-code`, skill `author-lesson`, skillVersion `1`, generatedAt 2026-10-19. There is no
   `migratedFrom` and no `reviewedBy`.
 
-The saved review JSONs are the round-6 reviews, and they describe the draft *before* the round-6 fixes. The rubric
-numbers pass: every criterion is ≥ 3 and the mean is 3.38. The gate fails only on 8 must-fix items. The final gate
-confirmed that all 8 are in the current draft (see "Final gate"). Only a fresh independent review can clear them
-from the JSON.
+At the final gate of the draft (round 6), the saved review JSONs were the round-6 reviews and described the draft
+*before* the round-6 fixes. Every criterion was ≥ 3 and the mean 3.38; the gate failed only on 8 must-fix items, all
+found applied in the draft (see "Final gate"). The later review rounds below cleared them.
 
-## Objectives (current draft)
+## Objectives
 
 | id | bloom | text (jp) | assessed by |
 |---|---|---|---|

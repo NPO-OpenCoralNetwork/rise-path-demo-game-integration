@@ -1,8 +1,9 @@
-# Brief: vibe-coding/cc-10-safety-cost
+# Brief: claude-code/cc-10-safety-cost
 
 第10回｜安全とコストを管理する — module 4 「チームと自動化」, lesson 10 of 11 of the Claude Code course
-(`doc/brushup-2026/research/claude-code-curriculum.ja.md` §7). Draft only; the course it is published in is the
-owner's decision (report §7 「公開時の形」).
+(`doc/brushup-2026/research/claude-code-curriculum.ja.md` §7). Published 2026-10-21 by the owner's decision
+(report §7 「公開時の形」) in the course `claude-code`: `content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json`,
+`next` = `cc-11-capstone`. It was a draft until then.
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を毎日の開発に使い始めた人。バイブコーディングコースの第3章（VS Code）・第5章（GitHub）程度の基礎がある人、または他の AI コーディングツールを使ったことがある開発者。
@@ -34,9 +35,9 @@ owner's decision (report §7 「公開時の形」).
   7. 「`/usage` の金額が請求額」「`/compact` をこまめにすれば節約になる」（e5 b, e6 a）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（measure.mjs: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`）
+- 所要時間 / minutes: 17（`scripts/lessons/measure.mjs`: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2467 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`、2026-10-21）
 - 難易度 / level: intermediate
-- ロケール / locales: jp のみ（cc-* 共通の決定。英語版は公開するコースが決まってから）
+- ロケール / locales: jp のみ（cc-* 共通の決定。英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。
 
 ## 制約 / Constraints
@@ -45,7 +46,7 @@ owner's decision (report §7 「公開時の形」).
 - 使ってはいけないもの / avoid: 価格（料金ページへのリンクだけ）、本物の鍵や `.env` の値、破壊的なコマンド、大事なリポジトリでの演習、確かめていない UI の文言（`/status` や拒否時の表示の文言は書かない）。
 
 ## 資料 / Sources
-All checked 2026-10-20 (facts file `facts-cc-10-safety-cost.md`, plus the official pages re-read for the deny-rule syntax).
+All checked 2026-10-20 (facts file `content/courses/claude-code/reports/facts/cc-10-safety-cost.facts.md`, plus the official pages re-read for the deny-rule syntax).
 - `cc-security` — Security — https://code.claude.com/docs/en/security — Anthropic (five practices, trust dialog, MCP not audited)
 - `cc-permissions` — Configure permissions — https://code.claude.com/docs/en/permissions — Anthropic (Read/Edit patterns, gitignore syntax, `/path` anchoring, what deny rules don't reach, workspace trust, `-p`). Re-read 2026-10-20 for the round-1 fixes; the page says: "`//path` | Absolute path from filesystem root", "`~/path` | Path from home directory", "`/path` | Path relative to the settings source", "`path` or `./path` | Path relative to current directory"; "A deny rule such as `Read(/secrets/**)` in user settings blocks `~/.claude/secrets/**`, not a `secrets` directory in your project. To write a rule in user settings that applies inside every project, use a `//` absolute path or a `~/` home-relative path instead."; "Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee`, and to the targets of Bash redirections … They don't apply to … a Python or Node script that opens files itself."; "A `Read` deny rule also blocks the Edit and Write tools on the same path"; "If your project has a `.claudeignore` file, it has no effect".
 - `cc-permission-modes` — Choose a permission mode — https://code.claude.com/docs/en/permission-modes — Anthropic (auto default v2.1.283 for interactive terminal and VS Code sessions, bypassPermissions only in isolated environments, start as root/sudo refused on Linux and macOS)
@@ -84,8 +85,8 @@ and the why) before practice; practice with checklist, hints (and troubleshoot o
 (rule JSON, review prompt expect); exam covers o1–o3 twice each, with transfer items (e1, e5); every objective also has
 an inline question; summary 3 points; 7 flashcards. One diagram (structure: which layer covers what). No images.
 
-Body length: the course-wide measure (`measure.mjs`, see the Format line) gives prose 1,896 (budget 1,200–2,400)
-and est 17.2 min after the mobile-fit fixes.
+Body length: the course-wide measure (`scripts/lessons/measure.mjs`, see the Format line) gave prose 1,896 (budget 1,200–2,400)
+and est 17.2 min after the mobile-fit fixes; after the 2026-10-21 fixes it gives prose 1,887 and est 17.3 min (Format line).
 
 ## Assumptions
 - Headless run: the outline above was used as is.

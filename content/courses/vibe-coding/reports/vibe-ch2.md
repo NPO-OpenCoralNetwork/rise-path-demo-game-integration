@@ -1,26 +1,25 @@
-# Report: vibe-coding/vibe-ch2 (draft)
+# Report: vibe-coding/vibe-ch2 (published)
 
-**Status: DRAFT, not published. Verification round (2026-10-19): REVISE, `check-review.mjs` exits 1 on one new
-must-fix (q8 option c feedback), which was applied after the gate. See "Verification round (2026-10-19)" at the end of
-this report; it supersedes the final-gate status below.** The draft is
-`content/courses/vibe-coding/drafts/vibe-ch2.lesson.json`. `lessons/`, `course.json` and `provenance.reviewedBy` are
-untouched. Publishing (author-lesson step 10) is the owner's call.
+**Status: PUBLISHED in course `vibe-coding` (lessons/ and course.json, on the owner's approval, 2026-10-19). Gate: PASS
+(`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa; mean 3.38). Lesson hash sha256:54674b81ebd4f945.
+The current gate is "Gate under the hash-anchored check-review (2026-10-19)" at the end of this report; the sections
+before it record the draft rounds, the publishing and the gate re-runs in order.**
 
-The saved review JSONs are the round-6 reviews, and they describe the draft *before* the round-6 fixes. The rubric
-numbers pass: every criterion is ≥ 3 and the mean is 3.38. The gate fails only on 4 ja-editor must-fix items. The final
-gate confirmed that all 4 are in the current draft (see "Final gate"). Only a fresh independent review can clear
-them from the JSON, so by the contract the lesson is not "done" until that review makes `check-review.mjs` exit 0.
+At the final gate of the draft (round 6), the saved review JSONs were the round-6 reviews and described the draft
+*before* the round-6 fixes. Every criterion was ≥ 3 and the mean 3.38; the gate failed only on 4 ja-editor must-fix
+items, all found applied in the draft (see "Final gate"). The later review rounds below cleared them.
 
 - Lesson: 第2章｜AIと企画する力を身につける / Chapter 2 | Planning with AI. Rework of the migrated chapter
   `data/curricula/vibe_coding/chapter2.ts` (`VIBE_CHAPTER_2_DATA`). `provenance.migratedFrom` is kept and the author
   is `claude-code`, so the lesson is linted strict.
+- File: `content/courses/vibe-coding/lessons/vibe-ch2.lesson.json`. `provenance.reviewedBy` is left to the owner.
 - Locales: jp, en. Level: beginner. Prerequisites: ch0 and ch1.
-- estMinutes: **18** in the draft. `course.json` still lists 30; changing it is the owner's call.
-- In round 4 the hands-on practice moved to its own draft, `drafts/vibe-ch2-practice.lesson.json`. Its report is
-  `reports/vibe-ch2-practice.md`.
+- estMinutes: **18**. `course.json` lists 18 since publishing (it listed 30 before).
+- In round 4 the hands-on practice moved to its own lesson, now `lessons/vibe-ch2-practice.lesson.json` (next after
+  this lesson in `course.json`). Its report is `reports/vibe-ch2-practice.md`.
 - Brief, outline and the per-round notes: `content/courses/vibe-coding/briefs/vibe-ch2.md`.
 
-## Objectives (current draft)
+## Objectives
 
 | id | bloom | jp | assessed by |
 |---|---|---|---|

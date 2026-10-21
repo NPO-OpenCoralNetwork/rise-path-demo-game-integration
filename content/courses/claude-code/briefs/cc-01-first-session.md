@@ -1,9 +1,11 @@
-# Brief: vibe-coding/cc-01-first-session
+# Brief: claude-code/cc-01-first-session
 
-第1回｜最初のタスクを任せる — the first lesson of the planned Claude Code course
+第1回｜最初のタスクを任せる — the first lesson of the Claude Code course
 (`doc/brushup-2026/research/claude-code-curriculum.ja.md` §7, module 1 「はじめる」, lesson 1 of 11).
-Drafted in `content/courses/vibe-coding/drafts/` because the preview needs a `course.json`; where the
-course is published (new `claude-code` course or a vibe-coding module) is the owner's decision.
+Published 2026-10-21 by the owner's decision in the course `claude-code`:
+`content/courses/claude-code/lessons/cc-01-first-session.lesson.json`, `next` = `cc-02-permissions`. Until then it was
+drafted in `content/courses/vibe-coding/drafts/` (`courseId: "vibe-coding"`, no `next`) because the preview needs a
+`course.json`.
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: VS Code を使ったことがあり、Git のコミットの意味がわかる人（バイブコーディング第3章・第5章の程度）。Claude Code は初めて。チャットAIにコードを貼って相談した経験はある。
@@ -34,11 +36,11 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
   5. 「完了しました、と言えば完了」→ 差分を自分で見て、説明できる変更だけコミットする（q4, q9）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 16。コース共通の測り方（`measure.mjs`）の結果:
+- 所要時間 / minutes: 16。コース共通の測り方（`scripts/lessons/measure.mjs`）の結果:
   `prose 1659 (budget 1,200–2,400) · read 2483 · practice reading 842 · questions 10 · practice sections 1 · est 16.1 min (must be ≤ 20; estMinutes 16)`
   （(2,483 + 842) 字 ÷ 450 字/分 = 7.4 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 16.1 分 → 16）。実際の演習は 15 分ほどかかります。
 - 難易度 / level: beginner
-- ロケール / locales: jp only（英語版は公開先が決まってから）
+- ロケール / locales: jp only（英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ `cc-practice`（`git init` 済み）で、Claude に hello world の
   ページを作らせて出発点としてコミットし、何をするプロジェクトかを聞き、小さな変更を1つ頼み、予想してから `/diff`
   を見て、変更を説明させ、コミットする。チェックリストつき。
@@ -52,7 +54,7 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
   大切なリポジトリでの演習、破壊的なコマンド。
 
 ## 資料 / Sources
-All checked 2026-10-20 (facts file `facts-cc-01-first-session.md`, plus WebFetch of the quickstart (en/ja), commands,
+All checked 2026-10-20 (facts file `content/courses/claude-code/reports/facts/cc-01-first-session.facts.md`, plus WebFetch of the quickstart (en/ja), commands,
 interactive-mode and Japanese glossary pages).
 - `cc-overview` — Claude Code overview — https://code.claude.com/docs/en/overview — same engine on every surface; repo CLAUDE.md and settings work everywhere.
 - `cc-setup` — Advanced setup — https://code.claude.com/docs/en/setup — native installer commands, auto-update, system requirements, Node.js 22+ only for npm, Free plan excluded.
@@ -92,12 +94,13 @@ deferred to 第2回). Inline quizzes in 4 of 6 content sections (practice counts
 Every objective has an inline and an exam question. Worked example (5 steps with the why) → faded practice (same ①–⑤
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
-Body length: measured with the course-wide `measure.mjs` (see Format): prose **1,659** JP characters (budget 1,200–2,400),
+Body length: measured with the course-wide `scripts/lessons/measure.mjs` (see Format): prose **1,659** JP characters (budget 1,200–2,400),
 study reading 2,434, practice reading 806.
 
 ## Assumptions
 - Headless run: the outline was not checked in with a person.
-- Course placement: drafted as `courseId: "vibe-coding"` with no `next`, per the shared authoring guide.
+- Course placement: drafted as `courseId: "vibe-coding"` with no `next`, per the shared authoring guide; published
+  2026-10-21 in `claude-code` (`courseId: "claude-code"`, `next` in `course.json`).
 - The practice folder is created with `mkdir cc-practice`, `cd cc-practice`, `git init` on separate lines, because
   Windows PowerShell 5.1 does not accept `&&`. It assumes Git is installed and `git config` user name/email are set
   (バイブコーディング第5章); a troubleshoot line points there.
@@ -139,7 +142,9 @@ study reading 2,434, practice reading 806.
   390 px). `surfaces-table` keeps only the short surface names in the first column (「ターミナルCLI」「IDE拡張」);
   「CLIはCommand Line Interfaceの略」 and 「VS Code・JetBrains」 move to the second column, and the
   ネイティブインストーラー（native installer） mention moves to `install-how`, its first use. What `q2`, `q6` and `q7` rely on
-  is unchanged. `diagram-width`, `code-width` and `para-sentences` report no hits.
+  is unchanged. `diagram-width`, `code-width` and `para-sentences` report no hits (now `scripts/lessons/diagram-width.mjs` and
+  `scripts/lessons/para-sentences.mjs`; `code-width` was a session script, and `scripts/lessons/mobile-fit.mjs` now
+  checks code lines in the browser).
 
 ### Cross-lesson consistency (2026-10-21)
 - p-start expect now says that the first start in a new folder shows the trust dialog (cc-05 and cc-09 use 「信頼の確認」 as known).
