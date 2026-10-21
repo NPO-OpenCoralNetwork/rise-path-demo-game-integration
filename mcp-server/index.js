@@ -1005,6 +1005,7 @@ if (args.includes('--sse')) {
     const rateLimitMod = await import('express-rate-limit');
     const mcpRateLimit = rateLimitMod.default;
     const { initSupabase, getSupabase, extractBearerToken } = await import('../server/middleware/auth.js');
+    const { isBridgeToken } = await import('../server/middleware/bridgeToken.js');
     const { PHASE1_USER_ID, syncAuthUserStub } = await import('../server/db.js');
     const app = express();
 
@@ -1041,19 +1042,15 @@ if (args.includes('--sse')) {
     // ChatGPT Apps & Connectors uses a fixed token, so Bridge Token is essential.
     async function resolveUserId(req) {
         const token = extractBearerToken(req);
-        const bridgeToken = (process.env.RISE_PATH_BRIDGE_TOKEN || '').trim();
 
-        // 1. x-nexloom-bridge-token header (dedicated bridge header)
-        if (bridgeToken) {
-            const provided = (req.headers['x-nexloom-bridge-token'] || '').trim();
-            if (provided && provided === bridgeToken) {
-                req.authMethod = 'bridge-header';
-                return PHASE1_USER_ID; // Bridge uses shared user
-            }
+        // 1. x-nexloom-bridge-token header (dedicated bridge header), compared in constant time
+        if (isBridgeToken(req.headers['x-nexloom-bridge-token'])) {
+            req.authMethod = 'bridge-header';
+            return PHASE1_USER_ID; // Bridge uses shared user
         }
 
         // 2. Bearer token — check if it's Bridge Token first
-        if (token && bridgeToken && token === bridgeToken) {
+        if (isBridgeToken(token)) {
             req.authMethod = 'bridge-bearer';
             return PHASE1_USER_ID;
         }
@@ -1150,8 +1147,12 @@ if (args.includes('--sse')) {
         const mcpInstance = createMcpServer();
 
         // Store session by both route sessionId (for Express routing)
-        // and transport.sessionId (for MCP SDK extra.sessionId → resolveToolUserId)
-        const sessionData = { transport, userId, mcpInstance, activeSessionKey: '' };
+        // and transport.sessionId (for MCP SDK extra.sessionId → resolveToolUserId).
+        // X-Hermes-Session-Key is read per request (extra.requestInfo), never stored here.
+        // `bridge` marks sessions opened with the bridge token: their user comes per call from a
+        // registered session key, never from the connection.
+        const bridge = req.authMethod === 'bridge-header' || req.authMethod === 'bridge-bearer';
+        const sessionData = { transport, userId, mcpInstance, bridge };
         sessions.set(routeSessionId, sessionData);
         sessions.set(transport.sessionId, sessionData); // SDK uses this in extra.sessionId
 
@@ -1176,11 +1177,8 @@ if (args.includes('--sse')) {
         }
 
         const resolvedUserId = await resolveUserId(req);
-        const hermesSessionKey = String(req.headers['x-hermes-session-key'] || '').trim();
-        if (hermesSessionKey) {
-            session.activeSessionKey = hermesSessionKey;
-        }
-
+        // Only an authenticated POST reaches the SDK; its headers (incl. X-Hermes-Session-Key) go
+        // with this one call to the tool handler (tools/core/mcpUserScope.js).
         const authFailure = verifyMessagesSessionAuth(resolvedUserId, session.userId);
         if (authFailure) {
             if (authFailure.status === 403) {

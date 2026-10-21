@@ -141,7 +141,7 @@ ngrok http 3100
 
 ChatGPT の Settings → Apps & Connectors で：
 - **URL**: `https://xxxx.ngrok.io/sse`
-- **Auth**: Bearer Token（`.env` の `RISE_PATH_BRIDGE_TOKEN`）
+- **Auth**: Bearer Token に Supabase の JWT（ログインしたユーザー）。`RISE_PATH_BRIDGE_TOKEN` ではユーザーが分からないため、本番（`NODE_ENV=production`）ではユーザーが必要なツールが `session_binding_required` を返します（ローカルの開発環境では従来どおり動きます）
 
 ---
 

@@ -127,7 +127,7 @@ HERMES_API_KEY=change-me-local-dev
 |------|------|
 | MCP 露出 | `tools.include` allowlist のみ |
 | Hermes terminal/browser | rise-path プロファイルで **無効化** |
-| マルチユーザー | `X-Hermes-Session-Key: rp:user:{userId}` + `agent_session_binding`（migration 007） |
+| マルチユーザー | リクエストごとの `X-Hermes-Session-Key: rp:user:{userId}` を、API が登録した `agent_session_binding`（migration 007）で確かめる。本番ではキーのない bridge 呼び出しは fail-closed（下記） |
 | stdio 本番 | **非推奨** — SSE MCP + JWT を使用（`resources: true` 時は `learner://profile/me` のみ） |
 | 日記 LLM 送信 | Express が同意を DB/メモリに記録、MCP がサーバー側で強制（デフォルト OFF） |
 | 生データ露出 | `daily-life-range` / `daily-life-log` は Hermes allowlist に **含めない** |
@@ -154,6 +154,8 @@ mcp_servers:
 ```
 
 `RISE_PATH_BRIDGE_TOKEN` は `deploy/risepath-vm/stack.env` の `mcp` / `hermes` と同値。MCP は Bridge Token または Supabase JWT を検証（本番 `NODE_ENV=production` では匿名不可）。ユーザースコープ付きチャットは Express が `registerAgentSession` してから Hermes を呼ぶ。
+
+Hermes の `headers` は固定値なので、チャットごとの `X-Hermes-Session-Key` を MCP に送れません。本番の MCP は、キーのない bridge 呼び出しを「直近にチャットしたユーザー」とは扱わず、`session_binding_required` を返します（同時に使う別の人のデータを読み書きしないため）。この場合、コーチは学習者のデータなしで答えます。利用者が 1 人だけのスタックでは、`stack.env` に `RISE_PATH_MCP_LATEST_BINDING_FALLBACK=1` を入れると従来どおり直近のユーザーとして動きます（複数人で使い始めたら外す）。
 
 開発時のみ: `npm run mcp:sse`（ポート 3100）。
 
