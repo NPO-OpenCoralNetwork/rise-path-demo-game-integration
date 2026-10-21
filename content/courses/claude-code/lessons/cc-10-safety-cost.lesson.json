@@ -273,7 +273,7 @@
               "VMかクラウドセッションで開く"
             ],
             [
-              "強い権限（`bypassPermissions`）：確認なしで何でも動く",
+              "強い権限（`bypassPermissions`）：拒否ルール以外は、ほぼ確認なしで動く",
               "オフラインのコンテナかVMだけで使う"
             ]
           ]
@@ -626,7 +626,7 @@
               "id": "p-deny",
               "title": "拒否ルールを書いて試す",
               "md": "第1回の `cc-practice` とは別の、新しいフォルダーで試します。下のコマンドでダミーを作り、`.claude/settings.json` に拒否ルールを書きます。Claude Codeを起動したら、結果を予想して依頼文を送ります。",
-              "expect": "Claudeは中身を読めず、`/permissions` にルールが出ます。",
+              "expect": "Claudeの読み取りが拒否され、`/permissions` にルールが出ます。",
               "hint": "10-3の `keys/**` と同じ形です。",
               "troubleshoot": "中身が出たら、パスとJSONを直して起動し直します。"
             }
