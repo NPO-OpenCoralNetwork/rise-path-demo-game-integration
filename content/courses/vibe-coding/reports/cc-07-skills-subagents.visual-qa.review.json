@@ -1,60 +1,33 @@
 {
   "lessonId": "cc-07-skills-subagents",
   "file": "content/courses/vibe-coding/drafts/cc-07-skills-subagents.lesson.json",
-  "lessonHash": "sha256:97075ebd0299de71",
+  "lessonHash": "sha256:d414e3e1a2e0ec5b",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "Both mermaid diagrams (s1-diagram, s3-diagram) use flowchart TD with Japanese labels that are readable at 390 px (mobile-jp-04, mobile-jp-12/13), and the code blocks fit without sideways scrolling. The one flaw is the s4-table first column: 「サブエージェント」 breaks into 「サブエージェン／ト」 on both mobile (mobile-jp-16) and desktop (desktop-jp-11).",
-      "blockIds": [
-        "s1-diagram",
-        "s3-diagram",
-        "s4-table",
-        "s2-skill",
-        "s3-file",
-        "pr-model"
-      ]
+      "score": 4,
+      "evidence": "metrics.json has no hard failures: overflowX false, 0 console, mermaid, unknown-block and broken-image errors. Both diagrams (Figure 1 on mobile-jp-04, Figure 2 on mobile-jp-12/13) use top-down layouts with short Japanese labels that are readable at 390 px. The term tables, code blocks, steps, prompt, checklist and flashcards all render cleanly on desktop and mobile. No privacy data appears on any screen."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "metrics.json lists textOnlyScreens empty on desktop and mobile, and the desktop median is 39 chars per line, inside the 30–40 target. Each screen has a heading, figure, code block, steps or quiz, so there are no long walls of text and no empty gaps.",
-      "blockIds": [
-        "s2-steps",
-        "pr-steps",
-        "check-quiz"
-      ]
+      "evidence": "textOnlyScreens is empty on desktop and mobile. Every screen holds a table, figure, code, steps or a check. Desktop JP median is 39 chars per line (target 30-40; max 56 on one line). The code blocks are pre-wrapped to short lines, so the SKILL.md and researcher.md files fit within 390 px without side-scrolling (mobile-jp-06, -14, -23)."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is Japanese only, and the screens show no stray English UI strings. Diagram labels are in Japanese and both diagrams have alt text. Contrast is good on the callouts, the pitfall box and the dark code blocks, and nothing is hidden under the top or bottom bars (mobile-jp-01..31).",
-      "blockIds": [
-        "s1-diagram",
-        "s3-diagram",
-        "s4-pitfall"
-      ]
+      "evidence": "The lesson is Japanese-only and all visible text is Japanese. English appears only as parenthetical terms (skill, frontmatter, progressive disclosure, subagent, fork) and as code. Contrast is good throughout, the callouts (info and the red 'よくある失敗' box) are legible, and no controls sit under the top or bottom bars on any mobile screen."
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "s4-table",
-      "issue": "The first-column cell 「サブエージェント」 breaks inside the word as 「サブエージェン／ト」. This happens at 390 px and also at desktop width, because the long second-column cells squeeze the first column.",
-      "fix": "Shorten the second-column cells so the first column gets more width: drop the parentheticals and move the loading note into a third sentence of s4-lead or into the caption. Another option is to turn s4-table into a `definitions` block with term = 足すもの and md = きっかけ（読み込まれ方）, which gives each term its own full-width row on mobile, as s1-defs and s3-defs do.",
-      "screenshot": "pages/mobile-jp-16.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s4-table on desktop shows the same mid-word break (pages/desktop-jp-11.png); the s4-table fix above solves both.",
-    "reader: long inline code such as `disable-model-invocation: true` and `~/.claude/skills/api-guide/SKILL.md` wraps at the hyphen or slash on mobile (mobile-jp-09, mobile-jp-24); known reader behaviour.",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました。」 because drafts are not in course.json (mobile-jp-31, desktop-jp-21).",
-    "reader: the mobile full-length PNG stops at 16000 px; the per-screen pages cover the rest of the lesson."
+    "Practice section heading '演習：自分の手順をスキルにし、調べものを任せる' breaks as 'スキルに / し、' at 390 px (pages/mobile-jp-18.png). A shorter heading, or a break after 'スキルにし、', would read more naturally.",
+    "reader: the end banner says 'このコースの最後のレッスンまで読み終えました。' because drafts are not listed in course.json (pages/mobile-jp-31.png, pages/desktop-jp-21.png). This is known behaviour.",
+    "reader: inline code such as 'disable-model-invocation: true' and 'deploy-prod-manual' wraps mid-token on mobile (pages/mobile-jp-09.png, -10.png, -19.png, -25.png). This is known reader behaviour."
   ],
-  "verdict": "revise",
-  "summary": "The screenshots show the lesson under review (lessonHash sha256:97075ebd0299de71 matches). There are no hard failures: overflowX false, 0 console, mermaid, unknown-block and broken-image errors. No personal data appears on any screen. The layout is clean, with readable TD diagrams, code that fits at 390 px and no text-only screens. The only must-fix is the s4-table first column, which breaks 「サブエージェント」 mid-word on mobile and desktop."
+  "verdict": "pass",
+  "summary": "The screenshots show the lesson under review: metrics.json lessonHash sha256:d414e3e1a2e0ec5b matches the expected hash. There are no hard failures, and all 31 mobile and 21 desktop JP screens are clean: diagrams, tables, pre-wrapped code and the quiz options are readable at 390 px, with no clipping, overflow or personal data. The only finding is optional: a slightly awkward line break in the practice heading on mobile."
 }

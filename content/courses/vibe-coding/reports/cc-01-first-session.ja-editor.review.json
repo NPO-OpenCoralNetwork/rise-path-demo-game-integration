@@ -1,31 +1,39 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:eb6d40faa5d6fe69",
+  "lessonHash": "sha256:9251fd0014082e5c",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:3ebe60f3a0474749",
-    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/3ebe60f3a0474749/round-1/ja-editor.review.json",
+    "reviewedRevision": "sha256:eb6d40faa5d6fe69",
+    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/round-1/ja-editor.review.json",
     "changed": [
+      "loop-table",
       "surfaces-table",
       "install-how",
-      "install-unix",
-      "example-diff"
+      "practice-steps"
     ],
     "changedShare": 0.05,
     "fullReviewRequired": false
   },
-  "resolved": [],
+  "resolved": [
+    {
+      "blockId": "install-how",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "install-how now gives the full name the first time WSL appears: 「macOS・Linux・WSL（Windows Subsystem for Linux）用は、2行で1つのコマンドです。」 The sentence is now its own paragraph, so the 「、」 can stay. lessons:lint --strict: 0 errors, 0 warnings."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text reads naturally. In surfaces-table, 「基本の入口で、演習で使う。CLIはCommand Line Interfaceの略」 and 「VS Code・JetBrainsで変更箇所を見たい」 are clear table fragments, and install-how keeps です・ます (「2行で1つのコマンドです。」). The score stays at 3 because the stiff spots from earlier rounds are unchanged (loop-lead, surfaces-same), and 「JetBrains版」 still differs from 「IDE拡張（JetBrains）」 in the questions.",
+      "evidence": "The changed text is clean. In loop-table and surfaces-table, each cell now starts with the full name (「チャットAIは、…」「ターミナルCLI。…」「デスクトップアプリ。…」「クラウドセッション。…」), so the short row labels (チャット, 補完, CLI, アプリ, クラウド) still match the terms used in the rest of the lesson. The クラウド cell now reads more smoothly: 「GitHubのリポジトリを使い、先にpushする」. The practice-steps titles lost the ①–⑤ markers but keep です・ます in the body. The md still points to 1-5の①/②/⑤, so the link to the worked example is not lost. The score stays at 3 because earlier stiff spots are unchanged (loop-lead, surfaces-same).",
       "blockIds": [
+        "loop-table",
         "surfaces-table",
-        "install-how",
+        "practice-steps",
         "loop-lead",
         "surfaces-same"
       ]
@@ -33,20 +41,18 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs: prose 1633 (budget 1,200–2,400), est 15.9 min (≤ 20; estMinutes 16). para-sentences.mjs: 0 paragraphs over 3 sentences. lessons:lint --strict: 0 errors, 0 warnings. install-unix and example-diff now wrap their long lines for a phone screen, and install-how says that the 2 lines are one command.",
+      "evidence": "measure.mjs: prose 1659 (budget 1,200–2,400), est 16.0 min (≤ 20; estMinutes 16). para-sentences.mjs: 0 paragraphs over 3 sentences. lessons:lint --strict: 0 errors, 0 warnings. install-how is now split into two short paragraphs.",
       "blockIds": [
-        "install-how",
-        "install-unix",
-        "example-diff"
+        "install-how"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The English for each term still appears on first use after the move. CLI gets 「CLIはCommand Line Interfaceの略」 in surfaces-table, and ネイティブインストーラー（native installer） now appears first in install-how. The changed install-how sentence brings in WSL in prose without its full name, and the name is spelled out nowhere in the lesson (see mustFix). push, エンジン and npm are also still not explained (see niceToHave). Taken as a whole, the score stays at 3.",
+      "evidence": "The open must-fix is resolved: WSL is spelled out on first use in install-how. CLI is still spelled out in surfaces-table (「CLIはCommand Line Interfaceの略」). push, エンジン and npm are still not explained (see niceToHave), so the score stays at 3.",
       "blockIds": [
-        "surfaces-table",
         "install-how",
+        "surfaces-table",
         "surfaces-same",
         "install-node"
       ]
@@ -54,32 +60,27 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Unchanged since round 1: the lesson declares jp only, and every string is Japanese. Both links name their destination. The new filename 「macOS・Linux・WSL」 is plain text.",
+      "evidence": "Carried over: the lesson declares jp only. Every string is Japanese, and both links name their destination.",
       "carriedOver": true
     }
   ],
-  "mustFix": [
-    {
-      "blockId": "install-how",
-      "criterion": "prior",
-      "issue": "(d) abbreviation not spelled out on first use (style-guide §2 「略語は初出で正式名を書きます」): the changed sentence 「macOS・Linux・WSL用は、2行で1つのコマンドです。」 is now the first use of WSL in the lesson, and WSL is spelled out nowhere. The replacement below removes the 「、」 so the paragraph stays at 160 chars (checked with lessons:lint --strict on a scratch copy: 0 warnings).",
-      "fix": "「macOS・Linux・WSL用は、2行で1つのコマンドです。」→「macOS・Linux・WSL（Windows Subsystem for Linux）用は2行で1つのコマンドです。」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "install-how: 「2行で1つのコマンド」 could be read as \"two commands on two lines\". Saying the line was split for display is clearer, but it costs characters, so shorten another sentence if you use it — 「2行で1つのコマンドです。」→「2行に分けて表示した1つのコマンドです。」",
-    "install-unix / install-win: the filenames now use two styles side by side, 「macOS・Linux・WSL」 and 「PowerShell (Windows)」. Matching them reads better — 「PowerShell (Windows)」→「Windows・PowerShell」",
-    "surfaces-table: (carried) 「JetBrains版」 differs from 「IDE拡張（JetBrains）」 in q2 and q6 — 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」",
-    "surfaces-table: (carried) push is not explained, and the cell is three short sentences in a row — 「PCを閉じても進めたい。GitHubのリポジトリを使う。先にpushする」→「PCを閉じても進めたい。基本はGitHubのリポジトリを使い、先にpush（GitHubへ送る）する」",
-    "loop-lead: (carried, unchanged) 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
-    "surfaces-same: (carried, unchanged) 「どれも同じエンジンなので、」→「どれも中身は同じClaude Codeなので、」",
-    "install-node: (carried, unchanged) 「npmで入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
-    "check-quiz: (carried, unchanged) 「`claude --cloud` で送れます。」→「ターミナルの `claude --cloud` コマンドで送れます。」",
-    "hook-predict: (carried, unchanged) 「Claude Codeは前回の会話を覚えていません。」→「新しいセッションに、前回の会話は入っていません。」",
+    "surfaces-table: the short label and the start of the cell now repeat each other (「CLI」 / 「ターミナルCLI。…」). On a phone this is fine, but the cell could save a few characters by dropping the label echo. If kept, it is acceptable as is.",
+    "practice-steps: with ①–⑤ removed from the titles, the link to the 1-5 steps now lives only in the md. Putting it back in one title would help orientation — 「質問して、変更を1つ頼む」→「質問して、変更を1つ頼む（1-5の①②）」",
+    "install-how: 「2行で1つのコマンド」 could still be read as \"two commands\" — 「2行で1つのコマンドです。」→「2行に分けて表示した1つのコマンドです。」",
+    "install-unix / install-win: (carried) filename styles differ — 「PowerShell (Windows)」→「Windows・PowerShell」",
+    "surfaces-table: (carried) 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」, to match 「IDE拡張（JetBrains）」 in q2/q6",
+    "surfaces-table: (carried) push is not explained — 「先にpushする」→「先にpush（GitHubへ送る）する」",
+    "loop-lead: (carried) 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
+    "surfaces-same: (carried) 「どれも同じエンジンなので、」→「どれも中身は同じClaude Codeなので、」",
+    "install-node: (carried) 「npmで入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
+    "check-quiz: (carried) 「`claude --cloud` で送れます。」→「ターミナルの `claude --cloud` コマンドで送れます。」",
+    "hook-predict: (carried) 「Claude Codeは前回の会話を覚えていません。」→「新しいセッションに、前回の会話は入っていません。」",
     "session-check: (carried) 「昨日の会話は見えないが、」→「昨日の会話は見えないけれど、」",
-    "practice-steps: (carried) factual doubt: neither the audit nor the facts file covers 「入力欄の上に `cc-practice` が表示されます。」. A more general wording is safer: 「Claude Codeの入力欄が表示されます。」"
+    "practice-steps: (carried) factual doubt: neither the audit nor the facts file covers 「入力欄の上に `cc-practice` が表示されます。」 — safer: 「Claude Codeの入力欄が表示されます。」"
   ],
   "average": 3.5,
-  "verdict": "revise",
-  "summary": "Verification round: review-scope.mjs exited 0, with 4 of 43 blocks changed (5%). The previous review had no open must-fix items, so resolved is empty. Most of the changes are clean. surfaces-table still gives CLI its full English name, ネイティブインストーラー（native installer） now appears first in install-how, and the code blocks wrap for mobile. lint --strict is clean. One new class (d) error comes from the change: install-how now uses WSL in prose without its full name, and the lesson never spells it out. Every score is at least 3 and the mean is 3.5, but the must-fix item keeps the verdict at revise."
+  "verdict": "pass",
+  "summary": "Verification round. review-scope.mjs exited 0: 4 of 43 blocks changed (5%). The one open must-fix is resolved: install-how now spells out WSL（Windows Subsystem for Linux）. The changed blocks (loop-table, surfaces-table, install-how, practice-steps) are clean. They add no new naming mismatches, because each table cell starts with the full term. lint --strict is clean, with prose 1659 and 16.0 min. Scores: voice 3, load 4, prior 3, a11y_l10n 4 (mean 3.5), and mustFix is empty, so the verdict is pass."
 }
