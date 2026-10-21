@@ -278,13 +278,11 @@
           "id": "s2-version",
           "type": "callout",
           "variant": "info",
-          "title": "版による違い",
+          "title": "第2回のおさらい",
           "cite": [
-            "cc-best-practices",
-            "cc-permission-modes",
-            "cc-changelog"
+            "cc-permission-modes"
           ],
-          "md": "v2.1.283以降、ターミナルとVS Codeで対話するときは、起動時の指定や設定がなければautoモードで始まります。[autoモードが使えない環境](https://code.claude.com/docs/ja/permission-modes)では、Manualモードで始まります。autoモードでShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。"
+          "md": "autoモードからShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。起動時のモードは、第2回で見たとおりです。"
         },
         {
           "id": "s2-when",
@@ -542,7 +540,7 @@
           "cite": [
             "cc-best-practices"
           ],
-          "md": "役立つ仕様には、関わるファイルとインターフェース（interface、関数名など、ほかのコードとのつなぎ目）を書きます。範囲外のことも書き、最後は全体を確かめる手順で終わります。"
+          "md": "役立つ仕様には、関わるファイルと、関数名などほかのコードとのつなぎ目を書きます。範囲外のことも書き、最後は全体を確かめる手順で終わります。"
         },
         {
           "id": "s4-table",
@@ -561,11 +559,11 @@
           "id": "s4-community",
           "type": "callout",
           "variant": "note",
-          "title": "コミュニティのスキル集",
+          "title": "コミュニティのツール",
           "cite": [
             "cc-sdd"
           ],
-          "md": "仕様づくりには、cc-sddのようなコミュニティのスキル（skill）集もあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。"
+          "md": "仕様づくりには、cc-sddのようなコミュニティのツールもあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。"
         },
         {
           "id": "s4-check",
@@ -1013,7 +1011,7 @@
             {
               "id": "card-good-spec",
               "front": "役に立つSPEC.mdの3つの条件は？",
-              "back": "関わるファイルとインターフェースを書く、範囲外を書く、最後に全体を確かめる手順で終える、の3つです。"
+              "back": "関わるファイルとつなぎ目（関数名など）を書く、範囲外を書く、最後に全体を確かめる手順で終える、の3つです。"
             }
           ]
         },

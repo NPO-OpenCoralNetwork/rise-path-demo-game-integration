@@ -4,192 +4,195 @@
   "lessonHash": "sha256:c5dc598ce3ba8cf6",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:e66b60d1da0710f0",
-    "previousReview": ".artifacts/review/claude-code/cc-09-parallel-automation/e66b60d1da0710f0/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "lesson.courseId"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 3,
-      "evidence": "Re-scored because e1 changed. e1 keeps objectiveId o1 (evaluate), and its new prompt (「コンテキストをなるべく増やしたくありません」) still tests choosing a tool. Coverage is unchanged: o1 by q0–q2, e1 and e2; o2 by q3, e3 and e4; o3 by q4, e5 and e6. As before, o2 「書ける」 and o3 「設計できる」 are produced only in the self-checked practice (p1-checklist, p2-checklist).",
+      "evidence": "There are 3 can-do objectives with Bloom levels, and each has questions with objectiveId: o1 has q0–q2, e1 and e2; o2 has q3, e3 and e4; o3 has q4, e5 and e6. The writing in o2 (「書ける」) and the design in o3 (「設計できる」) are only produced in the practice sections with self-checks (p1-checklist, p2-checklist). The exam only asks the learner to choose, and two of its items can be answered by convergence (see active).",
       "blockIds": [
-        "check-quiz",
+        "hook-predict",
+        "s1-check",
+        "s2-check",
         "s3-check",
         "s4-check",
+        "check-quiz",
         "p1-checklist",
         "p2-checklist"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-b1 sets a concrete scene in 3 sentences (「機能の実装を任せている途中で、急ぎのバグ修正を頼まれました…「毎晩、テストの失敗を報告してほしい」」) that leads into both halves of the lesson. The ungraded predict question q0 targets misconception 1, every wrong option has feedback, and the answer is the third of four options.",
+      "evidence": "hook-b1 is a concrete scene in 3 sentences (「機能の実装を任せている途中で、急ぎのバグ修正を頼まれました…「毎晩、テストの失敗を報告してほしい」」) that sets up both halves of the lesson. The ungraded predict q0 targets the same-folder misconception, every wrong option has feedback, and the answer is the third option.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Re-scored to check the move to the claude-code course. The prerequisites (「第2回｜任せる範囲を決める：権限モードと巻き戻し」, 「第4回｜検証を任せる：テスト・レビュー・説明」, 「第6回｜CLAUDE.mdで前提を伝える」, 「第7回｜手順はスキルに、調べものはサブエージェントに」, 「第8回｜フックで守らせ、MCPでつなぐ」) match the lesson titles in course.json exactly. The in-text references also match it: 「（第10回）」 in p-run is cc-10-safety-cost, and summary-next names 「第10回｜安全とコストを管理する」. The lesson is cc-09's place in m4, so 「第9回」 in the title is right. The recalls in s1-lead, s3-mode, s3-table and e1 (「（第7回）」, 「MCPサーバー（第8回）」) are unchanged.",
+      "evidence": "The prerequisites list 第2回, 第4回, 第6回, 第7回 and 第8回 plus Git basics. The text recalls them where they are used (「第7回の[[サブエージェント]]」, 「Manualモード（第2回）」, 「MCPサーバー（第8回）」). Terms are defined before use: s1-defs and s4-defs, 非対話的実行 in s3-lead, and glosses for トークン（token…）, シェル（shell…）, CI（継続的インテグレーション）, PR（プルリクエスト） and API（Application Programming Interface）. The glossary entries match s1-defs and s4-defs.",
       "blockIds": [
         "s1-lead",
         "s1-defs",
+        "s1-cost",
+        "s3-lead",
         "s3-mode",
-        "s3-table",
-        "check-quiz",
-        "p1-steps-write",
-        "summary-next"
+        "s3-pitfall",
+        "s4-defs",
+        "p1-steps-write"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Re-scored for the s2-lead, s3-table and p-run edits. measure.mjs reports 「prose 2265 (budget 1,200–2,400) · read 2653 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)」, and lint --strict reports 0 warnings. The trimmed s2-lead (「練習では、2つの作業を小さなファイルの追加にします。」) offsets the additions, but est is now exactly at the cap. headless is still the densest segment, and nothing assesses unattended-where.",
+      "evidence": "measure.mjs reports 「prose 2265 (budget 1,200–2,400) · read 2653 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)」, so the lesson is within budget but exactly at the cap. lint --strict reports 0 warnings. headless is dense: 非対話的実行, シェル and four new flags (s3-table) in one segment. unattended-where adds 2 terms that are never practiced.",
       "blockIds": [
-        "s2-lead",
-        "s3-table",
-        "p1-steps-write",
         "headless",
+        "s3-table",
         "unattended-where"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s2-code with s2-steps is still a full worked example. Each step has a subgoal title and a reason. The ex-feature expect now names an observable result (「`.claude/worktrees/` の下に、フォルダーが2つできます」) next to the two branches. s3-code models practice 1, but no faded step comes between the full example and independent work.",
+      "evidence": "Each practice task comes after a worked example. s2-code with s2-steps gives 5 subgoal-labelled steps, each with its reason (「消すと、ブランチごと消えます」). s3-code with s3-table explains each flag (「付けないと…」), and s4-prompt maps a model prompt to the 4 points in its expect. No faded example comes between these and practice; p1-model is almost the same as s3-code.",
       "blockIds": [
         "s2-code",
         "s2-steps",
-        "s3-code"
-      ],
-      "carriedOver": true
+        "s3-code",
+        "s3-table",
+        "s4-prompt"
+      ]
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "Re-scored for the e1 change. The new explanation (「今の会話に入るのは、依頼文と要点だけです」) does not show up in any option text, so e1 does not give its answer away, and its answer stays at position 3. The density and hints of q1–q4 are unchanged. As before, in e3 each distractor changes one part, so the answer is the option whose parts appear most often, and q3 option a nearly repeats s3-mode.",
+      "evidence": "Four of the five segments have an inline check, and each check applies the idea to a new case: q1 (login text vs payment config), q2 (「モジュールが見つからない」), q3 (bare `-p` in CI) and q4 (5 quiet days). Each has hints and per-option feedback. But exam items e3 and e5 can be answered by convergence: each distractor changes exactly one part, so the option that shares the majority part in every slot is the key (must-fix).",
       "blockIds": [
-        "check-quiz",
         "s1-check",
         "s2-check",
         "s3-check",
-        "s4-check"
-      ],
-      "carriedOver": true
+        "s4-check",
+        "check-quiz"
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored for the e1 change. e1's wrong-option feedback is unchanged and still names each misconception in 2 sentences or fewer (「Ctrl + Bは、実行中のコマンドを裏に回す操作です」, 「エージェントチームは実験的で、トークンを多く使います」). Changing the prompt to 「なるべく」 heads off a new misconception, that a subagent adds nothing to the context, and the explanation corrects it with a reason.",
+      "evidence": "All 7 misconceptions in the brief are addressed by distractors or text: same folder (q0, q1 d), dependencies (q2), the `-p` default (q3 b/c/d), broad `Bash` (s3-pitfall, e3 b), the trust prompt (e4 d), prompts are not enforcement (s4-enforce, e6), and a quiet day vs a failed read (q4 d). Every feedback fixes the error in 2 sentences or fewer and gives a reason (「autoモードで始まるのは、ターミナルやVS Codeの対話セッションです。」).",
       "blockIds": [
-        "check-quiz",
         "hook-predict",
         "s1-check",
         "s2-check",
         "s3-check",
-        "s4-check"
-      ],
-      "carriedOver": true
+        "s3-pitfall",
+        "s4-enforce",
+        "s4-check",
+        "check-quiz"
+      ]
     },
     {
       "id": "visual",
       "score": 3,
-      "evidence": "There are no images and no decoration. The only change to s1-table is 「取り込みは自分でします」, and the three comparisons are still 「〜なら、…」 lists, which is a defensible choice for mobile. Leaving out a diagram is acceptable, though the worktree layout could use one.",
+      "evidence": "There are no images and no decoration. The comparisons in s1-table, s3-table and s4-table are 「〜なら、…」 lists, a defensible choice for mobile. The worktree layout (main folder, `.claude/worktrees/<名前>/`, branch `worktree-<名前>`) is spatial and is described only in text (ex-feature expect); a small diagram would help.",
       "blockIds": [
         "s1-table",
         "s3-table",
-        "s4-table"
-      ],
-      "carriedOver": true
+        "s4-table",
+        "s2-steps"
+      ]
     },
     {
       "id": "practice",
-      "score": 4,
-      "evidence": "Re-scored for the p-run change. The step now warns about cost before the learner runs it (「プランでなくAPIの料金です（第10回）。キーがなければ、`--bare` を外します。」), and it keeps its expect (「失敗したテスト1件が入ります」), hint and troubleshoot. Both tasks still have a hint → troubleshoot → model-answer ladder and a self-check checklist, and pc-bare still matches (「外すのは練習用フォルダーだけです」).",
+      "score": 3,
+      "evidence": "Both tasks are hands-on, with expect, a hint → troubleshoot ladder, a model answer (p1-model, p2-prompt expect) and a checklist (7 and 4 items). p-run also asks for a prediction first. The second task is not a transfer task: p2-before is the same nightly-test scenario as practice 1, and its model answer repeats p1-model's prompt.",
       "blockIds": [
-        "p1-task",
+        "p1-steps-setup",
         "p1-steps-write",
-        "p1-model",
         "p1-checklist",
+        "p1-model",
+        "p2-steps",
+        "p2-prompt",
         "p2-checklist"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points comes after the exam, and its 4 points still match the 4 key ideas. Point 3 is now two shorter sentences (「必要なコマンドだけを許可します。`--bare` と費用の上限も付けます。」). summary-next gives a reflection task, there are 7 retrieval flashcards, and summary-ask offers 3 askTutor suggestions.",
+      "evidence": "summary-points (4 points) comes after the exam and matches the four key ideas. summary-next gives a reflection task (「成功の条件を1文で書いてみましょう」) and the next lesson. There are 7 retrieval flashcards, and summary-ask offers 3 askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "Re-scored. The new claims match the fact files. s3-table 「CLAUDE.md、スキルを読み込みません」 matches facts-cc-09-parallel-automation.md ('--bare skips discovery of hooks, skills, subagents, plugins, MCP, auto memory and CLAUDE.md'). p-run 「プランでなくAPIの料金です」 matches 'It does not use your subscription login, so ANTHROPIC_API_KEY must be set'. The e1 explanation 「依頼文と要点だけ」 matches cc-07 (facts-cc-07-skills-subagents.md: 'returns only a summary'; cc-07 q feedback 「依頼文と返ってきた要約は、メインの会話に入ります」). The section-title wording mismatch from before (「方法」 vs 「道具」) is still there.",
+      "evidence": "The 3 findings confirmed in audit-cc-09-parallel-automation.json are fixed in the current text: s1-lead (「並列の作業を助ける道具を2つ紹介します」), s3-table (「確認が要る操作を、聞かずに拒否します（読み取りは動きます）」) and summary-points (「モードを指定しない `claude -p` は」). Other claims match facts-cc-09-parallel-automation.md and cross-lesson fact 8, are cited, and are pinned to versions (v2.1.302, v2.1.304). The section title 「並列の3つの方法」 still counts methods, which the docs do not support (niceToHave).",
       "blockIds": [
+        "s1-lead",
         "s3-table",
-        "p1-steps-write",
-        "check-quiz",
-        "s1-lead"
-      ],
-      "carriedOver": true
+        "summary-points",
+        "s4-table",
+        "check-quiz"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored. The changed text stays in です・ます with no banned phrases (「練習では、2つの作業を小さなファイルの追加にします。」). The glossary now uses メインの会話 like the rest of the course. Two terms still vary: the permission prompt is 「承認が要る」 in s3-mode but 「確認が要る」 in s3-table, and the practice folder is 「練習用リポジトリ」 in s2-code but 「練習用フォルダー」 in p1-task. The s2-lead edit removed one of the 「練習用リポジトリ」 uses.",
+      "evidence": "The lesson keeps です・ます, is warm (「名前だけで十分です」) and has no banned phrases. Two terms vary: the permission prompt is 「承認が要る」 in s3-mode and q3 but 「確認が要る」 in s3-table, e3 and pc-mode, and the practice place is 「練習用リポジトリ」 in s2-code but 「練習用フォルダー」 in p1-task.",
       "blockIds": [
-        "s2-lead",
-        "s2-code",
         "s3-mode",
         "s3-table",
+        "s3-check",
+        "s2-code",
         "p1-task"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The only declared locale (jp) is complete, and no text is baked into images. The changed blocks use only inline code and glossary links. The new e3 options are short enough to fit on mobile (「`--bare` ＋ `Bash(npm test *)` ＋ `dontAsk`」). Plain-text fields contain no markdown.",
+      "evidence": "The only declared locale (jp) is complete, and no text is baked into images. The link text is descriptive (「公式ドキュメント（非対話的実行）」), and the plain-text fields (checklist labels, askTutor) contain no markdown.",
       "blockIds": [
-        "s1-table",
-        "check-quiz",
+        "s3-mode",
         "p1-checklist",
+        "p2-checklist",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "Still open, p1-steps-write p-run: 「プランでなくAPIの料金です（第10回）。」 is terse, and 「プラン」 could be misread in a course that also teaches プランモード. Consider 「Pro・Maxなどのプランではなく、APIの料金がかかります（第10回）。」 (the ja-editor decides the wording; check that est stays ≤ 20).",
-    "Still open, s1-table item 2: s1-table says 「要点だけが会話に戻ります」 and the e1 explanation says 「今の会話に入るのは、依頼文と要点だけです」. Saying the same thing the same way would help. For example, s1-table could read 「会話に戻るのは要点だけです。」",
-    "Load is at the cap: measure.mjs reports est 20.0 (estMinutes 20, the same as course.json). Any further addition needs a matching cut.",
-    "Still open, check-quiz e3: each distractor changes one part, so the most common part in each slot gives the answer. Set option d's md to 「`Bash(npm test *)` ＋ `bypassPermissions`」 and its feedback to 「`--bare` がないとリポジトリのフックや `.mcp.json` のサーバーが動き、`bypassPermissions` は確認を飛ばします。無人のCIでは `--bare` と `dontAsk` を付けます。」",
-    "Still open, s3-code: the prompt 「リンターの警告を数えてください。」 does not name the allowed command. Replace line 2 with `  \"npm run lint の警告を数えてください。\" \\`.",
-    "Still open, s3-check: q3 option a nearly repeats s3-mode. Set its md to 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
-    "Still open, unattended-where: nothing assesses s4-table. If est allows after a cut, add one inline o3 question (「パソコンを閉じている夜間に毎日動かしたい」 → クラウドの定期タスク).",
-    "Still open: use one term for the permission prompt (s3-mode 「承認が要る」 vs s3-table and e3 「確認が要る」) and one name for the practice folder (s2-code 「練習用リポジトリ」 vs p1-task 「練習用フォルダー」). The ja-editor decides which."
+  "mustFix": [
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "e3 can be answered by convergence without knowing the flags. Each distractor changes one part of the key (b: `Bash`, c: `bypassPermissions`, d: no `--bare`). `--bare`, `Bash(npm test *)` and `dontAsk` each appear in 3 of 4 options, so a test-wise learner picks a, the only option made of all three majority parts. The item gives its answer away.",
+      "fix": "Keep the ids, array order (b, c, d, a), answer [\"a\"] and option a. Balance the parts so each value appears in exactly 2 options. Option b: md 「`--bare` ＋ `Bash` ＋ `bypassPermissions`」, feedback 「`Bash` は全コマンドを通し、`bypassPermissions` は確認を飛ばします。」. Option c: md 「`Bash(npm test *)` ＋ `bypassPermissions`」, feedback 「`--bare` がないとフックや `.mcp.json` が動き、`bypassPermissions` は確認を飛ばします。」. Option d: md 「`Bash` ＋ `dontAsk`」, feedback 「`--bare` がないとフックや `.mcp.json` が動き、`Bash` は全コマンドを通します。」. Then re-run lint (sentence length) and measure.mjs (est must stay ≤ 20)."
+    },
+    {
+      "criterion": "active",
+      "blockId": "check-quiz",
+      "issue": "e5 has the same convergence cue. b differs from the key only in success (「いい感じ」), d only in failure (「調べられなくても空の配列」), and c only in permission (「更新とコミットも」). JSON format, 「編集はしない」 and 「理由を返して」 each appear in 3 of 4 options, so a is the only all-majority option, and the o3 exam item can be answered without applying the 4 points.",
+      "fix": "Keep the ids, array order (b, d, a, c), answer [\"a\"] and option a. Option b: md 「「更新できるパッケージを調べて、いい感じにまとめて。編集はしない。調べられなければ『更新なし』と返して」」, feedback 「「いい感じ」では完了の形が決まらず、読めない日も「更新なし」になります。」. Option d: md 「「名前・今の版・最新の版をJSONの配列で返して。なければ空の配列。必要なら更新とコミットも。調べられなくても空の配列で返して」」, feedback 「報告だけの作業に更新やコミットを頼み、調べられない日も空の配列になります。」. Option c: md 「「更新できるパッケージを調べて、いい感じにまとめて。必要なら更新とコミットも。調べられなければ理由を返して」」, feedback 「「いい感じ」では完了の形が決まらず、報告だけの作業に更新やコミットを頼んでいます。」. Each value then appears in exactly 2 options. Re-run measure.mjs (est ≤ 20)."
+    }
   ],
-  "average": 3.38,
-  "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: 1 of 82 parts changed (2%), and the only change is lesson.courseId (vibe-coding → claude-code). The previous round had no must-fix items, and no earlier round left one open, so there are no resolved entries. validate reports 0 errors and lint --strict 0 warnings. measure.mjs reports prose 2265 and est 20.0, which matches estMinutes 20 here and in course.json. I checked the move for regressions: the prerequisites match the course.json lesson titles exactly, and every 「第N回」 reference matches the module order (第10回 = cc-10-safety-cost, the next link). I re-scored prior with no change and carried over every other score. There are no new must-fix items. Every criterion scores 3 or higher, and the mean is 3.38."
+  "niceToHave": [
+    "factual doubt / consistency, section parallel: the title 「1. 並列の3つの方法を選び分ける」 contradicts s1-lead 「並列の作業を助ける道具を2つ紹介します」. The docs count five ways to run agents and call worktrees and background commands supporting tools (audit-cc-09-parallel-automation.json, s1-lead verdict). Suggest the title 「1. 作業に合わせて並べ方を選ぶ」.",
+    "practice-audit p2-before: the weak prompt is the same nightly-test task as practice 1, so the learner can copy p1-model and does not transfer the 4 points. Consider another domain, e.g. 「毎朝ログを見て、エラーをいい感じにまとめておいて。原因がわかったら直しておいて。」, and adapt the p2-prompt expect model answer to match. Offset the added text so est stays ≤ 20.",
+    "p2-prompt: the prompt asks Claude to check 「費用の上限（--max-budget-usdなどで決めているか）」 and permissions, but the only variable is 「直した依頼文」, so Claude cannot see the flags and will always report them missing. Rename the variable to 「直した依頼文とコマンド」 (in both the prompt and vars[0].name) with hint 「例：claude --bare -p '…' --allowedTools \"Bash(npm test *)\" …」.",
+    "s3-check q3 option a (「Manualモードで始まり、承認が必要な `npm test` が拒否される」) nearly repeats s3-mode. Set its md to 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
+    "s3-code: the prompt 「リンターの警告を数えてください。」 does not name the allowed command. Replace line 2 with `  \"npm run lint の警告を数えてください。\" \\` so the prompt and `--allowedTools` visibly match.",
+    "unattended-where: no objective covers s4-table (GitHub Actions, クラウド・デスクトップの定期タスク, `/loop`) and no question assesses it, yet it adds 2 terms. Either add one inline question (「パソコンを閉じている夜間に毎日動かしたい」 → クラウドの定期タスク) after a matching cut, or shorten it to one sentence inside unattended.",
+    "Visual: a 4–5 node diagram of the worktree layout (cc-practice-09 → `.claude/worktrees/feature-a` / `bugfix-b`, branches `worktree-feature-a` / `worktree-bugfix-b`, merge back), with caption and alt, would support s2-steps on mobile.",
+    "Terminology (the ja-editor decides): use one term for the permission prompt (s3-mode and q3 「承認が要る」 vs s3-table, e3 and pc-mode 「確認が要る」), and one name for the practice place (s2-code 「練習用リポジトリ」 vs p1-task 「練習用フォルダー」).",
+    "p1-steps-write p-run: 「プランでなくAPIの料金です（第10回）。」 is terse, and 「プラン」 can be confused with プランモード. Consider 「Pro・Maxなどのプランではなく、APIの料金がかかります（第10回）。」, if est allows.",
+    "Load is at the cap (measure.mjs est 20.0, estMinutes 20). Any addition, including the e3 and e5 fixes, needs a matching cut."
+  ],
+  "average": 3.31,
+  "verdict": "revise",
+  "summary": "This is a full review. The lesson moved to content/courses/claude-code/lessons/ and its courseId changed, and the review gate no longer accepts the earlier review chain recorded under the vibe-coding path. validate reports 0 errors and lint --strict 0 warnings, and measure.mjs reports prose 2265 and est 20.0, which matches estMinutes 20. The biggest strength is a clear arc with strong misconception work: hook → worktree example → safe `claude -p` → the 4-point prompt, and every distractor targets a misconception from the brief, with short corrective feedback. The audit's three confirmed accuracy fixes are in place. Two items must be fixed: exam items e3 (o2) and e5 (o3) can be answered by convergence, because each distractor changes one part of the key. Rebalance their options as specified. The mean is 3.31, and every criterion scores 3 or higher."
 }

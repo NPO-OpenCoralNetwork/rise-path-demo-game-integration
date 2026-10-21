@@ -4,170 +4,164 @@
   "lessonHash": "sha256:cf71ff2e805d17bc",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:c9d22545bc0d23db",
-    "previousReview": ".artifacts/review/claude-code/cc-11-capstone/c9d22545bc0d23db/round-2/pedagogy-reviewer.review.json",
-    "changed": [
-      "lesson.courseId"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "Re-scored because sc-quiz and check-quiz changed. Only q4's hint (「点検リストのどの分野の問題かを、まず考えましょう。」) and one e3 feedback changed. Their stems, options, answers, objectiveId (o2) and bloom (evaluate) did not. o1 is still assessed by q1, q2, e1 and e2, and o2 by q3, q4 and e3. o1 is performed in practice-setup.",
+      "evidence": "Both objectives are can-do statements (「設計できる」 create, 「判断できる」 evaluate). o1 is assessed by q1, q2 (apply), e1 and e2, and o2 by q3, q4 and e3 (evaluate). e3, the teammate's self-check, assesses o2's checklist-based judgement most directly.",
       "blockIds": [
+        "dr-quiz",
+        "ex-quiz",
+        "cycle-quiz",
         "sc-quiz",
-        "check-quiz",
-        "practice-setup"
-      ],
-      "carriedOver": true
+        "check-quiz"
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-b1 is a concrete 3-sentence scenario (「初日にスキル（skill）5つとフック（hook）3つを一度に入れようとして、手が止まりました」) and is followed by the ungraded pq0. pq0's explanation now states the day-1 exception (「ただし、秘密情報とpushの守りは例外で、初日から置きます」), so the rule no longer contradicts the example.",
+      "evidence": "hook-b1 sets a concrete scene in 3 sentences (「初日にスキル（skill）5つとフック（hook）3つを一度に入れようとして、手が止まりました」) and says what the learner will do. The ungraded pq0 that follows leads straight to o1, and its explanation already names the day-1 exception for secrets and push.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Re-scored because the lesson now belongs to course claude-code. Each prerequisite matches a lesson title in content/courses/claude-code/course.json exactly (for example 「第3回｜探索→計画→実装→コミット」 and 「第10回｜安全とコストを管理する」). The lesson-number references in dr-table (「（第6回）」, 「（subagent、第7回）」, 「（第8回）」) match the course order too. dr-table still links each part to the lesson that taught it, and every katakana part is glossed on first use.",
+      "evidence": "The prerequisites list course titles that match content/courses/claude-code/course.json exactly (for example 「第8回｜フックで守らせ、MCPでつなぐ」). dr-table recalls each part together with the lesson that taught it (「（第6回）」, 「（subagent、第7回）」). The only new term, きっかけ, is defined in dr-b1 before the table uses it, and katakana terms carry their English on first use (プラグイン（plugin）, コンテキスト（context）).",
       "blockIds": [
         "lesson",
-        "dr-table",
-        "dr-b1"
+        "dr-b1",
+        "dr-table"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "Re-measured. measure.mjs gives 「prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate and the course.json entry (19). lint --strict shows 0 errors and 0 warnings. Only courseId changed, so the text load is the same.",
+      "score": 3,
+      "evidence": "measure.mjs gives 「prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)」, and lint --strict reports 0 warnings. The example section is the densest part: 6 blocks, and ex-prompt-skill's expect and note pack four mechanics (allowed-tools, the `!` injection, /reload-skills, the failure in a repo with no commits) next to the jq/xargs hook in ex-hook. The lesson is within budget but sits near the 20-minute cap.",
       "blockIds": [
-        "lesson",
+        "example",
         "ex-prompt-skill",
-        "sc-b1"
+        "ex-steps"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Re-scored because ex-prompt-skill changed. Its expect now explains every non-obvious line of the skill the learner copies: allowed-tools (「スキルを呼んでから次に入力するまで、確認なしで使えます」), the `!` injection, and /reload-skills. That improves the example. ex-steps still have subgoal titles, a trigger and an expect, and they come before practice. There is still no faded step between the full example and independent practice.",
+      "evidence": "ex-steps comes before practice: 5 steps with subgoal titles, the reason for each (「Claudeがテストのコマンドを2回まちがえたのが、きっかけです。」, 「整形の忘れが続いたので」) and an expect, backed by the full files in ex-prompt-claude-md, ex-settings and ex-prompt-skill. There is no faded step between the full example and the independent practice in practice-setup.",
       "blockIds": [
+        "ex-b1",
         "ex-steps",
-        "ex-prompt-skill",
-        "ex-settings"
-      ],
-      "carriedOver": true
+        "ex-settings",
+        "ex-prompt-skill"
+      ]
     },
     {
       "id": "active",
       "score": 4,
-      "evidence": "Re-scored because sc-quiz and check-quiz changed. 4 of the 5 content sections still end in an inline check (q1–q4), and never 2 sections in a row go without one. q4's hint now names the same 分野 that sc-b1 and the self-check-list title use. It points to an area without giving away the option.",
+      "evidence": "4 of the 5 content sections end in an inline check (q1–q4); only practice-setup has none, so 2 sections never go by without one. q1 and q2 ask the learner to apply the trigger table to new symptoms (ESLint forgotten, `npm install` repeated), and q3 and q4 are evaluate items. Every option has feedback.",
       "blockIds": [
         "dr-quiz",
         "ex-quiz",
         "cycle-quiz",
         "sc-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored because e3 changed. e3 a's feedback still names the misconception (cutting a CLAUDE.md that is already short) and gives the reason: 「40行は、公式の目安（200行未満）に収まっています。今の穴は、完了を確かめる手段がないことです。」. The other feedback is unchanged, each 2 sentences or fewer with a reason, and all 7 misconceptions in the brief map to distractors.",
+      "evidence": "The brief's 7 misconceptions all appear as distractors, each with feedback of 2 sentences or fewer that gives a reason. Examples: q1 b 「強調しても、CLAUDE.mdはお願いのままです。」, q2 b 「拒否すると、package.jsonを変えたときにも入れられなくなります。」, q3 d 「あらを探すよう頼まれたレビュアーは、問題のない作業にも指摘を出します。」, e3 c 「自分の作業を採点すると、甘くなりがちです。」.",
       "blockIds": [
-        "check-quiz",
+        "hook-predict",
+        "dr-quiz",
+        "ex-quiz",
+        "cycle-quiz",
         "sc-quiz",
-        "dr-b2"
-      ],
-      "carriedOver": true
+        "check-quiz"
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Re-scored for the changed table. dr-table is still a real 2-column comparison table, with 5 rows that pair a repeated problem with a part (for example 「横道の調べもので会話が埋まる」 → 「[[サブエージェント]]（subagent、第7回）」). The restored gloss makes one cell slightly longer but keeps the table at 2 columns. cycle-flow is unchanged: 5 nodes plus the review loop, with caption and alt. There are no decorative images.",
+      "evidence": "cycle-flow shows a process: 5 nodes and a review loop. Its labels match the cycle-steps titles word for word (「探索して計画する」 … 「コミットする」), and the caption states the takeaway (「レビューで直す指摘があれば、実装と検証に戻る」). dr-table is a real 2-column comparison of trigger and part. There are no decorative images.",
       "blockIds": [
-        "dr-table",
-        "cycle-flow"
-      ],
-      "carriedOver": true
+        "cycle-flow",
+        "dr-table"
+      ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Re-scored because sc-b1 (in the self-check practice section) changed. The lead now names the same four areas as the checklist (「安全・検証・コンテキスト・コストの4分野で点検します」), so the learner can see how self-check-list is organised before using it as the success checklist. Every step has an expect, and the model answers come after the hints. c-review and c-commit still have no hint or troubleshoot, so the hint ladder is incomplete.",
+      "evidence": "The task is authentic: the learner's own repository (on a working branch) and a postponed small change taken through a full cycle. Every step has an expect, self-check-list serves as the success criteria, and model answers are given (setup-prompt-model, setup-settings-model, and the expected plan in cycle-prompt-plan). The hint ladder is uneven: c-review, c-explain and c-commit have no hint or troubleshoot, and p-claude-md's 「25行以内」 is given without a reason.",
       "blockIds": [
-        "sc-b1",
-        "self-check-list",
+        "setup-steps",
+        "setup-prompt-model",
         "cycle-steps",
-        "setup-steps"
-      ],
-      "carriedOver": true
+        "cycle-prompt-plan",
+        "self-check-list"
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "Re-scored because the lesson is now the last lesson of the published course. summary-next's 「これで全11回は終わりです。次は、演習3で決めた部品を足していきましょう。」 matches course.json, where module m4 has 11 lessons in all and cc-11-capstone is last with no next link, so the closing does not point to a missing lesson. The summary still comes after the exam, with 4 points (point 4: 「安全・検証・コンテキスト・コストの4分野で点検し、次に足すものを決めます。」), a reflection prompt, 7 flashcards and askTutor suggestions.",
+      "evidence": "The summary follows the exam: 4 points, a reflection prompt (「この1サイクルで、自分で判断した場面を1行で書いておきましょう。」), a next step that matches the course's end (「これで全11回は終わりです。次は、演習3で決めた部品を足していきましょう。」), 7 flashcards and askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
-        "summary-cards"
+        "summary-cards",
+        "summary-ask"
       ]
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Re-scored for the changed claims. e3 a's 「200行未満」 matches facts-cc-11-capstone.md (「Aim for under 200 lines per file」) and cc-06. ex-prompt-skill's 「スキルを呼んでから次に入力するまで、確認なしで使えます」 matches factbase.md docs-25 (「`allowed-tools`: pre-approved tools for the turn that invokes the skill」), and the block cites cc-skills. The earlier fixes (the ex-claude-md restart, the ex-rules auto-mode scope, the ex-hook command) are unchanged.",
+      "evidence": "All 3 issues that audit-cc-11-capstone.json confirmed are fixed in the current text: ex-prompt-skill 「起動後に `.claude/skills/` を新しく作ったときは、先に `/reload-skills` を実行します」, setup-prompt-model 「Pythonのスクリプトが開くファイルは防げません」, and card-ask without 必ず plus 「`git -C . push` のような別の書き方には一致しません」. The auto-mode start (「v2.1.283以降、ターミナルとVS Codeの対話セッション」) and dr-b2's limits on permission rules match cross-lesson-facts.md items 1, 3, 4 and 6. Version and date are pinned in the subtitle, and the hook command matches the docs recipe in facts-cc-11-capstone.md.",
       "blockIds": [
+        "ex-steps",
         "ex-prompt-skill",
-        "check-quiz",
-        "ex-steps"
-      ],
-      "carriedOver": true
+        "setup-prompt-model",
+        "dr-b2",
+        "summary-cards",
+        "ex-settings"
+      ]
     },
     {
       "id": "voice",
-      "score": 4,
-      "evidence": "Re-scored for the changed text. It keeps です・ます and a calm tone (「確認なしで使えます」; 「4分野で点検します」). sc-b1, the q4 hint and summary point 4 now use 分野 throughout, with no leftover 観点 (grep finds none). That keeps the course's terms apart from cc-03's glossary term 「4つの観点」. lint finds no banned phrase.",
+      "score": 3,
+      "evidence": "The text keeps です・ます, stays calm and has no banned phrases (lint clean), for example 「次は、演習3で決めた部品を足していきましょう。」. It slips once on its central term: sc-b1 calls an unmet checklist item a きっかけ (「当てはまらない項目が、次に足すもののきっかけです。」), while the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」.",
       "blockIds": [
         "sc-b1",
-        "sc-quiz",
-        "summary-points",
-        "ex-prompt-skill"
-      ],
-      "carriedOver": true
+        "lesson"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Re-scored for the changed table. dr-table's caption, headers and the restored cell are plain text, apart from the glossary link that the other rows also use (「[[サブエージェント]]（subagent、第7回）」). That suits fields that render without markdown. The table keeps 2 real header cells for screen readers. cycle-flow's alt text is complete, and the jp locale is complete.",
+      "evidence": "The jp locale is complete. cycle-flow's alt names all 5 stages and the loop back. The only link has descriptive text (「公式ドキュメントの日本語版」). Plain-text checklist labels use 「/clear」 instead of markdown code, and no text is baked into images.",
       "blockIds": [
-        "dr-table",
-        "cycle-flow"
-      ],
-      "carriedOver": true
+        "cycle-flow",
+        "summary-next",
+        "self-check-list"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Factual doubt: ex-prompt-skill's 「確認なしで使えます」 could be read as allowed-tools overriding the deny and ask rules that ex-rules just set. facts-cc-11-capstone.md says an allow 「cannot carve an exception out of a deny」, and the changelog fixed managed ask rules 「being bypassed by … skill allowed-tools」. Check this against cc-skills. If it holds, add after the sentence: 「拒否ルールは、それでも優先されます。」",
-    "sc-b1 calls an unmet checklist item a きっかけ, while the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
-    "dr-table row 1 has no verb (「CLAUDE.mdに1行（第6回）」), while the next rows name whole parts. For a clear action, change it to 「CLAUDE.mdに1行足す（第6回）」.",
+    "sc-b1 widens the glossary term きっかけ (「同じ困りごとが繰り返し起きること」) to mean an unmet checklist item. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
+    "p-claude-md (setup-steps) expects 「25行以内」 with no reason, while e3 a's feedback says 40 lines is within the official guide (「200行未満」). Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
     "c-review (cycle-steps) has no hint or troubleshoot. Add the hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
-    "c-commit (cycle-steps) has no hint. Add the hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
-    "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide (「200行未満」). Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
-    "worked (to reach 4): add a faded step before practice-setup. For example, add a question where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
+    "c-commit (cycle-steps) has no hint. Add the hint 「1行目が長すぎたら、「変えた内容を1行目に短く」と頼みます。」",
+    "worked (to reach 4): add a faded step before practice-setup. For example, add an inline item in which the learner picks the part for ③ (「整形の忘れが続いた」) before ex-steps reveals it, or leave one ex-steps item's md for the learner to complete.",
+    "cycle-prompt-plan is titled 「模範解答：計画の依頼文」, but c-plan tells the learner to send it (「下の依頼文を送ります」), so it is a template, not a model answer to check against. Change the title to 「計画の依頼文と、返ってくる計画の例」.",
+    "ex-hook (ex-steps ③) relies on `jq`, but the lesson never says it must be installed. Add the troubleshoot 「整形されないときは、`jq --version` で `jq` が入っているかを確かめます。」",
+    "ex-b1 says ① was set up on day 1, while ex-claude-md names a trigger that takes time to happen (「2回まちがえた」). To make the timeline clear, change ex-claude-md's md to 「初日に、Claudeがテストのコマンドを2回まちがえました。これがきっかけです。推測できないことだけを書きます。」",
+    "dr-table row 1 has no verb (「CLAUDE.mdに1行（第6回）」), while the brief's outline reads 「CLAUDE.mdに1行足す（第6回）」. Use the outline's wording so the row names an action.",
+    "Factual doubt: ex-prompt-skill's 「確認なしで使えます」 could be read as allowed-tools overriding the deny and ask rules that ex-rules just set. facts-cc-11-capstone.md (safety-7) says an allow 「cannot carve an exception out of a deny」. If cc-skills confirms that deny rules still win, add after that sentence: 「拒否ルールは、それでも優先されます。」",
+    "load: ex-prompt-skill's expect is the densest block. To lighten the example section, consider moving the /reload-skills paragraph into the note, next to the no-commit warning."
   ],
-  "average": 3.85,
+  "average": 3.69,
   "verdict": "pass",
-  "summary": "Verification round: review-scope exited 0. Only lesson.courseId changed (vibe-coding → claude-code, 1 of 71 parts, 2%), and no block, section or objective changed. The previous rounds left no open must-fix, so there are no resolved entries. I checked the change against content/courses/claude-code/course.json. The lesson title, estMinutes 19, the prerequisite titles, the 第n回 references and summary-next's 「全11回は終わりです」 all match the course, where cc-11-capstone is the last lesson with no next link. I found no regression. validate shows 0 errors and lint --strict shows 0 errors and 0 warnings. measure.mjs gives prose 1344 and est 19.3 min, against estMinutes 19. I re-scored prior, load and meta and carried over the other 10 criteria. Every criterion is 3 or higher and the mean is 3.85, so the verdict is pass. The niceToHave items are the same as in the previous round."
+  "summary": "Full review, because the lesson moved from the vibe-coding drafts to content/courses/claude-code/lessons/ and courseId changed, and the review gate no longer accepts the earlier chain under the old path. Its main strength is close alignment: one rule (start with CLAUDE.md, add a part when its trigger comes, and put secrets and push behind permission rules from day 1) runs through the hook, worked example, three authentic practice tasks, transfer exam items and accurate, cited facts. validate shows 0 errors, lint --strict shows 0 warnings, and measure.mjs gives est 19.3 min for estMinutes 19. There is no must-fix. The most useful improvements are a faded step before practice, a fuller hint ladder in cycle-steps, and using きっかけ only in its glossary sense in sc-b1."
 }

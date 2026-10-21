@@ -4,183 +4,164 @@
   "lessonHash": "sha256:1767d55f356db7d2",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:83c7a256e5bf982c",
-    "previousReview": ".artifacts/review/claude-code/cc-01-first-session/83c7a256e5bf982c/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "lesson.courseId"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "q3 still has objectiveId o3 and bloom understand. The prompt asks what happens in a fresh session, and the new answer c 「昨日の会話は見えないが、伝え直すか開き直せば続けられる」 tests that o3 idea. Every objective still has 2 or more graded questions (o1: q1, q5; o2: q2, q6; o3: q3, q4, q7, q8, q9).",
+      "evidence": "There are three can-do objectives with matching Bloom verbs: o1 「説明できる」 (understand), o2 「選べる」 (apply) and o3 「実行できる」 (apply). Each has an inline and an exam question: o1 q1/q5 (q0 is the ungraded predict), o2 q2/q6 at apply level, o3 q3/q4/q7/q8/q9, with q9 at analyze level.",
       "blockIds": [
-        "session-check",
         "loop-check",
         "surfaces-check",
+        "session-check",
         "example-check",
         "check-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-problem gives a concrete pain in three sentences (「ファイルを貼り付け、答えを書き写すことになりがちです」) and states the lesson's goal. The ungraded predict q0 uses chat, completion and memory as distractors, and the lesson corrects all three later.",
+      "evidence": "hook-problem sets a concrete problem in 3 sentences (「ファイルを貼り付け、答えを書き写すことになりがちです…何も貼らずに…聞けます」) and promises the commit goal. hook-predict q0 is an ungraded predict quiz on o1, and its distractors are chat, completion and memory. It has no trivia and no statistics.",
       "blockIds": [
         "hook-problem",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "I re-scored this because the lesson moved from the vibe-coding course to its own claude-code course, so its prerequisites now point into another course. The cross-course references still resolve. 「Gitのコミット（commit）の意味がわかる（バイブコーディング第5章）」 matches vibe-ch5 「第5章｜GitHubワークフロー完全理解」, and 「VS Codeを使ったことがある（バイブコーディング第3章）」 matches vibe-ch3 「第3章｜開発環境コックピット（VS Code）」. The p-commit troubleshoot 「バイブコーディング第5章の `git config`」 also still names a real chapter. The course name makes these references clear across the course boundary. The course description now says push is required (「Gitのcommitとpushの意味がわかる人向けです」), which partly closes the earlier push gap for learners who start from the course page. The lesson's own prerequisites still say only commit. Two gaps are unchanged: q2 and the cloud row depend on push, and install-how expands WSL only in English (「WSL（Windows Subsystem for Linux）」).",
+      "evidence": "The prerequisites name cd/ls, Git commit (バイブコーディング第5章), VS Code (第3章) and the plan. Each segment defines its terms before use in definitions blocks: loop-defs, surfaces-defs, session-defs and example-defs. One small gap: 「Consoleアカウント」 appears in install-needs one block before install-how explains it, and the q2/surfaces-table reliance on push is not stated in the prerequisites.",
       "blockIds": [
+        "install-needs",
         "install-how",
-        "surfaces-table",
-        "surfaces-check",
-        "practice-steps"
+        "loop-defs",
+        "surfaces-defs",
+        "session-defs",
+        "example-defs"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Re-scored because practice-steps grew. measure.mjs: 「prose 1659 (budget 1,200–2,400) · read 2483 · practice reading 842 · questions 10 · practice sections 1 · est 16.1 min (must be ≤ 20; estMinutes 16)」. Practice reading went from 801 to 842 characters, and the estimate still rounds to estMinutes 16. The p-start expect is now 3 short sentences (「初めてのフォルダでは、信頼の確認が出ます。自分で作ったフォルダなので、承認します。入力欄の上に `cc-practice` が表示されます。」), each well under 60 characters. 「信頼の確認」 is plain Japanese, not a new technical term. Lint --strict reports 0 errors and 0 warnings. The earlier load points (install segment term count, repeated table labels) are unchanged.",
+      "evidence": "measure.mjs gives 「prose 1659 (budget 1,200–2,400) · … est 16.1 min (must be ≤ 20; estMinutes 16)」, and lint --strict is clean. Each segment holds one idea with at most 3 new terms. The install section is the densest stretch: install-lead, install-needs, install-how, two code blocks, install-verify and a callout, with no check. It stays within budget.",
       "blockIds": [
-        "practice-steps",
+        "install-needs",
         "install-how",
-        "loop-table",
         "surfaces-table"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Re-scored because practice-steps changed. The ①–⑤ markers were removed from the step titles (「質問して、変更を1つ頼む」「予想してから差分を見る」「変更を説明してもらう」「コミットして確かめる」). The step bodies still point back to the example: 「1-5の①を送り」, 「1-5の②と同じく」 and 「1-5の⑤を送り」. p-diff and p-explain no longer cite ③ and ④, so the mapping from the example to the practice is a little weaker for those two steps. Their titles still mirror the example steps (「④ 変更を説明してもらう」 ↔ 「変更を説明してもらう」). The earlier gaps are unchanged: the example never shows the page being committed first, and practice-steps is the only level of fading.",
+      "evidence": "example-steps comes before practice. It has 5 labelled steps (①–⑤), each with its reason (「変える前に全体をつかむためです」「頼んでいない変更を見つけるためです」) and an expect, plus example-diff showing the result. practice-steps reuses the same flow with the learner's own change. That is not a true faded example with parts left blank, so it scores 3, not 4.",
       "blockIds": [
-        "practice-steps",
         "example-steps",
-        "example-diff"
-      ],
-      "carriedOver": true
+        "example-diff",
+        "practice-steps"
+      ]
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "q3's new c does not give the answer away. The density rule is met (q1–q4). q1-a still restates the loop-diagram description, while d (「原因を推測してコードを書き換え、そのまま完了と報告する」) differs in its opening, so q1 can still be answered by matching words.",
+      "evidence": "There are inline checks in loop, surfaces, session and first-session; only install has none, so the density holds. q2 (unpushed commits plus a closed laptop) and q4 (「完了しました」 before committing) are real application items, and every option has feedback. q1's correct option 「実行してエラーを読み、直してから、もう一度実行して確かめる」 nearly repeats the loop-diagram description 「実行してエラーを読み、直して、また実行します」, so q1 can be answered by matching words.",
       "blockIds": [
-        "session-check",
         "loop-check",
         "surfaces-check",
+        "session-check",
         "example-check"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Each wrong option of q3 has feedback of 2 sentences or fewer that names the misconception (a 「まっさらなコンテキストで始まります」, b 「フォルダが同じでも…昨日の会話は入りません」, d 「消えるのは会話の記憶で、ファイルではありません」). The other misconceptions from the brief are corrected in q0, q1, q5, install-node, q7-c, q4-a and q9-a.",
+      "evidence": "All five misconceptions in the brief are encoded and corrected with a reason in 2 sentences or fewer. Chat/autocomplete: q0-a/c, q1-b/c, q5-b/c. Memory: q3-a/b, q5-d. Node.js: install-node, q7-a. Free plan: q7-c. Trusting 「完了しました」: q4-a, q9-a/c. Example: q3-d 「消えるのは会話の記憶で、ファイルではありません」.",
       "blockIds": [
-        "session-check",
         "hook-predict",
         "loop-check",
+        "session-check",
         "install-node",
-        "check-quiz"
-      ],
-      "carriedOver": true
+        "check-quiz",
+        "example-check"
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Re-scored because loop-table and surfaces-table changed. Both tables keep 2 columns, and the first columns are now short (「チャット」「補完」「Claude Code」; 「CLI」「IDE拡張」「アプリ」「クラウド」), which gives the second column more room on a phone. Every cell now opens with the full name, so the header 「場面と、知っておくこと」 matches the content less well, and in the CLI row the label is repeated three times (see niceToHave). The diagram, its caption and alt, and the absence of decorative images are unchanged.",
+      "evidence": "loop-diagram is a 5-node process diagram whose labels match the definition (情報を集める → 行動する → 結果を確かめる). The caption states the takeaway (「確かめて足りなければ、情報を集める段階に戻る」), and the alt text describes both branches. The two 2-column tables compare things and are not decoration. The lesson has no images.",
       "blockIds": [
+        "loop-diagram",
         "loop-table",
-        "surfaces-table",
-        "loop-diagram"
-      ],
-      "carriedOver": true
+        "surfaces-table"
+      ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Re-scored because p-start changed. A learner on a first run now gets a warning about the folder-trust prompt instead of a surprise: 「初めてのフォルダでは、信頼の確認が出ます。」 The expect also gives a reason to approve (「自分で作ったフォルダなので、承認します。」), which models a sound rule for trusting a folder. Its success signal is still observable (「入力欄の上に `cc-practice` が表示されます。」). One weakness: the approve action now sits in expect, while md only says 「上のコマンドを1行ずつ実行します。」 (see niceToHave). Everything else is unchanged. The task is authentic and runs in a throwaway folder, every step has an expect, practice-checklist has 6 observable criteria, the hint ladder has at most two rungs (hint + troubleshoot), and p-commit has no hint.",
+      "evidence": "The practice is a hands-on task in a safe cc-practice folder: 6 steps, each with expect, hint and often troubleshoot, plus a model answer in practice-prompt-explain.expect and a 6-item practice-checklist as success criteria. The hint ladder has 2 rungs (hint, then troubleshoot), not 3, and the transfer is limited to choosing your own small change.",
       "blockIds": [
         "practice-steps",
+        "practice-prompt-page",
         "practice-prompt-explain",
         "practice-checklist"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points comes after the exam. summary-next asks a reflection question tied to the practice (「演習で、確認なしで進んだ操作はありましたか。」). The 7 cards match the body and are cited, and askTutor follows.",
+      "evidence": "The summary section comes after the check and has all four parts. summary-points has 5 points. summary-next asks a reflection question (「演習で、確認なしで進んだ操作はありましたか。」) and names the next step, 第2回. summary-cards has 7 flashcards that prompt retrieval rather than repeat the text, and there is an askTutor block.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "Re-scored because p-start changed. The added sentence 「初めてのフォルダでは、信頼の確認が出ます。」 agrees with the fact files: cross-lesson-facts.md item 8 treats a trust dialog for an untrusted folder as standard interactive behaviour (「`claude -p` … without a trust dialog」), and facts-cc-01-first-session.md lists the 「trust dialog」 as a built-in safeguard on the security page. It also matches cc-05 (「初めてのフォルダなので、信頼の確認が出ます。」) and cc-09 (「初めてのフォルダーでは、先に `claude` で信頼の確認に答えます。」). This addresses the first-start part of the previous round's factual doubt. practice-steps cites cc-quickstart, cc-terminal-guide and cc-how-it-works, and the lesson's sources do not include the security page, so I cannot trace the trust dialog to a cited page (niceToHave). The 「入力欄の上に `cc-practice` が表示されます」 detail is unchanged and still cannot be traced to a source.",
+      "evidence": "The installer commands, OS/RAM requirements, Node.js 22+ only for npm, JetBrains needing the CLI separately, the cloud clone-and-push rule, the fresh context per session and auto mode from v2.1.283 all match facts-cc-01-first-session.md and cross-lesson-facts.md. The three audit findings (q6-b, example-habit, q3-c) now read as the verified fixes, the version is pinned (v2.1.304) and every factual block has a cite. One UI detail in p-start is not in the evidence files (see niceToHave).",
       "blockIds": [
-        "practice-steps"
-      ],
-      "carriedOver": true
+        "install-unix",
+        "install-win",
+        "install-needs",
+        "surfaces-table",
+        "example-mode",
+        "example-habit",
+        "check-quiz"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored because install-how and both tables changed. The prose is in です・ます, warm, and has no banned phrases. Acronyms get their expansion at first use (API, WSL, CLI). The table cells are noun-phrase fragments, which is acceptable in a table. Glossary terms are still used in the cells (「クラウドセッション」). The code labels are still mixed: install-unix uses 「macOS・Linux・WSL」, while install-win uses 「PowerShell (Windows)」.",
+      "evidence": "The prose uses です・ます and a warm tone (「説明を求めながら学びましょう」「大切なプロジェクトには影響しません」), with no banned phrases (lint clean). Terms stay consistent with the glossary: エージェントループ, サーフェス, クラウドセッション, 差分. Table cells and options use plain form, which suits them.",
       "blockIds": [
-        "install-how",
-        "loop-table",
-        "surfaces-table",
-        "install-win"
-      ],
-      "carriedOver": true
+        "example-habit",
+        "practice-task",
+        "loop-table"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Re-scored because the table cells changed. Only jp is declared, and it is complete. The tables keep their captions (「見るものと、することの違い」「4つのサーフェスと、向いている場面」) and header rows, and each row starts with the full name, so a screen reader gets the meaning even though the labels are short. The diagram has Japanese labels and full alt text, and the links are descriptive.",
+      "evidence": "The lesson is jp only and has no missing locale. The diagram labels and alt text are in Japanese. The link texts say where they go (「公式ドキュメントの日本語版」「インストールのトラブルシューティング」), and no text is baked into images.",
       "blockIds": [
-        "loop-table",
-        "surfaces-table",
         "loop-diagram",
-        "install-lead"
-      ],
-      "carriedOver": true
+        "install-lead",
+        "practice-steps"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "lesson level vs course level (new with the move): the lesson has \"level\": \"beginner\", but content/courses/claude-code/course.json has \"level\": \"intermediate\". Choose one deliberately. The course-level prerequisites (cd/ls, commit and push) fit intermediate for the course, while beginner fits this first lesson. If the mismatch is intended, no change is needed.",
-    "prerequisites (raised again; the course description now says push): to match content/courses/claude-code/course.json, change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」. q2 and surfaces-table depend on push.",
-    "prerequisites (new with the move): now that バイブコーディング is a separate course, consider naming it as a course so learners know to look elsewhere: 「…（コース「バイブコーディング」第5章）」. The current text is still clear, so this is optional (ja-editor owns the wording).",
-    "practice-steps p-start: approving the trust prompt is something the learner does, but it appears only in expect. Move it into md and keep expect for the result. md: 「上のコマンドを1行ずつ実行します。初めてのフォルダでは信頼の確認が出るので、自分で作ったフォルダであることを確かめて承認します。」 expect: 「入力欄の上に `cc-practice` が表示されます。」 (ja-editor owns the final wording)",
-    "practice-steps p-start: the trust dialog is not on any page that practice-steps cites. Add the security page (https://code.claude.com/docs/en/security, which facts-cc-01-first-session.md names as covering the trust dialog) to sources as cc-security, and add it to practice-steps cite.",
-    "factual doubt (p-start expect): 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail. A safer wording, which matches cc-05: 「Claude Codeが起動し、入力欄が表示されます。」",
-    "practice-steps: restore the link to the example in the step bodies. p-diff md: 「1-5の③と同じく、変わる場所を予想してから、`/diff` を開きます。」 p-explain md: 「1-5の④として、下の「差分を説明してもらう依頼文」を送ります。」",
-    "install-how: WSL is expanded only in English. Second paragraph: 「macOS・Linux・WSL（Windows上で動くLinux環境）用は、2行で1つのコマンドです。WindowsのPowerShellでは、その下のコマンドを使います。」 (ja-editor owns the final wording)",
-    "loop-check q1: give d the same opening as a, so that only the 確かめる stage tells them apart. d md: 「実行してエラーを読み、直したところで完了と報告する」",
-    "install-win: to match install-unix's label, change filename to 「Windows（PowerShell）」.",
-    "check-quiz q8: set bloom to \"understand\"."
+    "loop-check q1 option a: its wording nearly repeats loop-diagram.description, so learners can match words instead of applying the loop. Replace option a's md with 「スクリプトを動かしてエラーの出どころを調べ、直したらもう一度動かして結果を見る」.",
+    "example-steps ex-diff and practice-steps p-diff: per interactive-mode.md (audit page copy), the /diff dialog first 「lists your changed files with their added and removed line counts」, and Enter opens a file's diff. A beginner may not find the changed lines. Set ex-diff.md to 「`/diff` で変わったファイルの一覧を開き、ファイルを選んでEnterで行を見ます。頼んでいない変更を見つけるためです。」 and add to p-diff.hint 「一覧でファイルを選んでEnterを押すと、変わった行が見えます。Escで閉じます。」",
+    "factual doubt: in practice-steps p-start, the expect 「入力欄の上に `cc-practice` が表示されます」 is not backed by facts-cc-01-first-session.md or audit-cc-01-first-session.json. terminal-guide only says you see 「the Claude Code welcome screen」. Consider replacing that sentence with 「Claude Codeの起動画面が表示されます。」",
+    "install-needs: 「Consoleアカウント」 is used one block before install-how explains it. Write the first item as 「有料プラン（Pro・Max・Team・Enterprise）か[[Consoleアカウント]]（無料プランは不可）」 so the glossary entry is reachable at first use.",
+    "prerequisites: surfaces-table, q2 and card-cloud depend on knowing what push is. Change the second prerequisite to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」.",
+    "practice-steps: a third hint rung on p-diff or p-explain (for example, a worked line from example-diff to compare against) would make the hint ladder complete (practice anchor 4).",
+    "session-check q3 is mapped to o3, but o3's text does not name the fresh-context idea that the session segment teaches. Consider making o3 mention it, or note in the brief that q3 assesses the 起動 part of o3."
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round. review-scope exited 0. Only lesson.courseId changed (vibe-coding → claude-code), 1 of 88 parts (2%). No blocks, sections or objectives changed. The previous review had no open must-fix items, and the round it verified had none either, so there are no resolved entries. I reviewed the change and its effects. The cross-course references (バイブコーディング第3章 and 第5章, the p-commit troubleshoot) still name real chapters. summary-next and the permission-mode glossary entry name 「第2回｜任せる範囲を決める：権限モードと巻き戻し」, which matches the next link to cc-02-permissions in course.json. The prompt blocks' target \"claude-code\" names the tool, not the course, so they are unaffected. The move caused no regressions, so there are no new must-fix items. I re-scored prior; it stays at 3. The other 12 criteria are carried over. validate shows 0 errors and lint --strict 0 warnings. measure.mjs gives prose 1659 and est 16.1 min (estMinutes 16). New nice-to-haves: the lesson level (beginner) differs from the course level (intermediate), and the prerequisites could match the course description's commit-and-push requirement."
+  "summary": "This is a full review because the lesson was published to content/courses/claude-code/lessons/ and the gate does not accept the earlier review chain recorded under the vibe-coding path. The lesson text is unchanged, validate and lint --strict are clean, and the length measures prose 1659 and est 16.1 min. Its biggest strength is alignment: three objectives, each assessed inline and in the exam, with misconception-driven feedback on every wrong option and a worked example (①–⑤ with reasons) before a practice with a checklist. There are no must-fix items; the most useful improvement is saying that /diff opens a file list first (ex-diff, p-diff) and making q1's correct option stop echoing the diagram description."
 }

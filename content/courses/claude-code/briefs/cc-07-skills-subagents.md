@@ -74,3 +74,6 @@
 | practice | practice | 演習：自分の手順をスキルにし、調べものを任せる | 自分の手順をスキルにして2通りで試し、サブエージェントの前後で `/context` を比べる | markdown, code bash, steps ×7 (hint/troubleshoot), prompt (claude-code), checklist, markdown, code yaml (模範解答) | — |
 | check | check | 確認テスト | 全目標の総まとめ（転移2問） | quiz exam ×5 | e1 → o1 (apply, transfer: チーム共有), e2 → o1 (analyze), e3 → o2 (evaluate, transfer: ライブラリ入れ替え前の洗い出し), e5 → o3 (understand), e6 → o3 (analyze) |
 | summary | summary | まとめ | 要点4つ、振り返りと次回（第8回）、復習カード6枚、AI先生 | summary, markdown, flashcards, askTutor | — |
+
+### After publishing (2026-10-21)
+- After publishing, a full pedagogy review found q6 answerable by matching words: its four options now describe situations without the s4 list wording (answer, ids and feedback unchanged).

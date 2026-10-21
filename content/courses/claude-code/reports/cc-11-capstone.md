@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-11-capstone (draft)
+# Report: claude-code/cc-11-capstone (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:c9d22545bc0d23db.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:cf71ff2e805d17bc.**
 
 - Title: 第11回 総合演習｜自分のリポジトリにClaude Code環境をつくる
-- Draft: `content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-11-capstone.md`
-- Level: intermediate · estMinutes 19 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-11-capstone.lesson.json` · brief: `content/courses/claude-code/briefs/cc-11-capstone.md`
+- Level: intermediate · estMinutes 19 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -37,35 +37,36 @@
 
 ```
 Review of cc-11-capstone by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json (sha256:c9d22545bc0d23db)
+  lesson content/courses/claude-code/lessons/cc-11-capstone.lesson.json (sha256:cf71ff2e805d17bc)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:423d9258076f1516 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-11-capstone/423d9258076f1516/lesson.json) · 0 resolved, 0 unresolved · 5 changed · carried over: hook, prior, visual, a11y_l10n · previous .artifacts/review/vibe-coding/cc-11-capstone/423d9258076f1516/round-1/pedagogy-reviewer.review.json and 4 earlier rounds checked
+  pedagogy-reviewer: full review
   visual-qa: full review
-  mean 3.77 (needs ≥ 3.3) · every criterion ≥ 3
+  mean 3.69 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer)
-  ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      4  (ja-editor, pedagogy-reviewer carried)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      4  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer)
   ✓ active     4  (pedagogy-reviewer)
   ✓ miscon     4  (pedagogy-reviewer)
-  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
   ✓ practice   3  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   4  (pedagogy-reviewer)
-  ✓ voice      4  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-11-capstone/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-11-capstone/`)
 
 1. `a0a5e3162b6d70c5`: ja-editor full revise (mean 3.50, must-fix 12); pedagogy-reviewer full revise (mean 3.08, must-fix 7)
 2. `ae84a43eacd96ce5`: ja-editor full pass (mean 3.75, must-fix 0); pedagogy-reviewer full revise (mean 3.77, must-fix 1)
 3. `054759c1db95b6c4`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0)
 4. `984f34269dfb6574`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0)
-5. `3122649e3d005674`: ja-editor verify fail (mean 3.75, must-fix 1); pedagogy-reviewer verify revise (mean 3.77, must-fix 1); visual-qa full pass (mean 3.67, must-fix 0)
-6. `423d9258076f1516`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
-7. `c9d22545bc0d23db`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `c9d22545bc0d23db`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `3122649e3d005674`: ja-editor verify fail (mean 3.75, must-fix 1); pedagogy-reviewer verify revise (mean 3.77, must-fix 1); visual-qa full pass (mean 3.67, must-fix 0)
+7. `423d9258076f1516`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.33, must-fix 0)
+8. `cf71ff2e805d17bc`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -77,7 +78,7 @@ An auditor with web access checked 60 claims (pages: 22); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-11-capstone --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-11-capstone/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-11-capstone --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-11-capstone/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 

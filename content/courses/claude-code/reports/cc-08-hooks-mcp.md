@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-08-hooks-mcp (draft)
+# Report: claude-code/cc-08-hooks-mcp (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:112a650daf9ca3d0.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:02bb8902d1916464.**
 
 - Title: 第8回｜フックで守らせ、MCPでつなぐ
-- Draft: `content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-08-hooks-mcp.md`
-- Level: intermediate · estMinutes 18 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-08-hooks-mcp.lesson.json` · brief: `content/courses/claude-code/briefs/cc-08-hooks-mcp.md`
+- Level: intermediate · estMinutes 18 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -39,35 +39,36 @@
 
 ```
 Review of cc-08-hooks-mcp by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json (sha256:112a650daf9ca3d0)
-  ja-editor: verification of sha256:dc1fce75fb87584d (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/lesson.json) · 0 resolved, 0 unresolved · 3 changed · carried over: none · previous .artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/ja-editor.review.json and 2 earlier rounds checked
-  pedagogy-reviewer: verification of sha256:dc1fce75fb87584d (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/lesson.json) · 0 resolved, 0 unresolved · 3 changed · carried over: hook, prior, worked, visual · previous .artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
+  lesson content/courses/claude-code/lessons/cc-08-hooks-mcp.lesson.json (sha256:02bb8902d1916464)
+  ja-editor: full review
+  pedagogy-reviewer: full review
   visual-qa: full review
-  mean 3.77 (needs ≥ 3.3) · every criterion ≥ 3
+  mean 3.85 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer)
-  ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      4  (ja-editor, pedagogy-reviewer carried)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      4  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     4  (pedagogy-reviewer carried)
+  ✓ worked     4  (pedagogy-reviewer)
   ✓ active     4  (pedagogy-reviewer)
   ✓ miscon     4  (pedagogy-reviewer)
-  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
   ✓ practice   4  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-08-hooks-mcp/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-08-hooks-mcp/`)
 
 1. `aa4125dd945c908e`: ja-editor full revise (mean 3.50, must-fix 8); pedagogy-reviewer full revise (mean 3.08, must-fix 5)
 2. `876f9427367ec7c6`: ja-editor full revise (mean 3.75, must-fix 4); pedagogy-reviewer full revise (mean 3.15, must-fix 2)
-3. `4e07cfeed4cb390f`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.54, must-fix 1); visual-qa full revise (mean 3.00, must-fix 3)
-4. `542dc5e44070249d`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.62, must-fix 1); visual-qa full revise (mean 3.00, must-fix 2)
-5. `01fa366fee4752fb`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+3. `01fa366fee4752fb`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+4. `112a650daf9ca3d0`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `542dc5e44070249d`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.62, must-fix 1); visual-qa full revise (mean 3.00, must-fix 2)
 6. `dc1fce75fb87584d`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-7. `112a650daf9ca3d0`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `4e07cfeed4cb390f`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.54, must-fix 1); visual-qa full revise (mean 3.00, must-fix 3)
+8. `02bb8902d1916464`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -81,7 +82,7 @@ An auditor with web access checked 55 claims (pages: 21); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-08-hooks-mcp --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-08-hooks-mcp/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-08-hooks-mcp --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-08-hooks-mcp/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 

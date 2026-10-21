@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-01-first-session (draft)
+# Report: claude-code/cc-01-first-session (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:83c7a256e5bf982c.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:1767d55f356db7d2.**
 
 - Title: 第1回｜最初のタスクを任せる
-- Draft: `content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-01-first-session.md`
-- Level: beginner · estMinutes 16 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-01-first-session.lesson.json` · brief: `content/courses/claude-code/briefs/cc-01-first-session.md`
+- Level: beginner · estMinutes 16 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -39,34 +39,35 @@
 
 ```
 Review of cc-01-first-session by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json (sha256:83c7a256e5bf982c)
-  ja-editor: verification of sha256:9251fd0014082e5c (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/ja-editor.review.json and 3 earlier rounds checked
-  pedagogy-reviewer: verification of sha256:9251fd0014082e5c (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, worked, active, miscon, visual, meta, voice, a11y_l10n · previous .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/pedagogy-reviewer.review.json and 3 earlier rounds checked
+  lesson content/courses/claude-code/lessons/cc-01-first-session.lesson.json (sha256:1767d55f356db7d2)
+  ja-editor: full review
+  pedagogy-reviewer: full review
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      4  (pedagogy-reviewer carried)
-  ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ align      4  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer carried)
-  ✓ active     3  (pedagogy-reviewer carried)
-  ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer)
+  ✓ active     3  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
   ✓ practice   3  (pedagogy-reviewer)
-  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   3  (pedagogy-reviewer)
-  ✓ voice      3  (ja-editor, pedagogy-reviewer carried)
-  ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-01-first-session/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-01-first-session/`)
 
 1. `a0e5c8baccf55921`: ja-editor full revise (mean 3.25, must-fix 11); pedagogy-reviewer full revise (mean 3.00, must-fix 4)
 2. `d8b090b9a8da1f4f`: ja-editor full revise (mean 3.25, must-fix 2); pedagogy-reviewer full pass (mean 3.38, must-fix 0)
-3. `3ebe60f3a0474749`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
-4. `eb6d40faa5d6fe69`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 3)
-5. `9251fd0014082e5c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `83c7a256e5bf982c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+3. `eb6d40faa5d6fe69`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 3)
+4. `83c7a256e5bf982c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `3ebe60f3a0474749`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
+6. `9251fd0014082e5c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `1767d55f356db7d2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -78,7 +79,7 @@ An auditor with web access checked 85 claims (pages: 29); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-01-first-session --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-01-first-session/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-01-first-session --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-01-first-session/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 

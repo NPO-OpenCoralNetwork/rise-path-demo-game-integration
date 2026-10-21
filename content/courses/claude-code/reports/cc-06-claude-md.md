@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-06-claude-md (draft)
+# Report: claude-code/cc-06-claude-md (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:2b49a5e74f15af83.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:e4875adb69003830.**
 
 - Title: 第6回｜CLAUDE.mdで前提を伝える
-- Draft: `content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-06-claude-md.md`
-- Level: intermediate · estMinutes 19 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-06-claude-md.lesson.json` · brief: `content/courses/claude-code/briefs/cc-06-claude-md.md`
+- Level: intermediate · estMinutes 19 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -39,15 +39,15 @@
 
 ```
 Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json (sha256:2b49a5e74f15af83)
-  ja-editor: verification of sha256:0913750984346c84 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: voice, load, a11y_l10n · previous .artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/round-1/ja-editor.review.json and 3 earlier rounds checked
+  lesson content/courses/claude-code/lessons/cc-06-claude-md.lesson.json (sha256:e4875adb69003830)
+  ja-editor: full review
   pedagogy-reviewer: full review
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      3  (pedagogy-reviewer)
   ✓ hook       4  (pedagogy-reviewer)
   ✓ prior      3  (ja-editor, pedagogy-reviewer)
-  ✓ load       3  (ja-editor carried, pedagogy-reviewer, visual-qa)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer)
   ✓ active     3  (pedagogy-reviewer)
   ✓ miscon     3  (pedagogy-reviewer)
@@ -55,18 +55,19 @@ Review of cc-06-claude-md by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ practice   4  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   4  (pedagogy-reviewer)
-  ✓ voice      3  (ja-editor carried, pedagogy-reviewer)
-  ✓ a11y_l10n  4  (ja-editor carried, pedagogy-reviewer, visual-qa)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-06-claude-md/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-06-claude-md/`)
 
 1. `77b9fd93b84c6577`: ja-editor full revise (mean 3.50, must-fix 16); pedagogy-reviewer full revise (mean 3.08, must-fix 9)
 2. `5e95f5eafa612ea0`: ja-editor full revise (mean 3.25, must-fix 4); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
-3. `6b93b57324d9ed64`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify revise (mean 3.23, must-fix 1); visual-qa full revise (mean 2.67, must-fix 4)
-4. `a2581804ebc9fe6d`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 2)
-5. `0913750984346c84`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `2b49a5e74f15af83`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+3. `0913750984346c84`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+4. `2b49a5e74f15af83`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `a2581804ebc9fe6d`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 2)
+6. `6b93b57324d9ed64`: ja-editor verify revise (mean 3.25, must-fix 1); pedagogy-reviewer verify revise (mean 3.23, must-fix 1); visual-qa full revise (mean 2.67, must-fix 4)
+7. `e4875adb69003830`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -80,7 +81,7 @@ An auditor with web access checked 60 claims (pages: 14); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-06-claude-md --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-06-claude-md/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-06-claude-md --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-06-claude-md/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 

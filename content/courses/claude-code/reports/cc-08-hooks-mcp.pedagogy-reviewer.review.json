@@ -4,103 +4,99 @@
   "lessonHash": "sha256:02bb8902d1916464",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:112a650daf9ca3d0",
-    "previousReview": ".artifacts/review/claude-code/cc-08-hooks-mcp/112a650daf9ca3d0/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "lesson.courseId"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "There are still three objectives, and each is assessed by at least 3 questions (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8). The changed q4 and q9 keep objectiveId o3 and bloom evaluate. The q4 stem still asks for the first thing to check before installing (「入れる前に、いちばん優先して確かめることはどれでしょう？」). The rewritten q9 options a and d still make the learner judge A and B together. The transfer items q5 and q8 are unchanged.",
+      "evidence": "There are three can-do objectives: o1 apply 「設定を書ける」, o2 understand 「説明できる」 and o3 evaluate 「判断できる」. Each is assessed by 3 or more questions with an objectiveId: o1 by q0, q1, q2 and q5; o2 by q3, q6 and q7; o3 by q4, q9 and q8. q1 and q5 are apply items, q2 is analyze, and q8 and q9 are evaluate.",
       "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s2-check",
+        "s3-check",
         "s5-check",
         "practice-b-quiz",
         "check-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-problem sets out a concrete failure in 2 sentences (「CLAUDE.mdに「`.env` は編集しないこと」と書いたのに、Claudeが `.env` を書き換えようとしました。」) and adds a version line. hook-predict is ungraded, and option d (Manual) is a real near-miss. The q0 explanation names 「第2回の拒否ルールのように」 as another mechanism.",
+      "evidence": "hook-problem states a concrete failure in 2 sentences: 「CLAUDE.mdに「`.env` は編集しないこと」と書いたのに、Claudeが `.env` を書き換えようとしました。」. A version line follows it. hook-predict is an ungraded predict quiz with real near-misses: 「太字で「絶対に」」, the per-request reminder, and Manual mode. Its explanation leads straight into the lesson (「このレッスンでは、その仕組みのひとつ、フックを作ります。」).",
       "blockIds": [
         "hook-problem",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Re-scored because courseId changed. The three lesson prerequisites (「第2回｜任せる範囲を決める：権限モードと巻き戻し」「第6回｜CLAUDE.mdで前提を伝える」「第7回｜手順はスキルに、調べものはサブエージェントに」) match the titles of cc-02-permissions, cc-06-claude-md and cc-07-skills-subagents word for word. All three lessons now have courseId claude-code, and course.json puts them before this lesson (m1 and m3), so the recalls in s1-lead (「第6回のとおり」「第2回の権限ルールやフック」) and s5-lead (「第7回のスキルやサブエージェントは」) point to lessons in the same course. jq and JSON editing are still listed, and s2-setup still starts with `jq --version`. The `onFailure` gloss gap in s3-pitfall remains (unchanged block).",
+      "evidence": "The prerequisites name 第2回, 第6回 and 第7回, plus jq and JSON editing, and s2-setup starts with `jq --version`. s1-lead recalls 「第6回のとおり」 and s5-lead recalls 「第7回のスキルやサブエージェントは」. Each segment defines its new terms in a definitions block before using them, with the same wording as the glossary (s1-defs, s2-defs, s4-defs, s5-defs). エージェントループ and リンター（linter） were taught in cc-01 and cc-04. The only small gap is the unglossed `onFailure` in s3-pitfall (see niceToHave).",
       "blockIds": [
         "s1-lead",
-        "s5-lead",
         "s1-defs",
-        "s3-pitfall"
+        "s2-defs",
+        "s4-defs",
+        "s5-defs",
+        "s2-setup"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs prints 「prose 1897 (budget 1,200–2,400) · read 2883 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)」. Prose grew by only 5 characters, and estMinutes 18 still matches the estimate rounded. The added gloss 「PR（プルリクエスト）」 keeps the q4 first sentence near 45 characters. The new first paragraph of summary-next (the question plus the guide sentence) is about 90 visible characters. lint --strict reports 0 warnings.",
+      "evidence": "measure.mjs prints 「prose 1897 (budget 1,200–2,400) · read 2883 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)」, and estMinutes 18 is the rounded estimate. lint --strict reports 0 warnings, and no segment adds more than 3 new terms (s4: MCP, MCPサーバー, スコープ). Each screen breaks the text with a table, a code block, a diagram or a check.",
       "blockIds": [
-        "s5-check",
-        "practice-b-quiz",
-        "summary-next"
-      ],
-      "carriedOver": true
+        "s1-config",
+        "s2-steps",
+        "s3-table",
+        "s4-scopes",
+        "s5-checks"
+      ]
     },
     {
       "id": "worked",
       "score": 4,
-      "evidence": "The s2 worked example is complete. ex-test says 「下の③の最初の4行は1つのコマンドで」, which matches s2-test. Its expect names what to swap (「`rm notes.txt` を `ls` に変えると `0` です」). The practice fades the example with the same JSON layout (p-predict).",
+      "evidence": "s2 is a full worked example: the script, its registration, then 3 steps with subgoal titles (「① スクリプトを書く」「② 実行を許可して登録する」「③ 予想してから、手で試す」). Each step says why (「`exit 2` は「止める」の合図で…」) and gives an expect and a troubleshoot. The practice then fades it (「例題と違うのは、マッチャーと取り出す項目です。」) with the same JSON test layout (p-predict hint), and part 2 is an independent evaluation.",
       "blockIds": [
         "s2-script",
+        "s2-settings",
         "s2-steps",
         "s2-test",
         "practice-steps"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "active",
       "score": 4,
-      "evidence": "There are inline checks in s1, s2, s3, s5 and the practice. q9 remains an evaluate item with crossed A×B options, and every wrong option has feedback (b 「社内製でも、課題には社外の人が書いた文章が混ざります。」, c 「閉じるツールは、権限ルールで外せます。」, d 「フックが外から取ってくるスクリプトは前もって確かめられません。」). Options a and d now share the same A half (「Aは閉じるツールを拒否ルールで外して試し」), so the item still hinges on the B judgment and gives nothing away. The model tables still come after the quiz. The q4 change is a gloss only. The correct answer for q9 is still in first position.",
+      "evidence": "There are inline checks in s1, s2, s3, s5 and the practice, so no two content sections in a row go without one (s4 sits between the s3 and s5 checks). They include q1, an apply item (choose PostToolUse for 「編集したら、毎回そのテストを実行する」), and q2, an analyze item (`cd docs && rm notes.txt` is not blocked; `rmdir old` is). Every wrong option has feedback. q4 is close to recognition right after s5-pitfall (see niceToHave).",
       "blockIds": [
-        "practice-b-quiz",
-        "s5-check",
         "s1-check",
         "s2-check",
-        "s3-check"
-      ],
-      "carriedOver": true
+        "s3-check",
+        "s5-check",
+        "practice-b-quiz"
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "All 6 misconceptions in the brief are still corrected with a reason, and the feedback on q4 and q9 did not change. 「社内製なら安全」 is corrected in q9 b, 「作者とソースがわかれば入れてよい」 in q9 d (「フックは権限ルールでも絞れません」), and 「公式なら安全」 in q4 d (「マーケットプレイスの名前は、カタログの出し手を示すだけです。」). The new wording in options a and d (「拒否ルールで外して」) also stops learners from thinking an allow rule removes a tool. That fits cc-02-permissions, where a tool that matches no rule falls to the permission mode (「権限モードに従う」).",
+      "evidence": "All six misconceptions in the brief are named and corrected with a reason. (1) CLAUDE.md as a guarantee: q0 a/b, q7 b. (2) 「`exit 1` で止まる」: s3-pitfall, q3 a, q5 b. (3) 「`exit 0` は許可」: s3-zero 「止めないだけで、許可ではありません」, q3 d. (4) PostToolUse undo: q6 b. (5) The condition covers everything: q2 d 「条件は、書いた文字の並びだけを見ています」 and the practice-prompt note on Bash writes. (6) Official means safe: q4 d, q8 b, q9 b/d. Each feedback is 2 sentences or fewer.",
       "blockIds": [
-        "practice-b-quiz",
-        "s5-check",
         "hook-predict",
+        "s3-pitfall",
         "s3-zero",
+        "s3-check",
+        "s2-check",
+        "s5-check",
+        "practice-b-quiz",
         "check-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s1-lifecycle is a 6-node process diagram with Japanese labels that match the text. The edge 「通す（権限の確認へ）」 agrees with s3-table. The caption states the takeaway, and the alt text describes both paths. All tables have 2 columns, and there are no decorative images.",
+      "evidence": "s1-lifecycle is a process diagram with 6 nodes. Its labels use the text's terms (PreToolUse, PostToolUse and Stop フック; 「通す（権限の確認へ）」 matches s3-table). The caption gives the takeaway (「PreToolUseフックは、ツールの実行を止められます。」), and the alt describes both paths. Every table has 2 columns and a caption, and there are no decorative images.",
       "blockIds": [
         "s1-lifecycle",
         "s3-table",
@@ -108,78 +104,79 @@
         "s5-checks",
         "practice-b-model",
         "practice-b-model-b"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "practice",
       "score": 4,
-      "evidence": "Part 1 is unchanged: it is authentic and faded, has a hint ladder and lists 5 success criteria in practice-checklist. In part 2, q9 option a (「閉じるツールを拒否ルールで外して試し」) agrees with the model write-up practice-b-model-b (「閉じるツールは権限ルールで外せる」) and with the facts in practice-b-task (「課題を読むツールと閉じるツールを持ち」). The hint 「8-5の表の6項目を…埋めてから比べましょう」 still fits.",
+      "evidence": "The task is authentic: protect `.env` with a PreToolUse hook, predict, test by hand, then confirm through Claude with practice-prompt. The help comes in layers: step hints, then troubleshoot, then the model answer (practice-model-script and practice-model-settings). Part 2 is a transfer evaluation of two fictional candidates, with model write-ups placed after q9. practice-checklist gives 5 observable success criteria (「cat .envで、中身が変わっていないことを確かめました」).",
       "blockIds": [
+        "practice-steps",
+        "practice-prompt",
+        "practice-model-script",
+        "practice-model-settings",
         "practice-b-task",
         "practice-b-quiz",
         "practice-b-model",
         "practice-b-model-b",
         "practice-checklist"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "Re-scored because courseId changed. summary-next names 「次は「第9回｜並列で進める・自動で回す」です。」. That matches the title of cc-09-parallel-automation (courseId claude-code) and the course.json entry for this lesson (`\"next\": {\"lessonId\": \"cc-09-parallel-automation\"}`), so the text and the course link agree. summary-points (4 points) still comes after the exam. summary-next still opens with the reflection question 「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」. There are 7 flashcards.",
+      "evidence": "summary-points has 4 points and comes after the exam. summary-next opens with a reflection prompt (「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」), links the Japanese hooks guide and names 「第9回｜並列で進める・自動で回す」. summary-cards has 7 flashcards, and askTutor offers 3 follow-ups.",
       "blockIds": [
-        "summary-next",
         "summary-points",
-        "summary-cards"
+        "summary-next",
+        "summary-cards",
+        "summary-tutor"
       ]
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "No new claim in the changes lacks support. Removing the close tool with a deny rule agrees with this course's own permission model (cc-02-permissions diagram: 「許可ルールに一致？」 →いいえ→ 「権限モードに従う」). It also agrees with facts-cc-08-hooks-mcp.md (「set permissions for MCP tools (e.g. deny `mcp__*`, or allow only `mcp__<server>__*`)」). The block keeps cite [cc-plugin-security, cc-mcp]. The gloss 「PR（プルリクエスト）」 is correct and matches cc-09 (「PR（プルリクエスト）」). The link URL is unchanged. validate reports 0 errors and lint --strict reports 0 warnings.",
+      "evidence": "All 5 findings in audit-cc-08-hooks-mcp.json are already in the text: 「ふつう」 plus the `onFailure` exception in s3-pitfall and card-exit1, q6 limited to PostToolUse and stating stderr, 「処理（ここではコマンド）」 in s1-config, and the `/hooks` expect without the matcher. hook-problem pins the version to v2.1.304. Non-obvious claims cite official pages: 「AnthropicはMCPサーバーを監査していません」 cites cc-security, and the scopes cite cc-mcp. The brief records that the scripts and test commands were run.",
       "blockIds": [
-        "practice-b-quiz",
-        "s5-check",
-        "summary-next"
-      ],
-      "carriedOver": true
+        "s3-pitfall",
+        "check-quiz",
+        "s1-config",
+        "practice-steps",
+        "s5-risk",
+        "s4-scopes",
+        "hook-problem"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text uses です・ます and a soft tone (「確かめましょう。」「どれでしょう？」). 「拒否ルール」 is the course term from cc-02 (「拒否ルール（deny）」) and also appears in this lesson's q0 explanation and a flashcard (「フックと拒否ルール（deny）は、どう使い分ける？」). There are no banned phrases. The ja-editor owns the wording.",
+      "evidence": "The lesson keeps です・ます and a warm tone throughout (「詰まったら、次の模範解答と比べます。」「予想してから、手で試す」), with no banned phrases. Terms stay consistent: 「権限の確認」「標準エラー出力」「拒否ルール」. Some phrasing still reads translated or clipped, such as 「止めないエラー」 (non-blocking error) and 「ネット越しのサーバー」 in s4-add. The ja-editor owns these.",
       "blockIds": [
-        "practice-b-quiz",
-        "s5-check",
-        "summary-next"
-      ],
-      "carriedOver": true
+        "s3-table",
+        "s4-add",
+        "practice-model-intro"
+      ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The only locale (jp) is complete, and the link text is still descriptive (「フックの公式ガイド（日本語）」) after it moved to the first paragraph of summary-next. The diagram labels are in Japanese, and the alt text covers both paths. Plain-text fields carry no markdown.",
+      "score": 4,
+      "evidence": "jp is the only declared locale and it is complete. The diagram labels are Japanese, s1-lifecycle has a descriptive alt, and every table has a caption. The link text in summary-next is descriptive (「フックの公式ガイド（日本語）」). No text is baked into images.",
       "blockIds": [
-        "summary-next",
         "s1-lifecycle",
-        "practice-checklist",
-        "practice-prompt"
-      ],
-      "carriedOver": true
+        "summary-next"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-b-quiz q9 (unchanged, still open): option a says 「拒否ルールで外して」, but the explanation and the c feedback say 「権限ルールで外し」 and 「権限ルールで外せます」. Change the second explanation sentence to \"Aは閉じるツールを拒否ルールで外し、課題に紛れた指示も考えて、読むツールだけで試します。許可ルールだけでは、閉じるツールは権限モードしだいで動けてしまいます。\" and the c feedback to \"閉じるツールは、拒否ルールで外せます。出どころと作者がわかるAは、読むツールだけで試せます。\"",
-    "practice-b-quiz q9 and check-quiz q7 (unchanged, still open): the correct option is first in array order, and the reader keeps array order. Put q9's options in the array order b, c, a, d.",
-    "summary-next (unchanged, still open): give the reflection question its own paragraph: \"あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？\\n\\nフックの最新の情報は、[フックの公式ガイド（日本語）](https://code.claude.com/docs/ja/hooks-guide)で確かめましょう。\\n\\n次は「第9回｜並列で進める・自動で回す」です。複数の作業を並行して動かし、自動化する方法を学びます。\"",
-    "s3-pitfall (unchanged, still open): add a gloss for `onFailure` where it first appears: \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
-    "s4 (unchanged, still open): no question covers scopes, yet summary-points[2] and card-scopes are about them. Either add a q8 distractor about committing to `.mcp.json` at `project` scope before trying the server at `local` scope, or shorten summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
-    "s3-check q3 (unchanged, still open): option b repeats the s3-table phrase 「hook error」, so learners can pick it by that phrase alone. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\".",
-    "check-quiz q8 (unchanged, still open): add \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\" to the explanation."
+    "s5-check q4: option a is the only option about what the plugin contains, and s5-pitfall has just said 「中身は自分で確かめます」, so the item is close to recognition. Replace option b with a content-related distractor so the item tests priority: md 「READMEの機能説明が、自分の使い方に合っているか」, feedback 「機能の説明は、中で何が動くかを教えてくれません。`hooks/hooks.json` や `.mcp.json` で、実行されるものを確かめます。」.",
+    "s4 / summary-points[2]: the `claude mcp add` commands and the three scopes are taught and summarised (「MCPサーバーは `claude mcp add` で追加し、スコープを選びます。」), but no objective names them and only card-scopes and a q8 distractor touch them. Either reframe the summary point toward o3 (for example 「MCPサーバーは、スコープで使える範囲が決まります。`project` はチーム全員に効くので、入れる前に確かめます。」) or add a short inline check in s4 tied to o3, such as which scope shares a server with the team.",
+    "s3-pitfall: `onFailure` appears without a gloss, yet q3's stem relies on it (「`onFailure` は設定していません」). Suggested text: 「フックの設定項目 `onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。」",
+    "factual doubt: facts-cc-08-hooks-mcp.md (Missed items, safety) says that without managed settings or a Team/Enterprise login, a plugin mod can approve a call that a PreToolUse hook blocked. s3-zero (「`exit 2` は、どの権限モードでも操作を止めます」) is still true as written, because it is about permission modes. Still, a one-line mention in s5-risk would strengthen o3, for example 「プラグインに含まれるモッド（mod）は、フックが止めた操作を許可できる場合もあります。」 with cite cc-plugin-security. Check the exact wording against the mods page first.",
+    "s2-lead: only ex-register says the hands-on part is for macOS/Linux (「macOSとLinuxでは」). Stating the environment up front would save Windows learners a dead end, for example 「macOS・Linux（WSLを含む）のbashで進めます。」.",
+    "check-quiz q7: answer a (「フックが、Claudeの判断とは関係なく編集を止める」) echoes the q0 explanation almost word for word, and the item mostly tests hooks versus CLAUDE.md rather than exit codes (o2). Consider rewording the stem so the learner has to use `exit 2` itself, for example by naming in the stem that the hook ends with `exit 2` while the CLAUDE.md line is missing."
   ],
-  "average": 3.85,
+  "average": 3.92,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0. Only lesson.courseId changed (1 of 91 parts, 2%; 0 of 49 blocks), so this is not a full review. The previous review had no open must-fix items, so `resolved` is empty. I re-scored prior and meta against the published course. All prerequisite titles and the next-lesson note 「第9回｜並列で進める・自動で回す」 match the claude-code lessons and the course.json next link to cc-09-parallel-automation. The change caused no regression: validate reports 0 errors, lint --strict reports 0 warnings, and measure.mjs gives est 17.8 against estMinutes 18. Every criterion is 3 or higher, and the mean is 3.85. The most useful remaining polish is the q9 wording: it uses both 拒否ルール and 権限ルール (niceToHave)."
+  "summary": "Full review after the move to content/courses/claude-code/lessons/: validate 0 errors, lint --strict 0 warnings, est 17.8 min matching estMinutes 18. The biggest strength is the line from worked example to practice: block-rm.sh with predicted manual tests, then a faded protect-files task with layered hints and a 5-item checklist, then a two-candidate evaluation with model write-ups. Every misconception in the brief is corrected in option feedback. No must-fix: the most useful improvements are a content-related distractor for q4 and tying s4's MCP commands and scopes to an objective or a check."
 }

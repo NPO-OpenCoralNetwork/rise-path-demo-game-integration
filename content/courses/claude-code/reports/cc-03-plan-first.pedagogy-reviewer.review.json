@@ -1,197 +1,183 @@
 {
   "lessonId": "cc-03-plan-first",
-  "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:8ad1a10792b712d4",
+  "file": "content/courses/claude-code/lessons/cc-03-plan-first.lesson.json",
+  "lessonHash": "sha256:a0ee84f2b69dd0e5",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:a69e9dc117810e75",
-    "changed": [
-      "s3-steps",
-      "practice-steps",
-      "practice-spec-steps"
-    ],
-    "changedShare": 0.04,
-    "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/a69e9dc117810e75/round-1/pedagogy-reviewer.review.json"
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "All three objectives are can-do statements, and each has 2 or more items with objectiveId, at least one at apply level or above: o1 has q1 (apply) and e1 (analyze); o2 has q2, q3 and e4 (evaluate), plus q0 (predict); o3 has q4 and e5 (apply). o3 is a create objective but is tested by apply-level multiple choice; the create step itself happens in practice-spec.",
+      "evidence": "Each of the three can-do objectives has at least 2 questions with objectiveId, and at least one of them is at apply level or higher. o1 has q1 (apply) and e1 (analyze). o2 has q2, q3 and e4 (evaluate), plus the ungraded q0. o3 has q4 and e5 (apply). o3 is a create objective, but multiple choice only tests parts of it. The full create task happens in practice-spec.",
       "blockIds": [
+        "hook-predict",
         "s1-check",
         "s2-check",
         "s3-check",
         "s4-check",
-        "check-quiz",
-        "hook-predict"
-      ],
-      "carriedOver": true
+        "check-quiz"
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-problem is a concrete scenario in 2 sentences (「ほしかったのは、スマートフォンでボタンがはみ出すのを直すことだけでした」) with no trivia, and s1-example and s3-steps later solve exactly this problem. q0 is ungraded, and each of its distractors encodes a brief misconception (stronger adjectives, Manual mode, /rewind).",
+      "evidence": "hook-problem is a concrete 2-sentence scenario with no trivia: 「ほしかったのは、スマートフォンでボタンがはみ出すのを直すことだけでした」. s1-example and s3-steps later solve exactly this problem. q0 is a predict item, and its distractors are brief misconceptions: stronger adjectives, Manualモード, and `/rewind`.",
       "blockIds": [
         "hook-problem",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
-      "score": 4,
-      "evidence": "The rewrite of s1-table into a list removes the jargon that needed glosses (モック and ウィジェット are gone). Every item now just names what to write under each heading, such as 「**参照先**には、@参照するファイル、URL、Gitの履歴など、読ませたい情報源を書きます。」, which uses @参照 just after s1-defs defines it. The earlier small gap stays: package.json in q3 is never explained.",
+      "score": 3,
+      "evidence": "Prerequisites name 第1回 and 第2回, and s2-defs recalls the earlier lesson (「第2回で見た権限モードの1つです」). @参照, 4つのフェーズ, 差分 and 仕様 are defined before use and match the glossary. One term is never explained: package.json is used in q3 (s3-check) without a gloss, although the lesson's level is beginner.",
       "blockIds": [
         "s1-defs",
-        "s1-table",
+        "s2-defs",
         "s4-defs",
         "s3-check"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "load",
-      "score": 3,
-      "evidence": "measure.mjs now prints 「prose 2393 (budget 1,200–2,400) · read 3059 · practice reading 1442 · questions 8 · practice sections 2 · est 19.3 min (must be ≤ 20; estMinutes 19)」. Removing the circled numbers from the 16 step titles cut prose by 6 characters (it was 2399), and est still matches estMinutes 19. Lint --strict shows 0 errors and 0 warnings. Prose is still close to the cap, s2 still holds 8 blocks, and practice-starter is still at the 25-line cap.",
+      "score": 2,
+      "evidence": "measure.mjs prints 「prose 2393 (budget 1,200–2,400) … est 19.3 min (must be ≤ 20; estMinutes 19)」, and lint --strict is clean. s2, however, holds 8 blocks and about 730 characters of explanation (s2-version alone is 204), against the contract's 300 per segment. Its version callout repeats 第2回. s4 introduces more than 3 new terms: 仕様, AskUserQuestionツール, インターフェース and スキル, plus the glosses in the prompt.",
       "blockIds": [
-        "s3-steps",
-        "practice-steps",
-        "practice-spec-steps",
-        "practice-starter",
         "s2-defs",
         "s2-enter",
         "s2-version",
-        "s2-when"
+        "s2-when",
+        "s4-good-spec",
+        "s4-community",
+        "s4-interview"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s3-steps is unchanged apart from its titles, which now read 「プランモードに入り、探索させる」 … 「コミットする」 with no ① to ⑥ prefixes. StepsBlock.tsx numbers each item itself (`rp-step-num` shows `i + 1`), so the order the learner sees is unchanged and the step numbers are no longer shown twice. The 6 steps (within 3–6) keep their subgoal titles and reasons, for example ex-explore 「ファイルを変えずに調べられます」, ex-plan 「書く前に、進め方を読める形にするためです」 and ex-commit 「記録すれば、あとで戻せます」. ex-fix still models checking the plan against the stated scope. The example still goes straight to practice, with no faded step in between.",
+      "evidence": "s3-steps is a worked example with 6 steps, subgoal titles and the reason for each step. It comes before the practice sections. Examples: ex-explore 「知った現状が、計画を読む物差しになります」 and ex-commit 「記録すれば、あとで戻せます」. ex-fix models checking a plan against the stated scope. The lesson has no faded example between the full example and independent practice.",
       "blockIds": [
         "s3-steps",
-        "s3-fix-prompt"
+        "s3-fix-prompt",
+        "s1-example"
       ]
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "Every content section has an inline check, and q1, q2 and q3 ask for application in new contexts. q2 option a (「初めて触るリポジトリで、READMEの誤字」) makes the learner weigh two cues against each other. e5 is fixed: b (「この会話のまま続けて実装して」) and d now encode real misconceptions. However, q4 and e5 both use the s4 example (家計簿アプリの予算), and both keys hinge on the same element (writing to SPEC.md). e5 c (「早めに切り上げて」) also partly clashes with the stem's 「詳しく…掘り下げて」.",
+      "evidence": "Every content section ends with an inline quiz. q1, q2 and q3 ask the learner to apply the idea in new contexts, for example q2 a 「初めて触るリポジトリで、READMEの誤字」, which weighs two cues against each other. Two items are weaker. q4 reuses the s4-interview hint scenario (家計簿アプリの予算). e5 reuses it again, and both keys turn on the same element, writing to SPEC.md.",
       "blockIds": [
         "s1-check",
         "s2-check",
         "s3-check",
         "s4-check",
         "check-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Every misconception in the brief appears as a distractor with reasoned feedback of at most 2 sentences: stronger adjectives (q0 a), Manual mode (q0 b, e4 d), /rewind (q0 d, e4 b 「Bashで変えたものや外部への操作を戻せません」), the classifier (e4 c), trusting the plan (q3 c), always planning (q2 b), files already changed (q3 d), and the same conversation or Claude remembering (q4 c, e5 b, e5 d).",
+      "evidence": "Each misconception in the brief appears as a distractor whose feedback corrects it, with a reason, in 2 sentences or fewer: stronger adjectives (q0 a), Manual mode (q0 b, e4 d), /rewind (e4 b 「Bashで変えたものや外部への操作を戻せません」), the classifier (e4 c), trusting the plan (q3 c), always planning (q2 b), files already changed (q3 d), and implementing in the same conversation (q4 c, e5 b).",
       "blockIds": [
         "hook-predict",
         "s2-check",
         "s3-check",
         "s4-check",
         "check-quiz"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Signaling is better now. Before, StepsBlock showed its own rail number next to a title that began with ①, so each step showed two numbers, and the rail swaps its number for a check mark when a step is done. The titles now carry only the subgoal (for example 「計画を作らせ、1か所直す」), so the rail is the only number shown. A search finds no ①–⑦ left in the lesson, and no prose refers to a step by its circled number. practice-starter's highlight [13–18] still covers addItem. s2-flow is a 5-node diagram with a caption and alt text, and the lesson has no decorative images.",
+      "evidence": "s2-flow is a 5-node process diagram with Japanese labels that match the text (探索, 計画, プランモード). Its caption states the takeaway, 「計画を読み、直してから承認して実装に進む」, and its alt text describes the loop back to planning. The lesson has no decorative images.",
       "blockIds": [
-        "s3-steps",
-        "practice-steps",
-        "practice-spec-steps",
-        "practice-starter",
         "s2-flow"
       ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "In practice-steps and practice-spec-steps, only the title prefixes changed. Every md, expect, hint and troubleshoot is identical to the previous revision. For example, pr-plan still has hint 「頼んでいない保存機能やライブラリの追加がないかを見ます。」 and the troubleshoot about 確かめ方, and pr-explain still has expect 「空のまま押しても行が増えず、各項目の削除ボタンで、その項目が消えます。」. The rail numbering keeps the order (7 and 3 steps). Nothing in the text referred to the old circled numbers: troubleshoot points to sections (「3-4の依頼文の2行目」), not to steps. The checklist and the model marked 「書いてから見比べましょう」 are still in place. The earlier gaps stay: the hint ladder has 2 levels rather than 3, and ps-ask's expect leaves out 「当たり前の質問はしない」, which c2-depth requires.",
+      "evidence": "practice-steps is an authentic hands-on task in a throwaway folder. Each step has an expect, pr-rewrite and pr-plan have a hint followed by a troubleshoot, and practice-checklist and practice-model are placed after the steps. practice-spec repeats this for o3. The hint ladder has 2 levels, not 3. The expect for ps-ask leaves out 「当たり前の質問はしない」, which c2-depth checks.",
       "blockIds": [
         "practice-steps",
-        "practice-spec-steps",
         "practice-checklist",
         "practice-model",
+        "practice-spec-steps",
         "practice-spec-checklist",
-        "practice-starter"
+        "practice-spec-model"
       ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points still has 5 points after the exam. Point 3 is shorter: 「差分を1文で説明できる変更は直接頼み、迷う変更やよく知らないコードは計画します。」 It drops 複数のファイル, which s2-when and s4-table keep (see niceToHave). summary-next keeps its reflection prompt and next step, there are 7 flashcards, and askTutor has 3 suggestions.",
+      "evidence": "summary-points has 5 points and comes after the exam. summary-next has a reflection prompt (「4つの観点のうち、どれが抜けていたでしょうか」) and names the next lesson. summary-cards has 7 cards, and summary-ask offers 3 tutor prompts.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
-      "score": 4,
-      "evidence": "The changed claims match facts-cc-03, which says the guide gives 「scope the task, point to sources, reference existing patterns, describe the symptom」 and 「use @ to reference files, paste images, give URLs」. s1-table follows this, s4-good-spec's 「最後は全体を確かめる手順で終わります」 matches 「end with an end-to-end verification step」, and card-good-spec uses the same 全体. s2-enter's third item still names the same command, 「`claude --permission-mode plan` で起動する」. The blocks keep their cite entries.",
+      "score": 3,
+      "evidence": "All three findings in audit-cc-03-plan-first.json are already fixed in the text: s2-enter-lead and card-enter now say 「主な」 3 ways, and s2-version states the flag, settings and Manual conditions. Claims are cited, and the version is pinned (v2.1.304). One claim is a doubt: s3-tip 「説明を求めた人は…点が高くなりました」 reads an observed pattern as a causal outcome (facts-cc-03-plan-first.md, learning-33: 「Patterns linked to high scores」).",
       "blockIds": [
-        "s1-table",
-        "s4-good-spec",
-        "s4-lead",
-        "s2-enter",
-        "summary-cards"
-      ],
-      "carriedOver": true
+        "s2-version",
+        "s2-enter-lead",
+        "summary-cards",
+        "s3-tip"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text stays です・ます and warm (s4-community 「まずは3-4の依頼文で、手で仕様を作ってみましょう」; s4-table 「…は、**直接頼みます**。」). Lint finds no banned phrases, and the terms 参照先, 仕様 and プランモード stay consistent with the glossary. Detailed wording is left to the ja-editor.",
+      "evidence": "The text is です・ます throughout and warm (「まずは3-4の依頼文で、手で仕様を作ってみましょう」). Lint finds no banned phrases, and 参照先, プランモード and 仕様 are used consistently with the glossary. Detailed wording is left to the ja-editor.",
       "blockIds": [
         "s4-community",
-        "s4-table",
-        "s1-table"
-      ],
-      "carriedOver": true
+        "s1-lead",
+        "summary-next"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp only and complete. The diagram labels are Japanese, s2-flow has descriptive alt text, the only link uses descriptive text (「autoモードが使えない環境」), and no text is baked into images.",
+      "evidence": "The lesson is jp only and complete. s2-flow has Japanese labels and descriptive alt text, the only link has descriptive text (「autoモードが使えない環境」), and no text is baked into images.",
       "blockIds": [
         "s2-flow",
         "s2-version"
-      ],
-      "carriedOver": true
+      ]
     }
   ],
-  "mustFix": [],
-  "niceToHave": [
-    "s3-steps ex-fix: the lesson's steps now show only rail numbers 1–6, so 「2番目は、…」 (meaning the plan's second item) could be read as the lesson's step 2. Consider 「計画の2番目は、変えないでと頼んだ共通のスタイルの変更です。」.",
-    "practice-starter: dropping placeholder=\"やること\" leaves the practice page with an unlabeled text box beside 追加. If line width allows, restore it as `<input id=\"item\" placeholder=\"やること\">`.",
-    "s1-table: o1 has only one worked rewrite (s1-example) before q1. If prose allows, add a short example to the 症状 item: 「**症状**には、起きていること、場所の見当、直った状態を書きます（例：タイムアウト後にログインできない。`src/auth/` を調べて直す）。」, and trim the same amount elsewhere (prose is 2393 of 2,400).",
-    "s1-lead: consider restoring 「依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。」 or appending 「だから、範囲や症状を言葉で渡します。」.",
-    "summary-points point 3: consider 「差分を1文で説明できる変更は直接頼み、進め方に迷う変更や、複数のファイル・よく知らないコードを変えるときは計画します。」.",
-    "practice-steps pr-setup: 「最初の3行でフォルダーを作り」 also covers git init. Consider 「最初の3行でフォルダーを作ってGitを始め、その中に `todo.html` を保存します。」.",
-    "check-quiz e5 (carried over): the item reuses the s4 scenario (家計簿アプリの予算). Change the stem's feature to 「読書記録アプリに、本の貸し出しの機能を足したい。」.",
-    "check-quiz e5 option c (carried over): consider md 「質問は、技術的な実装についてだけにして。」 with feedback 「話題を絞ると、画面やエッジケースの判断が仕様に残りません。UI/UXやトレードオフも聞いてもらいます。」.",
-    "practice-spec-steps ps-ask (carried over): change expect to 「AskUserQuestionと、聞いてほしい話題が3つ以上、「当たり前の質問はしない」が入ります。」 so that it matches c2-depth.",
-    "factual doubt (carried over): s3-tip 「説明を求めた人は、任せきりの人より理解度テストの点が高くなりました」 reads as causal. Consider 「…点が高い傾向がありました。」.",
-    "s3-check q3 (carried over): gloss package.json at its first use: 「package.json（使うライブラリを書くファイル）」.",
-    "s2-version (carried over): the link uses the /docs/ja/ URL, but the cited source cc-permission-modes is the /en/ page. Consider using the /en/ URL."
+  "mustFix": [
+    {
+      "criterion": "load",
+      "blockId": "s2-version",
+      "issue": "s2 carries about 730 characters of explanation in 8 blocks, more than twice the contract's 300 per segment. Its s2-version callout (204 characters) re-teaches 第2回 content: when auto mode is the starting mode, when Manual is, and the Shift+Tab cycle. cc-02-permissions already teaches both. This pulls attention away from the segment's one idea (separate explore and plan from implementing), and the lesson is at 2393 of its 2,400-character prose budget.",
+      "fix": "Shorten s2-version to a recall. Set title to 「第2回のおさらい」 and md to 「autoモードからShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。起動時のモードは、第2回で見たとおりです。」. Keep cite [\"cc-permission-modes\"] and drop cc-best-practices and cc-changelog from this block; s2-enter-lead still pins v2.1.304."
+    },
+    {
+      "criterion": "load",
+      "blockId": "s4-community",
+      "issue": "s4 introduces more than 3 new terms: 仕様, AskUserQuestionツール, インターフェース (s4-good-spec) and スキル (s4-community), plus UI/UX, エッジケース and トレードオフ glossed inside s4-interview. スキル is taught in 第7回 and is not needed here.",
+      "fix": "In s4-community, set title to 「コミュニティのツール」 and md to 「仕様づくりには、cc-sddのようなコミュニティのツールもあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。」. In s4-good-spec, replace the first sentence with 「役立つ仕様には、関わるファイルと、関数名などほかのコードとのつなぎ目を書きます。」. In summary-cards card-good-spec, change back to 「関わるファイルとつなぎ目（関数名など）を書く、範囲外を書く、最後に全体を確かめる手順で終える、の3つです。」."
+    }
   ],
-  "average": 3.54,
-  "verdict": "pass",
-  "summary": "Verification round: review-scope exited 0, with 3 of 44 blocks changed (s3-steps, practice-steps, practice-spec-steps; 4%) and sections and objectives unchanged. The previous review had no open must-fix items, so there are no resolved entries. The only change is that the circled-number prefixes (①–⑦) were removed from the step titles. StepsBlock already numbers each step on its rail, so this removes a duplicate number and is not a regression. All md, expect, hint and troubleshoot text is unchanged, and no prose refers to the old numbers. Validate shows 0 errors and lint --strict shows 0 warnings. measure.mjs now prints prose 2393 and est 19.3 (estMinutes 19). I re-scored load, worked, visual and practice with unchanged scores; the other scores carry over. The only new note is a niceToHave about the wording of 「2番目」 in ex-fix."
+  "niceToHave": [
+    "check-quiz e5: the s4-interview hint, q4 and e5 all use the same scenario (家計簿アプリの予算), and q4 and e5 have the same key (SPEC.md), so the exam item for o3 adds no new context. Change the stem's first sentence to 「読書記録アプリに、本の貸し出しの機能を足したい。」.",
+    "check-quiz e5 option c: 「早めに切り上げて」 partly clashes with the stem's 「詳しく…掘り下げて」. Consider md 「質問は、技術的な実装についてだけにして。」 with feedback 「話題を絞ると、画面やエッジケースの判断が仕様に残りません。UI/UXやトレードオフも聞いてもらいます。」.",
+    "practice-spec-steps ps-ask: change expect to 「AskUserQuestionと、聞いてほしい話題が3つ以上、「当たり前の質問はしない」が入ります。」 so it matches c2-depth.",
+    "s3-check q3: gloss package.json where it first appears: 「package.json（使うライブラリを書くファイル）」.",
+    "s3-steps ex-fix: 「2番目は、…」 can be misread as the lesson's step 2, because the reader numbers the steps. Use 「計画の2番目は、変えないでと頼んだ共通のスタイルの変更です。」.",
+    "factual doubt: s3-tip 「説明を求めた人は、任せきりの人より理解度テストの点が高くなりました。」 reads as causal, but learning-33 reports patterns linked to scores. Consider 「…点が高い傾向がありました。」.",
+    "summary-points point 3 drops 複数のファイル, which s2-when and s4-table keep. Consider 「差分を1文で説明できる変更は直接頼み、進め方に迷う変更や、複数のファイル・よく知らないコードを変えるときは計画します。」.",
+    "practice-steps pr-setup: 「最初の3行でフォルダーを作り」 also covers git init. Consider 「最初の3行でフォルダーを作ってGitを始め、その中に `todo.html` を保存します。」.",
+    "practice-steps pr-plan shows the Ctrl+G key, but its md never mentions it. Consider adding 「Ctrl + Gで計画を直接直してもかまいません。」.",
+    "s1-table: o1 has only one worked rewrite (s1-example) before q1. If the prose budget allows after the must-fix cuts, add a short before/after to the 症状 item.",
+    "s2-version (if the link is kept): it points to /docs/ja/permission-modes, while source cc-permission-modes is the /en/ page."
+  ],
+  "average": 3.31,
+  "verdict": "revise",
+  "summary": "This is a full review because the owner moved the lesson to content/courses/claude-code/lessons/ and the earlier review chain under the vibe-coding path is no longer accepted. Apart from courseId, the text matches the previously reviewed version. Strengths: misconception-driven distractors with reasoned feedback, a 6-step worked example with a reason for each step, and two practice sections with checklists and model answers. Two load fixes are required: cut s2-version to a one-line recall of 第2回, because s2 is about 730 characters against a 300-character segment budget, and bring s4 under 3 new terms by dropping スキル and インターフェース."
 }

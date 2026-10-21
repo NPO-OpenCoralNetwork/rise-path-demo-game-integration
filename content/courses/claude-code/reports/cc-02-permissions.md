@@ -1,11 +1,11 @@
-# Report: vibe-coding/cc-02-permissions (draft)
+# Report: claude-code/cc-02-permissions (published)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:b119e1c419d1e206.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:8c52cb12321e5ea5.**
 
 - Title: 第2回｜任せる範囲を決める：権限モードと巻き戻し
-- Draft: `content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-02-permissions.md`
-- Level: beginner · estMinutes 20 · locale jp (Japanese only) · courseId `vibe-coding` (preview course; publishing is the owner's call)
-- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. No `reviewedBy` (set when the owner publishes).
+- Lesson: `content/courses/claude-code/lessons/cc-02-permissions.lesson.json` · brief: `content/courses/claude-code/briefs/cc-02-permissions.md`
+- Level: beginner · estMinutes 20 · locale jp (Japanese only) · courseId `claude-code`
+- Provenance: author `claude-code`, skill `author-lesson`, generatedAt 2026-10-20. Reviews: see the gate below.
 
 ## Objectives
 
@@ -40,35 +40,36 @@
 
 ```
 Review of cc-02-permissions by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json (sha256:b119e1c419d1e206)
+  lesson content/courses/claude-code/lessons/cc-02-permissions.lesson.json (sha256:8c52cb12321e5ea5)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:fc6282d1f851b02f (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: hook, prior, load, worked, active, miscon, visual, practice, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
+  pedagogy-reviewer: full review
   visual-qa: full review
-  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer)
-  ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
-  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer carried)
-  ✓ active     3  (pedagogy-reviewer carried)
-  ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer carried)
-  ✓ meta       3  (pedagogy-reviewer carried)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer)
+  ✓ active     3  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
+  ✓ practice   3  (pedagogy-reviewer)
+  ✓ meta       3  (pedagogy-reviewer)
   ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-02-permissions/`)
+## Review rounds (snapshots in `.artifacts/review/claude-code/cc-02-permissions/`)
 
 1. `44ecfdc66d172d2b`: ja-editor full revise (mean 2.75, must-fix 10); pedagogy-reviewer full revise (mean 2.92, must-fix 4)
 2. `e9a914f94df54f03`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
-3. `6d79b8134ac7e198`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.31, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
-4. `95d0a505f30641a5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
-5. `53b74995ba36c9df`: ja-editor verify fail (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `fc6282d1f851b02f`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-7. `b119e1c419d1e206`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+3. `53b74995ba36c9df`: ja-editor verify fail (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+4. `fc6282d1f851b02f`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `b119e1c419d1e206`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `95d0a505f30641a5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
+7. `6d79b8134ac7e198`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.31, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
+8. `8c52cb12321e5ea5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -89,7 +90,7 @@ An auditor with web access checked 74 claims (pages: 14); a second checker tried
 
 ## Screenshots
 
-`npm run lessons:preview -- vibe-coding cc-02-permissions --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/vibe-coding/cc-02-permissions/` (gitignored). The visual-qa review above was made from these screenshots.
+`npm run lessons:preview -- claude-code cc-02-permissions --shots desktop-jp,mobile-jp` on a fresh no-HMR dev server; PNGs and `metrics.json` in `.artifacts/preview/claude-code/cc-02-permissions/` (gitignored). The visual-qa review above was made from these screenshots.
 
 ## Orchestrator notes
 

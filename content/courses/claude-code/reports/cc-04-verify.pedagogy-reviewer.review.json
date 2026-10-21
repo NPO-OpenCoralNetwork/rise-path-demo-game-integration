@@ -4,181 +4,163 @@
   "lessonHash": "sha256:38938fab0a8e18cd",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:17c13d4e45026e5d",
-    "previousReview": ".artifacts/review/claude-code/cc-04-verify/17c13d4e45026e5d/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "lesson.courseId"
-    ],
-    "changedShare": 0.01,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 3,
-      "evidence": "Each of the 3 objectives still has 3 or more graded items with objectiveId (o1: q0, q1, e1, e2; o2: q2, q3, e3, e4; o3: q4, q5, e5, e6). o1 is 'create / 設計できる' but is only assessed by selection, and e1 and e2 still carry bloom 'create'. No practice step asks the learner to design a check.",
+      "evidence": "There are three can-do objectives, and each has two or more graded questions with objectiveId: o1 has q1, e1 and e2; o2 has q2, q3, e3 and e4; o3 has q4, q5, e5 and e6. Not a 4: o1 is 「設計できる」 (create), but every o1 item, including e1 and e2 which are tagged bloom create, only asks the learner to pick a ready-made check. Nowhere does the learner write a check themselves.",
       "blockIds": [
-        "check-quiz",
+        "hook-predict",
         "s1-check",
-        "p-steps"
-      ],
-      "carriedOver": true
+        "check-quiz",
+        "practice"
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-lead sets a concrete problem in 3 sentences ('「完了しました。正しく動作します」…翌日、別の入力でエラーが出ました。何があれば防げたでしょうか。'), followed by the predict item q0 (o1) with tempting distractors.",
+      "evidence": "hook-lead is a concrete three-sentence scene (「完了しました。正しく動作します」, then an error the next day) that ends in a question. The ungraded predict q0 has a misconception named in each wrong option and leads into 4-1 and 4-2 (「4-1と4-2で詳しく見ていきます」). There is no trivia or statistic.",
       "blockIds": [
         "hook-lead",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "s1-table is now a list and keeps the English glosses on first use ('**ビルド（build）**', '**スクリーンショット（screenshot）の比較**'). s1-defs still defines 検証, 自動テスト and リンター before the list uses them. The recall of 第1回's agentic loop in s1-why is unchanged.",
+      "evidence": "Prerequisites list 第1回–第3回, Node.js 22 and Git. s1-why recalls 第1回's 「エージェントループ（agentic loop）」. Each new term is defined in a definitions block before it is quizzed, and the definitions match the glossary word for word. コンテキスト, which cc-01 already introduced as コンテキストウィンドウ, points ahead to 第5回, and サブエージェント points to 第7回.",
       "blockIds": [
-        "s1-table",
+        "s1-why",
         "s1-defs",
-        "s1-why"
-      ],
-      "carriedOver": true
+        "s2-defs",
+        "s4-defs",
+        "s5-defs"
+      ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 'prose 2242 (budget 1,200–2,400) · read 3218 · practice reading 1046 · questions 12 · est 19.5 min (must be ≤ 20; estMinutes 19)'. The longer s4-fresh sentence added 14 characters of prose (previously 2228). The est formula gives (3218+1046)/450 + 8 + 2 = 19.48, which still rounds to estMinutes 19. The '19.5' is only toFixed(1) display rounding. The new s4-fresh sentence ('このサブエージェントは、差分と渡された基準をもとに、自分でコードを読んで確かめます。') is about 41 characters and brings in no new term. lint --strict shows 0 warnings. 4-4 is still the heaviest section, with 10 blocks.",
+      "evidence": "measure.mjs gives 「prose 2242 (budget 1,200–2,400)」 and 「est 19.5 min (must be ≤ 20; estMinutes 19)」, and lint --strict is clean. No segment adds more than 3 new terms (4-4 adds サブエージェント, /code-review and 過剰設計), and every section ends in a check. Not a 4: 4-2 holds two ideas (asking for evidence, then /goal plus ターン and the 判定役 in the three-paragraph s2-goal), so it is the densest screen.",
       "blockIds": [
-        "s4-fresh",
-        "s4-names"
-      ],
-      "carriedOver": true
+        "s2-goal",
+        "s4-defs"
+      ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s3-code uses a named import ('import { equal } from \\'node:assert/strict\\';') with the 4 cases that s3-steps expects ('fail 4', then 'pass 4・fail 0'). The practice still repeats the flow fully prompted rather than fading to independent work.",
+      "evidence": "4-3 is a five-step worked example. Each step has a subgoal label and a reason (e.g. ex-red 「失敗を先に見ると、テストが新しいコードを試しているとわかります」) plus an expect, backed by runnable postal.test.mjs and both prompts, and it comes before the practice. The practice repeats the same subgoals with the reasons removed. That makes it partly faded, but there is no separate faded step before independent work.",
       "blockIds": [
-        "s3-code",
         "s3-steps",
+        "s3-code",
         "s3-prompt-write",
-        "s3-prompt-green"
-      ],
-      "carriedOver": true
+        "s3-prompt-green",
+        "p-steps"
+      ]
     },
     {
       "id": "active",
-      "score": 4,
-      "evidence": "Every content section still ends with an applied inline quiz, with feedback on every wrong option. In this round only e5's explanation changed. Its options, key and feedback are the same, so retrieval demand is unchanged.",
+      "score": 3,
+      "evidence": "Every content section has an inline check (q1–q5), so density is met, and q3–q5 ask for real analysis or judgement. Not a 4: q1 and q2 can be answered by matching the text just read. q1 maps directly onto the s1-table line 「画面の見た目なら、スクリーンショットの比較」. In q2, option c is the only report that contains any command or output, which echoes s2-prompt.",
       "blockIds": [
         "s1-check",
         "s2-check",
         "s3-check",
         "s4-check",
-        "s5-check",
-        "check-quiz"
-      ],
-      "carriedOver": true
+        "s5-check"
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "e5's explanation now reads '別のコンテキストのレビュー役は、作業の経緯を見ずに、差分と渡された基準をもとに判断します。' That still answers option a's misconception (self-grading in the same conversation; its feedback says '作業の経緯を見ていない、別のコンテキストに頼みます') and option d's misconception (no criteria). It no longer suggests the reviewer is limited to the diff text. The other distractor feedback still names concrete errors, for example e4 c ('無視する設定を残すと、検証の手段が1つ減ります').",
+      "evidence": "All seven misconceptions in the brief are corrected with reasons. Examples: q0 a 「聞き直しても…同じClaudeの自己申告です」; s3-pitfall (rewriting tests to pass) and e4 (a setting that suppresses errors); s4-trap (chasing every finding); e2 d 「判定役はコマンドを実行せず」. Every wrong option has feedback of at most two sentences.",
       "blockIds": [
-        "check-quiz",
         "hook-predict",
-        "s3-check",
-        "s5-check"
-      ],
-      "carriedOver": true
+        "s3-pitfall",
+        "s4-trap",
+        "check-quiz"
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s4-sort keeps its 5 nodes, its caption ('必須にするのは、正しさと要件に関わる指摘だけ') and a full alt. s1-table and p-model-sort are lists that bold the key term. There are no decorative images.",
+      "evidence": "s4-sort is the one diagram, and it is needed: a five-node process. Its labels use the text's own terms (正しさの問題, 要件の問題, 必須, 任意), the caption states the takeaway (「必須にするのは、正しさと要件に関わる指摘だけ」), the alt describes the whole flow, and there are no decorative images.",
       "blockIds": [
-        "s4-sort",
-        "s1-pick",
-        "s1-table",
-        "p-model-sort",
-        "p-model-intro"
-      ],
-      "carriedOver": true
+        "s4-sort"
+      ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The file names are consistent across p-prompt-write, p-prompt-green and p-model-code (leap.test.mjs / leap.mjs). p-checklist p-c1 to p-c7 gives clear success criteria. The hint ladder is shallow, because p-evidence and p-commit have no hints, and no step transfers o1.",
+      "evidence": "The isLeapYear task is authentic and safe (new folder, 「大事なリポジトリでは試さないでください」). It has 8 steps with expect, hints and troubleshoots, a 7-item checklist (p-checklist), and a model answer (p-model-code, p-model-sort). Not a 4: most steps have one or two hint levels, and all three prompts are given in full, so the learner never designs the check (o1).",
       "blockIds": [
-        "p-prompt-write",
-        "p-prompt-green",
-        "p-model-code",
+        "p-task",
+        "p-steps",
         "p-checklist",
-        "p-steps"
-      ],
-      "carriedOver": true
+        "p-model-code",
+        "p-model-sort"
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points comes after the exam. summary-next keeps its reflection question ('手元のタスクに、どの確認を渡せますか。'). There are 7 retrieval flashcards.",
+      "evidence": "The summary follows the exam and has 5 points. summary-next has a reflection question (「手元のタスクに、どの確認を渡せますか。」) and names the next lesson exactly (「第5回｜コンテキストを管理する」). There are 7 flashcards, each covering one idea, and askTutor offers 3 suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
-        "summary-cards"
-      ],
-      "carriedOver": true
+        "summary-cards",
+        "summary-ask"
+      ]
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Re-scored because the lesson moved into the claude-code course. Its cross-references still match content/courses/claude-code/course.json. The title '第4回｜検証を任せる：テスト・レビュー・説明' and estMinutes 19 are the same as module m2's entry. The 3 lesson prerequisites ('第1回｜最初のタスクを任せる', '第2回｜任せる範囲を決める：権限モードと巻き戻し', '第3回｜探索→計画→実装→コミット') match the cc-01 to cc-03 titles. The forward pointers ('詳しくは第5回' in the s4-defs glossary entry for コンテキスト, '詳しくは第7回' for サブエージェント, and summary-next's '次は「第5回｜コンテキストを管理する」です。') match cc-05-context, cc-07-skills-subagents and cc-04's next.lessonId 'cc-05-context'. No body text changed, so the round-1 fact checks of s4-fresh and e5 against facts-cc-04-verify.md [practice-20] still hold, and both blocks still cite cc-best-practices.",
+      "evidence": "Behaviour claims are cited and agree with audit-cc-04-verify.json and facts-cc-04-verify.md. The four confirmed audit fixes are present in the text: 「Claude自身が回せます」, 「満たすか無理と判定されるまで…進展がないときや…エラーでも止まります」, 「20ターンに達するまで」 and 「たいてい指摘を返します」. Also correct: /review as an alias of /code-review since v2.1.223, and the RCT's 52 learners and 50% vs 67%. Versions are pinned (v2.1.304, Node.js 22), and the brief records the postal and leap tests as run.",
       "blockIds": [
-        "s4-defs",
-        "summary-next",
-        "s4-fresh",
-        "check-quiz"
+        "s1-why",
+        "s2-goal",
+        "s2-goal-prompt",
+        "s4-trap",
+        "s4-names",
+        "s5-rct",
+        "s3-code",
+        "p-model-code"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed sentences use です・ます ('…自分でコードを読んで確かめます。', '…をもとに判断します。'). Lint finds no banned phrases. s2-goal still repeats 判定 within one sentence; that wording belongs to the ja-editor.",
+      "evidence": "The register is です・ます throughout and warm (「自分の仕事を自分で採点すると、甘くなりがちです。」). There are no banned phrases, and terms stay consistent (検証, 証拠, 必須/任意, 過剰設計). Not a 4: a few phrases are stiff or ambiguous, e.g. s1-why 「「結果を確かめる」を、Claude自身が回せます」 and s5-styles 「自分で書けるようにします」 (unclear who 自分 is).",
       "blockIds": [
-        "s4-fresh",
-        "check-quiz",
-        "s2-goal"
-      ],
-      "carriedOver": true
+        "s1-why",
+        "s5-styles"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Re-scored for the course move. courseId 'claude-code' matches the course.json id and its locales ['jp']. The lesson is jp only and complete. validate reports 0 errors at the new path. s4-sort's alt describes the full flow. Lists replace the 2 tables (mobile fit). The links have descriptive text ('[日本語の公式ドキュメント](…/best-practices)'). No text still refers to the old vibe-coding course.",
+      "evidence": "The lesson declares jp only, and all of it is in jp, diagram labels included. The diagram has alt text, and link texts say where they go (「Chromeとの連携」, 「日本語の公式ドキュメント」). Not a 4: s1-screenshot-note links to the English /docs/en/chrome page without saying so, in a Japanese lesson.",
       "blockIds": [
         "s4-sort",
-        "s1-table",
-        "p-model-sort",
+        "s1-screenshot-note",
         "s4-names"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s4-defs (optional, ties the change to the definition): the s4-fresh claim that the subagent '自分でコードを読んで確かめます' rests on subagents having their own tools, which s4-defs does not say. Optionally change the サブエージェント definition to '自分のコンテキストと道具で別に動き、結果を要約して返すClaude。詳しくは第7回。' and keep the glossary entry in sync.",
-    "Carried over: p-model-intro: p-model-sort lost its caption, and with it the stated rule. Replace the md with '模範解答の例です。テストのコードと、指摘の仕分けを示します。必須にするのは、正しさと要件に関わる指摘だけです。'",
-    "Carried over: o1 is at create level but is only assessed by selection. Add a p-steps item after p-explain: id 'p-design', title '⑨ 手元のタスク1つに、渡す確認を考える', expect '確認の種類と、依頼文に足す一言を1行で書けます。'. Add the checklist item p-c8 '自分のタスクに合う確認と、依頼文に足す一言を書きました'.",
-    "Carried over: check-quiz e1 and e2 carry bloom 'create' but are selection items. Set both to 'evaluate'.",
-    "Carried over: p-steps p-evidence: add hint '`git diff --stat` で差分を見てから、`node --test` を実行します。'",
-    "Carried over: p-steps p-commit: add hint 'Claudeに「テストと空の関数をコミットして」と頼んでもかまいません。'",
-    "Carried over: 4-4 is still the heaviest section (10 blocks). Consider dropping s4-names from the body, since the glossary entry '/code-review' already carries the /review alias, and moving the Japanese-docs link to summary-next.",
-    "s2-goal (for the ja-editor), carried over: replace 'ターンごとに別の小さなモデルが条件を判定し、満たすか無理と判定されるまでClaudeは続けます。' with 'ターンごとに別の小さなモデルが条件を判定します。満たすか、無理とされるまで、Claudeは続けます。'"
+    "align (o1): e1 and e2 are tagged bloom \"create\" but are multiple-choice selection. Either change both to \"bloom\": \"evaluate\", or add a practice step that has the learner write the check line themselves, e.g. in p-prompt-write replace the spec line with {{仕様と例の年}} (hint: 「仕様の各行に1つずつ年を当てはめて書きます」) so the learner designs the test cases.",
+    "active (s2-check q2): option c is the only report containing any command, so it can be picked by surface matching. Replace option b's md with 「`npm test` を実行し、すべて通りました」 and its feedback with 「コマンドの名前だけで、出力がありません。実行した結果の実物を見せてもらいます。」, so that naming a command without its output becomes the distractor.",
+    "practice (p-commit): say how to commit from inside the Claude session, as cc-03 did: change md/hint to 「Claudeに「テストと空の関数をコミットして」と頼みます。」.",
+    "prior (s2-goal-prompt): `node --test` appears here before 4-3 introduces node:test. Either add to the expect 「`node --test` はNode.jsの組み込みのテストを実行するコマンドです（4-3で使います）。」 or use `npm test` as e2 does.",
+    "load (lesson.estMinutes): measure.mjs gives est 19.5, which rounds to 20, while estMinutes is 19. Set estMinutes to 20, or trim about 230 characters of reading to land on 19.",
+    "a11y_l10n (s1-screenshot-note): change the link text to 「Chromeとの連携（英語）」, or link the Japanese page if /docs/ja/chrome exists.",
+    "voice (s1-why, for ja-editor): 「第1回のエージェントループ（agentic loop）の「結果を確かめる」まで、Claude自身で回せるようになります。」",
+    "voice (s5-styles, for ja-editor): replace 「自分で書けるようにします」 with 「学習者が自分で書けるようにします」 to match the glossary entry for Learning.",
+    "worked (s3-steps): the steps point to 「①の依頼文」 and 「④の依頼文」, which only appear after the steps block. Consider placing s3-prompt-write right after s3-steps step ① is introduced, or adding 「（下にあります）」 to those step titles."
   ],
-  "average": 3.54,
+  "average": 3.46,
   "verdict": "pass",
-  "summary": "Verification round (review-scope exit 0). Only lesson.courseId changed (1 of 103 parts, 1%), from vibe-coding to claude-code. No blocks, sections or objectives changed. The previous review had no open must-fix items, so there was nothing to resolve. I checked the move for regressions. courseId matches content/courses/claude-code/course.json. The lesson title and estMinutes 19 match its m2 entry, the 第1回 to 第3回 prerequisites match the course titles, and the 第5回/第7回 pointers and summary-next's next lesson match the course order and next.lessonId cc-05-context. No text still refers to the old course. validate: 0 errors. lint --strict: 0 warnings. measure.mjs: prose 2242 (budget 1,200–2,400), est 19.5 (≤ 20, estMinutes 19). I re-scored accuracy (4) and a11y_l10n (3) for the course move, and both are unchanged. The other 11 scores are carried over. align and practice stay at 3, because o1 (create) is still assessed only by selection (niceToHave)."
+  "summary": "This is a full review because the lesson moved from vibe-coding/drafts to claude-code/lessons, and the gate does not accept the earlier review chain recorded under the old course path. The lesson is tightly aligned: each objective has an inline question and two exam questions with real-misconception feedback, and a cited, audited worked example (test-first, with commands and outputs verified) comes before a practice that has a checklist and a model answer. No must-fix items. The most useful improvements are to let the learner actually design a check for o1, which is assessed today only by multiple choice, and to harden the q2 distractors."
 }

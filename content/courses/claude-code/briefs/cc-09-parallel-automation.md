@@ -167,3 +167,6 @@ predict before running (p-run).
 
 ### Cross-lesson consistency (2026-10-21)
 - glossary サブエージェント: 「メインの会話」; s3-table: `--bare` also skips CLAUDE.md and skills; e1: only the request and the summary enter the conversation (cc-07); p-run: `--bare` bills the API, not the plan (cc-10). Offsetting cuts in s2-lead and s3-table keep est at 19.998.
+
+### After publishing (2026-10-21)
+- After publishing, a full pedagogy review found e3 and e5 answerable by convergence: each flag or condition now appears in exactly two options (answers unchanged). s4-check option c uses 「」 instead of 『』 (ja-editor).
