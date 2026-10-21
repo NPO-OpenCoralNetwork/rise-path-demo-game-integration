@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:3ebe60f3a0474749",
+  "lessonHash": "sha256:eb6d40faa5d6fe69",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,59 +9,54 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "The tables, the TD mermaid loop diagram, the steps, the prompts and the quizzes all render cleanly at 390 px and 1440 px. On mobile, two code blocks are cut off at the right edge: the curl install line loses its `| bash` (pages/mobile-jp-09.png) and diff lines 4–5 are cut mid-call (pages/mobile-jp-14.png).",
-      "blockIds": [
-        "loop-table",
-        "loop-diagram",
-        "surfaces-table",
-        "install-unix",
-        "example-diff"
-      ]
+      "evidence": "The Mermaid loop diagram (loop-diagram, flowchart TD) has Japanese labels that are easy to read at 390 px (mobile-jp-04/05). The code, diff and prompt blocks render cleanly. Two tables break row labels mid-word, and in practice-steps the step circles 3-6 do not match the ①-⑤ in the titles (mobile-jp-17/18, desktop-jp-12/13)."
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "There are no text-only screens and no walls of text. Every desktop and mobile screen holds a heading, table, figure, code block or check. Desktop JP median is 39 chars/line, inside the 30–40 target.",
-      "blockIds": [
-        "hook-problem",
-        "example-steps",
-        "practice-steps"
-      ]
+      "score": 3,
+      "evidence": "No text-only screens on desktop-jp or mobile-jp. Desktop chars-per-line median is 39 (target 30-40), and every section mixes a table, definitions, a figure, code or a check. practice-steps reads as a long run on mobile (mobile-jp-17 to 19), and the doubled numbering makes it harder to follow."
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Diagram labels are Japanese and readable, and the diagram has a caption and an 「図の説明を読む」 disclosure. No mixed-language strings show up and no controls are hidden under the bars. The two code blocks cut off on mobile hide part of the command a learner has to read and run.",
+      "evidence": "Everything is in Japanese, and the English glosses appear on first use. Words break awkwardly in table header cells: 「デスクトッ/プアプリ」 (mobile-jp-07), 「デスクトップアプ/リ」, 「クラウドセッショ/ン」 and 「エディタの補/完」 (desktop-jp-05, desktop-jp-02), and 「チャット/AI」 (mobile-jp-03). No privacy data appears on any screen opened.",
       "blockIds": [
-        "loop-diagram",
-        "install-unix",
-        "example-diff"
+        "surfaces-table",
+        "loop-table"
       ]
     }
   ],
   "mustFix": [
     {
-      "criterion": "visual",
-      "blockId": "install-unix",
-      "issue": "At 390 px the command shows as `curl -fsSL https://claude.ai/install.sh | ba`, so `| bash` is cut off. The filename label is also cut to 'terminal (macOS / Linux / WS…'.",
-      "fix": "Split the command over two lines with a shell continuation: `curl -fsSL https://claude.ai/install.sh \\` then `  | bash`. Also shorten `filename` to `macOS・Linux・WSL`.",
-      "screenshot": "pages/mobile-jp-09.png"
+      "criterion": "a11y_l10n",
+      "blockId": "surfaces-table",
+      "issue": "The first-column labels break inside words at both widths: 「デスクトッ / プアプリ」 on mobile, and 「デスクトップアプ / リ」 and 「クラウドセッショ / ン」 with one-character orphans on desktop.",
+      "fix": "Shorten the row labels so each fits on one line or breaks at a word boundary, e.g. 「CLI」「IDE拡張」「アプリ」「クラウド」, and keep the full names (ターミナルCLI・デスクトップアプリ・クラウドセッション) in the second-column text. Or turn the table into a definitions block, where the term gets the full width.",
+      "screenshot": "pages/mobile-jp-07.png"
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "loop-table",
+      "issue": "The first-column labels break mid-word: 「エディタ / の補完」 and 「チャット / AI」 on mobile, and 「エディタの補 / 完」 with an orphaned 完 on desktop.",
+      "fix": "Use shorter labels such as 「チャット」「補完」「Claude Code」. The header 「道具」 and the second column already make clear what each one is.",
+      "screenshot": "pages/desktop-jp-02.png"
     },
     {
       "criterion": "visual",
-      "blockId": "example-diff",
-      "issue": "At 390 px diff lines 4 and 5 are cut off (`const p = document.getElementById` and `p.textContent = new Date().toLoca`), so the learner cannot read the lines the lesson asks them to check.",
-      "fix": "Keep every diff line to about 34 characters: break after `=` with a 2-space indent, e.g. `+  const p =` / `+    document.getElementById(\"today\");` and `+  p.textContent =` / `+    new Date().toLocaleDateString();`. Alternatively, use a shorter id and variable so each statement fits on one line.",
-      "screenshot": "pages/mobile-jp-14.png"
+      "blockId": "practice-steps",
+      "issue": "The reader numbers the steps 1-6 in circles, while the titles carry their own 「①②」「③」「④」「⑤」. Step circle 3 reads 「①② 質問して…」 and circle 6 reads 「⑤ コミットして確かめる」, which gives learners two numbering systems that disagree.",
+      "fix": "Remove the circled numbers from the titles (e.g. 「質問して、変更を1つ頼む」「予想してから差分を見る」) and keep the link to the example in the body text, which already says 「1-5の①を送り…」 and 「1-5の⑤を送り…」.",
+      "screenshot": "pages/mobile-jp-18.png"
     }
   ],
   "niceToHave": [
-    "The glossary panel shows 'エージェントループ' twice: once as 'エージェントループ (agentic loop)' and once on its own (pages/desktop-jp-01.png and others). Check whether the definitions term and the glossary entry should be merged, or whether this is reader: behaviour.",
-    "On desktop, one exam option wraps so that a single character sits alone on the next line: q5 option a ends with 「…確かめ／る」 (pages/desktop-jp-15.png) and q7 option b ends with 「…入／れる」 (pages/desktop-jp-16.png). Shortening each by a few characters would avoid this.",
-    "reader: the mobile full-length PNG is cut off at 16000 px (known).",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」 because drafts are not in course.json (known).",
-    "reader: wide code blocks give no horizontal scroll cue on mobile (known)."
+    "example-steps: the step circles 1-5 repeat the ①-⑤ in each title (「1 ① 何をするプロジェクトか聞く」, desktop-jp-09). Dropping the circled numbers from the titles would remove the duplication. They can stay only if practice-steps keeps referring to them.",
+    "install-node: the 'pitfall' variant draws a red alert box with an error icon around a reassuring message (「Node.jsは先に入れなくてかまいません」, mobile-jp-10, desktop-jp-07). 'info' or 'tip' would fit the tone better.",
+    "check-quiz q5 option a and q7 option b each leave a single character (「る」) on the second line on desktop (desktop-jp-15, desktop-jp-16). A slightly shorter wording would avoid it.",
+    "reader: the glossary side panel lists 「エージェントループ」 twice, once as 「エージェントループ (agentic loop)」 and once without the alias, but the lesson glossary has a single entry (desktop-jp-01 and later).",
+    "reader: the flashcard hint says 「クリックまたはスペースキーでめくる」 on mobile, where 'tap' would fit (mobile-jp-26).",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (known behaviour)."
   ],
   "verdict": "revise",
-  "summary": "The layout is clean and well paced on both viewports: no overflow, no console or mermaid errors, no text-only screens, a readable top-down loop diagram and tables that fit at 390 px. No personal data appears on any screen. Must fix: two code blocks are cut off at 390 px (install-unix loses `| bash`, and example-diff lines 4–5 are cut mid-call). Break those lines so they fit."
+  "summary": "lessonHash sha256:eb6d40faa5d6fe69 matches the expected value. metrics.json shows no hard failures: no overflow, console, Mermaid, unknown-block or broken-image errors, and no text-only screens. Desktop chars-per-line median is 39 (target 30-40). No personal data appears on any screen opened. The diagram, code and prompt blocks read well at 390 px. The fixes needed are to shorten the row labels in surfaces-table and loop-table so Japanese words stop breaking mid-word, and to remove the circled numbers from the practice-steps titles so they no longer clash with the reader's 1-6 step numbers."
 }

@@ -1,17 +1,17 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:3ebe60f3a0474749",
+  "lessonHash": "sha256:eb6d40faa5d6fe69",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:d8b090b9a8da1f4f",
-    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/d8b090b9a8da1f4f/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:3ebe60f3a0474749",
+    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/3ebe60f3a0474749/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "loop-table",
       "surfaces-table",
-      "session-check",
+      "install-how",
+      "install-unix",
       "example-diff"
     ],
     "changedShare": 0.05,
@@ -22,14 +22,15 @@
     {
       "id": "align",
       "score": 4,
-      "evidence": "Re-scored because session-check changed. q3 still has objectiveId o3 and bloom understand. The prompt asks what happens in a fresh session, and the new answer c 「昨日の会話は見えないが、伝え直すか開き直せば続けられる」 tests that o3 idea. Every objective still has 2 or more graded questions (o1: q1, q5; o2: q2, q6; o3: q3, q4, q7, q8, q9).",
+      "evidence": "q3 still has objectiveId o3 and bloom understand. The prompt asks what happens in a fresh session, and the new answer c 「昨日の会話は見えないが、伝え直すか開き直せば続けられる」 tests that o3 idea. Every objective still has 2 or more graded questions (o1: q1, q5; o2: q2, q6; o3: q3, q4, q7, q8, q9).",
       "blockIds": [
         "session-check",
         "loop-check",
         "surfaces-check",
         "example-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -44,7 +45,7 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Re-scored because surfaces-table changed. The merged CLI cell still reads 「基本の入口。演習で使う。ネイティブインストーラー（native installer）で入れる」, so the term appears before install-how and is never defined. Other terms are defined before the checks that use them (loop-defs, surfaces-defs, session-defs, example-defs). q2 still depends on push, which the prerequisites do not name.",
+      "evidence": "Re-scored because surfaces-table and install-how changed. The CLI cell no longer uses an undefined term: it now reads 「基本の入口で、演習で使う。CLIはCommand Line Interfaceの略」. ネイティブインストーラー first appears in install-how with its English (「推奨はネイティブインストーラー（native installer）で、自動で更新されます。」), so the gap from round 1 is closed. Two gaps remain. q2 and the cloud row (「先にpushする」) still depend on push, which the prerequisites do not name. install-how now also uses WSL in prose (「macOS・Linux・WSL用は…」) without explaining it.",
       "blockIds": [
         "surfaces-table",
         "install-how",
@@ -54,17 +55,18 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "Re-scored because loop-table and surfaces-table changed. measure.mjs: 「prose 1585 (budget 1,200–2,400) · read 2420 · practice reading 806 · questions 10 · est 15.8 min (must be ≤ 20; estMinutes 16)」. Lint --strict reports 0 warnings. The 2-column tables fit on mobile, and the longest cell, 「プロジェクトのファイル、ターミナル、Gitを見て、自分で調べ、変更し、確かめる」, is within budget. The surfaces segment still brings in IDE, CLI and ネイティブインストーラー on top of its 3 defined terms.",
+      "evidence": "Re-scored because surfaces-table, install-how and example-diff changed. measure.mjs: 「prose 1633 (budget 1,200–2,400) · read 2434 · practice reading 806 · questions 10 · est 15.9 min (must be ≤ 20; estMinutes 16)」. para-sentences: 「0 paragraph(s) over 3 sentences」. Lint --strict reports 0 warnings. Moving ネイティブインストーラー out of surfaces-table lightens that segment, which now adds only IDE and CLI on top of its 3 defined terms. The install segment still adds API, Console, native installer and WSL. The new sentence 「2行で1つのコマンドです」 heads off the confusion the line break could cause.",
       "blockIds": [
-        "loop-table",
         "surfaces-table",
-        "surfaces-defs"
+        "install-how",
+        "install-unix",
+        "example-diff"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Re-scored because example-diff changed. The diff now splits the script into 「const p = document.getElementById(\"today\");」 and 「p.textContent = new Date().toLocaleDateString();」. It is still correct JS and still matches the ex-diff expect (「日付を表示する数行が増えています」) and ex-explain (「日付を表示する場所と、書き込む処理の役割」). The two lines now map more clearly onto 'place' and 'write'. Gaps are unchanged: the example never shows that the page is committed first, and there is only one level of fading into practice-steps.",
+      "evidence": "Re-scored because example-diff changed. The diff now has no indentation, and each statement is wrapped onto two lines (「const p =」 / 「  document.getElementById(\"today\");」, 「p.textContent =」 / 「  new Date().toLocaleDateString();」). It is still valid JS, because an incomplete assignment is not ended by ASI. It still matches the ex-diff expect (「日付を表示する数行が増えています」) and ex-explain (「日付を表示する場所と、書き込む処理の役割」). The gaps are unchanged: the example never shows that the page is committed first, and there is only one level of fading into practice-steps.",
       "blockIds": [
         "example-diff",
         "example-steps",
@@ -74,33 +76,35 @@
     {
       "id": "active",
       "score": 3,
-      "evidence": "Re-scored because q3 changed. The new c does not give the answer away. a, b and d are each worded as a plausible belief, and b's feedback also names `claude --continue`, so the learner has to reason about context versus disk rather than spot the only option with a remedy. The density rule is still met (q1–q4). q1-a still restates the loop-diagram description, while d (「原因を推測してコードを書き換え、そのまま完了と報告する」) differs in its opening, so q1 can still be answered by matching words.",
+      "evidence": "q3's new c does not give the answer away. The density rule is met (q1–q4). q1-a still restates the loop-diagram description, while d (「原因を推測してコードを書き換え、そのまま完了と報告する」) differs in its opening, so q1 can still be answered by matching words.",
       "blockIds": [
         "session-check",
         "loop-check",
         "surfaces-check",
         "example-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored because q3 changed. Each wrong option of q3 still has feedback of 2 sentences or fewer that names the misconception: a 「まっさらなコンテキストで始まります」, b 「フォルダが同じでも…昨日の会話は入りません」, d 「消えるのは会話の記憶で、ファイルではありません」. The explanation keeps the nuance about memory (「自動メモリに残ることもありますが、毎回とは限りません」). The other misconceptions from the brief are still corrected (q0, q1, q5, install-node, q7-c, q4-a, q9-a).",
+      "evidence": "Each wrong option of q3 has feedback of 2 sentences or fewer that names the misconception (a 「まっさらなコンテキストで始まります」, b 「フォルダが同じでも…昨日の会話は入りません」, d 「消えるのは会話の記憶で、ファイルではありません」). The other misconceptions from the brief are corrected in q0, q1, q5, install-node, q7-c, q4-a and q9-a.",
       "blockIds": [
         "session-check",
         "hook-predict",
         "loop-check",
         "install-node",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "Re-scored because both tables and example-diff changed. loop-table's rows now read as one parallel pattern (「Xを見て、Yする」) under the caption 「見るものと、することの違い」, so the contrast is still clear in 2 columns. surfaces-table puts the use case and the caveat in one cell, which is slightly less scannable but fits on mobile. The diagram and caption are unchanged, example-diff shows the real artefact, and there are no decorative images.",
+      "evidence": "Re-scored because surfaces-table, install-unix and example-diff changed. The table keeps 2 columns, and the IDE row now names the editors in the cell (「VS Code・JetBrainsで変更箇所を見たい。JetBrains版はCLIが別に必要」), so the first column stays narrow. install-unix and example-diff are wrapped so they fit a mobile width without horizontal scrolling, and install-how signals the wrap. The diagram, its caption and the absence of decorative images are unchanged. The use case and the caveat still run together in the merged column (see niceToHave).",
       "blockIds": [
-        "loop-table",
         "surfaces-table",
+        "install-unix",
         "example-diff",
         "loop-diagram"
       ]
@@ -108,7 +112,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The task is authentic and runs in a throwaway folder. Every step has an expect, p-base now checks the heading before the first commit, practice-prompt-explain carries a model answer, and practice-checklist has 6 observable criteria. The hint ladder has at most two rungs (hint, then troubleshoot on p-start, p-base and p-change), and p-commit has no hint.",
+      "evidence": "The task is authentic and runs in a throwaway folder. Every step has an expect, practice-prompt-explain carries a model answer, and practice-checklist has 6 observable criteria. The hint ladder has at most two rungs, and p-commit has no hint.",
       "blockIds": [
         "practice-steps",
         "practice-prompt-explain",
@@ -119,7 +123,7 @@
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (5 points) comes after the exam. summary-next asks a reflection question tied to the practice (「演習で、確認なしで進んだ操作はありましたか。」) and names 第2回. The 7 cards in summary-cards now match the body (card-version 「バージョン番号が出れば成功です」, card-carry without --resume) and are cited, and askTutor follows.",
+      "evidence": "summary-points comes after the exam. summary-next asks a reflection question tied to the practice (「演習で、確認なしで進んだ操作はありましたか。」). The 7 cards match the body and are cited, and askTutor follows.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -131,50 +135,55 @@
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "Re-scored because q3-c changed. 「伝え直すか開き直せば続けられる」 claims that these ways work, not that they are required, so it stays within what the audit accepted (the audit rejected only 「必要がある」 as too strong). The explanation still says 「自動メモリに残ることもありますが、毎回とは限りません」. The table cells keep their earlier facts and citations (JetBrains needs the CLI, desktop needs a paid plan, cloud needs a pushed repo). The p-start expect 「入力欄の上に `cc-practice` が表示されます」 is still untraceable.",
+      "evidence": "Re-scored because surfaces-table, install-how and install-unix changed. 「CLIはCommand Line Interfaceの略」 is correct. The split command 「curl -fsSL https://claude.ai/install.sh \\」 / 「  | bash」 does the same thing as the cited one-liner, and install-how's 「2行で1つのコマンドです」 describes it correctly. The JetBrains, desktop and cloud cells keep their cited facts (cc-jetbrains, cc-desktop, cc-cloud). The rewrapped example-diff is still correct code. The p-start expect 「入力欄の上に `cc-practice` が表示されます」 still cannot be traced to a source.",
       "blockIds": [
-        "session-check",
         "surfaces-table",
+        "install-how",
+        "install-unix",
+        "example-diff",
         "practice-steps"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The lesson uses です・ます throughout in a warm tone (「大切なプロジェクトには影響しません」), with no banned phrases and English on katakana terms at first use. The auto-mode scope is now the same in example-mode and the glossary (「ターミナルとVS Codeの対話セッション」).",
+      "evidence": "Re-scored because install-how changed. The text stays in です・ます, in a warm tone and with no banned phrases. ネイティブインストーラー now gets its English at its first use in prose (「ネイティブインストーラー（native installer）」), and API keeps its expansion. Code labels are now mixed: install-unix has the Japanese-style 「macOS・Linux・WSL」, while install-win keeps 「PowerShell (Windows)」.",
       "blockIds": [
-        "example-mode",
-        "practice-task"
-      ],
-      "carriedOver": true
+        "install-how",
+        "install-unix",
+        "install-win",
+        "example-mode"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "Only jp is declared, and it is complete. The diagram has Japanese labels and full alt text, the links are descriptive (「公式ドキュメントの日本語版」, 「インストールのトラブルシューティング」), and the plain-text checklist labels no longer use markdown.",
+      "evidence": "Only jp is declared, and it is complete. The diagram has Japanese labels and full alt text, and the links are descriptive (「公式ドキュメントの日本語版」). The code-block labels are still meaningful after the change (「macOS・Linux・WSL」, 「差分の例（index.html）」).",
       "blockIds": [
         "loop-diagram",
         "install-lead",
-        "practice-checklist"
+        "install-unix",
+        "example-diff"
       ],
       "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "surfaces-table (changed block, carried-over observation): the CLI cell still uses 「ネイティブインストーラー（native installer）」 before install-how and never defines it. Change the cell to 「基本の入口。演習で使う。1-3の方法で入れる」, and change install-how's second sentence to 「推奨は、公式のインストール用コマンドで入れるネイティブインストーラー（native installer）で、自動で更新されます。」.",
-    "surfaces-table: in the merged column the use case and the caveat now read as one run of fragments. To keep them apart without a third column, mark the caveat, e.g. 「エディタで変更箇所を見たい。注意：JetBrains版はCLIが別に必要」 and 「PCを閉じても進めたい。注意：GitHubのリポジトリを使い、先にpushする」 (ja-editor owns the final wording).",
-    "loop-check q1: option a still repeats the loop-diagram description. Give d the same opening so that only the 確かめる stage tells them apart. d md: 「実行してエラーを読み、直したところで完了と報告する」. d feedback: 「直しただけでは、ループの「結果を確かめる」段階が抜けています。もう一度実行して確かめてから報告します。」",
-    "loop-diagram: `description` holds the failing-tests example, which the reader hides in a collapsed <details>. Move 「「失敗するテストを直して」なら、実行してエラーを読み、直して、また実行します。」 into a visible markdown block after the diagram.",
-    "prerequisites: q2 and surfaces-table depend on push. Change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」.",
-    "example-lead: use 「公式のクイックスタートの順に進めます。題材は、コミット済みの「hello world」の1ページです。」 so that the state step ③ relies on is shown before the practice's p-base.",
-    "practice p-change: add to the p-base md 「コミットしたら `exit` で終え、もう一度 `claude` を起動します。」 so that question ① is answered by reading files rather than from the same session's context.",
-    "factual doubt: the p-start expect 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail, and a first start may show a folder-trust prompt. Safer expect: 「Claude Codeが起動し、入力欄が表示されます。」.",
-    "check-quiz q8: set bloom to \"understand\", because 「このレッスンの進め方に沿って」 asks the learner to recall the order.",
-    "check-quiz q7-a feedback: 「Node.jsが要るのはnpmで入れる場合だけで、無料プランのままでは使えません。有料プランかConsoleアカウントを用意し、ネイティブインストーラーで入れます。」",
+    "install-how (changed block): WSL is now used in prose without explanation, and a Windows beginner cannot tell whether to use install-unix or install-win. Change the third sentence to 「macOS・Linux・WSL（Windows上のLinux環境）用は、2行で1つのコマンドです。WindowsのPowerShellでは、その下のコマンドを使います。」 (ja-editor owns the final wording).",
+    "install-win: to match the new install-unix label, change filename to 「Windows（PowerShell）」.",
+    "surfaces-table (changed block): the CLI cell now uses the 'scene and caveat' column for an acronym expansion. Option: 「基本の入口で、演習で使う。ターミナルで `claude` と打って始める」, with the expansion moved to surfaces-defs or to install-lead.",
+    "surfaces-table: the use case and the caveat still read as one run of fragments. Mark the caveat, e.g. 「VS Code・JetBrainsで変更箇所を見たい。注意：JetBrains版はCLIが別に必要」 and 「PCを閉じても進めたい。注意：GitHubのリポジトリを使い、先にpushする」.",
+    "loop-check q1: give d the same opening as a, so that only the 確かめる stage tells them apart. d md: 「実行してエラーを読み、直したところで完了と報告する」. d feedback: 「直しただけでは、ループの「結果を確かめる」段階が抜けています。もう一度実行して確かめてから報告します。」",
+    "loop-diagram: move 「「失敗するテストを直して」なら、実行してエラーを読み、直して、また実行します。」 from the collapsed description into a visible markdown block after the diagram.",
+    "prerequisites: change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」, because q2 and surfaces-table depend on push.",
+    "example-lead: 「公式のクイックスタートの順に進めます。題材は、コミット済みの「hello world」の1ページです。」",
+    "practice p-base: add 「コミットしたら `exit` で終え、もう一度 `claude` を起動します。」 so that question ① is answered by reading files.",
+    "factual doubt: the p-start expect 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail, and a first start may show a folder-trust prompt instead. Safer: 「Claude Codeが起動し、入力欄が表示されます。」.",
+    "check-quiz q8: set bloom to \"understand\".",
     "practice-steps p-commit: add the hint 「1つしか並ばないときは、「まだコミットしていない変更はある？」と聞いて、残りをコミットしてもらいます。」"
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round: review-scope exited 0, with 4 of 43 blocks changed (5%) and no structural change. The previous review had no must-fix items, so there are no resolved entries. All four changed blocks were reviewed in full. The two tables now have 2 columns and keep their contrast and citations. The new q3-c 「…伝え直すか開き直せば続けられる」 is accurate and does not give the answer away, and its wrong options still name real misconceptions. The rewritten example-diff is still correct and matches steps ③ and ④. No regressions were found. The only remaining issue in a changed block is the undefined ネイティブインストーラー term in surfaces-table, which stays a nice-to-have as in round 1. Validate and lint --strict are clean."
+  "summary": "Verification round. review-scope exited 0: 4 of 43 blocks changed (5%), with no change to sections or objectives. The previous review had no must-fix items, so there are no resolved entries. I reviewed all four changed blocks in full. The round-1 nice-to-have on surfaces-table is applied: the CLI cell no longer uses ネイティブインストーラー before it is introduced, and install-how now gives it with English at first use. The wrapped install-unix command and example-diff are still correct and match the steps' expects, and install-how points out the line break. No regressions and no new must-fix items. Small leftovers in changed blocks (WSL not explained, an acronym expansion in the scene column, mixed code-block labels) are listed as nice-to-haves. validate shows 0 errors and lint --strict 0 warnings; measure.mjs gives an estimate of 15.9 min."
 }

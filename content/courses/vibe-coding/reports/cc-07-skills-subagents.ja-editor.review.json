@@ -4,61 +4,64 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:e03f31fdd3519c9b",
+  "lessonHash": "sha256:97075ebd0299de71",
   "verifies": {
-    "reviewedRevision": "sha256:41f1a70fd4ffba29",
+    "reviewedRevision": "sha256:e03f31fdd3519c9b",
     "changed": [
       "s1-diagram",
       "s2-skill",
       "s2-steps",
       "s2-check",
       "s3-diagram",
+      "s3-file",
       "s4-table",
-      "s4-check",
-      "summary-next",
-      "lesson.glossary"
+      "pr-model"
     ],
-    "changedShare": 0.21,
+    "changedShare": 0.12,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-07-skills-subagents/41f1a70fd4ffba29/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-07-skills-subagents/e03f31fdd3519c9b/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "All changed text is in です・ます. Every glossary entry now ends in です, for example 「Claude Codeに渡す手順や資料のまとまりです。」 and 「Claude Codeに機能を足すしくみです。」. In q2 the options keep the same form: a 「フロントマターに…を書く」, b 「フロントマターの `description` に…と書き足す」, c 「本文の最初に「実行する前に、必ずユーザーに確認する」と書く」 and d 「…にする」. q6 option d now describes a situation like the other options: 「最初に全部登録しようとしている」. That was a round-1 suggestion. summary-next names the next lesson with its exact title: 「次は「第8回｜フックで守らせ、MCPでつなぐ」です。」, which matches the cc-08 title. No pressure phrases and no 翻訳調 were added.",
+      "evidence": "All changed prose is in です・ます. ex-description now reads 「できたフォルダに、エディターで `SKILL.md` を作ります。…長い説明文は、`>-` のあとで改行し、字下げして続けます。」. ex-slash now has a title and an action: 「⑤ 名前で呼び出す」 and 「`/commit-message` と入力します。」. In q3, option d 「手順：`npm test` を実行する／失敗を一覧にする／原因を調べる」 is still a candidate description, like options a–c, and its feedback is 2 sentences. The line breaks in the code blocks keep each instruction whole: 「あなたは調査の担当です。／ファイルは変更しません。／わかったことを5行以内にまとめて返します。／根拠のファイル名もつけます。」. No pressure phrases and no 翻訳調 were added.",
       "blockIds": [
-        "lesson.glossary",
+        "s2-steps",
         "s2-check",
-        "s4-check",
-        "summary-next"
+        "s3-file",
+        "s2-skill",
+        "pr-model"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "`lint --strict` is clean (0 errors, 0 warnings). measure.mjs reports prose 1931 (budget 1,200–2,400) and est 17.8 min (≤ 20), which matches estMinutes 18. The ex-folder troubleshoot in s2-steps is still 3 sentences after the `mkdir`/`cd` split: 「…`mkdir cc-practice` で作り、`cd cc-practice` で移ります。」. s4-table now has 2 columns and fits a phone screen.",
+      "evidence": "`lessons:lint --strict` is clean (0 errors, 0 warnings). measure.mjs gives prose 1975 (budget 1,200–2,400) and est 17.9 min (must be ≤ 20; estMinutes 18). para-sentences.mjs finds 0 paragraphs over 3 sentences. ex-description is now exactly 3 sentences. The code lines and table cells are shorter, so they fit a phone screen.",
       "blockIds": [
         "s2-steps",
+        "s2-skill",
+        "s3-file",
+        "pr-model",
         "s4-table"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "No new terms in the changed blocks. The diagram labels, table cells and glossary use the same names as the text (スキル, 説明文, 本文, サブエージェント, CLAUDE.md, フック). There is one small label and alt difference in s3-diagram (see niceToHave).",
+      "evidence": "The changed blocks bring in one notation, `>-`, and ex-description explains its use when it appears. The round-1 naming notes were fixed. The s3-diagram alt now matches its label: 「サブエージェントが自分のコンテキストでファイルを読んで要約し」. The s1-diagram labels now use one verb, 「全文を読む」「だけを読む」「本文を読む」. The s4-table names (CLAUDE.md, スキル, サブエージェント, フック) match the text and the glossary.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
         "s4-table",
-        "lesson.glossary"
+        "s2-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "jp is the only declared locale and nothing is missing. In s1-diagram the 「いいえ」 branch was dropped from the drawing, but the alt still describes it: 「それ以外では本文は読み込まれない」. Each diagram has its caption and a concrete alt.",
+      "evidence": "jp is the only declared locale, and no changed string is missing or empty. The s1-diagram alt still describes the reworded node: 「依頼が説明文に合うか /名前 で呼んだときだけSKILL.mdの本文が読み込まれ」. The s3-diagram alt matches its labels.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram"
@@ -67,14 +70,15 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s3-diagram: the node label was shortened to 「自分のコンテキスト」, but the alt and the サブエージェント glossary entry say コンテキストウィンドウ, and the glossary treats the two as different things (window vs its contents). Align the alt with the label — 「サブエージェントが自分のコンテキストウィンドウでファイルを読んで要約し」→「サブエージェントが自分のコンテキストでファイルを読んで要約し」",
-    "s1-diagram: the labels mix 読む and 読み込む for the same action (B 「全文を読む」, C 「だけを読む」, E 「本文を読み込む」), while the caption and alt use 読み込む. Use one verb — 「本文を読み込む」→「本文を読む」 (or change B and C to 読み込む)",
-    "check-quiz (unchanged, carried from round 1): 残 is still used twice in the e5 explanation — 「あとの作業に使える余裕が残ります。」→「あとの作業に使える余裕ができます。」",
-    "check-quiz (unchanged, carried from round 1): the e3 explanation still repeats 残る — 「計画に使える余裕が残ります。」→「計画に使える余裕ができます。」",
-    "s3-lead (unchanged, carried from round 1): the subject of 埋まる is left out — 「その中身はコンテキストに残り、埋まるほど作業の質が落ちます（第5回）。」→「その中身はコンテキストに残ります。コンテキストが埋まるほど、作業の質が落ちます（第5回）。」",
-    "pr-steps (unchanged, carried from round 1): グリッド has no English on first use — 「色分けされたグリッドで」→「色分けされたグリッド（grid）で」"
+    "s4-table: the フック row does not fit the column header 「きっかけ（読み込まれ方）」, because 「（第8回で扱います）」 is not a way of being loaded. Move the note out of the parentheses — 「頼まなくても、毎回必ず実行してほしい（第8回で扱います）」→「頼まなくても、毎回必ず実行してほしい（読み込まれ方は第8回で扱います）」",
+    "s2-skill: the filename was shortened to 「commit-message/SKILL.md」, but s3-file keeps the full path 「.claude/agents/researcher.md」. A learner who jumps straight to the code may not see where the file goes. Keep the full path for the skills too, or say where it goes in the step — 「できたフォルダに、エディターで `SKILL.md` を作ります。」→「できたフォルダ（`.claude/skills/commit-message/`）に、エディターで `SKILL.md` を作ります。」 (same for pr-model 「update-readme/SKILL.md」)",
+    "s2-steps ex-description: factual doubt: in YAML a `>-` block joins its lines with a space, so the Japanese description becomes 「変更を要約し、 コミットメッセージの案を出す。…」 with spaces between the lines. This is probably harmless, but you could say so — 「長い説明文は、`>-` のあとで改行し、字下げして続けます。」→「長い説明文は、`>-` のあとで改行し、字下げして続けます（行は1つにつながって読まれます）。」",
+    "check-quiz (unchanged, carried): 残 is still used twice in the e5 explanation — 「あとの作業に使える余裕が残ります。」→「あとの作業に使える余裕ができます。」",
+    "check-quiz (unchanged, carried): the e3 explanation still repeats 残る — 「計画に使える余裕が残ります。」→「計画に使える余裕ができます。」",
+    "s3-lead (unchanged, carried): the subject of 埋まる is left out — 「その中身はコンテキストに残り、埋まるほど作業の質が落ちます（第5回）。」→「その中身はコンテキストに残ります。コンテキストが埋まるほど、作業の質が落ちます（第5回）。」",
+    "pr-steps (unchanged, carried): グリッド has no English on first use — 「色分けされたグリッドで」→「色分けされたグリッド（grid）で」"
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: 8 of 39 blocks and the glossary changed (21%). The previous review had no must-fix items, so there are no resolved entries. I reviewed every changed block in full: two diagrams, the SKILL.md example, s2-steps, the q2, q3 and q6 options, the 2-column table, summary-next and the glossary, whose entries now all end in です. None of them has an (a)–(e) error. Two round-1 suggestions were applied (q6 option d and the 3-sentence ex-folder troubleshoot). There are two new small consistency notes, both niceToHave: the s3-diagram label and alt, and 読む vs 読み込む in s1-diagram. lint --strict is clean, and measure.mjs gives prose 1931 and est 17.8 min (estMinutes 18). All scores stay at 4."
+  "summary": "Verification round. review-scope.mjs exited 0: 8 of 39 blocks changed (12%). The previous review had no must-fix items, so there are no resolved entries. Two round-1 suggestions were applied: the s3-diagram alt now says 自分のコンテキスト, and the s1-diagram labels use one verb, 読む. I reviewed every changed block in full: the two diagrams, the three YAML code blocks (now folded with `>-`), s2-steps (ex-description, ex-slash), q3 option d and the reshaped 2-column s4-table. None of them has an (a)–(e) error. There are three new minor notes, all niceToHave: the フック row in s4-table, the shortened SKILL.md filenames, and a factual doubt about the spaces `>-` adds. lint --strict is clean, measure.mjs gives prose 1975 and est 17.9 min (estMinutes 18), and no paragraph has more than 3 sentences. All scores stay at 4."
 }
