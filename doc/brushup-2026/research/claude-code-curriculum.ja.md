@@ -9,7 +9,7 @@
 2. 実践のトレンドと、学習者がつまずく点。
 3. それをもとにしたコース設計。モジュール、レッスン、到達目標、演習。
 
-レッスンの下書きは `content/courses/vibe-coding/drafts/cc-*.lesson.json`、ブリーフは同じコースの `briefs/` にあります（§9）。
+レッスンは新コース `claude-code` として公開しました（2026-10-21）。レッスンは `content/courses/claude-code/lessons/cc-*.lesson.json`、ブリーフとレビュー結果は同じコースの `briefs/` と `reports/` にあります（§9）。
 
 ---
 
@@ -35,8 +35,8 @@
    そこで、各レッスンに「差分を説明させる」「結果を予測する」確認を入れます。Learning・Explanatory 出力スタイルも紹介します。
 7. **既存講座との差別化**：Anthropic の Claude Code 101（入門・英語）と Claude Code in Action（上級）が公式の骨格です。日本語の書籍は 2025-12 以降に 4 冊出ています。
    Rise Path の強みは 3 つです。日本語のネイティブな文章、1 レッスン 15〜20 分の小さな単位、「予測 → 確認 → 演習」で必ず手を動かす構成です。
-8. **提案するコース**：「Claude Code 実践：AIエージェントと開発する」。4 モジュール 11 レッスン、合計 約3時間40分です（§7）。
-   今回、11 レッスンすべての下書きを作成しました。各レッスンは、契約チェック（validate / lint）と独立レビュー（pedagogy-reviewer・ja-editor）にかけています（§9）。
+8. **提案するコース**：「Claude Code 実践：AIエージェントと開発する」。4 モジュール 11 レッスン、合計 約3時間25分です（§7、各レッスンの estMinutes の合計 205 分）。
+   11 レッスンすべてを作成し、契約チェック（validate / lint）と独立レビュー（pedagogy-reviewer・ja-editor・visual-qa）を通して、新コース `claude-code` として公開しました（§9）。
 
 ---
 
@@ -318,7 +318,7 @@
   - バイブコーディングコースの第3章（VS Code）・第5章（GitHub）程度の基礎がある人
   - 他の AI コーディングツールを使ったことがある開発者
 - **前提**：ターミナルで `cd`・`ls` ができる。Git の commit と push の意味がわかる。有料プランか Console アカウントがある。
-- **レベル**：初級〜中級。**全 11 レッスン・合計 約3時間40分**（1 レッスン 15〜25 分）。
+- **レベル**：初級〜中級。**全 11 レッスン・合計 約3時間25分**（1 レッスン 16〜20 分）。
 - **共通の型**（Rise Path のレッスン契約）：問題提起と予測 → 3〜5 の概念と例 → 確認問題 → 演習（成功条件・ヒント・模範解答）→ 総まとめテスト → 要点とフラッシュカード。
 - **版の書き方**：レッスンの冒頭に「2026年10月時点（Claude Code v2.1.304）」と書きます。既定値が変わった機能には最低バージョンを添えます。
 
@@ -353,9 +353,11 @@
 | `cc-10-safety-cost` | 安全とコストを管理する | o1 危ない場面と対策を結びつけられる（analyze）／o2 秘密情報を読ませない deny ルールを書ける（apply）／o3 想定外の請求の原因を特定できる（analyze） | 自分の設定を「安全・コスト」チェックリストで点検する |
 | `cc-11-capstone` | 総合演習：自分のリポジトリに Claude Code 環境をつくる | o1 CLAUDE.md・スキル・フック・権限ルールを組み合わせて設計できる（create）／o2 チェックリストで自分の設定を評価できる（evaluate） | 実在の自分のリポジトリで環境を作り、1 つの機能を計画 → 実装 → 検証 → コミットする |
 
-### 公開時の形（オーナーの判断事項）
+### 公開時の形
 
-- **案A（推奨）：新しいコース `claude-code` として公開する。**
+オーナーの判断で、案A（新しいコース `claude-code`）で公開しました（2026-10-21）。world は `ai`（紫）を使い、コースのページは `/claude-code`、学習コンテンツ（Learning Hub）にカードを追加しています。検討した 2 案は次のとおりです。
+
+- **案A（採用）：新しいコース `claude-code` として公開する。**
   - `content/courses/claude-code/course.json` を作り、上の 4 モジュールを並べます。
   - レッスンファイルは `lessons/` へ移し、`courseId` を `claude-code` に直します。`next` は公開時に付けます。
   - world は `vibe` を使い回すか、新しく作るかを決める必要があります。
@@ -363,8 +365,7 @@
   - 第6章（Gemini CLI）と並ぶ位置になります。
   - コースの学習時間が長くなり、Claude Code 未経験の人には第12章以降が重く感じられる可能性があります。
 
-今回の下書きは、プレビューに `course.json` が必要なため、`content/courses/vibe-coding/drafts/` に置いています。
-`courseId: "vibe-coding"`、`next` なし、日本語のみです。英語版は、公開するコースが決まってから翻訳します。
+作成中の下書きは、プレビューに `course.json` が必要なため `content/courses/vibe-coding/drafts/` に置いていました。公開時に `content/courses/claude-code/lessons/` へ移し、`courseId` を直し、`course.json` の `next` でつなげています。日本語のみです。
 
 ---
 
@@ -385,15 +386,17 @@ Claude Code は 2026-05 以降、ほぼ毎日（約150回）リリースされ�
 | 種類 | 場所 |
 |---|---|
 | このレポート | `doc/brushup-2026/research/claude-code-curriculum.ja.md` |
-| レッスンごとのブリーフ | `content/courses/vibe-coding/briefs/cc-*.md` |
-| レッスンの下書き（11本） | `content/courses/vibe-coding/drafts/cc-*.lesson.json` |
-| レビュー結果とレポート | `content/courses/vibe-coding/reports/cc-*` |
+| コースの定義（4 モジュール・11 レッスン） | `content/courses/claude-code/course.json` |
+| レッスンごとのブリーフ | `content/courses/claude-code/briefs/cc-*.md` |
+| レッスン（11本、公開済み） | `content/courses/claude-code/lessons/cc-*.lesson.json` |
+| レビュー結果とレポート | `content/courses/claude-code/reports/cc-*` |
+| コースのページ | アプリの `/claude-code`（`components/features/programming/CoursePathView.tsx`） |
 
 各レッスンの validate・lint・レビューの結果は、レッスンごとのレポート（`reports/cc-*.md`）に記録します。
 
 ### 9.0 状態（2026-10-21）
 
-11 本とも下書き（`drafts/`）として、validate 0 件・lint --strict 0 件で、3 つのレビュー（pedagogy-reviewer・ja-editor・visual-qa）を `check-review.mjs` で通っています（全観点 3 以上、平均 3.3 以上、必須修正なし）。公開（`lessons/` と `course.json` への追加）はしていません。
+11 本とも新コース `claude-code` として公開済みです（`lessons/` と `course.json`）。validate 0 件・lint --strict 0 件で、3 つのレビュー（pedagogy-reviewer・ja-editor・visual-qa）を `check-review.mjs` で通っています（全観点 3 以上、平均 3.3 以上、必須修正なし）。公開による移動のあとも、3 つのレビューをやり直しています。
 
 | レッスン | タイトル | 所要時間 | レビュー平均 |
 |---|---|---|---|
@@ -438,8 +441,8 @@ Claude Code は 2026-05 以降、ほぼ毎日（約150回）リリースされ�
 
 ## 10. オーナーへの確認事項
 
-1. 公開の形：案A（新コース `claude-code`）と案B（バイブコーディングに追加）のどちらにするか。
-2. 英語版をいつ作るか。公開するコースが決まってから翻訳する想定です。
+1. ~~公開の形~~：案A（新コース `claude-code`）で公開しました（2026-10-21）。
+2. 英語版をいつ作るか。
 3. 演習用リポジトリの題材：Rise Path で共通の練習用リポジトリ（小さな Web アプリ）を用意するか、学習者の手元のプロジェクトを使うか。今回の下書きは「新しい練習用フォルダを作る」形にしています。
 4. 有料プランが前提になる点：無料プランでは Claude Code が使えません。コース紹介文にどう書くかを決めます。
 5. §9.2 の書き方の決まりを、レッスン契約（`lesson-contract.md`）とリンターに取り込むか。
