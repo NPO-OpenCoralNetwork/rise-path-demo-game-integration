@@ -1,6 +1,6 @@
 # Report: claude-code/cc-10-safety-cost (published)
 
-**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:8a9d7701d14a41d6.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:5f607bd73eb54e78.**
 
 - Title: 第10回｜安全とコストを管理する
 - Lesson: `content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json` · brief: `content/courses/claude-code/briefs/cc-10-safety-cost.md`
@@ -33,30 +33,30 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`
+- course length measure: `prose 1887 (budget 1,200–2,400) · read 2467 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json (sha256:8a9d7701d14a41d6)
-  ja-editor: full review
-  pedagogy-reviewer: full review
+  lesson content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json (sha256:5f607bd73eb54e78)
+  ja-editor: verification of fdffcc2 (previous review cross-checked; scope recomputed from fdffcc2:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: a11y_l10n · previous fdffcc2:content/courses/claude-code/reports/cc-10-safety-cost.ja-editor.review.json
+  pedagogy-reviewer: verification of fdffcc2 (previous review cross-checked; scope recomputed from fdffcc2:content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, load, worked, active, miscon, meta, a11y_l10n · previous fdffcc2:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json
   visual-qa: full review
-  mean 3.31 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      4  (pedagogy-reviewer)
-  ✓ hook       4  (pedagogy-reviewer)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer)
-  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer)
-  ✓ active     3  (pedagogy-reviewer)
-  ✓ miscon     4  (pedagogy-reviewer)
+  mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
+  ✓ align      4  (pedagogy-reviewer carried)
+  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     3  (pedagogy-reviewer carried)
+  ✓ miscon     4  (pedagogy-reviewer carried)
   ✓ visual     3  (pedagogy-reviewer, visual-qa)
   ✓ practice   3  (pedagogy-reviewer)
-  ✓ meta       4  (pedagogy-reviewer)
-  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/claude-code/cc-10-safety-cost/`)
@@ -70,6 +70,7 @@ Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
 7. `31ca899dd855ae10`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify revise (mean 3.38, must-fix 1); visual-qa full revise (mean 3.00, must-fix 1)
 8. `4f85040f9e462bb2`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 9. `8a9d7701d14a41d6`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+10. `5f607bd73eb54e78`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 

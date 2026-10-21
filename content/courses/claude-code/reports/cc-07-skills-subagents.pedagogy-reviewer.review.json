@@ -4,23 +4,12 @@
   "lessonHash": "sha256:2679f127d93ca803",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:0ffacf7c3db87313",
-    "previousReview": ".artifacts/review/claude-code/cc-07-skills-subagents/0ffacf7c3db87313/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "s4-check"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "carriedOver": true,
-      "evidence": "The 3 objectives use observable verbs (まとめられる / 判断できる / 説明できる). Each has 2 or more questions with objectiveId: o1 has q2, q3, e1 and e2; o2 has q1, q5, q6 and e3; o3 has q4, e5 and e6. Both e1 (team sharing) and e3 (finding old code before swapping a library) are apply-or-higher transfer items. The create level of o1 is checked only by pr-checklist (「説明文に「何をするか」と「いつ使うか」が書いてあります」).",
+      "evidence": "The 3 objectives use observable verbs (まとめられる / 判断できる / 説明できる). Each has 2 or more questions with objectiveId: o1 has q2, q3, e1 and e2; o2 has q1, q5, q6 and e3; o3 has q4, e5 and e6. e1 (sharing with a team) and e3 (finding old code before a library swap) are transfer items at apply level or above. The create level of o1 is checked only through the practice (pr-write, pr-checklist).",
       "blockIds": [
         "s1-check",
         "s2-check",
@@ -33,8 +22,7 @@
     {
       "id": "hook",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "hook-b1 sets a concrete problem in 3 sentences (「コミットの前に、毎回同じ手順をClaude Codeに貼り付けていませんか。」), and the ungraded hook-q leads into 7-1. But hook-q mostly asks learners to recall lesson 6 (its explanation says 「（第6回）」). The second problem in hook-b1, research output flooding the conversation, gets no prediction.",
+      "evidence": "hook-b1 sets a concrete problem in 3 sentences (「コミットの前に、毎回同じ手順をClaude Codeに貼り付けていませんか。」), and the ungraded hook-q leads into 7-1. hook-q mostly asks learners to recall lesson 6, though (its explanation says 「（第6回）」). The second problem in hook-b1, research output flooding the conversation, gets no prediction.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
@@ -43,8 +31,7 @@
     {
       "id": "prior",
       "score": 4,
-      "carriedOver": true,
-      "evidence": "The prerequisites name lessons 5 and 6, and the text recalls them where they are used (「（第6回）」 in s1-lead and hook-q, 「（第5回）」 in s3-lead). The new terms are defined with their English in s1-defs (スキル, フロントマター, 段階的な読み込み) and s3-defs (サブエージェント, フォーク), and 拡張機能 is defined in s4-lead. These definitions match the glossary. YAML is glossed inline (「「項目名: 値」の形で設定を書く書式」).",
+      "evidence": "The prerequisites name lessons 5 and 6, and the text recalls them where they matter (「（第6回）」 in s1-lead and hook-q, 「（第5回）」 in s3-lead). New terms are defined with their English before use: s1-defs (スキル, フロントマター, 段階的な読み込み), s3-defs (サブエージェント, フォーク) and s4-lead (拡張機能). The definitions match the glossary, and YAML is explained inline (「「項目名: 値」の形で設定を書く書式」).",
       "blockIds": [
         "s1-defs",
         "s3-defs",
@@ -56,46 +43,46 @@
     {
       "id": "load",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "measure.mjs still reports 「prose 2167 (budget 1,200–2,400) · read 2594 · practice reading 931 · questions 12 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)」, and lint --strict gives 0 errors and 0 warnings after the q6 ending change. Section 7-3 is the densest: subagent, fork, background default and the agent file come in 7 blocks before its check. The unexplained `>-` sentence in ex-description also adds load.",
+      "evidence": "measure.mjs reports 「prose 2167 (budget 1,200–2,400) · read 2594 · practice reading 931 · questions 12 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)」, and lint --strict reports 0 errors and 0 warnings. The prose is near the top of the budget. Section 7-3 is the densest: the subagent, the fork, the background default and the agent file come in 7 blocks before its check.",
       "blockIds": [
         "s3-defs",
         "s3-bg",
         "s3-file-lead",
-        "s2-steps"
+        "s3-file"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "7-2 is a full worked example before practice. s2-steps has 5 labelled steps, each with its reason (「起動後に `.claude/skills/` を新しく作ると、`/reload-skills` するまで読み込まれないためです」, 「Claudeは説明文で使うかを決めるので」), plus a prediction in ex-auto. There is no faded example. The subagent half of the practice is shown only as s3-how's one-line phrasing.",
+      "evidence": "7-2 is a full worked example that comes before the practice. s2-steps has 5 labelled steps, each with its reason (「起動後に `.claude/skills/` を新しく作ると、`/reload-skills` するまで読み込まれないためです」, 「Claudeは説明文で使うかを決めるので」), and ex-auto asks for a prediction. There is no faded example. The subagent half of the practice is modelled only by s3-how's one sentence and the s3-file example.",
       "blockIds": [
         "s2-skill",
         "s2-steps",
-        "s3-how"
+        "s3-how",
+        "s3-file"
       ]
     },
     {
       "id": "active",
       "score": 4,
-      "evidence": "Re-scored because s4-check changed. Only the option endings of q6 changed: a 「…別のコマンドをClaudeが今日も実行している」, c 「…もう読まない出力で会話の大半が埋まっている」, d 「…今のうちにすべてスキルにしようとしている」. b is unchanged (「リリース前の12ステップの確認を、毎週チャットで一から説明し直している」). All four now end in 「〜ている」, so the grammatical form no longer marks b as different from the others. No option takes the wording of s4-table or s4-pitfall, so the evaluate item still needs the learner to map each situation to its trigger. The ids, order, answer [\"b\"], objectiveId o2 and bloom evaluate are unchanged. One weakness remains elsewhere: q2's answer is the key that s2-invoke names just before it.",
+      "evidence": "Each of the 4 content sections ends with an inline quiz (s1-check to s4-check), and every wrong option has feedback. q5 (fork vs ordinary subagent) and q6 (four situations mapped to their triggers, worded unlike s4-table) need application, not word matching. One weakness: q2's answer is the key that s2-invoke names just before it.",
       "blockIds": [
-        "s4-check",
-        "s4-table",
-        "s4-pitfall",
+        "s1-check",
         "s2-check",
+        "s3-check",
+        "s4-check",
         "s2-invoke"
       ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored because s4-check changed. The unchanged q6 feedback still fits the reworded options. a 「規約やコマンドのまちがいは、CLAUDE.mdに足すきっかけです。」 matches the ongoing wrong command in a's 「実行している」. c 「あとで見返さない出力で会話が埋まるのは、サブエージェントのきっかけです。」 matches 「埋まっている」. d 「きっかけのない拡張機能は、説明文のぶんだけコンテキストを使い続けます。困りごとが来てから足します。」 corrects the intention in 「すべてスキルにしようとしている」. Elsewhere nothing changed: the misconceptions in the brief still appear as distractors with corrective feedback (q2 b, q4 c, q5 b, e2 a), and s4-pitfall names the 「最初に全部そろえる」 mistake.",
+      "evidence": "Each misconception in the brief is a distractor with corrective feedback: skills load in full (q1 a), a polite request stops auto-use (q2 b), nothing comes back (q4 c), subagents remember the conversation (q5 b), a more detailed body fixes triggering (e2 a), and install everything up front (q6 d, plus s4-pitfall 「最初に全部そろえる」). e6 b corrects the idea that reading more files grows the main context (「読む量が多くても、それだけではメインの会話は増えません」). The practice hint pr-after contradicts that point (see mustFix).",
       "blockIds": [
-        "s4-check",
+        "s1-check",
         "s2-check",
         "s3-check",
+        "s4-check",
         "check-quiz",
         "s4-pitfall"
       ]
@@ -103,8 +90,7 @@
     {
       "id": "visual",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "s1-diagram (5 nodes) and s3-diagram (4 nodes) show a process, and their captions state the takeaway (「読んだ中身はサブエージェント側に残り、メインの会話には要約だけが戻る」). There are no decorative images. But the s1-diagram labels say 「読む」 while the lesson's term is 読み込む (段階的な読み込み). Its alt also describes a branch the diagram does not draw (「それ以外では本文は読み込まれない」), and that is the contrast q1 tests.",
+      "evidence": "s1-diagram (5 nodes) and s3-diagram (4 nodes) show a process, and their captions state the takeaway (「読んだ中身はサブエージェント側に残り、メインの会話には要約だけが戻る」). There are no decorative images. The s1-diagram labels say 「読む」 where the lesson's term is 読み込む. Its alt also describes a branch the diagram does not draw (「それ以外では本文は読み込まれない」), and that branch is the contrast q1 tests.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram"
@@ -113,8 +99,7 @@
     {
       "id": "practice",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "The task is authentic: the learner turns their own repeated work into a skill, then compares `/context` before and after delegating. All 7 pr-steps have an expect, pr-prompt gives the delegation text, pr-checklist sets 5 success criteria and pr-model/pr-model-lead give a model answer with its reason. pr-write has only one hint rung (「7-2の `commit-message` を手本に、中身を入れ替えます。」) before the full model answer.",
+      "evidence": "The task is authentic: the learner turns their own repeated work into a skill, then compares `/context` before and after delegating. All 7 pr-steps have an expect, pr-checklist sets 5 success criteria, and pr-model/pr-model-lead give a model answer with its reason. But pr-write has only one hint rung before the model answer. pr-after's hint 「ファイルが少ないと、差は小さく出ます。」 also ties the ⑤→⑦ difference to the number of files read, which is the opposite of what pr-c5 asks the learner to explain.",
       "blockIds": [
         "pr-steps",
         "pr-prompt",
@@ -126,8 +111,7 @@
     {
       "id": "meta",
       "score": 4,
-      "carriedOver": true,
-      "evidence": "summary-points (4 points) comes after the exam. summary-next has a lesson-specific reflection (「スキルにしたい手順と、サブエージェントに任せたい調べものを1つずつ挙げてみましょう」) and names the next lesson by its exact title. It is followed by 6 flashcards and 3 askTutor suggestions.",
+      "evidence": "summary-points (4 points) comes after the exam. summary-next has a reflection specific to this lesson (「スキルにしたい手順と、サブエージェントに任せたい調べものを1つずつ挙げてみましょう」) and names the next lesson by its exact title. Then come 6 flashcards and 3 askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -138,24 +122,23 @@
     {
       "id": "accuracy",
       "score": 3,
-      "carriedOver": true,
-      "evidence": "The 4 confirmed findings in audit-cc-07-skills-subagents.json are all applied: q5 d (「スキルはふだん今の会話の中で動くため、脇では進みません。」), q2 d (「フロントマターなどの設定で決めます」), e6 c (「主に」), and the s4 caption is gone. s4-main matches sub-agents.md (\"A subagent that isn't a fork starts fresh and may need time to gather context\"), and the versions are pinned (v2.1.304, v2.1.198). Not scored 4: nothing shows that the folded `description: >-` in s2-skill, s3-file and pr-model loads as written. The q6 ending change adds no new factual claim.",
+      "evidence": "The earlier doubt about `description: >-` is settled: content/courses/claude-code/reports/facts/cc-07-skills-subagents.facts.md [repro-yaml] shows that s2-skill, pr-model and s3-file load and that each description arrives as one string. The 4 confirmed findings in audit-cc-07-skills-subagents.json are applied (q5 d, q2 d 「フロントマターなどの設定で決めます」, e6 c 「主に」, no s4 caption). s4-pitfall is backed by features-overview (\"If descriptions are vague or overlap, Claude may load the wrong skill\"), and versions are pinned (v2.1.304, v2.1.198). Not a 4: the pr-after hint contradicts the lesson's own e6 b feedback.",
       "blockIds": [
-        "s3-check",
-        "s2-check",
-        "check-quiz",
-        "s4-main",
         "s2-skill",
         "s3-file",
-        "pr-model"
+        "pr-model",
+        "s2-check",
+        "s3-check",
+        "check-quiz",
+        "s4-pitfall",
+        "pr-steps"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored because s4-check changed. The q6 options now share one ending (「〜ている」), so the list reads evenly, and lint --strict finds no banned phrases or long sentences. Elsewhere unchanged: です・ます, warm (「まず予想してみましょう」), and katakana terms carry their English on first use (サブエージェント（subagent）, バックグラウンド（background）). Minor inconsistency remains: s1-diagram's 「読む」 vs 「読み込まれる」 in the text. The ja-editor owns the wording.",
+      "evidence": "The text uses です・ます and is warm (「まず予想してみましょう」), and lint --strict finds no banned phrases or overlong sentences. Katakana terms carry their English on first use (サブエージェント（subagent）, バックグラウンド（background）). One term is inconsistent: s1-diagram's 「読む」 against 「読み込まれる」 in the text. The ja-editor owns the wording.",
       "blockIds": [
-        "s4-check",
         "hook-b1",
         "s3-bg",
         "s1-diagram"
@@ -164,8 +147,7 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "carriedOver": true,
-      "evidence": "The lesson is jp only and complete, including the diagram labels. Both diagrams have alt text, and the s2-legacy link text is descriptive (「公式ドキュメント（日本語版）」). s4-table is a semantic list of self-contained sentences that fits mobile.",
+      "evidence": "The lesson is jp only and complete, diagram labels included. Both diagrams have alt text, and the s2-legacy link text is descriptive (「公式ドキュメント（日本語版）」). s4-table is a semantic list of self-contained sentences, which fits a phone screen.",
       "blockIds": [
         "s1-diagram",
         "s3-diagram",
@@ -174,20 +156,28 @@
       ]
     }
   ],
-  "mustFix": [],
+  "mustFix": [
+    {
+      "criterion": "practice",
+      "blockId": "pr-steps",
+      "issue": "Step pr-after asks the learner to explain the difference from ⑤ (「⑤との差の理由を説明します」). Its hint 「ファイルが少ないと、差は小さく出ます。」 says this difference grows with the number of files the subagent read. That contradicts the lesson's core point for o3 and its own e6 b feedback (「読む量が多くても、それだけではメインの会話は増えません」). A learner who sees a small difference is steered to the wrong explanation (few files) instead of the one pr-c5 checks (only the request and the report came back).",
+      "fix": "In pr-steps item pr-after, replace the hint with: 「差は、サブエージェントが読んだファイルの量ではなく、依頼文と報告の長さで決まります。報告に挙がったファイルの数と見比べてみましょう。」 Leave expect and pr-c5 as they are."
+    }
+  ],
   "niceToHave": [
-    "s4-check q6: the prompt asks 「次の困りごとのうち」, but option d begins 「まだ困っていないが」, so it is not a 困りごと. Consider the prompt 「次の場面のうち、スキルにするのがいちばん合うのはどれでしょう？」 (wording: ja-editor).",
-    "s4-check q6 explanation: it still quotes the list wording (「何度も貼っている複数ステップの手順は」), while option b says 「一から説明し直している」. To show the learner the mapping, consider 「毎週一から説明し直している複数ステップの手順は、「何度も貼っている」と同じくスキルにするきっかけです。本文は使うときだけ読み込まれるので、CLAUDE.mdを長くせずにすみます。」 (wording: ja-editor).",
-    "factual doubt: none of the saved official pages (skills.md, sub-agents.md) shows a folded `description: >-`, and the commit-message folder in audit-repro-cc-07-skills-subagents is empty. Reproduce s2-skill once in cc-practice and confirm that `/commit-message` appears and loads. If it does not, use single-line descriptions in s2-skill, s3-file and pr-model.",
-    "s2-steps ex-description: the `>-` sentence says how to write it but not what it does. Replace with 「長い説明文は、`>-` のあとで改行し、同じ幅で字下げして続けます。数行が1つの説明文になります。1行で書いてもかまいません。」",
-    "s1-diagram: add the branch that the alt and q1 rely on, `D -.->|それ以外| F[本文は<br>読み込まない]`. Also change the labels 「全文を読む」/「だけを読む」/「本文を読む」 to 読み込む so they match the term 段階的な読み込み, as far as the mobile width allows.",
+    "s1-diagram: draw the branch that the alt and q1 rely on, e.g. `D -.->|それ以外| F[本文は<br>読み込まない]`. Change the labels 「全文を読む」/「だけを読む」/「本文を読む」 to 読み込む so they match 段階的な読み込み, as far as the mobile width allows.",
+    "s2-steps ex-description: the `>-` sentence says how to write it but not what it does. [repro-yaml] shows that the lines fold into one string. Suggested text: 「長い説明文は、`>-` のあとで改行し、同じ幅で字下げして続けます。数行が1つの説明文になります。」 (wording: ja-editor).",
     "pr-write: add a middle hint rung before the model answer: 「説明文は「〜する。〜のときに使う。」の2文で、本文は①②③の番号つきの手順で書きます。」",
     "hook-predict: add a second ungraded prediction for the other problem in hook-b1, e.g. 「Claudeにサブエージェントで40個のファイルを読んでもらうと、メインの会話には何が残ると思いますか？」",
-    "s2-check q2: the answer is the key that s2-invoke names just before it. To make it less of a recall item, consider asking which of three skills (deploy-prod, summarize-changes, test-report) should get `disable-model-invocation: true`.",
+    "s2-check q2: the answer is the key that s2-invoke names just before it. To make it less of a recall item, ask which of three skills (deploy-prod, summarize-changes, test-report) should get `disable-model-invocation: true`.",
     "s3-file-lead: `tools: Read, Grep, Glob` is not explained, but e6 d relies on it (「読み取り用にしぼっていた」). Change the end to 「`tools` でツールをしぼれます（例は、読み取りと検索だけ）。」",
-    "The brief content/courses/claude-code/briefs/cc-07-skills-subagents.md is still stale. Line 1 reads 「# Brief: vibe-coding/cc-07-skills-subagents」, and the minutes line quotes 「prose 1975 … read 2613 … est 17.9 min」, but measure.mjs now reports 「prose 2167 … read 2594 … est 17.8 min」. Update both so later rounds read the right baseline."
+    "s4-check q6: the prompt asks 「次の困りごとのうち」, but option d begins 「まだ困っていないが」, so d is not a 困りごと. Consider 「次の場面のうち、スキルにするのがいちばん合うのはどれでしょう？」 (wording: ja-editor).",
+    "pr-after / pr-c5: one before/after reading shows how small the increase is, but not what was saved. The hint replacement in mustFix lets the learner compare the increase with the files named in the report. That gives the comparison that o3 needs.",
+    "factual doubt: commands.md says 「When agent view is turned off, `/subtask` isn't available and `/fork` spawns the forked subagent instead」. q5 and summary-cards present `/subtask` without that condition. Consider a short note in s3-defs or a troubleshoot entry.",
+    "[repro-yaml] was checked on Claude Code 2.1.306, and the lesson pins v2.1.304. The difference does not matter for YAML parsing, but the facts note could say so.",
+    "The brief content/courses/claude-code/briefs/cc-07-skills-subagents.md is stale. Line 1 reads 「# Brief: vibe-coding/cc-07-skills-subagents」. The minutes line quotes 「prose 1975 … read 2613 … est 17.9 min」, but measure.mjs now reports 「prose 2167 … read 2594 … est 17.8 min」. The outline still calls s4-table a 2-column table, but it is a list."
   ],
   "average": 3.46,
-  "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: only s4-check (q6) changed, 1 of 39 blocks (2%). The previous review had no open must-fix items, so resolved is empty. I reviewed the changed block in full. Options a, c and d now end in 「〜ている」 like b. Ids, order, answer b, feedback, objectiveId o2 and bloom are unchanged, and each piece of feedback still fits its reworded option. The change gives no answer cue and adds no factual claim. validate and lint --strict report no errors and no warnings. measure.mjs reports 「prose 2167 (budget 1,200–2,400) · est 17.8 min (must be ≤ 20; estMinutes 18)」. I re-scored active (4), miscon (4) and voice (3), which are unchanged; the other scores are carried over. Every criterion is 3 or more, the mean is 3.46 and there is no must-fix, so the verdict is pass. One new niceToHave covers the 「困りごと」 prompt against option d's 「まだ困っていないが」."
+  "verdict": "revise",
+  "summary": "This was a full review, because the earlier verification rounds were recorded against uncommitted snapshot copies. The lesson is well aligned: every objective has 3 or more questions, including transfer items e1 and e3. The 7-2 worked example comes before the practice and explains each step. The distractors cover each misconception in the brief, and [repro-yaml] settles the `>-` doubt. One must-fix blocks the pass: the pr-after hint 「ファイルが少ないと、差は小さく出ます。」 says the main context grows with the number of files the subagent read. That contradicts e6 b and the o3 explanation the practice asks for, so replace the hint with the text given in mustFix."
 }

@@ -42,22 +42,22 @@
 Review of cc-09-parallel-automation by ja-editor, pedagogy-reviewer, visual-qa: PASS
   lesson content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json (sha256:5b14d7bb36e8d118)
   ja-editor: full review
-  pedagogy-reviewer: verification of sha256:262fc82916e86736 (previous review cross-checked; scope recomputed from .artifacts/review/claude-code/cc-09-parallel-automation/262fc82916e86736/lesson.json) · 0 resolved, 0 unresolved · 7 changed · carried over: align, hook, visual, practice, meta, a11y_l10n · previous .artifacts/review/claude-code/cc-09-parallel-automation/262fc82916e86736/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
+  pedagogy-reviewer: full review
   visual-qa: full review
   mean 3.31 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      3  (pedagogy-reviewer carried)
-  ✓ hook       4  (pedagogy-reviewer carried)
+  ✓ align      3  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer)
   ✓ prior      3  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer)
   ✓ active     4  (pedagogy-reviewer)
   ✓ miscon     4  (pedagogy-reviewer)
-  ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer carried)
-  ✓ meta       4  (pedagogy-reviewer carried)
+  ✓ visual     3  (pedagogy-reviewer, visual-qa)
+  ✓ practice   3  (pedagogy-reviewer)
+  ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   3  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/claude-code/cc-09-parallel-automation/`)

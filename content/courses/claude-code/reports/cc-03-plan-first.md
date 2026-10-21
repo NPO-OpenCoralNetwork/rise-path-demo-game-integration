@@ -40,25 +40,23 @@
 ```
 Review of cc-03-plan-first by ja-editor, pedagogy-reviewer, visual-qa: PASS
   lesson content/courses/claude-code/lessons/cc-03-plan-first.lesson.json (sha256:50da68311b84aa11)
-  ja-editor: verification of sha256:a0ee84f2b69dd0e5 (previous review cross-checked; scope recomputed from .artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/lesson.json) · 0 resolved, 0 unresolved · 4 changed · carried over: none · previous .artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/round-1/ja-editor.review.json
-  pedagogy-reviewer: verification of sha256:a0ee84f2b69dd0e5 (previous review cross-checked; scope recomputed from .artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/lesson.json) · 2 resolved, 0 unresolved · 4 changed · carried over: align, hook, prior, worked, active, miscon, visual, practice · previous .artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/round-1/pedagogy-reviewer.review.json
+  ja-editor: full review
+  pedagogy-reviewer: full review
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      4  (pedagogy-reviewer carried)
-  ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ align      3  (pedagogy-reviewer)
+  ✓ hook       4  (pedagogy-reviewer)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer carried)
-  ✓ active     3  (pedagogy-reviewer carried)
-  ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer carried)
+  ✓ worked     3  (pedagogy-reviewer)
+  ✓ active     3  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer, visual-qa)
+  ✓ practice   3  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer)
   ✓ accuracy   3  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
-  resolved [load] s2-version (pedagogy-reviewer)
-  resolved [load] s4-community (pedagogy-reviewer)
+  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/claude-code/cc-03-plan-first/`)
