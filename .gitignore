@@ -27,6 +27,7 @@ dist-ssr
 .env.local
 .env.bak
 .env.local.bak
+.env.stack
 public/uploads/
 public/audio/cache/*.mp3
 public/audio/cache/*.meta.json

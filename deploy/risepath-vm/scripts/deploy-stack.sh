@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, smoke)
+# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, up, smoke)
 # Usage (on VM): ./deploy-stack.sh
 set -euo pipefail
 
@@ -21,7 +21,14 @@ set +a
 
 if [[ -d "${REPO_ROOT}/.git" ]]; then
   echo "==> git pull"
+  HEAD_BEFORE="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   git -C "${REPO_ROOT}" pull --ff-only
+  # The pull may replace this file, but bash keeps reading the copy it opened. Re-run once so
+  # the steps below always come from the pulled version.
+  if [[ "$(git -C "${REPO_ROOT}" rev-parse HEAD)" != "${HEAD_BEFORE}" && -z "${RISEPATH_DEPLOY_REEXEC:-}" ]]; then
+    echo "==> HEAD moved — re-running the pulled deploy-stack.sh"
+    RISEPATH_DEPLOY_REEXEC=1 exec "${BASH}" "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$@"
+  fi
 fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
@@ -67,16 +74,30 @@ if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   fi
 fi
 
-echo "==> docker compose up --build (profiles=${COMPOSE_PROFILES:-default})"
-compose up -d --build
+echo "==> docker compose build (profiles=${COMPOSE_PROFILES:-default})"
+compose build
+
+# Migrate before `up` starts the new api image: /api/v2/health answers 503 while a migration is
+# pending, and mcp (then hermes) waits for the api healthcheck. The running api keeps its old
+# image until `up`, and every migration that image knows is already applied.
+echo "==> db up (wait until healthy)"
+compose up -d --wait db
+
+echo "==> db:migrate (new api image, one-off container)"
+compose run --rm --no-deps -T api npm run db:migrate
+
+# An api left unhealthy by an earlier failed run keeps that status when `up` finds nothing to
+# change, and `up` then stops on mcp's depends_on at once. Recreate it and wait for healthy.
+echo "==> api up (recreate, wait until healthy)"
+compose up -d --no-deps --force-recreate --wait api
+
+echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
+compose up -d
 
 if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   echo "==> Memanto Ollama models (idempotent)"
   "${SCRIPT_DIR}/init-memanto-ollama.sh" || echo "⚠️  Ollama pull failed — retry: deploy/risepath-vm/scripts/init-memanto-ollama.sh"
 fi
-
-echo "==> db:migrate"
-compose exec -T api npm run db:migrate
 
 echo "==> stack smoke"
 SMOKE_FLAGS=(--require-mcp)

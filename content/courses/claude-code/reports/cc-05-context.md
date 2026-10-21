@@ -59,18 +59,22 @@ Review of cc-05-context by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-05-context/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-05-context/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `97684549e204b6ab`: ja-editor full revise (mean 3.50, must-fix 8); pedagogy-reviewer full revise (mean 3.15, must-fix 5)
-2. `a5c974718e314f36`: ja-editor full revise (mean 3.75, must-fix 1); pedagogy-reviewer full revise (mean 3.38, must-fix 1)
-3. `ad13e1245e9cc670`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0)
-4. `319f5a2007903c95`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0)
-5. `1a611951e0d6a3f3`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify revise (mean 3.46, must-fix 1); visual-qa full pass (mean 4.00, must-fix 0)
-6. `ab90c2fa7a4e7fe9`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-7. `2597b7828fdf4777`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-8. `e51506cc1e6117ed`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
-9. `7a183d3f582412d5`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-10. `4b4ffd1dc9356064`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+1. `97684549e204b6ab/round-1`: ja-editor full revise (mean 3.50, must-fix 8); pedagogy-reviewer full revise (mean 3.15, must-fix 5)
+2. `a5c974718e314f36/round-1`: ja-editor full revise (mean 3.75, must-fix 1); pedagogy-reviewer full revise (mean 3.38, must-fix 1)
+3. `ad13e1245e9cc670/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0)
+4. `319f5a2007903c95/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0)
+5. `319f5a2007903c95/round-2`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+6. `1a611951e0d6a3f3/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify revise (mean 3.46, must-fix 1); visual-qa full pass (mean 4.00, must-fix 0)
+7. `ab90c2fa7a4e7fe9/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+8. `2597b7828fdf4777/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `2597b7828fdf4777/round-2`: ja-editor full revise (mean 3.75, must-fix 1); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+10. `e51506cc1e6117ed/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+11. `7a183d3f582412d5/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+12. `7a183d3f582412d5/round-2`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
+13. `4b4ffd1dc9356064/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+14. `4b4ffd1dc9356064/round-2`: ja-editor full pass (mean 3.75, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -81,6 +85,8 @@ An auditor with web access checked 60 claims (pages: 18); a second checker tried
 - [overclaim] `s3-lead` (md (last sentence)): ファイルに書いた指示は、ディスクから読み直されます。 — https://code.claude.com/docs/en/context-window
 - [wrong] `pr-steps-start` (pr-start.expect): Claude Codeの入力欄が表示されます。 — https://code.claude.com/docs/en/security
 - [overclaim] `s2-session` (md (last sentence)): 開き直すと、前のコンテキストもそのまま戻ります。 — https://code.claude.com/docs/en/sessions
+
+Records: `content/courses/claude-code/reports/facts/cc-05-context.audit.json` and `cc-05-context.facts.md`.
 
 ## Screenshots
 

@@ -2,8 +2,8 @@
 # Hermes: nousresearch/hermes-agent — run scripts/init-hermes-profile.sh before first up.
 #
 #   cp stack.env.example stack.env && chmod 600 stack.env
-#   docker compose --env-file stack.env up -d --build
-#   docker compose exec api npm run db:migrate
+#   ./scripts/deploy-stack.sh   # build -> up --wait db -> run --rm --no-deps api npm run db:migrate -> up -d
+#   (apply migrations before the new api starts: its healthcheck fails while one is pending)
 
 name: risepath
 

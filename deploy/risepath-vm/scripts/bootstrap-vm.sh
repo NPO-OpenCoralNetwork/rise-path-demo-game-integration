@@ -3,7 +3,7 @@
 # Usage: ./bootstrap-vm.sh [repo-url]
 set -euo pipefail
 
-REPO_URL="${1:-https://github.com/t012093/rise-path-demo-game-Integration-.git}"
+REPO_URL="${1:-https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git}"
 INSTALL_DIR="${RISEPATH_INSTALL_DIR:-/opt/risepath}"
 STACK_DIR="${INSTALL_DIR}/deploy/risepath-vm"
 

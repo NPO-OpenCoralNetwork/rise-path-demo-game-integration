@@ -1,7 +1,7 @@
-# Brief: vibe-coding/cc-03-plan-first
+# Brief: claude-code/cc-03-plan-first
 
 「第3回｜探索→計画→実装→コミット」。Claude Code コース（cc-*）モジュール 2「頼み方と進め方」の 1 本目、全 11 回中の第 3 回。
-下書きはプレビューのため `vibe-coding` コースに置く（公開先はオーナーが決める。`next` なし）。
+2026-10-21 にオーナーの判断で `claude-code` コースに公開（`content/courses/claude-code/lessons/cc-03-plan-first.lesson.json`、`next` は `cc-04-verify`）。それまでは、プレビューのため下書きを `vibe-coding` コースに置いていた（`next` なし）。
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を使い始めた人。バイブコーディングコース第3章（VS Code）・第5章（GitHub）程度の基礎がある人、または他の AI コーディングツールの経験者。
@@ -35,9 +35,9 @@
   - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（コース共通の measure.mjs：`cc-03-plan-first.lesson.json: prose 2295 (budget 1,200–2,400) · read 2961 · practice reading 1442 · questions 8 · practice sections 2 · est 19.1 min (must be ≤ 20; estMinutes 19)`。(3,065 + 1,452) ÷ 450 ≒ 10.04 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.37 分）。
+- 所要時間 / minutes: 19（コース共通の `scripts/lessons/measure.mjs`：`cc-03-plan-first.lesson.json: prose 2295 (budget 1,200–2,400) · read 2961 · practice reading 1442 · questions 8 · practice sections 2 · est 19.1 min (must be ≤ 20; estMinutes 19)`。(2,961 + 1,442) ÷ 450 ≒ 9.78 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.1 分）。
 - 難易度 / level: beginner
-- ロケール / locales: jp のみ（英語版は公開先が決まってから）
+- ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 新しい練習用フォルダーに 25 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。
 
 ## 制約 / Constraints
@@ -62,11 +62,11 @@
 - 演習の `todo.html` は Chromium（headless）で動作を確認した（空の入力で空の `li` が増える）。
 - 新しいセッションの始め方は「`/clear` で会話を空にするか、`claude` を起動し直す」とした（公式は "start a fresh session"）。
 - 承認の選択肢の英語表記（「Yes, manually approve edits」「No, keep planning」）は 2026-10-20 の公式ページ（v2.1.304）のまま。レッスンでは s2-enter-lead で版（v2.1.304 時点）を示し、表示が変わりうる旨の注記は所要時間の上限のため入れていない。
-- 所要時間はコース共通の measure.mjs で数える（演習は 1 セクション 2 分）。20 分以内にするため、exam の e3（o2）と e6（o3）を削除した。o2 は q2・q3・e4、o3 は q4・e5 で評価する（どの目標も inline と exam に 1 問以上）。
+- 所要時間はコース共通の `scripts/lessons/measure.mjs` で数える（演習は 1 セクション 2 分）。20 分以内にするため、exam の e3（o2）と e6（o3）を削除した。o2 は q2・q3・e4、o3 は q4・e5 で評価する（どの目標も inline と exam に 1 問以上）。
 - 390px の画面に収めるため、表は使わない。s1-table と s4-table は、1 列目が 5 字を超えて語の途中で折り返す（visual QA：s4-table の「よく知らないコー／ド」「新しいセッショ／ン」）ので、どちらも全文の箇条書き（list、id はそのまま）にした。s1-table は「**観点**には、〜を書きます。」の 4 項目で、公式ガイドの書き直し例（foo.py・ExecutionFactory・ウィジェット・src/auth/）は本文の予算（prose ≤ 2,400）のため外した。書き直しの例は s1-example が担う。s4-table は「差分を1文で説明できる→直接頼む／迷う・複数のファイル・よく知らないコード→計画／大きめの機能→インタビューと仕様」の 3 項目。q1・e1・e4 が頼る内容（症状＝起きていること・場所の見当・直った状態、既存のパターン＝まねしてほしい既存のコード、計画が役立つ場面）は残した。図は `flowchart TD`（自然幅 199px）。コードは 1 行 44 桁以内・1 行 1 コマンド。
 - list にした分の本文を払うため、s1-lead の 2 文目、s4-lead の「仕様を書いてから実装する」（s4-flow と重複）を削り、s2-enter の 3 つ目を「`claude --permission-mode plan` で起動する」、まとめの 3 点目と 5 点目を短くした。
-- 演習の `todo.html` は、390px で折り返さないよう、`getElementById` の 3 か所を 2 行に分け、`addButton` を `addBtn` にした。visual QA（390px で 5・15・21 行目が切れる）を受けて、さらに空行を削り、`createElement` を 2 行に分け、クリックの処理を `addBtn.onclick = () => {…};` にし、入力欄を `<input id="item">`（placeholder なし。`new-item` だと 10 行目が 390px で折り返すため）にした。全行 36 桁以内、25 行、addItem は 13–18 行目（highlight も 13–18）。ブラウザチェック（code-wrap）で折り返しなしを確認し、動作は Chromium（headless）で再確認した（空の入力で空の `li` が増える）。演習の bash ブロックの長いコメントは「# ここでtodo.htmlを保存」に縮め、手順の説明（最初の 3 行 → 保存 → 最後の 2 行）は pr-setup に移した。
-- autoモードで始まる条件は、コース共通の事実（cross-lesson facts 1）に合わせて「ターミナルとVS Codeで対話するとき」と書いた（対話セッションのみ）。
+- 演習の `todo.html` は、390px で折り返さないよう、`getElementById` の 3 か所を 2 行に分け、`addButton` を `addBtn` にした。visual QA（390px で 5・15・21 行目が切れる）を受けて、さらに空行を削り、`createElement` を 2 行に分け、クリックの処理を `addBtn.onclick = () => {…};` にし、入力欄を `<input id="item">`（placeholder なし。`new-item` だと 10 行目が 390px で折り返すため）にした。全行 36 桁以内、25 行、addItem は 13–18 行目（highlight も 13–18）。ブラウザチェック（code-wrap。いまは `scripts/lessons/mobile-fit.mjs`）で折り返しなしを確認し、動作は Chromium（headless）で再確認した（空の入力で空の `li` が増える）。演習の bash ブロックの長いコメントは「# ここでtodo.htmlを保存」に縮め、手順の説明（最初の 3 行 → 保存 → 最後の 2 行）は pr-setup に移した。
+- autoモードで始まる条件は、コース共通の事実（`content/courses/claude-code/reports/facts/cross-lesson-facts.md` の 1）に合わせて「ターミナルとVS Codeで対話するとき」と書いた（対話セッションのみ）。
 - 例題の手順は契約の 3–6 手順に合わせて 6 手順にした（ex-enter を ex-explore に統合。ex-enter の id はなくなった）。各手順に理由を添えた（ex-plan・ex-commit に追加）。
 - プロンプト中の `@ファイル名` の後ろには半角スペースを置く（Claude Code がパスの終わりをスペースで判断するため）。それ以外は日本語と英数字のあいだにスペースを入れない。
 

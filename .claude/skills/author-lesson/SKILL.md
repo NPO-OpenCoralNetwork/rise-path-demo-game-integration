@@ -212,6 +212,11 @@ Move the file from `drafts/` to `lessons/`, add it to a module in `course.json` 
 estMinutes, `next` links of the neighbours), then `npm run lessons:validate` (whole content) and
 `npm run lessons:catalog`. Never set `provenance.reviewedBy` yourself.
 
+A snapshot copy exists only in the checkout that made it. Before publishing (or opening a PR to
+publish), every verification on the lesson's chain must name a committed previous round
+(`<commit id>:…`, with a commit id as `reviewedRevision`); where one does not, have that reviewer
+review in full. `server/tests/reviewChainsDurable.test.js` enforces this for published lessons.
+
 ## Done means
 
 - `lessons:validate` 0 errors and `lessons:lint --strict` 0 warnings (or each one justified).

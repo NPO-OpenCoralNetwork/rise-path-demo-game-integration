@@ -1,0 +1,94 @@
+{
+  "lessonId": "cc-03-plan-first",
+  "checkedCount": 50,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/best-practices",
+    "https://code.claude.com/docs/en/best-practices.md",
+    "https://code.claude.com/docs/en/permission-modes",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/commands",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/common-workflows",
+    "https://code.claude.com/docs/en/common-workflows.md",
+    "https://code.claude.com/docs/en/tools-reference",
+    "https://code.claude.com/docs/en/tools-reference.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/checkpointing.md",
+    "https://code.claude.com/docs/en/context-window.md",
+    "https://code.claude.com/docs/ja/permission-modes",
+    "https://code.claude.com/docs/ja/permission-modes.md",
+    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md",
+    "https://www.anthropic.com/research/AI-assistance-coding-skills",
+    "https://github.com/gotalab/cc-sdd"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s2-version",
+      "where": "md, first sentence",
+      "claim": "v2.1.283以降、対話セッション（session）はautoモードで始まります。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "With Claude Code v2.1.283 or later, auto mode is the built-in starting permission mode for interactive terminal and VS Code sessions. ... When you start a new session in a terminal, Claude Code takes the permission mode from the first of these that applies: 1. The `--permission-mode` flag, or `--dangerously-skip-permissions` 2. `permissions.defaultMode` in a settings file ... 3. The built-in default ... When the flag, a settings file, or the built-in default selects `auto` but auto mode isn't available to the session, Claude Code starts the session in Manual instead. (CHANGELOG 2.1.283: \"`permissions.defaultMode` still overrides it\")",
+      "fix": "v2.1.283以降、設定で変えていなければ、対話セッション（session）はautoモードで始まります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"With Claude Code v2.1.283 or later, auto mode is the built-in starting permission mode for interactive terminal and VS Code sessions.\" / \"When you start a new session in a terminal, Claude Code takes the permission mode from the first of these that applies: 1. The `--permission-mode` flag ... 2. `permissions.defaultMode` in a settings file ... 3. The built-in default\" / \"When the flag, a settings file, or the built-in default selects `auto` but auto mode isn't available to the session, Claude Code starts the session in Manual instead.\" / \"In an organization with the HIPAA configuration applied, the built-in `auto` default doesn't apply.\" CHANGELOG 2.1.283: \"Changed interactive sessions on third-party providers or with telemetry off to start in auto mode when no permission mode is configured; `permissions.defaultMode` still overrides it\"",
+        "reason": "I tried to defend the lesson and couldn't. The official page backs the version number, the mode name and the Shift+Tab order that follows: from auto, the first press goes to Manual, then the cycle runs default → acceptEdits → plan. But the page calls auto only the \"built-in starting permission mode\", the third fallback in a list. The `--permission-mode` flag and `permissions.defaultMode` in a settings file both come first and override it. The session also starts in Manual when auto mode isn't available, for example with an unsupported model, `disableAutoMode`, a server-side shutoff, or a HIPAA org. The CHANGELOG puts the same limit on it: \"when no permission mode is configured\". The lesson's sentence has no condition, so it says more than the page does. The callout does end with \"表示が違うときは…確かめましょう\", but that is a fallback, not a condition on the sentence. The proposed fix is better but still incomplete. It covers settings only. It leaves out the launch flag, which the lesson itself teaches in the same section (`claude --permission-mode plan`). It also leaves out the Manual start when auto is unavailable, so the fixed sentence would still be false in those cases. My betterFix adds both conditions and keeps each sentence under 60 characters (57 and 30).",
+        "betterFix": "v2.1.283以降、起動時の指定や設定がなければ、対話セッション（session）はautoモードで始まります。autoモードが使えない環境では、Manualで始まります。"
+      }
+    },
+    {
+      "blockId": "s2-enter-lead",
+      "where": "md",
+      "claim": "[[プランモード]]への入り方は3つです（2026年10月、v2.1.304時点）。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "Enter plan mode by pressing `Shift+Tab` or prefixing a single prompt with `/plan`. You can also start in plan mode from the CLI: ... ### Set plan mode as the default To make plan mode the default for a project's terminal sessions, set `defaultMode` to `plan` in `.claude/settings.json`",
+      "fix": "[[プランモード]]への主な入り方は3つです（2026年10月、v2.1.304時点）。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"Enter plan mode by pressing `Shift+Tab` or prefixing a single prompt with `/plan`. You can also start in plan mode from the CLI: claude --permission-mode plan\" ... \"### Set plan mode as the default — To make plan mode the default for a project's terminal sessions, set `defaultMode` to `plan` in `.claude/settings.json`\". The CLI tab under \"Switch permission modes\" also lists \"**As a default**: set `permissions.defaultMode` at the scope you want\", next to Shift+Tab and `--permission-mode`.",
+        "reason": "The three methods the lesson lists (Shift+Tab, a `/plan` prefix, `claude --permission-mode plan`) are each supported. They match the one sentence on the permission-modes page that names ways to enter plan mode, and best-practices and common-workflows say the same. But no official page says there are exactly three. The same permission-modes page gives at least one more way in the terminal: setting `defaultMode` to `plan` in `.claude/settings.json` (its own subsection, \"Set plan mode as the default\", which is also the \"As a default\" entry in the CLI tab). The page also describes the VS Code mode indicator and the Desktop mode selector, and the tools reference has an `EnterPlanMode` tool. So 「入り方は3つです」 claims a complete list where the official page only lists examples, which makes it an overclaim. The proposed fix 「主な入り方は3つです」 keeps the three supported methods and drops the claim that there are no others, so it is accurate. The version note (v2.1.304) is a point-in-time note; the CHANGELOG now starts at 2.1.305, and that is outside this finding.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "summary-cards",
+      "where": "cards[card-enter].front",
+      "claim": "プランモードに入る3つの方法は？",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "To make plan mode the default for a project's terminal sessions, set `defaultMode` to `plan` in `.claude/settings.json`",
+      "fix": "プランモードに入る主な3つの方法は？",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"Enter plan mode by pressing `Shift+Tab` or prefixing a single prompt with `/plan`. You can also start in plan mode from the CLI: claude --permission-mode plan\" ... \"### Set plan mode as the default — To make plan mode the default for a project's terminal sessions, set `defaultMode` to `plan` in `.claude/settings.json`\". CLI tab of \"Switch permission modes\": \"**As a default**: set `permissions.defaultMode` at the scope you want\".",
+        "reason": "I tried to defend the lesson and only partly could. The three methods on the card (Shift+Tab, a `/plan` prefix, `claude --permission-mode plan`) match the docs' \"Enter plan mode by…\" sentence word for word, and the lesson body around line 229 copies it. But the docs never say there are exactly three ways. The next subsection of the same page, \"Set plan mode as the default\", gives a fourth way to start in plan mode in the terminal: `defaultMode: plan`. It has the same effect as `--permission-mode plan`, which the lesson already counts as a way to enter. The CLI tab under \"Switch permission modes\" also lists `permissions.defaultMode` next to Shift+Tab and the flag. Other routes exist too: `/plan` with no description, Claude calling the `EnterPlanMode` tool, and the mode selector in VS Code or Desktop. So \"the 3 ways\" claims more than the page does. The proposed fix \"主な3つの方法\" is accurate, and the back's \"の3つです\" still fits it. Outside this card: the body line 229 says 「入り方は3つです」 and has the same overclaim.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "sources",
+      "where": "sources[cc-permission-modes].title",
+      "claim": "Permission modes",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "# Choose a permission mode",
+      "fix": "Choose a permission mode",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "pageMetadata: {\"title\":\"Choose a permission mode\",\"sidebarTitle\":\"Permission modes\",\"description\":\"Control whether Claude asks before acting. ...\"}. The docs navigation lists the same page as {\"title\":\"Choose a permission mode\",\"sidebarTitle\":\"Permission modes\",\"href\":\"/en/permission-modes\"}.",
+        "reason": "The auditor is right that the page's H1 and HTML title are \"Choose a permission mode\". But the sources[] entry is a citation label, not a claim of fact. \"Permission modes\" is the page's own official name in Anthropic's docs: its sidebarTitle in the page metadata, and the label the docs navigation shows for it. The url points to the right page. The lesson contract (lesson-contract.md, .claude/rules/content.md) asks only for id/title/url/publisher/checkedAt and does not require the H1 word for word. The other sources follow the same pattern; for example, cc-commands is titled \"Commands\". So nothing on the official page contradicts the lesson's title. Using the full H1 would be optional polish, not a fix.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

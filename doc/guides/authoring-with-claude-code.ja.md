@@ -288,8 +288,19 @@ npm run lessons:preview -- vibe-coding vibe-ch1
 1. `drafts/<lesson>.lesson.json` を `lessons/` に移す
 2. `course.json` のモジュールに追加し、前後のレッスンの `next` をつなぐ
 3. `npm run lessons:validate` と `npm run lessons:catalog` で確認する
-4. `provenance.reviewedBy` に、確認した人の名前を書く
-5. PR にして、レポートとスクリーンショットを添える
+4. 修正確認レビューが、前回の回をコミット済みの `<コミット ID>:…/reports/…` で指しているか
+   確かめる（`reviewedRevision` もコミット ID）。さかのぼった各回も同じです。スナップショットの
+   写しは、作ったチェックアウトにしかないため、ほかのクローンではゲートが通りません。そうでない
+   レビュアーには、全体レビューをやり直してもらいます。公開済みのレッスンは
+   `server/tests/reviewChainsDurable.test.js` が確かめます。
+5. `provenance.reviewedBy` に、確認した人の名前を書く
+6. PR にして、レポートとスクリーンショットを添える
+7. マージのあと、フロントエンドを再ビルドして再デプロイする。レッスンはビルド時にバンドルへ
+   入るため、マージしただけでは学習者に届きません（VM は
+   [risepath_vm_deployment.md](risepath_vm_deployment.md) の §4.2、Vercel は
+   [deploy/vercel/README.md](../../deploy/vercel/README.md)）。新しいコースは、Learning Hub の
+   カードを出す seed の migration（例: `server/migrations/011_seed_claude_code_portal.sql`）も
+   要ります。
 
 ---
 

@@ -1,10 +1,20 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:8a9d7701d14a41d6",
+  "lessonHash": "sha256:acb5aef2ac3d7210",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "c6817ae",
+    "previousReview": "c6817ae:content/courses/claude-code/reports/cc-10-safety-cost.pedagogy-reviewer.review.json",
+    "changed": [
+      "s2-table"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -16,7 +26,8 @@
         "s3-check",
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -25,7 +36,8 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -37,7 +49,8 @@
         "s2-isolate",
         "s5-md2",
         "s5-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
@@ -48,7 +61,8 @@
         "s2-sandbox",
         "s2-isolate",
         "s5-md2"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -58,7 +72,8 @@
         "s3-steps",
         "s3-code",
         "practice-steps-deny"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -69,7 +84,8 @@
         "s2-check",
         "s3-check",
         "s5-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -82,12 +98,13 @@
         "s3-check",
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 3,
-      "evidence": "s2-layers is a 5-node structural diagram with Japanese labels, a caption and alt text. There are no images and both tables have 2 columns. But the caption 「VMやクラウドセッションはClaude Code全体を…囲みます」 describes a layer that is not drawn. The edge label 「サンドボックスの中」 suggests the sandbox is always on, although s2-defs says 「既定はオフです」.",
+      "evidence": "Re-scored because s2-table changed. The table still has 2 columns. The new row 3 cell (「強い権限（`bypassPermissions`）：拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」) is a few characters longer but is still one clause that fits a mobile column, and its column 2 cell is unchanged. The s2-layers issues are unchanged: the caption 「VMやクラウドセッションはClaude Code全体を…囲みます」 describes a layer that is not drawn, and the edge label 「サンドボックスの中」 hides 「既定はオフです」 (s2-defs).",
       "blockIds": [
         "s2-layers",
         "s2-table",
@@ -97,7 +114,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "An authentic audit of 田中さん's settings and habits leads to a hands-on deny-rule test in a dummy folder (with a prediction before sending practice-prompt-read) and a bill explanation. There is a 4-item checklist and model answers (practice-answer-rule, practice-prompt-review.expect). The hint ladder is shallow: p-audit has one hint, and p-bill's troubleshoot already gives the answer. practice-case-habits states 「`.env` と `secrets/` に拒否ルールがない」 outright.",
+      "evidence": "Unchanged since the previous round. practice-steps-deny's expect 「Claudeの読み取りが拒否され、`/permissions` にルールが出ます。」 is observable and matches practice-prompt-read's expect 「拒否ルールのため読めなかったと答えます」. There is an authentic audit of 田中さん's setup, a 4-item checklist and model answers. The hint ladder is still shallow (p-audit has one hint, and p-bill's troubleshoot gives the answer), and practice-case-habits still says 「`.env` と `secrets/` に拒否ルールがない」 outright.",
       "blockIds": [
         "practice-steps",
         "practice-steps-deny",
@@ -105,7 +122,8 @@
         "practice-steps-bill",
         "practice-prompt-review",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -116,24 +134,22 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
-      "score": 3,
-      "evidence": "The version is pinned in the subtitle (v2.1.304), and every factual block cites official pages. The fixes from audit-cc-10-safety-cost.json are applied: the 17% figure is dated to 「2026年3月の公式記事」, the auto default is scoped to the terminal and VS Code, and s2-isolate names hooks and `.mcp.json`. Path forms match cross-lesson-facts.md items 4–5. s2-table row 3 「確認なしで何でも動く」 conflicts with the glossary's 拒否ルール 「どの権限モードでも効きます」 (see niceToHave).",
+      "score": 4,
+      "evidence": "Re-scored because s2-table changed. Row 3 now reads 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」. This says that deny-ruled actions are stopped, not prompted, and so removes the misreading that the previous niceToHave and the audit raised about 「拒否ルール以外は」. It matches reports/facts/cc-10-safety-cost.facts.md [safety-1] 'Deny rules still block in every mode, including bypassPermissions', and 「ほぼ」 covers [safety-14] (explicit ask rules and critical-path rm/rmdir still stop). It agrees with the glossary entry 拒否ルール and with e4's feedback 「拒否ルールは、どの権限モードでも効きます。」. The block still cites cc-permission-modes. The audit's dropped finding carries a matching laterChanged note (reports/facts/cc-10-safety-cost.audit.json).",
       "blockIds": [
-        "s1-auto",
-        "s2-isolate",
         "s2-table",
-        "s3-pitfall",
         "check-quiz"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The text is consistently です・ます, warm and free of banned phrases, and katakana terms carry their English on first use. The offline case is worded three ways: 「オフラインのコンテナかVMだけで使う」 (s2-table), 「ネットにつながらないコンテナやVMの中で使う」 (e2-b) and 「ネットにつながらない隔離環境」 (e1-b).",
+      "evidence": "Re-scored because s2-table changed. The new cell is plain and calm, です・ます is not needed in a table cell, and the glossary term 拒否ルール is used consistently. 「止めた操作」 matches the lesson's verb elsewhere (q1-d 「拒否ルールで止めます」). The offline case is still worded three ways: 「オフラインのコンテナかVMだけで使う」 (s2-table, unchanged column), 「ネットにつながらないコンテナやVMの中で使う」 (e2-b) and 「ネットにつながらない隔離環境」 (e1-b).",
       "blockIds": [
         "s2-table",
         "check-quiz",
@@ -149,24 +165,15 @@
         "s5-md2",
         "s2-layers",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-check q2: make it a scenario that needs analysis rather than a lookup in s2-table row 2. For example, use the prompt 「友人から『このリポジトリのセットアップを手伝って』とURLが届きました。中身は見たことがありません。どう始めますか？」 and keep the options and feedback.",
-    "check-quiz e6: o3 is 「原因を特定できる」, but e6 asks for a remedy and states the cause in the stem. Consider the prompt 「1日じゅう同じセッションで関係のない作業を次々に頼んでいたら、使用量の減りが早くなりました。主な原因はどれでしょう？」, with the answer 「それまでの履歴全体を、毎回送り直している」 and distractors built from the current options.",
-    "factual doubt: s2-table row 3 says 「確認なしで何でも動く」, but the glossary (拒否ルール) and e4-b say deny rules work in every mode. The audit kept the cell because it matches the docs' summary table. To remove the internal tension, consider 「強い権限（`bypassPermissions`）：拒否ルール以外は確認なしで動く」 and check it against the permission-modes page.",
-    "s2-layers: the caption and alt describe a VM layer that is not drawn, and the edge 「サンドボックスの中」 hides that the sandbox is off by default. Change the edge label to 「サンドボックス（オン時）の中」, or draw the outer layer as a mobile-safe subgraph and re-check the preview at 390 px.",
-    "s2-layers: hooks are said to run outside the sandbox (s2-sandbox, e2-c, card-sandbox), but the diagram does not show them. Consider adding a node such as `F[\"リポジトリのフック\"]` with `C -->|サンドボックスの外| F`.",
-    "s5-table row 1 and the practice rely on `/status`, which the lesson never explains. Add a few words to the action cell, for example 「`/status` で使っている認証を確かめ、キーを外す」.",
-    "s5-md2: its second paragraph holds three unrelated asides. Move each next to its table row: 「（`-p` では承認なしで使われる）」 to row 1, and 「`/compact` はそれ自体が大きな要求」 to row 2. Keep the エフォート definition in s5-md2.",
-    "practice-case-habits: 「`.env` と `secrets/` に拒否ルールがない」 names the problem for the learner. Consider the neutral observation 「プロジェクトに `.env` と `secrets/` があり、`.claude/settings.json` は置いていない」.",
-    "practice-folder: `mkdir cc-practice-10` runs wherever the terminal happens to be. Consider making `cd ~` the first line, so the folder is not created inside `cc-practice`, which already holds a deny rule from 第2回.",
-    "s3-steps ex-target gives no reason for the step. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」 (wording for ja-editor).",
-    "Use one phrase for the offline case across s2-table, e1-b, e2-b, the e2 explanation and practice-prompt-review ①, for example 「ネットにつながらないコンテナやVM」 (wording for ja-editor)."
+    "Still open from earlier rounds (unchanged blocks): make s2-check q2 a scenario instead of a lookup in s2-table row 2; make check-quiz e6 test the cause in line with o3; fix the s2-layers caption, alt and edge 「サンドボックスの中」 (for example 「サンドボックス（オン時）の中」); explain `/status` in s5-table row 1; spread the s5-md2 asides into their table rows; make practice-case-habits a neutral observation (「プロジェクトに `.env` と `secrets/` があり、`.claude/settings.json` は置いていない」); add `cd ~` as the first line of practice-folder; give ex-target a reason; use one phrase for the offline case across s2-table, e1-b, e2-b and practice-prompt-review ①."
   ],
-  "average": 3.31,
+  "average": 3.38,
   "verdict": "pass",
-  "summary": "This is a full review: the earlier review chain was recorded under the old course path. The lesson content hash (sha256:8a9d7701d14a41d6) is unchanged since the move. Strongest point: tight alignment, with every objective assessed by inline and exam items whose feedback names a real misconception, plus a hands-on deny-rule test in a dummy folder. No must-fix items; the most useful improvements are making q2 a scenario instead of a table lookup, making e6 test the cause in line with o3, and drawing the diagram layer its caption promises."
+  "summary": "Verification round. review-scope.mjs exited 0: 1 of 44 blocks changed (s2-table row 3), and the previous review had no open must-fix items. The new wording 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」 is correct and cited ([safety-1], [safety-14]). It removes the misreading noted in the previous niceToHave, so that item is dropped. Visual, accuracy and voice were re-scored and are unchanged at 3, 4 and 3. validate and lint --strict are clean. measure.mjs gives prose 1887 and est 17.3 min, which matches estMinutes 17. No regressions were found."
 }

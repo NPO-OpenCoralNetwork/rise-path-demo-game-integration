@@ -1,8 +1,9 @@
-# Brief: vibe-coding/cc-09-parallel-automation
+# Brief: claude-code/cc-09-parallel-automation
 
 第9回｜並列で進める・自動で回す — module 4 「チームと自動化」, lesson 9 of 11 of the Claude Code course
-(plan: `doc/brushup-2026/research/claude-code-curriculum.ja.md` §7). Drafted in `vibe-coding/drafts/` for preview;
-the course it is published in is the owner's decision.
+(plan: `doc/brushup-2026/research/claude-code-curriculum.ja.md` §7). Published 2026-10-21 by the owner's
+decision in the course `claude-code`: `content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json`,
+`next` = `cc-10-safety-cost`. Drafted in `vibe-coding/drafts/` for preview until then.
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を日常の開発に使い始めた人（中級）。1つのセッションで頼む・確かめる・コミットする流れはできる。
@@ -44,11 +45,11 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: `cc-09-parallel-automation.lesson.json: prose 2262 (budget 1,200–2,400) · read 2650 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`）。
+- 所要時間 / minutes: 20（`scripts/lessons/measure.mjs`: `cc-09-parallel-automation.lesson.json: prose 2262 (budget 1,200–2,400) · read 2650 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`）。
   est = (2,650 + 1,246) / 450 + 11 × 40秒 + 2 × 2分 = 8.66 + 7.33 + 4 = 19.99 → 20。prose rose from 1,583 because the three
-  tables became lists (measure.mjs counts lists as prose, tables only as reading).
+  tables became lists (`scripts/lessons/measure.mjs` counts lists as prose, tables only as reading).
 - 難易度 / level: intermediate
-- ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
+- ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）。
 - 演習の題材 / practice task idea: 練習用リポジトリ `cc-practice-09` に、1件だけわざと失敗するテストのある小さなプロジェクトを作り、
   失敗したテストを JSON でまとめる夜間チェックの `claude -p` を書いて、予想してから実行する（演習1）。
   次に、同僚の「毎晩テストを流して、いい感じにまとめて、失敗していたら直しておいて」を4点で点検して直す（演習2）。
@@ -63,7 +64,8 @@ the course it is published in is the owner's decision.
   大事なリポジトリでの演習、プレビュー機能を必須の手順にすること。
 
 ## 資料 / Sources
-All checked 2026-10-20 (publisher Anthropic). Facts come from the verified facts file for this lesson; the headless,
+All checked 2026-10-20 (publisher Anthropic). Facts come from the verified facts file for this lesson
+(`content/courses/claude-code/reports/facts/cc-09-parallel-automation.facts.md`); the headless,
 permissions, worktrees, common-workflows, GitHub Actions and CLI reference pages and the automations post were re-read
 on 2026-10-20 for the exact wording used below.
 - `cc-worktrees` Run parallel sessions with worktrees — https://code.claude.com/docs/en/worktrees

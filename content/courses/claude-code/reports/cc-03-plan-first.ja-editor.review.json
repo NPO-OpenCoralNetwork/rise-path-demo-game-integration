@@ -4,75 +4,75 @@
   "lessonHash": "sha256:50da68311b84aa11",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:a0ee84f2b69dd0e5",
-    "previousReview": ".artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/round-1/ja-editor.review.json",
-    "changed": [
-      "s2-version",
-      "s4-good-spec",
-      "s4-community",
-      "summary-cards"
-    ],
-    "changedShare": 0.06,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The changed text keeps です・ます and a plain, warm voice: s2-version 「autoモードからShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。起動時のモードは、第2回で見たとおりです。」, s4-good-spec 「役立つ仕様には、関わるファイルと、関数名などほかのコードとのつなぎ目を書きます。」 and s4-community 「仕様づくりには、cc-sddのようなコミュニティのツールもあります。」 The card-good-spec back keeps the parallel 「〜を書く、〜を書く、〜で終える、の3つです。」 form. Lint shows 0 banned-phrase findings. Unchanged blocks are as in round 1.",
+      "evidence": "Every learner-facing string is in です・ます, warm and plain, and has no pressure phrases (lint reports 0 banned-phrase findings). Options are parallel in form: q1 and q4 are all quoted requests ending in 「。」」; q2 all end in a verb (「〜を直す」「〜を変える」); e4 all use 「〇〇モードで…。…から」. Every wrong-option feedback is within 2 sentences, e.g. q3-d 「プランモードのあいだは、package.jsonはまだ変わっていません。直すのはファイルではなく計画です。」. Notation follows §3: keys are written 「Shift + Tab」「Ctrl + G」 in the text and kept in steps[].keys; screen labels are quoted (「No, keep planning」「Yes, manually approve edits」); 「おこなう」 is written in kana. A few spots read slightly stiff (ex-explore 「知った現状が、計画を読む物差しになります。」), but the meaning stays clear.",
       "blockIds": [
-        "s2-version",
-        "s4-good-spec",
-        "s4-community",
-        "summary-cards"
+        "s1-check",
+        "s2-check",
+        "s3-steps",
+        "s3-check",
+        "s4-check",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2295 (budget 1,200–2,400) · est 19.1 min (must be ≤ 20; estMinutes 19)」. Prose went down from 2393, is within budget and matches estMinutes. s4 no longer introduces インターフェース or スキル. s2-version is now a 2-sentence recall with no version details.",
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings, so every sentence and paragraph fits its budget. measure.mjs prints 「prose 2295 (budget 1,200–2,400) · read 2961 · practice reading 1442 · questions 8 · practice sections 2 · est 19.1 min (must be ≤ 20; estMinutes 19)」, which is within budget and matches estMinutes. Each segment introduces at most 3 new terms: s1 has 4つの観点 and @参照; s2 has 4つのフェーズ, プランモード and 差分; s4 has 仕様 and AskUserQuestionツール. Each concept is followed by an example or a check.",
       "blockIds": [
-        "s2-version",
-        "s4-good-spec",
-        "s4-community"
+        "s1-defs",
+        "s2-defs",
+        "s4-defs",
+        "lesson"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The changes remove two new terms and add no undefined ones. 「つなぎ目」 is explained in place in s4-good-spec (「関数名などほかのコードとのつなぎ目」), and card-good-spec uses the same word: 「関わるファイルとつなぎ目（関数名など）を書く」. s2-version points back to 第2回, and cc-02-permissions does teach the same order (「autoから押すとManual → `acceptEdits` → プランモード（plan mode）と進みます」) and the starting mode. No glossary entry names インターフェース or スキル, so nothing became inconsistent.",
+      "evidence": "Terms are defined before use and match the glossary: 4つの観点, @参照, 4つのフェーズ, プランモード (plan mode), 差分 (diff), 仕様 (spec, SPEC.md) and AskUserQuestionツール. Katakana terms carry English on first use: フェーズ（phase）, ステータスバー（status bar）, リポジトリ（repository）, ポート（port）, エディタ（editor）, ライブラリ（library）, セッション（session）, ツール（tool）, エッジケース（edge case）, トレードオフ（trade-off). Abbreviations are spelled out: WSL（Windows Subsystem for Linux）, UI/UX（User Interface / User Experience、画面と使い心地）, CSV（Comma-Separated Values）. Cross-references match the real lesson titles (prerequisites and summary-next 「第4回｜検証を任せる：テスト・レビュー・説明」). s2-version builds on the auto→Manual→acceptEdits→プランモード order taught in 第2回.",
       "blockIds": [
-        "s2-version",
-        "s4-good-spec",
-        "summary-cards",
+        "s1-defs",
+        "s2-defs",
+        "s2-enter",
+        "s4-defs",
+        "s4-interview",
+        "check-quiz",
+        "summary-next",
         "lesson"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares only jp, and lint has no locale-plain-string findings. s2-version no longer has a link, so the round-1 weak spot (link text that named a topic, not its destination) is gone. The s2-flow alt text and caption are unchanged.",
+      "evidence": "The lesson declares only the jp locale, and lint has no locale-plain-string findings. The s2-flow diagram has a caption (「計画を読み、直してから承認して実装に進む」) and an alt text that walks the whole flow, including the loop back. Its labels (探索, 計画, 実装して確かめる, コミット) match the text and glossary. The lesson has no inline links, so link-text rules do not apply. The code is short and wrapped to fit a narrow screen.",
       "blockIds": [
-        "s2-version",
-        "s2-flow"
+        "s2-flow",
+        "practice-starter",
+        "lesson"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-version: 「第2回で見たとおり」 asks the learner to recall the starting mode without naming it. Adding the common case helps learners who study alone — 「起動時のモードは、第2回で見たとおりです。」→「起動時のモード（多くの場合はauto）は、第2回で見たとおりです。」",
-    "s2-version: notation differs from cc-02-permissions, which writes 「Manual → `acceptEdits` → プランモード」 with code formatting and spaces. Aligning the two helps learners match them — 「Manual→acceptEdits→プランモード」→「Manual → `acceptEdits` → プランモード」",
-    "s4-community: in this lesson 「ツール」 already names Claude's own tools (AskUserQuestionツール, glossary 「Claudeが選択肢つきの質問をするためのツール」), so 「コミュニティのツール」 could suggest cc-sdd is that kind of tool — 「cc-sddのようなコミュニティのツールもあります。」→「cc-sddのような、コミュニティが作った仕組みもあります。」 (title 「コミュニティのツール」→「コミュニティの仕組み」)",
-    "sources: the cc-sdd source title still says 「仕様駆動開発のスキル集」, but s4-community no longer uses スキル. If source titles are shown to the learner — 「cc-sdd（仕様駆動開発のスキル集）」→「cc-sdd（仕様駆動開発のツール集）」",
-    "summary-cards: card-good-spec still says 「役に立つ」, while s4-good-spec and ps-spec.hint say 「役立つ」 (still open from round 1) — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
-    "summary-cards: on its own, 「つなぎ目」 is vague on the card. Matching s4-good-spec makes it clear — 「関わるファイルとつなぎ目（関数名など）を書く」→「関わるファイルと、ほかのコードとのつなぎ目（関数名など）を書く」",
-    "practice-spec-model: the つなぎ目 condition from s4-good-spec is still missing from the model answer (round-1 item, reworded for the new term) — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとほかのコードとのつなぎ目、範囲外のこと、」",
-    "summary-points, s1-table, practice-model, q4, ex-explore, s1-rich: the round-1 niceToHave items in these unchanged blocks are still open; see the previous review."
+    "summary-cards: card-good-spec says 「役に立つ」, while s4-good-spec and ps-spec.hint say 「役立つ」 — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
+    "check-quiz: the e4 explanation also uses 「役に立つ」, while s2-when says 「計画が最も役立つのは」 — 「計画が最も役に立つ場面です。」→「計画が最も役立つ場面です。」",
+    "summary-cards: on the card alone, 「つなぎ目」 is vague; matching s4-good-spec makes it clear — 「関わるファイルとつなぎ目（関数名など）を書く」→「関わるファイルと、ほかのコードとのつなぎ目（関数名など）を書く」",
+    "practice-spec-model: the model answer leaves out the つなぎ目 condition from s4-good-spec — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとほかのコードとのつなぎ目、範囲外のこと、」",
+    "s2-version: 「第2回で見たとおり」 asks the learner to recall the starting mode without naming it — 「起動時のモードは、第2回で見たとおりです。」→「起動時のモード（設定を変えていなければauto）は、第2回で見たとおりです。」",
+    "s2-version: notation differs from cc-02-permissions, which writes 「Manual → `acceptEdits` → プランモード」 — 「Manual→acceptEdits→プランモード」→「Manual → `acceptEdits` → プランモード」",
+    "s4-community: in this lesson 「ツール」 already names Claude's own tools (AskUserQuestionツール), so 「コミュニティのツール」 can be read as the same kind of tool — 「cc-sddのようなコミュニティのツールもあります。」→「cc-sddのような、コミュニティが作った仕組みもあります。」 (title 「コミュニティのツール」→「コミュニティの仕組み」)",
+    "sources: the cc-sdd title still says スキル, a word the lesson no longer uses. Change it if source titles are shown to the learner — 「cc-sdd（仕様駆動開発のスキル集）」→「cc-sdd（仕様駆動開発のツール集）」",
+    "s3-steps: in ex-explore, 「物差し」 is a slightly literary metaphor — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」",
+    "s3-steps: in ex-fix, the subject of 「2番目は」 comes late — 「2番目は、変えないでと頼んだ共通のスタイルの変更です。」→「2番目の手順は、変えないでと頼んだ共通のスタイルを変えるものです。」",
+    "practice-steps: pr-plan lists the Ctrl+G key, but its text names only the request route — 「計画を読み、範囲外の変更か足りない点を1つ直してもらいます。」→「計画を読み、範囲外の変更か足りない点を1つ直します。依頼文でも、Ctrl + Gでも直せます。」",
+    "practice-steps: pr-explain says 「確かめる」 where pr-plan.troubleshoot says 「確かめ方」 and s4 says 「確かめる手順」. Naming the source of the check helps — 「ブラウザを再読み込みして試します。」→「計画の確かめ方のとおりに、ブラウザを再読み込みして試します。」",
+    "s1-table: the 範囲 item packs two kinds of information into one clause — 「**範囲**には、どのファイルのどんな場面か、テストの方針を書きます。」→「**範囲**には、どのファイルのどんな場面かと、テストの方針を書きます。」"
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "Verification round (review-scope exit 0, 4 of 44 blocks changed, 6%). Round 1 had no open must-fix items, so there are no resolved entries. The changed blocks (s2-version, s4-good-spec, s4-community, summary-cards) are correct, natural Japanese in です・ます. They introduce no new undefined terms and do not conflict with the glossary or with cc-02-permissions. Lint is clean, and measure.mjs shows prose 2295 and est 19.1 min (estMinutes 19). No new must-fix items. The optional fixes are to name the usual starting mode in s2-version, to avoid the second meaning of 「ツール」 in s4-community, and to keep 「つなぎ目」 the same across the card and the practice model answer."
+  "summary": "Full review of the current text. No text changed since the last review; this round makes the review chain checkable from the repository. `lessons:lint --strict` is clean, and measure.mjs shows prose 2295 within the 1,200–2,400 budget and est 19.1 min matching estMinutes 19. The Japanese is natural です・ます with no pressure phrases. Terms match across the text, glossary, diagram and flashcards. Katakana terms and abbreviations carry English or a spelled-out form on first use. Options are parallel, and every wrong-option feedback fits in 2 sentences. The claims flagged in audit-cc-03-plan-first.json (s2-version, s2-enter-lead, card-enter) are already corrected or qualified in the current text. No must-fix items. The optional fixes would keep 役立つ and つなぎ目 consistent across blocks, avoid the second meaning of 「ツール」 in s4-community, and smooth a few stiff phrases in s3-steps."
 }
