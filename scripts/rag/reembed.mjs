@@ -159,7 +159,7 @@ export async function reembedChunks({ pool, embed = embedTexts, dryRun = false, 
     return { stale, processed, reembedded, batches };
 }
 
-/** Load .env.local without overriding variables already set (same rules as server.js). */
+/** Load .env.local without overriding variables already set. */
 async function loadEnvLocal() {
     try {
         const raw = await fs.readFile(path.join(ROOT, '.env.local'), 'utf8');

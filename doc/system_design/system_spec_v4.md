@@ -402,7 +402,7 @@ Curriculum
 
 | 障害 | 影響範囲 | フォールバック |
 |------|---------|-------------|
-| **DB 接続断** | 全機能 | `/health` が `degraded` を返す。MCP ツールは `db_unavailable` エラー。フロント静的カリキュラムは動作継続 |
+| **DB 接続断** | 全機能 | `/health` が `degraded` を返す。API は 5 秒以内に 503 `{ error_type: "db_connection" }`（`Retry-After: 10`）、MCP ツールは `db_connection` エラー。ジョブワーカーは待ち時間を延ばして再試行（最大 1 分）。フロント静的カリキュラムは動作継続 |
 | **Gemini API 障害** | AI 生成のみ | Kit 取得は成功（DB のみ）。生成リクエストに 503 返却。フロントに「AI 一時停止中」バナー |
 | **Supabase Auth 障害** | 認証 | dev-fallback で継続（開発環境のみ）。本番では 503 |
 | **learner_profiles なし** | パーソナライゼーション | Kit はデフォルト rules で生成。`suggested_learning_mode = null` |

@@ -12,9 +12,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyDbError, isDbUnavailable } from '../../tools/core/dbErrors.js';
 import { loadEnv } from '../../tools/core/env.js';
-import { getPool, poolConfig, resetPoolForTests } from '../db.js';
+import { getPool, poolConfig, resetPoolForTests, setPoolForTests } from '../db.js';
 import { DB_UNAVAILABLE_BODY, dbUnavailableErrorHandler, respondIfDbUnavailable } from '../dbUnavailable.js';
-import { pollDelay } from '../jobWorker.js';
+import { JobWorker, pollDelay } from '../jobWorker.js';
+import { loadUserTtsPreferences } from '../../tools/core/kokoroTts.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -35,6 +36,8 @@ describe('isDbUnavailable', () => {
             new Error('Connection terminated due to connection timeout', { cause: new Error('timeout expired') }),
             new Error('Connection terminated unexpectedly'),
             new Error('Query read timeout'),
+            new Error('Client has encountered a connection error and is not queryable'),
+            new Error('Client was closed and is not queryable'),
             // "localhost" resolves to ::1 and 127.0.0.1: Node reports both refusals together.
             new AggregateError([withCode('ECONNREFUSED'), withCode('ECONNREFUSED')], ''),
         ];
@@ -75,6 +78,7 @@ describe('pool settings', () => {
             connectionTimeoutMillis: 5000,
             idleTimeoutMillis: 30000,
             keepAlive: true,
+            keepAliveInitialDelayMillis: 10000,
             statement_timeout: 30000,
             query_timeout: 35000,
         });
@@ -85,15 +89,34 @@ describe('pool settings', () => {
         assert.equal(config.connectionTimeoutMillis, 1500);
         assert.equal(config.statement_timeout, 10000);
         assert.equal(config.query_timeout, 15000);
+        assert.equal(poolConfig('postgresql://db/rp', { PG_STATEMENT_TIMEOUT_MS: '200' }).query_timeout, 400);
     });
 
-    it('never waits forever to connect, and can turn the statement limit off', () => {
+    it('never waits forever to connect; turning the server limit off keeps the client one', () => {
         for (const value of ['0', '-1', 'abc', '']) {
             assert.equal(poolConfig('postgresql://db/rp', { PG_CONNECT_TIMEOUT_MS: value }).connectionTimeoutMillis, 5000, value);
         }
         const off = poolConfig('postgresql://db/rp', { PG_STATEMENT_TIMEOUT_MS: '0' });
-        assert.equal('statement_timeout' in off, false);
-        assert.equal('query_timeout' in off, false);
+        assert.equal('statement_timeout' in off, false, 'no startup setting for a pooler that rejects it');
+        assert.equal(off.query_timeout, 35000);
+    });
+
+    it('warns once, not on every call, when DATABASE_URL_PHASE1 is not set (the job worker polls every 2 s)', async (t) => {
+        const saved = process.env.DATABASE_URL_PHASE1;
+        delete process.env.DATABASE_URL_PHASE1;
+        resetPoolForTests();
+        const warn = t.mock.method(console, 'warn', () => {});
+        try {
+            const worker = new JobWorker();
+            for (let i = 0; i < 3; i++) {
+                assert.equal(getPool(), null);
+                await worker.tick();
+            }
+            const missing = warn.mock.calls.filter((call) => String(call.arguments[0]).includes('DATABASE_URL_PHASE1'));
+            assert.ok(missing.length <= 1, `warned ${missing.length} times`);
+        } finally {
+            if (saved !== undefined) process.env.DATABASE_URL_PHASE1 = saved;
+        }
     });
 
     it('getPool builds the shared pool with these settings and an idle-client error handler', async () => {
@@ -137,6 +160,11 @@ describe('503 helpers', () => {
                 res.headersSent = true;
                 return res;
             },
+            ended: false,
+            end() {
+                res.ended = true;
+                return res;
+            },
         };
         return res;
     };
@@ -152,6 +180,13 @@ describe('503 helpers', () => {
         assert.equal(respondIfDbUnavailable(other, new Error('boom')), false);
         assert.equal(other.statusCode, 200);
         assert.equal(other.body, undefined);
+
+        // A response already under way (a stream) is ended, not left open.
+        const streaming = fakeRes();
+        streaming.headersSent = true;
+        assert.equal(respondIfDbUnavailable(streaming, withCode('ECONNRESET')), true);
+        assert.equal(streaming.ended, true);
+        assert.equal(streaming.statusCode, 200);
     });
 
     it('the last error handler answers 503 for an outage and passes everything else on', () => {
@@ -183,7 +218,7 @@ describe('where the helpers are used', () => {
     /** Each `catch (name) { … }` block: its variable name and body (braces matched). */
     const catchBlocks = (src) => {
         const blocks = [];
-        const re = /\} catch \((\w+)\) \{/g;
+        const re = /\} catch(?: \((\w+)\))? \{/g;
         let m;
         while ((m = re.exec(src))) {
             const open = m.index + m[0].length - 1;
@@ -215,8 +250,20 @@ describe('where the helpers are used', () => {
         }
     });
 
-    it('a ROLLBACK in a catch cannot throw and hide the original error', () => {
-        for (const file of [...DB_ROUTE_FILES, 'server/ragService.js', 'server/jobWorker.js']) {
+    it('a ROLLBACK in a catch cannot throw and hide the original error (server, tools/core, MCP)', () => {
+        const files = ['server.js', 'mcp-server/index.js'];
+        const walk = (dir) => {
+            for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+                const rel = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (!['tests', 'migrations', 'node_modules'].includes(entry.name)) walk(rel);
+                } else if (/\.m?js$/.test(entry.name)) files.push(rel);
+            }
+        };
+        walk('server');
+        walk('tools/core');
+        assert.ok(files.length > 40, `scanned ${files.length} files`);
+        for (const file of files) {
             for (const block of catchBlocks(read(file))) {
                 for (const line of block.body.split('\n').filter((l) => l.includes("query('ROLLBACK')"))) {
                     assert.match(line, /query\('ROLLBACK'\)\.catch\(/, `${file}: ${line.trim()}`);
@@ -298,6 +345,22 @@ describe('.env loading', () => {
         assert.match(src, /import \{ loadEnv \} from '\.\/tools\/core\/env\.js';/);
         assert.match(src, /await loadEnv\(\{ force: \[\] \}\);/);
         assert.doesNotMatch(src, /loadEnvFile|readFile\([^)]*\.env/);
+    });
+});
+
+describe('TTS during an outage', () => {
+    it('falls back to the default voice when the preferences cannot be read', async (t) => {
+        t.mock.method(console, 'warn', () => {});
+        setPoolForTests({
+            query: async () => {
+                throw Object.assign(new Error('connect ECONNREFUSED 172.18.0.2:5432'), { code: 'ECONNREFUSED' });
+            },
+        });
+        try {
+            assert.equal(await loadUserTtsPreferences('00000000-0000-0000-0000-000000000001'), null);
+        } finally {
+            resetPoolForTests();
+        }
     });
 });
 

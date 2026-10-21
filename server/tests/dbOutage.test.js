@@ -16,7 +16,7 @@ import { createApp } from '../../server.js';
 import { getPool, setPoolForTests, resetPoolForTests } from '../db.js';
 import { JobWorker } from '../jobWorker.js';
 
-const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'PG_CONNECT_TIMEOUT_MS',
+const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'PG_CONNECT_TIMEOUT_MS', 'PG_STATEMENT_TIMEOUT_MS',
     'SUPABASE_URL', 'VITE_SUPABASE_URL', 'SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY'];
 
 /** A TCP server that accepts connections and never says anything, like a hung Postgres. */
@@ -30,6 +30,40 @@ const silentServer = async () => {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     return {
         url: `postgresql://rp:rp@127.0.0.1:${server.address().port}/rp`,
+        close: async () => {
+            for (const socket of sockets) socket.destroy();
+            await new Promise((resolve) => server.close(resolve));
+        },
+    };
+};
+
+/**
+ * A Postgres stand-in that completes the startup handshake (AuthenticationOk, ReadyForQuery) and
+ * then, on the first query, either drops the connection ('drop') or never answers ('hang').
+ */
+const fakePostgres = async (mode) => {
+    const sockets = new Set();
+    const server = net.createServer((socket) => {
+        sockets.add(socket);
+        socket.on('close', () => sockets.delete(socket));
+        socket.on('error', () => {});
+        let started = false;
+        let pending = Buffer.alloc(0);
+        socket.on('data', (chunk) => {
+            if (started) {
+                if (mode === 'drop') socket.destroy();
+                return;
+            }
+            pending = Buffer.concat([pending, chunk]);
+            if (pending.length < 4 || pending.length < pending.readInt32BE(0)) return;
+            started = true;
+            socket.write(Buffer.from([0x52, 0, 0, 0, 8, 0, 0, 0, 0, 0x5a, 0, 0, 0, 5, 0x49]));
+        });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    return {
+        url: `postgresql://rp:rp@127.0.0.1:${server.address().port}/rp`,
+        openSockets: () => sockets.size,
         close: async () => {
             for (const socket of sockets) socket.destroy();
             await new Promise((resolve) => server.close(resolve));
@@ -110,6 +144,41 @@ describe('routes answer 503 when the database cannot be reached', () => {
                 body: JSON.stringify({ display_name: 'Learner' }),
             });
         });
+    });
+
+    it('a connection lost in the middle of a transaction answers 503 and does not take the process down', async () => {
+        // pg emits 'error' on a checked-out client whose connection drops; pg-pool only listens on
+        // idle clients, so without a listener this was an uncaught exception.
+        hole = await fakePostgres('drop');
+        process.env.DATABASE_URL_PHASE1 = hole.url;
+        await withServer(async (base) => {
+            await expect503(`${base}/user/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ display_name: 'Learner' }),
+            });
+        });
+    });
+
+    it('a client whose query timed out is closed instead of being handed to the next request', async () => {
+        hole = await fakePostgres('hang');
+        process.env.DATABASE_URL_PHASE1 = hole.url;
+        process.env.PG_STATEMENT_TIMEOUT_MS = '200';
+        const pool = getPool();
+        const first = await pool.connect();
+        await assert.rejects(first.query('BEGIN'), /Query read timeout/);
+        // Route code then rolls back and releases without passing the error, as it did before.
+        await first.query('ROLLBACK').catch(() => {});
+        first.release();
+        const second = await pool.connect();
+        try {
+            assert.notEqual(second, first, 'the timed-out client (maybe still inside BEGIN) is not reused');
+        } finally {
+            second.release();
+        }
+        const deadline = Date.now() + 2000;
+        while (hole.openSockets() > 1 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.equal(hole.openSockets(), 1, 'its connection is closed, so the server rolls the transaction back');
     });
 
     it('the database port refuses connections', async () => {

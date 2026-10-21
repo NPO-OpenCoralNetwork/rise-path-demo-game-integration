@@ -14,11 +14,14 @@ const UNAVAILABLE_CODES = new Set([
     '57P01', '57P02', '57P03', '53300', '08000', '08001', '08003', '08004', '08006',
 ]);
 
-// pg and pg-pool report a lost or timed-out connection with plain Errors and no code.
+// pg and pg-pool report a lost or timed-out connection with plain Errors and no code. The last two
+// come from a client that already lost its connection (server/db.js closes it after a timeout).
 const UNAVAILABLE_MESSAGES = [
     /^timeout exceeded when trying to connect/i,
     /^Connection terminated/i,
     /^Query read timeout/i,
+    /^Client has encountered a connection error and is not queryable/i,
+    /^Client was closed and is not queryable/i,
 ];
 
 /**

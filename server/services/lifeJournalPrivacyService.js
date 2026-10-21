@@ -213,7 +213,8 @@ export async function deleteLifeJournalData({
                 : {}),
         };
     } catch (err) {
-        await client.query('ROLLBACK');
+        // A lost connection makes ROLLBACK throw too; keep the original error.
+        await client.query('ROLLBACK').catch(() => {});
         throw err;
     } finally {
         client.release();
