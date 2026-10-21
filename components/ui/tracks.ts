@@ -41,5 +41,7 @@ export function trackCopy(id: TrackId, lang: TrackLang, course?: Course | null):
   const fallback = (course?.locale as ContentLocale | undefined) ?? 'jp';
   const title = resolveLText(course?.title ?? COURSE_TRACKS[id].title, locale, fallback);
   const description = resolveLText(course?.subtitle, locale, fallback);
-  return { badge: COURSE_TRACKS[id].badge[lang], title: title.value, description: description.value, ...(title.lang ? { lang: title.lang } : {}) };
+  // A card shows the title before its '：' tagline ("Claude Code 実践"), which fits two lines on a phone.
+  const shortTitle = title.value.split('：')[0].trim() || title.value;
+  return { badge: COURSE_TRACKS[id].badge[lang], title: shortTitle, description: description.value, ...(title.lang ? { lang: title.lang } : {}) };
 }

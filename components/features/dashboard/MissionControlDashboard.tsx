@@ -409,13 +409,14 @@ const VIBE_COURSE_SLUG = 'vibe-coding';
 const CLAUDE_CODE_COURSE_SLUG = 'claude-code';
 
 // Five cards without a lonely last one: on 2 columns the first card spans the row (1 + 2 + 2),
-// a 6-column grid gives 3 + 2 from lg, and all five share one row from xl.
+// a 6-column grid gives 3 + 2 from lg, and all five share one row from 2xl. Next to the sidebar,
+// five cards at xl are too narrow for the two-line titles and descriptions.
 const TRACK_SPAN = [
-  'col-span-2 xl:col-span-1',
-  'lg:col-span-2 xl:col-span-1',
-  'lg:col-span-2 xl:col-span-1',
-  'lg:col-span-3 xl:col-span-1',
-  'lg:col-span-3 xl:col-span-1',
+  'col-span-2 2xl:col-span-1',
+  'lg:col-span-2 2xl:col-span-1',
+  'lg:col-span-2 2xl:col-span-1',
+  'lg:col-span-3 2xl:col-span-1',
+  'lg:col-span-3 2xl:col-span-1',
 ];
 
 const TrackSection: React.FC = () => {
@@ -448,7 +449,7 @@ const TrackSection: React.FC = () => {
           {t.seeAll}
         </ButtonLink>
       </div>
-      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 xl:grid-cols-5">
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 2xl:grid-cols-5">
         <li className={`flex ${TRACK_SPAN[0]}`}>
           <CourseCard
             className="flex-1"

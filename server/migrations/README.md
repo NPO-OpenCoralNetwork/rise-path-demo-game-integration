@@ -39,6 +39,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `009_learner_memory_meta.sql` | 学習者メモリの同期メタデータ |
 | `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス（`CONCURRENTLY` なし。作成中は `material_chunks` への書き込みが待たされる） |
 | `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
+| `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
 
 ## 参考資料（適用しない）
 
