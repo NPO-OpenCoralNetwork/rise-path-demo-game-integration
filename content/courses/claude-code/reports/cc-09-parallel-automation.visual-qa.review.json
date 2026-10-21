@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-09-parallel-automation",
   "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:262fc82916e86736",
+  "lessonHash": "sha256:5b14d7bb36e8d118",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,46 +9,46 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "There are no images or diagrams, so nothing is decorative or broken. Comparisons use definitions tables (s1-defs, s4-defs), which read cleanly at 390 px (pages/mobile-jp-03.png, mobile-jp-12/13.png). The code blocks s2-code and p1-model keep every source line whole on mobile, with highlighted lines (pages/mobile-jp-05/06.png, mobile-jp-20.png). Nothing is clipped, overflowX is false and brokenImages is 0.",
+      "evidence": "The lesson has no images, so none are decorative, broken or unreadable (brokenImages 0, mermaidErrors 0). The visuals are definition tables (s1-defs, s4-defs) and code blocks (s2-code, s3-code, p1-model). At 390 px they all fit with no sideways scroll, and the highlighted lines 13/17 and 2, 12-16 are easy to see (pages/mobile-jp-06.png, pages/mobile-jp-20.png). The score is 3, not 4, because there is no figure: a small diagram of the main folder and the two worktree folders and branches would show the worktree idea in s2 more clearly.",
       "blockIds": [
         "s1-defs",
-        "s4-defs",
         "s2-code",
         "s3-code",
+        "s4-defs",
         "p1-model"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty on desktop-jp and mobile-jp. Every screen has a heading, table, code block, steps or a check, and paragraphs stay short. Desktop charsPerLine has a median of 37, inside the 30–40 target (max 51). Inline checks appear in every section (s1-check to s4-check), and the long practice runs are broken up by steps and checklists (pages/mobile-jp-16–23.png).",
+      "evidence": "textOnlyScreens is empty for both desktop-jp and mobile-jp. Every one of the 31 mobile screens has a heading, table, code block, steps list, prompt or check. Inline checks q1-q4 come after each segment, and the five flags in s3-table are a numbered list with one flag per item (pages/mobile-jp-10.png, pages/mobile-jp-11.png). Desktop charsPerLine median is 40 (target 30-40, max 51).",
       "blockIds": [
+        "s3-table",
         "s1-check",
         "s2-check",
         "s3-check",
-        "s4-check",
-        "p1-steps-write",
-        "p1-checklist"
+        "s4-check"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The lesson is Japanese only, and every screen is in natural Japanese with English terms in parentheses on first use (ワークツリー（worktree）, 無人実行（unattended run）). There is no untranslated UI. The link text in s3-mode names its target (公式ドキュメント（非対話的実行）). Inline code chips such as --permission-mode dontAsk and Bash(npm test *) stay whole and readable in the check-quiz options at 390 px (pages/mobile-jp-25/26.png).",
+      "score": 4,
+      "evidence": "The lesson is Japanese only and contentLocale matches (no locale fallback). English appears only with first-use terms such as ワークツリー（worktree） and 非対話的実行（non-interactive mode）, and in code. The link text 「公式ドキュメント（非対話的実行）」 in s3-mode says where it goes. Contrast is good in the dark code blocks and in the callouts (pages/desktop-jp-07.png, pages/desktop-jp-08.png). No personal data on any screen.",
       "blockIds": [
         "s3-mode",
-        "check-quiz"
+        "s3-pitfall",
+        "s2-map"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s1-table: the three-way choice (subagent / worktree / background) is a bullet list under a two-row definitions table (pages/mobile-jp-03/04.png). A single comparison table (method × what returns × where it edits × when to use) would make the choice easier to scan.",
-    "check-quiz q3 (pages/mobile-jp-25.png): the question stem mixes six inline code chips across four lines, so it reads densely at 390 px. Consider moving the 'Bash(…) は --allowedTools の値…' explanation into a short sentence before the options, or into a smaller note.",
-    "reader: on mobile the flashcard hint says 'クリックまたはスペースキーでめくる' (pages/mobile-jp-29.png). A touch-appropriate hint (タップでめくる) would fit better.",
-    "reader: the '前のレッスン' link at the bottom of mobile runs to the right edge of the viewport (pages/mobile-jp-31.png). Consider wrapping it or adding right padding.",
-    "reader: the mobile full-length PNG is truncated at 16000px, and failed /api/ requests (14) were ignored as environment noise. The per-screen PNGs were used instead."
+    "s2-lead/s2-code: add a small flowchart TD (main folder -> .claude/worktrees/feature-a and bugfix-b, each on its own worktree-* branch, merged back with git merge) with a caption and alt, so the worktree idea is shown and not only described (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/mobile-jp-06.png).",
+    "lesson glossary vs s1-defs/s4-defs: the desktop sidebar 用語・このレンズン lists each term twice, for example 「ワークツリー（worktree）」 and 「ワークツリー」, and 「定期タスク（scheduled task）」 and 「定期タスク」 (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/desktop-jp-01.png). Use the same term string in the glossary and in the definitions, or ask the reader team to merge entries with the same base term.",
+    "reader: on mobile the 前のレッスン link at the bottom runs to the right edge of the screen (「…MCPでつなぐ」), so the end of the title may be cut off (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/mobile-jp-31.png).",
+    "reader: the mobile full-length PNG stops at 16000px and the desktop one is also truncated, so this review used the per-screen PNGs. 14 failed /api/ requests (500) were logged as environment noise."
   ],
+  "average": 3.67,
   "verdict": "pass",
-  "summary": "Checked all 31 mobile-jp and 21 desktop-jp screens. Nothing fails: no overflow, no console or mermaid errors, no unknown blocks, no broken images, no text-only screens, and no personal data on any screen. Code blocks, tables and inline code chips read cleanly at 390 px. The only suggestions are optional: a single comparison table for the three parallel methods, and a lighter stem for check question 3."
+  "summary": "No hard failures: overflowX false; console errors, mermaid errors, unknown blocks and broken images are all 0. At 390 px, inline code chips and code lines show in full with no awkward wraps, and every screen has a heading, table, code block or check. The main visual improvement is optional: a small worktree diagram in the s2 example."
 }
