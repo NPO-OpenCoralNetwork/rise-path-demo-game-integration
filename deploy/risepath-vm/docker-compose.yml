@@ -10,7 +10,10 @@ name: risepath
 
 services:
   db:
-    image: postgres:16-alpine
+    # Postgres 16 with pgvector. On a new, empty pgdata volume migration 000 creates the vector
+    # extension, so material_chunks.embedding is vector(768) with an HNSW index (RAG vector search).
+    # Changing the image does not convert a volume made by an earlier image. Bump tag and digest together.
+    image: pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +22,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      # -h 127.0.0.1: on first boot the image's init server listens only on the socket; TCP means the real server.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -32,10 +36,6 @@ services:
       context: ../..
       dockerfile: deploy/risepath-vm/Dockerfile
       target: api
-      args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
-        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
     restart: unless-stopped
     env_file:
       - path: stack.env
