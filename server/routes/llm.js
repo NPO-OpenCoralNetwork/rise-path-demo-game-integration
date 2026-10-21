@@ -6,8 +6,8 @@
  * POST /llm/personality-insight { scores, locale } → PersonalityInsight
  * POST /llm/tutor               AskTutorDetail (PLAN §9.1) → SSE: meta, text.delta…, done | error
  *
- * Mounted in server.js before the blanket /api/v2 auth middlewares, with optionalAuth, so
- * guests can use it in strict mode; the AI rate limiter and the guest daily budget
+ * Mounted in server.js on /api/v2/llm with optionalAuth only, so guests can use it in strict
+ * mode; the AI rate limiter and the guest daily budget
  * (server/llm/guestAccess.js) apply to the POST routes only. Each POST runs: AI limiter →
  * body validation (and the guest lesson check) → guest budget → handler, so rejected requests
  * never use guest quota; a call that fails before any model ran is refunded. Anonymous tutor
