@@ -332,16 +332,19 @@ policyTool(
 // --- rag-search ---
 policyTool(
     'rag-search',
-    '教育コンテンツをベクトル検索する',
+    '自分がアップロードした教材と、全員に公開された教材を検索する',
     {
         query: z.string().describe('検索クエリ'),
         domain: z.string().optional().describe('検索対象ドメイン (例: blender-3d)。省略時は全ドメイン'),
-        max_results: z.number().optional().describe('最大結果数 (デフォルト: 3)'),
+        max_results: z.number().optional().describe('最大結果数 (デフォルト: 3、1〜10)'),
     },
-    async ({ query, domain, max_results }) => {
+    async ({ query, domain, max_results }, extra) => {
         const t = Date.now();
         try {
-            return toolResult(await searchContent({ query, domain, maxResults: max_results }), { toolName: 'rag-search', startTime: t });
+            // Uploaded materials are private: search the caller's own plus public ones.
+            const userId = await requireScopedUser(undefined, extra, { toolName: 'rag-search', startTime: t });
+            if (typeof userId !== 'string') return userId;
+            return toolResult(await searchContent({ query, domain, maxResults: max_results, userId }), { toolName: 'rag-search', startTime: t });
         } catch (err) {
             return toolError(err, { toolName: 'rag-search', startTime: t });
         }

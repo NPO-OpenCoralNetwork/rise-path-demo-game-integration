@@ -153,6 +153,9 @@ describe('RAG embeddings (shared by ragSearch + ragService)', () => {
     });
 });
 
+/** WHERE prefix of every searchContent query: ready materials that are the caller's own or public. */
+const SEARCHABLE_SCOPE = /WHERE m\.status = 'ready' AND \(m\.user_id = \$1 OR m\.meta->>'visibility' = 'public'\)/;
+
 describe('tools/core/ragSearch searchContent', () => {
     it('vector search embeds the query and only matches chunks from the same embedding model', async () => {
         const client = fakeEmbeddingClient();
@@ -167,20 +170,79 @@ describe('tools/core/ragSearch searchContent', () => {
 
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.ok(search, 'vector query issued');
-        assert.match(search.sql, /c\.embedding_model = \$2/);
-        assert.equal(search.params[1], MODEL_IDS.gemini.embedding);
-        assert.equal(search.params[2], 'u1');
-        assert.equal(search.params[3], 2);
+        assert.match(search.sql, SEARCHABLE_SCOPE);
+        assert.match(search.sql, /c\.embedding <=> \$2::vector/);
+        assert.match(search.sql, /AND c\.embedding_model = \$3/);
+        assert.match(search.sql, /LIMIT \$4/);
+        assert.equal(search.params[0], 'u1');
+        assert.deepEqual(search.params.slice(2), [MODEL_IDS.gemini.embedding, 2]);
     });
 
-    it('falls back to keyword search when no embedding key is configured', async () => {
+    it('falls back to keyword search over the same scope when no embedding key is configured', async () => {
         setEmbeddingClientForTests(null);
         const pool = mockPool({ rows: [] });
         setPoolForTests(pool);
-        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d' });
+        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', userId: 'u1' });
         assert.equal(result.search_type, 'keyword');
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, SEARCHABLE_SCOPE);
+        assert.deepEqual(keyword.params, ['u1', '%blender%', '%modifiers%', 3]);
     });
+
+    it('falls back to keyword search over the same scope without pgvector', async () => {
+        const pool = mockPool({ hasVector: false, rows: [] });
+        setPoolForTests(pool);
+        const result = await searchContent({ query: 'blender modifiers', userId: 'u1' });
+        assert.equal(result.search_type, 'keyword');
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, SEARCHABLE_SCOPE);
+        assert.equal(keyword.params[0], 'u1');
+    });
+
+    it('refuses to search without a userId and runs no query (uploaded materials are private)', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool();
+        setPoolForTests(pool);
+
+        for (const userId of [undefined, null, '', '   ', 42]) {
+            const result = await searchContent({ query: 'blender modifiers', userId });
+            assert.equal(result.error_type, 'validation');
+            assert.deepEqual(result.results, []);
+        }
+        assert.equal(pool.queries.length, 0);
+        assert.equal(client.log.length, 0);
+    });
+
+    it('falls back to keyword search over the same scope when embedding the query fails', async () => {
+        setEmbeddingClientForTests({
+            models: { embedContent: async () => { throw new Error('embedding service down'); } },
+        });
+        const pool = mockPool({ rows: [] });
+        setPoolForTests(pool);
+
+        const result = await searchContent({ query: 'blender modifiers', userId: 'u1' });
+        assert.equal(result.search_type, 'keyword');
+        assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
+
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, SEARCHABLE_SCOPE);
+        assert.equal(keyword.params[0], 'u1');
+    });
+
+    for (const [maxResults, limit] of [[undefined, 3], [0, 1], [-5, 1], [2.7, 2], [100, 10], [Number.NaN, 3]]) {
+        it(`clamps maxResults ${maxResults} to ${limit}`, async () => {
+            setEmbeddingClientForTests(null);
+            const pool = mockPool({ rows: [] });
+            setPoolForTests(pool);
+            await searchContent({ query: 'blender modifiers', userId: 'u1', maxResults });
+            const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+            assert.equal(keyword.params.at(-1), limit);
+        });
+    }
 });
 
 describe('server/ragService ingest + retrieve', () => {
@@ -365,16 +427,16 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
 
         const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
-        assert.match(coverage.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$2/);
+        assert.match(coverage.sql, /WHERE m\.status = 'ready' AND \(m\.user_id = \$1 OR m\.meta->>'visibility' = 'public'\) AND c\.embedding_model = \$2/);
         assert.deepEqual(coverage.params, ['u1', MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(m\.user_id = \$1 OR m\.meta->>'visibility' = 'public'\) AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
         assert.deepEqual(keyword.params, ['u1', '%blender%', '%modifiers%', 2]);
         assert.equal(warnings.length, 1);
     });
 
-    it('searchContent over all users (MCP rag-search, no userId): another user\'s current chunk does not hide older chunks', async () => {
+    it('searchContent with mixed chunks in the caller\'s scope: a current chunk does not hide older chunks', async () => {
         const client = fakeEmbeddingClient();
         setEmbeddingClientForTests(client);
         const pool = mockPool({
@@ -385,7 +447,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: result } = await captureWarnings(() =>
-            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3 }));
+            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3, userId: 'u1' }));
 
         assert.equal(result.search_type, 'vector+keyword');
         assert.equal(result.reembed_required, true);
@@ -394,9 +456,11 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
             ['m-krita', 0.4, undefined],
         ]);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$1 OR c\.embedding_model > \$1\) AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.deepEqual(keyword.params, [MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(m\.user_id = \$1 OR m\.meta->>'visibility' = 'public'\) AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.deepEqual(keyword.params, ['u1', MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
-        assert.deepEqual(search.params.slice(1), [MODEL_IDS.gemini.embedding, 3]);
+        assert.match(search.sql, SEARCHABLE_SCOPE);
+        assert.equal(search.params[0], 'u1');
+        assert.deepEqual(search.params.slice(2), [MODEL_IDS.gemini.embedding, 3]);
     });
 });
