@@ -58,31 +58,43 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 秘密の値（トンネルトークン、`ORIGIN_SECRET`）はチャット・issue・git に貼らない。`<domain>` は自分のドメインに読み替える。
 
-0. この変更の PR を `main` にマージする。手順 7 の VM の pull も、手順 13 の Vercel の Production Branch も `main` を使う。
+0. この変更の PR を `main` にマージしてから VM を作る。クイックスタートの clone も、手順 13 の Vercel の Production Branch も `main` を使う。マージ前の `main` を clone すると、swap、`stack.env` の検査、Hermes のファイルの持ち主の修正が入らない。
 
-### A. VM を再開する
+### 新しい VM の順番
 
-2026-10-21 時点で、オーナーの報告では VM は使っていない。
+下の手順は A〜G の順に番号が付いている。新しい VM から始めるときは、次の順に進める。いちばん時間がかかるのは Cloudflare のゾーンが Active になるまで（最大 48 時間）なので、最初に始めて、待つあいだに VM を作る。
 
-1. 状態を確認して起動する。初回デプロイの前に、コンソールでブートディスクのスナップショットを取ってもよい。
+- **最初に**: 手順 4（Cloudflare にドメインを追加し、ネームサーバーを切り替える）。Free プランのゾーンは、28 日以内に Active にならないと消える。
+- **ゾーンを待つあいだに**:
+  - 手順 1: GCP の予算アラートを作り、残っていれば `risepath-dev-schedule` を消す。Tailscale の管理画面で旧 `risepath-vm` を Remove し、Mac で `ssh-keygen -R risepath-vm` を実行する。
+  - 手順 2〜3: マシンタイプを決めて VM を作り、ファイアウォールを確かめる。VM README のクイックスタートで、スタックを `COMPOSE_PROFILES=full` で動かす（`bootstrap-vm.sh` の 1 回目 → SSH し直す → `stack.env` を埋める → 2 回目）。Mac の `.env.local` を新しい値に替え、Tailscale 経由で `npm run smoke:vm` を流す。流せるのは `ORIGIN_SECRET` を入れる前だけ。
+  - 手順 13 の import だけ: Vercel で GitHub リポジトリを import する。env はまだ入れない。
+- **ゾーンが Active になったら**: 手順 5〜6（トンネル）→ 手順 7〜12（`tunnel.env`、`ORIGIN_SECRET` などの値、`full,tunnel`、`deploy-stack.sh`、`403` の確認）→ 手順 13〜15（Vercel Production の env、Redeploy、`app.<domain>` の追加）→ 手順 16（Supabase。`app.<domain>` が開けるようになってから。そのあと初回サインインをして、自分を管理者にする）→ 手順 17（確認チェックリストと `npm run smoke:edge`）。
 
-   ```bash
-   gcloud compute instances describe risepath-vm --zone=asia-northeast1-b --format='value(status,resourcePolicies)'
-   gcloud compute instances start risepath-vm --zone=asia-northeast1-b
-   ```
+### A. 新しい VM を用意する
 
-   `describe` が `was not found` を返したら、VM は削除されている。VM README の[クイックスタート](../risepath-vm/README.md#クイックスタート)（`provision-gce.sh` → Tailscale → `bootstrap-vm.sh`）で作り直す。DB は空から始まる。そのあと手順 3 から続ける。
+2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。VM は新しく作り、DB は空から始まる（Supabase のアカウントは残るが、進捗やジャーナルなど旧 VM の DB にあったデータは無い）。
 
-2. 夜間停止を外す。公開 API は 24 時間動いている必要がある。コンピュート費用は 14 時間/日の頃より増える。`provision-gce.sh` は既定で夜間停止を付けない（`NIGHT_STOP=1` で付ける）。
+1. 予算アラートを作り、前の VM の残りを片付ける。
+   - GCP コンソールの Billing → Budgets & alerts で、このプロジェクトに月額の予算としきい値を作る。アラートは通知だけで、課金は止まらない。金額は、手順 2 の推定を GCP の料金計算ツールで確かめてから決める。
+   - 夜間停止のスケジュールが残っていれば消す。どの VM にも付いていなければ消せる。
 
-   ```bash
-   gcloud compute instances remove-resource-policies risepath-vm \
-     --resource-policies=risepath-dev-schedule --zone=asia-northeast1-b
-   # 任意: スケジュール自体も消す
-   gcloud compute resource-policies delete risepath-dev-schedule --region=asia-northeast1
-   ```
+     ```bash
+     gcloud compute resource-policies describe risepath-dev-schedule --region=asia-northeast1   # 無ければ not found。そのまま次へ
+     gcloud compute resource-policies delete risepath-dev-schedule --region=asia-northeast1
+     ```
 
-3. GCP ファイアウォールを確認する。タグ `risepath-vm` に、3006・5432・3100・8642・8880 を `0.0.0.0/0` へ開くルールが無いこと。外向きの TCP と UDP の 7844（Cloudflare Tunnel）が許可されていること。
+   - Tailscale の管理画面（Machines）で、旧 `risepath-vm` を Remove する。残っていると、新しい VM が `risepath-vm-1` になる。
+   - Mac で `ssh-keygen -R risepath-vm` を実行し、旧 VM のホスト鍵を消す。
+
+2. マシンタイプを決めて VM を作る。VM README の[クイックスタート](../risepath-vm/README.md#クイックスタート)に沿って進める（`provision-gce.sh` → Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh` の 1 回目 → SSH し直す → `stack.env` を埋める → 2 回目）。
+   - Memanto なしは `e2-medium`（4 GB。既定）。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`（8 GB）。理由は VM README の「[マシンタイプ](../risepath-vm/README.md#マシンタイプ)」。
+   - 月額は**推定**（未確認）: 24 時間稼働の `asia-northeast1` で `e2-medium` 約 $31、`e2-standard-2` 約 $63。ディスクは別。第三者のサイトの値なので、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめる。
+   - `stack.env` は VM README の表のとおりに埋める。`POSTGRES_PASSWORD` は DB の最初の起動で固定される。`COMPOSE_PROFILES=full` のままにし、手順 9〜10 の公開エッジの値はまだ入れない。
+   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–012 がすべて入る。
+   - Mac の `.env.local` を新しいパスワードと `HERMES_API_KEY` に替える（VM README の「Mac `.env.local`」）。`ORIGIN_SECRET` を入れる前に、Tailscale 経由で `npm run smoke:vm` を流す。
+
+3. GCP ファイアウォールを確認する。タグ `risepath-vm` に、3006・5432・3100・8642・8880 を `0.0.0.0/0` へ開くルールが無いこと。外向きの TCP と UDP の 7844（Cloudflare Tunnel）が許可されていること。ルールはタグに付くので、前の VM のルールが残っていれば新しい VM にも効く。
 
 ### B. Cloudflare
 
@@ -100,18 +112,9 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 ### C. VM のスタック
 
-7. **初回デプロイの注意: 先に pull してから `deploy-stack.sh` を実行する。** VM にある `deploy-stack.sh` は古い可能性がある。古い本体には tunnel のガードが無く、ホストに node があると smoke をホストから流す（ゲートが有効だと 403 で落ちる）。
-
-   pull の前に取得元を確かめる。`origin` が `https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git` でなければ、pull しても新しいコードは入らない。VM README の「[既存の `/opt/risepath` がある場合](../risepath-vm/README.md#既存の-optrisepath-がある場合)」に沿って clone し直してから続ける。
+7. この版の compose になったか確かめる。新しい VM はクイックスタートで `main` を clone したばかりなので、取得元の確認や pull の先行は要らない（`deploy-stack.sh` が毎回 pull する）。`compose OK` が出なければ、ここで止めて手順 0 のマージを見直す。
 
    ```bash
-   git -C /opt/risepath remote -v
-   ```
-
-   pull したら、この版の compose になったか確かめる。`compose OK` が出なければ、ここで止めて手順 0 のマージと取得元を見直す。
-
-   ```bash
-   git -C /opt/risepath pull --ff-only
    cd /opt/risepath/deploy/risepath-vm
    grep -q cloudflared docker-compose.yml && echo 'compose OK'
    ```
@@ -137,9 +140,10 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
     - `TRUST_PROXY=1`: `cloudflared` が 1 ホップ。`true` にしない
     - `LLM_ALLOWED_ORIGINS`: API に届く Host は `app.<domain>` にならない（`api.<domain>` の見込み）ので、アプリのオリジンを明示する
     - `RISE_PATH_PUBLIC_URL` があると、メディア URL が `https://api.<domain>` の絶対 URL になり 403 になる
-    - Memanto を使う場合、`memory` プロファイルは `deploy-stack.sh` が足す
+    - Memanto を使う場合、`memory` プロファイルは `deploy-stack.sh` が足す。`MEMANTO_ENABLED=true` も `stack.env` に入れる（VM 起動時の systemd ユニットが読む。手順 2 で入れていればそのまま）
+    - `GEMINI_API_KEY` が入っているか確かめる。コース生成、画像生成、教材の索引づけが使う。無いと、確認チェックリストの画像生成が失敗する
 11. `./scripts/deploy-stack.sh` を実行する。`tunnel` プロファイルで値が足りないと、足りない変数名だけを表示して止まる。smoke は `api` コンテナ内で流れる。終わったら `docker compose --env-file stack.env ps` で `cloudflared` が healthy か見る。
-    - 実行の前に、未適用の migration を確かめてもよい（任意。適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。2026-06-24 の記録は 000–008 までなので、009〜012 が未適用と出る見込み。`deploy-stack.sh` がまとめて適用する。
+    - 実行の前に、migration の状態を確かめてもよい（任意。適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–012 が適用済みなので、13 件すべて適用済み（未適用 0 件）と出れば正しい。
 
       ```bash
       docker compose --env-file stack.env build api
@@ -164,6 +168,8 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 ### E. Supabase
 
 16. Authentication → URL Configuration で、Site URL を `https://app.<domain>` にし、Redirect URLs に `https://app.<domain>/auth/callback` を足す（`context/AuthContext.tsx` の `emailRedirectTo`）。
+    - 変えるのは、`app.<domain>` が開けるようになってから（手順 14〜15 のあと）。先に変えると、認証メールのリンクがまだ開けないホストを指す。
+    - 初回サインインのあと、自分を管理者にする。空の DB には管理者がいない（プロフィールは役割 `learner` で作られる）。`https://app.<domain>` で一度サインインしてから、VM README の「[管理者にする](../risepath-vm/README.md#5-管理者にする初回サインインのあと)」の `UPDATE` を流す。
 
 ### F. 公開前の確認
 
@@ -171,6 +177,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 ### G. 運用
 
+- GCP の予算アラート（手順 1）: 24 時間稼働の最初の 1 日分の費用が Billing のレポートに出たら、しきい値を見直す。手順 2 の月額は推定なので、実際の額で決め直す。
 - 稼働監視: `https://app.<domain>/api/v2/health` を外形監視する（edge には `{ ok, status }` だけを返す）。`ROUTER_EXTERNAL_TARGET_ERROR` や Cloudflare のエラーページは、`cloudflared` か VM が落ちている印。
 - Anthropic・Gemini・OpenRouter の各コンソールで、利用上限かアラートを設定する。公開直後はゲスト枠（`LLM_GUEST_DAILY_PER_IP`・`LLM_GUEST_DAILY_TOTAL`）を下げることも考える。
 - `ORIGIN_SECRET` は定期的にローテーションする（上の 3 段階）。
