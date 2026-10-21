@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
 import { createApp } from '../../server.js';
-import { ORIGIN_SECRET_HEADER, createOriginGate, readOriginSecrets } from '../middleware/originGate.js';
+import { ORIGIN_SECRET_HEADER, createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from '../middleware/originGate.js';
 import { resetGatewayForTests } from '../llm/index.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 
@@ -74,7 +74,7 @@ describe('readOriginSecrets', () => {
         return true;
     });
 
-    it('is off when ORIGIN_SECRET is unset, and the gate then passes every request through', () => {
+    it('is off when ORIGIN_SECRET is unset, and the gate then passes requests without Cloudflare headers through', () => {
         assert.deepEqual(readOriginSecrets({}), []);
         assert.deepEqual(readOriginSecrets({ ORIGIN_SECRET: '  ' }), []);
         const gate = createOriginGate({ env: {} });
@@ -101,6 +101,67 @@ describe('readOriginSecrets', () => {
         const digests = readOriginSecrets({ ORIGIN_SECRET: ` ${SECRET} `, ORIGIN_SECRET_PREVIOUS: PREVIOUS });
         assert.equal(digests.length, 2);
         assert.ok(digests.every((digest) => digest.length === 32));
+    });
+});
+
+describe('tunnelProfileWithoutSecret', () => {
+    it('is true only when COMPOSE_PROFILES lists tunnel and ORIGIN_SECRET is unset', () => {
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: 'full,tunnel' }), true);
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: ' full , tunnel ' }), true);
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: 'tunnel', ORIGIN_SECRET: '  ' }), true);
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: 'full,tunnel', ORIGIN_SECRET: SECRET }), false);
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: 'full' }), false);
+        assert.equal(tunnelProfileWithoutSecret({ COMPOSE_PROFILES: 'full,tunnels' }), false);
+        assert.equal(tunnelProfileWithoutSecret({}), false);
+    });
+});
+
+describe('origin gate and requests that came through Cloudflare', () => {
+    beforeEach(saveEnv);
+    afterEach(restoreEnv);
+
+    const CLOUDFLARE = [{ 'cf-ray': '8f1e2d3c4b5a6978-NRT' }, { 'cf-connecting-ip': '203.0.113.20' }, { 'cdn-loop': 'cloudflare; loops=1' }];
+
+    it('gate off: answers 403 to Cloudflare traffic and passes everything else', async () => {
+        const lines = [];
+        const logger = { warn: (line) => lines.push(String(line)) };
+        await withApp({ logger }, async (base) => {
+            const status = (headers) => fetch(`${base}/api/v2/llm/status`, { headers });
+            for (const headers of CLOUDFLARE) {
+                const response = await status(headers);
+                assert.equal(response.status, 403, JSON.stringify(headers));
+                assert.deepEqual(await response.json(), { error: 'forbidden' });
+                assert.equal(response.headers.get('cache-control'), 'no-store');
+                assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+            }
+            assert.equal((await status({ 'cdn-loop': 'CloudFlare' })).status, 403, 'cdn-loop is matched case-insensitively');
+            assert.equal((await status({})).status, 200);
+            assert.equal((await status({ 'cdn-loop': 'vercel', 'x-forwarded-for': '203.0.113.21' })).status, 200);
+        });
+        assert.equal(lines.length, 1, 'at most one refusal line per minute');
+        assert.match(lines[0], /refused 1 request\(s\) from Cloudflare while ORIGIN_SECRET is unset/);
+        assert.ok(!lines[0].includes('203.0.113.20') && !lines[0].includes('8f1e2d3c'), 'the log holds no header value');
+    });
+
+    it('gate off: reports enabled=false and refuses Cloudflare traffic even from loopback', () => {
+        const gate = createOriginGate({ env: {}, logger: quietLogger });
+        assert.equal(gate.enabled, false);
+        let status = 0;
+        const res = { set: () => res, status: (code) => { status = code; return res; }, json: () => res };
+        gate({ headers: { 'cf-ray': '1' }, socket: { remoteAddress: '127.0.0.1' } }, res, () => assert.fail('passed through'));
+        assert.equal(status, 403);
+    });
+
+    it('gate on: loopback is exempt only without Cloudflare headers', async () => {
+        process.env.ORIGIN_SECRET = SECRET;
+        await withApp({ logger: quietLogger }, async (base) => {
+            const status = (headers) => fetch(`${base}/api/v2/llm/status`, { headers });
+            assert.equal((await status({})).status, 200);
+            for (const headers of CLOUDFLARE) {
+                assert.equal((await status(headers)).status, 403, JSON.stringify(headers));
+            }
+            assert.equal((await status({ 'cf-ray': '8f1e2d3c4b5a6978-NRT', [ORIGIN_SECRET_HEADER]: SECRET })).status, 200, 'with the secret it is an edge request');
+        });
     });
 });
 

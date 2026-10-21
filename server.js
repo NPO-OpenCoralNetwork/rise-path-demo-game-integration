@@ -22,7 +22,7 @@ import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
-import { createOriginGate, readOriginSecrets } from './server/middleware/originGate.js';
+import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit from 'express-rate-limit';
 
 // ESM dirname equivalent
@@ -77,6 +77,7 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // --- Middleware ---
     // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
     // get 403 before CORS, body parsing, logging or the limiters run (and before a 50 MB body is read).
+    // Without it, only requests that came through Cloudflare get 403.
     app.use(createOriginGate({ ...originGate }));
     // Every response: no MIME sniffing. API responses: not cached by Vercel, Cloudflare or the
     // browser unless a route sets its own Cache-Control later (llm.js, agent.js streams).
@@ -224,6 +225,11 @@ async function main() {
 
     // Checked before createApp so a weak value stops startup with a clear error; never logs values.
     const originSecrets = readOriginSecrets(process.env).length;
+    // COMPOSE_PROFILES reaches the api through stack.env: a tunnel without the gate stops here.
+    if (tunnelProfileWithoutSecret(process.env)) {
+        console.error('[OriginGate] COMPOSE_PROFILES lists tunnel but ORIGIN_SECRET is not set; refusing to start.');
+        process.exit(1);
+    }
     console.log(originSecrets > 0 ? `[OriginGate] on (${originSecrets} accepted secrets)` : '[OriginGate] off');
 
     const app = await createApp();

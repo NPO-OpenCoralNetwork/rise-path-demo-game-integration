@@ -1,8 +1,10 @@
 // VM stack config for the public edge: cloudflared (compose profile `tunnel`) publishes
 // https://api.<domain> through Cloudflare Tunnel. It is pinned by tag and digest, reads only
-// tunnel.env, publishes no ports and shares the `edge` network with api alone. tunnel.env stays
-// out of git and, with stack.env, out of the Docker build context; deploy-stack.sh refuses the
-// tunnel profile until the origin gate and the token are set.
+// tunnel.env, publishes no ports and reaches api by name on the `edge` network. The stack
+// publishes its ports on all host interfaces, so a tunnel route pointing at a host or gateway IP
+// could reach them too: the tunnel's only Published application must be http://api:3006.
+// tunnel.env stays out of git and, with stack.env, out of the Docker build context;
+// deploy-stack.sh refuses the tunnel profile until the origin gate and the token are set.
 // Text checks with node:fs only (no YAML dependency).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
