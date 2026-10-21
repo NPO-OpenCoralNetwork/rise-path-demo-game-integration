@@ -5,7 +5,8 @@
  * and verifies.reviewedRevision must be a commit id. A snapshot copy under .artifacts/review/
  * (git-ignored) or a sha256: revision exists only in the checkout that made it, so check-review.mjs
  * fails everywhere else. With git history (CI checks out in full), every earlier verification on
- * the chain is checked the same way. Drafts may still verify against snapshots.
+ * the chain is checked the same way, and each reviewedRevision must name a commit of this repository
+ * (an amended or rebased local commit is in no other clone). Drafts may still verify against snapshots.
  * Rules: .claude/skills/review-lesson/SKILL.md.
  */
 import { describe, it } from 'node:test';
@@ -84,6 +85,10 @@ function chainProblems({ reports, review }) {
       problems.push(`${at}: ${problem}`);
       break;
     }
+    const revision = round.verifies.reviewedRevision;
+    if (FULL_HISTORY && !resolveCommitId(revision, ROOT)) {
+      problems.push(`${at}: verifies.reviewedRevision ${revision} names no commit of this repository (or a branch or tag has that name)`);
+    }
     if (depth >= MAX_CHAIN) {
       problems.push(`${at}: the chain goes back more than ${MAX_CHAIN} rounds; do a full review`);
       break;
@@ -133,6 +138,14 @@ describe('a verification round must name a committed previous round', () => {
 describe('verification rounds of published lessons can be checked in a fresh clone', () => {
   const verifications = publishedVerifications();
   if (!verifications.length) it('no published lesson has a verification round', () => {});
+  else {
+    it('refuses a reviewedRevision that names no commit of this repository', { skip: !FULL_HISTORY && 'needs full git history' }, () => {
+      const [{ reports, review }] = verifications;
+      const missing = '0000000000000000000000000000000000000000';
+      const problems = chainProblems({ reports, review: { ...review, verifies: { ...review.verifies, reviewedRevision: missing } } });
+      assert.ok(problems.some((p) => p.startsWith(`${reports}: verifies.reviewedRevision ${missing} names no commit`)), problems.join('\n'));
+    });
+  }
   for (const verification of verifications) {
     it(verification.reports, () => {
       const problems = chainProblems(verification);

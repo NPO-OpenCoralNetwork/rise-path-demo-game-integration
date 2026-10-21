@@ -176,11 +176,14 @@ async function main() {
     await page.setContent('<!doctype html><html><body><div id="d"></div></body></html>');
     await page.addScriptTag({ path: mermaidFile });
     const href = webFontsHref(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'));
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let fontTimeout;
+    // The timeout is cleared once the race settles, so a quick font load does not keep the process alive for 10 s.
     const webFonts = href
       ? await Promise.race([
         page.addStyleTag({ url: href }).then(() => true, () => false),
-        new Promise((resolve) => { setTimeout(() => resolve(false), 10000); }),
-      ])
+        new Promise((resolve) => { fontTimeout = setTimeout(() => resolve(false), 10000); }),
+      ]).finally(() => clearTimeout(fontTimeout))
       : false;
     console.log(webFonts ? `fonts: ${WEB_FONTS.join(', ')} from Google Fonts, as the reader` : 'fonts: system only (Google Fonts did not load); widths can differ from the reader by a few px');
     for (const [i, source] of sources.entries()) {

@@ -26,6 +26,8 @@ const strip = (s) => String(s ?? '')
 export const textLength = (s) => [...strip(s)].length;
 const len = textLength;
 const txt = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? (v.jp ?? v.en ?? '') : '');
+/** An item that wraps its text ({ md } / { label }) gives that field; a string or {jp, en} item is the text itself. */
+const field = (v, key) => (v && typeof v === 'object' && key in v ? v[key] : v);
 
 function blockProse(b, proseOnly) {
   let n = 0;
@@ -34,12 +36,12 @@ function blockProse(b, proseOnly) {
   switch (b.type) {
     case 'markdown': case 'callout': add(b.md); add(b.title); break;
     case 'definitions': (b.items || []).forEach((i) => { add(i.term); add(i.md); }); break;
-    case 'table': add(b.caption); (b.columns || []).forEach((c) => add(typeof c === 'string' ? c : c?.label));
+    case 'table': add(b.caption); (b.columns || []).forEach((c) => add(field(c, 'label')));
       (b.rows || []).forEach((r) => (Array.isArray(r) ? r : r?.cells || []).forEach(add)); break;
-    case 'list': (b.items || []).forEach((i) => add(typeof i === 'string' ? i : i?.md)); add(b.title); break;
+    case 'list': (b.items || []).forEach((i) => add(field(i, 'md'))); add(b.title); break;
     case 'steps': add(b.title); (b.items || []).forEach((i) => { add(i.title); add(i.md); add(i.expect); }); break;
     case 'diagram': case 'image': add(b.caption); break;
-    case 'summary': add(b.title); (b.points || b.items || []).forEach((p) => add(typeof p === 'string' ? p : p?.md)); break;
+    case 'summary': add(b.title); (b.points || b.items || []).forEach((p) => add(field(p, 'md'))); break;
     case 'prompt': add(b.title); add(b.expect); add(b.note); break;
     case 'checklist': add(b.title); (b.items || []).forEach((i) => add(i.label)); break;
     default: break; // quiz, flashcards, askTutor, code

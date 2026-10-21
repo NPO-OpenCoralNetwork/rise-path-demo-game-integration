@@ -28,8 +28,9 @@ export function longParagraphs(lesson, max = 3) {
   const hits = [];
   const visit = (v, path) => {
     if (typeof v === 'string') {
-      const stem = /questions\[[^\]]+\]\.prompt$/.test(path);
-      if (!stem && /(^|\.)(code|alt|prompt|id|lang|filename|url|type|bloom|objectiveId)$/.test(path)) return; // prompt-block bodies are instructions, not prose
+      const field = path.replace(/\.(jp|en|fr)$/, ''); // a localized value ({jp, en}) is tested as its field
+      const stem = /questions\[[^\]]+\]\.prompt$/.test(field);
+      if (!stem && /(^|\.)(code|alt|prompt|id|lang|filename|url|type|bloom|objectiveId)$/.test(field)) return; // prompt-block bodies are instructions, not prose
       v.split(/\n/).forEach((p, i) => {
         const n = countSentences(p);
         if (n > max) hits.push({ path: `${path}${i ? `#line${i + 1}` : ''}`, sentences: n, text: p, advisory: stem });

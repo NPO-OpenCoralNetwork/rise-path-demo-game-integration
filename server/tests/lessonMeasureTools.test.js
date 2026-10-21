@@ -73,6 +73,26 @@ describe('measure.mjs', () => {
     assert.deepEqual(m.sections.map((s) => `${s.id} ${s.chars}`), ['hook 3', 's1 18', 'practice 11', 'check 0', 'summary 3']);
   });
 
+  it('counts localized ({jp, en}) list items, summary points and table columns like plain strings', () => {
+    const lesson = (item) => ({
+      sections: [{
+        id: 's1',
+        role: 'concept',
+        blocks: [
+          { type: 'list', items: [item('あいう', 'abc')] },
+          { type: 'summary', points: [item('まとめ', 'sum')] },
+          { type: 'table', columns: [item('列', 'col')], rows: [['セル']] },
+        ],
+      }],
+    });
+    const pair = (m) => [m.prose, m.read];
+    // prose: list 3 + summary 3; read adds the table (column 1 + cell 2).
+    assert.deepEqual(pair(measureLesson(lesson((jp) => jp))), [6, 9]);
+    assert.deepEqual(pair(measureLesson(lesson((jp, en) => ({ jp, en })))), [6, 9]);
+    // Like every localized field, the Japanese text counts, and English only when there is no Japanese.
+    assert.deepEqual(pair(measureLesson(lesson((jp, en) => ({ en })))), [6, 11]);
+  });
+
   it('measures an empty lesson as zero', () => {
     assert.deepEqual(measureLesson({}), { prose: 0, read: 0, practice: 0, questions: 0, tasks: 0, est: 0, sections: [] });
   });
@@ -110,6 +130,26 @@ describe('para-sentences.mjs', () => {
       { path: 'sections[s1].blocks[q].questions[q1].prompt', sentences: 4, text: four, advisory: true },
     ]);
     assert.deepEqual(longParagraphs(lesson, 4), []);
+  });
+
+  it('tests a localized value ({jp, en}) as its field: quiz stems stay advisory, prompt bodies and diagram code are skipped', () => {
+    const four = '一。二。三。四。';
+    const lesson = {
+      sections: [{
+        id: 's1',
+        blocks: [
+          { id: 'm', type: 'markdown', md: { jp: four, en: 'One. Two. Three. Four.' } },
+          { id: 'p', type: 'prompt', prompt: { jp: four } },
+          { id: 'd', type: 'diagram', code: { jp: `flowchart LR\n  A[${four}]` }, alt: { jp: four } },
+          { id: 'q', type: 'quiz', questions: [{ id: 'q1', prompt: { jp: four, en: four } }] },
+        ],
+      }],
+    };
+    assert.deepEqual(longParagraphs(lesson), [
+      { path: 'sections[s1].blocks[m].md.jp', sentences: 4, text: four, advisory: false },
+      { path: 'sections[s1].blocks[q].questions[q1].prompt.jp', sentences: 4, text: four, advisory: true },
+      { path: 'sections[s1].blocks[q].questions[q1].prompt.en', sentences: 4, text: four, advisory: true },
+    ]);
   });
 });
 
