@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ingestMaterial } from '../ragService.js';
 import { getPool } from '../db.js';
+import { isUuid } from '../../tools/core/ids.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
 import { generateImageWithGemini } from '../geminiBackendService.js';
@@ -77,6 +78,7 @@ router.get('/curricula', async (req, res) => {
 router.get('/curricula/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Not found' });
 
     try {
         const detailRes = await pool.query(`
@@ -198,8 +200,16 @@ router.post('/rag/index', async (req, res) => {
     
     const { material_id } = req.body;
     if (!material_id) return res.status(400).json({ error: 'material_id required' });
+    if (!isUuid(material_id)) return res.status(404).json({ error: 'Material not found' });
 
     try {
+        // Only the caller's own materials can be (re)ingested.
+        const owned = await pool.query(
+            'select id from materials where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
+            [material_id, req.userId]
+        );
+        if (!owned.rowCount) return res.status(404).json({ error: 'Material not found' });
+
         const result = await pool.query(
             `insert into jobs (user_id, type, status, payload)
              values (CAST($1 AS uuid), 'ingest', 'queued', $2)
@@ -218,10 +228,12 @@ router.get('/jobs/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Job not found' });
+
     try {
         const result = await pool.query(
-            'select status, progress, error from jobs where id = CAST($1 AS uuid)',
-            [req.params.id]
+            'select status, progress, error from jobs where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
+            [req.params.id, req.userId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Job not found' });
         res.json(result.rows[0]);

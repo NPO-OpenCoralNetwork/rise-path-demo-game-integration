@@ -174,37 +174,3 @@ export const retrieveContext = async (query, limit = 3, userId) => {
     }
 };
 
-export const getFullMaterialText = async (materialId) => {
-    const pool = getPool();
-    if (!pool) return "";
-    
-    try {
-        const result = await pool.query(
-            `SELECT content FROM material_chunks 
-             WHERE material_id = $1 
-             ORDER BY chunk_index ASC`,
-            [materialId]
-        );
-        return result.rows.map(row => row.content).join("\n");
-    } catch (e) {
-        console.error("Full text retrieval failed:", e);
-        return "";
-    }
-};
-
-export const getMaterialDetails = async (materialId) => {
-    const pool = getPool();
-    if (!pool) return null;
-    
-    try {
-        const result = await pool.query(
-            `SELECT storage_path, type FROM materials WHERE id = $1`,
-            [materialId]
-        );
-        if (result.rows.length === 0) return null;
-        return result.rows[0];
-    } catch (e) {
-        console.error("Material details retrieval failed:", e);
-        return null;
-    }
-};

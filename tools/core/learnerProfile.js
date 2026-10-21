@@ -5,6 +5,30 @@
  */
 import { getPool, PHASE1_USER_ID } from '../../server/db.js';
 import { classifyDbError } from './dbErrors.js';
+import { isUuid } from './ids.js';
+
+/**
+ * One learner profile row (each assessment save is its own row and id), only if it belongs to
+ * `userId`. Profiles hold personality and lifestyle answers, so a profile id from a request is
+ * never trusted on its own. Throws on database errors.
+ *
+ * @param {Object} params
+ * @param {string} params.profileId - learner_profiles.id from the request
+ * @param {string} params.userId - the authenticated caller
+ * @returns {Promise<{ id: string, version: number, raw_profile: any, derived_learning_profile: any,
+ *   applied_rules: any } | null>} null when not found, not owned, or the id is malformed
+ */
+export async function getOwnedLearnerProfile({ profileId, userId }) {
+    const pool = getPool();
+    if (!pool || !isUuid(profileId) || !isUuid(userId)) return null;
+    const result = await pool.query(
+        `select id, version, raw_profile, derived_learning_profile, applied_rules
+         from learner_profiles
+         where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)`,
+        [profileId, userId]
+    );
+    return result.rowCount ? result.rows[0] : null;
+}
 
 /**
  * Get the latest learner profile for a user.

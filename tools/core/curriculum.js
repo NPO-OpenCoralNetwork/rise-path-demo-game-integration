@@ -24,6 +24,7 @@ import {
 
 import { getAdaptationSignals } from './journal.js';
 import { getAnalysis } from './lifeJournal.js';
+import { isUuid } from './ids.js';
 import {
     buildHabitSignalsForKit,
     deriveGenerationRules,
@@ -35,6 +36,29 @@ const shiftIsoDate = (isoDate, deltaDays) => {
     d.setUTCDate(d.getUTCDate() + deltaDays);
     return d.toISOString().slice(0, 10);
 };
+
+/**
+ * The content of a curriculum's current version (`current_version_id`, usually the latest saved
+ * draft), only if the curriculum belongs to `userId`. Throws on database errors.
+ *
+ * @param {Object} params
+ * @param {string} params.curriculumId - curricula.id from the request
+ * @param {string} params.userId - the authenticated caller
+ * @returns {Promise<object | null>} content_json, or null when not found, not owned, without a
+ *   current version, or the id is malformed
+ */
+export async function getOwnedCurriculumContent({ curriculumId, userId }) {
+    const pool = getPool();
+    if (!pool || !isUuid(curriculumId) || !isUuid(userId)) return null;
+    const result = await pool.query(
+        `select cv.content_json
+         from curricula c
+         join curriculum_versions cv on cv.id = c.current_version_id
+         where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
+        [curriculumId, userId]
+    );
+    return result.rowCount ? result.rows[0].content_json : null;
+}
 
 /**
  * Load last-30-day life journal summary for generation-kit injection (Phase 16-6g).
