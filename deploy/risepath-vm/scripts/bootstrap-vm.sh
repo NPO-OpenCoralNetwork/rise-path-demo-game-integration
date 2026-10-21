@@ -57,13 +57,16 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Deploy and smoke (stops on template values in stack.env)"
+bash "${STACK_DIR}/scripts/deploy-stack.sh"
+
+# Only after a green deploy: the boot unit runs `compose up -d` with stack.env as it is. Enabled
+# earlier, a reboot with a template stack.env would start db with POSTGRES_PASSWORD=change-me,
+# which the db volume then keeps.
 echo "==> Installing systemd unit (start stack on VM boot)"
 sudo cp "${STACK_DIR}/systemd/risepath-stack.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable risepath-stack.service
-
-echo "==> Stack smoke"
-bash "${STACK_DIR}/scripts/deploy-stack.sh"
 
 echo "==> Done. Re-run the stack smoke on this VM (inside the api container, past the origin gate):"
 echo "    cd ${STACK_DIR} && docker compose --env-file stack.env exec -T api node scripts/smoke-vm-stack.mjs --target container"

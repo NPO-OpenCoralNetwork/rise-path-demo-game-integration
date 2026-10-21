@@ -165,6 +165,14 @@ describe('deploy-stack.sh', () => {
     }
   });
 
+  it('refuses profile full without an OpenRouter key, and checks HERMES_API_KEY whenever full is listed', () => {
+    const at = script.indexOf('PLACEHOLDERS=()');
+    const guard = script.slice(at, script.search(/^\s*compose \w/m));
+    assert.ok(guard.includes('if [[ ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then\n  HERMES_PROFILE=1'), 'full as a list item');
+    assert.match(guard, /if \[\[ "\$\{HERMES_PROFILE\}" -eq 1 && "\$\{HERMES_KEYED\}" -eq 0 \]\]; then\n\s*PLACEHOLDERS\+=\("OPENROUTER_API_KEY [^"\n]*COMPOSE_PROFILES=tts[^"\n]*"\)/);
+    assert.match(guard, /if \[\[ "\$\{HERMES_PROFILE\}" -eq 1 \]\]; then\n\s*value="\$\{HERMES_API_KEY:-\}"/);
+  });
+
   it('refuses Memanto unless stack.env sets MEMANTO_ENABLED=true (the boot unit reads it)', () => {
     const check = script.indexOf('"${MEMANTO_ENABLED:-}" != "true"');
     assert.ok(check > 0 && check < script.indexOf('COMPOSE_FILES+=(-f docker-compose.memanto.yml)'));
@@ -221,6 +229,15 @@ describe('bootstrap-vm.sh', () => {
 
   it('runs deploy-stack.sh from INSTALL_DIR, where the systemd unit points', () => {
     assert.ok(script.includes('bash "${STACK_DIR}/scripts/deploy-stack.sh"'));
+  });
+
+  it('installs and enables the boot unit only after deploy-stack.sh succeeds', () => {
+    assert.match(script, /^set -euo pipefail$/m);
+    const deploy = script.indexOf('bash "${STACK_DIR}/scripts/deploy-stack.sh"');
+    assert.ok(deploy > 0, 'deploy-stack.sh call');
+    for (const step of ['sudo cp "${STACK_DIR}/systemd/risepath-stack.service"', 'systemctl daemon-reload', 'systemctl enable']) {
+      assert.ok(script.indexOf(step) > deploy, `${step} after the deploy`);
+    }
   });
 });
 

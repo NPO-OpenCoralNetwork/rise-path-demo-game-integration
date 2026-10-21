@@ -31,12 +31,11 @@ if [[ -d "${REPO_ROOT}/.git" ]]; then
   fi
 fi
 
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
+if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY,,}" != *change-me* ]]; then
   HERMES_KEYED=1
   COMPOSE_PROFILES="${COMPOSE_PROFILES:-full}"
 else
   HERMES_KEYED=0
-  echo "⚠️  OPENROUTER_API_KEY unset — skipping hermes profile (set in stack.env to enable)"
   COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 fi
 
@@ -101,7 +100,16 @@ for name in POSTGRES_PASSWORD DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_SERVICE_
     PLACEHOLDERS+=("${name}")
   fi
 done
-if [[ "${HERMES_KEYED}" -eq 1 ]]; then
+# Profile full starts hermes (published on API_SERVER_PORT) even without an OpenRouter key, so it
+# needs that key and its own API key. Profile tts alone runs kokoro-tts without Hermes.
+HERMES_PROFILE=0
+if [[ ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then
+  HERMES_PROFILE=1
+fi
+if [[ "${HERMES_PROFILE}" -eq 1 && "${HERMES_KEYED}" -eq 0 ]]; then
+  PLACEHOLDERS+=("OPENROUTER_API_KEY (COMPOSE_PROFILES lists full, which starts Hermes: set the key, or use COMPOSE_PROFILES=tts for TTS without Hermes)")
+fi
+if [[ "${HERMES_PROFILE}" -eq 1 ]]; then
   value="${HERMES_API_KEY:-}"
   if [[ ${#value} -lt 16 || "${value,,}" == *change-me* ]]; then
     PLACEHOLDERS+=("HERMES_API_KEY (at least 16 characters: openssl rand -hex 32)")
@@ -116,9 +124,12 @@ if [[ ${#PLACEHOLDERS[@]} -gt 0 ]]; then
   exit 1
 fi
 
-if [[ "${HERMES_KEYED}" -eq 1 ]]; then
+# The guard above makes full imply a real OpenRouter key; without full, Hermes does not start.
+if [[ "${HERMES_PROFILE}" -eq 1 ]]; then
   echo "==> init Hermes profile (full stack)"
   "${SCRIPT_DIR}/init-hermes-profile.sh"
+else
+  echo "==> COMPOSE_PROFILES has no full: Hermes is not started (no init, no smoke)"
 fi
 
 compose() {
