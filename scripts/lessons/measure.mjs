@@ -12,7 +12,9 @@
 // est   = (read + practice reading) / 450 + 40 s per question (every section) + 2 min per practice section.
 //
 // usage: node scripts/lessons/measure.mjs <lesson.json> [...]   (PER=1 also prints each section)
+// Exports textLength and measureLesson (lesson object → the numbers above) for tests and other tools.
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const strip = (s) => String(s ?? '')
   .replace(/\]\([^)]*\)/g, ']')           // drop link targets
@@ -20,7 +22,9 @@ const strip = (s) => String(s ?? '')
   .replace(/\[\[([^\]]+)\]\]/g, '$1')
   .replace(/[`*_[\]#>]/g, '')
   .replace(/\s+/g, '');
-const len = (s) => [...strip(s)].length;
+/** Counted characters of one text (see "chars" above). */
+export const textLength = (s) => [...strip(s)].length;
+const len = textLength;
 const txt = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? (v.jp ?? v.en ?? '') : '');
 
 function blockProse(b, proseOnly) {
@@ -44,10 +48,16 @@ function blockProse(b, proseOnly) {
 }
 const questions = (b) => (b.type === 'quiz' ? (b.questions || []).length : 0);
 
-for (const f of process.argv.slice(2)) {
-  const L = JSON.parse(fs.readFileSync(f, 'utf8'));
+/**
+ * Measures one lesson object.
+ *
+ * @param {any} L lesson JSON
+ * @returns {{ prose: number, read: number, practice: number, questions: number, tasks: number, est: number,
+ *   sections: Array<{ id: string, role: string, chars: number }> }}
+ */
+export function measureLesson(L) {
   let body = 0, prose = 0, practice = 0, q = 0, tasks = 0;
-  const per = [];
+  const sections = [];
   for (const s of L.sections || []) {
     let n = 0;
     for (const b of s.blocks || []) {
@@ -58,9 +68,19 @@ for (const f of process.argv.slice(2)) {
     }
     if (s.role === 'practice') { practice += n; tasks += 1; }
     else if (s.role !== 'check') body += n;
-    per.push(`${s.id}(${s.role}) ${n}`);
+    sections.push({ id: s.id, role: s.role, chars: n });
   }
   const est = (body + practice) / 450 + (q * 40) / 60 + tasks * 2;
-  console.log(`${f.split('/').pop()}: prose ${prose} (budget 1,200–2,400) · read ${body} · practice reading ${practice} · questions ${q} · practice sections ${tasks} · est ${est.toFixed(1)} min (must be ≤ 20; estMinutes ${L.estMinutes})`);
-  if (process.env.PER) console.log('  ' + per.join(' · '));
+  return { prose, read: body, practice, questions: q, tasks, est, sections };
 }
+
+function main(files) {
+  for (const f of files) {
+    const L = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const m = measureLesson(L);
+    console.log(`${f.split('/').pop()}: prose ${m.prose} (budget 1,200–2,400) · read ${m.read} · practice reading ${m.practice} · questions ${m.questions} · practice sections ${m.tasks} · est ${m.est.toFixed(1)} min (must be ≤ 20; estMinutes ${L.estMinutes})`);
+    if (process.env.PER) console.log('  ' + m.sections.map((s) => `${s.id}(${s.role}) ${s.chars}`).join(' · '));
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main(process.argv.slice(2));
