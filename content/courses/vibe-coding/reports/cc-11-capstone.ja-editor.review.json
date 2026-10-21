@@ -1,80 +1,76 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
+  "lessonHash": "sha256:423d9258076f1516",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "lessonHash": "sha256:3122649e3d005674",
-  "verifies": {
-    "reviewedRevision": "sha256:984f34269dfb6574",
-    "changed": [
-      "dr-table"
-    ],
-    "changedShare": 0.02,
-    "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/984f34269dfb6574/round-1/ja-editor.review.json"
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "Re-scored because dr-table changed. The new caption 「きっかけと、足す部品（かっこ内は学んだ回。公式ドキュメントの対応表から）」 and the new column headers 「繰り返す困りごと」/「足す部品」 are natural Japanese. The glossary term きっかけ still appears in the caption, so the link to the dr-b1 body is kept. The row cells stay parallel noun phrases. No pressure phrases.",
+      "evidence": "Full re-read of every string. All prose uses です・ます. Only tables, list items, options and step titles end in noun or plain form, which style-guide §1 allows. No pressure phrases appear. Each question's options share one form: pq0, q2, q3, q4, e1, e2 and e3 all end in 〜する, and q1 is all noun phrases (「…フック」「…スキル」「…サブエージェント」「…「IMPORTANT」」). Every wrong-option feedback has 2 sentences: the first names the misconception and the second gives the right idea, as in 「強調しても、CLAUDE.mdはお願いのままです。例外なく毎回起きてほしいことは、フックに置きます。」. Notation is consistent: half-width alphanumerics, no space between Japanese and English, and key names written as 「Shift + Tab」「Ctrl + G」. A few phrases read stiffly (「検証が空いている」「各行に聞く」「1回で困る」「自分の作業の採点」), but none of them misleads. They are listed in niceToHave.",
       "blockIds": [
-        "dr-table"
+        "hook-predict",
+        "dr-quiz",
+        "ex-quiz",
+        "cycle-quiz",
+        "sc-quiz",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Re-measured with measure.mjs: prose 1329 (budget 1,200–2,400) · read 1820 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19, which matches est rounded). lessons:lint --strict gives 0 errors and 0 warnings. dr-table is still 2 columns. The shorter headers and cells make it narrower on a phone.",
+      "evidence": "measure.mjs gives: prose 1329 (budget 1,200–2,400) · read 1829 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19). So estMinutes 19 matches est rounded. lessons:lint --strict reports 0 errors and 0 warnings, so no sentence-length, paragraph-length or banned-phrase finding. The longest prose paragraphs (dr-b2, ex-rules, pq0 explanation) stay at 3 sentences. The tables have 2 columns, and the steps have at most 5 items. Every section has a table, a diagram, steps or a quiz, so no screen is text only.",
       "blockIds": [
-        "dr-table"
+        "dr-b2",
+        "dr-table",
+        "ex-steps",
+        "cycle-flow"
       ]
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Re-scored because dr-table changed. The edit removed 「subagent、」 from the row 「[[サブエージェント]]（第7回）」. dr-table is the first place in the lesson body that uses サブエージェント (before it, the term appears only in the prerequisite title 「第7回｜手順はスキルに、調べものはサブエージェントに」). The hook gives English for its own katakana terms: 「スキル（skill）」, 「フック（hook）」 and 「プラグイン（plugin）」. So サブエージェント is now the one katakana term that has no English on first use (style-guide §2). The other definitions are unchanged and correct. Restoring the English lifts this back to 4.",
+      "score": 4,
+      "evidence": "The round-2 must-fix is fixed in the current text: dr-table now reads 「[[サブエージェント]]（subagent、第7回）」. Every katakana term gets its English on first use: スキル（skill）, フック（hook）, プラグイン（plugin）, コンテキスト（context）, 権限ルール（permission rule）, プランモード（plan mode）, 差分（diff）, and the deny/ask rules. MCP is spelled out on first use (MCP（Model Context Protocol）). Each glossary term matches the term in the body, and the aliases 確認ルール and 拒否ルール are the words used in ex-rules and e1. The prerequisites list lessons 2–10, and the body points back to them (第3回, 第6回, 第7回, 第8回). One small gap: autoモード is assumed known from 第2回 without a reminder of what it is (niceToHave).",
       "blockIds": [
-        "dr-table"
+        "dr-table",
+        "hook-b1",
+        "dr-quiz",
+        "c-plan"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over from round 2. The change does not touch locales, diagram labels or link text. The lesson is single-locale jp, and every dr-table string is present.",
+      "evidence": "The lesson is single-locale jp, and every string is present and in Japanese. cycle-flow has a caption and an alt text, and the alt describes all 5 stages and the loop back. Its node labels use the same words as the cycle-steps titles: 「探索して計画する」「実装して検証する」「別のコンテキストでレビューする」. The one link, 「公式ドキュメントの日本語版」, names where it goes. Code blocks carry lang and filename (.claude/settings.json).",
       "blockIds": [
         "cycle-flow",
-        "ex-settings"
-      ],
-      "carriedOver": true
+        "summary-next",
+        "ex-settings",
+        "setup-settings-model"
+      ]
     }
   ],
-  "mustFix": [
-    {
-      "blockId": "dr-table",
-      "criterion": "prior",
-      "issue": "(d) katakana term without English on first use (style-guide §2): this round's edit removed 「subagent、」. dr-table is the first use of サブエージェント in the lesson body, and the hook gives English for スキル, フック and プラグイン.",
-      "fix": "「[[サブエージェント]]（第7回）」→「[[サブエージェント]]（subagent、第7回）」"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "dr-table: 「CLAUDE.mdに1行」 lost its verb, while the column header is 「足す部品」 and the body says 「CLAUDE.mdに1行足す」. The short form still reads correctly, but the full phrase matches the body — 「CLAUDE.mdに1行（第6回）」→「CLAUDE.mdに1行足す（第6回）」",
-    "self-check-list: sc-safety leaves the command unmarked, while sc-context and sc-cost put theirs in 「」 (carried over) — 「git pushの確認ルールを書きました」→「「git push」の確認ルールを書きました」",
-    "ex-steps: in ex-hook, the long inline command is hard to read on a phone (carried over) — 「コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。」→「コマンドは、下の設定ファイルの16行目です。」",
-    "ex-steps: in ex-claude-md, the subject of 推測 is left implicit (carried over) — 「推測できないことだけを書きます。」→「Claudeが推測できないことだけを書きます。」",
-    "setup-steps: 「各行に聞く」 is odd (carried over) — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
-    "setup-steps / check-quiz: the 25-line target in p-claude-md and the 40 lines in e3 sit side by side without explanation (carried over) — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行以内）。」",
-    "cycle-steps: the c-build hint leaves its quoted request without 「」 (carried over) — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
-    "dr-b2: 「1回で困る」 is terse (carried over) — 「秘密情報とpushは1回で困るので」→「秘密情報とpushは1回の失敗でも困るので」",
-    "sc-b2: the parts of the sentence are only loosely linked (carried over) — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
-    "summary-cards / check-quiz: 「自分の作業」 is ambiguous (carried over) — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」",
-    "check-quiz: in the e3 explanation, 「検証が空いている」 is unusual (carried over) — 「検証が空いている今は、ここを最初に埋めます。」→「完了を確かめる手段がない今は、ここを最初に埋めます。」",
-    "check-quiz: in the e1 explanation, 「止めます」 also covers the ask rule (carried over) — 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」→「一致した操作は、Claudeの判断に関係なく、Claude Codeが拒否するか確認を求めます。」",
-    "lesson (glossary きっかけ): the definition does not fit every dr-table row (carried over) — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
+    "dr-table: 「CLAUDE.mdに1行」 has no verb, while the column header is 「足す部品」 and the body says 「CLAUDE.mdに1行足す」. Adding the verb matches the body — 「CLAUDE.mdに1行（第6回）」→「CLAUDE.mdに1行足す（第6回）」",
+    "ex-rules: autoモード is assumed known from 第2回. A short reminder makes the reason for the ask rule clear — 「v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。」→「v2.1.283以降、ターミナルとVS Codeの対話セッションは、確認を減らして進むautoモードで始まります（第2回）。」",
+    "self-check-list: sc-safety leaves the command unquoted, while sc-context and sc-cost put theirs in 「」 — 「git pushの確認ルールを書きました」→「「git push」の確認ルールを書きました」",
+    "ex-steps: in ex-hook, the long inline command is hard to read on a phone and repeats the settings file below — 「コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。」→「コマンドは、下の設定ファイルの16行目です。」",
+    "ex-steps: in ex-claude-md, the subject of 推測 is left out — 「推測できないことだけを書きます。」→「Claudeが推測できないことだけを書きます。」",
+    "setup-steps: 「各行に聞く」 reads oddly — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
+    "setup-steps / check-quiz: the 25-line target in p-claude-md and the 40 lines accepted in e3 sit side by side with no explanation — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行以内）。」",
+    "cycle-steps: the c-build hint does not put the quoted request in 「」 (§3) — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
+    "dr-b2: 「1回で困る」 is terse — 「秘密情報とpushは1回で困るので」→「秘密情報とpushは1回の失敗でも困るので」",
+    "sc-b2: the parts of the sentence are only loosely linked — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
+    "summary-cards (card-review): 「自分の作業」 can be read as the learner's own work — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」 (the same applies to the e3 option c feedback: 「自分の作業を採点すると」→「Claudeが自分の作業を採点すると」)",
+    "check-quiz: in the e3 explanation, 「検証が空いている」 is an unusual phrase — 「検証が空いている今は、ここを最初に埋めます。」→「完了を確かめる手段がない今は、ここを最初に埋めます。」",
+    "check-quiz: in the e1 explanation, 「止めます」 also has to cover the ask rule — 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」→「一致した操作は、Claudeの判断に関係なく、Claude Codeが拒否するか確認を求めます。」",
+    "lesson (glossary きっかけ): the definition does not fit the plugin row in dr-table (「別のリポジトリでも同じ設定を使う」) — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
   ],
-  "average": 3.75,
-  "verdict": "fail",
-  "summary": "Verification round. review-scope.mjs exited 0: 1 of 71 parts changed (2%), only dr-table. The previous review had no open must-fix items, so there is nothing to resolve. lessons:lint --strict is clean, and measure.mjs gives prose 1329 and est 19.1 against estMinutes 19. The new caption and headers read well. However, the edit dropped 「subagent、」 from the サブエージェント row. That row is the term's first use in the lesson body, so it now breaks the §2 rule that a katakana term gives its English on first use. This is a (d) must-fix, and prior drops from 4 to 3. Restoring 「（subagent、第7回）」 resolves it. The other points are niceToHave."
+  "average": 4,
+  "verdict": "pass",
+  "summary": "Full review of hash sha256:423d9258076f1516. lessons:lint --strict is clean (0 errors, 0 warnings). measure.mjs gives prose 1329 within the 1,200–2,400 budget and est 19.1 min, which matches estMinutes 19. The round-2 must-fix is resolved: dr-table again reads 「[[サブエージェント]]（subagent、第7回）」, so every katakana term gives its English on first use, and prior returns to 4. The Japanese is consistent throughout: です・ます, options with matching endings, 2-sentence feedback, glossary terms that match the body and the diagram labels, and a link that names its destination. The facts I checked (autoモード from v2.1.283 in terminal and VS Code sessions, /reload-skills, the limits of the ask rule) agree with audit-cc-11-capstone.json and cross-lesson-facts.md. No (a)–(e) errors. The remaining points are wording and rhythm, listed in niceToHave."
 }

@@ -4,48 +4,42 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:01fa366fee4752fb",
+  "lessonHash": "sha256:dc1fce75fb87584d",
   "verifies": {
-    "reviewedRevision": "sha256:542dc5e44070249d",
+    "reviewedRevision": "sha256:01fa366fee4752fb",
     "changed": [
-      "s1-config",
-      "s2-script",
-      "s2-steps",
-      "s2-test",
-      "s4-add",
-      "practice-steps",
-      "practice-model-script"
+      "practice-b-task",
+      "practice-b-quiz",
+      "lesson.estMinutes"
     ],
-    "changedShare": 0.08,
+    "changedShare": 0.04,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/542dc5e44070249d/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/01fa366fee4752fb/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "I checked every changed block. The text stays in warm です・ます. s1-config now splits the pipe into three short sentences, one idea each: 「コマンドは、2つの部分を `|` でつないでいます。」, then one sentence for `jq -r …` and one for `xargs npx prettier --write`. The chmod permission is now named apart from the tool permission. ex-register says 「② 実行を許可して登録する」 and 「実行の許可がないとフックは起動せず」, and p-script says 「作って実行を許可し」. In ex-test, 「③の最初の4行は1つのコマンド」 matches s2-test, where the echo takes three lines and the pipe into block-rm.sh is the fourth, before `echo $?`. 「`rm notes.txt` を `ls` に変えると `0` です。」 now says what to replace. The p-predict hint matches the new s2-test text: 「`\"Bash\"` を `\"Edit\"` に変えます。`\"command\": \"rm notes.txt\"` は、`\"file_path\": \".env\"` にします。」. Code comments stay in Japanese. I found no grammar or naming errors.",
+      "evidence": "I checked every string in the changed blocks. The scenario has moved from the q9 prompt into practice-b-task, as two list items. Each item is warm です・ます with short sentences: 「Aは、社内チームの課題管理MCPサーバーです。」 and 「ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。」. The q9 prompt now asks once: 「AとBについて、いちばん適切な判断はどれでしょう？」. This fixes the niceToHave from my last round about the prompt asking twice. Options, feedback and explanation are unchanged and still parallel. The names A and B match the captions of practice-b-model and practice-b-model-b. I found no grammar or naming errors.",
       "blockIds": [
-        "s1-config",
-        "s2-steps",
-        "s2-test",
-        "practice-steps"
+        "practice-b-task",
+        "practice-b-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs reports 「prose 1892 (budget 1,200–2,400) · … · est 17.5 min (must be ≤ 20; estMinutes 17)」, so estMinutes 17 still matches the rounded estimate. lessons:lint --strict reports 「0 errors, 0 warnings」. The s1-config paragraph has three sentences, within the budget. The p-script troubleshoot now has two short sentences, one for each failure.",
+      "evidence": "measure.mjs reports 「prose 1892 (budget 1,200–2,400) · … · est 17.8 min (must be ≤ 20; estMinutes 18)」, so estMinutes 18 now matches the rounded estimate. lessons:lint --strict reports 「0 errors, 0 warnings」. Each list item in practice-b-task has 3 sentences or fewer. The q9 prompt is now one short sentence, so the learner reads the scenario once before the options.",
       "blockIds": [
-        "s1-config",
-        "practice-steps"
+        "practice-b-task",
+        "practice-b-quiz"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Carried over from round 2. The changed blocks add no new terms, and jq, 標準エラー出力 and マッチャー are still defined before use.",
+      "evidence": "Carried over from round 3. The changed blocks add no new terms. MCPサーバー, プラグイン, フック and 権限ルール are defined earlier in the lesson.",
       "blockIds": [
         "s1-defs",
         "s2-defs",
@@ -57,7 +51,7 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over from round 2. The lesson is jp only. The changed code blocks keep their Japanese comments, for example s4-add 「# 手元のサーバーの書き方」.",
+      "evidence": "Carried over from round 3. The lesson is jp only, and the new markdown list in practice-b-task is plain Japanese that the reader renders.",
       "blockIds": [
         "s4-add",
         "summary-next"
@@ -67,8 +61,7 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s4-add: the comment now says 「<コマンド>」, while s4-transport says 「`--` の後に起動コマンドを書きます」. Both name the same thing, so it is better to use one word — 「# claude mcp add <名前> -- <コマンド>」→「# claude mcp add <名前> -- <起動コマンド>」",
-    "practice-b-quiz: still open from round 2 (unchanged text). The q9 prompt asks the question twice — 「架空の2候補について、いちばん適切な判断を選びます。」→「架空の2候補AとBがあります。」",
+    "s4-add: still open from round 3 (unchanged text). Use the same word as s4-transport — 「# claude mcp add <名前> -- <コマンド>」→「# claude mcp add <名前> -- <起動コマンド>」",
     "practice-b-model: still open from round 2. The 作者 row repeats the update schedule — 「社内チーム・毎月更新」→「社内チームで、いまも保守している」",
     "check-quiz: still open from round 2. The second sentence of the q8 explanation has no subject — 「そのためプロンプトインジェクションの入り口になります。」→「そのため、このサーバーはプロンプトインジェクションの入り口になります。」",
     "s5-risk: still open from round 2. Use the same wording as the q8-b feedback — 「AnthropicはMCPサーバーを監査していません。」→「AnthropicはMCPサーバーのセキュリティ監査をしていません。」",
@@ -76,5 +69,5 @@
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "Verification round (mode verify): review-scope.mjs exited 0, with 7 of 49 blocks changed (8%). My round-2 review had no must-fix items, so there are no resolved entries. I re-read every learner-facing string in s1-config, s2-script, s2-steps, s2-test, s4-add, practice-steps and practice-model-script. The three niceToHave fixes from round 2 for s2-steps and p-script are applied: 実行の許可, 「最初の4行」, and 「`rm notes.txt` を `ls` に変える」. The line count now matches the reformatted s2-test, and the p-predict hint matches its new JSON. lessons:lint --strict is clean. measure.mjs gives prose 1892 and est 17.5 min, which matches estMinutes 17. I found no (a)–(e) errors in the changed text. One small new wording mismatch, 「<コマンド>」 against 「起動コマンド」, is in niceToHave, along with the round-2 suggestions left in unchanged blocks."
+  "summary": "This was a verification round (mode verify). review-scope.mjs exited 0: 2 of 49 blocks changed, plus estMinutes (4% of parts). My last review had no must-fix items, so there are no resolved entries. The scenario for candidates A and B has moved from the q9 prompt into a list in practice-b-task, and the prompt is now one short question. This applies my earlier niceToHave about the prompt asking twice. estMinutes 18 matches measure.mjs (est 17.8 min, prose 1892), and lessons:lint --strict is clean. I found no (a)–(e) errors in the changed text. The remaining niceToHave items are all in unchanged blocks."
 }

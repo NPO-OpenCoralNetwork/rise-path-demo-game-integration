@@ -1,20 +1,27 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:3122649e3d005674",
+  "lessonHash": "sha256:423d9258076f1516",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:984f34269dfb6574",
-    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/984f34269dfb6574/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:3122649e3d005674",
+    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/3122649e3d005674/round-1/pedagogy-reviewer.review.json",
     "changed": [
       "dr-table"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false
   },
-  "resolved": [],
+  "resolved": [
+    {
+      "blockId": "dr-table",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "dr-table row 3, column 2 now reads 「[[サブエージェント]]（subagent、第7回）」. This is the first body use of the term. Later uses come after it, in the dr-quiz feedback (「サブエージェントは、横道の作…」), in cycle-flow and in the cycle and exam blocks. So the English now comes on first use, as it does for スキル（skill）, フック（hook） and プラグイン（plugin）."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -42,8 +49,8 @@
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "dr-table still ties each part to the lesson that taught it, and the caption now says what the parentheses mean (「かっこ内は学んだ回。公式ドキュメントの対応表から」). The header 「繰り返す困りごと」 matches the glossary meaning of きっかけ, which dr-b1 defines just before the table. This change removed the English from the first body use of サブエージェント: the cell went from 「[[サブエージェント]]（subagent、第7回）」 to 「[[サブエージェント]]（第7回）」, and no other body block in the lesson glosses it. The contract requires the English on first use, and the lesson does this for スキル（skill）, フック（hook）, プラグイン（plugin） and 権限ルール（permission rule）. The term is still linked to the glossary, whose definition says 「英語ではsubagent」, so this scores 3, not 2.",
+      "score": 4,
+      "evidence": "Re-scored after the fix. dr-table still ties each part to the lesson that taught it, and the caption says what the parentheses mean (「かっこ内は学んだ回。公式ドキュメントの対応表から」). Row 3 now restores the English on first use (「[[サブエージェント]]（subagent、第7回）」), so every katakana part in the table is glossed on first use: スキル（skill）, フック（hook） in hook-b1, プラグイン（plugin） earlier in the hook, and サブエージェント（subagent） here. The header 「繰り返す困りごと」 matches the glossary meaning of きっかけ, which dr-b1 defines just before the table.",
       "blockIds": [
         "dr-table",
         "dr-b1",
@@ -53,7 +60,7 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "Re-measured after the dr-table change. measure.mjs: 「prose 1329 (budget 1,200–2,400) · read 1820 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. The table cells are shorter now (「CLAUDE.mdに1行（第6回）」), and lint --strict reports 0 errors and 0 warnings.",
+      "evidence": "Re-measured after the dr-table change. measure.mjs: 「prose 1329 (budget 1,200–2,400) · read 1829 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. The restored gloss adds 9 characters to one cell and no new term, and lint --strict reports 0 errors and 0 warnings.",
       "blockIds": [
         "lesson",
         "dr-table"
@@ -99,7 +106,7 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "dr-table is still a real 2-column comparison table, with 5 rows that pair a repeated problem with a part. The shorter header (「足す部品」) and the caption note make it narrower without losing information. cycle-flow is unchanged: 5 nodes plus the review loop, with caption and alt. There are no decorative images.",
+      "evidence": "Re-scored for the changed table. dr-table is still a real 2-column comparison table, with 5 rows that pair a repeated problem with a part (for example 「横道の調べもので会話が埋まる」 → 「[[サブエージェント]]（subagent、第7回）」). The restored gloss makes one cell slightly longer but keeps the table at 2 columns. cycle-flow is unchanged: 5 nodes plus the review loop, with caption and alt. There are no decorative images.",
       "blockIds": [
         "dr-table",
         "cycle-flow"
@@ -153,30 +160,23 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "dr-table's caption and column headers are plain text without markdown (「きっかけと、足す部品（かっこ内は学んだ回。公式ドキュメントの対応表から）」), which suits fields that render without markdown. The table keeps 2 real header cells for screen readers. cycle-flow's alt text is complete, and the jp locale is complete.",
+      "evidence": "Re-scored for the changed table. dr-table's caption, headers and the restored cell are plain text, apart from the glossary link that the other rows also use (「[[サブエージェント]]（subagent、第7回）」). That suits fields that render without markdown. The table keeps 2 real header cells for screen readers. cycle-flow's alt text is complete, and the jp locale is complete.",
       "blockIds": [
         "dr-table",
         "cycle-flow"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "prior",
-      "blockId": "dr-table",
-      "issue": "Regression from this round's dr-table change. The row-3 cell went from 「[[サブエージェント]]（subagent、第7回）」 to 「[[サブエージェント]]（第7回）」. dr-table is the first body use of サブエージェント, and no other body block glosses it, so the lesson no longer gives the English on first use. That breaks lesson-contract §6 (「Katakana terms carry the English on first use」), and the lesson does give it for スキル（skill）, フック（hook）, プラグイン（plugin） and 権限ルール（permission rule）.",
-      "fix": "In dr-table row 3, column 2, replace 「[[サブエージェント]]（第7回）」 with 「[[サブエージェント]]（subagent、第7回）」."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "dr-table row 1 dropped its verb (「CLAUDE.mdに1行（第6回）」), while the next rows name whole parts. For a clear action, change it to 「CLAUDE.mdに1行足す（第6回）」.",
-    "c-review (cycle-steps) has no hint or troubleshoot. Add hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
-    "c-commit (cycle-steps) has no hint. Add hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
+    "dr-table row 1 has no verb (「CLAUDE.mdに1行（第6回）」), while the next rows name whole parts. For a clear action, change it to 「CLAUDE.mdに1行足す（第6回）」.",
+    "c-review (cycle-steps) has no hint or troubleshoot. Add the hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
+    "c-commit (cycle-steps) has no hint. Add the hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
     "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide. Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
     "sc-b1 calls an unmet checklist item a きっかけ, but the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
     "worked (to reach 4): add a faded step before practice-setup. For example, add a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
   ],
-  "average": 3.77,
-  "verdict": "revise",
-  "summary": "Verification round. review-scope exited 0: 1 of 31 blocks changed (2%), with no change to sections or objectives. The previous round had no open must-fix items, so there are no resolved entries. I reviewed the changed block, dr-table, in full. Its headers are shorter, and the note that the parentheses give the lesson number moved into the caption, so the table is narrower for mobile. The change also dropped the English gloss from the first body use of サブエージェント (「（subagent、第7回）」 became 「（第7回）」). That is a lesson-contract regression and is the one must-fix. I re-scored prior (now 3), load, visual and a11y_l10n, and carried the other 9 criteria over. validate and lint --strict are clean. measure.mjs gives prose 1,329 and est 19.1 min against estMinutes 19. Every criterion is 3 or higher and the mean is 3.77, but the must-fix makes the verdict revise."
+  "average": 3.85,
+  "verdict": "pass",
+  "summary": "This is a verification round. review-scope exited 0 because only 1 of 31 blocks changed (dr-table, 2%), and no section or objective changed. The one open must-fix is resolved. dr-table row 3 now reads 「[[サブエージェント]]（subagent、第7回）」, which restores the English gloss on first use. I reviewed dr-table in full and found no new problem. I re-scored prior (back to 4), load, visual and a11y_l10n, and carried over the other 9 criteria. validate shows 0 errors and lint --strict shows 0 errors and 0 warnings. measure.mjs gives prose 1,329 and est 19.1 min, against estMinutes 19. Every criterion is 3 or higher, the mean is 3.85, and no must-fix or unresolved item remains, so the verdict is pass. worked and practice are still at 3, and the niceToHave list says how to raise them."
 }
