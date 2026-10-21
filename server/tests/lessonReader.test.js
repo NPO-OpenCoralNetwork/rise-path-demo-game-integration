@@ -278,6 +278,16 @@ describe('reader model', () => {
     assert.equal(linkGlossaryTerms('[[API]] と [[UI|画面]]'), '[API](#rp-term:API) と [画面](#rp-term:UI)');
   });
 
+  it('leaves [[ ]] inside inline code and code fences alone', () => {
+    // cc-08's hint quotes the shell test `[[ "$COMMAND" == rm* ]]`; it must stay code, not become a link.
+    assert.equal(
+      linkGlossaryTerms('`[[ "$COMMAND" == rm* ]]` と [[API]]'),
+      '`[[ "$COMMAND" == rm* ]]` と [API](#rp-term:API)',
+    );
+    assert.equal(linkGlossaryTerms('```sh\n[[ -f a ]]\n```\n[[UI|画面]]'), '```sh\n[[ -f a ]]\n```\n[画面](#rp-term:UI)');
+    assert.equal(linkGlossaryTerms('``a ` [[b]]`` [[c]]'), '``a ` [[b]]`` [c](#rp-term:c)');
+  });
+
   it('estimates minutes left', () => {
     assert.equal(minutesLeft(20, 0), 20);
     assert.equal(minutesLeft(20, 99), 1);

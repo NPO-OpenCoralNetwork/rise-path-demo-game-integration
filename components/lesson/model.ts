@@ -225,12 +225,19 @@ export function findGlossaryItem(items: readonly GlossaryItem[], term: string): 
 
 export const TERM_HREF_PREFIX = '#rp-term:';
 
+/** Code fences and inline code spans; their text is code (`[[ "$X" == y ]]` is shell), not markdown. */
+const CODE_SEGMENT = /(```[\s\S]*?```|``[\s\S]*?``|`[^`]*`)/;
+
 /** `[[term]]` / `[[term|label]]` → a markdown link the renderer turns into a glossary button. */
 export function linkGlossaryTerms(md: string): string {
-  return md.replace(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g, (_m, term: string, label?: string) => {
-    const text = (label ?? term).trim().replace(/([[\]])/g, '\\$1');
-    return `[${text}](${TERM_HREF_PREFIX}${encodeURIComponent(term.trim())})`;
-  });
+  // split() with a capture group alternates prose (even) and code (odd); only prose is linked.
+  return md.split(CODE_SEGMENT).map((part, index) => (index % 2 === 1 ? part : part.replace(
+    /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g,
+    (_m, term: string, label?: string) => {
+      const text = (label ?? term).trim().replace(/([[\]])/g, '\\$1');
+      return `[${text}](${TERM_HREF_PREFIX}${encodeURIComponent(term.trim())})`;
+    },
+  ))).join('');
 }
 
 /** Markdown → plain text for tutor excerpts and aria labels. */

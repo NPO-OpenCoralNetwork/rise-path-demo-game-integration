@@ -450,6 +450,13 @@
     overflow-wrap: anywhere;
   }
 
+  /* In a sunken box (expected result, hint, revealed answer, flashcard) a chip would be the same
+     colour as the box; it takes the surface colour and a hairline instead. */
+  .rp-prose :where(.rp-step-expect, .rp-feedback-hint, .rp-option[data-state="answer"], .rp-card-face) :where(:not(pre) > code) {
+    background: var(--rp-surface);
+    box-shadow: inset 0 0 0 1px var(--rp-border);
+  }
+
   .rp-prose kbd,
   .rp-keys kbd {
     font-family: var(--rp-mono);
