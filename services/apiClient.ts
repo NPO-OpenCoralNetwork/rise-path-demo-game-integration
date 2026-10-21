@@ -1,9 +1,11 @@
 // Centralized API client with auth header injection.
 // Phase 7: Uses Supabase JWT as Bearer token for authentication.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v2';
+// Every call to /api/v2 goes through apiFetch (server/tests/apiClientUsage.test.js checks it).
+const API_BASE =(import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v2';
 
 import { getSupabaseClient } from './supabaseClient';
 import { shouldSendLegacyUserIdHeader } from './authPolicy';
+import { buildRequestHeaders } from './apiHeaders';
 
 // Legacy fallback for Guest users (no Supabase session)
 let _getUserId: (() => string | null) = () => null;
@@ -17,11 +19,8 @@ export const isApiAvailable = (): boolean => {
 };
 
 export const apiFetch = async (path: string, options: RequestInit = {}): Promise<Response> => {
-    // A FormData body gets no Content-Type here: the browser sets multipart/form-data with its boundary.
-    const headers: Record<string, string> = {
-        ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-        ...(options.headers as Record<string, string> || {}),
-    };
+    // JSON by default; FormData bodies (uploads) keep the browser's multipart Content-Type.
+    const headers = buildRequestHeaders(options.body, (options.headers as Record<string, string>) || {});
 
     // Primary: Supabase JWT as Bearer token
     const supabase = getSupabaseClient();

@@ -4,6 +4,7 @@ import { fetchGeneratedCourseById } from '../../services/curriculumApi';
 import GeneratedDocView from '../features/ai/GeneratedDocView';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import SignInRequiredNotice from '../common/SignInRequiredNotice';
 import {
   convertToGeneratedCurriculumV2,
   GeneratedCurriculumV2,
@@ -48,6 +49,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
   const [lessonIndex, setLessonIndex] = useState<{ module: number; lesson: number }>({ module: 0, lesson: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<LessonError | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
   const t = copy[language];
 
   // Get lesson ID from URL params (optional)
@@ -66,6 +68,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
     setCurrentLesson(null);
     setLessonIndex({ module: 0, lesson: 0 });
     setError(null);
+    setSignInRequired(false);
     setLoading(true);
 
     fetchGeneratedCourseById(courseId)
@@ -104,7 +107,10 @@ const GeneratedLessonViewWrapper: React.FC = () => {
           setError('noLessons');
         }
       })
-      .catch(() => setError('loadFailed'))
+      .catch((err) => {
+        if ((err as { status?: number } | null)?.status === 401) setSignInRequired(true);
+        else setError('loadFailed');
+      })
       .finally(() => setLoading(false));
   }, [courseId, lessonIdParam, moduleIndexParam, lessonIndexParam]);
 
@@ -183,6 +189,14 @@ const GeneratedLessonViewWrapper: React.FC = () => {
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-500 font-medium">{t.loading}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (signInRequired) {
+    return (
+      <div className="mx-auto w-full max-w-form px-4 py-12">
+        <SignInRequiredNotice />
       </div>
     );
   }

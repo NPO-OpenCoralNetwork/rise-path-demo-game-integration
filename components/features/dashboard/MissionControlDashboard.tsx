@@ -143,9 +143,11 @@ const MissionControlDashboard: React.FC<DashboardProps> = () => {
 
   const today = useMemo(() => formatToday(new Date(), language), [language]);
   const name = !user || user.isGuest ? t.guestName : user.name || t.guestName;
+  // Only a generated course (UUID) has insights; built-in course slugs would only 404.
   const curriculumId = useMemo(() => {
     try {
-      return window.localStorage.getItem('active_curriculum_id') || undefined;
+      const id = window.localStorage.getItem('active_curriculum_id');
+      return id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : undefined;
     } catch {
       return undefined;
     }

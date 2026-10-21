@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import {
     Terminal, Box, Palette, BookOpen, Compass,
-    Sparkles, Cpu, ArrowRight, Gamepad2, Settings, ChevronUp, ChevronDown
+    Sparkles, Cpu, ArrowRight, Gamepad2
 } from 'lucide-react';
 import { LearningPortal, LocalizedText, ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
-import { fetchLearningPortals, updateLearningPortal, updateLearningPortalOrder } from '../../../services/learningPortalApi';
+import { fetchLearningPortals } from '../../../services/learningPortalApi';
 import { VIEW_PATHS } from '../../../navigation/viewPaths';
 import { features } from '../../../config/features';
 import { getCourse } from '../../../content';
 import { trackCopy, type TrackId } from '../../ui/tracks';
 import PageHeader from '../../ui/PageHeader';
 import CourseCard from '../../ui/CourseCard';
-import { Button, ButtonLink } from '../../ui/Button';
+import { ButtonLink } from '../../ui/Button';
 
 type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
 
@@ -68,12 +68,6 @@ const trackFields = (id: TrackId) => {
     };
 };
 
-/**
- * The portal admin controls (visibility, order) call PATCH /api/learning-portals/*, which the
- * server does not serve yet. Until it does, they show only in dev with ?dev=1.
- */
-const canManagePortals = features.devSamples;
-
 const resolveLocalizedText = (value: LocalizedText, language: 'en' | 'jp'): string => {
     if (!value) return '';
     if (typeof value === 'string') return value;
@@ -96,13 +90,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         en: {
             headerTitle: 'Learning Content',
             headerSubtitle: 'Select a field to start learning.',
-            manageLabel: 'Manage',
-            manageDone: 'Done',
-            visibilityOn: 'Visible',
-            visibilityOff: 'Hidden',
-            moveUp: 'Move up',
-            moveDown: 'Move down',
-            updateFailed: 'Update failed. Please try again.',
             portals: {
                 web: {
                     title: 'Web Basics',
@@ -142,13 +129,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         jp: {
             headerTitle: '学習コンテンツ',
             headerSubtitle: '興味のある分野を選択して、学習を開始してください。',
-            manageLabel: '管理',
-            manageDone: '完了',
-            visibilityOn: '公開',
-            visibilityOff: '非公開',
-            moveUp: '上へ',
-            moveDown: '下へ',
-            updateFailed: '更新に失敗しました。もう一度お試しください。',
             portals: {
                 web: {
                     title: 'Web Basics',
@@ -188,8 +168,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
     } as const;
 
     const t = copy[language];
-    const [isEditing, setIsEditing] = useState(false);
-    const [notice, setNotice] = useState<string | null>(null);
     const fallbackPortals: LearningPortal[] = [
         {
             id: 'web',
@@ -332,7 +310,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
 
         const loadPortals = async () => {
             try {
-                const data = await fetchLearningPortals({ includeInactive: isEditing });
+                const data = await fetchLearningPortals();
                 if (!isMounted) return;
                 setPortals(data.length ? data : fallbackPortals);
             } catch (error) {
@@ -347,13 +325,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
         return () => {
             isMounted = false;
         };
-    }, [isEditing]);
-
-    useEffect(() => {
-        if (!notice) return;
-        const timer = setTimeout(() => setNotice(null), 2500);
-        return () => clearTimeout(timer);
-    }, [notice]);
+    }, []);
 
     const orderedPortals = [...portals].sort((a, b) => {
         const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : 0;
@@ -363,64 +335,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
     });
 
     const availablePortals = orderedPortals.filter((portal) => !isLabsHidden(resolveViewState(portal.view)));
-    const displayPortals = isEditing ? availablePortals : availablePortals.filter((portal) => portal.isActive);
-
-    const updatePortalState = (updates: Array<{ id: string; changes: Partial<LearningPortal> }>) => {
-        setPortals((prev) =>
-            prev.map((portal) => {
-                const update = updates.find((item) => item.id === portal.id);
-                return update ? { ...portal, ...update.changes } : portal;
-            })
-        );
-    };
-
-    const handleToggleVisibility = async (portal: LearningPortal, event: React.MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation();
-        const nextActive = !portal.isActive;
-        updatePortalState([{ id: portal.id, changes: { isActive: nextActive } }]);
-        try {
-            await updateLearningPortal(portal.id, { isActive: nextActive });
-        } catch (error) {
-            updatePortalState([{ id: portal.id, changes: { isActive: portal.isActive } }]);
-            console.error('Failed to update portal visibility:', error);
-            setNotice(t.updateFailed);
-        }
-    };
-
-    const handleMove = async (
-        portalId: string,
-        direction: -1 | 1,
-        event: React.MouseEvent<HTMLButtonElement>
-    ) => {
-        event.stopPropagation();
-        const index = orderedPortals.findIndex((portal) => portal.id === portalId);
-        const targetIndex = index + direction;
-        if (index < 0 || targetIndex < 0 || targetIndex >= orderedPortals.length) return;
-
-        const current = orderedPortals[index];
-        const target = orderedPortals[targetIndex];
-        const currentOrder = Number.isFinite(current.sortOrder) ? current.sortOrder : 0;
-        const targetOrder = Number.isFinite(target.sortOrder) ? target.sortOrder : 0;
-
-        updatePortalState([
-            { id: current.id, changes: { sortOrder: targetOrder } },
-            { id: target.id, changes: { sortOrder: currentOrder } },
-        ]);
-
-        try {
-            await updateLearningPortalOrder([
-                { id: current.id, sortOrder: targetOrder },
-                { id: target.id, sortOrder: currentOrder },
-            ]);
-        } catch (error) {
-            updatePortalState([
-                { id: current.id, changes: { sortOrder: currentOrder } },
-                { id: target.id, changes: { sortOrder: targetOrder } },
-            ]);
-            console.error('Failed to reorder portals:', error);
-            setNotice(t.updateFailed);
-        }
-    };
+    const displayPortals = availablePortals.filter((portal) => portal.isActive);
 
     const portalHref = (view: ViewState): string | undefined => VIEW_PATHS[view] || undefined;
 
@@ -429,26 +344,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
             <PageHeader
                 title={t.headerTitle}
                 description={t.headerSubtitle}
-                actions={
-                    <>
-                        {notice && (
-                            <span role="status" className="rounded-full bg-sun-soft px-3 py-1 text-caption font-semibold text-sun-text">
-                                {notice}
-                            </span>
-                        )}
-                        {canManagePortals && (
-                            <Button
-                                variant={isEditing ? 'primary' : 'secondary'}
-                                size="sm"
-                                aria-pressed={isEditing}
-                                leadingIcon={<Settings size={14} aria-hidden="true" />}
-                                onClick={() => setIsEditing((prev) => !prev)}
-                            >
-                                {isEditing ? t.manageDone : t.manageLabel}
-                            </Button>
-                        )}
-                    </>
-                }
             />
 
             <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5">
@@ -458,7 +353,6 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     const title = resolveLocalizedText(portal.title, language);
                     const description = resolveLocalizedText(portal.description, language);
                     const viewState = resolveViewState(portal.view);
-                    const portalIndex = orderedPortals.findIndex((item) => item.id === portal.id);
                     const href = portalHref(viewState);
 
                     return (
@@ -472,46 +366,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                                 description={description}
                                 image={portal.image || undefined}
                                 glyph={<Icon size={44} className="" />}
-                                dimmed={isEditing && !portal.isActive}
-                                {...(isEditing
-                                    ? {}
-                                    : href
-                                        ? { to: href }
-                                        : { onClick: () => onNavigate(viewState) })}
-                                footer={
-                                    isEditing ? (
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                aria-pressed={portal.isActive}
-                                                onClick={(event) => handleToggleVisibility(portal, event)}
-                                            >
-                                                {portal.isActive ? t.visibilityOn : t.visibilityOff}
-                                            </Button>
-                                            <div className="ml-auto flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    aria-label={`${t.moveUp}: ${title}`}
-                                                    onClick={(event) => handleMove(portal.id, -1, event)}
-                                                    disabled={portalIndex <= 0}
-                                                >
-                                                    <ChevronUp size={16} aria-hidden="true" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    aria-label={`${t.moveDown}: ${title}`}
-                                                    onClick={(event) => handleMove(portal.id, 1, event)}
-                                                    disabled={portalIndex === orderedPortals.length - 1}
-                                                >
-                                                    <ChevronDown size={16} aria-hidden="true" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : undefined
-                                }
+                                {...(href ? { to: href } : { onClick: () => onNavigate(viewState) })}
                             />
                         </li>
                     );
