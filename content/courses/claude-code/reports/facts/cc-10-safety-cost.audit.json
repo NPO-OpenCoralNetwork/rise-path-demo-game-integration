@@ -1,0 +1,161 @@
+{
+  "lessonId": "cc-10-safety-cost",
+  "checkedCount": 76,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/security.md",
+    "https://code.claude.com/docs/ja/security",
+    "https://code.claude.com/docs/ja/security.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/sandboxing.md",
+    "https://code.claude.com/docs/en/sandbox-environments.md",
+    "https://code.claude.com/docs/en/settings-reference.md",
+    "https://code.claude.com/docs/en/settings.md",
+    "https://code.claude.com/docs/en/data-usage.md",
+    "https://code.claude.com/docs/en/costs.md",
+    "https://code.claude.com/docs/en/model-config.md",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/authentication.md",
+    "https://code.claude.com/docs/en/auto-mode-config.md",
+    "https://code.claude.com/docs/en/changelog.md",
+    "https://www.anthropic.com/engineering/claude-code-auto-mode",
+    "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+    "https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan",
+    "https://claude.com/pricing",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md",
+    "https://registry.npmjs.org/@anthropic-ai/claude-code"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s1-auto",
+      "where": "md (2nd sentence)",
+      "claim": "ただし、その分類器はAnthropicの検証で、行き過ぎた操作の17%を見逃しました。",
+      "problem": "outdated",
+      "evidenceUrl": "https://www.anthropic.com/engineering/claude-code-auto-mode",
+      "evidenceQuote": "Engineering post (datePublished 2026-03-25): \"the transcript classifier (running on Sonnet 4.6) evaluates each action against a set of decision criteria before it executes\"; \"The 17% false-negative rate on real overeager actions is the honest number.\" Current docs (https://code.claude.com/docs/en/permission-modes): \"By default, classifier requests go to Claude Sonnet 5.\" The 17% was measured on the March 2026 Sonnet 4.6 pipeline. It is not a measurement of the classifier behind today's default auto mode, which 「その分類器」 implies.",
+      "fix": "ただし、2026年3月の公式記事の検証では、分類器が行き過ぎた操作の17%を見逃しました。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "permission-modes (current): \"With Claude Code v2.1.283 or later, auto mode is the built-in starting permission mode for interactive terminal and VS Code sessions.\" / \"By default, classifier requests go to Claude Sonnet 5. If `/status` shows `Auto mode server` as `Enabled`, they're sent only for calls outside the server's review.\" Engineering post (dated Mar 25, 2026, no update note): \"the transcript classifier (running on Sonnet 4.6)\" ... \"The 17% false-negative rate on real overeager actions is the honest number.\"",
+        "reason": "I tried to defend the lesson and couldn't. In context, the callout's first sentence says auto mode has been the default for interactive sessions since v2.1.283. The next sentence uses 「その分類器」, so it reads as the classifier behind today's default auto mode. The only source for 17% is the engineering post. That post is dated Mar 25, 2026 and has no update note. Its number measures the full two-stage pipeline running on Sonnet 4.6, on 52 real overeager actions. Today's docs say classifier requests go to Sonnet 5 by default, or are reviewed on the server when that is enabled. So the lesson ties a figure from an older pipeline to the current classifier. That claims more than any page supports. The past tense 「見逃しました」 and the phrase 「Anthropicの検証で」 make the sentence sound historical, but the demonstrative still links the number to today's classifier. The lesson's broader point is still supported: the docs say \"Auto mode reduces permission prompts but does not guarantee safety.\" Only the link between the number and the current classifier is wrong. The proposed fix is accurate. It dates the figure to the March 2026 official post and drops 「その」. It stays within the 60-character sentence budget and uses です・ます. No better fix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s1-auto",
+      "where": "md (1st sentence)",
+      "claim": "autoモードは、v2.1.283から対話セッションの既定です。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "\"With Claude Code v2.1.283 or later, auto mode is the built-in starting permission mode for interactive terminal and VS Code sessions.\" / \"The table covers sessions you start in a terminal or through the VS Code extension; for the desktop app and claude.ai, see the Desktop and Web tabs\"",
+      "fix": "autoモードは、v2.1.283からターミナルとVS Codeの対話セッションの既定です。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"With Claude Code v2.1.283 or later, auto mode is the built-in starting permission mode for interactive terminal and VS Code sessions.\" / \"The table covers sessions you start in a terminal or through the VS Code extension; for the desktop app and claude.ai, see the Desktop and Web tabs\" — Desktop tab: \"As a default: set defaultMode in settings.\" (no built-in auto default is stated); Web tab: \"Cloud sessions: Accept edits, Plan, and Auto ... Auto mode appears only when your organization allows it\".",
+        "reason": "I tried to defend the lesson and couldn't. The permission-modes page does back the version number (v2.1.283) and the auto default, but only for \"interactive terminal and VS Code sessions\". It says outright that the Desktop app and claude.ai are handled separately. The Desktop tab, and the Desktop guide's \"Choose a permission mode\" section, never say new sessions start in auto. They only say you can set `defaultMode`. The Web/cloud tab lists Auto as an option, not the default, and only when the organization allows it. The CHANGELOG entry for 2.1.283 doesn't mention the change. Plain 「対話セッション」 also takes in Desktop and cloud sessions, and this same lesson defines クラウドセッション in its glossary, so a learner could reasonably read the sentence as covering them. The lesson says more than the page does. The proposed fix is accurate: JetBrains runs Claude Code in the IDE terminal, so 「ターミナル」 already covers it. It also fits the style rules (about 45 chars, no space between Japanese and alphanumerics), so betterFix isn't needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s2-isolate",
+      "where": "md (2nd sentence)",
+      "claim": "`claude -p` では、確認なしでリポジトリのフックや設定が動きます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "Table 'What runs before you trust a folder', `claude -p` column: hooks / env block / apiKeyHelper row \"Used.\"; \"`permissions.allow` rules and `additionalDirectories` in `.claude/settings.json` | Not used until you accept the trust dialog, which appears again listing them | Not used.\"; .mcp.json row \"Connected without asking, approved or not.\" Not every repository setting takes effect in -p: allow rules are explicitly not used.",
+      "fix": "`claude -p` では、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/headless",
+        "evidenceQuote": "\"Without `--bare`, a `-p` session runs the hooks in a project's `.claude/settings.json` and connects the servers in its `.mcp.json`, even in a folder you've never trusted. A `-p` session shows no workspace trust dialog and no per-server approval prompt.\" Also https://code.claude.com/docs/en/permissions, table \"What runs before you trust a folder\", `claude -p` column: hooks / `env` block / `apiKeyHelper` row \"Used\"; \"`permissions.allow` rules and `additionalDirectories` in `.claude/settings.json`\" row \"Not used. Claude Code prints a `this workspace has not been trusted` warning to stderr\"; `.mcp.json` row \"Connected without asking, approved or not.\"",
+        "reason": "I tried to defend the lesson. The case for it: \"や\" lists examples rather than everything, and some settings do apply in -p (the env block and helpers like apiKeyHelper are \"Used\"). Even so, the plain phrase \"リポジトリの…設定が動きます\" claims more than the docs say. The permissions page says the trust-gated settings, permissions.allow and additionalDirectories, are \"Not used\" under -p. Its table also marks subagent-frontmatter hooks and extraKnownMarketplaces as \"Not used\". The context makes the misreading likely. The block right before it (s2-defs) defines workspace trust as the check that keeps a project's allow rules from applying until you approve. The next sentence then says that in -p, where no check appears, the repository's \"設定\" run without confirmation. A learner would conclude that -p skips the trust gate, so allow rules apply too. The docs say the opposite. When the headless page lists what -p runs without trust, it names only two things: hooks in .claude/settings.json and .mcp.json servers. The proposed fix uses exactly those two items, so it is accurate and needs no betterFix. The sentence is about 50 chars, under the 60-char budget. It puts spaces around inline code, which matches the lesson's existing style. Note for the caller: the same loose wording appears in the s2-table row (\"フックや設定が動く\") and in the feedback for quiz q2 option c (\"リポジトリのフックや設定が使われます\"). Those were outside this check, but they may need the same fix.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s2-check",
+      "where": "q2 option c feedback",
+      "claim": "`-p` では信頼の確認が出ないまま、リポジトリのフックや設定が使われます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "\"`permissions.allow` rules and `additionalDirectories` in `.claude/settings.json` | Not used until you accept the trust dialog, which appears again listing them | Not used.\"; .mcp.json row: \"Connected without asking, approved or not.\"",
+      "fix": "`-p` では信頼の確認が出ないまま、リポジトリのフックや `.mcp.json` のサーバーが使われます。確認が出ないのは、守りが1つ減った状態です。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder",
+        "evidenceQuote": "\"Claude Code shows the trust dialog in interactive sessions only. A `claude -p` run or an SDK session never shows it, and trusting a parent folder doesn't count for these rules\" ... table, `claude -p` column: \"Hooks in settings files, the env block and helper commands such as apiKeyHelper, and a project skill's hooks and allowed-tools | ... | Used\" / \"`permissions.allow` rules and `additionalDirectories` in `.claude/settings.json` | Not used until you accept the trust dialog, which appears again listing them | Not used. Claude Code prints a `this workspace has not been trusted` warning to stderr\" / \"Frontmatter hooks in a project subagent, a project @skills-dir plugin, and extraKnownMarketplaces entries ... | Not used\" / \"Servers in `.mcp.json`, including ones the repository approves in its own settings | ... | Connected without asking, approved or not.\" Also https://code.claude.com/docs/en/security: \"Note: A `-p` session shows neither prompt.\"",
+        "reason": "Part of the lesson is right. The docs confirm that `-p` shows no trust dialog (\"A -p session shows neither prompt\"). They also confirm that hooks in settings files, the `env` block and helpers such as `apiKeyHelper` are used in a `-p` run, and those last two are settings. So the sentence is not plain false.\n\nThe problem is the bare word 設定 (\"settings\"). The permissions page splits the repository's settings into two groups. The capability-granting ones that the trust dialog exists to gate, `permissions.allow` and `additionalDirectories`, are explicitly \"Not used\" in `-p`, and Claude Code warns \"this workspace has not been trusted\". Subagent frontmatter hooks, `@skills-dir` plugins and `extraKnownMarketplaces` are not used either.\n\nContext makes the wording worse. Option d's feedback in the same question defines the trust dialog as the screen where you decide whether to turn on that folder's settings (そのフォルダーの設定を有効にするか). Read next to it, \"-p uses the repository's settings without the dialog\" tells the learner that `-p` acts as if the folder were trusted. The page says the opposite for exactly the settings the dialog gates. So the lesson says more than the page supports.\n\nThe proposed fix holds up. It keeps \"hooks\" (settings-file hooks: \"Used\") and swaps 設定 for `.mcp.json` servers (\"Connected without asking, approved or not.\"). That item is precisely supported and is the bigger risk: `-p` also skips the separate `.mcp.json` approval prompt. The rest of the sentence is unchanged and the spacing around inline code is fine, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s3-steps",
+      "where": "step ex-place md",
+      "claim": "プロジェクトの `.claude/settings.json` に書きます。gitで共有され、全員に効きます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/settings",
+      "evidenceQuote": "\"It reaches your teammate's clone and the cloud session only if you commit the file to version control; until you do, it's a file on your disk like any other and nobody else has it\"",
+      "fix": "プロジェクトの `.claude/settings.json` に書きます。コミットすれば、チーム全員に効きます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/settings",
+        "evidenceQuote": "Shared project | `.claude/settings.json` | Everyone working in the folder that contains it. In a git repository, commit it so teammates get it ... `acme-app/.claude/settings.json`: your `acme-app/`. It reaches your teammate's clone and the cloud session only if you commit the file to version control; until you do, it's a file on your disk like any other and nobody else has it. (Also https://code.claude.com/docs/en/permissions: \"You can check permission settings into version control to share them with every developer in your organization\")",
+        "reason": "I read the step in context. s3-steps/ex-place tells the learner where to write the deny rule and says 「gitで共有され、全員に効きます」, which reads as if the file reaches teammates automatically. The official settings page says sharing happens only once you commit the file. Until then, nobody else has it. The permissions page also ties sharing to checking the file into version control. So the lesson states it more strongly than the docs do. No official page I checked (settings, permissions, settings-reference) says the file is shared without a commit. The auditor read the context correctly. The proposed fix is accurate. \"全員に効きます\" holds for deny rules once the file is committed, because the permissions page says \"`deny` and `ask` rules aren't affected\" by workspace trust, and the settings page says \"`deny` and `ask` rules apply right away.\" The fix is short, uses です・ます, and fits the sentence budget, so I have no betterFix.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s3-steps",
+      "where": "step ex-verify expect",
+      "claim": "Claudeは中身を読めません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "\"Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee` ... They don't apply to a command that reads files without naming them, such as `grep -r pattern .` run from the directory that holds the file, or to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself.\"",
+      "fix": "Readツールや `cat` での読み取りが拒否されます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+        "evidenceQuote": "\"Read and Edit deny rules apply to Claude's built-in file tools, to file commands Claude Code recognizes in Bash, such as `cat`, `head`, `tail`, `sed`, and `tee`, and to the targets of Bash redirections such as `> file` and `< file`. They don't apply to a command that reads files without naming them, such as `grep -r pattern .` run from the directory that holds the file, or to arbitrary subprocesses that read or write files indirectly, like a Python or Node script that opens files itself. For OS-level enforcement that blocks all processes from accessing a path, enable the sandbox.\" (The settings-reference permissions.deny entry says the same: Claude Code \"excludes matching files from file discovery and search results, denies reads of them ... they don't apply to a command that reads files without naming them, such as `grep -r pattern .`, or to arbitrary subprocesses\".)",
+        "reason": "The finding stands. In the lesson, step ex-verify tells the learner to check `/permissions` and then ask Claude to read the file. The expected result it gives is the absolute \"Claudeは中身を読めません。\" The best support I found is in settings-reference: Claude Code \"denies reads of them\" and leaves the matching files out of discovery and search results. That backs a refused read through Claude's file tools. It does not back \"Claude cannot read the contents.\" Both the permissions page and settings-reference say the deny rules only cover the built-in file tools, the Bash file commands Claude Code recognizes (cat, head, tail, sed, tee) and redirection targets. They do not cover `grep -r pattern .` run from the folder that holds the file, or scripts that open files themselves. grep is also a read-only command, which can run without asking, so Claude could see the contents that way. The s3-pitfall callout that follows does mention the script gap. It does not mention grep -r, and the expect line still promises more than the docs do. The proposed fix \"Readツールや `cat` での読み取りが拒否されます。\" matches the documented scope: built-in file tools and recognized commands such as cat are denied. It uses です・ます and fits the spacing style used elsewhere in the lesson, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "e2 option d feedback",
+      "claim": "Claude Codeは、rootやsudoでの `bypassPermissions` を拒否します。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "\"On Linux and macOS, Claude Code refuses to start in `bypassPermissions` mode when running as root or under `sudo`:\" ... \"The check is skipped automatically inside a recognized sandbox.\"",
+      "fix": "LinuxとmacOSでは、rootやsudoでの `bypassPermissions` の起動を拒否します。権限を強めるほど、間違いの影響も大きくなります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "On Linux and macOS, Claude Code refuses to start in `bypassPermissions` mode when running as root or under `sudo`: ... --dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons ... The check is skipped automatically inside a recognized sandbox. To run autonomously in a container, use the dev container configuration, which runs Claude Code as a non-root user.",
+        "reason": "I fetched the official permission-modes page, and the core fact is real: Claude Code refuses to start in bypassPermissions as root or under sudo. But the page gives two limits. The check applies on Linux and macOS only, and it is skipped inside a recognized sandbox. The lesson's feedback for e2 option d says 'Claude Codeは、rootやsudoでの `bypassPermissions` を拒否します。' with no OS scope and no exception, so it states the rule as universal, which is stronger than the page. Searching the current CHANGELOG for root and sudo turned up no entry that widens the check. The proposed fix closely translates the page's main sentence ('On Linux and macOS, Claude Code refuses to start in bypassPermissions mode when running as root or under sudo'). It also changes '拒否' to '起動を拒否', which matches 'refuses to start'. The fix leaves out the recognized-sandbox exception, but option d is about starting with sudo on an ordinary machine, where that exception does not apply. Adding 'サンドボックス' there could also be confused with the Bash /sandbox feature from option c. The fix is about 56 characters, inside the 60-character sentence budget. So the finding stands and the proposed fix is acceptable as written.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "s2-table",
+      "where": "row 3 (強い権限), column 起きうること",
+      "claim": "確認なしで何でも動く",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "\"Deny rules block in every mode, including `bypassPermissions`.\" / bypassPermissions section: \"The actions no mode auto-approves still prompt in this mode.\" (The lesson's own glossary also says 拒否ルール「どの権限モードでも効きます」.)",
+      "fix": "拒否ルール以外は、ほぼ確認なしで動く",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"The table below shows what Claude can do without a permission prompt in each mode.\" ... \"| `bypassPermissions` | Everything | Isolated containers and VMs only |\" and \"`bypassPermissions` mode disables permission prompts and safety checks so tool calls execute immediately, including writes to protected paths.\"",
+        "reason": "The lesson cell is a summary row in a three-column table (場面 / 起きうること / 合う対策), and the block cites cc-permission-modes. That page's own summary table puts bypassPermissions under \"What runs without asking\" with the value \"Everything\". So 「確認なしで何でも動く」 is a faithful translation of the official summary cell, not something stronger. The row's third column, 「ネットにつながらないコンテナやVMだけで使う」, matches the same table's \"Isolated containers and VMs only\". The page also says \"disables permission prompts and safety checks so tool calls execute immediately\". The exceptions the auditor quotes (deny rules still block; explicit ask rules, critical-path rm/rmdir and a few other actions still prompt) are real, but they are details in the page body. The official page itself does not repeat them in its summary table. Inside the lesson, the glossary entry 「拒否ルール…どの権限モードでも効きます」 and the q-feedback about deny rules already cover the deny-rule point, so a learner is not left with a wrong model. The proposed fix is also weaker than the original. 「拒否ルール以外は、ほぼ確認なしで動く」 suggests that deny rules make an action prompt when they actually block it outright. It also leaves out ask rules and critical-path removals, which still prompt. And it softens a risk warning the official page itself states bluntly (\"offers no protection against prompt injection or unintended actions\"). No change is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}
