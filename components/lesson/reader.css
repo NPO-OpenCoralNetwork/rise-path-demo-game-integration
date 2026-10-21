@@ -442,6 +442,11 @@
     color: var(--rp-fg);
     padding: 0.12em 0.4em;
     border-radius: var(--radius-chip, 6px);
+    /* A chip moves to the next line whole instead of splitting a flag or path ('--' / 'bare');
+       only a chip longer than the line wraps, inside its own box. */
+    display: inline-block;
+    box-sizing: border-box;
+    max-width: 100%;
     overflow-wrap: anywhere;
   }
 
@@ -1095,18 +1100,26 @@
     outline-offset: -2px;
   }
 
+  /* Long lines wrap instead of hiding their end behind a scroll with no cue (a JSON string cannot be
+     shortened to fit a phone). The wrapped part hangs under the code, after the line number. */
   .rp-code-pre code {
     display: block;
-    min-width: max-content;
     font: inherit;
-    white-space: pre;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     background: none;
     padding: 0;
   }
 
   .rp-code-line {
     display: block;
-    padding: 0 18px;
+    padding: 0 18px 0 calc(18px + 2ch);
+    text-indent: -2ch;
+  }
+
+  .rp-code-numbered .rp-code-line {
+    padding-left: calc(18px + 3em);
+    text-indent: -3em;
   }
 
   .rp-code-line[data-hl] {
@@ -1119,6 +1132,7 @@
     width: 2em;
     margin-right: 1em;
     text-align: right;
+    text-indent: 0;
     color: var(--rp-fg-3);
     user-select: none;
   }
