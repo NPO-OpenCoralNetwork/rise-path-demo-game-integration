@@ -121,4 +121,4 @@ estMinutes 19.
 `lessons:validate` 0 errors, `lessons:lint --strict` 0 warnings.
 
 ### Last fix round (2026-10-21)
-- dr-table fits 356 px: headers 「繰り返す困りごと／足す部品」, the lesson numbers stay in the cells and the caption says so; the (subagent) gloss is left to the glossary (visual QA).
+- dr-table fits 356 px: headers 「繰り返す困りごと／足す部品」, the lesson numbers stay in the cells and the caption says so; the (subagent、…) gloss stays, as the first body use of the term (visual QA; pedagogy-reviewer and ja-editor).

@@ -1,15 +1,15 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:984f34269dfb6574",
+  "lessonHash": "sha256:3122649e3d005674",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "No hard failures in metrics.json. The cycle-flow diagram (flowchart TD) is legible at 390 px with Japanese labels, and the code blocks wrap cleanly. One problem: on mobile the right column of the dr-table is cut off at the screen edge (pages/mobile-jp-03.png, pages/mobile-jp-04.png).",
+      "score": 4,
+      "evidence": "The dr-table (2 columns) fits at 390 px with no clipping (pages/mobile-jp-03.png, 04). The cycle-flow mermaid is flowchart TD with readable Japanese labels and a clear return edge labelled 直す指摘がある (pages/mobile-jp-17.png). The JSON code blocks ex-settings and setup-settings-model are readable, and their highlights line up (pages/mobile-jp-09.png, 16). metrics.json has no overflow, console, mermaid, unknown-block or image errors.",
       "blockIds": [
         "dr-table",
         "cycle-flow",
@@ -20,7 +20,7 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "textOnlyScreens is empty at both widths, and the screens alternate between steps, prompts, code and quizzes. The densest spot is the header, where the prerequisites list runs as about 9 lines of small grey text on mobile (pages/mobile-jp-01.png). Desktop charsPerLine has a median of 42, slightly above the 30–40 target.",
+      "evidence": "Every screen has a heading, figure, table, code block or check (textOnlyScreens is empty), and the steps and expect boxes break up the text. But the lesson is long (30 mobile screens), and the header's prerequisites list is an 8-line block of small grey text (pages/mobile-jp-01.png).",
       "blockIds": [
         "ex-steps",
         "setup-steps",
@@ -29,33 +29,27 @@
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The lesson is Japanese only and no stray English UI shows. Contrast is good and the diagram labels are Japanese and readable. Part of the core table cannot be seen at 390 px without an obvious horizontal scroll. The ⏸ glyph in the plan-mode chip renders as a small, unclear mark (pages/mobile-jp-18.png).",
+      "score": 4,
+      "evidence": "All visible text is Japanese, and English terms such as plugin, skill, hook and plan mode appear in parentheses. Glossary terms are underlined, and the key chips and inline code chips stay whole. No line breaks fall inside Japanese words, and contrast is fine except for the small grey prerequisites line.",
       "blockIds": [
-        "dr-table",
-        "cycle-steps"
+        "hook-b1",
+        "cycle-steps",
+        "self-check-list"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "dr-table",
-      "issue": "At 390 px the second column ('足す部品（学んだ回）') runs off the right edge. The header and the cells 'CLAUDE.mdに1行足す（第6回）', 'サブエージェント（subagent、第7回）' and 'プラグイン（第8回）' are clipped, and nothing shows that the table scrolls sideways. The learner must use this table: the q1 hint and the p-more step both point to it.",
-      "fix": "Make both columns fit the 358 px measure. Shorten the headers to '繰り返す困りごと' / '足す部品'. Shorten the second-column cells, for example 'CLAUDE.mdに1行（第6回）' and 'サブエージェント（第7回）' (drop the '(subagent、…)' gloss, which the glossary already covers). If the table still overflows, put the 回 numbers in the caption, or turn the table into a list of 'きっかけ → 部品' lines.",
-      "screenshot": "pages/mobile-jp-03.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "lesson.prerequisites: the 10 prerequisites appear as one long run of small grey text, about 9 lines on mobile (pages/mobile-jp-01.png). Shorten them, for example '第2〜8回・第10回の内容', 'Gitのcommitがわかる', '試せるリポジトリ'.",
-    "ex-steps: the step titles '① …' to '⑤ …' repeat the reader's own numbered circles 1–5, so each step shows two numbers (pages/mobile-jp-06.png, pages/desktop-jp-04.png). Consider removing the circled numbers from the titles and writing 'ステップ1〜2' in ex-b1 and the prompt titles.",
-    "cycle-steps c-plan: the '⏸ plan mode on' chip renders ⏸ as a tiny ambiguous mark (pages/mobile-jp-18.png). Consider writing 'plan mode on' without the glyph, or describing the indicator in words.",
-    "self-check-list sc-safety: the plain text 'git push' breaks across two lines on mobile (pages/mobile-jp-22.png). Consider '「git push」' to match the quoting style of the other items.",
-    "dr-quiz / check-quiz: a few desktop options leave a single character on a second line ('す' in q2 option a on pages/desktop-jp-08.png, 'く' in e1 option a on pages/desktop-jp-17.png). Minor; shortening by one or two characters would avoid it.",
-    "reader: the keys row shows 'Shift + Tab Ctrl + G' with no separator between the two combos, so it can read as one four-key chord (pages/mobile-jp-18.png, pages/desktop-jp-12.png).",
-    "reader: desktop charsPerLine median is 42 (target 30–40) at a 680 px measure.",
-    "reader: the end banner calls this the course's last lesson, because drafts are not in course.json (pages/mobile-jp-30.png). This is expected for a draft."
+    "lesson.prerequisites: the 10 entries show as one 8-line run of small grey text under the title on mobile (pages/mobile-jp-01.png). Shorten them, for example to 第2〜8回・第10回を修了、Gitのcommitの意味がわかる、試せるリポジトリがある.",
+    "ex-steps: each step title starts with ① to ⑤, and the reader also draws a numbered circle, so every step shows its number twice (pages/mobile-jp-06.png, pages/desktop-jp-04.png). The circled numbers are what ex-b1 refers to (①と②は初日に…), so either keep them or reword ex-b1 if you drop them.",
+    "cycle-steps c-plan: the key chips show as Shift + Tab right next to Ctrl + G with only a small gap, so they can read as one four-key combination (pages/mobile-jp-18.png, pages/desktop-jp-12.png). Consider listing only Shift+Tab in keys and leaving Ctrl + G in the text.",
+    "self-check-list sc-safety: on mobile, the plain-text 'git push' breaks across two lines (git / pushの確認…) (pages/mobile-jp-22.png). Writing it as 「git push」 or shortening the label would keep the command together.",
+    "ex-settings line 16: the long hook command soft-wraps with a hanging indent on both mobile and desktop (pages/mobile-jp-09.png, pages/desktop-jp-06.png). It is still readable, and the same command appears as an inline chip in ex-steps.",
+    "reader: desktop charsPerLine median is 42 against the JP target of 30–40 (measure 680 px).",
+    "reader: on mobile-jp-29 a faint blurred shape sits in the top bar next to the title (pages/mobile-jp-29.png).",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json, and the mobile full-length PNG is capped at 16000 px. These are known preview behaviour."
   ],
-  "verdict": "revise",
-  "summary": "Clean render: no overflow, console, mermaid or image failures. The vertical cycle diagram, code blocks and step cards read well at 390 px, and no personal data appears on any screen. The one must-fix is the dr-table: its right column is cut off at 390 px (pages/mobile-jp-03.png). Shorten the headers and second-column cells so both columns fit."
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "The screenshots show the lesson under review (lessonHash sha256:3122649e3d005674 from metrics.json), and they have no hard failures, no overflow and no personal data. The vertical cycle diagram, 2-column table, JSON code blocks and prompt blocks are all readable at 390 px. The most useful polish is to shorten the 8-line prerequisites list under the title and remove the double step numbering in ex-steps."
 }

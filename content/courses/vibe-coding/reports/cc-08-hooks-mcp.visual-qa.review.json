@@ -1,56 +1,36 @@
 {
   "lessonId": "cc-08-hooks-mcp",
   "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:01fa366fee4752fb",
+  "lessonHash": "sha256:dc1fce75fb87584d",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "The s1-lifecycle flowchart TD reads well at 390 px, with Japanese labels at a legible size (pages/mobile-jp-04.png, pages/mobile-jp-05.png). All tables (s3-table, s4-scopes, s5-checks, practice-b-model, practice-b-model-b) fit at 390 px without clipping (pages/mobile-jp-13.png, pages/mobile-jp-16.png, pages/mobile-jp-18.png, pages/mobile-jp-25.png). Long command strings in s2-settings and practice-model-settings line 9/18 soft-wrap in the middle of 'hooks' ('/.claude/hoo' then 'ks/block-rm.sh'), which still reads but looks awkward (pages/mobile-jp-09.png, pages/mobile-jp-23.png).",
-      "blockIds": [
-        "s1-lifecycle",
-        "s3-table",
-        "s4-scopes",
-        "s5-checks",
-        "s2-settings",
-        "practice-model-settings"
-      ]
+      "score": 4,
+      "evidence": "metrics.json has no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks and 0 broken images. The hook-loop flowchart (Fig. 1) is TD with Japanese labels that can be read at 390 px (pages/mobile-jp-04.png). Term tables, the exit-code table, the scope table and the A/B comparison tables fit the 390 px width and nothing is clipped (pages/mobile-jp-13.png, mobile-jp-16.png, mobile-jp-25.png, mobile-jp-26.png)."
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Every screen has a heading, figure, table, code block or check (textOnlyScreens empty), and paragraphs stay short. The exception is the practice-b-quiz prompt: it puts both scenarios A and B into one 10-line bold paragraph on mobile, which is hard to scan and compare (pages/mobile-jp-24.png, pages/desktop-jp-17.png).",
-      "blockIds": [
-        "practice-b-quiz"
-      ]
+      "evidence": "No screen is text-only on either device (textOnlyScreens is empty). Every section alternates a term table, code and a check. The lesson is long, though: 34 mobile screens and 24 desktop screens. The practice section stacks a prompt, a 19-line script and a 24-line settings.json back to back (pages/mobile-jp-22.png to mobile-jp-24.png), which is the densest stretch."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is Japanese only. Diagram labels, captions, table headers and controls are all in Japanese, and no stray English UI text appears. Inline code chips stay whole and wrap to the next line cleanly (pages/mobile-jp-10.png, pages/mobile-jp-27.png). No controls are hidden under the top or bottom bars, and no personal data appears on any screen opened."
+      "evidence": "This is a JP-only lesson. All UI and diagram labels are in Japanese, and English appears only as glossed terms and code. Contrast is good everywhere, including the callouts and the dark code blocks. No control is hidden under the 56 px top bar or the 60 px bottom bar on mobile (pages/mobile-jp-30.png, mobile-jp-34.png). No personal data appears on any screen: the desktop rail shows only an EN/JP language switch, with no account name or email."
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "load",
-      "blockId": "practice-b-quiz",
-      "issue": "The q9 prompt packs the full descriptions of candidates A and B, plus the question, into one bold paragraph. At 390 px that is 10 dense bold lines. The learner has to hold both scenarios in mind to compare them, and nothing visually separates A from B.",
-      "fix": "Move the scenario out of the prompt into practice-b-task as a 2-item list or a small table (A: 社内チームの課題管理MCPサーバー…／B: 作者とソースがわかる「全部入り」プラグイン…). Then cut the q9 prompt to one short line, such as 「AとBについて、いちばん適切な判断はどれでしょう？」.",
-      "screenshot": "pages/mobile-jp-24.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "practice-b-model / practice-b-model-b: A and B are two separate tables. On mobile the learner scrolls between them to compare (pages/mobile-jp-25.png, pages/mobile-jp-26.png). Consider one 3-column table (確かめること | A | B) with short cells. Both worked tables also sit open right under q9, before the learner answers (pages/desktop-jp-18.png). Consider placing them after the checklist or labelling them as the answer.",
-    "s2-settings / practice-model-settings: on mobile, the \"command\" string on line 9/18 wraps inside the word 'hooks' (pages/mobile-jp-09.png, pages/mobile-jp-23.png). It stays readable and has a copy button. A short note that the value is one line would help learners who type it by hand.",
-    "practice-model-intro: on mobile, the chip \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh breaks inside its own box at 'prot|ect-files.sh' (pages/mobile-jp-22.png). It is acceptable, but naming only the file (protect-files.sh) would avoid the break.",
-    "reader: on mobile the code-block header truncates the filename to '.claude/hooks/protect-files...' (pages/mobile-jp-22.png). The full name appears only in the paragraph above.",
-    "reader: desktop JP charsPerLine median is 42 (max 53) against the 30–40 target, at measurePx 680 and font 18.7 px. This is a reader measure setting, not lesson content.",
-    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」, which is keyboard and mouse wording on a touch device (pages/mobile-jp-32.png).",
-    "reader: the end banner says this is the course's last lesson (drafts are not in course.json). Failed /api/ requests (13) were ignored as environment noise. The full-length mobile PNG stops at 16000 px."
+    "Desktop JP charsPerLine median is 42 (max 53), just above the 30–40 target at a 680 px measure. This comes from the reader's measure, not from the lesson text (reader:).",
+    "reader: on mobile the header of the practice script's code block truncates the filename to '.claude/hooks/protect-files....' (pages/mobile-jp-22.png). The full path appears in the step text above and on desktop, but the header could wrap or use a smaller font.",
+    "reader: in the settings.json blocks, the long 'command' value soft-wraps inside the word 'hoo/ks' at 390 px (pages/mobile-jp-09.png, mobile-jp-23.png), and on desktop it breaks at 'block-/rm.sh' (pages/desktop-jp-07.png). It still reads correctly with the hanging indent. If the lesson wants to avoid it, it could shorten the path, for example by naming the hook directory 'hooks/' relative to $CLAUDE_PROJECT_DIR in prose only.",
+    "reader: the inline chip '\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-rm.sh' in step 2 of 8-2 is longer than the mobile line and wraps inside its box (pages/mobile-jp-10.png), as does the protect-files path chip (pages/mobile-jp-22.png). Both are readable, and the same value appears in the code block.",
+    "reader: the A and B comparison tables in the practice section use different first-column widths on desktop (pages/desktop-jp-18.png), which makes side-by-side scanning slightly harder. A fixed label-column width for key/value tables would align them.",
+    "reader: environment noise, not lesson defects. 14 /api/ requests failed (500 on user progress, events and notifications); the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png, desktop-jp-24.png); and both full-length PNGs are truncated."
   ],
-  "verdict": "revise",
-  "summary": "metrics.json has no hard failures. Layout holds up well at 390 px: the TD flowchart, all tables and the soft-wrapped code stay readable, and no screen shows personal data. The one must-fix is the practice-b-quiz prompt: it packs both scenarios A and B into a 10-line bold paragraph, so move them into practice-b-task as a list or table and keep the question short."
+  "verdict": "pass",
+  "summary": "Visually clean on both mobile (390 px) and desktop. There are no hard failures in metrics.json, the hook-loop diagram and every table can be read at 390 px, there is no personal data on any screen, and every section has a table, code or a check. The only rough spots come from the reader: long path chips and command lines wrap inside the path, and one code-block filename is truncated on mobile. All of these are listed as nice-to-have."
 }
