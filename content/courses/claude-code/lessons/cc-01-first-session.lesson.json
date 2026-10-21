@@ -1,0 +1,1229 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-01-first-session",
+  "courseId": "claude-code",
+  "title": "第1回｜最初のタスクを任せる",
+  "subtitle": "質問から1コミットまで、最初のセッションを自分の手で通す",
+  "locale": "jp",
+  "level": "beginner",
+  "estMinutes": 16,
+  "prerequisites": [
+    "ターミナルで基本のコマンド（cd・ls）が使える",
+    "Gitのコミット（commit）の意味がわかる（バイブコーディング第5章）",
+    "VS Codeを使ったことがある（バイブコーディング第3章）",
+    "Claudeの有料プラン（Pro・Max・Team・Enterprise）かConsoleアカウントがある"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "チャットや補完とエージェントループの違いを説明できる",
+      "bloom": "understand"
+    },
+    {
+      "id": "o2",
+      "text": "状況に合うサーフェス（ターミナルCLI・IDE拡張・デスクトップアプリ・クラウドセッション）を選べる",
+      "bloom": "apply"
+    },
+    {
+      "id": "o3",
+      "text": "Claude Codeを入れて起動し、質問 → 小さな変更 → 差分の確認 → コミットの流れで最初のセッションを実行できる",
+      "bloom": "apply"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：貼り付けずに聞いてみる",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-problem",
+          "type": "markdown",
+          "style": "lead",
+          "md": "チャットAIに相談すると、ファイルを貼り付け、答えを書き写すことになりがちです。Claude Codeなら、何も貼らずに「このプロジェクトは何をするもの？」と聞けます。このレッスンでは、最初のタスクを任せ、確かめてコミットするまで進みます。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-quickstart"
+          ],
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": "練習用のフォルダでClaude Codeを起動し、ファイルを何も貼らずに「このプロジェクトは何をするもの？」と聞きました。Claude Codeはまず何をするでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「ファイルの中身を貼り付けてください」と頼んで待つ",
+                  "feedback": "それはチャットAIの進め方です。Claude Codeは、必要なファイルを自分で探して読みます。"
+                },
+                {
+                  "id": "b",
+                  "md": "フォルダの中のファイルを自分で探して読み、それから答える"
+                },
+                {
+                  "id": "c",
+                  "md": "エディタで開いているファイル1つだけを見て答える",
+                  "feedback": "それはエディタの補完に近い見方です。Claude Codeは、開いているかどうかに関係なく、プロジェクトのファイルを読みます。"
+                },
+                {
+                  "id": "d",
+                  "md": "前回起動したときに読んだ内容を思い出して答える",
+                  "feedback": "Claude Codeは前回の会話を覚えていません。必要なファイルを、その場で読みます。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "公式のクイックスタートによると、Claude Codeは必要に応じてプロジェクトのファイルを読みます。自分で貼り付ける必要はありません。なぜそう動けるのかを、1-1で見ていきます。",
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "loop",
+      "title": "1-1. チャット・補完・エージェントループ",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "loop-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "何を見て、何をするかで比べてみましょう。"
+        },
+        {
+          "id": "loop-table",
+          "type": "table",
+          "cite": [
+            "cc-how-it-works",
+            "cc-best-practices"
+          ],
+          "caption": "見るものと、することの違い",
+          "columns": [
+            "道具",
+            "見るものと、すること"
+          ],
+          "rows": [
+            [
+              "チャット",
+              "チャットAIは、貼り付けた文章を見て、文章で答えて待つ"
+            ],
+            [
+              "補完",
+              "エディタの補完は、開いているファイルを見て、続きのコードを提案する"
+            ],
+            [
+              "Claude Code",
+              "プロジェクトのファイル、ターミナル、Gitを見て、自分で調べ、変更し、確かめる"
+            ]
+          ]
+        },
+        {
+          "id": "loop-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-glossary"
+          ],
+          "items": [
+            {
+              "term": "エージェントループ（agentic loop）",
+              "md": "「情報を集める → 行動する → 結果を確かめる」を、目的を果たすまで繰り返す動き方です。"
+            },
+            {
+              "term": "ツール（tool）",
+              "md": "ファイルの読み書きやコマンドの実行など、Claudeが実行できる操作です。ツールがないと、文章で答えるだけになります。"
+            }
+          ]
+        },
+        {
+          "id": "loop-diagram",
+          "type": "diagram",
+          "engine": "mermaid",
+          "cite": [
+            "cc-how-it-works"
+          ],
+          "code": "flowchart TD\n  A[依頼を受け取る] --> B[情報を集める]\n  B --> C[行動する]\n  C --> D[結果を確かめる]\n  D -->|まだ足りない| B\n  D -->|できた| E[報告する]",
+          "caption": "エージェントループ：確かめて足りなければ、情報を集める段階に戻る",
+          "alt": "依頼を受け取る、情報を集める、行動する、結果を確かめる、が上から下へ並ぶ。結果を確かめるから「まだ足りない」の矢印で情報を集めるに戻り、「できた」の矢印で報告するへ進む図",
+          "description": "「失敗するテストを直して」なら、実行してエラーを読み、直して、また実行します。"
+        },
+        {
+          "id": "loop-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-how-it-works"
+          ],
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "練習用のプロジェクトで「スクリプトを実行するとエラーが出る。原因を調べて直して」と頼みました。エージェントループで動くClaude Codeの進め方として、最も近いのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "原因の候補を文章で挙げ、コードが貼り付けられるのを待つ",
+                  "feedback": "それはチャットAIの進め方です。Claude Codeはツールを使い、エラーや関係するファイルを自分で調べます。"
+                },
+                {
+                  "id": "c",
+                  "md": "エディタで開いているファイルだけを見て、続きのコードを提案する",
+                  "feedback": "それはエディタの補完の進め方です。Claude Codeは開いているファイルに限らず、プロジェクト全体から原因を探します。"
+                },
+                {
+                  "id": "a",
+                  "md": "実行してエラーを読み、直してから、もう一度実行して確かめる"
+                },
+                {
+                  "id": "d",
+                  "md": "原因を推測してコードを書き換え、そのまま完了と報告する",
+                  "feedback": "書き換えただけでは、ループの「結果を確かめる」段階が抜けています。直したら、もう一度実行して確かめてから報告します。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "Claude Codeは、情報を集める（実行してエラーを読む）→ 行動する（直す）→ 結果を確かめる（もう一度実行する）を繰り返します。チャットや補完との違いは、ツールで自分から調べて確かめるところです。",
+              "hint": "ループの最後の段階が何だったかを思い出しましょう。",
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "surfaces",
+      "title": "1-2. どこで使うか：4つのサーフェス",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "surfaces-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "Claude Codeを使う場所は、ターミナルだけではありません。"
+        },
+        {
+          "id": "surfaces-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-glossary"
+          ],
+          "items": [
+            {
+              "term": "サーフェス（surface）",
+              "md": "Claude Codeを使う場所です。ターミナル、IDE（統合開発環境）、デスクトップアプリ、クラウドセッションなどがあります。"
+            },
+            {
+              "term": "クラウドセッション（cloud session）",
+              "md": "クラウド上でClaude Codeを動かす使い方です。"
+            },
+            {
+              "term": "CLAUDE.md",
+              "md": "プロジェクトの指示を書くファイルです。"
+            }
+          ]
+        },
+        {
+          "id": "surfaces-table",
+          "type": "table",
+          "cite": [
+            "cc-overview",
+            "cc-vs-code",
+            "cc-jetbrains",
+            "cc-desktop",
+            "cc-cloud"
+          ],
+          "caption": "4つのサーフェスと、向いている場面",
+          "columns": [
+            "サーフェス",
+            "場面と、知っておくこと"
+          ],
+          "rows": [
+            [
+              "CLI",
+              "ターミナルCLI。基本の入口で、演習で使う。CLIはCommand Line Interfaceの略"
+            ],
+            [
+              "IDE拡張",
+              "VS Code・JetBrainsで変更箇所を見たい。JetBrains版はCLIが別に必要"
+            ],
+            [
+              "アプリ",
+              "デスクトップアプリ。ターミナルなしで始めたい。有料プランが必要"
+            ],
+            [
+              "クラウド",
+              "クラウドセッション。PCを閉じても進めたい。GitHubのリポジトリを使い、先にpushする"
+            ]
+          ]
+        },
+        {
+          "id": "surfaces-same",
+          "type": "markdown",
+          "cite": [
+            "cc-overview"
+          ],
+          "md": "どれも同じエンジンなので、リポジトリの[[CLAUDE.md]]や設定はどこでも使えます。"
+        },
+        {
+          "id": "surfaces-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-cloud"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "GitHubにあるリポジトリを手元で作業していて、まだpushしていないコミットが2つあります。この続きを、ノートPCを閉じて出かけている間に進めてほしいとき、どうしますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "そのままクラウドセッションを始めて、続きを頼む",
+                  "feedback": "クラウドセッションはGitHubのリポジトリを複製して動くので、pushしていないコミットは見えません。先にpushします。"
+                },
+                {
+                  "id": "c",
+                  "md": "ターミナルCLIで続きを頼んでから、PCを閉じる",
+                  "feedback": "ターミナルCLIは自分のPCの上で動くので、PCを閉じると止まります。PCの外で動く使い方を選びます。"
+                },
+                {
+                  "id": "d",
+                  "md": "IDE拡張（VS Code）で続きを頼んでから、PCを閉じる",
+                  "feedback": "IDE拡張（VS Code）も自分のPCの上で動きます。PCを閉じると作業も止まります。"
+                },
+                {
+                  "id": "b",
+                  "md": "コミットをpushしてから、クラウドセッションで続きを頼む"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "クラウドセッションはクラウド上で動くので、PCを閉じても続きます。GitHubのリポジトリを複製して使うため、手元のコミットは先にpushします。",
+              "hint": "クラウドセッションが、どこからコードを持ってくるかを考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "install",
+      "title": "1-3. インストールして、確かめる",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "install-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "内容は2026年10月時点（v2.1.304）です。更新が多いので、手順は[公式ドキュメントの日本語版](https://code.claude.com/docs/ja/setup)でも確かめましょう。"
+        },
+        {
+          "id": "install-needs",
+          "type": "list",
+          "style": "check",
+          "cite": [
+            "cc-setup",
+            "cc-quickstart"
+          ],
+          "items": [
+            "有料プラン（Pro・Max・Team・Enterprise）かConsoleアカウント（無料プランは不可）",
+            "macOS 13.0以上、Windows 10 1809以上、Ubuntu 20.04以上など",
+            "4GB以上のメモリと、インターネット接続"
+          ]
+        },
+        {
+          "id": "install-how",
+          "type": "markdown",
+          "cite": [
+            "cc-setup",
+            "cc-quickstart"
+          ],
+          "md": "ConsoleアカウントではAPI（Application Programming Interface）を前払いで使えます。推奨はネイティブインストーラー（native installer）で、自動で更新されます。\n\nmacOS・Linux・WSL（Windows Subsystem for Linux）用は、2行で1つのコマンドです。"
+        },
+        {
+          "id": "install-unix",
+          "type": "code",
+          "lang": "bash",
+          "filename": "macOS・Linux・WSL",
+          "cite": [
+            "cc-setup"
+          ],
+          "code": "curl -fsSL https://claude.ai/install.sh \\\n  | bash"
+        },
+        {
+          "id": "install-win",
+          "type": "code",
+          "lang": "powershell",
+          "filename": "PowerShell (Windows)",
+          "cite": [
+            "cc-setup"
+          ],
+          "code": "irm https://claude.ai/install.ps1 | iex"
+        },
+        {
+          "id": "install-verify",
+          "type": "markdown",
+          "cite": [
+            "cc-quickstart"
+          ],
+          "md": "新しいターミナルで次を実行し、バージョン番号が出れば成功です。"
+        },
+        {
+          "id": "install-version",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "claude --version"
+        },
+        {
+          "id": "install-node",
+          "type": "callout",
+          "variant": "pitfall",
+          "title": "Node.jsは先に入れなくてかまいません",
+          "cite": [
+            "cc-setup"
+          ],
+          "md": "古い記事の「まずNode.jsを入れる」は、npmで入れる場合の手順です。推奨の方法では要りません。"
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "title": "1-4. 起動して、セッションを始める",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "session-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-quickstart"
+          ],
+          "md": "作業フォルダに `cd` で移動し、`claude` と入力します。初回は、ブラウザでログインします。"
+        },
+        {
+          "id": "session-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-glossary",
+            "cc-memory"
+          ],
+          "items": [
+            {
+              "term": "セッション（session）",
+              "md": "`claude` を起動すると始まる、ひと続きの会話です。"
+            },
+            {
+              "term": "コンテキストウィンドウ（context window）",
+              "md": "会話や読んだファイルが入る、セッションの作業スペースです。中身を「コンテキスト」と呼びます。"
+            },
+            {
+              "term": "自動メモリ（auto memory）",
+              "md": "Claudeが自分のために書き残すメモです。"
+            }
+          ]
+        },
+        {
+          "id": "session-fresh",
+          "type": "markdown",
+          "cite": [
+            "cc-how-it-works",
+            "cc-memory"
+          ],
+          "md": "新しいセッションは、毎回まっさらな[[コンテキスト]]で始まります。前回の内容を引き継ぐ道は3つです。"
+        },
+        {
+          "id": "session-carry",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-memory",
+            "cc-quickstart"
+          ],
+          "items": [
+            "[[CLAUDE.md]]（人が書く指示）",
+            "[[自動メモリ]]（Claudeのメモ）",
+            "`claude --continue` などで開き直した会話"
+          ]
+        },
+        {
+          "id": "session-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-how-it-works"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "昨日のセッションで、ページの配色を相談して決めました。今日、同じフォルダで新しく `claude` を起動し、「昨日決めた配色で続けて」とだけ送ると、どうなるでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "昨日の会話を覚えているので、そのまま続けられる",
+                  "feedback": "新しいセッションは、まっさらなコンテキストで始まります。昨日の会話は、開き直さない限り見えません。"
+                },
+                {
+                  "id": "b",
+                  "md": "同じフォルダなので、昨日の会話が自動で読み込まれる",
+                  "feedback": "フォルダが同じでも、新しいセッションに昨日の会話は入りません。`claude --continue` で開き直せば、続きから話せます。"
+                },
+                {
+                  "id": "c",
+                  "md": "昨日の会話は見えないが、伝え直すか開き直せば続けられる"
+                },
+                {
+                  "id": "d",
+                  "md": "コンテキストが空なので、昨日変更したファイルも元に戻っている",
+                  "feedback": "コンテキストが空でも、ファイルの変更はディスクに残っています。消えるのは会話の記憶で、ファイルではありません。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "セッションは毎回まっさらなコンテキストで始まり、昨日の会話は入っていません。自動メモリに残ることもありますが、毎回とは限りません。続けたいときは `claude --continue` で開き直すか、決めたことを依頼文やCLAUDE.mdに書きます。",
+              "hint": "コンテキストに入っているものと、ディスクに残っているものを分けて考えましょう。",
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "first-session",
+      "title": "1-5. 例題：質問から1コミットまで",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "example-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-quickstart"
+          ],
+          "md": "公式のクイックスタートの順に進めます。題材は「hello world」の1ページです。"
+        },
+        {
+          "id": "example-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-commands"
+          ],
+          "items": [
+            {
+              "term": "差分（diff）",
+              "md": "どの行が追加・削除されたかを示したものです。"
+            }
+          ]
+        },
+        {
+          "id": "example-steps",
+          "type": "steps",
+          "cite": [
+            "cc-quickstart",
+            "cc-commands"
+          ],
+          "items": [
+            {
+              "id": "ex-ask",
+              "title": "① 何をするプロジェクトか聞く",
+              "md": "「このプロジェクトは何をするもの？」と送ります。変える前に全体をつかむためです。",
+              "expect": "`index.html` を読んだうえでの説明が返ります。"
+            },
+            {
+              "id": "ex-change",
+              "title": "② 小さな変更を1つ頼む",
+              "md": "「見出しの下に今日の日付を表示して」と送ります。1つに絞ると差分が小さくなります。",
+              "expect": "`index.html` が変わります。確認を求められたら、読んでから「Yes」を選びます。"
+            },
+            {
+              "id": "ex-diff",
+              "title": "③ 差分を確かめる",
+              "md": "`/diff` で、変わった行を見ます。頼んでいない変更を見つけるためです。",
+              "expect": "日付を表示する数行が増えています（下の例）。"
+            },
+            {
+              "id": "ex-explain",
+              "title": "④ 変更を説明してもらう",
+              "md": "「今の変更を、行ごとに説明して」と送ります。説明できない変更は入れないためです。",
+              "expect": "日付を表示する場所と、書き込む処理の役割がわかります。"
+            },
+            {
+              "id": "ex-commit",
+              "title": "⑤ コミットする",
+              "md": "「変更内容がわかるメッセージでコミットして」と送ります。あとで戻れるようにするためです。",
+              "expect": "「見出しの下に今日の日付を表示」などのコミットができます。"
+            }
+          ]
+        },
+        {
+          "id": "example-diff",
+          "type": "code",
+          "lang": "diff",
+          "filename": "差分の例（index.html）",
+          "code": " <h1>hello world</h1>\n+<p id=\"today\"></p>\n+<script>\n+const p =\n+  document.getElementById(\"today\");\n+p.textContent =\n+  new Date().toLocaleDateString();\n+</script>"
+        },
+        {
+          "id": "example-mode",
+          "type": "callout",
+          "variant": "info",
+          "title": "確認を求められないこともあります",
+          "cite": [
+            "cc-glossary",
+            "cc-how-it-works",
+            "cc-quickstart"
+          ],
+          "md": "v2.1.283から、ターミナルとVS Codeの対話セッションはautoモードで始まります。この権限モード（permission mode）では多くの操作が確認なしで進むので、③の差分の確認が大切です。"
+        },
+        {
+          "id": "example-habit",
+          "type": "callout",
+          "variant": "tip",
+          "title": "説明を求めながら学びましょう",
+          "cite": [
+            "ai-skills-rct"
+          ],
+          "md": "Anthropicの研究では、AIに説明を求めて学んだ人は、頼りきった人より直後のテストの点が高めでした。"
+        },
+        {
+          "id": "example-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "Claudeが変更を終えて「完了しました」と表示しました。コミットの前にすることとして、最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "Claudeが確かめたはずなので、すぐにコミットを頼む",
+                  "feedback": "「完了しました」はClaudeの報告で、確かめた証拠ではありません。差分を自分で見てからコミットします。"
+                },
+                {
+                  "id": "c",
+                  "md": "同じ依頼を新しいセッションでもう一度して、結果を比べる",
+                  "feedback": "やり直しても、今の変更が正しいかはわかりません。まず今の差分を読みます。"
+                },
+                {
+                  "id": "d",
+                  "md": "変わったファイルを、自分で最初から書き直す",
+                  "feedback": "全部を書き直す必要はありません。差分を読み、わからない行だけ説明を求めます。"
+                },
+                {
+                  "id": "b",
+                  "md": "`/diff` で変わった行を見て、わからない行は説明を求める"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "コミットの前に、差分で何が変わったかを確かめ、説明できない行はClaudeに聞きます。頼んでいない変更が混ざっていたら、コミットの前に直してもらいます。",
+              "hint": "「完了しました」は、誰が確かめた結果かを考えましょう。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "演習：練習用フォルダで1コミットまで",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "1-5の流れを、新しい練習用フォルダで通します。大切なプロジェクトには影響しません。"
+        },
+        {
+          "id": "practice-setup",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "claude --version\nmkdir cc-practice\ncd cc-practice\ngit init\nclaude"
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "cite": [
+            "cc-quickstart",
+            "cc-terminal-guide",
+            "cc-how-it-works"
+          ],
+          "items": [
+            {
+              "id": "p-start",
+              "title": "練習用フォルダで起動する",
+              "md": "上のコマンドを1行ずつ実行します。",
+              "expect": "初めてのフォルダでは、信頼の確認が出ます。自分で作ったフォルダなので、承認します。入力欄の上に `cc-practice` が表示されます。",
+              "hint": "初めてなら、ブラウザでのログインを先に済ませます。",
+              "troubleshoot": "`claude` が見つからないときは、新しいターミナルで試します。それでも見つからないときは、[インストールのトラブルシューティング](https://code.claude.com/docs/ja/troubleshoot-install)でPATHの直し方を見ます。"
+            },
+            {
+              "id": "p-base",
+              "title": "出発点を作ってコミットする",
+              "md": "下の「ページを作る依頼文」を送ります。見出しを確かめてから、最初のコミットを頼みます。",
+              "expect": "`index.html` と最初のコミットができます。",
+              "hint": "できた `index.html` は、ダブルクリックでブラウザに表示できます。コミットは「ここまでを最初のコミットにして」と頼めば十分です。",
+              "troubleshoot": "名前とメールアドレスが未設定でコミットできないときは、バイブコーディング第5章の `git config` を先に実行します。"
+            },
+            {
+              "id": "p-change",
+              "title": "質問して、変更を1つ頼む",
+              "md": "1-5の①を送り、自分で決めた変更を1つ頼みます。",
+              "expect": "`index.html` だけが変わります。",
+              "hint": "背景色を変える、自己紹介の1行を足す、などが手ごろです。違う方向に進みはじめたら、Escキーで止めて訂正を送ります。",
+              "troubleshoot": "迷ったら、1-5の②と同じく「見出しの下に今日の日付を表示して」と送ります。"
+            },
+            {
+              "id": "p-diff",
+              "title": "予想してから差分を見る",
+              "md": "変わる場所を予想してから、`/diff` を開きます。",
+              "expect": "予想と実際の差分を比べられます。",
+              "hint": "頼んでいない変更が混ざっていたら、理由を聞き、不要なら戻してもらいます。"
+            },
+            {
+              "id": "p-explain",
+              "title": "変更を説明してもらう",
+              "md": "下の「差分を説明してもらう依頼文」を送ります。",
+              "expect": "変わった行の役割を、自分の言葉で言えます。",
+              "hint": "最後に出る質問に、自分で答えてみます。わからない言葉は「〇〇って何？」と続けて聞きます。"
+            },
+            {
+              "id": "p-commit",
+              "title": "コミットして確かめる",
+              "md": "1-5の⑤を送り、「最近のコミットを見せて」と頼みます。",
+              "expect": "履歴にコミットが2つ並びます。"
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt-page",
+          "type": "prompt",
+          "cite": [
+            "cc-terminal-guide"
+          ],
+          "title": "ページを作る依頼文",
+          "target": "claude-code",
+          "prompt": "練習用に、シンプルなWebページをindex.htmlに1つ作ってください。\n見出しは「{{見出しの言葉}}」にしてください。\nHTMLファイル1つだけで、外部のライブラリは使わないでください。",
+          "vars": [
+            {
+              "name": "見出しの言葉",
+              "hint": "例：hello world"
+            }
+          ],
+          "expect": "`index.html` が1つでき、Claudeが作ったファイルを報告します。ダブルクリックすると、ブラウザに見出しが表示されます。"
+        },
+        {
+          "id": "practice-prompt-explain",
+          "type": "prompt",
+          "title": "差分を説明してもらう依頼文",
+          "target": "claude-code",
+          "prompt": "まだコミットしていない変更を、初心者向けに説明してください。\n変わったファイルと行ごとに、何をしているのか、なぜ必要なのかを短く書いてください。\n最後に、私が{{確かめたいこと}}を理解できたかを確かめる質問を1つ出してください。",
+          "vars": [
+            {
+              "name": "確かめたいこと",
+              "hint": "例：日付を表示するしくみ"
+            }
+          ],
+          "expect": "たとえば、次のような説明が返ります。\n\n`index.html` の見出しの下に、日付を表示する段落（`id=\"today\"`）を足しました。`script` の中の `new Date()` は、今日の日付を取り出します。取り出した日付を、その段落に書き込んでいます。\n\n確認の質問：日付を見出しの上に出すには、どの行を動かしますか？"
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": "できたかどうかのチェックリスト",
+          "items": [
+            {
+              "id": "c-version",
+              "label": "claude --versionで、バージョン番号が表示されました"
+            },
+            {
+              "id": "c-ask",
+              "label": "変更を頼む前に、何をするプロジェクトかを聞きました"
+            },
+            {
+              "id": "c-one",
+              "label": "頼んだ変更は1つで、差分にほかの変更は混ざっていませんでした"
+            },
+            {
+              "id": "c-diff",
+              "label": "/diffで、変わった行を自分の目で確かめました"
+            },
+            {
+              "id": "c-explain",
+              "label": "変わった行の役割を、自分の言葉で説明できます"
+            },
+            {
+              "id": "c-commit",
+              "label": "履歴に、出発点と自分の変更の2つのコミットがあります"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-how-it-works",
+            "cc-desktop",
+            "cc-cloud",
+            "cc-setup",
+            "cc-quickstart"
+          ],
+          "questions": [
+            {
+              "id": "q5",
+              "kind": "single",
+              "prompt": "同僚が「Claude Codeって、要はエディタの補完が賢くなったものでしょう？」と言いました。違いの説明として、最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "補完と違い、Claude Codeはツールで自分から調べ、変更し、結果を確かめる"
+                },
+                {
+                  "id": "b",
+                  "md": "どちらも同じ仕組みで、Claude Codeのほうが大きなモデルを使っている",
+                  "feedback": "違いはモデルの大きさではありません。Claude Codeはツールを使い、エージェントループで動きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "Claude CodeはチャットAIと同じで、貼り付けた情報だけをもとに答える",
+                  "feedback": "貼った情報だけで答えるのは、チャットAIの進め方です。Claude Codeは、必要なファイルを自分で読みます。"
+                },
+                {
+                  "id": "d",
+                  "md": "Claude Codeは過去の会話をすべて覚えているので、補完より正確になる",
+                  "feedback": "セッションは毎回まっさらなコンテキストで始まります。違いは記憶ではなく、ツールで調べて確かめる動き方です。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "補完は開いているファイルの続きを提案し、チャットAIは文章で答えて待ちます。Claude Codeはツールを使い、情報を集める → 行動する → 結果を確かめる、を繰り返します。",
+              "objectiveId": "o1",
+              "bloom": "understand"
+            },
+            {
+              "id": "q6",
+              "kind": "single",
+              "prompt": "ターミナルに慣れていない同僚が、GitHubに置いていない手元のフォルダで試したいと言っています。Proプランに入っています。最初にすすめるサーフェスはどれでしょう？",
+              "options": [
+                {
+                  "id": "d",
+                  "md": "ターミナルCLI",
+                  "feedback": "使えますが、先にターミナルの操作に慣れる必要があります。ターミナルなしで始められる入口があります。"
+                },
+                {
+                  "id": "c",
+                  "md": "IDE拡張（JetBrains）",
+                  "feedback": "JetBrainsの拡張はCLIを別に入れる必要があり、ターミナルの操作が要ります。ターミナルなしで始められる入口を選びます。"
+                },
+                {
+                  "id": "a",
+                  "md": "デスクトップアプリ"
+                },
+                {
+                  "id": "b",
+                  "md": "クラウドセッション",
+                  "feedback": "GitHubにないフォルダも、コミットのあるGitリポジトリなら `claude --cloud` で送れます。ただしターミナルが要るので、デスクトップアプリが近道です。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "デスクトップアプリにはClaude Codeが含まれていて、ターミナルを使わずに始められます。有料プランが必要ですが、同僚はProプランなので使えます。",
+              "objectiveId": "o2",
+              "bloom": "apply"
+            },
+            {
+              "id": "q7",
+              "kind": "single",
+              "prompt": "WindowsのPCを使う友人が、無料（Free）プランのままClaude Codeを始めようとしています。「先にNode.jsを入れないと」とも言っています。推奨の始め方として、正しい助言はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "Node.js 22以上を入れてから、npmでClaude Codeを入れる",
+                  "feedback": "Node.jsが必要なのは、npmで入れる場合だけです。推奨のネイティブインストーラーには必要ありません。"
+                },
+                {
+                  "id": "c",
+                  "md": "無料プランのまま、PowerShellでネイティブインストーラーを実行する",
+                  "feedback": "無料プランにはClaude Codeが含まれません。有料プランかConsoleアカウントが必要です。"
+                },
+                {
+                  "id": "d",
+                  "md": "Node.jsを入れたうえで、デスクトップアプリをダウンロードする",
+                  "feedback": "デスクトップアプリにも有料プランが必要で、Node.jsは要りません。まずプランを用意します。"
+                },
+                {
+                  "id": "b",
+                  "md": "有料プランかConsoleアカウントを用意し、ネイティブインストーラーで入れる"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "Claude Codeには、有料プラン（Pro・Max・Team・Enterprise）かConsoleアカウントが必要です。推奨のネイティブインストーラーはNode.jsを使わないので、PowerShellでそのまま実行できます。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            },
+            {
+              "id": "q8",
+              "kind": "single",
+              "prompt": "初めて触るプロジェクトで、同僚がいきなり大きな機能をまとめて頼もうとしています。このレッスンの進め方に沿って、どの順番をすすめますか？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "大きな機能をまとめて頼む → コミットする → あとで差分を見る",
+                  "feedback": "大きな変更を先に頼むと、差分が大きくなり確かめにくくなります。まず質問し、小さな変更から始めます。"
+                },
+                {
+                  "id": "a",
+                  "md": "質問する → 小さな変更を頼む → 差分を確かめる → コミットする"
+                },
+                {
+                  "id": "c",
+                  "md": "小さな変更を頼む → コミットする → 何をするプロジェクトか聞く",
+                  "feedback": "中身を知らないまま変えると、意図とずれやすくなります。変える前に、まず質問して全体をつかみます。"
+                },
+                {
+                  "id": "d",
+                  "md": "質問する → 小さな変更を頼む → コミットする → 差分を確かめる",
+                  "feedback": "コミットのあとに差分を見ると、確かめる前に履歴に入ってしまいます。差分はコミットの前に見ます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "公式のクイックスタートと同じく、まず質問して読ませ、小さな変更を頼みます。差分を確かめて説明できる状態にしてから、コミットします。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            },
+            {
+              "id": "q9",
+              "kind": "single",
+              "prompt": "見出しの色だけを変えるよう頼んだのに、`/diff` を開くと、頼んでいない `about.html` も変わっていました。どうしますか？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "`about.html` を変えた理由を聞き、不要なら戻してもらう"
+                },
+                {
+                  "id": "a",
+                  "md": "Claudeが必要と判断した変更なので、そのままコミットする",
+                  "feedback": "頼んでいない変更を確かめずに入れると、思わぬ不具合の原因になります。理由を聞いてから決めます。"
+                },
+                {
+                  "id": "c",
+                  "md": "ひとまずコミットして、問題が出たらあとで直す",
+                  "feedback": "確かめずにコミットすると、どの変更が原因かをあとで探すことになります。コミットの前に確かめます。"
+                },
+                {
+                  "id": "d",
+                  "md": "理由は聞かずに、自分で `about.html` を戻してコミットする",
+                  "feedback": "理由を聞かずに戻すと、必要な変更まで消してしまうかもしれません。まず理由を聞いてから決めます。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "差分は、頼んだことと実際の変更を比べる場所です。頼んでいない変更は理由を聞き、不要なら戻してもらいます。説明できる変更だけをコミットします。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "Claude Codeは、ツールで調べ、変更し、確かめるループで動きます。",
+            "サーフェスは場面で選びます。どれも同じエンジンで動きます。",
+            "推奨はネイティブインストーラーで、Node.jsは要りません。",
+            "新しいセッションは、前回の会話を覚えていません。",
+            "質問 → 小さな変更 → 差分の確認と説明 → コミットの順に進めます。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "演習で、確認なしで進んだ操作はありましたか。次は「第2回｜任せる範囲を決める：権限モードと巻き戻し」です。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cite": [
+            "cc-how-it-works",
+            "cc-quickstart",
+            "cc-setup",
+            "cc-memory",
+            "cc-cloud"
+          ],
+          "cards": [
+            {
+              "id": "card-loop",
+              "front": "エージェントループの3つの段階は？",
+              "back": "情報を集める → 行動する → 結果を確かめる、の3つです。目的を果たすまで繰り返します。"
+            },
+            {
+              "id": "card-tool",
+              "front": "Claude CodeがチャットAIと違うのはなぜ？",
+              "back": "ツールで自分からファイルを読み、コマンドを実行し、変更して確かめられるからです。"
+            },
+            {
+              "id": "card-version",
+              "front": "インストールできたかを確かめるコマンドは？",
+              "back": "`claude --version` です。バージョン番号が出れば成功です。"
+            },
+            {
+              "id": "card-node",
+              "front": "Node.jsが必要なのはどんなとき？",
+              "back": "npmで入れるときだけです（22以上）。推奨のネイティブインストーラーでは要りません。"
+            },
+            {
+              "id": "card-carry",
+              "front": "前回の内容を新しいセッションに引き継ぐ道は？",
+              "back": "CLAUDE.md、自動メモリ、`claude --continue` などで開き直した会話の3つです。"
+            },
+            {
+              "id": "card-flow",
+              "front": "最初のセッションの進め方は？",
+              "back": "質問 → 小さな変更 → 差分の確認と説明 → コミット、の順です。"
+            },
+            {
+              "id": "card-cloud",
+              "front": "PCを閉じても作業を続けたいときのサーフェスは？",
+              "back": "クラウドセッションです。GitHubのリポジトリを複製して動くので、先にpushしておきます。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "WindowsでClaude Codeを入れるときの注意点は？",
+            "/diffの画面の読み方を教えて",
+            "差分の説明が難しすぎたら、どう頼み直せばいい？"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "エージェントループ",
+      "md": "Claude Codeの動き方です。「情報を集める → 行動する → 結果を確かめる」を、目的を果たすまで繰り返します。",
+      "aliases": [
+        "agentic loop"
+      ]
+    },
+    {
+      "term": "ツール",
+      "md": "Claudeが実行できる操作です。ファイルを読む、編集する、コマンドを実行する、Webを調べる、などがあります。",
+      "aliases": [
+        "tool"
+      ]
+    },
+    {
+      "term": "サーフェス",
+      "md": "Claude Codeを使う場所です。ターミナル、IDE、デスクトップアプリ、クラウドセッションなどがあり、どれも同じエンジンで動きます。",
+      "aliases": [
+        "surface"
+      ]
+    },
+    {
+      "term": "クラウドセッション",
+      "md": "自分のPCではなく、クラウド上でClaude Codeを動かす使い方です。GitHubのリポジトリを複製して作業し、ノートPCを閉じても続きます。",
+      "aliases": [
+        "cloud session"
+      ]
+    },
+    {
+      "term": "CLAUDE.md",
+      "md": "プロジェクトの指示を書いておくファイルです。セッションを始めるたびに読み込まれます。"
+    },
+    {
+      "term": "Consoleアカウント",
+      "md": "Claude Consoleのアカウントです。APIの料金を前払いして、Claude Codeを使えます。",
+      "aliases": [
+        "Console account"
+      ]
+    },
+    {
+      "term": "セッション",
+      "md": "`claude` を起動すると始まる、ひと続きの会話です。起動したフォルダに結びつき、記録は自分のPCに保存されます。",
+      "aliases": [
+        "session"
+      ]
+    },
+    {
+      "term": "コンテキストウィンドウ",
+      "md": "セッションの作業スペースです。会話、読んだファイルの内容、コマンドの結果などが入ります。中身を「コンテキスト」と呼びます。",
+      "aliases": [
+        "context window",
+        "コンテキスト"
+      ]
+    },
+    {
+      "term": "自動メモリ",
+      "md": "Claudeが自分のために書き残すメモです。次のセッションの始めに読み込まれます。",
+      "aliases": [
+        "auto memory"
+      ]
+    },
+    {
+      "term": "差分",
+      "md": "ファイルのどの行が追加され、どの行が削除されたかを示したものです。Claude Codeの中では `/diff` で確かめられます。",
+      "aliases": [
+        "diff"
+      ]
+    },
+    {
+      "term": "権限モード",
+      "md": "Claudeが確認なしで実行できる操作の範囲を決める設定です。v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。詳しくは「第2回｜任せる範囲を決める：権限モードと巻き戻し」で扱います。",
+      "aliases": [
+        "permission mode"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-overview",
+      "title": "Claude Code overview",
+      "url": "https://code.claude.com/docs/en/overview",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-setup",
+      "title": "Advanced setup",
+      "url": "https://code.claude.com/docs/en/setup",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-quickstart",
+      "title": "Quickstart",
+      "url": "https://code.claude.com/docs/en/quickstart",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-how-it-works",
+      "title": "How Claude Code works",
+      "url": "https://code.claude.com/docs/en/how-claude-code-works",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-best-practices",
+      "title": "Best practices for Claude Code",
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-glossary",
+      "title": "Glossary",
+      "url": "https://code.claude.com/docs/en/glossary",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-vs-code",
+      "title": "Use Claude Code in VS Code",
+      "url": "https://code.claude.com/docs/en/vs-code",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-jetbrains",
+      "title": "JetBrains IDEs",
+      "url": "https://code.claude.com/docs/en/jetbrains",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-desktop",
+      "title": "Desktop application",
+      "url": "https://code.claude.com/docs/en/desktop",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-cloud",
+      "title": "Use Claude Code in the cloud",
+      "url": "https://code.claude.com/docs/en/claude-code-on-the-web",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-memory",
+      "title": "How Claude remembers your project",
+      "url": "https://code.claude.com/docs/en/memory",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-commands",
+      "title": "Commands",
+      "url": "https://code.claude.com/docs/en/commands",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-terminal-guide",
+      "title": "Terminal guide for new users",
+      "url": "https://code.claude.com/docs/en/terminal-guide",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "ai-skills-rct",
+      "title": "How AI assistance impacts the formation of coding skills (2026-01-29)",
+      "url": "https://www.anthropic.com/research/AI-assistance-coding-skills",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "tags": [
+    "claude-code"
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

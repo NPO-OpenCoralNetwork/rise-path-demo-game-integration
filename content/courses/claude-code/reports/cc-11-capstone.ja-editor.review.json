@@ -1,0 +1,83 @@
+{
+  "lessonId": "cc-11-capstone",
+  "file": "content/courses/claude-code/lessons/cc-11-capstone.lesson.json",
+  "lessonHash": "sha256:cf71ff2e805d17bc",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "I re-read every string at the published path. Compared with the round-2 draft, the only change is courseId (vibe-coding to claude-code). All prose uses です・ます. Tables, list items, options, checklist labels and step titles end in noun or plain form, which style-guide §1 allows. There are no pressure phrases. Each question's options share one form: pq0, q2, q3, q4, e1, e2 and e3 all end in 〜する, and q1 is all noun phrases. Every wrong-option feedback has 2 sentences: the first names the misconception and the second gives the right idea (e.g. e3 option a: 「40行は、公式の目安（200行未満）に収まっています。今の穴は、完了を確かめる手段がないことです。」). Notation is consistent: half-width alphanumerics, no space between Japanese and English, and keys written as 「Shift + Tab」「Ctrl + G」. A few phrases still read stiffly (「検証が空いている」「各行に聞く」「1回で困る」「自分の作業の採点」), but none of them misleads. They are listed in niceToHave.",
+      "blockIds": [
+        "hook-predict",
+        "dr-quiz",
+        "ex-quiz",
+        "cycle-quiz",
+        "sc-quiz",
+        "check-quiz",
+        "ex-prompt-skill"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "measure.mjs output: prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19). estMinutes 19 matches est rounded. lessons:lint --strict reports 0 errors and 0 warnings, so there is no sentence-length, paragraph-length or banned-phrase finding. The longest prose paragraphs (dr-b2, ex-rules, the pq0 explanation) stay at 3 sentences. Tables have 2 columns, and steps have at most 5 items. Every section has a table, diagram, steps or quiz.",
+      "blockIds": [
+        "dr-b2",
+        "dr-table",
+        "ex-steps",
+        "ex-prompt-skill",
+        "cycle-flow"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "Every katakana term gives its English on first use: スキル（skill）, フック（hook）, プラグイン（plugin）, コンテキスト（context）, 権限ルール（permission rule）, サブエージェント（subagent、第7回）, プランモード（plan mode）, 差分（diff）, and the deny/ask rules. MCP is spelled out on first use (MCP（Model Context Protocol）). ex-prompt-skill explains allowed-tools. sc-b1, the checklist title and summary-points name 「安全・検証・コンテキスト・コストの4分野」, and the q4 hint says 「分野」. Each glossary term matches the body, and the aliases 確認ルール and 拒否ルール are the words used in ex-rules and e1. The prerequisites and the 第N回 references match the lesson titles in content/courses/claude-code/course.json. 「これで全11回は終わりです」 matches the course subtitle 「11回で身につけます」. One small gap remains: autoモード is assumed known from 第2回 (niceToHave).",
+      "blockIds": [
+        "dr-table",
+        "ex-prompt-skill",
+        "sc-b1",
+        "summary-points",
+        "sc-quiz",
+        "check-quiz",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The lesson is single-locale jp, and every string is present and in Japanese. cycle-flow has a caption and an alt text, and the alt describes all 5 stages and the loop back. Its node labels use the same words as the cycle-steps titles. The one link, 「公式ドキュメントの日本語版」, names where it goes. Code blocks carry lang and filename (.claude/settings.json). The move to the claude-code course left no learner-facing reference to the old course slug.",
+      "blockIds": [
+        "cycle-flow",
+        "cycle-steps",
+        "summary-next",
+        "ex-settings",
+        "setup-settings-model"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "ex-prompt-skill: in the allowed-tools sentence, 「次に入力する」 does not say who types next. The learner could read it as Claude's next input — 「スキルを呼んでから次に入力するまで、確認なしで使えます。」→「スキルを呼んでから、次に自分がメッセージを送るまでの間、確認なしで使えます。」",
+    "setup-steps / check-quiz: the 25-line target in p-claude-md sits next to 「公式の目安（200行未満）」 in e3, and nothing explains the gap — 「25行以内のCLAUDE.mdができています。」→「25行ほどの短いCLAUDE.mdができています（公式の目安は200行未満）。」",
+    "dr-table: 「CLAUDE.mdに1行」 has no verb, while the body says 「CLAUDE.mdに1行足す」 — 「CLAUDE.mdに1行（第6回）」→「CLAUDE.mdに1行足す（第6回）」",
+    "ex-steps (ex-rules): autoモード is assumed known from 第2回. A short reminder would make the reason for the ask rule clear — 「v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。」→「v2.1.283以降、ターミナルとVS Codeの対話セッションは、確認を減らして進むautoモードで始まります（第2回）。」",
+    "self-check-list: sc-safety leaves the command unquoted, while sc-context and sc-cost put theirs in 「」 — 「git pushの確認ルールを書きました」→「「git push」の確認ルールを書きました」",
+    "ex-steps (ex-claude-md): the subject of 推測 is left out — 「推測できないことだけを書きます。」→「Claudeが推測できないことだけを書きます。」",
+    "setup-steps (p-claude-md): 「各行に聞く」 reads oddly — 「各行に「消したらまちがえる？」と聞きます。」→「各行について「消したらClaudeがまちがえる？」と自分に聞きます。」",
+    "cycle-steps (c-build): the hint does not put the quoted request in 「」 (§3) — 「コマンドと出力を見せてと頼みます。」→「「コマンドと出力を見せて」と頼みます。」",
+    "dr-b2: 「1回で困る」 is terse — 「秘密情報とpushは1回で困るので」→「秘密情報とpushは1回の失敗でも困るので」",
+    "sc-b2: the parts of the sentence are only loosely linked — 「レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。」→「レビューの指摘のうち、Claudeが知っておくべきだったことは、CLAUDE.mdに足す候補です。」",
+    "summary-cards (card-review): 「自分の作業」 can be read as the learner's own work — 「自分の作業の採点は、甘くなりがちだからです。」→「Claudeが自分の作業を採点すると、甘くなりがちだからです。」 (the same applies to the e3 option c feedback: 「自分の作業を採点すると」→「Claudeが自分の作業を採点すると」)",
+    "check-quiz: in the e3 explanation, 「検証が空いている」 is an unusual phrase — 「検証が空いている今は、ここを最初に埋めます。」→「完了を確かめる手段がない今は、ここを最初に埋めます。」",
+    "check-quiz: in the e1 explanation, 「止めます」 also has to cover the ask rule — 「一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。」→「一致した操作は、Claudeの判断に関係なく、Claude Codeが拒否するか確認を求めます。」",
+    "ex-steps (ex-hook): the long inline command is hard to read on a phone and repeats the settings file below — 「コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。」→「コマンドは、下の設定ファイルに書いてあります。」",
+    "lesson (glossary きっかけ): the definition does not fit the plugin row in dr-table (「別のリポジトリでも同じ設定を使う」) — 「同じ困りごとが繰り返し起きること。」→「同じ困りごとが繰り返し起きることや、部品が必要になる場面。」"
+  ],
+  "average": 4,
+  "verdict": "pass",
+  "summary": "Full review of the published lesson at hash sha256:cf71ff2e805d17bc. A diff against the round-2 draft (content/courses/vibe-coding/drafts/, commit before 3213ae2) shows that only courseId changed, from vibe-coding to claude-code. lessons:lint --strict is clean (0 errors, 0 warnings). measure.mjs gives prose 1344, inside the 1,200–2,400 budget, and est 19.3 min, which matches estMinutes 19. The prerequisites, the 第N回 references and 「全11回」 match content/courses/claude-code/course.json, and no learner-facing text refers to the old course. I found no (a)–(e) errors. Every criterion stays at 4, and the remaining points are about wording and rhythm (niceToHave)."
+}

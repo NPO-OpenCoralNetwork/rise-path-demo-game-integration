@@ -71,6 +71,7 @@ import {
   WebInspectorView,
   VibePrologueView,
   VibePathView,
+  ClaudeCodePathView,
   LearnRoute,
   DevBlocksRoute,
   UnityPathView,
@@ -143,6 +144,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/art')) return ViewState.ART_MUSEUM;
     if (path.startsWith('/sonic')) return ViewState.SONIC_LAB;
     if (path.startsWith('/vibe')) return ViewState.PROGRAMMING_VIBE;
+    if (path.startsWith('/claude-code')) return ViewState.CLAUDE_CODE;
     if (path.startsWith('/unity')) return ViewState.UNITY_AI_GAME_DEV;
     if (path === '/library') return ViewState.LIBRARY;
     // Lesson reader (default theme; the shell switches to the rail via isLessonPath).
@@ -169,6 +171,7 @@ const AppContent: React.FC = () => {
 
   const handleCourseSelect = async (course: Course) => {
     if (course.id === 'vibe-coding') { navigate('/vibe'); return; }
+    if (course.id === 'claude-code') { navigate('/claude-code'); return; }
     if (course.id === 'blender-3d') { navigate('/blender'); return; }
     if (course.id === 'art-atelier') { navigate('/art'); return; }
     if (course.id === 'scratch-game') { navigate('/p-school'); return; }
@@ -311,6 +314,7 @@ const AppContent: React.FC = () => {
 
               {/* Vibe Coding */}
               <Route path="/vibe" element={<VibePathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
+              <Route path="/claude-code" element={<ClaudeCodePathView onBack={() => navigate('/learning-hub')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
               <Route path="/vibe/prologue" element={<VibePrologueView onBack={() => navigate('/vibe')} onNavigate={handleNavigate} language={language} setLanguage={setLanguage} />} />
               {/* The 12 Vibe chapters now render in the lesson reader. */}
               <Route path="/vibe/:chapter" element={<VibeChapterRedirect />} />

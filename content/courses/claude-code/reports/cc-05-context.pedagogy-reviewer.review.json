@@ -1,0 +1,177 @@
+{
+  "lessonId": "cc-05-context",
+  "file": "content/courses/claude-code/lessons/cc-05-context.lesson.json",
+  "lessonHash": "sha256:4b4ffd1dc9356064",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "There are three can-do objectives with matching Bloom verbs (見分け…選べる / 説明できる / 確かめられる). Each one has 2 or more questions with objectiveId: o1 has q2, q4, p1–p3 and e1; o2 has q3, e3 and e4 (plus the predict q0); o3 has q1 and e5. Each objective has an apply or analyze item (q1, q4, p1–p3).",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "pr-diagnose",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-problem is a concrete 3-sentence scene (「朝に『テストは `npm test` で実行して』と伝えたのに、午後のClaudeは別のコマンドを試します」) with no trivia. hook-predict q0 is ungraded, tied to o2, and has feedback that names a misconception (「Claudeは会話の中で学習して、性質が変わるわけではありません」). sum-hook answers the scene at the end.",
+      "blockIds": [
+        "hook-problem",
+        "hook-predict",
+        "sum-hook"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "prerequisites list 第1回–第4回, cd/ls and Git commit. Recalled terms are flagged (s3-defs 「（第1回）」, s4-defs 「（第4回）」, s1-lead 「第1回で見たコンテキストウィンドウ」), and the new terms (コンテキスト圧縮 in s2-defs, ルール in s3-defs) are defined before use and match the glossary. 「プランモード（plan mode）の計画」 in s3-table gets no recall line, and タイムゾーン in ex-learn has no English gloss.",
+      "blockIds": [
+        "s1-defs",
+        "s2-defs",
+        "s3-defs",
+        "s4-defs",
+        "s3-table"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "measure.mjs gives 「prose 1945 (budget 1,200–2,400) … est 19.9 min (must be ≤ 20; estMinutes 20)」 and lint --strict reports 0 warnings. Every content section has a table, diagram, list or check. Section 5-2 holds two ideas (clear/compact, and resuming with s2-session/s2-code), and 5-3 is dense: 3 definitions, a diagram, a 3-row table, a fix and a pitfall.",
+      "blockIds": [
+        "5-2",
+        "5-3"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "5-5 comes before practice. Its 5 labelled steps each give a reason (ex-pattern 「関係のない話題も広い調べものもなく…」, ex-fix cites the 2-correction rule), and s5-prompt is the full model rewrite. Practice A (p1–p3) diagnoses with hints, but it is not a faded version of the example. ex-learn collects 3 conditions (ずれた行の例, 日付の書き方, タイムゾーン), yet s5-prompt uses only 2 of them.",
+      "blockIds": [
+        "s5-log",
+        "s5-steps",
+        "s5-prompt"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 4,
+      "evidence": "Every content section except 5-4 has an inline quiz (5-1 q1, 5-2 q2, 5-3 q3, 5-5 q4), so no 2 content sections in a row lack one. The items are new scenarios, not rewordings: q1 asks for a before/after measurement, q4 has the learner pick a rewritten first prompt, and p1–p3 are analyze-level. Every wrong option has feedback.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "pr-diagnose"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All 5 misconceptions from the brief are built into the distractors, and each is corrected in 2 sentences or fewer: more context makes Claude smarter (q2 b, p1 d); reopening empties the context (q2 d, p2 c, p3 d); compaction wipes everything or keeps every file (q3 a/c, e3 d); stronger wording fixes it (q0 c, q4 a, e5 a); asking Claude measures usage (q1 d, 「Claudeの答えは、測った値ではありません」).",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "pr-diagnose",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "s3-diagram shows a state change with 6 nodes. Its labels use the text's terms (「決まった<br>ファイルの<br>指示」, 「要約に置き換わる」, 「ディスクから<br>読み直す」), and the caption states the takeaway (「会話は要約に置き換わり、決まったファイルの指示はディスクから戻る」). The alt text lists the four re-read items, and the lesson has no decorative images.",
+      "blockIds": [
+        "s3-diagram",
+        "s3-table"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "The practice is a hands-on test in a new folder: /context 3 times, a prediction (pr-predict), a focused /compact, and a check of what survived (pr-prompt-b, whose expect admits 「Claudeの分け方は自己申告なので、この2点で確かめましょう」). It has expects, troubleshoot lines, the pr-checklist (6 items) and a model answer (pr-answer). Each hint step has only one hint (pr-predict, p1–p3), so there is no 3-level hint ladder.",
+      "blockIds": [
+        "pr-diagnose",
+        "pr-code",
+        "pr-steps-start",
+        "pr-prompt-a",
+        "pr-steps-compact",
+        "pr-prompt-b",
+        "pr-checklist",
+        "pr-answer"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "The summary section comes after the exam and has all four parts: sum-hook (the answer to the opening scene), sum-points (4 points), sum-next (a reflection 「会話だけで何度も伝えている指示を、1つ書き出してみましょう」 plus 第6回 as the next step) and 8 flashcards. There is also askTutor.",
+      "blockIds": [
+        "sum-hook",
+        "sum-points",
+        "sum-next",
+        "sum-cards",
+        "sum-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "All 5 confirmed findings in audit-cc-05-context.json are in the current text: p2 d 「何が大事かをClaudeが推測して要約します」, e4 b 「コンテキストが上限に近づくと起きる」, s3-lead 「直下のCLAUDE.mdなど、決まったファイルの指示」, the pr-start trust dialog, and s2-session 「前の会話の履歴が戻ります」. The audit has 0 unverified items, and its dropped /btw item stands as written. The version is pinned in s1-lead (v2.1.304), and every behaviour block cites its source. Two loose spots remain (p2 c 「使用量はそのままです」, the expect in pr-context-3), listed as doubts in niceToHave.",
+      "blockIds": [
+        "s1-lead",
+        "s2-table",
+        "s3-table",
+        "s3-pitfall",
+        "pr-diagnose",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "です・ます throughout, warm and free of pressure (「まず予想してみましょう」, 「自分で確かめましょう」), with no banned phrases (lint clean). Terms are mostly consistent: 「自動のコンテキスト圧縮」 is introduced in s2-defs, but feedback in p2 and e4 says 「自動の圧縮」.",
+      "blockIds": [
+        "s2-defs",
+        "pr-diagnose",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson declares jp only and every field is filled. The diagram has Japanese labels and alt text. The link text is descriptive (「コンテキストウィンドウの公式ドキュメント（日本語）」). Plain-text fields (checklist labels, askTutor, table columns, captions) carry no markdown.",
+      "blockIds": [
+        "s3-diagram",
+        "s3-fix",
+        "pr-checklist",
+        "sum-ask"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s5-prompt (worked example consistency): ex-learn collects 3 conditions, but the prompt holds only 2. Change the third line to 「前に試したときは、{{ずれた行の例}} の日付が1日ずれました。」 and add var {\"name\": \"ずれた行の例\", \"hint\": \"例：2026-10-20,1200 の行\"}.",
+    "pr-predict (practice hint ladder, to reach 4): use three graded hints. (1) 「5-3の図で、それぞれの指示がたどる矢印を見ます。」 (2) 「直下のCLAUDE.mdは『決まったファイル』に入るかを考えます。」 (3) 「会話だけの指示は、要約に置き換わる側です。」",
+    "factual doubt (pr-steps-compact pr-context-3): s3-table says up to five recently changed files are re-read after compaction, so in this small folder the drop can be small. Add troubleshoot: 「減り方が小さいのは、最近のファイルが読み直されるためです（5-3の表）。」",
+    "factual doubt (pr-diagnose p2 option c feedback): a resumed session restores the conversation history but not every bit of state (audit note on s2-session). Write 「開き直しても同じ会話の続きなので、使用量はほとんど変わりません。空きを作るには `/compact` で要約します。」",
+    "check-quiz e5: the item tests reading the loaded-files part of /context, while o3 says 「使用量を確かめられる」. Either widen o3 to 「/context でコンテキストの使用量と、読み込まれたファイルを確かめられる」 (an objective change, so it needs a full review), or keep e5 and add an o3 exam item about usage.",
+    "s3-table row 1: write 「プランモード（plan mode、第3回）の計画」 so the term has a recall, like the other recalled terms.",
+    "s5-steps ex-learn: on first use, write 「どのタイムゾーン（time zone）の日付として扱うか」.",
+    "Term consistency with s2-defs: write 「自動のコンテキスト圧縮」 instead of 「自動の圧縮」 in pr-diagnose p2 option d feedback, the p2 explanation and check-quiz e4 option b feedback.",
+    "pr-steps-start pr-start md: after the `\\` sentence, add 「`\\` の行でEnterを押すと、続きを待つ `>` が出ます。」 so a learner typing line by line is not surprised by the continuation prompt.",
+    "pr-code: the echo line is already split, so the full rule fits. Write 「echo '- <title>は「練習：」で始める' \\」 to model a complete instruction, and update pr-checklist / pr-answer if needed.",
+    "Brief drift: content/courses/claude-code/briefs/cc-05-context.md still has the heading 「Brief: vibe-coding/cc-05-context」 and calls the lesson a draft with courseId vibe-coding. It also quotes the CLAUDE.md line as 「- HTMLの<title>は「練習：」で始める」, while pr-code has 「- <title>は「練習：」から」. Update the brief to match the published lesson."
+  ],
+  "average": 3.46,
+  "verdict": "pass",
+  "summary": "This is a full review because the lesson moved from the vibe-coding drafts to content/courses/claude-code/lessons/ (courseId claude-code), and the gate no longer accepts the earlier review chain. The content hash is unchanged (sha256:4b4ffd1dc9356064). Its biggest strength is the line from a concrete hook, through misconception-based checks, to a hands-on test that has the learner predict and then see what survives compaction. Every fix from the fact audit is in the text. Nothing must be fixed; the most useful optional changes are a 3-level hint ladder on pr-predict and adding the missing row example to s5-prompt, so the worked example uses all three conditions it collects."
+}

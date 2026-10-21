@@ -1,0 +1,166 @@
+{
+  "lessonId": "cc-04-verify",
+  "file": "content/courses/claude-code/lessons/cc-04-verify.lesson.json",
+  "lessonHash": "sha256:38938fab0a8e18cd",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "There are three can-do objectives, and each has two or more graded questions with objectiveId: o1 has q1, e1 and e2; o2 has q2, q3, e3 and e4; o3 has q4, q5, e5 and e6. Not a 4: o1 is 「設計できる」 (create), but every o1 item, including e1 and e2 which are tagged bloom create, only asks the learner to pick a ready-made check. Nowhere does the learner write a check themselves.",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "check-quiz",
+        "practice"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-lead is a concrete three-sentence scene (「完了しました。正しく動作します」, then an error the next day) that ends in a question. The ungraded predict q0 has a misconception named in each wrong option and leads into 4-1 and 4-2 (「4-1と4-2で詳しく見ていきます」). There is no trivia or statistic.",
+      "blockIds": [
+        "hook-lead",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "Prerequisites list 第1回–第3回, Node.js 22 and Git. s1-why recalls 第1回's 「エージェントループ（agentic loop）」. Each new term is defined in a definitions block before it is quizzed, and the definitions match the glossary word for word. コンテキスト, which cc-01 already introduced as コンテキストウィンドウ, points ahead to 第5回, and サブエージェント points to 第7回.",
+      "blockIds": [
+        "s1-why",
+        "s1-defs",
+        "s2-defs",
+        "s4-defs",
+        "s5-defs"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "measure.mjs gives 「prose 2242 (budget 1,200–2,400)」 and 「est 19.5 min (must be ≤ 20; estMinutes 19)」, and lint --strict is clean. No segment adds more than 3 new terms (4-4 adds サブエージェント, /code-review and 過剰設計), and every section ends in a check. Not a 4: 4-2 holds two ideas (asking for evidence, then /goal plus ターン and the 判定役 in the three-paragraph s2-goal), so it is the densest screen.",
+      "blockIds": [
+        "s2-goal",
+        "s4-defs"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "4-3 is a five-step worked example. Each step has a subgoal label and a reason (e.g. ex-red 「失敗を先に見ると、テストが新しいコードを試しているとわかります」) plus an expect, backed by runnable postal.test.mjs and both prompts, and it comes before the practice. The practice repeats the same subgoals with the reasons removed. That makes it partly faded, but there is no separate faded step before independent work.",
+      "blockIds": [
+        "s3-steps",
+        "s3-code",
+        "s3-prompt-write",
+        "s3-prompt-green",
+        "p-steps"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Every content section has an inline check (q1–q5), so density is met, and q3–q5 ask for real analysis or judgement. Not a 4: q1 and q2 can be answered by matching the text just read. q1 maps directly onto the s1-table line 「画面の見た目なら、スクリーンショットの比較」. In q2, option c is the only report that contains any command or output, which echoes s2-prompt.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check",
+        "s5-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All seven misconceptions in the brief are corrected with reasons. Examples: q0 a 「聞き直しても…同じClaudeの自己申告です」; s3-pitfall (rewriting tests to pass) and e4 (a setting that suppresses errors); s4-trap (chasing every finding); e2 d 「判定役はコマンドを実行せず」. Every wrong option has feedback of at most two sentences.",
+      "blockIds": [
+        "hook-predict",
+        "s3-pitfall",
+        "s4-trap",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "s4-sort is the one diagram, and it is needed: a five-node process. Its labels use the text's own terms (正しさの問題, 要件の問題, 必須, 任意), the caption states the takeaway (「必須にするのは、正しさと要件に関わる指摘だけ」), the alt describes the whole flow, and there are no decorative images.",
+      "blockIds": [
+        "s4-sort"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "The isLeapYear task is authentic and safe (new folder, 「大事なリポジトリでは試さないでください」). It has 8 steps with expect, hints and troubleshoots, a 7-item checklist (p-checklist), and a model answer (p-model-code, p-model-sort). Not a 4: most steps have one or two hint levels, and all three prompts are given in full, so the learner never designs the check (o1).",
+      "blockIds": [
+        "p-task",
+        "p-steps",
+        "p-checklist",
+        "p-model-code",
+        "p-model-sort"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "The summary follows the exam and has 5 points. summary-next has a reflection question (「手元のタスクに、どの確認を渡せますか。」) and names the next lesson exactly (「第5回｜コンテキストを管理する」). There are 7 flashcards, each covering one idea, and askTutor offers 3 suggestions.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 4,
+      "evidence": "Behaviour claims are cited and agree with audit-cc-04-verify.json and facts-cc-04-verify.md. The four confirmed audit fixes are present in the text: 「Claude自身が回せます」, 「満たすか無理と判定されるまで…進展がないときや…エラーでも止まります」, 「20ターンに達するまで」 and 「たいてい指摘を返します」. Also correct: /review as an alias of /code-review since v2.1.223, and the RCT's 52 learners and 50% vs 67%. Versions are pinned (v2.1.304, Node.js 22), and the brief records the postal and leap tests as run.",
+      "blockIds": [
+        "s1-why",
+        "s2-goal",
+        "s2-goal-prompt",
+        "s4-trap",
+        "s4-names",
+        "s5-rct",
+        "s3-code",
+        "p-model-code"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The register is です・ます throughout and warm (「自分の仕事を自分で採点すると、甘くなりがちです。」). There are no banned phrases, and terms stay consistent (検証, 証拠, 必須/任意, 過剰設計). Not a 4: a few phrases are stiff or ambiguous, e.g. s1-why 「「結果を確かめる」を、Claude自身が回せます」 and s5-styles 「自分で書けるようにします」 (unclear who 自分 is).",
+      "blockIds": [
+        "s1-why",
+        "s5-styles"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The lesson declares jp only, and all of it is in jp, diagram labels included. The diagram has alt text, and link texts say where they go (「Chromeとの連携」, 「日本語の公式ドキュメント」). Not a 4: s1-screenshot-note links to the English /docs/en/chrome page without saying so, in a Japanese lesson.",
+      "blockIds": [
+        "s4-sort",
+        "s1-screenshot-note",
+        "s4-names"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "align (o1): e1 and e2 are tagged bloom \"create\" but are multiple-choice selection. Either change both to \"bloom\": \"evaluate\", or add a practice step that has the learner write the check line themselves, e.g. in p-prompt-write replace the spec line with {{仕様と例の年}} (hint: 「仕様の各行に1つずつ年を当てはめて書きます」) so the learner designs the test cases.",
+    "active (s2-check q2): option c is the only report containing any command, so it can be picked by surface matching. Replace option b's md with 「`npm test` を実行し、すべて通りました」 and its feedback with 「コマンドの名前だけで、出力がありません。実行した結果の実物を見せてもらいます。」, so that naming a command without its output becomes the distractor.",
+    "practice (p-commit): say how to commit from inside the Claude session, as cc-03 did: change md/hint to 「Claudeに「テストと空の関数をコミットして」と頼みます。」.",
+    "prior (s2-goal-prompt): `node --test` appears here before 4-3 introduces node:test. Either add to the expect 「`node --test` はNode.jsの組み込みのテストを実行するコマンドです（4-3で使います）。」 or use `npm test` as e2 does.",
+    "load (lesson.estMinutes): measure.mjs gives est 19.5, which rounds to 20, while estMinutes is 19. Set estMinutes to 20, or trim about 230 characters of reading to land on 19.",
+    "a11y_l10n (s1-screenshot-note): change the link text to 「Chromeとの連携（英語）」, or link the Japanese page if /docs/ja/chrome exists.",
+    "voice (s1-why, for ja-editor): 「第1回のエージェントループ（agentic loop）の「結果を確かめる」まで、Claude自身で回せるようになります。」",
+    "voice (s5-styles, for ja-editor): replace 「自分で書けるようにします」 with 「学習者が自分で書けるようにします」 to match the glossary entry for Learning.",
+    "worked (s3-steps): the steps point to 「①の依頼文」 and 「④の依頼文」, which only appear after the steps block. Consider placing s3-prompt-write right after s3-steps step ① is introduced, or adding 「（下にあります）」 to those step titles."
+  ],
+  "average": 3.46,
+  "verdict": "pass",
+  "summary": "This is a full review because the lesson moved from vibe-coding/drafts to claude-code/lessons, and the gate does not accept the earlier review chain recorded under the old course path. The lesson is tightly aligned: each objective has an inline question and two exam questions with real-misconception feedback, and a cited, audited worked example (test-first, with commands and outputs verified) comes before a practice that has a checklist and a model answer. No must-fix items. The most useful improvements are to let the learner actually design a check for o1, which is assessed today only by multiple choice, and to harden the q2 distractors."
+}

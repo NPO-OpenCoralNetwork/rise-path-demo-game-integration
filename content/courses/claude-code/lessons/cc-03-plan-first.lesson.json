@@ -1,0 +1,1142 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-03-plan-first",
+  "courseId": "claude-code",
+  "title": "第3回｜探索→計画→実装→コミット",
+  "subtitle": "いきなり書かせず、調べて計画し、直してから任せる",
+  "locale": "jp",
+  "level": "beginner",
+  "estMinutes": 19,
+  "prerequisites": [
+    "第1回｜最初のタスクを任せる",
+    "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+    "ターミナルで基本のコマンド（cd・ls）が使える",
+    "Gitのコミット（commit）の意味がわかる"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "あいまいな依頼を、範囲・参照先・既存のパターン・症状の4つの観点で具体的に書き直せる",
+      "bloom": "apply"
+    },
+    {
+      "id": "o2",
+      "text": "プランモードを使うべき場面と省いてよい場面を判断し、承認する前に計画を直せる",
+      "bloom": "evaluate"
+    },
+    {
+      "id": "o3",
+      "text": "大きめの機能のために、仕様をインタビューしてもらう依頼文を作れる",
+      "bloom": "create"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：「いい感じにして」の行き先",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-problem",
+          "type": "markdown",
+          "style": "lead",
+          "md": "Claude Codeに「ログイン画面をいい感じにして」と頼んだら、共通のデザインや認証の処理まで書き換え始めました。ほしかったのは、スマートフォンでボタンがはみ出すのを直すことだけでした。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": "次に同じことを頼むとき、まず変えるとよいのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「いい感じに」を「すごくおしゃれに」のように強めて頼む",
+                  "feedback": "言葉を強めても、どのファイルの何を直すかは伝わりません。足りないのは、範囲や症状といった具体的な情報です。"
+                },
+                {
+                  "id": "b",
+                  "md": "Manualモードに切り替え、編集を1つずつ承認する",
+                  "feedback": "1つずつ承認しても、方向の違いに気づくのは書き換えが始まってからです。書く前に計画を見るほうが、早く直せます。"
+                },
+                {
+                  "id": "d",
+                  "md": "違ったら `/rewind` で戻し、同じ依頼で何度か試す",
+                  "feedback": "同じあいまいな依頼では、また推測で範囲が決まります。依頼の中身を変えないと、結果は変わりにくいままです。"
+                },
+                {
+                  "id": "c",
+                  "md": "直したいことを具体的に書き、書く前に計画を見る"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "依頼があいまいだと、Claudeは推測で範囲を決めます。3-1で依頼を具体的にする方法を、3-2と3-3で書く前に計画を確かめる方法を学びます。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s1",
+      "title": "3-1. 依頼を4つの観点で具体的にする",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "Claudeは意図をある程度推測できますが、頭の中までは読めません。"
+        },
+        {
+          "id": "s1-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-best-practices",
+            "cc-common-workflows"
+          ],
+          "items": [
+            {
+              "term": "4つの観点",
+              "md": "依頼を具体的にするための、範囲・参照先・既存のパターン・症状の4つです。公式ガイド（best practices）が挙げる方法です。"
+            },
+            {
+              "term": "@参照",
+              "md": "`@src/app.js` のように、依頼の中でファイル名の前に `@` を付ける書き方です。Claudeはそのファイルを読んでから答えます。"
+            }
+          ]
+        },
+        {
+          "id": "s1-table",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "items": [
+            "**範囲**には、どのファイルのどんな場面か、テストの方針を書きます。",
+            "**参照先**には、@参照するファイル、URL、Gitの履歴など、読ませたい情報源を書きます。",
+            "**既存のパターン**には、まねしてほしい既存のコードを書きます。",
+            "**症状**には、起きていること、場所の見当、直った状態を書きます。"
+          ]
+        },
+        {
+          "id": "s1-rich",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices",
+            "cc-common-workflows"
+          ],
+          "md": "画面の崩れは、スクリーンショットをCtrl + Vで貼ります。WindowsとWSL（Windows Subsystem for Linux）ではAlt + Vです。\n\n調べる段階なら、「このファイルの改善点は？」のようなあいまいな質問も役立ちます。"
+        },
+        {
+          "id": "s1-example",
+          "type": "prompt",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "title": "書き直した依頼の例（ログイン画面）",
+          "target": "claude-code",
+          "prompt": "@{{ログイン画面のファイル}} のレイアウトを直してください。\n症状：スマートフォン幅（375px）で「ログイン」ボタンが画面の右にはみ出します。［スクリーンショットを貼り付け］\n範囲：変えるのはログイン画面だけです。認証の処理と、全画面で使う共通のスタイルは変えないでください。\n既存のパターン：{{崩れない画面のファイル}} のフォームは崩れないので、同じレイアウトの書き方に合わせてください。\n直った状態：幅375pxで、ボタンが画面の中に収まります。",
+          "vars": [
+            {
+              "name": "ログイン画面のファイル",
+              "hint": "例：src/pages/Login.tsx"
+            },
+            {
+              "name": "崩れない画面のファイル",
+              "hint": "例：src/pages/Signup.tsx"
+            }
+          ],
+          "expect": "Claudeが2つのファイルを読んで違いを見つけ、ログイン画面のファイルだけを直します。",
+          "note": "参照先は1行目の@参照で、画像は症状を見せるためのものです。残りの観点には見出しを付け、症状に「直った状態」も添えています。"
+        },
+        {
+          "id": "s1-check",
+          "type": "quiz",
+          "mode": "inline",
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "「商品の検索を直して」という依頼を書き直します。「症状」の観点を満たす書き方はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「検索の処理が読みにくいです。もっとよいコードに書き直してください。」",
+                  "feedback": "「よいコード」は直し方の希望で、何が起きているかは伝わりません。症状には、起きていることと直った状態を書きます。"
+                },
+                {
+                  "id": "b",
+                  "md": "「『くつ』では0件ですが、『靴』なら出ます。両方で出たら直ったとしてください。」"
+                },
+                {
+                  "id": "c",
+                  "md": "「急ぎの対応です。お客さまが待っているので、できるだけ早く直してください。」",
+                  "feedback": "急ぎかどうかは、何が壊れているかの情報ではありません。Claudeが再現できるように、起きていることを書きます。"
+                },
+                {
+                  "id": "d",
+                  "md": "「@src/search.ts が検索の処理です。読んでから直してください。」",
+                  "feedback": "これは「参照先」の観点で、症状ではありません。何が起きていて、どうなれば直ったかを足します。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "症状は、起きていること・場所の見当・直った状態を伝える観点です。bは再現のしかたと直った状態がわかるので、Claudeが自分で確かめられます。",
+              "hint": "Claudeがその文だけで問題を再現できるかどうかで比べてみましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "3-2. 探索→計画→実装→コミット",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "いきなり書かせると、違う問題を解くコードができることがあります。公式ガイドは、調べて計画する段階と実装を分けた、4つのフェーズ（phase）を勧めています。"
+        },
+        {
+          "id": "s2-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-best-practices",
+            "cc-permission-modes"
+          ],
+          "items": [
+            {
+              "term": "4つのフェーズ",
+              "md": "探索（コードを読んで調べる）→計画（手順を書く）→実装（変えて確かめる）→コミット（commit、変更を記録する）の流れです。"
+            },
+            {
+              "term": "プランモード",
+              "md": "英語ではplan modeで、第2回で見た権限モードの1つです。ファイルを読み、調べるためのコマンドを実行して計画を書きますが、承認するまでソースは編集しません。"
+            },
+            {
+              "term": "差分",
+              "md": "変更前と変更後の違い（diff）です。"
+            }
+          ]
+        },
+        {
+          "id": "s2-flow",
+          "type": "diagram",
+          "engine": "mermaid",
+          "cite": [
+            "cc-best-practices",
+            "cc-permission-modes"
+          ],
+          "code": "flowchart TD\n  A[探索<br>プランモード] --> B[計画<br>プランモード]\n  B --> C{計画を読む}\n  C -->|直したい点がある| B\n  C -->|承認| D[実装して確かめる]\n  D --> E[コミット]",
+          "caption": "計画を読み、直してから承認して実装に進む",
+          "alt": "探索、計画、計画を読む、実装して確かめる、コミットが上から下へ並び、計画を読んで直したい点があれば計画に戻る矢印がある図"
+        },
+        {
+          "id": "s2-enter-lead",
+          "type": "markdown",
+          "cite": [
+            "cc-changelog"
+          ],
+          "md": "[[プランモード]]への主な入り方は3つです（2026年10月、v2.1.304時点）。"
+        },
+        {
+          "id": "s2-enter",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-best-practices",
+            "cc-commands",
+            "cc-permission-modes"
+          ],
+          "items": [
+            "Shift + Tabを、ステータスバー（status bar）に `⏸ plan mode on` と出るまで押す",
+            "依頼の先頭に `/plan` を付けて送る",
+            "`claude --permission-mode plan` で起動する"
+          ]
+        },
+        {
+          "id": "s2-version",
+          "type": "callout",
+          "variant": "info",
+          "title": "第2回のおさらい",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "md": "autoモードからShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。起動時のモードは、第2回で見たとおりです。"
+        },
+        {
+          "id": "s2-when",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "計画には手間もかかります。誤字の修正やログ1行の追加のように、[[差分]]を1文で説明できる変更なら、計画を省いて直接頼みます。\n\n計画が最も役立つのは、進め方に迷うとき、複数のファイルやよく知らないコードを変えるときです。"
+        },
+        {
+          "id": "s2-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "次の4つの依頼のうち、プランモードで計画してから進める価値が最も高いのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "初めて触るリポジトリ（repository）で、READMEの誤字を1か所直す",
+                  "feedback": "よく知らないリポジトリでも、この差分は1文で言えます。計画の手間のほうが大きいので、直接頼みます。"
+                },
+                {
+                  "id": "b",
+                  "md": "いつも触っている関数で、引数の既定値を10から20に変える",
+                  "feedback": "念のため毎回計画すると、手間ばかり増えます。場所と中身が決まった変更は、直接頼んで差分を確かめます。"
+                },
+                {
+                  "id": "c",
+                  "md": "ログイン後に一部の人だけ画面が真っ白になる不具合を、原因から調べて直す"
+                },
+                {
+                  "id": "d",
+                  "md": "設定ファイルにあるポート（port）番号を、3000から3007に変える",
+                  "feedback": "設定ファイルでも、差分を1文で言える変更です。大事なファイルかどうかより、進め方が決まっているかで判断します。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "cは原因がわからず、進め方に迷う作業です。探索と計画で原因と方針を確かめると、違う方向へ進むのを防げます。",
+              "hint": "その変更を1文で説明できるかどうかを考えてみましょう。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "3-3. 例題：ログイン画面を4つのフェーズで直す",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "s3-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "3-1の依頼を[[4つのフェーズ]]で進めます。よく知らないコードなので、計画が役立つ場面です。"
+        },
+        {
+          "id": "s3-steps",
+          "type": "steps",
+          "cite": [
+            "cc-best-practices",
+            "cc-permission-modes"
+          ],
+          "items": [
+            {
+              "id": "ex-explore",
+              "title": "プランモードに入り、探索させる",
+              "keys": [
+                "Shift+Tab"
+              ],
+              "md": "プランモードなら、ファイルを変えずに調べられます。2つの画面のファイルを[[@参照]]で渡し、「レイアウトの違いを説明して」と頼みます。知った現状が、計画を読む物差しになります。",
+              "expect": "違いが説明されます。ファイルは変わりません。"
+            },
+            {
+              "id": "ex-plan",
+              "title": "計画を作らせる",
+              "md": "3-1の依頼文に「まず計画を立てて」と添えて送ります。書く前に、進め方を読める形にするためです。",
+              "expect": "計画が出ます。たとえば「ボタンの幅を直す」「共通のスタイルを変える」「幅375pxで確かめる」の3手順です。"
+            },
+            {
+              "id": "ex-fix",
+              "title": "計画を読んで直す",
+              "keys": [
+                "Ctrl+G"
+              ],
+              "md": "2番目は、変えないでと頼んだ共通のスタイルの変更です。「No, keep planning」を選び、下の依頼文で直します。Ctrl + Gでエディタ（editor）を開き、計画を直接直すこともできます。",
+              "expect": "ログイン画面だけを変える計画に直ります。"
+            },
+            {
+              "id": "ex-approve",
+              "title": "承認して実装させる",
+              "md": "「Yes, manually approve edits」を選ぶと、編集を1つずつ確かめられます。",
+              "expect": "編集のたびに、承認を求められます。"
+            },
+            {
+              "id": "ex-explain",
+              "title": "差分を説明させ、予想してから確かめる",
+              "md": "「差分を、何のための変更か説明して」と頼みます。説明から結果を予想し、幅375pxで確かめます。",
+              "expect": "予想どおり、ボタンが画面の中に収まります。"
+            },
+            {
+              "id": "ex-commit",
+              "title": "コミットする",
+              "md": "「変更内容がわかるメッセージでコミットして」と頼みます。記録すれば、あとで戻せます。",
+              "expect": "`git log` にコミットが1件増えます。"
+            }
+          ]
+        },
+        {
+          "id": "s3-fix-prompt",
+          "type": "prompt",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "title": "計画を直してもらう依頼文",
+          "target": "claude-code",
+          "prompt": "計画の「{{直したい点}}」は、{{直し方}}に変えてください。ほかは今の計画のままで、直した計画をもう一度見せてください。",
+          "vars": [
+            {
+              "name": "直したい点",
+              "hint": "例：共通のスタイルを変える手順"
+            },
+            {
+              "name": "直し方",
+              "hint": "例：ログイン画面のファイルの中だけで直す方法"
+            }
+          ],
+          "expect": "Claudeは編集せず、直した計画を出し直します。"
+        },
+        {
+          "id": "s3-tip",
+          "type": "callout",
+          "variant": "tip",
+          "title": "説明させてからコミットする理由",
+          "cite": [
+            "ai-skills-rct"
+          ],
+          "md": "Anthropicは、新しいライブラリ（library）をAIと学ぶ実験をしました。説明を求めた人は、任せきりの人より理解度テストの点が高くなりました。"
+        },
+        {
+          "id": "s3-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "別の作業の計画に、頼んでいない「新しいライブラリをpackage.jsonに追加する」手順が入っていました。どうしますか？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "「Yes, manually approve edits」で承認し、package.jsonの編集だけ断る",
+                  "feedback": "承認すると、ライブラリを使う前提の計画のまま実装が始まります。書く前の計画の段階で直すほうが、手戻りが少なくなります。"
+                },
+                {
+                  "id": "a",
+                  "md": "「No, keep planning」を選び、ライブラリを足さない計画に直してもらう"
+                },
+                {
+                  "id": "c",
+                  "md": "Claudeが調べて立てた計画なので、そのまま承認する",
+                  "feedback": "計画にはClaudeの推測が含まれます。意図と違う点は、承認する前に直します。"
+                },
+                {
+                  "id": "d",
+                  "md": "プランモードを抜けて、package.jsonを自分で元に戻す",
+                  "feedback": "プランモードのあいだは、package.jsonはまだ変わっていません。直すのはファイルではなく計画です。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "計画は、書き換えが始まる前に方向を直せる場所です。頼んでいない変更は、承認する前に計画から外してもらいます。Ctrl + Gで計画をエディタで開き、直接直してもかまいません。",
+              "hint": "承認する前と、承認したあとでは、どちらが直しやすいかを考えてみましょう。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "3-4. 大きめの機能は仕様から始める",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "大きめの機能は決めることが多く、1つの依頼文に書ききれません。公式ガイドは、Claudeにインタビューしてもらう方法を勧めています。"
+        },
+        {
+          "id": "s4-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-best-practices",
+            "cc-tools-reference"
+          ],
+          "items": [
+            {
+              "term": "仕様",
+              "md": "英語ではspecです。何を作るか、作らないか、どう確かめるかを書いた文書で、ここでは `SPEC.md` に書きます。"
+            },
+            {
+              "term": "AskUserQuestionツール",
+              "md": "Claudeが選択肢つきの質問をするためのツール（tool）です。"
+            }
+          ]
+        },
+        {
+          "id": "s4-flow",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "流れは、インタビュー→`SPEC.md` に書かせる→新しいセッション（session）で実装、の3段階です。新しいセッションは、`/clear` か `claude` の再起動で始まります。会話がまっさらなので、[[仕様]]を手がかりに実装に集中できます。"
+        },
+        {
+          "id": "s4-interview",
+          "type": "prompt",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "title": "インタビューを頼む依頼文",
+          "target": "claude-code",
+          "prompt": "{{作りたい機能}}を作りたいと考えています。AskUserQuestionツールを使って、私に詳しくインタビューしてください。\n技術的な実装、UI/UX（User Interface / User Experience、画面と使い心地）、エッジケース（edge case、めったに起きない場面）、懸念点、トレードオフ（trade-off、何かを得ると何かを失う関係）について聞いてください。当たり前の質問はせず、私がまだ考えていない難しい部分を掘り下げてください。\nすべて話し終えるまでインタビューを続け、最後に完全な仕様をSPEC.mdに書いてください。",
+          "vars": [
+            {
+              "name": "作りたい機能",
+              "hint": "例：家計簿アプリの予算の機能"
+            }
+          ],
+          "expect": "Claudeが選択肢つきの質問を続けます。答え終わると、`SPEC.md` が作られます。",
+          "note": "公式ガイドの依頼文の日本語訳に、用語の説明を足したものです。"
+        },
+        {
+          "id": "s4-good-spec",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "役立つ仕様には、関わるファイルと、関数名などほかのコードとのつなぎ目を書きます。範囲外のことも書き、最後は全体を確かめる手順で終わります。"
+        },
+        {
+          "id": "s4-table",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "items": [
+            "差分を1文で説明できる変更は、**直接頼みます**。",
+            "進め方に迷うとき、複数のファイルやよく知らないコードを変えるときは、**計画**します。",
+            "大きめの機能は、**インタビューと仕様**から始めます。"
+          ]
+        },
+        {
+          "id": "s4-community",
+          "type": "callout",
+          "variant": "note",
+          "title": "コミュニティのツール",
+          "cite": [
+            "cc-sdd"
+          ],
+          "md": "仕様づくりには、cc-sddのようなコミュニティのツールもあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。"
+        },
+        {
+          "id": "s4-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "「家計簿アプリに予算の機能を足したい」とき、仕様づくりの依頼として最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "「仕様はおすすめの内容で決めてSPEC.mdに書き、そのまま実装まで進めて。」",
+                  "feedback": "これでは、仕様がClaudeの推測で決まります。インタビューは、あなたの判断を引き出して仕様に残すためのものです。"
+                },
+                {
+                  "id": "c",
+                  "md": "「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」",
+                  "feedback": "決めたことが仕様に残らず、同じ会話のまま実装が始まります。SPEC.mdに書かせ、新しいセッションで読ませます。"
+                },
+                {
+                  "id": "d",
+                  "md": "「まず実装してみて、迷ったところがあれば、あとでまとめて私に質問して。」",
+                  "feedback": "決める前に書かせると、違う問題を解くコードができやすくなります。大きめの機能ほど、先にインタビューで決めます。"
+                },
+                {
+                  "id": "a",
+                  "md": "「AskUserQuestionツールで私にインタビューし、終わったらSPEC.mdに仕様を書いて。」"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "aには、聞き方（AskUserQuestionでのインタビュー）と、書き出し先（SPEC.md）の両方があります。決めたことが仕様に残るので、実装のときに読み返せます。",
+              "hint": "インタビューのあと、決めたことがどこに残るかに注目しましょう。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "演習1：TODO画面を4つのフェーズで直す",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "「TODOアプリをいい感じにして」という依頼を出発点に、練習用のTODO画面を直します。[[4つの観点]]で書き直し、計画を1か所直してから、コミットまで進めます。大事なリポジトリでは試さないでください。"
+        },
+        {
+          "id": "practice-setup",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "mkdir cc-practice-03\ncd cc-practice-03\ngit init\n# ここでtodo.htmlを保存\ngit add todo.html\ngit commit -m \"最初のTODO画面\""
+        },
+        {
+          "id": "practice-starter",
+          "type": "code",
+          "lang": "html",
+          "filename": "todo.html",
+          "highlight": [
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "code": "<!doctype html>\n<meta charset=\"utf-8\">\n<title>TODO</title>\n<h1>TODO</h1>\n<input id=\"item\">\n<button id=\"add\">追加</button>\n<ul id=\"list\"></ul>\n<script>\n  const input =\n    document.getElementById('item');\n  const list =\n    document.getElementById('list');\n  function addItem(text) {\n    const li =\n      document.createElement('li');\n    li.textContent = text;\n    list.appendChild(li);\n  }\n  const addBtn =\n    document.getElementById('add');\n  addBtn.onclick = () => {\n    addItem(input.value);\n    input.value = '';\n  };\n</script>"
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "pr-setup",
+              "title": "練習用の画面を用意する",
+              "md": "最初の3行でフォルダーを作り、その中に `todo.html` を保存します。最後の2行でコミットしてから、ブラウザで開き、空のまま「追加」を押します。",
+              "expect": "空の行が増えます。コミットも1件できます。"
+            },
+            {
+              "id": "pr-rewrite",
+              "title": "依頼を4つの観点で書き直す",
+              "md": "直したいのは、空の入力で行が増えることと、削除ボタンがないことの2つです。",
+              "expect": "4つの観点が、それぞれ1行以上入った依頼文ができます。",
+              "hint": "症状には「何をすると何が起きるか」と「直った状態」を書きます。",
+              "troubleshoot": "既存のパターンは、`todo.html` で項目を作っている関数です。"
+            },
+            {
+              "id": "pr-explore",
+              "title": "プランモードで探索させる",
+              "keys": [
+                "Shift+Tab"
+              ],
+              "md": "`claude` を起動してプランモードに入り、「@todo.html を読んで、項目を追加する流れを説明して」と頼みます。",
+              "expect": "項目を作る流れが説明されます。ファイルは変わりません。"
+            },
+            {
+              "id": "pr-plan",
+              "title": "計画を作らせ、1か所直す",
+              "keys": [
+                "Ctrl+G"
+              ],
+              "md": "書き直した依頼を送ります。計画を読み、範囲外の変更か足りない点を1つ直してもらいます。",
+              "expect": "直した点が入った計画と、承認の選択肢が出ます。",
+              "hint": "頼んでいない保存機能やライブラリの追加がないかを見ます。",
+              "troubleshoot": "見つからなければ、確かめ方が具体的か（何をすると何が見えれば直ったか）を見て、足りない点を足してもらいます。"
+            },
+            {
+              "id": "pr-implement",
+              "title": "承認して実装させる",
+              "md": "「Yes, manually approve edits」を選び、編集を1つずつ確かめます。",
+              "expect": "`todo.html` だけが編集されます。",
+              "troubleshoot": "ほかのファイルへの編集は断り、範囲を伝え直します。"
+            },
+            {
+              "id": "pr-explain",
+              "title": "差分を説明させてから確かめる",
+              "md": "差分の説明を頼み、結果を予想してから、ブラウザを再読み込みして試します。",
+              "expect": "空のまま押しても行が増えず、各項目の削除ボタンで、その項目が消えます。"
+            },
+            {
+              "id": "pr-commit",
+              "title": "コミットする",
+              "md": "「変更内容がわかるメッセージでコミットして」と頼みます。",
+              "expect": "`git log --oneline` に、コミットが2件並びます。"
+            }
+          ]
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": "演習1の成功の基準",
+          "items": [
+            {
+              "id": "c1-perspectives",
+              "label": "依頼文に、範囲・参照先・既存のパターン・症状が入っています"
+            },
+            {
+              "id": "c1-plan-fix",
+              "label": "承認する前に、計画を1か所以上直しました"
+            },
+            {
+              "id": "c1-scope",
+              "label": "変更されたファイルは、todo.htmlだけでした"
+            },
+            {
+              "id": "c1-behavior",
+              "label": "空の入力で行が増えず、各項目の削除ボタンでその項目が消えます"
+            },
+            {
+              "id": "c1-explain",
+              "label": "差分の各変更の目的を、自分の言葉で言えます"
+            },
+            {
+              "id": "c1-commit",
+              "label": "git log --onelineに、コミットが2件あります"
+            }
+          ]
+        },
+        {
+          "id": "practice-model",
+          "type": "prompt",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "title": "模範解答：書き直した依頼文（書いてから見比べましょう）",
+          "target": "claude-code",
+          "prompt": "参照先：@todo.html を読んでください。このTODO画面を直したいので、まず計画を立ててください。\n症状：入力欄が空のまま「追加」を押すと、空の行が増えます。直ったら、空のまま押しても何も増えません。\n範囲：変えるのはtodo.htmlだけです。各項目に「{{ボタンの文言}}」ボタンも付け、押すとその項目が消えるようにしてください。ライブラリと保存機能は今回は足しません。\n既存のパターン：項目は今あるaddItem関数で作っています。ボタンもaddItemの中で作ってください。\n計画の最後に、ブラウザでの確かめ方を書いてください。",
+          "vars": [
+            {
+              "name": "ボタンの文言",
+              "hint": "例：削除"
+            }
+          ],
+          "expect": "計画に、空の入力ではaddItemを呼ばない手順と、addItemの中でボタンを作る手順が入ります。",
+          "note": "書き方が違っても、4つの観点が入っていれば正解です。"
+        }
+      ]
+    },
+    {
+      "id": "practice-spec",
+      "title": "演習2：仕様インタビューの依頼文を作る",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-spec-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "TODO画面に「期限とリマインダー」を付けるなら、決めることが多いので[[仕様]]から始めます。3-4を参考に、インタビューの依頼文を自分で書きましょう。"
+        },
+        {
+          "id": "practice-spec-steps",
+          "type": "steps",
+          "items": [
+            {
+              "id": "ps-feature",
+              "title": "作りたい機能を1文で書く",
+              "md": "期限とリマインダーで、何をしたいかを書きます。",
+              "expect": "1行目に、機能が1文で入ります。",
+              "hint": "例：「各項目に期限を付け、期限の前に知らせたい」のように書きます。"
+            },
+            {
+              "id": "ps-ask",
+              "title": "インタビューの頼み方を書く",
+              "md": "使うツールと、聞いてほしい話題を書きます。",
+              "expect": "AskUserQuestionと、聞いてほしい話題が3つ以上入ります。",
+              "hint": "TODO画面なら、データの持ち方や画面が話題になります。",
+              "troubleshoot": "3-4の依頼文の2行目を、TODO画面に合わせて書き換えます。"
+            },
+            {
+              "id": "ps-spec",
+              "title": "書き出し先と仕様の条件を書く",
+              "md": "`SPEC.md` と、仕様に入れる3つの条件を足します。",
+              "expect": "関わるファイル・範囲外・確かめる手順が入ります。",
+              "hint": "3-4の「役立つ仕様には」で始まる段落を見直しましょう。",
+              "troubleshoot": "「実装はまだしないでください」も足すと、途中で書き始めません。"
+            }
+          ]
+        },
+        {
+          "id": "practice-spec-checklist",
+          "type": "checklist",
+          "title": "演習2の成功の基準",
+          "items": [
+            {
+              "id": "c2-feature",
+              "label": "作りたい機能を1文で書きました"
+            },
+            {
+              "id": "c2-tool",
+              "label": "AskUserQuestionツールでインタビューするよう頼みました"
+            },
+            {
+              "id": "c2-depth",
+              "label": "聞いてほしい話題と「当たり前の質問はしない」を入れました"
+            },
+            {
+              "id": "c2-spec",
+              "label": "書き出し先のSPEC.mdと、仕様に入れる3つの条件を書きました"
+            },
+            {
+              "id": "c2-session",
+              "label": "実装は、新しいセッションでSPEC.mdを読ませてから頼むことにしました"
+            }
+          ]
+        },
+        {
+          "id": "practice-spec-model",
+          "type": "prompt",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "title": "模範解答：インタビューの依頼文（書いてから見比べましょう）",
+          "target": "claude-code",
+          "prompt": "@todo.html のTODO画面に、{{作りたい機能}}を足したいと考えています。AskUserQuestionツールを使って、私に詳しくインタビューしてください。\nデータの持ち方、画面、エッジケース（めったに起きない場面）、懸念点、トレードオフについて聞いてください。当たり前の質問はせず、私がまだ考えていない難しい部分を掘り下げてください。\nすべて話し終えるまで続けてから、完全な仕様をSPEC.mdに書いてください。仕様には、関わるファイル、範囲外のこと、最後に全体を確かめる手順を入れてください。実装はまだしないでください。",
+          "vars": [
+            {
+              "name": "作りたい機能",
+              "hint": "例：期限とリマインダーの機能"
+            }
+          ],
+          "expect": "Claudeが選択肢つきの質問を続けます。最後に、関わるファイル・範囲外のこと・確かめる手順が書かれた `SPEC.md` ができます。"
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-best-practices",
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "同僚が、CSV（Comma-Separated Values）の取り込みについて依頼文を書きました。4つの観点のうち、まだ入っていないのはどれでしょう？\n「@src/import.ts のCSV取り込みを直して。1万行のCSVで10秒以上かかる。3秒以内になれば完了。変えるのはimport.tsだけ。」",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "範囲",
+                  "feedback": "「変えるのはimport.tsだけ」が範囲です。まだないのは、まねしてほしい既存のコードです。"
+                },
+                {
+                  "id": "b",
+                  "md": "参照先",
+                  "feedback": "`@src/import.ts` が参照先です。まだないのは、まねしてほしい既存のコードです。"
+                },
+                {
+                  "id": "c",
+                  "md": "既存のパターン"
+                },
+                {
+                  "id": "d",
+                  "md": "症状",
+                  "feedback": "「1万行で10秒以上」と「3秒以内で完了」が、症状と直った状態です。まだないのは、まねしてほしい既存のコードです。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "既存のパターンがないと、Claudeはプロジェクトの書き方と違う方法で直すことがあります。同じリポジトリで速く動いている処理を、ファイル名で示して足します。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e4",
+              "kind": "single",
+              "prompt": "チームの人が「プランモードは遅いので、全部autoモードで任せている。失敗したら `/rewind` で戻せばいい」と言います。初めて触るリポジトリで、3つのファイルにまたがる機能を足すときはどう判断しますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "プランモードで計画する。承認の前に方向を直せるから"
+                },
+                {
+                  "id": "b",
+                  "md": "autoモードで任せる。`/rewind` ですべて戻せるから",
+                  "feedback": "`/rewind` は、Bashで変えたものや外部への操作を戻せません。戻せても、同じ依頼からやり直すことになります。"
+                },
+                {
+                  "id": "c",
+                  "md": "autoモードで任せる。分類器（classifier）が意図と違う変更を止めるから",
+                  "feedback": "分類器が止めるのは、危険に見える操作です。計画が意図に合うかどうかは、人が読んで判断します。"
+                },
+                {
+                  "id": "d",
+                  "md": "Manualモードで任せる。編集を1つずつ承認できるから",
+                  "feedback": "1つずつ承認しても、方向の違いに気づくのは書き換えが始まってからです。計画なら、書く前に方向を直せます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "よく知らないコードで複数のファイルを変える作業は、計画が最も役に立つ場面です。計画は書き換えの前に読めるので、方向の違いを早く直せます。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e5",
+              "kind": "single",
+              "prompt": "次のインタビュー依頼文の下書きに、足すべき一文はどれでしょう？\n「家計簿アプリに予算の機能を足したい。AskUserQuestionツールで私に詳しくインタビューして。当たり前の質問はせず、難しい部分を掘り下げて。」",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「すべて話し終えたら、完全な仕様をSPEC.mdに書いて。」"
+                },
+                {
+                  "id": "b",
+                  "md": "「インタビューが終わったら、この会話のまま続けて実装して。」",
+                  "feedback": "インタビューの長い会話が残ったままでは、実装に集中しにくくなります。SPEC.mdに書かせ、新しいセッションで読ませます。"
+                },
+                {
+                  "id": "c",
+                  "md": "「質問は5問までにして、早めに切り上げて。」",
+                  "feedback": "数を先に決めると、難しい部分を掘り下げきれません。すべて話し終えるまで続けてもらいます。"
+                },
+                {
+                  "id": "d",
+                  "md": "「インタビューの答えは、仕様に書かず覚えておいて。」",
+                  "feedback": "会話の中だけの決定は、新しいセッションでは読めません。決めたことはSPEC.mdに書いて残します。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "インタビューで決めたことは、仕様に書いて初めて実装に使えます。SPEC.mdにしておけば、新しいセッションでもそのまま読めます。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "あいまいな依頼は、範囲・参照先・既存のパターン・症状の4つの観点で書き直します。",
+            "進め方は探索→計画→実装→コミットです。探索と計画はプランモードでおこない、計画を読んで直してから承認します。",
+            "差分を1文で説明できる変更は直接頼み、迷う変更やよく知らないコードは計画します。",
+            "大きめの機能は、AskUserQuestionでインタビューしてもらい、SPEC.mdに書かせてから新しいセッションで実装します。",
+            "実装のあとは差分を説明させ、予想してから確かめます。目的を自分の言葉で言えたら、コミットします。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "最近AIに頼んだ依頼を1つ思い出してみましょう。4つの観点のうち、どれが抜けていたでしょうか。\n\n次は「第4回｜検証を任せる：テスト・レビュー・説明」です。計画に書いた確かめ方を、Claudeに実行させる方法を学びます。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-perspectives",
+              "front": "依頼を具体的にする4つの観点は？",
+              "back": "範囲・参照先・既存のパターン・症状の4つです。"
+            },
+            {
+              "id": "card-phases",
+              "front": "公式が勧める4つのフェーズは？",
+              "back": "探索→計画→実装→コミットの順です。探索と計画はプランモードでおこないます。"
+            },
+            {
+              "id": "card-skip",
+              "front": "計画を省いてよい目安は？",
+              "back": "差分を1文で説明できる変更のときです。"
+            },
+            {
+              "id": "card-enter",
+              "front": "プランモードに入る主な3つの方法は？",
+              "back": "Shift + Tabを `⏸ plan mode on` まで押す、`/plan` を付けて送る、`claude --permission-mode plan` で起動する、の3つです。"
+            },
+            {
+              "id": "card-fix",
+              "front": "承認する前に計画を直すには？",
+              "back": "「No, keep planning」を選んで、直す点を伝えます。Ctrl + Gでエディタを開き、直接直すこともできます。"
+            },
+            {
+              "id": "card-spec",
+              "front": "大きめの機能を始める流れは？",
+              "back": "AskUserQuestionでインタビューしてもらい、SPEC.mdに書かせてから、新しいセッションで実装します。"
+            },
+            {
+              "id": "card-good-spec",
+              "front": "役に立つSPEC.mdの3つの条件は？",
+              "back": "関わるファイルとつなぎ目（関数名など）を書く、範囲外を書く、最後に全体を確かめる手順で終える、の3つです。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分の依頼文を4つの観点でチェックして",
+            "計画のどこを読めば、範囲外の変更に気づける？",
+            "TODO画面のSPEC.mdは、どんな見出しになる？"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "4つの観点",
+      "md": "依頼を具体的にするための、範囲・参照先・既存のパターン・症状の4つです。"
+    },
+    {
+      "term": "@参照",
+      "md": "依頼の中でファイル名の前に `@` を付ける書き方です。Claudeはそのファイルを読んでから答えます。"
+    },
+    {
+      "term": "4つのフェーズ",
+      "md": "探索→計画→実装→コミットの流れです。探索と計画はプランモードでおこないます。"
+    },
+    {
+      "term": "プランモード",
+      "md": "権限モードの1つです。ファイルを読み、調べて計画を書きますが、承認するまでソースを編集しません。",
+      "aliases": [
+        "plan mode"
+      ]
+    },
+    {
+      "term": "差分",
+      "md": "変更前と変更後の違いです。",
+      "aliases": [
+        "diff"
+      ]
+    },
+    {
+      "term": "仕様",
+      "md": "何を作るか、作らないか、どう確かめるかを書いた文書です。このレッスンではSPEC.mdに書きます。",
+      "aliases": [
+        "spec",
+        "SPEC.md"
+      ]
+    },
+    {
+      "term": "AskUserQuestionツール",
+      "md": "Claudeが選択肢つきの質問をするためのツールです。",
+      "aliases": [
+        "AskUserQuestion"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-best-practices",
+      "title": "Best practices for Claude Code",
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permission-modes",
+      "title": "Permission modes",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-commands",
+      "title": "Commands",
+      "url": "https://code.claude.com/docs/en/commands",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-common-workflows",
+      "title": "Common workflows",
+      "url": "https://code.claude.com/docs/en/common-workflows",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-tools-reference",
+      "title": "Tools reference",
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-changelog",
+      "title": "Claude Code CHANGELOG",
+      "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "ai-skills-rct",
+      "title": "How AI assistance impacts the formation of coding skills (2026-01-29)",
+      "url": "https://www.anthropic.com/research/AI-assistance-coding-skills",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-sdd",
+      "title": "cc-sdd（仕様駆動開発のスキル集）",
+      "url": "https://github.com/gotalab/cc-sdd",
+      "publisher": "gotalab（コミュニティ）",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "tags": [
+    "claude-code",
+    "plan-mode",
+    "prompting"
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

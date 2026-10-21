@@ -36,6 +36,7 @@ npm run db:migrate:status
 | `008_seed_learning_portals.sql` | Learning Hub カード seed |
 | `009_learner_memory_meta.sql` | 学習者メモリの同期メタデータ |
 | `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス |
+| `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
 
 ## 参考資料（適用しない）
 

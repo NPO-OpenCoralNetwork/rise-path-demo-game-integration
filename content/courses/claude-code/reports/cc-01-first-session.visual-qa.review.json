@@ -1,0 +1,57 @@
+{
+  "lessonId": "cc-01-first-session",
+  "file": "content/courses/claude-code/lessons/cc-01-first-session.lesson.json",
+  "lessonHash": "sha256:1767d55f356db7d2",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "At 390 px nothing is cut off and nothing sticks out sideways. The loop-diagram flowchart (TD) has readable Japanese labels and a caption (mobile-jp-04/05). Both tables keep two readable columns (mobile-jp-03, mobile-jp-07). Code blocks fit: install-unix wraps the pipe onto its own line, and in example-diff the soft-wrapped lines are easy to follow by their line numbers (mobile-jp-09, mobile-jp-14/15). metrics.json shows no overflow, console, mermaid, unknown-block or broken-image failures.",
+      "blockIds": [
+        "loop-diagram",
+        "loop-table",
+        "surfaces-table",
+        "install-unix",
+        "example-diff"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on desktop and on mobile. Every section opens with a definitions block, a table, steps or code, and a check follows within 1-2 screens (mobile-jp-05, -07, -11, -15). Desktop median is 39 characters per line, inside the 30-40 target. The full-length PNGs show no wall of text and no large empty gap.",
+      "blockIds": [
+        "loop-defs",
+        "surfaces-defs",
+        "session-defs",
+        "example-steps",
+        "practice-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "This lesson is Japanese only. The screens show no English UI leaking in, and English terms appear only as glosses next to the Japanese, for example 'サーフェス（surface）'. Inline code chips stay whole and fit in their lines (mobile-jp-11, -25). Text contrast is good, and the bottom bar does not hide any 答える button or other control (mobile-jp-06, -08, -25).",
+      "blockIds": [
+        "surfaces-defs",
+        "session-lead",
+        "check-quiz"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "example-steps: each step shows two numbers, the circled step marker and a '①…⑤' prefix in the title (mobile-jp-13, desktop-jp-09). Drop the ①-⑤ prefixes from the ex-* titles. Then change the references in p-change and p-commit ('1-5の①', '1-5の⑤') to '1-5の手順1' and '1-5の手順5'. See .artifacts/preview/claude-code/cc-01-first-session/pages/mobile-jp-13.png.",
+    "o2: on mobile, the reflection block breaks the objective text inside a word, 'クラウドセッショ / ン）を選べる' (mobile-jp-28). A shorter objective, such as '状況に合うサーフェス（CLI・IDE拡張・アプリ・クラウド）を選べる', would avoid the break. See .artifacts/preview/claude-code/cc-01-first-session/pages/mobile-jp-28.png.",
+    "c-version: the checklist label 'claude --versionで…' is plain text, while the same command is a code chip everywhere else. Write it as `claude --version` in the label (mobile-jp-20/21).",
+    "reader: the glossary side panel lists 'エージェントループ' twice, as 'エージェントループ (agentic loop)' and as a bare 'エージェントループ' (desktop-jp-01). Other terms that appear both in a definitions block and in the lesson glossary are listed once. The panel should merge the two entries, or the loop-defs term should match the glossary term.",
+    "reader: the prerequisites line under the lesson header is small grey text, and on mobile it breaks inside 'バイブコーディ / ング' (mobile-jp-01).",
+    "reader: on mobile the flashcard hint says 'クリックまたはスペースキーでめくる', which does not fit a touch screen (mobile-jp-27).",
+    "reader: the mobile full-length PNG stops at 16000 px; the per-screen PNGs were used instead. Failed /api/ requests (500 on user/progress, events, notifications) are environment noise."
+  ],
+  "average": 4,
+  "verdict": "pass",
+  "summary": "The screenshots show a clean, well-paced lesson: no hard failures in metrics.json, nothing cut off at 390 px, and a figure, table, code block or check on every screen. The diagram and tables stay readable on mobile, and there is no personal data on any screen. Remaining items are minor and optional: the double step numbering in example-steps ('1' plus '①') and one awkward line break in the mobile reflection block."
+}

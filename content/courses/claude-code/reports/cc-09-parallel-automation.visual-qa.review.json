@@ -1,0 +1,54 @@
+{
+  "lessonId": "cc-09-parallel-automation",
+  "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:5b14d7bb36e8d118",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "The lesson has no images, so none are decorative, broken or unreadable (brokenImages 0, mermaidErrors 0). The visuals are definition tables (s1-defs, s4-defs) and code blocks (s2-code, s3-code, p1-model). At 390 px they all fit with no sideways scroll, and the highlighted lines 13/17 and 2, 12-16 are easy to see (pages/mobile-jp-06.png, pages/mobile-jp-20.png). The score is 3, not 4, because there is no figure: a small diagram of the main folder and the two worktree folders and branches would show the worktree idea in s2 more clearly.",
+      "blockIds": [
+        "s1-defs",
+        "s2-code",
+        "s3-code",
+        "s4-defs",
+        "p1-model"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty for both desktop-jp and mobile-jp. Every one of the 31 mobile screens has a heading, table, code block, steps list, prompt or check. Inline checks q1-q4 come after each segment, and the five flags in s3-table are a numbered list with one flag per item (pages/mobile-jp-10.png, pages/mobile-jp-11.png). Desktop charsPerLine median is 40 (target 30-40, max 51).",
+      "blockIds": [
+        "s3-table",
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The lesson is Japanese only and contentLocale matches (no locale fallback). English appears only with first-use terms such as ワークツリー（worktree） and 非対話的実行（non-interactive mode）, and in code. The link text 「公式ドキュメント（非対話的実行）」 in s3-mode says where it goes. Contrast is good in the dark code blocks and in the callouts (pages/desktop-jp-07.png, pages/desktop-jp-08.png). No personal data on any screen.",
+      "blockIds": [
+        "s3-mode",
+        "s3-pitfall",
+        "s2-map"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s2-lead/s2-code: add a small flowchart TD (main folder -> .claude/worktrees/feature-a and bugfix-b, each on its own worktree-* branch, merged back with git merge) with a caption and alt, so the worktree idea is shown and not only described (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/mobile-jp-06.png).",
+    "lesson glossary vs s1-defs/s4-defs: the desktop sidebar 用語・このレンズン lists each term twice, for example 「ワークツリー（worktree）」 and 「ワークツリー」, and 「定期タスク（scheduled task）」 and 「定期タスク」 (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/desktop-jp-01.png). Use the same term string in the glossary and in the definitions, or ask the reader team to merge entries with the same base term.",
+    "reader: on mobile the 前のレッスン link at the bottom runs to the right edge of the screen (「…MCPでつなぐ」), so the end of the title may be cut off (.artifacts/preview/claude-code/cc-09-parallel-automation/pages/mobile-jp-31.png).",
+    "reader: the mobile full-length PNG stops at 16000px and the desktop one is also truncated, so this review used the per-screen PNGs. 14 failed /api/ requests (500) were logged as environment noise."
+  ],
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "No hard failures: overflowX false; console errors, mermaid errors, unknown blocks and broken images are all 0. At 390 px, inline code chips and code lines show in full with no awkward wraps, and every screen has a heading, table, code block or check. The main visual improvement is optional: a small worktree diagram in the s2 example."
+}

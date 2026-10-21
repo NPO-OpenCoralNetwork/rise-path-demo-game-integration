@@ -105,6 +105,9 @@ export const VibePrologueView = lazy(
 export const VibePathView = lazy(
   () => import('../features/programming/VibePathView')
 );
+export const ClaudeCodePathView = lazy(
+  () => import('../features/programming/ClaudeCodePathView')
+);
 export const UnityPathView = lazy(
   () => import('../features/programming/UnityPathView')
 );

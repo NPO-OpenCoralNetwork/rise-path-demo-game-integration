@@ -29,6 +29,7 @@ const WORLD_BY_VIEW: Partial<Record<ViewState, string>> = {
     [ViewState.PROGRAMMING_AI]: 'ai',
     [ViewState.PROGRAMMING_VIBE]: 'vibe',
     [ViewState.VIBE_PATH]: 'vibe',
+    [ViewState.CLAUDE_CODE]: 'ai',
     [ViewState.P_SCHOOL]: 'pschool',
     [ViewState.UNITY_AI_GAME_DEV]: 'unity',
     [ViewState.BLENDER]: 'blender',
@@ -128,6 +129,11 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     subtitle: 'Block Coding RPG',
                     description: 'Learn programming by building battle scripts with Scratch-style blocks.'
                 },
+                claudeCode: {
+                    title: 'Claude Code in Practice',
+                    subtitle: 'AI agent',
+                    description: 'Hand research, planning, fixes and checks to an AI agent in your terminal. 11 lessons, in Japanese.'
+                },
             },
             bannerTitle: 'Learning Path Diagnosis',
             bannerSubtitle: 'We recommend a curriculum tailored to your interests and skills.',
@@ -168,6 +174,11 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
                     title: 'Scratch game',
                     subtitle: 'ブロックプログラミングRPG',
                     description: 'Scratchブロックでバトルの作戦を組み、遊びながらプログラミングを学ぶ。'
+                },
+                claudeCode: {
+                    title: 'Claude Code 実践',
+                    subtitle: 'AIエージェント',
+                    description: '調べる・計画する・直す・確かめるを、ターミナルのAIエージェントに任せる方法を11回で学びます。'
                 },
             },
             bannerTitle: '学習パス診断',
@@ -219,6 +230,20 @@ const LearningHub: React.FC<LearningHubProps> = ({ onNavigate }) => {
             image: "https://images.unsplash.com/photo-1629654297299-c8506221ca97?auto=format&fit=crop&q=80&w=800",
             isActive: true,
             sortOrder: 30
+        },
+        {
+            id: 'claude-code',
+            title: { en: copy.en.portals.claudeCode.title, jp: copy.jp.portals.claudeCode.title },
+            subtitle: { en: copy.en.portals.claudeCode.subtitle, jp: copy.jp.portals.claudeCode.subtitle },
+            description: { en: copy.en.portals.claudeCode.description, jp: copy.jp.portals.claudeCode.description },
+            icon: 'terminal',
+            view: ViewState.CLAUDE_CODE,
+            color: 'text-violet-500',
+            bg: 'bg-violet-50',
+            borderColor: 'border-violet-100',
+            image: '',
+            isActive: true,
+            sortOrder: 35
         },
         {
             id: 'scratch-game',

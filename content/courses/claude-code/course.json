@@ -1,0 +1,133 @@
+{
+  "schema": "risepath.course/v1",
+  "id": "claude-code",
+  "world": "ai",
+  "title": "Claude Code 実践：AIエージェントと開発する",
+  "subtitle": "調べる・計画する・直す・確かめるを、ターミナルのAIエージェントに任せる方法を11回で身につけます。",
+  "description": "2026年10月時点（Claude Code v2.1.304）の内容です。ターミナルで `cd` と `ls` が使え、Gitのcommitとpushの意味がわかる人向けです。演習には、Claude Codeが使える有料プランかConsoleアカウントが必要です。",
+  "level": "intermediate",
+  "locale": "jp",
+  "locales": [
+    "jp"
+  ],
+  "modules": [
+    {
+      "id": "m1",
+      "title": "はじめる",
+      "summary": "エージェントに初めて仕事を任せ、任せる範囲と戻し方を決めます。",
+      "lessons": [
+        {
+          "id": "cc-01-first-session",
+          "title": "第1回｜最初のタスクを任せる",
+          "estMinutes": 16,
+          "next": {
+            "lessonId": "cc-02-permissions"
+          }
+        },
+        {
+          "id": "cc-02-permissions",
+          "title": "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "cc-03-plan-first"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "title": "頼み方と進め方",
+      "summary": "探索・計画・実装・検証の順で進め、コンテキストを保つ頼み方を身につけます。",
+      "lessons": [
+        {
+          "id": "cc-03-plan-first",
+          "title": "第3回｜探索→計画→実装→コミット",
+          "estMinutes": 19,
+          "next": {
+            "lessonId": "cc-04-verify"
+          }
+        },
+        {
+          "id": "cc-04-verify",
+          "title": "第4回｜検証を任せる：テスト・レビュー・説明",
+          "estMinutes": 19,
+          "next": {
+            "lessonId": "cc-05-context"
+          }
+        },
+        {
+          "id": "cc-05-context",
+          "title": "第5回｜コンテキストを管理する",
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "cc-06-claude-md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "title": "プロジェクトに合わせて育てる",
+      "summary": "CLAUDE.md・スキル・サブエージェント・フック・MCPで、自分のプロジェクトに合わせます。",
+      "lessons": [
+        {
+          "id": "cc-06-claude-md",
+          "title": "第6回｜CLAUDE.mdで前提を伝える",
+          "estMinutes": 19,
+          "next": {
+            "lessonId": "cc-07-skills-subagents"
+          }
+        },
+        {
+          "id": "cc-07-skills-subagents",
+          "title": "第7回｜手順はスキルに、調べものはサブエージェントに",
+          "estMinutes": 18,
+          "next": {
+            "lessonId": "cc-08-hooks-mcp"
+          }
+        },
+        {
+          "id": "cc-08-hooks-mcp",
+          "title": "第8回｜フックで守らせ、MCPでつなぐ",
+          "estMinutes": 18,
+          "next": {
+            "lessonId": "cc-09-parallel-automation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "m4",
+      "title": "チームと自動化",
+      "summary": "並列と無人実行、安全とコストを押さえ、自分のリポジトリで環境を組み立てます。",
+      "lessons": [
+        {
+          "id": "cc-09-parallel-automation",
+          "title": "第9回｜並列で進める・自動で回す",
+          "estMinutes": 20,
+          "next": {
+            "lessonId": "cc-10-safety-cost"
+          }
+        },
+        {
+          "id": "cc-10-safety-cost",
+          "title": "第10回｜安全とコストを管理する",
+          "estMinutes": 17,
+          "next": {
+            "lessonId": "cc-11-capstone"
+          }
+        },
+        {
+          "id": "cc-11-capstone",
+          "title": "第11回 総合演習｜自分のリポジトリにClaude Code環境をつくる",
+          "estMinutes": 19
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "claude-code",
+    "ai-agent",
+    "developer-tools"
+  ]
+}

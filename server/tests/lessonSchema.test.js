@@ -124,9 +124,10 @@ describe('validateLesson errors', () => {
   it('lessons:validate exits 0 on the repository content', () => {
     const result = runCli('validate.mjs', []);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    // 12 Vibe chapters plus content/examples/blocks-gallery.lesson.json (WP-05).
-    const summary = /(\d+) lesson files, 1 course file: no errors/.exec(result.stdout);
-    assert.ok(summary && Number(summary[1]) >= 13, result.stdout);
+    // 12 Vibe chapters, the Claude Code lessons and content/examples/blocks-gallery.lesson.json;
+    // course files: vibe-coding and claude-code.
+    const summary = /(\d+) lesson files, (\d+) course files?: no errors/.exec(result.stdout);
+    assert.ok(summary && Number(summary[1]) >= 13 && Number(summary[2]) >= 2, result.stdout);
   });
 
   it('names unknown block types and unknown fields', () => {

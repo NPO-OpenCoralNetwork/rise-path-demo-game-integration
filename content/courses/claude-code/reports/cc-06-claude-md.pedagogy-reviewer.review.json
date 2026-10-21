@@ -1,0 +1,163 @@
+{
+  "lessonId": "cc-06-claude-md",
+  "file": "content/courses/claude-code/lessons/cc-06-claude-md.lesson.json",
+  "lessonHash": "sha256:e4875adb69003830",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 3,
+      "evidence": "Each of the 3 can-do objectives has 2 or more graded questions, and each has one at apply level or higher (o1: q4, e1, e2; o2: q2, q3, e3; o3: q5, e6). Two gaps hold this at 3. o1 names 「CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール」, but e2 tests choosing a hook (answer 「フックで自動的に実行させる」), and e1 tests when AGENTS.md is read. Only q4 is a direct choice among the places o1 names.",
+      "blockIds": [
+        "s3-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 sets a concrete scene in 3 sentences: the repeated 「テストは `npm run test:unit` で」 and the senior's 300-line CLAUDE.md with 「`.env` は絶対に読まない」. It ends on 「`.env` の読み取りをどう止めるか、予想してみましょう」. q0 is an ungraded predict item on o3, and its explanation points ahead to 6-4. There is no trivia or statistic.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "The 5 prerequisite titles match the titles of cc-01 to cc-05 in content/courses/claude-code/course.json word for word. The lesson recalls earlier lessons where it needs them (「第1回と第5回で見たとおり」 in s1-lead, 「第2回で書いた、ツールの使用を…」 in s4-defs). Terms are defined before use, with English on first use. The glossary セッション entry agrees with s1-lead and with the feedback on e6 option a.",
+      "blockIds": [
+        "s1-lead",
+        "s1-defs",
+        "s3-defs",
+        "s4-defs"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "measure.mjs reports 「prose 2399 (budget 1,200–2,400) · questions 9 · est 19.3 min (must be ≤ 20; estMinutes 19)」, and lint --strict finds 0 warnings. Each segment has 3 or fewer new terms. Two things hold this at 3. s3 packs 3 new terms, a code block, a diagram, a callout and a check into one segment. Also, 自動メモリ（auto memory） is defined in s1-defs, but no later block or question uses it.",
+      "blockIds": [
+        "s1-defs",
+        "s3-defs",
+        "s3-code",
+        "s3-diagram"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s5-steps is a complete worked example placed before practice. Its 6 steps have subgoal labels (「① コードからわかる行を消す」 to 「⑥ 自分だけの好みをローカルへ移す」), and each gives a reason in md and a result in expect. The result is correct: 「チームのCLAUDE.mdは2行になります」 (the rewritten test line and the path to the procedure). There is no faded example between it and the independent 19-line practice.",
+      "blockIds": [
+        "s5-lines",
+        "s5-steps"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Each of s1 to s4 ends with an inline check, and every wrong option has feedback. In q2 the learner repairs a conflict, in q3 judges which line can go, and in q4 places a 10-line rule set. q5 can still be answered by recognition: its answer 「CLAUDE.mdは判断の材料として読まれ、強制はされないから」 restates s4-lead (「参考に判断しますが、必ず守るという保証はありません」) and the section title 「書いても強制にはならない」.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s4-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 3,
+      "evidence": "Every misconception in the brief appears as a distractor, with feedback of 2 sentences or fewer. Override instead of concatenation: q2 b, e1 a. `@` reducing context: q4 c, e3 a. Length or the 200-line limit as a guarantee: q5 b, e6 b. 「覚えている」: e6 a. Auto mode: e6 d. But 「IMPORTANT」 is a wrong answer in 5 of the 9 items (q0 a, q2 a, q5 a, e2 a, e3 c), so a learner can rule it out by pattern.",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s4-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "s3-diagram is a model visual. It has 5 nodes, labels in the text's own terms, alt text, and a caption that states the takeaway (「減らせるのは paths: 付きのルールです」). The s1-table labels clash with its caption 「（広い順）」: 「どこでも」 comes after 「組織全体」 but sounds broader, and 「ここだけ」 vs 「チーム」 mixes where with who.",
+      "blockIds": [
+        "s3-diagram",
+        "s1-table",
+        "s2-table",
+        "s4-table"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 4,
+      "evidence": "The task is authentic and asks for near transfer. The 19-line file in practice-setup adds new cases: 「編集したら毎回必ず npm run format」 becomes a hook candidate, and two test lines are combined. The hint ladder has 3 levels (the pr-decide hint, its troubleshoot, then practice-hint3), followed by a 7-item checklist and a model answer (practice-answer and practice-answer-settings). practice-hint3 matches the answer. Highlight 6–12 covers the 4 kept items and the HTML comment that practice-answer-why explains.",
+      "blockIds": [
+        "practice-setup",
+        "practice-steps",
+        "practice-hint3",
+        "practice-checklist",
+        "practice-answer",
+        "practice-answer-why"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "summary-points (4 points) comes after the exam. summary-next asks a reflection question (「ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか」). It names the next lesson 「第7回｜手順はスキルに、調べものはサブエージェントに」, which matches the `next` link (cc-07-skills-subagents) in course.json. summary-cards has 7 cards, and summary-ask offers 3 tutor prompts.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 4,
+      "evidence": "All 5 confirmed findings in audit-cc-06-claude-md.json are fixed in the current text. The 「作業フォルダーとその上に」 condition and 「`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます」 are in s3-defs, and the cat/head condition is in q4 and card-paths. The claims I checked against facts-cc-06-claude-md.md hold: 200 lines or 25KB for MEMORY.md, imports nested up to 4 levels, edits applying after /clear, /compact or a restart, HTML comments stripped, and 5 anti-patterns. The s4-table destinations match the blog page the audit saved (「the enforcement methods are hooks and permissions」, 「Use local files for personal preferences」). The version is pinned (「Claude Code v2.1.304」).",
+      "blockIds": [
+        "s3-defs",
+        "s3-check",
+        "s2-pitfall",
+        "s4-table",
+        "s4-close",
+        "practice-answer-why",
+        "summary-cards"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "Learner-facing text keeps です・ます and a warm tone (「まず…予想してみましょう」, 「迷ったら…確かめましょう」). The plain-form lines in practice-setup (a sample file) and the casual replies in e6 (a colleague speaking) are deliberate voices. lint --strict finds no banned phrase or over-long sentence. I leave wording to the ja-editor.",
+      "blockIds": [
+        "hook-b1",
+        "s3-info",
+        "practice-setup",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The only declared locale, jp, is complete, diagram labels included. The s3-diagram alt text describes exactly what is drawn, and the diagram has a caption. The link text says where it leads (「公式ドキュメント（日本語）」).",
+      "blockIds": [
+        "s3-diagram",
+        "s3-info"
+      ]
+    }
+  ],
+  "average": 3.46,
+  "mustFix": [],
+  "niceToHave": [
+    "check-quiz e2 option a (miscon): 「IMPORTANT」 is a wrong answer in 5 of the 9 items, so learners can rule it out by pattern. Replace the e2 a md with 「CLAUDE.mdに「編集したら必ず整形する」と書く」. Keep its feedback, which already names this misconception.",
+    "s4-check q5 option c (active): the answer restates s4-lead and the section title. Replace its md with 「CLAUDE.mdの行は、Claude Codeが操作を止める設定ではないから」.",
+    "s1-table (visual): the caption says 「（広い順）」, but 「どこでも」 comes after 「組織全体」 and reads as broader. Replace the caption with 「CLAUDE.mdの4つの置き場所と届く範囲（読まれる順）」, or replace row 2 col 1 with 「自分全般」. The ja-editor confirms the wording.",
+    "objectives o1 (align): e2 assesses choosing a hook, which o1 does not list. Change the o1 text to 「指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール・フック）を、内容に合わせて選べる」. Changing an objective forces a full review in the next round.",
+    "check-quiz e6 option a (load): s1-defs teaches auto memory, but nothing uses it later. Replace the md with 「「Claudeが自動メモリにも書いたから、もう確実だよ」」 and its feedback with 「自動メモリもCLAUDE.mdと同じく、読まれる頼みごとです。止めたい操作は、拒否ルールやフックで決めておきます。」.",
+    "content/courses/claude-code/briefs/cc-06-claude-md.md: the brief still describes the draft state. Its header says 「# Brief: vibe-coding/cc-06-claude-md」, and its course line says the draft lives in `vibe-coding/drafts/` with `courseId: \"vibe-coding\"` and no `next`. Update both to claude-code/lessons, with `next` cc-07-skills-subagents, so later rounds read the right context.",
+    "Budget guard: prose is at 2399 of the 2,400 cap (measure.mjs). Offset any text a fix adds with an equal cut."
+  ],
+  "verdict": "pass",
+  "summary": "Full review, which the gate requires after publishing. Comparing the lesson with the snapshot from the previous round (sha256:2b49a5e74f15af83) shows one change, courseId vibe-coding → claude-code. The new hash is sha256:e4875adb69003830. I re-read the whole lesson as a learner and re-scored every criterion from the current text. The prerequisites and the next-lesson name now match content/courses/claude-code/course.json. All criteria score 3 or more, the mean is 3.46 and there is no must-fix item. validate and lint --strict are clean, and measure.mjs gives est 19.3 min with prose at 2399 of 2400. In the previous round I raised a doubt about the source of the s4-table 禁止→拒否ルール row. The blog text saved by the audit settles it (「the enforcement methods are hooks and permissions」), so I dropped it. The criteria at 3 (align, load, worked, active, miscon, visual, voice) stay there for the reasons above. The niceToHave items show how to raise them."
+}

@@ -1,0 +1,78 @@
+{
+  "lessonId": "cc-03-plan-first",
+  "file": "content/courses/claude-code/lessons/cc-03-plan-first.lesson.json",
+  "lessonHash": "sha256:50da68311b84aa11",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:a0ee84f2b69dd0e5",
+    "previousReview": ".artifacts/review/claude-code/cc-03-plan-first/a0ee84f2b69dd0e5/round-1/ja-editor.review.json",
+    "changed": [
+      "s2-version",
+      "s4-good-spec",
+      "s4-community",
+      "summary-cards"
+    ],
+    "changedShare": 0.06,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "The changed text keeps です・ます and a plain, warm voice: s2-version 「autoモードからShift + Tabを押すと、Manual→acceptEdits→プランモードの順に変わります。起動時のモードは、第2回で見たとおりです。」, s4-good-spec 「役立つ仕様には、関わるファイルと、関数名などほかのコードとのつなぎ目を書きます。」 and s4-community 「仕様づくりには、cc-sddのようなコミュニティのツールもあります。」 The card-good-spec back keeps the parallel 「〜を書く、〜を書く、〜で終える、の3つです。」 form. Lint shows 0 banned-phrase findings. Unchanged blocks are as in round 1.",
+      "blockIds": [
+        "s2-version",
+        "s4-good-spec",
+        "s4-community",
+        "summary-cards"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2295 (budget 1,200–2,400) · est 19.1 min (must be ≤ 20; estMinutes 19)」. Prose went down from 2393, is within budget and matches estMinutes. s4 no longer introduces インターフェース or スキル. s2-version is now a 2-sentence recall with no version details.",
+      "blockIds": [
+        "s2-version",
+        "s4-good-spec",
+        "s4-community"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "The changes remove two new terms and add no undefined ones. 「つなぎ目」 is explained in place in s4-good-spec (「関数名などほかのコードとのつなぎ目」), and card-good-spec uses the same word: 「関わるファイルとつなぎ目（関数名など）を書く」. s2-version points back to 第2回, and cc-02-permissions does teach the same order (「autoから押すとManual → `acceptEdits` → プランモード（plan mode）と進みます」) and the starting mode. No glossary entry names インターフェース or スキル, so nothing became inconsistent.",
+      "blockIds": [
+        "s2-version",
+        "s4-good-spec",
+        "summary-cards",
+        "lesson"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The lesson declares only jp, and lint has no locale-plain-string findings. s2-version no longer has a link, so the round-1 weak spot (link text that named a topic, not its destination) is gone. The s2-flow alt text and caption are unchanged.",
+      "blockIds": [
+        "s2-version",
+        "s2-flow"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s2-version: 「第2回で見たとおり」 asks the learner to recall the starting mode without naming it. Adding the common case helps learners who study alone — 「起動時のモードは、第2回で見たとおりです。」→「起動時のモード（多くの場合はauto）は、第2回で見たとおりです。」",
+    "s2-version: notation differs from cc-02-permissions, which writes 「Manual → `acceptEdits` → プランモード」 with code formatting and spaces. Aligning the two helps learners match them — 「Manual→acceptEdits→プランモード」→「Manual → `acceptEdits` → プランモード」",
+    "s4-community: in this lesson 「ツール」 already names Claude's own tools (AskUserQuestionツール, glossary 「Claudeが選択肢つきの質問をするためのツール」), so 「コミュニティのツール」 could suggest cc-sdd is that kind of tool — 「cc-sddのようなコミュニティのツールもあります。」→「cc-sddのような、コミュニティが作った仕組みもあります。」 (title 「コミュニティのツール」→「コミュニティの仕組み」)",
+    "sources: the cc-sdd source title still says 「仕様駆動開発のスキル集」, but s4-community no longer uses スキル. If source titles are shown to the learner — 「cc-sdd（仕様駆動開発のスキル集）」→「cc-sdd（仕様駆動開発のツール集）」",
+    "summary-cards: card-good-spec still says 「役に立つ」, while s4-good-spec and ps-spec.hint say 「役立つ」 (still open from round 1) — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
+    "summary-cards: on its own, 「つなぎ目」 is vague on the card. Matching s4-good-spec makes it clear — 「関わるファイルとつなぎ目（関数名など）を書く」→「関わるファイルと、ほかのコードとのつなぎ目（関数名など）を書く」",
+    "practice-spec-model: the つなぎ目 condition from s4-good-spec is still missing from the model answer (round-1 item, reworded for the new term) — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとほかのコードとのつなぎ目、範囲外のこと、」",
+    "summary-points, s1-table, practice-model, q4, ex-explore, s1-rich: the round-1 niceToHave items in these unchanged blocks are still open; see the previous review."
+  ],
+  "average": 4,
+  "verdict": "pass",
+  "summary": "Verification round (review-scope exit 0, 4 of 44 blocks changed, 6%). Round 1 had no open must-fix items, so there are no resolved entries. The changed blocks (s2-version, s4-good-spec, s4-community, summary-cards) are correct, natural Japanese in です・ます. They introduce no new undefined terms and do not conflict with the glossary or with cc-02-permissions. Lint is clean, and measure.mjs shows prose 2295 and est 19.1 min (estMinutes 19). No new must-fix items. The optional fixes are to name the usual starting mode in s2-version, to avoid the second meaning of 「ツール」 in s4-community, and to keep 「つなぎ目」 the same across the card and the practice model answer."
+}

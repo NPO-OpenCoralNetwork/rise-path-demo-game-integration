@@ -1,0 +1,172 @@
+{
+  "lessonId": "cc-10-safety-cost",
+  "file": "content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json",
+  "lessonHash": "sha256:8a9d7701d14a41d6",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "Three can-do objectives with Bloom levels: o1 analyze, o2 apply, o3 analyze. Each is assessed at least twice outside the ungraded q0: o1 by q1, q2, e1 and e2; o2 by q3 (apply), e3 (apply, transfer to `~/.aws/`) and e4; o3 by q4, e5 and e6. lessons:lint --strict reports 0 warnings.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-b1 sets a concrete scene in 3 sentences (「知らないリポジトリをcloneし…」「`ANTHROPIC_API_KEY` が残っています」) and then asks 「何が起こりうるでしょうか。」. The predict question q0 is a multi-select, and its explanation points ahead to 10-1, 10-2 and 10-5. There is no trivia or statistics.",
+      "blockIds": [
+        "hook-b1",
+        "hook-predict"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "evidence": "Prerequisites list 第2回 and 第5回 through 第9回. New terms are defined before use: プロンプトインジェクション in s1-defs, VM glossed in s1-practices, ワークスペースの信頼 and サンドボックス in s2-defs, クラウドセッション inline in s2-isolate, エフォート in s5-md2 before s5-table. A few terms are never explained: `/status` (s5-table, e5, practice), `--bare` (s2-isolate) and Console (e5).",
+      "blockIds": [
+        "s1-defs",
+        "s2-defs",
+        "s2-isolate",
+        "s5-md2",
+        "s5-table"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "measure.mjs gives 「prose 1887 (budget 1,200–2,400) · est 17.3 min (must be ≤ 20; estMinutes 17)」, and lint is clean. Every segment ends with a table, diagram or check. s2 is at the 3-new-term limit and also brings in Seatbelt, bubblewrap and `--bare`. The second paragraph of s5-md2 strings three unrelated asides together (`-p` and the key, `/clear` versus `/compact`, the definition of エフォート).",
+      "blockIds": [
+        "s2-defs",
+        "s2-sandbox",
+        "s2-isolate",
+        "s5-md2"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 3,
+      "evidence": "s3-steps is a worked example with 4 labelled subgoals, each with an expect, followed by s3-code and then q3. p-deny applies the same form to `.env` and `secrets/` (hint 「10-3の `keys/**` と同じ形です。」). ex-target gives no reason, and the audit and bill parts of the practice have no worked example besides the lookup tables.",
+      "blockIds": [
+        "s3-steps",
+        "s3-code",
+        "practice-steps-deny"
+      ]
+    },
+    {
+      "id": "active",
+      "score": 3,
+      "evidence": "Inline checks follow s1, s2, s3 and s5; only s4 has none, so there are never 2 content sections in a row without a check. q1 (`curl … | bash` from a web page), q3 (`certs/**`) and q4 (Pro limit after chat use) are application scenarios. q2 (「知らない人の公開リポジトリを試したいとき、公式ドキュメントが勧める方法」) can be answered by looking up s2-table row 2 just above it.",
+      "blockIds": [
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "Every wrong option has feedback of at most 2 sentences that names a real misconception and gives the reason. For example, q1-d 「CLAUDE.mdは助言で、強制ではありません」, q2-b sandbox scope, q3-d `.claudeignore`, e3-b single `/`, e5-b 「`/usage` の金額は手元の見積もり」 and e6-a 「`/compact` は…それ自体が大きな要求」. These match the brief's misconception list 1–7.",
+      "blockIds": [
+        "hook-predict",
+        "s1-check",
+        "s2-check",
+        "s3-check",
+        "s5-check",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 3,
+      "evidence": "s2-layers is a 5-node structural diagram with Japanese labels, a caption and alt text. There are no images and both tables have 2 columns. But the caption 「VMやクラウドセッションはClaude Code全体を…囲みます」 describes a layer that is not drawn. The edge label 「サンドボックスの中」 suggests the sandbox is always on, although s2-defs says 「既定はオフです」.",
+      "blockIds": [
+        "s2-layers",
+        "s2-table",
+        "s5-table"
+      ]
+    },
+    {
+      "id": "practice",
+      "score": 3,
+      "evidence": "An authentic audit of 田中さん's settings and habits leads to a hands-on deny-rule test in a dummy folder (with a prediction before sending practice-prompt-read) and a bill explanation. There is a 4-item checklist and model answers (practice-answer-rule, practice-prompt-review.expect). The hint ladder is shallow: p-audit has one hint, and p-bill's troubleshoot already gives the answer. practice-case-habits states 「`.env` と `secrets/` に拒否ルールがない」 outright.",
+      "blockIds": [
+        "practice-steps",
+        "practice-steps-deny",
+        "practice-prompt-read",
+        "practice-steps-bill",
+        "practice-prompt-review",
+        "practice-checklist"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "The summary section comes after the exam. It has 3 points, a reflection question (「自分の環境で、田中さんと同じ状態になっているものはありますか。」), a next step to 第11回, 7 flashcards that each test a distinct point (for example card-clear and card-usage), and askTutor suggestions.",
+      "blockIds": [
+        "summary-points",
+        "summary-next",
+        "summary-cards",
+        "summary-ask"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 3,
+      "evidence": "The version is pinned in the subtitle (v2.1.304), and every factual block cites official pages. The fixes from audit-cc-10-safety-cost.json are applied: the 17% figure is dated to 「2026年3月の公式記事」, the auto default is scoped to the terminal and VS Code, and s2-isolate names hooks and `.mcp.json`. Path forms match cross-lesson-facts.md items 4–5. s2-table row 3 「確認なしで何でも動く」 conflicts with the glossary's 拒否ルール 「どの権限モードでも効きます」 (see niceToHave).",
+      "blockIds": [
+        "s1-auto",
+        "s2-isolate",
+        "s2-table",
+        "s3-pitfall",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The text is consistently です・ます, warm and free of banned phrases, and katakana terms carry their English on first use. The offline case is worded three ways: 「オフラインのコンテナかVMだけで使う」 (s2-table), 「ネットにつながらないコンテナやVMの中で使う」 (e2-b) and 「ネットにつながらない隔離環境」 (e1-b).",
+      "blockIds": [
+        "s2-table",
+        "check-quiz",
+        "practice-prompt-review"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The only locale is jp. Link texts are descriptive (「セキュリティの公式ドキュメント」, 「公式の料金ページ」). The diagram labels are Japanese and s2-layers has full alt text. Plain-text fields (checklist labels, var hints, captions) avoid markdown. The alt describes a VM enclosure that the diagram does not draw.",
+      "blockIds": [
+        "s1-md2",
+        "s5-md2",
+        "s2-layers",
+        "practice-checklist"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s2-check q2: make it a scenario that needs analysis rather than a lookup in s2-table row 2. For example, use the prompt 「友人から『このリポジトリのセットアップを手伝って』とURLが届きました。中身は見たことがありません。どう始めますか？」 and keep the options and feedback.",
+    "check-quiz e6: o3 is 「原因を特定できる」, but e6 asks for a remedy and states the cause in the stem. Consider the prompt 「1日じゅう同じセッションで関係のない作業を次々に頼んでいたら、使用量の減りが早くなりました。主な原因はどれでしょう？」, with the answer 「それまでの履歴全体を、毎回送り直している」 and distractors built from the current options.",
+    "factual doubt: s2-table row 3 says 「確認なしで何でも動く」, but the glossary (拒否ルール) and e4-b say deny rules work in every mode. The audit kept the cell because it matches the docs' summary table. To remove the internal tension, consider 「強い権限（`bypassPermissions`）：拒否ルール以外は確認なしで動く」 and check it against the permission-modes page.",
+    "s2-layers: the caption and alt describe a VM layer that is not drawn, and the edge 「サンドボックスの中」 hides that the sandbox is off by default. Change the edge label to 「サンドボックス（オン時）の中」, or draw the outer layer as a mobile-safe subgraph and re-check the preview at 390 px.",
+    "s2-layers: hooks are said to run outside the sandbox (s2-sandbox, e2-c, card-sandbox), but the diagram does not show them. Consider adding a node such as `F[\"リポジトリのフック\"]` with `C -->|サンドボックスの外| F`.",
+    "s5-table row 1 and the practice rely on `/status`, which the lesson never explains. Add a few words to the action cell, for example 「`/status` で使っている認証を確かめ、キーを外す」.",
+    "s5-md2: its second paragraph holds three unrelated asides. Move each next to its table row: 「（`-p` では承認なしで使われる）」 to row 1, and 「`/compact` はそれ自体が大きな要求」 to row 2. Keep the エフォート definition in s5-md2.",
+    "practice-case-habits: 「`.env` と `secrets/` に拒否ルールがない」 names the problem for the learner. Consider the neutral observation 「プロジェクトに `.env` と `secrets/` があり、`.claude/settings.json` は置いていない」.",
+    "practice-folder: `mkdir cc-practice-10` runs wherever the terminal happens to be. Consider making `cd ~` the first line, so the folder is not created inside `cc-practice`, which already holds a deny rule from 第2回.",
+    "s3-steps ex-target gives no reason for the step. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」 (wording for ja-editor).",
+    "Use one phrase for the offline case across s2-table, e1-b, e2-b, the e2 explanation and practice-prompt-review ①, for example 「ネットにつながらないコンテナやVM」 (wording for ja-editor)."
+  ],
+  "average": 3.31,
+  "verdict": "pass",
+  "summary": "This is a full review: the earlier review chain was recorded under the old course path. The lesson content hash (sha256:8a9d7701d14a41d6) is unchanged since the move. Strongest point: tight alignment, with every objective assessed by inline and exam items whose feedback names a real misconception, plus a hands-on deny-rule test in a dummy folder. No must-fix items; the most useful improvements are making q2 a scenario instead of a table lookup, making e6 test the cause in line with o3, and drawing the diagram layer its caption promises."
+}

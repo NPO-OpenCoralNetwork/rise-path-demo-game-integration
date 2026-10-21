@@ -1,0 +1,57 @@
+{
+  "lessonId": "cc-06-claude-md",
+  "file": "content/courses/claude-code/lessons/cc-06-claude-md.lesson.json",
+  "lessonHash": "sha256:e4875adb69003830",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "All three tables (s1-table, s2-table, s4-table) fit at 390 px with no clipping, and code chips such as ~/.claude/CLAUDE.md and ./.claude/CLAUDE.md move whole to the next line (pages/mobile-jp-04.png, pages/mobile-jp-05.png, pages/mobile-jp-14.png). The s3-diagram flowchart TD has readable Japanese labels at mobile width (pages/mobile-jp-10.png, pages/mobile-jp-11.png). Neither code block needs to wrap at 390 px: practice-setup has 24 lines and practice-answer has 25, and both show line numbers and the highlighted lines 6-12 (pages/mobile-jp-19.png, pages/mobile-jp-25.png).",
+      "blockIds": [
+        "s1-table",
+        "s2-table",
+        "s4-table",
+        "s3-diagram",
+        "practice-setup",
+        "practice-answer"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "No screen is text only (textOnlyScreens is empty for both devices), and every content section ends with a check card. The practice section is the densest part: a 24-line code block, 6 steps, a prompt, a 7-item checklist, the hint callout and a 25-line answer run back to back over about 9 mobile screens (pages/mobile-jp-18.png to pages/mobile-jp-26.png). Desktop charsPerLine has a median of 42, above the 30-40 target, because of the reader's 680 px measure.",
+      "blockIds": [
+        "practice-setup",
+        "practice-steps",
+        "practice-checklist",
+        "practice-hint3",
+        "practice-answer"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The screens are Japanese throughout, apart from technical terms that are intentionally in English (Memory files, deny, paths:). The diagram has an alt text and Japanese labels. Contrast is good on the callouts (pages/mobile-jp-08.png pitfall, pages/mobile-jp-11.png info). The top and bottom bars hide no controls: the answer buttons and the 完了 checkboxes stay visible (pages/mobile-jp-06.png, pages/mobile-jp-17.png). No personal data appears on any screen: the desktop sidebar shows only the EN/JP switch and the header shows only the course and lesson titles.",
+      "blockIds": [
+        "s3-diagram",
+        "s2-pitfall",
+        "s3-info"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-steps / s5-steps: each step title starts with a circled number (① 見本を置く) right next to the reader's own number badge 1, so every step shows its number twice (pages/mobile-jp-17.png, pages/mobile-jp-20.png). Remove the ①–⑥ from the titles.",
+    "practice-checklist: checklist labels show paths and commands as plain bold text (.env, .claude/settings.json, paths:, /context), so they don't look like the code they refer to. On mobile, '.env と git push の禁止' also breaks before 'が、' (pages/mobile-jp-23.png). Rephrase so the line breaks fall more naturally, e.g. 'deny に .env と git push の禁止があります'.",
+    "practice-prompt: the prompt body shows literal backticks around `.claude/settings.json`, `CLAUDE.local.md` and `@` (pages/mobile-jp-22.png). This is acceptable because Claude reads Markdown, but the text would be cleaner with 「」 instead of backticks.",
+    "practice-hint3: the 'answer-near' hint callout is shown expanded directly above the model answer (pages/mobile-jp-24.png, pages/mobile-jp-25.png), so the learner sees both without asking for them. Consider a collapsible form if the block supports one.",
+    "reader: desktop charsPerLine median is 42 (max 50), above the JP target of 30-40, because of the 680 px content measure. This is not a lesson defect.",
+    "reader: the mobile full-length PNG stops at 16000 px (pageHeight 23422), so the review relied on the per-screen PNGs. Failed /api/ requests (500 on user/progress, events, notifications) are environment noise."
+  ],
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "No hard failures: overflowX false, 0 console, mermaid, unknown-block or broken-image errors, and no text-only screens. The screenshots show the lesson under review (lessonHash sha256:e4875adb69003830). Tables, the TD flowchart and both long code blocks stay readable at 390 px with whole code chips, and no screen shows personal data. The only remaining polish is in the dense practice section (doubled step numbers, checklist line breaks, the hint shown right before the answer), all listed as niceToHave."
+}

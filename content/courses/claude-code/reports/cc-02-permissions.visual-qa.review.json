@@ -1,0 +1,52 @@
+{
+  "lessonId": "cc-02-permissions",
+  "file": "content/courses/claude-code/lessons/cc-02-permissions.lesson.json",
+  "lessonHash": "sha256:8c52cb12321e5ea5",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "No hard failures in metrics.json: overflowX is false, and console errors, mermaid errors, unknown blocks and broken images are all 0. At 390 px the rule-order flowchart (rules-diagram) fits and its Japanese labels are readable (pages/mobile-jp-09.png). The settings.json code block (example-code) is 10 lines with no wrapping (pages/mobile-jp-12.png), and the definition cards (rules-defs, auto-defs) stack cleanly (pages/mobile-jp-08.png).",
+      "blockIds": [
+        "rules-diagram",
+        "example-code",
+        "rules-defs",
+        "auto-defs",
+        "rules-files"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "textOnlyScreens is empty on both desktop and mobile, and a question, figure, code block, callout or step list appears every one or two screens. The desktop JP median line length is 41 characters (max 54), just above the 30 to 40 target. The check-quiz runs about four mobile screens of five questions in a row (pages/mobile-jp-22.png to pages/mobile-jp-26.png).",
+      "blockIds": [
+        "check-quiz",
+        "modes-table",
+        "rewind-table"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Every screen is Japanese, with English terms only in parentheses on first use or as code. Diagram labels are in Japanese. Callout and code-block contrast is good, and no control is hidden under the top or bottom bars (pages/mobile-jp-05.png, pages/mobile-jp-27.png). No line breaks fall inside Japanese words in headings. No personal data appears on any screen.",
+      "blockIds": [
+        "auto-bypass",
+        "example-pitfall",
+        "rules-diagram"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "rewind-prompt: at 390 px the inline filename `rewind-copy.md` in the prompt text breaks at the hyphen into `rewind-` / `copy.md` (pages/mobile-jp-21.png). It is still readable. To avoid it, shorten the name (for example `copy.md`) or start the filename on a new line.",
+    "rules-prompt / rewind-prompt: the backticks around `git push`, `.claude/settings.json` and the {{読ませないファイル}} slot show as literal characters (pages/mobile-jp-20.png, pages/desktop-jp-14.png). That is acceptable for text the learner copies into Claude Code, but the slot wrapped in backticks looks cluttered. Consider removing the backticks around the slot.",
+    "check-quiz: five questions in a row take about four mobile screens (pages/mobile-jp-22.png to pages/mobile-jp-26.png). This is acceptable for an end-of-lesson check, so this item is only a note.",
+    "reader: the desktop JP median line length is 41 characters (target 30 to 40, measure 680 px). This is a reader layout setting, not a lesson defect.",
+    "reader: the full-length PNGs are truncated (desktop 16152 px, mobile 20406 px of the page). The per-screen PNGs cover the whole lesson."
+  ],
+  "verdict": "pass",
+  "summary": "The lesson looks clean at both 390 px and 1440 px. The rule-order flowchart, the settings.json example and the step lists are readable, and inline code chips stay whole without overflow. There are no hard failures and no must-fix items. The only small problems are a filename split at its hyphen and literal backticks in the copy-paste prompt blocks."
+}

@@ -1,0 +1,50 @@
+{
+  "lessonId": "cc-03-plan-first",
+  "file": "content/courses/claude-code/lessons/cc-03-plan-first.lesson.json",
+  "lessonHash": "sha256:50da68311b84aa11",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "metrics.json shows no hard failures: overflowX false, 0 console, mermaid, unknown-block and broken-image errors. The s2-flow diagram is a vertical flowchart, and its Japanese labels (探索/プランモード … コミット) are readable at 390 px (pages/mobile-jp-07.png, mobile-jp-08.png). The definition tables s1-defs, s2-defs and s4-defs stack cleanly on mobile, and practice-starter fits 390 px without sideways scrolling, with lines 13-18 highlighted (mobile-jp-19.png, mobile-jp-20.png).",
+      "blockIds": [
+        "s2-flow",
+        "s1-defs",
+        "s2-defs",
+        "s4-defs",
+        "practice-starter"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "evidence": "No screen is text-only on either device (textOnlyScreens empty), and desktop JP has a median of 38 characters per line (target 30-40). The prose is broken up by tables, steps, prompts and checks. The long prompt blocks s4-interview and practice-spec-model still fill most of a mobile screen as dense text (mobile-jp-16.png, mobile-jp-28.png).",
+      "blockIds": [
+        "s4-interview",
+        "practice-spec-model"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "All visible lesson text and diagram labels are Japanese, with English terms only as glosses (plan mode, diff, edge case). Contrast is good on the light cards and on the dark code blocks. No control is hidden under the top or bottom bars. Inline chips such as `/rewind`, `@src/app.js` and `claude --permission-mode plan` stay whole (mobile-jp-02.png, mobile-jp-03.png, mobile-jp-08.png).",
+      "blockIds": [
+        "hook-predict",
+        "s1-defs",
+        "s2-enter"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "Single-character widows on desktop: option 3 of q2 ends with 「す」 alone on a line (pages/desktop-jp-06.png). The first item of the reflection card (text of objective o1) ends with 「る」 alone on a line (pages/desktop-jp-22.png, desktop-jp-23.png). Shortening each by a few characters would avoid this.",
+    "s4-interview breaks the English gloss 「トレードオフ（trade-off…）」 at the hyphen as 'trade-' / 'off' on both mobile and desktop (pages/mobile-jp-16.png, pages/desktop-jp-10.png). It is still readable; you could drop the English or reword it so the hyphen does not fall at a line end.",
+    "reader: on mobile the flashcard hint says 「クリックまたはスペースキーでめくる」 (pages/mobile-jp-33.png), which does not fit touch devices.",
+    "reader: the mobile full-length PNG is cut off at 16000px, so the per-screen PNGs were used. Failed /api/ requests (13) were ignored as environment noise."
+  ],
+  "verdict": "pass",
+  "summary": "I found no layout, readability or privacy problems on any of the 35 mobile or 23 desktop JP screens, and metrics.json has no hard failures. The vertical s2-flow diagram, the stacked definition tables and the 25-line practice-starter code all read well at 390 px. The only items left are optional: a few single-character line ends and the long, dense prompt blocks."
+}
