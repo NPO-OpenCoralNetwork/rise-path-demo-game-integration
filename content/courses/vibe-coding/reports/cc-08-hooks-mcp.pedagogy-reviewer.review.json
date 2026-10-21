@@ -1,0 +1,184 @@
+{
+  "lessonId": "cc-08-hooks-mcp",
+  "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
+  "lessonHash": "sha256:112a650daf9ca3d0",
+  "reviewer": "pedagogy-reviewer",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:dc1fce75fb87584d",
+    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "s5-check",
+      "practice-b-quiz",
+      "summary-next"
+    ],
+    "changedShare": 0.04,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "align",
+      "score": 4,
+      "evidence": "There are still three objectives, and each is assessed by at least 3 questions (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8). The changed q4 and q9 keep objectiveId o3 and bloom evaluate. The q4 stem still asks for the first thing to check before installing (「入れる前に、いちばん優先して確かめることはどれでしょう？」). The rewritten q9 options a and d still make the learner judge A and B together. The transfer items q5 and q8 are unchanged.",
+      "blockIds": [
+        "s5-check",
+        "practice-b-quiz",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "hook",
+      "score": 4,
+      "evidence": "hook-problem sets out a concrete failure in 2 sentences (「CLAUDE.mdに「`.env` は編集しないこと」と書いたのに、Claudeが `.env` を書き換えようとしました。」) and adds a version line. hook-predict is ungraded, and option d (Manual) is a real near-miss. The q0 explanation names 「第2回の拒否ルールのように」 as another mechanism.",
+      "blockIds": [
+        "hook-problem",
+        "hook-predict"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "evidence": "The prerequisites list lessons 2, 6 and 7, jq and JSON editing, and s2-setup starts with `jq --version`. Earlier lessons are recalled in s1-lead (「第6回のとおり」「第2回の権限ルールやフック」) and s5-lead (「第7回のスキルやサブエージェントは」). The definitions blocks match the glossary word for word. One gap: `onFailure` appears in s3-pitfall without a gloss.",
+      "blockIds": [
+        "s1-lead",
+        "s1-defs",
+        "s2-defs",
+        "s4-defs",
+        "s5-defs",
+        "s3-pitfall"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "measure.mjs prints 「prose 1897 (budget 1,200–2,400) · read 2883 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)」. Prose grew by only 5 characters, and estMinutes 18 still matches the estimate rounded. The added gloss 「PR（プルリクエスト）」 keeps the q4 first sentence near 45 characters. The new first paragraph of summary-next (the question plus the guide sentence) is about 90 visible characters. lint --strict reports 0 warnings.",
+      "blockIds": [
+        "s5-check",
+        "practice-b-quiz",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "worked",
+      "score": 4,
+      "evidence": "The s2 worked example is complete. ex-test says 「下の③の最初の4行は1つのコマンドで」, which matches s2-test. Its expect names what to swap (「`rm notes.txt` を `ls` に変えると `0` です」). The practice fades the example with the same JSON layout (p-predict).",
+      "blockIds": [
+        "s2-script",
+        "s2-steps",
+        "s2-test",
+        "practice-steps"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "active",
+      "score": 4,
+      "evidence": "There are inline checks in s1, s2, s3, s5 and the practice. q9 remains an evaluate item with crossed A×B options, and every wrong option has feedback (b 「社内製でも、課題には社外の人が書いた文章が混ざります。」, c 「閉じるツールは、権限ルールで外せます。」, d 「フックが外から取ってくるスクリプトは前もって確かめられません。」). Options a and d now share the same A half (「Aは閉じるツールを拒否ルールで外して試し」), so the item still hinges on the B judgment and gives nothing away. The model tables still come after the quiz. The q4 change is a gloss only. The correct answer for q9 is still in first position.",
+      "blockIds": [
+        "practice-b-quiz",
+        "s5-check",
+        "s1-check",
+        "s2-check",
+        "s3-check"
+      ]
+    },
+    {
+      "id": "miscon",
+      "score": 4,
+      "evidence": "All 6 misconceptions in the brief are still corrected with a reason, and the feedback on q4 and q9 did not change. 「社内製なら安全」 is corrected in q9 b, 「作者とソースがわかれば入れてよい」 in q9 d (「フックは権限ルールでも絞れません」), and 「公式なら安全」 in q4 d (「マーケットプレイスの名前は、カタログの出し手を示すだけです。」). The new wording in options a and d (「拒否ルールで外して」) also stops learners from thinking an allow rule removes a tool. That fits cc-02-permissions, where a tool that matches no rule falls to the permission mode (「権限モードに従う」).",
+      "blockIds": [
+        "practice-b-quiz",
+        "s5-check",
+        "hook-predict",
+        "s3-zero",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "s1-lifecycle is a 6-node process diagram with Japanese labels that match the text. The edge 「通す（権限の確認へ）」 agrees with s3-table. The caption states the takeaway, and the alt text describes both paths. All tables have 2 columns, and there are no decorative images.",
+      "blockIds": [
+        "s1-lifecycle",
+        "s3-table",
+        "s4-scopes",
+        "s5-checks",
+        "practice-b-model",
+        "practice-b-model-b"
+      ],
+      "carriedOver": true
+    },
+    {
+      "id": "practice",
+      "score": 4,
+      "evidence": "Part 1 is unchanged: it is authentic and faded, has a hint ladder and lists 5 success criteria in practice-checklist. In part 2, q9 option a (「閉じるツールを拒否ルールで外して試し」) agrees with the model write-up practice-b-model-b (「閉じるツールは権限ルールで外せる」) and with the facts in practice-b-task (「課題を読むツールと閉じるツールを持ち」). The hint 「8-5の表の6項目を…埋めてから比べましょう」 still fits.",
+      "blockIds": [
+        "practice-b-task",
+        "practice-b-quiz",
+        "practice-b-model",
+        "practice-b-model-b",
+        "practice-checklist"
+      ]
+    },
+    {
+      "id": "meta",
+      "score": 4,
+      "evidence": "summary-points (4 points) comes after the exam. summary-next still opens with the reflection question 「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」. The descriptive link now comes before the next-lesson note (「次は「第9回｜並列で進める・自動で回す」です。」), and the link sentence names its topic (「フックの最新の情報は、」). There are 7 flashcards, and card-before-install matches s5-checks.",
+      "blockIds": [
+        "summary-next",
+        "summary-points",
+        "summary-cards"
+      ]
+    },
+    {
+      "id": "accuracy",
+      "score": 4,
+      "evidence": "No new claim in the changes lacks support. Removing the close tool with a deny rule agrees with this course's own permission model (cc-02-permissions diagram: 「許可ルールに一致？」 →いいえ→ 「権限モードに従う」). It also agrees with facts-cc-08-hooks-mcp.md (「set permissions for MCP tools (e.g. deny `mcp__*`, or allow only `mcp__<server>__*`)」). The block keeps cite [cc-plugin-security, cc-mcp]. The gloss 「PR（プルリクエスト）」 is correct and matches cc-09 (「PR（プルリクエスト）」). The link URL is unchanged. validate reports 0 errors and lint --strict reports 0 warnings.",
+      "blockIds": [
+        "practice-b-quiz",
+        "s5-check",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "The changed text uses です・ます and a soft tone (「確かめましょう。」「どれでしょう？」). 「拒否ルール」 is the course term from cc-02 (「拒否ルール（deny）」) and also appears in this lesson's q0 explanation and a flashcard (「フックと拒否ルール（deny）は、どう使い分ける？」). There are no banned phrases. The ja-editor owns the wording.",
+      "blockIds": [
+        "practice-b-quiz",
+        "s5-check",
+        "summary-next"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "The only locale (jp) is complete, and the link text is still descriptive (「フックの公式ガイド（日本語）」) after it moved to the first paragraph of summary-next. The diagram labels are in Japanese, and the alt text covers both paths. Plain-text fields carry no markdown.",
+      "blockIds": [
+        "summary-next",
+        "s1-lifecycle",
+        "practice-checklist",
+        "practice-prompt"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-b-quiz q9 (changed block): option a now says 「拒否ルールで外して」, but the explanation and the c feedback say 「権限ルールで外し」 and 「権限ルールで外せます」. Neither says why a deny rule is needed. Change the second explanation sentence to \"Aは閉じるツールを拒否ルールで外し、課題に紛れた指示も考えて、読むツールだけで試します。許可ルールだけでは、閉じるツールは権限モードしだいで動けてしまいます。\" and the c feedback to \"閉じるツールは、拒否ルールで外せます。出どころと作者がわかるAは、読むツールだけで試せます。\"",
+    "practice-b-quiz q9 (changed block, order unchanged): the correct option a is still first in array order, and so is the answer to q7 (check-quiz). The reader shows options in array order, so put q9's options in the array order b, c, a, d.",
+    "summary-next (changed block): the reflection question now shares a paragraph with the link sentence, so learners may not pause on it. Give it its own paragraph: \"あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？\\n\\nフックの最新の情報は、[フックの公式ガイド（日本語）](https://code.claude.com/docs/ja/hooks-guide)で確かめましょう。\\n\\n次は「第9回｜並列で進める・自動で回す」です。複数の作業を並行して動かし、自動化する方法を学びます。\"",
+    "s4-add (unchanged): the comment reads `# claude mcp add <名前> -- <コマンド>`, but s4-transport says 「`--` の後に起動コマンドを書きます」. If the code width allows, change the comment to \"# claude mcp add <名前> -- <起動コマンド>\".",
+    "s3-check q3 (unchanged): option b repeats the s3-table phrase 「hook error」, so learners can pick it by that phrase alone. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\".",
+    "s4 (unchanged): no objective or question covers scopes, yet summary-points[2] and card-scopes are about them. Either tie scopes to o3 with a q8 distractor about committing to `.mcp.json` at `project` scope before trying the server at `local` scope, or cut summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
+    "s3-zero (unchanged): it repeats the table cell 「（許可ではない）」. Change the s3-table cell to \"進む。表示はなく、ふだんの権限の確認へ\".",
+    "s3-pitfall (unchanged): gloss `onFailure` on first use: \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
+    "check-quiz q8 (unchanged): add \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\" to the explanation, so q8 also names what runs, which q4 taught as the first check."
+  ],
+  "average": 3.85,
+  "verdict": "pass",
+  "summary": "Verification round: review-scope.mjs exited 0 (3 of 49 blocks changed, 4%; sections and objectives unchanged). The previous review had no open must-fix items, so `resolved` is empty. I reviewed all three changed blocks in full. In s5-check, q4 only adds the gloss 「PR（プルリクエスト）」. In practice-b-quiz, q9 options a and d now say 「閉じるツールを拒否ルールで外して試し」, which fits the course's permission model in cc-02-permissions and the cited MCP advice; the answer, feedback and alignment are unchanged. In summary-next, the descriptive link now comes before the next-lesson note. I found no errors or regressions. The q9 explanation still says 「権限ルール」 and does not say why an allow rule is not enough; that is a niceToHave. validate reports 0 errors, lint --strict reports 0 warnings, and measure.mjs gives est 17.8, matching estMinutes 18. Every criterion is 3 or higher, and the mean is 3.85."
+}

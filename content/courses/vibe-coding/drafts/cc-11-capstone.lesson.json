@@ -1,0 +1,1020 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-11-capstone",
+  "courseId": "vibe-coding",
+  "title": "第11回 総合演習｜自分のリポジトリにClaude Code環境をつくる",
+  "subtitle": "CLAUDE.mdから育てる環境と、計画からコミットまでの1サイクル（2026年10月時点、Claude Code v2.1.304）",
+  "locale": "jp",
+  "level": "intermediate",
+  "estMinutes": 19,
+  "prerequisites": [
+    "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+    "第3回｜探索→計画→実装→コミット",
+    "第4回｜検証を任せる：テスト・レビュー・説明",
+    "第5回｜コンテキストを管理する",
+    "第6回｜CLAUDE.mdで前提を伝える",
+    "第7回｜手順はスキルに、調べものはサブエージェントに",
+    "第8回｜フックで守らせ、MCPでつなぐ",
+    "第10回｜安全とコストを管理する",
+    "Gitのcommitの意味がわかる",
+    "練習用フォルダか、作業用ブランチで試せる自分のリポジトリがある"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "CLAUDE.md・スキル・フック・権限ルールを組み合わせて、自分のリポジトリ用のClaude Code環境を設計できる",
+      "bloom": "create"
+    },
+    {
+      "id": "o2",
+      "text": "チェックリストを使って、自分の環境と作業の進め方を評価し、次に足すものを判断できる",
+      "bloom": "evaluate"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：学んだ部品を、どこから組み合わせる？",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "佐藤さんが、自分のToDoアプリでClaude Codeを使い始めます。初日にスキル（skill）5つとフック（hook）3つを一度に入れようとして、手が止まりました。このレッスンでは、環境を設計し、変更を1つコミットまで進めます。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-features-overview"
+          ],
+          "questions": [
+            {
+              "id": "pq0",
+              "kind": "single",
+              "prompt": "佐藤さんが最初の日にそろえるものとして、最も合うのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "学んだ部品を全部入れ、使わなかったものをあとで消す",
+                  "feedback": "全部を一度に入れると、どの部品が効いているのかを確かめられません。公式ドキュメントは、少しずつ足すよう勧めています。"
+                },
+                {
+                  "id": "b",
+                  "md": "CLAUDE.mdだけで始め、同じ困りごとが続いたら1つずつ足す"
+                },
+                {
+                  "id": "c",
+                  "md": "何も用意せず、決まりごとは毎回の依頼文で伝える",
+                  "feedback": "毎回の依頼文で伝えると、手間が増え、伝え忘れも起きます。毎回必要な前提は、CLAUDE.mdに書きます。"
+                },
+                {
+                  "id": "d",
+                  "md": "評判のよいプラグイン（plugin）を入れ、その設定に作業を合わせる",
+                  "feedback": "プラグインは、同じ設定を2つ目のリポジトリでも使うときの部品です。入れる前に、中身を確かめます（第8回）。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "公式ドキュメントは、まずCLAUDE.mdだけで始め、ほかの部品は困りごとが繰り返し起きたときに足すよう勧めています。ただし、秘密情報とpushの守りは例外で、初日から置きます。次のセクションで、どの困りごとにどの部品が合うかを見ます。",
+              "objectiveId": "o1",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "design-rule",
+      "title": "設計のルール：CLAUDE.mdから始め、きっかけが来たら足す",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "dr-b1",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-features-overview"
+          ],
+          "md": "公式ドキュメントは、[[CLAUDE.md]]だけで始め、ほかの部品は必要になってから足すよう勧めています。合図は、同じ困りごとが繰り返し起きること、つまり[[きっかけ]]です。"
+        },
+        {
+          "id": "dr-table",
+          "type": "table",
+          "cite": [
+            "cc-features-overview",
+            "cc-memory"
+          ],
+          "caption": "きっかけと、足す部品（かっこ内は学んだ回。公式ドキュメントの対応表から）",
+          "columns": [
+            "繰り返す困りごと",
+            "足す部品"
+          ],
+          "rows": [
+            [
+              "規約やコマンドを2回まちがえる",
+              "CLAUDE.mdに1行（第6回）"
+            ],
+            [
+              "同じ依頼文や手順を何度も貼る",
+              "[[スキル]]（第7回）"
+            ],
+            [
+              "横道の調べもので会話が埋まる",
+              "[[サブエージェント]]（subagent、第7回）"
+            ],
+            [
+              "例外なく毎回起きてほしいことがある",
+              "[[フック]]（第8回）"
+            ],
+            [
+              "別のリポジトリでも同じ設定を使う",
+              "プラグイン（第8回）"
+            ]
+          ]
+        },
+        {
+          "id": "dr-b2",
+          "type": "markdown",
+          "cite": [
+            "cc-features-overview",
+            "cc-memory",
+            "steering-post",
+            "cc-permissions"
+          ],
+          "md": "CLAUDE.mdとスキルは「お願い」で、保証はありません。Claudeの判断に任せたくないことは、[[フック]]と[[権限ルール]]（permission rule）に置きます。ただし、秘密情報とpushは1回で困るので、きっかけを待たず、初日から権限ルールで守ります。\n\n権限ルールが止めるのは、ルールに一致した操作だけです。スクリプトが自分で開くファイルの読み取りや、`git -C . push` のような別の書き方のpushは、止まりません。"
+        },
+        {
+          "id": "dr-quiz",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-features-overview",
+            "steering-post"
+          ],
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "CLAUDE.mdに「ファイルを編集したらESLintを実行する」と書きましたが、Claudeはときどき実行を忘れます。次に足すものとして、最も合うのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "CLAUDE.mdの同じ行に付ける「IMPORTANT」",
+                  "feedback": "強調しても、CLAUDE.mdはお願いのままです。例外なく毎回起きてほしいことは、フックに置きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "ESLintの手順をまとめたスキル",
+                  "feedback": "スキルの中身も、Claudeへのお願いです。毎回必ず実行させるなら、フックが合います。"
+                },
+                {
+                  "id": "a",
+                  "md": "編集のあとにESLintを実行するフック"
+                },
+                {
+                  "id": "d",
+                  "md": "ESLintの結果を調べるサブエージェント",
+                  "feedback": "サブエージェントは、横道の作業を別のコンテキスト（context）で進める仕組みです。毎回の自動実行は、フックの役目です。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "CLAUDE.mdとスキルの中身は、Claudeへのお願いで、従う保証はありません。「例外なく毎回」がきっかけなので、Claude Codeが必ず実行するフックに置きます。",
+              "hint": "表の中で、「例外なく毎回」に当たる行を探しましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "example",
+      "title": "例題：小さなToDoアプリの環境",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "ex-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "題材は、佐藤さんのToDoアプリ（Node.js、テストは `npm test`）です。①と②は初日に置き、③と④は、きっかけが起きた週に1つずつ足しました。"
+        },
+        {
+          "id": "ex-steps",
+          "type": "steps",
+          "cite": [
+            "cc-memory",
+            "cc-permissions",
+            "cc-permission-modes",
+            "cc-hooks-guide",
+            "cc-skills",
+            "cc-settings"
+          ],
+          "items": [
+            {
+              "id": "ex-claude-md",
+              "title": "① CLAUDE.mdを短く書く",
+              "md": "Claudeがテストのコマンドを2回まちがえたのが、きっかけです。推測できないことだけを書きます。",
+              "expect": "起動し直すと、`/context` の「Memory files」に出ます。"
+            },
+            {
+              "id": "ex-rules",
+              "title": "② 秘密情報とpushに権限ルールを置く",
+              "md": "`.env` には秘密情報があるので、拒否ルール（deny）にします。v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります。そのため、`git push` は確認ルール（ask）にします。",
+              "expect": "`/permissions` に、ルールと設定ファイルの場所が並びます。"
+            },
+            {
+              "id": "ex-hook",
+              "title": "③ 整形をフックにする",
+              "md": "整形の忘れが続いたので、編集のたびにPrettierを走らせます。コマンドは `jq -r '.tool_input.file_path' | xargs npx prettier --write` です。`jq` で編集したファイル名を取り出し、Prettierに渡します。",
+              "expect": "編集したファイルが、毎回整形されます。"
+            },
+            {
+              "id": "ex-skill",
+              "title": "④ 毎回の依頼をスキルにする",
+              "md": "作業のたびに「差分（diff）を説明して」と打っていたので、スキルにします。",
+              "expect": "`/explain-diff` と打つと、今の差分の説明が返ります。",
+              "troubleshoot": "呼べないときは `/reload-skills` を実行します。"
+            },
+            {
+              "id": "ex-share",
+              "title": "⑤ コミットしてチームで使う",
+              "md": "CLAUDE.md、`.claude/settings.json`、`.claude/skills/` をコミットします。",
+              "expect": "チームの人も、同じ環境で始められます。"
+            }
+          ]
+        },
+        {
+          "id": "ex-prompt-claude-md",
+          "type": "prompt",
+          "title": "①のCLAUDE.mdを書いてもらう依頼文",
+          "target": "claude-code",
+          "cite": [
+            "cc-best-practices",
+            "cc-memory"
+          ],
+          "prompt": "CLAUDE.mdを、次の内容で作ってください。書いたら差分を見せてください。\n\n# todo-app\nNode.js 22で作る、小さなToDoアプリ。\n\n## コマンド\n- テスト：`npm test`（コミットの前に必ず実行する）\n- 開発サーバー：`npm run dev`\n\n## 決まりごと\n- データの読み書きは `src/store.js` だけで行う\n- 新しい関数には、`tests/` にテストを足す\n- コミットメッセージは日本語。1行目に変えた内容を書く",
+          "expect": "Claudeが `CLAUDE.md` を作り、追加した行の差分を見せます。"
+        },
+        {
+          "id": "ex-settings",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-permissions",
+            "cc-settings",
+            "cc-hooks-guide"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"ask\": [\"Bash(git push *)\"],\n    \"deny\": [\n      \"Read(./.env)\",\n      \"Read(./.env.*)\"\n    ]\n  },\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Edit|Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"jq -r '.tool_input.file_path' | xargs npx prettier --write\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+          "highlight": [
+            3,
+            5,
+            6,
+            12,
+            16
+          ]
+        },
+        {
+          "id": "ex-prompt-skill",
+          "type": "prompt",
+          "title": "④のスキルを作ってもらう依頼文",
+          "target": "claude-code",
+          "cite": [
+            "cc-skills"
+          ],
+          "prompt": "`.claude/skills/explain-diff/SKILL.md` を、次の内容で作ってください。\n\n---\nname: explain-diff\ndescription: 今の変更（差分）を説明する。「差分を説明して」と頼まれたときに使う。\nallowed-tools: Bash(git diff *)\n---\n## 今の差分\n!`git diff HEAD`\n\n## 説明のしかた\n変えたファイルごとに、次の3つを短く説明してください。\n- 何を、なぜ変えたか\n- 動きが変わる場面と、それを確かめたテスト\n- 私が自分の目で確かめるとよい箇所を1つ\n差分が空なら、変更はないと答えてください。",
+          "expect": "Claudeが `.claude/skills/explain-diff/SKILL.md` を作ります。\n\n`allowed-tools` に書いたツールは、スキルを呼んでから次に入力するまで、確認なしで使えます。\n\n`!` で始まる行は、スキルを使うたびに `git diff HEAD` の結果に置きかわります。\n\n起動後に `.claude/skills/` を新しく作ったときは、先に `/reload-skills` を実行します。そのあと `/explain-diff` と打つと、今の差分にもとづく説明が返ります。",
+          "note": "コミットが1つもないリポジトリでは `git diff HEAD` が失敗し、スキル全体が止まります。先に1回コミットしておきます。"
+        },
+        {
+          "id": "ex-quiz",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-features-overview",
+            "cc-memory"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "例題のリポジトリで、Claudeがテストの前に `npm install` をやり直すことが2回続きました。依存はすでに入っています。何を足すのが最も合うでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "CLAUDE.mdに「`npm install` はpackage.jsonを変えたときだけ」と1行足す"
+                },
+                {
+                  "id": "b",
+                  "md": "拒否ルールに `Bash(npm install *)` を足して、実行を止める",
+                  "feedback": "拒否すると、package.jsonを変えたときにも入れられなくなります。2回のまちがいは、まずCLAUDE.mdに1行足すきっかけです。"
+                },
+                {
+                  "id": "c",
+                  "md": "`npm install` を見つけたら、実行を止めるフックを足す",
+                  "feedback": "フックは、例外なく毎回起きてほしいことのための部品です。必要な場面もある操作は、CLAUDE.mdで条件を伝えます。"
+                },
+                {
+                  "id": "d",
+                  "md": "テストの手順をスキルにして、テストの前に毎回呼び出す",
+                  "feedback": "抜けているのは、「依存は入っている」という前提です。前提は、CLAUDE.mdに書きます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "同じまちがいが2回続いたら、CLAUDE.mdに1行足すきっかけです。条件つきで書けば、package.jsonを変えたときには実行できます。",
+              "hint": "止めたいのか、条件を伝えたいのかを考えましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-setup",
+      "title": "演習1：自分のリポジトリに環境をつくる",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "setup-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "自分のリポジトリで同じことをします。大事なリポジトリなら作業用のブランチで、なければ練習用フォルダで進めます。"
+        },
+        {
+          "id": "setup-steps",
+          "type": "steps",
+          "cite": [
+            "cc-memory",
+            "cc-permissions",
+            "cc-settings",
+            "cc-prompt-caching"
+          ],
+          "items": [
+            {
+              "id": "p-claude-md",
+              "title": "CLAUDE.mdを書く",
+              "md": "`/init` で下書きを作り、推測できないことだけを残します。",
+              "expect": "25行以内のCLAUDE.mdができています。",
+              "hint": "各行に「消したらまちがえる？」と聞きます。",
+              "troubleshoot": "長い手順は、スキルの候補にします。"
+            },
+            {
+              "id": "p-rules",
+              "title": "権限ルールを書く",
+              "md": "秘密情報の拒否ルールと、`git push` の確認ルールを書きます。",
+              "expect": "`/permissions` に、書いたルールが並びます。",
+              "hint": "秘密情報の場所は、`ls -a` などで自分で確かめます。",
+              "troubleshoot": "出ないときは、設定ファイルの末尾のカンマなどを確かめます。"
+            },
+            {
+              "id": "p-more",
+              "title": "きっかけがある分だけ足す",
+              "md": "きっかけがあれば、表から部品を1つ足します。なければ足しません。",
+              "expect": "足した部品ごとに、きっかけを1行で言えます。",
+              "hint": "この1週間で、同じ依頼を何回したかを思い出します。"
+            },
+            {
+              "id": "p-restart",
+              "title": "起動し直して確かめる",
+              "md": "直したCLAUDE.mdと設定は、起動し直すと読み込まれます。",
+              "expect": "`/context` と `/status` に表示されます。",
+              "troubleshoot": "出ないときは、リポジトリの一番上で起動したかを確かめます。"
+            }
+          ]
+        },
+        {
+          "id": "setup-prompt-model",
+          "type": "prompt",
+          "title": "模範解答：CLAUDE.mdを書き直してもらう依頼文",
+          "target": "claude-code",
+          "cite": [
+            "cc-best-practices",
+            "cc-memory"
+          ],
+          "prompt": "`/init` が作ったCLAUDE.mdを、次の内容に書き直してください。書いたら差分を見せてください。\n\n# kakeibo-cli\nPython 3.12の家計簿ツール。CSVを読み、月ごとに集計する。\n\n## コマンド\n- テスト：`python -m pytest`（変更のたびに実行し、出力を見せる）\n- 実行例：`python -m kakeibo summary data/sample.csv`\n\n## 構成\n- 集計は `kakeibo/summary.py`、CSVの読み込みは `kakeibo/io.py`\n- `data/private/` は個人のデータ（読み取りは設定で拒否している）\n\n## 決まりごと\n- 金額は円の整数（int）で扱い、`float` は使わない\n- 新しい関数には、`tests/` にテストを足す\n- 依存を増やす前に、理由を説明して確認をとる\n- コミットメッセージは日本語。1行目に変えた内容を書く\n\n## 進め方\n- 3つ以上のファイルを変えるときは、先に計画を見せる",
+          "expect": "Claudeが、`/init` の下書きとの差分を見せながら書き直します。\n\nCLAUDE.mdは19行です。個人のデータは、CLAUDE.mdで伝えるだけでなく、下の設定でも読み取りを拒否しています。ただし、拒否できるのはClaudeのファイル操作で、Pythonのスクリプトが開くファイルは防げません。",
+          "note": "Pythonで書いた家計簿ツールの例です。設定ファイルの模範解答は、この下にあります。"
+        },
+        {
+          "id": "setup-settings-model",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-permissions",
+            "cc-settings"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"ask\": [\"Bash(git push *)\"],\n    \"deny\": [\n      \"Read(./.env)\",\n      \"Read(./.env.*)\",\n      \"Read(./data/private/**)\"\n    ]\n  }\n}",
+          "highlight": [
+            3,
+            5,
+            6,
+            7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-cycle",
+      "title": "演習2：1つの変更を計画からコミットまで進める",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "cycle-task",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-champion-kit",
+            "cc-best-practices"
+          ],
+          "md": "題材は、面倒で後回しにしていた小さな作業が向いています。1文で言える変更なら計画は省けますが（第3回）、今回は全部の段階を通します。"
+        },
+        {
+          "id": "cycle-flow",
+          "type": "diagram",
+          "engine": "mermaid",
+          "code": "flowchart TD\n  A[\"探索して計画する<br>（プランモード）\"] --> B[\"実装して検証する<br>（テストの出力を見る）\"]\n  B --> C[\"別のコンテキストで<br>レビューする<br>（サブエージェント）\"]\n  C -- 直す指摘がある --> B\n  C -- 直す指摘がない --> D[\"差分を説明してもらう\"]\n  D --> E[\"コミットする\"]",
+          "caption": "1サイクルの流れ：レビューで直す指摘があれば、実装と検証に戻る",
+          "alt": "探索して計画する、実装して検証する、別のコンテキストでレビューする、差分を説明してもらう、コミットするの5段階が上から下へ並び、レビューから実装と検証へ戻る矢印がある図"
+        },
+        {
+          "id": "cycle-steps",
+          "type": "steps",
+          "cite": [
+            "cc-permission-modes",
+            "cc-best-practices",
+            "cc-sub-agents"
+          ],
+          "items": [
+            {
+              "id": "c-plan",
+              "title": "探索して計画する",
+              "md": "Shift + Tabを、`⏸ plan mode on` と出るまで押して[[プランモード]]（plan mode）にし、下の依頼文を送ります。Ctrl + Gで計画を直してから、承認します。",
+              "keys": [
+                "Shift+Tab",
+                "Ctrl+G"
+              ],
+              "expect": "ファイル、テスト、確かめるコマンドの入った計画です。",
+              "troubleshoot": "大きすぎたら、「最初の1歩だけに絞って」と頼みます。"
+            },
+            {
+              "id": "c-build",
+              "title": "実装して検証する",
+              "md": "実装が始まったら、どのテストが通るかを予想しておきます。",
+              "expect": "テストが通り、実行したコマンドと出力を自分で見ています。",
+              "hint": "「完了しました」だけなら、コマンドと出力を見せてと頼みます。",
+              "troubleshoot": "2回直せなかったら、`/clear` して始め直します。"
+            },
+            {
+              "id": "c-review",
+              "title": "別のコンテキストでレビューする",
+              "md": "下の依頼文で、[[サブエージェント]]に計画と差分を照らし合わせてもらいます。",
+              "expect": "返ってきた指摘を、直すものと見送るものに理由つきで分けています。"
+            },
+            {
+              "id": "c-explain",
+              "title": "差分を説明してもらう",
+              "md": "`/explain-diff` を作っていれば使い、なければ「今の差分を説明して」と頼みます。返ってきた説明の1か所を、自分の言葉で言い直します。",
+              "expect": "なぜその変更をしたかを、画面を見ずに言えます。"
+            },
+            {
+              "id": "c-commit",
+              "title": "コミットする",
+              "md": "`git diff` で変更を見てから、コミットを頼みます。",
+              "expect": "1行目で内容がわかるコミットが増えています。"
+            }
+          ]
+        },
+        {
+          "id": "cycle-prompt-plan",
+          "type": "prompt",
+          "title": "模範解答：計画の依頼文",
+          "target": "claude-code",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "prompt": "{{変えたいこと}}をしたいです。\nまず関係するファイルを読み、今の仕組みを3行で説明してください。\nそのうえで、次を含む計画を立ててください。\n- 変更するファイルと、それぞれの変更\n- 追加するテスト\n- 終わったことを確かめるコマンド（{{確かめるコマンド}}）\n- 今回は変えないこと\nわからない点があれば、計画の前に質問してください。",
+          "vars": [
+            {
+              "name": "変えたいこと",
+              "hint": "例：月ごとの集計に「前月との差」の列を足す"
+            },
+            {
+              "name": "確かめるコマンド",
+              "hint": "例：python -m pytest"
+            }
+          ],
+          "expect": "家計簿ツールなら、たとえば次のような計画が返ります。\n\n変更：`kakeibo/summary.py` に前月との差を計算する関数を足し、表に1列加えます。\n\nテスト：前月がない月と、差がマイナスになる月のテストを足します。\n\n確かめ方：`python -m pytest` のテストがすべて通ること。\n\n変えないこと：CSVの読み込み（`kakeibo/io.py`）。"
+        },
+        {
+          "id": "cycle-prompt-review",
+          "type": "prompt",
+          "title": "別のコンテキストでレビューしてもらう依頼文",
+          "target": "claude-code",
+          "cite": [
+            "cc-best-practices",
+            "cc-sub-agents"
+          ],
+          "prompt": "サブエージェントを使って、計画と照らし合わせながら、今の差分をレビューしてください。\n確かめること：計画の要件がすべて実装されているか、テストがあるか、計画の外の変更がないか。\n好みの指摘ではなく、正しさと要件に関わる問題だけを、ファイル名と理由つきで挙げてください。",
+          "expect": "サブエージェントが別のコンテキストで差分を読み、問題点の一覧を返します。\n\n直すかどうかは、計画の要件に関わるかで自分が決めます。直したら、もう一度テストを走らせます。"
+        },
+        {
+          "id": "cycle-quiz",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "別のコンテキストでのレビューで、指摘が5つ返ってきました。2つは計画の要件が満たされていないという指摘、3つは「将来のために抽象化を足しては」という提案です。どうするのが最も合うでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "5つとも直して、指摘を0にしてからコミットする",
+                  "feedback": "指摘をすべて追うと、余計な抽象化や念のためのチェックが増えます。直すのは、正しさと要件に関わるものだけです。"
+                },
+                {
+                  "id": "c",
+                  "md": "テストは通っているので、5つとも直さずにコミットする",
+                  "feedback": "テストが通っても、計画の要件が欠けていることはあります。要件に関わる指摘は直します。"
+                },
+                {
+                  "id": "d",
+                  "md": "指摘が0になるまで、レビューを何度もやり直す",
+                  "feedback": "あらを探すよう頼まれたレビュアーは、問題のない作業にも指摘を出します。回数ではなく、指摘の中身で判断します。"
+                },
+                {
+                  "id": "a",
+                  "md": "要件に関わる2つを直し、提案の3つは理由を書いて見送る"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "公式ドキュメントは、指摘をすべて追うと過剰な設計になると注意しています。正しさと計画の要件に関わる指摘だけを直し、見送るものは理由を残します。",
+              "hint": "計画と照らし合わせて、どの指摘が「要件」に当たるかを考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "self-check",
+      "title": "演習3：点検して、次に足すものを決める",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "sc-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "最後に、安全・検証・コンテキスト・コストの4分野で点検します。当てはまらない項目が、次に足すもののきっかけです。"
+        },
+        {
+          "id": "self-check-list",
+          "type": "checklist",
+          "title": "点検リスト（安全・検証・コンテキスト・コスト）",
+          "cite": [
+            "cc-permissions",
+            "cc-best-practices",
+            "cc-costs",
+            "cc-authentication"
+          ],
+          "items": [
+            {
+              "id": "sc-safety",
+              "label": "安全：秘密情報の拒否ルールと、git pushの確認ルールを書きました"
+            },
+            {
+              "id": "sc-verify",
+              "label": "検証：確かめるコマンドを計画に入れ、その出力を自分で見ました"
+            },
+            {
+              "id": "sc-review",
+              "label": "検証：実装とは別のコンテキストで、レビューを受けました"
+            },
+            {
+              "id": "sc-understand",
+              "label": "検証：差分の1か所を、自分の言葉で説明できます"
+            },
+            {
+              "id": "sc-context",
+              "label": "コンテキスト：CLAUDE.mdは短く、作業の切れ目で「/clear」しています"
+            },
+            {
+              "id": "sc-cost",
+              "label": "コスト：「/usage」で使用量を、「/status」で認証方法を確かめました"
+            }
+          ]
+        },
+        {
+          "id": "sc-b2",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "次に足すものを1つ決め、きっかけと一緒にメモします。レビューの指摘で、Claudeが知っておくべきだったことはCLAUDE.mdの候補です。"
+        },
+        {
+          "id": "sc-quiz",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-best-practices",
+            "cc-memory"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "1つの会話でバグを直したあと、別の機能追加を続けています。Claudeが、前の作業の前提を混ぜ始めました。次にすることとして、最も合うのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "今の会話のやりとりを、CLAUDE.mdにすべて書き写す",
+                  "feedback": "CLAUDE.mdは毎回読み込まれるので、長くなるほど守られにくくなります。残すのは、次の作業でも必要な決まりごとだけです。"
+                },
+                {
+                  "id": "a",
+                  "md": "作業の区切りで `/clear` し、新しい作業として依頼し直す"
+                },
+                {
+                  "id": "c",
+                  "md": "前の前提を混ぜないよう、依頼のたびに注意を書き足す",
+                  "feedback": "注意を足しても、前の作業のやりとりは会話に残ったままです。関係のない作業の間は、`/clear` で会話を空にします。"
+                },
+                {
+                  "id": "d",
+                  "md": "同じ会話のまま、`/compact` を何度も繰り返す",
+                  "feedback": "要約しても、前の作業の中身は形を変えて残ります。関係のない作業に移るときは、`/clear` を使います。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "公式ドキュメントは、関係のない作業の間で `/clear` するよう勧めています。続けて使う決まりごとがあれば、CLAUDE.mdに短く足します。",
+              "hint": "点検リストのどの分野の問題かを、まず考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-features-overview",
+            "cc-memory",
+            "cc-permissions",
+            "cc-skills",
+            "steering-post",
+            "cc-best-practices",
+            "harness-design"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "PythonのWebアプリのリポジトリで、3つのことが起きています。Claudeがテストのコマンドを2回まちがえました。`secrets/` に鍵のファイルがあります。本番へのpushの前には、必ず人が確認したいと考えています。最初の環境として、最も合うのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "3つともCLAUDE.mdに「必ず」「絶対に」と書き、毎回読み込ませる",
+                  "feedback": "CLAUDE.mdはお願いで、保証はありません。鍵とpushは、Claudeの判断に任せず止める権限ルールに置きます。"
+                },
+                {
+                  "id": "c",
+                  "md": "3つそれぞれにスキルを作り、作業の前に毎回呼び出す",
+                  "feedback": "スキルの中身も、Claudeへのお願いです。鍵の読み取りとpushを、Claudeの判断に任せず止めるのは権限ルールです。"
+                },
+                {
+                  "id": "a",
+                  "md": "テストのコマンドはCLAUDE.md、鍵は拒否ルール、pushは確認ルールに置く"
+                },
+                {
+                  "id": "d",
+                  "md": "学んだ部品をすべて入れ、困らなかったものをあとで消す",
+                  "feedback": "公式の勧めは、CLAUDE.mdから始めて、きっかけが来たら足すことです。全部入れると、どれが効いているか確かめられません。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "2回のまちがいはCLAUDE.mdに1行足すきっかけです。鍵は `Read(./secrets/**)` の拒否ルール、pushは `Bash(git push *)` の確認ルールにします。一致した操作を、Claudeの判断に関係なくClaude Codeが止めます。",
+              "objectiveId": "o1",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e2",
+              "kind": "single",
+              "prompt": "チームのCLAUDE.mdに、30行のリリース手順が書かれています。リリースは月に1回です。どうするのが最も合うでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "手順をスキルに移し、人が呼び出したときだけ動くようにする"
+                },
+                {
+                  "id": "a",
+                  "md": "手順の先頭に「IMPORTANT」を付けて、CLAUDE.mdに残す",
+                  "feedback": "強調しても、手順は毎回読み込まれて場所を取ります。使うときだけ読み込まれるスキルに移します。"
+                },
+                {
+                  "id": "c",
+                  "md": "手順の各行を、それぞれ別のフックにして自動で動かす",
+                  "feedback": "フックは、決まったタイミングで毎回動く処理です。月1回の手順には、呼び出したときに動くスキルが合います。"
+                },
+                {
+                  "id": "d",
+                  "md": "手順をサブエージェントの定義に書き写し、リリースを任せる",
+                  "feedback": "サブエージェントは、調べものなどを別のコンテキストで進める仕組みです。繰り返す手順は、スキルにまとめます。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "CLAUDE.mdの一部が手順になったら、スキルに移すきっかけです。スキルの本文は、使うときだけ読み込まれます。リリースのように影響の大きい手順は `disable-model-invocation: true` にして、Claudeが自分からは使わず、人が `/名前` で呼び出したときだけ動くようにします。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            },
+            {
+              "id": "e3",
+              "kind": "single",
+              "prompt": "同僚の点検結果です。安全の項目は満たし、CLAUDE.mdは40行です。ただ、完了かどうかはClaudeの「完了しました」という報告だけで判断しています。次にすることとして、最も優先すべきはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "CLAUDE.mdを20行になるまで削り、読み込む量を減らす",
+                  "feedback": "40行は、公式の目安（200行未満）に収まっています。今の穴は、完了を確かめる手段がないことです。"
+                },
+                {
+                  "id": "b",
+                  "md": "MCP（Model Context Protocol）サーバーを足して、使える道具を増やす",
+                  "feedback": "道具を足すきっかけは、まだ起きていません。証拠なしで完了にしていることが、いちばんの穴です。"
+                },
+                {
+                  "id": "c",
+                  "md": "完了報告のたびに、同じ会話で「本当に？」と聞き直す",
+                  "feedback": "自分の作業を採点すると、甘くなりがちです。実行できる確認の結果で判断します。"
+                },
+                {
+                  "id": "d",
+                  "md": "テストのコマンドをCLAUDE.mdに書き、出力で完了を確かめる"
+                }
+              ],
+              "answer": [
+                "d"
+              ],
+              "explanation": "公式ドキュメントは、Claudeが実行できる確認（テストやビルド）を渡し、主張ではなく証拠を求めるよう勧めています。検証が空いている今は、ここを最初に埋めます。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "CLAUDE.mdから始め、きっかけが来たら、合う部品を1つずつ足します。",
+            "CLAUDE.mdとスキルはお願いです。Claudeの判断に任せたくないことは、権限ルールとフックに置きます。",
+            "計画からコミットまでの段階を順に通し、完了は実行結果という証拠で判断します。",
+            "安全・検証・コンテキスト・コストの4分野で点検し、次に足すものを決めます。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "この1サイクルで、自分で判断した場面を1行で書いておきましょう。\n\nこれで全11回は終わりです。次は、演習3で決めた部品を足していきましょう。\n\nClaude Codeは頻繁に更新されます。動かないときは、[公式ドキュメントの日本語版](https://code.claude.com/docs/ja/overview)で確かめましょう。",
+          "cite": [
+            "cc-champion-kit"
+          ]
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-start",
+              "front": "自分のリポジトリの環境づくりは、何から始めますか？",
+              "back": "CLAUDE.mdです。ほかの部品は、きっかけが来たら1つずつ足します。"
+            },
+            {
+              "id": "card-twice",
+              "front": "Claudeが規約やコマンドを2回まちがえたら？",
+              "back": "CLAUDE.mdに1行足します。"
+            },
+            {
+              "id": "card-every",
+              "front": "例外なく毎回起きてほしいことは、どこに置きますか？",
+              "back": "フックです。CLAUDE.mdとスキルはお願いで、保証はありません。"
+            },
+            {
+              "id": "card-deny",
+              "front": "`.env` を読ませないための設定は？",
+              "back": "`permissions.deny` に `Read(./.env)` などの拒否ルールを書きます。"
+            },
+            {
+              "id": "card-ask",
+              "front": "`git push` の前に人が確認するための設定は？",
+              "back": "`permissions.ask` に `Bash(git push *)` の確認ルールを書きます。`git -C . push` のような別の書き方には一致しません。"
+            },
+            {
+              "id": "card-review",
+              "front": "レビューを、実装とは別のコンテキストで頼むのはなぜですか？",
+              "back": "自分の作業の採点は、甘くなりがちだからです。サブエージェントに、計画と差分を照らし合わせてもらいます。"
+            },
+            {
+              "id": "card-update",
+              "front": "古い記事のとおりに動かないときは？",
+              "back": "公式ドキュメントの日本語版で、今の書き方を確かめます。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分のリポジトリのCLAUDE.mdに、最初に書くことを一緒に考えてほしい",
+            "拒否ルールと確認ルールの書き方を、自分の設定で確かめたい",
+            "レビューの指摘を直すか見送るか、迷ったときの考え方は？"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "きっかけ",
+      "md": "同じ困りごとが繰り返し起きること。公式ドキュメントは、きっかけが来たときに、それに合う部品を1つ足すよう勧めています（英語の資料ではtrigger）。"
+    },
+    {
+      "term": "CLAUDE.md",
+      "md": "プロジェクトの指示を書くファイル。セッションの開始時に読み込まれます。Claudeへのお願いで、強制ではありません。"
+    },
+    {
+      "term": "スキル",
+      "md": "繰り返す手順や依頼文を `SKILL.md` にまとめたもの。`/名前` で呼び出せて、本文は使うときだけ読み込まれます。英語ではskill。"
+    },
+    {
+      "term": "フック",
+      "md": "ファイルの編集のあとなど、決まったタイミングでClaude Codeが毎回実行する処理。英語ではhook。"
+    },
+    {
+      "term": "権限ルール",
+      "md": "ツールの使用を許可（allow）・確認（ask）・拒否（deny）する設定。Claudeの判断ではなく、Claude Codeが一致した操作に適用します。英語ではpermission rule。",
+      "aliases": [
+        "確認ルール",
+        "拒否ルール"
+      ]
+    },
+    {
+      "term": "プランモード",
+      "md": "ファイルを編集せず、読んで計画を立てるだけの権限モード。計画を承認すると、実装に移ります。英語ではplan mode。"
+    },
+    {
+      "term": "サブエージェント",
+      "md": "メインの会話とは別のコンテキストウィンドウで作業し、結果の要約だけを返す補助のエージェント。英語ではsubagent。"
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-features-overview",
+      "title": "Extend Claude Code",
+      "url": "https://code.claude.com/docs/en/features-overview",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-memory",
+      "title": "How Claude remembers your project",
+      "url": "https://code.claude.com/docs/en/memory",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-best-practices",
+      "title": "Best practices for Claude Code",
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permissions",
+      "title": "Configure permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-settings",
+      "title": "Settings files and precedence",
+      "url": "https://code.claude.com/docs/en/settings",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permission-modes",
+      "title": "Choose a permission mode",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-hooks-guide",
+      "title": "Automate actions with hooks",
+      "url": "https://code.claude.com/docs/en/hooks-guide",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-skills",
+      "title": "Extend Claude with skills",
+      "url": "https://code.claude.com/docs/en/skills",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-sub-agents",
+      "title": "Create custom subagents",
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-prompt-caching",
+      "title": "How Claude Code uses prompt caching",
+      "url": "https://code.claude.com/docs/en/prompt-caching",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-champion-kit",
+      "title": "Champion kit",
+      "url": "https://code.claude.com/docs/en/champion-kit",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-costs",
+      "title": "Manage costs effectively",
+      "url": "https://code.claude.com/docs/en/costs",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-authentication",
+      "title": "Authentication",
+      "url": "https://code.claude.com/docs/en/authentication",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "steering-post",
+      "title": "Steering Claude Code: when to use CLAUDE.md, skills, hooks, and subagents",
+      "url": "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "harness-design",
+      "title": "Harness design for long-running application development",
+      "url": "https://www.anthropic.com/engineering/harness-design-long-running-apps",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

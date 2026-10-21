@@ -1,0 +1,78 @@
+{
+  "lessonId": "cc-03-plan-first",
+  "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
+  "lessonHash": "sha256:8ad1a10792b712d4",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:a69e9dc117810e75",
+    "changed": [
+      "s3-steps",
+      "practice-steps",
+      "practice-spec-steps"
+    ],
+    "changedShare": 0.04,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/a69e9dc117810e75/round-1/ja-editor.review.json"
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "voice",
+      "score": 4,
+      "evidence": "The only change is in the step titles of s3-steps, practice-steps and practice-spec-steps, where the circled numbers were removed. For example, 「① プランモードに入り、探索させる」 is now 「プランモードに入り、探索させる」 and 「⑦ コミットする」 is now 「コミットする」. A jq diff against the snapshot shows no other changed string. All md, expect, hint and troubleshoot text is the same. No prose anywhere in the lesson refers to a step by its circled number (no ①–⑦ remain). The one ordinal left, 「2番目は、変えないでと頼んだ共通のスタイルの変更です。」 in ex-fix, refers to the second step of Claude's plan in ex-plan, not to a lesson step, so it still reads correctly. The titles keep the same verb-final form (「〜させる」「〜する」「〜書く」), so they stay parallel. I found no new (a)–(e) errors.",
+      "blockIds": [
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2393 (budget 1,200–2,400) · est 19.3 min (must be ≤ 20; estMinutes 19)」. Removing the numbers made the titles a little shorter. Both values are within budget, and estMinutes still matches.",
+      "blockIds": [
+        "s3-steps",
+        "practice-steps",
+        "practice-spec-steps"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous review. The change renames no term and touches no glossary entry.",
+      "blockIds": [
+        "s1-table",
+        "s4-good-spec"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous review. The lesson declares only jp, and the changed titles are plain jp strings with no locale gap.",
+      "blockIds": [
+        "s2-flow",
+        "s2-version"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "summary-points: point 3 drops 「複数のファイル」, which s4-table and s3 name as a reason to plan (carried over) — 「差分を1文で説明できる変更は直接頼み、迷う変更やよく知らないコードは計画します。」→「差分を1文で説明できる変更は直接頼み、迷う変更や複数のファイル、よく知らないコードを変えるときは計画します。」",
+    "summary-points: point 5 does not say what is predicted; pr-explain says 「結果を予想してから」 (carried over) — 「差分を説明させ、予想してから確かめます。」→「差分を説明させ、結果を予想してから確かめます。」",
+    "s1-table: in the 範囲 item, two things are joined by only a comma (carried over) — 「どのファイルのどんな場面か、テストの方針を書きます。」→「どのファイルのどんな場面かと、テストの方針を書きます。」",
+    "s4-community: 「手で仕様を作って」 suggests the learner writes the spec alone, but the lesson has Claude write it through an interview (carried over) — 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」→「まずはスキル集を使わず、3-4の依頼文で仕様を作ってみましょう。」",
+    "s2-version: the link text names a topic, not the destination page (carried over) — 「[autoモードが使えない環境](…)では」→「[autoモードが使えない環境（権限モードの公式ドキュメント）](…)では」",
+    "summary-cards: card-good-spec says 「役に立つ」, but s4-good-spec says 「役立つ仕様には」 (carried over) — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
+    "practice-spec-model / practice-spec-steps: the interface condition from s4-good-spec is missing (carried over) — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとインターフェース、範囲外のこと、」",
+    "practice-model: the delete-button request sits under 範囲 (carried over) — move 「各項目に「{{ボタンの文言}}」ボタンも付け、…」 to its own line, starting with 「追加：」",
+    "s4-check: option c has two sentences while the other options have one each (carried over) — 「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」→「AskUserQuestionツールで私にインタビューし、決まったらそのまま実装まで進めて。」",
+    "s3-steps: ex-explore reads like a translation (carried over; unchanged text) — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」"
+  ],
+  "average": 4.0,
+  "verdict": "pass",
+  "summary": "Verification round. review-scope.mjs exited 0: 3 of 44 blocks changed (4%), and sections and objectives are unchanged. The previous review had no open must-fix items, so there are no resolved entries. The only change is that the circled numbers (①–⑦) were removed from the step titles in s3-steps, practice-steps and practice-spec-steps. All other strings are the same. No text refers to a step by number. The 「2番目」 in ex-fix refers to the plan's own step, not to a lesson step. Lint is clean, and measure.mjs gives prose 2393 and est 19.3 min, which matches estMinutes 19. I found no (a)–(e) errors. The nice-to-haves are carried over from the previous round."
+}

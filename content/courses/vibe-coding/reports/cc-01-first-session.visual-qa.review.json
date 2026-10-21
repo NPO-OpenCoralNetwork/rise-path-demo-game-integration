@@ -1,0 +1,54 @@
+{
+  "lessonId": "cc-01-first-session",
+  "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
+  "lessonHash": "sha256:83c7a256e5bf982c",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "Nothing is cut off and no screen scrolls sideways. At 390 px the TD mermaid loop-diagram labels are readable (pages/mobile-jp-04.png), and both 2-column tables fit without clipping (loop-table on mobile-jp-03, surfaces-table on mobile-jp-07). The pre-wrapped example-diff code also fits without soft-wrapping (mobile-jp-14/15). metrics.json has no hard failures: overflowX false, consoleErrors 0, mermaidErrors 0, unknownBlocks 0, brokenImages 0.",
+      "blockIds": [
+        "loop-diagram",
+        "loop-table",
+        "surfaces-table",
+        "example-diff",
+        "install-unix"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on both desktop and mobile. Desktop JP median charsPerLine is 39, inside the 30–40 target. Every section breaks up its text with definitions, tables, code, steps or a check, and paragraphs stay short on every screen (for example desktop-jp-06 and mobile-jp-09).",
+      "blockIds": [
+        "install-needs",
+        "install-how",
+        "example-steps",
+        "practice-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "evidence": "All visible text is Japanese, with English glosses on the first use of each term (definitions on mobile-jp-04, 06 and 11), and the diagram labels are Japanese. Some small problems remain: commands in practice-checklist show as plain text instead of code (mobile-jp-21), and some quiz options on desktop leave a 1–2 character orphan on the second line (desktop-jp-15, desktop-jp-16).",
+      "blockIds": [
+        "practice-checklist",
+        "check-quiz"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "practice-checklist: the labels 'claude --versionで…' and '/diffで…' show as plain bold text, not as code like everywhere else in the lesson (pages/mobile-jp-20.png, pages/mobile-jp-21.png, pages/desktop-jp-14.png, pages/desktop-jp-15.png). If checklist labels accept inline markdown, wrap them in backticks. Otherwise reword the labels, for example 'バージョン番号を表示できました'.",
+    "example-steps: each step shows two numbers, the reader's circle and the ① to ⑤ in the title ('1 ① 何をするプロジェクトか聞く', pages/mobile-jp-13.png, pages/desktop-jp-09.png). practice-steps refers to '1-5の①' and '1-5の⑤', so you could keep the circled numbers. Or drop them from the titles and change those references to '1-5の手順1' and '1-5の手順5'.",
+    "check-quiz q5 option a wraps on desktop and leaves only 'る' on the second line (pages/desktop-jp-15.png); shorten it, for example to 'Claude Codeはツールで自分から調べ、変更し、確かめる'. q7 option b does the same with 'れる' (pages/desktop-jp-16.png); a shorter version would be '有料プランかConsoleアカウントで、ネイティブインストーラーを使う'.",
+    "reader: the glossary sidebar ('用語・このレッスン') lists エージェントループ twice, once as 'エージェントループ (agentic loop)' and once as plain 'エージェントループ', on every desktop screen (for example pages/desktop-jp-03.png).",
+    "reader: the diff code block (example-diff, pages/desktop-jp-10.png) does not colour the added '+' lines, so learners can only spot them by the '+' character.",
+    "reader: the end banner says 'このコースの最後のレッスンまで読み終えました' (pages/mobile-jp-28.png, pages/desktop-jp-20.png) because drafts are not in course.json. This is known behaviour, not a lesson defect.",
+    "reader: the full-length mobile PNG stops at 16000px (metrics truncated: true). Every per-screen PNG through mobile-jp-28 was checked."
+  ],
+  "verdict": "pass",
+  "summary": "The screenshots show the lesson under review (lessonHash sha256:83c7a256e5bf982c from metrics.json) and have no hard failures: no sideways overflow, console or mermaid errors, unknown blocks or broken images. All tables, the TD mermaid loop and the pre-wrapped code blocks are readable at 390 px. No privacy problems appear on any screen. There are no must-fix items; the most useful polish is showing the commands in practice-checklist as code and shortening the two exam options that leave a 1–2 character orphan on desktop."
+}

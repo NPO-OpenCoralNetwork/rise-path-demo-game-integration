@@ -1,0 +1,52 @@
+{
+  "lessonId": "cc-09-parallel-automation",
+  "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:e66b60d1da0710f0",
+  "reviewer": "visual-qa",
+  "rubricVersion": "rubric.v1",
+  "mode": "full",
+  "scores": [
+    {
+      "id": "visual",
+      "score": 4,
+      "evidence": "metrics.json reports no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks and 0 broken images on both devices. At 390 px both code blocks (s2-code, s3-code) fit without sideways scrolling, and the p1-model answer stays readable with its highlighted lines (pages/mobile-jp-05/06/10/20.png). The definitions in s1-defs and s4-defs stack cleanly on mobile and show as two columns on desktop (pages/desktop-jp-02.png, pages/desktop-jp-09.png).",
+      "blockIds": [
+        "s2-code",
+        "s3-code",
+        "p1-model",
+        "s1-defs",
+        "s4-defs"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "textOnlyScreens is empty on desktop-jp and mobile-jp. Desktop charsPerLine has a median of 37 (target 30–40). Every screen has a heading, a code block, steps, a prompt, a checklist or a quiz, and the screenshots show no walls of text and no empty gaps.",
+      "blockIds": [
+        "s2-steps",
+        "s3-table",
+        "s4-prompt",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "The lesson is Japanese only, and the UI and content are in Japanese throughout. English terms appear only as glosses in parentheses, such as ワークツリー（worktree）. Contrast is good on the light cards and in the dark code theme. No line breaks inside Japanese words, and no controls are hidden under the top bar or the 60 px bottom bar (pages/mobile-jp-03.png, pages/mobile-jp-25.png). Long inline chips like `bypassPermissions` move whole to the next line (pages/mobile-jp-25.png).",
+      "blockIds": [
+        "s1-defs",
+        "check-quiz"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s4-prompt: at 390 px the inline JSON shape {\"todos\": [...], \"unreadable\": [...]} breaks across two lines in the middle of the object (pages/mobile-jp-14.png). It is still readable, but putting the shape on its own line would make it easier to compare with the result.",
+    "p1-checklist: the flag names (--bare, --permission-mode dontAsk, ...) show as plain bold text, not as code chips the way they do in s3-table (pages/mobile-jp-19.png, pages/desktop-jp-12.png). If checklist items support inline code, wrap them in backticks to keep this consistent.",
+    "reader: the end banner says this is the course's last lesson (このコースの最後のレッスンまで読み終えました) because drafts are not listed in course.json (pages/mobile-jp-31.png, pages/desktop-jp-21.png).",
+    "reader: the mobile full-length PNG is cut off at its height limit (truncated: true). Every per-screen page was checked instead.",
+    "reader: 14 failed /api/ requests (500 on user/events, progress, notifications) are environment noise and are not counted as console errors."
+  ],
+  "verdict": "pass",
+  "summary": "Clean layout on both devices: no overflow, no clipped or overlapping text, no broken images, and code blocks, definitions, steps, prompts and the 6-question exam all read well at 390 px. No personal data appears on any screen. Nothing must be fixed; the optional polish is putting the JSON shape in s4-prompt on its own line on mobile and showing flags as code in p1-checklist."
+}

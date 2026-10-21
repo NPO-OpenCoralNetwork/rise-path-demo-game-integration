@@ -1,0 +1,1134 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-02-permissions",
+  "courseId": "vibe-coding",
+  "title": "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+  "subtitle": "確認なしで進める範囲を選び、pushの前には確認を挟み、失敗したら戻す",
+  "locale": "jp",
+  "level": "beginner",
+  "estMinutes": 20,
+  "prerequisites": [
+    "第1回｜最初のタスクを任せる",
+    "ターミナルでcdとlsが使える",
+    "Gitのcommitとpushの意味がわかる"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "場面に合う権限モードを選べる",
+      "bloom": "apply"
+    },
+    {
+      "id": "o2",
+      "text": "/rewind で戻せるものと戻せないものを見分けられる",
+      "bloom": "analyze"
+    },
+    {
+      "id": "o3",
+      "text": "git push の前に確認を挟む確認ルール（ask）を書ける",
+      "bloom": "apply"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：確認は減らしたい、でもpushは止めたい",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "第1回の演習では、多くの操作が確認なしで進みました。便利ですが、pushまで知らないうちに進んだら困ります。\n\nどこまで任せ、どこで止めるか。まず予想してみましょう。"
+        },
+        {
+          "id": "hook-version",
+          "type": "callout",
+          "variant": "note",
+          "title": "この回の前提",
+          "md": "2026年10月時点（Claude Code v2.1.304）の内容です。更新が速いので、[権限モードの公式ドキュメント（日本語）](https://code.claude.com/docs/ja/permission-modes)もあわせて確かめてください。"
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-permission-modes",
+            "cc-auto-mode-config"
+          ],
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": "v2.1.283以降のClaude Codeを、設定を変えずにターミナルで起動しました。作業中にClaudeが `git push` を実行しようとしたら、どうなるでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "確認の画面が出て、あなたの許可を待つ",
+                  "feedback": "以前はそれがふつうでした。いまの対話セッション（session）は別のモードで始まり、pushは確認なしで通ります。"
+                },
+                {
+                  "id": "b",
+                  "md": "裏で動く安全チェックが、危険とみなして止める",
+                  "feedback": "安全チェックが既定で止めるのは、force pushなどです。作業中のリポジトリ（repository）へのふつうのpushは、既定では通します。"
+                },
+                {
+                  "id": "c",
+                  "md": "確認なしで、そのまま実行される"
+                },
+                {
+                  "id": "d",
+                  "md": "Claude Codeは、pushのようなGit操作を実行できない",
+                  "feedback": "Claude Codeはターミナルのコマンドを実行できるので、pushもできます。だから、止めたい操作は自分で決めておきます。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります（2-1の一覧）。autoモードは既定で、作業中のリポジトリへのpushを通します。pushの前に確認を挟む書き方は、2-4で学びます。",
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "modes",
+      "title": "2-1. 権限モードで、確認なしに進める範囲を選ぶ",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "modes-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "どの操作を確認なしで進めるかを決める設定を、権限モード（permission mode）と呼びます。6種類あり、確認なしで動く範囲と、向く場面が違います。",
+          "cite": [
+            "cc-permission-modes"
+          ]
+        },
+        {
+          "id": "modes-table",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "items": [
+            "**Manual**（`default`）：読み取りだけ。一つずつ確かめる作業向け",
+            "**`acceptEdits`**：読み取り、ファイル編集、`mkdir` など。差分を見ながらの編集向け",
+            "**プランモード**（`plan`）：読み取りと調査だけ。変更前の調査と計画向け",
+            "**`auto`**：すべて（裏で安全チェック）。長い作業向け。v2.1.283以降、ターミナルとVS Codeの対話セッションの既定",
+            "**`dontAsk`**：読み取りと、事前に許可したものだけ。人が見ない自動実行向け",
+            "**`bypassPermissions`**：すべて（チェックなし）。隔離した環境だけで使う"
+          ]
+        },
+        {
+          "id": "modes-switch",
+          "type": "markdown",
+          "cite": [
+            "cc-permission-modes",
+            "cc-changelog"
+          ],
+          "md": "ターミナルでは **Shift + Tab** で切り替え、いまのモードは画面下に出ます。autoから押すとManual → `acceptEdits` → プランモード（plan mode）と進みます。もう一度押すとautoに戻ります。\n\n古い記事の「defaultモード」は、Manualモードの旧名です（v2.1.200で改名）。"
+        },
+        {
+          "id": "modes-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "q1",
+              "kind": "single",
+              "prompt": "初めて触るリポジトリで、まず構成を調べてから、どこを直すかの方針を決めたいと考えています。最初に選ぶモードとして、最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "autoモード",
+                  "feedback": "autoモードでも調べられますが、方針が決まる前にファイルを書き換え始めることがあります。調べて計画するだけなら、書き換えないモードが合います。"
+                },
+                {
+                  "id": "c",
+                  "md": "`acceptEdits` モード",
+                  "feedback": "`acceptEdits` は、ファイル編集を確認なしで進めるモードです。方針が決まる前の段階では、編集を許す必要がありません。"
+                },
+                {
+                  "id": "d",
+                  "md": "`bypassPermissions` モード",
+                  "feedback": "確認も安全チェックもなくなるので、隔離した環境以外では使いません。調べるだけなら、なおさら必要ありません。"
+                },
+                {
+                  "id": "a",
+                  "md": "プランモード"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "プランモードでは、Claudeはファイルを読んで計画を書きますが、承認するまで書き換えません。方針を決めてから、編集を任せるモードに切り替えます。",
+              "hint": "「まだ何も書き換えたくない」場面だという点に注目しましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auto-mode",
+      "title": "2-2. autoモードに任せてよいこと、よくないこと",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "auto-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "auto-mode-eng"
+          ],
+          "md": "確認が何度も続くと、人は中身を読まずに許可しがちです。autoモードでは、この確認を分類器（classifier）が引き受けます。2-1の一覧で「安全チェック」と呼んだものです。"
+        },
+        {
+          "id": "auto-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "items": [
+            {
+              "term": "分類器",
+              "md": "Claudeの操作を実行の前に確かめる、別のAIモデル。危ない操作を止めます。"
+            }
+          ]
+        },
+        {
+          "id": "auto-defaults",
+          "type": "markdown",
+          "cite": [
+            "cc-permission-modes",
+            "cc-auto-mode-config"
+          ],
+          "md": "既定で止めるのは、force pushや `git reset --hard`、本番へのデプロイ（deploy）などです。作業中のリポジトリへのふつうのpushは通します。"
+        },
+        {
+          "id": "auto-limit",
+          "type": "markdown",
+          "cite": [
+            "auto-mode-eng",
+            "cc-permission-modes"
+          ],
+          "md": "ただし、[[分類器]]も見逃します。Anthropicが2026年3月の記事で示した評価では、頼んだ範囲を超えた実際の操作の17%を通しました。本番に関わる操作は、Manualモードか2-3のルールで止めて、人が見ます。"
+        },
+        {
+          "id": "auto-bypass",
+          "type": "callout",
+          "variant": "warning",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "title": "bypassPermissionsは隔離した環境だけで",
+          "md": "`bypassPermissions` は、確認も安全チェックも外します。`--dangerously-skip-permissions` も同じです。隔離したコンテナ（container）や仮想マシンの中だけで使います。"
+        },
+        {
+          "id": "auto-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "auto-mode-eng",
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "autoモードで任せていたら、次の手順が「本番サーバーの設定を書き換えるスクリプト（script）を実行する」になりました。どう進めるのが最も適切でしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "分類器が危ない操作を止めるので、autoモードのまま任せる",
+                  "feedback": "分類器も、頼んだ範囲を超えた操作の一部を見逃します（Anthropicが2026年3月に示した評価で17%）。本番に関わる操作は、人が中身を見てから進めます。"
+                },
+                {
+                  "id": "b",
+                  "md": "Manualモードに切り替え、実行前にスクリプトの中身を読んで判断する"
+                },
+                {
+                  "id": "c",
+                  "md": "`bypassPermissions` モードに切り替え、止まらずに一気に終わらせる",
+                  "feedback": "確認も安全チェックも外れるので、本番に関わる作業では逆効果です。このモードは隔離した環境だけで使います。"
+                },
+                {
+                  "id": "d",
+                  "md": "`dontAsk` モードに切り替え、危ない操作は自動で拒否させる",
+                  "feedback": "`dontAsk` は危なさを判断せず、確認が要る操作をすべて拒否します。スクリプトは実行されず、中身を確かめる機会にもなりません。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "autoモードは確認を減らしますが、安全を保証するものではありません。本番に関わる操作の前はManualモードに切り替え、中身を読んでから許可します。",
+              "hint": "分類器が「どのくらい見逃すか」を思い出しましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rules",
+      "title": "2-3. 権限ルールで「この操作だけは」を決める",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "rules-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "モードは全体の任せ方です。「pushの前だけは止まってほしい」ときは、権限ルール（permission rule）を使います。"
+        },
+        {
+          "id": "rules-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-permissions",
+            "cc-auto-mode-config",
+            "cc-permission-modes"
+          ],
+          "items": [
+            {
+              "term": "権限ルール",
+              "md": "特定の操作の扱いを決める設定で、`.claude/settings.json` などに書きます。許可ルール（allow）・確認ルール（ask）・拒否ルール（deny）があります。"
+            },
+            {
+              "term": "確認ルール",
+              "md": "一致した操作の前に、確認を求めます。autoモードでも同じです。`dontAsk` モードでは、確認せずに拒否します。"
+            },
+            {
+              "term": "拒否ルール",
+              "md": "一致した操作を止めます。`bypassPermissions` を含む、どのモードでも効きます。"
+            }
+          ]
+        },
+        {
+          "id": "rules-order",
+          "type": "markdown",
+          "cite": [
+            "cc-permissions"
+          ],
+          "md": "調べる順番は下の図のとおりです。\n\nルールを守らせるのは、モデルではなくClaude Codeの仕組みです。依頼文やCLAUDE.mdに「pushしないで」と書いても、強制にはなりません。"
+        },
+        {
+          "id": "rules-diagram",
+          "type": "diagram",
+          "engine": "mermaid",
+          "cite": [
+            "cc-permissions"
+          ],
+          "code": "flowchart TD\n  A[\"Claudeが<br>操作しようとする\"] --> B[拒否ルールに<br>一致？]\n  B -->|いいえ| C[確認ルールに<br>一致？]\n  C -->|いいえ| D[許可ルールに<br>一致？]\n  D -->|いいえ| E[権限モードに<br>従う]\n  B -->|はい| B1[止める]\n  C -->|はい| C1[あなたに<br>確認する]\n  D -->|はい| D1[確認なしで<br>実行する]\n  B ~~~ C\n  C ~~~ D\n  D ~~~ E",
+          "caption": "権限ルールは拒否 → 確認 → 許可の順に調べられ、最初に一致したもので決まる",
+          "alt": "Claudeの操作が、拒否ルール、確認ルール、許可ルールの順に調べられる流れ図。一致すればそれぞれ止める、確認する、確認なしで実行する。どれにも一致しなければ権限モードに従う。"
+        },
+        {
+          "id": "rules-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-permissions"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "許可ルールは `Bash(git *)`、確認ルールは `Bash(git push *)` です。Claudeが `git push origin main` を実行しようとすると、どうなるでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "確認なしで実行される",
+                  "feedback": "許可ルールにも一致しますが、確認ルールが先に調べられます。ルールの広さや書いた順では決まりません。"
+                },
+                {
+                  "id": "c",
+                  "md": "実行が止められる",
+                  "feedback": "止めるのは拒否ルール（deny）です。確認ルールは止めずに、あなたに確認を求めます。"
+                },
+                {
+                  "id": "b",
+                  "md": "確認の画面が出る"
+                },
+                {
+                  "id": "d",
+                  "md": "2つのルールが矛盾するので、モードに任される",
+                  "feedback": "どれかのルールに一致した時点で、結果は決まります。モードに任されるのは、どのルールにも一致しないときだけです。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "ルールは拒否 → 確認 → 許可の順に調べられます。`git push origin main` は先に確認ルールに一致するので、許可ルールがあっても確認の画面が出ます。",
+              "hint": "図の上から順に、どこで最初に「はい」になるかをたどりましょう。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rules-example",
+      "title": "2-4. 例題：pushの前に確認を挟む設定を書く",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "example-intro",
+          "type": "markdown",
+          "style": "lead",
+          "md": "例題として、「pushの前は確認」「`.env` は読ませない」を設定します。`.env` は秘密を置きがちなファイルです。"
+        },
+        {
+          "id": "example-steps",
+          "type": "steps",
+          "cite": [
+            "cc-permissions"
+          ],
+          "items": [
+            {
+              "id": "ex-sort",
+              "title": "確認か拒否かを決める",
+              "md": "pushは中身を見たいので[[確認ルール]]、`.env` は読ませないので[[拒否ルール]]にします。",
+              "expect": "`ask` と `deny` に1つずつ入れます。"
+            },
+            {
+              "id": "ex-pattern",
+              "title": "ルールの形に書く",
+              "md": "コマンドは `Bash(コマンド *)`、読み取りは `Read(パス)` と書きます。末尾の「空白＋`*`」は、続きが何でも、なくても一致します。",
+              "expect": "下のコードになります。"
+            },
+            {
+              "id": "ex-verify",
+              "title": "読み込まれたか確かめる",
+              "md": "書いただけでは効いたかわかりません。起動し直して `/permissions` を開きます。",
+              "expect": "2つのルールが、書いたファイル名と一緒に出ます。"
+            }
+          ]
+        },
+        {
+          "id": "example-code",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-permissions",
+            "cc-auto-mode-config"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"ask\": [\n      \"Bash(git push *)\"\n    ],\n    \"deny\": [\n      \"Read(./.env)\"\n    ]\n  }\n}"
+        },
+        {
+          "id": "example-pitfall",
+          "type": "callout",
+          "variant": "pitfall",
+          "cite": [
+            "cc-permissions"
+          ],
+          "title": "ルールは文字列で一致を判断する",
+          "md": "`git -C . push` は `git push` で始まらないので、確認ルールに一致しません。autoモードでは、確認なしで通ることがあります。`Read(./.env)` を書いても、一部のコマンドやスクリプトによる読み取りは止められません。"
+        },
+        {
+          "id": "example-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-permissions"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "`npm test` は、許可ルールの `Bash(npm test)` で確認なしにしてあります。`git push` の前だけは、必ず確認したいと考えています。足すルールとして、最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "許可ルールに `Bash(git push *)`",
+                  "feedback": "許可ルールに入れると、pushは確認なしで実行されます。必ず確認したい操作は、確認ルールに入れます。"
+                },
+                {
+                  "id": "c",
+                  "md": "拒否ルールに `Bash(git push *)`",
+                  "feedback": "拒否ルールは確認ではなく、pushそのものを止めます。止めずに確認を挟みたいなら、確認ルールです。"
+                },
+                {
+                  "id": "d",
+                  "md": "確認ルールに `Bash(git push)`",
+                  "feedback": "`*` がないと、`git push` だけの完全一致になります。`git push origin main` には一致せず、autoモードでは確認なしで通ることがあります。"
+                },
+                {
+                  "id": "a",
+                  "md": "確認ルールに `Bash(git push *)`"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "確認なしで任せたい操作は許可ルール（allow）に、必ず確認したい操作は確認ルール（ask）に入れます。`Bash(git push *)` は、`git push` のあとに何が続いても一致します。",
+              "hint": "確認ルールと拒否ルールの違いと、`*` があるかないかの2点を確かめましょう。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rewind",
+      "title": "2-5. チェックポイントと /rewind：戻せるもの、戻せないもの",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "rewind-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-checkpointing"
+          ],
+          "md": "Claude Codeは、プロンプト（prompt）を送るたびに、直前のファイルの状態を記録します。この記録をチェックポイント（checkpoint）と呼び、セッションごとに直近100回分が残ります。"
+        },
+        {
+          "id": "rewind-how",
+          "type": "markdown",
+          "cite": [
+            "cc-checkpointing"
+          ],
+          "md": "入力欄が空のときにEscを2回押すか `/rewind` を実行し、戻す時点と、コード・会話・両方のどれを戻すかを選びます。ただし戻るのは、Claudeのファイル編集ツールでの変更だけです。"
+        },
+        {
+          "id": "rewind-table",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-checkpointing"
+          ],
+          "items": [
+            "**Claudeの編集ツール**（追記、書き換え）：戻る",
+            "**Bashのコマンド**（`rm`・`mv`・`cp`）：戻らない",
+            "**外部への操作**（push、データベース、デプロイ）：戻らない",
+            "**Claude Codeの外**（自分での編集）：基本は戻らない"
+          ]
+        },
+        {
+          "id": "rewind-git",
+          "type": "markdown",
+          "cite": [
+            "cc-checkpointing"
+          ],
+          "md": "[[チェックポイント]]はセッション中のやり直し用で、バージョン管理の代わりではありません。区切りごとにGitでコミットしましょう。"
+        },
+        {
+          "id": "rewind-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-checkpointing"
+          ],
+          "questions": [
+            {
+              "id": "q5",
+              "kind": "single",
+              "prompt": "autoモードで作業を任せたあと、Escを2回押して作業前のプロンプトを選び、「Restore code」を選びました。元に戻るのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "Claudeが編集ツールで `app.js` に足した関数"
+                },
+                {
+                  "id": "b",
+                  "md": "ClaudeがBashの `mv` で変えたファイル名",
+                  "feedback": "Bashのコマンドでの変更は、チェックポイントに記録されません。戻すにはGitを使います。"
+                },
+                {
+                  "id": "c",
+                  "md": "Claudeが `git push` でGitHubに送ったコミット",
+                  "feedback": "外へ送った操作は、手元のチェックポイントでは取り消せません。pushの前に、確認ルールで確認を挟んでおきます。"
+                },
+                {
+                  "id": "d",
+                  "md": "作業中に、自分がエディタで書き換えた `README.md`",
+                  "feedback": "Claude Codeの外での編集は、基本的に記録されません。自分の変更も、Gitのコミットで守ります。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "チェックポイントが記録するのは、Claudeのファイル編集ツールでの変更だけです。Bashでの変更や外部への操作は、`/rewind` では戻りません。",
+              "hint": "それぞれ「どうやって変えたか」を、上の一覧に当てはめましょう。",
+              "objectiveId": "o2",
+              "bloom": "analyze"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-sort",
+      "title": "演習1：場面ごとに権限モードを選ぶ",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "sort-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "2つの場面に合うモードを選びます。2-1の一覧を見ずに答えてから、確かめましょう。"
+        },
+        {
+          "id": "sort-quiz",
+          "type": "quiz",
+          "mode": "inline",
+          "title": "どのモードを選びますか？",
+          "cite": [
+            "cc-permission-modes"
+          ],
+          "questions": [
+            {
+              "id": "ps1",
+              "kind": "single",
+              "prompt": "場面1：夜のあいだ、人が見ていない状態で、決まったテストだけを自動で実行させたい。どのモードを選びますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`dontAsk` モード"
+                },
+                {
+                  "id": "b",
+                  "md": "autoモード",
+                  "feedback": "autoモードは、許可していない操作も分類器の判断で進めます。人が見ない実行では、確認が要る操作を拒否するモードが合います。"
+                },
+                {
+                  "id": "c",
+                  "md": "Manualモード",
+                  "feedback": "確認を求めても、人が見ていないので誰も答えられません。"
+                },
+                {
+                  "id": "d",
+                  "md": "`bypassPermissions` モード",
+                  "feedback": "確認も安全チェックも外れます。隔離した環境でない限り使いません。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "`dontAsk` モードは、読み取りと事前に許可したものだけを動かし、確認が要る操作は拒否します。人が見ていない自動実行向けのモードです。",
+              "hint": "「答える人がいない」ときに、許可していない操作をどう扱いたいかを考えましょう。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            },
+            {
+              "id": "ps2",
+              "kind": "single",
+              "prompt": "場面2：差分を見ながら、小さなファイル編集を何度もくり返したい。テストの実行など、ほかのコマンドは確認したい。どのモードを選びますか？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "Manualモード",
+                  "feedback": "編集のたびに確認が出て、くり返すたびに手が止まります。編集だけを確認なしにするモードがあります。"
+                },
+                {
+                  "id": "b",
+                  "md": "autoモード",
+                  "feedback": "テストなどのコマンドも、確認なしで進むことがあります。コマンドを確認したいなら別のモードです。"
+                },
+                {
+                  "id": "c",
+                  "md": "`acceptEdits` モード"
+                },
+                {
+                  "id": "d",
+                  "md": "プランモード",
+                  "feedback": "プランモードでは、承認するまでファイルを書き換えません。編集をくり返す場面には合いません。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "`acceptEdits` モードでは、ファイル編集と `mkdir`・`mv` などのファイル操作が確認なしで進みます。読み取り専用のコマンドを除き、ほかのコマンドでは確認が出ます。",
+              "hint": "編集とコマンドで、扱いを分けたい場面です。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice-rules",
+      "title": "演習2：ルールを試し、巻き戻しも確かめる",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "rules-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "第1回の `cc-practice` で、2-4の設定と巻き戻しを試します。大事なリポジトリでは試さないでください。"
+        },
+        {
+          "id": "rules-files",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "cd cc-practice\nmkdir -p .claude\necho \"TOKEN=dummy\" > .env\necho \".env\" >> .gitignore\necho \"# メモ\" > rewind-practice.md\nls -a"
+        },
+        {
+          "id": "rules-steps",
+          "type": "steps",
+          "cite": [
+            "cc-permissions",
+            "cc-checkpointing"
+          ],
+          "items": [
+            {
+              "id": "p-files",
+              "title": "練習用のファイルを作る",
+              "md": "`cc-practice` の1つ上のフォルダで、上のコマンドを1行ずつ実行します。",
+              "expect": "`.claude` と `.env` などが一覧に出ます。",
+              "troubleshoot": "`cd` でエラーが出たら、そこで止めます。第1回の手順でフォルダを作ってから、続けます。"
+            },
+            {
+              "id": "p-rule",
+              "title": "ルールを書く",
+              "md": "2-4を見ずに、`.claude/settings.json` をエディタで書きます。",
+              "expect": "`ask` と `deny` に1つずつ入っています。",
+              "hint": "形は `Bash(…)` と `Read(…)` です。",
+              "troubleshoot": "迷ったら、2-4のコードを写します。"
+            },
+            {
+              "id": "p-run",
+              "title": "予想してから、ルールを試す",
+              "md": "結果を予想してメモし、`claude` で依頼文1を送ります。確認が出たら「No」を選びます。",
+              "expect": "`.env` のReadは拒否ルールで止まり、pushの前に確認が出ます。",
+              "hint": "練習用フォルダにはリモート（remote、送り先のリポジトリ）がないので、許可しても外には何も送られません。",
+              "troubleshoot": "確認が出ないときは、`/permissions` でルールを確かめます。"
+            },
+            {
+              "id": "pw-restore",
+              "title": "予想してから、コードだけを戻す",
+              "md": "結果を予想して依頼文2を送ります。終わったら空の入力欄でEscを2回押し、依頼文2を選び、「Restore code」を押します。",
+              "keys": [
+                "Esc",
+                "Esc"
+              ],
+              "expect": "`head rewind-*.md` で見ると、`rewind-practice.md` だけが1行に戻っています。",
+              "troubleshoot": "`head` は、別のターミナルで `cc-practice` に移って実行します。"
+            }
+          ]
+        },
+        {
+          "id": "rules-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "依頼文1：ルールを試す",
+          "prompt": "この練習用フォルダで、次の2つを順に試してください。\n1. `{{読ませないファイル}}` を、ファイルを読むツールで読んで表示してください。\n2. リモートがなくてエラーになってもかまわないので、`git push` を1回だけ実行してください。\n最後に、それぞれで何が起きたかを、`.claude/settings.json` の内容と結びつけて説明してください。",
+          "vars": [
+            {
+              "name": "読ませないファイル",
+              "hint": "例：.env（拒否ルールに書いたファイル）"
+            }
+          ],
+          "expect": "1つめは拒否ルールで止められます。スクリプトなど別の方法で読まれたら、それが2-4の注意にある限界です。2つめは実行の前に確認の画面が出て、「No」を選ぶとpushは実行されません。\n\n説明が出ないときは「何が起きたか説明して」と送り、自分の予想と比べます。`Read(./.env)` と `Bash(git push *)` が理由に挙がれば成功です。"
+        },
+        {
+          "id": "rewind-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "依頼文2：2種類の変更を起こす",
+          "prompt": "`rewind-practice.md` の最後に「{{足す1行}}」という1行を、ファイル編集ツールで足してください。\nそのあと、Bashの `cp` コマンドで、`rewind-practice.md` を `rewind-copy.md` にコピーしてください。\nほかのファイルは変更しないでください。",
+          "vars": [
+            {
+              "name": "足す1行",
+              "hint": "例：巻き戻しの練習"
+            }
+          ],
+          "expect": "`rewind-practice.md` に1行が足され、同じ内容の `rewind-copy.md` ができたと報告されます。"
+        },
+        {
+          "id": "rules-checklist",
+          "type": "checklist",
+          "title": "演習2のチェックリスト",
+          "items": [
+            {
+              "id": "pr-predict",
+              "label": "試す前に、結果を予想してメモしました"
+            },
+            {
+              "id": "pr-env",
+              "label": ".env の読み取りが止まり、pushの前に確認が出ました"
+            },
+            {
+              "id": "pw-c-reason",
+              "label": "コピーだけが残った理由を説明できます"
+            },
+            {
+              "id": "pr-transfer",
+              "label": "応用：自分のコマンドを1つ、確認ルールにしました"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-permission-modes",
+            "cc-permissions",
+            "cc-checkpointing",
+            "cc-auto-mode-config"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。確認を減らしたいと考えています。`--dangerously-skip-permissions` を付けて起動するかどうか、最も適切な判断はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "付けない。autoモードで進め、止めたい操作は確認ルールにする"
+                },
+                {
+                  "id": "b",
+                  "md": "付けて起動し、作業が終わったらすぐに外す",
+                  "feedback": "短い時間でも、確認も安全チェックもない状態になります。隔離した環境でない限り使いません。"
+                },
+                {
+                  "id": "c",
+                  "md": "付けるが、依頼文に「危ない操作はしないで」と書いておく",
+                  "feedback": "依頼文の指示は、Claude Codeが守らせるルールではありません。安全チェックのないモードを補うことはできません。"
+                },
+                {
+                  "id": "d",
+                  "md": "付けずにManualモードにし、確認はすべて読まずに許可する",
+                  "feedback": "読まずに許可すると、確認の意味がなくなります。確認を減らしたいなら、autoモードとルールを組み合わせます。"
+                }
+              ],
+              "answer": [
+                "a"
+              ],
+              "explanation": "`--dangerously-skip-permissions` は `bypassPermissions` モードと同じで、ネットにつながらないコンテナや仮想マシン向けです。ふだんのノートPCではautoモードで確認を減らし、止めたい操作はルールで止めます。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            },
+            {
+              "id": "e3",
+              "kind": "single",
+              "prompt": "「古いログを片づけて」と頼んだら、ClaudeはBashの `rm` で `logs/` のファイルを消し、編集ツールで `config.js` も書き換えました。その依頼の前を選んで「Restore code」を選ぶと、どうなるでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`config.js` も消えたログも、両方とも元に戻る",
+                  "feedback": "Bashの `rm` での削除は、チェックポイントに記録されません。戻せるのは、編集ツールでの変更だけです。"
+                },
+                {
+                  "id": "b",
+                  "md": "`config.js` は戻るが、消えたログは戻らない"
+                },
+                {
+                  "id": "c",
+                  "md": "消えたログだけが戻り、`config.js` は戻らない",
+                  "feedback": "逆です。チェックポイントが記録するのは、Claudeの編集ツールでの変更です。"
+                },
+                {
+                  "id": "d",
+                  "md": "どちらも戻らず、会話だけが戻る",
+                  "feedback": "「Restore code」は、編集ツールでの変更を戻します。`config.js` は元に戻ります。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "チェックポイントが記録するのは、Claudeのファイル編集ツールでの変更だけです。Bashの `rm`・`mv`・`cp` での変更は戻らないので、Gitのコミットで備えます。",
+              "objectiveId": "o2",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e4",
+              "kind": "single",
+              "prompt": "チームの仲間が「`/rewind` があるなら、こまめなGitのコミットはもう要らないよね」と言いました。返答として最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "要らない。`/rewind` はセッション中のすべての変更を戻せるから",
+                  "feedback": "`/rewind` が戻すのは、Claudeの編集ツールでの変更だけです。Bashでの変更や外部への操作は戻りません。"
+                },
+                {
+                  "id": "b",
+                  "md": "要らない。コードと会話の両方を戻せば、pushも取り消せるから",
+                  "feedback": "pushのように外へ送った操作は、手元のチェックポイントでは取り消せません。"
+                },
+                {
+                  "id": "c",
+                  "md": "要る。`/rewind` は直前の1回分しか戻せないから",
+                  "feedback": "チェックポイントはプロンプトごとに作られ、直近100回分が残ります。Gitが要る理由は、回数ではなく戻せる範囲です。"
+                },
+                {
+                  "id": "d",
+                  "md": "要る。Bashでの変更やpushは、`/rewind` では戻らないから"
+                }
+              ],
+              "answer": [
+                "d"
+              ],
+              "explanation": "チェックポイントは、セッション中にすばやくやり直すための仕組みで、バージョン管理の代わりではありません。長く残す履歴やチームでの共有にも使えないので、区切りごとにGitでコミットしておきます。",
+              "objectiveId": "o2",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e5",
+              "kind": "single",
+              "prompt": "autoモードで作業中です。確認ルールは `Bash(git push *)` の1つだけです。Claudeが次のコマンドを実行しようとしたとき、確認の画面が出ないのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`git push`",
+                  "feedback": "末尾が「空白＋`*`」のルールは、続きのない `git push` だけの実行にも一致します。確認が出ます。"
+                },
+                {
+                  "id": "b",
+                  "md": "`git push origin main`",
+                  "feedback": "`git push` で始まるので、ルールに一致して確認が出ます。"
+                },
+                {
+                  "id": "c",
+                  "md": "`git -C . push origin main`"
+                },
+                {
+                  "id": "d",
+                  "md": "`git push --force origin main`",
+                  "feedback": "`git push` で始まるので一致し、確認が出ます。オプションが付いていても、始まりが同じなら一致します。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "`git -C . push` は `git push` で始まらないので、確認ルールに一致しません。あとはautoモードの分類器が判断し、作業中のリポジトリへのpushは既定で通します。Claudeの判断に関係なく止めるフック（hook）は、第8回で学びます。",
+              "objectiveId": "o3",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e6",
+              "kind": "single",
+              "prompt": "ClaudeがGitHubのコマンドラインツール `gh` で、プルリクエスト（pull request）を作るとします。その前に、必ず確認を挟みたいと考えています。どこに何を書くのが最も適切でしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "`deny` に `Bash(gh pr create *)`",
+                  "feedback": "拒否ルール（deny）は確認ではなく、作ることそのものを止めます。確認を挟んで進めたいなら、確認ルール（ask）です。"
+                },
+                {
+                  "id": "b",
+                  "md": "`ask` に `Bash(gh pr create *)`"
+                },
+                {
+                  "id": "c",
+                  "md": "`ask` に `Bash(gh * create)`",
+                  "feedback": "`*` を途中に置くと、最後が `create` で終わるコマンドにしか一致しません。`gh pr create --title …` のように続きがあると一致せず、確認が出ないことがあります。"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.mdに「作る前に確認して」",
+                  "feedback": "CLAUDE.mdはClaudeへの助言で、Claude Codeが守らせるルールではありません。必ず確認したいなら、確認ルールにします。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "必ず確認したい操作は、確認ルール（`ask`）に「コマンドの始まり＋空白＋`*`」の形で書きます。`Bash(gh pr create *)` なら、autoモードでも確認が出ます。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "権限モードで、確認なしに進める範囲を選びます（Shift + Tab）。",
+            "autoモードにも見逃しがあります。本番に関わる操作は人が見ます。",
+            "ルールは拒否 → 確認 → 許可の順です。pushの前は `Bash(git push *)` で確認を挟みます。",
+            "`/rewind` で戻るのは、Claudeの編集ツールでの変更だけです。Gitでこまめにコミットします。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "ほかに確認したい操作を1つ選び、ルールの形で書いてみましょう。\n\n次は「第3回｜探索→計画→実装→コミット」です。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-modes",
+              "front": "6つの権限モードは？",
+              "back": "Manual（`default`）・`acceptEdits`・プランモード（`plan`）・`auto`・`dontAsk`・`bypassPermissions` の6つです。"
+            },
+            {
+              "id": "card-switch",
+              "front": "ターミナルでモードを切り替えるキーは？",
+              "back": "Shift + Tabです。autoから押すと、Manual → `acceptEdits` → プランモードの順に進みます。"
+            },
+            {
+              "id": "card-auto",
+              "front": "autoモードに任せきりにしない理由は？",
+              "back": "分類器も見逃すからです（Anthropicが2026年3月に示した評価で17%）。本番に関わる操作は人が見ます。"
+            },
+            {
+              "id": "card-order",
+              "front": "権限ルールが調べられる順番は？",
+              "back": "拒否（deny）→ 確認（ask）→ 許可（allow）の順です。最初に一致したもので決まります。"
+            },
+            {
+              "id": "card-ask",
+              "front": "pushの前に確認を挟むルールは？",
+              "back": "`.claude/settings.json` の `permissions` に `\"ask\": [\"Bash(git push *)\"]` と書きます。"
+            },
+            {
+              "id": "card-rewind",
+              "front": "`/rewind` で戻らない変更は？",
+              "back": "Bashのコマンドでの変更と、push・データベース・デプロイなど外部への操作です。"
+            },
+            {
+              "id": "card-bypass",
+              "front": "`bypassPermissions` を使ってよい場所は？",
+              "back": "ネットにつながらないコンテナや仮想マシンなど、隔離した環境だけです。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分の作業に合う権限モードを、一緒に選んで",
+            "git -C . push のような抜け道は、どう防げばいい？",
+            "/rewind とGitの使い分けを、例で教えて"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "権限モード",
+      "md": "Claude Codeが、どの操作を確認なしで進めるかを決める設定。Manual・`acceptEdits`・プランモード・`auto`・`dontAsk`・`bypassPermissions` の6種類があります。",
+      "aliases": [
+        "permission mode"
+      ]
+    },
+    {
+      "term": "Manualモード",
+      "md": "読み取り以外は、すべて確認するモード。設定値は `default`（古い記事の「defaultモード」）です。",
+      "aliases": [
+        "defaultモード",
+        "manual mode"
+      ]
+    },
+    {
+      "term": "分類器",
+      "md": "autoモードで、Claudeの操作を実行の前に確かめる別のAIモデル。危ない操作を止めますが、見逃すこともあります。",
+      "aliases": [
+        "classifier",
+        "安全チェック"
+      ]
+    },
+    {
+      "term": "権限ルール",
+      "md": "特定の操作の扱いを決める設定。許可ルール（allow）・確認ルール（ask）・拒否ルール（deny）があり、拒否 → 確認 → 許可の順に調べられます。",
+      "aliases": [
+        "permission rule"
+      ]
+    },
+    {
+      "term": "確認ルール",
+      "md": "一致した操作の前に確認を求める権限ルール（ask）。autoモードでも確認が出ます。`dontAsk` モードでは拒否されます。",
+      "aliases": [
+        "askルール"
+      ]
+    },
+    {
+      "term": "拒否ルール",
+      "md": "一致した操作を止める権限ルール（deny）。どのモードでも効きます。",
+      "aliases": [
+        "denyルール"
+      ]
+    },
+    {
+      "term": "チェックポイント",
+      "md": "プロンプトを送る直前の、ファイルの状態の記録。`/rewind` で戻せるのは、Claudeのファイル編集ツールでの変更だけです。",
+      "aliases": [
+        "checkpoint"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-permission-modes",
+      "title": "Choose a permission mode",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permissions",
+      "title": "Configure permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-auto-mode-config",
+      "title": "Configure auto mode",
+      "url": "https://code.claude.com/docs/en/auto-mode-config",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-checkpointing",
+      "title": "Checkpointing",
+      "url": "https://code.claude.com/docs/en/checkpointing",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "auto-mode-eng",
+      "title": "How we built Claude Code auto mode: a safer way to skip permissions",
+      "url": "https://www.anthropic.com/engineering/claude-code-auto-mode",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-changelog",
+      "title": "Claude Code CHANGELOG",
+      "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

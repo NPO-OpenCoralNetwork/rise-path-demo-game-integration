@@ -1,0 +1,1217 @@
+{
+  "schema": "risepath.lesson/v1",
+  "id": "cc-06-claude-md",
+  "courseId": "vibe-coding",
+  "title": "第6回｜CLAUDE.mdで前提を伝える",
+  "subtitle": "毎回の説明をやめて、短く確かめられる指示を、合う場所に置く",
+  "locale": "jp",
+  "level": "intermediate",
+  "estMinutes": 19,
+  "prerequisites": [
+    "第1回｜最初のタスクを任せる",
+    "第2回｜任せる範囲を決める：権限モードと巻き戻し",
+    "第3回｜探索→計画→実装→コミット",
+    "第4回｜検証を任せる：テスト・レビュー・説明",
+    "第5回｜コンテキストを管理する",
+    "ターミナルで基本のコマンド（cd・ls）が使える",
+    "Gitのcommitの意味がわかる"
+  ],
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール）を、内容に合わせて選べる",
+      "bloom": "apply"
+    },
+    {
+      "id": "o2",
+      "text": "長すぎるCLAUDE.mdを、短く具体的で確かめられる指示に改善できる",
+      "bloom": "evaluate"
+    },
+    {
+      "id": "o3",
+      "text": "CLAUDE.mdに書いても強制にはならない理由を説明できる",
+      "bloom": "understand"
+    }
+  ],
+  "sections": [
+    {
+      "id": "hook",
+      "title": "はじめに：毎回の説明と、守られない決まり",
+      "role": "hook",
+      "blocks": [
+        {
+          "id": "hook-b1",
+          "type": "markdown",
+          "style": "lead",
+          "md": "セッション（session）のたびに、「テストは `npm run test:unit` で」と同じ説明をしていませんか。先輩の300行のCLAUDE.mdには「`.env` は絶対に読まない」とあります。これで本当に守られるのでしょうか。\n\nこのレッスンは、2026年10月時点（Claude Code v2.1.304）の内容です。まず、`.env` の読み取りをどう止めるか、予想してみましょう。",
+          "cite": [
+            "cc-changelog"
+          ]
+        },
+        {
+          "id": "hook-predict",
+          "type": "quiz",
+          "mode": "predict",
+          "title": "予想してみよう",
+          "cite": [
+            "cc-memory",
+            "cc-permissions"
+          ],
+          "questions": [
+            {
+              "id": "q0",
+              "kind": "single",
+              "prompt": "`.env` を読ませたくないとき、Claudeの判断に関係なく止められるのはどれだと思いますか？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "設定ファイルの拒否ルール（deny）に書く"
+                },
+                {
+                  "id": "a",
+                  "md": "CLAUDE.mdの先頭に「IMPORTANT」を付けて書く",
+                  "feedback": "強調すると目に留まりやすくはなりますが、守るかどうかはClaudeの判断のままです。"
+                },
+                {
+                  "id": "c",
+                  "md": "毎回の依頼文の最初に、読まないでと書き添える",
+                  "feedback": "会話だけの頼みごとは、コンテキスト圧縮（compaction）で消えることもあります。Claudeの判断に任せたままです。"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.mdに同じ決まりを何度もくり返して書く",
+                  "feedback": "くり返しても頼みごとであることは変わりません。長くなるぶん、ほかの指示が守られにくくなります。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "CLAUDE.mdも依頼文も、Claudeが読むコンテキスト（context）です。第2回で書いた権限ルール（permission rule）の拒否ルールは、Claudeの判断と関係なく止めます。ただし、止まるのはルールに一致する操作だけです（6-4）。",
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s1",
+      "title": "6-1. CLAUDE.mdは毎回最初に読まれる",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s1-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "第1回と第5回で見たとおり、セッションは毎回まっさらな状態で始まります。前の会話は引き継がれないので、毎回伝えたい前提はファイルに書いておきます。",
+          "cite": [
+            "cc-memory"
+          ]
+        },
+        {
+          "id": "s1-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-memory"
+          ],
+          "items": [
+            {
+              "term": "CLAUDE.md",
+              "md": "毎回のセッションの始めに読み込まれる、プロジェクトの指示のファイル。人が書いて育てます。"
+            },
+            {
+              "term": "CLAUDE.local.md",
+              "md": "自分だけが使う、このプロジェクト用の指示のファイル。CLAUDE.mdと同じように読まれます。Gitに入れないよう、`.gitignore` に書きます。"
+            },
+            {
+              "term": "自動メモリ（auto memory）",
+              "md": "Claudeが自分で書くメモ。そのパソコンの中だけにあり、`MEMORY.md` の最初の200行か25KBまでが毎回読まれます。"
+            }
+          ]
+        },
+        {
+          "id": "s1-init",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "最初の1枚は `/init` で下書きできます。Claudeがコードを調べ、ビルドやテストのコマンドを書き出します。すでにあるときは、上書きせずに改善案を出します。"
+        },
+        {
+          "id": "s1-table",
+          "type": "table",
+          "cite": [
+            "cc-memory"
+          ],
+          "caption": "CLAUDE.mdの4つの置き場所と届く範囲（広い順）",
+          "columns": [
+            "届く範囲",
+            "置き場所：ファイル"
+          ],
+          "rows": [
+            [
+              "組織全体",
+              "管理ポリシー：Linuxでは `/etc/claude-code/` のCLAUDE.mdなど"
+            ],
+            [
+              "どこでも",
+              "ユーザー（自分・すべてのプロジェクト）：`~/.claude/CLAUDE.md`"
+            ],
+            [
+              "チーム",
+              "プロジェクト（Gitで共有）：`./CLAUDE.md` か `./.claude/CLAUDE.md`"
+            ],
+            [
+              "ここだけ",
+              "ローカル（自分・このプロジェクトだけ）：`./CLAUDE.local.md`"
+            ]
+          ]
+        },
+        {
+          "id": "s1-concat",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "4つは上書きし合わず、広い順にすべてつながって読まれます。矛盾する2行があると、Claudeはどちらかを選んでしまいます。"
+        },
+        {
+          "id": "s1-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-memory"
+          ],
+          "questions": [
+            {
+              "id": "q2",
+              "kind": "single",
+              "prompt": "ユーザーのCLAUDE.mdに「インデントは4スペース」、プロジェクトのCLAUDE.mdに「2スペース」とあります。Claudeのインデントが日によって変わります。どう直すのが最も適切でしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "プロジェクトの行に「IMPORTANT」を付けて優先させる",
+                  "feedback": "強調しても、矛盾する2行は両方読まれたままです。片方を消さない限り、Claudeはどちらかを選びます。"
+                },
+                {
+                  "id": "b",
+                  "md": "プロジェクトの行は後から読まれるので、そのままでよい",
+                  "feedback": "CLAUDE.mdどうしは上書きし合わず、つながって読まれます。後から読まれても、前の行は消えません。"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.local.mdにも「2スペース」の行を足す",
+                  "feedback": "行を足しても、ユーザーの「4スペース」は残ります。矛盾は、増やさずに消して直します。"
+                },
+                {
+                  "id": "c",
+                  "md": "矛盾する2行の片方を消して、どちらか1つにそろえる"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "4つのCLAUDE.mdは上書きし合わず、すべてつながって読まれます。矛盾する2行があるとClaudeはどちらかを選ぶので、片方を消してそろえます。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "6-2. 短く、具体的に、確かめられるように",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s2-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "CLAUDE.mdは毎回[[コンテキスト]]に入ります。公式の目安は、1ファイル200行未満です。長いほどコンテキストを使い、指示が守られにくくなります。"
+        },
+        {
+          "id": "s2-table",
+          "type": "table",
+          "cite": [
+            "cc-memory"
+          ],
+          "caption": "守れたかを確かめられる形に書き直す（公式ドキュメントの例）",
+          "columns": [
+            "あいまいな書き方",
+            "確かめられる書き方"
+          ],
+          "rows": [
+            [
+              "整形する",
+              "インデントは2スペース"
+            ],
+            [
+              "テストする",
+              "コミットの前に `npm test` を実行する"
+            ],
+            [
+              "整理する",
+              "API（Application Programming Interface）のハンドラー（handler）は `src/api/handlers/` に置く"
+            ]
+          ]
+        },
+        {
+          "id": "s2-keep",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices",
+            "cc-memory",
+            "cc-features-overview"
+          ],
+          "md": "書くのは、Claudeが推測できないことです。独自のコマンド、標準と違う決まり、環境のくせなどです。Claudeが同じ間違いを2回したら、1行足します。"
+        },
+        {
+          "id": "s2-cut",
+          "type": "markdown",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "md": "逆に、消しても間違いが増えない行は削ります。公式ガイドの例は次のとおりです。"
+        },
+        {
+          "id": "s2-list",
+          "type": "list",
+          "style": "bullet",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "items": [
+            "コードを読めばわかること（使っている言語、フォルダーの構成）",
+            "一般的な書き方の決まり",
+            "詳しいAPIの資料（リンクだけ書く）",
+            "よく変わる情報",
+            "「きれいなコードを書く」のような当たり前のこと"
+          ]
+        },
+        {
+          "id": "s2-pitfall",
+          "type": "callout",
+          "variant": "pitfall",
+          "title": "書き足した行が効かないとき",
+          "cite": [
+            "cc-prompt-caching"
+          ],
+          "md": "プロジェクトやユーザーのCLAUDE.mdは、セッションの始めに読んだ内容が使われ続けます。途中で直した行は、`/clear`、`/compact`、再起動のあとに反映されます。"
+        },
+        {
+          "id": "s2-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-best-practices"
+          ],
+          "questions": [
+            {
+              "id": "q3",
+              "kind": "single",
+              "prompt": "CLAUDE.mdを短くしています。消しても間違いが増えにくい行はどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「テストは `npm run test:unit` で（`npm test` はE2E（End-to-End）テストまで走る）」",
+                  "feedback": "どのコマンドを使うかは、コードからは推測しにくい情報です。消すと、遅いテストを走らせる間違いが起きます。"
+                },
+                {
+                  "id": "b",
+                  "md": "「動かす前に `docker compose up db` でDB（データベース）を起動する」",
+                  "feedback": "環境のくせは、コードから読み取りにくい情報です。消すと、DBなしで動かして失敗しがちです。"
+                },
+                {
+                  "id": "c",
+                  "md": "「APIのエラーは `ApiError` で返す（`Error` は使わない）」",
+                  "feedback": "標準と違う決まりは、Claudeが推測できない情報です。消すと、標準の書き方に戻ってしまいます。"
+                },
+                {
+                  "id": "d",
+                  "md": "「このアプリはReactとTypeScriptで書かれている」"
+                }
+              ],
+              "answer": [
+                "d"
+              ],
+              "explanation": "使っている言語やライブラリは、Claudeがコードや `package.json` を読めばわかります。消しても困らない行を削ると、大事な指示が埋もれません。",
+              "hint": "その行を消したとき、Claudeが自分で調べて取り戻せるかを考えましょう。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "6-3. 分けて育てる：インポートとルール",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s3-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "長くなったファイルは分けて整理できます。"
+        },
+        {
+          "id": "s3-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-memory",
+            "cc-changelog"
+          ],
+          "items": [
+            {
+              "term": "インポート（import）",
+              "md": "CLAUDE.mdに `@パス` と書き、別のファイルを取り込むこと。取り込んだ先も起動時に読まれます（入れ子は4段まで）。`@` を付けずに書いたパスは、取り込まれず案内になります。"
+            },
+            {
+              "term": "ルール（rules）",
+              "md": "`.claude/rules/` に置くMarkdownのファイル。先頭に `paths:` がなければ起動時に、あれば一致するファイルを扱うときだけ読まれます。"
+            },
+            {
+              "term": "AGENTS.md",
+              "md": "ほかのAIコーディングツールと共有する指示のファイルで、Claude Codeはv2.1.277以降で読みます。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。"
+            }
+          ]
+        },
+        {
+          "id": "s3-code-intro",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "ルールのファイルの先頭に、対象のパスを書きます（下の例）。決まりは、その下に箇条書きで足します。"
+        },
+        {
+          "id": "s3-code",
+          "type": "code",
+          "lang": "yaml",
+          "filename": ".claude/rules/api.md",
+          "cite": [
+            "cc-memory"
+          ],
+          "code": "---\npaths:\n  - \"src/api/**/*.ts\"\n---"
+        },
+        {
+          "id": "s3-diagram",
+          "type": "diagram",
+          "engine": "mermaid",
+          "cite": [
+            "cc-memory"
+          ],
+          "code": "flowchart TD\n  S[セッション開始] --> A[\"CLAUDE.mdと<br>インポート先、<br>paths: なしのルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths:<br>付きの<br>ルール\"]\n  A --> X[コンテキスト]\n  E --> X",
+          "caption": "インポートしても、毎回読まれる量は減りません。減らせるのは paths: 付きのルールです。",
+          "alt": "セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図"
+        },
+        {
+          "id": "s3-agents",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "[[AGENTS.md]]をほかのツールと共有しているなら、CLAUDE.mdの先頭に `@AGENTS.md` と書きます。その下に、Claude Code専用の指示を足せます。"
+        },
+        {
+          "id": "s3-info",
+          "type": "callout",
+          "variant": "info",
+          "title": "変わりやすいところ",
+          "cite": [
+            "cc-changelog"
+          ],
+          "md": "Claude Codeは更新が多く、読み込みの決まりも変わります。迷ったら[公式ドキュメント（日本語）](https://code.claude.com/docs/ja/memory)で確かめましょう。"
+        },
+        {
+          "id": "s3-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-memory"
+          ],
+          "questions": [
+            {
+              "id": "q4",
+              "kind": "single",
+              "prompt": "`src/api/` のファイルを扱うときだけ必要な決まりが10行あります。どこに置くのがよいでしょう？",
+              "options": [
+                {
+                  "id": "b",
+                  "md": "`paths:` 付きの `.claude/rules/api.md`"
+                },
+                {
+                  "id": "a",
+                  "md": "プロジェクトの `CLAUDE.md` の末尾",
+                  "feedback": "CLAUDE.mdに書くと、APIを触らない作業でも毎回読まれます。一部のファイルだけの決まりは、`paths:` 付きのルールに移します。"
+                },
+                {
+                  "id": "c",
+                  "md": "CLAUDE.mdから `@` で取り込む別のファイル",
+                  "feedback": "取り込んだファイルも起動時に読まれるので、毎回のコンテキストは減りません。必要なときだけ読ませるなら `paths:` 付きのルールです。"
+                },
+                {
+                  "id": "d",
+                  "md": "自分の `CLAUDE.local.md`",
+                  "feedback": "CLAUDE.local.mdは自分だけの指示で、チームには届きません。一部のファイルに絞る仕組みもありません。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "`paths:` 付きのルールは、Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときに読まれます。1つのファイルを `cat` や `head` で見たときも同じです。ほかの作業のコンテキストは増やしません。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "6-4. 書いても強制にはならない",
+      "role": "concept",
+      "blocks": [
+        {
+          "id": "s4-lead",
+          "type": "markdown",
+          "style": "lead",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "[[CLAUDE.md]]の中身は、Claudeが読むコンテキストとして届きます。Claudeはそれを参考に判断しますが、必ず守るという保証はありません。"
+        },
+        {
+          "id": "s4-docs",
+          "type": "markdown",
+          "cite": [
+            "cc-features-overview",
+            "cc-permissions"
+          ],
+          "md": "公式ドキュメントも、CLAUDE.mdの「`.env` を編集しない」は頼みごとで、保証ではないとしています。Claudeの判断に任せず止めたいことは、Claude Code自身が止める仕組みに任せます。"
+        },
+        {
+          "id": "s4-defs",
+          "type": "definitions",
+          "cite": [
+            "cc-permissions",
+            "cc-features-overview",
+            "cc-skills"
+          ],
+          "items": [
+            {
+              "term": "権限ルール（permission rule）",
+              "md": "第2回で書いた、ツールの使用を許可・確認・拒否する設定。Claudeの判断と関係なく、Claude Codeが守らせます。"
+            },
+            {
+              "term": "フック（hook）",
+              "md": "決まったタイミングで、Claude Codeが自動で動かす処理。編集のたびに整形を走らせる、などに使います（第8回）。"
+            },
+            {
+              "term": "スキル（skill）",
+              "md": "手順などをまとめたファイル。ふだんは説明だけが読まれ、使うときに本文が読み込まれます（第7回）。"
+            }
+          ]
+        },
+        {
+          "id": "s4-table",
+          "type": "table",
+          "cite": [
+            "steering-post"
+          ],
+          "caption": "CLAUDE.mdに書きがちな5つのつまずきと、移す先（公式ブログより）",
+          "columns": [
+            "書きがちなこと",
+            "移す先"
+          ],
+          "rows": [
+            [
+              "禁止",
+              "権限ルールの拒否ルール（deny、第2回）"
+            ],
+            [
+              "毎回必ず",
+              "フック（第8回）"
+            ],
+            [
+              "長い手順",
+              "スキル（第7回）"
+            ],
+            [
+              "API専用",
+              "`paths:` 付きのルール（6-3）"
+            ],
+            [
+              "自分の好み",
+              "`CLAUDE.local.md` か `~/.claude/CLAUDE.md`（6-1）"
+            ]
+          ]
+        },
+        {
+          "id": "s4-close",
+          "type": "markdown",
+          "cite": [
+            "steering-post",
+            "cc-permissions"
+          ],
+          "md": "同じ記事によれば、本当に守らせる仕組みは、毎回同じように働く「決定的（deterministic）」なものです。ただし拒否ルールが止めるのは、一致する操作だけです。スクリプトが自分で開く `.env` の読み取りや、`git -C . push` のような別の書き方は止まりません（第2回）。"
+        },
+        {
+          "id": "s4-check",
+          "type": "quiz",
+          "mode": "inline",
+          "cite": [
+            "cc-memory",
+            "cc-permissions"
+          ],
+          "questions": [
+            {
+              "id": "q5",
+              "kind": "single",
+              "prompt": "CLAUDE.mdに「`git push` はしない」と書いたのに、Claudeがpushしようとしました。理由として最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「IMPORTANT」を付けなかったので、読み飛ばされたから",
+                  "feedback": "強調は目に留まりやすくするだけで、強制にはなりません。Claudeの判断に任せず止めるなら拒否ルールです。"
+                },
+                {
+                  "id": "b",
+                  "md": "CLAUDE.mdが200行を超えると、すべて無視されるから",
+                  "feedback": "長いと守られにくくなりますが、すべて無視されるわけではありません。短くても、CLAUDE.mdは強制になりません。"
+                },
+                {
+                  "id": "c",
+                  "md": "CLAUDE.mdは判断の材料として読まれ、強制はされないから"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.mdは、最初の1回の依頼にしか効かないから",
+                  "feedback": "CLAUDE.mdはセッションの始めに読まれ、その後もコンテキストに残ります。止まらなかったのは、強制する仕組みではないからです。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守るかどうかはClaudeの判断に委ねられます。Claudeの判断に任せず止めたいなら、`Bash(git push *)` の拒否ルールを使います。ただし、`git -C . push` のような別の書き方には一致しません。",
+              "objectiveId": "o3",
+              "bloom": "understand"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "6-5. 例題：気になる6行を仕分ける",
+      "role": "example",
+      "blocks": [
+        {
+          "id": "s5-lead",
+          "type": "markdown",
+          "style": "lead",
+          "md": "あるチームのCLAUDE.mdから、気になる6行を抜き出しました。1行ずつ、行き先を決めます。"
+        },
+        {
+          "id": "s5-lines",
+          "type": "list",
+          "style": "number",
+          "items": [
+            "「このアプリはReactとTypeScriptで作られています」",
+            "「テストはちゃんと実行してください」",
+            "「IMPORTANT: `.env` は絶対に読まないこと」",
+            "「`src/api/` の関数は、入力を検証してから使うこと」",
+            "「リリースの手順」と、それに続く12ステップ",
+            "「返事は短く、箇条書きで（私の好み）」"
+          ]
+        },
+        {
+          "id": "s5-steps",
+          "type": "steps",
+          "cite": [
+            "cc-best-practices",
+            "cc-memory",
+            "steering-post"
+          ],
+          "items": [
+            {
+              "id": "ex-derive",
+              "title": "① コードからわかる行を消す",
+              "md": "1行目は、コードや `package.json` を読めばわかります。",
+              "expect": "1行目を削除します。消しても困りません。"
+            },
+            {
+              "id": "ex-verify",
+              "title": "② あいまいな行を確かめられる形にする",
+              "md": "2行目の「ちゃんと」では、守れたかを確かめられません。",
+              "expect": "「コミットの前に `npm test` を実行する」に直します。"
+            },
+            {
+              "id": "ex-deny",
+              "title": "③ 禁止を拒否ルールへ移す",
+              "md": "3行目は、強調しても頼みごとのままです。Claudeの判断に任せず止めたいので、[[権限ルール（permission rule）|権限ルール]]に移します。",
+              "expect": "`.claude/settings.json` の `deny` に `Read(./.env)` が入ります。"
+            },
+            {
+              "id": "ex-rules",
+              "title": "④ 一部の決まりをルールへ移す",
+              "md": "4行目は `src/api/` を扱うときだけ必要です。ほかの作業で毎回読ませる必要はありません。",
+              "expect": "`paths:` 付きの `.claude/rules/api.md` に移します。"
+            },
+            {
+              "id": "ex-skill",
+              "title": "⑤ 長い手順を外に出す",
+              "md": "5行目は、リリースのときしか使わない手順です。第7回で[[スキル（skill）|スキル]]にする候補です。",
+              "expect": "別のファイルに移し、CLAUDE.mdにはそのパスだけを残します。"
+            },
+            {
+              "id": "ex-local",
+              "title": "⑥ 自分だけの好みをローカルへ移す",
+              "md": "6行目は、チームの決まりではなく自分の好みです。",
+              "expect": "`CLAUDE.local.md` に移します。チームのCLAUDE.mdは2行になります。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "演習：膨らんだCLAUDE.mdを書き直す",
+      "role": "practice",
+      "blocks": [
+        {
+          "id": "practice-task",
+          "type": "markdown",
+          "style": "lead",
+          "md": "見本のCLAUDE.mdを、練習用のフォルダーで書き直します。行き先は、Claude Codeに頼む前に自分で決めます。大事なリポジトリでは試さないでください。"
+        },
+        {
+          "id": "practice-setup",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "mkdir -p cc-practice-06 &&\n  cd cc-practice-06\ngit init\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\nReactとTypeScriptで作られたアプリです。\nsrc/ にソース、tests/ にテストがある。\nコードはきれいに、読みやすく書くこと。\nIMPORTANT: .env は絶対に読まないこと。\nIMPORTANT: git push は絶対にしない。\nテストはちゃんと実行してください。\nテストは npm run test:unit で実行。\nnpm test はE2Eまで走って遅い。\n編集したら毎回必ず npm run format。\nsrc/api/ の関数は入力を検証して使う。\n返事は短く、箇条書きで（私の好み）。\n## 画面を追加する手順\n1. src/pages/ に新しいファイルを作る\n2. src/routes.ts に新しい画面を登録する\n3. 見出しを locales/ja.json に足す\n4. tests/pages/ にテストを足す\n5. npm run test:unit で確かめる\n6. スクリーンショットを撮ってPRに貼る\nEOF"
+        },
+        {
+          "id": "practice-steps",
+          "type": "steps",
+          "cite": [
+            "cc-memory",
+            "cc-permissions"
+          ],
+          "items": [
+            {
+              "id": "pr-setup",
+              "title": "① 見本を置く",
+              "md": "上のコマンドを、ターミナルで実行します。",
+              "expect": "`cc-practice-06` に、19行の `CLAUDE.md` ができます。"
+            },
+            {
+              "id": "pr-decide",
+              "title": "② 自分で行き先を決める",
+              "md": "1行ずつ「残す・直す・消す・移す・後でフックにする」を決めます。どの行かは、行の書き出しの言葉でメモします。",
+              "expect": "19行すべてに、行き先が1つずつ付きます。",
+              "hint": "6-5の6つの手順を、上から順に当てはめます。",
+              "troubleshoot": "迷ったら「確実に守らせたいか」「一部のファイルだけか」「長い手順か」「自分だけか」の順に問います。"
+            },
+            {
+              "id": "pr-ask",
+              "title": "③ メモのとおりに頼む",
+              "md": "`claude` を起動し、下の依頼文にメモを貼って送ります。確認を求められたら、中身を読んでから許可します。",
+              "expect": "CLAUDE.mdが短くなり、移した先のファイルができます。"
+            },
+            {
+              "id": "pr-explain",
+              "title": "④ 差分（diff）を説明してもらう",
+              "md": "「どの行をどこへ、なぜ移したか説明して」と頼み、メモと比べます。",
+              "expect": "メモと違う行は、6-4の表でどちらが合うか確かめます。"
+            },
+            {
+              "id": "pr-context",
+              "title": "⑤ 読み込みを確かめる",
+              "md": "Claude Codeを起動し直します。`api.md` が読まれているか予想してから、`/context` を開きます。",
+              "expect": "「Memory files」に `CLAUDE.md` と `CLAUDE.local.md` が並びます。ユーザーのCLAUDE.mdがあれば、それも並びます。`api.md` は、`src/api/` を扱うまで読まれません。"
+            },
+            {
+              "id": "pr-permissions",
+              "title": "⑥ 拒否ルールを確かめる",
+              "md": "`/permissions` を開きます。",
+              "expect": "拒否ルールとして、`.env` の読み取りと `git push` を止める2行が見つかります。書き方は、たとえば `Read(./.env)` と `Bash(git push *)` です。"
+            }
+          ]
+        },
+        {
+          "id": "practice-prompt",
+          "type": "prompt",
+          "target": "claude-code",
+          "title": "行き先を決めてから頼む依頼文",
+          "prompt": "このフォルダーのCLAUDE.mdを整理してください。\n行き先は私が決めたので、次のメモのとおりに分けてください。\n{{行き先のメモ}}\n- 禁止は `.claude/settings.json` の `permissions.deny` に書く\n- 自分だけの好みは `CLAUDE.local.md` に移し、`.gitignore` に追加する\n- 外に出した手順は、CLAUDE.mdから `@` を付けないパスで案内する\n- 私のメモに無理があれば、変える前に理由を教えてください\n終わったら、どの行をどこへ移したかを表で示してください。",
+          "vars": [
+            {
+              "name": "行き先のメモ",
+              "hint": "例：「Reactと…」→消す、「テストは npm run…」→残す（19行分を書きます）"
+            }
+          ],
+          "expect": "変えたファイルと、行き先の表が返ってきます。表が自分のメモと合っているかを確かめます。"
+        },
+        {
+          "id": "practice-checklist",
+          "type": "checklist",
+          "title": "できたかチェック",
+          "items": [
+            {
+              "id": "pc-vague",
+              "label": "CLAUDE.mdに「ちゃんと」「きれいに」のような、確かめられない行がありません"
+            },
+            {
+              "id": "pc-derive",
+              "label": "コードを読めばわかる行（言語、フォルダーの構成）を消しました"
+            },
+            {
+              "id": "pc-deny",
+              "label": ".env と git push の禁止が、.claude/settings.json の deny にあります"
+            },
+            {
+              "id": "pc-rules",
+              "label": "src/api/ の決まりが、paths: 付きの .claude/rules/api.md にあります"
+            },
+            {
+              "id": "pc-procedure",
+              "label": "手順はCLAUDE.mdの外にあり、@ なしのパスで案内しています"
+            },
+            {
+              "id": "pc-local",
+              "label": "好みはCLAUDE.local.mdにあり、.gitignore に入っています"
+            },
+            {
+              "id": "pc-check",
+              "label": "再起動後の /context と /permissions で、読み込みと拒否ルールを確かめました"
+            }
+          ]
+        },
+        {
+          "id": "practice-hint3",
+          "type": "callout",
+          "variant": "tip",
+          "title": "それでも迷ったら（答えに近いヒント）",
+          "md": "IMPORTANTの2行は拒否ルール、`src/api/` の行は `paths:` 付きのルール、好みの行はローカルへ移します。「## 画面を追加する手順」から下は、`docs/add-screen.md` へ移します。\n\nReactとTypeScript、フォルダーの構成、「きれいに」の3行は消します。「ちゃんと」の行は「コミットの前に `npm run test:unit` を通す」に直し、残りのテスト2行は1つにまとめます。「毎回必ず」の整形はフックの候補（第8回）なので、今はコマンドだけ残します。"
+        },
+        {
+          "id": "practice-answer-intro",
+          "type": "markdown",
+          "md": "模範解答の一例です。見本を置いた直後なら、下のコマンドとJSONでこの形にできます。"
+        },
+        {
+          "id": "practice-answer",
+          "type": "code",
+          "lang": "bash",
+          "filename": "terminal",
+          "code": "mkdir -p docs\nsed -n '/^## 画面/,$p' CLAUDE.md \\\n  > docs/add-screen.md\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\n- テストは `npm run test:unit` で\n  （`npm test` はE2Eまで走って遅い）\n- コミットの前に\n  `npm run test:unit` を通す\n- 整形は `npm run format` で行う\n- 画面追加の手順：`docs/add-screen.md`\n<!-- 整形は後でフックにする -->\nEOF\nmkdir -p .claude/rules\ncat > .claude/rules/api.md <<'EOF'\n---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- 関数は入力を検証してから使う\nEOF\ncat > CLAUDE.local.md <<'EOF'\n- 返事は短く、箇条書きで書く\nEOF\necho \"CLAUDE.local.md\" >> .gitignore",
+          "highlight": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ]
+        },
+        {
+          "id": "practice-answer-settings",
+          "type": "code",
+          "lang": "json",
+          "filename": ".claude/settings.json",
+          "cite": [
+            "cc-permissions"
+          ],
+          "code": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Read(./.env)\",\n      \"Bash(git push *)\"\n    ]\n  }\n}"
+        },
+        {
+          "id": "practice-answer-why",
+          "type": "markdown",
+          "cite": [
+            "cc-memory"
+          ],
+          "md": "残した4つの項目は、どれも確かめられます。HTMLコメントは読み込みの前に取り除かれ、人向けのメモになります。"
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "title": "理解度チェック",
+      "role": "check",
+      "blocks": [
+        {
+          "id": "check-quiz",
+          "type": "quiz",
+          "mode": "exam",
+          "cite": [
+            "cc-memory",
+            "cc-best-practices",
+            "cc-features-overview",
+            "cc-permissions",
+            "cc-permission-modes",
+            "cc-skills",
+            "steering-post"
+          ],
+          "questions": [
+            {
+              "id": "e1",
+              "kind": "single",
+              "prompt": "チームのリポジトリにはAGENTS.mdだけがあり、Claude Codeはそれを読んでいました。自分用にCLAUDE.local.mdを作ったら、チームの決まりが守られなくなりました。原因として最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "CLAUDE.local.mdが、AGENTS.mdの内容を上書きしたから",
+                  "feedback": "指示のファイルどうしは上書きし合いません。CLAUDE.local.mdができたことで、AGENTS.mdが読まれなくなったのが原因です。"
+                },
+                {
+                  "id": "b",
+                  "md": "CLAUDE.local.mdがあると、AGENTS.mdが読まれなくなるから"
+                },
+                {
+                  "id": "c",
+                  "md": "AGENTS.mdは古い形式なので、CLAUDE.local.mdより後回しになるから",
+                  "feedback": "Claude CodeがAGENTS.mdを読むのはv2.1.277からで、古いから後回しにされるわけではありません。読まれる条件を満たさなくなったのが原因です。"
+                },
+                {
+                  "id": "d",
+                  "md": "CLAUDE.local.mdはGitに入らないので、決まりが消えたから",
+                  "feedback": "Gitに入るかどうかは、読み込みとは関係ありません。CLAUDE.local.mdがあると、既定ではAGENTS.mdが読まれなくなります。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "既定では、CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときだけ、AGENTS.mdが読まれます。この既定は、`/config` の「Project instructions」で変えられます。チームでCLAUDE.mdを作り、先頭に `@AGENTS.md` と書けば両方を使えます。",
+              "objectiveId": "o1",
+              "bloom": "analyze"
+            },
+            {
+              "id": "e2",
+              "kind": "single",
+              "prompt": "「ファイルを編集したら、毎回必ず `npm run format` を実行する」を確実に実行させたいとき、どうしますか？",
+              "options": [
+                {
+                  "id": "c",
+                  "md": "フックで自動的に実行させる"
+                },
+                {
+                  "id": "a",
+                  "md": "CLAUDE.mdに「IMPORTANT」付きで書く",
+                  "feedback": "Claudeが整形を選んで実行するのと、整形が自動で走るのは別のことです。毎回必ず起こすならフックです。"
+                },
+                {
+                  "id": "b",
+                  "md": "手順をスキルにまとめておく",
+                  "feedback": "スキルは、関係するときや呼んだときに読まれる手順です。毎回必ず起きる保証にはなりません。"
+                },
+                {
+                  "id": "d",
+                  "md": "許可ルール（allow）に登録する",
+                  "feedback": "許可ルールは、確認なしで実行してよいことを決めるだけです。実行そのものを毎回起こす仕組みではありません。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "毎回必ず起きてほしいことは、フックに任せます。フックはClaudeの判断を待たず、決まったタイミングで動きます（第8回）。",
+              "objectiveId": "o1",
+              "bloom": "apply"
+            },
+            {
+              "id": "e3",
+              "kind": "single",
+              "prompt": "`/init` で作ったCLAUDE.mdが240行になりました。直し方として最も適切なのはどれでしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "半分を別のファイルに分け、`@` で取り込む",
+                  "feedback": "取り込んだファイルも起動時に読まれるので、毎回の量は減りません。整理にはなっても、短くはなりません。"
+                },
+                {
+                  "id": "b",
+                  "md": "コードからわかる行を消し、一部だけの決まりをルールへ移す"
+                },
+                {
+                  "id": "c",
+                  "md": "大事な行すべてに「IMPORTANT」を付けて、目立たせる",
+                  "feedback": "強調は、ここぞという1行に使います。全部に付けると、どれも目立たなくなります。"
+                },
+                {
+                  "id": "d",
+                  "md": "そのまま使い、Claudeが間違えたら会話でそのつど直す",
+                  "feedback": "同じ直しを毎回くり返すなら、それはCLAUDE.mdに書くべき1行です。長すぎる問題も残ったままです。"
+                }
+              ],
+              "answer": [
+                "b"
+              ],
+              "explanation": "目安は200行未満です。消しても間違いが増えない行を削り、一部のファイルだけの決まりを `paths:` 付きのルールに移すと、毎回読まれる量が減ります。",
+              "objectiveId": "o2",
+              "bloom": "evaluate"
+            },
+            {
+              "id": "e6",
+              "kind": "single",
+              "prompt": "同僚が「CLAUDE.mdに『本番のデータベースには絶対に接続しない』と書いたから安心だ」と言っています。どう返すのが最も適切でしょう？",
+              "options": [
+                {
+                  "id": "a",
+                  "md": "「前のセッションで頼んであるから、もう覚えているよ」",
+                  "feedback": "セッションは毎回まっさらに始まり、前の会話は引き継がれません。止めたい操作は、拒否ルールやフックで決めておきます。"
+                },
+                {
+                  "id": "b",
+                  "md": "「200行未満のCLAUDE.mdなら、必ず守られるから大丈夫」",
+                  "feedback": "短いほど守られやすくはなりますが、保証にはなりません。止める仕組みは、別に用意します。"
+                },
+                {
+                  "id": "c",
+                  "md": "「頼みごとなので、拒否ルールかフックでも止めておこう」"
+                },
+                {
+                  "id": "d",
+                  "md": "「autoモードなら、危ない操作はすべて止まるから大丈夫」",
+                  "feedback": "autoモードの分類器（classifier）も、見逃しがゼロではありません。止めたい操作は、拒否ルールやフックで決めておきます。"
+                }
+              ],
+              "answer": [
+                "c"
+              ],
+              "explanation": "CLAUDE.mdはClaudeが読むコンテキストで、守る保証はありません。本当に止めたい操作は、毎回同じように働く拒否ルールやフックに任せます。ただし拒否ルールが止めるのは、一致する操作だけです。",
+              "objectiveId": "o3",
+              "bloom": "apply"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "title": "まとめ",
+      "role": "summary",
+      "blocks": [
+        {
+          "id": "summary-points",
+          "type": "summary",
+          "points": [
+            "CLAUDE.mdは、毎回のセッションの始めに読まれる指示です。4つの置き場所は上書きし合わず、すべてつながって読まれます。",
+            "1ファイル200行未満を目安に、確かめられる形で書きます。同じ間違いが2回起きたら足し、消しても困らない行は削ります。",
+            "一部のファイルだけの決まりは `paths:` 付きの[[ルール（rules）|ルール]]へ、長い手順は[[スキル（skill）|スキル]]へ、自分だけの好みは[[CLAUDE.local.md]]へ移します。",
+            "CLAUDE.mdは頼みごとで、強制ではありません。Claudeの判断に任せず止めたいことは拒否ルールに、毎回起こしたいことは[[フック（hook）|フック]]に任せます。"
+          ]
+        },
+        {
+          "id": "summary-next",
+          "type": "markdown",
+          "md": "ここ1週間で、Claudeに2回以上した同じ説明や直しはありますか。6-4の表で、置き場所を考えてみましょう。\n\n次は「第7回｜手順はスキルに、調べものはサブエージェントに」です。外に出した手順を、スキルにまとめます。"
+        },
+        {
+          "id": "summary-cards",
+          "type": "flashcards",
+          "cards": [
+            {
+              "id": "card-when",
+              "front": "CLAUDE.mdが読まれるのはいつ？",
+              "back": "毎回のセッションの始めです。途中で直した行は、`/clear`・`/compact`・再起動のあとに反映されます。"
+            },
+            {
+              "id": "card-scopes",
+              "front": "4つのCLAUDE.mdに矛盾があると？",
+              "back": "上書きはされず、全部読まれます。Claudeがどちらかを選ぶので、矛盾をなくします。"
+            },
+            {
+              "id": "card-add-cut",
+              "front": "1行足す・削るの目安は？",
+              "back": "同じ間違いが2回起きたら足します。消しても間違いが増えない行は削ります。"
+            },
+            {
+              "id": "card-import",
+              "front": "`@` で取り込むと、毎回読まれる量は減る？",
+              "back": "減りません。取り込んだファイルも起動時に読まれます。"
+            },
+            {
+              "id": "card-paths",
+              "front": "`paths:` 付きのルールが読まれるのは？",
+              "back": "Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。1つのファイルを `cat` や `head` で見たときも読まれます。"
+            },
+            {
+              "id": "card-never",
+              "front": "「絶対に〜しない」を、Claudeの判断に任せず止めるには？",
+              "back": "CLAUDE.mdではなく、権限ルールの拒否ルール（deny）に書きます。止まるのは、ルールに一致する操作だけです。"
+            },
+            {
+              "id": "card-agents",
+              "front": "AGENTS.mdが読まれるのは？",
+              "back": "v2.1.277以降、既定では作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです。共有するなら、CLAUDE.mdに `@AGENTS.md` と書きます。"
+            }
+          ]
+        },
+        {
+          "id": "summary-ask",
+          "type": "askTutor",
+          "suggestions": [
+            "自分のCLAUDE.mdで、削ってよい行を一緒に探して",
+            "この決まりはCLAUDE.mdとルール、どちらに置くべき？",
+            "拒否ルールとフックは、どう使い分ける？"
+          ]
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "CLAUDE.md",
+      "md": "毎回のセッションの始めに読み込まれる、プロジェクトの指示のファイル。人が書いて育てます。"
+    },
+    {
+      "term": "CLAUDE.local.md",
+      "md": "自分だけが使う、このプロジェクト用の指示のファイル。Gitに入れず、`.gitignore` に書きます。"
+    },
+    {
+      "term": "自動メモリ（auto memory）",
+      "aliases": [
+        "自動メモリ",
+        "auto memory"
+      ],
+      "md": "Claudeが自分で書くメモ。`MEMORY.md` の最初の200行か25KBまでが毎回読まれます。"
+    },
+    {
+      "term": "インポート（import）",
+      "aliases": [
+        "インポート",
+        "import"
+      ],
+      "md": "CLAUDE.mdに `@パス` と書いて別のファイルを取り込むこと。取り込んだ先も起動時に読まれます。"
+    },
+    {
+      "term": "ルール（rules）",
+      "aliases": [
+        "ルール",
+        "rules"
+      ],
+      "md": "`.claude/rules/` に置く指示のファイル。`paths:` があると、一致するファイルを扱うときだけ読まれます。"
+    },
+    {
+      "term": "AGENTS.md",
+      "md": "ほかのAIコーディングツールと共有する指示のファイルで、Claude Codeはv2.1.277以降で読みます。既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときに読まれます。`.claude/CLAUDE.md` はCLAUDE.mdに数え、`~/.claude/CLAUDE.md` は数えません。"
+    },
+    {
+      "term": "権限ルール（permission rule）",
+      "aliases": [
+        "権限ルール",
+        "拒否ルール",
+        "permission rule"
+      ],
+      "md": "ツールの使用を許可（allow）・確認（ask）・拒否（deny）する設定。Claude Codeが守らせます。"
+    },
+    {
+      "term": "フック（hook）",
+      "aliases": [
+        "フック",
+        "hook"
+      ],
+      "md": "決まったタイミングで、Claude Codeが自動で動かす処理。"
+    },
+    {
+      "term": "スキル（skill）",
+      "aliases": [
+        "スキル",
+        "skill"
+      ],
+      "md": "手順などをまとめたファイル。使うときに本文が読み込まれます。"
+    },
+    {
+      "term": "セッション（session）",
+      "aliases": [
+        "セッション",
+        "session"
+      ],
+      "md": "`claude` を起動すると始まる、ひと続きの会話。始めるたびに、まっさらなコンテキストから始まります。"
+    },
+    {
+      "term": "コンテキスト",
+      "aliases": [
+        "コンテキストウィンドウ"
+      ],
+      "md": "Claudeがいま読んでいる情報の全体。コンテキストウィンドウ（context window）に入ります。"
+    }
+  ],
+  "sources": [
+    {
+      "id": "cc-memory",
+      "title": "How Claude remembers your project",
+      "url": "https://code.claude.com/docs/en/memory",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-best-practices",
+      "title": "Best practices for Claude Code",
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-features-overview",
+      "title": "Extend Claude Code",
+      "url": "https://code.claude.com/docs/en/features-overview",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permissions",
+      "title": "Configure permissions",
+      "url": "https://code.claude.com/docs/en/permissions",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-permission-modes",
+      "title": "Permission modes",
+      "url": "https://code.claude.com/docs/en/permission-modes",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-skills",
+      "title": "Extend Claude with skills",
+      "url": "https://code.claude.com/docs/en/skills",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-prompt-caching",
+      "title": "How Claude Code uses prompt caching",
+      "url": "https://code.claude.com/docs/en/prompt-caching",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "cc-changelog",
+      "title": "Claude Code CHANGELOG",
+      "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    },
+    {
+      "id": "steering-post",
+      "title": "Steering Claude Code: when to use CLAUDE.md, skills, hooks, and subagents (2026-06-18)",
+      "url": "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more",
+      "publisher": "Anthropic",
+      "checkedAt": "2026-10-20"
+    }
+  ],
+  "provenance": {
+    "author": "claude-code",
+    "skill": "author-lesson",
+    "skillVersion": "1",
+    "generatedAt": "2026-10-20"
+  }
+}

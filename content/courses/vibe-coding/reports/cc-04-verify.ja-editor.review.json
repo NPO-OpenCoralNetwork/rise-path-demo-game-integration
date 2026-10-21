@@ -1,0 +1,81 @@
+{
+  "lessonId": "cc-04-verify",
+  "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "lessonHash": "sha256:17c13d4e45026e5d",
+  "verifies": {
+    "reviewedRevision": "sha256:7aa12666041c7288",
+    "previousReview": ".artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/round-1/ja-editor.review.json",
+    "changed": [
+      "s4-fresh",
+      "check-quiz"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "Both changed strings use です・ます, hold one idea and contain no banned phrases. s4-fresh now reads 「このサブエージェントは、差分と渡された基準をもとに、自分でコードを読んで確かめます。」. The e5 explanation now reads 「別のコンテキストのレビュー役は、作業の経緯を見ずに、差分と渡された基準をもとに判断します。」. Both agree with each other: the subagent does not see the history, and it judges from the diff and the criteria. The e5 explanation still matches the feedback on option a (「作業の経緯を見ていない、別のコンテキストに頼みます。」). Voice stays at 3 because the craft points from earlier rounds are still open in unchanged text: the s1-why referent, 「exportして」 in p-prompt-write, e2 option b, and the glossary register.",
+      "blockIds": [
+        "s4-fresh",
+        "check-quiz",
+        "s1-why",
+        "p-prompt-write"
+      ]
+    },
+    {
+      "id": "load",
+      "score": 4,
+      "evidence": "measure.mjs reports prose 2242 (budget 1,200–2,400) and est 19.5 min (limit 20), against estMinutes 19. `lessons:lint --strict` reports 0 errors and 0 warnings. The two changed sentences are about 40–45 characters, well inside the 60-character budget. s4-fresh is still 2 sentences long.",
+      "blockIds": [
+        "s4-fresh",
+        "check-quiz"
+      ]
+    },
+    {
+      "id": "prior",
+      "score": 3,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. No change touches a term definition. s4-fresh uses サブエージェント and コンテキスト, which s4-defs defines just before it. エッジケース still has no gloss in the text at s4-prompt.",
+      "blockIds": [
+        "s4-defs",
+        "s4-fresh",
+        "s4-prompt"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 3,
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round. This is a single-locale (jp) lesson, the changes add no plain strings, and no link or diagram changed. The open points in s4-names and s1-screenshot-note are unchanged.",
+      "blockIds": [
+        "s4-names",
+        "s1-screenshot-note"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s4-fresh: 「確かめます」 does not say what is checked. Naming the object (the diff against the criteria) reads more clearly — 「差分と渡された基準をもとに、自分でコードを読んで確かめます。」→「渡された基準を手がかりに、差分のコードを自分で読んで確かめます。」",
+    "lesson (estMinutes): measure.mjs now gives est 19.5 min, and rounded that is 20, not 19. Either set estMinutes to 20 or trim a little prose so est stays below 19.5.",
+    "s4-sort: the node label says 「再テスト」, but the alt and the body say テストを再実行 (carried) — 「必須：<br>直して<br>再テスト」→「必須：<br>直して<br>テスト再実行」",
+    "s1-why: after the paragraph break, 「公式ガイドが最初に挙げる方法です。」 has no subject (carried) — 「公式ガイドが最初に挙げる方法です。」→「これは、公式ガイドが最初に挙げる方法です。」",
+    "p-prompt-write: 「exportして」 is an English code term inside Japanese prose (carried) — 「中身が空の `isLeapYear` をexportして置くだけにしてください。」→「中身が空の `export function isLeapYear(year) {}` だけを置いてください。」",
+    "check-quiz e2: make option b match the feedback on d (carried) — 「`npm test` の失敗が0件になる。」→「Claudeが `npm test` を実行し、失敗が0件になる。」",
+    "s1-why: 「回せます」 is an odd verb for one step of the loop (carried) — 「「結果を確かめる」を、Claude自身が回せます。」→「「結果を確かめる」まで、Claude自身で進められます。」",
+    "s4-prompt: エッジケース appears in the text with no gloss. This keeps prior at 3 (carried) — 「計画と照らすなら次の依頼文です。」→「計画と照らすなら次の依頼文です。エッジケース（edge case）は、めったに起きない場面のことでした。」",
+    "s3-steps ex-commit: the sentence leaves out its condition (carried) — 「テストの書き換えに、`git diff` ですぐ気づけます。」→「先にコミットしておけば、テストの書き換えに `git diff` ですぐ気づけます。」",
+    "p-steps p-write hint: the spec is on one line, so 「各行」 does not fit (carried) — 「仕様の各行に、例の年を1つずつ当てはめてみましょう」→「仕様の決まりごとに、例の年を1つずつ当てはめてみましょう」",
+    "s4-names: the link text names only the site, not the page (carried) — 「[日本語の公式ドキュメント]」→「[公式ドキュメントのベストプラクティス（日本語）]」",
+    "s1-screenshot-note (factual doubt): the link points to the English page /docs/en/chrome, while s4-names links to a /docs/ja/ page. If a Japanese page exists, link to it.",
+    "glossary: the register is mixed (carried) — 「別のモデルが条件を判定します。」→「別のモデルが条件を判定する仕組み。」"
+  ],
+  "average": 3.25,
+  "verdict": "revise",
+  "summary": "Verification round: review-scope.mjs exited 0. Only 2 of 58 blocks changed: s4-fresh and the e5 explanation in check-quiz. The previous review had no open must-fix items, so the resolved list is empty. Both changed strings are correct です・ます Japanese and consistent with each other. They no longer say the reviewing subagent sees only the diff and criteria. I found no new (a)–(e) errors, so mustFix is empty. Lint is clean, prose is 2242 and est is 19.5 min, so estMinutes 19 may need to become 20 (niceToHave). Voice and load were re-scored and stay at 3 and 4. Prior and a11y_l10n are carried over at 3. The mean is 3.25, below 3.3, so the verdict stays revise until the carried niceToHave items lift voice or prior."
+}
