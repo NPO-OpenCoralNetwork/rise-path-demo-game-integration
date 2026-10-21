@@ -152,7 +152,7 @@ KOKORO_TTS_DEFAULT_VOICE_JA=jf_alpha
 KOKORO_TTS_DEFAULT_VOICE_EN=af_bella
 ```
 
-MCP ツール `request-tts` および `POST /api/generate-audio` は、このサイドカー API を呼び出す。
+MCP ツール `request-tts` および `POST /api/v2/tts/synthesize` は、このサイドカー API を呼び出す。
 全レイヤーで出力形式フィールド名は **`output_format`** に統一する（`format` は使用しない）。
 
 #### 3.2.1 ユーザー preference オーバーレイ（Phase 17-0）

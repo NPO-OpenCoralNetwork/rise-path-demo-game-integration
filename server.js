@@ -5,7 +5,6 @@ import { realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg'; // For legacy pool if needed, or remove
-import { generateAudioContent } from './scripts/kokoro_tts_node.js';
 import ttsRoutes, { ttsHealthHandler } from './server/routes/tts.js';
 import { jobWorker } from './server/jobWorker.js';
 
@@ -23,7 +22,8 @@ import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
-import rateLimit from 'express-rate-limit';
+import { isStrictAuthMode } from './server/middleware/authPolicy.js';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -86,7 +86,8 @@ export async function createApp({ serveStatic = true } = {}) {
         res.on('finish', () => {
             const ms = Date.now() - start;
             const auth = req.authMethod || '-';
-            console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${res.statusCode} ${ms}ms auth=${auth}`);
+            // originalUrl: a guard mounted on a path (e.g. /api/v2/agent) sees req.url without it.
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms auth=${auth}`);
         });
         next();
     });
@@ -104,21 +105,32 @@ export async function createApp({ serveStatic = true } = {}) {
     });
     app.use('/api/', globalLimiter);
 
-    // AI Heavy: 10 req/min/userId (Gemini API cost protection)
+    // AI Heavy: 10 req/min/userId (Gemini API cost protection). Guests are keyed by IP, with IPv6
+    // addresses grouped by subnet so rotating addresses within one network does not reset the limit.
     const aiLimiter = rateLimit({
         windowMs: 60 * 1000,
         max: isDev ? 100 : 10,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: (req) => req.userId || req.ip,
+        keyGenerator: (req) => req.userId || ipKeyGenerator(req.ip),
         message: { error: 'AI rate limit exceeded. Max 10 requests/min.' },
-        validate: { keyGeneratorIpFallback: false },
     });
 
+    // TTS: guests may synthesize outside strict mode only. Strict mode (production) has always
+    // required a user here; opening it to guests is an owner decision, not a side effect of the
+    // mount order.
+    const ttsAuth = (req, res, next) => (isStrictAuthMode() ? requireAuth : optionalAuth)(req, res, next);
+
     // --- Mount V2 Routes ---
+    // Every guard covers only the paths it protects. A mount on the bare /api/v2 prefix runs for
+    // every later /api/v2 request, which used to stack up to four guards on one request and spend
+    // the AI budget on ordinary reads. Guards that do run on the same request share one Supabase
+    // getUser call (verifyJwtOnce). The AI limiter runs after auth (keyed by user) and only on the
+    // POSTs that spend model or TTS time: /ai/generate, /image, /upload and /rag/index (embeddings),
+    // /tts/synthesize and /agent/chat.
     app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
-    // LLM gateway: mounted before the blanket /api/v2 auth below so guests are not 401'd in strict
-    // mode; optionalAuth sets req.userId when a token is present; the AI limiter covers its POSTs.
+    // LLM gateway: optionalAuth sets req.userId when a token is present, so guests are not 401'd in
+    // strict mode; the gateway router applies the AI limiter to its own POSTs.
     app.use(
         '/api/v2/llm',
         optionalAuth,
@@ -128,61 +140,27 @@ export async function createApp({ serveStatic = true } = {}) {
     // Course generator (ai.js) requires auth. Scoped to its own paths: chatgptCurriculumRoutes also
     // serves /api/v2/ai/* (generation-kit, curriculum-drafts…) with bridge-token auth further down.
     app.use(['/api/v2/ai/generate', '/api/v2/ai/drafts'], requireAuth);
-    app.use('/api/v2/ai', aiLimiter, aiRoutes);              // AI rate limit (keyed by req.userId once authed)
-    app.use('/api/v2/image', requireAuth, aiLimiter);        // AI rate limit for image generation
+    app.post('/api/v2/ai/generate', aiLimiter);
+    app.use('/api/v2/ai', aiRoutes);
+    app.post('/api/v2/image', requireAuth, aiLimiter);       // the route itself is in contentRoutes
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
-    app.use('/api/v2', chatgptCurriculumRoutes);             // uses own Bridge/JWT auth (§4.6)
-    app.use('/api/v2', lifeJournalRoutes);                   // Phase 16: life journal (Bridge/JWT auth)
-    app.use('/api/v2', learnerMemoryRoutes);                 // Phase 19: learner semantic memory (Bridge/JWT auth)
-    app.use('/api/v2', requireBridgeOrAuth, aiLimiter, agentRoutes); // Phase 16-6d: auth before AI rate limit
+    app.use('/api/v2', chatgptCurriculumRoutes);             // per-route Bridge/JWT auth (§4.6)
+    app.use('/api/v2', lifeJournalRoutes);                   // Phase 16: per-route Bridge/JWT auth
+    app.use('/api/v2', learnerMemoryRoutes);                 // Phase 19: Bridge/JWT auth on /learner-memory
+    app.use('/api/v2/agent', requireBridgeOrAuth);           // Phase 16-6d: agent paths only
+    app.post('/api/v2/agent/chat', aiLimiter);
+    app.use('/api/v2', agentRoutes);
+    app.get('/api/v2/tts/health', ttsHealthHandler);         // public probe — no auth, no rate limit
+    app.use('/api/v2/tts', ttsAuth);                         // Issue #3: every other TTS path (user prefs when authed)
+    app.post('/api/v2/tts/synthesize', aiLimiter);
+    app.use('/api/v2', ttsRoutes);
+    // Content POSTs that spend embeddings (the routes themselves are in contentRoutes).
+    app.post(['/api/v2/upload', '/api/v2/rag/index'], requireAuth, aiLimiter);
+    // Last: requireAuth on the bare prefix also answers every unmatched /api/v2 path.
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
-    app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
-    app.use('/api/v2', optionalAuth, aiLimiter, ttsRoutes);  // Issue #3: Kokoro TTS (+ user prefs when authed)
 
     // --- Legacy / Other Routes (Keeping for compatibility) ---
-
-    // Audio Generation (could be moved to content.js but keeping here for simplicity)
-    app.post('/api/generate-audio', async (req, res) => {
-        const courseData = req.body;
-        const courseId = courseData.id;
-        if (!courseId) return res.status(400).json({ error: 'Course ID is missing' });
-
-        res.json({ message: 'Audio generation started (Kokoro TTS)', courseId, engine: 'kokoro-82m-onnx' });
-        console.log(`Starting Kokoro TTS for course: ${courseId}`);
-
-        // Background process
-        (async () => {
-            try {
-                const baseDir = path.join(__dirname, 'public/data/audio', courseId);
-                await fs.mkdir(baseDir, { recursive: true });
-                const chapters = courseData.chapters || [];
-                for (let chIdx = 0; chIdx < chapters.length; chIdx++) {
-                    const slides = chapters[chIdx].slides || [];
-                    for (let sIdx = 0; sIdx < slides.length; sIdx++) {
-                        const slide = slides[sIdx];
-                        let text = slide.speechScript;
-                        if (!text || text.trim().length === 0) {
-                            const bullets = slide.bullets || [];
-                            text = bullets.length > 0 ? bullets.join(". ") : slide.title;
-                        }
-                        if (!text) continue;
-                        const filename = `${chIdx}_${sIdx}.mp3`;
-                        const filepath = path.join(baseDir, filename);
-                        try {
-                            const audioBase64 = await generateAudioContent(text, { language: 'ja' });
-                            const audioBuffer = Buffer.from(audioBase64, 'base64');
-                            await fs.writeFile(filepath, audioBuffer);
-                        } catch (err) {
-                            console.error(`Audio Error ${filename}:`, err);
-                        }
-                    }
-                }
-                console.log(`Audio generation done for: ${courseId}`);
-            } catch (error) {
-                console.error(`Audio Fatal Error:`, error);
-            }
-        })();
-    });
+    // (The legacy batch audio route was removed: unauthenticated, no callers. TTS lives in /api/v2/tts.)
 
     // Legacy Learning Portals (Using Phase 1 Pool directly here for read compatibility)
     // Note: Frontend mostly uses /api/v2 now, but LearningHub might still hit /api/learning-portals

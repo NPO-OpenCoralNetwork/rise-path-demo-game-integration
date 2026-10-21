@@ -15,6 +15,7 @@
 
 import { PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
+import { isBridgeToken } from './bridgeToken.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -24,6 +25,17 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABA
 
 let _supabase = null;
 let _initAttempted = false;
+/** @type {any} undefined = use the real client */
+let _supabaseOverride;
+
+/** Tests: replace the Supabase client (anything with `auth.getUser`); null = not configured. */
+export function setSupabaseForTests(client) {
+    _supabaseOverride = client;
+}
+
+export function resetSupabaseForTests() {
+    _supabaseOverride = undefined;
+}
 
 /**
  * Get or create a cached Supabase client instance.
@@ -31,6 +43,7 @@ let _initAttempted = false;
  * @returns {import('@supabase/supabase-js').SupabaseClient | null}
  */
 export const getSupabase = () => {
+    if (_supabaseOverride !== undefined) return _supabaseOverride;
     if (_supabase) return _supabase;
     if (_initAttempted) return null; // Already tried, Supabase not available
     return null; // Call initSupabase() first
@@ -81,59 +94,89 @@ export const extractBearerToken = (req) => {
     return null;
 };
 
+// ─── JWT verification (once per request) ─────────────────────
+
+const JWT_VERIFICATION = Symbol('jwtVerification');
+
+/**
+ * @typedef {{ status: 'missing' | 'unconfigured' | 'invalid' | 'error' } & { detail?: string }
+ *   | { status: 'valid', userId: string }} JwtVerification
+ */
+
+/** @returns {Promise<JwtVerification>} */
+async function verifyJwt(req) {
+    const token = extractBearerToken(req);
+    if (!token) return { status: 'missing' };
+    const supabase = getSupabase();
+    if (!supabase) return { status: 'unconfigured' };
+    // The bridge token travels as a bearer token too; it is not a user token, so skip the lookup.
+    if (isBridgeToken(token)) return { status: 'invalid', detail: 'The bridge token is not a user token' };
+    try {
+        const { data, error } = await supabase.auth.getUser(token);
+        if (error || !data?.user) return { status: 'invalid', detail: error?.message };
+        return { status: 'valid', userId: data.user.id };
+    } catch (err) {
+        return { status: 'error', detail: err.message };
+    }
+}
+
+/**
+ * The request's bearer token checked against Supabase at most once, however many guards run on
+ * the request: later calls reuse the first result.
+ * @param {import('express').Request} req
+ * @returns {Promise<JwtVerification>}
+ */
+export function verifyJwtOnce(req) {
+    if (!req[JWT_VERIFICATION]) req[JWT_VERIFICATION] = verifyJwt(req);
+    return req[JWT_VERIFICATION];
+}
+
+async function grant(req, next, userId, authMethod) {
+    req.userId = userId;
+    req.authMethod = authMethod;
+    await syncAuthUserStub(userId);
+    return next();
+}
+
 // ─── Middleware ──────────────────────────────────────────────
 
 /**
  * Require authentication. Sets req.userId and req.authMethod.
  */
 export const requireAuth = async (req, res, next) => {
-    const token = extractBearerToken(req);
+    const jwt = await verifyJwtOnce(req);
+
+    if (jwt.status === 'valid') return grant(req, next, jwt.userId, 'supabase-jwt');
 
     // No token provided
-    if (!token) {
-        if (allowDevAuthFallback()) {
-            req.userId = PHASE1_USER_ID;
-            req.authMethod = 'dev-fallback';
-            await syncAuthUserStub(req.userId);
-            return next();
-        }
+    if (jwt.status === 'missing') {
+        if (allowDevAuthFallback()) return grant(req, next, PHASE1_USER_ID, 'dev-fallback');
         return res.status(401).json({
             error: 'Authentication required',
             hint: 'Include Authorization: Bearer <supabase-jwt> header',
         });
     }
 
-    // Token provided — validate with Supabase
-    const supabase = getSupabase();
-    if (!supabase) {
+    // Token provided but Supabase is not configured
+    if (jwt.status === 'unconfigured') {
         if (allowDevAuthFallback()) {
-            req.userId = PHASE1_USER_ID;
-            req.authMethod = 'no-supabase-fallback';
             console.warn('[Auth] Token provided but Supabase not configured. Using dev fallback.');
-            await syncAuthUserStub(req.userId);
-            return next();
+            return grant(req, next, PHASE1_USER_ID, 'no-supabase-fallback');
         }
         return res.status(503).json({
             error: 'Authentication service not configured',
         });
     }
 
-    try {
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data?.user) {
-            return res.status(401).json({
-                error: 'Invalid or expired token',
-                detail: error?.message,
-            });
-        }
-        req.userId = data.user.id;
-        req.authMethod = 'supabase-jwt';
-        await syncAuthUserStub(req.userId);
-        next();
-    } catch (err) {
-        console.error('[Auth] JWT validation error:', err.message);
-        return res.status(500).json({ error: 'Authentication service error' });
+    if (jwt.status === 'invalid') {
+        return res.status(401).json({
+            error: 'Invalid or expired token',
+            detail: jwt.detail,
+        });
     }
+
+    console.error('[Auth] JWT validation error:', jwt.detail);
+    return res.status(500).json({ error: 'Authentication service error' });
 };
 
 /**
@@ -141,41 +184,15 @@ export const requireAuth = async (req, res, next) => {
  * Invalid or expired tokens do not block the request (unlike requireAuth).
  */
 export const optionalAuth = async (req, res, next) => {
-    const token = extractBearerToken(req);
-    if (!token) {
-        req.userId = null;
-        req.authMethod = 'anonymous';
-        return next();
-    }
+    const jwt = await verifyJwtOnce(req);
 
-    const supabase = getSupabase();
-    if (!supabase) {
-        if (allowDevAuthFallback()) {
-            req.userId = PHASE1_USER_ID;
-            req.authMethod = 'no-supabase-fallback';
-            await syncAuthUserStub(req.userId);
-            return next();
-        }
-        req.userId = null;
-        req.authMethod = 'anonymous';
-        return next();
+    if (jwt.status === 'valid') return grant(req, next, jwt.userId, 'supabase-jwt');
+    if (jwt.status === 'unconfigured' && allowDevAuthFallback()) {
+        return grant(req, next, PHASE1_USER_ID, 'no-supabase-fallback');
     }
+    if (jwt.status === 'error') console.warn('[Auth] optionalAuth JWT validation failed:', jwt.detail);
 
-    try {
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data?.user) {
-            req.userId = null;
-            req.authMethod = 'anonymous';
-            return next();
-        }
-        req.userId = data.user.id;
-        req.authMethod = 'supabase-jwt';
-        await syncAuthUserStub(req.userId);
-        return next();
-    } catch (err) {
-        console.warn('[Auth] optionalAuth JWT validation failed:', err.message);
-        req.userId = null;
-        req.authMethod = 'anonymous';
-        return next();
-    }
+    req.userId = null;
+    req.authMethod = 'anonymous';
+    return next();
 };

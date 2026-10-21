@@ -1,12 +1,11 @@
 /**
  * Bridge/JWT composite authentication (Phase 7).
- * Shared by chatgptCurriculum and lifeJournal routes.
+ * Used by the chatgptCurriculum, lifeJournal and learnerMemory routes and the /api/v2/agent paths.
  */
 import { PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
-import { getSupabase } from './auth.js';
+import { extractBearerToken, verifyJwtOnce } from './auth.js';
 import { allowDevAuthFallback } from './authPolicy.js';
-
-const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
+import { isBridgeToken } from './bridgeToken.js';
 
 async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated }) {
     req.userId = userId;
@@ -19,53 +18,37 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated }
  * Priority:
  *   1. x-nexloom-bridge-token header → Bridge auth
  *   2. Authorization: Bearer <bridge-token> → Bridge auth (legacy compat)
- *   3. Authorization: Bearer <supabase-jwt> → Supabase JWT validation
+ *   3. Authorization: Bearer <supabase-jwt> → Supabase JWT validation (shared with the other
+ *      guards on this request: at most one getUser call)
  *   4. (dev only) → PHASE1_USER_ID fallback
  */
 export const requireBridgeOrAuth = async (req, res, next) => {
-    const bridgeToken = cleanString(process.env.RISE_PATH_BRIDGE_TOKEN);
-
-    if (bridgeToken) {
-        const provided = cleanString(req.headers['x-nexloom-bridge-token']);
-        if (provided && provided === bridgeToken) {
-            await authorizeRequest(req, {
-                userId: PHASE1_USER_ID,
-                authMethod: 'bridge-token',
-                bridgeAuthenticated: true,
-            });
-            return next();
-        }
+    if (isBridgeToken(req.headers['x-nexloom-bridge-token'])) {
+        await authorizeRequest(req, {
+            userId: PHASE1_USER_ID,
+            authMethod: 'bridge-token',
+            bridgeAuthenticated: true,
+        });
+        return next();
     }
 
-    const authHeader = cleanString(req.headers.authorization);
-    if (authHeader.toLowerCase().startsWith('bearer ')) {
-        const token = authHeader.slice(7).trim();
+    if (isBridgeToken(extractBearerToken(req))) {
+        await authorizeRequest(req, {
+            userId: PHASE1_USER_ID,
+            authMethod: 'bridge-bearer',
+            bridgeAuthenticated: true,
+        });
+        return next();
+    }
 
-        if (bridgeToken && token === bridgeToken) {
-            await authorizeRequest(req, {
-                userId: PHASE1_USER_ID,
-                authMethod: 'bridge-bearer',
-                bridgeAuthenticated: true,
-            });
-            return next();
-        }
-
-        const supabase = getSupabase();
-        if (supabase) {
-            try {
-                const { data, error } = await supabase.auth.getUser(token);
-                if (!error && data?.user) {
-                    await authorizeRequest(req, {
-                        userId: data.user.id,
-                        authMethod: 'supabase-jwt',
-                        bridgeAuthenticated: false,
-                    });
-                    return next();
-                }
-            } catch {
-                // fall through to dev fallback
-            }
-        }
+    const jwt = await verifyJwtOnce(req);
+    if (jwt.status === 'valid') {
+        await authorizeRequest(req, {
+            userId: jwt.userId,
+            authMethod: 'supabase-jwt',
+            bridgeAuthenticated: false,
+        });
+        return next();
     }
 
     if (allowDevAuthFallback()) {
