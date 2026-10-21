@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-09-parallel-automation",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第9回｜並列で進める・自動で回す",
   "subtitle": "ワークツリーで並べ、claude -p で安全に自動化する（2026年10月時点・v2.1.304）",
   "locale": "jp",

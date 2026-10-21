@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-10-safety-cost",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第10回｜安全とコストを管理する",
   "subtitle": "外から紛れ込む指示、秘密情報、想定外の請求に備える（2026年10月時点、Claude Code v2.1.304）",
   "locale": "jp",

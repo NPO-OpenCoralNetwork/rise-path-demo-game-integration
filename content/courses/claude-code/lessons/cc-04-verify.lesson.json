@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-04-verify",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第4回｜検証を任せる：テスト・レビュー・説明",
   "subtitle": "「できました」の前に、確かめる手段と証拠と説明を求める（2026年10月時点・Claude Code v2.1.304）",
   "locale": "jp",

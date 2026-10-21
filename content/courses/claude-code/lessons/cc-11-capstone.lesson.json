@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-11-capstone",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第11回 総合演習｜自分のリポジトリにClaude Code環境をつくる",
   "subtitle": "CLAUDE.mdから育てる環境と、計画からコミットまでの1サイクル（2026年10月時点、Claude Code v2.1.304）",
   "locale": "jp",

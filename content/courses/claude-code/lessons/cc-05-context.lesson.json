@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-05-context",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第5回｜コンテキストを管理する",
   "subtitle": "長い会話で指示が効かなくなる理由と、立て直し方",
   "locale": "jp",

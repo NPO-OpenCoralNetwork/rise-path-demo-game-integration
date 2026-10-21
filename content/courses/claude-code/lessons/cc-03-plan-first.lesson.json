@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-03-plan-first",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第3回｜探索→計画→実装→コミット",
   "subtitle": "いきなり書かせず、調べて計画し、直してから任せる",
   "locale": "jp",

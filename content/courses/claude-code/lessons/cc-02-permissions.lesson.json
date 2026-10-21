@@ -1,7 +1,7 @@
 {
   "schema": "risepath.lesson/v1",
   "id": "cc-02-permissions",
-  "courseId": "vibe-coding",
+  "courseId": "claude-code",
   "title": "第2回｜任せる範囲を決める：権限モードと巻き戻し",
   "subtitle": "確認なしで進める範囲を選び、pushの前には確認を挟み、失敗したら戻す",
   "locale": "jp",
