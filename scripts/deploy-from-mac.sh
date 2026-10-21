@@ -25,7 +25,7 @@ echo "==> Deploy Rise Path stack to ${SSH_TARGET}:${REMOTE_DIR}"
 
 HAS_GIT="$(ssh -o ConnectTimeout=15 "${SSH_TARGET}" "test -d '${REMOTE_DIR}/.git' && echo yes || echo no")"
 if [[ "${DEPLOY_MODE}" == "rsync" || "${HAS_GIT}" != "yes" ]]; then
-  echo "==> rsync local tree (preserving remote stack.env)"
+  echo "==> rsync local tree (preserving remote stack.env and tunnel.env)"
   rsync -az --delete \
     --exclude node_modules \
     --exclude dist \
@@ -33,6 +33,7 @@ if [[ "${DEPLOY_MODE}" == "rsync" || "${HAS_GIT}" != "yes" ]]; then
     --exclude .env.local \
     --exclude 'data/curricula/blender/blender_manual_v500_en.html' \
     --exclude 'deploy/risepath-vm/stack.env' \
+    --exclude 'deploy/risepath-vm/tunnel.env' \
     --exclude 'deploy/risepath-vm/hermes-data' \
     "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
 else

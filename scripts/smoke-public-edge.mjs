@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Smoke test for the public edge: Vercel app.<domain> → Cloudflare Tunnel api.<domain> → api:3006.
- * Run from any machine after the cutover (doc/guides/risepath_vm_deployment.md). Uses Node's
+ * Run from any machine after the cutover (deploy/vercel/README.md, 確認チェックリスト). Uses Node's
  * built-in fetch only; reads shell variables only, never .env.local or stack.env.
  *
  * Usage:
@@ -56,7 +56,10 @@ async function request(url, init = {}) {
   }
 }
 
-const statusOf = ({ res, error }) => (error ? `unreachable (${error.message})` : String(res.status));
+// redact: print only the error's name, for a request that carries Authorization (undici puts the
+// rejected header value in the message).
+const statusOf = ({ res, error }, { redact = false } = {}) =>
+  (error ? `unreachable (${redact ? error.name : error.message})` : String(res.status));
 const header = (res, name) => res?.headers.get(name) ?? '';
 
 function parseJson(body) {
@@ -70,7 +73,11 @@ function parseJson(body) {
 async function main() {
   const app = readOrigin('PUBLIC_APP_URL');
   const api = readOrigin('PUBLIC_API_URL');
-  const bearer = (process.env.SMOKE_BEARER || '').trim();
+  // The token with or without a leading "Bearer ". A value a header cannot carry is refused unechoed.
+  const bearer = (process.env.SMOKE_BEARER || '').trim().replace(/^bearer\s+/i, '');
+  if (bearer && !/^[\x21-\x7e]+$/.test(bearer)) {
+    usage('SMOKE_BEARER has characters a header cannot carry (want printable ASCII, no spaces or line breaks)');
+  }
   let failures = 0;
   let passes = 0;
 
@@ -161,9 +168,11 @@ async function main() {
 
   // 9. Authorization survives the route (optional).
   if (bearer) {
-    const authorization = /^bearer\s/i.test(bearer) ? bearer : `Bearer ${bearer}`;
-    const profile = await request(`${app}/api/v2/user/profile`, { headers: { authorization } });
-    check(profile.res?.status === 200, `9. GET app /api/v2/user/profile with Authorization → ${statusOf(profile)} (want 200)`);
+    const profile = await request(`${app}/api/v2/user/profile`, { headers: { authorization: `Bearer ${bearer}` } });
+    check(
+      profile.res?.status === 200,
+      `9. GET app /api/v2/user/profile with Authorization → ${statusOf(profile, { redact: true })} (want 200)`,
+    );
   }
 
   console.log(`\n${failures === 0 ? '✅' : '❌'} ${passes} passed, ${failures} failed`);

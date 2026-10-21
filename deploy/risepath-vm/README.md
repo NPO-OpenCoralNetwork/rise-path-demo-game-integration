@@ -67,9 +67,9 @@ git -C /opt/risepath log -1 --oneline
 `origin` が上の URL でなければ、clone し直します。以前のリポジトリとは履歴がつながっていないので、remote を変えても pull できません。
 
 1. スタックを止める: `docker ps -q --filter label=com.docker.compose.project=risepath | xargs -r docker stop`
-2. `deploy/risepath-vm/stack.env` と `deploy/risepath-vm/hermes-data/` を VM 内の別の場所にコピーする（どちらも Git 管理外）
+2. `deploy/risepath-vm/stack.env`・`deploy/risepath-vm/tunnel.env`（作成済みなら）・`deploy/risepath-vm/hermes-data/` を VM 内の別の場所にコピーする（どれも Git 管理外）
 3. `/opt/risepath` を別名に移し、上の `git clone` をやり直す
-4. 2 つを元の場所に戻して `./deploy-stack.sh`
+4. コピーしたものを元の場所に戻し、`cd /opt/risepath/deploy/risepath-vm && ./scripts/deploy-stack.sh` を実行する
 
 DB などの Docker ボリュームは、Compose のプロジェクト名が `risepath` で固定なので残ります。
 
@@ -116,6 +116,13 @@ Mac から Tailscale 経由で検証できるのは、`stack.env` に `ORIGIN_SE
 npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100
 ```
 
+`npm run smoke:prod:e2e`（`E2E_API_URL=http://risepath-vm:3006`）と `npm run smoke:hermes:e2e:vm` も、Tailscale 経由で使えるのは `ORIGIN_SECRET` を設定する前だけです。設定したあとは 403 で失敗します（`scripts/setup-vm-ssh.sh` はこの E2E を飛ばします）。learner-memory の smoke は `api` コンテナ内で流せます（Bridge Token は `stack.env` から入ります）。
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env exec -T api node scripts/smoke-learner-memory-e2e.mjs
+```
+
 `ORIGIN_SECRET` を設定したあとは、Mac のリポジトリ直下で公開経路を確かめます（`scripts/deploy-from-mac.sh` も Tailscale 経由の smoke を飛ばし、このコマンドを表示します）。
 
 ```bash
@@ -126,7 +133,7 @@ PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run 
 
 ## Cloudflare Tunnel（公開エッジ）
 
-`https://api.<domain>` → Cloudflare → トンネル → `cloudflared` → `http://api:3006`。`cloudflared` は VM から外向き（TCP/UDP 7844）に接続するので、受信ポートは要りません。`edge` ネットワークで `api` とだけつながり、ポートを公開しません。
+`https://api.<domain>` → Cloudflare → トンネル → `cloudflared` → `http://api:3006`。`cloudflared` は VM から外向き（TCP/UDP 7844）に接続するので、受信ポートは要りません。`cloudflared` 自身はポートを公開せず、`edge` ネットワークで `api` に名前で届きます。ただし、スタックはポートをホストの全インターフェースに公開しているので、トンネルのルートがホストやゲートウェイの IP を指すと、5432・3006・3100・8642・8880 にも届きます。トンネルの Published application は `http://api:3006` の 1 つだけにします。
 
 1. Cloudflare Zero Trust で remotely-managed のトンネルを作ります。Published application は `api.<domain>` → Service URL `http://api:3006`。HTTP Host Header は空のままにします。
 2. トークンを `tunnel.env` にだけ入れます。Git 管理外で、`cloudflared` サービスだけが読みます（`stack.env` は読みません）。
@@ -150,7 +157,19 @@ PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run 
 4. `./scripts/deploy-stack.sh` を実行します。`COMPOSE_PROFILES` に `tunnel` があるのに `TUNNEL_TOKEN`・`ORIGIN_SECRET`（32 文字以上）・`LLM_ALLOWED_ORIGINS` が無い、または `RISE_PATH_PUBLIC_URL` があると、足りない変数名だけを表示して止まります。`TRUST_PROXY` が 1 でなければ警告します。
 5. `docker compose --env-file stack.env ps` で `cloudflared` が healthy か、`curl -s -o /dev/null -w '%{http_code}\n' https://api.<domain>/api/v2/health` が `403` かを確かめます。
 
-`ORIGIN_SECRET` が空で `COMPOSE_PROFILES=full` のままなら、origin gate は動かず、スタックは今までどおりに動きます。
+公開エッジを止める（ロールバックする）ときは、最初に `cloudflared` を消します。`COMPOSE_PROFILES` から `tunnel` を外しても、`up -d` は作成済みの `cloudflared` を残し、`restart: unless-stopped` で VM の再起動後も動き続けるためです。
+
+1. `cloudflared` を止めて消します。
+
+   ```bash
+   cd /opt/risepath/deploy/risepath-vm
+   docker compose --env-file stack.env --profile tunnel rm -sf cloudflared
+   ```
+
+2. `stack.env` の `ORIGIN_SECRET` を空にし、`COMPOSE_PROFILES` から `tunnel` を外します（`COMPOSE_PROFILES=full`）。
+3. `./scripts/deploy-stack.sh` を実行します。
+
+`ORIGIN_SECRET` が空のあいだも、Cloudflare を通ってきたリクエスト（`cf-ray`・`cf-connecting-ip` ヘッダー、`cloudflare` を含む `cdn-loop` ヘッダー）には API が 403 を返します。`COMPOSE_PROFILES` に `tunnel` があるのに `ORIGIN_SECRET` が空なら、`api` は起動しません。それ以外のリクエストには、スタックは今までどおりに動きます。
 
 ポートの公開は変えていません。db（5432）・mcp（3100）・hermes（8642）・kokoro（8880）には、Tailscale から今までどおり届きます。api（3006）だけは、`ORIGIN_SECRET` を設定すると `x-origin-secret` が要ります。ヘッダーを付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届きません。VM の :3006 が配信するフロントも Tailscale からは開けなくなるので、フロントは `app.<domain>` を使います。
 
