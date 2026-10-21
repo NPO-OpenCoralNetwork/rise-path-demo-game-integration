@@ -118,6 +118,8 @@ the `curriculum-builder` and `admin` profiles.
 - **Gemini CLI**: already configured in `.gemini/settings.json` (loads `AGENTS.md`, starts the
   server with the `curriculum-builder` profile). Run `gemini` at the repo root and check `/mcp`.
 - **ChatGPT**: needs a public HTTPS server. Run `npm run mcp:sse` (port 3100, `/sse`) with
-  `RISE_PATH_MCP_PROFILE=curriculum-builder` and `RP_LESSON_STORE=db`, authenticate with
-  `RISE_PATH_BRIDGE_TOKEN` or a Supabase JWT, and add the URL as a custom MCP connector. Bring the
-  drafts into a PR and run validation and review before publishing.
+  `RISE_PATH_MCP_PROFILE=curriculum-builder` and `RP_LESSON_STORE=db`, authenticate with a
+  Supabase JWT, and add the URL as a custom MCP connector. (With `RISE_PATH_BRIDGE_TOKEN` the
+  server cannot tell which user is calling, so in production the tools that need a user, such as
+  drafts, answer `session_binding_required`.) Bring the drafts into a PR and run validation and
+  review before publishing.

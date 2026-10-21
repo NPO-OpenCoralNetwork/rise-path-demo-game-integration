@@ -396,8 +396,9 @@ ChatGPT が接続できるのは、インターネットに公開された**リ�
 1. MCP サーバーを SSE で起動します: `npm run mcp:sse`（ポート 3100、エンドポイント `/sse`）。
    `RISE_PATH_MCP_PROFILE=curriculum-builder` と、下書きを DB に保存する `RP_LESSON_STORE=db` を
    設定してください（本番の SSE サーバーは、ファイルへの下書き保存を拒否します）。
-2. HTTPS の公開 URL（リバースプロキシやトンネル）を用意し、認証に `RISE_PATH_BRIDGE_TOKEN`
-   （Bearer トークン）か Supabase の JWT を使います。
+2. HTTPS の公開 URL（リバースプロキシやトンネル）を用意し、認証に Supabase の JWT を使います。
+   `RISE_PATH_BRIDGE_TOKEN` では呼び出しているユーザーが分からないため、本番では下書きの保存など
+   ユーザーが必要なツールが `session_binding_required` を返します。
 3. ChatGPT の設定でカスタムコネクタ（MCP）として `https://<公開ホスト>/sse` を追加します。
    画面の名前や手順は変わりやすいので、OpenAI のヘルプで最新の手順を確認してください。
 4. ChatGPT で作った下書きは DB に入ります。リポジトリに取り込むときは、PR にしてから
