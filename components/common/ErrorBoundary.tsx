@@ -1,6 +1,14 @@
 import React, { Component, ErrorInfo, ReactNode, createRef } from "react";
 import { Button, buttonClasses } from "../ui/Button";
-import { LANGUAGE_STORAGE_KEY, boundaryLanguage, chunkReloadStarted, isChunkLoadError } from "./chunkReload";
+import {
+    LANGUAGE_STORAGE_KEY,
+    boundaryLanguage,
+    buildId,
+    chunkReloadStarted,
+    chunkReloadTried,
+    isChunkLoadError,
+    sessionStorageOrNull,
+} from "./chunkReload";
 
 interface Props {
     children?: ReactNode;
@@ -68,7 +76,11 @@ class ErrorBoundary extends Component<Props, State> {
             const { error } = this.state;
             const language = boundaryLanguage(savedLanguage(), document.documentElement.lang);
             const t = copy[language];
-            const stale = isChunkLoadError(error) || chunkReloadStarted();
+            // "New version" only while a reload can still help: one is running, or a chunk failed and
+            // none was tried for this build yet. After that it is a plain error (blocked or missing file).
+            const stale =
+                chunkReloadStarted() ||
+                (isChunkLoadError(error) && !chunkReloadTried(sessionStorageOrNull(), buildId(document)));
             return (
                 <main
                     lang={language === "jp" ? "ja" : "en"}
@@ -81,11 +93,9 @@ class ErrorBoundary extends Component<Props, State> {
                         <p className="mt-2 text-body text-fg-2">{stale ? t.staleBody : t.errorBody}</p>
                         <div className="mt-5 flex flex-wrap gap-2">
                             <Button onClick={() => window.location.reload()}>{t.reload}</Button>
-                            {stale ? null : (
-                                <a href={import.meta.env.BASE_URL} className={buttonClasses({ variant: "secondary" })}>
-                                    {t.home}
-                                </a>
-                            )}
+                            <a href={import.meta.env.BASE_URL} className={buttonClasses({ variant: "secondary" })}>
+                                {t.home}
+                            </a>
                         </div>
                         {import.meta.env.DEV && error ? (
                             <details className="mt-5 rounded-control border border-line bg-sunken p-3">

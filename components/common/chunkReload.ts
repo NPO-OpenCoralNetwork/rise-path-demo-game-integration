@@ -2,22 +2,27 @@
  * Recovery from stale lazy chunks after a redeploy. A tab opened on the old build still asks for
  * the old hashed files, which now 404 (Express) or come back as index.html (Vercel rewrite).
  *
- * - index.tsx listens for Vite's `vite:preloadError` and reloads once (`claimChunkReload`).
- *   The time of that reload is kept in sessionStorage, so a second failure within
- *   CHUNK_RELOAD_WINDOW_MS is left to ErrorBoundary instead of looping.
- * - ErrorBoundary uses `isChunkLoadError` to show "a new version is available" with a Reload
- *   button, and `boundaryLanguage` because it renders outside LanguageProvider.
+ * - index.tsx listens for Vite's `vite:preloadError` and, when the payload is a failed chunk,
+ *   reloads once (`claimReloadForPreloadError`). The build that reload was tried for
+ *   is kept in sessionStorage, so the tab reloads at most once per build, however slowly each load
+ *   runs; a chunk that still fails on the same build is left to ErrorBoundary instead of looping.
+ * - ErrorBoundary uses `isChunkLoadError` and `chunkReloadTried` to show "a new version is
+ *   available" only while a reload can still help, and `boundaryLanguage` because it renders
+ *   outside LanguageProvider.
  *
  * No React or import.meta.env, and window is only touched behind a guard: server/tests imports
  * this file directly.
  */
 
-export const CHUNK_RELOAD_KEY = 'rp:chunkReloadAt';
-export const CHUNK_RELOAD_WINDOW_MS = 10_000;
+export const CHUNK_RELOAD_KEY = 'rp:chunkReload';
 /** Same key as context/LanguageContext.tsx. */
 export const LANGUAGE_STORAGE_KEY = 'risepath:language';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
+type DocumentLike = { querySelector(selectors: string): { getAttribute(name: string): string | null } | null };
+
+// The entry script, skipping Vite's dev client (/@vite/client) that dev injects in front of it.
+const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/@vite/"])';
 
 // Chromium, Firefox, Safari, Vite's CSS preload, and webpack-style errors (error.name).
 const CHUNK_ERROR_MESSAGES = [
@@ -35,32 +40,60 @@ export function isChunkLoadError(error: unknown): boolean {
   return typeof message === 'string' && CHUNK_ERROR_MESSAGES.some((pattern) => pattern.test(message));
 }
 
-/** True unless a reload was already tried less than `windowMs` ago. */
-export function shouldReload(lastReloadAt: number | null, now: number, windowMs = CHUNK_RELOAD_WINDOW_MS): boolean {
-  if (lastReloadAt === null || !Number.isFinite(lastReloadAt)) return true;
-  const elapsed = now - lastReloadAt;
-  return elapsed < 0 || elapsed >= windowMs;
+/**
+ * Identifies the running build by its entry module script: the hashed /assets/index-*.js in a
+ * production build, so every deploy changes it (/index.tsx in dev). Empty when there is none.
+ */
+export function buildId(doc: DocumentLike | null | undefined): string {
+  return doc?.querySelector(ENTRY_SCRIPT)?.getAttribute('src') ?? '';
+}
+
+/** The build a reload was recorded for; null when nothing readable is stored. Throws if storage does. */
+function recordedBuild(storage: StorageLike): string | null {
+  const raw = storage.getItem(CHUNK_RELOAD_KEY);
+  if (raw === null) return null;
+  try {
+    const build = (JSON.parse(raw) as { build?: unknown } | null)?.build;
+    return typeof build === 'string' ? build : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when an automatic reload was already tried in this tab for `build`. */
+export function chunkReloadTried(storage: StorageLike | null, build: string): boolean {
+  if (!storage) return false;
+  try {
+    return recordedBuild(storage) === build;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Records a reload attempt and returns true when the caller should reload now. Without a
- * working storage there is no loop guard, so it returns false and ErrorBoundary takes over.
+ * Records a reload for `build` and returns true when the caller should reload now: only when no
+ * reload was tried for this build yet. A record for another build (a newer deploy loaded since)
+ * allows one more. Without a working storage there is no loop guard, so it returns false and
+ * ErrorBoundary takes over.
  */
-export function claimChunkReload(
-  storage: StorageLike | null,
-  now = Date.now(),
-  windowMs = CHUNK_RELOAD_WINDOW_MS,
-): boolean {
+export function claimChunkReload(storage: StorageLike | null, build: string): boolean {
   if (!storage) return false;
   try {
-    const raw = storage.getItem(CHUNK_RELOAD_KEY);
-    const last = raw === null ? null : Number(raw);
-    if (!shouldReload(last, now, windowMs)) return false;
-    storage.setItem(CHUNK_RELOAD_KEY, String(now));
+    if (recordedBuild(storage) === build) return false;
+    storage.setItem(CHUNK_RELOAD_KEY, JSON.stringify({ build }));
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * index.tsx's `vite:preloadError` decision. Vite also fires that event for a lazy module that
+ * throws while it evaluates (its payload is then that error); a reload cannot fix that bug, so
+ * only a failed chunk claims the reload.
+ */
+export function claimReloadForPreloadError(payload: unknown, storage: StorageLike | null, build: string): boolean {
+  return isChunkLoadError(payload) && claimChunkReload(storage, build);
 }
 
 /** window.sessionStorage, or null where reading the property itself throws (blocked storage). */
