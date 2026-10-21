@@ -23,7 +23,10 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated }
  *   4. (dev only) → PHASE1_USER_ID fallback
  */
 export const requireBridgeOrAuth = async (req, res, next) => {
-    if (isBridgeToken(req.headers['x-nexloom-bridge-token'])) {
+    // Through the public edge (originGate.js) the bridge token never counts: visitors need a JWT.
+    const bridgeAllowed = req.originGate !== 'edge';
+
+    if (bridgeAllowed && isBridgeToken(req.headers['x-nexloom-bridge-token'])) {
         await authorizeRequest(req, {
             userId: PHASE1_USER_ID,
             authMethod: 'bridge-token',
@@ -32,7 +35,7 @@ export const requireBridgeOrAuth = async (req, res, next) => {
         return next();
     }
 
-    if (isBridgeToken(extractBearerToken(req))) {
+    if (bridgeAllowed && isBridgeToken(extractBearerToken(req))) {
         await authorizeRequest(req, {
             userId: PHASE1_USER_ID,
             authMethod: 'bridge-bearer',

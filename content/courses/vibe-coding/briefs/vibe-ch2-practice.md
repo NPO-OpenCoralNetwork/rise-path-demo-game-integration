@@ -41,7 +41,7 @@ evaluate level (review a plan and judge the fix), because the create-level task 
 ## 資料 / Sources
 - `abc-moscow` — What is MoSCoW Prioritization? — https://www.agilebusiness.org/resource/what-is-moscow-prioritization/ — Agile Business Consortium — checked 2026-10-19. Used for the Should / Could / Won't meanings in `practice-recap` and `check-quiz` (Won't = agreed not to be delivered in this timeframe).
 - `cc-best-practices` — Best practices for Claude Code — https://code.claude.com/docs/en/best-practices — Anthropic — checked 2026-10-19. Used for the interview request `practice-prompt-interview` (copied from `vibe-ch2` `s1-b4`, same cite: "have Claude interview you").
-- Repository: `content/courses/vibe-coding/drafts/vibe-ch2.lesson.json` (the source of the moved section and of the two copied prompts).
+- Repository: `content/courses/vibe-coding/lessons/vibe-ch2.lesson.json` (the source of the moved section and of the two copied prompts; a draft in `drafts/` until both were published on 2026-10-19).
 
 ## Outline
 
@@ -71,8 +71,9 @@ Glossary repeats 壁打ち from `vibe-ch2` (round 5), because learners may open 
   three Musts) also model `p-moscow`'s troubleshoot.
 - Lesson title kept exactly as specified in the round-4 instructions (JP uses 「つくる」, EN uses a colon). The reader
   shows the JP prefix 「第2章 演習」 as an eyebrow; the EN title is shown whole.
-- Publishing is owner-only: this lesson is **not** in `course.json`. Until the owner lists it, the preview's end card says
-  「このコースの最後のレッスンまで読み終えました。」 because an unlisted lesson has no outline position or next link.
+- Publishing is owner-only. The owner published this lesson on 2026-10-19: `course.json` lists it between `vibe-ch2` and
+  `vibe-ch3`. Before that, as an unlisted draft, the preview's end card said 「このコースの最後のレッスンまで読み終えました。」
+  because an unlisted lesson has no outline position or next link.
 
 ## Review round 4 (created)
 

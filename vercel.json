@@ -3,25 +3,60 @@
   "buildCommand": "npm run build:prod",
   "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
+      "src": "^/api/.*$",
+      "headers": {
+        "x-vercel-enable-rewrite-caching": "0"
+      },
+      "continue": true
+    },
     {
-      "source": "/(.*)",
-      "headers": [
+      "src": "^/(.*)$",
+      "headers": {
+        "X-Frame-Options": "SAMEORIGIN",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/(api/.*)$",
+      "dest": "${API_ORIGIN}/$1",
+      "env": ["API_ORIGIN"],
+      "transforms": [
         {
-          "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
+          "type": "request.headers",
+          "op": "set",
+          "target": {
+            "key": "x-origin-secret"
+          },
+          "args": "$ORIGIN_SECRET",
+          "env": ["ORIGIN_SECRET"]
         }
       ]
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(audio/cache/[a-f0-9]{64}[.](?:mp3|wav)|generated/img_[a-f0-9]{64}[.](?:png|jpg|webp))$",
+      "dest": "${API_ORIGIN}/$1",
+      "env": ["API_ORIGIN"],
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": {
+            "key": "x-origin-secret"
+          },
+          "args": "$ORIGIN_SECRET",
+          "env": ["ORIGIN_SECRET"]
+        }
+      ]
+    },
+    {
+      "src": "^/(?!api/|assets/|audio/cache/|generated/).*$",
+      "dest": "/index.html"
     }
   ]
 }

@@ -1,9 +1,10 @@
-# Rise Path dedicated VM stack (db + api + mcp + kokoro-tts + hermes)
+# Rise Path dedicated VM stack (db + api + mcp + kokoro-tts + hermes; cloudflared with profile tunnel)
 # Hermes: nousresearch/hermes-agent — run scripts/init-hermes-profile.sh before first up.
 #
 #   cp stack.env.example stack.env && chmod 600 stack.env
-#   docker compose --env-file stack.env up -d --build
-#   docker compose exec api npm run db:migrate
+#   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=full,tunnel
+#   ./scripts/deploy-stack.sh   # build -> up --wait db -> run --rm --no-deps api npm run db:migrate -> up -d
+#   (apply migrations before the new api starts: its healthcheck fails while one is pending)
 
 name: risepath
 
@@ -58,7 +59,13 @@ services:
       MEMANTO_SESSION_DURATION_HOURS: ${MEMANTO_SESSION_DURATION_HOURS:-24}
       MEMANTO_RECALL_LIMIT: ${MEMANTO_RECALL_LIMIT:-8}
       MEMANTO_MIN_CONFIDENCE_WRITE: ${MEMANTO_MIN_CONFIDENCE_WRITE:-0.7}
+    # default: db, mcp, hermes, kokoro-tts. edge: cloudflared only (api.<domain> → api:3006).
+    networks:
+      - default
+      - edge
     ports:
+      # Tailscale peers reach 100.x:3006. Once ORIGIN_SECRET is set they must send the
+      # x-origin-secret header and then count as edge requests (no bridge-token auth).
       - "3006:3006"
     healthcheck:
       test:
@@ -177,6 +184,35 @@ services:
       mcp:
         condition: service_healthy
     command: ["gateway", "run"]
+
+  # Public edge: Cloudflare Tunnel (remotely managed) publishes https://api.<domain> → http://api:3006.
+  # Outbound only (TCP/UDP 7844), no published ports. Reads TUNNEL_TOKEN from tunnel.env and never
+  # stack.env, so this container holds no API or DB keys. The image is distroless (no shell).
+  # Bump tag and digest together, in a quiet window: a restart drops in-flight streams.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
+    env_file:
+      - path: tunnel.env
+        required: false
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/cloudflared", "tunnel", "--metrics", "127.0.0.1:20241", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  # Plain bridge shared by api and cloudflared only; cloudflared keeps its outbound egress.
+  edge: {}
 
 volumes:
   pgdata:

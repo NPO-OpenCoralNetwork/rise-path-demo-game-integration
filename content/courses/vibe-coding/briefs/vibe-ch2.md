@@ -53,7 +53,7 @@ chapter (`data/curricula/vibe_coding/chapter2.ts`, export `VIBE_CHAPTER_2_DATA`;
 | `2-2` | concept | 2-2. 「作りたい」を目的と機能に分ける | 機能は手段。「なぜ？」と聞き返して目的を1文にする | markdown, definitions (目的・機能), table (機能 → 奥の目的), markdown (目的の型), quiz inline | `q2` → o2 (analyze, new context: 習い事の送迎当番; round 1 moved it off the practice topic) |
 | `2-5` (kept id; shown 3rd) | concept | 2-3. 最初に作る範囲を決める | 目的を確かめられる最小の版から作り、やらないことを決める | markdown lead, definitions (MVP・MoSCoW, cite), table MoSCoW × 家計簿 (cite), callout tip (Must の見分け方), quiz inline | `q3` → o3 (evaluate, new context: 読書記録) |
 | `2-3` (kept id; shown 4th) | example | 2-4. 1枚企画書にまとめる | 決めたことを1枚に並べ、AIに渡して読み返す | markdown (`s3-b1`, now also the lead-in to the example; `s3-intro` merged into it in round 4), definitions (1枚企画書), steps worked example (6 steps, 家計簿), diagram 画面の流れ, prompt (plan, model plan in `expect`), quiz inline | `q4` → o4 (Won't を空にすると？) |
-| ~~`practice`~~ | — | moved in round 4 to `drafts/vibe-ch2-practice.lesson.json` (ids kept) | — | `summary-next` points to it by title | — |
+| ~~`practice`~~ | — | moved in round 4 to its own lesson `vibe-ch2-practice` (a draft then, now `lessons/vibe-ch2-practice.lesson.json`; ids kept) | — | `summary-next` points to it by title | — |
 | `check` | check | 理解度チェック | 全目標の確認、転移問題を含む | quiz exam (6) | `q5` → o1 (transfer: 料理教室), `q6` → o2, `q7` → o3 (transfer: 水やり記録), `q8` → o4, `q10` → o4 (flawed plan → revise; transfer: 英単語アプリ), `q9` → o4 (試して直す, evaluate) |
 | `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next: the practice lesson, ch4), flashcards (6), askTutor | — |
 

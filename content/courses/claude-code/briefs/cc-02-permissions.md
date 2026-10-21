@@ -1,7 +1,7 @@
-# Brief: vibe-coding/cc-02-permissions
+# Brief: claude-code/cc-02-permissions
 
 「第2回｜任せる範囲を決める：権限モードと巻き戻し」。Claude Code コース（cc-*）モジュール 1「はじめる」の 2 本目、全 11 回中の第 2 回。
-下書きはプレビューのため `vibe-coding` コースに置く（公開先はオーナーが決める。`next` なし）。
+2026-10-21 にオーナーの判断で `claude-code` コースに公開（`content/courses/claude-code/lessons/cc-02-permissions.lesson.json`、`next` は `cc-03-plan-first`）。それまでは、プレビューのため下書きを `vibe-coding` コースに置いていた（`next` なし）。
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を使い始めた人。バイブコーディングコース第3章（VS Code）・第5章（GitHub）程度の基礎がある人、または他の AI コーディングツールの経験者。
@@ -34,10 +34,10 @@
   - `bypassPermissions` を短時間だけノート PC で使うのは平気（e1）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20。コース共通の measure.mjs の出力：`cc-02-permissions.lesson.json: prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)`。内訳：(2,466 + 801) ÷ 450 ≒ 7.26 分 + 問題 13 問（predict 1、inline 7、exam 5）× 40 秒 ≒ 8.67 分 + 演習 2 セクション × 2 分 = 4 分 → 19.93 分（19.927）。
-- 本文の長さ：measure.mjs の prose（lesson-contract §3 の本文予算）で 2,222 字（2 つの表を一覧にしたので、その項目が本文に入った）。予算 1,200〜2,400 字の範囲内。
+- 所要時間 / minutes: 20。コース共通の `scripts/lessons/measure.mjs` の出力：`cc-02-permissions.lesson.json: prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)`。内訳：(2,466 + 801) ÷ 450 ≒ 7.26 分 + 問題 13 問（predict 1、inline 7、exam 5）× 40 秒 ≒ 8.67 分 + 演習 2 セクション × 2 分 = 4 分 → 19.93 分（19.927）。
+- 本文の長さ：`scripts/lessons/measure.mjs` の prose（lesson-contract §3 の本文予算）で 2,222 字（2 つの表を一覧にしたので、その項目が本文に入った）。予算 1,200〜2,400 字の範囲内。
 - 難易度 / level: beginner
-- ロケール / locales: jp のみ（英語版は公開先が決まってから）
+- ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea:
   - 演習1：2 つの場面（無人の自動テスト、差分を見ながらの編集）にモードを選ぶ仕分けクイズ（2-1 の一覧を見ずに）。長いテスト修正 → auto の場面は exam の e1 と重なるので外した。
   - 演習2：第1回の `cc-practice` に `.claude/settings.json` を自分で書き（`ask: Bash(git push *)`、`deny: Read(./.env)`）、ダミーの `.env` を置いて、結果を予想してから Claude Code で試す（リモートがないので push しても外には何も出ない）。続けて、編集ツールでの追記と Bash の `cp` を 1 回ずつ起こし、「Restore code」で編集だけが戻ることを確かめる。
@@ -75,7 +75,7 @@ Contract check: hook は問題 3 文 + predict。セグメント 5（concept 4�
 
 ## Assumptions
 - 対話セッションではなく、オーナーへの確認なしで進めた（ヘッドレス）。上の構成をそのまま使った。
-- 第1回の練習用フォルダは `cc-practice`（第1回の下書きの演習と同じ名前）。見つからない場合は第1回の手順で作り直す。
+- 第1回の練習用フォルダは `cc-practice`（第1回の演習と同じ名前）。見つからない場合は第1回の手順で作り直す。
 - 演習の `.env` はダミー値だけ。練習用フォルダにはリモートがないので、確認で「Yes」を選んでも push は失敗し、外には何も送られない。
 - 演習で Claude Code を「起動し直す」ように書いた。設定ファイルの変更が実行中のセッションに反映されるかは公式ドキュメントで確かめられなかったため、確実な方法を選んだ（`/permissions` の画面からの変更は次のツール呼び出しから反映される、とは書かれている）。
 - 承認疲れの数字（確認の 93% が許可される）は本文の長さの都合で載せなかった。17% は「頼んだ範囲を超えた実際の操作」に対する見逃しとして、2026年3月の engineering post の測定であることを明記して書いた（real overeager actions、n=52。いまの分類器の値とは書かない）。

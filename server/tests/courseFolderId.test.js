@@ -78,7 +78,8 @@ describe('track totals read progress by course slug', () => {
                 assert.match(call, /courseTotals\(\s*\w+\s*,\s*readLessonSummary\s*,\s*(?:[A-Z_]+|courseSlug)\s*\)/, `${file}: ${call}`);
             }
         }
-        assert.equal(calls, 2);
+        // The course page, plus the dashboard's Vibe Coding and Claude Code track cards.
+        assert.equal(calls, 3);
     });
 
     it('defaults to course.id, which the validator keeps equal to the folder', () => {

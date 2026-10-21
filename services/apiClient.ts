@@ -17,8 +17,9 @@ export const isApiAvailable = (): boolean => {
 };
 
 export const apiFetch = async (path: string, options: RequestInit = {}): Promise<Response> => {
+    // A FormData body gets no Content-Type here: the browser sets multipart/form-data with its boundary.
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(options.headers as Record<string, string> || {}),
     };
 

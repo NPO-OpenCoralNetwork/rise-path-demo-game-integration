@@ -11,6 +11,7 @@ version: 1.0.0
 
 ## 利用可能なドメイン
 - `vibe-coding`: 物語駆動型コーディング (Prologue + Chapter 0-11)
+- `claude-code`: Claude Code 実践、AIエージェントとの開発 (第1-11回)
 - `blender-3d`: Blender 3Dモデリング (Stage 1-5+)
 - `art-atelier`: 美術史、金継ぎ、トライバルアート、工芸
 - `programming-web`: HTML/CSS, WebInspector

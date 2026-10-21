@@ -1,20 +1,22 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Languages } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { getCourse, lessonEntries } from '../../../content';
 import { getLastLesson, readLessonSummary } from '../../lesson/progressStore';
 import { LESSON_DONE_STATES, resolveLText, splitLessonTitle, type ContentLocale } from '../../lesson/model';
 import { courseTotals, formatCourseMeta } from '../../ui/lessonResume';
 import { ButtonLink } from '../../ui/Button';
-import { MdText } from '../../lesson/Md';
+import { Markdown } from '../../lesson/Md';
+import { courseOnlyLocales } from './courseLocales';
 
 /**
  * Overview of a lesson-reader course (/vibe, /claude-code). Everything on the page comes from
  * content/courses/<slug>/course.json and the reader's saved progress: title, subtitle,
  * description, module and lesson titles, each lesson's estMinutes, the totals (same helper as
  * the dashboard track card) and which lessons are read. The accent is the course's world.
- * Lessons open in the lesson reader.
+ * Lessons open in the lesson reader. When the UI language is not in course.locales, a note
+ * says so and the course text keeps its own `lang`.
  */
 
 export interface CoursePathViewProps {
@@ -26,6 +28,11 @@ export interface CoursePathViewProps {
   language: 'en' | 'jp';
   setLanguage?: (lang: 'en' | 'jp') => void;
 }
+
+const LOCALE_NAMES: Record<'en' | 'jp', Record<ContentLocale, string>> = {
+  en: { jp: 'Japanese', en: 'English', fr: 'French' },
+  jp: { jp: '日本語', en: '英語', fr: 'フランス語' },
+};
 
 const copy = {
   en: {
@@ -40,6 +47,7 @@ const copy = {
     minutes: (n: number) => `about ${n} min`,
     status: { done: 'Read', current: 'Last opened', started: (pct: number) => `${pct}% read`, todo: 'Not started' },
     missing: 'This course is not available right now.',
+    onlyIn: (locales: ContentLocale[]) => `This course is in ${locales.map((l) => LOCALE_NAMES.en[l]).join(' and ')} only.`,
   },
   jp: {
     back: '学習コンテンツに戻る',
@@ -53,6 +61,7 @@ const copy = {
     minutes: (n: number) => `約${n}分`,
     status: { done: '読了', current: '前回ここまで', started: (pct: number) => `${pct}% 読了`, todo: '未読' },
     missing: 'このコースは現在表示できません。',
+    onlyIn: (locales: ContentLocale[]) => `このコースは${locales.map((l) => LOCALE_NAMES.jp[l]).join('・')}のみです。`,
   },
 } as const;
 
@@ -103,7 +112,8 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
           state,
         };
       });
-      return { id: module.id, title: title.value, lang: title.lang, summary: module.summary ?? null, lessons };
+      const summary = resolveLText(module.summary, locale, fallback);
+      return { id: module.id, title: title.value, lang: title.lang, summary: summary.value || null, summaryLang: summary.lang, lessons };
     });
     const totals = courseTotals(course, readLessonSummary, courseSlug);
     const resumeHref = `/learn/${courseSlug}/${lastId ?? entries[0]?.ref.id ?? ''}`;
@@ -112,6 +122,14 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
 
   const title = resolveLText(course?.title, locale, fallback);
   const subtitle = resolveLText(course?.subtitle, locale, fallback);
+  const description = resolveLText(course?.description, locale, fallback);
+  const onlyIn = course ? courseOnlyLocales(course, locale) : null;
+  const badgeChip = (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-world-soft px-2.5 py-0.5 text-caption font-semibold text-world">
+      <span aria-hidden="true" className="size-2 rounded-full bg-world" />
+      {badge[language]}
+    </span>
+  );
 
   return (
     <div data-world={course?.world ?? 'default'} className="w-full px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-10">
@@ -133,13 +151,22 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
               <div aria-hidden="true" className="h-2 bg-world-accent" />
               <div className="flex flex-col gap-5 p-5 sm:p-8 md:flex-row md:items-end md:justify-between">
                 <div className="min-w-0">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-world-soft px-2.5 py-0.5 text-caption font-semibold text-world">
-                    <span aria-hidden="true" className="size-2 rounded-full bg-world" />
-                    {badge[language]}
-                  </span>
+                  {onlyIn ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {badgeChip}
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-caption font-semibold text-fg-2">
+                        <Languages size={14} aria-hidden="true" />
+                        {t.onlyIn(onlyIn)}
+                      </span>
+                    </div>
+                  ) : badgeChip}
                   <h1 lang={title.lang} className="mt-3 text-h1 text-fg">{title.value}</h1>
                   {subtitle.value ? <p lang={subtitle.lang} className="mt-2 max-w-2xl text-body-lg text-fg-2">{subtitle.value}</p> : null}
-                  {course.description ? <MdText value={course.description} className="mt-2 max-w-2xl text-small text-fg-2" /> : null}
+                  {description.value ? (
+                    <div lang={description.lang} className="mt-2 max-w-2xl text-small text-fg-2">
+                      <Markdown source={description.value} />
+                    </div>
+                  ) : null}
                   <p className="tabular mt-2 text-small text-fg-3">{formatCourseMeta(data.totals, language)}</p>
                 </div>
                 <div className="flex min-w-0 shrink-0 flex-col gap-3 md:w-64">
@@ -175,7 +202,11 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
                       <span className="eyebrow text-world">{t.module(moduleIndex + 1)}</span>
                       <span lang={module.lang}>{module.title}</span>
                     </h3>
-                    {module.summary ? <MdText value={module.summary} className="mb-3 max-w-2xl text-small text-fg-2" /> : null}
+                    {module.summary ? (
+                      <div lang={module.summaryLang} className="mb-3 max-w-2xl text-small text-fg-2">
+                        <Markdown source={module.summary} />
+                      </div>
+                    ) : null}
                     <ol className="overflow-hidden rounded-card border border-line bg-surface shadow-1">
                       {module.lessons.map((lesson) => (
                         <li key={lesson.id} className="border-b border-line last:border-b-0">
