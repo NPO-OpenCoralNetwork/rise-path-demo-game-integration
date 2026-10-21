@@ -9,7 +9,7 @@ VALUES
     'claude-code',
     '{"en":"Claude Code in Practice","jp":"Claude Code 実践"}'::jsonb,
     '{"en":"AI agent","jp":"AIエージェント"}'::jsonb,
-    '{"en":"Hand research, planning, fixes and checks to an AI agent in your terminal. 11 lessons, in Japanese.","jp":"調べる・計画する・直す・確かめるを、ターミナルのAIエージェントに任せる方法を11回で学びます。"}'::jsonb,
+    '{"en":"11 lessons in Japanese. The exercises need a paid plan with Claude Code or a Console account.","jp":"全11回です。演習には、Claude Codeが使える有料プランかConsoleアカウントが必要です。"}'::jsonb,
     'claude_code',
     'terminal',
     'text-violet-500',
