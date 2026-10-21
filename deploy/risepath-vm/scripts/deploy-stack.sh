@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, smoke)
+# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, up, smoke)
 # Usage (on VM): ./deploy-stack.sh
 set -euo pipefail
 
@@ -67,16 +67,25 @@ if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   fi
 fi
 
-echo "==> docker compose up --build (profiles=${COMPOSE_PROFILES:-default})"
-compose up -d --build
+echo "==> docker compose build (profiles=${COMPOSE_PROFILES:-default})"
+compose build
+
+# Migrate before `up` starts the new api image: /api/v2/health answers 503 while a migration is
+# pending, and mcp (then hermes) waits for the api healthcheck. The running api keeps its old
+# image until `up`, and every migration that image knows is already applied.
+echo "==> db up (wait until healthy)"
+compose up -d --wait db
+
+echo "==> db:migrate (new api image, one-off container)"
+compose run --rm --no-deps -T api npm run db:migrate
+
+echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
+compose up -d
 
 if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   echo "==> Memanto Ollama models (idempotent)"
   "${SCRIPT_DIR}/init-memanto-ollama.sh" || echo "⚠️  Ollama pull failed — retry: deploy/risepath-vm/scripts/init-memanto-ollama.sh"
 fi
-
-echo "==> db:migrate"
-compose exec -T api npm run db:migrate
 
 echo "==> stack smoke"
 SMOKE_FLAGS=(--require-mcp)

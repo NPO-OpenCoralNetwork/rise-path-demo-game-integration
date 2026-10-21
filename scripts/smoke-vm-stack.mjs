@@ -125,12 +125,21 @@ async function main() {
     ok = false;
   } else {
     console.log(`❌ API /api/v2/health → ${health.res?.status ?? 'unreachable'}`);
+    const pending = health.body?.database?.migrations?.pending_versions;
+    if (pending?.length) {
+      console.log(`   pending migrations: ${pending.join(', ')} — apply them before the new api image starts (deploy-stack.sh does)`);
+    }
     ok = false;
   }
 
   const portals = await fetchJson(`${apiBase}/api/learning-portals`);
   if (portals.res.status === 200 && portals.body?.ok) {
     console.log(`✅ API /api/learning-portals → 200 (count=${portals.body.portals?.length ?? 0})`);
+    if (portals.body.portals?.some((portal) => portal.id === 'claude-code')) {
+      console.log('✅ Learning Hub portal claude-code present');
+    } else {
+      console.log('⚠️  Learning Hub portal claude-code missing — migration 011 may be pending (npm run db:migrate:status)');
+    }
   } else {
     console.log(`❌ API /api/learning-portals → ${portals.res.status}`);
     ok = false;
@@ -151,6 +160,45 @@ async function main() {
   } else {
     console.log(`❌ API /api/v2/curricula → ${curricula.res.status}`);
     ok = false;
+  }
+
+  // The api image serves the built front end (dist/) with an SPA fallback; without dist/ the
+  // route is a plain 404 and the front end is deployed elsewhere, so there is nothing to check.
+  const page = await fetchJson(`${apiBase}/claude-code`);
+  const pageType = page.res?.headers.get('content-type') ?? '';
+  if (page.res?.status === 200 && pageType.includes('text/html')) {
+    console.log('✅ Front end /claude-code → 200 (HTML)');
+  } else if (page.error || page.res.status === 404) {
+    console.log('ℹ️  Front end /claude-code skipped (API does not serve dist/)');
+  } else {
+    console.log(`❌ Front end /claude-code → ${page.res.status} ${pageType}`.trimEnd());
+    ok = false;
+  }
+
+  const llm = await fetchJson(`${apiBase}/api/v2/llm/status`);
+  if (llm.error) {
+    console.log(`⚠️  LLM /api/v2/llm/status unreachable (${llm.error.message})`);
+  } else if (llm.res.status >= 500) {
+    console.log(`❌ LLM /api/v2/llm/status → ${llm.res.status}`);
+    ok = false;
+  } else if (llm.res.status === 200 && llm.body) {
+    const { providers, tasks, mock, forced_provider: forced } = llm.body;
+    const usable = llm.body.ok === true && mock !== true;
+    const state = [
+      `anthropic=${providers?.anthropic?.configured === true}`,
+      `gemini=${providers?.gemini?.configured === true}`,
+      `mock=${mock === true}`,
+      ...(forced ? [`forced=${forced}`] : []),
+      `tutor=${tasks?.['tutor.chat']?.provider ?? 'none'}`,
+    ].join(' ');
+    console.log(`${usable ? '✅' : '⚠️ '} LLM /api/v2/llm/status → 200 (${state})`);
+    if (llm.body.ok !== true) {
+      console.log('   No LLM provider configured — AI tutor calls answer 503 (set ANTHROPIC_API_KEY or GEMINI_API_KEY in stack.env)');
+    } else if (mock === true) {
+      console.log('   The built-in mock answers AI tutor calls (no provider key, or LLM_PROVIDER=mock)');
+    }
+  } else {
+    console.log(`⚠️  LLM /api/v2/llm/status → ${llm.res.status} (image without the LLM gateway?)`);
   }
 
   const mcpHealth = await fetchJson(`${mcpBase}/health`);

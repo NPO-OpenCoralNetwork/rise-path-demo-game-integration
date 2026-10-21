@@ -30,7 +30,7 @@ Supabase ダッシュボード → **Project Settings**:
 
 ## 3. PostgreSQL（`risepath` 専用）
 
-**推奨トポロジ:** [`doc/database_topology.md`](./database_topology.md) / デプロイ正本 [`doc/risepath_vm_deployment.md`](./risepath_vm_deployment.md)
+**推奨トポロジ:** [`doc/system_design/database_topology.md`](../system_design/database_topology.md) / デプロイ正本 [`doc/guides/risepath_vm_deployment.md`](./risepath_vm_deployment.md)
 
 - **データ（本番・推奨）** → 専用 VM **`risepath-vm`** 上の Docker Postgres、DB 名 **`risepath`**
 - **データ（移行期間の暫定）** → `nexloom-gce` 上の `risepath`（新規環境では使わない）
@@ -43,10 +43,11 @@ VM 上で Docker スタックを起動（詳細は [`risepath_vm_deployment.md`]
 
 ```bash
 cd deploy/risepath-vm
-cp stack.env.example stack.env
-docker compose --env-file stack.env up -d
-docker compose exec api npm run db:migrate
+cp stack.env.example stack.env   # 実値を入れる。git に含めない
+./scripts/deploy-stack.sh        # ビルド → db 起動 → migration → api 起動
 ```
+
+未適用の migration があると新しい api のヘルスチェックが失敗するので、migration は api の起動前に流します（`deploy-stack.sh` がこの順番です）。
 
 Mac の `.env.local`:
 

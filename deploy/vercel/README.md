@@ -33,7 +33,7 @@ npm run vercel:deploy
 
 `.vercelignore` で `node_modules`・Blender マニュアル HTML（~1.2GB）などを除外する。
 
-GitHub 連携でも `main` push 時に自動ビルド可能（環境変数は Dashboard で設定）。
+`main` へのマージだけではデプロイされない（CI にデプロイジョブはない）。レッスンはビルド時にバンドルされるので、学習者に届くのは再ビルド・再デプロイのあと。Vercel の Git 連携がこのリポジトリにつながっている場合だけ `main` push で自動ビルドされる（Dashboard で確認。環境変数も Dashboard で設定）。それ以外は `main` のクリーンなチェックアウトで `npm run vercel:deploy`（ローカルの作業ツリーをそのままアップロードする）。
 
 ## スモーク
 

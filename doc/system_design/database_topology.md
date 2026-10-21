@@ -58,9 +58,10 @@ Tailscale 内前提なら `sslmode=disable` が多い。インターネット公
 ```bash
 cd deploy/risepath-vm
 cp stack.env.example stack.env
-docker compose --env-file stack.env up -d
-docker compose exec api npm run db:migrate
+./scripts/deploy-stack.sh   # ビルド → db 起動 → migration → api 起動
 ```
+
+migration は新しい api の起動前に流します（未適用があると api のヘルスチェックが失敗します）。
 
 ### レガシー: nexloom-gce 上の bare Postgres bootstrap
 
@@ -91,7 +92,7 @@ npm run env:check -- --db
 ## migration（Issue #16 — 完了）
 
 - 適用先: **`risepath` データベースのみ**（ホストは `risepath-vm` が正本）
-- 正本: `server/migrations/000`〜`008` + `npm run db:migrate`
+- 正本: `server/migrations/000`〜`011` + `npm run db:migrate`（適用前に `npm run db:migrate:status` で未適用を確認）
 - Supabase user UUID → VM 側 `auth.users` **スタブ**（`syncAuthUserStub`）
 - RLS は VM Postgres では未使用。ユーザー分離は Express JWT + `user_id` カラム
 

@@ -1,6 +1,6 @@
 # Rise Path 専用 VM デプロイ（`risepath-vm`）
 
-> 更新日: 2026-06-24  
+> 更新日: 2026-10-21  
 > ステータス: **GCP `risepath-vm` 稼働中**（db/api/mcp + Memanto overlay、50GB ディスク）/ Hermes・kokoro は `--profile full` で起動  
 > 目的: **ai-note-meet / nexloom-gce の既存スタックを変更せず**、Rise Path を DB〜Hermes まで一式で再現・運用する。
 
@@ -70,11 +70,16 @@
 
 Postgres ロールは **`risepath_app`** に統一（`deploy/risepath-vm/stack.env.example` の `POSTGRES_USER`、Mac `.env.local`、レガシー bootstrap SQL と一致）。
 
-起動後ワンショット:
+migration は **新しい `api` イメージを起動する前に** 流す（`deploy-stack.sh` はこの順。§4.2。Memanto overlay を使うときは §7.2 の `-f` も付ける）:
 
 ```bash
-docker compose exec api npm run db:migrate
+docker compose --env-file stack.env build
+docker compose --env-file stack.env up -d --wait db
+docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate
+docker compose --env-file stack.env up -d
 ```
+
+`/api/v2/health` は未適用の migration が 1 つでもあると 503 を返し、`api` の healthcheck はこれを見る。`mcp` は `api` の healthy を、`hermes` は `mcp` を待つ。新しい migration を含むイメージを先に起動すると、`up` が unhealthy で止まり、`mcp` と `hermes` が更新されない。
 
 ### 2.2 リポジトリ内の予定ファイル
 
@@ -84,7 +89,7 @@ docker compose exec api npm run db:migrate
 | `deploy/risepath-vm/scripts/provision-gce.sh` | GCP VM + 09:00–23:00 JST スケジュール |
 | `deploy/risepath-vm/stack.env.example` | 変数名テンプレ（秘密なし） |
 | `deploy/risepath-vm/hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP + allowlist） |
-| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ + migrate + `smoke:vm` |
+| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ（build → migrate → up → `smoke:vm`） |
 | `docker-compose.yml`（ルート） | **ローカル開発用**（`db` + **`app`** のみ。本番 Compose はサービス名 `api`） |
 | `hermes/config.example.yaml` | Hermes `rise-path` プロファイルテンプレ |
 
@@ -121,7 +126,7 @@ HERMES_API_KEY=<API_SERVER_KEY と同値>
 
 **Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証し、Express 経由のユーザーチャットでは Express が先に `registerAgentSession(rp:user:{uuid})` する。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向け。
 
-stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](./architecture_v3_hermes_agent.md) §3.2）。
+stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) §3.2）。
 
 ---
 
@@ -153,17 +158,26 @@ cd deploy/risepath-vm/scripts
 
 **Hermes（開発期）:** VM には載せず **Mac ローカル**で `hermes -p rise-path gateway`。DB/MCP は VM 向け。
 
-### 4.2 初回デプロイ
+### 4.2 初回デプロイ・再デプロイ
 
 ```bash
-git clone <rise-path-repo> /opt/risepath
+git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git /opt/risepath
 cd /opt/risepath/deploy/risepath-vm
-cp stack.env.example stack.env   # 実値を入れる。git に含めない
+cp stack.env.example stack.env   # 実値を入れる。deploy/risepath-vm/.gitignore で除外済み
 chmod 600 stack.env
-docker compose --env-file stack.env up -d
-docker compose exec api npm run db:migrate
-docker compose exec api npm run env:check -- --db
+./scripts/deploy-stack.sh        # pull → build → db 起動 → db:migrate → up -d → smoke
+docker compose --env-file stack.env exec api npm run env:check -- --db
 ```
+
+既存の `/opt/risepath` の取得元確認と clone し直しの手順: [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md)
+
+**main へのマージだけではデプロイされない。** レッスンと `/claude-code` などの画面はビルド時に `api` イメージ（`dist/`）へ、MCP の `lesson-get` が読む `content/` は `mcp` イメージへ焼き込まれる。学習者に届くのは `deploy-stack.sh` で両方を再ビルドしたあと（Vercel のフロントは [`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。
+
+#### migration の確認（適用前）
+
+- `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
+- `db:migrate` は未適用をまとめて順に流す。2026-06-24 の記録は 000–008 まで。009〜011 が一度に入ることがある。
+- 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（小さいテーブルならすぐ終わる）。
 
 ### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
 
@@ -178,9 +192,13 @@ HERMES_API_KEY=***
 ### 4.4 ローカル Docker のみ（VM なしで試す場合）
 
 ```bash
-cd rise-path-demo-game-integration
-cp deploy/risepath-vm/stack.env.example .env.stack  # 将来
-docker compose -f deploy/risepath-vm/docker-compose.yml --env-file .env.stack up -d
+cd rise-path-demo-game-integration/deploy/risepath-vm
+cp stack.env.example stack.env   # Git 管理外。リポジトリ直下の .env.stack などには置かない
+chmod 600 stack.env
+docker compose --env-file stack.env build
+docker compose --env-file stack.env up -d --wait db
+docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate
+docker compose --env-file stack.env up -d
 ```
 
 ルートの `docker-compose.yml` は簡易版（`db` + **`app`**）。migration は `docker compose exec app npm run db:migrate`。フルスタックは `deploy/risepath-vm/`（サービス名 `api`）が正本。
@@ -223,7 +241,7 @@ pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
 
 ## 7. Phase 19: 学習者 Memanto overlay（risepath-vm 専用）
 
-開発者個人用 Memanto（nexloom-gce / `2005nk-work`）とは **別 volume・別 secret**。仕様: [`phase19_learner_semantic_memory_spec.md`](./phase19_learner_semantic_memory_spec.md)
+開発者個人用 Memanto（nexloom-gce / `2005nk-work`）とは **別 volume・別 secret**。仕様: [`phase19_learner_semantic_memory_spec.md`](../phases/phase19_learner_semantic_memory_spec.md)
 
 ### 7.1 有効化
 
@@ -271,25 +289,25 @@ docker compose exec api node scripts/smoke-vm-stack.mjs --target container --req
 | 項目 | 状態 |
 |------|------|
 | アーキテクチャ方針（本ドキュメント） | ✅ 確定 |
-| migration 000–008 + `db:migrate` | ✅ 完了 |
+| migration 000–011 + `db:migrate` | 🔄 リポジトリは 011 まで。VM は 000–008 適用の記録（2026-06-24）。`npm run db:migrate:status` で確認してから適用。010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る（§4.2） |
 | Express agent proxy + Life Journal API | ✅ 完了 |
-| `deploy/risepath-vm/docker-compose.yml` | ✅ db + api + mcp + kokoro-tts（healthcheck 付き） |
+| `deploy/risepath-vm/docker-compose.yml` | ✅ db + api + mcp + kokoro-tts + hermes（healthcheck 付き） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |
 | GCP スケジュール + provision スクリプト | ✅ `scripts/provision-gce.sh` |
-| `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線 |
+| `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線（migrate は新しい api の起動前） |
 | Hermes 本番 `config.yaml`（SSE） | ✅ `deploy/risepath-vm/hermes/config.yaml` |
-| Hermes コンテナイメージ | ⬜ 未作成（開発期は Mac ローカル gateway） |
+| Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可 |
 | `risepath-vm` GCP 実機プロビジョニング | 🔄 DB 接続済み（Tailscale）。フル stack は `deploy-stack.sh` で更新 |
 
 ---
 
-## 8. 関連ドキュメント
+## 9. 関連ドキュメント
 
 | ファイル | 内容 |
 |----------|------|
-| [`database_topology.md`](./database_topology.md) | Auth / DB / GCS の全体像 |
-| [`architecture_v3_hermes_agent.md`](./architecture_v3_hermes_agent.md) | Hermes + MCP + Skills |
-| [`hermes/README.md`](../hermes/README.md) | Hermes プロファイル手順 |
+| [`database_topology.md`](../system_design/database_topology.md) | Auth / DB / GCS の全体像 |
+| [`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) | Hermes + MCP + Skills |
+| [`hermes/README.md`](../../hermes/README.md) | Hermes プロファイル手順 |
 | [`env_local_setup_issue15.md`](./env_local_setup_issue15.md) | ローカル env |
 | [`prod_readiness_plan.md`](./prod_readiness_plan.md) | Phase 15 全体 |
 | [`portable_deployment.md`](./portable_deployment.md) | GCS / 引っ越し（Nexloom 側は別） |

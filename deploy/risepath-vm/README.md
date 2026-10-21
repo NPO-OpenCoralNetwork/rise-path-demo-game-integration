@@ -1,6 +1,6 @@
 # Rise Path VM deploy (`risepath-vm`)
 
-正本: [`doc/risepath_vm_deployment.md`](../../doc/risepath_vm_deployment.md)
+正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md)
 
 ## 開発期の方針
 
@@ -21,7 +21,7 @@
 | `stack.env.example` | 秘密なしテンプレ → `stack.env` |
 | `scripts/provision-gce.sh` | GCP VM + 夜間停止スケジュール作成 |
 | `scripts/bootstrap-vm.sh` | VM 初回セットアップ |
-| `scripts/deploy-stack.sh` | 再デプロイ（pull + build + migrate + smoke） |
+| `scripts/deploy-stack.sh` | 再デプロイ（pull → build → migrate → up → smoke） |
 | `hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP） |
 | `systemd/risepath-stack.service` | VM 起動時に compose up |
 
@@ -45,11 +45,29 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --hostname=risepath-vm
 
 # リポジトリ bootstrap
-git clone https://github.com/t012093/rise-path-demo-game-Integration-.git /opt/risepath
+git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git /opt/risepath
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
 # → stack.env を編集して再実行
 ```
+
+#### 既存の `/opt/risepath` がある場合
+
+`deploy-stack.sh` も `scripts/deploy-from-mac.sh` も、clone 元に `git pull --ff-only` するだけです。先に取得元を確認します。
+
+```bash
+git -C /opt/risepath remote -v
+git -C /opt/risepath log -1 --oneline
+```
+
+`origin` が上の URL でなければ、clone し直します。以前のリポジトリとは履歴がつながっていないので、remote を変えても pull できません。
+
+1. スタックを止める: `docker ps -q --filter label=com.docker.compose.project=risepath | xargs -r docker stop`
+2. `deploy/risepath-vm/stack.env` と `deploy/risepath-vm/hermes-data/` を VM 内の別の場所にコピーする（どちらも Git 管理外）
+3. `/opt/risepath` を別名に移し、上の `git clone` をやり直す
+4. 2 つを元の場所に戻して `./deploy-stack.sh`
+
+DB などの Docker ボリュームは、Compose のプロジェクト名が `risepath` で固定なので残ります。
 
 ### 3. Mac `.env.local`
 
@@ -72,6 +90,8 @@ Mac から検証:
 ```bash
 npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100
 ```
+
+コース追加などのコンテンツデプロイ後は、`claude-code` ポータル（migration 011）、`/claude-code`、`/api/v2/llm/status` の行も確認します。
 
 ## セキュリティ
 
