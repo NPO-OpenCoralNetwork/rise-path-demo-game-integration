@@ -1,15 +1,15 @@
 {
   "lessonId": "cc-01-first-session",
-  "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:83c7a256e5bf982c",
+  "file": "content/courses/claude-code/lessons/cc-01-first-session.lesson.json",
+  "lessonHash": "sha256:1767d55f356db7d2",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:9251fd0014082e5c",
-    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:83c7a256e5bf982c",
+    "previousReview": ".artifacts/review/claude-code/cc-01-first-session/83c7a256e5bf982c/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "practice-steps"
+      "lesson.courseId"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false
@@ -42,13 +42,13 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Re-scored because surfaces-table and install-how changed. install-how now expands WSL at its first use: 「macOS・Linux・WSL（Windows Subsystem for Linux）用は、2行で1つのコマンドです。」 The expansion is English only, so a Windows beginner still cannot tell from it whether to use install-unix or install-win. surfaces-table now gives each full surface name inside the cell (「ターミナルCLI。」「デスクトップアプリ。」「クラウドセッション。」), so q2's options (「ターミナルCLI」「クラウドセッション」) still match the table. One gap is unchanged: q2 and the cloud row (「先にpushする」) rely on push, but the prerequisites list only 「Gitのコミット（commit）の意味がわかる」.",
+      "evidence": "I re-scored this because the lesson moved from the vibe-coding course to its own claude-code course, so its prerequisites now point into another course. The cross-course references still resolve. 「Gitのコミット（commit）の意味がわかる（バイブコーディング第5章）」 matches vibe-ch5 「第5章｜GitHubワークフロー完全理解」, and 「VS Codeを使ったことがある（バイブコーディング第3章）」 matches vibe-ch3 「第3章｜開発環境コックピット（VS Code）」. The p-commit troubleshoot 「バイブコーディング第5章の `git config`」 also still names a real chapter. The course name makes these references clear across the course boundary. The course description now says push is required (「Gitのcommitとpushの意味がわかる人向けです」), which partly closes the earlier push gap for learners who start from the course page. The lesson's own prerequisites still say only commit. Two gaps are unchanged: q2 and the cloud row depend on push, and install-how expands WSL only in English (「WSL（Windows Subsystem for Linux）」).",
       "blockIds": [
         "install-how",
         "surfaces-table",
-        "surfaces-check"
-      ],
-      "carriedOver": true
+        "surfaces-check",
+        "practice-steps"
+      ]
     },
     {
       "id": "load",
@@ -59,7 +59,8 @@
         "install-how",
         "loop-table",
         "surfaces-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -116,7 +117,8 @@
         "practice-steps",
         "practice-prompt-explain",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -136,7 +138,8 @@
       "evidence": "Re-scored because p-start changed. The added sentence 「初めてのフォルダでは、信頼の確認が出ます。」 agrees with the fact files: cross-lesson-facts.md item 8 treats a trust dialog for an untrusted folder as standard interactive behaviour (「`claude -p` … without a trust dialog」), and facts-cc-01-first-session.md lists the 「trust dialog」 as a built-in safeguard on the security page. It also matches cc-05 (「初めてのフォルダなので、信頼の確認が出ます。」) and cc-09 (「初めてのフォルダーでは、先に `claude` で信頼の確認に答えます。」). This addresses the first-start part of the previous round's factual doubt. practice-steps cites cc-quickstart, cc-terminal-guide and cc-how-it-works, and the lesson's sources do not include the security page, so I cannot trace the trust dialog to a cited page (niceToHave). The 「入力欄の上に `cc-practice` が表示されます」 detail is unchanged and still cannot be traced to a source.",
       "blockIds": [
         "practice-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -165,20 +168,19 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-steps p-start (changed block): approving the trust prompt is something the learner does, but it now appears only in expect. Move it into md and keep expect for the result. md: 「上のコマンドを1行ずつ実行します。初めてのフォルダでは信頼の確認が出るので、自分で作ったフォルダであることを確かめて承認します。」 expect: 「入力欄の上に `cc-practice` が表示されます。」 (ja-editor owns the final wording)",
-    "practice-steps p-start (changed block): the trust dialog is not on any page that practice-steps cites. Add the security page (https://code.claude.com/docs/en/security, named in facts-cc-01-first-session.md as covering the trust dialog) to sources as cc-security, and add it to practice-steps cite.",
-    "factual doubt (unchanged part of p-start expect): 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail. Safer: 「Claude Codeが起動し、入力欄が表示されます。」 This matches cc-05's wording (「承認すると、Claude Codeの入力欄が表示されます。」).",
-    "practice-steps: now that ③ and ④ are gone from the titles, restore the link to the example in the step bodies. p-diff md: 「1-5の③と同じく、変わる場所を予想してから、`/diff` を開きます。」 p-explain md: 「1-5の④として、下の「差分を説明してもらう依頼文」を送ります。」",
-    "install-how: WSL is expanded only in English, and a Windows beginner still cannot tell which command to run. Second paragraph: 「macOS・Linux・WSL（Windows上で動くLinux環境）用は、2行で1つのコマンドです。WindowsのPowerShellでは、その下のコマンドを使います。」 (ja-editor owns the final wording)",
-    "surfaces-table: the CLI row repeats CLI three times. Cell: 「ターミナルで使う基本の入口で、演習で使う。Command Line Interfaceの略」. Consider renaming the column header to 「名前・場面と、知っておくこと」.",
-    "loop-table: the first two rows repeat their label. Option: first column 「チャットAI」「エディタ補完」, with cells 「貼り付けた文章を見て、文章で答えて待つ」 and 「開いているファイルを見て、続きのコードを提案する」, as long as this still fits on mobile.",
-    "install-win: to match install-unix's label, change filename to 「Windows（PowerShell）」.",
-    "prerequisites: change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」, because q2 and surfaces-table depend on push.",
+    "lesson level vs course level (new with the move): the lesson has \"level\": \"beginner\", but content/courses/claude-code/course.json has \"level\": \"intermediate\". Choose one deliberately. The course-level prerequisites (cd/ls, commit and push) fit intermediate for the course, while beginner fits this first lesson. If the mismatch is intended, no change is needed.",
+    "prerequisites (raised again; the course description now says push): to match content/courses/claude-code/course.json, change the second item to 「Gitのコミット（commit）とプッシュ（push）の意味がわかる（バイブコーディング第5章）」. q2 and surfaces-table depend on push.",
+    "prerequisites (new with the move): now that バイブコーディング is a separate course, consider naming it as a course so learners know to look elsewhere: 「…（コース「バイブコーディング」第5章）」. The current text is still clear, so this is optional (ja-editor owns the wording).",
+    "practice-steps p-start: approving the trust prompt is something the learner does, but it appears only in expect. Move it into md and keep expect for the result. md: 「上のコマンドを1行ずつ実行します。初めてのフォルダでは信頼の確認が出るので、自分で作ったフォルダであることを確かめて承認します。」 expect: 「入力欄の上に `cc-practice` が表示されます。」 (ja-editor owns the final wording)",
+    "practice-steps p-start: the trust dialog is not on any page that practice-steps cites. Add the security page (https://code.claude.com/docs/en/security, which facts-cc-01-first-session.md names as covering the trust dialog) to sources as cc-security, and add it to practice-steps cite.",
+    "factual doubt (p-start expect): 「入力欄の上に `cc-practice` が表示されます」 is an uncited UI detail. A safer wording, which matches cc-05: 「Claude Codeが起動し、入力欄が表示されます。」",
+    "practice-steps: restore the link to the example in the step bodies. p-diff md: 「1-5の③と同じく、変わる場所を予想してから、`/diff` を開きます。」 p-explain md: 「1-5の④として、下の「差分を説明してもらう依頼文」を送ります。」",
+    "install-how: WSL is expanded only in English. Second paragraph: 「macOS・Linux・WSL（Windows上で動くLinux環境）用は、2行で1つのコマンドです。WindowsのPowerShellでは、その下のコマンドを使います。」 (ja-editor owns the final wording)",
     "loop-check q1: give d the same opening as a, so that only the 確かめる stage tells them apart. d md: 「実行してエラーを読み、直したところで完了と報告する」",
-    "practice-steps p-commit: add the hint 「1つしか並ばないときは、「まだコミットしていない変更はある？」と聞いて、残りをコミットしてもらいます。」",
+    "install-win: to match install-unix's label, change filename to 「Windows（PowerShell）」.",
     "check-quiz q8: set bloom to \"understand\"."
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round. review-scope exited 0: 1 of 43 blocks changed (2%), with no change to sections or objectives. The previous review had no open must-fix items, so there are no resolved entries. I reviewed the changed block, practice-steps, in full. Only the p-start expect changed: it now warns that the first start in a new folder shows the trust prompt and says to approve it because the learner made the folder. This matches cc-05 and cc-09 and the trust dialog in cross-lesson-facts.md, and it addresses the first-start part of the previous round's factual doubt. There are no errors or regressions, so there are no new must-fix items. Two nice-to-haves: the approve action belongs in md rather than expect, and the trust dialog needs a cited source (the security page). I re-scored load, practice and accuracy, all unchanged at 3. validate shows 0 errors and lint --strict 0 warnings. measure.mjs gives est 16.1 min (estMinutes 16) and prose 1659."
+  "summary": "Verification round. review-scope exited 0. Only lesson.courseId changed (vibe-coding → claude-code), 1 of 88 parts (2%). No blocks, sections or objectives changed. The previous review had no open must-fix items, and the round it verified had none either, so there are no resolved entries. I reviewed the change and its effects. The cross-course references (バイブコーディング第3章 and 第5章, the p-commit troubleshoot) still name real chapters. summary-next and the permission-mode glossary entry name 「第2回｜任せる範囲を決める：権限モードと巻き戻し」, which matches the next link to cc-02-permissions in course.json. The prompt blocks' target \"claude-code\" names the tool, not the course, so they are unaffected. The move caused no regressions, so there are no new must-fix items. I re-scored prior; it stays at 3. The other 12 criteria are carried over. validate shows 0 errors and lint --strict 0 warnings. measure.mjs gives prose 1659 and est 16.1 min (estMinutes 16). New nice-to-haves: the lesson level (beginner) differs from the course level (intermediate), and the prerequisites could match the course description's commit-and-push requirement."
 }

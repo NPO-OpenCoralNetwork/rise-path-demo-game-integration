@@ -1,56 +1,51 @@
 {
   "lessonId": "cc-08-hooks-mcp",
-  "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
+  "file": "content/courses/claude-code/lessons/cc-08-hooks-mcp.lesson.json",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:112a650daf9ca3d0",
+  "lessonHash": "sha256:02bb8902d1916464",
   "verifies": {
-    "reviewedRevision": "sha256:dc1fce75fb87584d",
+    "reviewedRevision": "sha256:112a650daf9ca3d0",
     "changed": [
-      "s5-check",
-      "practice-b-quiz",
-      "summary-next"
+      "lesson.courseId"
     ],
-    "changedShare": 0.04,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/claude-code/cc-08-hooks-mcp/112a650daf9ca3d0/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "I checked every string in the 3 changed blocks. The q4 prompt reads 「同僚が「PR（プルリクエスト）の説明を自動で書く」プラグインを勧めてくれました。」. This is です・ます, and it spells PR out the same way as the other course draft that uses it (「CIで、PR（プルリクエスト）…」). In q9, options a and d now share the same opening, 「Aは閉じるツールを拒否ルールで外して試し、」, and differ only in what they decide about B. This keeps the options parallel. 拒否ルール is the word used in hook-predict (「第2回の拒否ルールのように」) and in the flashcard 「フックと拒否ルール（deny）は、どう使い分ける？」. In summary-next, the hooks-guide sentence 「フックの最新の情報は、[フックの公式ガイド（日本語）](…)で確かめましょう。」 is warm and natural. I found no grammar, notation or naming errors in the changed text.",
+      "evidence": "Carried over. The only change is lesson.courseId (vibe-coding → claude-code), which the learner does not see. No block text changed.",
       "blockIds": [
-        "s5-check",
-        "practice-b-quiz",
         "summary-next"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs reports 「prose 1897 (budget 1,200–2,400) · … · est 17.8 min (must be ≤ 20; estMinutes 18)」. estMinutes still matches the rounded estimate. lessons:lint --strict reports 「0 errors, 0 warnings」. Both paragraphs of summary-next have 2 sentences or fewer.",
+      "evidence": "Re-checked after the move. measure.mjs reports 「prose 1897 (budget 1,200–2,400) · … · est 17.8 min (must be ≤ 20; estMinutes 18)」, which matches estMinutes 18. lessons:lint --strict reports 「1 lesson file: 0 errors, 0 warnings.」",
       "blockIds": [
-        "summary-next",
-        "practice-b-quiz"
+        "summary-next"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "PR is spelled out on first use in q4 (「PR（プルリクエスト）」), and nothing earlier in the lesson uses PR. 拒否ルール in q9 a/d was introduced in hook-predict, which points back to round 2 of the course. No new terms are added. The scores and evidence for the unchanged definitions blocks (s1-defs, s2-defs, s4-defs, s5-defs) are as in the previous round.",
+      "evidence": "Re-checked the links to other rounds against the new course.json. The lesson points back to 「第2回の拒否ルールのように」, 「第6回のとおり」 and 「第7回のスキルや…」. In course.json these are cc-02-permissions 「第2回｜任せる範囲を決める…」, cc-06 「第6回｜CLAUDE.mdで前提を伝える」 and cc-07 「第7回｜手順はスキルに、調べものはサブエージェントに」, so every round number still points to the right lesson.",
       "blockIds": [
-        "s5-check",
-        "practice-b-quiz",
-        "hook-predict"
+        "hook-predict",
+        "s1-lead"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is jp only. The link text in summary-next, 「フックの公式ガイド（日本語）」, names where the link goes. The link now sits next to the question about hooks instead of after the next-lesson note, so it is easier to understand on its own.",
+      "evidence": "Re-checked because the course changed. The lesson is jp only. The next-lesson note in summary-next, 「第9回｜並列で進める・自動で回す」, matches the cc-09 title in course.json and cc-09-parallel-automation.lesson.json word for word. The link text 「フックの公式ガイド（日本語）」 still names where the link goes.",
       "blockIds": [
         "summary-next"
       ]
@@ -58,15 +53,15 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-b-quiz: the options now say 拒否ルール, but the explanation and the c feedback still say the broader 権限ルール for the same action. Using the same word helps the learner see that this is the mechanism option a names — 「Aは閉じるツールを権限ルールで外し、」→「Aは閉じるツールを拒否ルールで外し、」 and 「閉じるツールは、権限ルールで外せます。」→「閉じるツールは、拒否ルールで外せます。」",
-    "s5-check: optionally add the English with the katakana, as the style guide does for katakana terms. The other course lesson writes 「プルリクエスト（pull request）」 — 「PR（プルリクエスト）」→「PR（プルリクエスト、pull request）」",
-    "s4-add: still open from round 3 (unchanged text). Use the same word as s4-transport — 「# claude mcp add <名前> -- <コマンド>」→「# claude mcp add <名前> -- <起動コマンド>」",
-    "practice-b-model: still open from round 2. The 作者 row repeats the update schedule — 「社内チーム・毎月更新」→「社内チームで、いまも保守している」",
-    "check-quiz: still open from round 2. The second sentence of the q8 explanation has no subject — 「そのためプロンプトインジェクションの入り口になります。」→「そのため、このサーバーはプロンプトインジェクションの入り口になります。」",
-    "s5-risk: still open from round 2. Use the same wording as the q8-b feedback — 「AnthropicはMCPサーバーを監査していません。」→「AnthropicはMCPサーバーのセキュリティ監査をしていません。」",
-    "hook-predict: still open from round 2. Name the round-2 mechanism the same way as s1-lead — 「第2回の拒否ルールのように」→「第2回の権限ルール（拒否ルール）のように」"
+    "practice-b-quiz: still open from the previous round. Use the same word as the q9 options — 「Aは閉じるツールを権限ルールで外し、」→「Aは閉じるツールを拒否ルールで外し、」 and 「閉じるツールは、権限ルールで外せます。」→「閉じるツールは、拒否ルールで外せます。」",
+    "s5-check: still open. Optionally add the English after the katakana — 「PR（プルリクエスト）」→「PR（プルリクエスト、pull request）」",
+    "s4-add: still open from round 3. Use the same word as s4-transport — 「# claude mcp add <名前> -- <コマンド>」→「# claude mcp add <名前> -- <起動コマンド>」",
+    "practice-b-model: still open from round 2 — 「社内チーム・毎月更新」→「社内チームで、いまも保守している」",
+    "check-quiz: still open from round 2. Give the q8 explanation sentence a subject — 「そのためプロンプトインジェクションの入り口になります。」→「そのため、このサーバーはプロンプトインジェクションの入り口になります。」",
+    "s5-risk: still open from round 2 — 「AnthropicはMCPサーバーを監査していません。」→「AnthropicはMCPサーバーのセキュリティ監査をしていません。」",
+    "hook-predict: still open from round 2 — 「第2回の拒否ルールのように」→「第2回の権限ルール（拒否ルール）のように」"
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "Verification round (mode verify): review-scope.mjs exited 0 with 3 of 49 blocks changed (4%). My previous review had no must-fix items, so there are no resolved entries. What changed: q4 spells out PR as 「PR（プルリクエスト）」 on first use. q9 options a and d now remove the close tool with a 拒否ルール, and the two options stay parallel. summary-next moves the hooks-guide link before the next-lesson note. lessons:lint --strict is clean. measure.mjs reports prose 1897 and est 17.8 min, which matches estMinutes 18. I found no (a)–(e) errors in the changed text. New nice-to-haves: align the q9 explanation and the c feedback with 「拒否ルール」, and optionally add 「pull request」 to the PR gloss. The older nice-to-haves are all in unchanged blocks."
+  "summary": "Verification round (mode verify). review-scope.mjs exited 0. Only 1 of 91 parts changed (2%): lesson.courseId, from vibe-coding to claude-code. No block text changed. My previous review had no must-fix items, so there are no resolved entries. Because the lesson now belongs to a new course, I checked the links to other rounds. 第2回, 第6回 and 第7回 still match the lessons in claude-code/course.json. The next-lesson title 「第9回｜並列で進める・自動で回す」 matches cc-09. lessons:lint --strict is clean. measure.mjs reports prose 1897 and est 17.8 min, against estMinutes 18. I found no (a)–(e) errors. The niceToHave items from earlier rounds are all in unchanged text and are carried over."
 }

@@ -1,15 +1,15 @@
 {
   "lessonId": "cc-02-permissions",
-  "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
+  "file": "content/courses/claude-code/lessons/cc-02-permissions.lesson.json",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:b119e1c419d1e206",
+  "lessonHash": "sha256:8c52cb12321e5ea5",
   "verifies": {
-    "reviewedRevision": "sha256:fc6282d1f851b02f",
-    "previousReview": ".artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:b119e1c419d1e206",
+    "previousReview": ".artifacts/review/claude-code/cc-02-permissions/b119e1c419d1e206/round-2/pedagogy-reviewer.review.json",
     "changed": [
-      "check-quiz"
+      "lesson.courseId"
     ],
     "changedShare": 0.02,
     "fullReviewRequired": false
@@ -25,7 +25,8 @@
         "modes-table",
         "rules-check",
         "example-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -54,7 +55,7 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs reports 「prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)」, the same as last round. The e1 edit does not change the prose count. lint --strict reports 0 warnings. The prose is still close to the upper limit.",
+      "evidence": "measure.mjs reports 「prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)」, the same as last round. lint --strict reports 0 warnings. The prose is still close to the upper limit.",
       "blockIds": [
         "example-check",
         "check-quiz",
@@ -90,7 +91,7 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "e6 d (「CLAUDE.mdに「作る前に確認して」」) targets the belief that a written instruction is enforced, and its feedback names that belief. e1's distractors are unchanged and each names a real misconception: b says a short use is harmless (「短い時間でも、確認も安全チェックもない状態になります」), c says a prompt instruction can stand in for the missing checks, and d approves every prompt without reading it.",
+      "evidence": "e6 d (「CLAUDE.mdに「作る前に確認して」」) targets the belief that a written instruction is enforced, and its feedback names that belief. e1's distractors each name a real misconception: b says a short use is harmless (「短い時間でも、確認も安全チェックもない状態になります」), c says a prompt instruction can stand in for the missing checks, and d approves every prompt without reading it.",
       "blockIds": [
         "check-quiz",
         "rules-check",
@@ -125,58 +126,58 @@
     {
       "id": "meta",
       "score": 3,
-      "evidence": "summary-points comes after the exam, summary-next names 第3回, there are 7 flashcards, and summary-ask has 3 suggestions. summary-next ends in an action, not a reflection question.",
+      "evidence": "Re-scored because the move gave the lesson a place in course.json. summary-points comes after the exam, there are 7 flashcards, and summary-ask has 3 suggestions. summary-next says 「次は「第3回｜探索→計画→実装→コミット」です。」. That matches course.json, where cc-02-permissions has `\"next\": {\"lessonId\": \"cc-03-plan-first\"}` and cc-03-plan-first has the title 「第3回｜探索→計画→実装→コミット」. summary-next still ends in an action, not a reflection question.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "The new e1 setting fits the cross-lesson facts. cc-10 says 「知らないリポジトリにはVMか[[クラウドセッション]]…を勧めます」, so the old wording 「中身をよく知らないリポジトリで…autoモードで進め」 contradicted that lesson. The new wording, a team repository the learner works in, removes the contradiction. The key, auto mode on a laptop with ask rules, and the explanation 「ネットにつながらないコンテナや仮想マシン向けです」 match bypass-tip and flashcard 1015 (「ネットにつながらないコンテナや仮想マシンなど、隔離した環境だけです。」). No new claims were added.",
+      "evidence": "No text changed. In e1, the setting 「チームで使っているリポジトリ」 does not contradict cc-10, which sends unfamiliar repositories to a VM or a cloud session. The key and its explanation 「ネットにつながらないコンテナや仮想マシン向けです」 match bypass-tip and flashcard 1015. The cross-lesson references still hold in the published course: e5's explanation says hooks come in 「第8回」, and course.json lists cc-08-hooks-mcp as 「第8回｜フックで守らせ、MCPでつなぐ」.",
       "blockIds": [
         "check-quiz",
         "bypass-tip",
         "summary-cards"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The new e1 prompt is です・ます and calm: 「チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。」. Both sentences are within 60 characters, and lint reports no warnings. 「チーム」 matches e4's 「チームの仲間」. One inconsistency is still open: e6's options use `ask`/`deny`, while q4's use 確認ルール/拒否ルール.",
+      "evidence": "The e1 prompt is です・ます and calm: 「チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。」. lint reports no warnings. One inconsistency is still open: e6's options use `ask`/`deny`, while q4's use 確認ルール/拒否ルール.",
       "blockIds": [
         "check-quiz",
         "example-check",
         "rules-defs"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "jp is the only locale. Validation shows 0 errors and lint --strict shows 0 warnings. The plain-text fields contain no markdown, and rules-diagram keeps its full alt text.",
+      "evidence": "Re-scored because courseId changed. `courseId` is now 「claude-code」, which matches content/courses/claude-code/course.json (`\"id\": \"claude-code\"`, locales [\"jp\"]), and estMinutes 20 matches that file's entry for cc-02-permissions. jp is the only locale. lessons:validate reports 「no errors」 for both the lesson and course.json, and lint --strict reports 「0 errors, 0 warnings」. The prerequisite 「第1回｜最初のタスクを任せる」 is the same as the title of cc-01-first-session in the same course. The plain-text fields contain no markdown, and rules-diagram keeps its full alt text.",
       "blockIds": [
         "rules-checklist",
         "summary-ask",
         "rules-diagram"
-      ],
-      "carriedOver": true
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz e1 explanation (changed block, optional): connect the new team-repository setting to option a's second clause. audit-cc-02-permissions.json quotes permission-modes: auto mode allows 「Pushing to any branch of the repository you're working in, including the default branch」. Append 「チームのリポジトリでは、autoモードだと既定のブランチへのpushも通るので、pushは確認ルールにしておきます。」 (ja-editor decides the wording).",
-    "rewind-check q5 (unchanged, still open): replace option b md with 「Claudeが `sed -i` コマンドで書き換えた `app.js` の1行」 and its feedback with 「同じファイルでも、Bashのコマンドでの変更は記録されません。戻すにはGitを使います。」.",
-    "check-quiz e5 (unchanged): the key `git -C . push origin main` is the exact string in example-pitfall. Use `git -c push.default=current push origin main` as option c, so the item tests transfer of 「`git push` で始まらない」.",
+    "check-quiz e1 explanation (optional): connect the team-repository setting to option a's second clause. audit-cc-02-permissions.json quotes permission-modes: auto mode allows 「Pushing to any branch of the repository you're working in, including the default branch」. Append 「チームのリポジトリでは、autoモードだと既定のブランチへのpushも通るので、pushは確認ルールにしておきます。」 (ja-editor decides the wording).",
+    "rewind-check q5 (still open): replace option b md with 「Claudeが `sed -i` コマンドで書き換えた `app.js` の1行」 and its feedback with 「同じファイルでも、Bashのコマンドでの変更は記録されません。戻すにはGitを使います。」.",
+    "check-quiz e5: the key `git -C . push origin main` is the exact string in example-pitfall. Use `git -c push.default=current push origin main` as option c, so the item tests transfer of 「`git push` で始まらない」.",
     "check-quiz e6: to match q4, write options a–c with the Japanese rule names and the key, e.g. 「確認ルール（`ask`）に `Bash(gh pr create *)`」 (ja-editor decides the wording).",
     "rules-checklist pr-transfer: make it checkable, e.g. 「応用：自分のコマンドを1つ確認ルールにし、`/permissions` に出ることを確かめました」. Add a model answer for pw-c-reason to the pw-restore expect: 「`rewind-copy.md` は残ります。`cp` はBashのコマンドなので、記録されないからです。」.",
-    "auto-defaults (unchanged): explain force push and `git reset --hard`, e.g. 「既定で止めるのは、force push（リモートの履歴を上書きするpush）や `git reset --hard`（手元の変更を捨てる操作）、本番へのデプロイなどです。」 (split the sentence if it goes over 60 characters).",
-    "summary-next (unchanged): add a reflection question before the action, e.g. 「この回の予想で、外れたものはどれでしたか？」.",
-    "rules-steps (unchanged): add a faded step before p-rule, e.g. give the skeleton `{\"permissions\": {\"ask\": [\"…\"], \"deny\": [\"…\"]}}` in the p-rule hint."
+    "auto-defaults: explain force push and `git reset --hard`, e.g. 「既定で止めるのは、force push（リモートの履歴を上書きするpush）や `git reset --hard`（手元の変更を捨てる操作）、本番へのデプロイなどです。」 (split the sentence if it goes over 60 characters).",
+    "summary-next: add a reflection question before the action, e.g. 「この回の予想で、外れたものはどれでしたか？」.",
+    "rules-steps: add a faded step before p-rule, e.g. give the skeleton `{\"permissions\": {\"ask\": [\"…\"], \"deny\": [\"…\"]}}` in the p-rule hint."
   ],
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0. Only check-quiz changed (1 of 41 blocks, 2%), and the sections and objectives are the same. The previous review had no open must-fix items, so there are no resolved entries. The only edit is the first phrase of e1's prompt, from 「中身をよく知らないリポジトリで」 to 「チームで使っているリポジトリで」. I reviewed all of check-quiz. The new setting removes the contradiction with cc-10, which sends unfamiliar repositories to a VM or a cloud session. The key (a) is still the only correct answer, the distractors and their feedback still name real misconceptions, and the item still assesses o1 at the apply level. I found no regression. validate reports 0 errors and lint --strict reports 0 warnings. measure.mjs reports prose 2222 and est 19.9 min, with estMinutes at 20. I re-scored align, accuracy and voice, and carried over the other criteria. The mean is 3.38 (44/13), and every criterion is at 3 or higher."
+  "summary": "Verification round. The computed task asked for a full review, but review-scope.mjs --since sha256:b119e1c419d1e206 --expect-hash sha256:b119e1c419d1e206 exited 0, so the skill's rules call for a verification round. The only change is lesson.courseId, from vibe-coding to claude-code (1 of 74 parts, 2%). No block or section changed, and the objectives are the same. The previous review had no open must-fix items, so there are no resolved entries. I checked the move for regressions and found none. courseId matches content/courses/claude-code/course.json, and so does estMinutes 20. The prerequisite title matches cc-01-first-session. summary-next's 「第3回｜探索→計画→実装→コミット」 matches the course's next link to cc-03-plan-first. e5's 「第8回」 reference matches cc-08-hooks-mcp. validate reports 0 errors for the lesson and course.json, and lint --strict reports 0 warnings. measure.mjs reports prose 2222 and est 19.9 min, with estMinutes at 20. I re-scored meta and a11y_l10n and carried over the other criteria. The mean is 3.38 (44/13), and every criterion is at 3 or higher."
 }

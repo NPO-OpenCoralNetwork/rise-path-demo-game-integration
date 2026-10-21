@@ -1,19 +1,18 @@
 {
   "lessonId": "cc-05-context",
-  "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:ab90c2fa7a4e7fe9",
+  "file": "content/courses/claude-code/lessons/cc-05-context.lesson.json",
+  "lessonHash": "sha256:4b4ffd1dc9356064",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:7a183d3f582412d5",
+    "reviewedRevision": "sha256:ab90c2fa7a4e7fe9",
     "changed": [
-      "pr-code",
-      "pr-steps-start"
+      "lesson.courseId"
     ],
-    "changedShare": 0.03,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/7a183d3f582412d5/round-1/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/claude-code/cc-05-context/ab90c2fa7a4e7fe9/round-1/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
@@ -46,13 +45,14 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Re-checked because pr-steps-start changed. The pr-start md change only explains line continuation. Its expect is unchanged and still reads 「初めてのフォルダなので、信頼の確認が出ます。」, with no recall to 第1回. 「プランモード（plan mode）」 in s3-table row 1 also has no recall. The recalls in s1-lead, s3-defs and s4-defs remain.",
+      "evidence": "Re-checked because courseId changed to claude-code. The prerequisites still match the course.json titles exactly (「第1回｜最初のタスクを任せる」 … 「第4回｜検証を任せる：テスト・レビュー・説明」). The forward references 「第6回｜CLAUDE.mdで前提を伝える」 in sum-next and 「作り方は第7回で扱います。」 in s4-defs match the module order and the next link (cc-06-claude-md). Nothing regressed. pr-start expect and the 「プランモード（plan mode）」 row in s3-table still have no recall.",
       "blockIds": [
         "pr-steps-start",
         "s1-lead",
         "s3-defs",
         "s4-defs",
-        "s3-table"
+        "s3-table",
+        "sum-next"
       ]
     },
     {
@@ -67,7 +67,8 @@
         "s2-focus",
         "s2-session",
         "s2-code"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -129,7 +130,8 @@
         "pr-checklist",
         "pr-answer",
         "pr-diagnose"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -153,7 +155,8 @@
         "pr-code",
         "check-quiz",
         "sum-points"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -184,7 +187,7 @@
   "mustFix": [],
   "niceToHave": [
     "pr-steps-start pr-start: a learner who types the lines one by one sees a `>` continuation prompt after the `\\` line, and then types `  > CLAUDE.md` after it. Add this to md, after the `\\` sentence: 「`\\` の行でEnterを押すと、続きを待つ `>` が出ます。」.",
-    "pr-code: now that the echo line is split, the 390 px reason for the elliptical rule no longer applies. Write the first line as 「echo '- <title>は「練習：」で始める' \\」 (the second line stays 「  > CLAUDE.md」) so it models the full instruction style. Brief line 114 still quotes 「- HTMLの<title>は「練習：」で始める」; update it to the line you keep.",
+    "pr-code: now that the echo line is split, the 390 px reason for the elliptical rule no longer applies. Write the first line as 「echo '- <title>は「練習：」で始める' \\」 (the second line stays 「  > CLAUDE.md」) so it models the full instruction style. Update content/courses/claude-code/briefs/cc-05-context.md to quote the line you keep.",
     "pr-steps-start pr-start expect: 「初めてのフォルダなので、フォルダを信頼するかの確認（第1回）が出ます。承認すると、Claude Codeの入力欄が表示されます。」.",
     "hook-predict q0 option d feedback: 「不具合ではなく、長い会話で起きやすいふるまいです。会話がたまるほど、前の指示が埋もれやすくなります。」.",
     "Practice hint ladder (to reach 4 on practice): give pr-predict three hints. (1) 「5-3の図で、それぞれの指示がたどる矢印を見ます。」 (2) 「直下のCLAUDE.mdは『決まったファイル』に入るかを考えます。」 (3) 「会話だけの指示は、要約に置き換わる側です。」",
@@ -199,5 +202,5 @@
   ],
   "average": 3.46,
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: 2 of 47 blocks changed (pr-code, pr-steps-start; 3%), and no section or objective changed. The previous review had no open must-fix items, so there are no resolved entries. I reviewed both changed blocks in full. pr-code splits the echo line with a ` \\` continuation to fit 390 px. pr-start adds 「`\\` で終わる行は、次の行と合わせて1つのコマンドです。」, which is accurate and keeps the instruction to run one line at a time from breaking the redirect. The 「練習：」 rule the practice checks is unchanged, so nothing regressed. Two new niceToHave items: mention the `>` continuation prompt, and restore 「…で始める」 in the rule, since the split removes the width reason for the short form. I re-scored prior, load, practice and accuracy (unchanged at 3). The other criteria are carried over. lessons:validate and lessons:lint --strict are clean (0 errors, 0 warnings). measure.mjs: prose 1945, practice reading 1152, est 19.9 min against estMinutes 20. Every criterion is 3 or above, the mean is 3.46 and there are no must-fix items, so the verdict is pass."
+  "summary": "Verification round. review-scope.mjs exited 0. Only lesson.courseId changed (vibe-coding to claude-code, 1 of 82 parts, 2%). No block, section or objective changed, and the previous review had no open must-fix items, so there are no resolved entries. I checked the change against content/courses/claude-code/course.json. The courseId matches, and estMinutes 20 matches the course entry. The prerequisites match the 第1回–第4回 titles exactly, and the forward references (第6回 in sum-next, 第7回 in s4-defs) match the module order and the next link to cc-06-claude-md, so nothing regressed. I re-checked prior (still 3) and carried over the other criteria. lessons:validate and lessons:lint --strict are clean (0 errors, 0 warnings). measure.mjs: prose 1945, est 19.9 min against estMinutes 20. Every criterion is 3 or above, the mean is 3.46 and there are no must-fix items, so the verdict is pass."
 }

@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-04-verify",
-  "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
-  "lessonHash": "sha256:17c13d4e45026e5d",
+  "file": "content/courses/claude-code/lessons/cc-04-verify.lesson.json",
+  "lessonHash": "sha256:38938fab0a8e18cd",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,49 +9,47 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s4-sort flowchart TD has short three-line Japanese labels that stay readable at 390 px (pages/mobile-jp-18.png). The two code blocks s3-code and p-model-code keep their line numbers when long lines wrap (pages/mobile-jp-13.png, pages/mobile-jp-29.png), and nothing is cut off or overlaps on any screen.",
+      "evidence": "The s4-sort flowchart (flowchart TD) fills one 390 px screen with readable Japanese labels and a caption (pages/mobile-jp-18.png, mobile-jp-19.png). The code blocks s3-code and p-model-code soft-wrap on mobile, the line numbers stay readable, and nothing is cut off (mobile-jp-12/13, mobile-jp-29/30). metrics: overflowX false, 0 console, mermaid, unknown-block or broken-image errors.",
       "blockIds": [
         "s4-sort",
         "s3-code",
         "p-model-code",
-        "s1-table"
+        "s3-steps",
+        "p-steps"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Every section starts with a lead and a definitions card, and a check follows within one or two screens. The practice section is long, though: p-steps (8 steps) is followed by p-prompt-write, p-prompt-green and p-prompt-review back to back, which fills about six mobile screens without a break (pages/mobile-jp-23.png to pages/mobile-jp-28.png). Only mobile screen 4 counts as text-only, and it still holds a definitions card and a bold-keyed list.",
+      "evidence": "Desktop charsPerLine median is 39, inside the 30–40 target (max 49). Every desktop screen has a heading, figure, code block or check. One mobile screen counts as text-only: mobile-jp-04, which shows the end of s1-defs and the s1-pick/s1-table list. The three-paragraph s2-goal run spans mobile-jp-07/08 before the next prompt box.",
       "blockIds": [
-        "p-steps",
-        "p-prompt-write",
-        "p-prompt-green",
-        "p-prompt-review"
+        "s1-defs",
+        "s1-pick",
+        "s1-table",
+        "s2-goal"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All visible text is Japanese, with English terms in parentheses on first use. Diagram labels are in Japanese, and s4-sort has an alt text. Contrast is good on the callouts, chips and dark code blocks. The controls are not hidden under the top bar or the mobile bottom bar. No personal data appears on any screen.",
+      "evidence": "All visible text is Japanese, including the diagram labels, and the diagram has a caption (図1). No Japanese words break mid-word, and contrast is good on the callouts (s3-pitfall red, s4-names blue). The bottom bar hides no controls: every 答える button is fully visible (mobile-jp-06, 09, 15, 20, 22).",
       "blockIds": [
         "s4-sort",
-        "s1-defs",
-        "s4-defs"
+        "s3-pitfall",
+        "s4-names"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Mobile code wrap: in p-model-code line 5 the lone `{` wraps onto its own row (\"() =>\" / \"{\"), and in s3-code line 5 `=> {` wraps (pages/mobile-jp-29.png, pages/mobile-jp-13.png). It is still readable, but shorter test names such as test('4の倍数はうるう年', …) would keep each line on one row at 390 px.",
-    "s3-prompt-write, s3-prompt-green, s2-goal-prompt and the practice prompts show raw backticks around identifiers. On mobile this causes awkward breaks such as \"空文字\" / \"は `false`。\" (pages/mobile-jp-12.png). Dropping the backticks in the prompt text (the identifiers are clear without them) would read more cleanly, and the copied prompt would not change in meaning.",
-    "Practice section rhythm: think about moving each of p-prompt-write, p-prompt-green and p-prompt-review next to the step that uses it (or adding a short markdown line between them), so the three prompt cards do not stack after the 8-step list (pages/mobile-jp-25.png to pages/mobile-jp-28.png).",
-    "Desktop: the s4-sort diagram is taller than one 900 px screen (pages/desktop-jp-11.png to pages/desktop-jp-12.png), so the whole flow cannot be seen at once. The expand button helps; slightly shorter node labels would make the figure less tall.",
-    "reader: the flashcard hint says 'クリックまたはスペースキーでめくる' on the 390 px mobile view, where tap is the input (pages/mobile-jp-36.png).",
-    "reader: steps that only have a `hint` (p-green, p-review) are still labelled 'うまくいかないときは' (pages/mobile-jp-24.png, pages/desktop-jp-16.png).",
-    "reader: the desktop '用語・このレッスン' panel lists 10 of the 15 glossary terms (/goal, エッジケース, 過剰設計, Explanatory and Learning are missing) (pages/desktop-jp-01.png).",
-    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-38.png, pages/desktop-jp-25.png). This is a known preview state.",
-    "reader: the mobile full-length PNG stops at 16000 px, and 14 failed /api/ requests were ignored as environment noise. Both are known preview states."
+    "s3-steps / p-steps: each step title starts with a circled number (①…⑧) right next to the reader's own numbered circle, so every step shows its number twice (pages/mobile-jp-10.png, mobile-jp-23.png). Consider dropping the leading ①–⑧ from the titles but keeping the references like 「①の依頼文」.",
+    "s3-code / p-model-code: at 390 px, lines 2, 3, 5, 13 and 17 wrap. The `=> {` lands alone on the next line (pages/mobile-jp-13.png, mobile-jp-29.png, mobile-jp-30.png). It is still readable. Shorter test names, for example 'ハイフンなし' instead of '「3桁-4桁」の郵便番号は true', would keep most lines whole.",
+    "s2-goal-prompt, s3-prompt-write, s3-prompt-green, p-prompt-write, p-prompt-green, p-prompt-review: these prompt boxes show literal backticks (for example `isPostalCode`) as plain text (pages/mobile-jp-08.png, mobile-jp-12.png, mobile-jp-26.png). This is intended for copy-paste, but learners may wonder whether to type the backticks.",
+    "mobile-jp-04 is the only text-only mobile screen (s1-defs + s1-table list). It is acceptable, but s1-table could become a two-column table (確認 / 依頼文に足す一言) for easier scanning.",
+    "reader: the full-length mobile PNG (mobile-jp.png) stops at 16000 px. This review used the per-screen PNGs.",
+    "reader: the desktop side panel shows the 未回答 badge on every section above the current one in the TOC. That is expected, but it adds noise in screenshots."
   ],
   "average": 3.67,
   "verdict": "pass",
-  "summary": "The metrics show no hard failures (no horizontal overflow, console, mermaid, unknown-block or image errors), and no personal data appears on any screen. Desktop JP has a median of 39 characters per line, inside the 30–40 target. The s4-sort flowchart and both code blocks stay readable at 390 px. The biggest strength is the steady rhythm of lead, definitions card, prompt or code, then inline check. The most useful improvement is in the practice section: break up the three prompt cards that follow the 8-step list, and shorten the test names in p-model-code so line 5 does not wrap on mobile."
+  "summary": "The lesson renders cleanly at 390 px and 1440 px. No overflow, console, mermaid, block or image errors. The review flowchart and both test files stay readable on mobile, and no personal data (account names, private titles, paths, keys or billing) appears on any screen. Nothing blocks the lesson; the main polish item is the duplicated step numbers (①… next to the reader's numbered circles) in s3-steps and p-steps."
 }

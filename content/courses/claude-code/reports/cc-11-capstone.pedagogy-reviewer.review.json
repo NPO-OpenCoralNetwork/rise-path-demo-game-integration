@@ -1,21 +1,17 @@
 {
   "lessonId": "cc-11-capstone",
-  "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:c9d22545bc0d23db",
+  "file": "content/courses/claude-code/lessons/cc-11-capstone.lesson.json",
+  "lessonHash": "sha256:cf71ff2e805d17bc",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:423d9258076f1516",
-    "previousReview": ".artifacts/review/vibe-coding/cc-11-capstone/423d9258076f1516/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:c9d22545bc0d23db",
+    "previousReview": ".artifacts/review/claude-code/cc-11-capstone/c9d22545bc0d23db/round-2/pedagogy-reviewer.review.json",
     "changed": [
-      "ex-prompt-skill",
-      "sc-b1",
-      "sc-quiz",
-      "check-quiz",
-      "summary-points"
+      "lesson.courseId"
     ],
-    "changedShare": 0.08,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -28,7 +24,8 @@
         "sc-quiz",
         "check-quiz",
         "practice-setup"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -43,18 +40,17 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Re-scored after the fix. dr-table still ties each part to the lesson that taught it, and the caption says what the parentheses mean (「かっこ内は学んだ回。公式ドキュメントの対応表から」). Row 3 now restores the English on first use (「[[サブエージェント]]（subagent、第7回）」), so every katakana part in the table is glossed on first use: スキル（skill）, フック（hook） in hook-b1, プラグイン（plugin） earlier in the hook, and サブエージェント（subagent） here. The header 「繰り返す困りごと」 matches the glossary meaning of きっかけ, which dr-b1 defines just before the table.",
+      "evidence": "Re-scored because the lesson now belongs to course claude-code. Each prerequisite matches a lesson title in content/courses/claude-code/course.json exactly (for example 「第3回｜探索→計画→実装→コミット」 and 「第10回｜安全とコストを管理する」). The lesson-number references in dr-table (「（第6回）」, 「（subagent、第7回）」, 「（第8回）」) match the course order too. dr-table still links each part to the lesson that taught it, and every katakana part is glossed on first use.",
       "blockIds": [
+        "lesson",
         "dr-table",
-        "dr-b1",
-        "hook-b1"
-      ],
-      "carriedOver": true
+        "dr-b1"
+      ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Re-measured after the changes. measure.mjs: 「prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate. The new sentence in ex-prompt-skill explains a field that was already in the prompt (allowed-tools) and adds no new term. sc-b1 now lists the four areas instead of naming them with a new label. lint --strict shows 0 errors and 0 warnings.",
+      "evidence": "Re-measured. measure.mjs gives 「prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)」. estMinutes 19 matches the rounded estimate and the course.json entry (19). lint --strict shows 0 errors and 0 warnings. Only courseId changed, so the text load is the same.",
       "blockIds": [
         "lesson",
         "ex-prompt-skill",
@@ -69,7 +65,8 @@
         "ex-steps",
         "ex-prompt-skill",
         "ex-settings"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -80,7 +77,8 @@
         "ex-quiz",
         "cycle-quiz",
         "sc-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -90,7 +88,8 @@
         "check-quiz",
         "sc-quiz",
         "dr-b2"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -111,15 +110,16 @@
         "self-check-list",
         "cycle-steps",
         "setup-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "Re-scored because summary-points changed. Point 4 now reads 「安全・検証・コンテキスト・コストの4分野で点検し、次に足すものを決めます。」. It matches sc-b1 and the checklist title, and it no longer reuses cc-03's 「4つの観点」, which names a different set. The summary still comes after the exam, with 4 points, a reflection prompt, the next step, 7 flashcards and 3 askTutor suggestions.",
+      "evidence": "Re-scored because the lesson is now the last lesson of the published course. summary-next's 「これで全11回は終わりです。次は、演習3で決めた部品を足していきましょう。」 matches course.json, where module m4 has 11 lessons in all and cc-11-capstone is last with no next link, so the closing does not point to a missing lesson. The summary still comes after the exam, with 4 points (point 4: 「安全・検証・コンテキスト・コストの4分野で点検し、次に足すものを決めます。」), a reflection prompt, 7 flashcards and askTutor suggestions.",
       "blockIds": [
         "summary-points",
-        "sc-b1",
+        "summary-next",
         "summary-cards"
       ]
     },
@@ -131,7 +131,8 @@
         "ex-prompt-skill",
         "check-quiz",
         "ex-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -142,7 +143,8 @@
         "sc-quiz",
         "summary-points",
         "ex-prompt-skill"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -158,14 +160,14 @@
   "mustFix": [],
   "niceToHave": [
     "Factual doubt: ex-prompt-skill's 「確認なしで使えます」 could be read as allowed-tools overriding the deny and ask rules that ex-rules just set. facts-cc-11-capstone.md says an allow 「cannot carve an exception out of a deny」, and the changelog fixed managed ask rules 「being bypassed by … skill allowed-tools」. Check this against cc-skills. If it holds, add after the sentence: 「拒否ルールは、それでも優先されます。」",
-    "sc-b1 changed but still calls an unmet checklist item a きっかけ, while the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
+    "sc-b1 calls an unmet checklist item a きっかけ, while the glossary defines きっかけ as 「同じ困りごとが繰り返し起きること」. Change 「当てはまらない項目が、次に足すもののきっかけです。」 to 「当てはまらない項目が、次に足すものの候補です。」",
     "dr-table row 1 has no verb (「CLAUDE.mdに1行（第6回）」), while the next rows name whole parts. For a clear action, change it to 「CLAUDE.mdに1行足す（第6回）」.",
     "c-review (cycle-steps) has no hint or troubleshoot. Add the hint 「指摘が多すぎたら、計画の要件に関わるものだけに絞ってと頼みます。」",
     "c-commit (cycle-steps) has no hint. Add the hint 「1行目が長すぎたら、「何を変えたかを1行目に50字以内で」と頼みます。」",
-    "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide (now 「200行未満」). Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
-    "worked (to reach 4): add a faded step before practice-setup. For example, add a q-style prompt where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
+    "p-claude-md's 「25行以内」 is unexplained, while e3 a's feedback calls 40 lines fine under the official 200-line guide (「200行未満」). Change p-claude-md's hint to 「最初は25行以内を目安にします。各行に「消したらまちがえる？」と聞きます。」",
+    "worked (to reach 4): add a faded step before practice-setup. For example, add a question where the learner picks the part for ③ before seeing it, or leave one ex-steps item's md for the learner to complete."
   ],
   "average": 3.85,
   "verdict": "pass",
-  "summary": "Verification round. review-scope exited 0: 5 of 31 blocks changed (ex-prompt-skill, sc-b1, sc-quiz, check-quiz, summary-points; 8%), with no section or objective changes. The previous review left no open must-fix, so there are no resolved entries. I reviewed every changed block in full. 200行未満 now matches the facts and cc-06. The four areas are now 「安全・検証・コンテキスト・コストの4分野」 in all three places (sc-b1, the q4 hint, summary point 4), and no 観点 is left that could clash with cc-03. The allowed-tools sentence matches factbase docs-25. No regression was found. validate shows 0 errors and lint --strict shows 0 errors and 0 warnings. measure.mjs gives prose 1,344 and est 19.3 min, against estMinutes 19. I re-scored 10 criteria and carried over hook, prior, visual and a11y_l10n. Every criterion is 3 or higher, the mean is 3.85, and there is no must-fix, so the verdict is pass. One factual doubt, about allowed-tools versus deny rules, is in niceToHave."
+  "summary": "Verification round: review-scope exited 0. Only lesson.courseId changed (vibe-coding → claude-code, 1 of 71 parts, 2%), and no block, section or objective changed. The previous rounds left no open must-fix, so there are no resolved entries. I checked the change against content/courses/claude-code/course.json. The lesson title, estMinutes 19, the prerequisite titles, the 第n回 references and summary-next's 「全11回は終わりです」 all match the course, where cc-11-capstone is the last lesson with no next link. I found no regression. validate shows 0 errors and lint --strict shows 0 errors and 0 warnings. measure.mjs gives prose 1344 and est 19.3 min, against estMinutes 19. I re-scored prior, load and meta and carried over the other 10 criteria. Every criterion is 3 or higher and the mean is 3.85, so the verdict is pass. The niceToHave items are the same as in the previous round."
 }

@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-11-capstone",
-  "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:c9d22545bc0d23db",
+  "file": "content/courses/claude-code/lessons/cc-11-capstone.lesson.json",
+  "lessonHash": "sha256:cf71ff2e805d17bc",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,45 +9,47 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "metrics.json has no hard failures: overflowX false, consoleErrors 0, mermaidErrors 0, unknownBlocks 0, brokenImages 0. At 390 px the cycle-flow diagram is a vertical flowchart with readable Japanese labels and a caption (pages/mobile-jp-16.png, mobile-jp-17.png). The two-column dr-table fits without clipping (mobile-jp-03.png, mobile-jp-04.png). Line 16 of the ex-settings code wraps with a hanging indent and stays readable (mobile-jp-09.png).",
+      "evidence": "Each section has a figure, table, code or check. textOnlyScreens is empty on both devices. The dr-table has 2 columns and reads cleanly at 390 px (mobile-jp-03/04). The cycle-flow mermaid uses flowchart TD with Japanese labels that stay legible on mobile (mobile-jp-16/17). The ex-settings and setup-settings-model code blocks show their highlighted lines clearly, and line 16 wraps with a hanging indent under its line number (mobile-jp-09).",
       "blockIds": [
-        "cycle-flow",
         "dr-table",
+        "cycle-flow",
         "ex-settings",
-        "setup-settings-model"
+        "setup-settings-model",
+        "ex-steps",
+        "self-check-list"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "textOnlyScreens is empty on desktop and mobile, and the screens alternate between steps, prompts, code, quizzes and the checklist. One exception: the prerequisites line under the title is a single long run of small grey text separated by ｜ (mobile-jp-01.png, desktop-jp-01.png).",
+      "evidence": "The rhythm alternates well between lead text, steps, prompts and inline checks, and no screen is a wall of text. Two things add load. The 10 prerequisites render as one dense 9-line run of small grey text on mobile-jp-01. Desktop runs a median of 42 chars per line, above the 30–40 target, though that comes from the reader's measure.",
       "blockIds": [
-        "ex-steps",
-        "setup-steps",
-        "cycle-steps",
-        "self-check-list"
+        "lesson",
+        "setup-prompt-model",
+        "ex-prompt-skill"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a Japanese-only lesson. All headings, diagram labels, captions, quiz options and controls are in Japanese, and English terms appear only in parentheses on first use, e.g. スキル（skill） and 権限ルール（permission rule）. There are no awkward breaks inside Japanese words, nothing is hidden under the top or bottom bars (mobile-jp-05.png, mobile-jp-30.png), and no personal data is visible on any screen.",
+      "evidence": "All screens are in Japanese with no stray English UI text. English terms appear only as glosses (skill, hook, permission rule). The diagram has a caption and a full Japanese alt. Inline code chips stay whole and readable at 390 px (mobile-jp-07, mobile-jp-12). Contrast is fine, and nothing is hidden under the top or bottom bars.",
       "blockIds": [
+        "cycle-flow",
         "hook-b1",
-        "dr-b2",
-        "cycle-flow"
+        "dr-b2"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "lesson: the prerequisites line under the title is a single dense run of small grey text separated by ｜ (pages/mobile-jp-01.png, pages/desktop-jp-01.png). Shorten it to the lesson numbers, e.g. 「前提：第2〜10回、Gitのcommit、試せるリポジトリ」.",
-    "c-plan: the two shortcuts appear as one row of keycaps, Shift + Tab followed directly by Ctrl + G, and can read like a single four-key combo (pages/mobile-jp-18.png, pages/desktop-jp-12.png). List only one shortcut on the step, or add a separator or label between the two.",
-    "ex-steps: the step titles repeat the step number (①…⑤) next to the numbered circle (pages/mobile-jp-06.png, pages/desktop-jp-04.png). Keep the circled numbers only if ex-b1 needs them to refer to steps; otherwise remove them.",
-    "self-check-list: sc-context and sc-cost write commands as 「/clear」「/usage」「/status」 in brackets, while the rest of the lesson shows commands as code chips (pages/mobile-jp-23.png). Use inline code if the checklist supports it.",
-    "reader: desktop charsPerLine median is 42 (max 56) against the JP target of 30–40, with a 680 px measure at 18.7 px. This is a reader measure setting, not lesson content.",
-    "reader: the end banner says this is the course's last lesson because drafts are not listed in course.json, and the mobile full-length PNG stops at 16000 px. Both are known reader or preview behaviour."
+    "ex-steps: the step titles carry circled numbers that repeat the reader's step badge, so mobile and desktop show '1 ① CLAUDE.mdを短く書く' (pages/mobile-jp-06.png, pages/desktop-jp-04.png). Remove ①–⑤ from the titles and refer to them as 手順1・2 / 手順3・4 in ex-b1, ex-prompt-claude-md and ex-prompt-skill.",
+    "lesson (prerequisites): the 10 entries render as one dense block of small grey text on the first mobile screen (pages/mobile-jp-01.png). Shorten it to something like '第2〜8回・第10回' plus the two practical prerequisites.",
+    "self-check-list (sc-safety): 'git push' is plain text in the label and breaks across lines at 390 px as 'git / push' (pages/mobile-jp-22.png). Rephrase it as 'pushの確認ルール', or keep the words together.",
+    "reader: in c-plan, the Shift+Tab and Ctrl+G key chips sit next to each other with no separator, so 'Tab Ctrl' reads as one combination (pages/mobile-jp-18.png, pages/desktop-jp-12.png). Put a gap or a separator such as '／' between combinations.",
+    "reader: desktop JP runs a median of 42 chars per line (680 px measure at 18.7 px), above the 30–40 target. Narrow the measure a little.",
+    "reader: the full-length PNGs are truncated at 16000 px and per-screen PNGs were used instead. The 13 failed /api/ requests are environment noise and are not counted as console errors."
   ],
+  "average": 3.67,
   "verdict": "pass",
-  "summary": "The screenshots show the lesson at lessonHash sha256:c9d22545bc0d23db, and metrics.json reports no hard failures. The layout holds at 390 px: the vertical cycle-flow diagram, the two-column table, the soft-wrapped code line and the long inline chips are all readable, and nothing is clipped or hidden under the bars. No personal data appears on any screen. Only small polish items remain: the dense prerequisites line, the two keyboard shortcuts that read as one combo, and the doubled step numbers."
+  "summary": "metrics.json is clean: no overflow, console, mermaid, unknown-block or image errors, and no text-only screens. The table, diagram, code and checks stay readable at 390 px and 1440 px. No personal data appears on any screen. The most useful polish is to drop the circled numbers from the ex-steps titles, which double the step badges, and to shorten the dense prerequisites line on the first screen."
 }

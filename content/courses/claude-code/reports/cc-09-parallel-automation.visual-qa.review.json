@@ -1,52 +1,36 @@
 {
   "lessonId": "cc-09-parallel-automation",
-  "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:e66b60d1da0710f0",
+  "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:c5dc598ce3ba8cf6",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 4,
-      "evidence": "metrics.json reports no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks and 0 broken images on both devices. At 390 px both code blocks (s2-code, s3-code) fit without sideways scrolling, and the p1-model answer stays readable with its highlighted lines (pages/mobile-jp-05/06/10/20.png). The definitions in s1-defs and s4-defs stack cleanly on mobile and show as two columns on desktop (pages/desktop-jp-02.png, pages/desktop-jp-09.png).",
-      "blockIds": [
-        "s2-code",
-        "s3-code",
-        "p1-model",
-        "s1-defs",
-        "s4-defs"
-      ]
+      "score": 3,
+      "evidence": "Both term tables (worktree / background execution, unattended run / scheduled task) stack cleanly at 390 px (pages/mobile-jp-03.png, pages/mobile-jp-12.png and pages/mobile-jp-13.png). The two code blocks highlight the important lines 13/17 and 2, 12-16, and fit without horizontal scroll (pages/mobile-jp-06.png, pages/mobile-jp-20.png). The lesson has no diagram, though, so how worktrees, branches and the merge relate is told in words and code only."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty on desktop-jp and mobile-jp. Desktop charsPerLine has a median of 37 (target 30–40). Every screen has a heading, a code block, steps, a prompt, a checklist or a quiz, and the screenshots show no walls of text and no empty gaps.",
-      "blockIds": [
-        "s2-steps",
-        "s3-table",
-        "s4-prompt",
-        "check-quiz"
-      ]
+      "evidence": "metrics.json reports textOnlyScreens empty on both devices. Desktop charsPerLine median is 37, inside the JP 30-40 target. Every mobile screen breaks prose with a table, code, steps, a callout or a check, and the full-length rhythm shows no wall of text or empty gap."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson is Japanese only, and the UI and content are in Japanese throughout. English terms appear only as glosses in parentheses, such as ワークツリー（worktree）. Contrast is good on the light cards and in the dark code theme. No line breaks inside Japanese words, and no controls are hidden under the top bar or the 60 px bottom bar (pages/mobile-jp-03.png, pages/mobile-jp-25.png). Long inline chips like `bypassPermissions` move whole to the next line (pages/mobile-jp-25.png).",
-      "blockIds": [
-        "s1-defs",
-        "check-quiz"
-      ]
+      "evidence": "The lesson is Japanese only, and every visible label, button and diagram-free figure is in Japanese with English glosses on first use, for example 'ワークツリー（worktree）'. Inline code chips stay whole and readable at 390 px, for example the option chips in the exam (pages/mobile-jp-25.png). Contrast is good, and nothing is hidden under the top or bottom bars."
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s4-prompt: at 390 px the inline JSON shape {\"todos\": [...], \"unreadable\": [...]} breaks across two lines in the middle of the object (pages/mobile-jp-14.png). It is still readable, but putting the shape on its own line would make it easier to compare with the result.",
-    "p1-checklist: the flag names (--bare, --permission-mode dontAsk, ...) show as plain bold text, not as code chips the way they do in s3-table (pages/mobile-jp-19.png, pages/desktop-jp-12.png). If checklist items support inline code, wrap them in backticks to keep this consistent.",
-    "reader: the end banner says this is the course's last lesson (このコースの最後のレッスンまで読み終えました) because drafts are not listed in course.json (pages/mobile-jp-31.png, pages/desktop-jp-21.png).",
-    "reader: the mobile full-length PNG is cut off at its height limit (truncated: true). Every per-screen page was checked instead.",
-    "reader: 14 failed /api/ requests (500 on user/events, progress, notifications) are environment noise and are not counted as console errors."
+    "Add a small flowchart TD to the worked-example section (3 nodes or so: 本体 -> .claude/worktrees/feature-a and bugfix-b -> git merge) so learners see how the two worktrees and branches relate. Today the relationship is only in the code block and steps (pages/mobile-jp-05.png, pages/mobile-jp-06.png).",
+    "The flag names in the practice-1 checklist ('--bare を付けています', '--permission-mode dontAsk で…') show as bold proportional text, not code chips, unlike the rest of the lesson (pages/mobile-jp-19.png, pages/desktop-jp-13.png). Wrap them in backticks for consistency, if the checklist block supports inline code.",
+    "In the model-answer code block, the prompt string (lines 3-11) sits flush left while the flags are indented, so the quoted string is a little harder to tell apart from the command (pages/mobile-jp-20.png). Indenting the string lines by two spaces would make the structure clearer.",
+    "Desktop charsPerLine max is 51, above the 30-40 target. The median is 37, so this is advisory only.",
+    "reader: the full-length mobile PNG stops at 16000px (truncated), so the per-screen PNGs were used to review it.",
+    "reader: 14 failed /api/v2/user/* requests (500) were ignored as environment noise."
   ],
   "verdict": "pass",
-  "summary": "Clean layout on both devices: no overflow, no clipped or overlapping text, no broken images, and code blocks, definitions, steps, prompts and the 6-question exam all read well at 390 px. No personal data appears on any screen. Nothing must be fixed; the optional polish is putting the JSON shape in s4-prompt on its own line on mobile and showing flags as code in p1-checklist."
+  "summary": "metrics.json shows no hard failures: no overflow and no console, mermaid, block or image errors. The lessonHash is copied from metrics.json. No personal data appears on any of the screens I opened. Tables, highlighted code, steps and checks render cleanly on all 31 mobile and 21 desktop screens, with nothing cut off at 390 px. The most useful optional improvement is a small diagram of the worktree, branch and merge flow."
 }

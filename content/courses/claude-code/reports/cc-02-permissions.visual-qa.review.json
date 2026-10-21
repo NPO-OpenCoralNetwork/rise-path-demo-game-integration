@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-02-permissions",
-  "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
-  "lessonHash": "sha256:b119e1c419d1e206",
+  "file": "content/courses/claude-code/lessons/cc-02-permissions.lesson.json",
+  "lessonHash": "sha256:8c52cb12321e5ea5",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,43 +9,44 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "metrics.json shows no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks, 0 broken images, and no text-only screens. The rules-diagram flowchart (TD) has readable Japanese labels at 390 px (.artifacts/preview/vibe-coding/cc-02-permissions/pages/mobile-jp-09.png). On mobile, every code chip in the question options stays whole inside its option card (mobile-jp-13.png, mobile-jp-25.png).",
+      "evidence": "No hard failures in metrics.json: overflowX is false, and console errors, mermaid errors, unknown blocks and broken images are all 0. At 390 px the rule-order flowchart (rules-diagram) fits and its Japanese labels are readable (pages/mobile-jp-09.png). The settings.json code block (example-code) is 10 lines with no wrapping (pages/mobile-jp-12.png), and the definition cards (rules-defs, auto-defs) stack cleanly (pages/mobile-jp-08.png).",
       "blockIds": [
         "rules-diagram",
         "example-code",
-        "example-check",
-        "check-quiz"
+        "rules-defs",
+        "auto-defs",
+        "rules-files"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Each segment is short and broken up by definition tables, a diagram, steps, code and a check at most two to three screens apart. The lesson is still long at 29 mobile screens, though, and the modes-table bullet list plus modes-switch fill about two dense screens (mobile-jp-03.png, mobile-jp-04.png).",
+      "evidence": "textOnlyScreens is empty on both desktop and mobile, and a question, figure, code block, callout or step list appears every one or two screens. The desktop JP median line length is 41 characters (max 54), just above the 30 to 40 target. The check-quiz runs about four mobile screens of five questions in a row (pages/mobile-jp-22.png to pages/mobile-jp-26.png).",
       "blockIds": [
+        "check-quiz",
         "modes-table",
-        "modes-switch",
-        "rules-steps"
+        "rewind-table"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Text is all Japanese with English terms in parentheses on first use, contrast is good, and nothing in the lesson content sits under the top or bottom bars. On mobile, headings wrap at natural phrase breaks, for example '権限モードで、確認なしに / 進める範囲を選ぶ' (mobile-jp-03.png).",
+      "evidence": "Every screen is Japanese, with English terms only in parentheses on first use or as code. Diagram labels are in Japanese. Callout and code-block contrast is good, and no control is hidden under the top or bottom bars (pages/mobile-jp-05.png, pages/mobile-jp-27.png). No line breaks fall inside Japanese words in headings. No personal data appears on any screen.",
       "blockIds": [
-        "modes",
-        "auto-mode",
-        "rules"
+        "auto-bypass",
+        "example-pitfall",
+        "rules-diagram"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "rules-prompt / rewind-prompt: the prompt text shows raw Markdown backticks, and in rules-prompt the fill-in chip sits inside them (`[読ませないファイル]`). On mobile the filename `rewind-copy.md` breaks as '`rewind-' / 'copy.md`' (.artifacts/preview/vibe-coding/cc-02-permissions/pages/mobile-jp-20.png, mobile-jp-21.png). Consider dropping the backticks around {{読ませないファイル}}, or quoting names with 「」 so the prompt reads cleanly before it is copied.",
-    "rules-order: '調べる順番は下の図のとおりです。' is followed by a second paragraph before the figure appears (mobile-jp-08.png, desktop-jp-05.png). Moving the CLAUDE.md sentence below rules-diagram, or splitting it into its own block, would put the figure right after its reference.",
-    "reader: desktop JP charsPerLine median is 41 (max 54) against the 30–40 target at a 680 px measure. This comes from the reader's column width, not the lesson.",
-    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json. The mobile full-length PNG is truncated at 16000 px, and failed /api/ requests were ignored as environment noise."
+    "rewind-prompt: at 390 px the inline filename `rewind-copy.md` in the prompt text breaks at the hyphen into `rewind-` / `copy.md` (pages/mobile-jp-21.png). It is still readable. To avoid it, shorten the name (for example `copy.md`) or start the filename on a new line.",
+    "rules-prompt / rewind-prompt: the backticks around `git push`, `.claude/settings.json` and the {{読ませないファイル}} slot show as literal characters (pages/mobile-jp-20.png, pages/desktop-jp-14.png). That is acceptable for text the learner copies into Claude Code, but the slot wrapped in backticks looks cluttered. Consider removing the backticks around the slot.",
+    "check-quiz: five questions in a row take about four mobile screens (pages/mobile-jp-22.png to pages/mobile-jp-26.png). This is acceptable for an end-of-lesson check, so this item is only a note.",
+    "reader: the desktop JP median line length is 41 characters (target 30 to 40, measure 680 px). This is a reader layout setting, not a lesson defect.",
+    "reader: the full-length PNGs are truncated (desktop 16152 px, mobile 20406 px of the page). The per-screen PNGs cover the whole lesson."
   ],
-  "average": 3.67,
   "verdict": "pass",
-  "summary": "The lesson renders cleanly at 390 px and on desktop: no hard failures, a readable vertical flowchart, code blocks that fit, and option cards that keep their code chips whole. No personal data was seen on any screen. Remaining polish: the raw backticks in the two prompt blocks, and the figure reference in rules-order that is separated from its diagram."
+  "summary": "The lesson looks clean at both 390 px and 1440 px. The rule-order flowchart, the settings.json example and the step lists are readable, and inline code chips stay whole without overflow. There are no hard failures and no must-fix items. The only small problems are a filename split at its hyphen and literal backticks in the copy-paste prompt blocks."
 }

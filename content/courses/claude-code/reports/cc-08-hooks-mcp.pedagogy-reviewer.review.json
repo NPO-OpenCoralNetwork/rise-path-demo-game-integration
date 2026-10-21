@@ -1,19 +1,17 @@
 {
   "lessonId": "cc-08-hooks-mcp",
-  "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:112a650daf9ca3d0",
+  "file": "content/courses/claude-code/lessons/cc-08-hooks-mcp.lesson.json",
+  "lessonHash": "sha256:02bb8902d1916464",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:dc1fce75fb87584d",
-    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:112a650daf9ca3d0",
+    "previousReview": ".artifacts/review/claude-code/cc-08-hooks-mcp/112a650daf9ca3d0/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s5-check",
-      "practice-b-quiz",
-      "summary-next"
+      "lesson.courseId"
     ],
-    "changedShare": 0.04,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -26,7 +24,8 @@
         "s5-check",
         "practice-b-quiz",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -41,16 +40,13 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The prerequisites list lessons 2, 6 and 7, jq and JSON editing, and s2-setup starts with `jq --version`. Earlier lessons are recalled in s1-lead (「第6回のとおり」「第2回の権限ルールやフック」) and s5-lead (「第7回のスキルやサブエージェントは」). The definitions blocks match the glossary word for word. One gap: `onFailure` appears in s3-pitfall without a gloss.",
+      "evidence": "Re-scored because courseId changed. The three lesson prerequisites (「第2回｜任せる範囲を決める：権限モードと巻き戻し」「第6回｜CLAUDE.mdで前提を伝える」「第7回｜手順はスキルに、調べものはサブエージェントに」) match the titles of cc-02-permissions, cc-06-claude-md and cc-07-skills-subagents word for word. All three lessons now have courseId claude-code, and course.json puts them before this lesson (m1 and m3), so the recalls in s1-lead (「第6回のとおり」「第2回の権限ルールやフック」) and s5-lead (「第7回のスキルやサブエージェントは」) point to lessons in the same course. jq and JSON editing are still listed, and s2-setup still starts with `jq --version`. The `onFailure` gloss gap in s3-pitfall remains (unchanged block).",
       "blockIds": [
         "s1-lead",
+        "s5-lead",
         "s1-defs",
-        "s2-defs",
-        "s4-defs",
-        "s5-defs",
         "s3-pitfall"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "load",
@@ -60,7 +56,8 @@
         "s5-check",
         "practice-b-quiz",
         "summary-next"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -84,7 +81,8 @@
         "s1-check",
         "s2-check",
         "s3-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -96,7 +94,8 @@
         "hook-predict",
         "s3-zero",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -122,12 +121,13 @@
         "practice-b-model",
         "practice-b-model-b",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4 points) comes after the exam. summary-next still opens with the reflection question 「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」. The descriptive link now comes before the next-lesson note (「次は「第9回｜並列で進める・自動で回す」です。」), and the link sentence names its topic (「フックの最新の情報は、」). There are 7 flashcards, and card-before-install matches s5-checks.",
+      "evidence": "Re-scored because courseId changed. summary-next names 「次は「第9回｜並列で進める・自動で回す」です。」. That matches the title of cc-09-parallel-automation (courseId claude-code) and the course.json entry for this lesson (`\"next\": {\"lessonId\": \"cc-09-parallel-automation\"}`), so the text and the course link agree. summary-points (4 points) still comes after the exam. summary-next still opens with the reflection question 「あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？」. There are 7 flashcards.",
       "blockIds": [
         "summary-next",
         "summary-points",
@@ -142,7 +142,8 @@
         "practice-b-quiz",
         "s5-check",
         "summary-next"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -152,7 +153,8 @@
         "practice-b-quiz",
         "s5-check",
         "summary-next"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -163,22 +165,21 @@
         "s1-lifecycle",
         "practice-checklist",
         "practice-prompt"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-b-quiz q9 (changed block): option a now says 「拒否ルールで外して」, but the explanation and the c feedback say 「権限ルールで外し」 and 「権限ルールで外せます」. Neither says why a deny rule is needed. Change the second explanation sentence to \"Aは閉じるツールを拒否ルールで外し、課題に紛れた指示も考えて、読むツールだけで試します。許可ルールだけでは、閉じるツールは権限モードしだいで動けてしまいます。\" and the c feedback to \"閉じるツールは、拒否ルールで外せます。出どころと作者がわかるAは、読むツールだけで試せます。\"",
-    "practice-b-quiz q9 (changed block, order unchanged): the correct option a is still first in array order, and so is the answer to q7 (check-quiz). The reader shows options in array order, so put q9's options in the array order b, c, a, d.",
-    "summary-next (changed block): the reflection question now shares a paragraph with the link sentence, so learners may not pause on it. Give it its own paragraph: \"あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？\\n\\nフックの最新の情報は、[フックの公式ガイド（日本語）](https://code.claude.com/docs/ja/hooks-guide)で確かめましょう。\\n\\n次は「第9回｜並列で進める・自動で回す」です。複数の作業を並行して動かし、自動化する方法を学びます。\"",
-    "s4-add (unchanged): the comment reads `# claude mcp add <名前> -- <コマンド>`, but s4-transport says 「`--` の後に起動コマンドを書きます」. If the code width allows, change the comment to \"# claude mcp add <名前> -- <起動コマンド>\".",
-    "s3-check q3 (unchanged): option b repeats the s3-table phrase 「hook error」, so learners can pick it by that phrase alone. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\".",
-    "s4 (unchanged): no objective or question covers scopes, yet summary-points[2] and card-scopes are about them. Either tie scopes to o3 with a q8 distractor about committing to `.mcp.json` at `project` scope before trying the server at `local` scope, or cut summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
-    "s3-zero (unchanged): it repeats the table cell 「（許可ではない）」. Change the s3-table cell to \"進む。表示はなく、ふだんの権限の確認へ\".",
-    "s3-pitfall (unchanged): gloss `onFailure` on first use: \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
-    "check-quiz q8 (unchanged): add \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\" to the explanation, so q8 also names what runs, which q4 taught as the first check."
+    "practice-b-quiz q9 (unchanged, still open): option a says 「拒否ルールで外して」, but the explanation and the c feedback say 「権限ルールで外し」 and 「権限ルールで外せます」. Change the second explanation sentence to \"Aは閉じるツールを拒否ルールで外し、課題に紛れた指示も考えて、読むツールだけで試します。許可ルールだけでは、閉じるツールは権限モードしだいで動けてしまいます。\" and the c feedback to \"閉じるツールは、拒否ルールで外せます。出どころと作者がわかるAは、読むツールだけで試せます。\"",
+    "practice-b-quiz q9 and check-quiz q7 (unchanged, still open): the correct option is first in array order, and the reader keeps array order. Put q9's options in the array order b, c, a, d.",
+    "summary-next (unchanged, still open): give the reflection question its own paragraph: \"あなたのCLAUDE.mdで、本当は毎回必ず守らせたいルールはどれでしょう？\\n\\nフックの最新の情報は、[フックの公式ガイド（日本語）](https://code.claude.com/docs/ja/hooks-guide)で確かめましょう。\\n\\n次は「第9回｜並列で進める・自動で回す」です。複数の作業を並行して動かし、自動化する方法を学びます。\"",
+    "s3-pitfall (unchanged, still open): add a gloss for `onFailure` where it first appears: \"…`onFailure`（失敗したときの扱いを決める設定）を `\\\"block\\\"` にしたフックなどでは、失敗でも止まります。\"",
+    "s4 (unchanged, still open): no question covers scopes, yet summary-points[2] and card-scopes are about them. Either add a q8 distractor about committing to `.mcp.json` at `project` scope before trying the server at `local` scope, or shorten summary point 3 to \"MCPサーバーも、入れる前に確かめてからスコープを選んで追加します。\".",
+    "s3-check q3 (unchanged, still open): option b repeats the s3-table phrase 「hook error」, so learners can pick it by that phrase alone. Set option b md to \"フックでは止まらず、ふだんの権限の確認へ進む\".",
+    "check-quiz q8 (unchanged, still open): add \"`.mcp.json` に書かれる起動コマンドやURLも、入れる前に読みます。\" to the explanation."
   ],
   "average": 3.85,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0 (3 of 49 blocks changed, 4%; sections and objectives unchanged). The previous review had no open must-fix items, so `resolved` is empty. I reviewed all three changed blocks in full. In s5-check, q4 only adds the gloss 「PR（プルリクエスト）」. In practice-b-quiz, q9 options a and d now say 「閉じるツールを拒否ルールで外して試し」, which fits the course's permission model in cc-02-permissions and the cited MCP advice; the answer, feedback and alignment are unchanged. In summary-next, the descriptive link now comes before the next-lesson note. I found no errors or regressions. The q9 explanation still says 「権限ルール」 and does not say why an allow rule is not enough; that is a niceToHave. validate reports 0 errors, lint --strict reports 0 warnings, and measure.mjs gives est 17.8, matching estMinutes 18. Every criterion is 3 or higher, and the mean is 3.85."
+  "summary": "Verification round: review-scope.mjs exited 0. Only lesson.courseId changed (1 of 91 parts, 2%; 0 of 49 blocks), so this is not a full review. The previous review had no open must-fix items, so `resolved` is empty. I re-scored prior and meta against the published course. All prerequisite titles and the next-lesson note 「第9回｜並列で進める・自動で回す」 match the claude-code lessons and the course.json next link to cc-09-parallel-automation. The change caused no regression: validate reports 0 errors, lint --strict reports 0 warnings, and measure.mjs gives est 17.8 against estMinutes 18. Every criterion is 3 or higher, and the mean is 3.85. The most useful remaining polish is the q9 wording: it uses both 拒否ルール and 権限ルール (niceToHave)."
 }

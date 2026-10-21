@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-05-context",
-  "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:ab90c2fa7a4e7fe9",
+  "file": "content/courses/claude-code/lessons/cc-05-context.lesson.json",
+  "lessonHash": "sha256:4b4ffd1dc9356064",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,43 +9,26 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s3-diagram flowchart is TD and fits 390 px with readable Japanese labels (pages/mobile-jp-09.png). The two-column tables s2-table, s3-table, s4-table and pr-answer read cleanly on mobile and desktop without sideways scrolling (pages/mobile-jp-06.png, -10.png, -12.png, -13.png, -27.png). metrics.json reports overflowX false, 0 mermaid errors, 0 broken images and 0 unknown blocks.",
-      "blockIds": [
-        "s3-diagram",
-        "s2-table",
-        "s3-table",
-        "s4-table",
-        "pr-answer"
-      ]
+      "evidence": "Figure 1 (compaction flowchart, TD) has Japanese labels that are easy to read at both widths (pages/desktop-jp-06.png, pages/mobile-jp-09.png). The term, comparison and failure-pattern tables fit in 2 columns at 390 px with nothing cut off (pages/mobile-jp-06.png, pages/mobile-jp-10.png, pages/mobile-jp-12.png, pages/mobile-jp-13.png). Every screen has a heading, figure, table, code block or check (textOnlyScreens empty), and there are no hard failures in metrics.json."
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "textOnlyScreens is empty on both devices. Every section breaks up its prose with a definitions card, table, diagram, steps or a check. Desktop JP median is 39 characters per line (target 30–40, max 53).",
-      "blockIds": [
-        "s1-defs",
-        "s5-steps",
-        "pr-steps-compact"
-      ]
+      "evidence": "The page has a steady rhythm: concept, then term table, then comparison table or figure, then an inline check (1/5 to 5/5). There are no walls of text, and the step lists put each expected result in a short separate box (pages/mobile-jp-15.png, pages/mobile-jp-16.png, pages/desktop-jp-10.png). Desktop JP median is 39 chars per line, inside the 30–40 target."
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All screens show Japanese only, with no stray English UI or untranslated strings, and English terms appear in parentheses on first use (for example 「コンテキスト圧縮（compaction）」). Text contrast is good, and no control is hidden under the 56 px top bar or the 60 px bottom bar (pages/mobile-jp-30.png, pages/mobile-jp-34.png).",
-      "blockIds": [
-        "s2-defs",
-        "pr-diagnose"
-      ]
+      "evidence": "All visible text is in Japanese, with English shown only as glossary glosses (session, context window, compaction). Contrast is good, and the 1–4 keyboard hints and option numbers are visible. No controls sit under the top or bottom bars (pages/mobile-jp-30.png, pages/mobile-jp-34.png). No overflowX, console or mermaid errors, unknown blocks or broken images."
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "pr-steps-compact (step pr-compact): on mobile, the inline chip `/compact 作ったファイルとその役割を中心に残して` is too long for one line and wraps inside its own box (pages/mobile-jp-25.png). It is still readable. If you want the learner to copy it exactly, consider moving the command into a short code block or a prompt block.",
-    "reader: in the s2-table cell 「自動で起きる。起きたら、指示が残っているかを確かめる」, the mobile line break leaves 「起きたら、指示が」 short with a visible gap before 「残っているか」 (pages/mobile-jp-06.png). This comes from the phrase-wrapping and is not a lesson defect.",
-    "reader: the end banner says this is the last lesson of the course (pages/mobile-jp-34.png, pages/desktop-jp-22.png). That only happens because drafts are not listed in course.json.",
-    "reader: the mobile full-length PNG stops at 16000 px. The per-screen pages still cover the whole 24129 px page.",
-    "reader: 13 failed /api/v2/user/* requests (500) were ignored as environment noise."
+    "On mobile, the 'auto compaction' row of the 5-2 comparison table breaks as '起きたら、指示が / 残っているかを確かめる', which leaves a short ragged line. A slightly shorter cell text, such as '自動で起きる。指示が残ったか確かめる', would wrap more evenly (pages/mobile-jp-06.png).",
+    "In practice step 3, the inline chip '/compact 作ったファイルとその役割を中心に残して' is longer than the 390 px line, so it wraps inside its own box. It stays readable, but a shorter focus such as '/compact ファイルと役割を残して' would keep it on one line (pages/mobile-jp-25.png).",
+    "reader: the mobile full-length PNG stops at 16000 px, and the per-screen PNGs were used instead. 13 failed /api/ requests (500 on progress, events and notifications) are environment noise and are not counted as console errors.",
+    "reader: on desktop the right rail (AI teacher and glossary) has a lot of empty space below it on long screens. This is not a lesson issue."
   ],
   "verdict": "pass",
-  "summary": "I opened every mobile-jp and desktop-jp screen. All layouts are clean: there are no hard failures in metrics.json, no content is cut off at 390 px, the tables and the TD flowchart are readable, the code-block line numbers and wrapping work, and no screen shows personal data. Nothing must be fixed; the only lesson-side suggestion is to move the long /compact chip in pr-compact into a code or prompt block."
+  "summary": "This preview shows the lesson at hash sha256:4b4ffd1dc9356064 (copied from metrics.json). It renders cleanly at 1440 px and 390 px, with no hard failures, no horizontal overflow and no text-only screens. The 2-column tables and the top-down compaction diagram stay readable on mobile. No personal data is visible on any of the 56 screens checked. Nothing needs fixing; the two layout notes (a ragged table cell and a long /compact chip that wraps) are optional polish."
 }

@@ -1,18 +1,17 @@
 {
   "lessonId": "cc-04-verify",
-  "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
-  "lessonHash": "sha256:17c13d4e45026e5d",
+  "file": "content/courses/claude-code/lessons/cc-04-verify.lesson.json",
+  "lessonHash": "sha256:38938fab0a8e18cd",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:7aa12666041c7288",
-    "previousReview": ".artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:17c13d4e45026e5d",
+    "previousReview": ".artifacts/review/claude-code/cc-04-verify/17c13d4e45026e5d/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s4-fresh",
-      "check-quiz"
+      "lesson.courseId"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.01,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -56,7 +55,8 @@
       "blockIds": [
         "s4-fresh",
         "s4-names"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -81,7 +81,8 @@
         "s4-check",
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -92,7 +93,8 @@
         "hook-predict",
         "s3-check",
         "s5-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -134,12 +136,12 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Both changes remove an overstatement. The old s4-fresh said 'サブエージェントが見るのは、差分と渡された基準だけです'. The new one says the subagent '差分と渡された基準をもとに、自分でコードを読んで確かめます'. This matches facts-cc-04-verify.md [practice-20] ('a subagent reviews the diff in a fresh context against the plan') and facts-cc-07-skills-subagents.md ('It runs in its own context window with its own system prompt, tools and permissions'). It also matches the lesson's own s4-prompt expect ('レビュー役のサブエージェントが差分を読み…') and the s4-defs definition ('自分のコンテキストで別に動き…'). e5's explanation now says the same thing ('作業の経緯を見ずに、差分と渡された基準をもとに判断します'), so the two blocks no longer contradict each other or cc-07. Both blocks keep cite cc-best-practices.",
+      "evidence": "Re-scored because the lesson moved into the claude-code course. Its cross-references still match content/courses/claude-code/course.json. The title '第4回｜検証を任せる：テスト・レビュー・説明' and estMinutes 19 are the same as module m2's entry. The 3 lesson prerequisites ('第1回｜最初のタスクを任せる', '第2回｜任せる範囲を決める：権限モードと巻き戻し', '第3回｜探索→計画→実装→コミット') match the cc-01 to cc-03 titles. The forward pointers ('詳しくは第5回' in the s4-defs glossary entry for コンテキスト, '詳しくは第7回' for サブエージェント, and summary-next's '次は「第5回｜コンテキストを管理する」です。') match cc-05-context, cc-07-skills-subagents and cc-04's next.lessonId 'cc-05-context'. No body text changed, so the round-1 fact checks of s4-fresh and e5 against facts-cc-04-verify.md [practice-20] still hold, and both blocks still cite cc-best-practices.",
       "blockIds": [
+        "s4-defs",
+        "summary-next",
         "s4-fresh",
-        "check-quiz",
-        "s4-prompt",
-        "s4-defs"
+        "check-quiz"
       ]
     },
     {
@@ -150,19 +152,19 @@
         "s4-fresh",
         "check-quiz",
         "s2-goal"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp only and complete. s4-sort's alt describes the full flow. Lists replace the 2 tables (mobile fit). The links have descriptive text ('[日本語の公式ドキュメント](…/best-practices)').",
+      "evidence": "Re-scored for the course move. courseId 'claude-code' matches the course.json id and its locales ['jp']. The lesson is jp only and complete. validate reports 0 errors at the new path. s4-sort's alt describes the full flow. Lists replace the 2 tables (mobile fit). The links have descriptive text ('[日本語の公式ドキュメント](…/best-practices)'). No text still refers to the old vibe-coding course.",
       "blockIds": [
         "s4-sort",
         "s1-table",
         "p-model-sort",
         "s4-names"
-      ],
-      "carriedOver": true
+      ]
     }
   ],
   "mustFix": [],
@@ -178,5 +180,5 @@
   ],
   "average": 3.54,
   "verdict": "pass",
-  "summary": "Verification round (review-scope exit 0: 2 of 58 blocks changed (s4-fresh, check-quiz e5), 2% of parts; sections and objectives unchanged). The previous review had no open must-fix items, so nothing needed resolving. I reviewed both changed blocks in full. s4-fresh and e5's explanation no longer say the reviewer sees only the diff and the criteria. They now say it does not see the work history and reads the code itself, which matches facts-cc-04-verify.md [practice-20], the cc-07 subagent facts and the lesson's own s4-prompt expect. Neither change introduces an error or regression. validate: 0 errors. lint --strict: 0 warnings. measure.mjs: prose 2242 (budget 1,200–2,400) and est 19.48, displayed as 19.5, which still rounds to estMinutes 19. I re-scored load, active, miscon, accuracy and voice, all unchanged, and carried the other scores over. align and practice stay at 3, because o1 (create) is still assessed only by selection (niceToHave)."
+  "summary": "Verification round (review-scope exit 0). Only lesson.courseId changed (1 of 103 parts, 1%), from vibe-coding to claude-code. No blocks, sections or objectives changed. The previous review had no open must-fix items, so there was nothing to resolve. I checked the move for regressions. courseId matches content/courses/claude-code/course.json. The lesson title and estMinutes 19 match its m2 entry, the 第1回 to 第3回 prerequisites match the course titles, and the 第5回/第7回 pointers and summary-next's next lesson match the course order and next.lessonId cc-05-context. No text still refers to the old course. validate: 0 errors. lint --strict: 0 warnings. measure.mjs: prose 2242 (budget 1,200–2,400), est 19.5 (≤ 20, estMinutes 19). I re-scored accuracy (4) and a11y_l10n (3) for the course move, and both are unchanged. The other 11 scores are carried over. align and practice stay at 3, because o1 (create) is still assessed only by selection (niceToHave)."
 }

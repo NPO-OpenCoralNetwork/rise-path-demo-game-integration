@@ -1,24 +1,18 @@
 {
   "lessonId": "cc-10-safety-cost",
-  "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:18da014f91a89678",
+  "file": "content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json",
+  "lessonHash": "sha256:8a9d7701d14a41d6",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:4f85040f9e462bb2",
+    "reviewedRevision": "sha256:18da014f91a89678",
     "changed": [
-      "s5-table",
-      "s5-check",
-      "practice-steps-deny",
-      "practice-folder",
-      "check-quiz",
-      "lesson.prerequisites",
-      "lesson.glossary"
+      "lesson.courseId"
     ],
-    "changedShare": 0.09,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-10-safety-cost/4f85040f9e462bb2/round-3/pedagogy-reviewer.review.json"
+    "previousReview": ".artifacts/review/claude-code/cc-10-safety-cost/18da014f91a89678/round-2/pedagogy-reviewer.review.json"
   },
   "resolved": [],
   "scores": [
@@ -48,56 +42,61 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Re-scored because prerequisites changed. The gap from earlier rounds is closed: prerequisites now list 「第6回｜CLAUDE.mdで前提を伝える」 and 「第7回｜手順はスキルに、調べものはサブエージェントに」. Both titles match the cc-06 and cc-07 drafts, and they cover the CLAUDE.md, スキル and サブエージェント that s5-table and e6-c use. s5-md2 still defines 「[[エフォート]]（effort）」 before s5-table uses it. The body recalls earlier lessons only once, in p-deny's 「第1回の `cc-practice`」, which is not enough for a 4.",
+      "evidence": "Re-checked because courseId moved to claude-code, so the prerequisites now point into a new course. The six lesson prerequisites match titles in content/courses/claude-code/course.json word for word, for example 「第6回｜CLAUDE.mdで前提を伝える」 and 「第9回｜並列で進める・自動で回す」. The course.json entry for cc-10 matches the lesson: title 「第10回｜安全とコストを管理する」, estMinutes 17, module m4, next cc-11-capstone. summary-next names 「第11回 総合演習｜自分のリポジトリにClaude Code環境をつくる」, the course.json title. s5-md2 still defines 「[[エフォート]]（effort）」 before s5-table uses it. The body still recalls an earlier lesson only once, in p-deny's 「第1回の `cc-practice`」, which keeps this at 3.",
       "blockIds": [
         "s5-md2",
         "s5-table",
-        "practice-steps-deny"
+        "practice-steps-deny",
+        "summary-next"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Re-checked for the changed blocks. measure.mjs reports 「prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · est 17.3 min (must be ≤ 20; estMinutes 17)」. Practice reading went from 1072 to 1106 because of p-deny's one new sentence, and est still rounds to estMinutes 17. Strict lint gives 0 warnings. As before, s5-md2's second paragraph packs three unrelated facts, and s2 is 7 blocks long.",
+      "evidence": "measure.mjs reports 「prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · est 17.3 min (must be ≤ 20; estMinutes 17)」. Strict lint gives 0 warnings. As before, s5-md2's second paragraph packs three unrelated facts, and s2 is 7 blocks long.",
       "blockIds": [
         "practice-steps-deny",
         "s5-table",
         "s5-md2"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Re-checked because p-deny changed, but only to name the practice folder. s3-steps works the example through four labelled subgoals, each with a reason, and s3-code matches ex-target (`Read(./config/secret.json)`). ex-target still gives no reason for its choice. There is still no faded step between the full example and p-deny, whose hint 「10-3の `keys/**` と同じ形です。」 is the only scaffold.",
+      "evidence": "s3-steps works the example through four labelled subgoals, each with a reason, and s3-code matches ex-target (`Read(./config/secret.json)`). ex-target still gives no reason for its choice. There is still no faded step between the full example and p-deny, whose hint 「10-3の `keys/**` と同じ形です。」 is the only scaffold.",
       "blockIds": [
         "s3-steps",
         "s3-code",
         "practice-steps-deny"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
       "score": 3,
-      "evidence": "Re-checked for the changed feedback in q4 and e6. The stems, options, answers and hints did not change, so neither question gives its answer away any more than before. q1–q4 still run inline across s1, s2, s3 and s5, and the exam follows. Every wrong option has feedback. q2 can still be partly matched on surface words, because its explanation and s2-isolate share 「VMかクラウドセッション」.",
+      "evidence": "q1–q4 run inline across s1, s2, s3 and s5, and the exam follows. Every wrong option has feedback. q2 can still be partly matched on surface words, because its explanation and s2-isolate share 「VMかクラウドセッション」.",
       "blockIds": [
         "s5-check",
         "check-quiz",
         "s2-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "Re-scored for the two changed feedbacks. q4-b now says 「上限は5時間ごとと週ごとの2つで、チャットと共有されます。毎朝リセットされる仕組みではありません。」. It still corrects the 'separate daily reset' misconception in two sentences. e6-c now says 「…200行未満に保ち、専門の手順はスキルに移します。」, which still corrects 'put everything in CLAUDE.md' with a reason. Other distractors are unchanged, for example e4-b 「拒否ルールは、どの権限モードでも効きます」.",
+      "evidence": "q4-b says 「上限は5時間ごとと週ごとの2つで、チャットと共有されます。毎朝リセットされる仕組みではありません。」, which corrects the 'separate daily reset' misconception in two sentences. e6-c says 「…200行未満に保ち、専門の手順はスキルに移します。」, which corrects 'put everything in CLAUDE.md' with a reason. e4-b 「拒否ルールは、どの権限モードでも効きます」 names a real misconception.",
       "blockIds": [
         "s5-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 3,
-      "evidence": "Re-scored against the current screenshots (metrics.json lessonHash sha256:31ca899dd855ae10, mermaidErrors 0, overflowX false). The visual-qa defect is fixed. On mobile-jp-07, both 「シェルコマンド」 and 「ファイル操作 MCP」 show in full, and the edge labels 「サンドボックスの中」 and 「サンドボックスの外」 are readable. desktop-jp-05 is clean too. There are 5 nodes, the labels match the text's terms, and the caption states the takeaway. The drawing still shows no layers: the caption's 「守りは重ねて」 is carried by text alone. Hooks are still not drawn.",
+      "evidence": "Screenshots (metrics.json lessonHash sha256:31ca899dd855ae10, mermaidErrors 0, overflowX false): on mobile-jp-07, 「シェルコマンド」 and 「ファイル操作 MCP」 show in full and the edge labels 「サンドボックスの中」 and 「サンドボックスの外」 are readable. There are 5 nodes, the labels match the text's terms, and the caption states the takeaway. The drawing shows no layers, so the caption's 「守りは重ねて」 is carried by text alone. Hooks are not drawn.",
       "blockIds": [
         "s2-layers"
       ],
@@ -106,13 +105,14 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Re-scored. practice-folder now creates `cc-practice-10`, and p-deny says 「第1回の `cc-practice` とは別の、新しいフォルダーで試します。」. This keeps the deny test honest, because the dummy `.env` can no longer be blocked by an older rule instead of the learner's own. The audit, deny and bill tasks keep expect, hint and troubleshoot, and practice-answer-rule and the checklist still match. The hint ladder is still only one or two levels deep, and p-deny does not tell the learner why a new folder is needed.",
+      "evidence": "practice-folder creates `cc-practice-10`, and p-deny says 「第1回の `cc-practice` とは別の、新しいフォルダーで試します。」, so the deny test depends on the learner's own rule. The audit, deny and bill tasks keep expect, hint and troubleshoot, and practice-answer-rule and the checklist match. The hint ladder is only one or two levels deep, and p-deny does not say why a new folder is needed.",
       "blockIds": [
         "practice-steps-deny",
         "practice-folder",
         "practice-answer-rule",
         "practice-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -129,30 +129,32 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "Re-checked the changed facts. 「CLAUDE.mdは200行未満」 in s5-table and 「200行未満に保ち」 in e6-c match facts-cc-10-safety-cost.md, which reads 'CLAUDE.md under 200 lines (move specialised instructions into skills)'. 「5時間ごとと週ごとの2つ」 in q4-b and 「5時間ごとの上限と週の上限」 in the glossary match the Help Center's 'five-hour session limit and a weekly limit'. They do not add the 'rolling' detail the audit warns against. q4 is about a Pro user, so leaving out Max's separate Fable limit is not an error. The cites are unchanged.",
+      "evidence": "「CLAUDE.mdは200行未満」 in s5-table and 「200行未満に保ち」 in e6-c match facts-cc-10-safety-cost.md: 'CLAUDE.md under 200 lines (move specialised instructions into skills)'. 「5時間ごとと週ごとの2つ」 in q4-b and 「5時間ごとの上限と週の上限」 in the glossary match the Help Center's 'five-hour session limit and a weekly limit'. Neither adds the 'rolling' detail the audit warns against. The courseId change adds no claim.",
       "blockIds": [
         "s5-table",
         "s5-check",
         "check-quiz",
         "practice-folder"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Re-scored for the changed text. The new p-deny sentence is plain です・ます. 「200行未満」 is now the same in s5-table and e6-c. The glossary and q4-b say 「5時間ごと」, which drops the clash with this course's meaning of 「セッション」, but s5-table row 4 still says 「（5時間と週）」. Still open from earlier rounds: s5-md2 reads as a list of loose notes, and s2-table's 「オフライン」 differs from 「ネットにつながらない」 elsewhere.",
+      "evidence": "The text is plain です・ます. 「200行未満」 is the same in s5-table and e6-c. The glossary and q4-b say 「5時間ごと」, but s5-table row 4 still says 「（5時間と週）」. s5-md2 reads as a list of loose notes, and s2-table's 「オフライン」 differs from 「ネットにつながらない」 elsewhere.",
       "blockIds": [
         "practice-steps-deny",
         "s5-table",
         "s5-check",
         "s5-md2",
         "s2-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The s2-layers alt matches the drawing: 「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」. It still names 「分類器」, which no label shows, and it describes a VM enclosure as context, not as a drawn shape. The only locale, jp, is complete, and the 2-column tables fit mobile (mobile-jp-07).",
+      "evidence": "The s2-layers alt matches the drawing: 「シェルコマンドはサンドボックスの中で動き、ファイル操作ツールとMCPサーバーはその外で動きます。」. It names 「分類器」, which no label shows, and it describes a VM enclosure as context, not as a drawn shape. The only locale, jp, is complete, and the 2-column tables fit mobile (mobile-jp-07).",
       "blockIds": [
         "s2-layers",
         "s2-table",
@@ -165,14 +167,14 @@
   "niceToHave": [
     "practice-steps-deny: tell the learner why the new folder is needed, so the step teaches 'check that your own rule is what blocks the read'. Replace the first sentence with 「第1回から使う `cc-practice` には、第2回で書いた `.env` の拒否ルールが残っています。自分のルールが効いたと確かめるため、新しいフォルダーで試します。」 (wording for ja-editor).",
     "factual doubt: practice-folder starts with `mkdir cc-practice-10` in whatever folder the terminal is in. A learner still inside `cc-practice` would create `cc-practice/cc-practice-10`. If Claude Code reads settings or CLAUDE.md from parent folders, the old rule could still apply. Consider adding `cd ~` as the first line, or a p-deny troubleshoot note: 「`cc-practice` の中で作らず、ホームなどの外で作ります。」",
-    "s5-table row 4: match the glossary's new wording. Change 「すぐ上限に届く：[[利用上限]]（5時間と週）をチャットと共有」 to 「すぐ上限に届く：[[利用上限]]（5時間ごとと週ごと）をチャットと共有」 (wording for ja-editor).",
-    "s2-layers: draw the outer layer again in a mobile-safe way so that 「守りは重ねて」 is visible. For example, wrap B, C, E and D in `subgraph VMBOX[\"VM・クラウドセッション（全体を囲む）\"]` with `direction TD`, then re-run lessons:preview and check that mobile-jp-07 still fits.",
-    "s2-layers still leaves out hooks, which s2-sandbox, e2-c and card-sandbox say run outside the sandbox. Add `F[\"リポジトリのフック\"]` next to D with `C -->|サンドボックスの外| F` (6 nodes), and check the width at 390 px.",
+    "s5-table row 4: match the glossary's wording. Change 「すぐ上限に届く：[[利用上限]]（5時間と週）をチャットと共有」 to 「すぐ上限に届く：[[利用上限]]（5時間ごとと週ごと）をチャットと共有」 (wording for ja-editor).",
+    "s2-layers: draw the outer layer in a mobile-safe way so that 「守りは重ねて」 is visible. For example, wrap B, C, E and D in `subgraph VMBOX[\"VM・クラウドセッション（全体を囲む）\"]` with `direction TD`, then re-run lessons:preview and check that mobile-jp-07 still fits.",
+    "s2-layers leaves out hooks, which s2-sandbox, e2-c and card-sandbox say run outside the sandbox. Add `F[\"リポジトリのフック\"]` next to D with `C -->|サンドボックスの外| F` (6 nodes), and check the width at 390 px.",
     "s5-md2: move each fact next to its row. Change the cause cell of s5-table row 1 to 「APIの請求が届いた：`ANTHROPIC_API_KEY` を承認した（`-p` では承認なしで使われる）」. Change the action cell of row 2 to 「作業の切れ目で `/clear`（費用なし）。`/compact` はそれ自体が大きな要求。調べものはサブエージェントへ」. Keep the エフォート definition in s5-md2.",
-    "Use one phrase for the offline case across the lesson. For example, change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」 to match s2-table. Wording is for ja-editor.",
-    "Still open from earlier rounds: ex-target (s3-steps) gives no reason for its choice. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」"
+    "Use one phrase for the offline case across the lesson. For example, change practice-prompt-review ① to 「…既定から外し、オフラインのコンテナかVMの中だけで使います。」 to match s2-table (wording for ja-editor).",
+    "ex-target (s3-steps) gives no reason for its choice. Consider 「漏れると困る鍵のファイルを挙げます。Claudeが読んだ中身は、会話としてAnthropicに送られます。」"
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round. review-scope exited 0. 7 of 85 parts changed (9%): s5-table, s5-check, practice-steps-deny, practice-folder, check-quiz, prerequisites and glossary. Sections and objectives are unchanged. The previous review had no open must-fix, so resolved is empty. All changed blocks were reviewed in full and none introduces an error. 「200行未満」 and 「5時間ごと」 match the audited wording ('under 200 lines', 'five-hour session limit') and claim no rolling window. The separate cc-practice-10 folder makes the deny test depend on the learner's own rule. Prerequisites now list 第6回 and 第7回, which closes the gap noted in earlier rounds. lessons:validate gives 0 errors and lessons:lint --strict gives 0 warnings. measure.mjs gives prose 1887 and est 17.3 min against estMinutes 17. Re-scored criteria: prior 3, load 3, worked 3, active 3, miscon 4, practice 3, accuracy 4 and voice 3; the rest are carried over. Every criterion is 3 or higher, the mean is 3.38 and no must-fix is open, so the verdict is pass. Files: content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json, .artifacts/review/vibe-coding/cc-10-safety-cost/4f85040f9e462bb2/round-3/pedagogy-reviewer.review.json"
+  "summary": "Verification round. review-scope.mjs exited 0. Only lesson.courseId changed (1 of 85 parts, 2%; 0 of 44 blocks; sections and objectives unchanged), so a full review was not required, even though the task text asked for one. The previous review had no open must-fix, so resolved is empty. I checked the change against content/courses/claude-code/course.json. All six lesson prerequisites match course titles exactly. The cc-10 entry (title, estMinutes 17, next cc-11-capstone) matches the lesson. summary-next names the 第11回 title as course.json has it. So the move to claude-code causes no regression. lessons:validate gives 0 errors and lessons:lint --strict gives 0 warnings. measure.mjs gives prose 1887 and est 17.3 min against estMinutes 17. prior was re-scored at 3; every other score is carried over. Every criterion is 3 or higher, the mean is 3.38 and no must-fix is open, so the verdict is pass. Files: content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json, content/courses/claude-code/course.json, .artifacts/review/claude-code/cc-10-safety-cost/18da014f91a89678/round-2/pedagogy-reviewer.review.json"
 }

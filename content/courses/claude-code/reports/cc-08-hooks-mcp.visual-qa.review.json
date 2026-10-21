@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-08-hooks-mcp",
-  "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:112a650daf9ca3d0",
+  "file": "content/courses/claude-code/lessons/cc-08-hooks-mcp.lesson.json",
+  "lessonHash": "sha256:02bb8902d1916464",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,10 +9,9 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s1-lifecycle flowchart (TD) has readable Japanese labels at 390 px (pages/mobile-jp-04.png). Every table (s1-defs, s3-table, s4-scopes, s5-checks, practice-b-model, practice-b-model-b) fits the column without sideways scroll (pages/mobile-jp-16.png, pages/mobile-jp-25.png, pages/mobile-jp-26.png). There is no overflow, no broken image and no Mermaid error.",
+      "evidence": "On mobile, the s1-lifecycle flowchart TD fits the 390 px width with readable Japanese labels (pages/mobile-jp-04.png). All tables (s3-table, s4-scopes, s5-checks, practice-b-model, practice-b-model-b) fit without sideways scrolling (pages/mobile-jp-16.png, pages/mobile-jp-25.png, pages/mobile-jp-26.png). metrics.json reports overflowX false, 0 console, mermaid or image errors, 0 unknown blocks and no textOnlyScreens.",
       "blockIds": [
         "s1-lifecycle",
-        "s1-defs",
         "s3-table",
         "s4-scopes",
         "s5-checks",
@@ -23,29 +22,34 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "No screen is text-only. Prose is broken up by definition tables, code, steps and checks. Desktop JP chars per line has a median of 42, a little above the 30–40 target. The practice section runs long on mobile: 2 code blocks of 19 and 24 lines, then 2 tables (pages/mobile-jp-22.png to pages/mobile-jp-26.png).",
+      "evidence": "Every screen has a heading, code, table or check, and the quiz cards break up the text well. The prerequisites line on mobile is a dense grey run of 6 items (pages/mobile-jp-01.png). On mobile, the ex-register step stacks many inline code chips (pages/mobile-jp-10.png). Desktop JP charsPerLine median is 42, a little above the 30–40 target.",
       "blockIds": [
-        "practice-model-script",
-        "practice-model-settings",
-        "practice-b-model",
-        "practice-b-model-b"
+        "s2-steps",
+        "practice-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All Japanese. Diagram labels, captions and controls are in JP with no stray English UI. Contrast is good on the callouts and code. Nothing is hidden under the top or bottom bars (pages/mobile-jp-03.png, pages/mobile-jp-30.png). No personal data appears on any screen."
+      "evidence": "The Japanese-only lesson shows Japanese throughout, with English terms in parentheses (フック（hook）, 標準入力（stdin）). Diagram labels are Japanese, contrast is good on code blocks and callouts, and no controls are hidden under the top or bottom bars (pages/mobile-jp-21.png, pages/mobile-jp-30.png). No personal data on any screen opened.",
+      "blockIds": [
+        "s1-defs",
+        "s1-lifecycle",
+        "practice-prompt"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-settings / practice-model-settings: on mobile the line `\"command\": \"\\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/block-rm.sh\"` wraps inside the word (`.claude/hoo` / `ks/block-rm.sh`), and on desktop it splits as `block-` / `rm.sh` (pages/mobile-jp-09.png, pages/mobile-jp-23.png, pages/desktop-jp-07.png). It can still be read and the copy button keeps the text whole. You could shorten the line, for example by giving the path its own variable in a comment, if you want it to break cleanly.",
-    "practice-model-intro: the chip `\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh` is longer than a mobile line and wraps inside itself as `prot` / `ect-files.sh` (pages/mobile-jp-22.png). The settings code block below shows the same value, so you could drop the chip from the sentence and point to line 18 of the code instead.",
-    "s1-prettier: line 9 soft-wraps on both mobile and desktop (`... | xargs npx` / `prettier --write\"`) (pages/mobile-jp-06.png, pages/desktop-jp-04.png). It is still readable.",
-    "reader: code-block title bars cut long filenames short with an ellipsis on mobile (`.claude/hooks/protect-files...`, pages/mobile-jp-22.png). The full path is given in the step text, but the title is cut off.",
-    "reader: the two practice tables (practice-b-model, practice-b-model-b) get different column widths on desktop, so the A and B values do not line up for comparison (pages/desktop-jp-18.png, pages/desktop-jp-19.png).",
-    "reader: the mobile full-length PNG stops at 16000px, failed /api/ requests show up as ignored network errors, and the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png, pages/desktop-jp-24.png)."
+    "On mobile, line 9 of s2-settings and lines 9 and 18 of practice-model-settings soft-wrap inside the word 'hooks' ('.claude/hoo' / 'ks/block-rm.sh'), in .artifacts/preview/claude-code/cc-08-hooks-mcp/pages/mobile-jp-09.png and pages/mobile-jp-23.png. The lines are still readable and have a copy button. If you want cleaner wraps, use a shorter script folder or name (for example .claude/hooks/no-rm.sh) so the line breaks at a slash.",
+    "practice-model-intro: on mobile the long path chip '\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh' wraps inside 'prot|ect-files.sh' (pages/mobile-jp-22.png). It could be shown as a one-line code block instead of an inline chip, or the sentence could point to line 18 of the settings block below.",
+    "practice-b-model and practice-b-model-b come straight after the practice-b-quiz options, so the learner can see the model write-up before answering (pages/mobile-jp-25.png, pages/desktop-jp-18.png). The two tables also use different column widths on desktop, which makes A and B harder to compare. Consider one 3-column table (確かめること / A / B) placed after the quiz, or behind a reveal if the reader supports one.",
+    "Lesson prerequisites: the 6 prerequisites appear as one dense grey run-on line under the title (pages/mobile-jp-01.png). Shorten them (for example list only 第2回・第6回・第7回 and 'jqが入っている').",
+    "reader: on mobile the code-block header truncates the filename '.claude/hooks/protect-files…' with an ellipsis (pages/mobile-jp-22.png).",
+    "reader: soft-wrapped code lines continue at the code's left edge with no visible hanging indent (pages/mobile-jp-06.png line 9, pages/desktop-jp-07.png line 9).",
+    "reader: on mobile the flashcard hint says 'クリックまたはスペースキーでめくる', which is keyboard/mouse wording on a touch screen (pages/mobile-jp-32.png).",
+    "reader: desktop JP charsPerLine median is 42 (max 53), above the 30–40 target at a 680 px measure. The mobile full-length PNG is truncated, and failed /api/ requests (500) are environment noise."
   ],
   "verdict": "pass",
-  "summary": "metrics.json shows no hard failures: no overflow, no console errors, no Mermaid errors, no unknown blocks and no broken images. No screen is text-only, and the hook lifecycle diagram and all tables read well at 390 px. Nothing must be fixed. The only small issues are long hook paths that wrap inside words in code lines and inline chips; the copy buttons and the code blocks keep the full value."
+  "summary": "No must-fix items. All hard checks in metrics.json are clean, and the flowchart, tables, quizzes and code blocks are readable at 390 px and on desktop, with no personal data on any screen. The biggest optional improvements: hide or move the A/B model write-up tables below the practice-b-quiz, and avoid mid-word wraps in the long $CLAUDE_PROJECT_DIR hook paths on mobile."
 }

@@ -1,55 +1,55 @@
 {
   "lessonId": "cc-05-context",
-  "file": "content/courses/vibe-coding/drafts/cc-05-context.lesson.json",
-  "lessonHash": "sha256:ab90c2fa7a4e7fe9",
+  "file": "content/courses/claude-code/lessons/cc-05-context.lesson.json",
+  "lessonHash": "sha256:4b4ffd1dc9356064",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:7a183d3f582412d5",
+    "reviewedRevision": "sha256:ab90c2fa7a4e7fe9",
     "changed": [
-      "pr-code",
-      "pr-steps-start"
+      "lesson.courseId"
     ],
-    "changedShare": 0.03,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-05-context/7a183d3f582412d5/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/claude-code/cc-05-context/ab90c2fa7a4e7fe9/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Two blocks changed: pr-code and pr-steps-start. In pr-code, the echo line is now split with 「\\」 so it fits a phone screen. The CLAUDE.md text is unchanged (「- <title>は「練習：」から」). pr-start's md adds 「`\\` で終わる行は、次の行と合わせて1つのコマンドです。」. That sentence is in です・ます form, parses correctly and is accurate. It explains the new continuation line. The sentence before it, 「上のコマンドを1行ずつ実行します。」, now sits a little awkwardly beside it, but the next sentence settles the point, so the learner still reads it correctly. That goes to niceToHave. The stiff spots in unchanged text are carried over (s5-steps, s5-check). `lessons:lint --strict` reports 0 errors and 0 warnings. The score stays at 3.",
+      "evidence": "No learner-facing text changed. The only change is lesson.courseId, from vibe-coding to claude-code. The lesson text has no other mention of 'vibe' or of a course path, so the move breaks no reference. The awkward spots in unchanged text are carried over in niceToHave: pr-steps-start, s5-steps and s5-check. lessons:lint --strict reports 0 errors and 0 warnings.",
       "blockIds": [
         "pr-steps-start",
-        "pr-code",
         "s5-steps",
         "s5-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Re-scored because pr-start's md gained a sentence. The paragraph now has 3 sentences, which is within §1, and lint reports no sentence-length or paragraph-length finding. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289, practice reading 1152 and est 19.9 min (must be ≤ 20), with estMinutes 20.",
+      "evidence": "No text changed. measure.mjs gives prose 1945 (budget 1,200–2,400), read 3289, practice reading 1152 and est 19.9 min (must be ≤ 20), with estMinutes 20. Lint reports no sentence-length or paragraph-length finding.",
       "blockIds": [
         "pr-steps-start"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "The changes do not touch prior knowledge. The line-continuation mark 「\\」 is explained where it first appears (pr-start), and no new term is introduced.",
+      "evidence": "The change does not touch any terms or definitions. The score is carried over from the previous review.",
       "blockIds": [
-        "s4-table",
-        "s3-table"
+        "s3-table",
+        "s4-table"
       ],
       "carriedOver": true
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The changes do not touch a11y_l10n. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
+      "evidence": "The change does not touch a11y_l10n. This is a single-locale lesson, and the s3-diagram labels and alt text are unchanged.",
       "blockIds": [
         "s3-diagram"
       ],
@@ -58,11 +58,11 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "pr-steps-start: 「1行ずつ」 now sits next to the new continuation-line sentence, so the two read as slightly at odds — 「上のコマンドを1行ずつ実行します。`\\` で終わる行は、次の行と合わせて1つのコマンドです。」→「上のコマンドを順に実行します。`\\` で終わる行は、次の行と合わせて1つのコマンドです。」",
+    "pr-steps-start: 「1行ずつ」 sits next to the continuation-line sentence, so the two read as slightly at odds (carried over) — 「上のコマンドを1行ずつ実行します。」→「上のコマンドを順に実行します。」",
     "pr-code: the CLAUDE.md rule leaves out its verb, while the expect texts and the checklist say 「で始まる」. This is code, so the author decides (carried over) — 「- <title>は「練習：」から」→「- <title>は「練習：」で始める」",
     "hook-predict: option d no longer mentions reinstalling, but its feedback still starts from it (carried over) — 「入れ直しても、同じ使い方なら同じことが起きます。」→「同じ使い方なら、入れ直しても同じことが起きます。」",
-    "pr-checklist: pr-code and pr-prompt-a write 「<title>」, but the checklist still writes the bare 「title」 (carried over) — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
-    "s3-diagram: the alt text lists four items that the diagram no longer shows (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
+    "pr-checklist: pr-code and pr-prompt-a write 「<title>」, but the checklist writes the bare 「title」 (carried over) — 「about.htmlのtitleが「練習：」で始まるかを確かめました」→「about.htmlの `<title>` が「練習：」で始まるかを確かめました」",
+    "s3-diagram: the alt text lists four items that the diagram does not show (carried over) — 「決まったファイルの指示は、直下のCLAUDE.md、paths:のないルール、自動メモリ、プランモード（plan mode）の計画。」→「決まったファイルの指示の中身は、下の表で示す。」",
     "s3-table: the caption quotes only part of the diagram label (carried over) — 「図の「決まったファイル」と、そのほかのファイル」→「図の「決まったファイルの指示」と、そのほかのファイル」",
     "s4-table: 「2回でだめなら」 drops the verb that s5 and e1 use (carried over) — 「2回でだめなら `/clear` し」→「2回直してだめなら `/clear` し」",
     "s5-check: option d's feedback has no subject (carried over) — 「失敗したやり方まで持ち込みます。」→「全文を貼ると、失敗したやり方まで持ち込みます。」",
@@ -75,5 +75,5 @@
   ],
   "average": 3.75,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0, with 2 of 47 blocks changed (3%: pr-code and pr-steps-start). The previous review had no open must-fix items, so the resolved list is empty. pr-code now splits the echo line with a 「\\」 continuation, and pr-start adds a correct です・ます sentence that explains it. The changes add no (a)–(e) error. Only one small wording point was added to niceToHave: 「1行ずつ」 next to the continuation note. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.9 min, with estMinutes 20. Scores are 3/4/4/4 (mean 3.75) and mustFix is empty, so the lesson passes."
+  "summary": "Verification round: review-scope.mjs exited 0. Only 1 of 82 parts changed (2%): lesson.courseId, from vibe-coding to claude-code. No block changed. The previous review had no open must-fix items, so the resolved list is empty. No learner-facing text changed, so there is no new (a)–(e) error. lessons:lint --strict is clean. measure.mjs gives prose 1945 and est 19.9 min, with estMinutes 20. All scores are carried over: 3/4/4/4 (mean 3.75). mustFix is empty, so the lesson passes. The niceToHave items from earlier rounds are carried over."
 }

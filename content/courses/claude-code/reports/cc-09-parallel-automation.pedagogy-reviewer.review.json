@@ -1,21 +1,17 @@
 {
   "lessonId": "cc-09-parallel-automation",
-  "file": "content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json",
-  "lessonHash": "sha256:e66b60d1da0710f0",
+  "file": "content/courses/claude-code/lessons/cc-09-parallel-automation.lesson.json",
+  "lessonHash": "sha256:c5dc598ce3ba8cf6",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:6da74e7b888a7ddb",
-    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:e66b60d1da0710f0",
+    "previousReview": ".artifacts/review/claude-code/cc-09-parallel-automation/e66b60d1da0710f0/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s2-lead",
-      "s3-table",
-      "p1-steps-write",
-      "check-quiz",
-      "lesson.glossary"
+      "lesson.courseId"
     ],
-    "changedShare": 0.07,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -30,7 +26,8 @@
         "s4-check",
         "p1-checklist",
         "p2-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -45,13 +42,15 @@
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Re-scored because of the glossary and s3-table changes. The サブエージェント glossary entry now says 「メインの会話とは別のコンテキストで…（第7回）」, which matches the wording of cc-05 and cc-07. The new s3-table item 1 names only terms the learner already knows (「CLAUDE.md、スキル」 from 第6回 and 第7回, 「MCPサーバー（第8回）」). Recalls of earlier lessons are still in place in s1-lead, s3-mode, s3-table and e1 (「（第7回）」).",
+      "evidence": "Re-scored to check the move to the claude-code course. The prerequisites (「第2回｜任せる範囲を決める：権限モードと巻き戻し」, 「第4回｜検証を任せる：テスト・レビュー・説明」, 「第6回｜CLAUDE.mdで前提を伝える」, 「第7回｜手順はスキルに、調べものはサブエージェントに」, 「第8回｜フックで守らせ、MCPでつなぐ」) match the lesson titles in course.json exactly. The in-text references also match it: 「（第10回）」 in p-run is cc-10-safety-cost, and summary-next names 「第10回｜安全とコストを管理する」. The lesson is cc-09's place in m4, so 「第9回」 in the title is right. The recalls in s1-lead, s3-mode, s3-table and e1 (「（第7回）」, 「MCPサーバー（第8回）」) are unchanged.",
       "blockIds": [
         "s1-lead",
         "s1-defs",
         "s3-mode",
         "s3-table",
-        "check-quiz"
+        "check-quiz",
+        "p1-steps-write",
+        "summary-next"
       ]
     },
     {
@@ -64,7 +63,8 @@
         "p1-steps-write",
         "headless",
         "unattended-where"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "worked",
@@ -87,7 +87,8 @@
         "s2-check",
         "s3-check",
         "s4-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -100,7 +101,8 @@
         "s2-check",
         "s3-check",
         "s4-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -123,7 +125,8 @@
         "p1-model",
         "p1-checklist",
         "p2-checklist"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -146,7 +149,8 @@
         "p1-steps-write",
         "check-quiz",
         "s1-lead"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "voice",
@@ -158,7 +162,8 @@
         "s3-mode",
         "s3-table",
         "p1-task"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -175,16 +180,16 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "p1-steps-write p-run (changed): 「プランでなくAPIの料金です（第10回）。」 is terse, and 「プラン」 could be misread in a course that also teaches プランモード. Consider 「Pro・Maxなどのプランではなく、APIの料金がかかります（第10回）。」 (the ja-editor decides the wording; check est stays ≤ 20).",
-    "check-quiz e1 (changed) vs s1-table item 2 (unchanged): s1-table says 「要点だけが会話に戻ります」, while the new e1 explanation says 「今の会話に入るのは、依頼文と要点だけです」. The two do not contradict each other, but saying the same thing the same way would help. For example, s1-table could read 「会話に戻るのは要点だけです。」",
-    "Load is at the cap: measure.mjs now reports est 20.0 (estMinutes 20). Any further addition needs a matching cut.",
-    "Still open from earlier rounds, check-quiz e3: each distractor changes one part, so the most common part in each slot gives the answer. Set option d's md to 「`Bash(npm test *)` ＋ `bypassPermissions`」 and its feedback to 「`--bare` がないとリポジトリのフックや `.mcp.json` のサーバーが動き、`bypassPermissions` は確認を飛ばします。無人のCIでは `--bare` と `dontAsk` を付けます。」",
+    "Still open, p1-steps-write p-run: 「プランでなくAPIの料金です（第10回）。」 is terse, and 「プラン」 could be misread in a course that also teaches プランモード. Consider 「Pro・Maxなどのプランではなく、APIの料金がかかります（第10回）。」 (the ja-editor decides the wording; check that est stays ≤ 20).",
+    "Still open, s1-table item 2: s1-table says 「要点だけが会話に戻ります」 and the e1 explanation says 「今の会話に入るのは、依頼文と要点だけです」. Saying the same thing the same way would help. For example, s1-table could read 「会話に戻るのは要点だけです。」",
+    "Load is at the cap: measure.mjs reports est 20.0 (estMinutes 20, the same as course.json). Any further addition needs a matching cut.",
+    "Still open, check-quiz e3: each distractor changes one part, so the most common part in each slot gives the answer. Set option d's md to 「`Bash(npm test *)` ＋ `bypassPermissions`」 and its feedback to 「`--bare` がないとリポジトリのフックや `.mcp.json` のサーバーが動き、`bypassPermissions` は確認を飛ばします。無人のCIでは `--bare` と `dontAsk` を付けます。」",
     "Still open, s3-code: the prompt 「リンターの警告を数えてください。」 does not name the allowed command. Replace line 2 with `  \"npm run lint の警告を数えてください。\" \\`.",
-    "Still open, s3-check q3 option a nearly repeats s3-mode. Set its md to 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
+    "Still open, s3-check: q3 option a nearly repeats s3-mode. Set its md to 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
     "Still open, unattended-where: nothing assesses s4-table. If est allows after a cut, add one inline o3 question (「パソコンを閉じている夜間に毎日動かしたい」 → クラウドの定期タスク).",
     "Still open: use one term for the permission prompt (s3-mode 「承認が要る」 vs s3-table and e3 「確認が要る」) and one name for the practice folder (s2-code 「練習用リポジトリ」 vs p1-task 「練習用フォルダー」). The ja-editor decides which."
   ],
   "average": 3.38,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0 with 5 of 82 parts changed (7%), and the previous review had no open must-fix items. Validate reports 0 errors and lint --strict 0 warnings. measure.mjs reports prose 2265 and est 20.0 (estMinutes 20). The cross-lesson edits are accurate and supported by facts-cc-09-parallel-automation.md and the cc-07 facts: --bare also skips CLAUDE.md and skills; --bare bills the API, not the plan; only the request and the summary enter the conversation. They also bring the glossary in line with cc-05 and cc-07. No new must-fix; est is now exactly at the 20-minute cap."
+  "summary": "Verification round. review-scope.mjs exited 0: 1 of 82 parts changed (2%), and the only change is lesson.courseId (vibe-coding → claude-code). The previous round had no must-fix items, and no earlier round left one open, so there are no resolved entries. validate reports 0 errors and lint --strict 0 warnings. measure.mjs reports prose 2265 and est 20.0, which matches estMinutes 20 here and in course.json. I checked the move for regressions: the prerequisites match the course.json lesson titles exactly, and every 「第N回」 reference matches the module order (第10回 = cc-10-safety-cost, the next link). I re-scored prior with no change and carried over every other score. There are no new must-fix items. Every criterion scores 3 or higher, and the mean is 3.38."
 }
