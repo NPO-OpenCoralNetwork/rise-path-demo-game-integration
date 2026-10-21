@@ -1,8 +1,9 @@
-# Brief: vibe-coding/cc-06-claude-md
+# Brief: claude-code/cc-06-claude-md
 
 Course: Claude Code 実践（cc-*）, module 3 「プロジェクトに合わせて育てる」, lesson 6 of 11.
-Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-coding/drafts/` for preview only
-(`courseId: "vibe-coding"`, no `next`); where it is published is the owner's decision.
+Title: 「第6回｜CLAUDE.mdで前提を伝える」. Published 2026-10-21 by the owner's decision in the
+course `claude-code`: `content/courses/claude-code/lessons/cc-06-claude-md.lesson.json`, `next` = `cc-07-skills-subagents`.
+Until then the draft lived in `vibe-coding/drafts/` for preview only (`courseId: "vibe-coding"`, no `next`).
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を数週間使い始めた開発者・学習者。毎回同じ説明をしている、または長い CLAUDE.md を書いたのに守られないと感じている人。
@@ -34,9 +35,9 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
   - IMPORTANT を付ければ確実（→ 強調は 1 行ずつ。強制にはならない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（コース共通の measure.mjs：`cc-06-claude-md.lesson.json: prose 2399 (budget 1,200–2,400) · read 3714 · practice reading 1363 · questions 9 · practice sections 1 · est 19.3 min (must be ≤ 20; estMinutes 19)`。(3,714 + 1,363) ÷ 450 ≈ 11.28分 + 問題9問 × 40秒 = 6.0分 + 演習1セクション × 2分 = 2分、計 19.3分 → 19）。
+- 所要時間 / minutes: 19（コース共通の `scripts/lessons/measure.mjs`：`cc-06-claude-md.lesson.json: prose 2399 (budget 1,200–2,400) · read 3714 · practice reading 1363 · questions 9 · practice sections 1 · est 19.3 min (must be ≤ 20; estMinutes 19)`。(3,714 + 1,363) ÷ 450 ≈ 11.28分 + 問題9問 × 40秒 = 6.0分 + 演習1セクション × 2分 = 2分、計 19.3分 → 19）。
 - 難易度 / level: intermediate
-- ロケール / locales: jp のみ（英語版は公開先が決まってから）。
+- ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）。
 - 演習の題材 / practice task idea: 練習用フォルダー `cc-practice-06` に、膨らんだ見本の CLAUDE.md（19 行、ヒアドキュメントで作成。どの行も 390 px で折り返さない長さ）を置く（`mkdir -p cc-practice-06 &&` の次の行で `cd`）。自分で行き先を決めてから Claude Code に書き直しを頼み、差分を説明させ、再起動後に `/context` と `/permissions` で確かめる。具体的な行は残し、手順は `docs/add-screen.md`（第7回のスキル候補）、`src/api/` の決まりは `paths:` 付きルール、「絶対に〜しない」は拒否ルール、好みは CLAUDE.local.md へ。チェックリスト、3 段のヒント、模範解答つき。
 
 ## 制約 / Constraints
@@ -58,9 +59,9 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 
 ## Assumptions
 - 前提の第1回〜第5回は、コース共通の正式タイトル（「第2回｜任せる範囲を決める：権限モードと巻き戻し」など）で書いた。
-- 権限ルールの書式（`Read(./.env)`、`Bash(git push *)`）と `/permissions` が規則と出どころのファイルを表示する点は、第2回用の検証済み facts（docs-15, safety-9）から使った。
+- 権限ルールの書式（`Read(./.env)`、`Bash(git push *)`）と `/permissions` が規則と出どころのファイルを表示する点は、第2回用の検証済み facts（`content/courses/claude-code/reports/facts/cc-02-permissions.facts.md` の docs-15, safety-9）から使った。
 - 「auto モードの分類器も見逃しがゼロではない」は第2回用 facts（permission-modes: "does not guarantee safety"）による。
-- estMinutes: コース共通の measure.mjs で 19.3 分 → 19（Format の行）。問題は 9 問（予想 1・確認 4・テスト 4）。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
+- estMinutes: コース共通の `scripts/lessons/measure.mjs` で 19.3 分 → 19（Format の行）。問題は 9 問（予想 1・確認 4・テスト 4）。初版（13 問、23 分）から、ほかで評価している q1・q7・e4・e5 を削った。
 - 本文の長さ（vibe-ch2 のレポートと同じ数え方：prose のうちプロンプトの expect と手順の hint/troubleshoot を除く）は初版で 2,355 字、prose 全体で 2,470 字。レビュー後の修正（拒否ルールの限界の2文、ヒントの9行目、略語の正式名など）で約 200 字増えた。
 - 演習の見本と模範解答はスクラッチで実際に実行し、19 行の CLAUDE.md、`sed -n '/^## 画面/,$p'`（行番号ではなく見出しの中身で指定）での 7 行の手順の切り出し、`.gitignore` への追記、settings.json の JSON として正しいことを確かめた（コマンドを1行に1つにした後と、第4ラウンドで行を縮めた後も再実行して確認。模範解答の CLAUDE.md は 9 行、手順は 7 行）。
 - スマートフォン幅（390 px）に合わせた変更：表はすべて2列にした（s1-table は届く範囲を置き場所のセルへ「ユーザー：自分（すべてのプロジェクト）」の形で移し、管理ポリシーは「Linuxでは `/etc/claude-code/` のCLAUDE.mdなど」と短いコードにした。s4-table は詳しい回・節を移す先のセルへ「フック（第8回）」の形で移した）。見出しは短くし、表の内容と問題が頼る行は変えていない。s3-diagram は横に並ぶノードを2つまでにした（第3ラウンドで下の行のとおり描き直した）。演習の見本と模範解答のコマンドは `&&` でつながず1行に1つにした。

@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/claude-code/lessons/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:8a9d7701d14a41d6",
+  "lessonHash": "sha256:acb5aef2ac3d7210",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,20 +9,12 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "metrics.json has no hard failures: overflowX false, 0 console, mermaid, unknown-block or broken-image errors, and no text-only screens. At 390 px the s2-layers flowchart (TD) has readable Japanese labels (mobile-jp-06/07). The s2-table and s5-table fit with no sideways scroll (mobile-jp-07, mobile-jp-13/14), and the code blocks s3-code, practice-folder and practice-answer-rule show whole lines with no wrapping (mobile-jp-10, 17, 18).",
-      "blockIds": [
-        "s2-layers",
-        "s2-table",
-        "s5-table",
-        "s3-code",
-        "practice-folder",
-        "practice-answer-rule"
-      ]
+      "evidence": "The s2-layers flowchart TD is readable at 390 px, with Japanese labels on the nodes and edges (pages/mobile-jp-06.png, mobile-jp-07.png). Both tables (s2-table, s5-table) fit as two columns with no sideways scroll (mobile-jp-07, mobile-jp-13/14). Every code block (s3-code, practice-folder, practice-answer-rule) shows its lines whole and unwrapped. metrics.json: overflowX false, 0 console, mermaid, unknown-block and broken-image errors."
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Every section mixes text with a figure, table, code, steps or a check, and the inline checks come about every 2–3 mobile screens. The practice section is long, though: about 6 mobile screens (mobile-jp-15 to 20) of code, three separate steps blocks, two prompts and a checklist.",
+      "evidence": "textOnlyScreens is empty on both devices, and every concept section breaks its text with a definition, diagram, table, callout or check. The practice section runs about six mobile screens (mobile-jp-15 to 20). It has three separate one-step steps blocks (practice-steps, practice-steps-deny, practice-steps-bill), and each one restarts at ①.",
       "blockIds": [
         "practice-steps",
         "practice-steps-deny",
@@ -32,22 +24,17 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The UI and the content are all in Japanese and no English UI strings leak through. Diagram labels are in Japanese and the caption is visible. Inline code chips stay whole: --dangerously-skip-permissions in check-quiz e1 moves to its own line (mobile-jp-21). Glossary terms are underlined, and the contrast of text, callouts and chips looks sufficient on every screen.",
-      "blockIds": [
-        "s2-layers",
-        "check-quiz"
-      ]
+      "evidence": "The lesson is all Japanese, with no stray English UI strings. Inline code chips stay whole and readable, for example `--dangerously-skip-permissions` in e1 (mobile-jp-21.png). Contrast is good on the callouts, the dark code blocks and the quiz cards. No controls are hidden under the 56 px top bar or the 60 px bottom bar."
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "practice-steps / practice-steps-deny / practice-steps-bill: each is a one-item steps block, so all three show '1ステップ中 0 完了' and a step numbered 1 (mobile-jp-16, mobile-jp-18). Consider numbering them as one sequence (put the code and prompt blocks in between as step text, or retitle them 手順1/2/3) so the practice reads as one ordered task.",
-    "s5-table on mobile: the right column '確かめ方と対策' is narrow, so short phrases like 'サブエージェントへ' and 'CLAUDE.mdは200行未満' wrap onto 3–4 lines (mobile-jp-13/14). It is readable; shortening the left cells (for example dropping '長いセッションで、') would balance the columns.",
-    "lesson.prerequisites: on mobile-jp-01 the 7 prerequisites run together as one dense grey 6-line paragraph. A shorter list (for example '第2・5〜9回、cd/ls、JSONの編集') would scan faster.",
-    "reader: desktop charsPerLine median 44 (max 56) is above the 30–40 JP target at the 680 px measure. This is the reader's column width, not the lesson.",
-    "reader: the flashcard hint 'クリックまたはスペースキーでめくる' also shows on mobile, where 'タップ' would fit better (mobile-jp-26).",
-    "reader: the mobile full-length PNG is truncated (pageHeight 20004), so this review used the per-screen PNGs; failed /api/ requests (14) were ignored as environment noise."
+    "Line breaks at 390 px leave one or two characters alone on the last line. Examples: hook-predict option 2 ends with 「なる」 on its own line (pages/mobile-jp-02.png), s1-practices item 2 ends with 「い」 (pages/mobile-jp-04.png), and s3-check options 1 and 4 end with 「く」 (pages/mobile-jp-11.png, mobile-jp-12.png). Shortening the text a little would avoid these orphans, for example 「…そのまま流し込まない」 → 「…そのまま渡さない」.",
+    "The practice section shows three one-step 'steps' blocks (practice-steps, practice-steps-deny, practice-steps-bill). Each is headed 「1ステップ中 0 完了」 and numbered ① (pages/mobile-jp-16.png, mobile-jp-18.png). Merging them into one steps block numbered ①②③, with the code and prompt blocks between them, would show the order more clearly.",
+    "The s2-layers caption says VMs and cloud sessions enclose all of Claude Code, but the diagram has no box for that outer layer (pages/mobile-jp-07.png). An outer subgraph labelled 「VM・クラウドセッション」 would let the picture show this layer as well.",
+    "reader: desktop-jp charsPerLine median is 44 against the 30–40 target (measure 680 px at 18.7 px). The reader's text column is too wide for Japanese.",
+    "reader: the mobile full-length PNG is cut off at 16000 px (pageHeight 20055), so the per-screen PNGs were used instead. The 14 failed /api/ requests were ignored as environment noise."
   ],
   "verdict": "pass",
-  "summary": "Clean render on both viewports. There are no hard failures in metrics.json, the s2-layers TD flowchart and both tables are readable at 390 px, code blocks and long inline chips stay intact, and no personal data appears on any screen (the ~/.zshrc key is a placeholder). The most worthwhile change is to merge the three one-item steps blocks in the practice into one numbered sequence."
+  "summary": "lessonHash sha256:acb5aef2ac3d7210 is copied from metrics.json. Every screen was checked: 28 mobile, 19 desktop, Japanese only, no EN shots. There are no hard failures and no privacy findings on any screen. The diagram, both tables, the code blocks and the long inline code chips are all readable at 390 px with nothing cut off. The only suggestions are optional: orphan characters at the ends of lines and the three separate one-step practice steps blocks."
 }

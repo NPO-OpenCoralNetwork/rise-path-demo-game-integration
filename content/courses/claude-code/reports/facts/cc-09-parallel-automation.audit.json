@@ -1,0 +1,111 @@
+{
+  "lessonId": "cc-09-parallel-automation",
+  "checkedCount": 70,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/worktrees.md",
+    "https://code.claude.com/docs/en/common-workflows.md",
+    "https://code.claude.com/docs/en/agents.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/agent-view.md",
+    "https://code.claude.com/docs/en/headless.md",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://code.claude.com/docs/en/security.md",
+    "https://code.claude.com/docs/en/cli-reference.md",
+    "https://code.claude.com/docs/en/github-actions.md",
+    "https://code.claude.com/docs/en/routines.md",
+    "https://code.claude.com/docs/en/scheduled-tasks.md",
+    "https://code.claude.com/docs/en/agent-teams.md",
+    "https://code.claude.com/docs/en/sub-agents.md",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/ja/headless",
+    "https://code.claude.com/docs/ja/headless.md",
+    "https://claude.dev/blog/building-effective-agent-automations/",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s1-lead",
+      "where": "md",
+      "claim": "第7回の[[サブエージェント]]のほかに、作業を並べる方法が2つあります。",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/agents",
+      "evidenceQuote": "Claude Code has five ways to work on several tasks at once: subagents, agent view, agent teams, dynamic workflows, and projects. ... Three more tools support this work without being a way to run agents themselves: * Worktrees give each session a separate git checkout ... * A background bash command runs one shell command without blocking the conversation. It doesn't spawn an agent.",
+      "fix": "第7回の[[サブエージェント]]に加えて、並列の作業を助ける道具を2つ紹介します。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/agents",
+        "evidenceQuote": "\"Claude Code has five ways to work on several tasks at once: subagents, agent view, agent teams, dynamic workflows, and projects.\" ... \"Three more tools support this work without being a way to run agents themselves: * Worktrees give each session a separate git checkout...\" ... \"A few other features run Claude without you driving each step, but they solve a different problem than splitting work across agents: * A background bash command runs one shell command without blocking the conversation. It doesn't spawn an agent.\" Also https://code.claude.com/docs/en/worktrees: \"Worktrees are one of several ways to run Claude in parallel.\"",
+        "reason": "I tried to show the lesson is right and couldn't. The lead says that besides subagents there are 「方法が2つあります」, which reads as a complete count. The official page names five ways (subagents, agent view, agent teams, dynamic workflows, projects), and neither of the lesson's two is one of them. That page calls worktrees a supporting tool and says background bash solves \"a different problem than splitting work across agents\". The lesson's best defense is the worktrees page, which calls worktrees \"one of several ways to run Claude in parallel\". But \"one of several\" also means more than two. The lesson itself goes on to say, in s2-map, 「ほかに、エージェントビュー…とエージェントチーム…もあります」. So the lead claims more than the docs, and more than the rest of the lesson. The finding stands. The proposed fix is accurate. 「並列の作業を助ける道具を2つ紹介します」 follows the docs' \"Three more tools support this work\". It also limits what the lesson covers instead of claiming a full count, and it fits the later note about agent view and agent teams. No betterFix is needed. One optional consistency point: the section title (「並列の3つの方法」) and the table still say 方法. If the author wants to keep that wording, 「第7回の[[サブエージェント]]に加えて、ここでは作業を並べる方法を2つ扱います。」 would also be accurate.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s3-table",
+      "where": "rows[2][1] (--permission-mode dontAsk の「役割」。同じ言い方が check-quiz e3 explanation「dontAsk でほかを拒否します」、p1-checklist pc-mode、p2-prompt expect にもあります)",
+      "claim": "許可していない操作を、確認せずに拒否する",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "If you set dontAsk mode, Claude Code auto-denies every tool call that would otherwise prompt you ... Claude still runs actions that need no approval in Manual mode, such as file reads inside your working directories and read-only Bash commands.",
+      "fix": "確認が要る操作を、聞かずに拒否する（読み取りは動く）",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"If you set `dontAsk` mode, Claude Code auto-denies every tool call that would otherwise prompt you, though a mod you installed can still approve some of those calls. ... Claude still runs actions that need no approval in Manual mode, such as file reads inside your working directories and read-only Bash commands. Actions matching your `permissions.allow` rules and calls approved by a PreToolUse hook run too.\" (Modes table row: \"File reads inside your working directories and pre-approved tools; anything that would prompt is denied\"). The headless page says the same: \"Actions that need no approval in Manual mode still run, such as file reads in your working directories and the read-only command set. Actions covered by your `--allowedTools` entries or `permissions.allow` rules also run.\"",
+        "reason": "I tried to defend the lesson. The best support is the section heading \"Allow only pre-approved tools with dontAsk mode\", which could be read as \"pre-approved runs, everything else is denied\". The body of the same section rules that reading out, and so does the headless page that the lesson cites. dontAsk only denies calls that would otherwise prompt. File reads inside the working directories and the read-only Bash command set still run, and nobody has to allow them. In 「許可していない操作を、確認せずに拒否する」 the subject is the learner: \"operations you have not allowed\". The lesson defines that allowing just before, as `--allowedTools` 「使うツールを絞って許可する」. The sibling texts make the reading explicit: check-quiz e3 「必要なコマンドだけを --allowedTools で許可し、dontAsk でほかを拒否します」, pc-mode 「ほかの操作を拒否している」, and the p2 expect 「Bash(npm test *) に絞り、dontAsk でほかを拒否します」. Each one tells the learner that everything except `npm test` is blocked. The docs say otherwise: reads inside the working directories (a `.env` file, for example) and read-only commands such as `cat`, `ls` and `git log` still run, and an installed mod can still approve some calls. That gives a misleading picture of what is protected, so the lesson says more than the page supports. The auditor read the context correctly. The proposed fix, 「確認が要る操作を、聞かずに拒否する（読み取りは動く）」, matches the docs (\"would otherwise prompt\" = 確認が要る), and it uses the same plain table-cell style as the other cells. If there is room, 「作業フォルダー内の読み取りは動く」 would be more exact, because reads outside the working directories and from network paths are still denied. The three sibling texts should get a matching edit. For example, e3 could say 「…--allowedTools で許可し、dontAsk で確認が要るほかの操作を拒否します。」, and pc-mode/p2 could use 「確認が要るほかの操作」 in place of 「ほか（の操作）」.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "summary-points",
+      "where": "points[2]",
+      "claim": "`claude -p` はv2.1.302からManualモードで始まります。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "In Claude Code v2.1.302 or later, claude -p and Agent SDK runs with no permission mode set start in Manual mode.",
+      "fix": "モードを指定しない `claude -p` は、v2.1.302からManualモードで始まります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"In Claude Code v2.1.302 or later, `claude -p` and Agent SDK runs with no permission mode set start in Manual mode.\" The same page lists where a mode can come from: \"1. The `--permission-mode` flag, or `--dangerously-skip-permissions` 2. `permissions.defaultMode` in a settings file 3. The built-in default\". Its table gives the built-in default for \"`claude -p` or the Agent SDK\" as `default`.",
+        "reason": "The official page backs the version and Manual mode, but only for runs \"with no permission mode set\". Manual is the built-in default, and it applies only when neither the --permission-mode flag nor a settings defaultMode picks a mode. The summary point (summary-points / points[2]) drops that condition, so it reads as if every `claude -p` starts in Manual. That is stronger than the page says. It also clashes with the lesson's own recommended command, which passes `--permission-mode dontAsk`. The lesson body (line 356, \"モードを指定しない `-p` は…\") and the flashcard (\"モード指定なしの `claude -p`\") keep the condition, so only the summary overstates it. The auditor's fix puts the condition back. 「モードを指定しない」 covers both the flag and settings, which matches \"no permission mode set\", and the sentence stays inside the length budget. No better fix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "check-quiz",
+      "where": "e4.explanation",
+      "claim": "知らないリポジトリでは `--bare` を付けます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/permissions",
+      "evidenceQuote": "Start with --bare so Claude Code reads no hooks, skills, custom commands, subagents, plugins, or .mcp.json servers from the project. The project's env block and helpers such as awsAuthRefresh in its settings files still apply, and Claude Code reads apiKeyHelper only from --settings",
+      "fix": "知らないリポジトリでは `--bare` を付けます。ただし、設定ファイルの `env` などは使われます。",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/permissions#what-runs-before-you-trust-a-folder",
+        "evidenceQuote": "\"Before you run `claude -p` in a repository you didn't write, decide what it may run on your machine: ... Start with `--bare` so Claude Code reads no hooks, skills, custom commands, subagents, plugins, or `.mcp.json` servers from the project.\" The headless page (https://code.claude.com/docs/en/headless#start-faster-with-bare-mode) adds: \"Without `--bare`, a `-p` session runs the hooks in a project's `.claude/settings.json` and connects the servers in its `.mcp.json`, even in a folder you've never trusted.\" The security page lists under untrusted content: \"Use virtual machines (VMs) to run scripts and make tool calls\".",
+        "reason": "The lesson sentence matches the official page and does not overclaim. 知らないリポジトリでは `--bare` を付けます is a recommendation, and the permissions page gives the same advice for \"a repository you didn't write\". The sentence before it says only what `--bare` stops: project hooks and `.mcp.json` servers. Both the headless and permissions pages say exactly that. Nothing in the explanation says `--bare` makes the run fully safe or blocks the `env` block. The next sentence also recommends running untrusted content in a VM, which the security page supports, so the lesson does not present `--bare` as complete isolation. The quiz asks for the flag to add first (まず付けるべきフラグ) from four choices, and `--bare` is clearly the right one. The auditor's point that the `env` block and helpers like `awsAuthRefresh` still apply under `--bare` is true. But it is something the lesson leaves out, not a false or stronger claim. It is optional extra detail, not a needed correction.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "sources",
+      "where": "cc-permission-modes.title",
+      "claim": "Permission modes",
+      "problem": "outdated",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "# Choose a permission mode",
+      "fix": "Choose a permission mode",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "\"pageMetadata\":{\"title\":\"Choose a permission mode\",\"sidebarTitle\":\"Permission modes\",\"description\":\"Control whether Claude asks before acting. ...\"} (the docs sidebar entry for /en/permission-modes renders data-title=\"Permission modes\")",
+        "reason": "The lesson's sources entry cc-permission-modes uses the title \"Permission modes\" as a citation label for https://code.claude.com/docs/en/permission-modes. I fetched the live page today. Its H1 and HTML <title> are \"Choose a permission mode\", which is what the auditor saw. The same page's own metadata also sets sidebarTitle to \"Permission modes\", and the docs navigation shows that exact label for this URL. So the label is Anthropic's current official navigation title for the page. It is not outdated or made up, and a learner can find the page by it in the sidebar. The URL is correct and the citation makes no factual claim that the page contradicts. One minor point: the other sources in this lesson use full page titles (for example \"Configure permissions\" and \"Run Claude Code programmatically\"). Changing this entry to \"Choose a permission mode\" would make the list consistent. That is an optional style change, not a needed correction.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

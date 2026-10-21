@@ -126,6 +126,12 @@ a pasted or hand-made copy, and never a commit named by a ref (`HEAD:…`, `main
 lesson's own path, `content/courses/<course>/drafts/<lesson>.lesson.json` or
 `…/lessons/<lesson>.lesson.json`.
 
+A snapshot copy (and its `sha256:` revision) exists only in the checkout that made it, so it is for
+draft rounds. Before a lesson is published (moved to `lessons/`, or opened as a PR to publish),
+every verification on its chain names a committed previous round (`<commit id>:…`, with a commit id
+as `reviewedRevision`), or the reviewer reviews in full; `server/tests/reviewChainsDurable.test.js`
+enforces this for published lessons.
+
 `check-review.mjs` (exit 2 = the review does not count) refuses a verification when it cannot load
 `previousReview` as a recorded round, when that is the review being checked or the working-tree
 reports file of the same lesson and reviewer, when `previousReview` or `reviewedRevision` names a

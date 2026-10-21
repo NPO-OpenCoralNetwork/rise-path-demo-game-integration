@@ -60,16 +60,18 @@ Review of cc-02-permissions by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-02-permissions/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-02-permissions/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `44ecfdc66d172d2b`: ja-editor full revise (mean 2.75, must-fix 10); pedagogy-reviewer full revise (mean 2.92, must-fix 4)
-2. `e9a914f94df54f03`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
-3. `53b74995ba36c9df`: ja-editor verify fail (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-4. `fc6282d1f851b02f`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `b119e1c419d1e206`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-6. `95d0a505f30641a5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
-7. `6d79b8134ac7e198`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.31, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
-8. `8c52cb12321e5ea5`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `44ecfdc66d172d2b/round-1`: ja-editor full revise (mean 2.75, must-fix 10); pedagogy-reviewer full revise (mean 2.92, must-fix 4)
+2. `e9a914f94df54f03/round-1`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.31, must-fix 0)
+3. `53b74995ba36c9df/round-1`: ja-editor verify fail (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+4. `fc6282d1f851b02f/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `b119e1c419d1e206/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `b119e1c419d1e206/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `95d0a505f30641a5/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
+8. `6d79b8134ac7e198/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.31, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
+9. `8c52cb12321e5ea5/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+10. `8c52cb12321e5ea5/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -87,6 +89,8 @@ An auditor with web access checked 74 claims (pages: 14); a second checker tried
 - [overclaim] `check-quiz` (e2.options[a].feedback, second sentence): コマンドのたびに確認も出ます。 — https://code.claude.com/docs/en/permission-modes
 - [overclaim] `sort-quiz` (ps2.explanation, second sentence): それ以外のコマンドでは確認が出ます。 — https://code.claude.com/docs/en/permissions
 - [overclaim] `sort-quiz` (ps1.explanation, first sentence): `dontAsk` モードは、事前に許可したツールだけを動かし、ほかはすべて拒否します。 — https://code.claude.com/docs/en/permission-modes
+
+Records: `content/courses/claude-code/reports/facts/cc-02-permissions.audit.json` and `cc-02-permissions.facts.md`.
 
 ## Screenshots
 

@@ -69,7 +69,8 @@
   /* Headings and buttons: proportional kana, phrase-aware wrapping. A phrase longer than the
      line ("GitHubワークフロー完全理解" on a phone) still breaks instead of overflowing.
      break-word, not anywhere: it leaves min-content sizes (flex rows of buttons) alone. */
-  :where(h1, h2, h3, h4, button, [role="tab"]):lang(ja) {
+  :where(h1, h2, h3, h4, button, [role="tab"]):lang(ja),
+  :where(h1, h2, h3, h4, button, [role="tab"]) [lang]:lang(ja) {
     font-feature-settings: "palt";
     letter-spacing: 0.01em;
     word-break: auto-phrase;

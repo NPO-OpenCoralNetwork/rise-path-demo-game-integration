@@ -127,8 +127,11 @@
 { "job_id": "uuid", "status": "queued" }
 ```
 
-### ~~POST /api/generate-audio~~（削除済み）
-認証がなく、呼び出し元もなかったため削除した。音声合成は `POST /api/v2/tts/synthesize` と MCP ツール `request-tts` を使う。
+### POST /api/generate-audio
+> 2026-10-21 に削除済み（呼び出し元なし）。TTS は現行の `/api/v2` ルート（`POST /api/v2/tts/synthesize`）を使う。
+
+**目的**: 音声生成（lesson単位でStorage保存）
+**補足**: `jobs.type=audio` を作成し、Worker が処理する
 
 ---
 

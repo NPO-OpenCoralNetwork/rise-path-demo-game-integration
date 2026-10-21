@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BarChart3, BookOpen, Clock, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../../../services/apiClient';
 
 interface DigestStats {
   total_lessons: number;
@@ -75,15 +76,13 @@ const LearningInsightsWidget: React.FC<LearningInsightsWidgetProps> = ({ curricu
       return;
     }
 
-    const base = '/api/v2';
     Promise.allSettled([
-      fetch(`${base}/curricula/${curriculumId}/weekly-digest`).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/curricula/${curriculumId}/weekly-load`, {
+      apiFetch(`/curricula/${curriculumId}/weekly-digest`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/curricula/${curriculumId}/weekly-load`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base_load_minutes: 60 }),
       }).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/curricula/${curriculumId}/summary-cards`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/curricula/${curriculumId}/summary-cards`).then(r => r.ok ? r.json() : null),
     ]).then(([digestR, loadR, cardsR]) => {
       if (digestR.status === 'fulfilled' && digestR.value) setDigest(digestR.value);
       if (loadR.status === 'fulfilled' && loadR.value) setLoad(loadR.value);

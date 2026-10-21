@@ -3,7 +3,7 @@ node_modules
 dist
 .grok
 sample
-p_school
+/data/curricula/p_school
 deploy/risepath-vm/hermes-data
 data/curricula/blender/blender_manual_v500_en.html
 public/uploads
@@ -11,3 +11,6 @@ public/uploads
 .env.local
 .env
 .env.*
+*.env
+.artifacts/
+.shots/

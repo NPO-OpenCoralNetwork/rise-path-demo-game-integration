@@ -31,8 +31,7 @@ const sendBridgeResult = (res, result) => {
     return res.json(result);
 };
 
-// Scoped to this router's paths: the router is mounted on /api/v2, so a bare router.use() would
-// authenticate (and 401) every later /api/v2 request too, e.g. guest TTS.
+// Scoped to its own paths: this router is mounted on all of /api/v2 (server.js).
 router.use('/learner-memory', requireBridgeOrAuth);
 
 // GET /api/v2/learner-memory/privacy

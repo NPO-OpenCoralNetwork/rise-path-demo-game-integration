@@ -4,78 +4,61 @@
   "lessonHash": "sha256:5b14d7bb36e8d118",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "verify",
-  "verifies": {
-    "reviewedRevision": "sha256:262fc82916e86736",
-    "previousReview": ".artifacts/review/claude-code/cc-09-parallel-automation/262fc82916e86736/round-1/pedagogy-reviewer.review.json",
-    "changed": [
-      "s1-lead",
-      "s1-table",
-      "s2-steps",
-      "s3-mode",
-      "s4-lead",
-      "s4-enforce",
-      "check-quiz"
-    ],
-    "changedShare": 0.09,
-    "fullReviewRequired": false
-  },
-  "resolved": [],
+  "mode": "full",
   "scores": [
     {
       "id": "align",
       "score": 3,
-      "evidence": "Each of the 3 objectives is still assessed (o1: q0–q2, e1, e2; o2: q3, e3, e4; o3: q4, e5, e6). The e4 change only rewords the prompt: it keeps objectiveId o2, bloom apply, the same options and the answer [\"a\"]. The writing in o2 (「書ける」) and the design in o3 (「設計できる」) are still produced only in the practice sections, which have self-checks (p1-checklist, p2-checklist). The exam only asks the learner to select.",
+      "evidence": "All three objectives are can-do statements, and each has 2 or more questions with objectiveId: o1 has q0, q1, q2, e1 and e2; o2 has q3, e3 and e4 (apply); o3 has q4, e5 and e6. One gap: o3 is a create objective (「設計できる」), but every o3 question asks the learner to analyze or choose. Only the ungraded practice-audit asks the learner to write the prompt.",
       "blockIds": [
-        "check-quiz",
+        "hook-predict",
+        "s1-check",
+        "s2-check",
+        "s3-check",
         "s4-check",
-        "p1-checklist",
-        "p2-checklist"
-      ],
-      "carriedOver": true
+        "check-quiz",
+        "practice-audit"
+      ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-b1 is a concrete scene in 3 sentences (「機能の実装を任せている途中で、急ぎのバグ修正を頼まれました…「毎晩、テストの失敗を報告してほしい」」) that sets up both halves of the lesson. The ungraded predict q0 targets the same-folder misconception, every wrong option has feedback, and the answer is the third option.",
+      "evidence": "hook-b1 sets a concrete problem in 3 sentences (「機能の実装を任せている途中で、急ぎのバグ修正…」「毎晩、テストの失敗を報告してほしい」), and the problem leads into o1–o3. hook-predict q0 is an ungraded prediction, and its wrong options carry the brief's misconception 1. There is no trivia or statistic.",
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "prior",
-      "score": 4,
-      "evidence": "The three new glosses sit at each term's first use in the file: s1-table 「依存パッケージ（package）を入れ直し」, s3-mode 「5つのフラグ（flag）で安全にしています」 (the first フラグ in the lesson; the next is s3-table) and e4 「手元にクローン（clone）しました」 (the only クローン). The earlier support is unchanged: the prerequisites and recall (「第7回の[[サブエージェント]]」, 「Manualモード（第2回）」), s1-defs, s4-defs, and glosses for トークン, シェル, CI, PR and API.",
+      "score": 3,
+      "evidence": "The prerequisites list 第2・4・6・7・8回 and Git basics, and the text recalls them where it relies on them (「Manualモード（第2回）」, 「MCPサーバー（第8回）」, 「CLAUDE.mdと同じく」). Most terms are explained on first use (トークン, PR, シェル, API). But s4-table uses 「GitHub Actions」 without saying what it is, and e3 uses `bypassPermissions` with no pointer to 第2回.",
       "blockIds": [
-        "s1-table",
+        "s1-cost",
         "s3-mode",
-        "check-quiz",
-        "s1-defs",
-        "s4-defs",
-        "s1-cost"
+        "s3-pitfall",
+        "s4-table",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 2262 (budget 1,200–2,400) · read 2650 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)」. The trims in s1-lead, s4-lead, s4-enforce and ex-merge offset the three glosses (prose 2265 → 2262), but est stays exactly at the cap. lint --strict reports 0 warnings. headless is still dense: 非対話的実行, シェル and four new flags (s3-table) in one segment. unattended-where still adds 2 terms that are never practiced.",
+      "evidence": "measure.mjs gives 「prose 2262 (budget 1,200–2,400) … est 20.0 min (must be ≤ 20; estMinutes 20)」 and lint --strict is clean, so the lesson is within budget but at the cap. Every section has a list, code or check, and no section adds more than 3 new terms. The headless section is the densest: 非対話的実行, フラグ and シェル plus five flags, though s3-table explains each flag in one line.",
       "blockIds": [
-        "headless",
+        "s3-lead",
+        "s3-code",
         "s3-table",
-        "unattended-where",
-        "s1-lead",
-        "s4-enforce"
+        "s3-pitfall"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "Each practice task comes after a worked example. s2-steps keeps 5 subgoal-labelled steps, and each gives its reason. The trimmed ex-merge still does: 「セッションを終えるときは、ワークツリーを残します。消すとブランチも消えます。」. s3-code with s3-table explains each flag, and s4-prompt maps a model prompt to the 4 points in its expect. No faded example comes between these and practice, and p1-model is almost the same as s3-code.",
+      "evidence": "s2-steps is a 5-step worked example. Each step has a subgoal title and a reason (「ワークツリーは既存のコミットから作ります」, 「消すとブランチも消えます」), and comes before any practice. s3-code with s3-table and s4-prompt (「4点との対応：…」) model the command and the prompt before practice-command and practice-audit. There is no faded example between the worked example and independent practice.",
       "blockIds": [
-        "s2-steps",
         "s2-code",
+        "s2-steps",
         "s3-code",
         "s3-table",
         "s4-prompt"
@@ -84,117 +67,113 @@
     {
       "id": "active",
       "score": 4,
-      "evidence": "Four of the five segments still end with an inline check that applies the idea to a new case (q1, q2, q3, q4), each with a hint and per-option feedback. The rewritten e4 prompt (「よく知らない公開リポジトリを、手元にクローン（clone）しました。中身を確かめる前に `claude -p` で要約させたいとします。」) adds no cue to the key: 「中身を確かめる前に」 was already in the earlier version, and the options and feedback are unchanged. e3 and e5 still balance every flag and clause across 2 options each.",
+      "evidence": "There are inline checks in 4 of the 5 segments (q1, q2, q3, q4), and two segments never pass in a row without one. They are apply or analyze items in new situations, such as diagnosing 「モジュールが見つからない」 in q2 and a bare `claude -p` in nightly CI in q3. Every wrong option has feedback, and every question has a hint.",
       "blockIds": [
         "s1-check",
         "s2-check",
         "s3-check",
-        "s4-check",
-        "check-quiz"
+        "s4-check"
       ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "The 7 misconceptions in the brief are still covered: broad `Bash` and `bypassPermissions` (e3 b, d), a missing `--bare` (e3 c, d; e4 d 「`-p` は信頼の確認を出しません。」), and a quiet day vs a failed read (q4 d, e5 b, e5 d). s4-enforce still corrects the belief that a prompt line is enforced: 「依頼文の「編集しない」は、CLAUDE.mdと同じく強制になりません。」.",
+      "evidence": "All 7 misconceptions in the brief are corrected with a reason: same-folder sessions (q0), missing dependencies (q2), -p auto/wait/allow-all (q3 b/c/d), 「Bash」 too broad (s3-pitfall, e3), -p trust (e4 d), the prompt not being enforced (s4-enforce, e6), and a quiet day vs a failed read (q4 d, e5). Each feedback is 2 sentences or fewer and names the specific mistake.",
       "blockIds": [
         "hook-predict",
+        "s2-check",
         "s3-check",
-        "s4-check",
-        "check-quiz",
         "s3-pitfall",
-        "s4-enforce"
+        "s4-check",
+        "check-quiz"
       ]
     },
     {
       "id": "visual",
       "score": 3,
-      "evidence": "There are no images and no decoration. The comparisons in s1-table, s3-table and s4-table are 「〜なら、…」 lists, a defensible choice for mobile. The worktree layout (main folder, `.claude/worktrees/<名前>/`, branch `worktree-<名前>`) is spatial and is described only in text (ex-feature expect); a small diagram would help.",
+      "evidence": "There are no images or diagrams, so nothing is decorative. The worktree layout is described in s2-code and in the ex-feature expect (「`.claude/worktrees/` の下に、フォルダーが2つ…ブランチ `worktree-feature-a` と `worktree-bugfix-b`」). That is enough without a figure, though a small diagram would help.",
       "blockIds": [
-        "s1-table",
-        "s3-table",
-        "s4-table",
+        "s2-code",
         "s2-steps"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "Both tasks are hands-on, with expect, a hint → troubleshoot ladder, a model answer (p1-model, p2-prompt expect) and a checklist (7 and 4 items). p-run also asks for a prediction first. The second task is not a transfer task: p2-before is the same nightly-test scenario as practice 1, and its model answer repeats p1-model's prompt.",
+      "evidence": "Both practices are hands-on and safe: a nightly claude -p in `cc-practice-09`, and an audit of a weak prompt. Each moves from hint to troubleshoot to a model answer (p1-model, the p2-prompt expect) and has a checklist (p1-checklist, p2-checklist), and p-run asks the learner to predict first. p2-before reuses the nightly-test task from practice 1, so neither practice is a transfer task.",
       "blockIds": [
-        "p1-steps-setup",
         "p1-steps-write",
         "p1-checklist",
         "p1-model",
+        "p2-before",
         "p2-steps",
         "p2-prompt",
         "p2-checklist"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4 points) comes after the exam and matches the four key ideas. summary-next gives a reflection task (「成功の条件を1文で書いてみましょう」) and the next lesson. There are 7 retrieval flashcards, and summary-ask offers 3 askTutor suggestions.",
+      "evidence": "The summary section comes after the exam. It has 4 takeaways (summary-points), a reflection task (「毎日くり返す確認を1つ選び…成功の条件を1文で」), the next lesson (「第10回｜安全とコストを管理する」), 7 flashcards and askTutor suggestions.",
       "blockIds": [
         "summary-points",
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "The trims keep the claims and their citations: ex-merge (「消すとブランチも消えます」, s2-steps cites cc-worktrees), s4-enforce (「CLAUDE.mdと同じく強制になりません。権限と費用の上限は、フラグや設定で守らせます。」, cites cc-headless), and s3-mode still cites cc-headless and cc-permission-modes. No new claim was added. The section title 「並列の3つの方法」 still counts methods, which the docs do not support. It now sits next to s1-lead 「並列の道具を2つ紹介します」 (niceToHave).",
+      "evidence": "The three confirmed findings in audit-cc-09-parallel-automation.json are fixed in the current text. s1-lead now says 「並列の道具を2つ紹介します」. s3-table says 「確認が要る操作を聞かずに拒否します（読み取りは動きます）」, and e3, pc-mode and p2-prompt use the same wording. summary-points says 「モードを指定しない `claude -p` は、v2.1.302から…」. The other claims checked against the cached official pages also hold: the 1-hour and 1-minute minimums, 3–5 times a normal run, `Failed to resolve base branch`, and removing a worktree also deleting its branch. The version is pinned to v2.1.304. One citation does not cover its claim: s4-enforce cites only cc-headless for the claim that CLAUDE.md is not enforced.",
       "blockIds": [
+        "s1-lead",
+        "s3-table",
+        "summary-points",
+        "s4-table",
+        "s4-four",
         "s2-steps",
-        "s4-enforce",
-        "s3-mode",
-        "s1-lead"
+        "s4-enforce"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text keeps です・ます and a neutral tone (「夜間のチェックなど、無人で回したい作業があります。」, 「並列の道具を2つ紹介します。」). The glosses follow the course's 「カタカナ（English）」 pattern. The terminology split from earlier rounds is unchanged: 「承認が要る」 in s3-mode and q3 vs 「確認が要る」 in s3-table, e3 and pc-mode, and 「練習用リポジトリ」 in s2-code vs 「練習用フォルダー」 in p1-task.",
+      "evidence": "The text is consistently です・ます and non-pressuring (「名前だけで十分です」, 「大事なリポジトリでは試しません」), with no banned phrases (lint clean). Katakana terms carry English on first use (ワークツリー（worktree）, フラグ（flag）). A few lines are clipped, such as 「準備：コミットと信頼」 and 「消すとブランチも消えます」. The ja-editor owns the wording.",
       "blockIds": [
-        "s1-lead",
-        "s4-lead",
-        "s3-mode",
-        "s3-table",
-        "s2-code",
-        "p1-task"
+        "s2-map",
+        "p1-task",
+        "s2-steps"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The only declared locale (jp) is complete, and no text is baked into images. The link text is descriptive (「公式ドキュメント（非対話的実行）」), and the plain-text fields (checklist labels, askTutor) contain no markdown.",
+      "evidence": "The lesson is jp only and complete, with no images and so no missing alt text. The one link has descriptive text (「公式ドキュメント（非対話的実行）」). Plain-text fields such as checklist labels contain no markdown (「--bare を付けています…」), so they render cleanly.",
       "blockIds": [
         "s3-mode",
         "p1-checklist",
-        "p2-checklist",
-        "summary-ask"
-      ],
-      "carriedOver": true
+        "p2-checklist"
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "s4-enforce (changed): the trim removed 「もよい指示ですが」, so the sentence now reads only as 「依頼文の「編集しない」は…強制になりません」. A learner may decide the prompt line is pointless, yet s4-prompt and the e5 key both keep 「編集はしない」. To restore the 'write it, and also enforce it' point in about the same length: 「依頼文の「編集しない」も書きますが、強制にはなりません。」 (the ja-editor decides the wording).",
-    "s1-lead (changed): 「並列の道具を2つ紹介します」 now sits right under the unchanged section title 「1. 並列の3つの方法を選び分ける」, so the 2-vs-3 mismatch is easier to see. Suggested title: 「1. 作業に合わせて並べ方を選ぶ」.",
-    "check-quiz e3/e5: the feedback only diagnoses. Where length allows, add the corrective step, e.g. e3 b 「`Bash` は全コマンドを通し、`bypassPermissions` は確認を飛ばします。`Bash(npm test *)` と `dontAsk` に絞ります。」.",
-    "Still open: p2-before reuses the nightly-test task from practice 1, so it is not a transfer task. Consider a log-summary task (「毎朝ログを見て、エラーをいい感じにまとめておいて。原因がわかったら直しておいて。」) and update the model answer in the p2-prompt expect to match.",
-    "Still open: the p2-prompt variable should be 「直した依頼文とコマンド」 so Claude can check `--max-budget-usd` and the permission flags.",
-    "Still open: s3-code line 2 → `  \"npm run lint の警告を数えてください。\" \\`; q3 option a → 「`npm test` が実行されないまま終わり、テスト結果のない要約が返る」.",
-    "Still open: unattended-where (s4-table) is neither assessed nor practiced. Add one inline item or shorten it to one sentence.",
-    "Still open: a 4–5 node worktree diagram with caption and alt would support s2-steps.",
-    "Load is still at the cap (measure.mjs est 20.0, estMinutes 20). Any addition needs a matching cut."
+    "s4-enforce citation: cc-headless does not say that CLAUDE.md is not enforced (in headless.md, 'enforce' appears only for json-schema `format`). Add the source {\"id\": \"cc-memory\", \"title\": \"How Claude remembers your project\", \"url\": \"https://code.claude.com/docs/en/memory\", \"publisher\": \"Anthropic\", \"checkedAt\": \"2026-10-20\"}, already used by cc-06, which says 'Claude treats CLAUDE.md files as context, not enforced configuration'. Then set s4-enforce cite to [\"cc-headless\", \"cc-memory\"].",
+    "s4-enforce wording: as written, a learner may decide that the 「編集しない」 line is pointless, yet s4-prompt and the e5 key both keep it. Suggested text: 「依頼文の「編集しない」も書きますが、CLAUDE.mdと同じく強制にはなりません。」 (the ja-editor decides the wording).",
+    "section parallel: the title 「1. 並列の3つの方法を選び分ける」 conflicts with s1-lead 「並列の道具を2つ紹介します」, and the agents page lists neither worktrees nor background bash among its five ways. Suggested title: 「1. 作業に合わせて並べ方を選ぶ」.",
+    "s4-table item 1: GitHub Actions is used without saying what it is. Suggested text: 「PR（プルリクエスト）や決まった時刻にCIで動かすなら、GitHub Actions（GitHubのCI）を使います。」",
+    "check-quiz e3: add a short pointer for the term from the earlier lesson, e.g. in option b feedback 「`Bash` は全コマンドを通し、`bypassPermissions`（第2回）は確認を飛ばします。」",
+    "unattended-where (s4-table) is not covered by any objective, question or practice, so for this lesson it is extra load (est is at the 20.0 cap). Either shorten it to one sentence, e.g. 「無人の作業は、GitHub Actions、[[定期タスク]]（クラウドの `/schedule` やデスクトップ）、`/loop` で動かせます。」, or add an o3 exam item that makes the learner pick where to run a given task, cutting an equal amount elsewhere.",
+    "o3 is a create objective, but every o3 question asks the learner to analyze or choose. Consider changing e5 into an item where the learner picks the missing line to add to a partly written prompt, or change o3's verb and bloom to 「点検して直せる」 / evaluate so the objective matches what is assessed.",
+    "practice-audit p2-before reuses the nightly-test task from practice 1, so it is not a transfer task. Consider 「毎朝ログを見て、エラーをいい感じにまとめておいて。原因がわかったら直しておいて。」 and update the model answer in the p2-prompt expect to match.",
+    "p2-prompt: rename the variable to 「直した依頼文とコマンド」 so that Claude can also check point 3 (--max-budget-usd) and the permission flags the prompt asks about.",
+    "s2-steps ex-feature: the learner is never told what to ask each worktree session. If the budget allows, add a line such as 「機能Aには「a.txt を追加して」、バグ修正Bには「b.txt を追加して」と頼みます。」",
+    "factual doubt: e2 says the dev server keeps Claude 「止まったまま」. interactive-mode.md says a command that reaches its timeout is moved to the background automatically. Suggested stem: 「…コマンドが終わらず、Claudeの作業がしばらく止まっています。」",
+    "The brief puts 「終了コード」 in scope for 非対話的実行, but the lesson never mentions exit codes. Either move it to the brief's out-of-scope list or add one sentence to s3-table.",
+    "Optional: a 4–5 node diagram (main checkout → .claude/worktrees/feature-a and bugfix-b on branches worktree-* → git merge), with caption and alt, would support s2-steps. Make an equal cut, because est is at the cap."
   ],
-  "average": 3.38,
+  "average": 3.31,
   "verdict": "pass",
-  "summary": "This is a verification round. review-scope.mjs exited 0: 7 of 42 blocks changed (9% of the parts), with no change to sections or objectives. The previous review had no open must-fix items, so `resolved` is empty. validate reports 0 errors and lint --strict 0 warnings. measure.mjs gives prose 2262 and est 20.0 (estMinutes 20), still at the cap. I reviewed every changed block in full. The three glosses (依存パッケージ（package）, フラグ（flag）, クローン（clone）) sit at each term's first use. The e4 prompt rewrite keeps the same options, answer and objective and adds no cue to the key. The trims in s1-lead, s4-lead and ex-merge keep their meaning. The s4-enforce trim drops the note that 「編集しない」 is still worth writing. It is not wrong and s4-prompt shows the line kept, so it goes to niceToHave. The changes raise no new must-fix and cause no regression. Every criterion is 3 or higher, and the mean is 3.38."
+  "summary": "Full review of an unchanged lesson. Its biggest strength is misconception coverage: all seven misconceptions in the brief are carried by specific wrong options or a pitfall, and each is corrected with a reason. The worked examples (s2-steps, s3-code with s3-table, s4-prompt) come before practice that has checklists and model answers. The audited accuracy fixes are in place and there is no open must-fix. The most useful improvements would make section 4 pay its way or shrink it, measure o3 at the create level, and add the cc-memory citation to s4-enforce."
 }

@@ -152,7 +152,8 @@ KOKORO_TTS_DEFAULT_VOICE_JA=jf_alpha
 KOKORO_TTS_DEFAULT_VOICE_EN=af_bella
 ```
 
-MCP ツール `request-tts` および `POST /api/v2/tts/synthesize` は、このサイドカー API を呼び出す。
+MCP ツール `request-tts` および `POST /api/generate-audio` は、このサイドカー API を呼び出す。
+（`POST /api/generate-audio` は 2026-10-21 に削除済み。TTS は現行の `/api/v2` ルート `POST /api/v2/tts/synthesize` を通る。）
 全レイヤーで出力形式フィールド名は **`output_format`** に統一する（`format` は使用しない）。
 
 #### 3.2.1 ユーザー preference オーバーレイ（Phase 17-0）
@@ -274,7 +275,7 @@ Gemini Multi-speaker TTS の代替として、**発話行ごとに個別合成 �
 1. DocChapter（ドキュメントタイプ）の生成
 2. Slide生成（任意）
 3. **Kokoro TTS サイドカー + `request-tts` 実装**（Issue #3）
-4. ボイス選択 UI（Issue #4）— 仕様: [`doc/phase17_voice_settings_ui_spec.md`](../phase17_voice_settings_ui_spec.md)
+4. ボイス選択 UI（Issue #4）— 仕様: [`doc/phases/phase17_voice_settings_ui_spec.md`](../../phases/phase17_voice_settings_ui_spec.md)
 5. 音声同期（`slide_timeline_sec` 連動）
 
 ## 5. JSON Schema

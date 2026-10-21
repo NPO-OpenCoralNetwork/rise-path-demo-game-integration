@@ -1,0 +1,121 @@
+{
+  "lessonId": "cc-06-claude-md",
+  "checkedCount": 60,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/memory",
+    "https://code.claude.com/docs/ja/memory",
+    "https://code.claude.com/docs/en/best-practices",
+    "https://code.claude.com/docs/en/features-overview",
+    "https://code.claude.com/docs/en/permissions",
+    "https://code.claude.com/docs/en/permission-modes",
+    "https://code.claude.com/docs/en/skills",
+    "https://code.claude.com/docs/en/prompt-caching",
+    "https://code.claude.com/docs/en/context-window",
+    "https://code.claude.com/docs/en/hooks-guide",
+    "https://code.claude.com/docs/en/tools-reference",
+    "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more",
+    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md (via raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md)",
+    "https://registry.npmjs.org/@anthropic-ai/claude-code"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s3-defs",
+      "where": "items[2] (AGENTS.md).md",
+      "claim": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降、CLAUDE.mdもCLAUDE.local.mdもないときに、代わりに読まれます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/memory",
+      "evidenceQuote": "By default, Claude reads `AGENTS.md` only when you have no `CLAUDE.md` in your working directory or above it. ... **Don't count, and keep loading alongside `AGENTS.md`**: your `~/.claude/CLAUDE.md`, your organization's managed `CLAUDE.md`, and `.claude/rules/` files",
+      "fix": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降の既定では、CLAUDE.mdの代わりに読まれます。プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです。`~/.claude/CLAUDE.md` があっても読まれます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "\"By default, Claude reads `AGENTS.md` only when you have no `CLAUDE.md` in your working directory or above it. Here's which of your files count for that check: * **Count, so Claude reads them instead of `AGENTS.md`**: a `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` in your working directory or any directory above it * **Don't count, and keep loading alongside `AGENTS.md`**: your `~/.claude/CLAUDE.md`, your organization's managed `CLAUDE.md`, and `.claude/rules/` files\" ... \"Reading `AGENTS.md` directly requires Claude Code v2.1.277 or later.\" ... \"`claude-md-or-agents-md` | Your `CLAUDE.md` files, or your `AGENTS.md` files when you have no `CLAUDE.md` or `CLAUDE.local.md` in your working directory or above it. This is the default\"",
+        "reason": "The page supports the version (v2.1.277) and the CLAUDE.md / CLAUDE.local.md condition. In this lesson's context, though, the sentence goes further than the page. The s1-table defines \"CLAUDE.md\" as four locations, including `~/.claude/CLAUDE.md` and the managed policy file. s1-concat then says all four are read together. So \"CLAUDE.mdもCLAUDE.local.mdもないときに、代わりに読まれます\" tells learners two wrong things: that a user or organization CLAUDE.md blocks AGENTS.md, and that AGENTS.md replaces those files. The page says the opposite: those files \"don't count, and keep loading alongside AGENTS.md\". The sentence also leaves out \"by default\", although the page says this is only the default (claude-md-or-agents-md) and the Project instructions setting can change it. The quiz explanation at line 900 does say 既定, but this definition does not. So the finding stands. The proposed fix is mostly right, but \"プロジェクトに\" narrows the condition too much. The page counts a CLAUDE.md in the working directory \"or any directory above it\", so a CLAUDE.md in a parent folder also stops AGENTS.md from being read. The fix also mentions only `~/.claude/CLAUDE.md`, not the managed file. The better fix below is 154 JP characters, and every sentence is 60 or fewer.",
+        "betterFix": "ほかのAIコーディングツールと共有する指示のファイル。v2.1.277以降の既定では、CLAUDE.mdの代わりに読まれます。作業フォルダとその上に、CLAUDE.mdもCLAUDE.local.mdもないときです。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。"
+      }
+    },
+    {
+      "blockId": "summary-cards",
+      "where": "cards[card-agents].back",
+      "claim": "CLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。共有するなら、CLAUDE.mdに `@AGENTS.md` と書きます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/memory",
+      "evidenceQuote": "`claude-md-or-agents-md` | Your `CLAUDE.md` files, or your `AGENTS.md` files when you have no `CLAUDE.md` or `CLAUDE.local.md` in your working directory or above it. This is the default | `claude-md-and-agents-md` | Your `CLAUDE.md` and `AGENTS.md` files together",
+      "fix": "既定では、プロジェクトにCLAUDE.mdもCLAUDE.local.mdもないときです（v2.1.277以降）。共有するなら、CLAUDE.mdに `@AGENTS.md` と書きます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "\"By default, Claude reads `AGENTS.md` only when you have no `CLAUDE.md` in your working directory or above it.\" / \"Don't count, and keep loading alongside `AGENTS.md`: your `~/.claude/CLAUDE.md`, your organization's managed `CLAUDE.md`, and `.claude/rules/` files\" / \"`claude-md-or-agents-md` | Your `CLAUDE.md` files, or your `AGENTS.md` files when you have no `CLAUDE.md` or `CLAUDE.local.md` in your working directory or above it. This is the default | `claude-md-and-agents-md` | Your `CLAUDE.md` and `AGENTS.md` files together\" (ja page: 「既定では、Claude はワーキングディレクトリまたはその上位ディレクトリに `CLAUDE.md` がない場合にのみ `AGENTS.md` を読み込みます」)",
+        "reason": "I tried to defend the card and couldn't. The memory page, in both English and Japanese, ties the no-CLAUDE.md condition to the default setting (\"By default\" / 「既定では」). It also names a `claude-md-and-agents-md` value for Project instructions that loads AGENTS.md alongside CLAUDE.md. The flashcard question asks「AGENTS.mdが読まれるのは？」, and its back states the default as if it were the only rule. That is stronger than the page. The lesson itself says this rule is only the default in the s4 quiz explanation (「既定では…この既定は、/config の「Project instructions」で変えられます」), but the summary card is studied on its own and leaves that out.\n\nThe card also never says where the check looks. Read at face value,「CLAUDE.mdも…ないとき」suggests that a personal ~/.claude/CLAUDE.md would block AGENTS.md. The page says that file does not count.\n\nThe v2.1.277 part is correct (\"Reading AGENTS.md directly requires Claude Code v2.1.277 or later\"). So is the @AGENTS.md import advice.\n\nThe proposed fix is good enough. It adds 既定では, and プロジェクトに is a fair learner-level stand-in for \"working directory or above it\": the troubleshooting section calls the usual cause \"a CLAUDE.md somewhere on the project path\", and it keeps ~/.claude/CLAUDE.md out. The fixed sentence is about 57 characters, under the 60-character limit, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "glossary",
+      "where": "glossary[AGENTS.md].md",
+      "claim": "ほかのAIコーディングツールと共有する指示のファイル。CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに、代わりに読まれます（v2.1.277以降）。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/memory",
+      "evidenceQuote": "To change the default, for example to have Claude always read both files, read only `CLAUDE.md`, or read only your organization's managed instructions, change the **Project instructions** setting.",
+      "fix": "ほかのAIコーディングツールと共有する指示のファイル。既定では、CLAUDE.md・`.claude/CLAUDE.md`・CLAUDE.local.mdのどれもないときに読まれます（v2.1.277以降）。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "\"By default, Claude reads `AGENTS.md` only when you have no `CLAUDE.md` in your working directory or above it.\" ... \"`claude-md-or-agents-md` | Your `CLAUDE.md` files, or your `AGENTS.md` files when you have no `CLAUDE.md` or `CLAUDE.local.md` in your working directory or above it. This is the default\" / \"`claude-md` | Your `CLAUDE.md` files only\" / \"`claude-md-and-agents-md` | Your `CLAUDE.md` and `AGENTS.md` files together\". The glossary page (https://code.claude.com/docs/en/glossary#agents-md) also says: \"You can change the **Project instructions** setting in `/config` to have Claude read both files or only `CLAUDE.md`.\"",
+        "reason": "The lesson has the condition right. The memory page counts CLAUDE.md, .claude/CLAUDE.md and CLAUDE.local.md toward the check, and reading AGENTS.md directly needs v2.1.277 or later. The problem is that the glossary entry gives this as a fixed rule, and the official pages only describe it as the default. The Project instructions setting changes the behavior. With `claude-md`, AGENTS.md is not read even when none of the three files exist. With `claude-md-and-agents-md`, it is read alongside CLAUDE.md. The memory page also lists cases where AGENTS.md support is off: the built-in plugin is disabled, or it is the first session after upgrading from v2.1.276 or earlier. The lesson itself already says 既定では in the quiz feedback and explanation (lines 894 and 900), so the glossary entry at line 1112 is stronger than both the page and the rest of the lesson. The proposed fix adds 既定では and keeps everything else accurate, so no betterFix is needed. Separately, the inline glossary at line 383 has the same missing qualifier and also leaves out `.claude/CLAUDE.md`.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s3-check",
+      "where": "questions[q4].explanation (2nd sentence)",
+      "claim": "`cat` などのコマンドで中身を見たときも同じです。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/tools-reference",
+      "evidenceQuote": "Those commands are `cat`, `nl`, `bat`, `batcat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `egrep`, `fgrep`, and `rg`, each run on one file with no pipes or redirects. A search that prints no matches doesn't count as a read, nor does any command outside this list. (memory page: \"It also loads when Claude views a matching file with a Bash command that counts as a read, such as `cat` or `head` on a single file.\")",
+      "fix": "1つのファイルを `cat` や `head` で見たときも同じです。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "A path-scoped rule loads when Claude uses the Read, Write, or Edit tool on a matching file. It also loads when Claude views a matching file with a Bash command that counts as a read, such as `cat` or `head` on a single file. (tools-reference: \"Those commands are `cat`, `nl`, `bat`, `batcat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `egrep`, `fgrep`, and `rg`, each run on one file with no pipes or redirects. A search that prints no matches doesn't count as a read, nor does any command outside this list.\")",
+        "reason": "I tried to defend the lesson and could not. The official memory page does say that a path-scoped rule also loads when Claude views a matching file with a Bash command. But it only counts a command that \"counts as a read\", such as `cat` or `head` \"on a single file\". The tools reference narrows this further. Only commands on a fixed list count, each run on one file with no pipes or redirects, and \"nor does any command outside this list\". The lesson says 「`cat` などのコマンドで中身を見たときも同じです」 with no condition at all, and 「など」 suggests any similar command works. Under the docs, `cat a b`, `cat file | grep x`, or `less`/`awk` would not load the rule. Nothing else in the lesson adds the condition: the related flashcard at line 1051 repeats the same unqualified wording. So the lesson states this more strongly than the docs do, and the finding stands. The proposed fix 「1つのファイルを `cat` や `head` で見たときも同じです。」 copies the memory page's own wording (\"such as `cat` or `head` on a single file\") and is accurate. No better fix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "summary-cards",
+      "where": "cards[card-paths].back",
+      "claim": "Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。`cat` などで中身を見たときも読まれます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/memory",
+      "evidenceQuote": "A path-scoped rule loads when Claude uses the Read, Write, or Edit tool on a matching file. It also loads when Claude views a matching file with a Bash command that counts as a read, such as `cat` or `head` on a single file.",
+      "fix": "Claudeが一致するファイルに `Read`・`Write`・`Edit` ツールを使うときです。1つのファイルを `cat` や `head` で見たときも読まれます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "\"A path-scoped rule loads when Claude uses the Read, Write, or Edit tool on a matching file. It also loads when Claude views a matching file with a Bash command that counts as a read, such as `cat` or `head` on a single file.\" The linked tools reference (https://code.claude.com/docs/en/tools-reference) adds: \"Those commands are `cat`, `nl`, `bat`, `batcat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `egrep`, `fgrep`, and `rg`, each run on one file with no pipes or redirects. A search that prints no matches doesn't count as a read, nor does any command outside this list.\"",
+        "reason": "The first sentence of the card (Read/Write/Edit on a matching file) matches the memory page exactly. \"など\" is also fine on its own, since head, tail, grep and others count too. What the card leaves out is the limit: the page says only a command that \"counts as a read,\" meaning one of the listed commands run on one file with no pipes or redirects. \"`cat` などで中身を見たとき\" reads as if any way of viewing the contents works, including `cat a b`, `cat x | less`, or commands not on the list. So the card claims more than the page does, and the finding stands. The proposed fix (\"1つのファイルを `cat` や `head` で見たときも読まれます。\") follows the memory page's own wording (\"such as `cat` or `head` on a single file\") and is accurate, so it needs no better fix. Side note: the explanation at line 471 of the lesson (\"`cat` などのコマンドで中身を見たときも同じです。\") has the same missing single-file limit.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "sources",
+      "where": "sources[cc-permission-modes].title",
+      "claim": "Permission modes",
+      "problem": "outdated",
+      "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+      "evidenceQuote": "# Choose a permission mode",
+      "fix": "Choose a permission mode",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/permission-modes",
+        "evidenceQuote": "pageMetadata: {\"title\":\"Choose a permission mode\",\"sidebarTitle\":\"Permission modes\",\"description\":\"Control whether Claude asks before acting. ...\"}. The page's own nav entry: data-title=\"Permission modes\" data-active=\"true\"",
+        "reason": "The auditor is right that the page's H1 and <title> are \"Choose a permission mode\". But the same official page sets \"Permission modes\" as its sidebarTitle in its own page metadata. That is the label the docs navigation shows for this exact URL, active on the page itself. So the lesson's source title names the right, current page with an official Anthropic label. It is not outdated, wrong or unsupported. The URL and the cited content are unchanged. Changing it to \"Choose a permission mode\" would be an optional cleanup for consistency: the other sources in this lesson use page H1s, for example \"Configure permissions\" rather than the sidebar label \"Permissions\". It does not fix an error. The proposed fix itself is accurate, because that string is the H1, if the owner wants consistency.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

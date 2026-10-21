@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Box, Braces, Check, Palette, RotateCw, Sparkles, Terminal } from 'lucide-react';
+import { ArrowRight, Bot, Box, Braces, Check, Palette, RotateCw, Sparkles, Terminal } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -257,7 +257,9 @@ const ContinueCard: React.FC = () => {
 
   const title = resolveLText(lesson?.title ?? entry?.ref.title, locale, fallbackLocale);
   const estMinutes = lesson?.estMinutes ?? entry?.ref.estMinutes;
-  const trackBadge = target.courseSlug === 'vibe-coding' ? trackCopy('vibe', language, course).title : resolveLText(course.title, locale, fallbackLocale).value;
+  // The course title keeps its own lang (a Japanese-only course in the English UI).
+  const vibeTrack = target.courseSlug === 'vibe-coding' ? trackCopy('vibe', language, course) : null;
+  const trackBadge = vibeTrack ? { value: vibeTrack.title, lang: vibeTrack.lang } : resolveLText(course.title, locale, fallbackLocale);
   const world = course.world ?? 'vibe';
 
   const meta: string[] = [];
@@ -290,7 +292,7 @@ const ContinueCard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-world-soft px-2.5 py-0.5 text-caption font-semibold text-world">
             <span aria-hidden="true" className="size-2 rounded-full bg-world" />
-            {target.fromLast ? trackBadge : t.startKicker}
+            {target.fromLast ? <span lang={trackBadge.lang}>{trackBadge.value}</span> : t.startKicker}
           </span>
           {target.fromLast ? <span className="text-caption text-fg-3">{t.continueKicker}</span> : null}
         </div>
@@ -404,6 +406,18 @@ const COVER_STYLE: React.CSSProperties = {
 // --- Tracks --------------------------------------------------------------------------------
 
 const VIBE_COURSE_SLUG = 'vibe-coding';
+const CLAUDE_CODE_COURSE_SLUG = 'claude-code';
+
+// Five cards without a lonely last one: on 2 columns the first card spans the row (1 + 2 + 2),
+// a 6-column grid gives 3 + 2 from lg, and all five share one row from 2xl. Next to the sidebar,
+// five cards at xl are too narrow for the two-line titles and descriptions.
+const TRACK_SPAN = [
+  'col-span-2 2xl:col-span-1',
+  'lg:col-span-2 2xl:col-span-1',
+  'lg:col-span-2 2xl:col-span-1',
+  'lg:col-span-3 2xl:col-span-1',
+  'lg:col-span-3 2xl:col-span-1',
+];
 
 const TrackSection: React.FC = () => {
   const { language } = useLanguage();
@@ -412,8 +426,14 @@ const TrackSection: React.FC = () => {
   // Progress is saved under the course folder name (the slug getCourse takes), not course.id.
   const vibeCourse = useMemo(() => getCourse(VIBE_COURSE_SLUG) ?? null, []);
   const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null), [vibeCourse]);
+  const claudeCodeCourse = useMemo(() => getCourse(CLAUDE_CODE_COURSE_SLUG) ?? null, []);
+  const claudeCode = useMemo(
+    () => (claudeCodeCourse ? courseTotals(claudeCodeCourse, readLessonSummary, CLAUDE_CODE_COURSE_SLUG) : null),
+    [claudeCodeCourse],
+  );
   const tracks = {
     vibe: trackCopy('vibe', language, vibeCourse),
+    claudeCode: trackCopy('claude-code', language, claudeCodeCourse),
     unity: trackCopy('unity', language),
     blender: trackCopy('blender', language),
     art: trackCopy('art', language),
@@ -429,8 +449,8 @@ const TrackSection: React.FC = () => {
           {t.seeAll}
         </ButtonLink>
       </div>
-      <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <li className="flex">
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 2xl:grid-cols-5">
+        <li className={`flex ${TRACK_SPAN[0]}`}>
           <CourseCard
             className="flex-1"
             world="vibe"
@@ -443,7 +463,20 @@ const TrackSection: React.FC = () => {
             to="/vibe"
           />
         </li>
-        <li className="flex">
+        <li className={`flex ${TRACK_SPAN[1]}`}>
+          <CourseCard
+            className="flex-1"
+            world="ai"
+            badge={tracks.claudeCode.badge}
+            title={<span lang={tracks.claudeCode.lang}>{tracks.claudeCode.title}</span>}
+            meta={claudeCode ? formatCourseMeta(claudeCode, language) : undefined}
+            progress={claudeCode && claudeCode.pct > 0 ? claudeCode.pct : undefined}
+            progressLabel={t.trackProgress}
+            glyph={<Bot aria-hidden="true" />}
+            to="/claude-code"
+          />
+        </li>
+        <li className={`flex ${TRACK_SPAN[2]}`}>
           <CourseCard
             className="flex-1"
             world="unity"
@@ -454,7 +487,7 @@ const TrackSection: React.FC = () => {
             to="/unity"
           />
         </li>
-        <li className="flex">
+        <li className={`flex ${TRACK_SPAN[3]}`}>
           <CourseCard
             className="flex-1"
             world="blender"
@@ -465,7 +498,7 @@ const TrackSection: React.FC = () => {
             to="/blender"
           />
         </li>
-        <li className="flex">
+        <li className={`flex ${TRACK_SPAN[4]}`}>
           <CourseCard
             className="flex-1"
             world="art"
