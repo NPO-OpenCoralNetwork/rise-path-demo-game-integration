@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-10-safety-cost",
   "file": "content/courses/vibe-coding/drafts/cc-10-safety-cost.lesson.json",
-  "lessonHash": "sha256:4f85040f9e462bb2",
+  "lessonHash": "sha256:18da014f91a89678",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,30 +9,30 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The s2-layers flowchart (TD) has readable Japanese labels and a caption at 390 px (pages/mobile-jp-06.png, pages/mobile-jp-07.png). The s2-table and s5-table stay 2 columns and wrap cleanly on mobile (pages/mobile-jp-07.png, pages/mobile-jp-13.png). Nothing sticks out sideways, overlaps, is clipped or breaks.",
+      "evidence": "The layered-defence flowchart (s2-layers) fits in a top-down column at 390 px and its Japanese labels can be read (pages/mobile-jp-06.png, -07.png). Both tables (s2-table, s5-table) keep two readable columns on mobile, and every code block (s3-code, practice-case-*, practice-folder, practice-answer-rule) shows whole lines with no clipping (pages/mobile-jp-10.png, -15.png, -17.png, -18.png).",
       "blockIds": [
         "s2-layers",
         "s2-table",
         "s5-table",
         "s3-code",
+        "practice-folder",
         "practice-answer-rule"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "metrics.json lists no text-only screens on desktop or mobile. Every content stretch breaks into definitions, a numbered list, a callout, steps, code or a check, and every section ends with a 確認しよう card (pages/desktop-jp-03.png, pages/desktop-jp-05.png, pages/desktop-jp-08.png, pages/desktop-jp-10.png).",
+      "score": 3,
+      "evidence": "metrics.json lists no text-only screens. Every section switches between prose, a definition list, a table or code and a check. The prerequisites line under the title is a dense five-line run of small text on mobile (pages/mobile-jp-01.png). The practice section stacks three separate one-step step lists, each with its own '1ステップ中 0 完了' header (pages/mobile-jp-16.png, -18.png).",
       "blockIds": [
-        "s1-check",
-        "s2-check",
-        "s3-check",
-        "s5-check"
+        "practice-steps",
+        "practice-steps-deny",
+        "practice-steps-bill"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "All visible text is Japanese, with the English kept for key terms (プロンプトインジェクション (prompt injection), サンドボックス (sandbox)). The diagram labels are Japanese, contrast is fine in the callouts and the dark code blocks, and no control is hidden under the top or bottom bars (pages/mobile-jp-03.png, pages/mobile-jp-11.png, pages/mobile-jp-28.png).",
+      "evidence": "All visible lesson text and the diagram labels are Japanese, with English terms only in parentheses, and contrast is good on every screen. Inline code chips stay whole on mobile and nothing is hidden under the top or bottom bars (pages/mobile-jp-11.png, -21.png). There is no untranslated or mixed-language text.",
       "blockIds": [
         "s1-defs",
         "s2-defs",
@@ -42,11 +42,14 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "The answer options in q3 (`deny` に `Write(./certs/**)` を書く, and option d with Read(./certs/**)) wrap so that only く is left on the second line at 390 px (pages/mobile-jp-11.png, pages/mobile-jp-12.png). Shortening them to 〜と書く, or moving を書く before the chip, would avoid the one-character line.",
-    "reader: desktop charsPerLine median is 44 (max 56) against the JP target of 30–40. This comes from the reader's 680 px text width, not the lesson.",
-    "reader: the end banner on draft previews says this is the course's last lesson (このコースの最後のレッスンまで読み終えました) (pages/mobile-jp-28.png, pages/desktop-jp-19.png). This is expected because drafts are not in course.json.",
-    "reader: metrics.json marks the mobile full-length PNG as truncated (16000 px cap). The per-screen pages/mobile-jp-01..28 still cover the whole lesson."
+    "s3-check (q3, options a and d): at 390 px only the last kana 'く' of 'を書く' wraps onto a line by itself after the code chip (pages/mobile-jp-11.png, -12.png). Shortening the options to 'deny に Write(./certs/**)' and 'deny に Read(./certs/**)' and moving 'を書く' into the question would keep each option on one line.",
+    "practice-steps / practice-steps-deny / practice-steps-bill: three step lists in a row, each holding one step, repeat the '手順 1ステップ中 0 完了' header (pages/mobile-jp-16.png, -18.png). Consider merging them into one 3-step list, or turning the single steps into md plus the prompt blocks.",
+    "lesson: the prerequisites line under the title runs to five lines of small grey text on mobile (pages/mobile-jp-01.png). A shorter list, for example lesson numbers only, would lighten the first screen.",
+    "reader: desktop JP charsPerLine median is 44 against a target of 30–40 (measure 680 px at 18.7 px). This comes from the reader's column width, not from the lesson.",
+    "reader: the mobile flashcard hint reads 'クリックまたはスペースキーでめくる' on a touch device (pages/mobile-jp-26.png).",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (pages/mobile-jp-28.png, desktop-jp-19.png).",
+    "reader: the mobile full-length PNG is truncated at 16000px (metrics.json truncated: true). The per-screen PNGs cover the whole page."
   ],
   "verdict": "pass",
-  "summary": "This preview shows the lesson under review (lessonHash sha256:4f85040f9e462bb2), and metrics.json has no hard failures: no sideways overflow, console, Mermaid or image errors, and no unknown blocks. The diagram, both tables and all code blocks are readable at 390 px, quizzes or checks break up the text often, and no screen shows personal data. The only suggestion is to stop the one-character line wraps in q3's answer options."
+  "summary": "metrics.json shows no hard failures: no overflow, no console, mermaid or image errors, no unknown blocks and no text-only screens. No screen shows personal data. At 390 px the flowchart, both two-column tables and every code block stay readable and nothing is cut off. Only small polish is left: one kana wraps alone in the q3 options, and the practice section has three one-step step lists that could be merged."
 }

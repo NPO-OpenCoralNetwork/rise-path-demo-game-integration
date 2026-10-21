@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-02-permissions",
   "file": "content/courses/vibe-coding/drafts/cc-02-permissions.lesson.json",
-  "lessonHash": "sha256:fc6282d1f851b02f",
+  "lessonHash": "sha256:b119e1c419d1e206",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,48 +9,43 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "No screen is text-only. The rules-diagram flowchart TD fits 390 px with readable Japanese labels (pages/mobile-jp-09.png). The example-code and rules-files code blocks show every line without wrapping or clipping (pages/mobile-jp-12.png, pages/mobile-jp-17.png, pages/mobile-jp-18.png). The modes-table and rewind-table lists, callouts and definitions break up the prose throughout.",
+      "evidence": "metrics.json shows no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks, 0 broken images, and no text-only screens. The rules-diagram flowchart (TD) has readable Japanese labels at 390 px (.artifacts/preview/vibe-coding/cc-02-permissions/pages/mobile-jp-09.png). On mobile, every code chip in the question options stays whole inside its option card (mobile-jp-13.png, mobile-jp-25.png).",
       "blockIds": [
         "rules-diagram",
         "example-code",
-        "rules-files",
-        "modes-table",
-        "rewind-table",
-        "rules-defs"
-      ]
-    },
-    {
-      "id": "load",
-      "score": 4,
-      "evidence": "On mobile, each screen holds about one idea, and a quiz comes after each section (確認しよう 1/6 to 6/6). Paragraphs are short. Long option chips such as `git push --force origin main` stay whole inside their option boxes (pages/mobile-jp-25.png). The flashcards and the askTutor block are well spaced (pages/mobile-jp-27.png).",
-      "blockIds": [
-        "modes-check",
-        "auto-check",
-        "rules-check",
         "example-check",
-        "rewind-check",
         "check-quiz"
       ]
     },
     {
-      "id": "a11y_l10n",
+      "id": "load",
       "score": 3,
-      "evidence": "All visible text is Japanese with English terms in parentheses. Contrast is fine and no control is hidden under the bars. Two small issues: the section reference '2-1' in sort-task breaks across lines as '2-' / '1の一覧' (pages/mobile-jp-15.png), and the prompt blocks show literal backticks, with `rewind-copy.md` split at the hyphen (pages/mobile-jp-22.png).",
+      "evidence": "Each segment is short and broken up by definition tables, a diagram, steps, code and a check at most two to three screens apart. The lesson is still long at 29 mobile screens, though, and the modes-table bullet list plus modes-switch fill about two dense screens (mobile-jp-03.png, mobile-jp-04.png).",
       "blockIds": [
-        "sort-task",
-        "rules-prompt",
-        "rewind-prompt"
+        "modes-table",
+        "modes-switch",
+        "rules-steps"
+      ]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Text is all Japanese with English terms in parentheses on first use, contrast is good, and nothing in the lesson content sits under the top or bottom bars. On mobile, headings wrap at natural phrase breaks, for example '権限モードで、確認なしに / 進める範囲を選ぶ' (mobile-jp-03.png).",
+      "blockIds": [
+        "modes",
+        "auto-mode",
+        "rules"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "sort-task: on pages/mobile-jp-15.png the reference '2-1の一覧' breaks as '2-' / '1の一覧'. Rewording so the reference does not land at the line end (for example 「一覧（2-1）を見ずに…」) or writing it as 「2-1節」 would make that break less likely.",
-    "rules-prompt / rewind-prompt: the prompt text shows raw backticks around `git push`, `.claude/settings.json`, `rewind-practice.md` and `rewind-copy.md`. On mobile, `rewind-copy.md` splits at the hyphen (pages/mobile-jp-22.png), and on desktop the 読ませないファイル chip sits inside visible backticks (pages/desktop-jp-14.png). Consider 「」 quotes instead of backticks in the learner-visible prompt, or accept them as literal Markdown for Claude.",
-    "reader: desktop charsPerLine median 41 and max 54 is above the JP target of 30–40 at a 680 px measure. This is a reader measure setting, not lesson content.",
-    "reader: the mobile full-length PNG stops at 16000 px (the per-screen PNGs cover the whole page), and the end banner says this is the course's last lesson because drafts are not in course.json."
+    "rules-prompt / rewind-prompt: the prompt text shows raw Markdown backticks, and in rules-prompt the fill-in chip sits inside them (`[読ませないファイル]`). On mobile the filename `rewind-copy.md` breaks as '`rewind-' / 'copy.md`' (.artifacts/preview/vibe-coding/cc-02-permissions/pages/mobile-jp-20.png, mobile-jp-21.png). Consider dropping the backticks around {{読ませないファイル}}, or quoting names with 「」 so the prompt reads cleanly before it is copied.",
+    "rules-order: '調べる順番は下の図のとおりです。' is followed by a second paragraph before the figure appears (mobile-jp-08.png, desktop-jp-05.png). Moving the CLAUDE.md sentence below rules-diagram, or splitting it into its own block, would put the figure right after its reference.",
+    "reader: desktop JP charsPerLine median is 41 (max 54) against the 30–40 target at a 680 px measure. This comes from the reader's column width, not the lesson.",
+    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json. The mobile full-length PNG is truncated at 16000 px, and failed /api/ requests were ignored as environment noise."
   ],
   "average": 3.67,
   "verdict": "pass",
-  "summary": "metrics.json reports no hard failures: no overflow, no console errors, mermaid errors, unknown blocks or broken images, and no text-only screens. No personal data appears on any screen opened. The lesson reads well at 390 px: the TD flowchart, the JSON and bash code blocks and the long inline-code options are all whole and legible. Only small line-break nits remain: '2-1' split in sort-task, and literal backticks and a split filename in the prompt blocks."
+  "summary": "The lesson renders cleanly at 390 px and on desktop: no hard failures, a readable vertical flowchart, code blocks that fit, and option cards that keep their code chips whole. No personal data was seen on any screen. Remaining polish: the raw backticks in the two prompt blocks, and the figure reference in rules-order that is separated from its diagram."
 }

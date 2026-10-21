@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-09-parallel-automation (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:6da74e7b888a7ddb.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:e66b60d1da0710f0.**
 
 - Title: 第9回｜並列で進める・自動で回す
 - Draft: `content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-09-parallel-automation.md`
@@ -34,31 +34,30 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 2260 (budget 1,200–2,400) · read 2648 · practice reading 1225 · questions 11 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)`
+- course length measure: `prose 2265 (budget 1,200–2,400) · read 2653 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-09-parallel-automation by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json (sha256:6da74e7b888a7ddb)
-  ja-editor: verification of sha256:174374fa262b8b76 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/lesson.json) · 1 resolved, 0 unresolved · 1 changed · carried over: prior, a11y_l10n · previous .artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/round-1/ja-editor.review.json and 1 earlier round checked
-  pedagogy-reviewer: verification of sha256:174374fa262b8b76 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, load, worked, visual, practice, meta, accuracy, voice, a11y_l10n · previous .artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
+  lesson content/courses/vibe-coding/drafts/cc-09-parallel-automation.lesson.json (sha256:e66b60d1da0710f0)
+  ja-editor: verification of sha256:6da74e7b888a7ddb (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/lesson.json) · 0 resolved, 0 unresolved · 5 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/round-1/ja-editor.review.json and 2 earlier rounds checked
+  pedagogy-reviewer: verification of sha256:6da74e7b888a7ddb (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/lesson.json) · 0 resolved, 0 unresolved · 5 changed · carried over: hook, worked, visual, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
   visual-qa: full review
   mean 3.31 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      3  (pedagogy-reviewer carried)
+  ✓ align      3  (pedagogy-reviewer)
   ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor carried, pedagogy-reviewer carried)
-  ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
   ✓ worked     3  (pedagogy-reviewer carried)
   ✓ active     3  (pedagogy-reviewer)
   ✓ miscon     4  (pedagogy-reviewer)
   ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
-  ✓ practice   4  (pedagogy-reviewer carried)
+  ✓ practice   4  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer carried)
-  ✓ accuracy   3  (pedagogy-reviewer carried)
-  ✓ voice      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer)
   ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
-  resolved [voice] check-quiz (ja-editor)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-09-parallel-automation/`)
@@ -69,6 +68,7 @@ Review of cc-09-parallel-automation by ja-editor, pedagogy-reviewer, visual-qa: 
 4. `2bf364c299299ca6`: ja-editor full revise (mean 3.50, must-fix 1); pedagogy-reviewer full pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 4)
 5. `174374fa262b8b76`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 6. `6da74e7b888a7ddb`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `e66b60d1da0710f0`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -85,6 +85,7 @@ An auditor with web access checked 70 claims (pages: 20); a second checker tried
 ## Orchestrator notes
 
 - Last small fixes made by the orchestrator from the reviewers' exact fix texts (cc-02 e6 d, cc-03 step titles, cc-05 pr-code, cc-08 q9 and practice-b-task, cc-09 e3 d, cc-11 dr-table), then re-reviewed by visual-qa, pedagogy-reviewer and ja-editor.
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 

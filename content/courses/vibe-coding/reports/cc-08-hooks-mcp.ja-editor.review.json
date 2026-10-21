@@ -4,63 +4,62 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:dc1fce75fb87584d",
+  "lessonHash": "sha256:112a650daf9ca3d0",
   "verifies": {
-    "reviewedRevision": "sha256:01fa366fee4752fb",
+    "reviewedRevision": "sha256:dc1fce75fb87584d",
     "changed": [
-      "practice-b-task",
+      "s5-check",
       "practice-b-quiz",
-      "lesson.estMinutes"
+      "summary-next"
     ],
     "changedShare": 0.04,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/01fa366fee4752fb/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-08-hooks-mcp/dc1fce75fb87584d/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "I checked every string in the changed blocks. The scenario has moved from the q9 prompt into practice-b-task, as two list items. Each item is warm です・ます with short sentences: 「Aは、社内チームの課題管理MCPサーバーです。」 and 「ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。」. The q9 prompt now asks once: 「AとBについて、いちばん適切な判断はどれでしょう？」. This fixes the niceToHave from my last round about the prompt asking twice. Options, feedback and explanation are unchanged and still parallel. The names A and B match the captions of practice-b-model and practice-b-model-b. I found no grammar or naming errors.",
+      "evidence": "I checked every string in the 3 changed blocks. The q4 prompt reads 「同僚が「PR（プルリクエスト）の説明を自動で書く」プラグインを勧めてくれました。」. This is です・ます, and it spells PR out the same way as the other course draft that uses it (「CIで、PR（プルリクエスト）…」). In q9, options a and d now share the same opening, 「Aは閉じるツールを拒否ルールで外して試し、」, and differ only in what they decide about B. This keeps the options parallel. 拒否ルール is the word used in hook-predict (「第2回の拒否ルールのように」) and in the flashcard 「フックと拒否ルール（deny）は、どう使い分ける？」. In summary-next, the hooks-guide sentence 「フックの最新の情報は、[フックの公式ガイド（日本語）](…)で確かめましょう。」 is warm and natural. I found no grammar, notation or naming errors in the changed text.",
       "blockIds": [
-        "practice-b-task",
-        "practice-b-quiz"
+        "s5-check",
+        "practice-b-quiz",
+        "summary-next"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs reports 「prose 1892 (budget 1,200–2,400) · … · est 17.8 min (must be ≤ 20; estMinutes 18)」, so estMinutes 18 now matches the rounded estimate. lessons:lint --strict reports 「0 errors, 0 warnings」. Each list item in practice-b-task has 3 sentences or fewer. The q9 prompt is now one short sentence, so the learner reads the scenario once before the options.",
+      "evidence": "measure.mjs reports 「prose 1897 (budget 1,200–2,400) · … · est 17.8 min (must be ≤ 20; estMinutes 18)」. estMinutes still matches the rounded estimate. lessons:lint --strict reports 「0 errors, 0 warnings」. Both paragraphs of summary-next have 2 sentences or fewer.",
       "blockIds": [
-        "practice-b-task",
+        "summary-next",
         "practice-b-quiz"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Carried over from round 3. The changed blocks add no new terms. MCPサーバー, プラグイン, フック and 権限ルール are defined earlier in the lesson.",
+      "evidence": "PR is spelled out on first use in q4 (「PR（プルリクエスト）」), and nothing earlier in the lesson uses PR. 拒否ルール in q9 a/d was introduced in hook-predict, which points back to round 2 of the course. No new terms are added. The scores and evidence for the unchanged definitions blocks (s1-defs, s2-defs, s4-defs, s5-defs) are as in the previous round.",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s4-defs",
-        "s5-defs"
-      ],
-      "carriedOver": true
+        "s5-check",
+        "practice-b-quiz",
+        "hook-predict"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over from round 3. The lesson is jp only, and the new markdown list in practice-b-task is plain Japanese that the reader renders.",
+      "evidence": "The lesson is jp only. The link text in summary-next, 「フックの公式ガイド（日本語）」, names where the link goes. The link now sits next to the question about hooks instead of after the next-lesson note, so it is easier to understand on its own.",
       "blockIds": [
-        "s4-add",
         "summary-next"
-      ],
-      "carriedOver": true
+      ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
+    "practice-b-quiz: the options now say 拒否ルール, but the explanation and the c feedback still say the broader 権限ルール for the same action. Using the same word helps the learner see that this is the mechanism option a names — 「Aは閉じるツールを権限ルールで外し、」→「Aは閉じるツールを拒否ルールで外し、」 and 「閉じるツールは、権限ルールで外せます。」→「閉じるツールは、拒否ルールで外せます。」",
+    "s5-check: optionally add the English with the katakana, as the style guide does for katakana terms. The other course lesson writes 「プルリクエスト（pull request）」 — 「PR（プルリクエスト）」→「PR（プルリクエスト、pull request）」",
     "s4-add: still open from round 3 (unchanged text). Use the same word as s4-transport — 「# claude mcp add <名前> -- <コマンド>」→「# claude mcp add <名前> -- <起動コマンド>」",
     "practice-b-model: still open from round 2. The 作者 row repeats the update schedule — 「社内チーム・毎月更新」→「社内チームで、いまも保守している」",
     "check-quiz: still open from round 2. The second sentence of the q8 explanation has no subject — 「そのためプロンプトインジェクションの入り口になります。」→「そのため、このサーバーはプロンプトインジェクションの入り口になります。」",
@@ -69,5 +68,5 @@
   ],
   "average": 4,
   "verdict": "pass",
-  "summary": "This was a verification round (mode verify). review-scope.mjs exited 0: 2 of 49 blocks changed, plus estMinutes (4% of parts). My last review had no must-fix items, so there are no resolved entries. The scenario for candidates A and B has moved from the q9 prompt into a list in practice-b-task, and the prompt is now one short question. This applies my earlier niceToHave about the prompt asking twice. estMinutes 18 matches measure.mjs (est 17.8 min, prose 1892), and lessons:lint --strict is clean. I found no (a)–(e) errors in the changed text. The remaining niceToHave items are all in unchanged blocks."
+  "summary": "Verification round (mode verify): review-scope.mjs exited 0 with 3 of 49 blocks changed (4%). My previous review had no must-fix items, so there are no resolved entries. What changed: q4 spells out PR as 「PR（プルリクエスト）」 on first use. q9 options a and d now remove the close tool with a 拒否ルール, and the two options stay parallel. summary-next moves the hooks-guide link before the next-lesson note. lessons:lint --strict is clean. measure.mjs reports prose 1897 and est 17.8 min, which matches estMinutes 18. I found no (a)–(e) errors in the changed text. New nice-to-haves: align the q9 explanation and the c feedback with 「拒否ルール」, and optionally add 「pull request」 to the PR gloss. The older nice-to-haves are all in unchanged blocks."
 }

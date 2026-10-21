@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-01-first-session (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:9251fd0014082e5c.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:83c7a256e5bf982c.**
 
 - Title: 第1回｜最初のタスクを任せる
 - Draft: `content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-01-first-session.md`
@@ -33,31 +33,30 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 1659 (budget 1,200–2,400) · read 2483 · practice reading 801 · questions 10 · practice sections 1 · est 16.0 min (must be ≤ 20; estMinutes 16)`
+- course length measure: `prose 1659 (budget 1,200–2,400) · read 2483 · practice reading 842 · questions 10 · practice sections 1 · est 16.1 min (must be ≤ 20; estMinutes 16)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-01-first-session by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json (sha256:9251fd0014082e5c)
-  ja-editor: verification of sha256:eb6d40faa5d6fe69 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/lesson.json) · 1 resolved, 0 unresolved · 4 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/round-1/ja-editor.review.json and 2 earlier rounds checked
-  pedagogy-reviewer: verification of sha256:eb6d40faa5d6fe69 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/lesson.json) · 0 resolved, 0 unresolved · 4 changed · carried over: align, hook, active, miscon, meta · previous .artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
+  lesson content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json (sha256:83c7a256e5bf982c)
+  ja-editor: verification of sha256:9251fd0014082e5c (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: a11y_l10n · previous .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/ja-editor.review.json and 3 earlier rounds checked
+  pedagogy-reviewer: verification of sha256:9251fd0014082e5c (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, worked, active, miscon, visual, meta, voice, a11y_l10n · previous .artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/pedagogy-reviewer.review.json and 3 earlier rounds checked
   visual-qa: full review
   mean 3.38 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      4  (pedagogy-reviewer carried)
   ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor, pedagogy-reviewer)
+  ✓ prior      3  (ja-editor, pedagogy-reviewer carried)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer)
+  ✓ worked     3  (pedagogy-reviewer carried)
   ✓ active     3  (pedagogy-reviewer carried)
   ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer, visual-qa)
+  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
   ✓ practice   3  (pedagogy-reviewer)
   ✓ meta       4  (pedagogy-reviewer carried)
   ✓ accuracy   3  (pedagogy-reviewer)
-  ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer, visual-qa)
-  resolved [prior] install-how (ja-editor)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-01-first-session/`)
@@ -67,6 +66,7 @@ Review of cc-01-first-session by ja-editor, pedagogy-reviewer, visual-qa: PASS
 3. `3ebe60f3a0474749`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
 4. `eb6d40faa5d6fe69`: ja-editor verify revise (mean 3.50, must-fix 1); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 3)
 5. `9251fd0014082e5c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+6. `83c7a256e5bf982c`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -83,6 +83,7 @@ An auditor with web access checked 85 claims (pages: 29); a second checker tried
 ## Orchestrator notes
 
 - 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 

@@ -1,67 +1,55 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:0913750984346c84",
+  "lessonHash": "sha256:2b49a5e74f15af83",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:a2581804ebc9fe6d",
+    "reviewedRevision": "sha256:0913750984346c84",
     "changed": [
-      "hook-b1",
-      "s1-table",
-      "s3-defs",
-      "practice-setup",
-      "practice-steps",
-      "practice-hint3",
-      "practice-answer",
-      "check-quiz",
-      "summary-cards",
       "lesson.glossary"
     ],
-    "changedShare": 0.12,
+    "changedShare": 0.02,
     "fullReviewRequired": false,
-    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/a2581804ebc9fe6d/round-1/ja-editor.review.json"
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/round-1/ja-editor.review.json"
   },
   "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed prose still uses です・ます. hook-b1 now ends with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」, which matches the hook-predict question q0. The previous niceToHave for practice-hint3 is done: 「`src/api/` の行は `paths:` 付きのルール」. Its new line 「「ちゃんと」の行は「コミットの前に `npm run test:unit` を通す」に直し」 uses the 直す destination from pr-decide and matches the answer. The sample in practice-setup now mixes plain form, こと and ください, but that is the messy file the learner rewrites, so it is on purpose. The sample still has 19 lines, which matches 「19行」 in pr-setup and pr-decide. A few spots are still uneven: the new e6 option a, the forms in the s1-table first column, and s4-table (see niceToHave).",
+      "carriedOver": true,
+      "evidence": "Carried over from the previous round because no block changed. The new glossary sentence reads correctly and uses です・ます in its second sentence, but it says 「始まる」 three times in two short sentences (see niceToHave). The uneven spots from the last round are still open: the e6 option a, the s1-table first column and s4-table.",
       "blockIds": [
-        "hook-b1",
-        "practice-hint3",
-        "practice-setup",
         "check-quiz",
-        "s1-table"
+        "s1-table",
+        "s4-table"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs: prose 2399 (budget 1,200–2,400), est 19.3 min (must be ≤ 20), estMinutes 19. These match. lessons:lint --strict: 0 errors, 0 warnings. practice-answer now splits the long commit item over two lines (「- コミットの前に」/「`npm run test:unit` を通す」), which suits a phone. The highlight is lines 6–12, which is exactly the new CLAUDE.md body. The answer still keeps 4 items, matching 「残した4つの項目」 in practice-answer-why.",
+      "carriedOver": true,
+      "evidence": "Carried over. measure.mjs: prose 2399 (budget 1,200–2,400), est 19.3 min (must be ≤ 20), estMinutes 19. These match. lessons:lint --strict: 0 errors, 0 warnings.",
       "blockIds": [
-        "practice-answer",
-        "practice-answer-why",
-        "practice-hint3"
+        "practice-answer"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "I re-scored this because the glossary and card-agents changed. The glossary entry for AGENTS.md now says 「`.claude/CLAUDE.md` はCLAUDE.mdに数え、`~/.claude/CLAUDE.md` は数えません。」. That agrees with s3-defs and with audit-cc-06-claude-md.json (\"Don't count… your `~/.claude/CLAUDE.md`\"). card-agents now reads 「v2.1.277以降、既定では作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないときです。」, which closes the carried niceToHave. The glossary term 「コンテキスト」 still has no English (niceToHave), so the score stays at 3.",
+      "evidence": "Re-scored because the glossary changed. The セッション（session） entry now reads 「`claude` を起動すると始まる、ひと続きの会話。始めるたびに、まっさらなコンテキストから始まります。」. That matches cc-01 (「`claude` を起動すると始まる、ひと続きの会話です。」) and agrees with s1 (「セッションは毎回まっさらな状態で始まります。前の会話は引き継がれない」) and the e6 feedback. The old 「1回分のやりとり」 could be read as one prompt and reply, and that reading is gone. The term keeps its English and its aliases. 「コンテキスト」 is still the only glossary term without English (niceToHave), so the score stays at 3.",
       "blockIds": [
         "lesson",
-        "summary-cards",
-        "s3-defs"
+        "hook-b1"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
       "carriedOver": true,
-      "evidence": "Carried over from round 1 of this revision. The lesson is single-locale (jp), and lint has no plain-string findings. The changes add no links or diagrams.",
+      "evidence": "Carried over. The lesson is single-locale (jp), and lint has no plain-string findings. The change adds no links or diagrams.",
       "blockIds": [
         "s3-diagram",
         "s3-info"
@@ -70,17 +58,18 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz: e6 option a 「前のセッションで頼んであるから、もう覚えているよ」 does not answer what the colleague said. The colleague wrote the rule in CLAUDE.md, and CLAUDE.md is read at the start of every session. The feedback 「セッションは毎回まっさらに始まり…」 could make a learner think CLAUDE.md is not carried over either. A distractor about the same premise works better: 「「前のセッションで頼んであるから、もう覚えているよ」」→「「何度も書いて強調すれば、確実に守られるよ」」, with feedback 「くり返しても、守るかどうかはClaudeの判断のままです。止めたい操作は、拒否ルールやフックで決めておきます。」",
-    "s1-table: the first column now mixes nouns (「組織全体」「チーム」) and adverbs (「どこでも」「ここだけ」). On their own, 「どこでも」 and 「ここだけ」 do not say whose scope they are. Using the same form helps: 「どこでも」→「自分の全プロジェクト」, 「ここだけ」→「自分のこのプロジェクト」",
-    "practice-answer: 「- テストは `npm run test:unit` で」 stops at the particle で. That is fine for the hook's quote, but a CLAUDE.md line reads more clearly as a full instruction: 「- テストは `npm run test:unit` で」→「- テストは `npm run test:unit` で実行する」 (adds no line, so the highlight 6–12 stays correct)",
-    "s4-table (unchanged, carried): the column 「書きがちなこと」 mixes a noun, an adverb and a compound. 「毎回必ず」→「「毎回必ず」の指示」, 「API専用」→「API専用の決まり」",
-    "s3-diagram (unchanged, carried): the node says 「インポート先」, but the alt text says 「インポートしたファイル」. Use one wording: alt 「インポートしたファイル」→「インポート先」",
-    "glossary (carried): 「コンテキスト」 is the only term without English. Term 「コンテキスト」→「コンテキスト（context）」, and add 「コンテキスト」 to aliases",
-    "s3-defs (changed; carried): 「ないとき、代わりに読まれます。」→「ないとき、CLAUDE.mdの代わりに読まれます。」",
-    "check-quiz (carried): e3 b 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」, which matches the new wording in practice-hint3",
-    "s3-check (unchanged, carried): q4 option c 「CLAUDE.mdから `@` で取り込む別のファイル」→「`CLAUDE.md` から `@` で取り込む別のファイル」"
+    "lesson (glossary セッション, changed): 「始まる」 appears three times in two short sentences. 「`claude` を起動すると始まる、ひと続きの会話。始めるたびに、まっさらなコンテキストから始まります。」→「`claude` を起動すると始まる、ひと続きの会話。毎回、まっさらなコンテキストから始まります。」",
+    "check-quiz (carried): e6 option a 「前のセッションで頼んであるから、もう覚えているよ」 does not answer the colleague's premise, which is that the rule is in CLAUDE.md. 「「前のセッションで頼んであるから、もう覚えているよ」」→「「何度も書いて強調すれば、確実に守られるよ」」, with feedback 「くり返しても、守るかどうかはClaudeの判断のままです。止めたい操作は、拒否ルールやフックで決めておきます。」",
+    "s1-table (carried): 「どこでも」→「自分の全プロジェクト」, 「ここだけ」→「自分のこのプロジェクト」",
+    "practice-answer (carried): 「- テストは `npm run test:unit` で」→「- テストは `npm run test:unit` で実行する」",
+    "s4-table (carried): 「毎回必ず」→「「毎回必ず」の指示」, 「API専用」→「API専用の決まり」",
+    "s3-diagram (carried): alt 「インポートしたファイル」→「インポート先」",
+    "glossary (carried): 「コンテキスト」→「コンテキスト（context）」, and add 「コンテキスト」 to aliases",
+    "s3-defs (carried): 「ないとき、代わりに読まれます。」→「ないとき、CLAUDE.mdの代わりに読まれます。」",
+    "check-quiz (carried): e3 b 「一部だけの決まりをルールへ移す」→「一部だけの決まりを `paths:` 付きのルールへ移す」",
+    "s3-check (carried): q4 option c 「CLAUDE.mdから `@` で取り込む別のファイル」→「`CLAUDE.md` から `@` で取り込む別のファイル」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round: review-scope.mjs exited 0 (12% of parts changed, 9 of 47 blocks plus the glossary). The previous review had no open must-fix, so there are no resolved entries. All changed text reads correctly. hook-b1 now leads into the predict question. The hint, the 19-line sample, the answer (4 items, highlight 6–12) and the 「残す・直す…」 destinations all agree. The AGENTS.md wording in the glossary, s3-defs and card-agents matches audit-cc-06-claude-md.json. Two carried niceToHave items are closed: card-agents and the 「`paths:` 付きのルール」 wording in practice-hint3. No new must-fix. The new e6 option a misses the colleague's premise; it is listed in niceToHave. Length: prose 2399, est 19.3 min, estMinutes 19. Lint is clean."
+  "summary": "Verification round: review-scope.mjs exited 0. Only lesson.glossary changed (2% of parts, 0 of 47 blocks). The previous review had no open must-fix, so there are no resolved entries. The セッション glossary entry now matches cc-01 and cc-05 (「`claude` を起動すると始まる、ひと続きの会話」) and agrees with s1 and the e6 feedback. No new must-fix. One new niceToHave: 「始まる」 is repeated in the entry. Length: prose 2399, est 19.3 min, estMinutes 19. Lint --strict is clean."
 }

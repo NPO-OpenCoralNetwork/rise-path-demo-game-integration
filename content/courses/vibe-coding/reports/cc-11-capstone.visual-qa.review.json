@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-11-capstone",
   "file": "content/courses/vibe-coding/drafts/cc-11-capstone.lesson.json",
-  "lessonHash": "sha256:423d9258076f1516",
+  "lessonHash": "sha256:c9d22545bc0d23db",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,10 +9,10 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "The two-column table dr-table stays readable at 390 px (pages/mobile-jp-03.png, mobile-jp-04.png). The flowchart TD cycle-flow has short JP labels and a readable feedback loop, '直す指摘がある' (mobile-jp-17.png, desktop-jp-11/12.png). The highlighted lines of the settings code blocks (ex-settings, setup-settings-model) are easy to tell apart, and line 16 soft-wraps legibly under its own line number (mobile-jp-09.png).",
+      "evidence": "metrics.json has no hard failures: overflowX false, consoleErrors 0, mermaidErrors 0, unknownBlocks 0, brokenImages 0. At 390 px the cycle-flow diagram is a vertical flowchart with readable Japanese labels and a caption (pages/mobile-jp-16.png, mobile-jp-17.png). The two-column dr-table fits without clipping (mobile-jp-03.png, mobile-jp-04.png). Line 16 of the ex-settings code wraps with a hanging indent and stays readable (mobile-jp-09.png).",
       "blockIds": [
-        "dr-table",
         "cycle-flow",
+        "dr-table",
         "ex-settings",
         "setup-settings-model"
       ]
@@ -20,39 +20,34 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "No screen is text-only (textOnlyScreens empty), and headings, steps, quizzes and figures alternate steadily. The example section stacks ex-steps, ex-prompt-claude-md, ex-settings and ex-prompt-skill back to back, which is about 5 mobile screens of steps, prompt and code (mobile-jp-06 to 11.png). The prerequisites line at the top is a dense 10-item run of text (mobile-jp-01.png).",
+      "evidence": "textOnlyScreens is empty on desktop and mobile, and the screens alternate between steps, prompts, code, quizzes and the checklist. One exception: the prerequisites line under the title is a single long run of small grey text separated by ｜ (mobile-jp-01.png, desktop-jp-01.png).",
       "blockIds": [
         "ex-steps",
-        "ex-prompt-claude-md",
-        "ex-settings",
-        "ex-prompt-skill"
+        "setup-steps",
+        "cycle-steps",
+        "self-check-list"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "All visible text is Japanese with English glosses where intended, the diagram labels are in JP, contrast is good, and no control is hidden under the bars. There are a few awkward breaks: a line that starts with '、' before the chip `.claude/skills/` in ex-share (mobile-jp-07.png), a lone 'す' in q2 option 1 and a lone 'く' in e1 option 3 on desktop (desktop-jp-08.png, desktop-jp-17.png), and 'git' / 'push' split across lines in the sc-safety label (mobile-jp-22/23.png).",
+      "score": 4,
+      "evidence": "This is a Japanese-only lesson. All headings, diagram labels, captions, quiz options and controls are in Japanese, and English terms appear only in parentheses on first use, e.g. スキル（skill） and 権限ルール（permission rule）. There are no awkward breaks inside Japanese words, nothing is hidden under the top or bottom bars (mobile-jp-05.png, mobile-jp-30.png), and no personal data is visible on any screen.",
       "blockIds": [
-        "ex-steps",
-        "ex-quiz",
-        "check-quiz",
-        "self-check-list"
+        "hook-b1",
+        "dr-b2",
+        "cycle-flow"
       ]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "self-check-list (sc-safety): put git push in a code chip, as in 「`git push` の確認ルール」, so the two words stay on one line at 390 px (pages/mobile-jp-22.png shows 'git' and 'push' on separate lines).",
-    "check-quiz e1 option a and ex-quiz q2 option a: on desktop these are the only options that wrap, each leaving one character alone on the second line ('置/く', '足/す'). This makes the correct answer stand out visually as the longest option. Shorten them slightly, for example 「テストのコマンドはCLAUDE.md、鍵は拒否ルール、pushは確認ルールへ」 (pages/desktop-jp-17.png, pages/desktop-jp-08.png).",
-    "ex-steps (ex-share): the line starts with '、' after the chip `.claude/settings.json` (pages/mobile-jp-07.png). Rewording as 「CLAUDE.mdと `.claude/settings.json` と `.claude/skills/` をコミットします。」 avoids the kinsoku break.",
-    "Example section: consider moving ex-prompt-skill after ex-quiz, or merging prompts, to break up about 5 mobile screens of steps, prompt and code (pages/mobile-jp-06.png to mobile-jp-11.png).",
-    "reader: desktop charsPerLine median is 42, above the JP target of 30–40 (measure 680 px); this is a reader layout setting, not lesson content.",
-    "reader: the keys row for c-plan shows 'Shift + Tab' and 'Ctrl + G' next to each other with no visible separator, so it can read as a single four-key combo (pages/mobile-jp-18.png, desktop-jp-12.png).",
-    "reader: step p-more has only a hint, but its expander is labelled 'うまくいかないときは' (pages/mobile-jp-13.png).",
-    "reader: the prerequisites line renders as one long run of text separated by '、' (pages/mobile-jp-01.png); a list or a collapsible would help.",
-    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-30.png); this is a known preview behaviour."
+    "lesson: the prerequisites line under the title is a single dense run of small grey text separated by ｜ (pages/mobile-jp-01.png, pages/desktop-jp-01.png). Shorten it to the lesson numbers, e.g. 「前提：第2〜10回、Gitのcommit、試せるリポジトリ」.",
+    "c-plan: the two shortcuts appear as one row of keycaps, Shift + Tab followed directly by Ctrl + G, and can read like a single four-key combo (pages/mobile-jp-18.png, pages/desktop-jp-12.png). List only one shortcut on the step, or add a separator or label between the two.",
+    "ex-steps: the step titles repeat the step number (①…⑤) next to the numbered circle (pages/mobile-jp-06.png, pages/desktop-jp-04.png). Keep the circled numbers only if ex-b1 needs them to refer to steps; otherwise remove them.",
+    "self-check-list: sc-context and sc-cost write commands as 「/clear」「/usage」「/status」 in brackets, while the rest of the lesson shows commands as code chips (pages/mobile-jp-23.png). Use inline code if the checklist supports it.",
+    "reader: desktop charsPerLine median is 42 (max 56) against the JP target of 30–40, with a 680 px measure at 18.7 px. This is a reader measure setting, not lesson content.",
+    "reader: the end banner says this is the course's last lesson because drafts are not listed in course.json, and the mobile full-length PNG stops at 16000 px. Both are known reader or preview behaviour."
   ],
-  "average": 3.33,
   "verdict": "pass",
-  "summary": "No hard failures in metrics.json: no overflow, console errors, mermaid errors, unknown blocks or broken images. No personal data appears on any screen. The table, flowchart and highlighted settings code are all readable at 390 px, and wrapped code lines and chips stay easy to follow. The remaining issues are minor Japanese line-break orphans and a dense run of blocks in the example section, all listed as nice-to-have."
+  "summary": "The screenshots show the lesson at lessonHash sha256:c9d22545bc0d23db, and metrics.json reports no hard failures. The layout holds at 390 px: the vertical cycle-flow diagram, the two-column table, the soft-wrapped code line and the long inline chips are all readable, and nothing is clipped or hidden under the bars. No personal data appears on any screen. Only small polish items remain: the dense prerequisites line, the two keyboard shortcuts that read as one combo, and the doubled step numbers."
 }

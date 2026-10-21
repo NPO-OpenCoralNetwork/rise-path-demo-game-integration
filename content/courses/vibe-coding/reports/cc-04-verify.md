@@ -1,6 +1,6 @@
 # Report: vibe-coding/cc-04-verify (draft)
 
-**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:7aa12666041c7288.**
+**Status: DRAFT, not published, not listed in `course.json`. Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:17c13d4e45026e5d.**
 
 - Title: 第4回｜検証を任せる：テスト・レビュー・説明
 - Draft: `content/courses/vibe-coding/drafts/cc-04-verify.lesson.json` · brief: `content/courses/vibe-coding/briefs/cc-04-verify.md`
@@ -33,30 +33,30 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 2228 (budget 1,200–2,400) · read 3204 · practice reading 1046 · questions 12 · practice sections 1 · est 19.4 min (must be ≤ 20; estMinutes 19)`
+- course length measure: `prose 2242 (budget 1,200–2,400) · read 3218 · practice reading 1046 · questions 12 · practice sections 1 · est 19.5 min (must be ≤ 20; estMinutes 19)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-04-verify by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/vibe-coding/drafts/cc-04-verify.lesson.json (sha256:7aa12666041c7288)
-  ja-editor: verification of sha256:f72c755010e86821 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-04-verify/f72c755010e86821/lesson.json) · 0 resolved, 0 unresolved · 9 changed · carried over: prior · previous .artifacts/review/vibe-coding/cc-04-verify/f72c755010e86821/round-1/ja-editor.review.json and 1 earlier round checked
-  pedagogy-reviewer: verification of sha256:f72c755010e86821 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-04-verify/f72c755010e86821/lesson.json) · 0 resolved, 0 unresolved · 9 changed · carried over: align, hook, active, miscon, meta · previous .artifacts/review/vibe-coding/cc-04-verify/f72c755010e86821/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
+  lesson content/courses/vibe-coding/drafts/cc-04-verify.lesson.json (sha256:17c13d4e45026e5d)
+  ja-editor: verification of sha256:7aa12666041c7288 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: prior, a11y_l10n · previous .artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/round-1/ja-editor.review.json and 2 earlier rounds checked
+  pedagogy-reviewer: verification of sha256:7aa12666041c7288 (previous review cross-checked; scope recomputed from .artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/lesson.json) · 0 resolved, 0 unresolved · 2 changed · carried over: align, hook, prior, worked, visual, practice, meta, a11y_l10n · previous .artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/round-1/pedagogy-reviewer.review.json and 2 earlier rounds checked
   visual-qa: full review
   mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
   ✓ align      3  (pedagogy-reviewer carried)
   ✓ hook       4  (pedagogy-reviewer carried)
-  ✓ prior      3  (ja-editor carried, pedagogy-reviewer)
+  ✓ prior      3  (ja-editor carried, pedagogy-reviewer carried)
   ✓ load       3  (ja-editor, pedagogy-reviewer, visual-qa)
-  ✓ worked     3  (pedagogy-reviewer)
-  ✓ active     4  (pedagogy-reviewer carried)
-  ✓ miscon     4  (pedagogy-reviewer carried)
-  ✓ visual     4  (pedagogy-reviewer, visual-qa)
-  ✓ practice   3  (pedagogy-reviewer)
+  ✓ worked     3  (pedagogy-reviewer carried)
+  ✓ active     4  (pedagogy-reviewer)
+  ✓ miscon     4  (pedagogy-reviewer)
+  ✓ visual     4  (pedagogy-reviewer carried, visual-qa)
+  ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       4  (pedagogy-reviewer carried)
   ✓ accuracy   4  (pedagogy-reviewer)
   ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  3  (ja-editor, pedagogy-reviewer, visual-qa)
+  ✓ a11y_l10n  3  (ja-editor carried, pedagogy-reviewer carried, visual-qa)
 ```
 
 ## Review rounds (snapshots in `.artifacts/review/vibe-coding/cc-04-verify/`)
@@ -65,6 +65,7 @@ Review of cc-04-verify by ja-editor, pedagogy-reviewer, visual-qa: PASS
 2. `d622512671de3ba6`: ja-editor full revise (mean 3.00, must-fix 3); pedagogy-reviewer full pass (mean 3.46, must-fix 0)
 3. `f72c755010e86821`: ja-editor verify revise (mean 3.25, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.33, must-fix 2)
 4. `7aa12666041c7288`: ja-editor verify revise (mean 3.25, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `17c13d4e45026e5d`: ja-editor verify revise (mean 3.25, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -82,6 +83,7 @@ An auditor with web access checked 54 claims (pages: 17); a second checker tried
 ## Orchestrator notes
 
 - 2026-10-21 reader update (components/lesson/reader.css): inline code chips kept whole, code-block lines soft-wrap with a hanging indent. Visual QA was re-run in full on fresh previews of every lesson, including cc-01-first-session, cc-04-verify, cc-05-context, cc-07-skills-subagents, cc-10-safety-cost and cc-11-capstone, which had passed before the change.
+- Cross-lesson consistency round (2026-10-21): the changed lessons cc-01-first-session, cc-02-permissions, cc-04-verify, cc-06-claude-md, cc-08-hooks-mcp, cc-09-parallel-automation, cc-10-safety-cost and cc-11-capstone were re-reviewed (visual QA full on a fresh preview; pedagogy-reviewer and ja-editor verification). For cc-02-permissions, cc-06-claude-md, cc-10-safety-cost and cc-11-capstone the gate refused the set because one reviewer's chain started at its earlier full review while the other's went further back ("no reviewer skips a round"); that reviewer then reviewed the final version in full.
 
 ## Course-wide conventions used
 

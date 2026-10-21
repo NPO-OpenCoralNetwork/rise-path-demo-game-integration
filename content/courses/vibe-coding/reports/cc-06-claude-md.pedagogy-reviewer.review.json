@@ -1,10 +1,20 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:0913750984346c84",
+  "lessonHash": "sha256:2b49a5e74f15af83",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:0913750984346c84",
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/0913750984346c84/round-1/pedagogy-reviewer.review.json",
+    "changed": [
+      "lesson.glossary"
+    ],
+    "changedShare": 0.02,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "align",
@@ -13,7 +23,8 @@
       "blockIds": [
         "s3-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "hook",
@@ -22,12 +33,13 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "Prerequisites list 第1回–第5回 by title, and the lesson recalls them where they are needed (「第1回と第5回で見たとおり」 in s1-lead, 「第2回で書いた、ツールの使用を…」 in s4-defs). Terms are defined before use with English on first use (セッション（session）, 権限ルール（permission rule）, フック（hook）). The changed glossary AGENTS.md entry now agrees with s3-defs and card-agents (「既定では、作業フォルダーとその上に…」, 「`~/.claude/CLAUDE.md` は数えません」).",
+      "evidence": "The changed glossary entry セッション（session） now reads 「`claude` を起動すると始まる、ひと続きの会話。始めるたびに、まっさらなコンテキストから始まります。」. Its first clause matches cc-01 and cc-05 word for word, and it agrees with s1-lead (「第1回と第5回で見たとおり、セッションは毎回まっさらな状態で始まります」) and with the e6 option a feedback. Prerequisites and the recall of earlier lessons are unchanged (「第2回で書いた、ツールの使用を…」 in s4-defs), as is the definition of terms before use with English on first use.",
       "blockIds": [
         "s1-lead",
         "s1-defs",
@@ -38,7 +50,7 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 2399 (budget 1,200–2,400) · questions 9 · est 19.3 min (must be ≤ 20; estMinutes 19)」. The lesson is within budget, estMinutes matches, and lint --strict reports 0 warnings. Two things keep this from a 4. s3 still packs 3 new terms, a code block, a diagram, a callout and a check into one segment. And 自動メモリ（auto memory） is defined in s1-defs, but no later block or question uses it, so it adds load without any later use.",
+      "evidence": "measure.mjs gives 「prose 2399 (budget 1,200–2,400) · questions 9 · est 19.3 min (must be ≤ 20; estMinutes 19)」, unchanged by the glossary edit. lint --strict reports 0 warnings. s3 still packs 3 new terms, a code block, a diagram, a callout and a check into one segment. 自動メモリ（auto memory） is defined in s1-defs, but no later block or question uses it.",
       "blockIds": [
         "s1-defs",
         "s3-defs",
@@ -53,7 +65,8 @@
       "blockIds": [
         "s5-lines",
         "s5-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
@@ -64,7 +77,8 @@
         "s2-check",
         "s3-check",
         "s4-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "miscon",
@@ -75,7 +89,8 @@
         "s1-check",
         "s4-check",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
@@ -86,7 +101,8 @@
         "s1-table",
         "s2-table",
         "s4-table"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
@@ -99,7 +115,8 @@
         "practice-answer",
         "practice-checklist",
         "practice-answer-why"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
@@ -110,18 +127,18 @@
         "summary-next",
         "summary-cards",
         "summary-ask"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "All five findings in audit-cc-06-claude-md.json are fixed in the current text. The default qualifier is in s3-defs, the glossary and card-agents (「既定では、作業フォルダーとその上に…」), and the single-file condition is in q4 and card-paths (「1つのファイルを `cat` や `head` で見たときも」). The limits of deny rules match cross-lesson-facts.md items 3–4 (s4-close 「`git -C . push`」), the version is pinned (「Claude Code v2.1.304」), and the practice-answer `sed -n '/^## 画面/,$p'` range copies the heading and its 6 steps.",
+      "evidence": "The new セッション definition 「`claude` を起動すると始まる、ひと続きの会話」 matches cc-01-first-session and cc-05-context. It replaces 「1回分のやりとり」, which contradicted s1-lead's 「前の会話は引き継がれない」 framing of a session as a whole conversation. The audit-cc-06-claude-md.json findings stay fixed in the unchanged blocks (default qualifier in s3-defs and the AGENTS.md glossary entry, 「`git -C . push`」 in s4-close per cross-lesson-facts.md items 3–4, 「Claude Code v2.1.304」 pinned).",
       "blockIds": [
+        "s1-lead",
         "s3-defs",
-        "s3-check",
-        "summary-cards",
         "s4-close",
-        "practice-answer"
+        "summary-cards"
       ]
     },
     {
@@ -133,7 +150,8 @@
         "s3-info",
         "practice-setup",
         "check-quiz"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "a11y_l10n",
@@ -142,20 +160,22 @@
       "blockIds": [
         "s3-diagram",
         "s3-info"
-      ]
+      ],
+      "carriedOver": true
     }
   ],
   "average": 3.46,
   "mustFix": [],
   "niceToHave": [
-    "s1-table (changed): the caption says 「（広い順）」, but 「どこでも」 comes after 「組織全体」 and reads as broader. The order shown is the load order (broad to specific in the memory docs). Replace the caption with 「CLAUDE.mdの4つの置き場所と届く範囲（読まれる順）」 (same length), or replace row 2 col 1 with 「自分全般」 (ja-editor to confirm the wording).",
-    "check-quiz e6 option a (changed): the lesson teaches auto memory in s1-defs, so the feedback 「セッションは毎回まっさらに始まり、前の会話は引き継がれません。」 leaves out the case where Claude did save the rule. A learner may think it was remembered after all. The option also fits the scenario poorly, because the colleague wrote the rule in CLAUDE.md, not in a chat. Replace md with 「「Claudeが自動メモリにも書いたから、もう確実だよ」」 and feedback with 「自動メモリもCLAUDE.mdと同じく、読まれる頼みごとです。止めたい操作は、拒否ルールやフックで決めておきます。」. This also gives 自動メモリ（s1-defs） a use (see load). Check the result against the 2,400 cap with measure.mjs.",
-    "check-quiz e2 option a (unchanged): 「IMPORTANT」 is still the wrong answer in 5 items. Replace e2 a md with 「CLAUDE.mdに「編集したら必ず整形する」と書く」 and keep its feedback (「Claudeが整形を選んで実行するのと、整形が自動で走るのは別のことです。…」), which already names this exact misconception.",
-    "s4-check q5 option c (unchanged): to stop recognition matching with s4-lead, replace the answer md with 「CLAUDE.mdの行は、Claude Codeが操作を止める設定ではないから」.",
-    "objectives o1 (unchanged): e2 assesses choosing a hook, which o1 does not list. Change o1 text to 「指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール・フック）を、内容に合わせて選べる」. Changing objectives forces a full review next round.",
-    "s4-table (unchanged): 「禁止」 and 「API専用」 follow the blog's anti-pattern names. pr-explain and summary-next send learners to this table to sort their own lines, so a broader label would transfer better. Consider 「一部のファイル用」 for row 4 col 1 and offset the characters in the caption.",
+    "lesson.glossary セッション (changed): the entry says 「始まる」 and then 「始めるたびに…始まります」, three forms of the same verb in two sentences. For the second sentence, use the cc-05 wording: 「新しいセッションは、前の会話を持たずに始まります。」. It is the same length and matches cc-05-context exactly (ja-editor to confirm).",
+    "lesson.glossary セッション (changed) vs s2 (unchanged): the s2 block says 「途中で直した行は、`/clear`、`/compact`、再起動のあとに反映されます」, while the glossary now ties a session's start to launching `claude`. A learner may not see why `/clear` counts as a fresh start without a restart. The flashcard and s2 text are correct as they stand. A clause such as 「（`/clear` でも新しく始まります）」 in the glossary would close the gap, if cross-lesson-facts.md or the official docs confirm that `/clear` starts a new session (factual doubt: unverified here).",
+    "s1-table (unchanged): the caption says 「（広い順）」, but 「どこでも」 comes after 「組織全体」 and reads as broader. Replace the caption with 「CLAUDE.mdの4つの置き場所と届く範囲（読まれる順）」, or replace row 2 col 1 with 「自分全般」 (ja-editor to confirm).",
+    "check-quiz e6 option a (unchanged): replace md with 「「Claudeが自動メモリにも書いたから、もう確実だよ」」 and feedback with 「自動メモリもCLAUDE.mdと同じく、読まれる頼みごとです。止めたい操作は、拒否ルールやフックで決めておきます。」. This gives 自動メモリ (s1-defs) a use. Offset the added characters against the 2,400 cap.",
+    "check-quiz e2 option a (unchanged): 「IMPORTANT」 is still the wrong answer in 5 items. Replace e2 a md with 「CLAUDE.mdに「編集したら必ず整形する」と書く」 and keep its feedback.",
+    "s4-check q5 option c (unchanged): replace the answer md with 「CLAUDE.mdの行は、Claude Codeが操作を止める設定ではないから」, so the answer no longer restates s4-lead and cannot be picked by recognition alone.",
+    "objectives o1 (unchanged): e2 assesses choosing a hook, which o1 does not list. Change o1 text to 「指示の置き場所（CLAUDE.md・.claude/rules/・CLAUDE.local.md・権限ルール・フック）を、内容に合わせて選べる」. This forces a full review next round.",
     "Budget guard: prose is 2399 of the 2,400 cap (measure.mjs). Offset any text a fix adds with an equal cut."
   ],
   "verdict": "pass",
-  "summary": "Full review of the current text. Every criterion scores 3 or more (mean 3.46), and there are no must-fix items. validate and lint --strict are clean, and measure.mjs gives 19.3 min with prose at 2399/2400. The biggest strengths are the 6-step worked example followed by a consistent 19-line practice with a 3-level hint ladder, the model answer and the checklist, plus accuracy: every audit finding is fixed. The most useful next fixes are to remove the 「IMPORTANT」 elimination pattern (still a wrong answer in 5 items, including e2 a) and to make the changed s1-table labels agree with 「（広い順）」."
+  "summary": "Verification round: review-scope.mjs exited 0, and only lesson.glossary changed (2%). The previous full review had no must-fix items, so there are no resolved entries. The new セッション definition is correct, matches cc-01 and cc-05, and fits s1-lead better than 「1回分のやりとり」. prior and accuracy were re-scored at 4, and the mean stays 3.46. validate and lint --strict are clean, and measure.mjs gives prose 2399/2400 and est 19.3 min. Open suggestions are wording only: the repeated 「始まる」 in the new entry, and the earlier IMPORTANT-pattern and s1-table items."
 }

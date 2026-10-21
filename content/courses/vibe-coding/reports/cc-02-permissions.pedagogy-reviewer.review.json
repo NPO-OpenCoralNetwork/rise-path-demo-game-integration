@@ -4,10 +4,10 @@
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:fc6282d1f851b02f",
+  "lessonHash": "sha256:b119e1c419d1e206",
   "verifies": {
-    "reviewedRevision": "sha256:53b74995ba36c9df",
-    "previousReview": ".artifacts/review/vibe-coding/cc-02-permissions/53b74995ba36c9df/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:fc6282d1f851b02f",
+    "previousReview": ".artifacts/review/vibe-coding/cc-02-permissions/fc6282d1f851b02f/round-1/pedagogy-reviewer.review.json",
     "changed": [
       "check-quiz"
     ],
@@ -19,19 +19,18 @@
     {
       "id": "align",
       "score": 4,
-      "evidence": "Objectives and objectiveIds are unchanged. The only edit is to e6 option d, and e6 still tests o3 at the apply level: 「必ず確認を挟みたいと考えています。どこに何を書くのが最も適切でしょう？」. To answer it, the learner must pick the right place (ask, deny or CLAUDE.md) and the right pattern (`Bash(gh pr create *)` against `Bash(gh * create)`). e1 (o1), e3 and e4 (o2), and e5 (o3, analyze) did not change.",
+      "evidence": "Objectives and objectiveIds have not changed. Only the e1 prompt changed. It now opens with 「チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。」. e1 still assesses o1 at the apply level: the learner has to decide whether `--dangerously-skip-permissions` fits an everyday laptop setting and choose auto mode plus rules instead. e3 and e4 (o2) and e5 and e6 (o3) are unchanged.",
       "blockIds": [
         "check-quiz",
+        "modes-table",
         "rules-check",
-        "example-check",
-        "sort-quiz",
-        "rules-steps"
+        "example-check"
       ]
     },
     {
       "id": "hook",
       "score": 4,
-      "evidence": "hook-lead recalls lesson 1 and states a concrete problem in short sentences with no trivia: 「便利ですが、pushまで知らないうちに進んだら困ります」. The ungraded predict q0 asks what a default session does with `git push`, every option is parallel, and the explanation points to 2-1 and 2-4. It leads straight to o3.",
+      "evidence": "hook-lead recalls lesson 1 and states a concrete problem in short sentences with no trivia: 「便利ですが、pushまで知らないうちに進んだら困ります」. The ungraded predict q0 asks what a default session does with `git push`. Its options are parallel, and its explanation points to 2-1 and 2-4.",
       "blockIds": [
         "hook-lead",
         "hook-predict"
@@ -41,7 +40,7 @@
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Prerequisites are listed, and hook-lead and rules-task recall lesson 1 and `cc-practice`. 権限モード, 分類器, the rule terms and チェックポイント are defined before use and match the glossary, and auto-lead ties 分類器 to 「2-1の一覧で「安全チェック」と呼んだもの」. In auto-defaults, 「force pushや `git reset --hard`」 is not explained for a learner who only knows commit and push, and 「リポジトリ（repository）」 first appears inside hidden feedback (q0 b).",
+      "evidence": "Prerequisites are listed, and hook-lead and rules-task recall lesson 1 and `cc-practice`. 権限モード, 分類器, the rule terms and チェックポイント are defined before they are used and match the glossary. In auto-defaults, 「force pushや `git reset --hard`」 is not explained for a learner who only knows commit and push, and 「リポジトリ（repository）」 first appears inside hidden feedback (q0 b).",
       "blockIds": [
         "hook-lead",
         "auto-lead",
@@ -55,7 +54,7 @@
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs reports 「prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)」, the same as last round, and lint --strict reports 0 warnings. The prose is still close to the upper limit.",
+      "evidence": "measure.mjs reports 「prose 2222 (budget 1,200–2,400) · read 2466 · practice reading 801 · questions 13 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)」, the same as last round. The e1 edit does not change the prose count. lint --strict reports 0 warnings. The prose is still close to the upper limit.",
       "blockIds": [
         "example-check",
         "check-quiz",
@@ -67,7 +66,7 @@
     {
       "id": "worked",
       "score": 3,
-      "evidence": "rules-example comes before practice-rules. Each example-steps step has a subgoal label (確認か拒否かを決める / ルールの形に書く / 読み込まれたか確かめる), a reason (「pushは中身を見たいので[[確認ルール]]」, 「書いただけでは効いたかわかりません」) and an expect, followed by example-code and a pitfall. p-rule then jumps to 「2-4を見ずに」 with no faded step between them.",
+      "evidence": "rules-example comes before practice-rules. Each example-steps step has a subgoal label, a reason (「pushは中身を見たいので[[確認ルール]]」) and an expect. example-code and a pitfall follow. p-rule then jumps to 「2-4を見ずに」 with no faded step in between.",
       "blockIds": [
         "example-steps",
         "example-code",
@@ -79,7 +78,7 @@
     {
       "id": "active",
       "score": 3,
-      "evidence": "Every content segment still ends in an apply or analyze check, and every wrong option has feedback. The rewritten q4 cannot be solved by matching words alone: you have to tell ask from deny (b, c) and see the missing `*` (d). Unchanged weak spots: q5's key repeats rewind-table's words, and e5's key `git -C . push origin main` is still the exact string in example-pitfall.",
+      "evidence": "Every content segment ends in an apply or analyze check, and every wrong option has feedback. Two weak spots remain. q5's key repeats the wording of rewind-table, and e5's key `git -C . push origin main` is the exact string shown in example-pitfall.",
       "blockIds": [
         "example-check",
         "rewind-check",
@@ -91,18 +90,19 @@
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "The changed e6 option d, 「CLAUDE.mdに「作る前に確認して」」, still targets a real misconception: that writing an instruction is enforced. rules-diagram's lead says 「依頼文やCLAUDE.mdに「pushしないで」と書いても、強制にはなりません」, and the option's feedback names it: 「CLAUDE.mdはClaudeへの助言で、Claude Codeが守らせるルールではありません。必ず確認したいなら、確認ルールにします。」. The option no longer copies the lesson's wording, so it is a fair distractor. e6 a (deny stops instead of asking) and c (`*` in the middle) are unchanged.",
+      "evidence": "e6 d (「CLAUDE.mdに「作る前に確認して」」) targets the belief that a written instruction is enforced, and its feedback names that belief. e1's distractors are unchanged and each names a real misconception: b says a short use is harmless (「短い時間でも、確認も安全チェックもない状態になります」), c says a prompt instruction can stand in for the missing checks, and d approves every prompt without reading it.",
       "blockIds": [
         "check-quiz",
         "rules-check",
         "example-check",
         "auto-check"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "rules-diagram has 8 nodes whose labels match the text (拒否ルール / 確認ルール / 許可ルール / 権限モードに従う). The caption states the takeaway, 「最初に一致したもので決まる」, and the alt describes the whole flow. desktop-jp-06.png shows it readable. The two comparisons are full-width lists rather than decorative images.",
+      "evidence": "rules-diagram has 8 nodes whose labels match the text. Its caption states the takeaway, 「最初に一致したもので決まる」, and its alt text describes the whole flow. The two comparisons are full-width lists, not decorative images.",
       "blockIds": [
         "rules-diagram",
         "modes-table",
@@ -113,7 +113,7 @@
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The hint ladder in p-rule, the success line in rules-prompt and the predict-first steps remain. pr-transfer (「応用：自分のコマンドを1つ、確認ルールにしました」) still has no way to check it, and pw-c-reason has no model answer.",
+      "evidence": "The hint ladder in p-rule, the success line in rules-prompt and the predict-first steps are in place. pr-transfer still cannot be checked, and pw-c-reason has no model answer.",
       "blockIds": [
         "rules-files",
         "rules-steps",
@@ -125,7 +125,7 @@
     {
       "id": "meta",
       "score": 3,
-      "evidence": "summary-points comes after the exam, summary-next names 第3回, there are 7 flashcards, and summary-ask keeps 3 suggestions. summary-next still ends in an action, not a reflection question.",
+      "evidence": "summary-points comes after the exam, summary-next names 第3回, there are 7 flashcards, and summary-ask has 3 suggestions. summary-next ends in an action, not a reflection question.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -137,19 +137,17 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "The changed items keep the audited claims. e5 still sets the mode (「autoモードで作業中です」), and its explanation says 「作業中のリポジトリへのpushは既定で通します」, which the audit supports. q4 and e6 keep the ask/deny semantics and the `*` matching that rules-defs and example-steps state. No new claims were added.",
+      "evidence": "The new e1 setting fits the cross-lesson facts. cc-10 says 「知らないリポジトリにはVMか[[クラウドセッション]]…を勧めます」, so the old wording 「中身をよく知らないリポジトリで…autoモードで進め」 contradicted that lesson. The new wording, a team repository the learner works in, removes the contradiction. The key, auto mode on a laptop with ask rules, and the explanation 「ネットにつながらないコンテナや仮想マシン向けです」 match bypass-tip and flashcard 1015 (「ネットにつながらないコンテナや仮想マシンなど、隔離した環境だけです。」). No new claims were added.",
       "blockIds": [
-        "example-check",
         "check-quiz",
-        "rules-defs",
-        "example-pitfall"
-      ],
-      "carriedOver": true
+        "bypass-tip",
+        "summary-cards"
+      ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The new e6 d text, 「CLAUDE.mdに「作る前に確認して」」, has the same 「〇〇に △△」 shape as a–c (「`ask` に `Bash(gh pr create *)`」), so the options now read in parallel and the feedback stays です・ます. As before, e6's options use the keys (`ask`/`deny`) while q4's use the Japanese names (確認ルール/拒否ルール). Both are glossary aliases, but they read slightly inconsistently.",
+      "evidence": "The new e1 prompt is です・ます and calm: 「チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。」. Both sentences are within 60 characters, and lint reports no warnings. 「チーム」 matches e4's 「チームの仲間」. One inconsistency is still open: e6's options use `ask`/`deny`, while q4's use 確認ルール/拒否ルール.",
       "blockIds": [
         "check-quiz",
         "example-check",
@@ -159,7 +157,7 @@
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "jp is the only locale, validation has 0 errors and lint --strict reports 0 warnings. The plain-text fields contain no markdown, and rules-diagram keeps its full alt.",
+      "evidence": "jp is the only locale. Validation shows 0 errors and lint --strict shows 0 warnings. The plain-text fields contain no markdown, and rules-diagram keeps its full alt text.",
       "blockIds": [
         "rules-checklist",
         "summary-ask",
@@ -170,14 +168,15 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "rewind-check q5 (unchanged, still open): replace option b md with 「Claudeが `sed -i` コマンドで書き換えた `app.js` の1行」 and its feedback with 「同じファイルでも、Bashのコマンドでの変更は記録されません。戻すにはGitを使います。」, so the item tests the kind of change rather than matching rewind-table's words.",
-    "check-quiz e5 (unchanged): the key `git -C . push origin main` is still the exact string in example-pitfall. Use `git -c push.default=current push origin main` as option c to test transfer of 「`git push` で始まらない」.",
-    "check-quiz e6: for consistency with q4, write options a–c with the Japanese rule names and the key, e.g. 「確認ルール（`ask`）に `Bash(gh pr create *)`」 and 「拒否ルール（`deny`）に `Bash(gh pr create *)`」 (ja-editor decides the wording).",
-    "rules-checklist pr-transfer: make it checkable, e.g. 「応用：自分のコマンドを1つ確認ルールにし、`/permissions` に出ることを確かめました」. For pw-c-reason, add a model answer to the pw-restore expect: 「`rewind-copy.md` は残ります。`cp` はBashのコマンドなので、記録されないからです。」.",
-    "auto-defaults (unchanged): gloss force push and `git reset --hard`, e.g. 「既定で止めるのは、force push（リモートの履歴を上書きするpush）や `git reset --hard`（手元の変更を捨てる操作）、本番へのデプロイなどです。」 (split it if it goes over 60 characters).",
+    "check-quiz e1 explanation (changed block, optional): connect the new team-repository setting to option a's second clause. audit-cc-02-permissions.json quotes permission-modes: auto mode allows 「Pushing to any branch of the repository you're working in, including the default branch」. Append 「チームのリポジトリでは、autoモードだと既定のブランチへのpushも通るので、pushは確認ルールにしておきます。」 (ja-editor decides the wording).",
+    "rewind-check q5 (unchanged, still open): replace option b md with 「Claudeが `sed -i` コマンドで書き換えた `app.js` の1行」 and its feedback with 「同じファイルでも、Bashのコマンドでの変更は記録されません。戻すにはGitを使います。」.",
+    "check-quiz e5 (unchanged): the key `git -C . push origin main` is the exact string in example-pitfall. Use `git -c push.default=current push origin main` as option c, so the item tests transfer of 「`git push` で始まらない」.",
+    "check-quiz e6: to match q4, write options a–c with the Japanese rule names and the key, e.g. 「確認ルール（`ask`）に `Bash(gh pr create *)`」 (ja-editor decides the wording).",
+    "rules-checklist pr-transfer: make it checkable, e.g. 「応用：自分のコマンドを1つ確認ルールにし、`/permissions` に出ることを確かめました」. Add a model answer for pw-c-reason to the pw-restore expect: 「`rewind-copy.md` は残ります。`cp` はBashのコマンドなので、記録されないからです。」.",
+    "auto-defaults (unchanged): explain force push and `git reset --hard`, e.g. 「既定で止めるのは、force push（リモートの履歴を上書きするpush）や `git reset --hard`（手元の変更を捨てる操作）、本番へのデプロイなどです。」 (split the sentence if it goes over 60 characters).",
     "summary-next (unchanged): add a reflection question before the action, e.g. 「この回の予想で、外れたものはどれでしたか？」.",
     "rules-steps (unchanged): add a faded step before p-rule, e.g. give the skeleton `{\"permissions\": {\"ask\": [\"…\"], \"deny\": [\"…\"]}}` in the p-rule hint."
   ],
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: only check-quiz changed (1 of 41 blocks, 2%), and sections and objectives are unchanged. The previous review had no open must-fix items, and neither did the round before it, so there are no resolved entries. The only edit is e6 option d, from 「CLAUDE.mdに「確認して」と書く」 to 「CLAUDE.mdに「作る前に確認して」」. I reviewed the whole check-quiz block. The option now has the same shape as a–c, still targets the 'an instruction is enforced' misconception, keeps its feedback, and does not give the answer away. There is no regression. validate shows 0 errors, lint --strict shows 0 warnings, and measure.mjs reports prose 2222 and est 19.9 min (estMinutes 20). align, miscon and voice were re-scored and the other criteria carried over. The mean is 3.38 (44/13), with every criterion at 3 or higher."
+  "summary": "Verification round: review-scope.mjs exited 0. Only check-quiz changed (1 of 41 blocks, 2%), and the sections and objectives are the same. The previous review had no open must-fix items, so there are no resolved entries. The only edit is the first phrase of e1's prompt, from 「中身をよく知らないリポジトリで」 to 「チームで使っているリポジトリで」. I reviewed all of check-quiz. The new setting removes the contradiction with cc-10, which sends unfamiliar repositories to a VM or a cloud session. The key (a) is still the only correct answer, the distractors and their feedback still name real misconceptions, and the item still assesses o1 at the apply level. I found no regression. validate reports 0 errors and lint --strict reports 0 warnings. measure.mjs reports prose 2222 and est 19.9 min, with estMinutes at 20. I re-scored align, accuracy and voice, and carried over the other criteria. The mean is 3.38 (44/13), and every criterion is at 3 or higher."
 }

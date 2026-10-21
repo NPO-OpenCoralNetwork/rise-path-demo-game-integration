@@ -1,25 +1,18 @@
 {
   "lessonId": "cc-04-verify",
   "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
-  "lessonHash": "sha256:7aa12666041c7288",
+  "lessonHash": "sha256:17c13d4e45026e5d",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:f72c755010e86821",
-    "previousReview": ".artifacts/review/vibe-coding/cc-04-verify/f72c755010e86821/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:7aa12666041c7288",
+    "previousReview": ".artifacts/review/vibe-coding/cc-04-verify/7aa12666041c7288/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "s1-pick",
-      "s1-table",
-      "s3-code",
-      "s4-sort",
-      "p-prompt-write",
-      "p-prompt-green",
-      "p-model-intro",
-      "p-model-code",
-      "p-model-sort"
+      "s4-fresh",
+      "check-quiz"
     ],
-    "changedShare": 0.09,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -53,85 +46,84 @@
         "s1-table",
         "s1-defs",
         "s1-why"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 'prose 2228 (budget 1,200–2,400) · est 19.4 min (must be ≤ 20; estMinutes 19)'. Prose rose from 2012 because s1-table and p-model-sort are now full-sentence lists. It is still inside the budget, and est still rounds to estMinutes 19. lint --strict: 0 warnings. 4-1 gained a block (s1-pick), and 4-4 is still the heaviest section, with 10 blocks.",
+      "evidence": "measure.mjs: 'prose 2242 (budget 1,200–2,400) · read 3218 · practice reading 1046 · questions 12 · est 19.5 min (must be ≤ 20; estMinutes 19)'. The longer s4-fresh sentence added 14 characters of prose (previously 2228). The est formula gives (3218+1046)/450 + 8 + 2 = 19.48, which still rounds to estMinutes 19. The '19.5' is only toFixed(1) display rounding. The new s4-fresh sentence ('このサブエージェントは、差分と渡された基準をもとに、自分でコードを読んで確かめます。') is about 41 characters and brings in no new term. lint --strict shows 0 warnings. 4-4 is still the heaviest section, with 10 blocks.",
       "blockIds": [
-        "s1-pick",
-        "s1-table",
-        "p-model-sort",
+        "s4-fresh",
         "s4-names"
       ]
     },
     {
       "id": "worked",
       "score": 3,
-      "evidence": "s3-code now uses a named import ('import { equal } from \\'node:assert/strict\\';' then 'equal(isPostalCode(\\'150-0002\\'), true);'). The import is valid, and it shortens each assertion without changing the 4 cases that s3-steps expects ('fail 4', then 'pass 4・fail 0'). The subgoal labels and reasons in s3-steps are unchanged. The practice still repeats the flow fully prompted rather than fading to independent work.",
+      "evidence": "s3-code uses a named import ('import { equal } from \\'node:assert/strict\\';') with the 4 cases that s3-steps expects ('fail 4', then 'pass 4・fail 0'). The practice still repeats the flow fully prompted rather than fading to independent work.",
       "blockIds": [
         "s3-code",
         "s3-steps",
         "s3-prompt-write",
         "s3-prompt-green"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "active",
       "score": 4,
-      "evidence": "Every content section still ends with an applied inline quiz, with feedback on every wrong option. q1's key ('「直した画面を画像と見比べ、ずれを直して」') still does not copy the reworded s1-table item ('「撮って見本の画像と比べて」と足します').",
+      "evidence": "Every content section still ends with an applied inline quiz, with feedback on every wrong option. In this round only e5's explanation changed. Its options, key and feedback are the same, so retrieval demand is unchanged.",
       "blockIds": [
         "s1-check",
         "s2-check",
         "s3-check",
         "s4-check",
-        "s5-check"
-      ],
-      "carriedOver": true
+        "s5-check",
+        "check-quiz"
+      ]
     },
     {
       "id": "miscon",
       "score": 4,
-      "evidence": "The distractor feedback still names concrete errors, for example e4 c ('無視する設定を残すと、検証の手段が1つ減ります') and q3 a ('期待値を変えれば、間違った実装でも通ります').",
+      "evidence": "e5's explanation now reads '別のコンテキストのレビュー役は、作業の経緯を見ずに、差分と渡された基準をもとに判断します。' That still answers option a's misconception (self-grading in the same conversation; its feedback says '作業の経緯を見ていない、別のコンテキストに頼みます') and option d's misconception (no criteria). It no longer suggests the reviewer is limited to the diff text. The other distractor feedback still names concrete errors, for example e4 c ('無視する設定を残すと、検証の手段が1つ減ります').",
       "blockIds": [
         "check-quiz",
         "hook-predict",
         "s3-check",
         "s5-check"
-      ],
-      "carriedOver": true
+      ]
     },
     {
       "id": "visual",
       "score": 4,
-      "evidence": "s4-sort keeps its 5 nodes. The terminal labels are now shorter ('必須：<br>直して<br>再テスト', '任意：<br>メモして<br>直すか決める'), and the caption is unchanged. s1-table and p-model-sort are now lists that bold the key term ('**自動テスト**が合います', '**必須**です'), and s1-pick gives the selection rule ahead of the list. p-model-sort lost its caption ('仕分けの例：必須は正しさと要件に関わるものだけ'), so the model answer no longer states the rule (see niceToHave). There are no decorative images.",
+      "evidence": "s4-sort keeps its 5 nodes, its caption ('必須にするのは、正しさと要件に関わる指摘だけ') and a full alt. s1-table and p-model-sort are lists that bold the key term. There are no decorative images.",
       "blockIds": [
         "s4-sort",
         "s1-pick",
         "s1-table",
         "p-model-sort",
         "p-model-intro"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "The file names are now consistent across p-prompt-write ('`leap.test.mjs` のようなテストと、空の関数だけの `leap.mjs`'), p-prompt-green ('`leap.mjs` の空の関数に') and p-model-code (filename 'leap.test.mjs', \"import { isLeapYear } from './leap.mjs'\"). p-model-intro now says what the model answer shows ('テストのコードと、指摘の仕分けを示します'). p-checklist p-c1 to p-c7 still gives clear success criteria. The hint ladder is still shallow, because p-evidence and p-commit have no hints, and no step transfers o1.",
+      "evidence": "The file names are consistent across p-prompt-write, p-prompt-green and p-model-code (leap.test.mjs / leap.mjs). p-checklist p-c1 to p-c7 gives clear success criteria. The hint ladder is shallow, because p-evidence and p-commit have no hints, and no step transfers o1.",
       "blockIds": [
         "p-prompt-write",
         "p-prompt-green",
-        "p-model-intro",
         "p-model-code",
-        "p-model-sort",
         "p-checklist",
         "p-steps"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points comes after the exam. summary-next keeps its reflection question ('手元のタスクに、どの確認を渡せますか。'). There are 7 retrieval flashcards. None of these blocks changed.",
+      "evidence": "summary-points comes after the exam. summary-next keeps its reflection question ('手元のタスクに、どの確認を渡せますか。'). There are 7 retrieval flashcards.",
       "blockIds": [
         "summary-points",
         "summary-next",
@@ -142,48 +134,49 @@
     {
       "id": "accuracy",
       "score": 4,
-      "evidence": "The changed code is correct. 'node:assert/strict' exports 'equal' as a named export, and the 4 leap-year cases in p-model-code match the stated spec (2024 true, 2023 false, 1900 false, 2000 true). s1-pick's rule ('タスクの完成を直接測れるものを選びます') is cited to cc-best-practices, like the caption it replaces. The s4-sort alt now matches the node text ('必須として直してテストを再実行し…任意としてメモして直すか決める'). No changed block adds an uncited non-obvious claim.",
+      "evidence": "Both changes remove an overstatement. The old s4-fresh said 'サブエージェントが見るのは、差分と渡された基準だけです'. The new one says the subagent '差分と渡された基準をもとに、自分でコードを読んで確かめます'. This matches facts-cc-04-verify.md [practice-20] ('a subagent reviews the diff in a fresh context against the plan') and facts-cc-07-skills-subagents.md ('It runs in its own context window with its own system prompt, tools and permissions'). It also matches the lesson's own s4-prompt expect ('レビュー役のサブエージェントが差分を読み…') and the s4-defs definition ('自分のコンテキストで別に動き…'). e5's explanation now says the same thing ('作業の経緯を見ずに、差分と渡された基準をもとに判断します'), so the two blocks no longer contradict each other or cc-07. Both blocks keep cite cc-best-practices.",
       "blockIds": [
-        "s3-code",
-        "p-model-code",
-        "s1-pick",
-        "s4-sort"
+        "s4-fresh",
+        "check-quiz",
+        "s4-prompt",
+        "s4-defs"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The new list items use です・ます ('…が合います。…と足します。', '…なので**任意**です。'). Lint finds no banned phrases. s2-goal still repeats 判定 within one sentence; that wording belongs to the ja-editor.",
+      "evidence": "The changed sentences use です・ます ('…自分でコードを読んで確かめます。', '…をもとに判断します。'). Lint finds no banned phrases. s2-goal still repeats 判定 within one sentence; that wording belongs to the ja-editor.",
       "blockIds": [
-        "s1-table",
-        "p-model-sort",
+        "s4-fresh",
+        "check-quiz",
         "s2-goal"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The lesson is jp only and complete. s4-sort's alt now describes the full flow, including both outcomes. Replacing the two tables with lists removes the mobile column problem. The links keep descriptive text ('[Chromeとの連携](…/chrome)'), and no text is baked into images.",
+      "evidence": "The lesson is jp only and complete. s4-sort's alt describes the full flow. Lists replace the 2 tables (mobile fit). The links have descriptive text ('[日本語の公式ドキュメント](…/best-practices)').",
       "blockIds": [
         "s4-sort",
         "s1-table",
         "p-model-sort",
-        "s1-screenshot-note"
-      ]
+        "s4-names"
+      ],
+      "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "p-model-intro: p-model-sort lost its caption, and with it the stated rule. Replace the md with '模範解答の例です。テストのコードと、指摘の仕分けを示します。必須にするのは、正しさと要件に関わる指摘だけです。'",
-    "Carried over, not applied: o1 is at create level but is only assessed by selection. Add a p-steps item after p-explain: id 'p-design', title '⑨ 手元のタスク1つに、渡す確認を考える', expect '確認の種類と、依頼文に足す一言を1行で書けます。'. Add the checklist item p-c8 '自分のタスクに合う確認と、依頼文に足す一言を書きました'.",
+    "s4-defs (optional, ties the change to the definition): the s4-fresh claim that the subagent '自分でコードを読んで確かめます' rests on subagents having their own tools, which s4-defs does not say. Optionally change the サブエージェント definition to '自分のコンテキストと道具で別に動き、結果を要約して返すClaude。詳しくは第7回。' and keep the glossary entry in sync.",
+    "Carried over: p-model-intro: p-model-sort lost its caption, and with it the stated rule. Replace the md with '模範解答の例です。テストのコードと、指摘の仕分けを示します。必須にするのは、正しさと要件に関わる指摘だけです。'",
+    "Carried over: o1 is at create level but is only assessed by selection. Add a p-steps item after p-explain: id 'p-design', title '⑨ 手元のタスク1つに、渡す確認を考える', expect '確認の種類と、依頼文に足す一言を1行で書けます。'. Add the checklist item p-c8 '自分のタスクに合う確認と、依頼文に足す一言を書きました'.",
     "Carried over: check-quiz e1 and e2 carry bloom 'create' but are selection items. Set both to 'evaluate'.",
     "Carried over: p-steps p-evidence: add hint '`git diff --stat` で差分を見てから、`node --test` を実行します。'",
     "Carried over: p-steps p-commit: add hint 'Claudeに「テストと空の関数をコミットして」と頼んでもかまいません。'",
     "Carried over: 4-4 is still the heaviest section (10 blocks). Consider dropping s4-names from the body, since the glossary entry '/code-review' already carries the /review alias, and moving the Japanese-docs link to summary-next.",
-    "s1-pick + s1-table (for the ja-editor): s1-pick is a one-sentence block that introduces the list. Optionally merge it into s1-why's second paragraph, ending it with '確認は、タスクの完成を直接測れるものを選びます。'",
     "s2-goal (for the ja-editor), carried over: replace 'ターンごとに別の小さなモデルが条件を判定し、満たすか無理と判定されるまでClaudeは続けます。' with 'ターンごとに別の小さなモデルが条件を判定します。満たすか、無理とされるまで、Claudeは続けます。'"
   ],
   "average": 3.54,
   "verdict": "pass",
-  "summary": "Verification round (review-scope exit 0: 9 of 58 blocks, 9%; sections and objectives unchanged). The previous review had no open must-fix items, so there is nothing to resolve. All 9 changed blocks were reviewed in full. s1-table and p-model-sort became lists, and s1-pick now states the selection rule. The test code uses a named import of equal, and the practice file names are now consistent (leap.test.mjs / leap.mjs). The s4-sort labels are shorter, and its alt is more complete. None of the changes adds an error or regression. The one loss is the rule caption on p-model-sort, which is in niceToHave. validate shows 0 errors and lint --strict 0 warnings. measure.mjs gives prose 2228 (budget 1,200–2,400) and est 19.4 against estMinutes 19. align and practice stay at 3, because o1 (create) is still assessed only by selection."
+  "summary": "Verification round (review-scope exit 0: 2 of 58 blocks changed (s4-fresh, check-quiz e5), 2% of parts; sections and objectives unchanged). The previous review had no open must-fix items, so nothing needed resolving. I reviewed both changed blocks in full. s4-fresh and e5's explanation no longer say the reviewer sees only the diff and the criteria. They now say it does not see the work history and reads the code itself, which matches facts-cc-04-verify.md [practice-20], the cc-07 subagent facts and the lesson's own s4-prompt expect. Neither change introduces an error or regression. validate: 0 errors. lint --strict: 0 warnings. measure.mjs: prose 2242 (budget 1,200–2,400) and est 19.48, displayed as 19.5, which still rounds to estMinutes 19. I re-scored load, active, miscon, accuracy and voice, all unchanged, and carried the other scores over. align and practice stay at 3, because o1 (create) is still assessed only by selection (niceToHave)."
 }

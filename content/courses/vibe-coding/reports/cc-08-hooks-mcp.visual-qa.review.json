@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-08-hooks-mcp",
   "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:dc1fce75fb87584d",
+  "lessonHash": "sha256:112a650daf9ca3d0",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,28 +9,43 @@
     {
       "id": "visual",
       "score": 4,
-      "evidence": "metrics.json has no hard failures: overflowX false, 0 console errors, 0 mermaid errors, 0 unknown blocks and 0 broken images. The hook-loop flowchart (Fig. 1) is TD with Japanese labels that can be read at 390 px (pages/mobile-jp-04.png). Term tables, the exit-code table, the scope table and the A/B comparison tables fit the 390 px width and nothing is clipped (pages/mobile-jp-13.png, mobile-jp-16.png, mobile-jp-25.png, mobile-jp-26.png)."
+      "evidence": "The s1-lifecycle flowchart (TD) has readable Japanese labels at 390 px (pages/mobile-jp-04.png). Every table (s1-defs, s3-table, s4-scopes, s5-checks, practice-b-model, practice-b-model-b) fits the column without sideways scroll (pages/mobile-jp-16.png, pages/mobile-jp-25.png, pages/mobile-jp-26.png). There is no overflow, no broken image and no Mermaid error.",
+      "blockIds": [
+        "s1-lifecycle",
+        "s1-defs",
+        "s3-table",
+        "s4-scopes",
+        "s5-checks",
+        "practice-b-model",
+        "practice-b-model-b"
+      ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "No screen is text-only on either device (textOnlyScreens is empty). Every section alternates a term table, code and a check. The lesson is long, though: 34 mobile screens and 24 desktop screens. The practice section stacks a prompt, a 19-line script and a 24-line settings.json back to back (pages/mobile-jp-22.png to mobile-jp-24.png), which is the densest stretch."
+      "evidence": "No screen is text-only. Prose is broken up by definition tables, code, steps and checks. Desktop JP chars per line has a median of 42, a little above the 30–40 target. The practice section runs long on mobile: 2 code blocks of 19 and 24 lines, then 2 tables (pages/mobile-jp-22.png to pages/mobile-jp-26.png).",
+      "blockIds": [
+        "practice-model-script",
+        "practice-model-settings",
+        "practice-b-model",
+        "practice-b-model-b"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "This is a JP-only lesson. All UI and diagram labels are in Japanese, and English appears only as glossed terms and code. Contrast is good everywhere, including the callouts and the dark code blocks. No control is hidden under the 56 px top bar or the 60 px bottom bar on mobile (pages/mobile-jp-30.png, mobile-jp-34.png). No personal data appears on any screen: the desktop rail shows only an EN/JP language switch, with no account name or email."
+      "evidence": "All Japanese. Diagram labels, captions and controls are in JP with no stray English UI. Contrast is good on the callouts and code. Nothing is hidden under the top or bottom bars (pages/mobile-jp-03.png, pages/mobile-jp-30.png). No personal data appears on any screen."
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "Desktop JP charsPerLine median is 42 (max 53), just above the 30–40 target at a 680 px measure. This comes from the reader's measure, not from the lesson text (reader:).",
-    "reader: on mobile the header of the practice script's code block truncates the filename to '.claude/hooks/protect-files....' (pages/mobile-jp-22.png). The full path appears in the step text above and on desktop, but the header could wrap or use a smaller font.",
-    "reader: in the settings.json blocks, the long 'command' value soft-wraps inside the word 'hoo/ks' at 390 px (pages/mobile-jp-09.png, mobile-jp-23.png), and on desktop it breaks at 'block-/rm.sh' (pages/desktop-jp-07.png). It still reads correctly with the hanging indent. If the lesson wants to avoid it, it could shorten the path, for example by naming the hook directory 'hooks/' relative to $CLAUDE_PROJECT_DIR in prose only.",
-    "reader: the inline chip '\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-rm.sh' in step 2 of 8-2 is longer than the mobile line and wraps inside its box (pages/mobile-jp-10.png), as does the protect-files path chip (pages/mobile-jp-22.png). Both are readable, and the same value appears in the code block.",
-    "reader: the A and B comparison tables in the practice section use different first-column widths on desktop (pages/desktop-jp-18.png), which makes side-by-side scanning slightly harder. A fixed label-column width for key/value tables would align them.",
-    "reader: environment noise, not lesson defects. 14 /api/ requests failed (500 on user progress, events and notifications); the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png, desktop-jp-24.png); and both full-length PNGs are truncated."
+    "s2-settings / practice-model-settings: on mobile the line `\"command\": \"\\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/block-rm.sh\"` wraps inside the word (`.claude/hoo` / `ks/block-rm.sh`), and on desktop it splits as `block-` / `rm.sh` (pages/mobile-jp-09.png, pages/mobile-jp-23.png, pages/desktop-jp-07.png). It can still be read and the copy button keeps the text whole. You could shorten the line, for example by giving the path its own variable in a comment, if you want it to break cleanly.",
+    "practice-model-intro: the chip `\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh` is longer than a mobile line and wraps inside itself as `prot` / `ect-files.sh` (pages/mobile-jp-22.png). The settings code block below shows the same value, so you could drop the chip from the sentence and point to line 18 of the code instead.",
+    "s1-prettier: line 9 soft-wraps on both mobile and desktop (`... | xargs npx` / `prettier --write\"`) (pages/mobile-jp-06.png, pages/desktop-jp-04.png). It is still readable.",
+    "reader: code-block title bars cut long filenames short with an ellipsis on mobile (`.claude/hooks/protect-files...`, pages/mobile-jp-22.png). The full path is given in the step text, but the title is cut off.",
+    "reader: the two practice tables (practice-b-model, practice-b-model-b) get different column widths on desktop, so the A and B values do not line up for comparison (pages/desktop-jp-18.png, pages/desktop-jp-19.png).",
+    "reader: the mobile full-length PNG stops at 16000px, failed /api/ requests show up as ignored network errors, and the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-34.png, pages/desktop-jp-24.png)."
   ],
   "verdict": "pass",
-  "summary": "Visually clean on both mobile (390 px) and desktop. There are no hard failures in metrics.json, the hook-loop diagram and every table can be read at 390 px, there is no personal data on any screen, and every section has a table, code or a check. The only rough spots come from the reader: long path chips and command lines wrap inside the path, and one code-block filename is truncated on mobile. All of these are listed as nice-to-have."
+  "summary": "metrics.json shows no hard failures: no overflow, no console errors, no Mermaid errors, no unknown blocks and no broken images. No screen is text-only, and the hook lifecycle diagram and all tables read well at 390 px. Nothing must be fixed. The only small issues are long hook paths that wrap inside words in code lines and inline chips; the copy buttons and the code blocks keep the full value."
 }

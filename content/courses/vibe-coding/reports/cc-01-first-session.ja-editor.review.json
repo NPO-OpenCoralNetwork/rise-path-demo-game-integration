@@ -1,38 +1,26 @@
 {
   "lessonId": "cc-01-first-session",
   "file": "content/courses/vibe-coding/drafts/cc-01-first-session.lesson.json",
-  "lessonHash": "sha256:9251fd0014082e5c",
+  "lessonHash": "sha256:83c7a256e5bf982c",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:eb6d40faa5d6fe69",
-    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/eb6d40faa5d6fe69/round-1/ja-editor.review.json",
+    "reviewedRevision": "sha256:9251fd0014082e5c",
+    "previousReview": ".artifacts/review/vibe-coding/cc-01-first-session/9251fd0014082e5c/round-1/ja-editor.review.json",
     "changed": [
-      "loop-table",
-      "surfaces-table",
-      "install-how",
       "practice-steps"
     ],
-    "changedShare": 0.05,
+    "changedShare": 0.02,
     "fullReviewRequired": false
   },
-  "resolved": [
-    {
-      "blockId": "install-how",
-      "criterion": "prior",
-      "status": "resolved",
-      "evidence": "install-how now gives the full name the first time WSL appears: 「macOS・Linux・WSL（Windows Subsystem for Linux）用は、2行で1つのコマンドです。」 The sentence is now its own paragraph, so the 「、」 can stay. lessons:lint --strict: 0 errors, 0 warnings."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text is clean. In loop-table and surfaces-table, each cell now starts with the full name (「チャットAIは、…」「ターミナルCLI。…」「デスクトップアプリ。…」「クラウドセッション。…」), so the short row labels (チャット, 補完, CLI, アプリ, クラウド) still match the terms used in the rest of the lesson. The クラウド cell now reads more smoothly: 「GitHubのリポジトリを使い、先にpushする」. The practice-steps titles lost the ①–⑤ markers but keep です・ます in the body. The md still points to 1-5の①/②/⑤, so the link to the worked example is not lost. The score stays at 3 because earlier stiff spots are unchanged (loop-lead, surfaces-same).",
+      "evidence": "The new p-start expect text is in です・ます. Its three sentences are short and parse cleanly: 「初めてのフォルダでは、信頼の確認が出ます。自分で作ったフォルダなので、承認します。入力欄の上に `cc-practice` が表示されます。」 It uses the same term as cc-05 (「信頼の確認が出ます」) and cc-09 (「信頼の確認に答えます」), so the later lessons can treat it as known. The score stays at 3 because the stiff spots in loop-lead and surfaces-same have not changed.",
       "blockIds": [
-        "loop-table",
-        "surfaces-table",
         "practice-steps",
         "loop-lead",
         "surfaces-same"
@@ -41,17 +29,17 @@
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs: prose 1659 (budget 1,200–2,400), est 16.0 min (≤ 20; estMinutes 16). para-sentences.mjs: 0 paragraphs over 3 sentences. lessons:lint --strict: 0 errors, 0 warnings. install-how is now split into two short paragraphs.",
+      "evidence": "measure.mjs gives prose 1659 (budget 1,200–2,400) and est 16.1 min (must be ≤ 20; estMinutes 16). lessons:lint --strict reports 0 errors and 0 warnings. The new expect text has 3 sentences, which is within the paragraph budget.",
       "blockIds": [
-        "install-how"
+        "practice-steps"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "The open must-fix is resolved: WSL is spelled out on first use in install-how. CLI is still spelled out in surfaces-table (「CLIはCommand Line Interfaceの略」). push, エンジン and npm are still not explained (see niceToHave), so the score stays at 3.",
+      "evidence": "「信頼の確認」 is plain Japanese, and the expect text says how to answer it: approve, because you made the folder yourself. It does not say what is being trusted (see niceToHave). push, エンジン and npm are still unexplained (niceToHave, carried), so the score stays at 3.",
       "blockIds": [
-        "install-how",
+        "practice-steps",
         "surfaces-table",
         "surfaces-same",
         "install-node"
@@ -60,27 +48,27 @@
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over: the lesson declares jp only. Every string is Japanese, and both links name their destination.",
+      "evidence": "Carried over: the lesson declares jp only. Every string is in Japanese, and both links name their destination.",
       "carriedOver": true
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "surfaces-table: the short label and the start of the cell now repeat each other (「CLI」 / 「ターミナルCLI。…」). On a phone this is fine, but the cell could save a few characters by dropping the label echo. If kept, it is acceptable as is.",
-    "practice-steps: with ①–⑤ removed from the titles, the link to the 1-5 steps now lives only in the md. Putting it back in one title would help orientation — 「質問して、変更を1つ頼む」→「質問して、変更を1つ頼む（1-5の①②）」",
-    "install-how: 「2行で1つのコマンド」 could still be read as \"two commands\" — 「2行で1つのコマンドです。」→「2行に分けて表示した1つのコマンドです。」",
-    "install-unix / install-win: (carried) filename styles differ — 「PowerShell (Windows)」→「Windows・PowerShell」",
-    "surfaces-table: (carried) 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」, to match 「IDE拡張（JetBrains）」 in q2/q6",
+    "practice-steps: p-start's expect now includes an action (「承認します」), but expect should say what the learner will see. The step would read more clearly if the dialog were named and the action moved to hint — 「初めてのフォルダでは、信頼の確認が出ます。自分で作ったフォルダなので、承認します。」→「初めてのフォルダでは、このフォルダを信頼するかの確認が出ます。自分で作ったフォルダなので、承認します。」 (this also says what 「信頼」 refers to)",
+    "practice-steps: (carried) factual doubt: neither audit-cc-01-first-session.json nor facts-cc-01-first-session.md covers 「入力欄の上に `cc-practice` が表示されます。」 or how the trust prompt is shown on first start. Safer wording: 「Claude Codeの入力欄が表示されます。」",
+    "practice-steps: (carried) since ①–⑤ were removed from the titles, the link to the 1-5 steps is only in the md — 「質問して、変更を1つ頼む」→「質問して、変更を1つ頼む（1-5の①②）」",
+    "install-how: (carried) 「2行で1つのコマンドです。」→「2行に分けて表示した1つのコマンドです。」",
+    "install-unix / install-win: (carried) the filename labels use different styles — 「PowerShell (Windows)」→「Windows・PowerShell」",
+    "surfaces-table: (carried) 「JetBrains版はCLIが別に必要」→「JetBrainsの拡張はCLIが別に必要」",
     "surfaces-table: (carried) push is not explained — 「先にpushする」→「先にpush（GitHubへ送る）する」",
     "loop-lead: (carried) 「何を見て、何をするかで比べてみましょう。」→「チャットAI、エディタの補完、Claude Codeを、何を見て何をするかで比べてみましょう。」",
     "surfaces-same: (carried) 「どれも同じエンジンなので、」→「どれも中身は同じClaude Codeなので、」",
     "install-node: (carried) 「npmで入れる場合の手順です。」→「npm（Node.jsのパッケージ管理ツール）で入れる場合の手順です。」",
     "check-quiz: (carried) 「`claude --cloud` で送れます。」→「ターミナルの `claude --cloud` コマンドで送れます。」",
     "hook-predict: (carried) 「Claude Codeは前回の会話を覚えていません。」→「新しいセッションに、前回の会話は入っていません。」",
-    "session-check: (carried) 「昨日の会話は見えないが、」→「昨日の会話は見えないけれど、」",
-    "practice-steps: (carried) factual doubt: neither the audit nor the facts file covers 「入力欄の上に `cc-practice` が表示されます。」 — safer: 「Claude Codeの入力欄が表示されます。」"
+    "session-check: (carried) 「昨日の会話は見えないが、」→「昨日の会話は見えないけれど、」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "Verification round. review-scope.mjs exited 0: 4 of 43 blocks changed (5%). The one open must-fix is resolved: install-how now spells out WSL（Windows Subsystem for Linux）. The changed blocks (loop-table, surfaces-table, install-how, practice-steps) are clean. They add no new naming mismatches, because each table cell starts with the full term. lint --strict is clean, with prose 1659 and 16.0 min. Scores: voice 3, load 4, prior 3, a11y_l10n 4 (mean 3.5), and mustFix is empty, so the verdict is pass."
+  "summary": "Verification round. review-scope.mjs exited 0: only practice-steps changed, in item p-start (1 of 43 blocks, 2%). The previous review had no open must-fix items. The new expect text about the trust prompt is correct です・ます Japanese. It uses the term 「信頼の確認」, the same as cc-05 and cc-09. lint --strict is clean, with prose 1659 and est 16.1 min. Scores: voice 3, load 4, prior 3, a11y_l10n 4 (mean 3.5). mustFix is empty, so the verdict is pass."
 }

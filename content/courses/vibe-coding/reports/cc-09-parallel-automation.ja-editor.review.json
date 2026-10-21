@@ -4,57 +4,58 @@
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
-  "lessonHash": "sha256:6da74e7b888a7ddb",
+  "lessonHash": "sha256:e66b60d1da0710f0",
   "verifies": {
-    "reviewedRevision": "sha256:174374fa262b8b76",
-    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/174374fa262b8b76/round-1/ja-editor.review.json",
+    "reviewedRevision": "sha256:6da74e7b888a7ddb",
+    "previousReview": ".artifacts/review/vibe-coding/cc-09-parallel-automation/6da74e7b888a7ddb/round-1/ja-editor.review.json",
     "changed": [
-      "check-quiz"
+      "s2-lead",
+      "s3-table",
+      "p1-steps-write",
+      "check-quiz",
+      "lesson.glossary"
     ],
-    "changedShare": 0.02,
+    "changedShare": 0.07,
     "fullReviewRequired": false
   },
-  "resolved": [
-    {
-      "blockId": "check-quiz",
-      "criterion": "voice",
-      "status": "resolved",
-      "evidence": "In e3, option d now reads 「`Bash(npm test *)` ＋ `dontAsk`」 with no trailing 「だけ」. Like options a, b and c, it is a bare flag list joined by ＋, so the four options are parallel in form (§5) and d no longer hints at what is missing."
-    }
-  ],
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The only change since the last round is option d of e3, which is now the bare list 「`Bash(npm test *)` ＋ `dontAsk`」. Its feedback (「`--bare` がないと、リポジトリのフックや `.mcp.json` のサーバーが確認なしで動きます。」) is one sentence and uses です・ます. lessons:lint --strict reports 0 errors and 0 warnings. The small clipped lines in the unchanged s3-table and s2-code remain, so voice stays at 3.",
+      "evidence": "The changed text uses です・ます and parses. s3-table item 1 now names its subject: 「付けないと、フックやMCPサーバーが確認なしで動きます。」 This closes the earlier niceToHave about 「どちらも」. The e1 explanation 「今の会話に入るのは、依頼文と要点だけです（第7回）。」 is clear. The added p-run sentence 「プランでなくAPIの料金です（第10回）。」 is clipped but still readable. The new s2-lead 「2つの作業を小さなファイルの追加にします」 is also a little terse. lessons:lint --strict reports 0 errors and 0 warnings. Unchanged lines such as the s2-code comment are still terse, so voice stays at 3.",
       "blockIds": [
-        "check-quiz",
         "s3-table",
-        "s2-code"
+        "p1-steps-write",
+        "s2-lead",
+        "check-quiz"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "measure.mjs gives prose 2260 (budget 1,200–2,400), read 2648, practice reading 1225, 11 questions, 2 practice sections and est 19.9 min (cap 20). estMinutes is 20. Removing 「だけ」 does not change the prose count. The prose is still close to the ceiling.",
+      "evidence": "measure.mjs gives prose 2265 (budget 1,200–2,400), read 2653, practice reading 1246, 11 questions, 2 practice sections and est 20.0 min (must be ≤ 20). estMinutes is 20, so they match. The cuts in s2-lead and s3-table offset most of the added text in p-run and s3-table. Lint shows no sentence-length or paragraph-length findings. The lesson is now exactly at the time cap, so it has no room for further additions.",
       "blockIds": [
-        "check-quiz"
+        "s2-lead",
+        "s3-table",
+        "p1-steps-write"
       ]
     },
     {
       "id": "prior",
       "score": 3,
-      "evidence": "Carried over: this round changed nothing that affects prior. The small gaps from earlier rounds remain (継続的インテグレーション has no English; s1-lead uses both 「道具」 and 「方法」).",
+      "evidence": "The サブエージェント glossary entry now begins 「メインの会話とは別のコンテキストで…」, which matches cc-05/07/11. The quiz in e1 still says 「今の会話」 for the same conversation. That reads naturally as 'the conversation you are in now', and a learner will not mistake it for something else. 「CLAUDE.md」 and 「スキル」 in s3-table were taught earlier in the course. 「プラン」 in p-run uses the course's term 「有料プラン」 from cc-01 and points to 第10回. The earlier small gaps remain (継続的インテグレーション without English; 「道具」 and 「方法」 both appear in s1-lead).",
       "blockIds": [
         "lesson",
-        "s1-lead"
-      ],
-      "carriedOver": true
+        "check-quiz",
+        "p1-steps-write",
+        "s3-table"
+      ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Carried over: the one declared locale (jp) is complete, lint reports no locale-plain-string findings, and the only link names its destination (「公式ドキュメント（非対話的実行）」 in s3-mode).",
+      "evidence": "Carried over: the one declared locale (jp) is complete, and lint reports no locale-plain-string findings. The only link names its destination (s3-mode). The changes add no links and no new locale.",
       "blockIds": [
         "s3-mode"
       ],
@@ -63,13 +64,14 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz: In e3 the key that explains the shorthand comes after the question. Put it before the question so the learner knows how to read the options first — 「`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
-    "p1-task (unchanged): s2-code calls cc-practice-09 a 「練習用リポジトリ」. Using the same word here reads more smoothly — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
-    "s1-defs (unchanged): The worktree definition does not give the branch name, so 「worktree-feature-a」 in s2-steps comes as a surprise. Add it if length allows — 「`claude --worktree <名前>` で作ります。」→「`claude --worktree <名前>` で作ります。ブランチ名は `worktree-<名前>` です。」",
-    "s3-table (unchanged): 「どちらも」 could name its subject — 「付けないと、どちらも確認なしで動きます」→「付けないと、フックもMCPサーバーも確認なしで動きます」",
-    "s2-code (unchanged): The code comment is terse — 「# 未追跡に出さない」→「# ワークツリーを未追跡ファイルに出さない」"
+    "p1-steps-write: (p-run) The new sentence has no subject, and 「プラン」 is shorter than the course's term 「有料プラン」 (cc-01). Naming the subject makes it clear that the cost is per-use API billing — 「プランでなくAPIの料金です（第10回）。」→「料金は有料プランでなく、APIの従量課金になります（第10回）。」",
+    "s2-lead: 「作業を…追加にします」 is a little clipped. 「置き換えます」 says what the learner does — 「練習では、2つの作業を小さなファイルの追加にします。」→「練習では、2つの作業を小さなファイルの追加に置き換えます。」",
+    "check-quiz: (e1, unchanged wording) The glossary now says 「メインの会話」, but the prompt, the option-b feedback and the explanation say 「今の会話」. This is optional, because the meaning is clear in context. To make the link to the glossary obvious, change the explanation — 「今の会話に入るのは、依頼文と要点だけです（第7回）。」→「メインの会話に入るのは、依頼文と要点だけです（第7回）。」",
+    "check-quiz: (e3, unchanged) Put the key to the shorthand before the question, so the learner knows how to read the options first — 「`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？`Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。」→「選択肢の `Bash(…)` は `--allowedTools` の値、`dontAsk` などは `--permission-mode` の値です。`claude -p \"…\"` と `--max-budget-usd 1` に加えて、どれを付けるのがいちばん安全でしょう？」",
+    "p1-task: (unchanged) s2-code calls cc-practice-09 a 「練習用リポジトリ」. Using the same word here reads more smoothly — 「練習用フォルダー `cc-practice-09` で進め」→「練習用リポジトリ `cc-practice-09` で進め」",
+    "s2-code: (unchanged) The code comment is terse — 「# 未追跡に出さない」→「# ワークツリーを未追跡ファイルに出さない」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "This is a verification round. review-scope.mjs exited 0: 1 of 42 blocks changed (check-quiz, question e3), 2% of the parts, and sections and objectives are unchanged. The open must-fix from the last round is resolved: option d of e3 now reads 「`Bash(npm test *)` ＋ `dontAsk`」 without 「だけ」, so all four options have the same form. The change adds no new (a)–(e) issue. lessons:lint --strict is clean. measure.mjs gives prose 2260 and est 19.9 min, with estMinutes 20. Scores are voice 3, load 4, prior 3 (carried over) and a11y_l10n 4 (carried over), a mean of 3.5. mustFix is empty, so the verdict is pass. The remaining items are in niceToHave."
+  "summary": "This is a verification round. review-scope.mjs exited 0: 4 of 42 blocks changed (s2-lead, s3-table, p1-steps-write, check-quiz), plus the glossary, for 7% of the parts. Sections and objectives are unchanged. The previous review had no open must-fix items, so the resolved list is empty. All changed text was checked in full. The new claims match facts-cc-09-parallel-automation.md: --bare skips CLAUDE.md and skills, and it needs ANTHROPIC_API_KEY instead of the subscription login. The glossary now uses メインの会話, as the other lessons do. The changes add no new (a)–(e) error. lessons:lint --strict is clean. measure.mjs gives prose 2265 and est 20.0 min, with estMinutes 20, exactly at the cap. Scores: voice 3, load 4, prior 3 (re-scored) and a11y_l10n 4 (carried over), a mean of 3.5. mustFix is empty, so the verdict is pass."
 }
