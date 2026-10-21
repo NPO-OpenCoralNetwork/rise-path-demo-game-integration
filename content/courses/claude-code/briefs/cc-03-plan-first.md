@@ -35,7 +35,7 @@
   - 仕様のインタビューをした同じ会話で実装すればよい／前回の会話を Claude が覚えている。→ 新しいセッションで `SPEC.md` を読ませる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19（コース共通の `scripts/lessons/measure.mjs`：`cc-03-plan-first.lesson.json: prose 2295 (budget 1,200–2,400) · read 2961 · practice reading 1442 · questions 8 · practice sections 2 · est 19.1 min (must be ≤ 20; estMinutes 19)`。(3,065 + 1,452) ÷ 450 ≒ 10.04 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.37 分）。
+- 所要時間 / minutes: 19（コース共通の `scripts/lessons/measure.mjs`：`cc-03-plan-first.lesson.json: prose 2295 (budget 1,200–2,400) · read 2961 · practice reading 1442 · questions 8 · practice sections 2 · est 19.1 min (must be ≤ 20; estMinutes 19)`。(2,961 + 1,442) ÷ 450 ≒ 9.78 分 + 問題 8 問（predict 1、inline 4、exam 3）× 40 秒 ≒ 5.33 分 + 演習 2 セクション × 2 分 = 4 分 → 19.1 分）。
 - 難易度 / level: beginner
 - ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 新しい練習用フォルダーに 25 行の `todo.html` を作る（空の入力で空の行が増える）。「TODO アプリをいい感じにして」を 4 つの観点で書き直し、プランモードで探索 → 計画 → 1 か所直す → 承認 → 実装 → 差分の説明 → コミット。演習2で「期限とリマインダー」のインタビュー依頼文を書く。

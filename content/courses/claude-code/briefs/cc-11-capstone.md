@@ -31,7 +31,7 @@ Until then it was a draft (`courseId: "vibe-coding"`, no `next`).
   7. 「古い記事どおりにすればよい」— Claude Codeは頻繁に変わる。公式ドキュメントで今の書き方を確かめる（`summary-next`、`card-update`。試験では問わない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: estMinutes 19 (course-wide measure `scripts/lessons/measure.mjs`, after the mobile-fit and cross-lesson fixes: `cc-11-capstone.lesson.json: prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)`; 19.1 → 19). The measure times each practice section at 2 min, `self-check` included; `self-check` is also the success-criteria checklist of the other two tasks. Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
+- 所要時間 / minutes: estMinutes 19 (course-wide measure `scripts/lessons/measure.mjs`, after the mobile-fit and cross-lesson fixes: `cc-11-capstone.lesson.json: prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)`; 19.3 → 19). The measure times each practice section at 2 min, `self-check` included; `self-check` is also the success-criteria checklist of the other two tasks. Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only (course decision; when to add English is the owner's decision, report §10).
 - 演習の題材 / practice task idea: the capstone task itself — on the learner's own repository (a working branch if it matters) or the earlier practice folder: build the setup (CLAUDE.md ≤ 25 lines, ask/deny rules, extensions only where a trigger already exists), then one full cycle on a small task they have been postponing. Success criteria: each step's `expect`, and `self-check-list` (6 items over safety, verification, context, cost; it doubles as the self-assessment). Hint ladder: step `hint` → `troubleshoot` → model answers. Model answers: CLAUDE.md for a Python kakeibo CLI (19 lines, in `setup-prompt-model`), an ask/deny settings snippet (`setup-settings-model`), and a plan prompt with an expected plan (`cycle-prompt-plan`).
@@ -117,9 +117,9 @@ review loop); no images.
   What's new digest and asking Claude Code about itself (round-1 review cut `sc-b3`, `sc-list` and exam item `e4`).
 
 ## Measured
-Course-wide measure (`scripts/lessons/measure.mjs`) after the mobile-fit and cross-lesson fixes: prose **1,329** (budget 1,200–2,400),
-read 1,833, practice reading 1,657, 8 questions (1 predict, 4 inline, 3 exam), 3 practice sections, est 19.1 min →
-estMinutes 19.
+Course-wide measure (`scripts/lessons/measure.mjs`) after the mobile-fit and cross-lesson fixes: prose **1,344** (budget 1,200–2,400),
+read 1,894, practice reading 1,672, 8 questions (1 predict, 4 inline, 3 exam), 3 practice sections, est 19.3 min →
+estMinutes 19 (2026-10-21).
 `lessons:validate` 0 errors, `lessons:lint --strict` 0 warnings.
 
 ### Last fix round (2026-10-21)

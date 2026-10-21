@@ -36,7 +36,7 @@ Until then it was a draft (`drafts/cc-05-context.lesson.json`, `courseId: "vibe-
   5. 「Claude に聞けば使用量がわかる」— 測るのは `/context`。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（course-wide measure `scripts/lessons/measure.mjs`, round 3 after the mobile-fit fixes: `cc-05-context.lesson.json: prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1152 · questions 12 · practice sections 1 · est 19.9 min (must be ≤ 20; estMinutes 20)`。(3,289 + 1,126) ÷ 450 ≈ 9.81分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.81分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
+- 所要時間 / minutes: 20（course-wide measure `scripts/lessons/measure.mjs`, round 3 after the mobile-fit fixes: `cc-05-context.lesson.json: prose 1945 (budget 1,200–2,400) · read 3289 · practice reading 1152 · questions 12 · practice sections 1 · est 19.9 min (must be ≤ 20; estMinutes 20)`。(3,289 + 1,152) ÷ 450 ≈ 9.87分 + 問題12問 × 40秒 = 8.0分 + 手を動かす演習1つ × 2分 = 19.87分 → 20。演習の前半（p1〜p3）は問題として数え、演習の2分は後半の手を動かす部分だけ。）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英訳をいつするかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 前半は3つのセッション（A 何でも入り、B 同じ作業が長く続く、C 範囲のない調査）を文章で読み、`/clear`・`/compact`・サブエージェントから対処を選ぶ。後半は練習用フォルダ（`cc-context-practice`、`git init`）で CLAUDE.md に1行のルールを書いてから起動し、会話だけの指示を1つ伝えて作業 → `/context` を3回（起動直後・作業後・圧縮後）→ 予想 → 焦点付き `/compact` → 何が残ったかを確かめる。チェックリストと解答例の表つき。

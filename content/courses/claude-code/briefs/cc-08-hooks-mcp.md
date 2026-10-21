@@ -98,7 +98,7 @@ inline and exam questions (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8); 
 one diagram (6 nodes), no images. Body: prose 1,897 by the course-wide `scripts/lessons/measure.mjs` (budget 1,200–2,400; see Format).
 Mobile fit (390 px): every table has 2 columns (cells ≤ 40 JP chars) and a first column of ≤ 4 JP characters or one
 short inline code; `scripts/lessons/diagram-width.mjs` measures the diagram at 344 px (limit 362); code-width.mjs (a session script) leaves only the four JSON
-`command` strings over 44 columns (see Assumptions); `scripts/lessons/para-sentences.mjs` reports only the q9 stem (advisory).
+`command` strings over 44 columns (see Assumptions); `scripts/lessons/para-sentences.mjs` reports 0 paragraphs (2026-10-21).
 The browser check at 390 px (code-wrap.sh, now `scripts/lessons/mobile-fit.mjs`; reader of 2026-10-21) finds no split chip and no cut-off line; it soft-wraps
 only the four JSON `command` lines, and lists the two `"$CLAUDE_PROJECT_DIR"/.claude/hooks/…` path chips (ex-register,
 practice-model-intro) as longer than a line (kept: a plain path in a sentence that reads well).

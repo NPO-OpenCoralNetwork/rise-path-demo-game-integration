@@ -75,7 +75,7 @@ content sections; practice has none); new terms per segment: 4-1 検証・自動
 Learning are the two style names, in the glossary); worked example (4-3 steps + prompts + code) before the practice,
 which repeats the same subgoals on a new function with fewer step explanations; every objective has an inline and
 two exam questions; exam has transfer items (e1, e2, e4, e6); summary 5 points; 7 flashcards; one process diagram
-(sorting findings); no images; ≤ 2 callouts per section; ≤ 3 sentences per paragraph (`scripts/lessons/para-sentences.mjs`: 0 hits); body = `scripts/lessons/measure.mjs` prose 2228 (see minutes); no tables, diagram ≤ 362 px wide and code lines ≤ 44 columns for 390 px screens. Correct options are spread over positions 1–4 (the reader
+(sorting findings); no images; ≤ 2 callouts per section; ≤ 3 sentences per paragraph (`scripts/lessons/para-sentences.mjs`: 0 hits); body = `scripts/lessons/measure.mjs` prose 2242 (see minutes); no tables, diagram ≤ 362 px wide and code lines ≤ 44 columns for 390 px screens. Correct options are spread over positions 1–4 (the reader
 numbers options by position, so explanations name the content, not the option letter).
 
 ## Assumptions

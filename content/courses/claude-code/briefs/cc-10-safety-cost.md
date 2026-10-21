@@ -38,7 +38,7 @@
 - 所要時間 / minutes: 17（`scripts/lessons/measure.mjs`: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2467 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`、2026-10-21）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（cc-* 共通の決定。英語版をいつ作るかはオーナーが決める。レポート §10）
-- 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。
+- 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice-10` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。
 
 ## 制約 / Constraints
 - ツールとバージョン / tools and versions: Claude Code v2.1.304（2026-10-20 時点）。auto モードがターミナルと VS Code の対話セッションの既定になったのは v2.1.283 から。
@@ -107,6 +107,11 @@ and est 17.2 min after the mobile-fit fixes; after the 2026-10-21 fixes it gives
   asking (not "settings": allow rules are not used in `-p`); the project `.claude/settings.json` reaches teammates
   once committed; the deny-rule check expects Read tool and `cat` reads to be refused (not "Claude cannot read
   it"); the root/sudo refusal is scoped to starting `bypassPermissions` on Linux and macOS.
+- After the audit (2026-10-21): the s2-table `bypassPermissions` cell, which the audit had kept (its one refuted finding),
+  was reworded after all because the pedagogy review found it contradicted the glossary and e4 (deny rules apply in
+  every mode). It now reads 「拒否ルールで止めた操作のほかは、ほぼ確認なしで動く」 (the ja-editor's wording; deny rules block
+  outright, while ask rules and critical-path `rm` still prompt, hence 「ほぼ」). `reports/facts/cc-10-safety-cost.audit.json`
+  records this as `laterChanged` on that finding.
 - Round-1 fixes: the hook now spells out API in a third scene sentence, followed by the lead-in question
   「何が起こりうるでしょうか。」. The permissions page (re-read 2026-10-20) supports the original e3 key and the
   `cat`/`head` and Edit/Write claims, but e3 now tests `~/` (taught in s3-pitfall) and e4 and q3 no longer rely on the
