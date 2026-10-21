@@ -1,79 +1,67 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:6b93b57324d9ed64",
+  "lessonHash": "sha256:a2581804ebc9fe6d",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
   "scores": [
     {
       "id": "visual",
-      "score": 2,
-      "evidence": "metrics.json has no hard failures (overflowX false, 0 console, mermaid, unknown-block or image errors). The s3-diagram flowchart TD has readable Japanese labels at 390 px (mobile-jp-10/11). But at 390 px the long lines of practice-setup and practice-answer are cut off at the right edge (mobile-jp-19, mobile-jp-25), and s1-table breaks words in odd places (mobile-jp-04/05).",
+      "score": 3,
+      "evidence": "No hard failures in metrics.json (overflowX false, 0 console, mermaid, unknown-block or broken-image errors). The s3-diagram flowchart TD has readable Japanese labels at 390 px (mobile-jp-10/11), and the tables and code read cleanly on desktop. On mobile, lines 6 and 8 of the practice-answer code reach the right edge, and the end of line 8 is cut off (mobile-jp-25).",
       "blockIds": [
-        "practice-setup",
-        "practice-answer",
+        "s3-diagram",
         "s1-table",
-        "s3-diagram"
+        "s2-table",
+        "s4-table",
+        "practice-answer"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "textOnlyScreens is empty on both devices and the rhythm is good: headings, definitions, tables, code and checks alternate. The desktop median is 42 chars per line (target 30–40, max 50). In practice-setup the gutter shows 1–23, but practice-hint3 refers to CLAUDE.md lines 1–18, so the learner has to work out the offset.",
+      "evidence": "No text-only screens on either device (textOnlyScreens is empty). Each section mixes definitions, a table or code with an inline check, so there are no walls of text. Desktop charsPerLine has a median of 42 (34–50), above the JP target of 30–40. The practice section is long on mobile (about 9 screens, mobile-jp-18 to 26), but steps and code break it up.",
       "blockIds": [
         "practice-setup",
-        "practice-hint3"
+        "practice-steps",
+        "practice-answer"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "This is a Japanese-only lesson. All labels, the diagram and the controls are in Japanese, with no stray English UI. Contrast is good, and no controls are hidden under the 56/60 px bars. Some table cells break mid-word on mobile, for example 「プロジェク/ト」 and 「変更をテストす/る」.",
+      "evidence": "This is a Japanese-only lesson, and no stray English UI shows on the JP screens. Contrast is fine throughout, and no controls are hidden under the top or bottom bars. In the s1-table on mobile, the row label 「組織の全員」 breaks inside the word as 「組織の全／員」 (mobile-jp-04).",
       "blockIds": [
-        "s1-table",
-        "s2-table"
+        "s1-table"
       ]
     }
   ],
   "mustFix": [
     {
       "criterion": "visual",
-      "blockId": "practice-setup",
-      "issue": "At 390 px, lines 6, 12, 13 and 14 of the sample CLAUDE.md are cut off at the right edge (for example 「テストは npm run test:unit で実行（npm te」 and 「ファイルを編集したら、毎回必ず npm run forma」). The learner cannot read the full lines they have to sort.",
-      "fix": "Keep every heredoc line under about 26 full-width characters. Split the long lines into two CLAUDE.md lines, or shorten them, for example 「テストは npm run test:unit で」 plus a separate line 「npm test はE2Eまで走って遅い」. Then update the line counts and numbers in practice-steps, practice-hint3 and the sed range in practice-answer.",
-      "screenshot": "pages/mobile-jp-19.png"
-    },
-    {
-      "criterion": "visual",
       "blockId": "practice-answer",
-      "issue": "At 390 px, lines 2 and 5–9 (the highlighted CLAUDE.md lines) and line 17 are cut off on the right, for example 「sed -n '12,18p' CLAUDE.md > docs/add-sc」 and 「<!-- 編集のたびの整形は、第8回でフックにする」.",
-      "fix": "Shorten the lines in the heredocs, for example 「- 単体テスト: `npm run test:unit`」 and 「- 画面追加: `docs/add-screen.md`」. Put the HTML comment on its own short line, and break the sed command with `\\`. Alternatively, move the resulting CLAUDE.md into its own code block (filename CLAUDE.md, lang markdown) with short lines.",
+      "issue": "At 390 px the model-answer code lines are wider than the code block. Line 8 「- コミットの前に `npm run test:unit` を通す」 is cut off after 「を通」. Lines 6 (「…で実行する」) and 19 (「…入力を検証してから使う」) run to the very edge, and nothing tells the learner the block scrolls.",
+      "fix": "Keep each line within about 34 full-width columns, as already done for lines 6–7. For example, split line 8 into 「- コミットの前に」 and 「  `npm run test:unit` を通す」. Shorten line 6 to 「- テストは `npm run test:unit`」. Change line 19 to 「- 入力を検証してから使う」 (the file already applies only to src/api/). Then update `highlight` to match the new line numbers.",
       "screenshot": "pages/mobile-jp-25.png"
     },
     {
-      "criterion": "visual",
-      "blockId": "practice-setup",
-      "issue": "The code gutter numbers the sample's lines 1–23, with the CLAUDE.md content starting at line 5. practice-hint3 and practice-steps refer to CLAUDE.md lines (「5・6行目は拒否ルール」), but on screen 5 is 「# メモ帳アプリ」 and the .env line is 9. Learners will match the wrong lines.",
-      "fix": "Show the sample CLAUDE.md as its own code block (filename `CLAUDE.md`, lang markdown) so that the gutter numbers 1–18 match the hint. Keep a separate short bash block that tells the learner to create it, or say in practice-hint3 that the line numbers are CLAUDE.md lines, not terminal lines.",
-      "screenshot": "pages/desktop-jp-13.png"
-    },
-    {
-      "criterion": "visual",
+      "criterion": "a11y_l10n",
       "blockId": "s1-table",
-      "issue": "At 390 px the label column is about 5 characters wide, so labels break inside words: 「プロジェク/ト：チーム」, 「ユーザー：自/分」, 「ローカル：自/分（このプロ/ジェクトだけ）」, 「組織の管理ポ/リシー」.",
-      "fix": "Replace the table with a `definitions` block (term = 「プロジェクト（チームで共有）」 and so on; md = the file path). Definitions render full width on mobile, as s1-defs does. Or shorten the labels to single words (組織 / ユーザー / プロジェクト / ローカル) and move the scope into the file column.",
-      "screenshot": "pages/mobile-jp-05.png"
+      "issue": "In the narrow first column on mobile, the row label 「組織の全員」 wraps inside the word as 「組織の全／員」.",
+      "fix": "Shorten the label so it fits on one line in the 届く範囲 column, for example 「組織全体」 or 「組織」 (the other labels are 「自分」 and 「チーム」).",
+      "screenshot": "pages/mobile-jp-04.png"
     }
   ],
   "niceToHave": [
-    "s5-steps and practice-steps: every step title starts with a circled number (①…⑥) next to the reader's own step number circle, so the number shows twice (mobile-jp-16, desktop-jp-11). Drop the ①–⑥ prefixes from the titles.",
-    "s2-table: on mobile, the left column breaks verbs as 「変更をテストす/る」 and 「ファイルを整理す/る」 (mobile-jp-06/07). Shorter labels such as 「テストする」 and 「整理する」 would fit on one line.",
-    "Desktop JP median line length is 42 chars (target 30–40, max 50). This comes from the reader's measure (680 px at 18.7 px), not the lesson.",
-    "reader: the mobile full-length PNG stops at 16000px (known).",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました。」 because drafts are not in course.json (known).",
-    "reader: horizontally scrolling code blocks have no scroll cue at 390 px (known), which makes the cut-off lines above harder to notice."
+    "The step titles in s5-steps and practice-steps start with ①–⑥, but the reader already shows a numbered circle next to each step, so each number appears twice (mobile-jp-16, desktop-jp-11). Removing the circled numbers from the titles would declutter them.",
+    "In practice-hint3 on mobile, the inline code `docs/add-screen.md` wraps at the hyphen (「docs/add-」/「screen.md」, mobile-jp-24). Moving it to the start of a sentence would help it stay on one line.",
+    "Several practice-checklist labels on mobile wrap awkwardly around inline paths, for example 「好みはCLAUDE.local.mdにあ／り」 (mobile-jp-23). Shorter labels or a different word order would avoid this.",
+    "The practice-prompt shows literal backticks around paths (`.claude/settings.json`). This is acceptable for text to paste, but plain quotes would read more cleanly (desktop-jp-15).",
+    "reader: desktop charsPerLine has a median of 42, above the JP target of 30–40, at a 680 px measure.",
+    "reader: the end banner says this is the course's last lesson (expected for a draft), and the mobile full-length PNG is truncated. Both are known behaviour.",
+    "reader: wide code blocks give no visible cue that they scroll sideways on mobile."
   ],
   "verdict": "revise",
-  "summary": "No hard failures in metrics.json and no personal data on any screen. The lesson mixes tables, definitions, a readable flowchart TD diagram and frequent checks, so no screen is text-only. The most important fix: at 390 px the practice-setup and practice-answer code blocks cut off their long Japanese lines, and the sample's gutter numbers do not match the CLAUDE.md line numbers the hint uses. s1-table also breaks words in odd places on mobile."
+  "summary": "The screenshots match lessonHash sha256:a2581804ebc9fe6d, there are no hard failures in metrics.json, and no personal data appears on any screen. The layout is clean and varied: every section has a table, definitions, code or a diagram plus an inline check, and the TD flowchart is readable at 390 px. The most important fix is the practice-answer code block, whose longest Japanese lines are cut off on mobile; the other is the 「組織の全員」 label in s1-table, which breaks mid-word."
 }

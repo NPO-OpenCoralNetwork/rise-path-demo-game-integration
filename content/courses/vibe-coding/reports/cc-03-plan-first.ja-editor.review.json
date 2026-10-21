@@ -1,51 +1,72 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:c61b1076cf96439d",
+  "lessonHash": "sha256:2a26cb723101d339",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "sha256:c61b1076cf96439d",
+    "changed": [
+      "s1-lead",
+      "s1-table",
+      "s1-rich",
+      "s2-enter",
+      "s4-lead",
+      "s4-good-spec",
+      "s4-table",
+      "s4-community",
+      "practice-setup",
+      "practice-starter",
+      "practice-steps",
+      "summary-points",
+      "lesson.estMinutes"
+    ],
+    "changedShare": 0.17,
+    "fullReviewRequired": false,
+    "previousReview": ".artifacts/review/vibe-coding/cc-03-plan-first/c61b1076cf96439d/round-1/ja-editor.review.json"
+  },
+  "resolved": [],
   "scores": [
     {
       "id": "voice",
       "score": 4,
-      "evidence": "The lesson uses warm, natural です・ます throughout. Wrong-option feedback stays within 2 sentences and names the misconception first (q0, q2, q3, q4, e1, e4, e5). All three meaning errors from round 1 are now fixed: s4-community reads 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」, pr-setup gives the right order (「上のコマンドの順にフォルダーを作り、`todo.html` を保存してコミットします。」), and the arrows in s4-flow and s4-table no longer have spaces. Options are parallel in form (q3, q4, e4, e5).",
+      "evidence": "The changed blocks keep warm, natural です・ます. The new s1-table list uses one frame for all four items (「**範囲**には、…を書きます。」 … 「**症状**には、…を書きます。」). The s4-table list is parallel too (「…は、**直接頼みます**。」「…は、**計画**します。」「…は、**インタビューと仕様**から始めます。」). The s2-enter items now share one form, ending in 「押す」「送る」「起動する」. pr-setup now matches the code: 「最初の3行でフォルダーを作り、その中に `todo.html` を保存します。最後の2行でコミットしてから…」. The practice-setup comment reads 「# ここでtodo.htmlを保存」. In the reformatted practice-starter, the highlight (lines 14–18) still covers addItem. No new (a)–(e) errors.",
       "blockIds": [
-        "s4-community",
+        "s1-table",
+        "s4-table",
+        "s2-enter",
         "practice-steps",
-        "s4-flow",
-        "s3-check",
-        "s4-check",
-        "check-quiz"
+        "practice-setup",
+        "practice-starter"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings. measure.mjs prints 「prose 2275 (budget 1,200–2,400) · est 20.0 min (must be ≤ 20; estMinutes 20)」, so the lesson is within budget and estMinutes matches. New terms per segment stay at 3 or fewer (s1-defs 2, s2-defs 3, s4-defs 2), and every screen has a table, diagram, steps or a check.",
+      "evidence": "`lessons:lint --strict`: 0 errors, 0 warnings. measure.mjs prints 「prose 2399 (budget 1,200–2,400) · est 19.4 min (must be ≤ 20; estMinutes 19)」, so the lesson is within budget and estMinutes matches. Turning the two 2-column tables into lists makes them easier to read on a phone. s1-lead and s4-lead are each down to the one idea that leads into the section.",
       "blockIds": [
-        "s1-defs",
-        "s2-defs",
-        "s4-defs",
-        "s2-flow",
-        "s4-table"
+        "s1-table",
+        "s4-table",
+        "s1-lead",
+        "s4-lead"
       ]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "「観点」 is now used only for the glossary term 「4つの観点」. The interview topics are called 「話題」 throughout (ps-ask md, expect and hint, and c2-depth). Glossary entries now all end in です・ます (「権限モードの1つです。」), and the 仕様 entry matches s4-defs (「何を作るか、作らないか、どう確かめるか」). Katakana terms and abbreviations get English or a spelled-out form on first use (フェーズ（phase）, セッション（session）, CSV（Comma-Separated Values）).",
+      "carriedOver": true,
+      "evidence": "Carried over from the previous review. The changed blocks use the glossary terms unchanged (4つの観点, 範囲・参照先・既存のパターン・症状, 仕様, インターフェース（interface…）), so no naming drift was introduced.",
       "blockIds": [
-        "practice-spec-steps",
-        "practice-spec-checklist",
-        "s4-defs",
-        "s2-defs"
+        "s1-table",
+        "s4-good-spec"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "The lesson declares only jp, and every string in that locale is filled. The diagram labels in s2-flow are Japanese, and its alt text describes the arrow back to the plan. The s2-version link text names its topic, not 「こちら」.",
+      "carriedOver": true,
+      "evidence": "Carried over from the previous review. The lesson declares only jp, and every changed string is filled.",
       "blockIds": [
         "s2-flow",
         "s2-version"
@@ -54,17 +75,18 @@
   ],
   "mustFix": [],
   "niceToHave": [
-    "s2-version: the link text names a topic, not the destination page (carried over from round 1) — 「[autoモードが使えない環境](…)では」→「[autoモードが使えない環境（権限モードの公式ドキュメント）](…)では」",
-    "summary-cards: card-good-spec says 「役に立つ」, but s4-good-spec and the ps-spec hint now say 「役立つ仕様には」. Use one form — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
-    "practice-spec-model / practice-spec-steps: s4-good-spec and card-good-spec name 「関わるファイルとインターフェース」 as the first condition, but the model answer and the ps-spec expect line leave out the interface. Add it — practice-spec-model「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとインターフェース、範囲外のこと、」; ps-spec expect「関わるファイル・範囲外・確かめる手順が入ります。」→「関わるファイルとインターフェース・範囲外・確かめる手順が入ります。」",
-    "practice-model: the delete button is a feature request, not a scope limit, but the model answer puts it under 範囲 next to the line about scope. Move it to its own line so the 4つの観点 stay distinct — 「範囲：変えるのはtodo.htmlだけです。各項目に「{{ボタンの文言}}」ボタンも付け、押すとその項目が消えるようにしてください。ライブラリと保存機能は今回は足しません。」→「範囲：変えるのはtodo.htmlだけです。ライブラリと保存機能は今回は足しません。\n追加：各項目に「{{ボタンの文言}}」ボタンを付け、押すとその項目が消えるようにしてください。」",
-    "s3-steps: in ex-explore, 「知った現状が、計画を読む物差しになります。」 reads like a translation — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」",
-    "s4-community: 「手で仕様を作って」 could suggest the learner writes SPEC.md alone, but the lesson has Claude write it through an interview — 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」→「まずはスキル集を使わず、3-4の依頼文で仕様を作ってみましょう。」",
-    "s4-check: option c has two sentences while a, b and d have one each. Join them — 「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」→「AskUserQuestionツールで私にインタビューし、決まったらそのまま実装まで進めて。」",
-    "practice-spec-task: 「リマインダー」 still has no English on first use (carried over from round 1; it is a common word, so the learner reads it correctly) — 「「期限とリマインダー」」→「「期限とリマインダー（reminder）」」",
-    "s1-table: rows[0][0] ends in a bare noun after the full stop, which reads as a fragment — 「どのファイルの、どんな場面か。テストの方針」→「どのファイルの、どんな場面か。テストの方針も」"
+    "summary-points: point 3 drops 「複数のファイル」, which s4-table and s3 name as a reason to plan. Keep the three conditions the same — 「差分を1文で説明できる変更は直接頼み、迷う変更やよく知らないコードは計画します。」→「差分を1文で説明できる変更は直接頼み、迷う変更や複数のファイル、よく知らないコードを変えるときは計画します。」",
+    "summary-points: point 5 says 「予想してから」 without saying what is predicted; the body (pr-explain) says 「結果を予想してから」 — 「差分を説明させ、予想してから確かめます。」→「差分を説明させ、結果を予想してから確かめます。」",
+    "s1-table: in the 範囲 item, 「どんな場面か」 and 「テストの方針」 are listed with only a comma, which reads a little loosely — 「どのファイルのどんな場面か、テストの方針を書きます。」→「どのファイルのどんな場面かと、テストの方針を書きます。」",
+    "s4-community: 「手で仕様を作って」 could suggest the learner writes SPEC.md alone, but the lesson has Claude write it through an interview (carried over) — 「まずは3-4の依頼文で、手で仕様を作ってみましょう。」→「まずはスキル集を使わず、3-4の依頼文で仕様を作ってみましょう。」",
+    "s2-version: the link text names a topic, not the destination page (unchanged text, carried over) — 「[autoモードが使えない環境](…)では」→「[autoモードが使えない環境（権限モードの公式ドキュメント）](…)では」",
+    "summary-cards: card-good-spec says 「役に立つ」, but s4-good-spec says 「役立つ仕様には」 (unchanged text, carried over) — 「役に立つSPEC.mdの3つの条件は？」→「役立つSPEC.mdの3つの条件は？」",
+    "practice-spec-model / practice-spec-steps: the interface condition from s4-good-spec is still missing (unchanged text, carried over) — 「仕様には、関わるファイル、範囲外のこと、」→「仕様には、関わるファイルとインターフェース、範囲外のこと、」",
+    "practice-model: the delete-button request sits under 範囲 (unchanged text, carried over) — move 「各項目に「{{ボタンの文言}}」ボタンも付け、…」 to its own line, starting with 「追加：」",
+    "s4-check: option c has two sentences while the other options have one each (unchanged text, carried over) — 「AskUserQuestionツールで私にインタビューして。決まったら、そのまま実装まで進めて。」→「AskUserQuestionツールで私にインタビューし、決まったらそのまま実装まで進めて。」",
+    "s3-steps: ex-explore reads like a translation (unchanged text, carried over) — 「知った現状が、計画を読む物差しになります。」→「現状を知っておくと、計画が正しいかを判断できます。」"
   ],
   "average": 4.0,
   "verdict": "pass",
-  "summary": "review-scope.mjs exited 1, so this is a full review. 17 of 44 blocks changed (39%), which is over the 30% limit; sections and objectives are unchanged. All 4 must-fix items from round 1 are fixed in the current text. s4-community now names what to try by hand. pr-setup gives the right order: make the folder, save the file, then commit. The interview topics are now 「話題」 in ps-ask and c2-depth, so they no longer collide with 「4つの観点」. Most round-1 nice-to-haves were applied too: glossary register, the 仕様 definition, the arrow spacing, the mode-name notation and the delete button's 直った状態. The lint is clean, and measure.mjs gives prose 2275 and est 20.0 min, both within budget. No new (a)–(e) errors were found. What remains is polish: the link text, 役立つ vs 役に立つ, and the interface missing from the model answer of 演習2."
+  "summary": "Verification round: review-scope.mjs exited 0, with 12 of 44 blocks changed (17%) and sections and objectives unchanged. The previous review had no open must-fix items, so there are no resolved entries. I checked every changed block in full. The two tables are now parallel bullet lists that fit a phone. pr-setup now matches the code line by line, and the starter code's highlight still covers addItem. The s2-enter items share one form, and the leads are tighter. Lint is clean, and measure.mjs gives prose 2399 (just under the 2,400 cap) and est 19.4 min, matching estMinutes 19. I found no new (a)–(e) errors. Two small issues come from the changes, both in summary-points: 「複数のファイル」 was dropped and 「結果を」 was removed. These are listed as nice-to-haves, along with polish carried over from the previous review."
 }

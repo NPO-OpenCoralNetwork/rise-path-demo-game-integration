@@ -1,31 +1,36 @@
 {
   "lessonId": "cc-06-claude-md",
   "file": "content/courses/vibe-coding/drafts/cc-06-claude-md.lesson.json",
-  "lessonHash": "sha256:6b93b57324d9ed64",
+  "lessonHash": "sha256:a2581804ebc9fe6d",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "sha256:5e95f5eafa612ea0",
-    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/5e95f5eafa612ea0/round-1/pedagogy-reviewer.review.json",
+    "reviewedRevision": "sha256:6b93b57324d9ed64",
+    "previousReview": ".artifacts/review/vibe-coding/cc-06-claude-md/6b93b57324d9ed64/round-1/pedagogy-reviewer.review.json",
     "changed": [
-      "hook-predict",
       "s1-table",
-      "s3-lead",
-      "s3-defs",
+      "s2-table",
       "s3-diagram",
       "s4-table",
       "practice-setup",
+      "practice-steps",
       "practice-prompt",
-      "practice-checklist",
+      "practice-hint3",
       "practice-answer",
-      "summary-next",
-      "lesson.glossary"
+      "practice-answer-why"
     ],
-    "changedShare": 0.14,
+    "changedShare": 0.12,
     "fullReviewRequired": false
   },
-  "resolved": [],
+  "resolved": [
+    {
+      "blockId": "s3-diagram",
+      "criterion": "visual",
+      "status": "resolved",
+      "evidence": "The chain is gone. Everything read at startup is now one node with a single edge to the context: `S[セッション開始] --> A[\"CLAUDE.mdと<br>インポート先、<br>paths: なしのルール\"]`, `A --> X[コンテキスト]`, `E --> X`. The alt now reads 「…インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り…」, so the 「（と自動メモリの先頭）」 mismatch is removed."
+    }
+  ],
   "scores": [
     {
       "id": "align",
@@ -47,7 +52,8 @@
       "blockIds": [
         "hook-b1",
         "hook-predict"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "prior",
@@ -57,16 +63,18 @@
         "s1-defs",
         "s3-defs",
         "s4-defs"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs: 「prose 2400 (budget 1,200–2,400) · questions 9 · est 19.0 min (must be ≤ 20; estMinutes 19)」, so prose sits exactly at the cap and estMinutes matches; lint --strict 0 warnings. s3-lead was cut to 「長くなったファイルは分けて整理できます。」, but s3 still carries imports, rules, AGENTS.md, a code block, a diagram and a callout in one segment.",
+      "evidence": "measure.mjs gives 「prose 2400 (budget 1,200–2,400) · questions 9 · est 19.1 min (must be ≤ 20; estMinutes 19)」, so prose is still exactly at the cap and estMinutes matches. lint --strict reports 0 warnings. The shorter table cells (s2-table 「整形する」, s4-table 「禁止」) lighten the screens, but s3 still holds imports, rules, AGENTS.md, a code block, a diagram and a callout in one segment.",
       "blockIds": [
-        "s3-lead",
         "s3-defs",
-        "s3-diagram"
+        "s3-diagram",
+        "s2-table",
+        "s4-table"
       ]
     },
     {
@@ -105,24 +113,26 @@
     },
     {
       "id": "visual",
-      "score": 3,
-      "evidence": "s1-table and s4-table are now 2-column comparisons that keep all the information (「プロジェクト：チーム（Gitで共有）」, 「フック（第8回）」). The reworked s3-diagram (6 nodes, caption states the takeaway) now draws `A[\"CLAUDE.md<br>インポート先\"] --> C[\"paths: なしの<br>ルール\"] --> X[コンテキスト]`, a chain that shows CLAUDE.md feeding into the rules, which the text never says.",
+      "score": 4,
+      "evidence": "s3-diagram now has 5 nodes. Its labels use the text's own terms (「インポート先」「paths: なしのルール」「paths: 付きのルール」), and the caption states the takeaway (「減らせるのは paths: 付きのルールです」). The 2-column tables keep their comparisons: s1-table puts 「届く範囲」 against 「置き場所：ファイル」, and s4-table names a destination for each of the blog's five anti-patterns.",
       "blockIds": [
         "s3-diagram",
         "s1-table",
+        "s2-table",
         "s4-table"
       ]
     },
     {
       "id": "practice",
       "score": 4,
-      "evidence": "The authentic 18-line task, 3-level hint ladder, 7-item checklist (now in です・ます: 「…確かめました」) and model answer remain. The split lines in practice-setup and practice-answer keep the 18-line file and the `sed -n '12,18p'` before the overwrite, and practice-answer's highlight moved from 4–8 to 5–9, which matches the four kept lines and the HTML comment.",
+      "evidence": "The authentic task is now a 19-line file, and every count agrees (pr-setup 「19行の `CLAUDE.md`」, pr-decide 「19行すべてに」, practice-prompt 「19行分を書きます」). Lines are named by their opening words instead of numbers (「どの行かは、行の書き出しの言葉でメモします」), and hint3 follows the same scheme. practice-answer extracts the procedure with `sed -n '/^## 画面/,$p'`, which works whatever the line count. Its highlight 6–11 covers exactly the four kept items and the comment, which matches practice-answer-why 「残した4つの項目」. The 3-level hint ladder and the 7-item checklist are still there.",
       "blockIds": [
         "practice-setup",
         "practice-steps",
-        "practice-checklist",
+        "practice-prompt",
         "practice-hint3",
-        "practice-answer"
+        "practice-answer",
+        "practice-answer-why"
       ]
     },
     {
@@ -133,58 +143,55 @@
         "summary-points",
         "summary-next",
         "summary-cards"
-      ]
+      ],
+      "carriedOver": true
     },
     {
       "id": "accuracy",
       "score": 3,
-      "evidence": "s3-defs AGENTS.md (「既定では、作業フォルダーとその上にCLAUDE.mdもCLAUDE.local.mdもないとき、代わりに読まれます。`~/.claude/CLAUDE.md` や組織のCLAUDE.mdがあっても読まれます。」) and the glossary now match the audit quote 「Count…: a CLAUDE.md, .claude/CLAUDE.md, or CLAUDE.local.md in your working directory or any directory above it」. The table rewrites keep the same facts (`/etc/claude-code/` のCLAUDE.md, 第2回/第7回/第8回 targets).",
+      "evidence": "The changed blocks keep their facts: s1-table still names 「Linuxでは `/etc/claude-code/` のCLAUDE.md」, and s2-table keeps the official pairs (「インデントは2スペース」, 「コミットの前に `npm test` を実行する」). s4-table's labels match the steering post's five anti-patterns in the facts file (「'Never do this'」, 「an API-specific rule without paths」). The new practice-answer runs as written: the `\\` continuation and the `/^## 画面/,$p` range copy the heading and its 6 steps.",
       "blockIds": [
-        "s3-defs",
         "s1-table",
-        "s4-table"
+        "s2-table",
+        "s4-table",
+        "practice-answer"
       ]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The changed text keeps です・ます and a warm tone: the checklist labels now read as statements (「…確かめられない行がありません」, 「…確かめました」), the prompt hint says 「18行分を書きます」, and summary-next invites rather than pushes (「置き場所を考えてみましょう」). Lint --strict finds no banned phrase or long sentence; wording is left to ja-editor.",
+      "evidence": "The changed learner text keeps です・ます (hint3: 「…ローカルへ移します」「今はコマンドだけ残します」, pr-decide: 「…でメモします」). The terse lines in practice-setup are the sample file's own voice, which is intended. lint --strict finds no banned phrase and no long sentence. Wording is left to ja-editor.",
       "blockIds": [
-        "practice-checklist",
-        "practice-prompt",
-        "summary-next",
-        "s3-defs"
+        "practice-hint3",
+        "practice-steps",
+        "practice-setup",
+        "s4-table"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "The jp locale is complete, s3-diagram has caption and alt, and the link text says where it goes (「公式ドキュメント（日本語）」). But the changed alt describes 「（と自動メモリの先頭）」, which the reworked diagram no longer shows.",
+      "score": 4,
+      "evidence": "The jp locale is complete. s3-diagram's alt now describes exactly what is drawn (startup items and the context, plus path-scoped rules loaded 「一致するファイルを扱うときに」), and the caption is present. Link text says where it goes (「公式ドキュメント（日本語）」).",
       "blockIds": [
         "s3-diagram",
         "s3-info"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "s3-diagram",
-      "issue": "Regression from the s3-diagram rework. The new code chains `S --> A[\"CLAUDE.md<br>インポート先\"]`, `A --> C[\"paths: なしの<br>ルール\"]`, `C --> X[コンテキスト]`, and A has no edge of its own to X. The rendered diagram shows CLAUDE.md and its imports passing through the unscoped rules into the context, as if rules were loaded by or through CLAUDE.md. s3-defs says rules are separate files read at startup, and import vs rules is the very distinction this segment teaches. The changed alt also describes 「（と自動メモリの先頭）」, which the diagram no longer shows, so screen-reader users get different content than sighted ones.",
-      "fix": "Keep the narrow 2-column layout and merge everything read at startup into one node. Set code to:\nflowchart TD\n  S[セッション開始] --> A[\"CLAUDE.md<br>インポート先<br>paths: なしの<br>ルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\n  A --> X[コンテキスト]\n  E --> X\nThat gives 5 nodes. Set alt to 「セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図」. Keep the caption as it is."
-    }
-  ],
+  "average": 3.38,
+  "mustFix": [],
   "niceToHave": [
-    "s3-defs and glossary AGENTS.md: 「ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）」 attaches the version to the file, but the audit quote says 「Reading AGENTS.md directly requires Claude Code v2.1.277 or later」. Consider 「ほかのAIコーディングツールと共有する指示のファイル。Claude Codeはv2.1.277以降で読みます。」 (keep each sentence ≤ 60 chars).",
-    "glossary AGENTS.md: unlike s3-defs, it does not say that `~/.claude/CLAUDE.md` and the managed CLAUDE.md do not count. A learner who reads only the glossary may think a personal CLAUDE.md blocks AGENTS.md. Consider appending 「`~/.claude/CLAUDE.md` は数えません。」",
-    "practice-setup: splitting `mkdir cc-practice-06 && cd cc-practice-06 && git init` into 3 lines drops the guard. If `cd` fails, `cat > CLAUDE.md` overwrites the CLAUDE.md of the current folder. To keep it narrow, consider the first line 「mkdir -p cc-practice-06 && cd cc-practice-06」, then 「git init」.",
-    "hook-b1 (unchanged, carried from the previous review): so the promise matches the single predict question, replace 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう。」 with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」",
-    "check-quiz e6 option a (unchanged, carried from the previous review): 「IMPORTANT」 is still the wrong answer in five items (q0 a, q2 a, q5 a, e3 c, e6 a). Replace e6 a with md 「「前のセッションで頼んであるから、もう覚えているよ」」 and feedback 「セッションは毎回まっさらに始まり、前の会話は引き継がれません。止めたい操作は、拒否ルールやフックで決めておきます。」",
-    "practice-hint3 (unchanged, carried from the previous review): 「7・8行目はテストのコマンドの行にまとめます」 still does not match practice-answer, which keeps two test lines. Replace that clause with 「7行目は「コミットの前に `npm run test:unit` を通す」に直し、8行目は残します」.",
-    "practice-steps pr-permissions expect (unchanged, carried from the previous review): Claude may write `Bash(git push:*)` or `Read(.env)`. Replace it with 「拒否ルールとして、`.env` の読み取りと `git push` を止める2行が見つかります（例：`Read(./.env)`、`Bash(git push *)`）。」",
-    "Budget guard: prose is at 2400 of the 2,400 cap (measure.mjs). Offset any text the fixes add with an equal cut."
+    "s4-table (changed): the bare labels 「禁止」 and 「API専用」 lose the condition that decides where a line goes. pr-explain and summary-next send learners to this table to sort their own lines. Not every prohibition can be written as a deny rule (for example a coding-style ban), and a rule for `tests/` is not 「API専用」. Replace row 1 col 1 with 「「絶対に〜しない」操作」 and row 4 col 1 with 「一部のファイル用」. To stay within the 2,400 cap, offset the added characters by changing the caption to 「CLAUDE.mdに書きがちなことの移す先（公式ブログより）」, then re-run measure.mjs.",
+    "s1-table (changed): the first column now shows 「自分」 twice, so the scope difference sits only in column 2. Use these rows: [「組織の全員」, 「管理ポリシー：Linuxでは `/etc/claude-code/` のCLAUDE.mdなど」], [「自分（全プロジェクト）」, 「ユーザー：`~/.claude/CLAUDE.md`」], [「チーム（Gitで共有）」, 「プロジェクト：`./CLAUDE.md` か `./.claude/CLAUDE.md`」], [「自分（このプロジェクト）」, 「ローカル：`./CLAUDE.local.md`」].",
+    "practice-hint3 (changed; carried mismatch): 「テストの3行は、コマンドの行にまとめます」 does not match practice-answer, which keeps two test items. It also skips the 直す step that s5-steps ② teaches for 「ちゃんと」. Replace it with 「「ちゃんと」の行は「コミットの前に `npm run test:unit` を通す」に直し、残りのテスト2行は1つにまとめます。」",
+    "practice-setup (unchanged lines in a changed block, carried): `mkdir cc-practice-06` / `cd cc-practice-06` on separate lines has no guard, so if `cd` fails, `cat > CLAUDE.md` overwrites the current folder's file. Use 「mkdir -p cc-practice-06 && cd cc-practice-06」 on the first line, then 「git init」.",
+    "s3-defs and glossary AGENTS.md (unchanged, carried): 「ほかのAIコーディングツールと共有する指示のファイル（v2.1.277以降）」 attaches the version to the file, but the audit says reading AGENTS.md requires v2.1.277. Consider 「ほかのAIコーディングツールと共有する指示のファイル。Claude Codeはv2.1.277以降で読みます。」",
+    "glossary AGENTS.md (unchanged, carried): unlike s3-defs, it does not say that `~/.claude/CLAUDE.md` does not count. Append 「`~/.claude/CLAUDE.md` は数えません。」",
+    "hook-b1 (unchanged, carried): so the promise matches the single predict question, replace 「何を、どこに、どれだけ書けばよいのか、まず予想してみましょう。」 with 「まず、`.env` の読み取りをどう止めるか、予想してみましょう。」",
+    "check-quiz e6 option a (unchanged, carried): 「IMPORTANT」 is the wrong answer in five items. Replace e6 a with md 「「前のセッションで頼んであるから、もう覚えているよ」」 and feedback 「セッションは毎回まっさらに始まり、前の会話は引き継がれません。止めたい操作は、拒否ルールやフックで決めておきます。」",
+    "practice-steps pr-permissions expect (unchanged, carried): Claude may write the rules in other forms. Use 「拒否ルールとして、`.env` の読み取りと `git push` を止める2行が見つかります（例：`Read(./.env)`、`Bash(git push *)`）。」",
+    "Budget guard: prose is at 2400 of the 2,400 cap (measure.mjs). Offset any text a fix adds with an equal cut."
   ],
-  "average": 3.23,
-  "verdict": "revise",
-  "summary": "This is a verification round (review-scope exit 0, 14% of parts changed). The previous review had no open must-fix items. The changed tables, glossary, AGENTS.md definition, practice code and next-lesson pointer are accurate and consistent, and the practice highlight was correctly shifted to lines 5–9. One regression blocks a pass: the narrowed s3-diagram draws CLAUDE.md → paths: なしのルール → コンテキスト as a chain, and its alt mentions auto memory that is no longer drawn. Merge the startup items into one node and align the alt as given."
+  "verdict": "pass",
+  "summary": "Verification round: review-scope exited 0 with 12% of parts changed (10 of 47 blocks). The one open must-fix is resolved: s3-diagram now merges CLAUDE.md, imports and unscoped rules into one startup node with its own edge to the context, and the alt no longer mentions auto memory. Every changed block was reviewed in full. The switch to a 19-line practice file is consistent across pr-setup, pr-decide, the prompt hint, hint3 and the answer, whose sed range and highlight 6–11 are correct. No regressions rise to a must-fix. The shortened s4-table and s1-table labels and the hint3/answer mismatch are listed in niceToHave. All 13 criteria are 3 or above, mean 3.38, lint and validate clean, est 19.1 min with prose at the 2,400 cap."
 }

@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-04-verify",
   "file": "content/courses/vibe-coding/drafts/cc-04-verify.lesson.json",
-  "lessonHash": "sha256:f72c755010e86821",
+  "lessonHash": "sha256:7aa12666041c7288",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,63 +9,48 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "No hard failures (overflowX false, 0 console, mermaid, unknown-block or image errors) and no text-only screens. The s4-sort flowchart TD is readable at 390 px (pages/mobile-jp-17.png, 18.png). At 390 px the two tables break inside words: s1-table splits 処/理, 統/一 and ビル/ド (pages/mobile-jp-04.png), and p-model-sort splits 入/力 (pages/mobile-jp-29.png).",
+      "evidence": "No layout failures on any screen. The s4-sort mermaid flowchart (flowchart TD) has readable Japanese labels at 390 px (pages/mobile-jp-17.png, pages/mobile-jp-18.png), and the code, prompt, steps, quiz and checklist blocks all render cleanly. Two small things hold it back. Steps titles repeat the number, so the reader's circle 1 sits next to the title's ① (s3-steps, p-steps). Inline backticks show up as raw characters inside the prompt bodies (s3-prompt-write, s3-prompt-green, s2-goal-prompt, p-prompt-write, p-prompt-green, p-prompt-review).",
       "blockIds": [
         "s4-sort",
-        "s1-table",
-        "p-model-sort"
+        "s3-steps",
+        "p-steps",
+        "s3-prompt-write",
+        "s3-prompt-green",
+        "s2-goal-prompt",
+        "p-prompt-write",
+        "p-prompt-green",
+        "p-prompt-review"
       ]
     },
     {
       "id": "load",
       "score": 4,
-      "evidence": "Every concept is followed by a prompt, steps or a check within a screen or two. Inline checks 1/5 to 5/5 come at regular intervals and there are no walls of text (pages/desktop-jp-04.png, 06.png, 09.png, 14.png). Desktop line length has a median of 40 characters (target 30–40, max 49), at the top of the range.",
+      "evidence": "The page has a steady rhythm: definitions, prompt, code, callout and quiz blocks alternate with short paragraphs, and there are no walls of text in desktop-jp.png. Only one mobile screen counts as text-only (mobile-jp-04, the s1-table list right after the s1-defs card), and desktop has none.",
       "blockIds": [
-        "s1-check",
-        "s2-check",
-        "s3-check",
-        "s4-check",
-        "s5-check",
-        "s3-steps"
+        "s1-table",
+        "s1-defs"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "Japanese throughout: diagram labels, captions and quiz options are all in Japanese, and nothing is hidden under the top or bottom bars. Prompt blocks show raw backticks (`postal.test.mjs`, /goal `node --test`) next to rendered inline code, and the table cells break mid-word on mobile (pages/mobile-jp-04.png, pages/desktop-jp-05.png).",
+      "score": 4,
+      "evidence": "Everything is in Japanese, including the diagram labels, the reader chrome and the prompt variable chips. There is no stray English UI text, and no Japanese word is broken mid-word. Body text has good contrast. Nothing is hidden under the mobile top or bottom bars, and the 答える and この予想で決定 buttons are visible on every quiz.",
       "blockIds": [
-        "s3-prompt-write",
-        "s3-prompt-green",
-        "s2-goal-prompt",
-        "s1-table"
+        "s4-sort",
+        "hook-predict"
       ]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "visual",
-      "blockId": "s1-table",
-      "issue": "At 390 px the first column wraps inside words: 「関数や処/理」, 「ビル/ドエラーの修正」, 「書き方の統/一」. The words are split across lines in the key comparison table.",
-      "fix": "Shorten the first-column cells so each fits on one line or breaks at the colon, e.g. 「自動テスト：関数」「ビルド：ビルドエラー」「リンター：書き方」「画面比較：見た目」. Mention screenshot (スクリーンショット) in the text below instead of in the cell. Shortening the second column (「テストを実行して」「ビルドを確かめて」) also gives the first column more room.",
-      "screenshot": "pages/mobile-jp-04.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "p-model-sort",
-      "issue": "At 390 px the cells wrap inside words: 「扱いがな/い」, 「仕様にない入/力」, 「1行にでき/る」.",
-      "fix": "Shorten the cells, e.g. 「負の年の扱いがない」 to 「負の年が未対応」, 「仕様にない入力」 to 「仕様外の入力」, 「`if` 文を1行にできる」 to 「`if` を1行に」, so each fits in the column or breaks at a natural boundary.",
-      "screenshot": "pages/mobile-jp-29.png"
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "s3-code / p-model-code: at 390 px the assertion lines scroll sideways, and the expected values (true/false) are off-screen (pages/mobile-jp-12.png, 13.png, 28.png, 29.png). Consider breaking each assert across two lines so the expected value is visible without scrolling.",
-    "s3-prompt-write, s3-prompt-green, s2-goal-prompt, p-prompt-write, p-prompt-green, p-prompt-review: backticks show as raw characters in the prompt text (pages/desktop-jp-08.png, 09.png). Consider dropping them in the prompts or using 「」 instead.",
-    "s3-steps / p-steps: the step titles repeat the numbering (①–⑧) next to the reader's numbered circles (pages/mobile-jp-09.png, 23.png). The prompt titles refer to ①/④, so this is acceptable, but it is visually redundant.",
-    "reader: the flashcard hint says 「クリックまたはスペースキーでめくる」 on mobile, where there is no keyboard (pages/mobile-jp-36.png).",
-    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (pages/mobile-jp-37.png, desktop-jp-25.png). Known behaviour.",
-    "reader: code blocks and tables have no scroll cue on mobile. Known behaviour.",
-    "Desktop line length: median 40, max 49, at the upper edge of the 30–40 target."
+    "s3-steps / p-steps: each step title starts with ①–⑧, but the reader already draws a numbered circle beside it, so learners see '1 ① テストと空の関数を…' (pages/mobile-jp-10.png, pages/mobile-jp-23.png). Consider dropping the circled number from the title. Keep the '（①の依頼文）' / '（依頼文1）' cross-references, or put them in the prompt titles only.",
+    "s3-prompt-write / s3-prompt-green / s2-goal-prompt / p-prompt-write / p-prompt-green / p-prompt-review: prompt bodies show literal backticks (`isPostalCode`, `node:test`, `isLeapYear`, /goal `node --test`) as plain characters (pages/mobile-jp-12.png, pages/mobile-jp-08.png, pages/desktop-jp-08.png). They are fine in what Claude receives, but they look like leaked markup. Consider using 「」 quotes for names in the Japanese prose, or keep them on purpose.",
+    "s3-code / p-model-code: at 390 px, the long lines (`'node:assert/strict'`, `'./postal.mjs'`, the end of the test('…') lines) run past the right edge of the code block (pages/mobile-jp-12.png, pages/mobile-jp-13.png, pages/mobile-jp-29.png). The block scrolls horizontally, so nothing is lost. Shorter test names (for example test('ハイフンなし', …)) would show more without scrolling.",
+    "reader: inline code breaks in the middle of a token at line ends: '/code-' | 'review' in s4-names (pages/mobile-jp-18.png) and '/output-' | 'style learning' in s5-defs (pages/desktop-jp-14.png). A no-break rule for short inline code would help.",
+    "reader: desktop JP charsPerLine median is 40, at the top of the 30–40 target, and the max is 49.",
+    "reader (known): the mobile full-length PNG stops at 16000 px, failed /api/ requests are ignored, and the end banner says this is the course's last lesson because drafts are not in course.json (pages/mobile-jp-38.png, pages/desktop-jp-25.png). There is also no scroll cue on wide code blocks."
   ],
-  "verdict": "revise",
-  "summary": "All hard checks pass and no screen shows personal data. The lesson has a steady rhythm of concept, prompt and check, and the review flowchart is readable at 390 px. The fixes needed are visual: on mobile the s1-table and p-model-sort cells break inside words, so shorten those cells."
+  "average": 3.67,
+  "verdict": "pass",
+  "summary": "metrics.json is clean: overflowX false, 0 console, mermaid, unknown-block or broken-image errors. Every mobile-jp and desktop-jp screen renders without clipping, overlap or privacy problems, and the TD flowchart stays readable at 390 px. Only cosmetic polish is left: the doubled step numbering (circle plus ①) and raw backticks in prompt bodies, both under niceToHave."
 }

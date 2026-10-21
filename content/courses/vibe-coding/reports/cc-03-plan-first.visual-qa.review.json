@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-03-plan-first",
   "file": "content/courses/vibe-coding/drafts/cc-03-plan-first.lesson.json",
-  "lessonHash": "sha256:c61b1076cf96439d",
+  "lessonHash": "sha256:2a26cb723101d339",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,58 +9,53 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "The s2-flow diagram is a vertical flowchart with readable Japanese labels at 390 px (mobile-jp-08) and on desktop (desktop-jp-05). The tables s1-defs, s1-table and s4-table are two columns and fit at 390 px. Two problems remain: a Japanese comment cut off at 390 px in practice-setup (mobile-jp-20), and single-character line wraps in s4-table on desktop (desktop-jp-12).",
+      "evidence": "The flowchart (s2-flow) is a vertical TD chart with readable Japanese labels at both 390px and 1440px, and the defs tables, prompt cards, steps and checklists render cleanly. However, the todo.html starter code (practice-starter) is clipped at 390px on lines 5, 15 and 21, and lines 14-18 are the highlighted ones (mobile-jp-19/20).",
       "blockIds": [
         "s2-flow",
-        "s1-table",
-        "s4-table",
-        "practice-setup"
+        "practice-starter",
+        "s1-defs",
+        "s2-defs",
+        "s4-defs"
       ]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "textOnlyScreens is empty for desktop-jp and mobile-jp. Every screen has a heading, table, figure, prompt, steps or check. The desktop median is 38 characters per line, inside the 30–40 target, and the full-length PNGs show no walls of text or empty gaps.",
+      "score": 3,
+      "evidence": "The lesson is long (35 mobile screens, 23 desktop screens), but there are no text-only screens and every section breaks up its prose with a defs table, a prompt card, steps or an inline check. Paragraphs stay short and no screen is a wall of text.",
       "blockIds": [
-        "s1-defs",
         "s3-steps",
-        "practice-steps"
+        "practice-steps",
+        "practice-spec-steps"
       ]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "Japanese text is consistent throughout. Contrast is good, the bars hide no controls, and keyboard hints are shown. English terms have glosses, for example 「Windows Subsystem for Linux」 and 「edge case、めったに起きない場面」. Part of the Japanese instruction in practice-setup is hidden past the edge at 390 px (mobile-jp-20).",
+      "score": 4,
+      "evidence": "The lesson is Japanese only. Diagram labels, buttons and checklists are all in Japanese, and English terms appear only as glossed loanwords. Contrast is good throughout, nothing is hidden under the top or bottom bars, and the desktop JP chars-per-line median is 39 (target 30-40).",
       "blockIds": [
-        "practice-setup",
-        "s1-rich"
+        "s2-flow",
+        "lesson"
       ]
     }
   ],
   "mustFix": [
     {
       "criterion": "visual",
-      "blockId": "practice-setup",
-      "issue": "At 390 px the Japanese comment on line 4 of the terminal block, 「# todo.html を保存してから、次の2行で記録す…」, runs past the right edge. The learner sees only part of the instruction and gets no cue to scroll.",
-      "fix": "Take the comment out of the code. Put 「todo.html を保存してから、最後の2行で記録します」 in the practice-task prose or in the pr-setup step, and keep only the commands in the code block. Otherwise shorten the comment to about 12 characters, for example 「# 保存後に記録」.",
+      "blockId": "practice-starter",
+      "issue": "At 390px the todo.html code block cuts off on the right. Line 5 shows `placeholder=\"やるこ`, highlighted line 15 ends at `document.createElement(`, and line 21 ends at `() =`. The learner cannot see the end of the highlighted addItem body or the click handler without scrolling a box that gives no cue that it scrolls.",
+      "fix": "Keep every line at 40 columns or fewer while staying within the 25-line cap. Delete blank line 13. Split line 15 into `const li =` and `  document.createElement('li');`, as lines 9-12 already do, and widen the highlight range to match. Replace line 21 with `addBtn.onclick = () => {` and its closing `});` with `};`. Shorten line 5 to `<input id=\"new-item\">`, or move `placeholder=\"やること\"` onto its own indented line if a line is still free.",
       "screenshot": "pages/mobile-jp-20.png"
-    },
-    {
-      "criterion": "visual",
-      "blockId": "s4-table",
-      "issue": "On desktop the s4-table cells wrap with a single character left on its own line: 「よく知らないコー／ド」 and 「新しいセッショ／ン」. Both breaks fall inside the word.",
-      "fix": "Shorten the cells so they fit on one line or break between words. For example, change 「迷う・複数のファイル・よく知らないコード」 to 「迷う・複数ファイル・不慣れなコード」 and 「インタビュー→`SPEC.md`→新しいセッション」 to 「インタビュー→`SPEC.md`→新セッション」.",
-      "screenshot": "pages/desktop-jp-12.png"
     }
   ],
   "niceToHave": [
-    "practice-starter: at 390 px, lines 5, 9, 10, 13, 18 and 19 of todo.html run past the visible width (mobile-jp-20, mobile-jp-21). This is normal horizontal scrolling for code, but shorter lines (for example the placeholder text, or splitting getElementById calls) would make more of it readable without scrolling, within the 25-line budget.",
-    "s2-flow: on desktop the edge label 「直したい点がある」 overlaps the curved return arrow slightly (desktop-jp-05). It is still readable.",
-    "s2-enter: on mobile the inline code `claude --permission-mode plan` reaches the right margin before it wraps (mobile-jp-09). It is not clipped.",
-    "reader: there is no scroll cue on wide code blocks at 390 px (known).",
-    "reader: the end banner says this is the course's last lesson, because drafts are not in course.json (known).",
-    "reader: the mobile full-length PNG is truncated at 16000px (known). The per-screen PNGs cover the whole page."
+    "s2-flow: on desktop (desktop-jp-05.png) the edge label 「直したい点がある」 sits right on the two curved loop arrows between 計画 and 計画を読む. A shorter label such as 「直す」 would keep the arrows clear. On mobile it reads fine.",
+    "s4-table: on mobile, the bold 「直接頼みます」 breaks as 「直接頼みま／す。」 (mobile-jp-17.png). Shortening the item to 「…変更は、**直接頼む**。」 would avoid the orphaned character.",
+    "desktop charsPerLine max is 46, above the 30-40 target. The median is 39, so this is minor.",
+    "reader: the todo.html and terminal code blocks give no scroll cue when they are wider than the screen on mobile (known reader behaviour).",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (mobile-jp-35.png, desktop-jp-23.png). Known reader behaviour.",
+    "reader: the full-length mobile PNG stops at 16000px, and 13 /api/ requests failed in the preview environment (known, not counted as console errors)."
   ],
+  "average": 3.33,
   "verdict": "revise",
-  "summary": "lessonHash sha256:c61b1076cf96439d is copied from metrics.json, and there are no hard failures (overflowX false, 0 console, mermaid, unknown-block and broken-image errors). The layout is clean at both widths: the vertical flowchart and the two-column tables read well at 390 px, no screen is text-only, and no personal data appears on any PNG. Two fixes are needed. Move or shorten the Japanese comment that is cut off at 390 px in the practice-setup terminal block (mobile-jp-20). Shorten the s4-table cells that leave a single character on its own line on desktop (desktop-jp-12)."
+  "summary": "metrics.json has no hard failures: no overflow, no console, mermaid, unknown-block or broken-image errors, and no text-only screens. The layout is clean on desktop and mobile, the TD flowchart is legible at 390px, and no screen shows personal data. The one must-fix is the todo.html starter code (practice-starter), which is cut off on the right at 390px, including the highlighted addItem lines. Rewrap it so every line fits in 40 columns."
 }

@@ -1,7 +1,7 @@
 {
   "lessonId": "cc-08-hooks-mcp",
   "file": "content/courses/vibe-coding/drafts/cc-08-hooks-mcp.lesson.json",
-  "lessonHash": "sha256:4e07cfeed4cb390f",
+  "lessonHash": "sha256:542dc5e44070249d",
   "reviewer": "visual-qa",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,70 +9,62 @@
     {
       "id": "visual",
       "score": 3,
-      "evidence": "Every screen has a heading, figure, table, code block or check (textOnlyScreens is empty on both widths). The s1-lifecycle flowchart (TD) can be read at 390 px, and its labels are Japanese. Two edge labels sit next to each other and read as one phrase, and the first column of the A/B tables breaks inside words on mobile.",
+      "evidence": "At 390 px the s1-lifecycle flowchart TD is readable, with Japanese labels and no clipped nodes (mobile-jp-04, desktop-jp-03). All tables (s3-table, s4-scopes, s5-checks, practice-b-model, practice-b-model-b) fit without sideways scrolling. Two bash blocks the learner types or copies lose their key line ends at 390 px: s2-script line 8 `>&2` (mobile-jp-08) and practice-model-script lines 5 and 12 (mobile-jp-22).",
       "blockIds": [
         "s1-lifecycle",
+        "s3-table",
         "s5-checks",
-        "practice-b-model",
-        "practice-b-model-b"
+        "s2-script",
+        "practice-model-script"
       ]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Paragraphs are short, and definitions, tables, code and checks alternate with no walls of text (for example mobile-jp-12 to mobile-jp-18). The practice section is long on mobile: about 9 screens from mobile-jp-19 to mobile-jp-26, with two 15/24-line code blocks and two 6-row tables in a row.",
+      "evidence": "No screen is text-only (textOnlyScreens empty on desktop and mobile). Each section breaks up its text with a definitions block, code, a table or a check. The weakest spots are the long bold scenario in the practice-b-quiz q9 prompt (6 to 7 lines, mobile-jp-23/24, desktop-jp-17) and the run of three code blocks in a row in practice (mobile-jp-21 to 23).",
       "blockIds": [
+        "practice-b-quiz",
         "practice-model-script",
-        "practice-model-settings",
-        "practice-b-model",
-        "practice-b-model-b"
+        "practice-model-settings"
       ]
     },
     {
       "id": "a11y_l10n",
       "score": 3,
-      "evidence": "The page is all Japanese, with no stray English UI on the jp screens. Contrast is good on the light cards and the dark code blocks, and the diagram has alt text. On mobile the line breaks 「実行されるも／の」 and 「外とのやり取／り」 split words, and the save path of the practice script is hidden behind an ellipsis.",
+      "evidence": "This is a Japanese-only lesson. Diagram labels, captions and quiz text are all in Japanese, with English terms only in glosses such as フック（hook）. Line breaks inside Japanese words look natural. The only weak spot is the prerequisites line, which is long and set in small grey type (mobile-jp-01, desktop-jp-01). Desktop median charsPerLine is 44, above the 30–40 target.",
       "blockIds": [
-        "practice-b-model",
-        "practice-b-model-b",
-        "practice-model-script"
+        "lesson",
+        "s1-lifecycle"
       ]
     }
   ],
   "mustFix": [
     {
       "criterion": "visual",
-      "blockId": "s1-lifecycle",
-      "issue": "The edge label 「ツールを使う」 (B→C) and the return label 「止める」 (C→B) sit almost touching between the 「Claudeが次の行動を選ぶ」 box and the PreToolUse diamond. They read as one phrase, 「ツールを使う止める」, on both widths.",
-      "fix": "Remove the label from `B --> C` (the PreToolUse diamond already says when this happens) and keep only `C -->|止める（選び直す）| B`. Another option is to label the forward edge 「使う前」 so the two labels no longer join into one phrase.",
-      "screenshot": "pages/desktop-jp-03.png"
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "practice-b-model",
-      "issue": "At 390 px the first column breaks inside words: 「実行されるも／の」 and 「外とのやり取／り」. The same happens in practice-b-model-b (mobile-jp-25), and s5-checks shows 「外とのやり／取り」 (mobile-jp-17).",
-      "fix": "Use labels of 4 characters or fewer in all three tables (s5-checks, practice-b-model, practice-b-model-b), for example 「実行内容」 instead of 「実行されるもの」 and 「外部連携」 instead of 「外とのやり取り」. Keep the card-before-install flashcard back in line with the new labels.",
-      "screenshot": "pages/mobile-jp-24.png"
+      "blockId": "s2-script",
+      "issue": "At 390 px, line 8 `echo \"Blocked: rm is not allowed\" >&2` is cut at the right edge, so only `>&` shows. The `>&2` is what this example teaches: the reason goes to stderr. The highlighted lines 7–9 are the core of the example.",
+      "fix": "Wrap line 8 the same way as practice-model-script, e.g. `  echo \"Blocked: rm is not allowed\" \\` then `    >&2`, or shorten the message to `echo \"Blocked: rm\" >&2`, so that every line is 36 characters or fewer.",
+      "screenshot": "pages/mobile-jp-08.png"
     },
     {
       "criterion": "visual",
       "blockId": "practice-model-script",
-      "issue": "On mobile the code header cuts the filename to 「.claude/hooks/protect-files.…」, and line 2 is cut at the right edge too. A mobile learner cannot see where to save the script, and the step text p-script only says `protect-files.sh`.",
-      "fix": "In practice-steps item p-script, name the full path: 「`.claude/hooks/protect-files.sh` を作って許可を付け…」. Also shorten the line-2 comment so it fits in about 35 monospace characters, for example `# .envなどへの書き込みを止める`.",
-      "screenshot": "pages/mobile-jp-21.png"
+      "issue": "At 390 px, the ends of highlighted line 5 (`jq -r '.tool_input.file_path // empty')`, cut at `empt`) and highlighted line 12 (`if [[ \"$FILE_PATH\" == *\"$pat\"* ]]; then`, `then` cut off) are hidden in the model answer that learners compare their script against.",
+      "fix": "Keep every line at 36 characters or fewer. For example, split line 5 as `  jq -r '.tool_input.file_path' \\` + `    '// empty')`, or shorten it by dropping `// empty`. Split line 12 into `  if [[ \"$FILE_PATH\" == *\"$pat\"* ]]` and `  then`, or rename `FILE_PATH` to `FP`.",
+      "screenshot": "pages/mobile-jp-22.png"
     }
   ],
   "niceToHave": [
-    "Highlighted code lines run past the visible width, so the key part is scrolled out of view: s1-prettier line 9 (`… xargs npx prettier --write`, desktop-jp-04 and mobile-jp-05), s2-settings and practice-model-settings line 9/18 (the script name after `$CLAUDE_PROJECT_DIR`, desktop-jp-16 and mobile-jp-22), s2-script lines 4 and 7 (mobile-jp-08), and the s4-add comments on lines 5–6 (mobile-jp-15). Consider shorter comments, or a sentence under the block that repeats the important value.",
-    "s2-steps and practice-steps titles start with ①②③ while the reader also draws 1/2/3 circles next to them (mobile-jp-09, desktop-jp-14). The circled numbers tie the steps to code comments such as `# ② 実行を許可する`, so either keep them on purpose or drop them from the titles and the comments.",
-    "The practice-prompt body shows literal backticks around `.env` (mobile-jp-20, desktop-jp-15). This is fine if it is meant for Claude; otherwise write it as 「.env」.",
-    "The keys chip `Ctrl + O` in practice-steps p-claude shows up with no explanation, because the explanation sits in the collapsed hint. Consider adding a few words to the step md (for example 「Ctrl+Oで止まった理由を確かめられます」).",
-    "Desktop charsPerLine median is 42 (min 33, max 68), above the 30–40 target. The 680 px measure is set by the reader, so this is not a lesson defect.",
-    "reader: the mobile full-length PNG stops at 16000 px (pageHeight 23027). The per-screen PNGs cover the whole lesson.",
-    "reader: the end banner says 「このコースの最後のレッスンまで読み終えました」 because drafts are not in course.json (mobile-jp-32, desktop-jp-23).",
-    "reader: no scroll cue on code blocks that scroll sideways.",
-    "reader: 14 failed /api/ requests (500 on user/progress, events, notifications) are environment noise and are not counted as console errors."
+    "s1-prettier: line 9 (the `command` string) is cut off on desktop as well as at 390 px (desktop-jp-04, mobile-jp-05). The prose in s1-config repeats the whole command, so nothing is lost. Optionally add a note under the code ('9行目のコマンドは上の文と同じです').",
+    "s2-settings / practice-model-settings: the `command` lines (9, 18) run past the right edge at 390 px (mobile-jp-09, mobile-jp-23). The path is repeated in prose in s2-steps and practice-model-intro, so this is acceptable. A JSON string cannot wrap.",
+    "s2-test: at 390 px the colon after `\"tool_input\"` on line 5 is just past the edge (mobile-jp-10). Moving `\"tool_input\":` onto line 6 would make it fit fully.",
+    "s4-add: at 390 px, line 2 loses its trailing `\\` and line 6 loses `<起動コマンド>` (mobile-jp-15). Shortening the comment on line 6 (for example `# claude mcp add <名前> -- <コマンド>`) and breaking line 2 before `http notion` would keep the continuation visible.",
+    "practice-b-quiz: the q9 prompt is a 6–7 line bold paragraph (mobile-jp-23/24). Moving the A/B scenario into the practice-b-task markdown (or a two-row table) and keeping only the question in the prompt would ease reading.",
+    "lesson: the prerequisites line under the subtitle is a long run of small grey text (mobile-jp-01). Fewer or shorter prerequisites would read better.",
+    "reader: desktop charsPerLine median is 44, above the JP target of 30–40 (measure 680 px). This is a reader layout setting, not lesson content.",
+    "reader: code blocks give no cue that they scroll sideways at 390 px (known behaviour).",
+    "reader: the end banner says this is the course's last lesson because drafts are not in course.json (known behaviour)."
   ],
   "verdict": "revise",
-  "summary": "There are no hard failures in metrics.json (no overflow, no console, mermaid, unknown-block or broken-image errors), every screen holds a heading, figure, table, code or check, and no screen I opened shows personal data. Three must-fix items remain. The diagram labels 「ツールを使う」 and 「止める」 run together into one phrase, the A/B checklist tables break words like 「実行されるも／の」 and 「外とのやり取／り」 at 390 px, and on mobile the save path of the practice script is hidden behind an ellipsis."
+  "summary": "metrics.json shows no hard failures (overflowX false, 0 console/mermaid/unknown/broken), no text-only screens, and no personal data on any screen. The flowchart and all tables read well at 390 px. Two bash blocks (s2-script, practice-model-script) lose key line ends at 390 px, including the `>&2` the example teaches. Wrapping those lines is the main fix."
 }
