@@ -794,7 +794,7 @@
             {
               "id": "e1",
               "kind": "single",
-              "prompt": "中身をよく知らないリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。確認を減らしたいと考えています。`--dangerously-skip-permissions` を付けて起動するかどうか、最も適切な判断はどれでしょう？",
+              "prompt": "チームで使っているリポジトリで、自分のノートPCのClaude Codeに長い修正作業を任せます。確認を減らしたいと考えています。`--dangerously-skip-permissions` を付けて起動するかどうか、最も適切な判断はどれでしょう？",
               "options": [
                 {
                   "id": "a",

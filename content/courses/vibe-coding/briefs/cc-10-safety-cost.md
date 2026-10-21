@@ -34,7 +34,7 @@ owner's decision (report §7 「公開時の形」).
   7. 「`/usage` の金額が請求額」「`/compact` をこまめにすれば節約になる」（e5 b, e6 a）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（measure.mjs: `cc-10-safety-cost.lesson.json: prose 1896 (budget 1,200–2,400) · read 2468 · practice reading 1072 · questions 11 · practice sections 1 · est 17.2 min (must be ≤ 20; estMinutes 17)`）
+- 所要時間 / minutes: 17（measure.mjs: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2459 · practice reading 1106 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（cc-* 共通の決定。英語版は公開するコースが決まってから）
 - 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。
@@ -122,3 +122,6 @@ and est 17.2 min after the mobile-fit fixes.
 - Code blocks fit the mobile column: the worked example uses `config/secret.json` (was `config/credentials.json`),
   Tanaka's `~/.zshrc` value is 「（副業用のキー）」, and the practice folder runs one command per line.
 - `s2-isolate` says 「`--bare` なしの `claude -p`」, as 第9回 does (cross-lesson facts, item 8).
+
+### Cross-lesson consistency (2026-10-21)
+- practice-folder uses its own folder `cc-practice-10` (cc-02 already wrote a `.env` deny rule into `cc-practice`); prerequisites add 第6回 and 第7回; 200行未満 as in cc-06; the plan limit is 「5時間ごと」, not a Claude Code session.

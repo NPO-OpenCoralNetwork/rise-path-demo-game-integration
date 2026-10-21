@@ -10,6 +10,8 @@
   "prerequisites": [
     "第2回｜任せる範囲を決める：権限モードと巻き戻し",
     "第5回｜コンテキストを管理する",
+    "第6回｜CLAUDE.mdで前提を伝える",
+    "第7回｜手順はスキルに、調べものはサブエージェントに",
     "第8回｜フックで守らせ、MCPでつなぐ",
     "第9回｜並列で進める・自動で回す",
     "ターミナルでcdとlsが使え、JSONの設定ファイルを編集できる"
@@ -513,7 +515,7 @@
             ],
             [
               "1回の使用量が多い：重いモデル、高いエフォート、長いCLAUDE.md",
-              "モデルとエフォートを作業に合わせる。CLAUDE.mdは200行以内"
+              "モデルとエフォートを作業に合わせる。CLAUDE.mdは200行未満"
             ],
             [
               "すぐ上限に届く：[[利用上限]]（5時間と週）をチャットと共有",
@@ -542,7 +544,7 @@
                 {
                   "id": "b",
                   "md": "Claude Codeの上限は、チャットとは別に毎朝リセットされる",
-                  "feedback": "上限は5時間のセッション上限と週の上限で、チャットと共有されます。毎朝リセットされる仕組みではありません。"
+                  "feedback": "上限は5時間ごとと週ごとの2つで、チャットと共有されます。毎朝リセットされる仕組みではありません。"
                 },
                 {
                   "id": "c",
@@ -623,7 +625,7 @@
             {
               "id": "p-deny",
               "title": "拒否ルールを書いて試す",
-              "md": "下のコマンドでダミーを作り、`.claude/settings.json` に拒否ルールを書きます。Claude Codeを起動したら、結果を予想して依頼文を送ります。",
+              "md": "第1回の `cc-practice` とは別の、新しいフォルダーで試します。下のコマンドでダミーを作り、`.claude/settings.json` に拒否ルールを書きます。Claude Codeを起動したら、結果を予想して依頼文を送ります。",
               "expect": "Claudeは中身を読めず、`/permissions` にルールが出ます。",
               "hint": "10-3の `keys/**` と同じ形です。",
               "troubleshoot": "中身が出たら、パスとJSONを直して起動し直します。"
@@ -635,7 +637,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-practice\ncd cc-practice\ngit init\nmkdir secrets .claude\necho \"PRACTICE_TOKEN=dummy\" > .env\necho \"dummy\" > secrets/dummy.txt"
+          "code": "mkdir cc-practice-10\ncd cc-practice-10\ngit init\nmkdir secrets .claude\necho \"PRACTICE_TOKEN=dummy\" > .env\necho \"dummy\" > secrets/dummy.txt"
         },
         {
           "id": "practice-prompt-read",
@@ -926,7 +928,7 @@
                 {
                   "id": "c",
                   "md": "今日の作業内容を、CLAUDE.mdにすべて書き足しておく",
-                  "feedback": "CLAUDE.mdはセッションの始めに読み込まれるので、長いほど使用量が増えます。200行以内に保ち、専門の手順はスキルに移します。"
+                  "feedback": "CLAUDE.mdはセッションの始めに読み込まれるので、長いほど使用量が増えます。200行未満に保ち、専門の手順はスキルに移します。"
                 },
                 {
                   "id": "d",
@@ -1059,7 +1061,7 @@
     },
     {
       "term": "利用上限",
-      "md": "Pro・Maxで使える量の上限。5時間のセッション上限と週の上限があり、Claudeのチャットと共有します。"
+      "md": "Pro・Maxで使える量の上限。5時間ごとの上限と週の上限があり、Claudeのチャットと共有します。"
     },
     {
       "term": "エフォート",

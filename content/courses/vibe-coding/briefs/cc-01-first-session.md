@@ -35,8 +35,8 @@ course is published (new `claude-code` course or a vibe-coding module) is the ow
 
 ## 形式 / Format
 - 所要時間 / minutes: 16。コース共通の測り方（`measure.mjs`）の結果:
-  `prose 1633 (budget 1,200–2,400) · read 2434 · practice reading 806 · questions 10 · practice sections 1 · est 15.9 min (must be ≤ 20; estMinutes 16)`
-  （(2,434 + 806) 字 ÷ 450 字/分 = 7.2 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 15.9 分 → 16）。実際の演習は 15 分ほどかかります。
+  `prose 1659 (budget 1,200–2,400) · read 2483 · practice reading 842 · questions 10 · practice sections 1 · est 16.1 min (must be ≤ 20; estMinutes 16)`
+  （(2,483 + 842) 字 ÷ 450 字/分 = 7.4 分 + 10 問 × 40 秒 = 6.7 分 + 演習 1 つ 2 分 = 16.1 分 → 16）。実際の演習は 15 分ほどかかります。
 - 難易度 / level: beginner
 - ロケール / locales: jp only（英語版は公開先が決まってから）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ `cc-practice`（`git init` 済み）で、Claude に hello world の
@@ -92,7 +92,7 @@ deferred to 第2回). Inline quizzes in 4 of 6 content sections (practice counts
 Every objective has an inline and an exam question. Worked example (5 steps with the why) → faded practice (same ①–⑤
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
-Body length: measured with the course-wide `measure.mjs` (see Format): prose **1,633** JP characters (budget 1,200–2,400),
+Body length: measured with the course-wide `measure.mjs` (see Format): prose **1,659** JP characters (budget 1,200–2,400),
 study reading 2,434, practice reading 806.
 
 ## Assumptions
@@ -140,3 +140,6 @@ study reading 2,434, practice reading 806.
   「CLIはCommand Line Interfaceの略」 and 「VS Code・JetBrains」 move to the second column, and the
   ネイティブインストーラー（native installer） mention moves to `install-how`, its first use. What `q2`, `q6` and `q7` rely on
   is unchanged. `diagram-width`, `code-width` and `para-sentences` report no hits.
+
+### Cross-lesson consistency (2026-10-21)
+- p-start expect now says that the first start in a new folder shows the trust dialog (cc-05 and cc-09 use 「信頼の確認」 as known).

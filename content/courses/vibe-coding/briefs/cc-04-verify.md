@@ -29,7 +29,7 @@ decides where it is published.
   7. `/goal` の判定役がテストを実行してくれる — 判定役はコマンドを実行せず、会話に出た結果だけを読む（goal docs）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 19 — measure.mjs: `cc-04-verify.lesson.json: prose 2228 (budget 1,200–2,400) · read 3204 · practice reading 1046 · questions 12 · practice sections 1 · est 19.4 min (must be ≤ 20; estMinutes 19)` → estMinutes 19.
+- 所要時間 / minutes: 19 — measure.mjs: `cc-04-verify.lesson.json: prose 2242 (budget 1,200–2,400) · read 3218 · practice reading 1046 · questions 12 · practice sections 1 · est 19.5 min (must be ≤ 20; estMinutes 19)` → estMinutes 19.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only（コースの公開先が決まってから英訳する）
 - 演習の題材 / practice task idea: 新しい練習用フォルダ（`cc-practice-verify`、`git init`）で、うるう年を判定する関数 `isLeapYear` をテストから作らせる。テストをコミット → テストを変えずに実装 → 自分でテストを実行 → 別のコンテキストでレビュー → 指摘を必須と任意に仕分け → 差分を説明させて予想を確かめる。チェックリスト・段階的なヒント・模範解答（テストのコードと仕分けの例）つき。
@@ -91,3 +91,6 @@ numbers options by position, so explanations name the content, not the option le
 - Mobile fit (390 px, course-wide): the two comparisons (`s1-table`, `p-model-sort`) are lists of full sentences, not tables, because table cells split words at 390 px (visual QA); 4-1 states their rule in the lead `s1-pick` (the old table caption). The 4-4 diagram breaks its labels at word boundaries (≤ 7 JP chars per line, 3 lines) and is 327 px wide (diagram-width.mjs, limit 362). Code lines are ≤ 44 columns (code-width.mjs): the tests import `equal` from `node:assert/strict`, and the practice files are `leap.mjs` / `leap.test.mjs`. `p-setup` has one command per line.
 - Checklist items are written in です・ます (「…コミットしました」), as in 第1回〜第3回, and the next lesson is named by its exact title 「第5回｜コンテキストを管理する」.
 - 依頼文1 asks for the empty `isLeapYear` to be exported, since a missing export stops the tests at load (see Constraints).
+
+### Cross-lesson consistency (2026-10-21)
+- s4-fresh and e5: the reviewing subagent does not see the history but reads code itself (cc-07); 「だけ」 removed.

@@ -29,7 +29,7 @@ an exam with transfer items, summary + flashcards. Draft only (`courseId: "vibe-
   7. 「古い記事どおりにすればよい」— Claude Codeは頻繁に変わる。公式ドキュメントで今の書き方を確かめる（`summary-next`、`card-update`。試験では問わない）。
 
 ## 形式 / Format
-- 所要時間 / minutes: estMinutes 19 (course-wide measure `measure.mjs`, after the mobile-fit and cross-lesson fixes: `cc-11-capstone.lesson.json: prose 1329 (budget 1,200–2,400) · read 1820 · practice reading 1657 · questions 8 · practice sections 3 · est 19.1 min (must be ≤ 20; estMinutes 19)`; 19.1 → 19). The measure times each practice section at 2 min, `self-check` included; `self-check` is also the success-criteria checklist of the other two tasks. Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
+- 所要時間 / minutes: estMinutes 19 (course-wide measure `measure.mjs`, after the mobile-fit and cross-lesson fixes: `cc-11-capstone.lesson.json: prose 1344 (budget 1,200–2,400) · read 1894 · practice reading 1672 · questions 8 · practice sections 3 · est 19.3 min (must be ≤ 20; estMinutes 19)`; 19.1 → 19). The measure times each practice section at 2 min, `self-check` included; `self-check` is also the success-criteria checklist of the other two tasks. Work in the learner's own repository takes longer than this reading estimate; the lesson does not state a number for it.
 - 難易度 / level: intermediate
 - ロケール / locales: jp only (course decision; English after the owner picks the publishing course).
 - 演習の題材 / practice task idea: the capstone task itself — on the learner's own repository (a working branch if it matters) or the earlier practice folder: build the setup (CLAUDE.md ≤ 25 lines, ask/deny rules, extensions only where a trigger already exists), then one full cycle on a small task they have been postponing. Success criteria: each step's `expect`, and `self-check-list` (6 items over safety, verification, context, cost; it doubles as the self-assessment). Hint ladder: step `hint` → `troubleshoot` → model answers. Model answers: CLAUDE.md for a Python kakeibo CLI (19 lines, in `setup-prompt-model`), an ask/deny settings snippet (`setup-settings-model`), and a plan prompt with an expected plan (`cycle-prompt-plan`).
@@ -122,3 +122,6 @@ estMinutes 19.
 
 ### Last fix round (2026-10-21)
 - dr-table fits 356 px: headers 「繰り返す困りごと／足す部品」, the lesson numbers stay in the cells and the caption says so; the (subagent、…) gloss stays, as the first body use of the term (visual QA; pedagogy-reviewer and ja-editor).
+
+### Cross-lesson consistency (2026-10-21)
+- 200行未満 as in cc-06; the check areas are 「安全・検証・コンテキスト・コストの4分野」 (cc-03 uses 「4つの観点」 for something else); ex-prompt-skill explains `allowed-tools`.

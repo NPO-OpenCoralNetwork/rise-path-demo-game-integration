@@ -44,8 +44,8 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 2260 (budget 1,200–2,400) · read 2648 · practice reading 1225 · questions 11 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)）。
-  est = (2,648 + 1,225) / 450 + 11 × 40秒 + 2 × 2分 = 8.61 + 7.33 + 4 = 19.94 → 20。prose rose from 1,583 because the three
+- 所要時間 / minutes: 20（`measure.mjs`: `cc-09-parallel-automation.lesson.json: prose 2265 (budget 1,200–2,400) · read 2653 · practice reading 1246 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)`）。
+  est = (2,653 + 1,246) / 450 + 11 × 40秒 + 2 × 2分 = 8.66 + 7.33 + 4 = 19.998 → 20。prose rose from 1,583 because the three
   tables became lists (measure.mjs counts lists as prose, tables only as reading).
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
@@ -164,3 +164,6 @@ predict before running (p-run).
 
 ### Last fix round (2026-10-21)
 - check-quiz e3 option d: 「だけ」 removed so the four options share one form (ja-editor).
+
+### Cross-lesson consistency (2026-10-21)
+- glossary サブエージェント: 「メインの会話」; s3-table: `--bare` also skips CLAUDE.md and skills; e1: only the request and the summary enter the conversation (cc-07); p-run: `--bare` bills the API, not the plan (cc-10). Offsetting cuts in s2-lead and s3-table keep est at 19.998.

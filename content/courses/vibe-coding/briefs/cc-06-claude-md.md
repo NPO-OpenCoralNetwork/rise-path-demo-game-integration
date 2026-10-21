@@ -90,3 +90,6 @@ Title: 「第6回｜CLAUDE.mdで前提を伝える」. Draft lives in `vibe-codi
 | practice | practice | 演習：膨らんだCLAUDE.mdを書き直す | 自分で行き先を決めてから頼み、差分を説明させ、読み込みを確かめる | markdown, code(bash 見本、mkdir -p … && の次の行で cd、390 px で折り返さない行), steps(6, hint/troubleshoot), prompt(claude-code), checklist(7), callout(tip: 答えに近いヒント), markdown, code(bash 模範解答), code(json settings), markdown | — |
 | check | check | 理解度チェック | 全目標を新しい場面で | quiz(exam) | e1 → o1（analyze, 転移: AGENTS.md と CLAUDE.local.md）、e2 → o1（apply, 転移: 毎回の整形）、e3 → o2（evaluate: 240 行）、e6 → o3（apply, 転移: 同僚への説明） |
 | summary | summary | まとめ | 4 点 + 次の一歩とふりかえり + 7 枚のカード + AI先生 | summary, markdown, flashcards, askTutor | — |
+
+### Cross-lesson consistency (2026-10-21)
+- glossary セッション: 「`claude` を起動すると始まる、ひと続きの会話」, as in cc-01 and cc-05.

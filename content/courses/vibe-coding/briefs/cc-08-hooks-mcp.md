@@ -26,7 +26,7 @@ Claude Code course (plan: `doc/brushup-2026/research/claude-code-curriculum.ja.m
   6. 「MCPサーバーやプラグインは公式が安全を確認している」→ AnthropicはMCPサーバーを監査していない。プラグインはあなたの権限で任意のコードを実行できる。マーケットプレイスの名前は出し手を示すだけ。
 
 ## 形式 / Format
-- 所要時間 / minutes: 18（コース共通の measure.mjs：`cc-08-hooks-mcp.lesson.json: prose 1892 (budget 1,200–2,400) · read 2878 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)`。(2,878 + 1,249) ÷ 450 ≈ 9.2分 + 問題10問 × 40秒 ≈ 6.7分 + 演習1セクション × 2分 = 2分、計 17.8分 → 18）。
+- 所要時間 / minutes: 18（コース共通の measure.mjs：`cc-08-hooks-mcp.lesson.json: prose 1897 (budget 1,200–2,400) · read 2883 · practice reading 1249 · questions 10 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)`。(2,883 + 1,249) ÷ 450 ≈ 9.2分 + 問題10問 × 40秒 ≈ 6.7分 + 演習1セクション × 2分 = 2分、計 17.8分 → 18）。
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先が決まってから）。
 - 演習の題材 / practice task idea: 例題と同じ練習用フォルダー（`cc-hooks-practice`）で、`.env` への書き込みを止める `PreToolUse` フック（`Edit|Write`、`tool_input.file_path`、`exit 2`）を作り、手で試す → Claudeに頼んで止まることを確かめ、理由を説明させる。後半は架空の2候補（社内の課題管理MCPサーバー／作者がわかりソースも公開された「全部入り」プラグイン。どちらにも強みと弱みが1つずつある）を8-5の表の項目ごとに書き出して見極め、書き出しの例（A は `practice-b-model`、B は `practice-b-model-b`）と比べる。
@@ -94,7 +94,7 @@ Contract check: hook problem in 2 sentences + predict; 5 segments (s1–s5), inl
 インジェクション; worked example (s2, 3 steps with subgoals, why and expect) → faded practice (same structure,
 different matcher and field, hint ladder: step hints → troubleshoot → model answer) → exam; every objective has
 inline and exam questions (o1: q0, q1, q2, q5; o2: q3, q6, q7; o3: q4, q9, q8); summary 4 points; 7 flashcards;
-one diagram (6 nodes), no images. Body: prose 1,892 by the course-wide measure.mjs (budget 1,200–2,400; see Format).
+one diagram (6 nodes), no images. Body: prose 1,897 by the course-wide measure.mjs (budget 1,200–2,400; see Format).
 Mobile fit (390 px): every table has 2 columns (cells ≤ 40 JP chars) and a first column of ≤ 4 JP characters or one
 short inline code; diagram-width.mjs measures the diagram at 344 px (limit 362); code-width.mjs leaves only the four JSON
 `command` strings over 44 columns (see Assumptions); para-sentences.mjs reports only the q9 stem (advisory).
@@ -116,7 +116,7 @@ Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
   「PreToolUseフック」), except around inline code. Plain-text fields (prerequisites, captions, checklist labels, askTutor)
   carry no code font, so command and file names there have no space either (「cat .envで」「/hooksのPreToolUseに」
   「--scopeで選ぶ」; ja-editor round 2).
-- Length follows the course-wide measure.mjs (prose 1,892, est 17.8 → 18 minutes), which replaced the earlier
+- Length follows the course-wide measure.mjs (prose 1,897, est 17.8 → 18 minutes), which replaced the earlier
   per-lesson character count.
 - Mobile fit (round 3): every code line is ≤ 44 columns except the four JSON `command` strings (s1-prettier line 9,
   s2-settings line 9, practice-model-settings lines 9 and 18). A JSON string cannot be wrapped, and the path string alone
@@ -156,3 +156,6 @@ Correct answers sit at positions 1/2/3/4 = 2/3/3/2 across q0–q9.
 
 ### Last fix round (2026-10-21)
 - q9: the two candidates A and B moved from the question into practice-b-task as a two-item list; the question is one short line (visual QA, load). estMinutes 17 → 18 (est 17.8).
+
+### Cross-lesson consistency (2026-10-21)
+- summary-next: the hooks-guide link moved before the next-lesson note; q4: PR（プルリクエスト）; q9 a/d: the close tool is removed with a deny rule (an allow rule alone leaves it to the mode).

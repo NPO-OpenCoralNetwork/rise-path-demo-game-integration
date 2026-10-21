@@ -90,3 +90,6 @@ Contract check: hook は問題 3 文 + predict。セグメント 5（concept 4�
 
 ### Last fix round (2026-10-21)
 - check-quiz e6 option d now reads 「CLAUDE.mdに「作る前に確認して」」, the same 「〜に〜」 form as options a–c (ja-editor).
+
+### Cross-lesson consistency (2026-10-21)
+- e1: 「チームで使っているリポジトリで」 instead of a repository you do not know, which cc-10 sends to a VM or the cloud.
