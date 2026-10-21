@@ -145,25 +145,25 @@
           ],
           "caption": "CLAUDE.mdの4つの置き場所と届く範囲（広い順）",
           "columns": [
-            "置き場所",
-            "ファイル"
+            "届く範囲",
+            "置き場所：ファイル"
           ],
           "rows": [
             [
-              "組織の管理ポリシー：組織の全員",
-              "Linuxでは `/etc/claude-code/` のCLAUDE.mdなど"
+              "組織の全員",
+              "管理ポリシー：Linuxでは `/etc/claude-code/` のCLAUDE.mdなど"
             ],
             [
-              "ユーザー：自分（すべてのプロジェクト）",
-              "`~/.claude/CLAUDE.md`"
+              "自分",
+              "ユーザー（すべてのプロジェクト）：`~/.claude/CLAUDE.md`"
             ],
             [
-              "プロジェクト：チーム（Gitで共有）",
-              "`./CLAUDE.md` か `./.claude/CLAUDE.md`"
+              "チーム",
+              "プロジェクト（Gitで共有）：`./CLAUDE.md` か `./.claude/CLAUDE.md`"
             ],
             [
-              "ローカル：自分（このプロジェクトだけ）",
-              "`./CLAUDE.local.md`"
+              "自分",
+              "ローカル（このプロジェクトだけ）：`./CLAUDE.local.md`"
             ]
           ]
         },
@@ -246,15 +246,15 @@
           ],
           "rows": [
             [
-              "コードを整える",
+              "整形する",
               "インデントは2スペース"
             ],
             [
-              "変更をテストする",
+              "テストする",
               "コミットの前に `npm test` を実行する"
             ],
             [
-              "ファイルを整理する",
+              "整理する",
               "API（Application Programming Interface）のハンドラー（handler）は `src/api/handlers/` に置く"
             ]
           ]
@@ -405,9 +405,9 @@
           "cite": [
             "cc-memory"
           ],
-          "code": "flowchart TD\n  S[セッション開始] --> A[\"CLAUDE.md<br>インポート先\"]\n  A --> C[\"paths: なしの<br>ルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths: 付きの<br>ルール\"]\n  C --> X[コンテキスト]\n  E --> X",
+          "code": "flowchart TD\n  S[セッション開始] --> A[\"CLAUDE.mdと<br>インポート先、<br>paths: なしのルール\"]\n  W[\"一致する<br>ファイルを<br>扱うとき\"] --> E[\"paths:<br>付きの<br>ルール\"]\n  A --> X[コンテキスト]\n  E --> X",
           "caption": "インポートしても、毎回読まれる量は減りません。減らせるのは paths: 付きのルールです。",
-          "alt": "セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルール（と自動メモリの先頭）が読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図"
+          "alt": "セッション開始時に、4つのCLAUDE.md、インポートしたファイル、paths: なしのルールが読まれてコンテキストに入り、paths: 付きのルールだけは一致するファイルを扱うときに読まれてコンテキストに入る図"
         },
         {
           "id": "s3-agents",
@@ -530,23 +530,23 @@
           ],
           "rows": [
             [
-              "「`.env` は絶対に読まない」のような禁止",
+              "禁止",
               "権限ルールの拒否ルール（deny、第2回）"
             ],
             [
-              "「編集したら毎回必ず整形する」",
+              "毎回必ず",
               "フック（第8回）"
             ],
             [
-              "30行の作業手順",
+              "長い手順",
               "スキル（第7回）"
             ],
             [
-              "`src/api/` だけの決まり",
+              "API専用",
               "`paths:` 付きのルール（6-3）"
             ],
             [
-              "自分だけの好み",
+              "自分の好み",
               "`CLAUDE.local.md` か `~/.claude/CLAUDE.md`（6-1）"
             ]
           ]
@@ -694,7 +694,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-practice-06\ncd cc-practice-06\ngit init\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\nこのアプリは React と TypeScript で作られています。\nsrc/ にソース、tests/ にテストがあります。\nコードはきれいに、読みやすく書いてください。\nIMPORTANT: .env は絶対に読まないこと。\nIMPORTANT: git push は絶対にしないこと。\nテストはちゃんと実行してください。\nテストは npm run test:unit で実行（npm test は E2E まで走って遅い）。\nファイルを編集したら、毎回必ず npm run format を実行すること。\nsrc/api/ の関数は、入力を検証してから使うこと。\n返事は短く、箇条書きでお願いします（私の好み）。\n## 画面を追加する手順\n1. src/pages/ に新しいファイルを作る\n2. src/routes.ts に新しい画面を登録する\n3. 見出しの文言を locales/ja.json に足す\n4. tests/pages/ にテストを足す\n5. npm run test:unit で確かめる\n6. スクリーンショットを撮って PR に貼る\nEOF"
+          "code": "mkdir cc-practice-06\ncd cc-practice-06\ngit init\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\nReactとTypeScriptで作られたアプリです。\nsrc/ にソース、tests/ にテストがあります。\nコードはきれいに、読みやすく書いてください。\nIMPORTANT: .env は絶対に読まないこと。\nIMPORTANT: git push は絶対にしないこと。\nテストはちゃんと実行してください。\nテストは npm run test:unit で実行。\nnpm test はE2Eまで走って遅い。\n編集したら毎回必ず npm run format を実行。\nsrc/api/ の関数は、入力を検証してから使う。\n返事は短く、箇条書きで（私の好み）。\n## 画面を追加する手順\n1. src/pages/ に新しいファイルを作る\n2. src/routes.ts に新しい画面を登録する\n3. 見出しの文言を locales/ja.json に足す\n4. tests/pages/ にテストを足す\n5. npm run test:unit で確かめる\n6. スクリーンショットを撮ってPRに貼る\nEOF"
         },
         {
           "id": "practice-steps",
@@ -708,13 +708,13 @@
               "id": "pr-setup",
               "title": "① 見本を置く",
               "md": "上のコマンドを、ターミナルで実行します。",
-              "expect": "`cc-practice-06` に、18行の `CLAUDE.md` ができます。"
+              "expect": "`cc-practice-06` に、19行の `CLAUDE.md` ができます。"
             },
             {
               "id": "pr-decide",
               "title": "② 自分で行き先を決める",
-              "md": "1行ずつ「残す・直す・消す・移す・後でフックにする」を決め、行番号つきでメモします。",
-              "expect": "18行すべてに、行き先が1つずつ付きます。",
+              "md": "1行ずつ「残す・直す・消す・移す・後でフックにする」を決めます。どの行かは、行の書き出しの言葉でメモします。",
+              "expect": "19行すべてに、行き先が1つずつ付きます。",
               "hint": "6-5の6つの手順を、上から順に当てはめます。",
               "troubleshoot": "迷ったら「確実に守らせたいか」「一部のファイルだけか」「長い手順か」「自分だけか」の順に問います。"
             },
@@ -753,7 +753,7 @@
           "vars": [
             {
               "name": "行き先のメモ",
-              "hint": "例：2行目→消す、8行目→残す（18行分を書きます）"
+              "hint": "例：「Reactと…」→消す、「テストは npm run…」→残す（19行分を書きます）"
             }
           ],
           "expect": "変えたファイルと、行き先の表が返ってきます。表が自分のメモと合っているかを確かめます。"
@@ -798,7 +798,7 @@
           "type": "callout",
           "variant": "tip",
           "title": "それでも迷ったら（答えに近いヒント）",
-          "md": "5・6行目は拒否ルール、10行目はルール、11行目はローカル、12〜18行目は `docs/add-screen.md` へ。2〜4行目は消し、7・8行目はテストのコマンドの行にまとめます。9行目の「毎回必ず」はフックの候補（第8回）なので、今はコマンドだけ残します。"
+          "md": "IMPORTANTの2行は拒否ルール、`src/api/` の行はルール、好みの行はローカルへ移します。「## 画面を追加する手順」から下は、`docs/add-screen.md` へ移します。\n\nReactとTypeScript、フォルダーの構成、「きれいに」の3行は消します。テストの3行は、コマンドの行にまとめます。「毎回必ず」の整形はフックの候補（第8回）なので、今はコマンドだけ残します。"
         },
         {
           "id": "practice-answer-intro",
@@ -810,13 +810,14 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir -p docs\nsed -n '12,18p' CLAUDE.md > docs/add-screen.md\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\n- テストは `npm run test:unit` で実行する（`npm test` は E2E まで走って遅い）\n- コミットの前に `npm run test:unit` を通す\n- 整形は `npm run format` で行う\n- 画面を追加するときは `docs/add-screen.md` の手順に従う\n<!-- 編集のたびの整形は、第8回でフックにする -->\nEOF\nmkdir -p .claude/rules\ncat > .claude/rules/api.md <<'EOF'\n---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- src/api/ の関数は、入力を検証してから使う\nEOF\ncat > CLAUDE.local.md <<'EOF'\n- 返事は短く、箇条書きで書く\nEOF\necho \"CLAUDE.local.md\" >> .gitignore",
+          "code": "mkdir -p docs\nsed -n '/^## 画面/,$p' CLAUDE.md \\\n  > docs/add-screen.md\ncat > CLAUDE.md <<'EOF'\n# メモ帳アプリ\n- テストは `npm run test:unit` で実行する\n  （`npm test` はE2Eまで走って遅い）\n- コミットの前に `npm run test:unit` を通す\n- 整形は `npm run format` で行う\n- 画面追加の手順：`docs/add-screen.md`\n<!-- 整形は後でフックにする -->\nEOF\nmkdir -p .claude/rules\ncat > .claude/rules/api.md <<'EOF'\n---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- src/api/ の関数は、入力を検証してから使う\nEOF\ncat > CLAUDE.local.md <<'EOF'\n- 返事は短く、箇条書きで書く\nEOF\necho \"CLAUDE.local.md\" >> .gitignore",
           "highlight": [
-            5,
             6,
             7,
             8,
-            9
+            9,
+            10,
+            11
           ]
         },
         {
@@ -835,7 +836,7 @@
           "cite": [
             "cc-memory"
           ],
-          "md": "残した4行は、どれも確かめられます。HTMLコメントは読み込みの前に取り除かれ、人向けのメモになります。"
+          "md": "残した4つの項目は、どれも確かめられます。HTMLコメントは読み込みの前に取り除かれ、人向けのメモになります。"
         }
       ]
     },

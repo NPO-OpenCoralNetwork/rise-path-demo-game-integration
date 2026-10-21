@@ -3,7 +3,7 @@
   "id": "cc-09-parallel-automation",
   "courseId": "vibe-coding",
   "title": "第9回｜並列で進める・自動で回す",
-  "subtitle": "ワークツリーで作業を並べ、claude -p で安全に自動化する（2026年10月時点・v2.1.304）",
+  "subtitle": "ワークツリーで並べ、claude -p で安全に自動化する（2026年10月時点・v2.1.304）",
   "locale": "jp",
   "level": "intermediate",
   "estMinutes": 20,
@@ -23,7 +23,7 @@
     },
     {
       "id": "o2",
-      "text": "CIなどで使う安全な claude -p コマンドを書ける",
+      "text": "CI（継続的インテグレーション）などで使う安全な claude -p コマンドを書ける",
       "bloom": "apply"
     },
     {
@@ -122,30 +122,17 @@
         },
         {
           "id": "s1-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
+          "items": [
+            "調べものやレビューなら、[[サブエージェント]]に任せます。要点だけが会話に戻ります。設定しなければ、同じフォルダーを編集します。",
+            "別々の変更を同時に進めるなら、[[ワークツリー]]を使います。依存パッケージを入れ直し、取り込みは自分で行います。",
+            "長いテストや開発サーバーなら、[[バックグラウンド実行]]に回します。様子は `/tasks` で見ます。"
+          ],
           "cite": [
             "cc-agents",
             "cc-worktrees",
             "cc-interactive-mode"
-          ],
-          "caption": "誰がまとめるか、何に向くかで選ぶ",
-          "columns": [
-            "方法（まとめる人）",
-            "向いている作業と、気をつけること"
-          ],
-          "rows": [
-            [
-              "[[サブエージェント]]（Claude）",
-              "調べもの・レビュー。設定しなければ、同じフォルダーを編集する"
-            ],
-            [
-              "[[ワークツリー]]（自分）",
-              "別々の変更を同時に進める。依存パッケージを入れ直す"
-            ],
-            [
-              "[[バックグラウンド実行]]（自分）",
-              "テスト・開発サーバー。様子は `/tasks` で見る"
-            ]
           ]
         },
         {
@@ -221,10 +208,10 @@
             "cc-worktrees",
             "cc-common-workflows"
           ],
-          "code": "# 練習用のリポジトリを作り、最初のコミットを用意する\nmkdir cc-practice-09\ncd cc-practice-09\ngit init\necho \".claude/worktrees/\" > .gitignore  # 未追跡に出さない\ngit add .gitignore\ngit commit -m \"Ignore worktrees\"\nclaude  # 一度起動してフォルダーの信頼の確認に答え、終了する\n\n# ターミナル1：機能Aのセッション\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正B（cc-practice-09 で実行）\nclaude --worktree bugfix-b\n\n# 作業のあと、本体のフォルダーで取り込む\ngit merge worktree-bugfix-b",
+          "code": "# 練習用リポジトリを作る\nmkdir cc-practice-09\ncd cc-practice-09\ngit init\n# 未追跡に出さない\necho .claude/worktrees/ > .gitignore\ngit add .gitignore\ngit commit -m \"Ignore worktrees\"\n# 信頼の確認に答えて終了\nclaude\n\n# ターミナル1：機能A\nclaude --worktree feature-a\n\n# ターミナル2：バグ修正B\n# cc-practice-09 で実行\nclaude --worktree bugfix-b\n\n# 作業後、本体で取り込む\ngit merge worktree-bugfix-b",
           "highlight": [
-            11,
-            14
+            13,
+            17
           ]
         },
         {
@@ -244,7 +231,7 @@
             {
               "id": "ex-feature",
               "title": "2つのセッションを始める",
-              "md": "ターミナルごとに名前を変えて、`claude --worktree` を実行します。別フォルダー・別ブランチなので、変更がぶつかりません。",
+              "md": "`claude --worktree` を、ターミナルごとに名前を変えて実行します。別フォルダー・別ブランチなので、変更がぶつかりません。",
               "expect": "ブランチ `worktree-feature-a` と `worktree-bugfix-b` で、Claudeが1つずつ動きます。",
               "troubleshoot": "`Failed to resolve base branch` と出たら、コミットがあるか確かめます。"
             },
@@ -336,7 +323,7 @@
           "cite": [
             "cc-headless"
           ],
-          "md": "CI（Continuous Integration）やスクリプトでは、会話をせずに1回だけ動かします。これを非対話的実行（non-interactive mode）と呼び、`claude -p \"<依頼文>\"` と書きます。"
+          "md": "CIやスクリプトでは、会話をせずに1回だけ動かします。これを非対話的実行（non-interactive mode）と呼び、`claude -p \"<依頼文>\"` と書きます。"
         },
         {
           "id": "s3-mode",
@@ -345,7 +332,7 @@
             "cc-headless",
             "cc-permission-modes"
           ],
-          "md": "v2.1.302から、モードを指定しない `-p` はManualモード（第2回）で始まり、承認が要る操作は拒否されます。既定は版で変わるので、[公式ドキュメント（非対話的実行）](https://code.claude.com/docs/ja/headless)で確かめましょう。"
+          "md": "v2.1.302から、モードを指定しない `-p` はManualモード（第2回）で始まり、承認が要る操作は拒否されます。既定は版で変わるので、[公式ドキュメント（非対話的実行）](https://code.claude.com/docs/ja/headless)で確かめましょう。\n\n下の例は、5つのフラグで安全にしています。"
         },
         {
           "id": "s3-code",
@@ -356,42 +343,23 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "claude --bare -p \\\n  \"npm run lint の警告をファイルごとに数えてください。\" \\\n  --allowedTools \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
+          "code": "claude --bare -p \\\n  \"リンターの警告を数えてください。\" \\\n  --allowedTools \\\n    \"Bash(npm run lint *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例"
         },
         {
           "id": "s3-table",
-          "type": "table",
+          "type": "list",
+          "style": "number",
+          "items": [
+            "`--bare` は、フックやMCPサーバー（第8回）などを読み込みません。付けないと、どちらも確認なしで動きます。",
+            "`--allowedTools` は、使うツールを絞って許可します。付けないと、必要な操作まで拒否されます。",
+            "`--permission-mode dontAsk` は、確認が要る操作を聞かずに拒否します（読み取りは動きます）。付けないと、モードは設定や既定で決まります。",
+            "`--output-format json` は、結果や費用をJSONで返します。付けないと、スクリプトで読みにくくなります。",
+            "`--max-budget-usd` は、費用の見積もりが上限に届いたら止めます。付けないと、費用に歯止めがありません。"
+          ],
           "cite": [
             "cc-headless",
             "cc-cli-reference",
             "cc-permissions"
-          ],
-          "caption": "安全な claude -p を作る5つのフラグ",
-          "columns": [
-            "フラグ",
-            "役割と、付けないとどうなるか"
-          ],
-          "rows": [
-            [
-              "`--bare`",
-              "フックやMCP（第8回）などを読まない。付けないと、フックが確認なしで動く"
-            ],
-            [
-              "`--allowedTools`",
-              "使うツールを絞って許可する。付けないと、必要な操作まで拒否される"
-            ],
-            [
-              "`--permission-mode` `dontAsk`",
-              "確認が要る操作を聞かずに拒否（読み取りは動く）。付けないと、モードは設定しだい"
-            ],
-            [
-              "`--output-format` `json`",
-              "結果や費用をJSONで返す。付けないと、スクリプトで読みにくい"
-            ],
-            [
-              "`--max-budget-usd`",
-              "費用の見積もりが上限に届いたら止める。付けないと、費用に歯止めがない"
-            ]
           ]
         },
         {
@@ -482,35 +450,19 @@
         },
         {
           "id": "s4-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
+          "items": [
+            "CIで、PR（プルリクエスト）や決まった時刻に動かすなら、GitHub Actionsを使います。",
+            "パソコンを閉じていても動かすなら、クラウドの[[定期タスク]]（`/schedule`）です。間隔は最短1時間で、試験公開中です。",
+            "自分のパソコンで手元のファイルを使うなら、デスクトップの[[定期タスク]]です。",
+            "開いているセッションでしばらく見張るなら、`/loop` を使います。間隔は最短1分です。"
+          ],
           "cite": [
             "cc-common-workflows",
             "cc-github-actions",
             "cc-routines",
             "cc-scheduled-tasks"
-          ],
-          "caption": "動かす場所と場面で選ぶ",
-          "columns": [
-            "方法",
-            "動く場所と、向いている場面"
-          ],
-          "rows": [
-            [
-              "GitHub Actions",
-              "CIで、PR（プルリクエスト）や決まった時刻に動かす"
-            ],
-            [
-              "クラウドの[[定期タスク]]（`/schedule`）",
-              "クラウドで、パソコンを閉じていても動く（間隔は最短1時間、試験公開中）"
-            ],
-            [
-              "デスクトップの[[定期タスク]]",
-              "自分のパソコンで、手元のファイルを使って動く"
-            ],
-            [
-              "`/loop`",
-              "開いているセッションで、短い見張りに使う（間隔は最短1分）"
-            ]
           ]
         }
       ]
@@ -557,7 +509,7 @@
           "type": "prompt",
           "target": "claude-code",
           "title": "依頼文の例（毎週のTODO一覧）",
-          "prompt": "{{フォルダー}} の中のTODOコメントを集めて、一覧を作ってください。\n成功の条件：{\"todos\": [...], \"unreadable\": [...]} の形のJSONを返すこと。todosの各要素は、ファイル名・行番号・内容です。\nTODOが1つもなければ、todosは空の配列にしてください。\nファイルの編集やコミットはしないでください。\n読めなかったファイルは、unreadableに必ず挙げてください。",
+          "prompt": "{{フォルダー}} の中のTODOコメントを集めて、一覧を作ってください。\n成功の条件：{\"todos\": [...], \"unreadable\": [...]} の形のJSONを返してください。todosの各要素は、ファイル名・行番号・内容です。\nTODOが1つもなければ、todosは空の配列にしてください。\nファイルの編集やコミットはしないでください。\n読めなかったファイルは、unreadableに必ず挙げてください。",
           "vars": [
             {
               "name": "フォルダー",
@@ -668,7 +620,7 @@
             {
               "id": "p-run",
               "title": "結果を予想してから実行する",
-              "md": "結果を予想してから実行します。`--bare` には、API（Application Programming Interface）キーが必要です。キーがなければ、`--bare` を外します。",
+              "md": "`--bare` には、API（Application Programming Interface）キーが必要です。キーがなければ、`--bare` を外します。",
               "expect": "返ったJSONの `result` に、失敗したテスト1件が入ります。",
               "hint": "予想と違ったら、違いを1行メモします。",
               "troubleshoot": "「実行できなかった」と返ったら、許可のパターンを見直します。"
@@ -719,12 +671,12 @@
             "cc-headless",
             "cc-cli-reference"
           ],
-          "code": "# 模範解答の例（自分のコマンドと見比べる）\nclaude --bare -p \\\n'npm test を実行し、失敗したテストを\nJSONの配列で返してください。\n各要素は name・file・error（エラーの1行目）です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\", \"reason\": \"<理由>\"}\nを返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
+          "code": "# 模範解答（見比べる用）\nclaude --bare -p \\\n'npm test を実行し、失敗したテストを\nJSONの配列で返してください。\n各要素は name・file・error で、\nerror はエラーの1行目です。\n失敗が0件なら [] を返してください。\nテストを実行できなかったときは、[] ではなく\n{\"status\": \"error\",\n \"reason\": \"<理由>\"}\nを返してください。' \\\n  --allowedTools \"Bash(npm test *)\" \\\n  --permission-mode dontAsk \\\n  --output-format json \\\n  --max-budget-usd 1  # 上限の金額は例",
           "highlight": [
-            10,
-            11,
             12,
-            13
+            13,
+            14,
+            15
           ]
         }
       ]

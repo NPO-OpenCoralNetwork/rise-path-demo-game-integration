@@ -207,14 +207,14 @@
                 },
                 {
                   "id": "d",
-                  "md": "権限モードをManualモードにして、毎回自分で確認する",
+                  "md": "権限モードをManualにして、毎回自分で確認する",
                   "feedback": "確認する人が見落とせば、編集は進みます。人の注意に頼らず、仕組みで止めます。"
                 }
               ],
               "answer": [
                 "c"
               ],
-              "explanation": "CLAUDE.mdや依頼文は、Claudeが読んで判断する「お願い」です。毎回確実に守らせたいときは、Claudeの判断と関係なく動く仕組みを使います。それがこのレッスンで作るフックです。",
+              "explanation": "CLAUDE.mdや依頼文は、Claudeが読んで判断する「お願い」です。毎回確実に守らせたいときは、第2回の拒否ルールのように、Claudeの判断と関係なく動く仕組みを使います。このレッスンでは、その仕組みのひとつ、フックを作ります。",
               "objectiveId": "o1",
               "bloom": "understand"
             }
@@ -235,7 +235,7 @@
             "cc-memory",
             "cc-features-overview"
           ],
-          "md": "第6回のとおり、CLAUDE.mdは強制ではなく、Claudeが読むお願いです。毎回必ず守らせたいことは、フック（hook）に任せます。"
+          "md": "第6回のとおり、CLAUDE.mdは強制ではなく、Claudeが読むお願いです。毎回必ず守らせたいことは、第2回の権限ルールやフック（hook）に任せます。"
         },
         {
           "id": "s1-defs",
@@ -266,7 +266,7 @@
             "cc-hooks-guide",
             "cc-hooks"
           ],
-          "code": "flowchart TD\n  A[あなたの依頼] --> B[Claudeが<br>次の行動を選ぶ]\n  B -->|ツールを使う| C{PreToolUse<br>フック}\n  C -->|止める| B\n  C -->|通す（権限の確認へ）| D[ツールを<br>実行する]\n  D --> E[PostToolUse<br>フック]\n  E --> B\n  B -->|応答を終える| F[Stop<br>フック]",
+          "code": "flowchart TD\n  A[あなたの依頼] --> B[Claudeが<br>次の行動を選ぶ]\n  B --> C{PreToolUse<br>フック}\n  C -->|止める| B\n  C -->|通す（権限の確認へ）| D[ツールを<br>実行する]\n  D --> E[PostToolUse<br>フック]\n  E --> B\n  B -->|応答を終える| F[Stop<br>フック]",
           "caption": "フックは、エージェントループの決まった場所で毎回動きます。PreToolUseフックは、ツールの実行を止められます。",
           "alt": "依頼を受けたClaudeが次の行動を選び、ツールを使う前にPreToolUseフック、実行した後にPostToolUseフック、応答を終えるときにStopフックが動く流れ図です。PreToolUseフックが止めると、ツールは実行されず、Claudeは行動を選び直します。通すと、ふだんの権限の確認へ進みます。"
         },
@@ -379,7 +379,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "# jqがあるか確かめる（バージョンが出ればOK）\njq --version\n# 練習用のフォルダーを新しく作って移る\nmkdir cc-hooks-practice\ncd cc-hooks-practice\ngit init\nmkdir -p .claude/hooks\n# 演習で守る .env（中身はダミーの値だけ）\necho \"DUMMY_VALUE=practice\" > .env"
+          "code": "# jqのバージョンが出ればOK\njq --version\n# 練習用フォルダーを作る\nmkdir cc-hooks-practice\ncd cc-hooks-practice\ngit init\nmkdir -p .claude/hooks\n# 守る.env（ダミーの値だけ）\necho \"DUMMY_VALUE=practice\" > .env"
         },
         {
           "id": "s2-script",
@@ -389,13 +389,14 @@
           "cite": [
             "cc-hooks"
           ],
-          "code": "#!/bin/bash\n# block-rm.sh：rm で始まるコマンドを止める\nINPUT=$(cat)\nCOMMAND=$(echo \"$INPUT\" | jq -r '.tool_input.command // empty')\n\nif [[ \"$COMMAND\" == rm* ]]; then\n  echo \"Blocked: rm commands are not allowed\" >&2\n  exit 2\nfi\n\nexit 0",
+          "code": "#!/bin/bash\n# rmで始まるコマンドを止める\nINPUT=$(cat)\nCOMMAND=$(echo \"$INPUT\" |\n  jq -r '.tool_input.command // empty')\n\nif [[ \"$COMMAND\" == rm* ]]; then\n  echo \"Blocked: rm is not allowed\" >&2\n  exit 2\nfi\n\nexit 0",
           "highlight": [
             3,
             4,
-            6,
+            5,
             7,
-            8
+            8,
+            9
           ]
         },
         {
@@ -424,20 +425,20 @@
             {
               "id": "ex-script",
               "title": "① スクリプトを書く",
-              "md": "JSONの `tool_input.command` から、`jq` でコマンドを取り出します。`rm` で始まれば理由を書いて `exit 2` で終えます。`exit 2` は「止める」の合図で、標準エラー出力の文が理由としてClaudeに届きます（8-3で詳しく）。",
+              "md": "`.claude/hooks/block-rm.sh` に、上のスクリプトを保存します。`jq` で `tool_input.command` を取り出し、`rm` で始まれば理由を書いて `exit 2` で終えます。`exit 2` は「止める」の合図で、標準エラー出力の文が理由としてClaudeに届きます（8-3で詳しく）。",
               "expect": "`rm` で始まると理由の文が出て `exit 2` で終わり、それ以外は `exit 0` で終わります。"
             },
             {
               "id": "ex-register",
               "title": "② 許可を付けて登録する",
-              "md": "macOSとLinuxでは `chmod +x` で実行を許可します。`PreToolUse` にマッチャー `Bash` で登録します。パスは、プロジェクトのフォルダーを指す `$CLAUDE_PROJECT_DIR` から書きます。",
+              "md": "macOSとLinuxでは `chmod +x` で実行を許可し、`PreToolUse` にマッチャー `Bash` で登録します。コマンドは `\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-rm.sh` です。`$CLAUDE_PROJECT_DIR` は、プロジェクトのフォルダーを指します。",
               "expect": "`cc-hooks-practice` で `claude` を起動し、`/hooks` を開くと、`PreToolUse` の下に表示されます。",
               "troubleshoot": "許可がないとフックは起動せず、何も止まりません。一覧に出ないときは、JSONの余計なカンマなどを直し、Claude Codeを再起動します。"
             },
             {
               "id": "ex-test",
               "title": "③ 予想してから、手で試す",
-              "md": "下のコマンドでJSONを渡します。JSONの中の `rm` は文字として渡るだけで、実行はされません。結果を先に予想しましょう。",
+              "md": "下の③の3行は1つのコマンドで、フックにJSONを渡します。JSONの中の `rm` は文字として渡るだけで、実行はされません。結果を先に予想しましょう。",
               "expect": "理由の文と `2` が出ます。`ls` に変えると `0` です。",
               "troubleshoot": "`Permission denied` と出たら、②の `chmod +x` を実行します。`jq: command not found` なら、jqを入れるまで何も止まりません。"
             }
@@ -451,7 +452,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "code": "# ② 実行を許可する（macOS・Linux）\nchmod +x .claude/hooks/block-rm.sh\n\n# ③ JSONを渡して試す（3行で1つのコマンド）\necho '{\"tool_name\":\"Bash\",\n  \"tool_input\":{\"command\":\"rm notes.txt\"}}' |\n  .claude/hooks/block-rm.sh\necho $?"
+          "code": "# ② 実行を許可する\nchmod +x .claude/hooks/block-rm.sh\n\n# ③ JSONを渡して試す\necho '{\"tool_name\":\"Bash\",\"tool_input\":\n  {\"command\":\"rm notes.txt\"}}' |\n  .claude/hooks/block-rm.sh\necho $?"
         },
         {
           "id": "s2-check",
@@ -527,7 +528,7 @@
           "rows": [
             [
               "`0`",
-              "進む。表示はなく、ふだんの権限確認へ（許可ではない）"
+              "進む。表示はなく、ふだんの権限の確認へ（許可ではない）"
             ],
             [
               "`2`",
@@ -545,7 +546,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "md": "`exit 2` は、どの権限モードでも操作を止めます。"
+          "md": "`exit 0` は止めないだけで、許可ではありません。`exit 2` は、どの権限モードでも操作を止めます。"
         },
         {
           "id": "s3-pitfall",
@@ -595,7 +596,7 @@
                 {
                   "id": "d",
                   "md": "フックでは止まらず、確認なしで編集が許可される",
-                  "feedback": "`exit 1` は止めないエラーで、許可ではありません。編集は、ふだんの権限確認へ進みます。"
+                  "feedback": "`exit 1` は止めないエラーで、許可ではありません。編集は、ふだんの権限の確認へ進みます。"
                 }
               ],
               "answer": [
@@ -648,7 +649,7 @@
           "cite": [
             "cc-mcp"
           ],
-          "code": "# ネット越しのサーバーを追加する（公式の例）\nclaude mcp add --transport http notion \\\n  https://mcp.notion.com/mcp\n\n# 手元のサーバーは、-- の後に起動コマンドを書く\n# claude mcp add <名前> -- <コマンド> [引数...]\n\n# 追加したサーバーを一覧で確かめる\nclaude mcp list",
+          "code": "# ネット越しのサーバー\nclaude mcp add --transport http notion \\\n  https://mcp.notion.com/mcp\n\n# 手元のサーバーの書き方\n# claude mcp add <名前> -- <起動コマンド>\n\n# 追加したサーバーの一覧\nclaude mcp list",
           "highlight": [
             2,
             3
@@ -660,7 +661,7 @@
           "cite": [
             "cc-mcp"
           ],
-          "md": "ネット越しなら `--transport http` が推奨で、古い方式の `sse` は非推奨です。"
+          "md": "ネット越しなら `--transport http` が推奨で、古い方式の `sse` は非推奨です。手元のサーバーは、`--` の後に起動コマンドを書きます。"
         },
         {
           "id": "s4-scopes",
@@ -675,16 +676,16 @@
           ],
           "rows": [
             [
-              "`local`（既定）",
-              "このプロジェクト・自分だけ"
+              "`local`",
+              "既定。このプロジェクトで、自分だけ"
             ],
             [
-              "`project`（`.mcp.json` で共有）",
-              "このプロジェクト・チーム全員。対話セッションでは、使う前に承認"
+              "`project`",
+              "このプロジェクトで、チーム全員。`.mcp.json` で共有し、対話セッションでは使う前に承認の確認が出る"
             ],
             [
               "`user`",
-              "すべてのプロジェクト・自分だけ"
+              "すべてのプロジェクトで、自分だけ"
             ]
           ]
         }
@@ -734,7 +735,7 @@
             "cc-security",
             "cc-mcp"
           ],
-          "md": "プラグインは、自分のアカウントの権限で任意のコードを実行できます。AnthropicはMCPサーバーを監査していません。外部の文章を読むサーバーは、プロンプトインジェクションの入り口にもなります。"
+          "md": "プラグインは、あなたのPCのユーザー権限で任意のコードを実行できます。AnthropicはMCPサーバーを監査していません。外部の文章を読むサーバーは、プロンプトインジェクションの入り口にもなります。"
         },
         {
           "id": "s5-checks",
@@ -754,15 +755,15 @@
               "どこから配られているか"
             ],
             [
-              "作者と保守",
+              "作者",
               "誰が作り、いまも保守しているか"
             ],
             [
-              "実行されるもの",
-              "`/plugin` の詳細、`hooks/hooks.json`、`.mcp.json`"
+              "実行内容",
+              "`/plugin` の詳細、`hooks/hooks.json` と `.mcp.json` の中身"
             ],
             [
-              "外とのやり取り",
+              "外部連携",
               "外部の文章を読むか、どこへ送るか"
             ],
             [
@@ -821,7 +822,7 @@
               "answer": [
                 "a"
               ],
-              "explanation": "プラグインは、自分のアカウントの権限でコードを実行できます。`/plugin` の詳細や `hooks/hooks.json`、`.mcp.json` を読み、何が動くのかを先に確かめます。",
+              "explanation": "プラグインは、あなたのPCのユーザー権限でコードを実行できます。`/plugin` の詳細や `hooks/hooks.json`、`.mcp.json` を読み、何が動くのかを先に確かめます。",
               "objectiveId": "o3",
               "bloom": "evaluate"
             }
@@ -850,21 +851,22 @@
             {
               "id": "p-script",
               "title": "① スクリプトを書いて登録する",
-              "md": "`protect-files.sh` を作って許可を付け、`PreToolUse` の配列に足します。",
+              "md": "`.claude/hooks/protect-files.sh` を作って許可を付け、`PreToolUse` の配列に足します。",
               "expect": "`/hooks` の `PreToolUse` の下に、新しいフックが出ます。選ぶと、実行するコマンドを確かめられます。",
-              "hint": "編集のツールは `Edit` と `Write`、パスは `tool_input.file_path` です。"
+              "hint": "編集のツールは `Edit` と `Write`、パスは `tool_input.file_path` です。",
+              "troubleshoot": "`/hooks` に出ないときは、例題の②と同じく、JSONのカンマと `chmod +x` を確かめます。"
             },
             {
               "id": "p-predict",
               "title": "② 予想してから、手で試す",
               "md": "`.env` のパスを入れたJSONを渡す前に、結果をメモします。",
               "expect": "理由の文と `2` が出ます。`README.md` なら `0` です。",
-              "hint": "例題のテストのコマンドで、`tool_input` を `{\"file_path\":\".env\"}` に変えます。"
+              "hint": "例題のテストのコマンドを使います。`tool_input` を `{\"file_path\":\".env\"}` に変えます。渡す先は `.claude/hooks/protect-files.sh` にします。"
             },
             {
               "id": "p-claude",
               "title": "③ Claudeに頼んで確かめる",
-              "md": "下の依頼文を送る前に、Claudeの動きを予想します。",
+              "md": "下の依頼文を送る前に、Claudeの動きを予想します。送ったあと、Ctrl + Oで理由を確かめます。",
               "keys": [
                 "Ctrl+O"
               ],
@@ -878,7 +880,7 @@
           "type": "prompt",
           "target": "claude-code",
           "title": "フックの動作を確かめる依頼文",
-          "prompt": "これはフックの動作確認です。`.env` の末尾に「{{追加する行}}」という1行を追加してください。\nフックに止められたら、別の方法は試さずに作業をやめてください。\nそのあと、どのツールがなぜ止まったのかを、受け取ったメッセージを引用して説明してください。",
+          "prompt": "これはフックの動作確認です。.envの末尾に「{{追加する行}}」という1行を追加してください。\nフックに止められたら、別の方法は試さずに作業をやめてください。\nそのあと、どのツールがなぜ止まったのかを、受け取ったメッセージを引用して説明してください。",
           "vars": [
             {
               "name": "追加する行",
@@ -897,7 +899,7 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "md": "詰まったら、次の模範解答と比べます。"
+          "md": "詰まったら、次の模範解答と比べます。設定に書くのは `\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh` です。"
         },
         {
           "id": "practice-model-script",
@@ -907,11 +909,13 @@
           "cite": [
             "cc-hooks-guide"
           ],
-          "code": "#!/bin/bash\n# protect-files.sh：守りたいファイルへの書き込みを止める\nINPUT=$(cat)\nFILE_PATH=$(echo \"$INPUT\" | jq -r '.tool_input.file_path // empty')\n\nPROTECTED_PATTERNS=(\".env\" \"package-lock.json\" \".git/\")\n\nfor pattern in \"${PROTECTED_PATTERNS[@]}\"; do\n  if [[ \"$FILE_PATH\" == *\"$pattern\"* ]]; then\n    echo \"Blocked: $FILE_PATH matches protected pattern '$pattern'\" >&2\n    exit 2\n  fi\ndone\n\nexit 0",
+          "code": "#!/bin/bash\n# .envなどへの書き込みを止める\nINPUT=$(cat)\nFILE_PATH=$(echo \"$INPUT\" |\n  jq -r '.tool_input.file_path // empty')\n\nPROTECTED_PATTERNS=(\n  \".env\" \"package-lock.json\" \".git/\"\n)\n\nfor pat in \"${PROTECTED_PATTERNS[@]}\"; do\n  if [[ \"$FILE_PATH\" == *\"$pat\"* ]]; then\n    echo \"Blocked: $FILE_PATH matches\" \\\n      \"protected pattern '$pat'\" >&2\n    exit 2\n  fi\ndone\n\nexit 0",
           "highlight": [
             4,
-            6,
-            9
+            5,
+            7,
+            8,
+            12
           ]
         },
         {
@@ -945,7 +949,7 @@
             {
               "id": "q9",
               "kind": "single",
-              "prompt": "架空の候補です。Aは社内チームの課題管理MCPサーバーで、ソースは社内で公開され、毎月更新されています。課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。Bは作者がわかり、ソースも公開されている「全部入り」プラグインです。ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。いちばん適切な判断はどれでしょう？",
+              "prompt": "架空の2候補について、いちばん適切な判断を選びます。Aは社内チームの課題管理MCPサーバーで、ソースは社内で公開され、毎月更新されています。課題を読むツールと閉じるツールを持ち、課題には社外の人も書き込めます。Bは作者がわかり、ソースも公開されている「全部入り」プラグインです。ただし、そのフックは編集のたびに、外部から取ってきたスクリプトを実行します。どれを選びますか？",
               "options": [
                 {
                   "id": "a",
@@ -996,15 +1000,15 @@
               "社内で公開"
             ],
             [
-              "作者と保守",
+              "作者",
               "社内チーム・毎月更新"
             ],
             [
-              "実行されるもの",
+              "実行内容",
               "`.mcp.json` のサーバー"
             ],
             [
-              "外とのやり取り",
+              "外部連携",
               "社外の人が書いた課題を読む"
             ],
             [
@@ -1033,18 +1037,18 @@
           "rows": [
             [
               "出どころ",
-              "ソースが公開されている"
+              "公開されたソースから配られている"
             ],
             [
-              "作者と保守",
+              "作者",
               "作者がわかる"
             ],
             [
-              "実行されるもの",
+              "実行内容",
               "外から取ってくるスクリプト（前もって読めない）"
             ],
             [
-              "外とのやり取り",
+              "外部連携",
               "編集のたびに外部から取ってくる"
             ],
             [
@@ -1220,7 +1224,7 @@
                 {
                   "id": "d",
                   "md": "ファイルを書き換えるツールがないことを確かめ、それで十分とする",
-                  "feedback": "読むだけでも、Webページに紛れた指示を取り込むことがあります。プロンプトインジェクションも考えて、ツールを絞ります。"
+                  "feedback": "読むだけでも、Webページに紛れた指示を取り込むことがあります。出どころと作者も確かめてから入れます。"
                 }
               ],
               "answer": [
@@ -1291,7 +1295,7 @@
             {
               "id": "card-before-install",
               "front": "プラグインを入れる前に確かめることは？",
-              "back": "出どころ、作者と保守、実行されるもの、外とのやり取り、権限、更新の6つです。"
+              "back": "出どころ、作者、実行内容、外部連携、権限、更新の6つです。"
             }
           ]
         },

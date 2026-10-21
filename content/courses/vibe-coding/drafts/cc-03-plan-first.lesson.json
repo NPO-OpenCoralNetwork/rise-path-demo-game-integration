@@ -6,7 +6,7 @@
   "subtitle": "いきなり書かせず、調べて計画し、直してから任せる",
   "locale": "jp",
   "level": "beginner",
-  "estMinutes": 20,
+  "estMinutes": 19,
   "prerequisites": [
     "第1回｜最初のタスクを任せる",
     "第2回｜任せる範囲を決める：権限モードと巻き戻し",
@@ -92,7 +92,7 @@
           "type": "markdown",
           "style": "lead",
           "cite": ["cc-best-practices"],
-          "md": "Claudeは意図をある程度推測できますが、頭の中までは読めません。依頼があいまいだと、どのファイルをどこまで変えるかも推測で決まります。"
+          "md": "Claudeは意図をある程度推測できますが、頭の中までは読めません。"
         },
         {
           "id": "s1-defs",
@@ -111,22 +111,21 @@
         },
         {
           "id": "s1-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
           "cite": ["cc-best-practices"],
-          "caption": "4つの観点と、公式ガイドの書き直し例",
-          "columns": ["観点：書くこと", "書き直した例"],
-          "rows": [
-            ["**範囲**：どのファイルの、どんな場面か。テストの方針", "`foo.py` のテストで、ログアウト中の場合を扱う。モック（mock、仮の部品）なし"],
-            ["**参照先**：読ませたい情報源。@参照するファイル、ページのURL、Gitの履歴", "`ExecutionFactory`（クラス名）の経緯を、Gitの履歴から要約する"],
-            ["**既存のパターン**：まねしてほしい既存のコード", "既存のウィジェット（widget、画面の部品）の作りに合わせ、カレンダーを作る"],
-            ["**症状**：起きていること、場所の見当、直った状態", "タイムアウト後のログイン失敗。`src/auth/` を調べ、再現テストを書いて直す"]
+          "items": [
+            "**範囲**には、どのファイルのどんな場面か、テストの方針を書きます。",
+            "**参照先**には、@参照するファイル、URL、Gitの履歴など、読ませたい情報源を書きます。",
+            "**既存のパターン**には、まねしてほしい既存のコードを書きます。",
+            "**症状**には、起きていること、場所の見当、直った状態を書きます。"
           ]
         },
         {
           "id": "s1-rich",
           "type": "markdown",
           "cite": ["cc-best-practices", "cc-common-workflows"],
-          "md": "画面の崩れは、スクリーンショットをCtrl + Vで貼って見せます。WindowsとWSL（Windows Subsystem for Linux）ではAlt + Vです。\n\n調べる段階なら、「このファイルの改善点は？」のようなあいまいな質問も役立ちます。"
+          "md": "画面の崩れは、スクリーンショットをCtrl + Vで貼ります。WindowsとWSL（Windows Subsystem for Linux）ではAlt + Vです。\n\n調べる段階なら、「このファイルの改善点は？」のようなあいまいな質問も役立ちます。"
         },
         {
           "id": "s1-example",
@@ -236,7 +235,7 @@
           "items": [
             "Shift + Tabを、ステータスバー（status bar）に `⏸ plan mode on` と出るまで押す",
             "依頼の先頭に `/plan` を付けて送る",
-            "起動するときに `claude --permission-mode plan` と入力する"
+            "`claude --permission-mode plan` で起動する"
           ]
         },
         {
@@ -422,7 +421,7 @@
           "type": "markdown",
           "style": "lead",
           "cite": ["cc-best-practices"],
-          "md": "大きめの機能は決めることが多く、1つの依頼文に書ききれません。公式ガイドは、Claudeにインタビューしてもらい、仕様を書いてから実装する方法を勧めています。"
+          "md": "大きめの機能は決めることが多く、1つの依頼文に書ききれません。公式ガイドは、Claudeにインタビューしてもらう方法を勧めています。"
         },
         {
           "id": "s4-defs",
@@ -462,18 +461,17 @@
           "id": "s4-good-spec",
           "type": "markdown",
           "cite": ["cc-best-practices"],
-          "md": "役立つ仕様には、関わるファイルとインターフェース（interface、関数名など、ほかのコードとのつなぎ目）を書きます。範囲外のことも書き、最後は機能全体を確かめる手順で終わります。"
+          "md": "役立つ仕様には、関わるファイルとインターフェース（interface、関数名など、ほかのコードとのつなぎ目）を書きます。範囲外のことも書き、最後は全体を確かめる手順で終わります。"
         },
         {
           "id": "s4-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
           "cite": ["cc-best-practices"],
-          "caption": "変更の大きさで、準備の度合いを選ぶ",
-          "columns": ["変更の大きさ", "進め方"],
-          "rows": [
-            ["差分を1文で説明できる", "計画を省いて直接頼む"],
-            ["迷う・複数のファイル・よく知らないコード", "プランモードで計画してから実装"],
-            ["決めることが多い大きめの機能", "インタビュー→`SPEC.md`→新しいセッション"]
+          "items": [
+            "差分を1文で説明できる変更は、**直接頼みます**。",
+            "進め方に迷うとき、複数のファイルやよく知らないコードを変えるときは、**計画**します。",
+            "大きめの機能は、**インタビューと仕様**から始めます。"
           ]
         },
         {
@@ -482,7 +480,7 @@
           "variant": "note",
           "title": "コミュニティのスキル集",
           "cite": ["cc-sdd"],
-          "md": "cc-sddのような、仕様づくりのためのコミュニティのスキル（skill）集もあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。"
+          "md": "仕様づくりには、cc-sddのようなコミュニティのスキル（skill）集もあります。公式の機能ではないので、まずは3-4の依頼文で、手で仕様を作ってみましょう。"
         },
         {
           "id": "s4-check",
@@ -541,15 +539,15 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "mkdir cc-practice-03\ncd cc-practice-03\ngit init\n# todo.html を保存してから、次の2行で記録する\ngit add todo.html\ngit commit -m \"最初のTODO画面\""
+          "code": "mkdir cc-practice-03\ncd cc-practice-03\ngit init\n# ここでtodo.htmlを保存\ngit add todo.html\ngit commit -m \"最初のTODO画面\""
         },
         {
           "id": "practice-starter",
           "type": "code",
           "lang": "html",
           "filename": "todo.html",
-          "highlight": [12, 13, 14, 15, 16],
-          "code": "<!doctype html>\n<meta charset=\"utf-8\">\n<title>TODO</title>\n<h1>TODO</h1>\n<input id=\"new-item\" placeholder=\"やること\">\n<button id=\"add\">追加</button>\n<ul id=\"list\"></ul>\n<script>\n  const input = document.getElementById('new-item');\n  const list = document.getElementById('list');\n\n  function addItem(text) {\n    const li = document.createElement('li');\n    li.textContent = text;\n    list.appendChild(li);\n  }\n\n  const addButton = document.getElementById('add');\n  addButton.addEventListener('click', () => {\n    addItem(input.value);\n    input.value = '';\n  });\n</script>"
+          "highlight": [14, 15, 16, 17, 18],
+          "code": "<!doctype html>\n<meta charset=\"utf-8\">\n<title>TODO</title>\n<h1>TODO</h1>\n<input id=\"new-item\" placeholder=\"やること\">\n<button id=\"add\">追加</button>\n<ul id=\"list\"></ul>\n<script>\n  const input =\n    document.getElementById('new-item');\n  const list =\n    document.getElementById('list');\n\n  function addItem(text) {\n    const li = document.createElement('li');\n    li.textContent = text;\n    list.appendChild(li);\n  }\n  const addBtn =\n    document.getElementById('add');\n  addBtn.addEventListener('click', () => {\n    addItem(input.value);\n    input.value = '';\n  });\n</script>"
         },
         {
           "id": "practice-steps",
@@ -558,7 +556,7 @@
             {
               "id": "pr-setup",
               "title": "① 練習用の画面を用意する",
-              "md": "上のコマンドの順にフォルダーを作り、`todo.html` を保存してコミットします。ブラウザで開き、空のまま「追加」を押します。",
+              "md": "最初の3行でフォルダーを作り、その中に `todo.html` を保存します。最後の2行でコミットしてから、ブラウザで開き、空のまま「追加」を押します。",
               "expect": "空の行が増えます。コミットも1件できます。"
             },
             {
@@ -816,9 +814,9 @@
           "points": [
             "あいまいな依頼は、範囲・参照先・既存のパターン・症状の4つの観点で書き直します。",
             "進め方は探索→計画→実装→コミットです。探索と計画はプランモードでおこない、計画を読んで直してから承認します。",
-            "差分を1文で説明できる変更は、計画を省いて直接頼みます。進め方に迷うとき、複数のファイルやよく知らないコードを変えるときは計画します。",
+            "差分を1文で説明できる変更は直接頼み、迷う変更やよく知らないコードは計画します。",
             "大きめの機能は、AskUserQuestionでインタビューしてもらい、SPEC.mdに書かせてから新しいセッションで実装します。",
-            "実装のあとは差分を説明させ、結果を予想してから確かめます。変更の目的を自分の言葉で言えたら、コミットします。"
+            "実装のあとは差分を説明させ、予想してから確かめます。目的を自分の言葉で言えたら、コミットします。"
           ]
         },
         {

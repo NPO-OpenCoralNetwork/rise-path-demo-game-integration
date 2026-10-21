@@ -15,7 +15,7 @@ the course it is published in is the owner's decision.
 ## 到達目標 / Outcome (必須)
 このレッスンの後、学習者は次のことができる / After this lesson the learner can:
 - o1 (bloom: evaluate): ワークツリー・サブエージェント・バックグラウンド実行から、状況に合う並列化の方法を選べる
-- o2 (bloom: apply): CI などで使う安全な `claude -p` コマンドを書ける
+- o2 (bloom: apply): CI（継続的インテグレーション）などで使う安全な `claude -p` コマンドを書ける
 - o3 (bloom: create): 無人で動かす作業の依頼文を、成功条件・権限・費用の上限・失敗の報告つきで設計できる
 
 ## 範囲 / Scope
@@ -44,8 +44,9 @@ the course it is published in is the owner's decision.
   7. 「何も報告がない日は、何もなかった日」— 読み込みの失敗が「何もない」に見える。読めなかったものを名指しで報告させる。
 
 ## 形式 / Format
-- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 1583 (budget 1,200–2,400) · read 2654 · practice reading 1232 · questions 11 · practice sections 2 · est 20.0 min (must be ≤ 20; estMinutes 20)）。
-  est = (2,654 + 1,232) / 450 + 11 × 40秒 + 2 × 2分 = 8.64 + 7.33 + 4 = 19.97 → 20。
+- 所要時間 / minutes: 20（`measure.mjs`: cc-09-parallel-automation.lesson.json: prose 2224 (budget 1,200–2,400) · read 2658 · practice reading 1217 · questions 11 · practice sections 2 · est 19.9 min (must be ≤ 20; estMinutes 20)）。
+  est = (2,658 + 1,217) / 450 + 11 × 40秒 + 2 × 2分 = 8.61 + 7.33 + 4 = 19.94 → 20。prose rose from 1,583 because the three
+  tables became lists (measure.mjs counts lists as prose, tables only as reading).
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（英語版は公開先のコースが決まってから）。
 - 演習の題材 / practice task idea: 練習用リポジトリ `cc-practice-09` に、1件だけわざと失敗するテストのある小さなプロジェクトを作り、
@@ -86,10 +87,10 @@ on 2026-10-20 for the exact wording used below.
 | section id | role | title | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：機能の途中で、急ぎのバグ修正が来た | 同じフォルダーの2つのセッションは変更がぶつかる。夜間の報告も頼まれている | markdown (3 sentences), quiz predict | `q0` → o1 (ungraded) |
-| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), table (3 methods, 2 columns: method + who coordinates / fits + caution), markdown (sessions and subagents multiply tokens; トークン（token） glossed), quiz inline | `q1` → o1 (evaluate, new context: login text fix + payment config change, reviewed and merged separately) |
+| `parallel` | concept | 1. 並列の3つの方法を選び分ける | 誰がまとめるか・何を分けるかで、サブエージェント／ワークツリー／バックグラウンドを選ぶ | markdown lead (recall 第7回), definitions (ワークツリー, バックグラウンド実行), list `s1-table` (3 methods as 「〜なら、…」 sentences: what each fits, who merges, the caution), markdown (sessions and subagents multiply tokens; トークン（token） glossed), quiz inline | `q1` → o1 (evaluate, new context: login text fix + payment config change, reviewed and merged separately) |
 | `worktree-example` | example | 2. 例題：ワークツリーで2つの作業を並べる | 準備（コミットと信頼）→ 2つのセッション → 環境 → 差分の説明 → 取り込み | markdown lead (says to replace the two tasks with small file additions in the practice repo), code (terminal), steps (5, subgoal + why + expect; ex-setup expect conditional on a project with dependencies), callout info (map, names only: agent view = 試験公開中, agent teams = experimental), quiz inline | `q2` → o1 (analyze: missing deps in a worktree) |
-| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry), markdown (v2.1.302 + recall 第2回 + docs link), code (lint example), table (5 flags, 2 columns: flag / role + without it), callout pitfall (`"Bash"` too broad; シェル（shell） glossed), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
-| `unattended-where` | concept | 4. 無人実行を動かす場所 | 動かす場所と場面で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), table (4 places, 2 columns: method / where it runs + fits) | — (no quiz; the neighbouring sections have one) |
+| `headless` | concept | 3. 非対話的実行を安全に書く | `-p` は v2.1.302 から Manual で始まる。5つのフラグで、許すもの・読むもの・費用を決める | markdown lead (defines 非対話的実行 at first use; glossary entry; CI is spelled out in o2), markdown (v2.1.302 + recall 第2回 + docs link + 「下の例は、5つのフラグで…」), code (lint example), numbered list `s3-table` (5 flags: role + without it), callout pitfall (`"Bash"` too broad; シェル（shell） glossed), quiz inline | `q3` → o2 (apply: bare `-p` in CI) |
+| `unattended-where` | concept | 4. 無人実行を動かす場所 | 動かす場所と場面で、GitHub Actions／クラウドの定期タスク／デスクトップの定期タスク／`/loop` を選ぶ | markdown lead, definitions (無人実行, 定期タスク), list `s4-table` (4 places as 「〜なら、…」 sentences) | — (no quiz; the neighbouring sections have one) |
 | `unattended` | concept | 5. 依頼文を4点で点検する | 依頼文は成功の条件と失敗の報告、権限と費用の上限はフラグや設定で | markdown + list (the 4 points), markdown (enforcement, recall CLAUDE.md), prompt (weekly TODO example, expect maps it to the 4 points), quiz inline | `q4` → o3 (analyze: failed read reported as quiet day) |
 | `practice-command` | practice | 演習1：夜間チェックのコマンドを書く | 失敗したテストを JSON にまとめる `claude -p` を書き、予想してから実行 | markdown task, steps (p-project), prompt (setup), steps (p-command, p-run; hint → troubleshoot; p-run says `--bare` needs an API (spelled out) key and to drop it without one), checklist (7, incl. `--bare`), code model answer (labelled by a comment) | — |
 | `practice-audit` | practice | 演習2：無人実行の依頼文を点検する | 弱い依頼文を4点で点検して直し、Claude に見落としを聞く | markdown task, markdown quote (weak prompt), steps (p-audit with hint → troubleshoot, p-rewrite with hint), prompt (audit; model answer in expect), checklist (4) | — |
@@ -131,6 +132,16 @@ predict before running (p-run).
   Round 2: every table cell is ≤ 40 JP chars (s3-table `--bare` and `dontAsk` rows shortened; the `--bare` row no longer
   names CLAUDE.md, 「など」 covers it); s3-code and p1-model put the prompt on its own lines so every code line is ≤ 60
   columns; two s2-code comments were shortened. The lesson has no diagram.
+  Round 3 (visual QA at 390 px): s1-table, s3-table and s4-table are now lists of full sentences with the same ids
+  (their first columns were too long and the second columns broke words; s3-table is numbered so 「5つのフラグ」 stays
+  visible, and s3-mode says it before the example). Code comments sit on their own lines and are ≤ 12 JP chars; every
+  code line fits the 390 px code box (s3-code: shorter prompt, the `--allowedTools` value on its own line; p1-model:
+  the error JSON on two lines; s2-code: `echo` without quotes). ex-feature and p-run start with their inline code, and
+  the subtitle is shorter, so `claude -p` and `--bare` do not split at a line end. The `--bare` item says that without
+  it both hooks and MCP servers run without a confirmation (cross-lesson fact 8).
+- Round 3 ja-editor must-fix: o2 spells out CI（継続的インテグレーション） at first use (plain text); s3-lead now says
+  only 「CI」. Also from its niceToHave list: s4-prompt says 「返してください」, and the s3 `dontAsk` item says
+  「設定や既定で決まります」.
 - Round 2 reviews (pedagogy, ja-editor): q1 moved to a new context (login text + payment config, reviewed separately);
   s2-lead and ex-setup make the worked example reachable in the empty practice repo; トークン（token） and シェル（shell）
   get English and a short gloss at first use (s1-cost, s3-pitfall). Small niceToHave items applied: q4 d is now a

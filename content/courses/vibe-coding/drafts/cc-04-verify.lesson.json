@@ -127,33 +127,24 @@
           ]
         },
         {
-          "id": "s1-table",
-          "type": "table",
+          "id": "s1-pick",
+          "type": "markdown",
           "cite": [
             "cc-best-practices"
           ],
-          "caption": "確認は、タスクの完成を直接測れるものを選ぶ",
-          "columns": [
-            "確認：合うタスク",
-            "依頼文に足す一言"
+          "md": "確認は、タスクの完成を直接測れるものを選びます。"
+        },
+        {
+          "id": "s1-table",
+          "type": "list",
+          "cite": [
+            "cc-best-practices"
           ],
-          "rows": [
-            [
-              "自動テスト：関数や処理",
-              "「実装後にテストを実行して」"
-            ],
-            [
-              "ビルド（build）：ビルドエラーの修正",
-              "「原因を直し、ビルドを確かめて」"
-            ],
-            [
-              "リンター：書き方の統一",
-              "「直したらリンターを実行して」"
-            ],
-            [
-              "スクリーンショット（screenshot）比較：画面の見た目",
-              "「撮って見本の画像と比べて」"
-            ]
+          "items": [
+            "関数や処理なら、**自動テスト**が合います。依頼文に「実装後にテストを実行して」と足します。",
+            "ビルドエラーの修正なら、**ビルド（build）**が合います。「原因を直し、ビルドを確かめて」と足します。",
+            "書き方の統一なら、**リンター**が合います。「直したらリンターを実行して」と足します。",
+            "画面の見た目なら、**スクリーンショット（screenshot）の比較**が合います。「撮って見本の画像と比べて」と足します。"
           ]
         },
         {
@@ -420,7 +411,7 @@
           "type": "code",
           "lang": "js",
           "filename": "postal.test.mjs",
-          "code": "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { isPostalCode } from './postal.mjs';\n\ntest('「3桁-4桁」の郵便番号は true', () => {\n  assert.equal(isPostalCode('150-0002'), true);\n});\n\ntest('ハイフンなしは false', () => {\n  assert.equal(isPostalCode('1500002'), false);\n});\n\ntest('桁数が足りないものは false', () => {\n  assert.equal(isPostalCode('150-002'), false);\n});\n\ntest('空文字は false', () => {\n  assert.equal(isPostalCode(''), false);\n});"
+          "code": "import { test } from 'node:test';\nimport { equal } from 'node:assert/strict';\nimport { isPostalCode } from './postal.mjs';\n\ntest('「3桁-4桁」の郵便番号は true', () => {\n  equal(isPostalCode('150-0002'), true);\n});\n\ntest('ハイフンなしは false', () => {\n  equal(isPostalCode('1500002'), false);\n});\n\ntest('桁数が足りないものは false', () => {\n  equal(isPostalCode('150-002'), false);\n});\n\ntest('空文字は false', () => {\n  equal(isPostalCode(''), false);\n});"
         },
         {
           "id": "s3-prompt-green",
@@ -575,9 +566,9 @@
           "id": "s4-sort",
           "type": "diagram",
           "engine": "mermaid",
-          "code": "flowchart TD\n  A[レビューの指摘] --> B{正しさの問題？<br>仕様どおりに<br>動かない}\n  B -->|はい| M[必須：直して<br>テストを再実行]\n  B -->|いいえ| C{要件の問題？<br>抜けや<br>範囲外の変更}\n  C -->|はい| M\n  C -->|いいえ| O[任意：メモして<br>直すか決める]",
+          "code": "flowchart TD\n  A[レビューの指摘] --> B{正しさの問題？<br>仕様どおりに<br>動かない}\n  B -->|はい| M[必須：<br>直して<br>再テスト]\n  B -->|いいえ| C{要件の問題？<br>抜けや<br>範囲外の変更}\n  C -->|はい| M\n  C -->|いいえ| O[任意：<br>メモして<br>直すか決める]",
           "caption": "必須にするのは、正しさと要件に関わる指摘だけ",
-          "alt": "レビューの指摘について、正しさの問題か、次に要件の問題かを順に問い、どちらかに当てはまれば必須、どちらでもなければ任意に分ける流れ図"
+          "alt": "レビューの指摘について、正しさの問題か、次に要件の問題かを順に問う流れ図。どちらかに当てはまれば必須として直してテストを再実行し、どちらでもなければ任意としてメモして直すか決める"
         },
         {
           "id": "s4-names",
@@ -805,7 +796,7 @@
               "hint": "例：Node.jsの組み込みテスト（node:test）"
             }
           ],
-          "expect": "`leap-year.test.mjs` のようなテストと、空の関数だけの `leap-year.mjs` ができます。2024・2023・1900・2000のような年で、仕様を1件ずつ確かめるテストです。実行すると、すべて失敗します。"
+          "expect": "`leap.test.mjs` のようなテストと、空の関数だけの `leap.mjs` ができます。2024・2023・1900・2000のような年で、仕様を1件ずつ確かめるテストです。実行すると、すべて失敗します。"
         },
         {
           "id": "p-prompt-green",
@@ -813,7 +804,7 @@
           "title": "依頼文2（テストを変えずに実装させる）",
           "target": "claude-code",
           "prompt": "テストがすべて通るまで、`isLeapYear` を実装してください。\nテストのファイルは、変更も削除もしないでください。\n最後に、実行したコマンドと出力をそのまま見せてください。確かめられなかったことがあれば、そう書いてください。",
-          "expect": "`leap-year.mjs` の空の関数に、400・100・4で割り切れるかを調べる短い中身が入ります。報告には、テストを実行したコマンドと「fail 0」の出力が付きます。"
+          "expect": "`leap.mjs` の空の関数に、400・100・4で割り切れるかを調べる短い中身が入ります。報告には、テストを実行したコマンドと「fail 0」の出力が付きます。"
         },
         {
           "id": "p-prompt-review",
@@ -871,40 +862,23 @@
         {
           "id": "p-model-intro",
           "type": "markdown",
-          "md": "模範解答の例です。"
+          "md": "模範解答の例です。テストのコードと、指摘の仕分けを示します。"
         },
         {
           "id": "p-model-code",
           "type": "code",
           "lang": "js",
-          "filename": "leap-year.test.mjs",
-          "code": "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { isLeapYear } from './leap-year.mjs';\n\ntest('4で割り切れる年はうるう年', () => {\n  assert.equal(isLeapYear(2024), true);\n});\n\ntest('4で割り切れない年は平年', () => {\n  assert.equal(isLeapYear(2023), false);\n});\n\ntest('100で割り切れる年は平年', () => {\n  assert.equal(isLeapYear(1900), false);\n});\n\ntest('400で割り切れる年はうるう年', () => {\n  assert.equal(isLeapYear(2000), true);\n});"
+          "filename": "leap.test.mjs",
+          "code": "import { test } from 'node:test';\nimport { equal } from 'node:assert/strict';\nimport { isLeapYear } from './leap.mjs';\n\ntest('4で割り切れる年はうるう年', () => {\n  equal(isLeapYear(2024), true);\n});\n\ntest('4で割り切れない年は平年', () => {\n  equal(isLeapYear(2023), false);\n});\n\ntest('100で割り切れる年は平年', () => {\n  equal(isLeapYear(1900), false);\n});\n\ntest('400で割り切れる年はうるう年', () => {\n  equal(isLeapYear(2000), true);\n});"
         },
         {
           "id": "p-model-sort",
-          "type": "table",
-          "caption": "仕分けの例：必須は正しさと要件に関わるものだけ",
-          "columns": [
-            "指摘の例",
-            "分類：理由"
-          ],
-          "rows": [
-            [
-              "「1900年が `true` になる」",
-              "必須：仕様に反する"
-            ],
-            [
-              "「負の年の扱いがない」",
-              "任意：仕様にない入力"
-            ],
-            [
-              "「文字列なら例外にすべき」",
-              "任意：起こりうるか未定"
-            ],
-            [
-              "「`if` 文を1行にできる」",
-              "任意：好みの問題"
-            ]
+          "type": "list",
+          "items": [
+            "「1900年が `true` になる」は、仕様に反するので**必須**です。",
+            "「負の年の扱いがない」は、仕様にない入力なので**任意**です。",
+            "「文字列なら例外にすべき」は、起こりうるか未定なので**任意**です。",
+            "「`if` 文を1行にできる」は、好みの問題なので**任意**です。"
           ]
         }
       ]

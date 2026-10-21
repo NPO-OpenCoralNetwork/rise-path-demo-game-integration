@@ -86,7 +86,7 @@
               "answer": [
                 "c"
               ],
-              "explanation": "v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります（2-1の表）。autoモードは既定で、作業中のリポジトリへのpushを通します。pushの前に確認を挟む書き方は、2-4で学びます。",
+              "explanation": "v2.1.283以降、ターミナルとVS Codeの対話セッションはautoモードで始まります（2-1の一覧）。autoモードは既定で、作業中のリポジトリへのpushを通します。pushの前に確認を挟む書き方は、2-4で学びます。",
               "objectiveId": "o3",
               "bloom": "understand"
             }
@@ -103,47 +103,25 @@
           "id": "modes-lead",
           "type": "markdown",
           "style": "lead",
-          "md": "どの操作を確認なしで進めるかを決める設定を、権限モード（permission mode）と呼びます。6種類あり、作業の途中でも切り替えられます。",
+          "md": "どの操作を確認なしで進めるかを決める設定を、権限モード（permission mode）と呼びます。6種類あり、確認なしで動く範囲と、向く場面が違います。",
           "cite": [
             "cc-permission-modes"
           ]
         },
         {
           "id": "modes-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
           "cite": [
             "cc-permission-modes"
           ],
-          "caption": "モードごとに、確認なしで動く範囲が違う",
-          "columns": [
-            "モード",
-            "確認なしで動くものと、向く場面"
-          ],
-          "rows": [
-            [
-              "Manual（`default`）",
-              "読み取りだけ。一つずつ確かめる作業"
-            ],
-            [
-              "`acceptEdits`",
-              "読み取り、ファイル編集、`mkdir` など。差分を見ながらの編集"
-            ],
-            [
-              "プランモード（`plan`）",
-              "読み取りと調査だけ。変更前の調査と計画"
-            ],
-            [
-              "`auto`",
-              "すべて（裏で安全チェック）。長い作業。ターミナルとVS Codeの既定"
-            ],
-            [
-              "`dontAsk`",
-              "読み取りと、事前に許可したものだけ。人が見ない自動実行"
-            ],
-            [
-              "`bypassPermissions`",
-              "すべて（チェックなし）。隔離した環境だけ"
-            ]
+          "items": [
+            "**Manual**（`default`）：読み取りだけ。一つずつ確かめる作業向け",
+            "**`acceptEdits`**：読み取り、ファイル編集、`mkdir` など。差分を見ながらの編集向け",
+            "**プランモード**（`plan`）：読み取りと調査だけ。変更前の調査と計画向け",
+            "**`auto`**：すべて（裏で安全チェック）。長い作業向け。v2.1.283以降、ターミナルとVS Codeの対話セッションの既定",
+            "**`dontAsk`**：読み取りと、事前に許可したものだけ。人が見ない自動実行向け",
+            "**`bypassPermissions`**：すべて（チェックなし）。隔離した環境だけで使う"
           ]
         },
         {
@@ -212,7 +190,7 @@
           "cite": [
             "auto-mode-eng"
           ],
-          "md": "確認が何度も続くと、人は中身を読まずに許可しがちです。autoモードでは、この確認を分類器（classifier）が引き受けます。2-1の表で「安全チェック」と呼んだものです。"
+          "md": "確認が何度も続くと、人は中身を読まずに許可しがちです。autoモードでは、この確認を分類器（classifier）が引き受けます。2-1の一覧で「安全チェック」と呼んだものです。"
         },
         {
           "id": "auto-defs",
@@ -252,7 +230,7 @@
           "cite": [
             "cc-permission-modes"
           ],
-          "title": "bypassPermissions は隔離した環境だけで",
+          "title": "bypassPermissionsは隔離した環境だけで",
           "md": "`bypassPermissions` は、確認も安全チェックも外します。`--dangerously-skip-permissions` も同じです。隔離したコンテナ（container）や仮想マシンの中だけで使います。"
         },
         {
@@ -350,7 +328,7 @@
           "cite": [
             "cc-permissions"
           ],
-          "code": "flowchart TD\n  A[\"Claudeが<br>操作しようとする\"] --> B{拒否ルールに一致？}\n  B -->|はい| B1[止める]\n  B -->|いいえ| C{確認ルールに一致？}\n  C -->|はい| C1[あなたに確認する]\n  C -->|いいえ| D{許可ルールに一致？}\n  D -->|はい| D1[確認なしで実行する]\n  D -->|いいえ| E[権限モードに従う]",
+          "code": "flowchart TD\n  A[\"Claudeが<br>操作しようとする\"] --> B[拒否ルールに<br>一致？]\n  B -->|いいえ| C[確認ルールに<br>一致？]\n  C -->|いいえ| D[許可ルールに<br>一致？]\n  D -->|いいえ| E[権限モードに<br>従う]\n  B -->|はい| B1[止める]\n  C -->|はい| C1[あなたに<br>確認する]\n  D -->|はい| D1[確認なしで<br>実行する]\n  B ~~~ C\n  C ~~~ D\n  D ~~~ E",
           "caption": "権限ルールは拒否 → 確認 → 許可の順に調べられ、最初に一致したもので決まる",
           "alt": "Claudeの操作が、拒否ルール、確認ルール、許可ルールの順に調べられる流れ図。一致すればそれぞれ止める、確認する、確認なしで実行する。どれにも一致しなければ権限モードに従う。"
         },
@@ -523,36 +501,20 @@
           "cite": [
             "cc-checkpointing"
           ],
-          "md": "入力欄が空のときにEscを2回押すか `/rewind` を実行し、戻す時点と、コード・会話・両方のどれを戻すかを選びます。"
+          "md": "入力欄が空のときにEscを2回押すか `/rewind` を実行し、戻す時点と、コード・会話・両方のどれを戻すかを選びます。ただし戻るのは、Claudeのファイル編集ツールでの変更だけです。"
         },
         {
           "id": "rewind-table",
-          "type": "table",
+          "type": "list",
+          "style": "bullet",
           "cite": [
             "cc-checkpointing"
           ],
-          "caption": "/rewind で戻るのは、Claudeのファイル編集ツールでの変更だけ",
-          "columns": [
-            "どうやって変えたか（例）",
-            "/rewind で"
-          ],
-          "rows": [
-            [
-              "Claudeの編集ツール（追記、書き換え）",
-              "戻る"
-            ],
-            [
-              "Bashのコマンド（`rm`・`mv`・`cp`）",
-              "戻らない"
-            ],
-            [
-              "外への操作（push、データベース、デプロイ）",
-              "戻らない"
-            ],
-            [
-              "Claude Codeの外（自分での編集）",
-              "基本は戻らない"
-            ]
+          "items": [
+            "**Claudeの編集ツール**（追記、書き換え）：戻る",
+            "**Bashのコマンド**（`rm`・`mv`・`cp`）：戻らない",
+            "**外部への操作**（push、データベース、デプロイ）：戻らない",
+            "**Claude Codeの外**（自分での編集）：基本は戻らない"
           ]
         },
         {
@@ -599,8 +561,8 @@
               "answer": [
                 "a"
               ],
-              "explanation": "チェックポイントが記録するのは、Claudeのファイル編集ツールでの変更だけです。Bashでの変更や外への操作は、`/rewind` では戻りません。",
-              "hint": "それぞれ「どうやって変えたか」を、表の左の列に当てはめましょう。",
+              "explanation": "チェックポイントが記録するのは、Claudeのファイル編集ツールでの変更だけです。Bashでの変更や外部への操作は、`/rewind` では戻りません。",
+              "hint": "それぞれ「どうやって変えたか」を、上の一覧に当てはめましょう。",
               "objectiveId": "o2",
               "bloom": "analyze"
             }
@@ -617,7 +579,7 @@
           "id": "sort-task",
           "type": "markdown",
           "style": "lead",
-          "md": "2つの場面に合うモードを選びます。2-1の表を見ずに答えてから、確かめましょう。"
+          "md": "2つの場面に合うモードを選びます。2-1の一覧を見ずに答えてから、確かめましょう。"
         },
         {
           "id": "sort-quiz",
@@ -714,7 +676,7 @@
           "type": "code",
           "lang": "bash",
           "filename": "terminal",
-          "code": "cd cc-practice\nmkdir -p .claude\necho \"PRACTICE_TOKEN=dummy-not-a-secret\" > .env\necho \".env\" >> .gitignore\necho \"# 練習メモ\" > rewind-practice.md\nls -a"
+          "code": "cd cc-practice\nmkdir -p .claude\necho \"TOKEN=dummy\" > .env\necho \".env\" >> .gitignore\necho \"# 練習メモ\" > rewind-practice.md\nls -a"
         },
         {
           "id": "rules-steps",
@@ -729,7 +691,7 @@
               "title": "練習用のファイルを作る",
               "md": "`cc-practice` の1つ上のフォルダで、上のコマンドを1行ずつ実行します。",
               "expect": "`.claude` と `.env` などが一覧に出ます。",
-              "troubleshoot": "フォルダがなければ、第1回の手順で作ります。"
+              "troubleshoot": "`cd` でエラーが出たら、そこで止めます。第1回の手順でフォルダを作ってから、続けます。"
             },
             {
               "id": "p-rule",
@@ -799,7 +761,7 @@
             },
             {
               "id": "pr-env",
-              "label": ".env のReadが止まり、pushの前に確認が出ました"
+              "label": ".envの読み取りが止まり、pushの前に確認が出ました"
             },
             {
               "id": "pw-c-reason",
@@ -901,7 +863,7 @@
                 {
                   "id": "a",
                   "md": "要らない。`/rewind` はセッション中のすべての変更を戻せるから",
-                  "feedback": "`/rewind` が戻すのは、Claudeの編集ツールでの変更だけです。Bashでの変更や外への操作は戻りません。"
+                  "feedback": "`/rewind` が戻すのは、Claudeの編集ツールでの変更だけです。Bashでの変更や外部への操作は戻りません。"
                 },
                 {
                   "id": "b",
@@ -1045,7 +1007,7 @@
             {
               "id": "card-rewind",
               "front": "`/rewind` で戻らない変更は？",
-              "back": "Bashのコマンドでの変更と、push・データベース・デプロイなど外への操作です。"
+              "back": "Bashのコマンドでの変更と、push・データベース・デプロイなど外部への操作です。"
             },
             {
               "id": "card-bypass",
@@ -1059,8 +1021,8 @@
           "type": "askTutor",
           "suggestions": [
             "自分の作業に合う権限モードを、一緒に選んで",
-            "git -C . push のような抜け道は、どう防げばいい？",
-            "/rewind とGitの使い分けを、例で教えて"
+            "git -C . pushのような抜け道は、どう防げばいい？",
+            "/rewindとGitの使い分けを、例で教えて"
           ]
         }
       ]
