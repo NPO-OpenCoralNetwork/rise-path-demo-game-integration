@@ -1,5 +1,6 @@
 import express from 'express';
 import { getPool } from '../db.js';
+import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import {
     buildCurriculumDescription,
@@ -384,7 +385,8 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
             saved_at: saved.createdAt,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Save draft error:', error);
         return res.status(500).json({ error: 'Failed to save curriculum draft', detail: error.message });
     } finally {
@@ -487,7 +489,8 @@ router.post('/learner-profiles/assessments', requireBridgeOrAuth, async (req, re
             derived_learning_profile,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Save assessment error:', error);
         res.status(500).json({ error: 'Failed to save learner profile', detail: error.message });
     } finally {
@@ -524,6 +527,7 @@ router.get('/learner-profiles/latest', requireBridgeOrAuth, async (req, res) => 
             created_at: row.created_at,
         });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Get latest profile error:', error);
         res.status(500).json({ error: 'Failed to retrieve learner profile', detail: error.message });
     }
@@ -567,6 +571,7 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
 
         res.json({ ok: true, ...resumeCard });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Resume card error:', error);
         res.status(500).json({ error: 'Failed to build resume card', detail: error.message });
     }
@@ -618,6 +623,7 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
 
         res.json({ ok: true, ...loadResult });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Weekly load error:', error);
         res.status(500).json({ error: 'Failed to adjust weekly load', detail: error.message });
     }
@@ -637,6 +643,7 @@ router.get('/curricula/:id/summary-cards', requireBridgeOrAuth, async (req, res)
         const cards = buildSummaryCards({ curriculum: asObject(content) });
         res.json({ ok: true, cards });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Summary cards error:', error);
         res.status(500).json({ error: 'Failed to build summary cards', detail: error.message });
     }
@@ -671,6 +678,7 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
         });
         res.json({ ok: true, ...digest });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Weekly digest error:', error);
         res.status(500).json({ error: 'Failed to build weekly digest', detail: error.message });
     }
@@ -690,6 +698,7 @@ router.get('/curricula/:id/encyclopedia', requireBridgeOrAuth, async (req, res) 
         const encyclopedia = buildMiniEncyclopedia({ curriculum: asObject(content) });
         res.json({ ok: true, ...encyclopedia });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Encyclopedia error:', error);
         res.status(500).json({ error: 'Failed to build encyclopedia', detail: error.message });
     }
@@ -734,6 +743,7 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
         );
         res.json({ ok: true, journal_entry_id: result.rows[0].id, created_at: result.rows[0].created_at });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Journal save error:', error);
         res.status(500).json({ error: 'Failed to save journal entry', detail: error.message });
     }
@@ -758,6 +768,7 @@ router.get('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
         const summary = buildJournalSummary({ entries: result.rows });
         res.json({ ok: true, ...summary });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Journal fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch journal', detail: error.message });
     }
@@ -783,6 +794,7 @@ router.get('/journal/recent', requireBridgeOrAuth, async (req, res) => {
         );
         res.json({ ok: true, entries: result.rows });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Recent journal error:', error);
         res.status(500).json({ error: 'Failed to fetch recent journal', detail: error.message });
     }
@@ -802,6 +814,7 @@ router.get('/adaptation', requireBridgeOrAuth, async (req, res) => {
         }
         res.json({ ok: true, ...signals });
     } catch (error) {
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Adaptation signals error:', error);
         res.status(500).json({ error: 'Failed to get adaptation signals', detail: error.message });
     }
@@ -872,7 +885,8 @@ router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
             published_at: publishedAt,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
+        if (respondIfDbUnavailable(res, error)) return;
         console.error('[ChatGPT Curriculum API] Publish error:', error);
         return res.status(500).json({ error: 'Failed to publish curriculum', detail: error.message });
     } finally {

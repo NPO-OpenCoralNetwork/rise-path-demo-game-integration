@@ -99,7 +99,8 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             await client.query('COMMIT');
             console.log(`Ingested material ${materialId}: ${chunks.length} chunks`);
         } catch (e) {
-            await client.query('ROLLBACK');
+            // A lost connection makes ROLLBACK throw too; keep the original error.
+            await client.query('ROLLBACK').catch(() => {});
             throw e;
         } finally {
             client.release();

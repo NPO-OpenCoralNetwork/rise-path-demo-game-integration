@@ -22,6 +22,37 @@ export function resetPoolForTests() {
 
 export const isDbConfigured = () => Boolean(process.env.DATABASE_URL_PHASE1?.trim());
 
+const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
+const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
+
+const nonNegativeInt = (value, fallback) => {
+    const n = Number.parseInt(String(value ?? ''), 10);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
+/**
+ * Pool settings. pg waits forever by default, so a database that stopped answering held every
+ * request (and the job worker) until the TCP stack gave up. Here getting a connection fails after
+ * PG_CONNECT_TIMEOUT_MS, and the server cancels a statement after PG_STATEMENT_TIMEOUT_MS (0 turns
+ * that limit off, for a pooler that rejects the setting).
+ * @param {string} connectionString
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function poolConfig(connectionString, env = process.env) {
+    const statementMs = nonNegativeInt(env.PG_STATEMENT_TIMEOUT_MS, DEFAULT_STATEMENT_TIMEOUT_MS);
+    return {
+        connectionString,
+        connectionTimeoutMillis: nonNegativeInt(env.PG_CONNECT_TIMEOUT_MS, 0) || DEFAULT_CONNECT_TIMEOUT_MS,
+        idleTimeoutMillis: 30_000,
+        keepAlive: true,
+        ...(statementMs > 0 && {
+            statement_timeout: statementMs,
+            // Client-side backstop for a server that stops answering in the middle of a query.
+            query_timeout: statementMs + 5_000,
+        }),
+    };
+}
+
 export const getPool = () => {
     if (poolOverrideActive) return poolOverrideForTests;
     if (pool) return pool;
@@ -32,7 +63,7 @@ export const getPool = () => {
         return null;
     }
     
-    pool = new Pool({ connectionString });
+    pool = new Pool(poolConfig(connectionString));
     
     // Add global error handler to prevent crash on idle client errors
     pool.on('error', (err) => {

@@ -25,11 +25,19 @@ function envIsUnset(key) {
     return val === undefined || val === null || String(val).trim() === '';
 }
 
-export async function loadEnv() {
+/**
+ * Loads the first of .env.local and .env found in `dir` into process.env. Variables that are already
+ * set (and not empty) keep their value, except the `force` keys.
+ * @param {{ dir?: string, force?: Iterable<string> }} [options]
+ *   force: keys the file always wins for. The MCP server keeps the default list; the API server
+ *   passes [] so the deployment's own environment always wins.
+ */
+export async function loadEnv({ dir = rootDir, force = FORCE_FROM_DOTENV } = {}) {
+    const forced = new Set(force);
     const envFiles = ['.env.local', '.env'];
     for (const envFile of envFiles) {
         try {
-            const raw = await fs.readFile(path.join(rootDir, envFile), 'utf8');
+            const raw = await fs.readFile(path.join(dir, envFile), 'utf8');
             raw.split(/\r?\n/).forEach((line) => {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed.startsWith('#')) return;
@@ -38,7 +46,7 @@ export async function loadEnv() {
                 if (sep === -1) return;
                 const key = norm.slice(0, sep).trim();
                 if (!key) return;
-                if (!FORCE_FROM_DOTENV.has(key) && !envIsUnset(key)) return;
+                if (!forced.has(key) && !envIsUnset(key)) return;
                 let val = norm.slice(sep + 1).trim();
                 if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
                     val = val.slice(1, -1);
@@ -46,6 +54,9 @@ export async function loadEnv() {
                 process.env[key] = val;
             });
             break; // stop after first found file
-        } catch { /* file not found, try next */ }
+        } catch (error) {
+            // Missing file: try the next one.
+            if (error?.code !== 'ENOENT') console.warn(`Failed to load ${envFile}:`, error.message);
+        }
     }
 }

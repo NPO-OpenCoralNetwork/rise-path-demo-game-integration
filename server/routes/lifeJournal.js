@@ -1,5 +1,6 @@
 import express from 'express';
 import { getPool } from '../db.js';
+import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import {
     validateDailyPayload,
@@ -35,6 +36,7 @@ const validateGranularity = (granularity) => {
 const router = express.Router();
 
 const respondServerError = (res, label, error) => {
+    if (respondIfDbUnavailable(res, error)) return;
     console.error(`[Life Journal API] ${label}:`, error);
     const body = { error: label };
     if (process.env.NODE_ENV !== 'production') {

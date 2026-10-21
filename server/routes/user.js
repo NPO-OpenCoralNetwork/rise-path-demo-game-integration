@@ -1,5 +1,6 @@
 import express from 'express';
 import { getPool } from '../db.js';
+import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import {
     deepMergePreferences,
     isSpeakerVoicesUpdateForbidden,
@@ -40,6 +41,7 @@ router.get('/profile', async (req, res) => {
         }
         res.json({ ok: true, profile: normalizeProfileRow(result.rows[0]) });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Profile GET error:', e.message);
         res.status(500).json({ error: 'Failed to load profile' });
     }
@@ -120,6 +122,7 @@ router.put('/profile', async (req, res) => {
         });
     } catch (e) {
         await client.query('ROLLBACK').catch(() => {});
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Profile PUT error:', e.message);
         res.status(500).json({ error: 'Failed to update profile' });
     } finally {
@@ -147,6 +150,7 @@ router.get('/progress', async (req, res) => {
         }
         res.json({ ok: true, progress });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Progress GET error:', e.message);
         res.status(500).json({ error: 'Failed to load progress' });
     }
@@ -169,6 +173,7 @@ router.put('/progress/:courseId', async (req, res) => {
         );
         res.json({ ok: true });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Progress PUT error:', e.message);
         res.status(500).json({ error: 'Failed to update progress' });
     }
@@ -189,6 +194,7 @@ router.get('/events', async (req, res) => {
         );
         res.json({ ok: true, events: result.rows });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Events GET error:', e.message);
         res.status(500).json({ error: 'Failed to load events' });
     }
@@ -208,6 +214,7 @@ router.post('/events', async (req, res) => {
         );
         res.json({ ok: true, event: result.rows[0] });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Events POST error:', e.message);
         res.status(500).json({ error: 'Failed to add event' });
     }
@@ -228,6 +235,7 @@ router.get('/notifications', async (req, res) => {
         );
         res.json({ ok: true, notifications: result.rows });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Notifications GET error:', e.message);
         res.status(500).json({ error: 'Failed to load notifications' });
     }
@@ -247,6 +255,7 @@ router.post('/notifications', async (req, res) => {
         );
         res.json({ ok: true, notification: result.rows[0] });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         console.error('[User API] Notifications POST error:', e.message);
         res.status(500).json({ error: 'Failed to add notification' });
     }
@@ -263,6 +272,7 @@ router.put('/notifications/:id/read', async (req, res) => {
         );
         res.json({ ok: true });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         res.status(500).json({ error: 'Failed to mark read' });
     }
 });
@@ -278,6 +288,7 @@ router.put('/notifications/read-all', async (req, res) => {
         );
         res.json({ ok: true });
     } catch (e) {
+        if (respondIfDbUnavailable(res, e)) return;
         res.status(500).json({ error: 'Failed to mark all read' });
     }
 });
