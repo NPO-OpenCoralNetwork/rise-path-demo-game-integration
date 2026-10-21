@@ -2939,7 +2939,8 @@ export const uploadFile = async (file: File) => {
   const response = await apiFetch('/upload', { method: 'POST', body: formData });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || 'Upload failed.');
+    // With the status, so the generator can explain 413 (too large) and 415 (file type).
+    throw aiHttpError(err.error || 'Upload failed.', response.status);
   }
   return await response.json();
 };

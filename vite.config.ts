@@ -35,10 +35,16 @@ export default defineConfig(({ mode }) => {
             '**/node_modules/**',
             '**/.git/**',
             '**/dist/**',
-            '**/public/uploads/**',
+            '**/uploads/**',
             '**/sample/**'
           ]
-        }
+        },
+        fs: {
+          // Uploaded materials (server/uploads.js; public/uploads in older versions) sit inside the
+          // project, which this server exposes on the network: never serve them. Vite's defaults
+          // are kept, since setting the list replaces them.
+          deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/uploads/**'],
+        },
       },
       plugins: [react(), tailwindcss()],
       build: {

@@ -29,6 +29,8 @@ dist-ssr
 .env.local.bak
 .env.stack
 public/uploads/
+# Uploaded materials (server/uploads.js; RISE_PATH_UPLOAD_DIR)
+/uploads/
 public/audio/cache/*.mp3
 public/audio/cache/*.meta.json
 !public/audio/cache/.gitkeep

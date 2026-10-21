@@ -7,6 +7,15 @@ import { fileURLToPath } from 'url';
 import { ingestMaterial } from '../ragService.js';
 import { getPool } from '../db.js';
 import { respondIfDbUnavailable } from '../dbUnavailable.js';
+import {
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MB,
+    UNSUPPORTED_UPLOAD,
+    acceptedUpload,
+    privateUploadStorage,
+    storagePathFor,
+    uploadTitle,
+} from '../uploads.js';
 import { isUuid } from '../../tools/core/ids.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
@@ -27,15 +36,11 @@ const DEFAULT_COURSE_CARD = {
 };
 
 // --- Upload Setup ---
-const uploadDir = path.join(PROJECT_ROOT, 'public/uploads');
+// Uploaded materials are private (server/uploads.js): outside public/, under a random name, PDF /
+// text / Markdown up to 20 MB. Generated images stay in public/generated, which the app serves.
 const generatedDir = path.join(PROJECT_ROOT, 'public/generated');
 const imageCache = new Map();
 (async () => {
-    try {
-        await fs.access(uploadDir);
-    } catch {
-        await fs.mkdir(uploadDir, { recursive: true });
-    }
     try {
         await fs.access(generatedDir);
     } catch {
@@ -43,11 +48,49 @@ const imageCache = new Map();
     }
 })();
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+const upload = multer({
+    storage: privateUploadStorage,
+    // The file and nothing else: busboy kept any number of 1 MB fields in memory, and a second file
+    // or any field now stops the upload before it is read. (busboy's `parts` limit fires when it is
+    // reached, so `parts: 1` would refuse the file itself.)
+    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0 },
+    // Browsers send the file name in UTF-8; multer's default (latin1) garbled Japanese titles.
+    defParamCharset: 'utf8',
+    fileFilter: (req, file, cb) => {
+        if (acceptedUpload(file.originalname, file.mimetype)) return cb(null, true);
+        cb(Object.assign(new Error('Unsupported file type'), { code: UNSUPPORTED_UPLOAD }));
+    },
 });
-const upload = multer({ storage });
+
+// Errors from the disk rather than from what the client sent.
+const DISK_ERRORS = new Set(['EACCES', 'EPERM', 'ENOSPC', 'EDQUOT', 'EMFILE', 'ENFILE', 'EROFS', 'EIO', 'UPLOAD_DIR_SERVED']);
+
+/**
+ * Reads the upload (a failed or aborted upload leaves no file behind) and turns its errors into
+ * answers: 413 too large, 415 not PDF / text / Markdown, 500 for the disk, and 400 for anything
+ * else the client sent (malformed multipart, extra fields or files, an aborted request). Without a
+ * database there is nowhere to record the material, so the body is not read at all.
+ */
+const receiveUpload = (req, res, next) => {
+    if (!getPool()) return res.status(503).json({ error: 'DB not configured' });
+    upload.single('file')(req, res, (err) => {
+        if (!err) return next();
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: `The file is larger than ${MAX_UPLOAD_MB} MB.`, error_type: 'file_too_large' });
+        }
+        if (err.code === UNSUPPORTED_UPLOAD) {
+            return res.status(415).json({
+                error: 'Only PDF, text (.txt) and Markdown (.md) files can be uploaded.',
+                error_type: UNSUPPORTED_UPLOAD,
+            });
+        }
+        if (DISK_ERRORS.has(err.code)) {
+            console.error('Upload Error:', err);
+            return res.status(500).json({ error: 'Upload failed' });
+        }
+        return res.status(400).json({ error: 'Invalid upload', error_type: 'validation' });
+    });
+};
 
 // --- Routes ---
 
@@ -110,26 +153,26 @@ router.get('/curricula/:id', async (req, res) => {
 });
 
 // POST /api/v2/upload
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', receiveUpload, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     if (!req.file) return res.status(400).json({ error: 'No file' });
 
+    const kind = acceptedUpload(req.file.originalname, req.file.mimetype);
     try {
-        const type = req.file.mimetype.includes('pdf') ? 'pdf' : 
-                     req.file.mimetype.includes('audio') ? 'audio' : 'txt';
-        const storagePath = `public/uploads/${req.file.filename}`;
-        const absolutePath = path.join(PROJECT_ROOT, storagePath);
-
         const result = await pool.query(
             `insert into materials (user_id, type, title, storage_path, status)
              values (CAST($1 AS uuid), $2, $3, $4, 'uploaded') returning id, status`,
-            [req.userId, type, req.file.originalname, storagePath]
-        );
+            [req.userId, kind.type, uploadTitle(req.file.originalname), storagePathFor(req.file.path)]
+        ).catch(async (insertErr) => {
+            // No material row will point at the file: remove it before answering.
+            await fs.unlink(req.file.path).catch(() => {});
+            throw insertErr;
+        });
         const materialId = result.rows[0].id;
 
         try {
-            await ingestMaterial(materialId, absolutePath, req.file.mimetype, req.userId);
+            await ingestMaterial(materialId, req.file.path, kind.mimeType, req.userId);
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
             console.error('Immediate Ingestion failed:', ingestErr);

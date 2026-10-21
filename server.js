@@ -36,6 +36,7 @@ import { loadEnv } from './tools/core/env.js';
 // Legacy Learning Portals read the Phase 1 pool directly (see the route in createApp).
 import { getPool } from './server/db.js';
 import { dbUnavailableErrorHandler, respondIfDbUnavailable } from './server/dbUnavailable.js';
+import { blockLegacyUploads, uploadDir, uploadDirProblem } from './server/uploads.js';
 
 /**
  * Builds the Express app: middleware, rate limits and every route, in mount order. No listen,
@@ -175,6 +176,11 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     });
 
     if (serveStatic) {
+        // Uploaded materials are private (server/uploads.js keeps them outside public/): never
+        // served, including files an older version stored in public/uploads, however the path is
+        // spelled (encoded, doubled slashes, dot segments, any case).
+        app.use(blockLegacyUploads(path.join(__dirname, 'public')));
+
         // --- Static File Serving (Production) ---
         // In production, serve the built frontend from dist/
         const distPath = path.join(__dirname, 'dist');
@@ -218,6 +224,13 @@ async function main() {
         process.exit(1);
     }
     console.log(originSecrets > 0 ? `[OriginGate] on (${originSecrets} accepted secrets)` : '[OriginGate] off');
+
+    // Uploads must not land where the app or the dev server serves files.
+    const uploadProblem = uploadDirProblem(uploadDir());
+    if (uploadProblem) {
+        console.error(`[Uploads] ${uploadProblem}; refusing to start.`);
+        process.exit(1);
+    }
 
     const app = await createApp();
     const PORT = Number.parseInt(process.env.PORT, 10) || 3006;
