@@ -44,6 +44,10 @@ sudo systemctl enable risepath-stack.service
 echo "==> Stack smoke"
 bash "${SCRIPT_DIR}/deploy-stack.sh"
 
-echo "==> Done. Verify from Mac:"
+echo "==> Done. Re-run the stack smoke on this VM (inside the api container, past the origin gate):"
+echo "    cd ${STACK_DIR} && docker compose --env-file stack.env exec -T api node scripts/smoke-vm-stack.mjs --target container"
+echo "Public path (Vercel app.<domain> → Cloudflare Tunnel api.<domain>), from the Mac:"
+echo "    PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge"
+echo "From the Mac over Tailscale (while stack.env has no ORIGIN_SECRET; then :3006 needs the x-origin-secret header):"
 echo "    npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100"
 echo "Mac .env.local → DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable"

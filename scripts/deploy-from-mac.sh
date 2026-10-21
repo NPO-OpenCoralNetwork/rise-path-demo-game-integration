@@ -47,10 +47,16 @@ chmod +x init-hermes-profile.sh deploy-stack.sh
 ./deploy-stack.sh
 EOF
 
-echo "==> Remote smoke via Tailscale"
+# Smoke flags from the VM's stack.env, plus an origin-gate marker line when ORIGIN_SECRET is set
+# (never the value).
 SMOKE_FLAGS=()
+ORIGIN_GATE=0
 while IFS= read -r flag; do
-  [[ -n "${flag}" ]] && SMOKE_FLAGS+=("${flag}")
+  case "${flag}" in
+    '') ;;
+    origin-gate:on) ORIGIN_GATE=1 ;;
+    *) SMOKE_FLAGS+=("${flag}") ;;
+  esac
 done < <(ssh -o ConnectTimeout=15 "${SSH_TARGET}" "REMOTE_DIR='${REMOTE_DIR}' bash -s" <<'REMOTE'
 set -euo pipefail
 STACK_ENV="${REMOTE_DIR}/deploy/risepath-vm/stack.env"
@@ -73,10 +79,23 @@ fi
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
   flags+=(--require-hermes)
 fi
+if [[ -n "${ORIGIN_SECRET:-}" ]]; then
+  echo "origin-gate:on"
+fi
 printf '%s\n' "${flags[@]}"
 REMOTE
 )
 
+if [[ "${ORIGIN_GATE}" -eq 1 ]]; then
+  # With the origin gate on, :3006 over Tailscale answers 403 without the edge's x-origin-secret.
+  echo "==> stack.env sets ORIGIN_SECRET: skipping the Mac-side smoke via Tailscale"
+  echo "    deploy-stack.sh already ran the container smoke on the VM."
+  echo "==> Done. Check the public path (Vercel app.<domain> → Cloudflare Tunnel api.<domain>):"
+  echo "    PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge"
+  exit 0
+fi
+
+echo "==> Remote smoke via Tailscale"
 node "${REPO_ROOT}/scripts/smoke-vm-stack.mjs" \
   --base "http://${VM_HOST}:3006" \
   --mcp "http://${VM_HOST}:3100" \
