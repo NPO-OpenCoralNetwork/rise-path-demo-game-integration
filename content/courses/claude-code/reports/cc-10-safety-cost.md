@@ -69,9 +69,9 @@ Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
 6. `4b13c12f53aeb2f8/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
 7. `ba8eeb1a7115a66b/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full revise (mean 3.00, must-fix 1)
 8. `31ca899dd855ae10/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify revise (mean 3.38, must-fix 1); visual-qa full revise (mean 3.00, must-fix 1)
-9. `4f85040f9e462bb2/round-3`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-10. `4f85040f9e462bb2/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-11. `4f85040f9e462bb2/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `4f85040f9e462bb2/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+10. `4f85040f9e462bb2/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+11. `4f85040f9e462bb2/round-3`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 12. `8a9d7701d14a41d6/round-1`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 13. `8a9d7701d14a41d6/round-2`: ja-editor full pass (mean 3.50, must-fix 0); pedagogy-reviewer full pass (mean 3.31, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 14. `5f607bd73eb54e78/round-1`: ja-editor verify pass (mean 3.50, must-fix 0); pedagogy-reviewer verify pass (mean 3.38, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
@@ -79,7 +79,7 @@ Review of cc-10-safety-cost by ja-editor, pedagogy-reviewer, visual-qa: PASS
 
 ## Fact audit against the official docs (2026-10-20)
 
-An auditor with web access checked 76 claims (pages: 22); a second checker tried to refute each finding. Confirmed and fixed: 7. Refuted (text kept): 1.
+An auditor with web access checked 76 claims (pages: 22); a second checker tried to refute each finding. Confirmed and fixed: 7. Refuted (text kept): 0. Refuted, but changed later for another reason: 1 (below).
 
 - [outdated] `s1-auto` (md (2nd sentence)): ただし、その分類器はAnthropicの検証で、行き過ぎた操作の17%を見逃しました。 — https://www.anthropic.com/engineering/claude-code-auto-mode
 - [overclaim] `s1-auto` (md (1st sentence)): autoモードは、v2.1.283から対話セッションの既定です。 — https://code.claude.com/docs/en/permission-modes

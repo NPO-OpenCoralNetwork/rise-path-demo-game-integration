@@ -92,7 +92,7 @@ npm run env:check -- --db
 ## migration（Issue #16 — 完了）
 
 - 適用先: **`risepath` データベースのみ**（ホストは `risepath-vm` が正本）
-- 正本: `server/migrations/000`〜`011` + `npm run db:migrate`（適用前に `npm run db:migrate:status` で未適用を確認）
+- 正本: `server/migrations/000`〜`012` + `npm run db:migrate`（適用前に `npm run db:migrate:status` で未適用を確認）
 - Supabase user UUID → VM 側 `auth.users` **スタブ**（`syncAuthUserStub`）
 - RLS は VM Postgres では未使用。ユーザー分離は Express JWT + `user_id` カラム
 

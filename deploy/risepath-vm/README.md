@@ -105,7 +105,7 @@ Mac から検証:
 npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100
 ```
 
-コース追加などのコンテンツデプロイ後は、`claude-code` ポータル（migration 011）、`/claude-code`、`/api/v2/llm/status` の行も確認します。
+コース追加などのコンテンツデプロイ後は、`claude-code` ポータル（migration 011 で追加、012 で説明文を更新）、`/claude-code`、`/api/v2/llm/status` の行も確認します。
 
 ## セキュリティ
 

@@ -193,7 +193,7 @@ docker compose --env-file stack.env exec api npm run env:check -- --db
 #### migration の確認（適用前）
 
 - `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
-- `db:migrate` は未適用をまとめて順に流す。2026-06-24 の記録は 000–008 まで。009〜011 が一度に入ることがある。
+- `db:migrate` は未適用をまとめて順に流す。2026-06-24 の記録は 000–008 まで。009〜012 が一度に入ることがある。
 - 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（小さいテーブルならすぐ終わる）。
 
 ### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
@@ -312,7 +312,7 @@ docker compose exec api node scripts/smoke-vm-stack.mjs --target container --req
 | 項目 | 状態 |
 |------|------|
 | アーキテクチャ方針（本ドキュメント） | ✅ 確定 |
-| migration 000–011 + `db:migrate` | 🔄 リポジトリは 011 まで。VM は 000–008 適用の記録（2026-06-24）。`npm run db:migrate:status` で確認してから適用。010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る（§4.2） |
+| migration 000–012 + `db:migrate` | 🔄 リポジトリは 012 まで。VM は 000–008 適用の記録（2026-06-24）。`npm run db:migrate:status` で確認してから適用。010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る（§4.2） |
 | Express agent proxy + Life Journal API | ✅ 完了 |
 | `deploy/risepath-vm/docker-compose.yml` | ✅ db + api + mcp + kokoro-tts + hermes（healthcheck 付き） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |

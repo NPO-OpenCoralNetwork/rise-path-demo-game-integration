@@ -95,7 +95,7 @@ Every objective has an inline and an exam question. Worked example (5 steps with
 labels, hints) → exam. Every wrong option has ≤ 2-sentence feedback naming the misconception. No images.
 
 Body length: measured with the course-wide `scripts/lessons/measure.mjs` (see Format): prose **1,659** JP characters (budget 1,200–2,400),
-study reading 2,434, practice reading 806.
+study reading 2,483, practice reading 842 (2026-10-21).
 
 ## Assumptions
 - Headless run: the outline was not checked in with a person.

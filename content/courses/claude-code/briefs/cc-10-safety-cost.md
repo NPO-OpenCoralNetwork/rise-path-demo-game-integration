@@ -35,7 +35,7 @@
   7. 「`/usage` の金額が請求額」「`/compact` をこまめにすれば節約になる」（e5 b, e6 a）。
 
 ## 形式 / Format
-- 所要時間 / minutes: 17（`scripts/lessons/measure.mjs`: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2467 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`、2026-10-21）
+- 所要時間 / minutes: 17（`scripts/lessons/measure.mjs`: `cc-10-safety-cost.lesson.json: prose 1887 (budget 1,200–2,400) · read 2474 · practice reading 1109 · questions 11 · practice sections 1 · est 17.3 min (must be ≤ 20; estMinutes 17)`、2026-10-21）
 - 難易度 / level: intermediate
 - ロケール / locales: jp のみ（cc-* 共通の決定。英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: Max プランの「田中さん」の設定と習慣を点検する。`~/.claude/settings.json` の `bypassPermissions`、`~/.zshrc` の `ANTHROPIC_API_KEY`、毎晩の `claude -p`、知らないリポジトリを手元で開く習慣、`.env`・`secrets/` に拒否ルールなし、1日1セッション。新しい練習用フォルダー `cc-practice-10` でダミーの `.env` と `secrets/` に拒否ルールを書いて試し、先月届いた API の請求を説明する。模範解答は `practice-answer-rule`（JSON）と `practice-prompt-review.expect`（点検4項目と請求の説明）。

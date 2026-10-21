@@ -71,8 +71,8 @@ Review of cc-05-context by ja-editor, pedagogy-reviewer, visual-qa: PASS
 8. `2597b7828fdf4777/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 9. `2597b7828fdf4777/round-2`: ja-editor full revise (mean 3.75, must-fix 1); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 10. `e51506cc1e6117ed/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
-11. `7a183d3f582412d5/round-2`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
-12. `7a183d3f582412d5/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+11. `7a183d3f582412d5/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+12. `7a183d3f582412d5/round-2`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
 13. `4b4ffd1dc9356064/round-1`: ja-editor verify pass (mean 3.75, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 14. `4b4ffd1dc9356064/round-2`: ja-editor full pass (mean 3.75, must-fix 0); pedagogy-reviewer full pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
