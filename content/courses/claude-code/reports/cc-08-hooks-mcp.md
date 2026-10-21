@@ -59,16 +59,17 @@ Review of cc-08-hooks-mcp by ja-editor, pedagogy-reviewer, visual-qa: PASS
   ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-08-hooks-mcp/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-08-hooks-mcp/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `aa4125dd945c908e`: ja-editor full revise (mean 3.50, must-fix 8); pedagogy-reviewer full revise (mean 3.08, must-fix 5)
-2. `876f9427367ec7c6`: ja-editor full revise (mean 3.75, must-fix 4); pedagogy-reviewer full revise (mean 3.15, must-fix 2)
-3. `01fa366fee4752fb`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
-4. `112a650daf9ca3d0`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-5. `542dc5e44070249d`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.62, must-fix 1); visual-qa full revise (mean 3.00, must-fix 2)
-6. `dc1fce75fb87584d`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
-7. `4e07cfeed4cb390f`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.54, must-fix 1); visual-qa full revise (mean 3.00, must-fix 3)
-8. `02bb8902d1916464`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+1. `aa4125dd945c908e/round-1`: ja-editor full revise (mean 3.50, must-fix 8); pedagogy-reviewer full revise (mean 3.08, must-fix 5)
+2. `876f9427367ec7c6/round-1`: ja-editor full revise (mean 3.75, must-fix 4); pedagogy-reviewer full revise (mean 3.15, must-fix 2)
+3. `01fa366fee4752fb/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.77, must-fix 0); visual-qa full revise (mean 3.33, must-fix 1)
+4. `112a650daf9ca3d0/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+5. `542dc5e44070249d/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.62, must-fix 1); visual-qa full revise (mean 3.00, must-fix 2)
+6. `dc1fce75fb87584d/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+7. `4e07cfeed4cb390f/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.54, must-fix 1); visual-qa full revise (mean 3.00, must-fix 3)
+8. `02bb8902d1916464/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.85, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
+9. `02bb8902d1916464/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.92, must-fix 0); visual-qa full pass (mean 3.67, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -79,6 +80,8 @@ An auditor with web access checked 55 claims (pages: 21); a second checker tried
 - [overclaim] `check-quiz` (q6 prompt (it makes answer a and the explanation depend on stderr, which the prompt never mentions)): 編集のたびにリンター（linter）を走らせる `PostToolUse` フックが、問題を見つけると `exit 2` で終わります。 (answer a: 編集は済み、リンターの指摘がClaudeに届く) — https://code.claude.com/docs/en/hooks
 - [wrong] `s1-config` (md; the same claim is in summary-cards card-three-levels back): フックは設定ファイルに、イベント → マッチャー → コマンドの3段で書きます。 / イベント → マッチャー → 実行するコマンド。 — https://code.claude.com/docs/en/hooks
 - [unsupported] `practice-steps` (p-script expect; also practice-checklist pc-hooks label): `/hooks` に、マッチャー `Edit|Write` のフックが出ます。 / /hooks の PreToolUse に、マッチャー Edit|Write のフックが表示されました — https://code.claude.com/docs/en/hooks
+
+Records: `content/courses/claude-code/reports/facts/cc-08-hooks-mcp.audit.json` and `cc-08-hooks-mcp.facts.md`.
 
 ## Screenshots
 

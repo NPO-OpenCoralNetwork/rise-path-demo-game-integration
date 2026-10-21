@@ -1,6 +1,6 @@
-# Brief: vibe-coding/cc-07-skills-subagents
+# Brief: claude-code/cc-07-skills-subagents
 
-<!-- Claude Code course (cc-*), lesson 7 of 11. Drafted in vibe-coding/drafts for preview; the owner decides where it is published. -->
+<!-- Claude Code course (cc-*), lesson 7 of 11. Published 2026-10-21 by the owner's decision in the course claude-code: content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json, next = cc-08-hooks-mcp. Drafted in vibe-coding/drafts for preview until then. -->
 
 ## 学習者 / Learner (必須)
 - 誰が読むか / who: Claude Code を数週間使い、CLAUDE.md を書いたことがある開発者・学習者（コース「Claude Code 実践」モジュール3「プロジェクトに合わせて育てる」）。
@@ -33,9 +33,9 @@
   7. 使われないスキルは本文を詳しくすれば使われる → 判断に使われるのは description。
 
 ## 形式 / Format
-- 所要時間 / minutes: 18（コース共通の measure.mjs：`prose 1975 (budget 1,200–2,400) · read 2613 · practice reading 931 · questions 12 · practice sections 1 · est 17.9 min (must be ≤ 20; estMinutes 18)`。(2,613 + 931) ÷ 450 ＝ 7.9分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習1セクション × 2分 ＝ 2分、計 17.9分 → 18）
+- 所要時間 / minutes: 18（コース共通の `scripts/lessons/measure.mjs`：`prose 2183 (budget 1,200–2,400) · read 2610 · practice reading 931 · questions 12 · practice sections 1 · est 17.9 min (must be ≤ 20; estMinutes 18)`（2026-10-21）。(2,610 + 931) ÷ 450 ＝ 7.9分、問題12問（予想1問を含む）× 40秒 ＝ 8.0分、演習1セクション × 2分 ＝ 2分、計 17.9分 → 18）
 - 難易度 / level: intermediate
-- ロケール / locales: jp のみ（英語は公開先が決まってから）
+- ロケール / locales: jp のみ（英語版をいつ作るかはオーナーが決める。レポート §10）
 - 演習の題材 / practice task idea: 自分が繰り返している手順（なければ「README の更新手順」）を `.claude/skills/<名前>/SKILL.md` にし、自然な依頼と `/名前` の2通りで試す（使われるかを先に予想）。続けて、サブエージェントに調べものを任せ、`/context` の前後でメインのコンテキストの増え方を比べ、理由を自分の言葉で説明する。
 
 ## 制約 / Constraints

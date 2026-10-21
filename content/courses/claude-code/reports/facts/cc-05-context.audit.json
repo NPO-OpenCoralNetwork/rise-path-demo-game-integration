@@ -1,0 +1,125 @@
+{
+  "lessonId": "cc-05-context",
+  "checkedCount": 60,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/best-practices",
+    "https://code.claude.com/docs/en/context-window",
+    "https://code.claude.com/docs/ja/context-window",
+    "https://code.claude.com/docs/en/how-claude-code-works",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/prompt-caching",
+    "https://code.claude.com/docs/en/sub-agents.md",
+    "https://code.claude.com/docs/en/cli-reference.md",
+    "https://code.claude.com/docs/en/costs.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/sessions.md",
+    "https://code.claude.com/docs/en/security.md",
+    "https://code.claude.com/docs/en/quickstart.md",
+    "https://code.claude.com/docs/en/model-config.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md",
+    "https://registry.npmjs.org/@anthropic-ai/claude-code"
+  ],
+  "confirmed": [
+    {
+      "blockId": "pr-diagnose",
+      "where": "p2.options.d.feedback",
+      "claim": "自動の圧縮では、何を残すかを自分で選べません。区切りのよいところで焦点を付けて要約すると、大事なことを残せます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/how-claude-code-works",
+      "evidenceQuote": "To control what's preserved during compaction, add a \"Compact Instructions\" section to CLAUDE.md or run `/compact` with a focus (like `/compact focus on the API changes`). / (context-window) The summary keeps what you choose instead of what the automatic pass guesses is important.",
+      "fix": "自動の圧縮は、何が大事かをClaudeが推測して要約します。区切りのよいところで焦点を付けて要約すると、大事なことを残せます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/how-claude-code-works",
+        "evidenceQuote": "\"To control what's preserved during compaction, add a \"Compact Instructions\" section to CLAUDE.md or run `/compact` with a focus (like `/compact focus on the API changes`).\" Also https://code.claude.com/docs/en/best-practices: \"When auto compaction triggers, Claude summarizes what matters most, including code patterns, file states, and key decisions ... Customize compaction behavior in CLAUDE.md with instructions like \"When compacting, always preserve the full list of modified files and any test commands\" to ensure critical context survives summarization.\" And https://code.claude.com/docs/en/context-window: \"The summary keeps what you choose instead of what the automatic pass guesses is important.\"",
+        "reason": "The feedback for option d of p2 says flatly that with automatic compaction you cannot choose what is kept (自動の圧縮では、何を残すかを自分で選べません). Two official pages contradict this. How Claude Code works says a \"Compact Instructions\" section in CLAUDE.md controls what compaction keeps. Best practices says CLAUDE.md instructions shape compaction behavior so that important context survives the summary. Neither page limits this to a manual /compact, and the best-practices bullet sits right after the one about auto compaction. So the claim is stated more strongly than the docs support. It is half right: without such instructions, the automatic pass decides on its own what matters, and a focused /compact keeps what you choose (\"what the automatic pass guesses is important\" / \"Claude summarizes what matters most\"). The lesson never teaches CLAUDE.md compaction instructions, so the absolute 選べません is not backed up anywhere else in it. The proposed fix (自動の圧縮は、何が大事かをClaudeが推測して要約します。…) matches the docs closely: the automatic pass guesses what is important, and Claude summarizes what matters most. It is accurate, makes no absolute claim, fits within 2 sentences and the 60-character sentence limit, and keeps the point the question teaches. No better fix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "e4.options.b.feedback",
+      "claim": "自動の圧縮はいつ起きるかを選べないので、言い直しは漏れやすくなります。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/commands",
+      "evidenceQuote": "`/autocompact [auto\\|<tokens>]` | Set the auto-compact window: how full the context window gets before Claude Code compacts automatically. Pass a size such as `500k`, or `auto` to return to the window tuned for your model.",
+      "fix": "自動の圧縮は作業の途中でも起きるので、言い直しは漏れやすくなります。ファイルに書けば、圧縮のあとに自動で読み直されます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/context-window",
+        "evidenceQuote": "\"Compact earlier: run /autocompact with a token count, like /autocompact 500k, to set how full the context window gets before the automatic pass runs.\" Also on https://code.claude.com/docs/en/how-claude-code-works: \"Claude Code manages context automatically as you approach the limit. It clears older tool outputs first, then summarizes the conversation if needed.\"",
+        "reason": "The lesson says 「自動の圧縮はいつ起きるかを選べない」 (you can't choose when auto-compaction happens). The official docs contradict that. The context-window page lists \"Compact earlier\" with `/autocompact`, which sets how full the context gets before the automatic pass runs. The model-config page \"Set the auto-compact window\" also lists the `autoCompactWindow` setting, the `--autocompact` flag and `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, and mentions `DISABLE_COMPACT`, which turns all compaction off. The lesson's main point still holds: you can't count on restating rules in chat, and CLAUDE.md is reloaded after compaction. Only the reason it gives is too strong. The auditor's fix 「作業の途中でも起きる」 is plausible, but no page I fetched says it in so many words. The docs do say directly that auto-compaction runs \"as you approach the limit\". The lesson already uses that wording elsewhere (「上限に近づくと自動でも起き」), so the better fix below follows it.",
+        "betterFix": "自動の圧縮は、コンテキストが上限に近づくと起きるので、言い直しは漏れやすくなります。ファイルに書けば、圧縮のあとに自動で読み直されます。"
+      }
+    },
+    {
+      "blockId": "s3-lead",
+      "where": "md (last sentence)",
+      "claim": "ファイルに書いた指示は、ディスクから読み直されます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/context-window",
+      "evidenceQuote": "Path-scoped rules and nested CLAUDE.md files load into message history when Claude reads, writes, or edits their trigger file, so compaction summarizes them away with everything else.",
+      "fix": "直下のCLAUDE.mdなど、決まったファイルの指示はディスクから読み直されます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/context-window",
+        "evidenceQuote": "\"Project-root CLAUDE.md and unscoped rules | Re-injected from disk\" ... \"Rules with `paths:` frontmatter | Claude Code reloads them on demand\" ... \"Path-scoped rules and nested CLAUDE.md files load into message history when Claude reads, writes, or edits their trigger file, so compaction summarizes them away with everything else. If a rule must persist across compaction, drop the `paths:` frontmatter or move it to the project-root CLAUDE.md.\" Also: \"Most startup content reloads automatically\".",
+        "reason": "I tried to defend the lesson, but the finding holds, though only narrowly. The official table backs the immediate \"re-injected from disk\" behavior for four things only: the project-root CLAUDE.md, unscoped rules, auto memory and the plan-mode plan. The lead sentence says, with no hedge, that file-written instructions in general are re-read from disk. It comes right after 「細かい指示は失われることがあります」, so it reads as \"anything in a file survives compaction.\" The page says the opposite for path-scoped rules and nested CLAUDE.md: compaction \"summarizes them away,\" and they come back only on demand, when Claude next touches a trigger file. The page also tells you to remove `paths:` if a rule must survive compaction. Invoked skill bodies are also file-based instructions, and they come back truncated or get dropped. The page itself hedges with \"Most startup content reloads automatically,\" while the lesson does not hedge. The best case for the lesson is that s3-diagram and s3-table qualify the sentence right afterwards, and the table entry for `paths:` rules (「要約でいったん消え、対象のファイルを扱うときに読み直される」) is accurate. A literal reading (\"eventually re-read, even if only on demand\") is also not strictly false. Even so, the lead states the rule more strongly than the page, and its only citation (cc-how-it-works) says nothing about re-reading from disk. That page only says \"instructions from early in the conversation can get lost. Put persistent rules in CLAUDE.md.\" The proposed fix (直下のCLAUDE.mdなど、決まったファイルの指示はディスクから読み直されます。) is accurate against the table. The citation for this sentence should point to cc-context-window. Side note, not part of this finding: the s3-diagram caption 「ファイルに書いた指示はディスクから戻る」 makes the same unhedged claim. Its node lists only the four re-injected items, so it is consistent within the diagram, but it could take the same narrowing.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "pr-steps-start",
+      "where": "pr-start.expect",
+      "claim": "Claude Codeの入力欄が表示されます。",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/security",
+      "evidenceQuote": "Trust verification: In an interactive session, Claude Code shows the workspace trust dialog when you start it in a folder you haven't trusted. / (permissions) In a repository, Claude Code keys the trust on the git repository root, so the trust covers the whole repository apart from any git repository nested inside it",
+      "fix": "信頼の確認が出たら答えます。そのあと、Claude Codeの入力欄が表示されます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/security",
+        "evidenceQuote": "\"Trust verification: In an interactive session, Claude Code shows the workspace trust dialog when you start it in a folder you haven't trusted.\" Also https://code.claude.com/docs/en/permissions: \"In a repository, Claude Code keys the trust on the git repository root, so the trust covers the whole repository apart from any git repository nested inside it\" and \"The parent-folder column doesn't apply inside a nested repository: in an interactive session Claude Code shows the trust dialog for it\".",
+        "reason": "In the lesson, the step's code block runs `mkdir cc-context-practice && cd cc-context-practice && git init`, writes CLAUDE.md, then runs `claude`, and the expect for that step says only that the input field appears. Because `git init` makes the folder a new git repository root, no earlier trust can cover it. The permissions page says that even when a parent folder is trusted, a nested repository still gets the trust dialog in an interactive session. So on this first launch the learner always sees the workspace trust dialog before the input field. As written, the expect claims more than the docs allow: it says the input field comes right after the commands, but the docs say a dialog comes first. To defend the lesson I checked the quickstart. It also skips the trust step (\"The Claude Code prompt appears with the version, current model, and working directory shown above it\"), but it describes a generic project folder, not a newly created repository, so it does not override the security and permissions pages. I also searched the CHANGELOG for any change that skips the trust dialog for new or empty folders and found none. Within this course, cc-09 already handles the same situation (\"初めてのフォルダーでは、先に `claude` を起動して、信頼の確認に答えます。\"), which shows cc-05 leaves out a step it should include. The proposed fix mostly works, but \"答えます\" is vague. If the learner declines the dialog, the input field never appears, and the docs describe the step as accepting the dialog. The better fix says the dialog will appear and that the learner accepts it. It uses 承認, the same word cc-10 uses for this dialog (信頼の確認で承認), and keeps this lesson's spelling フォルダ.",
+        "betterFix": "初めてのフォルダなので、信頼の確認が出ます。承認すると、Claude Codeの入力欄が表示されます。"
+      }
+    },
+    {
+      "blockId": "s2-session",
+      "where": "md (last sentence)",
+      "claim": "開き直すと、前のコンテキストもそのまま戻ります。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/sessions",
+      "evidenceQuote": "If the session was compacted, the conversation opens at a `Conversation compacted` row. Claude continues with the last compaction's summary, the messages that compaction left unsummarized, and every message since. ... Not every configuration flag from the original launch is restored.",
+      "fix": "開き直すと、前の会話の履歴が戻ります。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/sessions",
+        "evidenceQuote": "\"When Claude Code loads a conversation from its transcript, the resumed session restores the conversation along with the state saved in it: Conversation history: the messages, tool calls, and results. If the session was compacted ... The messages that the last compaction summarized aren't loaded again. ... Interrupted tool calls: a tool that was still running when the previous process ended ... doesn't finish or get rerun when you resume. ... Background Bash and monitor tasks aren't [restored]. ... Not every configuration flag from the original launch is restored. If the session depended on `--mcp-config`, `--settings`, `--plugin-dir`, `--fallback-model`, or directories added with `--add-dir`, pass them again when you resume\"",
+        "reason": "The official pages do back the core idea that resuming brings the conversation back. how-claude-code-works says resuming \"reopens it under the same session ID and appends new messages to the existing conversation.\" best-practices says \"you don't have to re-explain the context\" and that `claude --continue` lets you \"pick up where you left off.\" cli-reference adds that the recorded system prompt is reused after `--resume` or `--continue`. The auditor's compaction argument on its own is weak. Context at exit is already the summary plus later messages, and that is exactly what comes back.\n\nThe finding still stands because of 「そのまま」 (\"exactly as it was\"). The lesson defines コンテキスト in s1-defs as 指示、会話、読んだファイル、コマンドの出力 (instructions, conversation, files read, command output). The sessions page says resume restores \"the conversation along with the state saved in it\" and then lists real gaps:\n- messages summarized by the last compaction are not loaded again\n- interrupted tool calls are not rerun\n- background Bash and monitor tasks are not restored\n- flags such as `--mcp-config`, `--plugin-dir` and `--add-dir` are not restored and must be passed again, so MCP tools from those flags are missing from the resumed context\n\nSo 「前のコンテキストもそのまま戻ります」 says more than the page does. The proposed fix 「開き直すと、前の会話の履歴が戻ります。」 matches the page's own wording (\"Conversation history: the messages, tool calls, and results\" is restored). It does not overclaim, so no better fix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "pr-diagnose",
+      "where": "p1.explanation (last sentence)",
+      "claim": "ボタンの色のようなその場の質問は、`/btw` で聞くと会話の履歴に残りません。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/interactive-mode",
+      "evidenceQuote": "No tool access: side questions answer only from what is already in context. Claude can't read files, run commands, or search when answering a side question. ... Use `/btw` to ask about what Claude already knows from this session; use a subagent to go find out something new.",
+      "fix": "会話に出た内容への短い質問なら、`/btw` で聞くと履歴に残りません。ファイルを新しく読む質問には使えません。",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/best-practices",
+        "evidenceQuote": "\"For questions that don't need to stay in context, use /btw. The answer never enters conversation history, so you can check a detail without growing context.\" (best-practices, Manage context aggressively). Also https://code.claude.com/docs/en/interactive-mode: \"Use `/btw` to ask a question about your current work without adding to the conversation history. ... The question and answer never enter the conversation history.\" And https://code.claude.com/docs/en/commands: \"Use `/btw` for a side question that shouldn't add to the conversation history.\"",
+        "reason": "The sentence makes one claim: a quick side question asked with /btw stays out of the conversation history. Three official pages say exactly that, and the lesson cites two of them on this block (cc-best-practices, cc-commands). The best-practices page also recommends /btw for \"questions that don't need to stay in context\" and to \"check a detail\", which is what その場の質問 means here. The no-tool-access limit the auditor quotes is real, but it does not contradict the sentence. The lesson never says /btw can read files or run commands. The scenario's question, 「このボタンの色の付け方は古い？」, points at a button already in the conversation (「この」). A judgment like \"is this styling outdated\" can come from what is in context plus the model's general knowledge, which is the use the docs describe: \"ask about what Claude already knows from this session\". The lesson does not go further than the page. The auditor added a caveat; adding it would make the text more complete, but the text as written is not wrong. The finding does not stand.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

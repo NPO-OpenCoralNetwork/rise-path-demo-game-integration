@@ -101,7 +101,33 @@ export RISEPATH_VM_HOST="${HOST_ALIAS}"
 export RISEPATH_VM_USER="${LOGIN_USER}"
 bash "${REPO_ROOT}/scripts/deploy-from-mac.sh"
 
-echo "==> Remote E2E"
-E2E_API_URL="http://${HOST_ALIAS}:3006" npm run smoke:prod:e2e --prefix "${REPO_ROOT}"
+# The same remote check as deploy-from-mac.sh: a marker line when stack.env sets ORIGIN_SECRET
+# (never the value).
+REMOTE_DIR="${RISEPATH_REMOTE_DIR:-/opt/risepath}"
+ORIGIN_GATE="$(ssh -o ConnectTimeout=15 "${SSH_TARGET}" "REMOTE_DIR='${REMOTE_DIR}' bash -s" <<'REMOTE'
+set -euo pipefail
+STACK_ENV="${REMOTE_DIR}/deploy/risepath-vm/stack.env"
+if [[ -f "${STACK_ENV}" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${STACK_ENV}"
+  set +a
+fi
+if [[ -n "${ORIGIN_SECRET:-}" ]]; then
+  echo "origin-gate:on"
+fi
+REMOTE
+)"
+
+if [[ "${ORIGIN_GATE}" == "origin-gate:on" ]]; then
+  # With the origin gate on, :3006 over Tailscale answers 403 without the edge's x-origin-secret.
+  echo "==> stack.env sets ORIGIN_SECRET: skipping the Remote E2E via Tailscale"
+  echo "    Check the public path: PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge"
+  echo "    or, on the VM in deploy/risepath-vm, the container smoke:"
+  echo "    docker compose --env-file stack.env exec -T api node scripts/smoke-vm-stack.mjs --target container"
+else
+  echo "==> Remote E2E"
+  E2E_API_URL="http://${HOST_ALIAS}:3006" npm run smoke:prod:e2e --prefix "${REPO_ROOT}"
+fi
 
 echo "✅ VM SSH + deploy complete"

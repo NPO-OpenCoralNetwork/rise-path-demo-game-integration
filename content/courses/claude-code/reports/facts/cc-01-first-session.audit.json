@@ -1,0 +1,87 @@
+{
+  "lessonId": "cc-01-first-session",
+  "checkedCount": 85,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/overview.md",
+    "https://code.claude.com/docs/en/setup.md",
+    "https://code.claude.com/docs/en/quickstart.md",
+    "https://code.claude.com/docs/en/how-claude-code-works.md",
+    "https://code.claude.com/docs/en/best-practices.md",
+    "https://code.claude.com/docs/en/glossary.md",
+    "https://code.claude.com/docs/en/vs-code.md",
+    "https://code.claude.com/docs/en/jetbrains.md",
+    "https://code.claude.com/docs/en/desktop.md",
+    "https://code.claude.com/docs/en/desktop-quickstart.md",
+    "https://code.claude.com/docs/en/claude-code-on-the-web.md",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/terminal-guide.md",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/cli-reference.md",
+    "https://code.claude.com/docs/en/platforms.md",
+    "https://code.claude.com/docs/en/authentication.md",
+    "https://code.claude.com/docs/en/troubleshoot-install.md",
+    "https://code.claude.com/docs/ja/setup",
+    "https://code.claude.com/docs/ja/setup.md",
+    "https://code.claude.com/docs/ja/troubleshoot-install",
+    "https://code.claude.com/docs/ja/troubleshoot-install.md",
+    "https://code.claude.com/docs/ja/overview",
+    "https://code.claude.com/docs/ja/quickstart",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md",
+    "https://registry.npmjs.org/@anthropic-ai/claude-code",
+    "https://www.anthropic.com/research/AI-assistance-coding-skills"
+  ],
+  "confirmed": [
+    {
+      "blockId": "check-quiz",
+      "where": "q6 option b feedback",
+      "claim": "クラウドセッションはGitHubのリポジトリを複製して動くので、GitHubにないフォルダでは使えません。手元のフォルダなら、デスクトップアプリが近道です。",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/claude-code-on-the-web",
+      "evidenceQuote": "When you run `claude --cloud` from a repository that has no git remote, or from a github.com repository that the Claude GitHub App isn't installed on, Claude Code bundles your local repository and uploads it directly to the cloud session. ... The directory must be a git repository with at least one commit",
+      "fix": "GitHubにないフォルダも、コミットのあるGitリポジトリなら `claude --cloud` で送れます。ただしターミナルが要るので、デスクトップアプリが近道です。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/claude-code-on-the-web",
+        "evidenceQuote": "\"When you run `claude --cloud` from a repository that has no git remote, or from a github.com repository that the Claude GitHub App isn't installed on, Claude Code bundles your local repository and uploads it directly to the cloud session. ... Bundled repositories must meet these limits: The directory must be a git repository with at least one commit; The bundled repository must be under 100 MB...\" The Limitations section adds: \"You can send a GitLab, Bitbucket, or other non-GitHub repository to a cloud session as a local bundle by setting `CCR_FORCE_BUNDLE=1`, but the session can't push results back to that remote.\"",
+        "reason": "I read q6 in context. A colleague who isn't used to the terminal wants to try Claude Code on a local folder that isn't on GitHub, and option b's feedback says cloud sessions \"cannot be used\" (使えません) with folders that aren't on GitHub. The official cloud page says the opposite. With `claude --cloud`, a local git repository that has no remote (or isn't covered by the GitHub App) is bundled and uploaded to the cloud session, as long as it has at least one commit. So the absolute 使えません is wrong. It is only true for a folder that isn't a git repository at all, and the lesson doesn't make that distinction. The idea that cloud sessions copy the GitHub repository is true by default (\"The cloud VM clones your current directory's GitHub remote\"), but the same page names the upload as an exception. The proposed fix holds up. It limits the claim to a git repository with at least one commit, which matches the docs. Its point that `claude --cloud` needs the terminal is true, since it is a CLI flag. It still leads to the desktop app as the right answer. That keeps the distractor's reasoning sound for a colleague who is new to the terminal. The Desktop docs also say a cloud session there means you \"select repositories instead of a folder\". I see no inaccuracy in the proposed fix, so I left betterFix empty. Side note: the same \"copies the GitHub repository\" wording appears in q1 feedback (line 301), the flashcard (line 1036) and the glossary (line 1076). There it is used for the push-first case, and the default clone behavior does support it.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "example-habit",
+      "where": "md",
+      "claim": "Anthropicの研究では、AIに説明を求めて学んだ人は、あとのテストでも高い点を保ちました。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://www.anthropic.com/research/AI-assistance-coding-skills",
+      "evidenceQuote": "On a quiz that covered concepts they'd used just a few minutes before ... Our qualitative analysis does not draw a causal link between interaction patterns and learning outcomes ... our assessment measured comprehension shortly after the coding task. Whether immediate quiz performance predicts longer-term skill development is an important question this study does not resolve.",
+      "fix": "Anthropicの研究では、AIに説明を求めながら学んだ人ほど、直後のテストの点が高めでした。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://www.anthropic.com/research/AI-assistance-coding-skills",
+        "evidenceQuote": "\"On a quiz that covered concepts they'd used just a few minutes before, participants in the AI group scored 17% lower than those who coded by hand\" ... \"Our sample was relatively small, and our assessment measured comprehension shortly after the coding task. Whether immediate quiz performance predicts longer-term skill development is an important question this study does not resolve.\" / High-scoring patterns: \"behaviors where the average quiz score was 65% or higher. Participants in these clusters used AI both for code generation and conceptual queries.\"; low-scoring patterns involved \"a heavy reliance on AI, either through code generation or debugging\" (under 40%).",
+        "reason": "The finding stands. In the lesson, 「あとのテストでも高い点を保ちました」 says the learners kept high scores on a later test, which implies retention over time. The cited Anthropic post says otherwise. The study gave only one quiz, a few minutes after the task, and gave no delayed or follow-up test. The authors say outright that the study does not answer whether that immediate score predicts longer-term skill. They also say their qualitative analysis \"does not draw a causal link between interaction patterns and learning outcomes.\" The post does back a narrower claim: patterns that asked for explanations or conceptual answers (generation-then-comprehension 86%, hybrid code-explanation 68%, conceptual inquiry 65%) scored higher on that immediate quiz than heavy-reliance patterns (under 40%). So the lesson says more than the page does. The auditor read the context correctly. The proposed fix is mostly right but has one problem. 「説明を求めながら学んだ人ほど」 implies a dose-response: the more someone asked, the higher their score. The study did not measure that. It grouped participants into interaction patterns and compared each group's average. The fix also drops what the scores are compared against. The better fix names the comparison group, the heavy-reliance patterns, says 「直後」, and stays under 60 Japanese characters. (Outside this block: the callout title 「説明を求めると、理解が残ります」 also suggests cause and lasting retention, so the author may want to soften it as well.)",
+        "betterFix": "Anthropicの研究では、AIに説明を求めて学んだ人は、頼りきった人より直後のテストの点が高めでした。"
+      }
+    },
+    {
+      "blockId": "session-check",
+      "where": "q3 option c (the correct answer)",
+      "claim": "昨日の会話は見えないので、伝え直すか開き直す必要がある",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/memory",
+      "evidenceQuote": "`project`: ongoing work, deadlines, and decisions that Claude can't derive from the code or git history ... Claude doesn't save something every session. It decides what's worth remembering based on whether the information would be useful in a future conversation. ... Auto memory is on by default in local sessions.",
+      "fix": "昨日の会話は見えないので、伝え直すか開き直すのが確実",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/memory",
+        "evidenceQuote": "\"Each Claude Code session begins with a fresh context window. Two mechanisms carry knowledge across sessions: ... Auto memory: notes Claude writes itself\" / \"`project`: ongoing work, deadlines, and decisions that Claude can't derive from the code or git history\" / \"Claude doesn't save something every session. It decides what's worth remembering based on whether the information would be useful in a future conversation.\" / \"Auto memory is on by default in local sessions.\" Also https://code.claude.com/docs/en/how-claude-code-works: \"Each new session starts with a fresh context window, without the conversation history from previous sessions. Claude can persist learnings across sessions using auto memory\"",
+        "reason": "The first half of option c (\"昨日の会話は見えない\") is supported: a new session starts without the previous conversation history. The second half (\"伝え直すか開き直す必要がある\") says re-telling or reopening is required, and the docs don't support that. The scenario is a local session started fresh in the same folder. Auto memory is on by default there, its `project` type explicitly covers \"decisions\", and MEMORY.md loads at the start of every session. So a color scheme decided yesterday may already be carried over, and re-telling is not strictly necessary. What the docs do say is that it isn't guaranteed, because Claude doesn't save something every session. That makes \"確実\" (the reliable way) accurate and \"必要がある\" (required) too strong. The lesson also contradicts itself: the block just before this quiz (session-fresh / session-carry) lists 自動メモリ as one of three ways a new session picks up earlier work. The proposed fix \"昨日の会話は見えないので、伝え直すか開き直すのが確実\" is accurate. --continue/--resume reopen the same session ID with its history, and stating the decision in the prompt always works. The fix keeps the plain form the other options use, and c stays the single best answer, so no betterFix is needed.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [],
+  "unverified": 0
+}

@@ -3,7 +3,7 @@
 > 適用先: **専用 VM `risepath-vm`** の PostgreSQL **`risepath`**（Docker Compose）  
 > 移行期間の暫定: `nexloom-gce` / `risepath`（新規環境では使わない）  
 > 認証: **Supabase Auth**（JWT）。`auth.users` は VM 側の ID スタブ（`000_extensions_and_auth.sql`）。  
-> デプロイ正本: [`doc/risepath_vm_deployment.md`](../../doc/risepath_vm_deployment.md)
+> デプロイ正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md)
 
 ## 認証と FK（`auth.users` スタブ）
 
@@ -21,6 +21,8 @@ npm run db:migrate:status
 `scripts/db-migrate.mjs` が `schema_migrations` テーブルで適用済みを追跡します。  
 再実行しても未適用分だけ流します。
 
+VM では、新しい `api` イメージを起動する前に適用します。未適用があると `/api/v2/health` が 503 になり、`api` の healthcheck が通りません。`deploy/risepath-vm/scripts/deploy-stack.sh` はこの順で流します。
+
 ## チェーン（Issue #16）
 
 | ファイル | 内容 |
@@ -35,8 +37,9 @@ npm run db:migrate:status
 | `007_agent_tables.sql` | Hermes プロキシ consent / session binding |
 | `008_seed_learning_portals.sql` | Learning Hub カード seed |
 | `009_learner_memory_meta.sql` | 学習者メモリの同期メタデータ |
-| `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス |
+| `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス（`CONCURRENTLY` なし。作成中は `material_chunks` への書き込みが待たされる） |
 | `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
+| `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
 
 ## 参考資料（適用しない）
 
@@ -44,4 +47,4 @@ npm run db:migrate:status
 - `doc/local_postgres.sql` — 旧スキーマ + seed 元（アーカイブ）
 - `scripts/migrate_curricula.js` — 廃止（列は 001 に統合済み）
 
-関連: [`doc/database_topology.md`](../../doc/database_topology.md), [`doc/env_local_setup_issue15.md`](../../doc/env_local_setup_issue15.md)
+関連: [`doc/system_design/database_topology.md`](../../doc/system_design/database_topology.md), [`doc/guides/env_local_setup_issue15.md`](../../doc/guides/env_local_setup_issue15.md)

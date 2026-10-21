@@ -1,0 +1,128 @@
+{
+  "lessonId": "cc-08-hooks-mcp",
+  "checkedCount": 55,
+  "pagesFetched": [
+    "https://code.claude.com/docs/en/hooks.md",
+    "https://code.claude.com/docs/en/hooks-guide.md",
+    "https://code.claude.com/docs/en/hooks-guide",
+    "https://code.claude.com/docs/en/features-overview.md",
+    "https://code.claude.com/docs/en/memory.md",
+    "https://code.claude.com/docs/en/mcp.md",
+    "https://code.claude.com/docs/en/plugins/overview.md",
+    "https://code.claude.com/docs/en/plugins/install.md",
+    "https://code.claude.com/docs/en/plugins/security.md",
+    "https://code.claude.com/docs/en/security.md",
+    "https://code.claude.com/docs/en/permissions.md",
+    "https://code.claude.com/docs/en/permission-modes.md",
+    "https://code.claude.com/docs/en/interactive-mode.md",
+    "https://code.claude.com/docs/en/settings.md",
+    "https://code.claude.com/docs/en/commands.md",
+    "https://code.claude.com/docs/ja/hooks-guide",
+    "https://code.claude.com/docs/ja/hooks-guide.md",
+    "https://code.claude.com/docs/llms.txt",
+    "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more",
+    "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
+    "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+  ],
+  "confirmed": [
+    {
+      "blockId": "s3-pitfall",
+      "where": "md (the same unconditional claim also appears in s3-table row 3, q3 answer b, q5 option b feedback, card-exit1 back and summary-points[1])",
+      "claim": "Unixの習慣で `exit 1` を返しても、フックでは止まりません。止めるときは `exit 2` です。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+      "evidenceQuote": "Exit code 1 without valid JSON output is a non-blocking error unless the hook is one whose failure blocks the action, even though 1 is the conventional Unix failure code. If your hook is meant to enforce a policy, use `exit 2`. ... To block the action instead, set \"onFailure\": \"block\" on a command or http hook. Requires Claude Code v2.1.295 or later. ... Exit code other than 0 or 2: counts for a command hook even if it printed JSON that allows the action ... With \"block\" set, a failure does what exit code 2 does on that event",
+      "fix": "s3-pitfall md: Unixの習慣で `exit 1` を返しても、既定ではフックは止まりません。止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックだけは、失敗でも止まります。 / card-exit1 back: 既定では止まりません。止めないエラーとして通知が出て、操作は進みます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+        "evidenceQuote": "\"Exit code 1 without valid JSON output is a non-blocking error unless the hook is one whose failure blocks the action, even though 1 is the conventional Unix failure code. If your hook is meant to enforce a policy, use `exit 2`.\" / \"Non-blocking error: your hook exits with any other code ... The action goes ahead, except for hooks whose failure blocks the action, for example a hook with `onFailure` set to \"block\".\" / \"To block the action instead, set \"onFailure\": \"block\" on a command or http hook. Requires Claude Code v2.1.295 or later.\" / NOTE: \"On Windows without Git Bash, a shell-form `PreToolUse` or `PermissionRequest` command hook that fails with `onFailure` unset can instead block the tool call.\" / Exit-code table, valid JSON + any other exit code: \"Success. Claude Code ignores the exit code, and the fields alone decide.\"",
+        "reason": "I tried to defend the lesson and couldn't. Its core advice is supported: in its own setup (plain stderr text, no `onFailure` field, bash available), `exit 1` doesn't block and `exit 2` does. The hooks guide (https://code.claude.com/docs/en/hooks-guide) agrees: an exit code other than 0 or 2 without valid JSON \"proceeds on most events, unless the hook is one whose failure blocks the action\". The problem is that the lesson says it with no exception at all: 「フックでは止まりません」 in s3-pitfall, 「止まりません」 on the card, 「`exit 1` では止まりません」 in the summary, and 「`exit 1` で止まることはありません」 in the q3-c feedback. The official reference adds a \"unless...\" every time it says this, and it names three cases where an `exit 1` hook does stop the action. (1) `onFailure: \"block\"`. The CHANGELOG lists it under 2.1.295, and the current release is 2.1.305, so it is live. (2) On Windows without Git Bash, a shell-form `PreToolUse` or `PermissionRequest` hook can block even with `onFailure` unset. (3) If the hook prints valid JSON while exiting 1, the exit code is ignored and the JSON fields decide, so a deny still blocks. The lesson states the rule more strongly than the page does, so the finding stands. The proposed fix is better but still wrong in one place. 「`onFailure` を \"block\" にしたフックだけは」 says \"only\", but the page itself calls `onFailure` just one example (\"for example\") and documents the Windows default case. Saying failure always blocks under `onFailure` also ignores that the field has no effect on Stop, SubagentStop, TaskCompleted, TeammateIdle and background hooks. And 「既定では止まりません」 on the card is not true by default on Windows without Git Bash.",
+        "betterFix": "s3-pitfall md: Unixの習慣で `exit 1` を返しても、フックはふつう止まりません。止めないエラーとして扱われ、操作は進みます。止めるときは `exit 2` です。`onFailure` を `\"block\"` にしたフックなどでは、失敗でも止まります。\ncard-exit1 back: ふつうは止まりません。止めないエラーとして通知が出て、操作は進みます。\nsummary-points[1]: `PreToolUse` フックは、理由を標準エラー出力に書いて `exit 2` で止めます。`exit 1` では、ふつう止まりません。\nq3 option c feedback: ふつうは `exit 1` では止まりません。止めて理由を届けたいときは、`exit 2` と標準エラー出力を使います。\n(s3-table row 3, the q3 answer b and the q5 option feedback can stay as they are. They describe the lesson's own default hook, which has no `onFailure` and prints only plain stderr, and the s3-pitfall callout now carries the exception.)"
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "q6 option d feedback",
+      "claim": "フックの `exit 2` で、セッションが止まることはありません。Claudeは届いた指摘を読んで、作業を続けます。",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+      "evidenceQuote": "Exit code 2 behavior per event ... `UserPromptSubmit` | Yes | Blocks the prompt, so it never reaches Claude ... `PostToolUse` | No | Shows stderr to Claude; the tool already ran ... `PostToolBatch` | Yes | Stops the agentic loop before the next model call",
+      "fix": "`PostToolUse` の `exit 2` で、セッションが止まることはありません。Claudeは届いた指摘を読んで、作業を続けます。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+        "evidenceQuote": "Exit code 2 behavior per event: \"`PostToolUse` | No | Shows stderr to Claude; the tool already ran\" ... \"`PostToolBatch` | Yes | Stops the agentic loop before the next model call\" ... \"`UserPromptSubmit` | Yes | Blocks the prompt, so it never reaches Claude\". PostToolBatch decision control: \"Returning `decision: \\\"block\\\"` or `continue: false` stops the agentic loop before the next model call. The blocking message comes from the JSON `reason` or `stopReason`, or from stderr on exit 2.\" Also, from hooks-guide: \"Exit 2: write a reason to stderr. Depending on the event, Claude receives it as feedback so it can adjust, the user sees it, or no message appears\".",
+        "reason": "The feedback sits on q6, which is about a `PostToolUse` linter hook, but it states a rule for all hooks: 「フックの `exit 2` で、セッションが止まることはありません」. The Hooks reference contradicts that general rule. On `PostToolBatch`, exit 2 \"Stops the agentic loop before the next model call\". On `UserPromptSubmit`, exit 2 blocks the prompt, so Claude never gets it and does not carry on working. The hooks guide also says the effect of exit 2 depends on the event. So the claim is true only for `PostToolUse` (stderr goes to Claude, the tool has already run, the loop keeps going). A learner who takes in the general wording would be misled about other events. The proposed fix limits the claim to `PostToolUse`, and the reference table supports it: \"Shows stderr to Claude; the tool already ran\", plus \"Claude receives it as feedback so it can adjust\". The fix is accurate and matches the lesson's own wording in s3-post. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "check-quiz",
+      "where": "q6 prompt (it makes answer a and the explanation depend on stderr, which the prompt never mentions)",
+      "claim": "編集のたびにリンター（linter）を走らせる `PostToolUse` フックが、問題を見つけると `exit 2` で終わります。 (answer a: 編集は済み、リンターの指摘がClaudeに届く)",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+      "evidenceQuote": "The message that comes with the block is your hook's stderr. ... For most events, Claude Code writes stdout to the debug log and doesn't show it in the transcript. ... `PostToolUse` | No | Shows stderr to Claude; the tool already ran",
+      "fix": "編集のたびにリンター（linter）を走らせる `PostToolUse` フックがあります。問題を見つけると、指摘を標準エラー出力に書いて `exit 2` で終わります。このとき起きることはどれでしょう？",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+        "evidenceQuote": "\"For most events, Claude Code writes stdout to the debug log and doesn't show it in the transcript. ... To surface a warning to Claude from a `PostToolUse` or `PostToolUseFailure` hook, exit 2 instead so Claude sees the stderr even though the tool already ran.\" / Per-event table: \"`PostToolUse` | No | Shows stderr to Claude; the tool already ran\". The guide (hooks-guide) agrees: \"Exit 2: write a reason to stderr. Depending on the event, Claude receives it as feedback so it can adjust...\"",
+        "reason": "The lesson's general teaching is correct: PostToolUse runs after the tool, exit 2 cannot undo the edit, and stderr is sent to Claude. The s3-post block, the q6 explanation and the card-post flashcard all say \"標準エラー出力の文がClaudeに届く\". The problem is the q6 prompt. It only says the hook \"問題を見つけると `exit 2` で終わります\" and never says where the linter's findings are written. Answer a still states without any condition that \"リンターの指摘がClaudeに届く\". The official reference says only stderr reaches Claude on PostToolUse exit 2, and that stdout goes to the debug log for most events. Many linters, such as eslint and ruff, print their findings to stdout. So a hook like `npx eslint \"$f\" || exit 2` exits 2, but the findings never reach Claude. Answer a is only true if the hook sends the findings to stderr, and the prompt never says it does. That is a stronger claim than the documentation supports, and it also blurs distractor c (\"指摘はどこにも表示されない\"). The proposed fix adds the missing condition (\"指摘を標準エラー出力に書いて `exit 2` で終わります\"). That matches the docs exactly, follows the lesson's style (です・ます, keeps 「標準エラー出力に書いて `exit 2`」 as worded in q5 and the summary) and stays within the sentence-length budget. No betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "s1-config",
+      "where": "md; the same claim is in summary-cards card-three-levels back",
+      "claim": "フックは設定ファイルに、イベント → マッチャー → コマンドの3段で書きます。 / イベント → マッチャー → 実行するコマンド。",
+      "problem": "wrong",
+      "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+      "evidenceQuote": "The configuration has three levels of nesting: 1. Choose a hook event to respond to ... 2. Add a matcher group to filter when it fires ... 3. Define one or more hook handlers to run when matched ... hook handler for the shell command, HTTP endpoint, MCP tool, prompt, or agent that runs.",
+      "fix": "s1-config md: フックは設定ファイルに、イベント → マッチャー → 処理（ここではコマンド）の3段で書きます。下は、編集のたびに整形ツールを動かす公式の例です。 / card-three-levels back: イベント → マッチャー → 実行する処理（コマンドなど）。",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+        "evidenceQuote": "\"Hooks are defined in JSON settings files. The configuration has three levels of nesting: 1. Choose a hook event to respond to, like `PreToolUse` or `Stop` 2. Add a matcher group to filter when it fires, like \"only for the Bash tool\" 3. Define one or more hook handlers to run when matched\" ... \"This page uses specific terms for each level: hook event for the lifecycle point, matcher group for the filter, and hook handler for the shell command, HTTP endpoint, MCP tool, prompt, or agent that runs.\" The guide (https://code.claude.com/docs/en/hooks-guide) also says: \"Each hook has a `type` that determines how it runs. Most hooks use `\"type\": \"command\"`, which runs a shell command. Four other types are available: http, mcp_tool, prompt, agent\".",
+        "reason": "I tried to defend the lesson. The best support is the cited guide's opening line, \"Hooks are user-defined shell commands.\" The guide's own examples also follow event → matcher → {type: command}. But when the official pages spell out the three-level structure, they call level 3 a \"hook handler\", and a handler can be one of five types: shell command, HTTP endpoint, MCP tool, prompt or agent. The guide repeats this: \"Most hooks use type: command ... Four other types are available.\"\n\ns1-config and the card-three-levels flashcard present \"コマンド\" as level 3 of the general structure. A learner would come away thinking level 3 is always a command, which is narrower than the docs. The flashcard asks about the general structure (\"フックの設定の3段は？\") and gives no example to soften it. The lesson's own definition of a hook in s1-defs already hedges with \"スクリプトなどの処理\", so the two blocks also disagree with the lesson itself.\n\nThis is a small issue: the lesson narrows the third level, it is not a factual error, and every example in the lesson really is a command hook. The proposed fixes are accurate. \"処理（ここではコマンド）\" keeps the command example in focus without implying commands are the only option. \"実行する処理（コマンドなど）\" matches both the docs and the lesson's own definition. Both follow the style rules (です・ます, short sentences), so no betterFix is needed.",
+        "betterFix": ""
+      }
+    },
+    {
+      "blockId": "practice-steps",
+      "where": "p-script expect; also practice-checklist pc-hooks label",
+      "claim": "`/hooks` に、マッチャー `Edit|Write` のフックが出ます。 / /hooks の PreToolUse に、マッチャー Edit|Write のフックが表示されました",
+      "problem": "unsupported",
+      "evidenceUrl": "https://code.claude.com/docs/en/hooks",
+      "evidenceQuote": "Type `/hooks` in Claude Code to open a read-only browser for your configured hooks. The list labels each hook with where it comes from, such as user settings, project settings, local settings, a plugin, or the current session. Select a hook to see the full text of what it runs and where it's defined (no page fetched says the list shows the matcher; CHANGELOG 2.1.286: \"Changed /hooks to open on one list of your configured hooks grouped by event\")",
+      "fix": "p-script expect: `/hooks` の `PreToolUse` の下に、新しいフックが出ます。選ぶと、実行するコマンドを確かめられます。 / pc-hooks label: /hooks の PreToolUse に、新しく足したフックが表示されました",
+      "verdict": {
+        "stands": true,
+        "evidenceUrl": "https://code.claude.com/docs/en/hooks#the-%2Fhooks-menu",
+        "evidenceQuote": "\"Type `/hooks` in Claude Code to open a read-only browser for your configured hooks. The list labels each hook with where it comes from, such as user settings, project settings, local settings, a plugin, or the current session. Select a hook to see the full text of what it runs and where it's defined, such as the path of its settings file or the name of its plugin.\" Guide (https://code.claude.com/docs/en/hooks-guide): \"Your new hook appears in the list under `Notification`.\" / \"Run `/hooks` and confirm the hook appears under the correct event\" / \"browse all configured hooks grouped by event\". CHANGELOG: \"Changed `/hooks` to open on one list of your configured hooks grouped by event, so viewing a hook takes one Enter instead of three\".",
+        "reason": "I tried to show the lesson is right and could not. I read the full /hooks menu section of the hooks reference (downloaded hooks.md), the hooks guide in English and Japanese, and every /hooks entry in the CHANGELOG. The docs back three things: hooks are listed grouped by event (so the new hook does appear under PreToolUse), each row shows where the hook comes from, and selecting a hook shows the full text of what it runs. No official page says the list shows a hook's matcher, so nothing documents that a learner will see \"Edit|Write\" there. The p-script expect and the pc-hooks checklist label both have the learner confirm a hook \"with matcher Edit|Write\" in /hooks. That is a more specific screen result than any page supports.\n\nThe CHANGELOG entry \"Fixed the interactive /hooks menu crashing when a hook matcher is named after an inherited object property\" shows the menu uses matchers internally, but it says nothing about what the current single list displays. I tried to check the real screen by running Claude Code 2.1.305 in an isolated scratch config, but the sandbox refused that, so I could not reproduce it.\n\nThe proposed fix only claims what the docs support: the hook appears under PreToolUse, and selecting it shows the command it runs. So I give no betterFix. One optional style point: the plain-text label \"/hooks の PreToolUse に\" keeps spaces between Japanese and ASCII. The lesson already writes labels that way, and checklist labels render as plain text through Txt, with no inline code.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "blockId": "s5-checks",
+      "where": "rows[2][1] (確かめること「実行されるもの」の見るところ)",
+      "claim": "`/plugin` の詳細、`hooks/hooks.json`、`.mcp.json`",
+      "problem": "overclaim",
+      "evidenceUrl": "https://code.claude.com/docs/en/plugins/security",
+      "evidenceQuote": "The Will install section shows that a hook exists but not what it runs, so read these files in the plugin's directory: hooks/hooks.json: the command each hook runs; .mcp.json: each server's command or URL; bin/: every file in the directory",
+      "fix": "`/plugin` の詳細、`hooks/hooks.json`、`.mcp.json`、`bin/`",
+      "verdict": {
+        "stands": false,
+        "evidenceUrl": "https://code.claude.com/docs/en/plugins/security",
+        "evidenceQuote": "\"In a Claude Code session, run `/plugin` and select the plugin. The details pane shows a **Will install** section listing the plugin's commands, agents, skills, hooks, and MCP and LSP servers.\" ... \"The **Will install** section shows that a hook exists but not what it runs, so read these files in the plugin's directory: **`hooks/hooks.json`**: the command each hook runs; **`.mcp.json`**: each server's command or URL; **`bin/`**: every file in the directory\"",
+        "reason": "I fetched the Plugin security and trust page. All three places in the row are on it: the `/plugin` details pane (step 2) and `hooks/hooks.json` and `.mcp.json` (step 3). Nothing in the row goes beyond what the page says. The auditor's real point is that `bin/` was left out. That makes the list incomplete, but it is not an overclaim. The row never says these are the only places to look. The caption says the table is \"organized based on\" the official steps (公式ドキュメントの手順をもとに整理), so it is a selection. The quiz explanation for the same item uses non-exhaustive や. The selection also fits the lesson's scope. Segment s5 teaches hooks and MCP servers, and the plugin definition ends with など. The lesson never introduces a plugin's `bin/` folder, and s5 already has three new terms, which is the per-segment limit. The page also says that running a `bin/` executable is a Bash tool call, so permission rules apply. The lesson's \"権限\" row (ツールを権限ルールで絞れるか（フックは対象外）) is consistent with that. Adding `bin/` would make the row more complete, but nothing in the current text is wrong or stated more strongly than the source.",
+        "betterFix": ""
+      }
+    }
+  ],
+  "unverified": 0
+}

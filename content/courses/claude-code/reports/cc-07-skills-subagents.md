@@ -1,6 +1,6 @@
 # Report: claude-code/cc-07-skills-subagents (published)
 
-**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:2679f127d93ca803.**
+**Status: PUBLISHED in course `claude-code` (lessons/ and course.json, on the owner's instruction, 2026-10-21). Gate: PASS (`check-review.mjs` over ja-editor, pedagogy-reviewer, visual-qa). Lesson hash sha256:735836d64d5beaab.**
 
 - Title: 第7回｜手順はスキルに、調べものはサブエージェントに
 - Lesson: `content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json` · brief: `content/courses/claude-code/briefs/cc-07-skills-subagents.md`
@@ -32,43 +32,48 @@
 
 - validate: 1 lesson file, 0 course files: no errors.
 - lint --strict: 1 lesson file: 0 errors, 0 warnings.
-- course length measure: `prose 2167 (budget 1,200–2,400) · read 2594 · practice reading 931 · questions 12 · practice sections 1 · est 17.8 min (must be ≤ 20; estMinutes 18)`
+- course length measure: `prose 2183 (budget 1,200–2,400) · read 2610 · practice reading 931 · questions 12 · practice sections 1 · est 17.9 min (must be ≤ 20; estMinutes 18)`
 
 ## Gate (current draft)
 
 ```
 Review of cc-07-skills-subagents by ja-editor, pedagogy-reviewer, visual-qa: PASS
-  lesson content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json (sha256:2679f127d93ca803)
-  ja-editor: full review
-  pedagogy-reviewer: verification of sha256:0ffacf7c3db87313 (previous review cross-checked; scope recomputed from .artifacts/review/claude-code/cc-07-skills-subagents/0ffacf7c3db87313/lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: align, hook, prior, load, worked, visual, practice, meta, accuracy, a11y_l10n · previous .artifacts/review/claude-code/cc-07-skills-subagents/0ffacf7c3db87313/round-1/pedagogy-reviewer.review.json and 1 earlier round checked
+  lesson content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json (sha256:735836d64d5beaab)
+  ja-editor: verification of a0c0ded (previous review cross-checked; scope recomputed from a0c0ded:content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: prior, a11y_l10n · previous a0c0ded:content/courses/claude-code/reports/cc-07-skills-subagents.ja-editor.review.json and 1 earlier round checked
+  pedagogy-reviewer: verification of a0c0ded (previous review cross-checked; scope recomputed from a0c0ded:content/courses/claude-code/lessons/cc-07-skills-subagents.lesson.json) · 0 resolved, 0 unresolved · 1 changed · carried over: hook, prior, load, worked, active, visual, practice, meta, voice · previous a0c0ded:content/courses/claude-code/reports/cc-07-skills-subagents.pedagogy-reviewer.review.json and 1 earlier round checked
   visual-qa: full review
   mean 3.46 (needs ≥ 3.3) · every criterion ≥ 3
-  ✓ align      4  (pedagogy-reviewer carried)
+  ✓ align      4  (pedagogy-reviewer)
   ✓ hook       3  (pedagogy-reviewer carried)
-  ✓ prior      4  (ja-editor, pedagogy-reviewer carried)
+  ✓ prior      4  (ja-editor carried, pedagogy-reviewer carried)
   ✓ load       3  (ja-editor, pedagogy-reviewer carried, visual-qa)
   ✓ worked     3  (pedagogy-reviewer carried)
-  ✓ active     4  (pedagogy-reviewer)
+  ✓ active     4  (pedagogy-reviewer carried)
   ✓ miscon     4  (pedagogy-reviewer)
   ✓ visual     3  (pedagogy-reviewer carried, visual-qa)
   ✓ practice   3  (pedagogy-reviewer carried)
   ✓ meta       4  (pedagogy-reviewer carried)
-  ✓ accuracy   3  (pedagogy-reviewer carried)
-  ✓ voice      3  (ja-editor, pedagogy-reviewer)
-  ✓ a11y_l10n  4  (ja-editor, pedagogy-reviewer carried, visual-qa)
+  ✓ accuracy   3  (pedagogy-reviewer)
+  ✓ voice      3  (ja-editor, pedagogy-reviewer carried)
+  ✓ a11y_l10n  4  (ja-editor carried, pedagogy-reviewer, visual-qa)
 ```
 
-## Review rounds (snapshots in `.artifacts/review/claude-code/cc-07-skills-subagents/`)
+## Review rounds (local snapshots in `.artifacts/review/claude-code/cc-07-skills-subagents/`, one line per lesson version and round; the reviews the gate counts are the committed ones in this folder)
 
-1. `ac1d14f8dc7c957a`: ja-editor full revise (mean 3.50, must-fix 7); pedagogy-reviewer full revise (mean 3.15, must-fix 5)
-2. `49fdb7d006e71baa`: ja-editor full revise (mean 4.00, must-fix 1); pedagogy-reviewer full revise (mean 3.38, must-fix 2)
-3. `41f1a70fd4ffba29`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.54, must-fix 0)
-4. `e03f31fdd3519c9b`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
-5. `97075ebd0299de71`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
-6. `d414e3e1a2e0ec5b`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-7. `f8e6497346002dd9`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-8. `0ffacf7c3db87313`: ja-editor verify fail (mean 4.00, must-fix 1); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
-9. `2679f127d93ca803`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+1. `ac1d14f8dc7c957a/round-1`: ja-editor full revise (mean 3.50, must-fix 7); pedagogy-reviewer full revise (mean 3.15, must-fix 5)
+2. `49fdb7d006e71baa/round-1`: ja-editor full revise (mean 4.00, must-fix 1); pedagogy-reviewer full revise (mean 3.38, must-fix 2)
+3. `41f1a70fd4ffba29/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full pass (mean 3.54, must-fix 0)
+4. `e03f31fdd3519c9b/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 2.67, must-fix 3)
+5. `97075ebd0299de71/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
+6. `d414e3e1a2e0ec5b/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+7. `d414e3e1a2e0ec5b/round-2`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+8. `f8e6497346002dd9/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.54, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+9. `f8e6497346002dd9/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.38, must-fix 1); visual-qa full pass (mean 4.00, must-fix 0)
+10. `0ffacf7c3db87313/round-1`: ja-editor verify fail (mean 4.00, must-fix 1); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+11. `2679f127d93ca803/round-1`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
+12. `2679f127d93ca803/round-2`: ja-editor full pass (mean 4.00, must-fix 0); pedagogy-reviewer full revise (mean 3.46, must-fix 1); visual-qa full pass (mean 4.00, must-fix 0)
+13. `a3c0929a6fa09460/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full revise (mean 3.67, must-fix 1)
+14. `735836d64d5beaab/round-1`: ja-editor verify pass (mean 4.00, must-fix 0); pedagogy-reviewer verify pass (mean 3.46, must-fix 0); visual-qa full pass (mean 4.00, must-fix 0)
 
 ## Fact audit against the official docs (2026-10-20)
 
@@ -78,6 +83,8 @@ An auditor with web access checked 62 claims (pages: 19); a second checker tried
 - [overclaim] `s2-check` (q2 option d feedback): 誰が呼べるかを決めるのは、フロントマターの設定です。 — https://code.claude.com/docs/en/skills
 - [overclaim] `check-quiz` (e6 option c feedback): バックグラウンドかどうかは、待つあいだに会話を続けられるかの違いです。メインに戻る中身の量は変わりません。 — https://code.claude.com/docs/en/sub-agents
 - [unsupported] `s4-table` (caption): きっかけが来たら足す（公式の「少しずつ育てる」表から一部を抜粋） — https://code.claude.com/docs/en/features-overview
+
+Records: `content/courses/claude-code/reports/facts/cc-07-skills-subagents.audit.json` and `cc-07-skills-subagents.facts.md`.
 
 ## Screenshots
 
