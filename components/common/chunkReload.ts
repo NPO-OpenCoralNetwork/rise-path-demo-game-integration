@@ -1,6 +1,6 @@
 /**
  * Recovery from stale lazy chunks after a redeploy. A tab opened on the old build still asks for
- * the old hashed files, which now 404 (Express) or come back as index.html (Vercel rewrite).
+ * the old hashed files, which now 404 (Express, and Vercel too: its SPA fallback skips /assets/).
  *
  * - index.tsx listens for Vite's `vite:preloadError` and, when the payload is a failed chunk,
  *   reloads once (`claimReloadForPreloadError`). The build that reload was tried for
