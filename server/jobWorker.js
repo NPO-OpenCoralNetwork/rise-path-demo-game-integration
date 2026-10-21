@@ -131,8 +131,11 @@ export class JobWorker {
                 const { material_id } = job.payload;
                 if (!material_id) throw new Error("Missing material_id");
 
-                // Get Material details to find path
-                const matRes = await pool.query('SELECT storage_path, type FROM materials WHERE id = $1', [material_id]);
+                // Get Material details to find path (only the job owner's own material)
+                const matRes = await pool.query(
+                    'SELECT storage_path, type FROM materials WHERE id = $1 AND user_id = $2',
+                    [material_id, job.user_id]
+                );
                 if (matRes.rowCount === 0) throw new Error("Material not found");
                 
                 const material = matRes.rows[0];

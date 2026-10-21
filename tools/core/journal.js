@@ -69,7 +69,7 @@ export async function getRecent({ userId, limit = 10 }) {
                     j.mood, j.confidence, j.time_spent_min, j.created_at,
                     c.title as curriculum_title
              FROM learning_journal j
-             LEFT JOIN curricula c ON c.id = j.curriculum_id
+             LEFT JOIN curricula c ON c.id = j.curriculum_id AND c.user_id = j.user_id
              WHERE j.user_id = CAST($1 AS uuid)
              ORDER BY j.created_at DESC LIMIT $2`,
             [effectiveUserId, safeLimit]

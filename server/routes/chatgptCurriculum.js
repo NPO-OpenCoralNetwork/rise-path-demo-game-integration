@@ -32,7 +32,9 @@ import {
 import { validateGenerationKit } from '../services/schemaValidator.js';
 import { validateJournalEntry, buildJournalSummary } from '../services/journalService.js';
 import { getAdaptationSignals } from '../../tools/core/journal.js';
-import { writeCurriculumVersion } from '../../tools/core/curriculum.js';
+import { getOwnedCurriculumContent, writeCurriculumVersion } from '../../tools/core/curriculum.js';
+import { getOwnedLearnerProfile } from '../../tools/core/learnerProfile.js';
+import { isUuid } from '../../tools/core/ids.js';
 
 const router = express.Router();
 
@@ -83,27 +85,19 @@ router.post('/ai/generation-kit', requireBridgeOrAuth, async (req, res) => {
 
     // If learner_profile_id provided and personalization requested, enrich the kit
     if (includePersonalization && learnerProfileId) {
-        const pool = getPool();
-        if (pool) {
-            try {
-                const result = await pool.query(
-                    `select raw_profile, derived_learning_profile from learner_profiles
-                     where id = CAST($1 AS uuid) order by version desc limit 1`,
-                    [learnerProfileId]
-                );
-                if (result.rowCount) {
-                    const row = result.rows[0];
-                    const dp = asObject(row.derived_learning_profile);
-                    const rules = deriveGenerationRules(dp, asObject(row.raw_profile));
-                    kit.personalization = {
-                        ...kit.personalization,
-                        derived_learning_profile: dp,
-                        generation_rules: rules,
-                    };
-                }
-            } catch (err) {
-                console.error('[ChatGPT Curriculum API] Failed to load learner profile for kit:', err.message);
+        try {
+            const row = await getOwnedLearnerProfile({ profileId: learnerProfileId, userId: req.userId });
+            if (row) {
+                const dp = asObject(row.derived_learning_profile);
+                const rules = deriveGenerationRules(dp, asObject(row.raw_profile));
+                kit.personalization = {
+                    ...kit.personalization,
+                    derived_learning_profile: dp,
+                    generation_rules: rules,
+                };
             }
+        } catch (err) {
+            console.error('[ChatGPT Curriculum API] Failed to load learner profile for kit:', err.message);
         }
     }
 
@@ -154,27 +148,20 @@ router.post('/ai/validate-intake', requireBridgeOrAuth, async (req, res) => {
     // Enrich with personalization summary if profile available
     let normalizedPersonalization = null;
     if (learnerProfileId) {
-        const pool = getPool();
-        if (pool) {
-            try {
-                const result = await pool.query(
-                    `select derived_learning_profile from learner_profiles
-                     where id = CAST($1 AS uuid) order by version desc limit 1`,
-                    [learnerProfileId]
-                );
-                if (result.rowCount) {
-                    const dp = asObject(result.rows[0].derived_learning_profile);
-                    // Return a summary of high-impact axes
-                    normalizedPersonalization = {};
-                    for (const [key, value] of Object.entries(dp)) {
-                        if (value === 'high' || value === 'heavy' || value === 'steady_small_steps' || value === 'coach_gentle') {
-                            normalizedPersonalization[key] = value;
-                        }
+        try {
+            const row = await getOwnedLearnerProfile({ profileId: learnerProfileId, userId: req.userId });
+            if (row) {
+                const dp = asObject(row.derived_learning_profile);
+                // Return a summary of high-impact axes
+                normalizedPersonalization = {};
+                for (const [key, value] of Object.entries(dp)) {
+                    if (value === 'high' || value === 'heavy' || value === 'steady_small_steps' || value === 'coach_gentle') {
+                        normalizedPersonalization[key] = value;
                     }
                 }
-            } catch (err) {
-                console.error('[ChatGPT Curriculum API] Failed to load learner profile for intake validation:', err.message);
             }
+        } catch (err) {
+            console.error('[ChatGPT Curriculum API] Failed to load learner profile for intake validation:', err.message);
         }
     }
 
@@ -200,6 +187,9 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     const requestedCurriculumId = cleanString(req.body?.curriculum_id);
     const learnerProfileId = cleanString(req.body?.learner_profile_id);
     const learningMode = cleanString(req.body?.learning_mode);
+    if (requestedCurriculumId && !isUuid(requestedCurriculumId)) {
+        return res.status(404).json({ error: 'Curriculum not found' });
+    }
     const kit = getGenerationKit({ portalId, templateId, locale, learningMode });
     const policyResolution = resolvePolicyVersion({
         requestedPolicyVersion: req.body?.policy_version,
@@ -241,13 +231,8 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
 
     if (learnerProfileId && pool) {
         try {
-            const lpResult = await pool.query(
-                `select id, version, raw_profile, derived_learning_profile, applied_rules
-                 from learner_profiles where id = CAST($1 AS uuid) order by version desc limit 1`,
-                [learnerProfileId]
-            );
-            if (lpResult.rowCount) {
-                const row = lpResult.rows[0];
+            const row = await getOwnedLearnerProfile({ profileId: learnerProfileId, userId: req.userId });
+            if (row) {
                 rawProfileSnapshot = asObject(row.raw_profile);
                 derivedLearningProfile = asObject(row.derived_learning_profile);
                 generationRulesSnapshot = deriveGenerationRules(derivedLearningProfile, rawProfileSnapshot);
@@ -551,6 +536,7 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json({ error: 'Curriculum not found' });
 
     try {
         // Fetch progress
@@ -562,19 +548,13 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
             [curriculumId, req.userId]
         );
 
-        // Fetch curriculum content for lesson resolution
-        const curriculumResult = await pool.query(
-            `select cv.content_json
-             from curricula c
-             join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
-        );
-        if (!curriculumResult.rowCount) {
+        // Fetch curriculum content for lesson resolution (the caller's own curricula only)
+        const content = await getOwnedCurriculumContent({ curriculumId, userId: req.userId });
+        if (!content) {
             return res.status(404).json({ error: 'Curriculum not found' });
         }
 
-        const curriculum = asObject(curriculumResult.rows[0].content_json);
+        const curriculum = asObject(content);
         const resumeCard = buildResumeCard({
             progress: progressResult.rows,
             curriculum,
@@ -600,6 +580,7 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
 
     const curriculumId = cleanString(req.params.id);
     const learnerProfileId = cleanString(req.body?.learner_profile_id);
+    if (!isUuid(curriculumId)) return res.status(404).json({ error: 'Curriculum not found' });
 
     try {
         // Fetch progress
@@ -610,18 +591,14 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
             [curriculumId, req.userId]
         );
 
-        // Fetch learner profile for personalization-aware adjustment
+        // Fetch learner profile for personalization-aware adjustment (the caller's own only)
         let derivedLearningProfile = {};
         let baseLoadMinutes = Number(req.body?.base_minutes) || 60;
         if (learnerProfileId) {
-            const lpResult = await pool.query(
-                `select derived_learning_profile, raw_profile from learner_profiles
-                 where id = CAST($1 AS uuid) order by version desc limit 1`,
-                [learnerProfileId]
-            );
-            if (lpResult.rowCount) {
-                derivedLearningProfile = asObject(lpResult.rows[0].derived_learning_profile);
-                const lifestyle = asObject(asObject(lpResult.rows[0].raw_profile).lifestyle);
+            const row = await getOwnedLearnerProfile({ profileId: learnerProfileId, userId: req.userId });
+            if (row) {
+                derivedLearningProfile = asObject(row.derived_learning_profile);
+                const lifestyle = asObject(asObject(row.raw_profile).lifestyle);
                 if (lifestyle.weekly_capacity_min) {
                     baseLoadMinutes = Math.round(Number(lifestyle.weekly_capacity_min) * 0.67);
                 }
@@ -654,15 +631,10 @@ router.get('/curricula/:id/summary-cards', requireBridgeOrAuth, async (req, res)
 
     const curriculumId = cleanString(req.params.id);
     try {
-        const result = await pool.query(
-            `select cv.content_json from curricula c
-             join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
-        );
-        if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        const content = await getOwnedCurriculumContent({ curriculumId, userId: req.userId });
+        if (!content) return res.status(404).json({ error: 'Curriculum not found' });
 
-        const cards = buildSummaryCards({ curriculum: asObject(result.rows[0].content_json) });
+        const cards = buildSummaryCards({ curriculum: asObject(content) });
         res.json({ ok: true, cards });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Summary cards error:', error);
@@ -678,15 +650,11 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
 
     const curriculumId = cleanString(req.params.id);
     const weekNumber = Number(req.query?.week) || 1;
+    if (!isUuid(curriculumId)) return res.status(404).json({ error: 'Curriculum not found' });
 
     try {
-        const [currResult, progressResult] = await Promise.all([
-            pool.query(
-                `select cv.content_json from curricula c
-                 join curriculum_versions cv on cv.id = c.current_version_id
-                 where c.id = CAST($1 AS uuid)`,
-                [curriculumId]
-            ),
+        const [content, progressResult] = await Promise.all([
+            getOwnedCurriculumContent({ curriculumId, userId: req.userId }),
             pool.query(
                 `select module_id, lesson_id, status, doc_completed_at, updated_at
                  from curriculum_progress
@@ -694,10 +662,10 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
                 [curriculumId, req.userId]
             ),
         ]);
-        if (!currResult.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        if (!content) return res.status(404).json({ error: 'Curriculum not found' });
 
         const digest = buildWeeklyDigest({
-            curriculum: asObject(currResult.rows[0].content_json),
+            curriculum: asObject(content),
             progress: progressResult.rows,
             weekNumber,
         });
@@ -716,15 +684,10 @@ router.get('/curricula/:id/encyclopedia', requireBridgeOrAuth, async (req, res) 
 
     const curriculumId = cleanString(req.params.id);
     try {
-        const result = await pool.query(
-            `select cv.content_json from curricula c
-             join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
-        );
-        if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        const content = await getOwnedCurriculumContent({ curriculumId, userId: req.userId });
+        if (!content) return res.status(404).json({ error: 'Curriculum not found' });
 
-        const encyclopedia = buildMiniEncyclopedia({ curriculum: asObject(result.rows[0].content_json) });
+        const encyclopedia = buildMiniEncyclopedia({ curriculum: asObject(content) });
         res.json({ ok: true, ...encyclopedia });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Encyclopedia error:', error);
@@ -741,6 +704,7 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json({ error: 'Curriculum not found' });
     const entry = {
         curriculum_id: curriculumId,
         module_id: cleanString(req.body?.module_id),
@@ -782,6 +746,7 @@ router.get('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json({ error: 'Curriculum not found' });
     try {
         const result = await pool.query(
             `select module_id, lesson_id, learned, difficulty, mood, confidence, time_spent_min, created_at
@@ -811,7 +776,7 @@ router.get('/journal/recent', requireBridgeOrAuth, async (req, res) => {
                     j.mood, j.confidence, j.time_spent_min, j.created_at,
                     c.title as curriculum_title
              from learning_journal j
-             left join curricula c on c.id = j.curriculum_id
+             left join curricula c on c.id = j.curriculum_id and c.user_id = j.user_id
              where j.user_id = CAST($1 AS uuid)
              order by j.created_at desc limit $2`,
             [req.userId, limit]
@@ -850,6 +815,9 @@ router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
     const curriculumVersionId = cleanString(req.body?.curriculum_version_id);
     if (!curriculumVersionId) {
         return res.status(400).json({ error: 'curriculum_version_id required' });
+    }
+    if (!isUuid(curriculumId) || !isUuid(curriculumVersionId)) {
+        return res.status(404).json({ error: 'Curriculum version not found' });
     }
 
     const client = await pool.connect();

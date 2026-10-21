@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Clock, Layers } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
+import { apiFetch } from '../../../services/apiClient';
 
 interface EncyclopediaEntry {
   module_id: string;
@@ -49,7 +50,8 @@ const EncyclopediaView: React.FC = () => {
 
   useEffect(() => {
     if (!courseId) return;
-    fetch(`/api/v2/curricula/${courseId}/encyclopedia`)
+    // apiFetch sends the user's token: the route only returns the caller's own curricula.
+    apiFetch(`/curricula/${courseId}/encyclopedia`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setData(d); })
       .catch(() => {})
