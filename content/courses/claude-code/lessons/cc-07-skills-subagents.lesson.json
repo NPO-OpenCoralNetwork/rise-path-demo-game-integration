@@ -774,12 +774,12 @@
               "options": [
                 {
                   "id": "b",
-                  "md": "`~/.claude/skills/api-guide/SKILL.md` に置く",
+                  "md": "`~/.claude/skills/api/SKILL.md` に置く",
                   "feedback": "ホームフォルダのスキルは、自分のすべてのプロジェクトで使う個人用です。チームと共有するには、プロジェクトの `.claude/skills/` に置いてコミットします。"
                 },
                 {
                   "id": "a",
-                  "md": "`.claude/skills/api-guide/SKILL.md` に置いてコミットする"
+                  "md": "`.claude/skills/api/SKILL.md` に置いてコミットする"
                 },
                 {
                   "id": "c",
@@ -788,7 +788,7 @@
                 },
                 {
                   "id": "d",
-                  "md": "`.claude/skills/api-guide.md` に置いてコミットする",
+                  "md": "`.claude/skills/api.md` に置いてコミットする",
                   "feedback": "スキルは、名前のフォルダの中に置いた `SKILL.md` です。フォルダを作らずにファイルだけを置く形にはしません。"
                 }
               ],
