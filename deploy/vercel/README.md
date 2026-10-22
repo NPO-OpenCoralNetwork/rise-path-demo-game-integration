@@ -192,7 +192,8 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 - GCP の予算アラート（手順 1）: 24 時間稼働の最初の 1 日分の費用が Billing のレポートに出たら、しきい値を見直す。手順 2 の月額は推定なので、実際の額で決め直す。
 - 稼働監視: `https://app.<domain>/api/v2/health` を外形監視する（edge には `{ ok, status }` だけを返す）。`ROUTER_EXTERNAL_TARGET_ERROR` や Cloudflare のエラーページは、`cloudflared` か VM が落ちている印。
-- Anthropic のコンソールで、利用上限かアラートを設定する（Hermes を有効にしたなら OpenRouter も）。公開直後はゲスト枠（`LLM_GUEST_DAILY_PER_IP`・`LLM_GUEST_DAILY_TOTAL`）と、サインイン済みの全ユーザー合計の日次上限（`AI_CAP_GLOBAL_*`。機能ごとの費用のブレーカー。日本時間 0 時にリセット。`deploy/risepath-vm/stack.env.example` を参照）を下げることも考える。全体の上限の 80% と 100% に達すると `[AI caps] global daily cap` のエラーログが出る。`AI_CAP_ALERT_WEBHOOK_URL` に Slack か Discord の Incoming Webhook を入れると、同じ内容が届く。
+- Anthropic のコンソールで、利用上限かアラートを設定する（Hermes を有効にしたなら OpenRouter も）。公開直後はサインイン済みの全ユーザー合計の日次上限（`AI_CAP_GLOBAL_*`。機能ごとの費用のブレーカー。日本時間 0 時にリセット。`deploy/risepath-vm/stack.env.example` を参照）を下げることも考える。全体の上限の 80% と 100% に達すると `[AI caps] global daily cap` のエラーログが出る。`AI_CAP_ALERT_WEBHOOK_URL` に Slack か Discord の Incoming Webhook を入れると、同じ内容が届く。
+- 未成年の安全対策（Phase 0.5）: ゲスト（ログインしていない人）は AI を使えない（`LLM_GUEST_AI` を設定しない既定。ゲスト枠 `LLM_GUEST_DAILY_*` はそのときだけ使う）。報告や止めた件数の通知は `SAFETY_ALERT_WEBHOOK_URL`（未設定なら `AI_CAP_ALERT_WEBHOOK_URL`）に届く。報告の確かめ方、紙の同意書の記録、虐待や命の危険が疑われるときの動き方は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md) を見る。
 - サインアップを公開するなら、Supabase の Email 認証の設定で「Confirm email」（メールアドレスの確認）が有効か確かめる。確認していないアカウントを量産して、有料の AI 機能の枠を増やせないようにするため（アプリには確認待ちの画面 `/auth/confirm-pending` がある）。
 - サインアップの公開前に、Supabase の Attack Protection で CAPTCHA（hCaptcha か Cloudflare Turnstile）も有効にする。ただし、アプリのサインアップとログインのフォームはまだ `captchaToken` を送らない。先に有効にするとログインできなくなるので、フォーム側の対応が入ってから有効にする。それまでは、Supabase の「Allow new users to sign up」を切ってサインアップを止めておくか、全体の上限（`AI_CAP_GLOBAL_*`）を低めにしておく。
 - `ORIGIN_SECRET` は定期的にローテーションする（上の 3 段階）。
@@ -211,12 +212,22 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
   ```
 
 - [ ] Authorization ヘッダーが routes を通って API に届く（`SMOKE_BEARER` を付けた smoke、またはログイン後のプロフィール表示）
-- [ ] チューターの応答が少しずつ表示される。DevTools の Network で `text/event-stream` になり、本文が分割して届く（Vercel の routes と Cloudflare Free が SSE をバッファしないか）
+- [ ] 18 歳以上のテスト用アカウントで、チューターの応答が少しずつ表示される。DevTools の Network で `text/event-stream` になり、本文が分割して届く（Vercel の routes と Cloudflare Free が SSE をバッファしないか）
 - [ ] 4.5 MB を超えるファイルのアップロードが成功する（外部転送のボディ上限）
 - [ ] TTS の音声が再生できる（`/audio/cache/...` が routes を通る）
 - [ ] AI の画像生成は止まっている（`GEMINI_ALLOWED` を設定しない既定。`/api/v2/image` は 503 `image_generation_unavailable` を返す）。`GEMINI_ALLOWED=true` にした環境でだけ、生成した画像が表示されるか（`/generated/img_...`）を見る
 - [ ] 画面に浮かぶ AI コーチ（共有の Hermes）が出ない（`VITE_FEATURE_AGENT_CHAT` を設定しない既定）。レッスンの AI チューターは使える
 - [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す
+- [ ] 未成年の安全対策（Phase 0.5。手順は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md)）。テスト用のアカウントを 2 つ（18 歳以上と 18 歳未満）使う。本物の子どもの情報は使わない:
+  - [ ] VM で migration 014 が当たっている（`deploy-stack.sh` の `db:migrate`）。`docker compose --env-file stack.env exec db psql -U risepath_app -d risepath -c '\d user_age'` で表が出る
+  - [ ] ログインしていない状態で AI を呼ぶと 401 `sign_in_required` になる（`LLM_GUEST_AI` を設定しない既定）。`/api/v2/llm/status` は 200 のまま
+  - [ ] 生まれた年と月を登録していないアカウントで、チューターを使おうとすると「AI を使う前に、ひとつだけ設定してください」の案内が出て、「AI の利用設定へ」ボタンで `/settings/ai-access` に進める（API は 403 `age_required`）。AI を使わないレッスンは読める
+  - [ ] 18 歳未満のアカウントで年月を登録すると、保護者の同意の画面になる。同意する前は AI を使えない（403 `guardian_consent_required`）
+  - [ ] 保護者の同意のあと、18 歳未満のアカウントのチューターの答えは、確認が終わってから**まとめて**表示される（少しずつ流れてこない。これは正しい動き）
+  - [ ] 18 歳未満のアカウントで、ふつうの学習の質問には答えが出る。架空の携帯番号（例: `090-0000-0000`）を書いて送ると、AI に答えさせずに「答えられません」という案内が出る（API は 422 `content_blocked`、`category: personal_info`）。この 1 件は管理者の安全のページの集計に「入力を止めた」として出る
+  - [ ] AI の答えの近くに「AI が作った答えです」の表示と「報告する」ボタンがある。報告を 1 件送ると、管理者のアカウントの `/settings/admin/safety` の「報告」に出て、「確認済みにする」で消える。`SAFETY_ALERT_WEBHOOK_URL`（または `AI_CAP_ALERT_WEBHOOK_URL`）を入れているなら、学習者の文章をふくまない通知が届く
+  - [ ] 18 歳未満のアカウントの「AI の利用設定」で保護者の同意をやめると、すぐに AI が使えなくなる
+  - [ ] ログインしていない状態で `https://app.<domain>/ai-safety` が開け、相談窓口の電話番号が出る
 - [ ] P-School の画像が出る（例: `https://app.<domain>/p_school/assets/armory.jpg`）
 - [ ] Hermes を有効にしたときだけ: AI エージェントが自分の教材を検索できる。テスト用の学習者で小さな教材をアップロードし、取り込みが終わってから、エージェントにその内容を質問する。答えに教材の内容が出れば、Hermes がツール呼び出しに `rp_turn` を渡している。出ずに「使えない」と返るときは、`docker compose --env-file stack.env logs mcp | grep session_binding_required` で確かめ、公開せずに止めて報告する
 - [ ] Hermes を有効にしたときだけ: 別の学習者でサインインし、同じ質問をしても、前の学習者の教材が出ない
