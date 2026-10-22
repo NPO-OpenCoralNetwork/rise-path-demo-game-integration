@@ -11,6 +11,13 @@
  * and no prefill, so the prompts (aiPrompts.js) ask for exactly one JSON object and
  * parseJsonReply reads it from plain JSON, a fenced block or the first balanced {...}.
  * Gateway failures are thrown as LlmError (server/llm/errors.js); the route maps them.
+ *
+ * Minors (Phase 0.5): with `{ audience: 'minor' }` each stage screens its learner text first (the
+ * topic message, revision feedback and the retrieved upload excerpts; server/safety/moderation.js)
+ * and its result before returning it, so nothing unscreened reaches the database (the route saves
+ * only what a stage returns). A block or failed check is thrown as SafetyError; its `direction`
+ * ('input' before the model ran, 'output' after) tells the route whether to give the unit back.
+ * The gateway call carries the audience, which adds the child-safety system part.
  */
 import { retrieveContext } from '../ragService.js';
 import {
@@ -19,6 +26,28 @@ import {
   buildCurriculumPrompt,
 } from './aiPrompts.js';
 import { getGateway } from '../llm/index.js';
+import { outputParts, screenForMinor } from '../safety/moderation.js';
+
+/**
+ * @typedef {{ signal?: AbortSignal, audience?: 'adult'|'minor', ip?: string | null }} StageOptions
+ */
+
+const SURFACE = 'course_generation';
+
+/** @param {string} label @param {unknown} text */
+const textPart = (label, text) => (typeof text === 'string' && text.trim() ? [{ label, text }] : []);
+/** Text the learner did not write (uploaded material): the classifier screens it, the local pre-filter does not. @param {string} label @param {unknown} text */
+const materialPart = (label, text) => textPart(label, text).map((p) => ({ ...p, prefilter: false }));
+
+/**
+ * Screen a minor's stage input or output (no-op for adults). Throws SafetyError.
+ * @param {'input'|'output'} direction @param {import('../safety/moderation.js').ScreenPart[]} parts
+ * @param {string | undefined} userId @param {StageOptions} options
+ */
+async function screenStage(direction, parts, userId, { audience, ip, signal } = {}) {
+  if (audience !== 'minor') return;
+  await screenForMinor({ direction, surface: SURFACE, parts, userId: userId ?? null, ip: ip ?? null, signal });
+}
 
 /** Gateway task for every stage (server/llm/models.config.js TASKS). */
 export const COURSE_GENERATE_TASK = 'course.generate';
@@ -145,12 +174,13 @@ export function parseJsonReply(text, accept = () => true) {
 /**
  * One gateway call for a stage. Throws LlmError on failure (no provider, rate limit, timeout…).
  * @param {{ stage: 'requirements'|'roadmap'|'curriculum', system: string, userMessage: string,
- *   userId?: string, input?: Record<string, unknown>, signal?: AbortSignal }} params
+ *   userId?: string, input?: Record<string, unknown>, signal?: AbortSignal, audience?: 'adult'|'minor' }} params
  */
-async function callCourseModel({ stage, system, userMessage, userId, input = {}, signal }) {
+async function callCourseModel({ stage, system, userMessage, userId, input = {}, signal, audience = 'adult' }) {
   const result = await getGateway().generate({
     task: COURSE_GENERATE_TASK,
     userId: userId ?? null,
+    audience,
     system: [{ text: system, cache: true }],
     messages: [{ role: 'user', content: userMessage }],
     locale: 'ja',
@@ -182,7 +212,9 @@ export function isStageReply(stage, value) {
 
 // --- Stage Handlers ---
 
-export async function generateRequirements(message, userId, kit, { signal } = {}) {
+/** @param {string} message @param {string} userId @param {any} kit @param {StageOptions} [options] */
+export async function generateRequirements(message, userId, kit, options = {}) {
+  const { signal, audience = 'adult' } = options;
   // RAG: search for relevant educational content
   let ragContext = '';
   try {
@@ -194,47 +226,50 @@ export async function generateRequirements(message, userId, kit, { signal } = {}
     console.warn('[AI Generator] RAG retrieval failed, continuing without:', e.message);
   }
 
+  await screenStage('input', [...textPart('learner topic', message), ...materialPart('uploaded material excerpts', ragContext)], userId, options);
+
   const system = buildRequirementsPrompt(kit, ragContext);
-  const result = await callCourseModel({ stage: 'requirements', system, userMessage: message, userId, input: { message }, signal });
+  const result = await callCourseModel({ stage: 'requirements', system, userMessage: message, userId, input: { message }, signal, audience });
 
-  if (!result.structuredData) {
-    return {
-      message: result.text,
-      intake: null,
-    };
-  }
-
-  return {
-    message: result.structuredData.message || result.text,
-    intake: result.structuredData.intake,
-  };
+  const reply = result.structuredData
+    ? { message: result.structuredData.message || result.text, intake: result.structuredData.intake }
+    : { message: result.text, intake: null };
+  await screenStage('output', outputParts(reply), userId, options);
+  return reply;
 }
 
-export async function generateRoadmap(intake, userId, kit, { signal } = {}) {
+/**
+ * The intake is an earlier, already screened stage result; a revision adds the learner's
+ * feedback as intake.revision_feedback, which a minor's call screens as input.
+ * @param {any} intake @param {string} userId @param {any} kit @param {StageOptions} [options]
+ */
+export async function generateRoadmap(intake, userId, kit, options = {}) {
+  const { signal, audience = 'adult' } = options;
+  await screenStage('input', textPart('revision feedback', intake?.revision_feedback), userId, options);
   const system = buildRoadmapPrompt(kit);
   const userMessage = `以下の学習要件に基づきロードマップを作成してください:\n\n${JSON.stringify(intake, null, 2)}`;
-  const result = await callCourseModel({ stage: 'roadmap', system, userMessage, userId, input: { intake }, signal });
+  const result = await callCourseModel({ stage: 'roadmap', system, userMessage, userId, input: { intake }, signal, audience });
 
-  if (!result.structuredData) {
-    return { message: result.text, modules: null };
-  }
-
-  return {
-    message: result.structuredData.message || result.text,
-    modules: result.structuredData.modules,
-  };
+  const reply = result.structuredData
+    ? { message: result.structuredData.message || result.text, modules: result.structuredData.modules }
+    : { message: result.text, modules: null };
+  await screenStage('output', outputParts(reply), userId, options);
+  return reply;
 }
 
-export async function generateCurriculum(intake, modules, userId, kit, { signal } = {}) {
+/** @param {any} intake @param {any} modules @param {string} userId @param {any} kit @param {StageOptions} [options] */
+export async function generateCurriculum(intake, modules, userId, kit, options = {}) {
+  const { signal, audience = 'adult' } = options;
   const system = buildCurriculumPrompt(kit);
   const userMessage = `以下の要件とロードマップに基づき、完全なカリキュラムを生成してください:\n\n## 要件\n${JSON.stringify(intake, null, 2)}\n\n## モジュール構成\n${JSON.stringify(modules, null, 2)}`;
-  const result = await callCourseModel({ stage: 'curriculum', system, userMessage, userId, input: { intake, modules }, signal });
+  const result = await callCourseModel({ stage: 'curriculum', system, userMessage, userId, input: { intake, modules }, signal, audience });
 
   if (!result.structuredData) {
+    // Nothing is saved or shown from a reply without a curriculum (the route answers 422).
     return { curriculum: null, rawText: result.text };
   }
 
-  return {
-    curriculum: result.structuredData.curriculum,
-  };
+  const reply = { curriculum: result.structuredData.curriculum };
+  await screenStage('output', outputParts(reply), userId, options);
+  return reply;
 }

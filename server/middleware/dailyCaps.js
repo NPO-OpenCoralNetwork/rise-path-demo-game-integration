@@ -282,20 +282,24 @@ const NOOP_HANDLE = Object.freeze({ refund: async () => {} });
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
- * AI_CAP_ALERT_WEBHOOK_URL as a URL, or the reason it cannot be used. An incoming-webhook URL is a
- * bearer secret, so no message ever contains it.
+ * An alert webhook setting as a URL, or the reason it cannot be used. An incoming-webhook URL is a
+ * bearer secret, so no message ever contains it. Also used for the safety alerts
+ * (server/safety/events.js), which pass their own variable name and require https.
  * @param {string} raw
+ * @param {{ name?: string, httpsOnly?: boolean }} [options]
  * @returns {URL | string}
  */
-function parseAlertWebhook(raw) {
+export function parseAlertWebhook(raw, { name = 'AI_CAP_ALERT_WEBHOOK_URL', httpsOnly = false } = {}) {
   let url;
   try {
     url = new URL(raw);
   } catch {
-    return 'AI_CAP_ALERT_WEBHOOK_URL is not a valid URL';
+    return `${name} is not a valid URL`;
   }
-  if (url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname))) return url;
-  return 'AI_CAP_ALERT_WEBHOOK_URL must use https:// (http:// only to localhost)';
+  if (url.protocol === 'https:') return url;
+  if (httpsOnly) return `${name} must use https://`;
+  if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)) return url;
+  return `${name} must use https:// (http:// only to localhost)`;
 }
 
 /**
@@ -304,7 +308,7 @@ function parseAlertWebhook(raw) {
  * @param {string} url  an href from parseAlertWebhook @param {string} line @param {typeof fetch} fetchImpl
  * @param {Pick<Console, 'warn'>} logger
  */
-async function postAlert(url, line, fetchImpl, logger) {
+export async function postAlert(url, line, fetchImpl, logger) {
   try {
     const response = await fetchImpl(url, {
       method: 'POST',

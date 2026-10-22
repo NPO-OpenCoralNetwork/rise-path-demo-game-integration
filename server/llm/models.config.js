@@ -94,6 +94,9 @@ export const TASKS = Object.freeze({
   'writing.feedback': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'assessment.insight': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'text.classify': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 1024 },
+  // Child-safety screen for minors' AI input and output (server/safety/moderation.js): one small
+  // JSON verdict. Thinking counts against maxTokens, so it leaves room above the tiny reply.
+  'safety.screen': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 2048 },
   // /api/v2/ai/generate (server/services/aiGenerator.js): requirements, roadmap and whole
   // curriculum replies as one JSON object. Long outputs, so streamed.
   'course.generate': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 32000, stream: true },

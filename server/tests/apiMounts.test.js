@@ -13,7 +13,7 @@ const BRIDGE_TOKEN = 'test-bridge-token-for-api-mounts';
 const SECRET = 'test-origin-secret-for-api-mounts-0123456789';
 const quietLogger = { warn: () => {} };
 
-const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY'];
+const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'AI_ACCESS_DEV_AUDIENCE', 'LLM_GUEST_AI', 'VITE_FEATURE_AGENT_CHAT'];
 
 const withApp = async (originGate, handler) => {
     const app = await createApp({ serveStatic: false, originGate });
@@ -79,6 +79,57 @@ describe('server.js /api/v2 mounts (production)', () => {
             assert.equal((await fetch(`${base}/api/v2/agent/health`, { headers: edge })).status, 401);
             const bearer = { Authorization: `Bearer ${BRIDGE_TOKEN}`, [ORIGIN_SECRET_HEADER]: SECRET };
             assert.equal((await fetch(`${base}/api/v2/agent/health`, { headers: bearer })).status, 401);
+        });
+    });
+
+    it('the AI access, safety and admin mounts want a JWT', async () => {
+        await withApp(undefined, async (base) => {
+            assert.equal((await fetch(`${base}/api/v2/user/ai-access`)).status, 401);
+            assert.equal((await fetch(`${base}/api/v2/user/ai-access/age`, { method: 'PUT', headers: bridge })).status, 401, 'not a bridge route');
+            assert.equal((await fetch(`${base}/api/v2/safety/reports`, { method: 'POST' })).status, 401);
+            assert.equal((await fetch(`${base}/api/v2/admin/safety/summary`, { headers: bridge })).status, 401);
+        });
+    });
+
+    it('AI POSTs: guests get 401 sign_in_required, GET /llm/status stays public', async () => {
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult'; // ignored in production
+        await withApp(undefined, async (base) => {
+            const status = await fetch(`${base}/api/v2/llm/status`);
+            assert.equal(status.status, 200);
+            await status.text();
+            const guest = await fetch(`${base}/api/v2/llm/tutor`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: 'hi',
+                    lesson: { courseId: 'vibe', lessonId: 'ch1', title: 'Vibe Coding', objectives: ['explain the flow'] },
+                    anchor: { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'Write the goal first.' },
+                }),
+            });
+            assert.equal(guest.status, 401);
+            assert.equal((await guest.json()).error_type, 'sign_in_required');
+        });
+    });
+
+    it('without a database the AI access gate fails closed (503), even for the bridge user', async () => {
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult'; // ignored in production
+        process.env.VITE_FEATURE_AGENT_CHAT = 'true';
+        await withApp(undefined, async (base) => {
+            const chat = await fetch(`${base}/api/v2/agent/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...bridge },
+                body: JSON.stringify({ skill: 'life-habit-analyst', message: 'hi' }),
+            });
+            assert.equal(chat.status, 503);
+            assert.equal((await chat.json()).error_type, 'ai_access_unavailable');
+            // External course drafts: the bridge token is the operator path, not gated (then no DB).
+            const draft = await fetch(`${base}/api/v2/ai/curriculum-drafts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...bridge },
+                body: JSON.stringify({}),
+            });
+            assert.notEqual(draft.status, 403);
+            assert.notEqual((await draft.json()).error_type, 'ai_access_unavailable');
         });
     });
 

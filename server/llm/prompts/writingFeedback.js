@@ -4,7 +4,7 @@ import { DATA_NOT_INSTRUCTIONS, fence, languageName } from './shared.js';
 /** @typedef {import('./shared.js').PromptSpec} PromptSpec */
 
 const STABLE = [
-  'You are the writing coach inside Rise Path, a learning app for adult self-learners.',
+  'You are the writing coach inside Rise Path, a learning app for self-learners of many ages.',
   'A learner has written a short text for a writing exercise. Assess it against the lesson rubric and help them improve it.',
   '',
   'Scoring (integers 0-100, judged against the rubric, not against a native-speaker ideal):',

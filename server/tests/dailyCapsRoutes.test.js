@@ -42,7 +42,7 @@ const ENV_KEYS = [
     'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1',
     'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY',
     'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'HERMES_API_URL', 'AI_CAP_ALERT_WEBHOOK_URL',
-    'VITE_FEATURE_AGENT_CHAT', ...CAP_KEYS,
+    'VITE_FEATURE_AGENT_CHAT', 'AI_ACCESS_DEV_AUDIENCE', 'LLM_GUEST_AI', ...CAP_KEYS,
 ];
 
 const withServer = async (handler) => {
@@ -193,6 +193,10 @@ describe('daily caps on the API routes', () => {
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'development';
         process.env.LLM_MOCK_DELAY_MS = '0';
+        // Past the AI access gate (aiAccessGate.js) without age rows, so the recorded queries are the
+        // caps' alone; guests may use AI (LLM_GUEST_AI). aiAccessRoutes.test.js covers the gate.
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult';
+        process.env.LLM_GUEST_AI = 'true';
         resetGatewayForTests();
         resetPoolForTests();
         setPoolForTests(null);

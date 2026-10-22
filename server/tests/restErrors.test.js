@@ -22,7 +22,7 @@ const MALFORMED = ['not-a-uuid', `${GOOD}x`];
 // which puts the message in its own text.
 const SECRET = 'relation "secret_table" does not exist (host db.internal:5432)';
 
-const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'RISE_PATH_BRIDGE_TOKEN', 'DATABASE_URL_PHASE1', 'TRUST_PROXY', 'ORIGIN_SECRET', 'KOKORO_TTS_CACHE_DIR'];
+const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'RISE_PATH_BRIDGE_TOKEN', 'DATABASE_URL_PHASE1', 'TRUST_PROXY', 'ORIGIN_SECRET', 'KOKORO_TTS_CACHE_DIR', 'AI_ACCESS_DEV_AUDIENCE'];
 
 const EMPTY = { rowCount: 0, rows: [] };
 const norm = (sql) => String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
@@ -178,6 +178,7 @@ describe('REST error answers', () => {
         // Outside production: the old answers sent the database text here (lifeJournal.js only here).
         process.env.NODE_ENV = 'development';
         process.env.KOKORO_TTS_CACHE_DIR = cacheDir;
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult'; // past the AI access gate (aiAccessGate.js) without age rows
         resetDailyCapsForTests();
         setSupabaseForTests({
             auth: { getUser: async (token) => ({ data: { user: token === 'token-a' ? { id: USER_A } : null }, error: null }) },

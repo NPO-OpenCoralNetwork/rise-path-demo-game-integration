@@ -12,7 +12,10 @@
  *   `output_config.effort` per task. Thinking tokens count against `max_tokens`, so task limits
  *   leave room for them. No sampling parameters (rejected by the current models).
  * - The stable system prefix carries `cache_control` so repeated calls read it from cache.
+ * - `metadata.user_id` is an opaque per-user id (anthropicUserId: a hash, never the account id,
+ *   name or email), so Anthropic's abuse signals point at one learner without identifying them.
  */
+import { createHash } from 'node:crypto';
 import { LlmError } from '../errors.js';
 import { ANTHROPIC_SERVER_FALLBACK_MODELS } from '../models.config.js';
 import { toLlmJsonSchema, validateStructured } from '../structured.js';
@@ -21,6 +24,17 @@ import { toLlmJsonSchema, validateStructured } from '../structured.js';
 /** @typedef {import('../models.config.js').TaskRoute} TaskRoute */
 
 const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+/**
+ * The opaque id sent as metadata.user_id: the first 32 hex characters of
+ * sha256('risepath:' + userId), or null without a user (guests send none).
+ * @param {unknown} userId
+ * @returns {string | null}
+ */
+export function anthropicUserId(userId) {
+  if (userId == null || userId === '') return null;
+  return createHash('sha256').update(`risepath:${String(userId)}`).digest('hex').slice(0, 32);
+}
 const NON_STREAMING_MAX_TOKENS = 16000;
 
 /** Lazy SDK load keeps server start fast and lets tests run without the network. */
@@ -136,6 +150,7 @@ export function createAnthropicProvider(options) {
    */
   function buildParams(req, route, outputFormat) {
     const useFallbacks = serverFallbacks && ANTHROPIC_SERVER_FALLBACK_MODELS.has(route.model);
+    const opaqueUser = anthropicUserId(req.userId);
     return {
       model: route.model,
       max_tokens: route.maxTokens,
@@ -143,6 +158,7 @@ export function createAnthropicProvider(options) {
       messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
       thinking: { type: /** @type {const} */ ('adaptive') },
       output_config: { effort: route.effort, ...(outputFormat ? { format: outputFormat } : {}) },
+      ...(opaqueUser ? { metadata: { user_id: opaqueUser } } : {}),
       ...(useFallbacks ? { betas: [SERVER_FALLBACK_BETA], fallbacks: /** @type {const} */ ('default') } : {}),
     };
   }

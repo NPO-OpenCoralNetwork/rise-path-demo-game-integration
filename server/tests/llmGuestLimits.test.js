@@ -180,7 +180,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
 
 // ---------------------------------------------------------------------------------------------
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'LLM_GUEST_AI', 'AI_ACCESS_DEV_AUDIENCE'];
 
 const withServer = async (handler) => {
     const app = await createApp({ serveStatic: false });
@@ -211,6 +211,9 @@ describe('/api/v2/llm guest tutor and guest budget', () => {
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'development';
         process.env.LLM_MOCK_DELAY_MS = '0';
+        // These cases exercise anonymous calls: guests may use AI only with LLM_GUEST_AI=true
+        // (server/middleware/aiAccessGate.js); signed-in callers without a pool count as adults.
+        process.env.LLM_GUEST_AI = 'true';
         resetGatewayForTests();
         resetPoolForTests();
         setPoolForTests(null);

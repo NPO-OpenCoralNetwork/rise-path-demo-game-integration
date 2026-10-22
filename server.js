@@ -18,12 +18,17 @@ import agentRoutes from './server/routes/agent.js';
 import contentRoutes from './server/routes/content.js';
 import userRoutes from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
+import aiAccessRoutes from './server/routes/aiAccess.js';
+import safetyRoutes from './server/routes/safety.js';
+import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
 import { dailyCap } from './server/middleware/dailyCaps.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
+import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
+import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
@@ -135,26 +140,48 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     });
 
     // --- Mount V2 Routes ---
+    // AI access gate (Phase 0.5 minor safeguards, server/middleware/aiAccessGate.js): every POST
+    // that calls a model needs sign-in (guests only with LLM_GUEST_AI=true), a recorded age and, under
+    // 18, a guardian's consent. It runs after auth and before the daily caps, so a refused call is
+    // never charged, and sets res.locals.aiAudience for the safety checks.
     app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
     // LLM gateway: mounted before the blanket /api/v2 auth below so guests are not 401'd in strict
     // mode; optionalAuth sets req.userId when a token is present; the AI limiter covers its POSTs.
+    // GET /status stays public and ungated; the POSTs run the gate inside guarded() (llm.js).
     app.use(
         '/api/v2/llm',
         optionalAuth,
         originGuard(isAllowedLlmOrigin),
-        createLlmRouter({ limiter: aiLimiter, guestBudget: createGuestBudget(), userCap: dailyCap('llm') }),
+        createLlmRouter({
+            limiter: aiLimiter,
+            guestBudget: createGuestBudget(),
+            userCap: dailyCap('llm'),
+            aiAccess: aiAccessGate(),
+        }),
     );
     // Course generator (ai.js) requires auth. Scoped to its own paths: chatgptCurriculumRoutes also
     // serves /api/v2/ai/* (generation-kit, curriculum-drafts…) with bridge-token auth further down.
     app.use(['/api/v2/ai/generate', '/api/v2/ai/drafts'], requireAuth);
-    app.use('/api/v2/ai', aiLimiter, aiRoutes);              // AI rate limit (keyed by req.userId once authed)
+    app.use('/api/v2/ai', aiLimiter);                        // AI rate limit (keyed by req.userId once authed)
+    app.post('/api/v2/ai/generate', aiAccessGate());          // before its daily cap (inside ai.js)
+    app.use('/api/v2/ai', aiRoutes);
     // AI rate limit for image generation, uploads and RAG indexing (served by contentRoutes below).
     app.use(['/api/v2/image', '/api/v2/upload', '/api/v2/rag'], requireAuth, aiLimiter);
+    // Image generation and Hermes (/agent/chat) have no minor screening and no child-safety prompt
+    // part, so they are adults only (403 adults_only for a minor, even with a guardian consent).
+    app.post('/api/v2/image', aiAccessGate({ adultsOnly: true })); // before its daily cap (content.js)
+    // The learner's age and guardian consent (server/routes/aiAccess.js).
+    app.use('/api/v2/user/ai-access', requireAuth, aiAccessRoutes);
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
+    // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
+    // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).
+    app.use('/api/v2/safety', requireAuth, safetyRoutes);
+    app.use('/api/v2/admin', requireAuth, requireAdmin, adminSafetyRoutes);
     app.use('/api/v2', chatgptCurriculumRoutes);             // uses own Bridge/JWT auth (§4.6)
     app.use('/api/v2', lifeJournalRoutes);                   // Phase 16: life journal (Bridge/JWT auth)
     app.use('/api/v2', learnerMemoryRoutes);                 // Phase 19: learner semantic memory (Bridge/JWT auth)
     app.use('/api/v2/agent', requireBridgeOrAuth, aiLimiter); // Phase 16-6d: auth before AI rate limit
+    app.post('/api/v2/agent/chat', aiAccessGate({ adultsOnly: true })); // adults only (see /image); before its daily cap (agent.js)
     app.use('/api/v2', agentRoutes);
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
     app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
@@ -236,6 +263,7 @@ async function main() {
     await loadEnvFile('.env.local');
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
+    for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
 
     // Checked before createApp so a weak value stops startup with a clear error; never logs values.
     const originSecrets = readOriginSecrets(process.env).length;

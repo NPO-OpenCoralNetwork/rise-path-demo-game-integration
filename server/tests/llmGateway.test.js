@@ -342,6 +342,30 @@ describe('Anthropic provider request shape (fake API server)', () => {
         });
     });
 
+    it('sends an opaque metadata.user_id for a signed-in user (never the id itself), none for guests', async () => {
+        await withFakeAnthropic(({ body, res }) => sendJson(res, anthropicMessage(body, 'ok')), async (baseUrl, requests) => {
+            const gateway = createGateway({ env: env(baseUrl), logger: quietLogger });
+            const userId = '11111111-1111-4111-8111-111111111111';
+            await gateway.generate({ task: 'text.classify', userId, messages: userMessage });
+            await gateway.generate({ task: 'text.classify', messages: userMessage });
+            assert.match(requests[0].body.metadata.user_id, /^[0-9a-f]{32}$/);
+            assert.ok(!JSON.stringify(requests[0].body).includes(userId));
+            assert.equal(requests[1].body.metadata, undefined);
+        });
+    });
+
+    it("a minor's request carries the child-safety part last, without cache_control", async () => {
+        await withFakeAnthropic(({ body, res }) => sendJson(res, anthropicMessage(body, 'ok')), async (baseUrl, requests) => {
+            const gateway = createGateway({ env: env(baseUrl), logger: quietLogger });
+            await gateway.generate({ task: 'tutor.chat', audience: 'minor', system: [{ text: 'Stable', cache: true }, { text: 'Per request' }], messages: userMessage });
+            const { system } = requests[0].body;
+            assert.equal(system.length, 3);
+            assert.deepEqual(system[0].cache_control, { type: 'ephemeral' });
+            assert.equal(system[2].cache_control, undefined);
+            assert.match(system[2].text, /under 18/);
+        });
+    });
+
     it('maps stop_reason refusal and max_tokens to typed errors', async () => {
         let stopReason = 'refusal';
         await withFakeAnthropic(({ body, res }) => sendJson(res, anthropicMessage(body, stopReason === 'refusal' ? null : 'cut', stopReason)), async (baseUrl) => {
