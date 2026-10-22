@@ -76,7 +76,7 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
 
     // --- Middleware ---
     // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
-    // get 403 before CORS, body parsing, logging or the limiters run (and before a 50 MB body is read).
+    // get 403 before CORS, body parsing, logging or the limiters run (and before any body is read).
     // Without it, only requests that came through Cloudflare get 403.
     app.use(createOriginGate({ ...originGate }));
     // Every response: no MIME sniffing. API responses: not cached by Vercel, Cloudflare or the
@@ -87,13 +87,39 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         next();
     });
 
-    // CORS: open for the existing API, but the LLM gateway answers only the app's own origins
-    // (server/llm/guestAccess.js), so other sites cannot use visitors' browsers as a model proxy.
+    // CORS: the whole API answers only the app's own origins (server/llm/guestAccess.js:
+    // LLM_ALLOWED_ORIGINS, the same host, and the dev server when not in production). A page on
+    // another site can then neither read the API's answers nor send it JSON or authenticated
+    // requests, which need a preflight. (CORS is not access control: a simple request still runs.)
     const isAllowedLlmOrigin = createOriginPolicy();
-    const openCors = cors();
-    const llmCors = cors((req, callback) => callback(null, { origin: isAllowedLlmOrigin(req.headers.origin, req) }));
-    app.use((req, res, next) => (req.path.startsWith('/api/v2/llm') ? llmCors : openCors)(req, res, next));
-    app.use(express.json({ limit: '50mb' }));
+    // A refused preflight ends here instead of reaching auth (a 401 in the log) or a rate limit.
+    app.use((req, res, next) => {
+        const { origin } = req.headers;
+        if (req.method !== 'OPTIONS' || !origin || !req.headers['access-control-request-method']) return next();
+        if (isAllowedLlmOrigin(origin, req)) return next();
+        res.vary('Origin');
+        return res.status(204).end();
+    });
+    app.use(cors((req, callback) => callback(null, { origin: isAllowedLlmOrigin(req.headers.origin, req) })));
+    // The largest real JSON body (a curriculum draft) is far below the limit. Uploads are
+    // multipart, which this parser does not read.
+    const JSON_BODY_LIMIT_MB = 2;
+    app.use(express.json({ limit: `${JSON_BODY_LIMIT_MB}mb` }));
+    // The parser's refusals as JSON instead of Express's HTML page (with a stack trace outside
+    // production). Only errors from express.json reach this handler.
+    app.use((err, req, res, next) => {
+        const status = err?.status ?? err?.statusCode;
+        if (!err?.type || !(status >= 400 && status < 500)) return next(err);
+        console.warn(`[Body] ${status} ${err.type}: ${req.method} ${req.originalUrl}`);
+        if (status === 413) {
+            return res.status(413).json({ error: `The request body is larger than ${JSON_BODY_LIMIT_MB} MB.`, error_type: 'payload_too_large' });
+        }
+        if (status === 415) {
+            return res.status(415).json({ error: 'The request body uses an unsupported charset or encoding.', error_type: 'unsupported_media_type' });
+        }
+        const error = err.type === 'entity.parse.failed' ? 'The request body is not valid JSON.' : 'The request body could not be read.';
+        return res.status(400).json({ error, error_type: 'validation' });
+    });
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
     // path when a scoped middleware (e.g. /api/v2/agent auth) answers.
