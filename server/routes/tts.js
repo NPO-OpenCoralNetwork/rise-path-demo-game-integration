@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { checkKokoroHealth, requestTts } from '../../tools/core/kokoroTts.js';
+import { errorDetail } from '../errorDetail.js';
 
 const router = Router();
 
@@ -46,9 +47,16 @@ router.post('/tts/synthesize', async (req, res) => {
             lesson_id,
         });
 
+        // A bad request is the caller's to fix: say what was wrong.
+        if (result.error_type === 'validation') return res.status(400).json(result);
         if (result.error_type) {
-            const status = result.error_type === 'validation' ? 400 : 503;
-            return res.status(status).json(result);
+            // The sidecar's own text (ffmpeg or onnxruntime output, temporary paths) stays in the log.
+            console.warn('[TTS API] synthesis unavailable:', result.error, result.details ?? '');
+            return res.status(503).json({
+                error: 'Voice service is unavailable',
+                error_type: result.error_type,
+                ...errorDetail([result.error, result.details].filter(Boolean).join(': ')),
+            });
         }
 
         const { buffer, cache_key: _cacheKey, ...payload } = result;
@@ -58,7 +66,7 @@ router.post('/tts/synthesize', async (req, res) => {
         return res.status(500).json({
             error: 'TTS synthesis failed',
             error_type: 'internal',
-            details: err.message,
+            ...errorDetail(err),
         });
     }
 });

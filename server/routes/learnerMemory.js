@@ -2,6 +2,7 @@ import express from 'express';
 import { getPool } from '../db.js';
 import { respondIfDbUnavailable } from '../dbUnavailable.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
+import { errorDetail } from '../errorDetail.js';
 import {
     getAiMemoryPrivacySettings,
     updateAiMemoryPrivacySettings,
@@ -18,7 +19,7 @@ const router = express.Router();
 const respondServerError = (res, label, error) => {
     if (respondIfDbUnavailable(res, error)) return;
     console.error(`[Learner Memory API] ${label}:`, error);
-    res.status(500).json({ error: label, detail: error?.message });
+    res.status(500).json({ error: label, ...errorDetail(error) });
 };
 
 const sendBridgeResult = (res, result) => {

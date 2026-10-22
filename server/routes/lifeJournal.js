@@ -1,6 +1,7 @@
 import express from 'express';
 import { getPool } from '../db.js';
 import { respondIfDbUnavailable } from '../dbUnavailable.js';
+import { errorDetail } from '../errorDetail.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import {
     validateDailyPayload,
@@ -38,11 +39,7 @@ const router = express.Router();
 const respondServerError = (res, label, error) => {
     if (respondIfDbUnavailable(res, error)) return;
     console.error(`[Life Journal API] ${label}:`, error);
-    const body = { error: label };
-    if (process.env.NODE_ENV !== 'production') {
-        body.detail = error.message;
-    }
-    res.status(500).json(body);
+    res.status(500).json({ error: label, ...errorDetail(error) });
 };
 
 // PUT /api/v2/life-journal/daily/:date
