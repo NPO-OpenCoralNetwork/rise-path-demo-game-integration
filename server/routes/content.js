@@ -70,7 +70,15 @@ const IMAGE_ASPECT_RATIOS = new Set(['1:1', '3:4', '4:3', '9:16', '16:9']);
 const IMAGE_SIZES = new Set(['1K', '2K']);
 
 /** Daily 'embeddings' cap for whole-file embedding; given back when the route ends before it. */
-const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 413, 500, 503] });
+const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 404, 413, 500, 503] });
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Gemini refused an image call before generating anything: no key, a key it does not accept
+ * (Gemini answers 400 API_KEY_INVALID, 401 or 403), or its own rate limit (429). Not counted.
+ */
+const geminiImageNeverRan = (error) => error?.code === 'GEMINI_NOT_CONFIGURED' || [400, 401, 403, 429].includes(error?.status);
 
 // --- Routes ---
 
@@ -153,6 +161,8 @@ router.post('/upload', embeddingsCap, receiveFile, async (req, res) => {
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
             console.error('Immediate Ingestion failed:', ingestErr);
+            // Nothing was embedded (the text could not be read): the 'embeddings' unit goes back.
+            if (ingestErr?.ingestStage === 'extract') void res.locals.refundDailyCap?.();
             res.json({ ok: true, material_id: materialId, status: 'uploaded' });
         }
     } catch (error) {
@@ -224,10 +234,10 @@ router.post('/image', async (req, res) => {
         imageCache.set(cacheKey, { url, mimeType });
         res.json({ ok: true, image: result.data, mimeType, text: result.text, url });
     } catch (error) {
-        console.error('[Content API] Image Error:', error.message);
-        // No key: Gemini was never called, so the image is not counted.
-        if (error?.message === 'Gemini API Key missing') void cap?.refund();
-        res.status(500).json({ error: 'Image generation failed', detail: error.message });
+        // The provider's own text stays in this log; the client gets a fixed answer.
+        console.error('[Content API] Image Error:', error?.status ?? '', error?.message);
+        if (geminiImageNeverRan(error)) void cap?.refund();
+        res.status(error?.status === 429 ? 503 : 500).json({ error: 'Image generation failed', error_type: 'image_failed' });
     }
 });
 
@@ -236,15 +246,23 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     
-    const { material_id } = req.body;
-    if (!material_id) return res.status(400).json({ error: 'material_id required' });
+    const materialId = req.body?.material_id;
+    if (typeof materialId !== 'string' || !UUID_RE.test(materialId)) {
+        return res.status(400).json({ error: 'material_id must be a UUID', error_type: 'invalid_body' });
+    }
 
     try {
+        // Only the caller's own material: the job re-embeds it and rewrites its chunks.
+        const owned = await pool.query(
+            'select 1 from materials where id = $1::uuid and user_id = $2::uuid',
+            [materialId, req.userId]
+        );
+        if (!owned.rowCount) return res.status(404).json({ error: 'Material not found' });
         const result = await pool.query(
             `insert into jobs (user_id, type, status, payload)
              values (CAST($1 AS uuid), 'ingest', 'queued', $2)
              returning id, status`,
-            [req.userId, JSON.stringify({ material_id })]
+            [req.userId, JSON.stringify({ material_id: materialId })]
         );
         res.json({ job_id: result.rows[0].id, status: 'queued' });
     } catch (error) {
@@ -253,15 +271,15 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
     }
 });
 
-// GET /api/v2/jobs/:id
+// GET /api/v2/jobs/:id — the caller's own jobs only; `error` is a short code (server/jobWorker.js).
 router.get('/jobs/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     try {
         const result = await pool.query(
-            'select status, progress, error from jobs where id = CAST($1 AS uuid)',
-            [req.params.id]
+            'select status, progress, error from jobs where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
+            [req.params.id, req.userId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Job not found' });
         res.json(result.rows[0]);

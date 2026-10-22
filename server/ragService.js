@@ -61,10 +61,15 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
  */
 export const MAX_CHUNKS_PER_MATERIAL = 200;
 
+/**
+ * Read, chunk, embed and store one material. A failure carries `ingestStage`: 'extract' (the file
+ * could not be read or split: nothing was embedded), 'embed' or 'store'.
+ */
 export const ingestMaterial = async (materialId, filePath, mimeType, userId) => {
     const pool = getPool();
     if (!pool) throw new Error("DB not configured");
     
+    let stage = 'extract';
     try {
         const text = await extractText(filePath, mimeType);
         const allChunks = await chunkText(text);
@@ -73,8 +78,10 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             console.warn(`[RAG] Material ${materialId}: ${allChunks.length} chunks; indexing the first ${MAX_CHUNKS_PER_MATERIAL} (MAX_CHUNKS_PER_MATERIAL).`);
         }
         // Embed (batched) before opening the transaction so no DB connection is held during API calls.
+        stage = 'embed';
         const vectors = await embedTexts(chunks);
         
+        stage = 'store';
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
@@ -118,6 +125,7 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         }
     } catch (e) {
         console.error("Ingestion failed:", e);
+        if (e && typeof e === 'object' && !('ingestStage' in e)) e.ingestStage = stage;
         throw e;
     }
 };

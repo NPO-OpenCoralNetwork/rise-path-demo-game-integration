@@ -21,10 +21,26 @@ const getPool = () => {
 
 const POLLING_INTERVAL_MS = 2000;
 
+/**
+ * The short code stored in jobs.error (GET /api/v2/jobs/:id shows it to the learner). The raw
+ * message, which can hold absolute server paths and file names, goes to the server log only.
+ */
+export function jobErrorCode(error) {
+    if (error?.jobErrorCode) return error.jobErrorCode;
+    if (error?.code === 'ENOENT') return 'file_missing';
+    if (error?.ingestStage === 'extract') return 'extract_failed';
+    if (error?.ingestStage === 'embed') return 'embed_failed';
+    return 'job_failed';
+}
+
+const jobError = (message, code) => Object.assign(new Error(message), { jobErrorCode: code });
+
 export class JobWorker {
-    constructor() {
+    /** @param {{ getPool?: () => any }} [options]  getPool: tests pass a mock pool */
+    constructor({ getPool: poolFn = getPool } = {}) {
         this.isRunning = false;
         this.timeoutId = null;
+        this.getPool = poolFn;
     }
 
     start() {
@@ -56,7 +72,7 @@ export class JobWorker {
     }
 
     async processNextJob() {
-        const pool = getPool();
+        const pool = this.getPool();
         if (!pool) {
             // Wait for env/pool
             return; 
@@ -124,16 +140,20 @@ export class JobWorker {
     }
 
     async handleJob(job) {
-        const pool = getPool();
+        const pool = this.getPool();
         
         try {
             if (job.type === 'ingest') {
                 const { material_id } = job.payload;
-                if (!material_id) throw new Error("Missing material_id");
+                if (!material_id) throw jobError("Missing material_id", 'material_not_found');
 
-                // Get Material details to find path
-                const matRes = await pool.query('SELECT storage_path, type FROM materials WHERE id = $1', [material_id]);
-                if (matRes.rowCount === 0) throw new Error("Material not found");
+                // Get Material details to find path. Only the job owner's material: the job
+                // re-embeds it and rewrites its chunks.
+                const matRes = await pool.query(
+                    'SELECT storage_path, type FROM materials WHERE id = $1 AND user_id = $2',
+                    [material_id, job.user_id]
+                );
+                if (matRes.rowCount === 0) throw jobError("Material not found", 'material_not_found');
                 
                 const material = matRes.rows[0];
                 const filePath = path.resolve(PROJECT_ROOT, material.storage_path);
@@ -141,7 +161,7 @@ export class JobWorker {
 
                 await ingestMaterial(material_id, filePath, mimeType, job.user_id);
             } else {
-                throw new Error(`Unknown job type: ${job.type}`);
+                throw jobError(`Unknown job type: ${job.type}`, 'unknown_job_type');
             }
 
             // Mark Done
@@ -158,7 +178,7 @@ export class JobWorker {
                 UPDATE jobs 
                 SET status = 'error', error = $2, updated_at = NOW() 
                 WHERE id = $1
-            `, [job.id, error.message]);
+            `, [job.id, jobErrorCode(error)]);
         }
     }
 }

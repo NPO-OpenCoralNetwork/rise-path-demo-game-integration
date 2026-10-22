@@ -37,6 +37,16 @@ export const getSupabase = () => {
 };
 
 /**
+ * Tests: a stand-in client whose auth.getUser(token) names the user, or null for none (dev
+ * fallback). Replaces what initSupabase() set up.
+ * @param {{ auth: { getUser: (token: string) => Promise<{ data: { user: { id: string } | null }, error: unknown }> } } | null} client
+ */
+export function setSupabaseForTests(client) {
+    _supabase = client;
+    _initAttempted = true;
+}
+
+/**
  * Initialize Supabase client. Call once at server startup.
  * Safe to call multiple times; only first call has effect.
  */

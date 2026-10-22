@@ -24,7 +24,7 @@ import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -127,7 +127,8 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         max: isDev ? 100 : 10,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: (req) => req.userId || req.ip,
+        // Guests by address, an IPv6 one by its /56 (one connection can switch inside it).
+        keyGenerator: (req) => req.userId || ipKeyGenerator(req.ip ?? ''),
         message: { error: 'AI rate limit exceeded. Max 10 requests/min.' },
         validate: { keyGeneratorIpFallback: false },
     });
