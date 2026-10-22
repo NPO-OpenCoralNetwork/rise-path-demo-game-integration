@@ -103,7 +103,7 @@ describe('admin safety routes', () => {
     it('GET /safety/reports lists reports with their text, filters by status, and marks cleared text', async () => {
         let seen;
         pool = makePool((sql, params) => {
-            if (sql.startsWith('select id, created_at, user_id, audience, surface, category, detail')) {
+            if (sql.startsWith('select id, created_at, user_id, audience, surface, category,')) {
                 seen = { sql, params };
                 return { rows: [
                     { id: REPORT_ID, created_at: new Date('2026-10-20T01:00:00Z'), user_id: CHILD, audience: 'minor', surface: 'tutor', category: 'harmful', detail: { reason: 'harmful', answer: 'A', question: 'Q', context: { lessonId: 'l1' } }, status: 'open', reviewed_by: null, reviewed_at: null },
@@ -116,7 +116,10 @@ describe('admin safety routes', () => {
         await withAdmin(async (base) => {
             const result = await call(`${base}/safety/reports?status=open&limit=500`);
             assert.equal(result.status, 200);
-            assert.deepEqual(seen.params, [200, 'open'], 'limit is capped; status is a parameter');
+            assert.deepEqual(seen.params, [200, 90, 365, 'open'], 'limit is capped; retention days and status are parameters');
+            // Retention holds even before the next prune: text past 90 days reads as null, rows past 365 days are not listed.
+            assert.match(seen.sql, /case when created_at < now\(\) - make_interval\(days => \$2::int\) then null else detail end as detail/);
+            assert.match(seen.sql, /created_at >= now\(\) - make_interval\(days => \$3::int\)/);
             const [first, second] = result.json.reports;
             assert.equal(first.answer, 'A');
             assert.equal(first.question, 'Q');
@@ -128,7 +131,7 @@ describe('admin safety routes', () => {
             assert.equal(second.answer, null);
 
             assert.equal((await call(`${base}/safety/reports?status=all`)).status, 200);
-            assert.deepEqual(seen.params, [50]);
+            assert.deepEqual(seen.params, [50, 90, 365]);
             assert.equal((await call(`${base}/safety/reports?status=deleted`)).status, 400);
             assert.equal((await call(`${base}/safety/reports?before=yesterday`)).status, 400);
         });

@@ -2,7 +2,8 @@
  * Phase 0.5 front-end regressions that node:test cannot render (no JSX transform here), so they
  * check the source of the components:
  * - AiAccessSetupView: withdrawing consent from a page that opened with consent in place (ready or
- *   paused) moves focus to the consent step heading, not <body>.
+ *   paused) moves focus to the consent step heading, not <body>; so does a 409 age_already_set on
+ *   the birth month save, which reloads into the next step.
  * - AdminSafetyView: after mark reviewed, paper consent, birth month and revoke, focus moves to a
  *   stable target (the reports heading or the "saved" status line, both tabIndex=-1).
  * - TutorPanel: the AI notice and report button show under any assistant text left on screen once
@@ -37,6 +38,12 @@ describe('AiAccessSetupView: focus after withdrawing consent', () => {
       assert.match(handler, /setAdvanced\(true\)/, `${card} onRevoked must call setAdvanced(true)`);
     });
   }
+
+  it('AgeStep onAlreadySet (409 age_already_set) lets the next step take focus', () => {
+    const jsx = element(view, 'AgeStep');
+    const handler = jsx.slice(jsx.indexOf('onAlreadySet='));
+    assert.match(handler, /setAdvanced\(true\)/, 'AgeStep onAlreadySet must call setAdvanced(true)');
+  });
 
   it('the consent step focuses its heading when advanced', () => {
     assert.match(element(view, 'ConsentStep'), /autoFocus=\{advanced\}/);

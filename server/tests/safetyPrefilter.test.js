@@ -96,6 +96,45 @@ describe('safety pre-filter: distress and self-harm (support lines, no model cal
         }
     });
 
+    it('leaves everyday injuries and research about suicide to the classifier', () => {
+        for (const text of [
+            'I hurt myself playing soccer, how long do muscles take to heal?',
+            'I cut myself while cooking. Why does blood clot?',
+            'I accidentally hurt myself with scissors',
+            "I don't want to hurt myself when I lift weights",
+            '自殺を考える若者が増えている理由を社会の授業で調べています',
+            '私は自殺を考える若者について調べています',
+            'ころんでケガをした、自分を傷つけないように',
+            '自分を傷つけずに練習する方法',
+        ]) {
+            assert.equal(prefilterText(text), null, text);
+        }
+    });
+
+    it('keeps wish forms and first-person self-harm with a distress cue blocked', () => {
+        for (const text of [
+            'I want to kill myself',
+            'i want to hurt myself',
+            'I am going to cut myself tonight',
+            'I keep hurting myself',
+            'I cut myself again',
+            'I hurt myself on purpose',
+            'i deliberately harm myself every day',
+            'もう生きていたくない',
+            '死にたい',
+            '消えたい',
+            '自殺を考えています',
+            '僕はもう自殺を考えてる',
+            '最近、自殺を考えてしまう',
+            '自殺を考えることがある',
+            '自分を傷つけてしまう',
+        ]) {
+            const hit = prefilterText(text);
+            assert.equal(hit?.category, 'self_harm', text);
+            assert.equal(hit?.support, true, text);
+        }
+    });
+
     it('still blocks first-person forms of those words', () => {
         for (const text of ['自傷してしまう', '自傷がやめられない', 'リストカットをやめられない', "I'm suicidal", 'I have been self-harming', 'i keep self harming']) {
             assert.equal(category(text), 'self_harm', text);
@@ -129,11 +168,19 @@ describe('safety pre-filter: personal information', () => {
         }
     });
 
-    it('blocks a postal code with an address, or a street address, but not number ranges', () => {
+    it('blocks a postal code with an address, or a street address, but not number ranges or scores', () => {
         for (const text of ['〒100-0001', '〒 530 0001', '住所は150-0001 渋谷区神宮前です', '大阪府大阪市北区梅田1-2-3に住んでいます', '東京都練馬区豊玉北5丁目']) {
             assert.equal(category(text), 'personal_info', text);
         }
-        for (const text of ['大阪府大阪市北区梅田1-2に住んでいます', '東京都港区芝4番地', '北海道札幌市中央区北1条西2丁目']) {
+        for (const text of [
+            '大阪府大阪市北区梅田1-2に住んでいます',
+            '大阪府大阪市北区梅田1-2-3',
+            '東京都港区芝4番地',
+            '東京都港区芝4番',
+            '北海道札幌市中央区北1条西2丁目',
+            '大阪府大阪市北区梅田1-2 のマンション101号室',
+            '神奈川県横浜市青葉区1-2ハイツ201',
+        ]) {
             assert.equal(category(text), 'personal_info', text);
         }
         for (const text of [
@@ -146,6 +193,16 @@ describe('safety pre-filter: personal information', () => {
             '神奈川県横浜市の人口は全国で2番目',
             '愛知県名古屋市では3-4割の家庭が',
             '福岡県福岡市の観光客は2-3倍、5-6万人',
+            // Ranges, scores and exercise numbers: two groups with no building, room or living word.
+            '神奈川県横浜市の気温は20-25℃くらい',
+            '沖縄県那覇市の気温は25-30°C',
+            '北海道札幌市の積雪は50-60cmです',
+            '長野県松本市の標高は500-600m',
+            '東京都千代田区は1-2kmの範囲',
+            '大阪府大阪市のチームが2-1で勝った',
+            '東京都の23区のうち世田谷区は1-2を争う',
+            '静岡県浜松市の第1-2問',
+            '東京都府中市の小学校で3-2の引き算',
         ]) {
             assert.equal(prefilterText(text), null, text);
         }

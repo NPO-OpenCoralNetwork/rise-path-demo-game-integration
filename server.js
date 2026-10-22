@@ -20,6 +20,7 @@ import userRoutes from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
 import aiAccessRoutes from './server/routes/aiAccess.js';
 import safetyRoutes from './server/routes/safety.js';
+import { pruneSafetyEvents } from './server/safety/events.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -277,6 +278,10 @@ async function main() {
     const app = await createApp();
     const PORT = Number.parseInt(process.env.PORT, 10) || 3006;
     jobWorker.start();
+    // Safety-event retention (90-day report text, 365-day events) on a timer, not only when traffic
+    // records a new event; the admin queries also enforce it.
+    void pruneSafetyEvents(undefined, { force: true });
+    setInterval(() => void pruneSafetyEvents(undefined, { force: true }), 60 * 60 * 1000).unref();
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);

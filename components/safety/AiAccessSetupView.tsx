@@ -329,6 +329,7 @@ const AiAccessSetupView: React.FC = () => {
                 }}
                 onAlreadySet={() => {
                   setNotice(t.ageAlreadySet);
+                  setAdvanced(true);
                   void load();
                 }}
               />

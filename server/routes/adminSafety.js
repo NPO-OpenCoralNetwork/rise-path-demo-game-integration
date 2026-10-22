@@ -32,7 +32,7 @@ import {
   revokeGuardianConsent,
   setBirthYm,
 } from '../safety/access.js';
-import { pruneSafetyEvents } from '../safety/events.js';
+import { EVENT_DAYS, REPORT_TEXT_DAYS, pruneSafetyEvents } from '../safety/events.js';
 
 const router = express.Router();
 
@@ -90,7 +90,11 @@ router.get('/safety/summary', async (req, res) => {
          GROUP BY 1, 2 ORDER BY 1, 2`,
         since,
       ),
-      pool.query("SELECT count(*)::int AS n FROM ai_safety_events WHERE kind = 'user_report' AND status = 'open'"),
+      pool.query(
+        `SELECT count(*)::int AS n FROM ai_safety_events
+         WHERE kind = 'user_report' AND status = 'open' AND created_at >= now() - make_interval(days => $1::int)`,
+        [EVENT_DAYS],
+      ),
     ]);
     /** @type {Record<string, number>} */
     const totals = {};
@@ -122,8 +126,10 @@ router.get('/safety/reports', async (req, res) => {
     return res.status(400).json({ error: 'before must be an ISO time', error_type: 'invalid_query' });
   }
   /** @type {unknown[]} */
-  const params = [limit];
-  const where = ["kind = 'user_report'"];
+  // Retention is also enforced here, so a list read before the next prune never shows text past
+  // REPORT_TEXT_DAYS or rows past EVENT_DAYS (pruning itself runs at most hourly).
+  const params = [limit, REPORT_TEXT_DAYS, EVENT_DAYS];
+  const where = ["kind = 'user_report'", 'created_at >= now() - make_interval(days => $3::int)'];
   if (status !== 'all') {
     params.push(status);
     where.push(`status = $${params.length}`);
@@ -135,7 +141,9 @@ router.get('/safety/reports', async (req, res) => {
   try {
     void pruneSafetyEvents(pool);
     const result = await pool.query(
-      `SELECT id, created_at, user_id, audience, surface, category, detail, status, reviewed_by, reviewed_at
+      `SELECT id, created_at, user_id, audience, surface, category,
+              CASE WHEN created_at < now() - make_interval(days => $2::int) THEN NULL ELSE detail END AS detail,
+              status, reviewed_by, reviewed_at
        FROM ai_safety_events WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $1`,
       params,
     );

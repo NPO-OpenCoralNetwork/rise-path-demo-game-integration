@@ -27,11 +27,22 @@
  */
 /** The writer: a first-person word, or nothing before (Japanese often drops the subject). */
 const SELF_JA = '(?:^|私|わたし|あたし|僕|ぼく|俺|おれ|自分)(?:は|が|も|の)?';
+/**
+ * 自殺を考え as the writer's own state: a first-person subject or a clause with no subject
+ * ("自殺を考えています", "僕はもう自殺を考えてる"), and the verb ends the clause. A noun after it
+ * ("自殺を考える若者が増えている理由") is a topic, left to the classifier.
+ */
+const SUICIDAL_THOUGHTS_JA = new RegExp(
+  '(?:^|[。、,!?…]|(?:私|わたし|あたし|僕|ぼく|俺|おれ|うち|自分)(?:は|が|も)?)'
+  + '(?:もう|最近|さいきん|時々|ときどき|よく|毎日|まいにち|本気で|ずっと|また)*'
+  + '(?:自殺|じさつ)を(?:考え|かんがえ)(?:て(?:い(?:る|ます|た|ました)|る|た|しまう|しまいます|しまった)?|る|た|ます|ました|ちゃう|ちゃった)'
+  + '(?=[。、,!?…]|$|けど|から|ので|んだ|んです|ことが|時が|ときが)',
+);
 const DISTRESS_JA = [
   /死にたい/, /しにたい/, /死んでしまいたい/, /死のうと(思|おも)/, /消えたい/, /きえたい/, /消えてしまいたい/,
   /いなくなりたい/, /生きていたくない/, /いきていたくない/, /生きたくない/, /生きるのが(つら|辛|しんど)い/,
-  /生きてる意味(が|は)?(ない|無い)/, /自殺(したい|しよう|する方法|のやり方|の方法|を考え)/, /じさつ(したい|しよう)/,
-  /自傷(し|を(して|し|やめ|止め)|が(やめ|止め)|行為を(して|し|やめ|止め|繰り返))/, /リストカット(し|を(して|し|やめ|止め)|が(やめ|止め))/, /リスカ(し|を|して)/, /自分を傷つけ/, /首(を|)(吊|つ)り(たい|方)/,
+  /生きてる意味(が|は)?(ない|無い)/, /自殺(したい|しよう|する方法|のやり方|の方法)/, SUICIDAL_THOUGHTS_JA, /じさつ(したい|しよう)/,
+  /自傷(し|を(して|し|やめ|止め)|が(やめ|止め)|行為を(して|し|やめ|止め|繰り返))/, /リストカット(し|を(して|し|やめ|止め)|が(やめ|止め))/, /リスカ(し|を|して)/, /自分を(傷つけ|きずつけ)(?!ない|なかった|ません|ずに)/, /首(を|)(吊|つ)り(たい|方)/,
   /飛び降り(たい|る方法|ようと)/, /楽に死ねる/,
   new RegExp(`${SELF_JA}(楽に|らくに|簡単に|確実に)?死ぬ方法`), new RegExp(`${SELF_JA}死に方を(教え|おしえ)`),
   // 虐待されて as the writer's own situation: the clause ends or goes on ("虐待されていると思う",
@@ -41,9 +52,19 @@ const DISTRESS_JA = [
   /(いじめ|イジメ)られて(いて|る|います)?(つら|辛|もう|死)/,
 ];
 
-/** English distress phrases (first person, not bare topic words), matched on lower-cased text with single spaces. */
+/**
+ * English distress phrases (first person, not bare topic words), matched on lower-cased text with
+ * single spaces. "kill myself" always counts; "hurt/cut/harm myself" only with a wish or a
+ * distress cue (keep, again, on purpose, every day...), so "I hurt myself playing soccer" or
+ * "I cut myself while cooking" reach the classifier, which allows health questions for school.
+ */
+const SELF_HARM_VERB_EN = '(hurt|hurting|cut|cutting|harm|harming) myself';
 const DISTRESS_EN = [
-  /\b(kill|killing|hurt|hurting|cut|cutting|harm|harming) myself\b/,
+  /\b(kill|killing) myself\b/,
+  new RegExp(`(?<!\\b(don'?t|do not|didn'?t|did not|never|not|won'?t) )\\b(want(ed)? to|wanna|going to|gonna|tried to|try(ing)? to|plan(ning)? to|need to|urge to|feel like) ${SELF_HARM_VERB_EN}\\b`),
+  new RegExp(`\\b(keep|kept|keeps|started|start|still) ${SELF_HARM_VERB_EN}\\b`),
+  new RegExp(`\\b${SELF_HARM_VERB_EN} (again|on purpose|deliberately|intentionally|every (day|night)|all the time|when i'?m (sad|upset|angry|stressed|alone))\\b`),
+  new RegExp(`\\b(on purpose|purposely|deliberately|intentionally) ${SELF_HARM_VERB_EN}\\b`),
   /\bi('?m| am)( feeling)? suicidal\b/, /\bfeel(ing)? suicidal\b/, /\b(thinking about|thoughts of|considering|(want|going|plan(ning)?) to commit) suicide\b/,
   /\bi('ve| have)? (been |keep )?self[- ]?harm(ing)?\b/, /\bi( really| just| still| sometimes)? (want to|wanna) die\b/, /\bend (my|it all|my own) life\b/,
   /\bdon'?t want to (live|be alive|exist)\b/, /\bno reason to live\b/, /\bbetter off dead\b/,
@@ -70,13 +91,17 @@ const PREFECTURE = '(?:北海道|東京都|大阪府|京都府|(?:青森|岩手|
 const POSTAL_MARK_RE = /〒\s*\d{3}\s*[-‐−ー－]?\s*\d{4}/;
 const POSTAL_ADDRESS_RE = new RegExp(`(?<![\\d.=+*/^-])\\d{3}[-‐−ー－]\\d{4}(?![\\d.])\\s*[、,]?\\s*(?:${PREFECTURE}|[一-龯々ヶ]{1,6}[市区町村郡])`);
 /**
- * Prefecture + city/ward/town + a block number ("1丁目", "2番地", "1-2-3", or "1-2" not followed by
- * a unit): a street address. "人口は2-3%増えた", "1-2月", "3番目" are not block numbers.
+ * Prefecture + city/ward/town + a block number: "1丁目", "2番地", "4番", three groups "1-2-3", or
+ * two groups "1-2" only when a building or room word ("1-2 のマンション", "1-2ハイツ201") or living
+ * there ("1-2に住んでいます") follows. Any other two-group range is a range, score or exercise
+ * number ("気温は20-25℃", "2-1で勝った", "1-2を争う", "第1-2問", "3-2の引き算", "人口は2-3%"):
+ * the classifier judges it. "3番目" is not a block number.
  */
 const DASH = '\\s*[-‐−ー－]\\s*';
-const NOT_A_UNIT = '(?![\\d.]|\\s*[%月日年時分秒割倍万億千百人回位度個本枚円点歳才件ヶかカ])';
+const BUILDING_JA = '(?:マンション|アパート|ハイツ|コーポ|メゾン|レジデンス|ハウス|ヒルズ|タワー|ビル|団地|住宅|社宅|寮|荘|号室|号棟|号館|号|棟)';
+const TWO_GROUP_ADDRESS = `(?![\\d.])(?:\\s*(?:の\\s*)?${BUILDING_JA}|\\s*(?:に|へ)?\\s*(?:住|すん|すま|在住|引っ越|ひっこ))`;
 const STREET_ADDRESS_RE = new RegExp(
-  `${PREFECTURE}[^\\s。、,]{1,12}?[市区町村郡][^\\s。、,]{0,12}?(?:\\d+\\s*丁目|\\d+\\s*番(?:地|(?![目手組線]))|\\d+${DASH}\\d+${DASH}\\d+|\\d+${DASH}\\d+${NOT_A_UNIT})`,
+  `${PREFECTURE}[^\\s。、,]{1,12}?[市区町村郡][^\\s。、,]{0,12}?(?:\\d+\\s*丁目|\\d+\\s*番(?:地|(?![目手組線]))|\\d+${DASH}\\d+${DASH}\\d+|\\d+${DASH}\\d+${TWO_GROUP_ADDRESS})`,
 );
 
 /**

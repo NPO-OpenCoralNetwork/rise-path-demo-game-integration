@@ -25,8 +25,10 @@
  * Cost: a request that already passed is remembered for an hour by a hash of the whole ordered
  * request (never the text), so a retried request is not screened twice. Any change (a new
  * message, a different history) screens every part again together: a request split across turns
- * or fields, each piece harmless alone, is judged as a whole. Long texts are split into chunks
- * screened in parallel. A block by the classifier keeps the daily unit charged
+ * or fields, each piece harmless alone, is judged as a whole: every input request goes to ONE
+ * classifier call (INPUT_SCREEN_MAX_CHARS is above the largest body the request schemas accept;
+ * a larger input fails closed instead of being split). Long outputs are split into chunks screened
+ * in parallel. A block by the classifier keeps the daily unit charged
  * (SafetyError.classifierRan), so the daily caps bound each user's classifier calls.
  */
 import { createHash } from 'node:crypto';
@@ -39,8 +41,16 @@ import { recordSafetyEvent } from './events.js';
 
 export const SAFETY_SCREEN_TASK = 'safety.screen';
 
-/** Characters per classifier call; longer payloads are split into several calls. */
+/** Characters per classifier call for output; longer outputs are split into several calls. */
 const CHUNK_CHARS = 40_000;
+/**
+ * Most text one input screen judges in a single classifier call. Above the largest request the
+ * schemas accept, so a request is never split: the tutor (server/llm/schemas.js TutorRequest) is
+ * 60,240 characters at most (message 2,000, 12 history turns of 4,000, 12 objectives of
+ * 500, excerpt and context 1,500 each, title and ids), writing feedback about 8,200 and a course
+ * generation stage about 7,000 (topic 4,000 + 3 material chunks). A larger input fails closed.
+ */
+export const INPUT_SCREEN_MAX_CHARS = 80_000;
 const ALLOW_CACHE_TTL_MS = 60 * 60 * 1000;
 const ALLOW_CACHE_MAX = 5000;
 
@@ -226,7 +236,7 @@ export function resetSafetyScreenCacheForTests() {
 }
 
 /**
- * Group parts into chunks of at most CHUNK_CHARS (a longer part is split on its own).
+ * Output only: group parts into chunks of at most CHUNK_CHARS (a longer part is split on its own).
  * @param {ScreenPart[]} parts
  * @returns {ScreenPart[][]}
  */
@@ -337,7 +347,7 @@ export async function screenForMinor({
   }
 
   // Skip only a request that passed as a whole. Parts that passed alone are screened again with
-  // the rest: a request split across turns or fields is judged together.
+  // the rest in the same call: a request split across turns or fields is judged together.
   const t = now();
   const key = cacheKey(direction, texts);
   if ((allowCache.get(key) ?? 0) > t) return;
@@ -346,9 +356,17 @@ export async function screenForMinor({
     throw await failed(new Error('safety.screen would run on the mock provider in production'));
   }
 
+  // Input is judged in one call, so pieces of a request never pass in separate calls. A request
+  // too large for one call is refused (fail closed), never split.
+  const total = texts.reduce((sum, p) => sum + p.text.length, 0);
+  if (direction === 'input' && total > INPUT_SCREEN_MAX_CHARS) {
+    throw await failed(new Error(`input of ${total} characters is larger than one screen call (${INPUT_SCREEN_MAX_CHARS})`));
+  }
+  const chunks = direction === 'input' ? [texts.map(({ label, text }) => ({ label, text }))] : chunkParts(texts);
+
   let verdicts;
   try {
-    verdicts = await Promise.all(chunkParts(texts).map((chunk) => classify(gateway, chunk, direction, { userId, env, signal })));
+    verdicts = await Promise.all(chunks.map((chunk) => classify(gateway, chunk, direction, { userId, env, signal })));
   } catch (error) {
     if ((isLlmError(error) && error.code === 'aborted') || signal?.aborted) throw error;
     throw await failed(error);

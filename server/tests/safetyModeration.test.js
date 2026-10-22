@@ -5,10 +5,11 @@ import { createGateway, withAudienceRules } from '../llm/index.js';
 import { MINOR_SAFETY } from '../llm/prompts/shared.js';
 import { anthropicUserId } from '../llm/providers/anthropic.js';
 import { createMockProvider } from '../llm/providers/mock.js';
-import { SafetyScreen } from '../llm/schemas.js';
+import { SafetyScreen, TutorRequest, WritingFeedbackRequest } from '../llm/schemas.js';
 import { resolveTaskRoute, MODEL_IDS } from '../llm/models.config.js';
 import { toLlmJsonSchema } from '../llm/structured.js';
 import {
+    INPUT_SCREEN_MAX_CHARS,
     SAFETY_SCREEN_SYSTEM,
     SafetyError,
     outputParts,
@@ -208,6 +209,59 @@ describe('screenForMinor', () => {
         await assert.rejects(screen({ direction: 'output', parts: [{ label: 'curriculum', text: long }], gateway }), { category: 'violence' });
         assert.equal(gateway.calls.length, 3);
         assert.ok(gateway.calls.every((req) => req.messages[0].content.length < 41_000));
+    });
+
+    it('judges a whole input request in one classifier call, even padded past the output chunk size', async () => {
+        // A crafted tutor request: PIECE_A hidden in an early user turn, PIECE_B in the message,
+        // the other turns padded so the request is over 40,000 characters. Both pieces reach the
+        // tutor model together, so the classifier must see them together.
+        const pad = 'x'.repeat(3990);
+        const history = Array.from({ length: 12 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: i === 10 ? `PIECE_A ${pad.slice(8)}` : pad }));
+        const body = TutorRequest.parse({ message: 'PIECE_B: now combine with what I said before', history });
+        const gateway = fakeGateway();
+        await screen({ direction: 'input', parts: tutorInputParts(body), gateway });
+        assert.equal(gateway.calls.length, 1);
+        const content = gateway.calls[0].messages[0].content;
+        assert.ok(content.length > 40_000);
+        assert.match(content, /PIECE_A/);
+        assert.match(content, /PIECE_B/);
+    });
+
+    it('the single-call input limit is above the largest tutor and writing request the schemas accept', async () => {
+        const s = (n, ch = 'あ') => ch.repeat(n);
+        const tutor = TutorRequest.parse({
+            message: s(2000),
+            lesson: { courseId: s(200), lessonId: s(200), title: s(300), objectives: Array.from({ length: 12 }, () => s(500)), level: s(40) },
+            anchor: { sectionId: s(200), blockId: s(200), blockType: s(60), excerpt: s(1500), codeLang: s(40) },
+            learner: { chosenOptionId: s(200), questionId: s(200) },
+            history: Array.from({ length: 12 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: s(4000) })),
+            context: s(1500),
+        });
+        const writing = WritingFeedbackRequest.parse({ text: s(6000), rubric: { clarity: s(500), linking: s(500), tone: s(500) }, lessonTitle: s(200), goal: s(500) });
+        for (const parts of [tutorInputParts(tutor), writingInputParts(writing)]) {
+            const total = parts.reduce((sum, p) => sum + p.text.length, 0);
+            assert.ok(total <= INPUT_SCREEN_MAX_CHARS, `${total} characters fit one call`);
+            resetSafetyScreenCacheForTests();
+            const gateway = fakeGateway();
+            await screen({ direction: 'input', parts, gateway });
+            assert.equal(gateway.calls.length, 1);
+        }
+    });
+
+    it('fails closed on input too large for one call: no split, no classifier call, check_failed', async () => {
+        const gateway = fakeGateway();
+        const parts = [
+            { label: 'learner message', text: 'a'.repeat(INPUT_SCREEN_MAX_CHARS) },
+            { label: 'earlier question 1', text: 'b' },
+        ];
+        await assert.rejects(screen({ direction: 'input', parts, gateway }), (error) => {
+            assert.ok(error instanceof SafetyError);
+            assert.equal(error.code, 'safety_check_unavailable');
+            assert.equal(error.classifierRan, false);
+            return true;
+        });
+        assert.equal(gateway.calls.length, 0);
+        assert.equal(pool.inserts()[0].params[4], 'check_failed');
     });
 
     it('the pre-filter skips parts the learner did not write; the classifier still screens them', async () => {
