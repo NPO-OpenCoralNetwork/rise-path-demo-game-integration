@@ -12,7 +12,7 @@ version: 1.0.0
 ## セッション開始時（Phase 19）
 
 1. ユーザーの質問・つまずき内容を要約し、`mcp_rise_path_learner_memory_recall` を呼ぶ（query = 要約）。
-   - `semantic_memory_status` が `disabled` のときは記憶なしとして扱う（エラーにしない）
+   - `semantic_memory_status` が `disabled` または `not_configured`（このサーバーでは AI 個人記憶を提供していない）のときは記憶なしとして扱う（エラーにしない）
 2. `mcp_rise_path_learner_personal_context` を呼ぶ（期間未指定で直近30日）。
    - 学習スタイル・生活習慣の傾向を把握してから対話を始める
 
