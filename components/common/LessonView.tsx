@@ -3,6 +3,8 @@ import { getLessonForCourse } from '../../services/curriculumData';
 import { analyzeWriting, toLlmLocale } from '../../services/llmApi';
 import { addLearningEvent } from '../../services/progressService';
 import { dailyLimitScope } from '../../services/aiDailyLimit';
+import { aiRefusalOf, type AiRefusal } from '../../services/safetyApi';
+import { AiNotice, AiRefusalNotice } from '../ui/AiNotice';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { AnalysisResult } from '../../types';
@@ -45,6 +47,8 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
   const [refinedDraft, setRefinedDraft] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState<AnalysisError | null>(null);
+  // The access gate or the safety screen refused the analysis (Phase 0.5): its own card.
+  const [analysisRefusal, setAnalysisRefusal] = useState<AiRefusal | null>(null);
   const { language } = useLanguage();
   const { logout } = useAuth();
 
@@ -55,6 +59,17 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
       daily_limit_guest: "Today's limit for guest AI feedback has been reached. Your draft is saved here. Sign in to keep getting feedback.",
       paused: 'AI feedback is paused for now. Your draft is saved here.',
       signIn: 'Sign in',
+      feedbackTitle: 'AI feedback',
+      coachTitle: "Coach's feedback",
+      refinedTitle: 'Suggested rewrite',
+      finalTitle: 'Final polish',
+      finalHint: 'Edit your text to use the feedback.',
+      practiceSpeaking: 'Practice speaking',
+      skipSpeaking: 'Skip speaking',
+      scoresLabel: 'Scores (out of 100)',
+      scores: { clarity: 'Clarity', linking: 'Linking', tone: 'Tone' },
+      thinking: 'AI is thinking…',
+      analyzing: 'Reading your text…',
     },
     jp: {
       failed: '今は文章を分析できませんでした。下書きはそのまま残っています。少し待ってからもう一度お試しください。',
@@ -62,8 +77,19 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
       daily_limit_guest: 'ゲストのAIフィードバックは、今日の上限に達しました。下書きはそのまま残っています。ログインすると、続けてフィードバックを受けられます。',
       paused: 'AIフィードバックは、今は停止しています。下書きはそのまま残っています。',
       signIn: 'ログイン',
+      feedbackTitle: 'AIのフィードバック',
+      coachTitle: 'コーチからのアドバイス',
+      refinedTitle: '書き直しの例',
+      finalTitle: '仕上げ',
+      finalHint: 'アドバイスを生かして、文章を直してみましょう。',
+      practiceSpeaking: '声に出して練習する',
+      skipSpeaking: '声の練習をとばす',
+      scoresLabel: 'スコア（100点中）',
+      scores: { clarity: 'わかりやすさ', linking: 'つながり', tone: 'ことばの調子' },
+      thinking: 'AIが考えています…',
+      analyzing: '文章を読んでいます…',
     },
-  } as const satisfies Record<'en' | 'jp', Record<AnalysisError | 'signIn', string>>;
+  } as const;
   const t = copy[language];
 
   const signIn = () => {
@@ -80,6 +106,7 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
   const handleAnalyze = async () => {
     setStep('ANALYZING');
     setAnalysisError(null);
+    setAnalysisRefusal(null);
     try {
       const result = await analyzeWriting(draft, lesson.rubric, {
         locale: toLlmLocale(language),
@@ -91,7 +118,9 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
       setStep('FEEDBACK');
     } catch (error) {
       console.error('Writing analysis failed:', error);
-      setAnalysisError(analysisErrorFor(error));
+      const refusal = aiRefusalOf(error);
+      if (refusal) setAnalysisRefusal(refusal);
+      else setAnalysisError(analysisErrorFor(error));
       setStep('DRAFT');
     }
   };
@@ -166,8 +195,12 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
         </div>
       </div>
 
+      {analysisRefusal && (
+        <AiRefusalNotice refusal={analysisRefusal} onSignIn={signIn} className="mt-4" />
+      )}
+
       {analysisError && (
-        <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p role="alert" className="mt-4 rounded-control border border-line bg-sunken px-4 py-3 text-small text-fg-2">
           {t[analysisError]}
           {analysisError === 'daily_limit_guest' && (
             <>
@@ -196,63 +229,73 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
     </div>
   );
 
-  const FeedbackView = () => (
-    <div className="max-w-4xl mx-auto py-8 px-6 grid grid-cols-1 md:grid-cols-2 gap-8 h-full overflow-y-auto">
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-900">AI Analysis</h2>
-        
-        {/* Scores */}
-        <div className="grid grid-cols-3 gap-3">
-          <ScoreCard label="Clarity" score={analysis?.clarityScore || 0} />
-          <ScoreCard label="Linking" score={analysis?.linkingScore || 0} />
-          <ScoreCard label="Tone" score={analysis?.toneScore || 0} />
-        </div>
+  // Writing feedback from the AI (/llm/writing-feedback), with the AI disclosure and report.
+  const FeedbackView = () => {
+    const answer = [analysis?.feedback, analysis?.refinedVersion].filter(Boolean).join('\n\n');
+    return (
+      <div className="mx-auto grid h-full max-w-4xl grid-cols-1 gap-8 overflow-y-auto px-6 py-8 md:grid-cols-2">
+        <section className="space-y-6" aria-labelledby="writing-feedback-title">
+          <h2 id="writing-feedback-title" className="text-h2 text-fg">{t.feedbackTitle}</h2>
 
-        {/* Feedback Text */}
-        <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-2xl">
-          <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
-            <Sparkles size={18} /> Coach's Feedback
-          </h3>
-          <p className="text-indigo-800 leading-relaxed">
-            {analysis?.feedback}
-          </p>
-        </div>
+          <dl className="grid grid-cols-3 gap-3" aria-label={t.scoresLabel}>
+            <ScoreCard label={t.scores.clarity} score={analysis?.clarityScore || 0} />
+            <ScoreCard label={t.scores.linking} score={analysis?.linkingScore || 0} />
+            <ScoreCard label={t.scores.tone} score={analysis?.toneScore || 0} />
+          </dl>
 
-        {/* Comparison */}
-        <div>
-           <h3 className="font-bold text-slate-500 text-sm uppercase tracking-wider mb-3">Suggested Refinement</h3>
-           <div className="bg-white border border-green-200 p-5 rounded-2xl shadow-sm relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-             <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">{analysis?.refinedVersion}</p>
-           </div>
-        </div>
-      </div>
+          <div className="rounded-card border border-line bg-surface p-5">
+            <h3 className="mb-2 flex items-center gap-2 text-body font-semibold text-fg">
+              <Sparkles size={18} aria-hidden="true" className="text-primary-text" /> {t.coachTitle}
+            </h3>
+            <p className="whitespace-pre-wrap text-body leading-relaxed text-fg-2">{analysis?.feedback}</p>
+          </div>
 
-      <div className="flex flex-col h-full">
-         <h2 className="text-2xl font-bold text-slate-900 mb-6">Final Polish</h2>
-         <p className="text-slate-500 mb-2 text-sm">Edit your text to incorporate the feedback.</p>
-         <textarea 
+          <div>
+            <h3 className="mb-3 text-small font-semibold text-fg-2">{t.refinedTitle}</h3>
+            <div className="rounded-card border border-line border-l-4 border-l-primary bg-surface p-5">
+              <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">{analysis?.refinedVersion}</p>
+            </div>
+          </div>
+
+          {answer && (
+            <AiNotice
+              surface="writing_feedback"
+              answer={answer}
+              question={draft}
+              context={courseId ? { courseId } : undefined}
+            />
+          )}
+        </section>
+
+        <div className="flex h-full flex-col">
+          <h2 className="mb-6 text-h2 text-fg">{t.finalTitle}</h2>
+          <label htmlFor="writing-final-text" className="mb-2 text-small text-fg-2">{t.finalHint}</label>
+          <textarea
+            id="writing-final-text"
             value={refinedDraft}
             onChange={(e) => setRefinedDraft(e.target.value)}
-            className="flex-1 w-full p-5 bg-white border-2 border-slate-200 rounded-2xl focus:border-green-500 outline-none resize-none text-lg leading-relaxed mb-6"
-         />
-         <div className="space-y-3">
-            <button 
+            className="mb-6 w-full flex-1 resize-none rounded-card border-2 border-line bg-surface p-5 text-lg leading-relaxed text-fg focus:border-primary"
+          />
+          <div className="space-y-3">
+            <button
+              type="button"
               onClick={handleStartRoleplay}
-              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-control bg-primary py-4 text-lg font-bold text-on-primary shadow-1 transition-colors hover:bg-primary-hover"
             >
-              Practice Speaking <Mic size={20} />
+              {t.practiceSpeaking} <Mic size={20} aria-hidden="true" />
             </button>
-            <button 
+            <button
+              type="button"
               onClick={handleComplete}
-              className="w-full bg-white text-slate-600 border border-slate-200 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-control border border-line bg-surface py-3 text-small font-bold text-fg-2 transition-colors hover:bg-sunken"
             >
-              Skip Speaking
+              {t.skipSpeaking}
             </button>
-         </div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const RoleplayView = () => {
     const [isRecording, setIsRecording] = useState(false);
@@ -362,18 +405,13 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
     );
   };
 
-  const ScoreCard = ({ label, score }: { label: string, score: number }) => {
-    let color = 'text-red-600 bg-red-50 border-red-100';
-    if (score >= 80) color = 'text-green-600 bg-green-50 border-green-100';
-    else if (score >= 60) color = 'text-yellow-600 bg-yellow-50 border-yellow-100';
-
-    return (
-      <div className={`p-4 rounded-2xl border text-center ${color}`}>
-        <div className="text-2xl font-bold">{score}</div>
-        <div className="text-xs font-bold uppercase opacity-80">{label}</div>
-      </div>
-    );
-  };
+  // A score on the feedback card: the number and its label (no colour coding).
+  const ScoreCard = ({ label, score }: { label: string, score: number }) => (
+    <div className="rounded-card border border-line bg-surface p-4 text-center">
+      <dt className="text-small font-semibold text-fg-2">{label}</dt>
+      <dd className="text-h2 font-bold text-fg tabular">{score}</dd>
+    </div>
+  );
 
   const CompleteView = () => (
     <div className="max-w-xl mx-auto py-12 px-6 text-center">
@@ -410,21 +448,23 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
            })}
         </div>
         <div className="text-sm font-bold text-slate-400">
-          {step === 'ANALYZING' ? 'AI Thinking...' : step}
+          {step === 'ANALYZING' ? t.thinking : step}
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto bg-slate-50">
         {step === 'INTRO' && <IntroView />}
-        {step === 'DRAFT' && <DraftView />}
+        {/* Called, not mounted as <DraftView />: these are recreated on every render, and as
+            components they would remount (losing the field's focus and the report dialog). */}
+        {step === 'DRAFT' && DraftView()}
         {step === 'ANALYZING' && (
-          <div className="h-full flex flex-col items-center justify-center text-indigo-600">
-            <RefreshCw size={48} className="animate-spin mb-4" />
-            <p className="font-medium animate-pulse">Analyzing tone and logic...</p>
+          <div role="status" className="flex h-full flex-col items-center justify-center text-primary-text">
+            <RefreshCw size={48} aria-hidden="true" className="mb-4 motion-safe:animate-spin" />
+            <p className="font-medium motion-safe:animate-pulse">{t.analyzing}</p>
           </div>
         )}
-        {(step === 'FEEDBACK' || step === 'REFINE') && <FeedbackView />}
+        {(step === 'FEEDBACK' || step === 'REFINE') && FeedbackView()}
         {step === 'ROLEPLAY' && <RoleplayView />}
         {step === 'COMPLETE' && <CompleteView />}
       </div>

@@ -156,3 +156,13 @@ export const PSchoolView = lazy(
 export const AidjCurriculumView = lazy(
   () => import('../features/aidj/AidjCurriculumView')
 );
+/** Phase 0.5 minor safeguards: AI access setup, the public guide and the admin page. */
+export const AiAccessSetupView = lazy(
+  () => import('../safety/AiAccessSetupView')
+);
+export const AiSafetyGuideView = lazy(
+  () => import('../features/safety/AiSafetyGuideView')
+);
+export const AdminSafetyView = lazy(
+  () => import('../features/admin/AdminSafetyView')
+);

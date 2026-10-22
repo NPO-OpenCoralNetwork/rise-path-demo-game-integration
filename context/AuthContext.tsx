@@ -10,6 +10,7 @@ import { deriveDisplayName, normalizeAuthEmail } from '../services/authFormValid
 import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
+import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -269,6 +270,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const logout = useCallback(async () => {
+        // First, so a failed remote sign-out still leaves no AI answers on a shared device.
+        clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
         const supabase = getSupabaseClient();
         const nexloomSupabase = getNexloomSupabaseClient();
         await Promise.all([
@@ -279,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('rp_auth_user');
         clearUserProfileCache();
         setAuthProvider(() => null);
-    }, []);
+    }, [user?.isGuest]);
 
     return (
         <AuthContext.Provider value={{

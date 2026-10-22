@@ -40,6 +40,10 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_API_KEY]: '/settings/api-key',
   [ViewState.SETTINGS_PRIVACY]: '/settings/privacy',
   [ViewState.SETTINGS_AI_MEMORY]: '/settings/ai-memory',
+  [ViewState.SETTINGS_AI_ACCESS]: '/settings/ai-access',
+  [ViewState.SETTINGS_ADMIN_SAFETY]: '/settings/admin/safety',
+  // Public guide; open when signed out too (App.tsx renders it outside the Layout then).
+  [ViewState.AI_SAFETY]: '/ai-safety',
 
   // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',

@@ -90,12 +90,18 @@ import {
   SonicSynthView,
   PSchoolView,
   AidjCurriculumView,
+  AiAccessSetupView,
+  AiSafetyGuideView,
+  AdminSafetyView,
 } from './components/routes/lazyRoutes';
 
 /** sessionStorage key for the page to open after sign-in. */
 const RETURN_TO_KEY = 'rp:returnTo';
 /** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
 const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
+/** Pages open when signed out; they render outside the Layout then. */
+const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety']);
+const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
@@ -124,6 +130,9 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/profile/generated')) return ViewState.PROFILE_GENERATED;
     if (path.startsWith('/profile/edit')) return ViewState.PROFILE_EDIT;
     if (path.startsWith('/profile')) return ViewState.PROFILE;
+    if (path.startsWith('/settings/admin/safety')) return ViewState.SETTINGS_ADMIN_SAFETY;
+    if (path.startsWith('/settings/ai-access')) return ViewState.SETTINGS_AI_ACCESS;
+    if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
     if (path.startsWith('/settings/ai-memory')) return ViewState.SETTINGS_AI_MEMORY;
     if (path.startsWith('/settings/privacy')) return ViewState.SETTINGS_PRIVACY;
@@ -224,13 +233,15 @@ const AppContent: React.FC = () => {
     navigate('/', { replace: true });
   };
 
+  const publicPath = PUBLIC_PATHS.has(normalizePath(location.pathname));
+
   return (
     <>
       {authLoading ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white/50 text-sm font-mono">
           Loading…
         </div>
-      ) : (!isLoggedIn && location.pathname !== '/aidj') ? (
+      ) : (!isLoggedIn && !publicPath) ? (
         location.pathname === '/auth/callback' ? (
           <AuthCallbackView onSuccess={handleLoginSuccess} />
         ) : location.pathname === '/auth/confirm-pending' ? (
@@ -242,10 +253,12 @@ const AppContent: React.FC = () => {
         )
       ) : (
         <>
-          {location.pathname === '/aidj' ? (
+          {normalizePath(location.pathname) === '/aidj' || (!isLoggedIn && publicPath) ? (
             <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/aidj" element={<AidjCurriculumView />} />
+                {/* Public guide for children and guardians (signed out: its own header, no Layout). */}
+                <Route path="/ai-safety" element={<AiSafetyGuideView />} />
               </Routes>
             </Suspense>
           ) : (
@@ -292,6 +305,10 @@ const AppContent: React.FC = () => {
               <Route path="/settings/api-key" element={<SettingsApiKeyView onNavigate={handleNavigate} />} />
               <Route path="/settings/ai-memory" element={<SettingsAiMemoryView onNavigate={handleNavigate} />} />
               <Route path="/settings/privacy" element={<SettingsPrivacyView onNavigate={handleNavigate} />} />
+              {/* Phase 0.5 minor safeguards: birth month, guardian consent, admin safety page. */}
+              <Route path="/settings/ai-access" element={<AiAccessSetupView />} />
+              <Route path="/settings/admin/safety" element={<AdminSafetyView />} />
+              <Route path="/ai-safety" element={<AiSafetyGuideView />} />
               <Route path="/settings" element={<SettingsView onNavigate={handleNavigate} />} />
               <Route path="/notifications" element={<NotificationsView onNavigate={handleNavigate} />} />
               <Route path="/subscription" element={<SubscriptionView onNavigate={handleNavigate} />} />
