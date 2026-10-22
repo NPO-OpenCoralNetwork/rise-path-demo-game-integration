@@ -169,6 +169,15 @@ describe('deploy-stack.sh', () => {
     assert.ok(guard.includes('exit 1'));
   });
 
+  it('removes a hermes container left from an earlier full deploy before `up` when full is not listed', () => {
+    const removeAt = script.indexOf('compose --profile full rm -sf hermes');
+    assert.ok(removeAt > 0, 'rm -sf hermes');
+    const guard = script.lastIndexOf('if [[', removeAt);
+    assert.match(script.slice(guard, removeAt), /"\$\{HERMES_PROFILE\}" -eq 0 && -n "\$\(compose --profile full ps -aq hermes/);
+    const upAt = script.search(/^compose up -d$/m);
+    assert.ok(upAt > removeAt, 'before the full `compose up -d`');
+  });
+
   it('runs the stack smoke inside the api container (loopback, past the origin gate)', () => {
     assert.match(script, /compose exec -T api env[\s\S]*node scripts\/smoke-vm-stack\.mjs --target container/);
     assert.ok(!script.includes('--target host'));

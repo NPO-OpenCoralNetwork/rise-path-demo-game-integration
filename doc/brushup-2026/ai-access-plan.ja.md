@@ -75,13 +75,13 @@
 - `GEMINI_ALLOWED` がちょうど `"true"` のときだけ Gemini を使います。未設定やほかの値なら、`GEMINI_API_KEY` があっても使いません（`server/llm/models.config.js:25`）。
 - キーだけ設定されている場合は、AI の機能が最初に呼ばれたとき（AI の窓口を作るとき）に、ログに警告を出します（`server/llm/index.js`）。
 - 教材の埋め込み（意味検索）、画像生成も同じスイッチに従います（`tools/core/ragSearch.js:56`、`server/geminiBackendService.js:25`）。
-- off の間、アップロードした教材は文章だけ保存し、キーワード検索で探します（`server/ragService.js:87-88`、`:167-171`）。
+- off の間、アップロードした教材は文章だけ保存し、キーワード検索で探します（`server/ragService.js:121-129`、`:183-189`）。
 - off の間、画像生成の API は 503 `image_generation_unavailable` を返します（`server/routes/content.js:239`）。画面では、画像の代わりに絵の説明文を出します（`components/features/ai/GeneratedDocView.tsx`、`services/curriculumApi.ts`）。
 
 **安いモデルへの切り替え**
 
 - `tutor.chat`（AI チューター）と `writing.feedback`（作文フィードバック）を `cheap`（Claude Haiku 5.5）にしました（`server/llm/models.config.js:93-94`）。
-- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:99`、`server/services/aiGenerator.js:24`、`:138-150`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
+- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:99`、`server/services/aiGenerator.js:24`、`:150-164`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
 - コース生成の失敗の扱いを、AI の窓口（ゲートウェイ）のエラーの種類で決めるようにしました。モデルが動く前の失敗なら、1 日の回数を返します（`server/routes/ai.js`）。
 
 **共有 Hermes を出さない**
@@ -90,7 +90,7 @@
 - サーバーも同じスイッチを読みます。ちょうど `"true"` でないと、`/api/v2/agent/chat` は 404 を返し、1 日の回数も数えません。前の設定のまま Hermes が動いている VM でも、学習者は共有 Hermes を使えません（`server/routes/agent.js`）。
 - 用語の説明の「AI 先生に聞く」ボタン、ライフジャーナルとプロフィール画面のチャットへのボタンも、off のときは出しません（`components/common/GlossaryText.tsx`、`components/features/life-journal/`、`components/features/dashboard/profile/ProfileDiagnosisView.tsx`）。
 - AI コーチのエラー表示から、設定名（`HERMES_API_KEY` など）を出さないようにしました（`services/agentApi.ts`）。
-- VM の既定の構成を `COMPOSE_PROFILES=tts` にし、Hermes のコンテナを起動しないようにしました（`deploy/risepath-vm/stack.env.example:141`、`deploy/risepath-vm/scripts/deploy-stack.sh`）。
+- VM の既定の構成を `COMPOSE_PROFILES=tts` にし、Hermes のコンテナを起動しないようにしました（`deploy/risepath-vm/stack.env.example:144`、`deploy/risepath-vm/scripts/deploy-stack.sh`）。
 
 **危ない手順書の書き換え**
 
@@ -114,7 +114,7 @@
 - 性格インサイト（`assessment.insight`）は中くらいのモデル（Sonnet 5.5）のままです（`server/llm/models.config.js:95`）。
 - サーバーの `/api/v2/agent/chat` は残っています。`VITE_FEATURE_AGENT_CHAT=true` にして Hermes を動かさない限り使えません（`server.js:157-158`、`server/routes/agent.js`）。
 - 本番の MCP コンテナは管理者用の設定のままで、インターネットには出していません（`deploy/risepath-vm/docker-compose.yml:124`）。
-- Memanto（AI メモリ）は既定で止まったままです（`deploy/risepath-vm/stack.env.example:169`）。
+- Memanto（AI メモリ）は既定で止まったままです（`deploy/risepath-vm/stack.env.example:172`）。
 - 1 日の上限の値は変えていません（`server/middleware/dailyCaps.js:71-77`）。
 
 ### 3.3 オーナーの作業

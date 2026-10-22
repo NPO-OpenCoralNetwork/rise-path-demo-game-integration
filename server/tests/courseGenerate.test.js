@@ -113,6 +113,21 @@ describe('aiGenerator stages call the gateway (task course.generate)', () => {
         assert.deepEqual(await generateRequirements('SQL', 'u1', {}), { message: broken, intake: null });
     });
 
+    it('an earlier object of another shape (an echoed input or an example) does not hide the stage object', async () => {
+        const accept = (value) => isStageReply('requirements', value);
+        assert.deepEqual(parseJsonReply('例: {"a":1}\n{"message":"m","intake":{"goal":"g"}}', accept), { message: 'm', intake: { goal: 'g' } });
+        assert.deepEqual(
+            parseJsonReply('```json\n{"example":true}\n```\n```json\n{"message":"m","intake":{"goal":"g"}}\n```', accept),
+            { message: 'm', intake: { goal: 'g' } },
+        );
+
+        // The roadmap stage echoes its input (an intake with many nested objects) before answering:
+        // the echo is skipped whole, so its nested braces do not use up the 50 attempts.
+        const echoedIntake = JSON.stringify({ goal: 'SQL', topics: Array.from({ length: 60 }, (_, i) => ({ id: i })) });
+        setGatewayForTests(fakeGateway(`要件: ${echoedIntake}\n{"message":"m","modules":[{"module_id":"m1"}]}`));
+        assert.deepEqual(await generateRoadmap({ goal: 'SQL' }, 'u1', {}), { message: 'm', modules: [{ module_id: 'm1' }] });
+    });
+
     it('isStageReply checks each stage shape', () => {
         assert.equal(isStageReply('requirements', { message: 'm', intake: { goal: 'SQL' } }), true);
         assert.equal(isStageReply('requirements', { message: 'm', intake: null }), false);

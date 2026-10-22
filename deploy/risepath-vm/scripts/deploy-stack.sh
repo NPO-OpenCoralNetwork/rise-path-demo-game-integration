@@ -154,6 +154,13 @@ compose run --rm --no-deps -T api npm run db:migrate
 echo "==> api up (recreate, wait until healthy)"
 compose up -d --no-deps --force-recreate --wait api
 
+# `up` leaves containers of services whose profile is not active alone, so a stack that ran Hermes
+# before (with the full profile) would keep it running after the switch to tts. Remove it.
+if [[ "${HERMES_PROFILE}" -eq 0 && -n "$(compose --profile full ps -aq hermes 2>/dev/null)" ]]; then
+  echo "==> COMPOSE_PROFILES has no full: removing the Hermes container left from an earlier deploy"
+  compose --profile full rm -sf hermes
+fi
+
 echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
 compose up -d
 

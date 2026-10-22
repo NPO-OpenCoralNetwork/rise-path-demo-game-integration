@@ -39,7 +39,7 @@ Experience learning tailored just for you.
 ### 5. **MCP Server — AI アシスタント連携** 🔌
 Claude Code・Cursor など、自分のパソコンで動く AI から Rise Path のツールを使えます。
 - **9 つの MCP ツール**: 学習進捗・ジャーナル・カリキュラム生成・RAG 検索
-- **Transport**: stdio（ローカル）。SSE は開発用で、自分のパソコンの中だけで使います（インターネットには公開しません）
+- **Transport**: stdio（ローカル）。SSE は開発のときと、VM の中（Hermes や、Tailscale 経由の運用者）だけで使います。インターネットには公開しません
 - **リモートの AI（ChatGPT、Claude.ai など）**: 学習者ごとの OAuth ができてから（Phase 1）。ブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡さないでください
 - **ヘルスチェック & Graceful Shutdown**: 本番運用対応
 
@@ -178,7 +178,7 @@ Every model call goes through the server gateway in `server/llm/`; the browser n
 
 **Default models.** The AI tutor (`tutor.chat`), writing feedback (`writing.feedback`) and course generation (`course.generate`, `/api/v2/ai/generate`) run on the cheap Claude model (Claude Haiku), within the daily caps in `server/middleware/dailyCaps.js`. To move one back to the larger model, set for example `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` (likewise `LLM_TASK_WRITING_FEEDBACK`, `LLM_TASK_COURSE_GENERATE`).
 
-**Why Gemini is off by default.** The [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) forbid using the API in a service "directed towards or likely to be accessed by individuals under the age of 18", and minors use Rise Path. So Gemini is used only when `GEMINI_ALLOWED=true`. With it off, uploaded materials are stored without vectors and found by keyword search (`node scripts/rag/reembed.mjs` embeds them later, once Gemini is allowed), and `/api/v2/image` answers 503 with `error_type: image_generation_unavailable`.
+**Why Gemini is off by default.** The [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) forbid using the API in a service "directed towards or is likely to be accessed by individuals under the age of 18", and minors use Rise Path. So Gemini is used only when `GEMINI_ALLOWED=true`. With it off, uploaded materials are stored without vectors and found by keyword search (`node scripts/rag/reembed.mjs` embeds them later, once Gemini is allowed), and `/api/v2/image` answers 503 with `error_type: image_generation_unavailable`.
 
 ---
 

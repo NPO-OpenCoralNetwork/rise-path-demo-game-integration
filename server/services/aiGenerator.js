@@ -101,31 +101,43 @@ function balancedObjectAt(text, from) {
 
 /**
  * The JSON object in a model reply: the whole reply, a ```json (or bare ```) fenced block, or
- * the first balanced {...} that parses. Returns null when there is none (arrays and scalars are
- * not stage replies).
+ * a balanced {...}, in that order: the first candidate that parses and that `accept` takes.
+ * `accept` lets a stage skip an earlier object of another shape (an echoed input, an example),
+ * so the stage's own object later in the reply is still found. Returns null when there is none
+ * (arrays and scalars are not stage replies).
  * @param {unknown} text
+ * @param {(value: Record<string, any>) => boolean} [accept]
  * @returns {Record<string, any> | null}
  */
-export function parseJsonReply(text) {
+export function parseJsonReply(text, accept = () => true) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim().replace(/^﻿/, '');
   if (!trimmed) return null;
 
-  const whole = tryParseObject(trimmed);
+  const take = (candidate) => {
+    const parsed = candidate ? tryParseObject(candidate) : null;
+    return parsed && accept(parsed) ? parsed : null;
+  };
+
+  const whole = take(trimmed);
   if (whole) return whole;
 
   for (const match of trimmed.matchAll(/```[a-zA-Z]*[ \t]*\r?\n?([\s\S]*?)```/g)) {
-    const fenced = tryParseObject(match[1].trim());
+    const fenced = take(match[1].trim());
     if (fenced) return fenced;
   }
 
-  // Bounded: each attempt scans to the end of a long reply at worst.
+  // Bounded: each attempt scans to the end of a long reply at worst. An object that parses but
+  // is not taken is skipped whole, so the braces nested in an echoed input do not use up attempts.
   let attempts = 0;
-  for (let start = trimmed.indexOf('{'); start !== -1 && attempts < MAX_OBJECT_STARTS; start = trimmed.indexOf('{', start + 1)) {
+  let start = trimmed.indexOf('{');
+  while (start !== -1 && attempts < MAX_OBJECT_STARTS) {
     attempts += 1;
     const candidate = balancedObjectAt(trimmed, start);
     const parsed = candidate ? tryParseObject(candidate) : null;
-    if (parsed) return parsed;
+    if (parsed && accept(parsed)) return parsed;
+    const next = parsed ? start + candidate.length : start + 1;
+    start = trimmed.indexOf('{', next);
   }
   return null;
 }
@@ -146,10 +158,9 @@ async function callCourseModel({ stage, system, userMessage, userId, input = {},
     signal,
   });
   const text = typeof result?.text === 'string' ? result.text : '';
-  const parsed = parseJsonReply(text);
-  // parseJsonReply can return a nested piece of a broken reply (say a {en, jp} title), so a
-  // stage only takes an object of its own shape; anything else counts as a reply with no JSON.
-  return { text, structuredData: parsed && isStageReply(stage, parsed) ? parsed : null };
+  // A stage only takes an object of its own shape: an echoed input, an example or a nested piece
+  // of a broken reply (say a {en, jp} title) is skipped, and none at all counts as no JSON.
+  return { text, structuredData: parseJsonReply(text, (value) => isStageReply(stage, value)) };
 }
 
 /**

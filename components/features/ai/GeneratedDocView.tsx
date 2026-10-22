@@ -1366,10 +1366,6 @@ const imagePreviewCache = new Map<string, string>();
 let imageLimit: { until: number; paused: boolean } | null = null;
 const imageLimitNow = (): 'daily' | 'paused' | null =>
     imageLimit && Date.now() < imageLimit.until ? (imageLimit.paused ? 'paused' : 'daily') : null;
-// Set when /image says image generation is not available here (503, or error_type
-// 'image_generation_unavailable': this deployment does not generate images). Until the page
-// reloads, image blocks skip the request and show their description instead: no repeated calls.
-let imageUnavailable = false;
 type ImageNote = 'daily' | 'paused' | 'unavailable' | 'failed';
 
 const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({ block, language }) => {
@@ -1413,7 +1409,7 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
             setIsLoading(false);
             return;
         }
-        const holding: ImageNote | null = imageUnavailable ? 'unavailable' : imageLimitNow();
+        const holding: ImageNote | null = imageLimitNow();
         if (holding) {
             setLimited(holding);
             setSrc(block.src || block.fallbackSrc || null);
@@ -1438,7 +1434,9 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                     imageLimit = { paused, until: paused ? Infinity : dailyLimitResetAt(err) ?? nextJstMidnight(Date.now()) };
                     setLimited(paused ? 'paused' : 'daily');
                 } else if (isImageGenerationUnavailable(err)) {
-                    imageUnavailable = true;
+                    // 503 image_generation_unavailable: this deployment does not generate images.
+                    // Each block still asks once, since the server answers images it already
+                    // cached (free, before this check); this block does not ask again.
                     setLimited('unavailable');
                 } else {
                     // Any other failure: this block does not ask again by itself.

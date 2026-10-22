@@ -15,7 +15,7 @@
 | 公開 | API は Cloudflare Tunnel の `https://api.<domain>` だけ。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
 | Mac | `npm run dev` + Tailscale で VM の db/mcp/kokoro（Hermes を有効にしたときは hermes も）に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
 | AI | チューター・文章フィードバック・コース生成は Claude（`ANTHROPIC_API_KEY`。既定は安いモデル）。Gemini は使いません（`GEMINI_ALLOWED` を設定しない。下の表） |
-| Hermes | **学習者には提供しません。** 既定は `COMPOSE_PROFILES=tts`（`hermes` コンテナを起動しません）で、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しません。API も同じ `VITE_FEATURE_AGENT_CHAT` を読み、ちょうど `true` でないと `/api/v2/agent/chat` は 404 を返します（Hermes が動いていても使えません）。前の `stack.env` で `COMPOSE_PROFILES=full` のままなら、`tts`（トンネルを使うなら `tts,tunnel`）に変えて Hermes を止めます。自分で運用するときや開発のときだけ、Compose の **`--profile full`**（`nousresearch/hermes-agent`）で起動できます。Mac 単体開発は `hermes -p rise-path gateway` も可 |
+| Hermes | **学習者には提供しません。** 既定は `COMPOSE_PROFILES=tts`（`hermes` コンテナを起動しません）で、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しません。API も同じ `VITE_FEATURE_AGENT_CHAT` を読み、ちょうど `true` でないと `/api/v2/agent/chat` は 404 を返します（Hermes が動いていても使えません）。前の `stack.env` で `COMPOSE_PROFILES=full` のままなら、`tts`（トンネルを使うなら `tts,tunnel`）に変えて `deploy-stack.sh` を実行し直します。前のデプロイで残った `hermes` コンテナは、そのときに削除されます。自分で運用するときや開発のときだけ、Compose の **`--profile full`**（`nousresearch/hermes-agent`）で起動できます。Mac 単体開発は `hermes -p rise-path gateway` も可 |
 
 ### マシンタイプ
 

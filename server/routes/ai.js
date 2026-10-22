@@ -290,12 +290,8 @@ export function courseGenerationError(error) {
 router.post('/generate', async (req, res) => {
   // Set request timeout
   req.setTimeout(60000);
-  // Stop the model call when the client goes away (the composer gives up after 60 s).
-  const controller = new AbortController();
-  res.on('close', () => {
-    if (!res.writableFinished) controller.abort();
-  });
-  const { signal } = controller;
+  // The model call is not cancelled when the client goes away (the composer gives up after 60 s):
+  // the stage finishes and saves the draft, so a charged unit is not thrown away.
 
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
@@ -335,7 +331,7 @@ router.post('/generate', async (req, res) => {
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
-      const result = await generateRequirements(message, userId, kit, { signal });
+      const result = await generateRequirements(message, userId, kit);
       const title = result.intake?.goal || message.slice(0, 100);
 
       let draftId = curriculum_id;
@@ -382,7 +378,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const intake = draft.rows[0].intake_json;
-      const result = await generateRoadmap(intake, userId, kit, { signal });
+      const result = await generateRoadmap(intake, userId, kit);
 
       // Update draft
       await pool.query(
@@ -413,7 +409,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const { intake_json: intake, modules_json: modules } = draft.rows[0];
-      const result = await generateCurriculum(intake, modules, userId, kit, { signal });
+      const result = await generateCurriculum(intake, modules, userId, kit);
 
       if (!result.curriculum) {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
@@ -462,7 +458,7 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
-        const result = await generateRequirements(message, userId, kit, { signal });
+        const result = await generateRequirements(message, userId, kit);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()
@@ -491,7 +487,7 @@ router.post('/generate', async (req, res) => {
         const intake = draft.rows[0].intake_json;
         // Append feedback to intake for re-generation
         const modifiedIntake = { ...intake, revision_feedback: message };
-        const result = await generateRoadmap(modifiedIntake, userId, kit, { signal });
+        const result = await generateRoadmap(modifiedIntake, userId, kit);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET modules_json = $1, updated_at = NOW()

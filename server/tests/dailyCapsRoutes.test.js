@@ -631,7 +631,8 @@ describe('daily caps on the API routes', () => {
             assert.equal(gateway.calls[0].task, 'course.generate');
             assert.equal(gateway.calls[0].userId, DEV_USER);
             assert.deepEqual(gateway.calls[0].messages, [{ role: 'user', content: 'Teach me SQL' }]);
-            assert.ok(gateway.calls[0].signal instanceof AbortSignal);
+            // Not cancelled when the client goes away: the stage finishes and saves the draft.
+            assert.equal(gateway.calls[0].signal, undefined);
         });
 
         it('answers 422 and saves nothing when the curriculum reply is broken JSON with a parseable nested piece', async () => {
