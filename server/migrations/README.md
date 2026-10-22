@@ -27,8 +27,8 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 
 | ファイル | 内容 |
 |----------|------|
-| `000_extensions_and_auth.sql` | pgcrypto, vector, `auth.users` スタブ, triggers |
-| `001_core_curriculum.sql` | curricula, versions, materials, jobs, portals, AI sessions |
+| `000_extensions_and_auth.sql` | pgcrypto, vector（Postgres に pgvector があるときだけ。VM の db イメージ `pgvector/pgvector:0.8.7-pg16` にはある）, `auth.users` スタブ, triggers |
+| `001_core_curriculum.sql` | curricula, versions, materials, jobs, portals, AI sessions, `material_chunks`（vector があれば `embedding vector(768)` + HNSW インデックス、無ければ `FLOAT8[]`） |
 | `002_user_app_tables.sql` | user_profiles, progress, events, notifications |
 | `003_learner_profiles.sql` | 診断プロファイル |
 | `004_learning_journal.sql` | レッスン単位ジャーナル |
@@ -40,6 +40,12 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス（`CONCURRENTLY` なし。作成中は `material_chunks` への書き込みが待たされる） |
 | `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
 | `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
+
+### pgvector（RAG のベクトル検索）
+
+`material_chunks.embedding` の型は、001 を最初に流したときに決まります。VM の db イメージは pgvector 入りなので、新しい空の DB では 000 が `vector` 拡張を作り、001 が `vector(768)` の列と HNSW インデックスを作ります。RAG はベクトル検索で動きます（埋め込みには `GEMINI_API_KEY` が要ります）。
+
+pgvector の無い Postgres（たとえば `postgres:16-alpine`）では、000 は `vector` を飛ばし、列は `FLOAT8[]` になります。このとき RAG はキーワード検索で動きます。001 は 2 回目以降は流れないので、あとから pgvector 入りのイメージに替えても列は変わりません。ベクトル検索になるのは、新しい空のボリュームから始めたときだけです。
 
 ## 参考資料（適用しない）
 
