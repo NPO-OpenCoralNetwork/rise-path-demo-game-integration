@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import { realpathSync } from 'fs';
+import { STATUS_CODES } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg'; // For legacy pool if needed, or remove
@@ -215,6 +216,17 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         // Also serve public/ for uploaded/generated assets
         app.use(express.static(path.join(__dirname, 'public')));
     }
+
+    // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
+    // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
+    // sent: Express's own handler sends the stack (database text included) outside production.
+    app.use((err, req, res, next) => {
+        if (res.headersSent) return next(err);
+        const code = err?.status ?? err?.statusCode;
+        const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
+        if (status >= 500) console.error(`[Server] ${req.method} ${req.originalUrl} failed:`, err);
+        res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
+    });
 
     return app;
 }
