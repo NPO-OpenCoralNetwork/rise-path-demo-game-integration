@@ -20,6 +20,7 @@ import { isUuid } from '../../tools/core/ids.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
 import { generateImageWithGemini } from '../geminiBackendService.js';
+import { errorDetail } from '../errorDetail.js';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -115,7 +116,7 @@ router.get('/curricula', async (req, res) => {
     } catch (error) {
         if (respondIfDbUnavailable(res, error)) return;
         console.error('[Content API] List Error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to load curricula', detail: error.message });
+        res.status(500).json({ error: 'Failed to load curricula', ...errorDetail(error) });
     }
 });
 
@@ -148,7 +149,7 @@ router.get('/curricula/:id', async (req, res) => {
     } catch (error) {
         if (respondIfDbUnavailable(res, error)) return;
         console.error('[Content API] Detail Error:', error.message);
-        res.status(500).json({ error: 'Failed to load curriculum', detail: error.message });
+        res.status(500).json({ error: 'Failed to load curriculum', ...errorDetail(error) });
     }
 });
 
@@ -236,7 +237,7 @@ router.post('/image', async (req, res) => {
         res.json({ ok: true, image: result.data, mimeType, text: result.text, url });
     } catch (error) {
         console.error('[Content API] Image Error:', error.message);
-        res.status(500).json({ error: 'Image generation failed', detail: error.message });
+        res.status(500).json({ error: 'Image generation failed', ...errorDetail(error) });
     }
 });
 
@@ -284,7 +285,10 @@ router.get('/jobs/:id', async (req, res) => {
             [req.params.id, req.userId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Job not found' });
-        res.json(result.rows[0]);
+        // jobs.error holds the worker's exception text (paths inside the container, database or
+        // model messages): the owner sees that the job failed, and the text only while developing.
+        const job = result.rows[0];
+        res.json({ ...job, error: job.error ? 'Processing failed' : null, ...errorDetail(job.error) });
     } catch (error) {
         if (respondIfDbUnavailable(res, error)) return;
         res.status(500).json({ error: 'Failed to check job' });

@@ -257,7 +257,8 @@ describe('life journal route errors', () => {
     it('omits error detail in production responses', async () => {
         const fs = await import('node:fs');
         const source = fs.readFileSync(new URL('../routes/lifeJournal.js', import.meta.url), 'utf8');
-        assert.ok(source.includes("process.env.NODE_ENV !== 'production'"));
+        // errorDetail (server/errorDetail.js, errorDetail.test.js) drops the text in production.
+        assert.ok(source.includes('...errorDetail(error)'));
         assert.ok(source.includes('respondServerError'));
         assert.ok(!source.includes('detail: error.message'));
     });

@@ -11,6 +11,7 @@ import {
     getHermesConfig,
 } from '../services/hermesAgentService.js';
 import { resolveIncludeDiaryExcerpts } from '../services/lifeJournalPrivacyService.js';
+import { errorDetail } from '../errorDetail.js';
 
 const router = express.Router();
 
@@ -93,10 +94,11 @@ router.post('/agent/chat', async (req, res) => {
         });
 
         if (!streamResult.ok) {
+            console.warn('[Agent Proxy] Hermes stream failed:', streamResult.status, streamResult.error_type, streamResult.detail ?? '');
             return res.status(streamResult.status).json({
                 error: streamResult.error,
                 error_type: streamResult.error_type,
-                detail: streamResult.detail,
+                ...errorDetail(streamResult.detail),
             });
         }
 
@@ -140,10 +142,11 @@ router.post('/agent/chat', async (req, res) => {
     });
 
     if (!result.ok) {
+        console.warn('[Agent Proxy] Hermes request failed:', result.status, result.error_type, result.detail ?? '');
         return res.status(result.status).json({
             error: result.error,
             error_type: result.error_type,
-            detail: result.detail,
+            ...errorDetail(result.detail),
         });
     }
 
