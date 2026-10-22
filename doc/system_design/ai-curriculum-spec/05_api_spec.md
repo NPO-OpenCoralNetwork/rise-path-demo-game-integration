@@ -51,6 +51,8 @@
 ### POST /api/materials
 **目的**: Storageにアップロード後、materialsメタを登録
 
+> 現行の実装は `POST /api/v2/upload`（multipart/form-data の `file`）。PDF・テキスト（.txt）・Markdown（.md）を 20MB まで受け付け、大きすぎれば 413、それ以外の形式は 415 を返す。保存先は `RISE_PATH_UPLOAD_DIR`（既定は `<プロジェクト>/uploads`）で、ファイル名はランダム。アップロードした資料は HTTP では配信しない（`/uploads/*` は 404）。
+
 **Request**
 ```json
 {

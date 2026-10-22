@@ -8,6 +8,10 @@ import { sendAiChat, sendAiDecision, fetchGeneratedCourseById, uploadFile, fetch
 import { addLearningEvent } from '../../../services/progressService';
 import ReactMarkdown from 'react-markdown';
 
+/** Same limits as the server (server/uploads.js), checked here so a wrong file is refused at once. */
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const ACCEPTED_UPLOAD = /\.(pdf|txt|md)$/i;
+
 type AiFailure = 'auth' | 'unavailable' | 'other';
 
 // The API client throws plain Errors. Prefer an attached HTTP status; otherwise match the messages
@@ -43,7 +47,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   const [curriculumId, setCurriculumId] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<string | null>(null); // 'requirements' | 'roadmap' | 'curriculum'
   
-  // File State
+  // File State (the server accepts PDF, text and Markdown up to 20 MB: server/uploads.js)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -78,6 +82,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       moduleLabel: 'Module',
       attachFile: 'Attach a file',
       removeFile: 'Remove attached file',
+      fileTooLarge: 'Files can be up to 20 MB.',
+      fileTypeUnsupported: 'Attach a PDF, a text file (.txt) or a Markdown file (.md).',
       send: 'Send',
       dismiss: 'Dismiss',
       stepsTitle: 'Planning steps',
@@ -122,6 +128,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       moduleLabel: 'モジュール',
       attachFile: 'ファイルを添付',
       removeFile: '添付ファイルを外す',
+      fileTooLarge: '添付できるファイルは 20MB までです。',
+      fileTypeUnsupported: 'PDF・テキスト（.txt）・Markdown（.md）のファイルを添付してください。',
       send: '送信',
       dismiss: '閉じる',
       stepsTitle: '作成の流れ',
@@ -240,7 +248,23 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     try {
         let attachments: any[] = [];
         if (selectedFile) {
-            const uploadRes = await uploadFile(selectedFile);
+            let uploadRes;
+            try {
+                uploadRes = await uploadFile(selectedFile);
+            } catch (uploadErr) {
+                // A refused file is the user's to fix, not a chat failure: take the message back
+                // and give them their text again.
+                const status = (uploadErr as { status?: unknown } | null)?.status;
+                if (status === 413 || status === 415) {
+                    setMessages(prev => prev.filter(m => m.id !== userMsg.id));
+                    setInputValue(msgText);
+                    setError(status === 413 ? t.fileTooLarge : t.fileTypeUnsupported);
+                    setSelectedFile(null);
+                    setIsGenerating(false);
+                    return;
+                }
+                throw uploadErr;
+            }
             attachments.push({ material_id: uploadRes.material_id });
             setSelectedFile(null);
         }
@@ -783,9 +807,25 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                     <div className="flex gap-3 relative items-end min-w-0">
                         <input 
                             type="file"
+                            accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
                             ref={fileInputRef}
                             className="hidden"
-                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                            onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                e.target.value = ''; // the same file can be picked again
+                                if (!file) return;
+                                // "All files" in the picker gets past accept, so check here too.
+                                if (!ACCEPTED_UPLOAD.test(file.name)) {
+                                    setError(t.fileTypeUnsupported);
+                                    return;
+                                }
+                                if (file.size > MAX_UPLOAD_BYTES) {
+                                    setError(t.fileTooLarge);
+                                    return;
+                                }
+                                setError(null);
+                                setSelectedFile(file);
+                            }}
                         />
                         <button 
                             type="button"

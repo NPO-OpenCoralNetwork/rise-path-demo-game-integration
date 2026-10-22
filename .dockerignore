@@ -11,6 +11,9 @@ sample
 # Large offline corpora — not needed in api/mcp runtime images
 data/curricula/blender/blender_manual_v500_en.html
 public/data/audio
+# Uploaded materials stay on the machine that received them (a volume on the VM)
+uploads
+public/uploads
 deploy/risepath-vm/hermes-data
 # VM stack secrets (stack.env, tunnel.env): no build step reads them
 deploy/risepath-vm/*.env

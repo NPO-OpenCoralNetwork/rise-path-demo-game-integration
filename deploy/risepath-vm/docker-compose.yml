@@ -59,6 +59,11 @@ services:
       MEMANTO_SESSION_DURATION_HOURS: ${MEMANTO_SESSION_DURATION_HOURS:-24}
       MEMANTO_RECALL_LIMIT: ${MEMANTO_RECALL_LIMIT:-8}
       MEMANTO_MIN_CONFIDENCE_WRITE: ${MEMANTO_MIN_CONFIDENCE_WRITE:-0.7}
+      # Fixed to the volume below, so a value in stack.env cannot put uploads outside it.
+      RISE_PATH_UPLOAD_DIR: /app/uploads
+    volumes:
+      # Uploaded materials (server/uploads.js): kept across rebuilds, never served over HTTP.
+      - uploads:/app/uploads
     # default: db, mcp, hermes, kokoro-tts. edge: cloudflared only (api.<domain> → api:3006).
     networks:
       - default
@@ -216,3 +221,4 @@ networks:
 
 volumes:
   pgdata:
+  uploads:

@@ -7,6 +7,7 @@ sample
 deploy/risepath-vm/hermes-data
 data/curricula/blender/blender_manual_v500_en.html
 public/uploads
+/uploads
 *.pdf
 .env.local
 .env
