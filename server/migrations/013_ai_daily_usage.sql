@@ -1,6 +1,6 @@
 -- Rise Path migration 013: daily usage counters for paid AI features (server/middleware/dailyCaps.js).
 -- One row per Japan-time day, feature kind and subject: a user id, a visitor address
--- ('ip:203.0.113.7', or an IPv6 /64), or '*' for the all-users total.
+-- ('ip:203.0.113.7', or an IPv6 /56 such as 'ip:2001:db8:1:200::/56'), or '*' for the all-users total.
 -- No foreign key, because subject is not always a user. The primary key starts with usage_day, so
 -- pruning old days later can use it. Rows are tiny ((users + addresses) x 5 kinds per day), so
 -- nothing prunes them yet.
