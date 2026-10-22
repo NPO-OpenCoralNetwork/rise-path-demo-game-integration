@@ -31,7 +31,8 @@ export interface AgentChatErrorCopy {
 
 export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): string {
   if (err instanceof AgentApiError) {
-    if (err.errorType === 'hermes_not_configured' || err.errorType === 'hermes_unreachable') {
+    // Hermes could not be used (a fixed error_type: the server never forwards Hermes's own text).
+    if (err.errorType === 'hermes_not_configured' || err.errorType === 'hermes_unreachable' || err.errorType === 'hermes_api_error') {
       return copy.hermesUnavailable;
     }
     // The connection to Hermes broke after the request was sent: a plain "try again".
@@ -48,7 +49,6 @@ export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): strin
       if (copy.dailyLimit) return copy.dailyLimit;
     }
     if (err.status === 429) return copy.rateLimited;
-    if (err.detail) return `${err.message}: ${err.detail}`;
     if (err.message) return err.message;
   }
   return copy.genericError;
@@ -102,11 +102,15 @@ export class AgentApiError extends Error {
   }
 }
 
-/** Retry on network errors and 5xx except 503; do not retry 4xx (including 403 diary gate). */
+/**
+ * Retry on network errors and 5xx except 503; do not retry 4xx (including 403 diary gate), nor a
+ * Hermes error (502 hermes_api_error): Hermes answered, and the same call would fail again.
+ */
 export function shouldRetryAgentChatWithoutStream(err: unknown): boolean {
   if (!(err instanceof AgentApiError)) return true;
   if (err.status >= 400 && err.status < 500) return false;
   if (err.status === 503) return false;
+  if (err.errorType === 'hermes_api_error') return false;
   return true;
 }
 
@@ -118,7 +122,7 @@ const parseAgentError = async (res: Response): Promise<AgentApiError> => {
       res.status,
       data?.error_type,
       data?.detail,
-      dailyLimitFields(data),
+      dailyLimitFields(data, res.headers.get('retry-after')),
     );
   } catch {
     return new AgentApiError(`Agent request failed (${res.status})`, res.status);

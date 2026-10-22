@@ -533,7 +533,8 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
               turn={turn}
               text={text}
               sourceChip={turn.role === 'assistant' && turn.status === 'done' ? sourceChip(turn) : null}
-              onRetry={turn === turns[turns.length - 1] ? tutor.retry : undefined}
+              // No Retry while a daily cap holds: the hook would refuse it without a word.
+              onRetry={turn === turns[turns.length - 1] && !limited ? tutor.retry : undefined}
             />
           ))}
         </div>

@@ -1370,11 +1370,12 @@ const imageLimitNow = (): 'daily' | 'paused' | null =>
 const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({ block, language }) => {
     const copy = {
         en: {
-            daily: "Today's limit for image previews has been reached. They come back after midnight Japan time.",
+            // Blocks on screen do not ask again by themselves: the page has to be opened again.
+            daily: "Today's limit for image previews has been reached. Open this page again after midnight Japan time to see them.",
             paused: 'Image previews are paused for now.',
         },
         jp: {
-            daily: '今日の画像生成は上限に達しました。日本時間の0時を過ぎると、また表示されます。',
+            daily: '今日の画像生成は上限に達しました。日本時間の0時を過ぎてから、このページを開き直すと表示されます。',
             paused: '画像の生成は、今は停止しています。',
         },
     } as const;

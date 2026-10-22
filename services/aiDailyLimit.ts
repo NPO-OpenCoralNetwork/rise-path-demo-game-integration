@@ -16,6 +16,8 @@ const CAP_SCOPES: readonly AiCapScope[] = ['user', 'ip', 'global', 'guest', 'off
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A reset_at that is already past here (this clock runs a little fast) holds this long, not a day. */
+const PAST_RESET_HOLD_MS = 60 * 1000;
 
 /** True when `err` is an error (or object) whose `errorType` is 'daily_limit_reached'. */
 export function isDailyLimitError(err: unknown): boolean {
@@ -47,27 +49,44 @@ export function nextJstMidnight(nowMs: number): number {
 }
 
 /**
- * When the limit lifts, in ms: the server's reset_at when it is a time after `nowMs` and within a
- * day, else the next 00:00 JST. null for a feature that is turned off (scope 'off') and for any
- * error that is not a daily limit.
+ * When the limit lifts, in ms: the reset time (dailyLimitFields) when it is after `nowMs` and
+ * within a day; a minute from now when it is already past (the server says the limit lifts
+ * about now, and this clock runs a little fast); else (none, unreadable, too far) the next
+ * 00:00 JST. null for a feature that is turned off (scope 'off') and for any error that is not a
+ * daily limit.
  */
 export function dailyLimitResetAt(err: unknown, nowMs: number = Date.now()): number | null {
   const scope = dailyLimitScope(err);
   if (!scope || scope === 'off') return null;
   const raw = (err as { resetAt?: unknown }).resetAt;
   const parsed = typeof raw === 'string' ? Date.parse(raw) : Number.NaN;
-  return Number.isFinite(parsed) && parsed > nowMs && parsed - nowMs <= DAY_MS ? parsed : nextJstMidnight(nowMs);
+  if (!Number.isFinite(parsed)) return nextJstMidnight(nowMs);
+  if (parsed <= nowMs) return nowMs + PAST_RESET_HOLD_MS;
+  return parsed - nowMs <= DAY_MS ? parsed : nextJstMidnight(nowMs);
 }
 
-/** The daily-limit fields of an API error body, named as the thrown errors carry them. */
-export function dailyLimitFields(body: unknown): { errorType?: string; kind?: string; scope?: string; resetAt?: string } {
+/**
+ * The daily-limit fields of an API error body, named as the thrown errors carry them. With the
+ * response's Retry-After (seconds), resetAt is that long after `nowMs` on this device's clock, so
+ * a clock that is off does not move when the limit lifts; without it, the server's reset_at.
+ */
+export function dailyLimitFields(
+  body: unknown,
+  retryAfter?: string | null,
+  nowMs: number = Date.now(),
+): { errorType?: string; kind?: string; scope?: string; resetAt?: string } {
   if (body === null || typeof body !== 'object') return {};
   const record = body as Record<string, unknown>;
   const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+  const seconds = typeof retryAfter === 'string' && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : Number.NaN;
+  const errorType = text(record.error_type);
+  const resetAt = errorType === DAILY_LIMIT_ERROR_TYPE && text(record.reset_at) && Number.isFinite(seconds) && seconds * 1000 <= DAY_MS
+    ? new Date(nowMs + seconds * 1000).toISOString()
+    : text(record.reset_at);
   return {
-    errorType: text(record.error_type),
+    errorType,
     kind: text(record.kind),
     scope: text(record.scope),
-    resetAt: text(record.reset_at),
+    resetAt,
   };
 }

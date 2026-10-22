@@ -36,15 +36,15 @@ const MIN_ANALYZING_MS = 1200;
  */
 const insightLimitCopy = {
   en: {
-    daily_limit: "Today's limit for AI analysis has been reached, so this shows the standard explanation. You can run the AI analysis again after midnight Japan time.",
+    daily_limit: "Today's limit for AI analysis has been reached, so this shows the standard explanation. Retake the assessment after midnight Japan time to get the AI analysis.",
     paused: 'AI analysis is paused for now, so this shows the standard explanation.',
   },
   jp: {
-    daily_limit: '今日のAI分析は上限に達したため、標準の解説を表示しています。日本時間の0時を過ぎると、AI分析をやり直せます。',
+    daily_limit: '今日のAI分析は上限に達したため、標準の解説を表示しています。AI分析を受けるには、日本時間の0時を過ぎてから診断を受け直してください。',
     paused: 'AI分析は今は停止しているため、標準の解説を表示しています。',
   },
   fr: {
-    daily_limit: "La limite d'analyses IA du jour est atteinte : voici l'explication standard. Vous pourrez relancer l'analyse IA après minuit, heure du Japon.",
+    daily_limit: "La limite d'analyses IA du jour est atteinte : voici l'explication standard. Refaites le test après minuit, heure du Japon, pour obtenir l'analyse IA.",
     paused: "L'analyse IA est suspendue pour le moment : voici l'explication standard.",
   },
 } as const;

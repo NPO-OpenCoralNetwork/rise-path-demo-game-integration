@@ -2741,10 +2741,10 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
 
 // /ai/generate and /ai/drafts require auth in strict mode, so they go through apiFetch (Bearer
 // token). Errors carry the HTTP status so CourseGeneratorView can tell 401 from 503/504, and
-// error_type, kind, scope and reset_at from the body so a daily cap (error_type
+// error_type, kind, scope and reset_at from the body (with Retry-After) so a daily cap (error_type
 // 'daily_limit_reached', services/aiDailyLimit.ts) is recognised.
-const aiHttpError = (message: string, status: number, body?: unknown): Error =>
-  Object.assign(new Error(message), { status, ...dailyLimitFields(body) });
+const aiHttpError = (message: string, status: number, body?: unknown, retryAfter?: string | null): Error =>
+  Object.assign(new Error(message), { status, ...dailyLimitFields(body, retryAfter) });
 
 export const sendAiChat = async (message: string, sessionId?: string, attachments: any[] = []) => {
   if (USE_DEMO_MODE) {
@@ -2793,7 +2793,7 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err);
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
       throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
@@ -2905,7 +2905,7 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err);
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
       throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
@@ -2942,7 +2942,7 @@ export const uploadFile = async (file: File) => {
   const response = await apiFetch('/upload', { method: 'POST', body: formData });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw Object.assign(new Error(err.error || 'Upload failed.'), { status: response.status, ...dailyLimitFields(err) });
+    throw Object.assign(new Error(err.error || 'Upload failed.'), { status: response.status, ...dailyLimitFields(err, response.headers.get('retry-after')) });
   }
   return await response.json();
 };
@@ -2961,7 +2961,7 @@ export const generateImagePreview = async (
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw Object.assign(new Error(err.error || 'Image generation failed.'), { status: response.status, ...dailyLimitFields(err) });
+    throw Object.assign(new Error(err.error || 'Image generation failed.'), { status: response.status, ...dailyLimitFields(err, response.headers.get('retry-after')) });
   }
   const data = await response.json();
   if (data?.url) {

@@ -35,7 +35,12 @@ export class LlmApiError extends Error {
 const readError = async (res: Response): Promise<LlmApiError> => {
   try {
     const data = await res.json();
-    return new LlmApiError(data?.error || `LLM request failed (${res.status})`, res.status, data?.error_type, dailyLimitFields(data));
+    return new LlmApiError(
+      data?.error || `LLM request failed (${res.status})`,
+      res.status,
+      data?.error_type,
+      dailyLimitFields(data, res.headers.get('retry-after')),
+    );
   } catch {
     return new LlmApiError(`LLM request failed (${res.status})`, res.status);
   }

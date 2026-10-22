@@ -57,8 +57,22 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   // When today's cap lifts (reset_at, else the next 00:00 JST): the panel then clears itself.
   const [blockedUntil, setBlockedUntil] = useState<number | null>(null);
   const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null);
+  // The blocked panel's body: did the refused message go back into the composer (a send), or was
+  // there none (Approve)?
+  const [blockedRestored, setBlockedRestored] = useState(false);
+  // Read out politely when course generation is available again.
+  const [statusMessage, setStatusMessage] = useState('');
   const blockedHeadingRef = useRef<HTMLHeadingElement>(null);
+  const blockedPanelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const removeFileRef = useRef<HTMLButtonElement>(null);
+  // Where focus goes after the next render: the composer input (the panel lifted) or the attached
+  // file's remove button (its upload was refused).
+  const focusAfterRef = useRef<'input' | 'file' | null>(null);
   const lastAttemptRef = useRef('');
+  // The composer stays locked while sending cannot work: no sign-in, or today's cap is reached
+  // (until 00:00 JST), or course generation is turned off.
+  const composerLocked = aiBlocked === 'auth' || aiBlocked === 'daily_limit' || aiBlocked === 'paused';
   
   // V2 Flow State
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -68,6 +82,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   // File State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // A file already uploaded for a message that was then refused (a daily cap): it stays attached
+  // and goes with that message when it is sent again, without a second upload.
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; materialId: string } | null>(null);
 
   const copy = {
     en: {
@@ -117,6 +134,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       dailyLimitBody: 'Your conversation and your message are kept here. You can continue after midnight Japan time. The ready-made courses are available meanwhile.',
       pausedTitle: 'Course generation is paused for now',
       pausedBody: 'Your conversation and your message are kept here. The ready-made courses are available meanwhile.',
+      dailyLimitBodyKept: 'Your conversation is kept here. You can continue after midnight Japan time. The ready-made courses are available meanwhile.',
+      pausedBodyKept: 'Your conversation is kept here. The ready-made courses are available meanwhile.',
+      availableAgain: 'Course generation is available again.',
+      fileUploaded: 'Uploaded',
       uploadDailyLimit: "Today's limit for file uploads has been reached. Remove the file to keep going, or attach it again after midnight Japan time.",
       uploadPaused: 'File uploads are paused for now. Remove the file to keep going.',
       uploadTooLarge: 'This file is larger than 10 MB. Remove it, or attach a smaller file.',
@@ -168,6 +189,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       dailyLimitBody: '会話と入力した文はそのまま残っています。日本時間の0時を過ぎたら、続きから作れます。その間も公開中のコースを読めます。',
       pausedTitle: 'コース生成は、今は停止しています',
       pausedBody: '会話と入力した文はそのまま残っています。その間も公開中のコースを読めます。',
+      dailyLimitBodyKept: '会話はそのまま残っています。日本時間の0時を過ぎたら、続きから作れます。その間も公開中のコースを読めます。',
+      pausedBodyKept: '会話はそのまま残っています。その間も公開中のコースを読めます。',
+      availableAgain: 'コース生成を、また使えるようになりました。',
+      fileUploaded: 'アップロード済み',
       uploadDailyLimit: '今日のファイルのアップロードは上限に達しました。ファイルを外せば、このまま続けられます。日本時間の0時を過ぎたら、また添付できます。',
       uploadPaused: 'ファイルのアップロードは、今は停止しています。ファイルを外せば、このまま続けられます。',
       uploadTooLarge: 'このファイルは10MBを超えています。ファイルを外すか、小さいファイルを添付してください。',
@@ -257,32 +282,47 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     if (aiBlocked) blockedHeadingRef.current?.focus();
   }, [aiBlocked]);
 
-  // Today's cap lifts at 00:00 JST: unlock the composer then (the restored message is still in it).
+  // Today's cap lifts at 00:00 JST: unlock the composer then (the restored message is still in it),
+  // say so politely, and move focus to the input when it was on the panel (or nowhere).
   useEffect(() => {
     if (aiBlocked !== 'daily_limit' || blockedUntil === null) return undefined;
     const timer = setTimeout(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || blockedPanelRef.current?.contains(active)) focusAfterRef.current = 'input';
       setAiBlocked(null);
       setBlockedUntil(null);
+      setStatusMessage(t.availableAgain);
     }, Math.min(Math.max(0, blockedUntil - Date.now()), 2 ** 31 - 1));
     return () => clearTimeout(timer);
-  }, [aiBlocked, blockedUntil]);
+  }, [aiBlocked, blockedUntil, t.availableAgain]);
+
+  // Focus requested above (or by a refused upload) once the target is on screen and enabled.
+  useEffect(() => {
+    if (!focusAfterRef.current || isGenerating || composerLocked) return;
+    const target = focusAfterRef.current === 'file' ? removeFileRef.current ?? inputRef.current : inputRef.current;
+    focusAfterRef.current = null;
+    target?.focus();
+  }, [aiBlocked, isGenerating, uploadNotice, composerLocked]);
 
   const handleSendMessage = async (text?: string) => {
+    if (composerLocked) return;
     const msgText = text || inputValue;
-    if (!msgText.trim() && !selectedFile) return;
+    if (!msgText.trim() && !selectedFile && !uploadedFile) return;
     if (isGenerating) return;
     // Too large for the server (413): say so here, before anything is sent or charged.
     if (selectedFile && selectedFile.size > MAX_UPLOAD_BYTES) {
+      focusAfterRef.current = 'file';
       setUploadNotice('too_large');
       return;
     }
 
     const isRevision = pendingApproval !== null && pendingApproval !== 'none';
+    const fileName = selectedFile?.name ?? uploadedFile?.name;
     
     const userMsg: Message = {
         id: Date.now().toString(),
         role: 'user',
-        text: selectedFile ? `${msgText} (Attached: ${selectedFile.name})`.trim() : msgText,
+        text: fileName ? `${msgText} (Attached: ${fileName})`.trim() : msgText,
         timestamp: new Date()
     };
     setMessages(prev => [...prev, userMsg]);
@@ -292,16 +332,21 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     setError(null);
     setAiBlocked(null);
     setUploadNotice(null);
+    setStatusMessage('');
     lastAttemptRef.current = msgText;
     const attempt = { text: msgText, userMsgId: userMsg.id };
 
     try {
         let attachments: any[] = [];
+        let uploaded = uploadedFile;
         if (selectedFile) {
             const uploadRes = await uploadFile(selectedFile);
-            attachments.push({ material_id: uploadRes.material_id });
+            uploaded = { name: selectedFile.name, materialId: uploadRes.material_id };
+            // Kept until the message is sent: a refused send keeps the file without a new upload.
+            setUploadedFile(uploaded);
             setSelectedFile(null);
         }
+        if (uploaded) attachments.push({ material_id: uploaded.materialId });
 
         let response;
         if (isRevision && curriculumId && sessionId && pendingApproval) {
@@ -309,6 +354,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         } else {
             response = await sendAiChat(msgText, sessionId || undefined, attachments);
         }
+        setUploadedFile(null);
 
         await handleApiResponse(response);
 
@@ -316,10 +362,6 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         handleAiFailure(err, attempt);
     }
   };
-
-  // The composer stays locked while sending cannot work: no sign-in, or today's cap is reached
-  // (until 00:00 JST), or course generation is turned off.
-  const composerLocked = aiBlocked === 'auth' || aiBlocked === 'daily_limit' || aiBlocked === 'paused';
 
   /**
    * `attempt`: the message that failed. When nothing was generated for it (a daily cap, a refused
@@ -334,12 +376,14 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     };
     if (failure === 'other') setError(t.errorChat);
     // The upload was refused before anything was generated: selectedFile stays attached, so the
-    // learner can remove it and send again.
+    // learner can remove it (focus goes to its remove button) and send again.
     else if (failure === 'upload_limit' || failure === 'upload_paused' || failure === 'upload_too_large') {
+      focusAfterRef.current = 'file';
       setUploadNotice(failure === 'upload_limit' ? 'limit' : failure === 'upload_paused' ? 'paused' : 'too_large');
       restoreAttempt();
     } else if (failure === 'daily_limit' || failure === 'paused') {
       setBlockedUntil(failure === 'daily_limit' ? dailyLimitResetAt(err) : null);
+      setBlockedRestored(Boolean(attempt));
       setAiBlocked(failure);
       restoreAttempt();
     } else setAiBlocked(failure);
@@ -347,6 +391,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   };
 
   const handleApprove = async () => {
+    if (composerLocked || isGenerating) return;
     if (!curriculumId || !sessionId || !pendingApproval) {
         setError(t.missingSession);
         return;
@@ -541,7 +586,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/30">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     {/* Demo Starter Grid */}
-                    {messages.length === 1 && !isGenerating && (
+                    {messages.length === 1 && !isGenerating && !composerLocked && (
                         <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
                             <div className="text-center max-w-lg">
                                 <p className="text-slate-600 text-sm mb-8 font-medium">
@@ -729,7 +774,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
 
                     {/* Login required / AI unavailable / today's generation cap reached / turned off */}
                     {aiBlocked && (
-                        <div role="alert" className="mx-0 sm:mx-6 mb-4 rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        <div ref={blockedPanelRef} role="alert" className="mx-0 sm:mx-6 mb-4 rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-sm animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-start gap-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${aiBlocked === 'auth' ? 'bg-primary-soft text-primary-text' : 'bg-sunken text-fg-2'}`}>
                                     {aiBlocked === 'auth'
@@ -748,8 +793,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                     <p className="text-sm text-fg-2 leading-relaxed">
                                         {aiBlocked === 'auth'
                                             ? (user && !user.isGuest ? t.authBodyExpired : t.authBody)
-                                            : aiBlocked === 'daily_limit' ? t.dailyLimitBody
-                                            : aiBlocked === 'paused' ? t.pausedBody : t.unavailableBody}
+                                            : aiBlocked === 'daily_limit' ? (blockedRestored ? t.dailyLimitBody : t.dailyLimitBodyKept)
+                                            : aiBlocked === 'paused' ? (blockedRestored ? t.pausedBody : t.pausedBodyKept) : t.unavailableBody}
                                     </p>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         {aiBlocked === 'daily_limit' || aiBlocked === 'paused' ? null : aiBlocked === 'auth' ? (
@@ -765,6 +810,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    focusAfterRef.current = 'input';
                                                     setAiBlocked(null);
                                                     setInputValue(lastAttemptRef.current);
                                                 }}
@@ -805,15 +851,20 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                     }
                                 </p>
                                 <div className="flex gap-3">
+                                    {/* Off while generation is locked (a daily cap, paused, sign-in): approving runs the next stage. */}
                                     <button 
+                                        type="button"
                                         onClick={handleApprove}
-                                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                                        disabled={composerLocked}
+                                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         <ThumbsUp size={14} /> {t.approve}
                                     </button>
                                     <button 
+                                        type="button"
                                         onClick={() => { /* Focus input for revision */ }}
-                                        className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                                        disabled={composerLocked}
+                                        className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         <ThumbsDown size={14} /> {t.revise}
                                     </button>
@@ -868,11 +919,30 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             <span>{uploadNotice === 'limit' ? t.uploadDailyLimit : uploadNotice === 'paused' ? t.uploadPaused : t.uploadTooLarge}</span>
                         </p>
                     )}
-                    {selectedFile && (
+                    {(selectedFile || uploadedFile) && (
                         <div className="mb-3 flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl w-fit animate-in fade-in slide-in-from-bottom-1">
                             <Paperclip size={14} className="text-indigo-500" />
-                            <span className="text-xs font-bold text-indigo-700 truncate max-w-[200px]">{selectedFile.name}</span>
-                            <button type="button" aria-label={t.removeFile} onClick={() => { setSelectedFile(null); setUploadNotice(null); }} className="text-indigo-500 hover:text-indigo-700 transition-colors">
+                            <span className="text-xs font-bold text-indigo-700 truncate max-w-[200px]">{selectedFile?.name ?? uploadedFile?.name}</span>
+                            {!selectedFile && uploadedFile && (
+                                <span className="flex items-center gap-1 text-xs text-indigo-700">
+                                    <CheckCircle size={12} aria-hidden="true" />
+                                    {t.fileUploaded}
+                                </span>
+                            )}
+                            <button
+                                ref={removeFileRef}
+                                type="button"
+                                aria-label={t.removeFile}
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    setUploadedFile(null);
+                                    setUploadNotice(null);
+                                    // The chip and its button go away: keep focus in the composer (or on the panel).
+                                    const input = inputRef.current;
+                                    (input && !input.disabled ? input : blockedHeadingRef.current)?.focus();
+                                }}
+                                className="text-indigo-500 hover:text-indigo-700 transition-colors"
+                            >
                                 <CloseIcon size={14} aria-hidden="true" />
                             </button>
                         </div>
@@ -884,6 +954,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             className="hidden"
                             onChange={(e) => {
                                 setSelectedFile(e.target.files?.[0] || null);
+                                setUploadedFile(null);
                                 setUploadNotice(null);
                                 // The same file can be picked again after it was removed.
                                 e.target.value = '';
@@ -899,6 +970,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             <Paperclip size={20} aria-hidden="true" />
                         </button>
                         <input 
+                            ref={inputRef}
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
@@ -913,12 +985,13 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             type="button"
                             aria-label={t.send}
                             onClick={() => handleSendMessage()}
-                            disabled={(!inputValue.trim() && !selectedFile) || isGenerating || composerLocked}
+                            disabled={(!inputValue.trim() && !selectedFile && !uploadedFile) || isGenerating || composerLocked}
                             className="absolute right-2 top-2 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-500 transition-all"
                         >
                             <Send size={20} aria-hidden="true" />
                         </button>
                     </div>
+                    <p className="sr-only" role="status">{statusMessage}</p>
                 </div>
             </div>
 
@@ -953,6 +1026,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             setAiBlocked(null);
                             setBlockedUntil(null);
                             setUploadNotice(null);
+                            setUploadedFile(null);
+                            setStatusMessage('');
                         }}
                         className="text-fg-3 hover:text-indigo-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mx-auto transition-colors"
                     >
