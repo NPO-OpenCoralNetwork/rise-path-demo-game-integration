@@ -1,4 +1,5 @@
 import { apiFetch, isApiAvailable } from './apiClient';
+import { dailyLimitFields } from './aiDailyLimit';
 import type { TutorChatContext } from './tutorBridge';
 
 export type AgentUiLanguage = 'en' | 'jp';
@@ -22,6 +23,10 @@ export interface AgentChatErrorCopy {
   loginRequired: string;
   demoUnavailable?: string;
   diaryExcerptsNotAllowed?: string;
+  /** 429 daily_limit_reached: today's agent_chat cap (server/middleware/dailyCaps.js), reset at 00:00 JST. */
+  dailyLimit?: string;
+  /** 429 daily_limit_reached with scope 'off': the feature is turned off (no reset time). */
+  featurePaused?: string;
 }
 
 export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): string {
@@ -29,12 +34,18 @@ export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): strin
     if (err.errorType === 'hermes_not_configured' || err.errorType === 'hermes_unreachable') {
       return copy.hermesUnavailable;
     }
+    // The connection to Hermes broke after the request was sent: a plain "try again".
+    if (err.errorType === 'hermes_interrupted') return copy.genericError;
     if (err.errorType === 'api_disabled' && copy.demoUnavailable) {
       return copy.demoUnavailable;
     }
     if (err.status === 401) return copy.loginRequired;
     if (err.status === 403 && err.errorType === 'diary_excerpts_not_allowed' && copy.diaryExcerptsNotAllowed) {
       return copy.diaryExcerptsNotAllowed;
+    }
+    if (err.errorType === 'daily_limit_reached') {
+      if (err.scope === 'off' && copy.featurePaused) return copy.featurePaused;
+      if (copy.dailyLimit) return copy.dailyLimit;
     }
     if (err.status === 429) return copy.rateLimited;
     if (err.detail) return `${err.message}: ${err.detail}`;
@@ -68,13 +79,26 @@ export class AgentApiError extends Error {
   status: number;
   errorType?: string;
   detail?: string;
+  /** Daily caps (services/aiDailyLimit.ts): the capped feature, whose limit, and when it lifts. */
+  kind?: string;
+  scope?: string;
+  resetAt?: string;
 
-  constructor(message: string, status: number, errorType?: string, detail?: string) {
+  constructor(
+    message: string,
+    status: number,
+    errorType?: string,
+    detail?: string,
+    limit: { kind?: string; scope?: string; resetAt?: string } = {},
+  ) {
     super(message);
     this.name = 'AgentApiError';
     this.status = status;
     this.errorType = errorType;
     this.detail = detail;
+    this.kind = limit.kind;
+    this.scope = limit.scope;
+    this.resetAt = limit.resetAt;
   }
 }
 
@@ -94,6 +118,7 @@ const parseAgentError = async (res: Response): Promise<AgentApiError> => {
       res.status,
       data?.error_type,
       data?.detail,
+      dailyLimitFields(data),
     );
   } catch {
     return new AgentApiError(`Agent request failed (${res.status})`, res.status);
