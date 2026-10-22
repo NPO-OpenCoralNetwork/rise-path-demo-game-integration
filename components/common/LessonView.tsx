@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getLessonForCourse } from '../../services/curriculumData';
 import { analyzeWriting, toLlmLocale } from '../../services/llmApi';
 import { addLearningEvent } from '../../services/progressService';
+import { dailyLimitScope } from '../../services/aiDailyLimit';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { AnalysisResult } from '../../types';
 import {
@@ -15,29 +17,69 @@ interface LessonViewProps {
 
 type Step = 'INTRO' | 'DRAFT' | 'ANALYZING' | 'FEEDBACK' | 'REFINE' | 'ROLEPLAY' | 'COMPLETE';
 
+/** The server's daily caps (429 daily_limit_reached, services/aiDailyLimit.ts) by scope. */
+type AnalysisError = 'failed' | 'daily_limit' | 'daily_limit_guest' | 'paused';
+
+const analysisErrorFor = (error: unknown): AnalysisError => {
+  const scope = dailyLimitScope(error);
+  if (!scope) return 'failed';
+  if (scope === 'guest') return 'daily_limit_guest';
+  return scope === 'off' ? 'paused' : 'daily_limit';
+};
+
+/** A guest's draft survives "Sign in" (which ends the guest session) in this tab. */
+const draftKey = (courseId?: string) => `rp:writingDraft:${courseId || 'default'}`;
+const takeSavedDraft = (courseId?: string): string => {
+  try {
+    const saved = sessionStorage.getItem(draftKey(courseId)) ?? '';
+    sessionStorage.removeItem(draftKey(courseId));
+    return saved;
+  } catch {
+    return '';
+  }
+};
+
 const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
   const [step, setStep] = useState<Step>('INTRO');
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => takeSavedDraft(courseId));
   const [refinedDraft, setRefinedDraft] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [analysisError, setAnalysisError] = useState(false);
+  const [analysisError, setAnalysisError] = useState<AnalysisError | null>(null);
   const { language } = useLanguage();
+  const { logout } = useAuth();
 
   const copy = {
     en: {
-      analysisFailed: 'We could not analyze your text right now. Your draft is saved here; please try again in a moment.',
+      failed: 'We could not analyze your text right now. Your draft is saved here; please try again in a moment.',
+      daily_limit: "Today's limit for AI feedback has been reached. Your draft is saved here; please try again after midnight Japan time.",
+      daily_limit_guest: "Today's limit for guest AI feedback has been reached. Your draft is saved here. Sign in to keep getting feedback.",
+      paused: 'AI feedback is paused for now. Your draft is saved here.',
+      signIn: 'Sign in',
     },
     jp: {
-      analysisFailed: '今は文章を分析できませんでした。下書きはそのまま残っています。少し待ってからもう一度お試しください。',
+      failed: '今は文章を分析できませんでした。下書きはそのまま残っています。少し待ってからもう一度お試しください。',
+      daily_limit: '今日のAIフィードバックは上限に達しました。下書きはそのまま残っています。日本時間の0時を過ぎたら、もう一度お試しください。',
+      daily_limit_guest: 'ゲストのAIフィードバックは、今日の上限に達しました。下書きはそのまま残っています。ログインすると、続けてフィードバックを受けられます。',
+      paused: 'AIフィードバックは、今は停止しています。下書きはそのまま残っています。',
+      signIn: 'ログイン',
     },
-  } as const;
+  } as const satisfies Record<'en' | 'jp', Record<AnalysisError | 'signIn', string>>;
   const t = copy[language];
+
+  const signIn = () => {
+    try {
+      sessionStorage.setItem(draftKey(courseId), draft);
+    } catch {
+      // Storage blocked: sign-in still works; the draft is not kept.
+    }
+    void logout();
+  };
 
   const lesson = getLessonForCourse(courseId || '');
 
   const handleAnalyze = async () => {
     setStep('ANALYZING');
-    setAnalysisError(false);
+    setAnalysisError(null);
     try {
       const result = await analyzeWriting(draft, lesson.rubric, {
         locale: toLlmLocale(language),
@@ -49,7 +91,7 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
       setStep('FEEDBACK');
     } catch (error) {
       console.error('Writing analysis failed:', error);
-      setAnalysisError(true);
+      setAnalysisError(analysisErrorFor(error));
       setStep('DRAFT');
     }
   };
@@ -126,7 +168,15 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
 
       {analysisError && (
         <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t.analysisFailed}
+          {t[analysisError]}
+          {analysisError === 'daily_limit_guest' && (
+            <>
+              {' '}
+              <button type="button" onClick={signIn} className="font-semibold underline underline-offset-2">
+                {t.signIn}
+              </button>
+            </>
+          )}
         </p>
       )}
 

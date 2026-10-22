@@ -10,7 +10,14 @@ const getApiKey = () => {
   return key;
 };
 
+/** Tests: a fake client with models.generateContent, or null to go back to the env key. */
+let clientForTests = null;
+export const setImageClientForTests = (client) => {
+  clientForTests = client;
+};
+
 const getClient = () => {
+  if (clientForTests) return clientForTests;
   const key = getApiKey();
   if (!key) return null;
   // Initialize for Gemini API (not Vertex AI for now, assuming API key usage)
@@ -28,7 +35,8 @@ export const generateImageWithGemini = async ({
   imageSize = "1K",
 } = {}) => {
   const genAI = getClient();
-  if (!genAI) throw new Error("Gemini API Key missing");
+  // Thrown before any call: the image route gives the daily cap unit back for this code.
+  if (!genAI) throw Object.assign(new Error("Gemini API Key missing"), { code: "GEMINI_NOT_CONFIGURED" });
   if (!prompt) throw new Error("Prompt is required");
 
   console.log(`[Gemini Image] request: ${prompt.slice(0, 120)}${prompt.length > 120 ? '…' : ''}`);

@@ -17,7 +17,7 @@ import {
     searchContent,
     setEmbeddingClientForTests,
 } from '../../tools/core/ragSearch.js';
-import { ingestMaterial, retrieveContext } from '../ragService.js';
+import { MAX_CHUNKS_PER_MATERIAL, ingestMaterial, retrieveContext } from '../ragService.js';
 
 const vector = (seed = 0) => Array.from({ length: EMBEDDING_DIM }, (_, i) => (i + seed) / EMBEDDING_DIM);
 
@@ -214,6 +214,32 @@ describe('server/ragService ingest + retrieve', () => {
         }
         assert.match(pool.queries[0].sql, /^BEGIN$/);
         assert.ok(pool.queries.some((q) => q.sql === 'COMMIT'));
+    });
+
+    it('embeds at most MAX_CHUNKS_PER_MATERIAL chunks of a long file (one daily embeddings unit)', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool();
+        setPoolForTests(pool);
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-ingest-'));
+        const file = path.join(dir, 'long.txt');
+        // ~800 new characters per chunk: 300,000 characters is well over the cap.
+        await fs.writeFile(file, 'Rise Path material. '.repeat(15000), 'utf8');
+        const warnings = [];
+        const { log, warn } = console;
+        console.log = () => {};
+        console.warn = (...args) => warnings.push(args.join(' '));
+        try {
+            await ingestMaterial('mat-long', file, 'text/plain', 'user-1');
+        } finally {
+            console.log = log;
+            console.warn = warn;
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+        const embedded = client.log.reduce((n, call) => n + call.contents.length, 0);
+        assert.equal(embedded, MAX_CHUNKS_PER_MATERIAL);
+        assert.equal(pool.queries.filter((q) => /INSERT INTO material_chunks/.test(q.sql)).length, MAX_CHUNKS_PER_MATERIAL);
+        assert.match(warnings.join('\n'), /mat-long: \d+ chunks; indexing the first 200/);
     });
 
     it('retrieveContext filters by embedding model under pgvector', async () => {

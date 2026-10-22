@@ -12,6 +12,7 @@ import {
     callHermesResponses,
     streamHermesChatCompletions,
     getHermesConfig,
+    hermesFetchFailure,
 } from '../services/hermesAgentService.js';
 import {
     setAgentChatConsent,
@@ -342,5 +343,29 @@ describe('ALLOWED_SKILLS', () => {
     it('includes life-habit-analyst and learning-coach', () => {
         assert.ok(ALLOWED_SKILLS.has('life-habit-analyst'));
         assert.ok(ALLOWED_SKILLS.has('learning-coach'));
+    });
+});
+describe('hermesFetchFailure', () => {
+    const failed = (cause) => Object.assign(new TypeError('fetch failed'), { cause });
+    const coded = (code) => Object.assign(new Error(code), { code });
+
+    it("is 'hermes_unreachable' only when the connection never opened", () => {
+        for (const code of ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'EHOSTUNREACH']) {
+            const result = hermesFetchFailure(failed(coded(code)));
+            assert.equal(result.error_type, 'hermes_unreachable', code);
+            assert.equal(result.status, 503);
+        }
+        const multi = Object.assign(new AggregateError([coded('ECONNREFUSED'), coded('ECONNREFUSED')]), { code: 'ECONNREFUSED' });
+        assert.equal(hermesFetchFailure(failed(multi)).error_type, 'hermes_unreachable', 'IPv4 and IPv6 both refused');
+    });
+
+    it("is 'hermes_interrupted' after the request was sent, or when the cause is unknown", () => {
+        for (const cause of [coded('UND_ERR_HEADERS_TIMEOUT'), coded('UND_ERR_SOCKET'), coded('ECONNRESET'), coded('UND_ERR_BODY_TIMEOUT'), undefined]) {
+            const result = hermesFetchFailure(failed(cause));
+            assert.equal(result.error_type, 'hermes_interrupted', String(cause?.code));
+            assert.equal(result.status, 503);
+        }
+        const mixed = new AggregateError([coded('ECONNREFUSED'), coded('ECONNRESET')]);
+        assert.equal(hermesFetchFailure(failed(mixed)).error_type, 'hermes_interrupted');
     });
 });

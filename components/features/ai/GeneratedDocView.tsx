@@ -15,6 +15,7 @@ import { GeneratedLesson, CurriculumPersonalization } from '../../../services/cu
 import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
 import { generateImagePreview } from '../../../services/curriculumApi';
+import { dailyLimitResetAt, dailyLimitScope, nextJstMidnight } from '../../../services/aiDailyLimit';
 import {
     checkTtsAvailable,
     getDisplayName,
@@ -1358,25 +1359,56 @@ const getMermaidThemeForType = (type: MermaidDiagramType) => {
 
 type ImageDocBlock = Extract<LocalizedDocBlock, { type: 'image' }>;
 const imagePreviewCache = new Map<string, string>();
+// Set when /image answers 429 daily_limit_reached (server/middleware/dailyCaps.js): until then,
+// image blocks skip the request (each would get the same 429). Today's cap holds until reset_at
+// (00:00 JST); a feature turned off ('paused') holds until the page reloads. A block that mounts
+// after the time has passed asks again; one already on screen keeps its note (no unattended calls).
+let imageLimit: { until: number; paused: boolean } | null = null;
+const imageLimitNow = (): 'daily' | 'paused' | null =>
+    imageLimit && Date.now() < imageLimit.until ? (imageLimit.paused ? 'paused' : 'daily') : null;
 
 const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({ block, language }) => {
+    const copy = {
+        en: {
+            // Blocks on screen do not ask again by themselves: the page has to be opened again.
+            daily: "Today's limit for image previews has been reached. Open this page again after midnight Japan time to see them.",
+            paused: 'Image previews are paused for now.',
+        },
+        jp: {
+            daily: '今日の画像生成は上限に達しました。日本時間の0時を過ぎてから、このページを開き直すと表示されます。',
+            paused: '画像の生成は、今は停止しています。',
+        },
+    } as const;
+    const t = copy[language];
     const cached = block.prompt ? imagePreviewCache.get(block.prompt) : null;
     const [src, setSrc] = useState<string | null>(
         block.prompt ? cached || null : block.src || block.fallbackSrc || null
     );
     const [isLoading, setIsLoading] = useState(false);
+    // A daily cap stopped this image: with no fallback image, a static note replaces the skeleton.
+    const [limited, setLimited] = useState<'daily' | 'paused' | null>(null);
     const analysisRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!block.prompt) {
+            setLimited(null);
             setSrc(block.src || block.fallbackSrc || null);
             return;
         }
         if (imagePreviewCache.has(block.prompt)) {
+            setLimited(null);
             setSrc(imagePreviewCache.get(block.prompt) || null);
             setIsLoading(false);
             return;
         }
+        const holding = imageLimitNow();
+        if (holding) {
+            setLimited(holding);
+            setSrc(block.src || block.fallbackSrc || null);
+            setIsLoading(false);
+            return;
+        }
+        setLimited(null);
         let cancelled = false;
         setSrc(null);
         setIsLoading(true);
@@ -1386,8 +1418,14 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                 imagePreviewCache.set(block.prompt || '', url);
                 setSrc(url);
             })
-            .catch(() => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
+                const scope = dailyLimitScope(err);
+                if (scope) {
+                    const paused = scope === 'off';
+                    imageLimit = { paused, until: paused ? Infinity : dailyLimitResetAt(err) ?? nextJstMidnight(Date.now()) };
+                    setLimited(paused ? 'paused' : 'daily');
+                }
                 setSrc(block.src || block.fallbackSrc || null);
             })
             .finally(() => {
@@ -1444,7 +1482,18 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
     if (!src) {
         return (
             <div className={`my-8 ${block.layout === 'full' ? '-mx-4 sm:-mx-6 md:-mx-12' : ''}`}>
-                <div className="w-full h-64 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-50 animate-pulse" />
+                {limited ? (
+                    // Static, no role="alert": several image blocks could otherwise announce at once.
+                    // What the image would show (caption, else alt text) stays readable under the note.
+                    <div className="w-full min-h-32 rounded-xl border border-line bg-sunken flex flex-col items-center justify-center gap-1 px-6 py-6 text-center">
+                        <p className="text-sm text-fg-2">{t[limited]}</p>
+                        {(getText(block.caption, language) || block.alt) && (
+                            <p className="text-xs text-fg-3">{getText(block.caption, language) || block.alt}</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-full h-64 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-50 animate-pulse" />
+                )}
             </div>
         );
     }

@@ -248,7 +248,10 @@ describe('/api/v2/llm routes (mock provider)', () => {
             }
             const third = await postJson(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
             assert.equal(third.status, 429);
-            assert.equal((await third.json()).error_type, 'rate_limited');
+            const limited = await third.json();
+            assert.equal(limited.error_type, 'daily_limit_reached');
+            assert.equal(limited.kind, 'llm');
+            assert.equal(limited.scope, 'guest');
             assert.ok(Number(third.headers.get('retry-after')) > 0);
         });
     });
@@ -305,7 +308,7 @@ describe('guest access helpers', () => {
         assert.equal(dev('https://evil.example', req('localhost:3006')), false);
     });
 
-    it('guest budget: per IP and total, signed-in users skip it, resets each UTC day', () => {
+    it('guest budget: per IP and total, signed-in users skip it, resets at 00:00 JST', () => {
         let now = Date.parse('2026-10-19T10:00:00Z');
         const budget = createGuestBudget({ env: {}, perIp: 2, total: 3, now: () => now });
         const run = (ip, userId = null) => {
@@ -321,7 +324,9 @@ describe('guest access helpers', () => {
         assert.equal(run('a', 'user-1'), 200, 'signed in: no guest budget');
         assert.equal(run('b'), 200);
         assert.equal(run('c'), 429, 'total cap');
-        now = Date.parse('2026-10-20T00:00:01Z');
-        assert.equal(run('a'), 200, 'new day');
+        now = Date.parse('2026-10-19T14:59:59Z');
+        assert.equal(run('a'), 429, 'still the same Japan-time day (23:59:59 JST)');
+        now = Date.parse('2026-10-19T15:00:01Z');
+        assert.equal(run('a'), 200, 'new day at 00:00 JST');
     });
 });

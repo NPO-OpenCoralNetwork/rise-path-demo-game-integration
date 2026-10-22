@@ -1,6 +1,7 @@
 // Client for the server-side LLM gateway (/api/v2/llm). The browser never holds a model key
 // or a model SDK; every AI call goes through these helpers.
 import { apiFetch } from './apiClient';
+import { dailyLimitFields } from './aiDailyLimit';
 import type { AIAdvice, AnalysisResult, Big5Profile, LessonRubric } from '../types';
 
 export type LlmLocale = 'ja' | 'en' | 'fr';
@@ -15,19 +16,31 @@ export const toLlmLocale = (language: string | undefined): LlmLocale => {
 export class LlmApiError extends Error {
   status: number;
   errorType?: string;
+  /** Daily caps (services/aiDailyLimit.ts): the capped feature, whose limit, and when it lifts. */
+  kind?: string;
+  scope?: string;
+  resetAt?: string;
 
-  constructor(message: string, status: number, errorType?: string) {
+  constructor(message: string, status: number, errorType?: string, limit: { kind?: string; scope?: string; resetAt?: string } = {}) {
     super(message);
     this.name = 'LlmApiError';
     this.status = status;
     this.errorType = errorType;
+    this.kind = limit.kind;
+    this.scope = limit.scope;
+    this.resetAt = limit.resetAt;
   }
 }
 
 const readError = async (res: Response): Promise<LlmApiError> => {
   try {
     const data = await res.json();
-    return new LlmApiError(data?.error || `LLM request failed (${res.status})`, res.status, data?.error_type);
+    return new LlmApiError(
+      data?.error || `LLM request failed (${res.status})`,
+      res.status,
+      data?.error_type,
+      dailyLimitFields(data, res.headers.get('retry-after')),
+    );
   } catch {
     return new LlmApiError(`LLM request failed (${res.status})`, res.status);
   }

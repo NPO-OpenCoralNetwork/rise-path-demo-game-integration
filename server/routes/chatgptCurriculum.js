@@ -38,6 +38,11 @@ const router = express.Router();
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A learner_profile_id that is not a UUID names no profile: the same 404 as an unknown id or
+// another user's, sent before the lookup so Postgres never sees it.
+const PROFILE_NOT_FOUND = { error: 'Learner profile not found' };
+
 const asObject = (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value;
@@ -85,22 +90,22 @@ router.post('/ai/generation-kit', requireBridgeOrAuth, async (req, res) => {
     if (includePersonalization && learnerProfileId) {
         const pool = getPool();
         if (pool) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select raw_profile, derived_learning_profile from learner_profiles
-                     where id = CAST($1 AS uuid) order by version desc limit 1`,
-                    [learnerProfileId]
+                     where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
+                    [learnerProfileId, req.userId]
                 );
-                if (result.rowCount) {
-                    const row = result.rows[0];
-                    const dp = asObject(row.derived_learning_profile);
-                    const rules = deriveGenerationRules(dp, asObject(row.raw_profile));
-                    kit.personalization = {
-                        ...kit.personalization,
-                        derived_learning_profile: dp,
-                        generation_rules: rules,
-                    };
-                }
+                if (!result.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
+                const row = result.rows[0];
+                const dp = asObject(row.derived_learning_profile);
+                const rules = deriveGenerationRules(dp, asObject(row.raw_profile));
+                kit.personalization = {
+                    ...kit.personalization,
+                    derived_learning_profile: dp,
+                    generation_rules: rules,
+                };
             } catch (err) {
                 console.error('[ChatGPT Curriculum API] Failed to load learner profile for kit:', err.message);
             }
@@ -156,20 +161,20 @@ router.post('/ai/validate-intake', requireBridgeOrAuth, async (req, res) => {
     if (learnerProfileId) {
         const pool = getPool();
         if (pool) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select derived_learning_profile from learner_profiles
-                     where id = CAST($1 AS uuid) order by version desc limit 1`,
-                    [learnerProfileId]
+                     where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
+                    [learnerProfileId, req.userId]
                 );
-                if (result.rowCount) {
-                    const dp = asObject(result.rows[0].derived_learning_profile);
-                    // Return a summary of high-impact axes
-                    normalizedPersonalization = {};
-                    for (const [key, value] of Object.entries(dp)) {
-                        if (value === 'high' || value === 'heavy' || value === 'steady_small_steps' || value === 'coach_gentle') {
-                            normalizedPersonalization[key] = value;
-                        }
+                if (!result.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
+                const dp = asObject(result.rows[0].derived_learning_profile);
+                // Return a summary of high-impact axes
+                normalizedPersonalization = {};
+                for (const [key, value] of Object.entries(dp)) {
+                    if (value === 'high' || value === 'heavy' || value === 'steady_small_steps' || value === 'coach_gentle') {
+                        normalizedPersonalization[key] = value;
                     }
                 }
             } catch (err) {
@@ -240,26 +245,28 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     let generationRulesSnapshot = null;
 
     if (learnerProfileId && pool) {
+        if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
         try {
             const lpResult = await pool.query(
                 `select id, version, raw_profile, derived_learning_profile, applied_rules
-                 from learner_profiles where id = CAST($1 AS uuid) order by version desc limit 1`,
-                [learnerProfileId]
+                 from learner_profiles where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)
+                 order by version desc limit 1`,
+                [learnerProfileId, req.userId]
             );
-            if (lpResult.rowCount) {
-                const row = lpResult.rows[0];
-                rawProfileSnapshot = asObject(row.raw_profile);
-                derivedLearningProfile = asObject(row.derived_learning_profile);
-                generationRulesSnapshot = deriveGenerationRules(derivedLearningProfile, rawProfileSnapshot);
-                personalizationMeta = {
-                    learner_profile_id: row.id,
-                    profile_version: row.version,
-                    raw_profile_snapshot: rawProfileSnapshot,
-                    derived_learning_profile: derivedLearningProfile,
-                    generation_rules_snapshot: generationRulesSnapshot,
-                    applied_overrides: asObject(rawProfileSnapshot?.declared_preferences),
-                };
-            }
+            // Only the caller's own profile: its raw answers are copied into the saved course.
+            if (!lpResult.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
+            const row = lpResult.rows[0];
+            rawProfileSnapshot = asObject(row.raw_profile);
+            derivedLearningProfile = asObject(row.derived_learning_profile);
+            generationRulesSnapshot = deriveGenerationRules(derivedLearningProfile, rawProfileSnapshot);
+            personalizationMeta = {
+                learner_profile_id: row.id,
+                profile_version: row.version,
+                raw_profile_snapshot: rawProfileSnapshot,
+                derived_learning_profile: derivedLearningProfile,
+                generation_rules_snapshot: generationRulesSnapshot,
+                applied_overrides: asObject(rawProfileSnapshot?.declared_preferences),
+            };
         } catch (err) {
             console.error('[ChatGPT Curriculum API] Failed to load learner profile for draft:', err.message);
         }
@@ -567,8 +574,8 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
             `select cv.content_json
              from curricula c
              join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
+             where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
+            [curriculumId, req.userId]
         );
         if (!curriculumResult.rowCount) {
             return res.status(404).json({ error: 'Curriculum not found' });
@@ -614,17 +621,17 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
         let derivedLearningProfile = {};
         let baseLoadMinutes = Number(req.body?.base_minutes) || 60;
         if (learnerProfileId) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             const lpResult = await pool.query(
                 `select derived_learning_profile, raw_profile from learner_profiles
-                 where id = CAST($1 AS uuid) order by version desc limit 1`,
-                [learnerProfileId]
+                 where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
+                [learnerProfileId, req.userId]
             );
-            if (lpResult.rowCount) {
-                derivedLearningProfile = asObject(lpResult.rows[0].derived_learning_profile);
-                const lifestyle = asObject(asObject(lpResult.rows[0].raw_profile).lifestyle);
-                if (lifestyle.weekly_capacity_min) {
-                    baseLoadMinutes = Math.round(Number(lifestyle.weekly_capacity_min) * 0.67);
-                }
+            if (!lpResult.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
+            derivedLearningProfile = asObject(lpResult.rows[0].derived_learning_profile);
+            const lifestyle = asObject(asObject(lpResult.rows[0].raw_profile).lifestyle);
+            if (lifestyle.weekly_capacity_min) {
+                baseLoadMinutes = Math.round(Number(lifestyle.weekly_capacity_min) * 0.67);
             }
         }
 
@@ -657,8 +664,8 @@ router.get('/curricula/:id/summary-cards', requireBridgeOrAuth, async (req, res)
         const result = await pool.query(
             `select cv.content_json from curricula c
              join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
+             where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
+            [curriculumId, req.userId]
         );
         if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
 
@@ -684,8 +691,8 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
             pool.query(
                 `select cv.content_json from curricula c
                  join curriculum_versions cv on cv.id = c.current_version_id
-                 where c.id = CAST($1 AS uuid)`,
-                [curriculumId]
+                 where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
+                [curriculumId, req.userId]
             ),
             pool.query(
                 `select module_id, lesson_id, status, doc_completed_at, updated_at
@@ -719,8 +726,8 @@ router.get('/curricula/:id/encyclopedia', requireBridgeOrAuth, async (req, res) 
         const result = await pool.query(
             `select cv.content_json from curricula c
              join curriculum_versions cv on cv.id = c.current_version_id
-             where c.id = CAST($1 AS uuid)`,
-            [curriculumId]
+             where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
+            [curriculumId, req.userId]
         );
         if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
 
@@ -759,6 +766,12 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
 
     try {
         // Phase 7: ensurePhase1User removed
+        // A reflection belongs to one of the caller's own curricula.
+        const owned = await pool.query(
+            'select 1 from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
+            [curriculumId, req.userId]
+        );
+        if (!owned.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
         const result = await pool.query(
             `insert into learning_journal
                 (user_id, curriculum_id, module_id, lesson_id, learned, difficulty, mood, confidence, time_spent_min)
@@ -811,7 +824,7 @@ router.get('/journal/recent', requireBridgeOrAuth, async (req, res) => {
                     j.mood, j.confidence, j.time_spent_min, j.created_at,
                     c.title as curriculum_title
              from learning_journal j
-             left join curricula c on c.id = j.curriculum_id
+             left join curricula c on c.id = j.curriculum_id and c.user_id = j.user_id
              where j.user_id = CAST($1 AS uuid)
              order by j.created_at desc limit $2`,
             [req.userId, limit]

@@ -221,7 +221,7 @@ describe('origin gate in the server.js stack', () => {
             await other.text();
             const again = await ask('203.0.113.10, 198.51.100.7');
             assert.equal(again.status, 429);
-            assert.equal((await again.json()).error_type, 'rate_limited');
+            assert.equal((await again.json()).error_type, 'daily_limit_reached');
         });
     });
 

@@ -8,6 +8,7 @@ import type {
   TutorRequest as BridgeTutorRequest,
 } from '../../services/tutorBridge';
 import { answerKey, type AnswerRecord } from './progressStore.ts';
+import { dailyLimitResetAt, dailyLimitScope } from '../../services/aiDailyLimit.ts';
 
 /**
  * State for the inline AI tutor (WP-11, PLAN §5.7).
@@ -35,7 +36,22 @@ export type TutorErrorKind =
   | 'refused'
   | 'rejected'
   | 'interrupted'
+  | 'daily_limit'
+  | 'daily_limit_guest'
+  | 'paused'
   | 'failed';
+
+/**
+ * The server's daily caps (server/middleware/dailyCaps.js, 429 daily_limit_reached):
+ * 'daily_limit' today's limit (lifts at 00:00 JST), 'daily_limit_guest' the guest budget (signing
+ * in lifts it), 'paused' the tutor is turned off (no reset time). While one holds, the hook
+ * refuses new questions locally instead of adding an error turn per try.
+ */
+export type TutorLimitKind = Extract<TutorErrorKind, 'daily_limit' | 'daily_limit_guest' | 'paused'>;
+export type TutorLimit = { kind: TutorLimitKind; until: number | null };
+
+const LIMIT_KINDS: ReadonlySet<TutorErrorKind> = new Set<TutorErrorKind>(['daily_limit', 'daily_limit_guest', 'paused']);
+export const isTutorLimitKind = (kind: TutorErrorKind | undefined): kind is TutorLimitKind => Boolean(kind && LIMIT_KINDS.has(kind));
 
 export type TutorTurn = {
   id: string;
@@ -225,6 +241,10 @@ export function buildTutorRequest(thread: TutorThread, message: string, locale: 
 
 /** Maps an LlmApiError (status / errorType), a fetch TypeError or anything else to a UI message key. */
 export function classifyTutorError(error: unknown): TutorErrorKind {
+  const limitScope = dailyLimitScope(error);
+  if (limitScope === 'guest') return 'daily_limit_guest';
+  if (limitScope === 'off') return 'paused';
+  if (limitScope) return 'daily_limit';
   const err = (error ?? {}) as { status?: unknown; errorType?: unknown; name?: unknown };
   const type = typeof err.errorType === 'string' ? err.errorType : '';
   const status = typeof err.status === 'number' ? err.status : 0;
@@ -237,6 +257,20 @@ export function classifyTutorError(error: unknown): TutorErrorKind {
   if (err.name === 'TypeError') return 'network';
   return 'failed';
 }
+
+/**
+ * The limit a failed question hit, or null: until the server's reset_at (else the next 00:00
+ * JST); a paused tutor has no end (the page must be reloaded after the owner turns it back on).
+ */
+export function tutorLimitFor(error: unknown, nowMs: number = Date.now()): TutorLimit | null {
+  const kind = classifyTutorError(error);
+  if (!isTutorLimitKind(kind)) return null;
+  return { kind, until: kind === 'paused' ? null : dailyLimitResetAt(error, nowMs) };
+}
+
+/** True while `limit` holds at `nowMs`. */
+export const tutorLimitActive = (limit: TutorLimit | null, nowMs: number = Date.now()): limit is TutorLimit =>
+  Boolean(limit && (limit.until === null || nowMs < limit.until));
 
 /**
  * The answer turn once its stream ended. A reply cut at the length limit (`done.truncated`)
@@ -383,6 +417,8 @@ export type TutorStreamApi = {
   stop: () => void;
   /** End the conversation on screen (it is kept for the block, and the stream stops). */
   dismiss: () => void;
+  /** A daily cap holds: new questions are refused locally until it lifts. */
+  limit: TutorLimit | null;
 };
 
 let turnSeq = 0;
@@ -408,6 +444,16 @@ export function useTutorStream({ locale, stream, learnerState }: {
   const nextTyped = useRef(false);
   const [thread, setThread] = useState<TutorThread | null>(null);
   const [busy, setBusy] = useState(false);
+  const [limit, setLimit] = useState<TutorLimit | null>(null);
+  const limitRef = useRef<TutorLimit | null>(null);
+  limitRef.current = limit;
+
+  // Lift a daily limit at its reset time (00:00 JST), so the panel works again without a reload.
+  useEffect(() => {
+    if (!limit || limit.until === null) return undefined;
+    const timer = setTimeout(() => setLimit(null), Math.min(Math.max(0, limit.until - Date.now()), 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [limit]);
 
   // Latest values for the stable callbacks below.
   const localeRef = useRef(locale);
@@ -429,6 +475,8 @@ export function useTutorStream({ locale, stream, learnerState }: {
     const stored = threads.current.get(key);
     const text = message.trim().slice(0, TUTOR_MESSAGE_MAX);
     if (!stored || !text) return;
+    // A daily cap holds: refuse here; the panel shows one notice instead of an error per try.
+    if (tutorLimitActive(limitRef.current)) return;
     // The learner may have retried or revealed the check since the last turn.
     const base = refreshThread(stored, liveRef.current);
     if (base !== stored) threads.current.set(key, base);
@@ -460,6 +508,11 @@ export function useTutorStream({ locale, stream, learnerState }: {
         update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, status: 'stopped' })));
       } else {
         update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, status: 'error', error: classifyTutorError(error) })));
+        const hit = tutorLimitFor(error);
+        if (hit) {
+          limitRef.current = hit;
+          setLimit(hit);
+        }
       }
     } finally {
       if (controller.current === own) {
@@ -500,7 +553,7 @@ export function useTutorStream({ locale, stream, learnerState }: {
   const retry = useCallback(() => {
     const key = activeKey.current;
     const current = key ? threads.current.get(key) : null;
-    if (!key || !current) return;
+    if (!key || !current || tutorLimitActive(limitRef.current)) return;
     const last = current.turns[current.turns.length - 1];
     const question = current.turns[current.turns.length - 2];
     if (!last || !question || last.role !== 'assistant' || question.role !== 'user') return;
@@ -522,5 +575,5 @@ export function useTutorStream({ locale, stream, learnerState }: {
   // Stop streaming when the reader unmounts (another lesson, another route).
   useEffect(() => () => controller.current?.abort(), []);
 
-  return { thread, busy, ask, send, markNextTyped, retry, stop, dismiss };
+  return { thread, busy, ask, send, markNextTyped, retry, stop, dismiss, limit: tutorLimitActive(limit) ? limit : null };
 }

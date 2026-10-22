@@ -5,7 +5,8 @@ import PersonalityAssessment from './PersonalityAssessment';
 import IntroSequence from './IntroSequence';
 import { analyzePersonality, toLlmLocale } from '../../../../services/llmApi';
 import { useTheme } from '../../../../context/ThemeContext';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, CalendarClock } from 'lucide-react';
+import { dailyLimitScope } from '../../../../services/aiDailyLimit';
 import { notifyAssessmentProfileChanged } from '../../../../constants/assessment';
 import { STORAGE_KEY } from './assessmentConstants';
 import { useLanguage } from '../../../../context/LanguageContext';
@@ -28,6 +29,25 @@ enum Step {
 
 // Keep the analysis screen up long enough to read, even when the answer comes back instantly.
 const MIN_ANALYZING_MS = 1200;
+
+/**
+ * Shown on the results when a daily cap (429 daily_limit_reached, services/aiDailyLimit.ts) kept
+ * the AI from analysing: the built-in explanation is on screen instead.
+ */
+const insightLimitCopy = {
+  en: {
+    daily_limit: "Today's limit for AI analysis has been reached, so this shows the standard explanation. Retake the assessment after midnight Japan time to get the AI analysis.",
+    paused: 'AI analysis is paused for now, so this shows the standard explanation.',
+  },
+  jp: {
+    daily_limit: '今日のAI分析は上限に達したため、標準の解説を表示しています。AI分析を受けるには、日本時間の0時を過ぎてから診断を受け直してください。',
+    paused: 'AI分析は今は停止しているため、標準の解説を表示しています。',
+  },
+  fr: {
+    daily_limit: "La limite d'analyses IA du jour est atteinte : voici l'explication standard. Refaites le test après minuit, heure du Japon, pour obtenir l'analyse IA.",
+    paused: "L'analyse IA est suspendue pour le moment : voici l'explication standard.",
+  },
+} as const;
 
 const DEMO_AI_ADVICE_BY_LANG: Record<'en' | 'jp' | 'fr', AIAdvice> = {
   en: {
@@ -271,6 +291,8 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
   const { setProfile: setGlobalProfile } = useTheme();
   const { language } = useLanguage();
   const [assessmentLanguage, setAssessmentLanguage] = useState<'en' | 'jp' | 'fr'>(language === 'jp' ? 'jp' : 'en');
+  // The last analysis hit a daily cap and shows the built-in text ('paused': the feature is off).
+  const [insightLimit, setInsightLimit] = useState<'daily_limit' | 'paused' | null>(null);
 
   const t = {
     en: {
@@ -342,6 +364,7 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
     // Server-side analysis (/api/v2/llm). If the AI is unavailable, the built-in profile text
     // for the chosen language keeps the results screen useful.
     let advice: AIAdvice & { personalityType?: string };
+    setInsightLimit(null);
     try {
       const [insight] = await Promise.all([
         analyzePersonality(finalScores, { locale: toLlmLocale(assessmentLanguage) }),
@@ -351,6 +374,8 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
     } catch (error) {
       console.warn('Personality analysis unavailable, using built-in profile text:', error);
       advice = DEMO_AI_ADVICE_BY_LANG[assessmentLanguage] || DEMO_AI_ADVICE_BY_LANG.jp;
+      const scope = dailyLimitScope(error);
+      if (scope) setInsightLimit(scope === 'off' ? 'paused' : 'daily_limit');
     }
 
     try {
@@ -452,6 +477,14 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
     const result = mapProfileToDiagnosisResult(profile, assessmentLanguage);
     return (
       <div className="bg-white text-slate-900">
+        {insightLimit && (
+          <div className="mx-auto max-w-3xl px-4 pt-4">
+            <p role="status" className="flex items-start gap-2 rounded-xl border border-line bg-sunken px-4 py-3 text-sm text-fg-2">
+              <CalendarClock size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+              <span>{insightLimitCopy[assessmentLanguage][insightLimit]}</span>
+            </p>
+          </div>
+        )}
         <ResultScreen result={result} onRetake={handleRestart} />
       </div>
     );
