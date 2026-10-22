@@ -21,6 +21,11 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated }
  *   2. Authorization: Bearer <bridge-token> → Bridge auth (legacy compat)
  *   3. Authorization: Bearer <supabase-jwt> → Supabase JWT validation
  *   4. (dev only) → PHASE1_USER_ID fallback
+ *
+ * A bridge caller (1, 2) is the shared PHASE1 user: it reads and writes only rows PHASE1_USER_ID
+ * owns, so a signed-in learner's curriculum or learner profile id answers 404. x-nexloom-user-id
+ * goes to the audit log only and never selects a Rise Path user. An integration that acts for a
+ * learner sends that learner's JWT (or needs a deliberate, signed user mapping, which does not exist).
  */
 export const requireBridgeOrAuth = async (req, res, next) => {
     // Through the public edge (originGate.js) the bridge token never counts: visitors need a JWT.

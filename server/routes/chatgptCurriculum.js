@@ -38,6 +38,11 @@ const router = express.Router();
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A learner_profile_id that is not a UUID names no profile: the same 404 as an unknown id or
+// another user's, sent before the lookup so Postgres never sees it.
+const PROFILE_NOT_FOUND = { error: 'Learner profile not found' };
+
 const asObject = (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value;
@@ -85,13 +90,14 @@ router.post('/ai/generation-kit', requireBridgeOrAuth, async (req, res) => {
     if (includePersonalization && learnerProfileId) {
         const pool = getPool();
         if (pool) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select raw_profile, derived_learning_profile from learner_profiles
                      where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
                     [learnerProfileId, req.userId]
                 );
-                if (!result.rowCount) return res.status(404).json({ error: 'Learner profile not found' });
+                if (!result.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
                 const row = result.rows[0];
                 const dp = asObject(row.derived_learning_profile);
                 const rules = deriveGenerationRules(dp, asObject(row.raw_profile));
@@ -155,13 +161,14 @@ router.post('/ai/validate-intake', requireBridgeOrAuth, async (req, res) => {
     if (learnerProfileId) {
         const pool = getPool();
         if (pool) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select derived_learning_profile from learner_profiles
                      where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
                     [learnerProfileId, req.userId]
                 );
-                if (!result.rowCount) return res.status(404).json({ error: 'Learner profile not found' });
+                if (!result.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
                 const dp = asObject(result.rows[0].derived_learning_profile);
                 // Return a summary of high-impact axes
                 normalizedPersonalization = {};
@@ -238,6 +245,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     let generationRulesSnapshot = null;
 
     if (learnerProfileId && pool) {
+        if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
         try {
             const lpResult = await pool.query(
                 `select id, version, raw_profile, derived_learning_profile, applied_rules
@@ -246,7 +254,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
                 [learnerProfileId, req.userId]
             );
             // Only the caller's own profile: its raw answers are copied into the saved course.
-            if (!lpResult.rowCount) return res.status(404).json({ error: 'Learner profile not found' });
+            if (!lpResult.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
             const row = lpResult.rows[0];
             rawProfileSnapshot = asObject(row.raw_profile);
             derivedLearningProfile = asObject(row.derived_learning_profile);
@@ -613,12 +621,13 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
         let derivedLearningProfile = {};
         let baseLoadMinutes = Number(req.body?.base_minutes) || 60;
         if (learnerProfileId) {
+            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             const lpResult = await pool.query(
                 `select derived_learning_profile, raw_profile from learner_profiles
                  where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
                 [learnerProfileId, req.userId]
             );
-            if (!lpResult.rowCount) return res.status(404).json({ error: 'Learner profile not found' });
+            if (!lpResult.rowCount) return res.status(404).json(PROFILE_NOT_FOUND);
             derivedLearningProfile = asObject(lpResult.rows[0].derived_learning_profile);
             const lifestyle = asObject(asObject(lpResult.rows[0].raw_profile).lifestyle);
             if (lifestyle.weekly_capacity_min) {

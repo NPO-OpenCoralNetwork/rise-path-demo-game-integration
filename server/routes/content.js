@@ -161,8 +161,8 @@ router.post('/upload', embeddingsCap, receiveFile, async (req, res) => {
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
             console.error('Immediate Ingestion failed:', ingestErr);
-            // Nothing was embedded (the text could not be read): the 'embeddings' unit goes back.
-            if (ingestErr?.ingestStage === 'extract') void res.locals.refundDailyCap?.();
+            // The unit stays charged even when nothing was embedded: the file and its material row
+            // are kept, and the daily cap is what bounds how many files an account can store.
             res.json({ ok: true, material_id: materialId, status: 'uploaded' });
         }
     } catch (error) {
@@ -272,6 +272,9 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
 });
 
 // GET /api/v2/jobs/:id — the caller's own jobs only; `error` is a short code (server/jobWorker.js).
+// A job that failed before the worker stored codes may still hold a raw message (absolute paths,
+// file names): anything that is not a code reads as 'job_failed'.
+const JOB_ERROR_CODE_RE = /^[a-z_]+$/;
 router.get('/jobs/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
@@ -282,7 +285,9 @@ router.get('/jobs/:id', async (req, res) => {
             [req.params.id, req.userId]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Job not found' });
-        res.json(result.rows[0]);
+        const job = result.rows[0];
+        if (job.error != null && !JOB_ERROR_CODE_RE.test(job.error)) job.error = 'job_failed';
+        res.json(job);
     } catch (error) {
         res.status(500).json({ error: 'Failed to check job' });
     }

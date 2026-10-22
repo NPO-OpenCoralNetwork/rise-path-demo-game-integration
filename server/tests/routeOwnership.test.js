@@ -5,10 +5,11 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../server.js';
-import { setPoolForTests, resetPoolForTests } from '../db.js';
+import { setPoolForTests, resetPoolForTests, PHASE1_USER_ID } from '../db.js';
 import { setSupabaseForTests } from '../middleware/auth.js';
 import { resetDailyCapsForTests } from '../middleware/dailyCaps.js';
 import { JobWorker, jobErrorCode } from '../jobWorker.js';
+import { logEntry, getRecent } from '../../tools/core/journal.js';
 
 const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -42,15 +43,25 @@ const one = (row) => ({ rowCount: 1, rows: [row] });
 /** Whitespace-normalized, lowercased SQL. */
 const norm = (sql) => String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Mock pool holding B's rows. `visible` is the ownership rule Postgres applies: an unscoped query
- * sees everyone's rows, a scoped one only the rows of the user it names.
+ * sees everyone's rows, a scoped one only the rows of the user it names. As in Postgres, a
+ * parameter cast to uuid that is not a UUID fails the statement (22P02). `jobError` is the error
+ * stored on B's failed job.
  */
-function createOwnedPool() {
+function createOwnedPool({ jobError = 'file_missing' } = {}) {
     const queries = [];
     const run = async (sql, params = []) => {
         const text = norm(sql);
         queries.push({ sql: text, params });
+        for (const [, cast, colon] of text.matchAll(/cast\(\$(\d+) as uuid\)|\$(\d+)::uuid/g)) {
+            const value = params[Number(cast ?? colon) - 1];
+            if (typeof value === 'string' && !UUID_RE.test(value)) {
+                throw Object.assign(new Error(`invalid input syntax for type uuid: "${value}"`), { code: '22P02' });
+            }
+        }
         const scoped = /user_id = (cast\(\$\d+ as uuid\)|\$\d+::uuid|\$\d+\b)/.test(text);
         const visible = !scoped || params.includes(USER_B);
         if (text.startsWith('insert into ai_daily_usage')) return one({ count: 1 });
@@ -64,7 +75,7 @@ function createOwnedPool() {
         }
         if (text.startsWith('select 1 from materials')) return visible ? one({ '?column?': 1 }) : EMPTY;
         if (text.startsWith('insert into jobs')) return one({ id: JOB_B, status: 'queued' });
-        if (text.startsWith('select status, progress, error from jobs')) return visible ? one({ status: 'error', progress: 0, error: 'file_missing' }) : EMPTY;
+        if (text.startsWith('select status, progress, error from jobs')) return visible ? one({ status: 'error', progress: 0, error: jobError }) : EMPTY;
         return EMPTY;
     };
     return {
@@ -171,6 +182,50 @@ describe('routes read only the caller\'s own rows', () => {
         });
     });
 
+    it('a learner_profile_id that is not a UUID is the same 404 as an unknown one, and never reaches Postgres', async () => {
+        await withServer(async (base) => {
+            for (const [method, path, body] of ROUTES.filter(([, , b]) => b?.learner_profile_id)) {
+                for (const learner_profile_id of ['not-a-uuid', `${PROFILE_B}x`]) {
+                    const result = await call(base, method, path, AS_B, { ...body, learner_profile_id });
+                    assert.equal(result.status, 404, `${path} ${learner_profile_id}: ${result.text.slice(0, 200)}`);
+                    assert.equal(result.json.error, 'Learner profile not found');
+                    assert.ok(!result.text.includes('invalid input syntax'), 'no Postgres detail');
+                }
+            }
+            assert.ok(!pool.queries.some((q) => q.sql.includes('from learner_profiles')), 'no profile lookup was sent');
+            assert.ok(!pool.queries.some((q) => q.sql.startsWith('insert into curricula')), 'no course saved');
+        });
+    });
+
+    it('/jobs/:id: an error stored before the worker kept short codes reads as job_failed', async () => {
+        pool = createOwnedPool({ jobError: "ENOENT: no such file or directory, open '/srv/app/public/uploads/secret.pdf'" });
+        setPoolForTests(pool);
+        await withServer(async (base) => {
+            const result = await call(base, 'GET', `/jobs/${JOB_B}`, AS_B);
+            assert.equal(result.status, 200, result.text);
+            assert.deepEqual(result.json, { status: 'error', progress: 0, error: 'job_failed' });
+        });
+        setPoolForTests(createOwnedPool());
+        await withServer(async (base) => {
+            assert.equal((await call(base, 'GET', `/jobs/${JOB_B}`, AS_B)).json.error, 'file_missing', 'a short code is shown as stored');
+        });
+    });
+
+    it('a bridge caller is the shared PHASE1 user: x-nexloom-user-id selects no one', async () => {
+        process.env.RISE_PATH_BRIDGE_TOKEN = 'bridge-secret';
+        await withServer(async (base) => {
+            for (const auth of [{ 'x-nexloom-bridge-token': 'bridge-secret' }, { Authorization: 'Bearer bridge-secret' }]) {
+                const headers = { ...auth, 'x-nexloom-user-id': USER_B };
+                assert.equal((await call(base, 'GET', `/curricula/${CURRICULUM_B}/resume`, headers)).status, 404);
+                const kit = await call(base, 'POST', '/ai/generation-kit', headers, { include_personalization: true, learner_profile_id: PROFILE_B });
+                assert.equal(kit.status, 404, kit.text);
+            }
+            const scoped = pool.queries.filter((q) => q.sql.includes('from learner_profiles') || q.sql.includes('from curricula c'));
+            assert.equal(scoped.length, 4);
+            for (const q of scoped) assert.deepEqual(q.params.slice(1), [PHASE1_USER_ID]);
+        });
+    });
+
     it('/rag/index: a material_id that is not a UUID is 400; a refused request gives the embeddings unit back', async () => {
         await withServer(async (base) => {
             for (const material_id of ['m1', 42, '../../etc/passwd', undefined]) {
@@ -187,6 +242,31 @@ describe('routes read only the caller\'s own rows', () => {
             assert.equal(pool.queries.filter((q) => q.sql.startsWith('update ai_daily_usage')).length, before + 1, 'the 404 was refunded');
             assert.ok(!pool.queries.some((q) => q.sql.startsWith('insert into jobs') && q.params[0] === USER_A), 'no job queued for A');
         });
+    });
+});
+
+describe('MCP journal tools (tools/core/journal.js, behind journal-log and journal-recent)', () => {
+    let pool;
+    beforeEach(() => {
+        pool = createOwnedPool();
+        setPoolForTests(pool);
+    });
+    afterEach(() => resetPoolForTests());
+
+    it("journal-log refuses another user's curriculum and writes nothing", async () => {
+        const entry = { curriculumId: CURRICULUM_B, moduleId: 'm1', lessonId: 'l1', learned: 'SQL joins' };
+        const refused = await logEntry({ userId: USER_A, ...entry });
+        assert.equal(refused.error_type, 'not_found');
+        assert.ok(!pool.queries.some((q) => q.sql.startsWith('insert into learning_journal')), 'no entry for B\'s curriculum');
+        const saved = await logEntry({ userId: USER_B, ...entry });
+        assert.equal(saved.status, 'saved', JSON.stringify(saved));
+        assert.deepEqual(pool.queries.filter((q) => q.sql.startsWith('insert into learning_journal')).map((q) => q.params[0]), [USER_B]);
+    });
+
+    it("journal-recent never joins another user's curriculum title", async () => {
+        const recent = await getRecent({ userId: USER_A });
+        assert.equal(recent.entries[0].curriculum_id, CURRICULUM_B);
+        assert.equal(recent.entries[0].curriculum_title, null);
     });
 });
 

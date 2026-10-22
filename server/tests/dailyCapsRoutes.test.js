@@ -349,6 +349,57 @@ describe('daily caps on the API routes', () => {
             assert.deepEqual(stored, [], 'nothing was written');
         });
 
+        it('keeps the unit when the stored file cannot be read, so the cap still bounds stored files', async () => {
+            process.env.AI_CAP_USER_EMBEDDINGS = '1';
+            // ai_daily_usage counted as Postgres does: RESERVE_SQL takes a slot while count < $4, REFUND_SQL gives one back.
+            const counts = new Map();
+            const mock = createMockPool((sql) => (sql.startsWith('insert into materials')
+                ? { rowCount: 1, rows: [{ id: DRAFT_ID, status: 'uploaded' }] }
+                : undefined));
+            setPoolForTests({
+                ...mock,
+                async query(sql, params = []) {
+                    const text = String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
+                    if (text.startsWith('insert into ai_daily_usage')) {
+                        const key = params.slice(0, 3).join('|');
+                        const count = counts.get(key) ?? 0;
+                        if (count >= params[3]) return { rowCount: 0, rows: [] };
+                        counts.set(key, count + 1);
+                        return { rowCount: 1, rows: [{ count: count + 1 }] };
+                    }
+                    if (text.startsWith('update ai_daily_usage')) {
+                        for (const subject of params[2]) {
+                            const key = `${params[0]}|${params[1]}|${subject}`;
+                            counts.set(key, Math.max(0, (counts.get(key) ?? 0) - 1));
+                        }
+                        return { rowCount: 1, rows: [] };
+                    }
+                    return mock.query(sql, params);
+                },
+            });
+            const name = `daily-cap-unreadable-${Date.now()}.pdf`;
+            const upload = (base) => {
+                const form = new FormData();
+                form.append('file', new Blob(['not a PDF'], { type: 'application/pdf' }), name);
+                return fetch(`${base}/upload`, { method: 'POST', body: form });
+            };
+            const uploads = path.join(ROOT, 'public/uploads');
+            try {
+                await withServer(async (base) => {
+                    const first = await upload(base);
+                    assert.equal(first.status, 200);
+                    assert.equal((await first.json()).status, 'uploaded', 'the text could not be read');
+                    const second = await upload(base);
+                    const json = await second.json();
+                    assertDailyLimit({ status: second.status, json, text: JSON.stringify(json), headers: second.headers }, 'embeddings', 'user');
+                });
+            } finally {
+                for (const file of fs.existsSync(uploads) ? fs.readdirSync(uploads) : []) {
+                    if (file.endsWith(name)) fs.unlinkSync(path.join(uploads, file));
+                }
+            }
+        });
+
         it('gives the unit back when the route ends with 503 (no database)', async () => {
             process.env.AI_CAP_USER_EMBEDDINGS = '1';
             await withServer(async (base) => {

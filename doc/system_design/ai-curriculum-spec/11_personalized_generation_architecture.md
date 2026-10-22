@@ -339,6 +339,8 @@ flowchart LR
 
 ## 9. API 仕様
 
+`learner_profile_id` を受ける API（9.3 から 9.5、`POST /api/v2/curricula/:id/weekly-load`。9.3 は `include_personalization: true` のときだけ読む）は、呼び出した本人の profile だけを読む。本人は Supabase JWT のユーザーで、bridge token の呼び出しは共有の `PHASE1_USER_ID` になる。他のユーザーの id、存在しない id、UUID でない id は、どれも 404 `Learner profile not found` を返す。bridge から学習者本人の profile は使えないため、学習者の代わりに動く連携はその学習者の JWT を送る（`server/routes/chatgptCurriculum.js`、`server/middleware/bridgeAuth.js`）。
+
 ### 9.1 `POST /api/v2/learner-profiles/assessments`
 
 目的:

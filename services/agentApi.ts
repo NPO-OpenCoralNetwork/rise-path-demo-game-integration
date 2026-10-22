@@ -49,6 +49,8 @@ export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): strin
       if (copy.dailyLimit) return copy.dailyLimit;
     }
     if (err.status === 429) return copy.rateLimited;
+    // 503 ai_unavailable (the daily caps' outage share): the server's English text is not shown.
+    if (err.errorType === 'ai_unavailable') return copy.genericError;
     if (err.message) return err.message;
   }
   return copy.genericError;
