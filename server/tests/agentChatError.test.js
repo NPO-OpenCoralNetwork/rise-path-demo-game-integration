@@ -40,6 +40,11 @@ describe('mapAgentChatError', () => {
         assert.equal(agentApi.mapAgentChatError(err, COPY), COPY.genericError);
     });
 
+    it('shows the generic copy for 503 agent_session_unavailable (the turn binding was not written), not the server text', () => {
+        const err = new agentApi.AgentApiError('Agent session could not be started', 503, 'agent_session_unavailable');
+        assert.equal(agentApi.mapAgentChatError(err, COPY), COPY.genericError);
+    });
+
     it('keeps the daily-limit and Hermes copy', () => {
         const limit = new agentApi.AgentApiError('Daily limit reached', 429, 'daily_limit_reached', undefined, { kind: 'agent_chat', scope: 'user' });
         assert.equal(agentApi.mapAgentChatError(limit, COPY), COPY.dailyLimit);

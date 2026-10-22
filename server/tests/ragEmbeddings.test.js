@@ -19,6 +19,9 @@ import {
 } from '../../tools/core/ragSearch.js';
 import { MAX_CHUNKS_PER_MATERIAL, ingestMaterial, retrieveContext } from '../ragService.js';
 
+/** searchContent searches one learner's materials; its id is a materials.user_id (uuid). */
+const LEARNER = 'a1a1a1a1-0000-4000-8000-000000000001';
+
 const vector = (seed = 0) => Array.from({ length: EMBEDDING_DIM }, (_, i) => (i + seed) / EMBEDDING_DIM);
 
 /** Fake @google/genai client recording every embedContent call. */
@@ -160,16 +163,17 @@ describe('tools/core/ragSearch searchContent', () => {
         const pool = mockPool({ rows: [{ content: 'Blender basics', chunk_index: 0, distance: 0.25, material_id: 'm1' }] });
         setPoolForTests(pool);
 
-        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: 'u1' });
+        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: LEARNER });
         assert.equal(result.search_type, 'vector');
         assert.equal(result.results[0].relevance_score, 0.75);
         assert.deepEqual(client.log[0].contents, ['blender modifiers']);
 
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.ok(search, 'vector query issued');
-        assert.match(search.sql, /c\.embedding_model = \$2/);
-        assert.equal(search.params[1], MODEL_IDS.gemini.embedding);
-        assert.equal(search.params[2], 'u1');
+        assert.match(search.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$3/);
+        assert.match(search.sql, /c\.embedding <=> \$2::vector/);
+        assert.equal(search.params[0], LEARNER);
+        assert.equal(search.params[2], MODEL_IDS.gemini.embedding);
         assert.equal(search.params[3], 2);
     });
 
@@ -177,7 +181,7 @@ describe('tools/core/ragSearch searchContent', () => {
         setEmbeddingClientForTests(null);
         const pool = mockPool({ rows: [] });
         setPoolForTests(pool);
-        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d' });
+        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', userId: LEARNER });
         assert.equal(result.search_type, 'keyword');
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
     });
@@ -382,7 +386,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: result, warnings } = await captureWarnings(() =>
-            searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: 'u1' }));
+            searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: LEARNER }));
 
         assert.equal(result.search_type, 'keyword');
         assert.equal(result.fallback_reason, 'reembed_required');
@@ -392,15 +396,15 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
 
         const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
         assert.match(coverage.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$2/);
-        assert.deepEqual(coverage.params, ['u1', MODEL_IDS.gemini.embedding]);
+        assert.deepEqual(coverage.params, [LEARNER, MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
         assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.deepEqual(keyword.params, ['u1', '%blender%', '%modifiers%', 2]);
+        assert.deepEqual(keyword.params, [LEARNER, '%blender%', '%modifiers%', 2]);
         assert.equal(warnings.length, 1);
     });
 
-    it('searchContent over all users (MCP rag-search, no userId): another user\'s current chunk does not hide older chunks', async () => {
+    it('searchContent with mixed chunks in the learner scope: a current chunk does not hide older chunks', async () => {
         const client = fakeEmbeddingClient();
         setEmbeddingClientForTests(client);
         const pool = mockPool({
@@ -411,7 +415,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: result } = await captureWarnings(() =>
-            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3 }));
+            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3, userId: LEARNER }));
 
         assert.equal(result.search_type, 'vector+keyword');
         assert.equal(result.reembed_required, true);
@@ -420,9 +424,10 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
             ['m-krita', 0.4, undefined],
         ]);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$1 OR c\.embedding_model > \$1\) AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.deepEqual(keyword.params, [MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.deepEqual(keyword.params, [LEARNER, MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
-        assert.deepEqual(search.params.slice(1), [MODEL_IDS.gemini.embedding, 3]);
+        assert.equal(search.params[0], LEARNER);
+        assert.deepEqual(search.params.slice(2), [MODEL_IDS.gemini.embedding, 3]);
     });
 });

@@ -46,20 +46,15 @@ router.post('/tts/synthesize', async (req, res) => {
             lesson_id,
         });
 
-        if (result.error_type) {
-            const status = result.error_type === 'validation' ? 400 : 503;
-            return res.status(status).json(result);
-        }
+        if (result.error_type === 'validation') return res.status(400).json(result);
+        // requestTts logged the sidecar's error and body; its answer carries neither.
+        if (result.error_type) return res.status(503).json({ error: result.error, error_type: result.error_type });
 
         const { buffer, cache_key: _cacheKey, ...payload } = result;
         return res.json(payload);
     } catch (err) {
         console.error('[TTS API] synthesize error:', err.message);
-        return res.status(500).json({
-            error: 'TTS synthesis failed',
-            error_type: 'internal',
-            details: err.message,
-        });
+        return res.status(500).json({ error: 'TTS synthesis failed', error_type: 'internal' });
     }
 });
 

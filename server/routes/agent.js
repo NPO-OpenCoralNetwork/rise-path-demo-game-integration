@@ -5,8 +5,8 @@
  * Cost: each chat that reaches Hermes takes one 'agent_chat' unit of the daily caps
  * (server/middleware/dailyCaps.js); the client's no-stream retry is a second paid call and
  * counts again. Validation (422) and diary (403) rejections are never charged; Hermes not
- * configured, a connection that never opened, or Hermes refusing our key (401/403) gives the
- * unit back.
+ * configured, a turn whose learner binding could not be written (Hermes is then not called), a
+ * connection that never opened, or Hermes refusing our key (401/403) gives the unit back.
  *
  * Errors: the client gets a fixed { error, error_type }, never Hermes's or OpenRouter's own text
  * (that goes to the server log), and never Hermes's own 4xx status (a 401 from Hermes is not the
@@ -26,11 +26,13 @@ import { resolveIncludeDiaryExcerpts } from '../services/lifeJournalPrivacyServi
 const router = express.Router();
 
 /**
- * Hermes did no work: not configured, the connection never opened (hermesFetchFailure), or it
- * refused our API key (401/403). 'hermes_interrupted' (a timeout or reset after the request was
- * sent) and any other Hermes error stay charged.
+ * Hermes did no work: not configured, the turn's learner binding could not be written (Hermes was
+ * not called), the connection never opened (hermesFetchFailure), or it refused our API key
+ * (401/403). 'hermes_interrupted' (a timeout or reset after the request was sent) and any other
+ * Hermes error stay charged.
  */
 const hermesNeverRan = (result) => result.error_type === 'hermes_not_configured'
+    || result.error_type === 'agent_session_unavailable'
     || result.error_type === 'hermes_unreachable'
     || (result.error_type === 'hermes_api_error' && (result.status === 401 || result.status === 403));
 

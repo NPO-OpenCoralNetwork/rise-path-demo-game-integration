@@ -10,6 +10,7 @@ import { getPool } from '../db.js';
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
 import { generateImageWithGemini } from '../geminiBackendService.js';
 import { dailyCap, reserveDailyCap } from '../middleware/dailyCaps.js';
+import { isUuid } from '../utils/ids.js';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -72,8 +73,6 @@ const IMAGE_SIZES = new Set(['1K', '2K']);
 /** Daily 'embeddings' cap for whole-file embedding; given back when the route ends before it. */
 const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 404, 413, 500, 503] });
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * Gemini refused an image call before generating anything: no key, a key it does not accept
  * (Gemini answers 400 API_KEY_INVALID, 401 or 403), or its own rate limit (429). Not counted.
@@ -102,14 +101,15 @@ router.get('/curricula', async (req, res) => {
         res.json({ ok: true, curricula: result.rows });
     } catch (error) {
         console.error('[Content API] List Error:', error.message, error.stack);
-        res.status(500).json({ error: 'Failed to load curricula', detail: error.message });
+        res.status(500).json({ error: 'Failed to load curricula' });
     }
 });
 
-// GET /api/v2/curricula/:id
+// GET /api/v2/curricula/:id — an id that is not a UUID is the same 404 as an unknown one.
 router.get('/curricula/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Not found' });
 
     try {
         const detailRes = await pool.query(`
@@ -133,7 +133,7 @@ router.get('/curricula/:id', async (req, res) => {
         });
     } catch (error) {
         console.error('[Content API] Detail Error:', error.message);
-        res.status(500).json({ error: 'Failed to load curriculum', detail: error.message });
+        res.status(500).json({ error: 'Failed to load curriculum' });
     }
 });
 
@@ -247,7 +247,7 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     
     const materialId = req.body?.material_id;
-    if (typeof materialId !== 'string' || !UUID_RE.test(materialId)) {
+    if (!isUuid(materialId)) {
         return res.status(400).json({ error: 'material_id must be a UUID', error_type: 'invalid_body' });
     }
 
@@ -271,13 +271,15 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
     }
 });
 
-// GET /api/v2/jobs/:id — the caller's own jobs only; `error` is a short code (server/jobWorker.js).
+// GET /api/v2/jobs/:id — the caller's own jobs only (an id that is not a UUID: 404, no query);
+// `error` is a short code (server/jobWorker.js).
 // A job that failed before the worker stored codes may still hold a raw message (absolute paths,
 // file names): anything that is not a code reads as 'job_failed'.
 const JOB_ERROR_CODE_RE = /^[a-z_]+$/;
 router.get('/jobs/:id', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Job not found' });
 
     try {
         const result = await pool.query(
@@ -289,6 +291,7 @@ router.get('/jobs/:id', async (req, res) => {
         if (job.error != null && !JOB_ERROR_CODE_RE.test(job.error)) job.error = 'job_failed';
         res.json(job);
     } catch (error) {
+        console.error('[Content API] Job status error:', error.message);
         res.status(500).json({ error: 'Failed to check job' });
     }
 });

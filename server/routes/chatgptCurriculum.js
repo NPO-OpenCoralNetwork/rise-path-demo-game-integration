@@ -33,15 +33,23 @@ import { validateGenerationKit } from '../services/schemaValidator.js';
 import { validateJournalEntry, buildJournalSummary } from '../services/journalService.js';
 import { getAdaptationSignals } from '../../tools/core/journal.js';
 import { writeCurriculumVersion } from '../../tools/core/curriculum.js';
+import { isUuid } from '../utils/ids.js';
 
 const router = express.Router();
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// A learner_profile_id that is not a UUID names no profile: the same 404 as an unknown id or
-// another user's, sent before the lookup so Postgres never sees it.
+// An id that is not a UUID names no row: the same 404 as an unknown id or another user's, sent
+// before the lookup so Postgres never sees it. Routes that answer an unknown curriculum with 200
+// (weekly-load, GET journal, /adaptation) answer a malformed one with CURRICULUM_NOT_FOUND.
 const PROFILE_NOT_FOUND = { error: 'Learner profile not found' };
+const CURRICULUM_NOT_FOUND = { error: 'Curriculum not found' };
+const VERSION_NOT_FOUND = { error: 'Curriculum version not found' };
+
+/** ROLLBACK in a catch: a failure is logged, so the route still sends its own fixed 500. */
+const rollback = (client) => client.query('ROLLBACK').catch((error) => {
+    console.error('[ChatGPT Curriculum API] Rollback failed:', error.message);
+});
 
 const asObject = (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -90,7 +98,7 @@ router.post('/ai/generation-kit', requireBridgeOrAuth, async (req, res) => {
     if (includePersonalization && learnerProfileId) {
         const pool = getPool();
         if (pool) {
-            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
+            if (!isUuid(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select raw_profile, derived_learning_profile from learner_profiles
@@ -161,7 +169,7 @@ router.post('/ai/validate-intake', requireBridgeOrAuth, async (req, res) => {
     if (learnerProfileId) {
         const pool = getPool();
         if (pool) {
-            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
+            if (!isUuid(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             try {
                 const result = await pool.query(
                     `select derived_learning_profile from learner_profiles
@@ -245,7 +253,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     let generationRulesSnapshot = null;
 
     if (learnerProfileId && pool) {
-        if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
+        if (!isUuid(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
         try {
             const lpResult = await pool.query(
                 `select id, version, raw_profile, derived_learning_profile, applied_rules
@@ -355,6 +363,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
     };
 
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
+    if (requestedCurriculumId && !isUuid(requestedCurriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
     const client = await pool.connect();
     try {
@@ -368,7 +377,7 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
             );
             if (!existing.rowCount) {
                 await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Curriculum not found' });
+                return res.status(404).json(CURRICULUM_NOT_FOUND);
             }
         }
 
@@ -406,9 +415,9 @@ router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
             saved_at: saved.createdAt,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await rollback(client);
         console.error('[ChatGPT Curriculum API] Save draft error:', error);
-        return res.status(500).json({ error: 'Failed to save curriculum draft', detail: error.message });
+        return res.status(500).json({ error: 'Failed to save curriculum draft' });
     } finally {
         client.release();
     }
@@ -509,9 +518,9 @@ router.post('/learner-profiles/assessments', requireBridgeOrAuth, async (req, re
             derived_learning_profile,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await rollback(client);
         console.error('[ChatGPT Curriculum API] Save assessment error:', error);
-        res.status(500).json({ error: 'Failed to save learner profile', detail: error.message });
+        res.status(500).json({ error: 'Failed to save learner profile' });
     } finally {
         client.release();
     }
@@ -547,7 +556,7 @@ router.get('/learner-profiles/latest', requireBridgeOrAuth, async (req, res) => 
         });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Get latest profile error:', error);
-        res.status(500).json({ error: 'Failed to retrieve learner profile', detail: error.message });
+        res.status(500).json({ error: 'Failed to retrieve learner profile' });
     }
 });
 
@@ -558,6 +567,7 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
     try {
         // Fetch progress
@@ -578,7 +588,7 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
             [curriculumId, req.userId]
         );
         if (!curriculumResult.rowCount) {
-            return res.status(404).json({ error: 'Curriculum not found' });
+            return res.status(404).json(CURRICULUM_NOT_FOUND);
         }
 
         const curriculum = asObject(curriculumResult.rows[0].content_json);
@@ -595,7 +605,7 @@ router.get('/curricula/:id/resume', requireBridgeOrAuth, async (req, res) => {
         res.json({ ok: true, ...resumeCard });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Resume card error:', error);
-        res.status(500).json({ error: 'Failed to build resume card', detail: error.message });
+        res.status(500).json({ error: 'Failed to build resume card' });
     }
 });
 
@@ -607,6 +617,7 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
 
     const curriculumId = cleanString(req.params.id);
     const learnerProfileId = cleanString(req.body?.learner_profile_id);
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
     try {
         // Fetch progress
@@ -621,7 +632,7 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
         let derivedLearningProfile = {};
         let baseLoadMinutes = Number(req.body?.base_minutes) || 60;
         if (learnerProfileId) {
-            if (!UUID_RE.test(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
+            if (!isUuid(learnerProfileId)) return res.status(404).json(PROFILE_NOT_FOUND);
             const lpResult = await pool.query(
                 `select derived_learning_profile, raw_profile from learner_profiles
                  where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid) order by version desc limit 1`,
@@ -649,7 +660,7 @@ router.post('/curricula/:id/weekly-load', requireBridgeOrAuth, async (req, res) 
         res.json({ ok: true, ...loadResult });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Weekly load error:', error);
-        res.status(500).json({ error: 'Failed to adjust weekly load', detail: error.message });
+        res.status(500).json({ error: 'Failed to adjust weekly load' });
     }
 });
 
@@ -660,6 +671,7 @@ router.get('/curricula/:id/summary-cards', requireBridgeOrAuth, async (req, res)
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
     try {
         const result = await pool.query(
             `select cv.content_json from curricula c
@@ -667,13 +679,13 @@ router.get('/curricula/:id/summary-cards', requireBridgeOrAuth, async (req, res)
              where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
             [curriculumId, req.userId]
         );
-        if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        if (!result.rowCount) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
         const cards = buildSummaryCards({ curriculum: asObject(result.rows[0].content_json) });
         res.json({ ok: true, cards });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Summary cards error:', error);
-        res.status(500).json({ error: 'Failed to build summary cards', detail: error.message });
+        res.status(500).json({ error: 'Failed to build summary cards' });
     }
 });
 
@@ -685,6 +697,7 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
 
     const curriculumId = cleanString(req.params.id);
     const weekNumber = Number(req.query?.week) || 1;
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
     try {
         const [currResult, progressResult] = await Promise.all([
@@ -701,7 +714,7 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
                 [curriculumId, req.userId]
             ),
         ]);
-        if (!currResult.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        if (!currResult.rowCount) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
         const digest = buildWeeklyDigest({
             curriculum: asObject(currResult.rows[0].content_json),
@@ -711,7 +724,7 @@ router.get('/curricula/:id/weekly-digest', requireBridgeOrAuth, async (req, res)
         res.json({ ok: true, ...digest });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Weekly digest error:', error);
-        res.status(500).json({ error: 'Failed to build weekly digest', detail: error.message });
+        res.status(500).json({ error: 'Failed to build weekly digest' });
     }
 });
 
@@ -722,6 +735,7 @@ router.get('/curricula/:id/encyclopedia', requireBridgeOrAuth, async (req, res) 
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
     try {
         const result = await pool.query(
             `select cv.content_json from curricula c
@@ -729,13 +743,13 @@ router.get('/curricula/:id/encyclopedia', requireBridgeOrAuth, async (req, res) 
              where c.id = CAST($1 AS uuid) and c.user_id = CAST($2 AS uuid)`,
             [curriculumId, req.userId]
         );
-        if (!result.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        if (!result.rowCount) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
         const encyclopedia = buildMiniEncyclopedia({ curriculum: asObject(result.rows[0].content_json) });
         res.json({ ok: true, ...encyclopedia });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Encyclopedia error:', error);
-        res.status(500).json({ error: 'Failed to build encyclopedia', detail: error.message });
+        res.status(500).json({ error: 'Failed to build encyclopedia' });
     }
 });
 
@@ -763,6 +777,7 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
     if (!validation.valid) {
         return res.status(422).json({ error: 'Invalid journal entry', details: validation.errors });
     }
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
 
     try {
         // Phase 7: ensurePhase1User removed
@@ -771,7 +786,7 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
             'select 1 from curricula where id = CAST($1 AS uuid) and user_id = CAST($2 AS uuid)',
             [curriculumId, req.userId]
         );
-        if (!owned.rowCount) return res.status(404).json({ error: 'Curriculum not found' });
+        if (!owned.rowCount) return res.status(404).json(CURRICULUM_NOT_FOUND);
         const result = await pool.query(
             `insert into learning_journal
                 (user_id, curriculum_id, module_id, lesson_id, learned, difficulty, mood, confidence, time_spent_min)
@@ -784,7 +799,7 @@ router.post('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
         res.json({ ok: true, journal_entry_id: result.rows[0].id, created_at: result.rows[0].created_at });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Journal save error:', error);
-        res.status(500).json({ error: 'Failed to save journal entry', detail: error.message });
+        res.status(500).json({ error: 'Failed to save journal entry' });
     }
 });
 
@@ -795,6 +810,7 @@ router.get('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 
     const curriculumId = cleanString(req.params.id);
+    if (!isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
     try {
         const result = await pool.query(
             `select module_id, lesson_id, learned, difficulty, mood, confidence, time_spent_min, created_at
@@ -807,7 +823,7 @@ router.get('/curricula/:id/journal', requireBridgeOrAuth, async (req, res) => {
         res.json({ ok: true, ...summary });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Journal fetch error:', error);
-        res.status(500).json({ error: 'Failed to fetch journal', detail: error.message });
+        res.status(500).json({ error: 'Failed to fetch journal' });
     }
 });
 
@@ -832,26 +848,30 @@ router.get('/journal/recent', requireBridgeOrAuth, async (req, res) => {
         res.json({ ok: true, entries: result.rows });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Recent journal error:', error);
-        res.status(500).json({ error: 'Failed to fetch recent journal', detail: error.message });
+        res.status(500).json({ error: 'Failed to fetch recent journal' });
     }
 });
 
 // GET /api/v2/adaptation
 // Get adaptive learning signals for the current user
 router.get('/adaptation', requireBridgeOrAuth, async (req, res) => {
+    const curriculumId = cleanString(req.query?.curriculum_id) || undefined;
+    if (curriculumId && !isUuid(curriculumId)) return res.status(404).json(CURRICULUM_NOT_FOUND);
     try {
         const signals = await getAdaptationSignals({
             userId: req.userId,
-            curriculumId: cleanString(req.query?.curriculum_id) || undefined,
+            curriculumId,
             moduleId: cleanString(req.query?.module_id) || undefined,
         });
         if (signals.error) {
-            return res.status(503).json({ ok: false, error: signals.error });
+            // classifyDbError's text can hold the database's own message: logged, not sent.
+            console.error('[ChatGPT Curriculum API] Adaptation signals error:', signals.error_type, signals.error);
+            return res.status(503).json({ ok: false, error: 'Failed to get adaptation signals' });
         }
         res.json({ ok: true, ...signals });
     } catch (error) {
         console.error('[ChatGPT Curriculum API] Adaptation signals error:', error);
-        res.status(500).json({ error: 'Failed to get adaptation signals', detail: error.message });
+        res.status(500).json({ error: 'Failed to get adaptation signals' });
     }
 });
 
@@ -864,6 +884,7 @@ router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
     if (!curriculumVersionId) {
         return res.status(400).json({ error: 'curriculum_version_id required' });
     }
+    if (!isUuid(curriculumId) || !isUuid(curriculumVersionId)) return res.status(404).json(VERSION_NOT_FOUND);
 
     const client = await pool.connect();
     try {
@@ -881,7 +902,7 @@ router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
         );
         if (!existing.rowCount) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Curriculum version not found' });
+            return res.status(404).json(VERSION_NOT_FOUND);
         }
 
         await client.query(
@@ -917,9 +938,9 @@ router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
             published_at: publishedAt,
         });
     } catch (error) {
-        await client.query('ROLLBACK');
+        await rollback(client);
         console.error('[ChatGPT Curriculum API] Publish error:', error);
-        return res.status(500).json({ error: 'Failed to publish curriculum', detail: error.message });
+        return res.status(500).json({ error: 'Failed to publish curriculum' });
     } finally {
         client.release();
     }

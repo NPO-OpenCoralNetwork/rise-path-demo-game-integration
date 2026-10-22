@@ -2,7 +2,8 @@
  * Hermes Agent proxy — Phase 16-6d
  * Forwards authenticated Web UI chat to Hermes API Server (OpenAI-compatible).
  */
-import { setAgentChatConsent, registerAgentSession } from '../../tools/core/agentSessionStore.js';
+import { setAgentChatConsent } from '../../tools/core/agentSessionStore.js';
+import { registerAgentTurn, buildTurnInstruction, TURN_KEY_PREFIX } from '../../tools/core/mcpUserScope.js';
 import { DATA_NOT_INSTRUCTIONS, fence, stripTags } from '../llm/prompts/shared.js';
 
 export const ALLOWED_SKILLS = new Set([
@@ -45,6 +46,12 @@ export function buildConversationKey(userId, skill) {
     return `rp:user:${userId}:${skill}`;
 }
 
+/**
+ * The X-Hermes-Session-Key Express sends Hermes: stable per learner, because Hermes scopes its own
+ * per-channel state by it (a key that changes every turn would start a new scope each time). Hermes
+ * does not forward it to the MCP server, and the MCP server ignores rp:user keys from clients; the
+ * learner for tool calls comes only from the turn token in `instructions`.
+ */
 export function buildSessionKey(userId) {
     return `rp:user:${userId}`;
 }
@@ -327,6 +334,35 @@ export function hermesFetchFailure(err) {
         : { ok: false, status: 503, error: 'Hermes API connection was interrupted', error_type: 'hermes_interrupted', detail: err?.message };
 }
 
+/**
+ * Everything a Hermes call needs for one chat turn, before Hermes is contacted. Mints the turn
+ * token (registerAgentTurn) that tells the MCP server which learner this turn's tool calls act for:
+ * Hermes gets it in `instructions` (the rp_turn argument of each tool call). When the binding cannot be written, the turn does not start: the
+ * MCP server could not resolve the learner, so Hermes is never called ('agent_session_unavailable',
+ * which the route refunds). Then the learner's diary consent for this turn is recorded.
+ * @returns {Promise<{ ok: true, conversation: string, input: string, instructions: string, sessionKey: string }
+ *   | { ok: false, status: number, error: string, error_type: string }>}
+ */
+async function beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts }) {
+    const turn = await registerAgentTurn(userId);
+    if (!turn) {
+        return {
+            ok: false,
+            status: 503,
+            error: 'Agent session could not be started',
+            error_type: 'agent_session_unavailable',
+        };
+    }
+    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    return {
+        ok: true,
+        conversation: buildConversationKey(userId, skill),
+        input: buildHermesInput({ skill, message, context }),
+        instructions: [buildSkillInstructions(skill), buildTurnInstruction(turn)].join('\n'),
+        sessionKey: buildSessionKey(userId),
+    };
+}
+
 export async function callHermesResponses({
     userId,
     skill,
@@ -345,11 +381,9 @@ export async function callHermesResponses({
         };
     }
 
-    const conversation = buildConversationKey(userId, skill);
-    const sessionKey = buildSessionKey(userId);
-    const input = buildHermesInput({ skill, message, context });
-    await registerAgentSession(sessionKey, userId);
-    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts });
+    if (!turn.ok) return turn;
+    const { conversation, input, instructions, sessionKey } = turn;
 
     let response;
     try {
@@ -363,7 +397,7 @@ export async function callHermesResponses({
             body: JSON.stringify({
                 model,
                 input,
-                instructions: buildSkillInstructions(skill),
+                instructions,
                 conversation,
                 store: true,
             }),
@@ -418,11 +452,9 @@ export async function streamHermesChatCompletions({
         };
     }
 
-    const conversation = buildConversationKey(userId, skill);
-    const sessionKey = buildSessionKey(userId);
-    const input = buildHermesInput({ skill, message, context });
-    await registerAgentSession(sessionKey, userId);
-    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts });
+    if (!turn.ok) return turn;
+    const { conversation, input, instructions, sessionKey } = turn;
 
     let response;
     try {
@@ -436,7 +468,7 @@ export async function streamHermesChatCompletions({
             body: JSON.stringify({
                 model,
                 input,
-                instructions: buildSkillInstructions(skill),
+                instructions,
                 conversation,
                 store: true,
                 stream: true,

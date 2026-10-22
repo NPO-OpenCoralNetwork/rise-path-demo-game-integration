@@ -92,7 +92,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
    - Memanto なしは `e2-medium`（4 GB。既定）。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`（8 GB）。理由は VM README の「[マシンタイプ](../risepath-vm/README.md#マシンタイプ)」。
    - 月額は**推定**（未確認）: 24 時間稼働の `asia-northeast1` で `e2-medium` 約 $31、`e2-standard-2` 約 $63。ディスクは別。第三者のサイトの値なので、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめる。
    - `stack.env` は VM README の表のとおりに埋める。`POSTGRES_PASSWORD` は DB の最初の起動で固定される。`COMPOSE_PROFILES` は表のとおり（`full`。Memanto を使うなら `full,memory`。Hermes を使わないなら `tts`）にし、手順 9〜10 の公開エッジの値はまだ入れない。`full` のときは `OPENROUTER_API_KEY` と 16 文字以上の `HERMES_API_KEY` が要り、無いと `deploy-stack.sh` が止まる。
-   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–012 がすべて入る。
+   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–013 がすべて入る。
    - Mac の `.env.local` を新しいパスワードと `HERMES_API_KEY` に替える（VM README の「Mac `.env.local`」）。`ORIGIN_SECRET` を入れる前に、Mac のリポジトリ直下で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（[VM README](../risepath-vm/README.md#4-手動でスタック操作vm-上)）。
 
 3. GCP ファイアウォールを確認する。ルールはタグに付くので、前の VM のルールが残っていれば新しい VM にも効く。
@@ -152,7 +152,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
     - `RISE_PATH_PUBLIC_URL` があると、メディア URL が `https://api.<domain>` の絶対 URL になり 403 になる
     - Memanto を使う場合は `COMPOSE_PROFILES=full,memory,tunnel` にする（書き忘れても `deploy-stack.sh` が `memory` を足す）。`MEMANTO_ENABLED=true` も `stack.env` に入れる（VM 起動時の systemd ユニットが読む。手順 2 で入れていればそのまま）
     - `GEMINI_API_KEY` が入っているか確かめる。コース生成、画像生成、教材の索引づけが使う。無いと、確認チェックリストの画像生成が失敗する
-11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–012 が入ったので、13 件すべて適用済み（未適用 0 件）と出れば正しい。
+11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–013 が入ったので、14 件すべて適用済み（未適用 0 件）と出れば正しい。
 
     ```bash
     docker compose --env-file stack.env build api
@@ -215,6 +215,8 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - [ ] 画像生成の結果が表示される（`/generated/img_...`）
 - [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す
 - [ ] P-School の画像が出る（例: `https://app.<domain>/p_school/assets/armory.jpg`）
+- [ ] AI エージェントが自分の教材を検索できる。テスト用の学習者で小さな教材をアップロードし、取り込みが終わってから、エージェントにその内容を質問する。答えに教材の内容が出れば、Hermes がツール呼び出しに `rp_turn` を渡している。出ずに「使えない」と返るときは、`docker compose --env-file stack.env logs mcp | grep session_binding_required` で確かめ、公開せずに止めて報告する
+- [ ] 別の学習者でサインインし、同じ質問をしても、前の学習者の教材が出ない
 
 ## 既知の制限
 

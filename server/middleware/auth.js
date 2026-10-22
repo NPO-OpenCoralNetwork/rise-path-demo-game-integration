@@ -131,10 +131,9 @@ export const requireAuth = async (req, res, next) => {
     try {
         const { data, error } = await supabase.auth.getUser(token);
         if (error || !data?.user) {
-            return res.status(401).json({
-                error: 'Invalid or expired token',
-                detail: error?.message,
-            });
+            // The auth provider's own text stays in the server log.
+            if (error) console.warn('[Auth] token rejected:', error?.message || error);
+            return res.status(401).json({ error: 'Invalid or expired token' });
         }
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';

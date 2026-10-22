@@ -27,8 +27,8 @@ version: 1.0.0
 2. 曖昧な場合はドメインを確認する
 
 ### Step 2: 検索実行
-1. `rag-search` ツールで検索 (max_results: 3)
-2. `content://domains` リソースで利用可能なドメイン一覧を参照
+1. `rag-search` ツールで検索 (max_results: 3)。検索対象は学習者本人がアップロードした教材だけ（他の学習者の資料や Rise Path のコース教材は含まない。`domain` は絞り込みに使われない）
+2. コース（ドメイン）の一覧は `content://domains` リソースで参照
 
 ### Step 3: 結果提示
 1. 関連度スコアの高い順に提示

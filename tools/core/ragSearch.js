@@ -2,6 +2,9 @@
  * Shared Business Logic — RAG Search
  *
  * Wraps the existing ragService (material_chunks + pgvector) for MCP/Express dual use.
+ * Every search is scoped to one learner's own ready materials (materials.user_id is NOT NULL and
+ * there is no shared or public material), like ragService.retrieveContext: without a learner id
+ * nothing is searched.
  * Falls back to basic keyword retrieval if pgvector or the embedding key is not available.
  * Vectors from different models are never compared: chunks embedded with an older model (or none)
  * are matched by keyword and merged with the vector results until scripts/rag/reembed.mjs
@@ -258,20 +261,46 @@ export async function keywordSearchChunks(pool, { query, scope, limit }) {
     return result.rows;
 }
 
+/** A learner id as stored in materials.user_id (uuid). Anything else matches no material. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Most results one search returns (the MCP tool schema enforces the same bound). */
+export const MAX_SEARCH_RESULTS = 10;
+
+const clampResults = (value) => {
+    const n = Math.trunc(Number(value));
+    return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_SEARCH_RESULTS) : 3;
+};
+
 /**
- * Search educational content using existing RAG pipeline.
- * Uses material_chunks table with pgvector cosine distance when available.
+ * The chunks one learner may read: their own materials with status 'ready'.
+ * @param {string} userId a UUID
+ * @returns {ChunkScope}
+ */
+export function learnerChunkScope(userId) {
+    return { conditions: ["m.status = 'ready'", 'm.user_id = $1'], params: [userId] };
+}
+
+/**
+ * Search the learner's own uploaded materials (material_chunks) with pgvector cosine distance
+ * when available, else by keyword.
  *
  * @param {Object} params
  * @param {string} params.query - Search query text
- * @param {string} params.domain - Learning domain filter (e.g. 'blender-3d')
- * @param {number} [params.maxResults=3] - Maximum results to return
- * @param {string} [params.userId] - User ID for scoping materials
+ * @param {string} [params.domain] - Echoed in each result; not a filter (materials have no domain)
+ * @param {number} [params.maxResults=3] - Maximum results to return (1-10)
+ * @param {string} params.userId - The learner whose materials are searched. Required: a missing
+ *   or non-UUID id returns no results without querying.
  */
 export async function searchContent({ query, domain, maxResults = 3, userId }) {
+    if (typeof userId !== 'string' || !UUID.test(userId)) {
+        return { results: [], search_type: 'none', message: 'No learner in scope' };
+    }
     const pool = getPool();
     if (!pool) return { results: [], error: 'DB not configured', error_type: 'db_connection' };
 
+    const scope = learnerChunkScope(userId);
+    const limit = clampResults(maxResults);
     try {
         // First check if pgvector extension is available
         const typeCheck = await pool.query(
@@ -280,9 +309,9 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
         const hasVector = typeCheck.rowCount > 0;
 
         if (hasVector) {
-            return await vectorSearch({ pool, query, domain, maxResults, userId });
+            return await vectorSearch({ pool, query, domain, maxResults: limit, scope });
         } else {
-            return await keywordFallback({ pool, query, domain, maxResults, userId });
+            return await keywordFallback({ pool, query, domain, maxResults: limit, scope });
         }
     } catch (err) {
         const classified = classifyDbError(err, 'ragSearch');
@@ -294,17 +323,10 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
  * Vector search using pgvector cosine distance.
  * Generates embedding for query via Gemini, then searches material_chunks.
  */
-async function vectorSearch({ pool, query, domain, maxResults, userId }) {
+async function vectorSearch({ pool, query, domain, maxResults, scope }) {
     if (!isEmbeddingConfigured()) {
         // No API key — fall back to keyword search
-        return await keywordFallback({ pool, query, domain, maxResults, userId });
-    }
-
-    /** @type {ChunkScope} */
-    const scope = { conditions: ['m.status = \'ready\''], params: [] };
-    if (userId) {
-        scope.params.push(userId);
-        scope.conditions.push(`m.user_id = $${scope.params.length}`);
+        return await keywordFallback({ pool, query, domain, maxResults, scope });
     }
 
     // Vectors from different models are never compared. With no EMBEDDING_MODEL chunks in scope
@@ -312,7 +334,7 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
     const coverage = await embeddingCoverage(pool, scope);
     warnLegacyEmbeddingsOnce(coverage.legacy);
     if (!coverage.current) {
-        return await keywordFallback({ pool, query, domain, maxResults, userId, scope, reason: 'reembed_required' });
+        return await keywordFallback({ pool, query, domain, maxResults, scope, reason: 'reembed_required' });
     }
 
     let queryVector;
@@ -320,33 +342,26 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
         [queryVector] = await embedTexts([query]);
     } catch {
         // Embedding generation failed — fall back to keyword
-        return await keywordFallback({ pool, query, domain, maxResults, userId });
+        return await keywordFallback({ pool, query, domain, maxResults, scope });
     }
 
-    // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older rows).
-    const conditions = ['m.status = \'ready\'', 'c.embedding_model = $2'];
-    const params = [JSON.stringify(queryVector), EMBEDDING_MODEL];
-    let paramIdx = 3;
-
-    if (userId) {
-        conditions.push(`m.user_id = $${paramIdx++}`);
-        params.push(userId);
-    }
-
-    // Note: domain filter on materials table (if metadata column exists)
-    // For now, search across all materials and let relevance do the filtering
-
+    // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older
+    // rows), inside the learner scope. materials has no domain column: `domain` is echoed only.
+    const params = [...scope.params, JSON.stringify(queryVector)];
+    const vectorParam = `$${params.length}`;
+    params.push(EMBEDDING_MODEL);
+    const modelCondition = `c.embedding_model = $${params.length}`;
     params.push(maxResults);
 
     const result = await pool.query(
         `SELECT c.content, c.chunk_index,
-                (c.embedding <=> $1::vector) as distance,
+                (c.embedding <=> ${vectorParam}::vector) as distance,
                 m.id as material_id
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
-         ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}
+         ${whereClause(scope, [modelCondition])}
          ORDER BY distance ASC
-         LIMIT $${paramIdx}`,
+         LIMIT $${params.length}`,
         params
     );
 
@@ -376,17 +391,15 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
  * Keyword-based fallback when pgvector or Gemini API is unavailable, or when no chunk in `scope`
  * is embedded with EMBEDDING_MODEL (`reason: 'reembed_required'`).
  * Uses PostgreSQL ILIKE for basic text matching.
- * @param {{ pool: any, query: string, domain?: string, maxResults: number, userId?: string,
- *   scope?: ChunkScope, reason?: string }} params
+ * @param {{ pool: any, query: string, domain?: string, maxResults: number,
+ *   scope: ChunkScope, reason?: string }} params scope: the learner scope (learnerChunkScope)
  */
-async function keywordFallback({ pool, query, domain, maxResults, userId, scope, reason }) {
+async function keywordFallback({ pool, query, domain, maxResults, scope, reason }) {
     if (extractKeywords(query).length === 0) {
         return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...(reason ? { fallback_reason: reason } : {}) };
     }
 
-    /** @type {ChunkScope} */
-    const searchScope = scope ?? { conditions: userId ? ['m.user_id = $1'] : [], params: userId ? [userId] : [] };
-    const rows = await keywordSearchChunks(pool, { query, scope: searchScope, limit: maxResults });
+    const rows = await keywordSearchChunks(pool, { query, scope, limit: maxResults });
 
     return {
         ...(reason ? { fallback_reason: reason } : {}),

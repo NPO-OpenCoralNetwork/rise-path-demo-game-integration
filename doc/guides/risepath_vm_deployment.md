@@ -25,7 +25,7 @@
 
 - **VM / Hermes インスタンス** = Rise Path **プロダクト 1 つ分**（マルチテナント）
 - **学習者ごとに VM や Hermes は作らない**
-- ユーザー枠は Supabase JWT → `rp:user:{uuid}` → MCP / DB の `user_id` スコープで分離
+- ユーザー枠は Supabase JWT → Express がチャット 1 ターンごとに発行する `rp_turn`（`agent_session_binding` の `rp:turn:<token>`）→ MCP / DB の `user_id` スコープで分離（[`hermes/README.md`](../../hermes/README.md)「MCP の学習者スコープ」）
 
 ### 1.3 VM 外に置くもの
 
@@ -143,7 +143,7 @@ Hermes 側の `API_SERVER_KEY` は、Compose と `init-hermes-profile.sh` が `H
 | Mac ローカル開発 | stdio（Hermes が子プロセス起動） | `hermes -p rise-path gateway` |
 | `risepath-vm` 本番 | **SSE**（`mcp` サービス） | `url: http://mcp:3100/sse` + Bearer |
 
-**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証し、Express 経由のユーザーチャットでは Express が先に `registerAgentSession(rp:user:{uuid})` する。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向け。
+**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証する。Express 経由のユーザーチャットでは、Express がターンごとに `registerAgentTurn(userId)` でランダムなトークンを発行して `agent_session_binding` に書き込み（失敗したら Hermes を呼ばずに 503）、Hermes には `instructions` で渡す（ヘッダー `X-Hermes-Session-Key` は学習者ごとに固定の `rp:user:{uuid}` で、Hermes 自身の状態の単位。MCP はこれを無視する）。Hermes は各ツール呼び出しの引数 `rp_turn` にそれを付け、MCP はその学習者として実行する。クライアントが送る `X-Hermes-Session-Key: rp:user:{uuid}` は無視される。`rp_turn` のない Bridge Token の呼び出しは strict auth（本番、`RISEPATH_STRICT_AUTH=true`、`VITE_DEMO_MODE=false`）では `session_binding_required`（直近 15 分にチャット中の学習者が 1 人だけならその学習者、という暫定フォールバックは strict auth でない開発環境だけ）。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向けで、その JWT の学習者として動く。
 
 stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) §3.2）。
 
@@ -212,7 +212,7 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 #### migration の確認（適用前）
 
 - `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
-- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–012 の 13 件を一度に流す。そのあとの `db:migrate:status` は、13 件すべて適用済み（未適用 0 件）になる。
+- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–013 の 14 件を一度に流す。そのあとの `db:migrate:status` は、14 件すべて適用済み（未適用 0 件）になる。
 - 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（新しい DB では空なので、すぐ終わる）。
 
 ### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
@@ -254,7 +254,7 @@ docker compose --env-file stack.env up -d
    ```
 
 2. `provision-gce.sh` で作る（§4.1。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`）。
-3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=full`（Memanto を使うなら `full,memory`。Hermes を使わないなら `tts`）のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration 000–012 をまとめて流す。
+3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=full`（Memanto を使うなら `full,memory`。Hermes を使わないなら `tts`）のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration 000–013 をまとめて流す。
 4. Mac の `.env.local` を新しいパスワードと `HERMES_API_KEY` に替える（§4.3）。`ORIGIN_SECRET` を入れる前に、Mac から `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。
 5. 初回サインインのあと、自分の `user_profiles.role` を `admin` にする（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「[管理者にする](../../deploy/risepath-vm/README.md#5-管理者にする初回サインインのあと)」）。
 
@@ -370,7 +370,7 @@ VM のホストには Node が無いので、`--target host` は使わない。M
 | 項目 | 状態 |
 |------|------|
 | アーキテクチャ方針（本ドキュメント） | ✅ 確定 |
-| migration 000–012 + `db:migrate` | ✅ リポジトリは 012 まで。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–012 を流す（§4.2） |
+| migration 000–013 + `db:migrate` | ✅ リポジトリは 013 まで。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–013 を流す（§4.2） |
 | Express agent proxy + Life Journal API | ✅ 完了 |
 | `deploy/risepath-vm/docker-compose.yml` | ✅ db（pgvector）+ api + mcp + kokoro-tts + hermes（healthcheck 付き） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |
