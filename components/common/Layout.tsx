@@ -29,6 +29,7 @@ import { useLanguage, type SelectedLanguage } from '../../context/LanguageContex
 import { VIEW_PATHS, pathToNavKey, isLessonPath, type NavKey } from '../../navigation/viewPaths';
 import { features } from '../../config/features';
 import BrandMark from './BrandMark';
+import { shellThemeForView } from './shellTheme';
 
 interface LayoutProps {
   currentView: ViewState;
@@ -83,19 +84,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
   ));
 
   useEffect(() => {
-    const view = currentView.toString();
-    if (view.startsWith('ART_')) {
-      setTheme('art');
-    } else if (
-      (view.startsWith('VIBE_') && view !== 'VIBE_PATH') || // Keep Path light
-      (view.startsWith('PROGRAMMING') && !view.includes('WEB')) || // WEB track is light
-      view.startsWith('PYTHON_') ||
-      view.startsWith('WEB_')
-    ) {
-      setTheme('vibe');
-    } else {
-      setTheme('default');
-    }
+    setTheme(shellThemeForView(currentView.toString()));
   }, [currentView, setTheme]);
 
   useEffect(() => {

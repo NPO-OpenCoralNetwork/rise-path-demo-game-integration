@@ -15,6 +15,7 @@ import { GeneratedLesson, CurriculumPersonalization } from '../../../services/cu
 import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
 import { generateImagePreview } from '../../../services/curriculumApi';
+import { resolveMermaidSource } from './mermaidSource';
 import {
     checkTtsAvailable,
     getDisplayName,
@@ -1777,8 +1778,11 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
             );
         }
 
-        case 'mermaid':
-            return <MermaidBlock chart={block.chart} caption={block.caption} language={language} />;
+        case 'mermaid': {
+            // `chart`, or `code` in drafts saved over MCP; a block with neither is not drawn.
+            const source = resolveMermaidSource(block);
+            return source ? <MermaidBlock chart={source} caption={block.caption} language={language} /> : null;
+        }
 
         case 'table':
             if (!block.headers || !block.rows) return null;

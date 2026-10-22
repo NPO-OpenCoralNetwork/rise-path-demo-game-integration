@@ -356,7 +356,7 @@ export type LocalizedDocBlock =
   | { type: 'code'; code: string; language: string; filename?: string; highlightLines?: number[] }
   | { type: 'list'; items: LocalizedText[]; style?: 'bullet' | 'number' | 'check' | 'key' }
   | { type: 'callout'; title?: LocalizedText; text: LocalizedText; variant: 'info' | 'warning' | 'tip' | 'success' }
-  | { type: 'mermaid'; chart: string; caption?: LocalizedText }
+  | { type: 'mermaid'; chart?: string; code?: string; caption?: LocalizedText } // read with resolveMermaidSource
   | { type: 'table'; headers: LocalizedText[]; rows: LocalizedText[][] }
   | {
     type: 'mindmap';
