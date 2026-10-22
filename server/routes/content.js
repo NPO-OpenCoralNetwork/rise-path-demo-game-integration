@@ -9,6 +9,7 @@ import { getPool } from '../db.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
 import { generateImageWithGemini } from '../geminiBackendService.js';
+import { dailyCap, reserveDailyCap } from '../middleware/dailyCaps.js';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -45,7 +46,31 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-const upload = multer({ storage });
+// One file per request, at most MAX_UPLOAD_MB: an 'embeddings' unit then covers a bounded file
+// (and ragService.js embeds at most MAX_CHUNKS_PER_MATERIAL chunks of it).
+const MAX_UPLOAD_MB = 10;
+const upload = multer({ storage, limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } });
+
+/** upload.single('file') with multer's limit errors as JSON: 413 too large, 400 anything else. */
+const receiveFile = (req, res, next) => upload.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: `The file is larger than ${MAX_UPLOAD_MB} MB.`, error_type: 'file_too_large' });
+        }
+        return res.status(400).json({ error: 'Send one file in the "file" field.', error_type: 'invalid_body' });
+    }
+    return next(error);
+});
+
+// --- Image request limits ---
+// 4K costs more per image, and the app only ever asks for 16:9 at 1K.
+const IMAGE_PROMPT_MAX_CHARS = 4000;
+const IMAGE_ASPECT_RATIOS = new Set(['1:1', '3:4', '4:3', '9:16', '16:9']);
+const IMAGE_SIZES = new Set(['1K', '2K']);
+
+/** Daily 'embeddings' cap for whole-file embedding; given back when the route ends before it. */
+const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 413, 500, 503] });
 
 // --- Routes ---
 
@@ -104,8 +129,8 @@ router.get('/curricula/:id', async (req, res) => {
     }
 });
 
-// POST /api/v2/upload
-router.post('/upload', upload.single('file'), async (req, res) => {
+// POST /api/v2/upload — the daily cap runs before multer, so nothing is stored when it is used up.
+router.post('/upload', embeddingsCap, receiveFile, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     if (!req.file) return res.status(400).json({ error: 'No file' });
@@ -139,13 +164,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // POST /api/v2/image
 router.post('/image', async (req, res) => {
     const rawPrompt = req.body?.prompt;
-    const prompt = (rawPrompt || '').trim();
+    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : '';
     console.log(`[Content API] Image request: ${prompt ? `${prompt.slice(0, 120)}${prompt.length > 120 ? '…' : ''}` : '<empty>'}`);
     if (!prompt) return res.status(400).json({ error: 'prompt required' });
 
+    const aspectRatio = req.body?.aspect_ratio || '16:9';
+    const imageSize = req.body?.image_size || '1K';
+    const invalid = prompt.length > IMAGE_PROMPT_MAX_CHARS
+        ? `prompt must be at most ${IMAGE_PROMPT_MAX_CHARS} characters`
+        : !IMAGE_ASPECT_RATIOS.has(aspectRatio)
+            ? `aspect_ratio must be one of ${[...IMAGE_ASPECT_RATIOS].join(', ')}`
+            : !IMAGE_SIZES.has(imageSize)
+                ? `image_size must be one of ${[...IMAGE_SIZES].join(', ')}`
+                : null;
+    if (invalid) return res.status(400).json({ error: invalid, error_type: 'invalid_body' });
+
+    // Daily 'image' cap: charged only when Gemini is called (cache hits are free).
+    let cap = null;
     try {
-        const aspectRatio = req.body?.aspect_ratio || '16:9';
-        const imageSize = req.body?.image_size || '1K';
         const cacheKey = crypto
             .createHash('sha256')
             .update(`${prompt}|${aspectRatio}|${imageSize}`)
@@ -167,6 +203,8 @@ router.post('/image', async (req, res) => {
             return res.json({ ok: true, url, mimeType, text: '', cached: true });
         }
 
+        cap = await reserveDailyCap(req, res, 'image');
+        if (!cap) return;
         const result = await generateImageWithGemini({
             prompt,
             aspectRatio,
@@ -187,12 +225,14 @@ router.post('/image', async (req, res) => {
         res.json({ ok: true, image: result.data, mimeType, text: result.text, url });
     } catch (error) {
         console.error('[Content API] Image Error:', error.message);
+        // No key: Gemini was never called, so the image is not counted.
+        if (error?.message === 'Gemini API Key missing') void cap?.refund();
         res.status(500).json({ error: 'Image generation failed', detail: error.message });
     }
 });
 
-// POST /api/v2/rag/index
-router.post('/rag/index', async (req, res) => {
+// POST /api/v2/rag/index — the indexing job embeds the whole file, so it takes an 'embeddings' unit.
+router.post('/rag/index', embeddingsCap, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     

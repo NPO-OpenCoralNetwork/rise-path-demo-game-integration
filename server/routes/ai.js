@@ -8,6 +8,14 @@
  *
  * Auth: server.js mounts requireAuth on /ai/generate and /ai/drafts, so req.userId is the
  * authenticated user (or the dev fallback user outside strict mode).
+ *
+ * Cost: every /ai/generate call that can run a Gemini stage takes one 'course_generation' unit of
+ * the daily caps (server/middleware/dailyCaps.js; one course is at least 3 calls). Approving the
+ * final 'curriculum' stage runs no model and is free. Before the unit is taken, the body is
+ * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID: 400 invalid_body)
+ * and a missing Gemini key answers 503, so neither is charged. After it, only the 400 and 404
+ * answers that every stage sends before calling Gemini give it back; 422, 500, 503 and 504 keep
+ * it. A refund never depends on the wording of an error message.
  * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
  */
 import express from 'express';
@@ -22,7 +30,9 @@ import {
   generateRequirements,
   generateRoadmap,
   generateCurriculum,
+  isGeminiConfigured,
 } from '../services/aiGenerator.js';
+import { reserveDailyCap } from '../middleware/dailyCaps.js';
 
 const router = express.Router();
 
@@ -225,20 +235,29 @@ export async function saveDraftVersion(pool, { curriculumId, userId, curriculum,
   }
 }
 
-// --- Daily generation limit ---
-const DAILY_LIMIT = parseInt(process.env.AI_DAILY_LIMIT || '5', 10);
+// --- POST /ai/generate ---
 
-async function checkDailyLimit(pool, userId) {
-  const result = await pool.query(
-    `SELECT COUNT(*)::int as cnt FROM curricula 
-     WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 day' 
-     AND status != 'error'`,
-    [userId]
-  );
-  return result.rows[0].cnt;
+/** Longest topic or revision feedback a learner can send (the composer limits it too). */
+export const MESSAGE_MAX_CHARS = 4000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Checks that need no database or model, run before the daily cap is charged. Returns the error
+ * text for a 400 invalid_body, or null.
+ * @param {Record<string, unknown>} body
+ */
+export function invalidGenerateBody(body) {
+  const { message, curriculum_id: curriculumId } = body;
+  if (message != null && typeof message !== 'string') return 'message must be a string';
+  if (typeof message === 'string' && message.length > MESSAGE_MAX_CHARS) {
+    return `message must be at most ${MESSAGE_MAX_CHARS} characters`;
+  }
+  if (curriculumId != null && curriculumId !== '' && (typeof curriculumId !== 'string' || !UUID_RE.test(curriculumId))) {
+    return 'curriculum_id must be a UUID';
+  }
+  return null;
 }
 
-// --- POST /ai/generate ---
 router.post('/generate', async (req, res) => {
   // Set request timeout
   req.setTimeout(60000);
@@ -246,20 +265,27 @@ router.post('/generate', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
 
-  const { message, session_id, curriculum_id, stage, decision, attachments } = req.body;
+  const body = asObject(req.body);
+  const { message, session_id, curriculum_id, stage, decision, attachments } = body;
 
   const userId = req.userId;
   if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
+  const invalid = invalidGenerateBody(body);
+  if (invalid) return res.status(400).json({ error: invalid, error_type: 'invalid_body' });
+
+  // Approving the saved curriculum runs no model: it needs no key and is never charged.
+  const runsModel = !(decision === 'approved' && stage === 'curriculum');
+  if (runsModel && !isGeminiConfigured()) {
+    return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
+  }
+
   try {
-    // --- Cost limit check ---
-    const dailyCount = await checkDailyLimit(pool, userId);
-    if (dailyCount >= DAILY_LIMIT) {
-      return res.status(429).json({
-        error: `日次生成上限（${DAILY_LIMIT}回）に達しました`,
-        daily_count: dailyCount,
-        limit: DAILY_LIMIT,
-      });
+    // --- Daily cap (429 daily_limit_reached when used up). Every 400 and 404 below is sent
+    // before Gemini runs, so those give the unit back; nothing else does.
+    if (runsModel) {
+      const cap = await reserveDailyCap(req, res, 'course_generation', { refundOnStatus: [400, 404] });
+      if (!cap) return;
     }
 
     // --- Get Kit (cached) ---
@@ -455,9 +481,10 @@ router.post('/generate', async (req, res) => {
   } catch (err) {
     console.error('[AI Generate] Error:', err);
 
-    // Gemini-specific errors
-    if (err.message?.includes('API key') || err.message?.includes('GEMINI')) {
-      return res.status(503).json({ error: 'AI service is temporarily unavailable' });
+    // Gemini-specific errors. Only the status depends on the message; the daily cap unit stays
+    // charged (a 503 is not in refundOnStatus), since Gemini may already have run.
+    if (err?.code === 'GEMINI_NOT_CONFIGURED' || err.message?.includes('API key') || err.message?.includes('GEMINI')) {
+      return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
     }
     if (err.message?.includes('timeout') || err.code === 'ECONNRESET') {
       return res.status(504).json({ error: '生成がタイムアウトしました。再試行してください' });

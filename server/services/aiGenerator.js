@@ -39,13 +39,32 @@ export async function getCachedKit(userId, getKitFn) {
 
 // --- Gemini Call ---
 let _genAI = null;
+/** Server-side and Vite-prefixed env vars are both accepted. */
+const geminiApiKey = () => process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+/** Thrown before any Gemini call when no key is set. The route answers 503 for it by `code`. */
+export class GeminiNotConfiguredError extends Error {
+  constructor() {
+    super('GEMINI_API_KEY not configured');
+    this.name = 'GeminiNotConfiguredError';
+    this.code = 'GEMINI_NOT_CONFIGURED';
+  }
+}
+
+/** True when a stage can call Gemini (a key is set, or a test client is injected). */
+export const isGeminiConfigured = () => Boolean(_genAI || geminiApiKey());
+
 function getGenAI() {
   if (_genAI) return _genAI;
-  // Support both server-side and Vite-prefixed env vars
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+  const apiKey = geminiApiKey();
+  if (!apiKey) throw new GeminiNotConfiguredError();
   _genAI = new GoogleGenAI({ apiKey });
   return _genAI;
+}
+
+/** Tests: a fake client with models.generateContent, or null to go back to the env key. */
+export function setGenAIForTests(client) {
+  _genAI = client;
 }
 
 async function callGemini(systemPrompt, userMessage) {

@@ -40,6 +40,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `010_material_chunks_embedding_model_idx.sql` | RAG の埋め込みモデル判定用インデックス（`CONCURRENTLY` なし。作成中は `material_chunks` への書き込みが待たされる） |
 | `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
 | `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
+| `013_ai_daily_usage.sql` | 有料AI機能の日次利用カウンタ（ユーザー別・接続元アドレス別・全体の合計。日本時間の日付で区切る） |
 
 ### pgvector（RAG のベクトル検索）
 

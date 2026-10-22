@@ -273,7 +273,7 @@ describe('/api/v2/llm guest tutor and guest budget', () => {
             await valid.text();
             const next = await postJson(`${base}/llm/personality-insight`, { scores: SCORES });
             assert.equal(next.status, 429, 'the valid request was charged');
-            assert.equal((await next.json()).error_type, 'rate_limited');
+            assert.equal((await next.json()).error_type, 'daily_limit_reached');
         });
     });
 
@@ -319,10 +319,10 @@ describe('guest budget refunds', () => {
     });
 
     it("does not add yesterday's refund to today's budget", () => {
-        let now = Date.parse('2026-10-19T23:59:59Z');
+        let now = Date.parse('2026-10-20T14:59:59Z'); // 23:59:59 JST
         const run = runner(createGuestBudget({ env: {}, perIp: 5, total: 1, now: () => now }));
         const [, yesterday] = run('a');
-        now = Date.parse('2026-10-20T00:00:01Z');
+        now = Date.parse('2026-10-20T15:00:01Z'); // 00:00:01 JST, the next day
         assert.equal(run('b')[0], 200, 'new day');
         refundGuestBudget(yesterday, new LlmError('provider_unavailable', 'down'));
         assert.equal(run('c')[0], 429, 'the total budget for today is still used up');

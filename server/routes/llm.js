@@ -7,11 +7,12 @@
  * POST /llm/tutor               AskTutorDetail (PLAN §9.1) → SSE: meta, text.delta…, done | error
  *
  * Mounted in server.js before the blanket /api/v2 auth middlewares, with optionalAuth, so
- * guests can use it in strict mode; the AI rate limiter and the guest daily budget
- * (server/llm/guestAccess.js) apply to the POST routes only. Each POST runs: AI limiter →
- * body validation (and the guest lesson check) → guest budget → handler, so rejected requests
- * never use guest quota; a call that fails before any model ran is refunded. Anonymous tutor
- * calls must come from a lesson (lesson + anchor) and get a shorter history and answer.
+ * guests can use it in strict mode; the AI rate limiter, the guest daily budget
+ * (server/llm/guestAccess.js) and the signed-in daily cap (server/middleware/dailyCaps.js, kind
+ * 'llm') apply to the POST routes only. Each POST runs: AI limiter → body validation (and the
+ * guest lesson check) → guest budget → user daily cap → handler, so rejected requests never use
+ * a daily quota; a call that fails before any model ran is refunded. Anonymous tutor calls must
+ * come from a lesson (lesson + anchor) and get a shorter history and answer.
  */
 import express from 'express';
 import { getGateway } from '../llm/index.js';
@@ -29,6 +30,7 @@ import { buildWritingFeedbackPrompt } from '../llm/prompts/writingFeedback.js';
 import { buildPersonalityInsightPrompt } from '../llm/prompts/personalityInsight.js';
 import { buildTutorPrompt } from '../llm/prompts/tutor.js';
 import { GUEST_TUTOR_LIMITS, refundGuestBudget } from '../llm/guestAccess.js';
+import { refundDailyCap } from '../middleware/dailyCaps.js';
 
 const HEARTBEAT_MS = 15000;
 
@@ -81,12 +83,16 @@ const writeSse = (res, type, data) => {
 };
 
 /**
- * @param {{ limiter?: import('express').RequestHandler, guestBudget?: import('express').RequestHandler }} [options]
+ * @param {{
+ *   limiter?: import('express').RequestHandler,
+ *   guestBudget?: import('express').RequestHandler,
+ *   userCap?: import('express').RequestHandler,
+ * }} [options]  userCap: the signed-in daily cap (dailyCap('llm')); guests pass it uncounted
  */
 export function createLlmRouter(options = {}) {
   const router = express.Router();
-  /** The AI limiter counts every POST; the guest budget only those that passed `checks`. */
-  const guarded = (...checks) => [options.limiter, ...checks, options.guestBudget].filter(Boolean);
+  /** The AI limiter counts every POST; the guest budget and user cap only those that passed `checks`. */
+  const guarded = (...checks) => [options.limiter, ...checks, options.guestBudget, options.userCap].filter(Boolean);
 
   router.get('/status', (_req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -108,6 +114,7 @@ export function createLlmRouter(options = {}) {
       res.json({ ok: true, data: result.data, meta: { provider: result.provider, model: result.model } });
     } catch (error) {
       refundGuestBudget(res, error);
+      refundDailyCap(res, error);
       if (!res.headersSent) sendError(res, error);
     }
   });
@@ -127,6 +134,7 @@ export function createLlmRouter(options = {}) {
       res.json({ ok: true, data: result.data, meta: { provider: result.provider, model: result.model } });
     } catch (error) {
       refundGuestBudget(res, error);
+      refundDailyCap(res, error);
       if (!res.headersSent) sendError(res, error);
     }
   });
@@ -183,14 +191,20 @@ export function createLlmRouter(options = {}) {
           const { provider, model, text, usage, truncated } = event.result;
           writeSse(res, 'done', { mode, grounding, provider, model, text, usage, ...(truncated ? { truncated: true } : {}) });
         } else if (event.type === 'error') {
-          if (!sentText) refundGuestBudget(res, event.error);
+          if (!sentText) {
+            refundGuestBudget(res, event.error);
+            refundDailyCap(res, event.error);
+          }
           const { body: errorBody } = toClientError(event.error);
           if (event.error?.code !== 'aborted') console.warn('[LLM Route] tutor stream error:', event.error?.code, event.error?.message);
           writeSse(res, 'error', errorBody);
         }
       }
     } catch (error) {
-      if (!sentText) refundGuestBudget(res, error);
+      if (!sentText) {
+        refundGuestBudget(res, error);
+        refundDailyCap(res, error);
+      }
       writeSse(res, 'error', toClientError(error).body);
     } finally {
       clearInterval(heartbeat);

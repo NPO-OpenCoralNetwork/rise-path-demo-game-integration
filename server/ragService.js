@@ -53,13 +53,25 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
     return chunks.filter(c => c.length > 0);
 };
 
+/**
+ * Most chunks embedded for one material (about 160,000 characters at 1,000 per chunk with 200
+ * overlap). One 'embeddings' unit of the daily caps (server/middleware/dailyCaps.js) is one
+ * material, so this bounds what a unit costs for /upload, /rag/index and the job worker alike.
+ * The rest of a longer file is not indexed.
+ */
+export const MAX_CHUNKS_PER_MATERIAL = 200;
+
 export const ingestMaterial = async (materialId, filePath, mimeType, userId) => {
     const pool = getPool();
     if (!pool) throw new Error("DB not configured");
     
     try {
         const text = await extractText(filePath, mimeType);
-        const chunks = await chunkText(text);
+        const allChunks = await chunkText(text);
+        const chunks = allChunks.slice(0, MAX_CHUNKS_PER_MATERIAL);
+        if (allChunks.length > chunks.length) {
+            console.warn(`[RAG] Material ${materialId}: ${allChunks.length} chunks; indexing the first ${MAX_CHUNKS_PER_MATERIAL} (MAX_CHUNKS_PER_MATERIAL).`);
+        }
         // Embed (batched) before opening the transaction so no DB connection is held during API calls.
         const vectors = await embedTexts(chunks);
         

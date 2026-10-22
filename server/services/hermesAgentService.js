@@ -292,6 +292,41 @@ async function readHermesError(response) {
     }
 }
 
+/**
+ * Error codes a fetch can fail with before the request reached Hermes: refused, no DNS answer,
+ * no route, connect timeout, bad URL. After any of these Hermes did no work.
+ */
+const HERMES_CONNECT_CODES = new Set([
+    'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'ERR_INVALID_URL',
+]);
+
+/** Codes on a fetch rejection: its own, its cause's, and an AggregateError's inner errors. */
+function fetchErrorCodes(err) {
+    const codes = [];
+    for (const item of [err, err?.cause]) {
+        if (!item) continue;
+        if (typeof item.code === 'string') codes.push(item.code);
+        if (Array.isArray(item.errors)) {
+            for (const inner of item.errors) if (typeof inner?.code === 'string') codes.push(inner.code);
+        }
+    }
+    return codes;
+}
+
+/**
+ * A rejected fetch to Hermes as a route result. 'hermes_unreachable' only when the connection
+ * never opened (HERMES_CONNECT_CODES), so the route can give the daily agent_chat unit back.
+ * Anything else ('hermes_interrupted': the headers timeout, a reset or closed socket after the
+ * request was sent) may have run the agent, so it stays charged.
+ */
+export function hermesFetchFailure(err) {
+    const codes = fetchErrorCodes(err);
+    const neverConnected = codes.length > 0 && codes.every((code) => HERMES_CONNECT_CODES.has(code));
+    return neverConnected
+        ? { ok: false, status: 503, error: 'Hermes API unreachable', error_type: 'hermes_unreachable', detail: err?.message }
+        : { ok: false, status: 503, error: 'Hermes API connection was interrupted', error_type: 'hermes_interrupted', detail: err?.message };
+}
+
 export async function callHermesResponses({
     userId,
     skill,
@@ -334,13 +369,7 @@ export async function callHermesResponses({
             }),
         });
     } catch (err) {
-        return {
-            ok: false,
-            status: 503,
-            error: 'Hermes API unreachable',
-            error_type: 'hermes_unreachable',
-            detail: err.message,
-        };
+        return hermesFetchFailure(err);
     }
 
     if (!response.ok) {
@@ -414,13 +443,7 @@ export async function streamHermesChatCompletions({
             }),
         });
     } catch (err) {
-        return {
-            ok: false,
-            status: 503,
-            error: 'Hermes API unreachable',
-            error_type: 'hermes_unreachable',
-            detail: err.message,
-        };
+        return hermesFetchFailure(err);
     }
 
     if (!response.ok) {

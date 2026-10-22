@@ -11,12 +11,15 @@ import {
     classifyTutorError,
     draftTutorCard,
     excerptLead,
+    isTutorLimitKind,
     plainAnswer,
     readTutorCards,
     resolveClientMode,
     saveTutorCard,
     threadHistory,
     threadKey,
+    tutorLimitActive,
+    tutorLimitFor,
 } from '../../components/lesson/useTutorStream.ts';
 import { ASSESSMENT_BLOCK_TYPES, TutorRequest, resolveTutorMode } from '../llm/schemas.js';
 
@@ -120,6 +123,11 @@ describe('tutor stream: errors', () => {
             [{ status: 503, errorType: 'no_provider' }, 'unavailable'],
             [{ status: 401 }, 'unavailable'],
             [{ status: 429 }, 'rate_limited'],
+            [{ status: 429, errorType: 'daily_limit_reached' }, 'daily_limit'],
+            [{ status: 429, errorType: 'daily_limit_reached', scope: 'user' }, 'daily_limit'],
+            [{ status: 429, errorType: 'daily_limit_reached', scope: 'global' }, 'daily_limit'],
+            [{ status: 429, errorType: 'daily_limit_reached', scope: 'guest' }, 'daily_limit_guest'],
+            [{ status: 429, errorType: 'daily_limit_reached', scope: 'off' }, 'paused'],
             [{ status: 502, errorType: 'rate_limited' }, 'rate_limited'],
             [{ status: 504 }, 'timeout'],
             [{ status: 502, errorType: 'refusal' }, 'refused'],
@@ -131,6 +139,24 @@ describe('tutor stream: errors', () => {
             [undefined, 'failed'],
         ];
         for (const [error, kind] of cases) assert.equal(classifyTutorError(error), kind, JSON.stringify(error));
+    });
+
+    it('a daily cap holds until reset_at (else 00:00 JST); a paused tutor until reload', () => {
+        const now = Date.parse('2026-10-22T10:00:00Z');
+        const daily = tutorLimitFor({ status: 429, errorType: 'daily_limit_reached', scope: 'user', resetAt: '2026-10-22T15:00:00.000Z' }, now);
+        assert.deepEqual(daily, { kind: 'daily_limit', until: Date.parse('2026-10-22T15:00:00Z') });
+        assert.equal(tutorLimitActive(daily, now), true);
+        assert.equal(tutorLimitActive(daily, Date.parse('2026-10-22T15:00:00Z')), false, 'lifts at 00:00 JST');
+        const guest = tutorLimitFor({ status: 429, errorType: 'daily_limit_reached', scope: 'guest' }, now);
+        assert.deepEqual(guest, { kind: 'daily_limit_guest', until: Date.parse('2026-10-22T15:00:00Z') }, 'no reset_at: the next 00:00 JST');
+        const paused = tutorLimitFor({ status: 429, errorType: 'daily_limit_reached', scope: 'off' }, now);
+        assert.deepEqual(paused, { kind: 'paused', until: null });
+        assert.equal(tutorLimitActive(paused, now + 7 * 24 * 3600e3), true);
+        assert.equal(tutorLimitFor({ status: 429 }, now), null, 'the per-minute limiter is not a daily cap');
+        assert.equal(tutorLimitActive(null), false);
+        assert.equal(isTutorLimitKind('daily_limit_guest'), true);
+        assert.equal(isTutorLimitKind('rate_limited'), false);
+        assert.equal(isTutorLimitKind(undefined), false);
     });
 });
 

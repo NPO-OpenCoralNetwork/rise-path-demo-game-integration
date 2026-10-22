@@ -1,9 +1,15 @@
 /**
  * Agent proxy routes — Phase 16-6d
  * POST /api/v2/agent/chat → Hermes API Server
+ *
+ * Cost: each chat that reaches Hermes takes one 'agent_chat' unit of the daily caps
+ * (server/middleware/dailyCaps.js); the client's no-stream retry is a second paid call and
+ * counts again. Validation (422) and diary (403) rejections are never charged; Hermes not
+ * configured, or a connection that never opened, gives the unit back.
  */
 import express from 'express';
 import { getPool } from '../db.js';
+import { reserveDailyCap } from '../middleware/dailyCaps.js';
 import {
     validateAgentChatBody,
     callHermesResponses,
@@ -13,6 +19,12 @@ import {
 import { resolveIncludeDiaryExcerpts } from '../services/lifeJournalPrivacyService.js';
 
 const router = express.Router();
+
+/**
+ * Hermes did no work: not configured, or the connection never opened (hermesFetchFailure).
+ * 'hermes_interrupted' (a timeout or reset after the request was sent) stays charged.
+ */
+const hermesNeverRan = (result) => result.error_type === 'hermes_not_configured' || result.error_type === 'hermes_unreachable';
 
 /**
  * Keeps an SSE proxy alive through idle Hermes pauses: every intervalMs with nothing forwarded,
@@ -83,6 +95,9 @@ router.post('/agent/chat', async (req, res) => {
         });
     }
 
+    const cap = await reserveDailyCap(req, res, 'agent_chat');
+    if (!cap) return;
+
     if (stream) {
         const streamResult = await streamHermesChatCompletions({
             userId,
@@ -93,6 +108,7 @@ router.post('/agent/chat', async (req, res) => {
         });
 
         if (!streamResult.ok) {
+            if (hermesNeverRan(streamResult)) void cap.refund();
             return res.status(streamResult.status).json({
                 error: streamResult.error,
                 error_type: streamResult.error_type,
@@ -140,6 +156,7 @@ router.post('/agent/chat', async (req, res) => {
     });
 
     if (!result.ok) {
+        if (hermesNeverRan(result)) void cap.refund();
         return res.status(result.status).json({
             error: result.error,
             error_type: result.error_type,
