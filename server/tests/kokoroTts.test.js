@@ -8,6 +8,7 @@ import {
     normalizeText,
     resolveLangCode,
     resolveVoiceId,
+    requestTts,
     synthesize,
     validateSynthesisParams,
 } from '../../tools/core/kokoroTts.js';
@@ -200,5 +201,46 @@ describe('synthesize', () => {
         const fs = await import('fs/promises');
         const files = await fs.readdir(cacheDir);
         assert.ok(files.some((name) => name.endsWith('.mp3')));
+    });
+});
+
+describe('requestTts (the MCP request-tts tool and POST /tts/synthesize)', () => {
+    afterEach(() => {
+        mock.restoreAll();
+    });
+
+    const UNAVAILABLE = { error: 'Voice service is unavailable', error_type: 'tts_unavailable' };
+    const SECRET = 'Traceback: /srv/kokoro/app.py line 42: model file /models/kokoro.onnx missing (host 10.0.0.7)';
+
+    /** requestTts with console.error captured; the cache dir is empty so the sidecar is called. */
+    const run = async (args) => {
+        process.env.KOKORO_TTS_CACHE_DIR = `/tmp/kokoro-tts-test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const logged = [];
+        mock.method(console, 'error', (...parts) => { logged.push(parts.join(' ')); });
+        const result = await requestTts({ userId: null, language: 'ja', ...args });
+        return { result, logged: logged.join('\n') };
+    };
+
+    it('answers a sidecar error with a fixed text; the sidecar body goes to the log only', async () => {
+        mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500, text: async () => SECRET }));
+        const { result, logged } = await run({ text: `sidecar error ${Date.now()}` });
+        assert.deepEqual(result, UNAVAILABLE);
+        assert.match(logged, /model file/, 'logged server-side');
+    });
+
+    it('answers an unreachable sidecar (exception text) and invalid JSON with the same fixed text', async () => {
+        mock.method(globalThis, 'fetch', async () => { throw new TypeError(`fetch failed: connect ECONNREFUSED ${SECRET}`); });
+        assert.deepEqual((await run({ text: `unreachable ${Date.now()}` })).result, UNAVAILABLE);
+        mock.restoreAll();
+        mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => `<html>${SECRET}</html>` }));
+        assert.deepEqual((await run({ text: `invalid json ${Date.now()}` })).result, UNAVAILABLE);
+    });
+
+    it('keeps validation errors as they are, without calling the sidecar', async () => {
+        const fetchMock = mock.fn(async () => { throw new Error('fetch should not be called'); });
+        mock.method(globalThis, 'fetch', fetchMock);
+        const { result } = await run({ text: 'hello', voice_id: 'nope' });
+        assert.deepEqual(result, { error: 'Invalid voice_id: nope', error_type: 'validation' });
+        assert.equal(fetchMock.mock.callCount(), 0);
     });
 });

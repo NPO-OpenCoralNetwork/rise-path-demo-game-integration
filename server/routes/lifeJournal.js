@@ -34,13 +34,10 @@ const validateGranularity = (granularity) => {
 
 const router = express.Router();
 
+/** A fixed 500 in every environment: the error (database text) is logged, never sent. */
 const respondServerError = (res, label, error) => {
     console.error(`[Life Journal API] ${label}:`, error);
-    const body = { error: label };
-    if (process.env.NODE_ENV !== 'production') {
-        body.detail = error.message;
-    }
-    res.status(500).json(body);
+    res.status(500).json({ error: label });
 };
 
 // PUT /api/v2/life-journal/daily/:date

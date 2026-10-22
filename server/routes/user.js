@@ -7,6 +7,7 @@ import {
     validateTtsPreferencesPatch,
     validatePrivacyPreferencesPatch,
 } from '../services/userPreferences.js';
+import { isUuid } from '../utils/ids.js';
 
 const router = express.Router();
 
@@ -252,10 +253,12 @@ router.post('/notifications', async (req, res) => {
     }
 });
 
-// PUT /api/v2/user/notifications/:id/read
+// PUT /api/v2/user/notifications/:id/read — notifications.id is a uuid: any other id (the app's
+// local `n_…` notifications, services/notificationService.ts) names no row and gets 404 unsent.
 router.put('/notifications/:id/read', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Notification not found' });
     try {
         await pool.query(
             'UPDATE notifications SET read = TRUE WHERE id = $1 AND user_id = $2',
@@ -263,6 +266,7 @@ router.put('/notifications/:id/read', async (req, res) => {
         );
         res.json({ ok: true });
     } catch (e) {
+        console.error('[User API] Notification mark read error:', e.message);
         res.status(500).json({ error: 'Failed to mark read' });
     }
 });

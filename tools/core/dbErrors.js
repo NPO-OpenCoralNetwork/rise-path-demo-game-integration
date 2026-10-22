@@ -25,5 +25,8 @@ export function classifyDbError(err, operation) {
     if (err.code === '22P02') {
         return { error: `Invalid UUID format during ${operation}`, error_type: 'validation' };
     }
-    return { error: `${operation} failed: ${err.message}`, error_type: 'unknown' };
+    // The driver's own text (column names, SQL fragments, values) stays in the server log: these
+    // results reach the LLM and can be quoted to a learner.
+    console.error(`[db] ${operation} failed:`, err?.code || '', err?.message || err);
+    return { error: `${operation} failed`, error_type: 'unknown' };
 }

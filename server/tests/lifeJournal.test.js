@@ -253,15 +253,9 @@ describe('patch upsert contract', () => {
     });
 });
 
+// The 500 bodies (a fixed label in every environment, no database text) are tested on the real
+// stack, for each life journal route, in restErrors.test.js.
 describe('life journal route errors', () => {
-    it('omits error detail in production responses', async () => {
-        const fs = await import('node:fs');
-        const source = fs.readFileSync(new URL('../routes/lifeJournal.js', import.meta.url), 'utf8');
-        assert.ok(source.includes("process.env.NODE_ENV !== 'production'"));
-        assert.ok(source.includes('respondServerError'));
-        assert.ok(!source.includes('detail: error.message'));
-    });
-
     it('exposes life journal privacy export and delete endpoints', async () => {
         const fs = await import('node:fs');
         const source = fs.readFileSync(new URL('../routes/lifeJournal.js', import.meta.url), 'utf8');

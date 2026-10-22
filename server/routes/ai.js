@@ -34,6 +34,7 @@ import {
   isGeminiConfigured,
 } from '../services/aiGenerator.js';
 import { reserveDailyCap } from '../middleware/dailyCaps.js';
+import { isUuid } from '../utils/ids.js';
 
 const router = express.Router();
 
@@ -240,7 +241,6 @@ export async function saveDraftVersion(pool, { curriculumId, userId, curriculum,
 
 /** Longest topic or revision feedback a learner can send (the composer limits it too). */
 export const MESSAGE_MAX_CHARS = 4000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Checks that need no database or model, run before the daily cap is charged. Returns the error
@@ -253,7 +253,7 @@ export function invalidGenerateBody(body) {
   if (typeof message === 'string' && message.length > MESSAGE_MAX_CHARS) {
     return `message must be at most ${MESSAGE_MAX_CHARS} characters`;
   }
-  if (curriculumId != null && curriculumId !== '' && (typeof curriculumId !== 'string' || !UUID_RE.test(curriculumId))) {
+  if (curriculumId != null && curriculumId !== '' && !isUuid(curriculumId)) {
     return 'curriculum_id must be a UUID';
   }
   return null;
