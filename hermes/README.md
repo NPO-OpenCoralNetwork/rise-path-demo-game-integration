@@ -2,7 +2,14 @@
 
 Rise Path の LLM 推論ランタイムとして [Hermes Agent](https://hermes-agent.nousresearch.com/) を使うための設定と手順。
 
-設計の詳細: [`doc/architecture_v3_hermes_agent.md`](../doc/architecture_v3_hermes_agent.md)
+> **2026-10-22 から、共有の Hermes は学習者に提供しません**（Phase 0。[`doc/brushup-2026/ai-access-plan.ja.md`](../doc/brushup-2026/ai-access-plan.ja.md)）。
+>
+> - 既定ではオフです。VM の `stack.env` の `COMPOSE_PROFILES` に `full` を入れず（既定は `tts`）、フロントの `VITE_FEATURE_AGENT_CHAT` も設定しません。このとき `hermes` コンテナは起動せず、画面に浮かぶ AI コーチと `/life-journal/chat` も出ません。アプリの中の AI チューターは Claude で動きます。
+> - このページの手順は、自分で運用するとき（セルフホスト）と開発のために残しています。
+> - Hermes を使いたい学習者は、Phase 1 ができてから、**自分の** Hermes を MCP で Rise Path につなぐ形になります（学習者ごとのログイン（OAuth）が前提です）。それまでは、`RISE_PATH_BRIDGE_TOKEN` を学習者や外部サービスに渡したり、MCP のポート（3100）をインターネットに公開したりしないでください。
+> - Hermes のモデルの接続先に、Anthropic の OAuth ログイン（Claude の個人サブスクリプションの認証で、Claude Code として要求を送る経路）を使わないでください。Anthropic は、第三者のツールが Claude のサブスクリプションの認証情報で要求を中継することを禁じています（[Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)）。OpenRouter・Nous Portal のような API キーで使うプロバイダーか、Anthropic の API キーを使います。
+
+設計の詳細: [`doc/archive/architecture_v3_hermes_agent.md`](../doc/archive/architecture_v3_hermes_agent.md)
 
 ## 前提
 
@@ -53,7 +60,7 @@ npm run smoke:hermes-local
 ```bash
 hermes profile create rise-path
 hermes model
-# → OpenRouter または Nous Portal を選択
+# → OpenRouter または Nous Portal を選択（Anthropic の OAuth ログインは使わない。冒頭の注意）
 ```
 
 ### 2. 設定をコピー
@@ -140,10 +147,11 @@ HERMES_API_KEY=change-me-local-dev
 | 日記 LLM 送信 | Express が同意を DB/メモリに記録、MCP がサーバー側で強制（デフォルト OFF） |
 | 生データ露出 | `daily-life-range` / `daily-life-log` は Hermes allowlist に **含めない** |
 
-## 本番（`risepath-vm`）
+## 本番（`risepath-vm`）— Hermes を有効にしたときだけ
 
 **正本:** [`doc/guides/risepath_vm_deployment.md`](../doc/guides/risepath_vm_deployment.md)
 
+- 学習者向けの既定（`COMPOSE_PROFILES=tts`）では `hermes` を起動しません。以下は `COMPOSE_PROFILES` に `full` を入れた、自分で運用する構成の話です
 - 専用 VM 上で Docker Compose: `db` + `api` + `mcp` + `hermes`
 - **`nexloom-gce` の gemini5 Hermes は使わない**（ai-note-meet / coral-shop 等と分離）
 - Hermes 設定は VM 内 `deploy/risepath-vm/hermes/config.yaml`（リポジトリ `hermes/config.example.yaml` 由来）
@@ -163,7 +171,7 @@ mcp_servers:
 
 `RISE_PATH_BRIDGE_TOKEN` は `deploy/risepath-vm/stack.env` の `mcp` / `hermes` と同値。MCP は Bridge Token または Supabase JWT を検証（本番 `NODE_ENV=production` では匿名不可）。Bridge Token のセッションが学習者として動けるのは、Express がそのターン用に発行した `rp_turn` を付けた呼び出しだけ（Express は `registerAgentTurn` してから Hermes を呼ぶ）。`rp_turn` のない呼び出しは strict auth（本番など）では `session_binding_required` になる。
 
-開発時のみ: `npm run mcp:sse`（ポート 3100）。
+開発時のみ: `npm run mcp:sse`（ポート 3100）。自分のマシンの中だけで使い、ngrok などのトンネルでインターネットに公開しません。
 
 ## 関連ファイル
 
@@ -172,6 +180,6 @@ mcp_servers:
 | `hermes/config.example.yaml` | Hermes プロファイル設定テンプレート |
 | `skills/life-habit-analyst/SKILL.md` | 生活習慣分析チャット用 Skill |
 | `mcp-server/index.js` | MCP Server（stdio / SSE） |
-| `doc/architecture_v3_hermes_agent.md` | v3 アーキテクチャ仕様 |
-| `doc/risepath_vm_deployment.md` | 専用 VM + Docker デプロイ正本 |
+| `doc/archive/architecture_v3_hermes_agent.md` | v3 アーキテクチャ仕様 |
+| `doc/guides/risepath_vm_deployment.md` | 専用 VM + Docker デプロイ正本 |
 | `deploy/risepath-vm/stack.env.example` | Compose 用 env テンプレ |

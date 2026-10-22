@@ -73,11 +73,13 @@ flags=(--require-mcp)
 if [[ -n "${MEMANTO_SECRET_KEY:-}" && "${MEMANTO_SECRET_KEY}" != "change-me-memanto-secret" ]]; then
   flags+=(--require-memanto)
 fi
-profiles="${COMPOSE_PROFILES:-full}"
+# Same rules as deploy/risepath-vm/scripts/deploy-stack.sh: no default profile, and Hermes only
+# when COMPOSE_PROFILES lists full and the OpenRouter key is real.
+profiles="${COMPOSE_PROFILES:-}"
 if [[ "${profiles}" == *tts* || "${profiles}" == *full* ]]; then
   flags+=(--require-kokoro)
 fi
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
+if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" && ",${profiles// /}," == *",full,"* ]]; then
   flags+=(--require-hermes)
 fi
 if [[ -n "${ORIGIN_SECRET:-}" ]]; then

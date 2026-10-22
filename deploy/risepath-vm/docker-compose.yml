@@ -1,8 +1,10 @@
-# Rise Path dedicated VM stack (db + api + mcp + kokoro-tts + hermes; cloudflared with profile tunnel)
-# Hermes: nousresearch/hermes-agent — run scripts/init-hermes-profile.sh before first up.
+# Rise Path dedicated VM stack (db + api + mcp; kokoro-tts with profile tts; cloudflared with profile
+# tunnel). Default COMPOSE_PROFILES=tts (stack.env.example). Hermes (profile full) is not offered to
+# learners; it stays for self-hosting and development (deploy-stack.sh runs
+# scripts/init-hermes-profile.sh before up when full is listed).
 #
 #   cp stack.env.example stack.env && chmod 600 stack.env
-#   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=full,tunnel
+#   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=tts,tunnel
 #   ./scripts/deploy-stack.sh   # build -> up --wait db -> run --rm --no-deps api npm run db:migrate -> up -d
 #   (apply migrations before the new api starts: its healthcheck fails while one is pending)
 
@@ -49,6 +51,9 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       HERMES_API_URL: ${HERMES_API_URL:-http://hermes:8642}
       HERMES_API_KEY: ${HERMES_API_KEY:-}
+      # Gemini only when GEMINI_ALLOWED is exactly "true" (off by default: under-18 clause in the
+      # Gemini API terms; stack.env.example).
+      GEMINI_ALLOWED: ${GEMINI_ALLOWED:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
       KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}

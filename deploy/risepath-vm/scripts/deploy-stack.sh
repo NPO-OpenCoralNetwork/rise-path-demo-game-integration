@@ -33,11 +33,12 @@ fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY,,}" != *change-me* ]]; then
   HERMES_KEYED=1
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-full}"
 else
   HERMES_KEYED=0
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 fi
+# Hermes (profile full) starts only when COMPOSE_PROFILES lists it: the shared agent is not offered
+# to learners, so an OpenRouter key alone no longer turns it on (stack.env.example: tts).
+COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
 MEMANTO_STACK=0

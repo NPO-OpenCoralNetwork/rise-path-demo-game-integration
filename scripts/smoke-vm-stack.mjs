@@ -196,9 +196,9 @@ async function main() {
     ].join(' ');
     console.log(`${usable ? '✅' : '⚠️ '} LLM /api/v2/llm/status → 200 (${state})`);
     if (llm.body.ok !== true) {
-      console.log('   No LLM provider configured — AI tutor calls answer 503 (set ANTHROPIC_API_KEY or GEMINI_API_KEY in stack.env)');
+      console.log('   No LLM provider configured — AI tutor calls answer 503 (set ANTHROPIC_API_KEY in stack.env; Gemini is used only with GEMINI_ALLOWED=true)');
     } else if (!tutorProvider) {
-      console.log(`   No provider for tutor.chat — AI tutor calls answer 503 (check LLM_PROVIDER${forced ? `=${forced}` : ''} and LLM_TASK_TUTOR_CHAT against ANTHROPIC_API_KEY / GEMINI_API_KEY in stack.env)`);
+      console.log(`   No provider for tutor.chat — AI tutor calls answer 503 (check LLM_PROVIDER${forced ? `=${forced}` : ''} and LLM_TASK_TUTOR_CHAT against ANTHROPIC_API_KEY in stack.env; Gemini needs GEMINI_ALLOWED=true)`);
     } else if (mock === true) {
       console.log('   The built-in mock answers AI tutor calls (no provider key, or LLM_PROVIDER=mock)');
     }
