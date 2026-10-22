@@ -13,9 +13,10 @@
  * the daily caps (server/middleware/dailyCaps.js; one course is at least 3 calls). Approving the
  * final 'curriculum' stage runs no model and is free. Before the unit is taken, the body is
  * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID: 400 invalid_body)
- * and a missing Gemini key answers 503, so neither is charged. After it, only the 400 and 404
- * answers that every stage sends before calling Gemini give it back; 422, 500, 503 and 504 keep
- * it. A refund never depends on the wording of an error message.
+ * and a missing Gemini key answers 503, so neither is charged. After it, the 400 and 404
+ * answers that every stage sends before calling Gemini give it back, and so does Gemini refusing
+ * the stage's one call (no key, a rejected key, its rate limit: by code and HTTP status); other
+ * 422, 500, 503 and 504 answers keep it. A refund never depends on the wording of an error message.
  * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
  */
 import express from 'express';
@@ -280,11 +281,13 @@ router.post('/generate', async (req, res) => {
     return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
   }
 
+  /** @type {{ refund: () => Promise<void> } | null} */
+  let cap = null;
   try {
     // --- Daily cap (429 daily_limit_reached when used up). Every 400 and 404 below is sent
-    // before Gemini runs, so those give the unit back; nothing else does.
+    // before Gemini runs, so those give the unit back, as does Gemini refusing the call (below).
     if (runsModel) {
-      const cap = await reserveDailyCap(req, res, 'course_generation', { refundOnStatus: [400, 404] });
+      cap = await reserveDailyCap(req, res, 'course_generation', { refundOnStatus: [400, 404] });
       if (!cap) return;
     }
 
@@ -481,8 +484,13 @@ router.post('/generate', async (req, res) => {
   } catch (err) {
     console.error('[AI Generate] Error:', err);
 
-    // Gemini-specific errors. Only the status depends on the message; the daily cap unit stays
-    // charged (a 503 is not in refundOnStatus), since Gemini may already have run.
+    // Each request runs one stage, and each stage makes one Gemini call. Gemini refusing it (no
+    // key; a key it does not accept: 400 API_KEY_INVALID, 401, 403; its rate limit: 429) means
+    // nothing was generated, so the unit goes back. Decided by code and status, never by message.
+    if (err?.code === 'GEMINI_NOT_CONFIGURED' || [400, 401, 403, 429].includes(err?.status)) void cap?.refund();
+
+    // Gemini-specific errors. Only the status depends on the message; any other error keeps the
+    // daily cap unit (a 503 is not in refundOnStatus), since Gemini may already have run.
     if (err?.code === 'GEMINI_NOT_CONFIGURED' || err.message?.includes('API key') || err.message?.includes('GEMINI')) {
       return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
     }

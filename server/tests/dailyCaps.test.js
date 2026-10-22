@@ -54,14 +54,17 @@ const fakeRes = () => {
 const fakePool = ({ role = null, fail = null, emptyReserve = false } = {}) => {
     const rows = new Map();
     const queries = [];
+    const state = { fail };
     return {
         queries,
         rows,
         sql: () => queries.map((q) => q.sql),
+        /** Statements matching `re` throw from now on (null: the database answers again). */
+        setFail(re) { state.fail = re; },
         async query(text, params = []) {
             const sql = String(text).replace(/\s+/g, ' ').trim().toLowerCase();
             queries.push({ sql, params });
-            if (fail && fail.test(sql)) throw new Error('relation "ai_daily_usage" does not exist');
+            if (state.fail && state.fail.test(sql)) throw new Error('relation "ai_daily_usage" does not exist');
             if (sql.startsWith('select role from user_profiles')) return { rows: role ? [{ role }] : [] };
             if (sql.startsWith('insert into ai_daily_usage')) {
                 if (emptyReserve) return { rows: [] };
@@ -299,16 +302,32 @@ describe('createDailyCaps (in memory)', () => {
 
     it('guests (no userId) pass without being counted', async () => {
         const pool = fakePool();
-        const { caps } = setup({ env: { AI_CAP_USER_LLM: '0', AI_CAP_GLOBAL_LLM: '0' }, pool });
-        for (const userId of [null, undefined, '']) {
+        const { caps } = setup({ env: { AI_CAP_USER_LLM: '1', AI_CAP_GLOBAL_LLM: '1' }, pool });
+        for (const userId of [null, undefined, '', null]) {
             const res = fakeRes();
-            const handle = await caps.reserve({ userId }, res, 'llm');
-            assert.ok(handle);
+            const handle = await caps.reserve({ userId, ip: '203.0.113.7' }, res, 'llm');
+            assert.ok(handle, 'over the limits of 1: guests are not counted');
             await handle.refund();
             assert.equal(res.body, undefined);
             assert.equal(res.locals.refundDailyCap, undefined);
         }
         assert.deepEqual(pool.queries, []);
+    });
+
+    it("a feature turned off (a limit of 0) is off for guests too (429 scope 'off', no query)", async () => {
+        for (const env of [{ AI_CAP_USER_LLM: '0' }, { AI_CAP_IP_LLM: '0' }, { AI_CAP_GLOBAL_LLM: '0' }]) {
+            const pool = fakePool();
+            const { caps } = setup({ env, pool });
+            for (const userId of [null, undefined, '']) {
+                const res = fakeRes();
+                assert.equal(await caps.reserve({ userId, ip: '203.0.113.7' }, res, 'llm'), null, JSON.stringify(env));
+                assert.equal(res.statusCode, 429);
+                assert.equal(res.body.error_type, 'daily_limit_reached');
+                assert.equal(res.body.scope, 'off');
+                assert.equal(res.body.reset_at, undefined);
+            }
+            assert.deepEqual(pool.queries, []);
+        }
     });
 
     it('reset() clears the counts', async () => {
@@ -423,12 +442,14 @@ describe('createDailyCaps (Postgres)', () => {
 });
 
 describe('per-address cap', () => {
-    it('ipSubject: public addresses only; IPv4-mapped IPv6 as IPv4; IPv6 by its /64', () => {
+    it('ipSubject: public addresses only; IPv4-mapped IPv6 as IPv4; IPv6 by its /56', () => {
         assert.equal(ipSubject('203.0.113.7'), 'ip:203.0.113.7');
         assert.equal(ipSubject('::ffff:203.0.113.7'), 'ip:203.0.113.7');
-        assert.equal(ipSubject('2001:db8:1:2::5'), 'ip:2001:db8:1:2::/64');
-        assert.equal(ipSubject('2001:0db8:0001:0002:aaaa:bbbb:cccc:dddd'), 'ip:2001:db8:1:2::/64');
-        assert.equal(ipSubject('2001:db8::1'), 'ip:2001:db8:0:0::/64');
+        assert.equal(ipSubject('2001:db8:1:2::5'), 'ip:2001:db8:1::/56');
+        assert.equal(ipSubject('2001:0db8:0001:0002:aaaa:bbbb:cccc:dddd'), 'ip:2001:db8:1::/56');
+        assert.equal(ipSubject('2001:db8:1:2ff:aaaa::1'), 'ip:2001:db8:1:200::/56');
+        assert.equal(ipSubject('2001:db8::1'), 'ip:2001:db8::/56');
+        assert.equal(ipSubject('2001:db8:1:2::5%eth0'), 'ip:2001:db8:1::/56', 'zone id ignored');
         for (const internal of ['127.0.0.1', '::ffff:127.0.0.1', '::1', '10.1.2.3', '172.20.0.5', '192.168.1.9', '100.100.1.1', '169.254.1.1', 'fd12::1', 'fe80::1%eth0', '', undefined, null, 'unknown']) {
             assert.equal(ipSubject(internal), null, String(internal));
         }
@@ -450,6 +471,17 @@ describe('per-address cap', () => {
         assert.equal((await call('image', 'user-d', undefined, '10.0.0.8')).status, 200, 'private addresses are not counted');
         assert.equal((await call('image', 'user-e', undefined, '10.0.0.8')).status, 200);
         assert.equal((await call('image', 'user-f', undefined, '10.0.0.8')).status, 200);
+    });
+
+    it('groups IPv6 callers by their /56: addresses in one /56 share the cap, other /56s do not', async () => {
+        const { call } = setup({ env: { AI_CAP_USER_IMAGE: '5', AI_CAP_IP_IMAGE: '2' } });
+        assert.equal((await call('image', 'user-a', undefined, '2001:db8:1:2::5')).status, 200);
+        assert.equal((await call('image', 'user-b', undefined, '2001:db8:1:7f::9')).status, 200, 'another /64, same /56');
+        const third = await call('image', 'user-c', undefined, '2001:db8:1:ff:1234::1');
+        assert.equal(third.status, 429, 'a third /64 inside the same /56');
+        assert.equal(third.body.scope, 'ip');
+        assert.equal((await call('image', 'user-c', undefined, '2001:db8:1:100::1')).status, 200, 'the next /56');
+        assert.equal((await call('image', 'user-d', undefined, '2001:db8:2::1')).status, 200, 'another network');
     });
 
     it('refund gives the address slot back too; admins skip the address cap', async () => {
@@ -476,14 +508,53 @@ describe('per-address cap', () => {
 });
 
 describe('database outage and owner alerts', () => {
-    it('during an outage the all-users cap is a tenth of its value in this process', async () => {
+    it('during an outage the all-users cap is a tenth of its value in this process; past it, 503 (not the daily cap)', async () => {
         const pool = fakePool({ fail: /ai_daily_usage/ });
         const { call } = setup({ env: { AI_CAP_GLOBAL_LLM: '20' }, pool });
         assert.equal((await call('llm', 'user-a')).status, 200);
         assert.equal((await call('llm', 'user-b')).status, 200);
         const third = await call('llm', 'user-c');
-        assert.equal(third.status, 429);
-        assert.equal(third.body.scope, 'global');
+        assert.equal(third.status, 503);
+        assert.deepEqual(Object.keys(third.body).sort(), ['error', 'error_type']);
+        assert.equal(third.body.error_type, 'ai_unavailable');
+        assert.equal(third.res.headers['retry-after'], '60', 'a short wait, no reset time');
+    });
+
+    it('an outage does not send a false "reached" alert, so the real one still goes out once', async () => {
+        const posted = [];
+        const fetch = async (url, init) => {
+            posted.push(JSON.parse(init.body).text);
+            return { ok: true, status: 200 };
+        };
+        const logger = recorder();
+        const pool = fakePool({ fail: /ai_daily_usage/ });
+        const { call, clock } = setup({
+            env: { AI_CAP_GLOBAL_LLM: '20', AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.example/alert' },
+            pool,
+            logger,
+            fetch,
+        });
+        const reached = () => logger.lines.filter((line) => line.includes('global daily cap reached: llm')).length;
+
+        // The database throws: this process may use 2 of 20 from memory, then answers 503.
+        assert.equal((await call('llm', 'outage-1')).status, 200);
+        assert.equal((await call('llm', 'outage-2')).status, 200);
+        assert.equal((await call('llm', 'outage-3')).status, 503);
+        assert.equal((await call('llm', 'outage-4')).status, 503);
+        assert.equal(reached(), 0, 'the outage share is not the daily cap');
+        assert.equal(logger.lines.filter((line) => line.includes('all-users outage share used up: llm')).length, 1, 'warned once a minute');
+
+        // The database answers again; then the real cap of 20 is used up.
+        clock.now += 61 * 1000;
+        pool.setFail(null);
+        for (let i = 0; i < 20; i += 1) assert.equal((await call('llm', `user-${i}`)).status, 200, `call ${i + 1}`);
+        const refused = await call('llm', 'user-late');
+        assert.equal(refused.status, 429);
+        assert.equal(refused.body.scope, 'global');
+        await call('llm', 'user-later');
+        await tick();
+        assert.equal(reached(), 1, 'exactly one reached alert, for the real cap');
+        assert.equal(posted.filter((text) => text.includes('global daily cap reached: llm')).length, 1);
     });
 
     it('posts the 80% and reached alerts once a day to AI_CAP_ALERT_WEBHOOK_URL', async () => {
@@ -518,20 +589,48 @@ describe('database outage and owner alerts', () => {
         assert.equal(posted.length, 4, 'a new Japan-time day alerts again');
     });
 
-    it('does not post without a webhook, or to a URL that is not http(s)', async () => {
-        let calls = 0;
-        const fetch = async () => {
-            calls += 1;
+    it('does not post without a webhook, or to a URL that is not https (http only to localhost)', async () => {
+        const urls = [];
+        const fetch = async (url) => {
+            urls.push(url);
             return { ok: true, status: 200 };
         };
         const logger = recorder();
         const { call } = setup({ env: { AI_CAP_GLOBAL_IMAGE: '1' }, logger, fetch });
         await call('image', 'a');
         await call('image', 'b');
-        const bad = setup({ env: { AI_CAP_GLOBAL_IMAGE: '1', AI_CAP_ALERT_WEBHOOK_URL: 'file:///etc/passwd' }, logger, fetch });
-        await bad.call('image', 'a');
+        for (const url of ['file:///etc/passwd', 'http://hooks.example/alert']) {
+            const bad = setup({ env: { AI_CAP_GLOBAL_IMAGE: '1', AI_CAP_ALERT_WEBHOOK_URL: url }, logger, fetch });
+            await bad.call('image', 'a');
+        }
         await tick();
-        assert.equal(calls, 0);
-        assert.match(logger.lines.join('\n'), /must start with https:\/\//);
+        assert.deepEqual(urls, []);
+        assert.match(logger.lines.join('\n'), /must use https:\/\//);
+        const local = setup({ env: { AI_CAP_GLOBAL_IMAGE: '1', AI_CAP_ALERT_WEBHOOK_URL: 'http://127.0.0.1:9/alert' }, logger, fetch });
+        await local.call('image', 'a');
+        await tick();
+        assert.deepEqual(urls, ['http://127.0.0.1:9/alert'], 'a relay on this machine may use http://');
+    });
+
+    it('never logs the webhook URL (a secret): not when it is invalid, refused, or the post fails', async () => {
+        const secret = 'T0SECRET/B0SECRET/xoxSECRET';
+        const fetch = async (url) => {
+            throw Object.assign(new TypeError(`fetch failed for ${url}`), {
+                cause: Object.assign(new Error(`getaddrinfo ENOTFOUND ${url}`), { code: 'ENOTFOUND' }),
+            });
+        };
+        const logger = recorder();
+        for (const url of [`https://hooks.example/services/${secret}`, `https://hooks example/${secret}`, `http://hooks.example/${secret}`]) {
+            const { call } = setup({ env: { AI_CAP_GLOBAL_IMAGE: '1', AI_CAP_ALERT_WEBHOOK_URL: url }, logger, fetch });
+            await call('image', 'a');
+            await call('image', 'b');
+        }
+        await tick();
+        const log = logger.lines.join('\n');
+        assert.match(log, /the alert webhook failed \(ENOTFOUND\)/);
+        assert.match(log, /AI_CAP_ALERT_WEBHOOK_URL is not a valid URL/);
+        assert.match(log, /AI_CAP_ALERT_WEBHOOK_URL must use https:\/\//);
+        assert.ok(!log.includes('SECRET'), log);
+        assert.ok(!log.includes('hooks.example'), log);
     });
 });

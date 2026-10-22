@@ -6,7 +6,9 @@
  * - CORS answers only the app's own origins (same host, LLM_ALLOWED_ORIGINS, and in development
  *   the Vite dev server), and a POST from any other browser origin is refused with 403.
  * - Anonymous POSTs share a daily budget per IP and in total (in memory, reset at 00:00 JST):
- *   LLM_GUEST_DAILY_PER_IP (default 100) and LLM_GUEST_DAILY_TOTAL (default 2000).
+ *   LLM_GUEST_DAILY_PER_IP (default 100) and LLM_GUEST_DAILY_TOTAL (default 2000). An IPv6 guest
+ *   counts by its /56 (ipSubject in server/middleware/dailyCaps.js), so switching addresses inside
+ *   one connection's block does not give a fresh budget.
  *   The routes mount the budget after body validation (and the guest lesson check), so only
  *   requests that will reach a model are charged, and give a request back with
  *   refundGuestBudget when the call fails before any model ran. Over the budget: 429 with
@@ -15,7 +17,7 @@
  * daily caps (server/middleware/dailyCaps.js) apply to them instead.
  */
 import { modelMayHaveRun } from './errors.js';
-import { jstDay, sendDailyLimit } from '../middleware/dailyCaps.js';
+import { ipSubject, jstDay, sendDailyLimit } from '../middleware/dailyCaps.js';
 
 const DEFAULT_PER_IP = 100;
 const DEFAULT_TOTAL = 2000;
@@ -99,7 +101,10 @@ export function createGuestBudget({ env = process.env, perIp, total, now = () =>
   return function guestBudget(req, res, next) {
     if (req.method !== 'POST' || req.userId) return next();
     roll();
-    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    // Public addresses as the daily caps count them (an IPv6 guest by its /56); internal ones
+    // (local dev, a proxy without TRUST_PROXY) as they are.
+    const raw = req.ip || req.socket?.remoteAddress || 'unknown';
+    const ip = ipSubject(raw) ?? raw;
     const mine = byIp.get(ip) ?? 0;
     if (mine >= limitPerIp || used >= limitTotal) {
       sendDailyLimit(res, {

@@ -192,6 +192,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - 稼働監視: `https://app.<domain>/api/v2/health` を外形監視する（edge には `{ ok, status }` だけを返す）。`ROUTER_EXTERNAL_TARGET_ERROR` や Cloudflare のエラーページは、`cloudflared` か VM が落ちている印。
 - Anthropic・Gemini・OpenRouter の各コンソールで、利用上限かアラートを設定する。公開直後はゲスト枠（`LLM_GUEST_DAILY_PER_IP`・`LLM_GUEST_DAILY_TOTAL`）と、サインイン済みの全ユーザー合計の日次上限（`AI_CAP_GLOBAL_*`。機能ごとの費用のブレーカー。日本時間 0 時にリセット。`deploy/risepath-vm/stack.env.example` を参照）を下げることも考える。全体の上限の 80% と 100% に達すると `[AI caps] global daily cap` のエラーログが出る。`AI_CAP_ALERT_WEBHOOK_URL` に Slack か Discord の Incoming Webhook を入れると、同じ内容が届く。
 - サインアップを公開するなら、Supabase の Email 認証の設定で「Confirm email」（メールアドレスの確認）が有効か確かめる。確認していないアカウントを量産して、有料の AI 機能の枠を増やせないようにするため（アプリには確認待ちの画面 `/auth/confirm-pending` がある）。
+- サインアップの公開前に、Supabase の Attack Protection で CAPTCHA（hCaptcha か Cloudflare Turnstile）も有効にする。ただし、アプリのサインアップとログインのフォームはまだ `captchaToken` を送らない。先に有効にするとログインできなくなるので、フォーム側の対応が入ってから有効にする。それまでは、Supabase の「Allow new users to sign up」を切ってサインアップを止めておくか、全体の上限（`AI_CAP_GLOBAL_*`）を低めにしておく。
 - `ORIGIN_SECRET` は定期的にローテーションする（上の 3 段階）。
 - `cloudflared` は `docker-compose.yml` でタグと digest を固定している。更新は両方を一緒に上げ、利用の少ない時間に行う。再起動で流れているストリームが切れる。
 

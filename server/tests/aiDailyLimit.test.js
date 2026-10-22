@@ -82,10 +82,37 @@ describe('aiDailyLimit: scope, reset time and body fields', () => {
         assert.equal(dailyLimitResetAt(limit({ resetAt: '2026-10-22T15:00:00.000Z' }), NOW), Date.parse('2026-10-22T15:00:00Z'));
         assert.equal(dailyLimitResetAt(limit({}), NOW), Date.parse('2026-10-22T15:00:00Z'));
         assert.equal(dailyLimitResetAt(limit({ resetAt: 'soon' }), NOW), Date.parse('2026-10-22T15:00:00Z'));
-        assert.equal(dailyLimitResetAt(limit({ resetAt: '2026-10-21T15:00:00.000Z' }), NOW), Date.parse('2026-10-22T15:00:00Z'), 'in the past');
         assert.equal(dailyLimitResetAt(limit({ resetAt: '2027-01-01T00:00:00.000Z' }), NOW), Date.parse('2026-10-22T15:00:00Z'), 'too far');
         assert.equal(dailyLimitResetAt(limit({ scope: 'off' }), NOW), null);
         assert.equal(dailyLimitResetAt({ status: 429 }, NOW), null);
+    });
+
+    it('dailyLimitResetAt: a reset_at already past on this clock (a little fast) holds a minute, not until tomorrow', () => {
+        const limit = (resetAt) => ({ errorType: 'daily_limit_reached', scope: 'global', resetAt });
+        // The server answered at 23:59:50 JST; this clock already says 00:00:20 JST.
+        const fastNow = Date.parse('2026-10-22T15:00:20Z');
+        assert.equal(dailyLimitResetAt(limit('2026-10-22T15:00:00.000Z'), fastNow), fastNow + 60 * 1000);
+        assert.equal(dailyLimitResetAt(limit('2026-10-22T15:00:20.000Z'), fastNow), fastNow + 60 * 1000, 'exactly now');
+        assert.equal(dailyLimitResetAt(limit('2026-10-21T15:00:00.000Z'), NOW), NOW + 60 * 1000, 'long past');
+    });
+
+    it('dailyLimitFields: with Retry-After, the limit lifts that many seconds from now on this clock', () => {
+        const body = { error_type: 'daily_limit_reached', kind: 'llm', scope: 'user', reset_at: '2026-10-22T15:00:00.000Z' };
+        // This clock is 2 minutes fast: reset_at would read as past, Retry-After does not.
+        const fastNow = Date.parse('2026-10-22T15:01:50Z');
+        const fields = dailyLimitFields(body, '10', fastNow);
+        assert.equal(fields.resetAt, '2026-10-22T15:02:00.000Z');
+        assert.equal(dailyLimitResetAt({ ...fields }, fastNow), fastNow + 10 * 1000);
+        // This clock is 3 hours slow: still 10 seconds.
+        const slowNow = Date.parse('2026-10-22T11:59:50Z');
+        assert.equal(dailyLimitResetAt(dailyLimitFields(body, ' 10 ', slowNow), slowNow), slowNow + 10 * 1000);
+        // No usable Retry-After: the server's reset_at.
+        for (const header of [null, undefined, '', 'Wed, 21 Oct 2026 07:28:00 GMT', '-5', '1.5', String(2 * 24 * 60 * 60)]) {
+            assert.equal(dailyLimitFields(body, header, fastNow).resetAt, body.reset_at, String(header));
+        }
+        // Not a resetting daily limit (scope 'off', another error): Retry-After is not a reset time.
+        assert.equal(dailyLimitFields({ error_type: 'daily_limit_reached', scope: 'off' }, '60', fastNow).resetAt, undefined);
+        assert.equal(dailyLimitFields({ error_type: 'ai_unavailable' }, '60', fastNow).resetAt, undefined);
     });
 
     it('dailyLimitFields copies error_type, kind, scope and reset_at; ignores the rest', () => {

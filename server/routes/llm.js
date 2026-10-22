@@ -10,9 +10,10 @@
  * guests can use it in strict mode; the AI rate limiter, the guest daily budget
  * (server/llm/guestAccess.js) and the signed-in daily cap (server/middleware/dailyCaps.js, kind
  * 'llm') apply to the POST routes only. Each POST runs: AI limiter → body validation (and the
- * guest lesson check) → guest budget → user daily cap → handler, so rejected requests never use
- * a daily quota; a call that fails before any model ran is refunded. Anonymous tutor calls must
- * come from a lesson (lesson + anchor) and get a shorter history and answer.
+ * guest lesson check) → daily cap (counts signed-in users; refuses everyone while the feature is
+ * turned off) → guest budget → handler, so rejected requests never use a daily quota; a call that
+ * fails before any model ran is refunded. Anonymous tutor calls must come from a lesson (lesson +
+ * anchor) and get a shorter history and answer.
  */
 import express from 'express';
 import { getGateway } from '../llm/index.js';
@@ -87,12 +88,16 @@ const writeSse = (res, type, data) => {
  *   limiter?: import('express').RequestHandler,
  *   guestBudget?: import('express').RequestHandler,
  *   userCap?: import('express').RequestHandler,
- * }} [options]  userCap: the signed-in daily cap (dailyCap('llm')); guests pass it uncounted
+ * }} [options]  userCap: the daily cap (dailyCap('llm')); guests pass it uncounted unless the
+ *   feature is turned off
  */
 export function createLlmRouter(options = {}) {
   const router = express.Router();
-  /** The AI limiter counts every POST; the guest budget and user cap only those that passed `checks`. */
-  const guarded = (...checks) => [options.limiter, ...checks, options.guestBudget, options.userCap].filter(Boolean);
+  /**
+   * The AI limiter counts every POST; the user cap and guest budget only those that passed
+   * `checks`. The cap runs first so a feature turned off (scope 'off') does not use guest budget.
+   */
+  const guarded = (...checks) => [options.limiter, ...checks, options.userCap, options.guestBudget].filter(Boolean);
 
   router.get('/status', (_req, res) => {
     res.set('Cache-Control', 'no-store');

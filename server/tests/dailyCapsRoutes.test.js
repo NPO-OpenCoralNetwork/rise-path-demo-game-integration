@@ -5,6 +5,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,7 @@ import { LlmError } from '../llm/errors.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 import { resetDailyCapsForTests } from '../middleware/dailyCaps.js';
 import { setGenAIForTests } from '../services/aiGenerator.js';
+import { setImageClientForTests } from '../geminiBackendService.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LESSON = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] };
@@ -154,6 +156,7 @@ describe('daily caps on the API routes', () => {
         setPoolForTests(null);
         resetDailyCapsForTests();
         setGenAIForTests(null);
+        setImageClientForTests(null);
     });
 
     afterEach(() => {
@@ -165,6 +168,7 @@ describe('daily caps on the API routes', () => {
         resetPoolForTests();
         resetDailyCapsForTests();
         setGenAIForTests(null);
+        setImageClientForTests(null);
     });
 
     describe('/llm (signed in)', () => {
@@ -202,12 +206,51 @@ describe('daily caps on the API routes', () => {
         });
 
         it('does not count guests against the per-user cap (only the guest budget applies)', async () => {
-            process.env.AI_CAP_USER_LLM = '0';
+            process.env.AI_CAP_USER_LLM = '1';
+            process.env.AI_CAP_GLOBAL_LLM = '1';
             await withServer(async (base) => {
-                const guest = await send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
-                assert.equal(guest.status, 200, guest.text);
+                for (let i = 0; i < 2; i += 1) {
+                    const guest = await send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR });
+                    assert.equal(guest.status, 200, guest.text);
+                    assert.match(guest.text, /event: done/);
+                }
+                const signedIn = await send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR }, SIGNED_IN);
+                assert.match(signedIn.text, /event: done/, 'the guests used none of the caps of 1');
+                assertDailyLimit(await send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR }, SIGNED_IN), 'llm', 'user');
+            });
+        });
+
+        it("a tutor turned off (AI_CAP_USER_LLM=0) is off for guests too, without using their budget", async () => {
+            process.env.AI_CAP_USER_LLM = '0';
+            process.env.LLM_GUEST_DAILY_PER_IP = '1';
+            await withServer(async (base) => {
+                const ask = (headers) => send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR }, headers);
+                assertDailyLimit(await ask(), 'llm', 'off');
+                assertDailyLimit(await ask(), 'llm', 'off');
+                assertDailyLimit(await send(`${base}/llm/writing-feedback`, FEEDBACK), 'llm', 'off');
+                assertDailyLimit(await ask(SIGNED_IN), 'llm', 'off');
+                delete process.env.AI_CAP_USER_LLM;
+                const guest = await ask();
+                assert.equal(guest.status, 200, 'the refused calls used none of the guest budget of 1');
                 assert.match(guest.text, /event: done/);
-                assertDailyLimit(await send(`${base}/llm/tutor`, { message: 'ok', lesson: LESSON, anchor: ANCHOR }, SIGNED_IN), 'llm', 'off');
+                assertDailyLimit(await ask(), 'llm', 'guest');
+            });
+        });
+
+        it('the per-minute AI limiter counts an IPv6 guest by its /56, not by each address', async () => {
+            process.env.TRUST_PROXY = '1';
+            await withServer(async (base) => {
+                const from = (ip) => send(`${base}/llm/writing-feedback`, { text: 'short', rubric: {} }, { 'X-Forwarded-For': ip });
+                // 100 a minute outside production: alternate four addresses in one /56 (two /64s).
+                const addresses = ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:db8:1:3::1', '2001:db8:1:ff::7'];
+                for (let i = 0; i < 100; i += 1) {
+                    const result = await from(addresses[i % addresses.length]);
+                    assert.equal(result.status, 400, `request ${i + 1} reaches validation`);
+                }
+                const limited = await from('2001:db8:1:2::99');
+                assert.equal(limited.status, 429, 'the 101st from the same /56 is limited');
+                assert.match(limited.json.error, /AI rate limit/);
+                assert.equal((await from('2001:db8:2::1')).status, 400, 'another /56 has its own count');
             });
         });
     });
@@ -235,8 +278,50 @@ describe('daily caps on the API routes', () => {
                 for (let i = 0; i < 2; i += 1) {
                     const result = await send(`${base}/image`, { prompt, aspect_ratio: '16:9', image_size: '1K' });
                     assert.equal(result.status, 500, `attempt ${i + 1} is not 429`);
-                    assert.equal(result.json.error, 'Image generation failed');
+                    assert.deepEqual(result.json, { error: 'Image generation failed', error_type: 'image_failed' });
                 }
+            });
+        });
+
+        /** A Gemini image client whose every call fails like the API does (ApiError carries `status`). */
+        const failingImageClient = (status) => {
+            const calls = [];
+            return {
+                calls,
+                models: {
+                    async generateContent(params) {
+                        calls.push(params);
+                        throw Object.assign(new Error(`{"error":{"code":${status},"message":"API key AIzaSECRET rejected for /srv/secret/path"}}`), { status });
+                    },
+                },
+            };
+        };
+
+        it('gives the image back when Gemini refuses the key (400, 401, 403) or rate limits (429, answered 503); no provider text', async () => {
+            process.env.AI_CAP_USER_IMAGE = '1';
+            await withServer(async (base) => {
+                for (const status of [400, 401, 403, 429]) {
+                    const client = failingImageClient(status);
+                    setImageClientForTests(client);
+                    for (let i = 0; i < 2; i += 1) {
+                        const result = await send(`${base}/image`, { prompt: `refused ${status} ${i} ${Math.random()}` });
+                        assert.equal(result.status, status === 429 ? 503 : 500, `${status}: attempt ${i + 1} is not 429`);
+                        assert.deepEqual(result.json, { error: 'Image generation failed', error_type: 'image_failed' });
+                        assert.ok(!result.text.includes('SECRET'));
+                    }
+                    assert.equal(client.calls.length, 2, `${status}: both calls reached Gemini`);
+                }
+            });
+        });
+
+        it('keeps the image charged when Gemini fails after accepting the call (500)', async () => {
+            process.env.AI_CAP_USER_IMAGE = '1';
+            setImageClientForTests(failingImageClient(500));
+            await withServer(async (base) => {
+                const first = await send(`${base}/image`, { prompt: `server error ${Math.random()}` });
+                assert.equal(first.status, 500);
+                assert.deepEqual(first.json, { error: 'Image generation failed', error_type: 'image_failed' });
+                assertDailyLimit(await send(`${base}/image`, { prompt: `server error ${Math.random()}` }), 'image', 'user');
             });
         });
 
@@ -363,6 +448,28 @@ describe('daily caps on the API routes', () => {
             });
         });
 
+        it('gives the unit back when Gemini refuses the key (by status, not message)', async () => {
+            const pool = createMockPool();
+            setPoolForTests(pool);
+            const calls = [];
+            setGenAIForTests({
+                models: {
+                    async generateContent(params) {
+                        calls.push(params);
+                        throw Object.assign(new Error('Forbidden'), { status: 403 });
+                    },
+                },
+            });
+            await withServer(async (base) => {
+                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
+                assert.equal(calls.length, 1, 'Gemini was called');
+                assert.equal(result.status, 500, result.text);
+                assert.ok(await waitFor(() => pool.usage().some((q) => q.sql.startsWith('update ai_daily_usage'))), 'refunded');
+                const refund = pool.usage().find((q) => q.sql.startsWith('update ai_daily_usage'));
+                assert.deepEqual(refund.params.slice(1), ['course_generation', [DEV_USER, '*']]);
+            });
+        });
+
         it('answers 503 without charging when no Gemini key is set', async () => {
             const pool = createMockPool();
             setPoolForTests(pool);
@@ -430,6 +537,59 @@ describe('daily caps on the API routes', () => {
                     assert.equal(result.json.error_type, 'hermes_unreachable');
                 }
             });
+        });
+
+        /** A stand-in Hermes that answers every request with `status` and an upstream message. */
+        const fakeHermes = async (status) => {
+            const server = http.createServer((req, res) => {
+                req.resume();
+                req.on('end', () => {
+                    res.writeHead(status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: { message: 'OpenRouter: key sk-or-SECRET is invalid (/srv/hermes/secret.yaml)' } }));
+                });
+            });
+            await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+            process.env.HERMES_API_URL = `http://127.0.0.1:${server.address().port}`;
+            return server;
+        };
+
+        it('gives the chat back when Hermes refuses its key (401/403), answers 502, and hides the upstream text', async () => {
+            process.env.AI_CAP_USER_AGENT_CHAT = '1';
+            process.env.HERMES_API_KEY = 'test-key';
+            for (const status of [401, 403]) {
+                const hermes = await fakeHermes(status);
+                try {
+                    await withServer(async (base) => {
+                        for (const stream of [false, false, true, true]) {
+                            const result = await send(`${base}/agent/chat`, { ...AGENT_CHAT, stream });
+                            assert.equal(result.status, 502, `${status}: ${result.text}`);
+                            assert.deepEqual(result.json, { error: 'Hermes API error', error_type: 'hermes_api_error' });
+                            assert.ok(!result.text.includes('SECRET'));
+                        }
+                    });
+                } finally {
+                    await new Promise((resolve) => hermes.close(resolve));
+                }
+            }
+        });
+
+        it('keeps the chat charged for any other Hermes error: 400 answers 502, 429 and 5xx answer 503', async () => {
+            process.env.AI_CAP_USER_AGENT_CHAT = '1';
+            process.env.HERMES_API_KEY = 'test-key';
+            for (const [status, expected] of [[400, 502], [429, 503], [500, 503]]) {
+                resetDailyCapsForTests();
+                const hermes = await fakeHermes(status);
+                try {
+                    await withServer(async (base) => {
+                        const first = await send(`${base}/agent/chat`, AGENT_CHAT);
+                        assert.equal(first.status, expected, `${status}: ${first.text}`);
+                        assert.deepEqual(first.json, { error: 'Hermes API error', error_type: 'hermes_api_error' });
+                        assertDailyLimit(await send(`${base}/agent/chat`, { ...AGENT_CHAT, stream: true }), 'agent_chat', 'user');
+                    });
+                } finally {
+                    await new Promise((resolve) => hermes.close(resolve));
+                }
+            }
         });
 
         it('keeps the chat charged when Hermes drops the connection after the request was sent', async () => {

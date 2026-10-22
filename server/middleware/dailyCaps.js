@@ -14,11 +14,12 @@
  * off for everyone, admins included (429 scope 'off', with no reset time). There is no
  * "unlimited" value: the global cap is the cost breaker and is always on.
  *
- * Subjects counted per call: the user id; 'ip:<address>' (an IPv6 caller by its /64), so a few
- * accounts made from one network cannot use up the global cap alone; and '*', all users. The
- * address is req.ip (the visitor behind the edge: originGate.js, or TRUST_PROXY). Loopback and
- * private addresses (local dev, the tailnet, a proxy without TRUST_PROXY) are not counted per
- * address, so one proxy address can never turn the per-address cap into a second global cap.
+ * Subjects counted per call: the user id; 'ip:<address>' (an IPv6 caller by its /56, the block a
+ * home or office connection usually gets), so a few accounts made from one network cannot use up
+ * the global cap alone; and '*', all users. The address is req.ip (the visitor behind the edge:
+ * originGate.js, or TRUST_PROXY). Loopback and private addresses (local dev, the tailnet, a proxy
+ * without TRUST_PROXY) are not counted per address, so one proxy address can never turn the
+ * per-address cap into a second global cap.
  *
  * The day is the Japan-time date, so every count resets at 00:00 JST. Counts live in
  * ai_daily_usage (server/migrations/013_ai_daily_usage.sql), one row per day, kind and subject.
@@ -26,19 +27,30 @@
  * When a query fails (database down, migration 013 not applied) the caps stay on, but the count
  * for that call starts again from 0 in this process's memory: during an outage a user can get up
  * to one more full user cap, and the all-users cap drops to a tenth (at least 1) so that an
- * outage day allows at most about 1.1 × the global cap per process.
+ * outage day allows at most about 1.1 × the global cap per process. A call refused by that
+ * outage share is not the daily cap: it answers 503 ai_unavailable (Retry-After 60) and logs a
+ * warning at most once a minute, without the 'reached' alert, which stays free for the real cap.
  *
  * Guests (no req.userId) are not counted here. On /llm the guest budget
- * (server/llm/guestAccess.js) covers them, and every other paid route requires auth.
+ * (server/llm/guestAccess.js) covers them, and every other paid route requires auth. A feature
+ * turned off (a limit of 0) is off for guests too.
  * Admins (user_profiles.role = 'admin') skip the user and address caps, not the global one.
  *
  * Over a cap: 429 { error, error_type: 'daily_limit_reached', kind, scope, reset_at } with
  * Retry-After set to the seconds left until 00:00 JST. scope is 'user', 'ip', 'global' or
  * 'guest'; a feature turned off answers scope 'off' without reset_at or Retry-After.
  * Reaching a global cap (and 80% of it) is logged as an error once a day per kind, and posted to
- * AI_CAP_ALERT_WEBHOOK_URL when it is set (a Slack- or Discord-style incoming webhook).
+ * AI_CAP_ALERT_WEBHOOK_URL when it is set (a Slack- or Discord-style incoming webhook; https://
+ * only, or http:// to a loopback address; the URL is a secret and is never logged).
+ *
+ * After fixing a problem that used up a global count without real use (a provider key that was
+ * rejected, say), reset that kind's all-users count for today in the database:
+ *   DELETE FROM ai_daily_usage WHERE usage_day = (now() AT TIME ZONE 'Asia/Tokyo')::date
+ *     AND kind = '<kind>' AND subject = '*';
+ * Each running process also forgets that day's 'reached' alert only at 00:00 JST.
  */
 import net from 'node:net';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { getPool } from '../db.js';
 import { modelMayHaveRun } from '../llm/errors.js';
 
@@ -78,6 +90,8 @@ const ROLE_CACHE_MAX = 1000;
 const DB_WARN_INTERVAL_MS = 60 * 1000;
 /** Share of the global cap a process may use from memory while the database does not answer. */
 const OUTAGE_GLOBAL_SHARE = 0.1;
+/** Retry-After (seconds) on the 503 sent when that outage share is used up. */
+const OUTAGE_RETRY_AFTER_S = 60;
 /** Share of a global cap at which the owner is warned before everyone is refused. */
 const GLOBAL_WARN_SHARE = 0.8;
 const ALERT_TIMEOUT_MS = 5000;
@@ -123,25 +137,14 @@ INTERNAL_ADDRESSES.addAddress('::1', 'ipv6');
 INTERNAL_ADDRESSES.addSubnet('fc00::', 7, 'ipv6');
 INTERNAL_ADDRESSES.addSubnet('fe80::', 10, 'ipv6');
 
-/** First four groups of an IPv6 address ('2001:db8::1' → '2001:db8:0:0'). @param {string} address */
-function ipv6Prefix64(address) {
-  const clean = address.split('%')[0].toLowerCase();
-  const groupCount = (/** @type {string[]} */ parts) => parts.reduce((n, part) => n + (part.includes('.') ? 2 : 1), 0);
-  let groups;
-  if (clean.includes('::')) {
-    const [head, tail] = clean.split('::');
-    const headParts = head ? head.split(':') : [];
-    const tailParts = tail ? tail.split(':') : [];
-    groups = [...headParts, ...Array(8 - groupCount(headParts) - groupCount(tailParts)).fill('0'), ...tailParts];
-  } else {
-    groups = clean.split(':');
-  }
-  return groups.slice(0, 4).map((part) => (Number.parseInt(part, 16) || 0).toString(16)).join(':');
-}
+/** IPv6 callers are grouped by this prefix: a home or office line usually gets a /56 (or a /48). */
+const IPV6_SUBNET = 56;
 
 /**
- * The ai_daily_usage subject for a caller's address: 'ip:203.0.113.7', 'ip:2001:db8:0:0::/64'
- * (an IPv6 caller can switch addresses inside its /64), or null for an internal or unknown one.
+ * The ai_daily_usage subject for a caller's address: 'ip:203.0.113.7', 'ip:2001:db8:1:200::/56'
+ * (an IPv6 caller can switch addresses inside its /56: express-rate-limit's ipKeyGenerator, as
+ * the per-minute limiters use), or null for an internal or unknown one. The guest budget
+ * (server/llm/guestAccess.js) groups guests the same way.
  * @param {unknown} ip
  * @returns {string | null}
  */
@@ -150,7 +153,8 @@ export function ipSubject(ip) {
   if (address.toLowerCase().startsWith('::ffff:') && net.isIPv4(address.slice(7))) address = address.slice(7);
   if (net.isIPv4(address)) return INTERNAL_ADDRESSES.check(address, 'ipv4') ? null : `ip:${address}`;
   if (net.isIPv6(address)) {
-    return INTERNAL_ADDRESSES.check(address.split('%')[0], 'ipv6') ? null : `ip:${ipv6Prefix64(address)}::/64`;
+    const bare = address.split('%')[0];
+    return INTERNAL_ADDRESSES.check(bare, 'ipv6') ? null : `ip:${ipKeyGenerator(bare, IPV6_SUBNET)}`;
   }
   return null;
 }
@@ -274,17 +278,33 @@ const createPgStore = (pool) => ({
 /** Handle for callers that are not counted (guests). */
 const NOOP_HANDLE = Object.freeze({ refund: async () => {} });
 
+/** Hosts an http:// alert webhook may use (a relay on this machine); anything else needs https://. */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 /**
- * Post an alert line to AI_CAP_ALERT_WEBHOOK_URL (Slack reads `text`, Discord `content`).
- * @param {string | undefined} url @param {string} line @param {typeof fetch | undefined} fetchImpl
+ * AI_CAP_ALERT_WEBHOOK_URL as a URL, or the reason it cannot be used. An incoming-webhook URL is a
+ * bearer secret, so no message ever contains it.
+ * @param {string} raw
+ * @returns {URL | string}
+ */
+function parseAlertWebhook(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return 'AI_CAP_ALERT_WEBHOOK_URL is not a valid URL';
+  }
+  if (url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname))) return url;
+  return 'AI_CAP_ALERT_WEBHOOK_URL must use https:// (http:// only to localhost)';
+}
+
+/**
+ * Post an alert line to the webhook (Slack reads `text`, Discord `content`). A failure is logged
+ * by its error name or code only: fetch messages can quote the URL.
+ * @param {string} url  an href from parseAlertWebhook @param {string} line @param {typeof fetch} fetchImpl
  * @param {Pick<Console, 'warn'>} logger
  */
 async function postAlert(url, line, fetchImpl, logger) {
-  if (!url || !fetchImpl) return;
-  if (!/^https?:\/\//i.test(url)) {
-    logger.warn('[AI caps] AI_CAP_ALERT_WEBHOOK_URL must start with https:// (or http://): alert not sent.');
-    return;
-  }
   try {
     const response = await fetchImpl(url, {
       method: 'POST',
@@ -294,7 +314,9 @@ async function postAlert(url, line, fetchImpl, logger) {
     });
     if (!response.ok) logger.warn(`[AI caps] the alert webhook answered ${response.status}.`);
   } catch (error) {
-    logger.warn(`[AI caps] the alert webhook failed: ${error instanceof Error ? error.message : String(error)}`);
+    const cause = /** @type {{ cause?: { code?: unknown } }} */ (error ?? {}).cause;
+    const reason = typeof cause?.code === 'string' ? cause.code : error instanceof Error ? error.name : 'unknown error';
+    logger.warn(`[AI caps] the alert webhook failed (${reason}).`);
   }
 }
 
@@ -325,18 +347,28 @@ export function createDailyCaps({
   let warnedNoPool = false;
   /** @type {Map<string, number>} */
   const lastDbWarnAt = new Map();
+  /** The last AI_CAP_ALERT_WEBHOOK_URL value read, and what it parsed to. */
+  let webhook = { raw: '', parsed: /** @type {URL | string} */ ('') };
+
+  /**
+   * A warning logged at most once a minute per key.
+   * @param {string} key @param {() => string} line
+   */
+  const warnEveryMinute = (key, line) => {
+    const t = now();
+    if (t - (lastDbWarnAt.get(key) ?? -Infinity) < DB_WARN_INTERVAL_MS) return;
+    lastDbWarnAt.set(key, t);
+    logger.warn(line());
+  };
 
   /**
    * A database problem, logged at most once a minute per kind of problem.
    * @param {string} what @param {unknown} error @param {string} consequence
    */
-  const warnDb = (what, error, consequence) => {
-    const t = now();
-    if (t - (lastDbWarnAt.get(what) ?? -Infinity) < DB_WARN_INTERVAL_MS) return;
-    lastDbWarnAt.set(what, t);
+  const warnDb = (what, error, consequence) => warnEveryMinute(what, () => {
     const reason = error instanceof Error ? error.message : String(error);
-    logger.warn(`[AI caps] ${what} failed (${reason}): ${consequence}`);
-  };
+    return `[AI caps] ${what} failed (${reason}): ${consequence}`;
+  });
   const MEMORY_FALLBACK = 'this process counts in memory from 0 until the database answers (the all-users cap drops to a tenth meanwhile). Is migration 013 applied?';
 
   /** One store object per pool, so a refund groups the subjects it charged into one UPDATE. */
@@ -359,21 +391,25 @@ export function createDailyCaps({
    * Take one slot for `subject` in `store`. A failed query falls back to memory for this charge,
    * where the all-users subject gets OUTAGE_GLOBAL_SHARE of its limit.
    * @param {CapStore} store @param {string} day @param {string} kind @param {string} subject @param {number} limit
-   * @returns {Promise<{ store: CapStore, count: number } | null>} null when the cap is reached
+   * @returns {Promise<{ store: CapStore | null, count: number, outage: boolean }>} store null when
+   *   refused; `outage` when the count came from memory because the database did not answer (a
+   *   refusal of the all-users subject is then its outage share: the real cap may be far off)
    */
   const charge = async (store, day, kind, subject, limit) => {
     let memoryLimit = limit;
+    let outage = false;
     if (store !== memory) {
       try {
         const count = await store.reserve(day, kind, subject, limit);
-        return count === null ? null : { store, count };
+        return count === null ? { store: null, count: 0, outage: false } : { store, count, outage: false };
       } catch (error) {
         warnDb('reserving a daily cap slot', error, MEMORY_FALLBACK);
+        outage = true;
         if (subject === GLOBAL_SUBJECT) memoryLimit = Math.max(1, Math.ceil(limit * OUTAGE_GLOBAL_SHARE));
       }
     }
     const count = await memory.reserve(day, kind, subject, memoryLimit);
-    return count === null ? null : { store: memory, count };
+    return count === null ? { store: null, count: 0, outage } : { store: memory, count, outage };
   };
 
   /** Give slots back to the stores that charged them. @param {{ store: CapStore, subject: string }[]} charges */
@@ -428,12 +464,19 @@ export function createDailyCaps({
       ? `[AI caps] global daily cap reached: ${kind} (${limit}) on ${day} JST. Signed-in users are refused this feature until 00:00 JST (AI_CAP_GLOBAL_${kind.toUpperCase()}).`
       : `[AI caps] global daily cap ${Math.round(GLOBAL_WARN_SHARE * 100)}% used: ${kind} (${limit}) on ${day} JST (AI_CAP_GLOBAL_${kind.toUpperCase()}).`;
     logger.error(line);
-    void postAlert(env.AI_CAP_ALERT_WEBHOOK_URL?.trim(), line, fetchImpl, logger);
+    const raw = env.AI_CAP_ALERT_WEBHOOK_URL?.trim() ?? '';
+    if (!raw || !fetchImpl) return;
+    if (raw !== webhook.raw) {
+      webhook = { raw, parsed: parseAlertWebhook(raw) };
+      if (typeof webhook.parsed === 'string') logger.warn(`[AI caps] ${webhook.parsed}: alerts are not posted.`);
+    }
+    if (typeof webhook.parsed !== 'string') void postAlert(webhook.parsed.href, line, fetchImpl, logger);
   };
 
   /**
    * Charge one use of `kind` to the caller, to their address and to the all-users total. Answers
-   * 429 itself and returns null when a cap is reached (or the feature is off); otherwise returns a
+   * 429 itself and returns null when a cap is reached (or the feature is off, for guests too), or
+   * 503 when only a database outage's share of the all-users cap is used up; otherwise returns a
    * handle whose refund() gives the use back once. Never throws.
    * @param {import('express').Request & { userId?: unknown }} req  req.userId from the auth middleware
    * @param {import('express').Response} res
@@ -444,15 +487,16 @@ export function createDailyCaps({
    */
   async function reserve(req, res, kind, { refundOnStatus = [] } = {}) {
     try {
-      const userId = req.userId ? String(req.userId) : '';
-      if (!userId) return NOOP_HANDLE;
       const limits = resolveCapLimits(env, { logger, warned: warnedLimits })[kind];
       if (!limits) throw new Error(`Unknown daily cap kind: ${kind}`);
       const t = now();
+      // Off is off for everyone, guests included (they are not counted, but not served either).
       if (limits.user === 0 || limits.ip === 0 || limits.global === 0) {
         sendDailyLimit(res, { kind, scope: 'off', now: t });
         return null;
       }
+      const userId = req.userId ? String(req.userId) : '';
+      if (!userId) return NOOP_HANDLE;
       const day = jstDay(t);
       const pool = poolFn();
       const store = storeFor(pool);
@@ -460,7 +504,7 @@ export function createDailyCaps({
       const charges = [];
       if (!(await isAdmin(userId, pool))) {
         const user = await charge(store, day, kind, userId, limits.user);
-        if (!user) {
+        if (!user.store) {
           sendDailyLimit(res, { kind, scope: 'user', now: t });
           return null;
         }
@@ -468,7 +512,7 @@ export function createDailyCaps({
         const address = ipSubject(req.ip || req.socket?.remoteAddress);
         if (address) {
           const network = await charge(store, day, kind, address, limits.ip);
-          if (!network) {
+          if (!network.store) {
             await giveBack(day, kind, charges);
             sendDailyLimit(res, { kind, scope: 'ip', now: t });
             return null;
@@ -477,9 +521,18 @@ export function createDailyCaps({
         }
       }
       const all = await charge(store, day, kind, GLOBAL_SUBJECT, limits.global);
-      if (!all) {
+      if (!all.store) {
         // The caller's own slots go back: a refused request uses nothing.
         await giveBack(day, kind, charges);
+        if (all.outage) {
+          // Only this process's outage share is used up, not the daily cap: no 'reached' alert
+          // (it would hide the real one for the rest of the day) and no reset time to promise.
+          const KIND = kind.toUpperCase();
+          warnEveryMinute(`outage share|${kind}`, () => `[AI caps] all-users outage share used up: ${kind} (${Math.max(1, Math.ceil(limits.global * OUTAGE_GLOBAL_SHARE))} of AI_CAP_GLOBAL_${KIND}=${limits.global}) in this process while the database does not answer. Callers get 503 until it does.`);
+          res.set('Retry-After', String(OUTAGE_RETRY_AFTER_S));
+          res.status(503).json({ error: 'This AI feature is busy right now. Please try again in a few minutes.', error_type: 'ai_unavailable' });
+          return null;
+        }
         alertGlobal('reached', day, kind, limits.global);
         sendDailyLimit(res, { kind, scope: 'global', now: t });
         return null;

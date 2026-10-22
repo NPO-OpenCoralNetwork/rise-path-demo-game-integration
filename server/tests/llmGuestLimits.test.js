@@ -318,6 +318,24 @@ describe('guest budget refunds', () => {
         assert.equal(run('a')[0], 429, 'a second refund for the same request does nothing');
     });
 
+    it('counts an IPv6 guest by its /56: addresses in one /64 or /56 share the budget, other /56s do not', () => {
+        const run = runner(createGuestBudget({ env: {}, perIp: 2, total: 50, now: () => Date.parse('2026-10-19T10:00:00Z') }));
+        assert.equal(run('2001:db8:1:2::5')[0], 200);
+        assert.equal(run('2001:db8:1:2:aaaa:bbbb:cccc:9')[0], 200, 'another address in the same /64');
+        assert.equal(run('2001:db8:1:2::77')[0], 429, 'a third address in that /64 shares the budget of 2');
+        assert.equal(run('2001:db8:1:80::1')[0], 429, 'another /64 inside the same /56 too');
+        assert.equal(run('2001:db8:1:100::1')[0], 200, 'the next /56 has its own budget');
+        assert.equal(run('2001:db8:2::1')[0], 200, 'another network');
+        const [, res] = run('2001:db8:2::2');
+        refundGuestBudget(res, new LlmError('no_provider', 'none'));
+        assert.equal(run('2001:db8:2:0:ffff::3')[0], 200, 'the refund goes back to the same /56');
+        assert.equal(run('::ffff:203.0.113.7')[0], 200);
+        assert.equal(run('203.0.113.7')[0], 200, 'IPv4-mapped and plain IPv4 are one address');
+        assert.equal(run('203.0.113.7')[0], 429);
+        assert.equal(run('127.0.0.1')[0], 200, 'internal addresses count as they are');
+        assert.equal(run('127.0.0.2')[0], 200);
+    });
+
     it("does not add yesterday's refund to today's budget", () => {
         let now = Date.parse('2026-10-20T14:59:59Z'); // 23:59:59 JST
         const run = runner(createGuestBudget({ env: {}, perIp: 5, total: 1, now: () => now }));
