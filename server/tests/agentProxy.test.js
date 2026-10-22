@@ -5,7 +5,7 @@ import {
     validateAgentChatBody,
     buildHermesInput,
     buildConversationKey,
-    buildTurnSessionKey,
+    buildSessionKey,
     extractAnswerFromHermesResponse,
     extractEvidenceFromHermesResponse,
     buildResponseCaveats,
@@ -143,10 +143,10 @@ describe('buildHermesInput', () => {
 });
 
 describe('session keys', () => {
-    it('builds a stable conversation key and a per-turn session key', () => {
+    it('builds stable conversation and session keys (the turn token is not in either)', () => {
         const uid = '00000000-0000-0000-0000-000000000099';
         assert.equal(buildConversationKey(uid, 'life-habit-analyst'), `rp:user:${uid}:life-habit-analyst`);
-        assert.equal(buildTurnSessionKey('abc'), 'rp:turn:abc');
+        assert.equal(buildSessionKey(uid), `rp:user:${uid}`);
     });
 });
 
@@ -268,7 +268,7 @@ describe('callHermesResponses', () => {
         const body = JSON.parse(capturedInit.body);
         const turn = turnInInstructions(body);
         assert.ok(isTurnToken(turn), body.instructions);
-        assert.equal(capturedInit.headers['X-Hermes-Session-Key'], `rp:turn:${turn}`);
+        assert.equal(capturedInit.headers['X-Hermes-Session-Key'], 'rp:user:user-abc', 'stable per learner; the turn token goes only in instructions');
         assert.equal(body.conversation, 'rp:user:user-abc:life-habit-analyst');
         assert.ok(body.input.includes('/life-habit-analyst'));
         assert.ok(!body.input.includes(turn), 'the token is not in the learner-controlled input');

@@ -151,6 +151,23 @@ describe('resolveMcpUserId', () => {
             assert.ok(!queries.some((q) => /ORDER BY updated_at DESC LIMIT 1/.test(q.sql)), 'no latest-binding lookup');
         });
 
+        for (const [flag, value] of [['RISEPATH_STRICT_AUTH', 'true'], ['VITE_DEMO_MODE', 'false']]) {
+            it(`with ${flag}=${value} outside production, fails closed like production (strict auth)`, async () => {
+                const prev = process.env[flag];
+                process.env[flag] = value;
+                try {
+                    await registerAgentSession(`rp:user:${USER_B}`, USER_B);
+                    await registerAgentTurn(USER_B);
+                    const result = await resolveMcpUserId({ extra: bridgeExtra(), sessions: bridgeSessions() });
+                    assert.equal(result.userId, undefined, 'a dev MCP on a real database never becomes the chatting learner');
+                    assert.equal(result.error_type, 'session_binding_required');
+                } finally {
+                    if (prev === undefined) delete process.env[flag];
+                    else process.env[flag] = prev;
+                }
+            });
+        }
+
         it('in development, acts for the learner when exactly one is chatting', async () => {
             await registerAgentSession(`rp:user:${USER_B}`, USER_B);
             const result = await resolveMcpUserId({ argsUserId: ATTACKER, extra: bridgeExtra(), sessions: bridgeSessions() });

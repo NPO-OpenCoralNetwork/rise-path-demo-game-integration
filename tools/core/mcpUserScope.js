@@ -12,10 +12,10 @@
  *    Express's in-memory bindings, it falls back to step 3, then PHASE1_USER_ID); a value that is
  *    not token-shaped (an LLM's guess such as 'current') counts as absent.
  * 3. The operator's own RISE_PATH_ACTIVE_SESSION_KEY (stdio, or a single-learner deployment).
- * 4. Development only (bridge-token SSE sessions and stdio): the learner with a live
+ * 4. Outside strict auth only (development: bridge-token SSE sessions and stdio): the learner with a live
  *    agent_session_binding, only when no other learner started a chat turn within
  *    RECENT_TURN_WINDOW_MS; with two or more the call fails closed. Then PHASE1_USER_ID.
- * 5. Production: session_binding_required. A bridge-token session (Hermes, or an external client
+ * 5. Strict auth (production, RISEPATH_STRICT_AUTH=true or VITE_DEMO_MODE=false): session_binding_required. A bridge-token session (Hermes, or an external client
  *    holding the bridge token) acts for a learner only through a turn token.
  *
  * Never from an LLM-supplied user_id, and never from an `rp:user:<uuid>` key sent by a client: a
@@ -24,6 +24,7 @@
 import { randomBytes } from 'node:crypto';
 import { parseSessionKey } from './agentSessionStore.js';
 import { getPool, syncAuthUserStub } from '../../server/db.js';
+import { isStrictAuthMode } from '../../server/middleware/authPolicy.js';
 
 async function finalizeScopedUser(userId) {
     if (userId) {
@@ -53,8 +54,10 @@ function cleanString(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+// Fail closed in strict auth (production, RISEPATH_STRICT_AUTH=true or VITE_DEMO_MODE=false), not
+// only when NODE_ENV is production: a dev MCP pointed at a real database must never act as a learner.
 function isProduction() {
-    return process.env.NODE_ENV === 'production';
+    return isStrictAuthMode();
 }
 
 export function getPhase1UserId() {

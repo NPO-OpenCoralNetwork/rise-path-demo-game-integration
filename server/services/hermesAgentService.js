@@ -46,9 +46,14 @@ export function buildConversationKey(userId, skill) {
     return `rp:user:${userId}:${skill}`;
 }
 
-/** The X-Hermes-Session-Key Express sends Hermes for one turn (the MCP server also accepts it). */
-export function buildTurnSessionKey(turn) {
-    return `${TURN_KEY_PREFIX}${turn}`;
+/**
+ * The X-Hermes-Session-Key Express sends Hermes: stable per learner, because Hermes scopes its own
+ * per-channel state by it (a key that changes every turn would start a new scope each time). Hermes
+ * does not forward it to the MCP server, and the MCP server ignores rp:user keys from clients; the
+ * learner for tool calls comes only from the turn token in `instructions`.
+ */
+export function buildSessionKey(userId) {
+    return `rp:user:${userId}`;
 }
 
 // Lesson context from openTutor() (PLAN §9.1 AskTutorDetail). Every field is learner-controlled,
@@ -332,8 +337,7 @@ export function hermesFetchFailure(err) {
 /**
  * Everything a Hermes call needs for one chat turn, before Hermes is contacted. Mints the turn
  * token (registerAgentTurn) that tells the MCP server which learner this turn's tool calls act for:
- * Hermes gets it in `instructions` (the rp_turn argument of each tool call) and in the
- * X-Hermes-Session-Key header. When the binding cannot be written, the turn does not start: the
+ * Hermes gets it in `instructions` (the rp_turn argument of each tool call). When the binding cannot be written, the turn does not start: the
  * MCP server could not resolve the learner, so Hermes is never called ('agent_session_unavailable',
  * which the route refunds). Then the learner's diary consent for this turn is recorded.
  * @returns {Promise<{ ok: true, conversation: string, input: string, instructions: string, sessionKey: string }
@@ -355,7 +359,7 @@ async function beginHermesTurn({ userId, skill, message, context, includeDiaryEx
         conversation: buildConversationKey(userId, skill),
         input: buildHermesInput({ skill, message, context }),
         instructions: [buildSkillInstructions(skill), buildTurnInstruction(turn)].join('\n'),
-        sessionKey: buildTurnSessionKey(turn),
+        sessionKey: buildSessionKey(userId),
     };
 }
 
