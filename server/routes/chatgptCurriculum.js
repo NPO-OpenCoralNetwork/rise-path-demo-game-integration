@@ -1,6 +1,7 @@
 import express from 'express';
 import { getPool } from '../db.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
+import { aiAccessGate } from '../middleware/aiAccessGate.js';
 import {
     buildCurriculumDescription,
     buildCurriculumTitle,
@@ -57,6 +58,14 @@ const asObject = (value) => {
 };
 
 // Note: extractBridgeToken removed in Phase 7 — replaced by requireBridgeOrAuth
+
+// Course drafts written by an outside AI (ChatGPT actions, MCP, Nexloom) skip Rise Path's own
+// moderation (Phase 0.5), so a learner JWT may save or publish one only as an adult
+// (server/middleware/aiAccessGate.js, adultsOnly: 403 adults_only / age_required). The bridge
+// token is an operator path: it acts as the shared PHASE1 user, never for a learner, and works
+// only from inside the network (bridgeAuth.js), so it is not gated.
+const adultsOnlyGate = aiAccessGate({ adultsOnly: true });
+const adultsOnlyForLearners = (req, res, next) => (req.bridgeAuthenticated ? next() : adultsOnlyGate(req, res, next));
 
 const bridgeContextFromRequest = (req) => ({
     nexloom_user_id: cleanString(req.headers['x-nexloom-user-id']),
@@ -206,7 +215,7 @@ router.post('/ai/validate-intake', requireBridgeOrAuth, async (req, res) => {
     res.json(response);
 });
 
-router.post('/ai/curriculum-drafts', requireBridgeOrAuth, async (req, res) => {
+router.post('/ai/curriculum-drafts', requireBridgeOrAuth, adultsOnlyForLearners, async (req, res) => {
     const portalId = cleanString(req.body?.portal_id);
     const templateId = cleanString(req.body?.template_id);
     const locale = cleanString(req.body?.locale);
@@ -875,7 +884,7 @@ router.get('/adaptation', requireBridgeOrAuth, async (req, res) => {
     }
 });
 
-router.post('/curricula/:id/publish', requireBridgeOrAuth, async (req, res) => {
+router.post('/curricula/:id/publish', requireBridgeOrAuth, adultsOnlyForLearners, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
 

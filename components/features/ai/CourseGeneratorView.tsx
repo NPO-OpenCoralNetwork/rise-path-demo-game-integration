@@ -7,9 +7,14 @@ import { useAuth } from '../../../context/AuthContext';
 import { sendAiChat, sendAiDecision, fetchGeneratedCourseById, uploadFile, fetchAiDrafts } from '../../../services/curriculumApi';
 import { addLearningEvent } from '../../../services/progressService';
 import { dailyLimitKind, dailyLimitResetAt, dailyLimitScope } from '../../../services/aiDailyLimit';
+import { aiRefusalOf, type AiRefusal } from '../../../services/safetyApi';
+import { AiNotice, AiRefusalNotice } from '../../ui/AiNotice';
 import ReactMarkdown from 'react-markdown';
 
-type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'other';
+type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'refusal' | 'other';
+
+/** Messages the app wrote itself (the welcome, a restored draft): no AI notice on them. */
+const APP_MESSAGE_IDS = new Set(['init', 'restored-draft']);
 /** Why the attached file was not sent: today's upload cap, uploads turned off, or too large. */
 type UploadNotice = 'limit' | 'paused' | 'too_large';
 
@@ -29,6 +34,11 @@ const classifyAiError = (err: unknown): AiFailure => {
     if (dailyLimitKind(err) === 'embeddings') return limitScope === 'off' ? 'upload_paused' : 'upload_limit';
     return limitScope === 'off' ? 'paused' : 'daily_limit';
   }
+  // Minor safeguards (Phase 0.5): the access gate (403 age_required …, 401 sign_in_required) and
+  // the safety screen (422 content_blocked, 503 safety_check_unavailable) get their own card.
+  const refusal = aiRefusalOf(err);
+  if (refusal?.type === 'access' && refusal.kind === 'sign_in_required') return 'auth';
+  if (refusal) return 'refusal';
   const status = (err as { status?: unknown } | null)?.status;
   if (status === 413) return 'upload_too_large';
   if (status === 401 || status === 403) return 'auth';
@@ -57,6 +67,12 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   // When today's cap lifts (reset_at, else the next 00:00 JST): the panel then clears itself.
   const [blockedUntil, setBlockedUntil] = useState<number | null>(null);
   const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null);
+  // The access gate or the safety screen refused the last call (services/safetyApi.ts aiRefusalOf).
+  const [aiRefusal, setAiRefusal] = useState<AiRefusal | null>(null);
+  // 'result': the refused call sent no learner text (Approve), so a block is about the AI's stage
+  // result and the card must not ask for different words.
+  const [refusalVariant, setRefusalVariant] = useState<'ask' | 'result'>('ask');
+  const refusalRef = useRef<HTMLDivElement>(null);
   // The blocked panel's body: did the refused message go back into the composer (a send), or was
   // there none (Approve)?
   const [blockedRestored, setBlockedRestored] = useState(false);
@@ -72,7 +88,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   const lastAttemptRef = useRef('');
   // The composer stays locked while sending cannot work: no sign-in, or today's cap is reached
   // (until 00:00 JST), or course generation is turned off.
-  const composerLocked = aiBlocked === 'auth' || aiBlocked === 'daily_limit' || aiBlocked === 'paused';
+  // An access refusal (age, guardian consent, a safety pause, adults only) locks it too, until
+  // the learner has done what its card says.
+  const composerLocked = aiBlocked === 'auth' || aiBlocked === 'daily_limit' || aiBlocked === 'paused' || aiRefusal?.type === 'access';
   
   // V2 Flow State
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -275,12 +293,18 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isGenerating, pendingApproval, error, aiBlocked]);
+  }, [messages, isGenerating, pendingApproval, error, aiBlocked, aiRefusal]);
 
   // The blocked panel takes focus when it appears, so keyboard and screen reader users land on it.
   useEffect(() => {
     if (aiBlocked) blockedHeadingRef.current?.focus();
   }, [aiBlocked]);
+  // So does an access refusal (the composer is locked), and a blocked stage result after Approve
+  // (nothing was typed); a blocked message or a failed safety check returns focus to the composer
+  // instead (focusAfterRef).
+  useEffect(() => {
+    if (aiRefusal?.type === 'access' || (aiRefusal?.type === 'blocked' && refusalVariant === 'result')) refusalRef.current?.focus();
+  }, [aiRefusal, refusalVariant]);
 
   // Today's cap lifts at 00:00 JST: unlock the composer then (the restored message is still in it),
   // say so politely, and move focus to the input when it was on the panel (or nowhere).
@@ -331,6 +355,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     setActiveLogs([]); 
     setError(null);
     setAiBlocked(null);
+    setAiRefusal(null);
     setUploadNotice(null);
     setStatusMessage('');
     lastAttemptRef.current = msgText;
@@ -374,7 +399,24 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       setMessages((prev) => prev.filter((m) => m.id !== attempt.userMsgId));
       setInputValue(attempt.text);
     };
-    if (failure === 'other') setError(t.errorChat);
+    if (failure === 'refusal') {
+      const refusal = aiRefusalOf(err);
+      setAiRefusal(refusal);
+      setRefusalVariant(attempt ? 'ask' : 'result');
+      if (refusal?.type === 'blocked') {
+        // Nothing usable came back: take the bubble back, but do not put blocked words back in
+        // the composer; the card asks for different words. After Approve nothing was typed: the
+        // card says the result was held back, and takes focus itself (effect above).
+        if (attempt) {
+          setMessages((prev) => prev.filter((m) => m.id !== attempt.userMsgId));
+          focusAfterRef.current = 'input';
+        }
+      } else if (refusal?.type === 'check_unavailable') {
+        // The message itself was fine: it goes back into the composer to send again later.
+        restoreAttempt();
+        focusAfterRef.current = 'input';
+      } else restoreAttempt();
+    } else if (failure === 'other') setError(t.errorChat);
     // The upload was refused before anything was generated: selectedFile stays attached, so the
     // learner can remove it (focus goes to its remove button) and send again.
     else if (failure === 'upload_limit' || failure === 'upload_paused' || failure === 'upload_too_large') {
@@ -400,6 +442,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     setIsGenerating(true);
     setActiveLogs([]); 
     setAiBlocked(null);
+    setAiRefusal(null);
     try {
         const response = await sendAiDecision(curriculumId, sessionId, pendingApproval, 'approved');
         await handleApiResponse(response);
@@ -619,8 +662,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                         </div>
                     )}
 
-                    {messages.map((msg) => {
+                    {messages.map((msg, msgIndex) => {
                         const text = msg.text || '';
+                        const previous = messages[msgIndex - 1];
+                        const showAiNotice = msg.role === 'model' && !APP_MESSAGE_IDS.has(msg.id) && Boolean(text.trim());
                         const isRoadmapMessage = msg.role === 'model' && /(ロードマップ案|学習ロードマップ|Roadmap)/i.test(text);
                         const isCurriculumMessage = msg.role === 'model' && /(カリキュラム詳細|詳細コンテンツ|Curriculum Details|カリキュラムを確定)/i.test(text);
                         const roadmapLabel = language === 'jp' ? 'ロードマップ' : 'Roadmap';
@@ -755,6 +800,15 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                   >
                                     {msg.text}
                                 </ReactMarkdown>
+                                {showAiNotice && (
+                                  <AiNotice
+                                    surface="course_generation"
+                                    answer={text}
+                                    question={previous?.role === 'user' ? previous.text : undefined}
+                                    context={curriculumId ? { courseId: curriculumId } : undefined}
+                                    className="mt-3 border-t border-line pt-2"
+                                  />
+                                )}
                                 </>
                               )}
                             </div>
@@ -769,6 +823,13 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             <button type="button" aria-label={t.dismiss} onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">
                                 <CloseIcon size={16} aria-hidden="true" />
                             </button>
+                        </div>
+                    )}
+
+                    {/* Access gate or safety screen (Phase 0.5): what is needed, or a calm note. */}
+                    {aiRefusal && (
+                        <div ref={refusalRef} tabIndex={-1} className="mx-0 sm:mx-6 mb-4 focus:outline-none" data-ai-refusal-panel="">
+                            <AiRefusalNotice refusal={aiRefusal} variant={refusalVariant} onSignIn={() => { void logout(); }} />
                         </div>
                     )}
 

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, Globe, Headphones, MessageCircle, Shield, Sparkles, User } from 'lucide-react';
+import { ArrowLeft, Bell, Flag, Globe, Headphones, MessageCircle, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useUserRole } from '../../../hooks/useUserRole';
+import { useAuth } from '../../../context/AuthContext';
+import { getAiAccess, type AiAccessStatus } from '../../../services/aiAccessApi';
 import { checkTtsAvailable, getDisplayName, loadTtsPreferences } from '../../../services/ttsPreferencesService';
 import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
 import SettingsSection from './SettingsSection';
@@ -19,6 +21,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     const { language, selectedLanguage, setLanguage } = useLanguage();
     const { setTheme } = useTheme();
     const { isAdmin } = useUserRole();
+    const { user } = useAuth();
+    const [aiAccess, setAiAccess] = useState<AiAccessStatus | null>(null);
     const [voiceLabel, setVoiceLabel] = useState('');
     const [ttsStatus, setTtsStatus] = useState<'ok' | 'unavailable' | 'loading'>('loading');
     const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
@@ -41,6 +45,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             });
         return () => { active = false; };
     }, [language]);
+
+    useEffect(() => {
+        if (!user || user.isGuest) return;
+        const controller = new AbortController();
+        getAiAccess(controller.signal)
+            .then(setAiAccess)
+            .catch(() => { /* The row still opens the page, which explains the error. */ });
+        return () => controller.abort();
+    }, [user?.id, user?.isGuest]);
 
     useEffect(() => {
         clearLegacyBrowserKey();
@@ -80,6 +93,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             dialogueVoicesHint: 'Map speakers to narration voices',
             privacy: 'Privacy',
             comingSoon: 'Soon',
+            safety: 'AI and safety',
+            aiAccess: 'AI access',
+            aiAccessHint: 'Birth year and month, guardian consent',
+            aiAccessReady: 'You can use AI',
+            aiAccessReadyMinor: 'Guardian agreed · you can use AI',
+            aiAccessNeedsAge: 'Enter your birth year and month to use AI',
+            aiAccessNeedsConsent: 'A guardian needs to agree before you use AI',
+            aiAccessPaused: 'AI is resting for today',
+            adminSafety: 'Safety administration',
+            adminSafetyHint: 'Reports, safety counts, paper consent forms',
         },
         jp: {
             title: '設定',
@@ -109,6 +132,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             dialogueVoicesHint: '話者ごとにナレーション声を割り当て',
             privacy: 'プライバシー',
             comingSoon: '準備中',
+            safety: 'AI と安全',
+            aiAccess: 'AI の利用設定',
+            aiAccessHint: '生まれた年と月、保護者の同意',
+            aiAccessReady: 'AI を使えます',
+            aiAccessReadyMinor: '保護者の同意ずみ・AI を使えます',
+            aiAccessNeedsAge: 'AI を使うには、生まれた年と月を登録してください',
+            aiAccessNeedsConsent: 'AI を使うには、保護者の同意が必要です',
+            aiAccessPaused: '今日は AI をお休みしています',
+            adminSafety: '安全の管理',
+            adminSafetyHint: '報告、止めた件数、紙の同意書の記録',
         },
     } as const;
 
@@ -132,6 +165,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
         : aiAvailability === 'unreachable'
         ? t.aiUnreachable
         : t.aiChecking;
+
+    const aiAccessSubtext = !aiAccess
+        ? t.aiAccessHint
+        : aiAccess.status === 'needs_age'
+        ? t.aiAccessNeedsAge
+        : aiAccess.status === 'needs_guardian_consent'
+        ? t.aiAccessNeedsConsent
+        : aiAccess.status === 'paused'
+        ? t.aiAccessPaused
+        : aiAccess.audience === 'minor'
+        ? t.aiAccessReadyMinor
+        : t.aiAccessReady;
 
     const voiceSubtext = ttsStatus === 'loading'
         ? t.voiceLoading
@@ -200,6 +245,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                             label={t.notifications}
                             onClick={() => onNavigate(ViewState.NOTIFICATIONS)}
                         />
+                    </SettingsSection>
+
+                    <SettingsSection title={t.safety}>
+                        <SettingsRow
+                            icon={<ShieldCheck size={20} />}
+                            label={t.aiAccess}
+                            subtext={aiAccessSubtext}
+                            onClick={() => onNavigate(ViewState.SETTINGS_AI_ACCESS)}
+                        />
+                        {isAdmin && (
+                            <SettingsRow
+                                icon={<Flag size={20} />}
+                                label={t.adminSafety}
+                                subtext={t.adminSafetyHint}
+                                onClick={() => onNavigate(ViewState.SETTINGS_ADMIN_SAFETY)}
+                            />
+                        )}
                     </SettingsSection>
 
                     <SettingsSection title={t.advanced}>

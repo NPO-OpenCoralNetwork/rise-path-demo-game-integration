@@ -152,6 +152,31 @@ describe('stack.env.example: Phase 0 defaults', () => {
   });
 });
 
+// Phase 0.5 minor safeguards (doc/guides/safety-operations.ja.md): the learner-facing stack keeps
+// guest AI off and never sets the development audience; the api receives all four settings.
+describe('stack.env.example and docker-compose.yml: Phase 0.5 minor safeguards', () => {
+  const values = lines(read(path.join(STACK, 'stack.env.example'))).filter((line) => !line.startsWith('#'));
+  const SAFETY_VARS = ['LLM_GUEST_AI', 'SAFETY_BLOCKS_BEFORE_PAUSE', 'SAFETY_ALERT_WEBHOOK_URL', 'AI_ACCESS_DEV_AUDIENCE'];
+
+  it('does not turn on guest AI or the development audience', () => {
+    assert.ok(!values.some((line) => /^LLM_GUEST_AI=\s*true\s*$/i.test(line)), 'LLM_GUEST_AI is not true');
+    assert.ok(!values.some((line) => line.startsWith('AI_ACCESS_DEV_AUDIENCE=')), 'AI_ACCESS_DEV_AUDIENCE stays unset');
+  });
+
+  it('passes each safety setting to the api service with an empty default', () => {
+    for (const name of SAFETY_VARS) {
+      assert.match(services.api || '', new RegExp(`^ {6}${name}: \\$\\{${name}:-\\}\\s*$`, 'm'), name);
+    }
+  });
+
+  it('gives no other service the safety settings', () => {
+    for (const [name, block] of Object.entries(services)) {
+      if (name === 'api') continue;
+      for (const variable of SAFETY_VARS) assert.ok(!block.includes(variable), `${name} has ${variable}`);
+    }
+  });
+});
+
 describe('deploy-stack.sh', () => {
   const script = read(path.join(STACK, 'scripts/deploy-stack.sh'));
   const guardAt = script.indexOf('== *",tunnel,"*');

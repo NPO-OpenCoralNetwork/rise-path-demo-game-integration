@@ -44,7 +44,7 @@ const parseSse = (raw) => raw
         return { event, data: data ? JSON.parse(data) : null };
     });
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'LLM_GUEST_AI', 'AI_ACCESS_DEV_AUDIENCE'];
 
 describe('/api/v2/llm routes (mock provider)', () => {
     const saved = {};
@@ -54,6 +54,9 @@ describe('/api/v2/llm routes (mock provider)', () => {
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'development';
         process.env.LLM_MOCK_DELAY_MS = '0';
+        // These cases exercise anonymous calls: guests may use AI only with LLM_GUEST_AI=true
+        // (server/middleware/aiAccessGate.js); signed-in callers without a pool count as adults.
+        process.env.LLM_GUEST_AI = 'true';
         resetGatewayForTests();
         resetPoolForTests();
         setPoolForTests(null);
@@ -92,6 +95,20 @@ describe('/api/v2/llm routes (mock provider)', () => {
 
             const other = await fetch(`${base}/curricula`);
             assert.equal(other.status, 401);
+        });
+    });
+
+    it('guests: without LLM_GUEST_AI the POSTs answer 401 sign_in_required before any cap; /llm/status stays open', async () => {
+        delete process.env.LLM_GUEST_AI;
+        await withServer(async (base) => {
+            const tutor = await postJson(`${base}/llm/tutor`, { message: 'hi', lesson: LESSON, anchor: ANCHOR });
+            assert.equal(tutor.status, 401);
+            assert.equal((await tutor.json()).error_type, 'sign_in_required');
+            assert.equal((await fetch(`${base}/llm/status`)).status, 200);
+            // A signed-in caller (dev fallback user, no database: an adult) is served.
+            const signedIn = await postJson(`${base}/llm/tutor`, { message: 'hi', lesson: LESSON, anchor: ANCHOR }, { Authorization: 'Bearer x' });
+            assert.equal(signedIn.status, 200);
+            await signedIn.text();
         });
     });
 

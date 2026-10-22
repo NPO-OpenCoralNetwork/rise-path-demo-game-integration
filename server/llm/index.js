@@ -14,6 +14,11 @@
  * The Gemini key counts only when GEMINI_ALLOWED is exactly "true" (models.config.js
  * isGeminiAllowed: the Gemini API terms exclude services that people under 18 use). A key set
  * without it is ignored, reported as unconfigured, and logged once as a warning.
+ *
+ * Minors (Phase 0.5): a request with `audience: 'minor'` gets the MINOR_SAFETY system part
+ * (prompts/shared.js) appended after its own parts, uncached, so every task a minor reaches
+ * carries the child-safety rules from this one place. The route decides the audience
+ * (server/middleware/aiAccessGate.js sets res.locals.aiAudience); a request body never does.
  */
 import { LlmError, isLlmError, modelMayHaveRun } from './errors.js';
 import {
@@ -24,6 +29,7 @@ import {
   resolveTaskRoute,
 } from './models.config.js';
 import { generateStructured } from './structured.js';
+import { MINOR_SAFETY } from './prompts/shared.js';
 import { createAnthropicProvider } from './providers/anthropic.js';
 import { createGeminiProvider } from './providers/gemini.js';
 import { createMockProvider } from './providers/mock.js';
@@ -44,6 +50,7 @@ import { createMockProvider } from './providers/mock.js';
  * @property {AbortSignal} [signal]
  * @property {{ provider?: ProviderId, model?: string, effort?: Effort, maxTokens?: number }} [override]
  * @property {unknown} [input]                     structured input the prompt was built from (mock + logs)
+ * @property {'adult'|'minor'} [audience]          'minor' appends MINOR_SAFETY (set by routes, never by a body)
  */
 
 /**
@@ -92,6 +99,21 @@ export function warnIfGeminiKeyIgnored(env = process.env, logger = console) {
   if (!geminiKeyIgnored(env)) return false;
   logger.warn(GEMINI_KEY_IGNORED_WARNING);
   return true;
+}
+
+/**
+ * The request as sent to a provider: for a minor, MINOR_SAFETY goes last, as its own uncached
+ * part (the cached prefix before it stays the same for adults and minors).
+ * @param {LlmRequest} req
+ * @returns {LlmRequest}
+ */
+export function withAudienceRules(req) {
+  if (req?.audience !== 'minor') return req;
+  /** @type {SystemPart[]} */
+  const parts = typeof req.system === 'string'
+    ? [{ text: req.system, cache: true }]
+    : Array.isArray(req.system) ? req.system : [];
+  return { ...req, system: [...parts, { text: MINOR_SAFETY }] };
 }
 
 /** @type {LlmUsage} */
@@ -199,6 +221,7 @@ export function createGateway(options = {}) {
       result?.truncated ? 'truncated=1' : '',
       error ? `error=${error.code}` : '',
       req.userId ? `user=${String(req.userId).slice(0, 8)}` : '',
+      req.audience === 'minor' ? 'audience=minor' : '',
     ];
     (error ? logger.warn : logger.info).call(logger, parts.filter(Boolean).join(' '));
   }
@@ -222,11 +245,12 @@ export function createGateway(options = {}) {
   return {
     /**
      * Non-streaming call. With `req.schema`, `result.data` is the zod-validated object.
-     * @param {LlmRequest} req
+     * @param {LlmRequest} request
      * @returns {Promise<LlmResult>}
      */
-    async generate(req) {
-      assertRequest(req);
+    async generate(request) {
+      assertRequest(request);
+      const req = withAudienceRules(request);
       let lastError = null;
       // Whether any attempt (or a structured first turn) already ran a model: the final error
       // then carries modelRan, so a guest's quota is not given back for a billed call.
@@ -268,11 +292,12 @@ export function createGateway(options = {}) {
      * they arrive as one final `error` event. Falls over to the next provider only before
      * any text has been sent. A reply cut off by the output limit after text was sent ends
      * with `done` (`truncated: true`) carrying that text, not with an error.
-     * @param {LlmRequest} req
+     * @param {LlmRequest} request
      * @returns {AsyncGenerator<LlmEvent>}
      */
-    async *stream(req) {
+    async *stream(request) {
       let routes;
+      const req = withAudienceRules(request);
       try {
         assertRequest(req);
         routes = plan(req.task, req.override);
@@ -343,6 +368,21 @@ export function createGateway(options = {}) {
         return plan(task).length > 0;
       } catch {
         return false;
+      }
+    },
+
+    /**
+     * The provider a call for `task` would try first ('mock' when only the mock fallback can
+     * serve it), or null when none can. The safety screen uses it to refuse the mock in
+     * production before calling.
+     * @param {string} task
+     * @returns {ProviderId | null}
+     */
+    firstProvider(task) {
+      try {
+        return plan(task)[0]?.provider ?? null;
+      } catch {
+        return null;
       }
     },
 

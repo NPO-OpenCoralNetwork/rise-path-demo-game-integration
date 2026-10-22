@@ -274,12 +274,16 @@ describe('POST /api/v2/ai/curriculum-drafts uses the shared version writer', () 
     };
 
     const withEnv = async (fn) => {
-        const saved = { token: process.env.RISE_PATH_BRIDGE_TOKEN, db: process.env.DATABASE_URL_PHASE1 };
+        const saved = { token: process.env.RISE_PATH_BRIDGE_TOKEN, db: process.env.DATABASE_URL_PHASE1, audience: process.env.AI_ACCESS_DEV_AUDIENCE };
         process.env.RISE_PATH_BRIDGE_TOKEN = '';
         delete process.env.DATABASE_URL_PHASE1;
+        // The dev fallback user is a learner JWT caller: the adults-only gate (aiAccessGate.js) sees an adult.
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult';
         try {
             return await fn();
         } finally {
+            if (saved.audience === undefined) delete process.env.AI_ACCESS_DEV_AUDIENCE;
+            else process.env.AI_ACCESS_DEV_AUDIENCE = saved.audience;
             if (saved.token === undefined) delete process.env.RISE_PATH_BRIDGE_TOKEN;
             else process.env.RISE_PATH_BRIDGE_TOKEN = saved.token;
             if (saved.db === undefined) delete process.env.DATABASE_URL_PHASE1;

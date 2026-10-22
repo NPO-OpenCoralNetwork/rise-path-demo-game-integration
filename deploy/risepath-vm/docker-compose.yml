@@ -55,6 +55,13 @@ services:
       # Gemini API terms; stack.env.example).
       GEMINI_ALLOWED: ${GEMINI_ALLOWED:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Minor safeguards (Phase 0.5; stack.env.example). Empty = the safe defaults: no guest AI,
+      # pause after 10 blocked inputs a day, alerts to AI_CAP_ALERT_WEBHOOK_URL. The dev audience is
+      # ignored in production (the api warns when it is set).
+      LLM_GUEST_AI: ${LLM_GUEST_AI:-}
+      SAFETY_BLOCKS_BEFORE_PAUSE: ${SAFETY_BLOCKS_BEFORE_PAUSE:-}
+      SAFETY_ALERT_WEBHOOK_URL: ${SAFETY_ALERT_WEBHOOK_URL:-}
+      AI_ACCESS_DEV_AUDIENCE: ${AI_ACCESS_DEV_AUDIENCE:-}
       KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
       KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}
       KOKORO_TTS_DEFAULT_VOICE_EN: ${KOKORO_TTS_DEFAULT_VOICE_EN:-af_bella}

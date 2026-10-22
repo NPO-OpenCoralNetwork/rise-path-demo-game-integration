@@ -23,6 +23,13 @@
  * unreachable or overloaded, our key rejected, rate limited) and keeps it when a model may have
  * produced output (timeouts, refusals, cut-off or invalid replies, a cancelled request). Any other
  * error (the database, say) keeps it too. A refund never depends on the wording of an error message.
+ *
+ * Minors (Phase 0.5): server.js runs the AI access gate (server/middleware/aiAccessGate.js) before
+ * this route, so res.locals.aiAudience is 'adult' or 'minor'. For a minor every stage screens the
+ * learner's text before the model and the stage result before anything is saved
+ * (server/services/aiGenerator.js): a block answers 422 content_blocked { category, support }, a
+ * failed check 503 safety_check_unavailable. A block before the model ran gives the unit back; one
+ * after it (the result held back) keeps it.
  */
 import express from 'express';
 import { getPool } from '../db.js';
@@ -41,6 +48,7 @@ import {
 import { reserveDailyCap } from '../middleware/dailyCaps.js';
 import { isLlmError, modelMayHaveRun, toClientError } from '../llm/errors.js';
 import { isUuid } from '../utils/ids.js';
+import { isSafetyError, safetyErrorResponse } from '../safety/moderation.js';
 
 const router = express.Router();
 
@@ -324,6 +332,8 @@ router.post('/generate', async (req, res) => {
 
     // --- Get Kit (cached) ---
     const kit = await getCachedKit(userId, getKit);
+    // Who the stages are for (the access gate decided); minors' stages are screened.
+    const stageOptions = { audience: res.locals?.aiAudience === 'minor' ? 'minor' : 'adult', ip: req.ip ?? null };
 
     // --- Stage Router ---
 
@@ -331,7 +341,7 @@ router.post('/generate', async (req, res) => {
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
-      const result = await generateRequirements(message, userId, kit);
+      const result = await generateRequirements(message, userId, kit, stageOptions);
       const title = result.intake?.goal || message.slice(0, 100);
 
       let draftId = curriculum_id;
@@ -378,7 +388,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const intake = draft.rows[0].intake_json;
-      const result = await generateRoadmap(intake, userId, kit);
+      const result = await generateRoadmap(intake, userId, kit, stageOptions);
 
       // Update draft
       await pool.query(
@@ -409,7 +419,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const { intake_json: intake, modules_json: modules } = draft.rows[0];
-      const result = await generateCurriculum(intake, modules, userId, kit);
+      const result = await generateCurriculum(intake, modules, userId, kit, stageOptions);
 
       if (!result.curriculum) {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
@@ -458,7 +468,7 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
-        const result = await generateRequirements(message, userId, kit);
+        const result = await generateRequirements(message, userId, kit, stageOptions);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()
@@ -487,7 +497,7 @@ router.post('/generate', async (req, res) => {
         const intake = draft.rows[0].intake_json;
         // Append feedback to intake for re-generation
         const modifiedIntake = { ...intake, revision_feedback: message };
-        const result = await generateRoadmap(modifiedIntake, userId, kit);
+        const result = await generateRoadmap(modifiedIntake, userId, kit, stageOptions);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET modules_json = $1, updated_at = NOW()
@@ -513,6 +523,15 @@ router.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request parameters' });
 
   } catch (err) {
+    // A minor's stage held back by the safety screen (events are recorded by the screen). Before
+    // the model ran (input) nothing was generated, so the unit goes back, unless the classifier
+    // made the call: it cost money, and the charged unit bounds each user's classifier calls.
+    if (isSafetyError(err)) {
+      if (err.direction === 'input' && !err.classifierRan) void cap?.refund();
+      const { status, body: errorBody } = safetyErrorResponse(err);
+      if (res.headersSent) return;
+      return res.status(status).json(errorBody);
+    }
     // The gateway logs provider details; the client gets a fixed answer by code.
     console.error('[AI Generate] Error:', isLlmError(err) ? `${err.code} (${err.provider ?? 'no provider'})` : err);
 

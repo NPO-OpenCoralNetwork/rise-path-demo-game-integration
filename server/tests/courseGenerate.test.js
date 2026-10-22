@@ -1,7 +1,7 @@
 // /api/v2/ai/generate on the LLM gateway: JSON replies (server/services/aiGenerator.js
 // parseJsonReply), the stage calls, the prompts, and the daily cap refund rules by LlmError code
 // (server/routes/ai.js).
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetGatewayForTests, setGatewayForTests } from '../llm/index.js';
 import { LlmError } from '../llm/errors.js';
@@ -16,6 +16,7 @@ import {
 } from '../services/aiGenerator.js';
 import { JSON_ONLY_RULE, buildCurriculumPrompt, buildRequirementsPrompt, buildRoadmapPrompt } from '../services/aiPrompts.js';
 import { courseGenerationError, refundsCourseGeneration } from '../routes/ai.js';
+import { isSafetyError, resetSafetyScreenCacheForTests } from '../safety/moderation.js';
 
 /** A gateway double that records generate() requests and answers with `text`. */
 const fakeGateway = (text, extra = {}) => {
@@ -158,6 +159,76 @@ describe('aiGenerator stages call the gateway (task course.generate)', () => {
         assert.equal(isCourseGenerationAvailable(), false);
         setGatewayForTests(fakeGateway('', { status: () => ({ tasks: { 'course.generate': { provider: 'anthropic' } } }) }));
         assert.equal(isCourseGenerationAvailable(), true);
+    });
+});
+
+describe('aiGenerator stages for minors (screened input and output)', () => {
+    /** Answers safety.screen with `verdict(input)` and course.generate with `text`; records both. */
+    const screeningGateway = (text, verdict = () => ({ verdict: 'allow', category: 'none', support: 'no' })) => {
+        const requests = [];
+        return {
+            requests,
+            screens: () => requests.filter((r) => r.task === 'safety.screen'),
+            stages: () => requests.filter((r) => r.task === COURSE_GENERATE_TASK),
+            firstProvider: () => 'anthropic',
+            async generate(req) {
+                requests.push(req);
+                if (req.task === 'safety.screen') {
+                    const data = verdict(req.input);
+                    return { provider: 'anthropic', model: 'm', text: JSON.stringify(data), data, stopReason: 'end', usage: {} };
+                }
+                return { provider: 'anthropic', model: 'm', text, stopReason: 'end', usage: {} };
+            },
+            async *stream() {},
+            status: () => ({}),
+        };
+    };
+    const quietInfo = console.info;
+    beforeEach(() => {
+        resetSafetyScreenCacheForTests();
+        console.info = () => {};
+    });
+    afterEach(() => {
+        console.info = quietInfo;
+    });
+
+    it('adults: no screening, audience adult on the stage call', async () => {
+        const gateway = screeningGateway('{"message":"plan","intake":{"goal":"SQL"}}');
+        setGatewayForTests(gateway);
+        await generateRequirements('Teach me SQL', 'u1', {});
+        assert.equal(gateway.screens().length, 0);
+        assert.equal(gateway.stages()[0].audience, 'adult');
+    });
+
+    it('minors: the topic is screened, the stage runs as minor, and its result is screened before it is returned', async () => {
+        const gateway = screeningGateway('{"message":"plan","intake":{"goal":"fractions"}}');
+        setGatewayForTests(gateway);
+        const result = await generateRequirements('分数を学びたい', 'u1', {}, { audience: 'minor' });
+        assert.deepEqual(result, { message: 'plan', intake: { goal: 'fractions' } });
+        assert.deepEqual(gateway.requests.map((r) => r.task === 'safety.screen' ? `screen:${r.input.direction}` : 'stage'), ['screen:input', 'stage', 'screen:output']);
+        assert.equal(gateway.stages()[0].audience, 'minor');
+        assert.match(gateway.screens()[1].input.text, /plan\nfractions/);
+    });
+
+    it('minors: a blocked topic throws before the model (direction input); a blocked result after it (output)', async () => {
+        const block = { verdict: 'block', category: 'violence', support: 'no' };
+        const inputBlocked = screeningGateway('{"message":"plan","intake":{"goal":"x"}}', (input) => (input.direction === 'input' ? block : { verdict: 'allow', category: 'none', support: 'no' }));
+        setGatewayForTests(inputBlocked);
+        await assert.rejects(generateRequirements('something', 'u1', {}, { audience: 'minor' }), (error) => isSafetyError(error) && error.direction === 'input');
+        assert.equal(inputBlocked.stages().length, 0);
+
+        resetSafetyScreenCacheForTests();
+        const outputBlocked = screeningGateway('{"message":"m","modules":[{"module_id":"m1"}]}', (input) => (input.direction === 'output' ? block : { verdict: 'allow', category: 'none', support: 'no' }));
+        setGatewayForTests(outputBlocked);
+        await assert.rejects(generateRoadmap({ goal: 'g', revision_feedback: 'shorter please' }, 'u1', {}, { audience: 'minor' }), (error) => isSafetyError(error) && error.direction === 'output' && error.category === 'violence');
+        assert.match(outputBlocked.screens()[0].input.text, /shorter please/, 'revision feedback is screened as input');
+    });
+
+    it('minors: a curriculum reply without a curriculum is not screened (nothing is saved or shown)', async () => {
+        const gateway = screeningGateway('Sorry, I cannot.');
+        setGatewayForTests(gateway);
+        assert.deepEqual(await generateCurriculum({}, [], 'u1', {}, { audience: 'minor' }), { curriculum: null, rawText: 'Sorry, I cannot.' });
+        assert.equal(gateway.screens().length, 0);
     });
 });
 

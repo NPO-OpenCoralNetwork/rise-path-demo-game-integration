@@ -16,7 +16,7 @@ const LESSON = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe
 const ANCHOR = { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'プロンプトは「目的・制約・例」の順に書くと伝わりやすい。' };
 const quietLogger = { warn: () => {} };
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'LLM_GUEST_AI'];
 
 /** Listens on 127.0.0.1; tests that need the gate to see a non-loopback caller turn the exemption off. */
 const listen = async (app, handler) => {
@@ -207,6 +207,7 @@ describe('origin gate in the server.js stack', () => {
         process.env.ORIGIN_SECRET = SECRET;
         process.env.TRUST_PROXY = '1';
         process.env.LLM_GUEST_DAILY_PER_IP = '1';
+        process.env.LLM_GUEST_AI = 'true'; // guests may use AI only with this (aiAccessGate.js)
         await withApp({ exemptLoopback: false, logger: quietLogger }, async (base) => {
             const ask = (forwardedFor) => fetch(`${base}/api/v2/llm/tutor`, {
                 method: 'POST',

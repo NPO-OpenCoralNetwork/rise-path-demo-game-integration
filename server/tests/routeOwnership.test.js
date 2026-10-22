@@ -20,7 +20,7 @@ const JOB_B = 'b0000000-0000-4000-8000-000000000004';
 const AS_A = { Authorization: 'Bearer token-a' };
 const AS_B = { Authorization: 'Bearer token-b' };
 
-const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'RISE_PATH_BRIDGE_TOKEN', 'DATABASE_URL_PHASE1', 'TRUST_PROXY', 'ORIGIN_SECRET'];
+const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'RISE_PATH_BRIDGE_TOKEN', 'DATABASE_URL_PHASE1', 'TRUST_PROXY', 'ORIGIN_SECRET', 'AI_ACCESS_DEV_AUDIENCE'];
 
 const PROFILE_ROW = {
     id: PROFILE_B,
@@ -136,6 +136,7 @@ describe('routes read only the caller\'s own rows', () => {
         for (const key of ENV_KEYS) saved[key] = process.env[key];
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'development';
+        process.env.AI_ACCESS_DEV_AUDIENCE = 'adult'; // past the AI access gate (aiAccessGate.js) without age rows
         pool = createOwnedPool();
         setPoolForTests(pool);
         resetDailyCapsForTests();

@@ -9,6 +9,7 @@ import {
   AssessmentProfileSource,
   loadAssessmentProfile,
 } from '../../../../services/learnerProfileService';
+import { AiNotice } from '../../../ui/AiNotice';
 
 interface ProfileDiagnosisViewProps {
   onNavigate: (view: ViewState) => void;
@@ -71,6 +72,7 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
       loading: 'Loading diagnosis…',
       demoSourceNote: 'Demo data — analysis accuracy may be limited.',
       dbSourceNote: 'Synced from your saved learner profile.',
+      noStrengths: 'No AI analysis of your strengths yet.',
     },
     jp: {
       title: 'AI診断',
@@ -92,6 +94,7 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
       loading: '診断結果を読み込み中…',
       demoSourceNote: 'デモデータ — 分析精度が限定的です。',
       dbSourceNote: '保存済みの学習プロフィールと同期しています。',
+      noStrengths: 'AIによる強みの分析は、まだありません。',
     }
   } as const;
 
@@ -217,11 +220,25 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
                 </div>
               ))}
               {(!profile.aiAdvice?.strengths || profile.aiAdvice.strengths.length === 0) && (
-                <div className="text-sm text-slate-500">Analyzing strengths…</div>
+                <div className="text-sm text-slate-500">{t.noStrengths}</div>
               )}
             </div>
           </div>
         </div>
+
+        {/* The strengths, learning style and motivation above come from the stored AI insight
+            (PersonalAssessmentView stores aiAdvice only when the AI wrote it). */}
+        {profile.aiAdvice && (
+          <AiNotice
+            surface="assessment_insight"
+            answer={[
+              ...(profile.aiAdvice.strengths ?? []).map((item) => `${item.title}: ${item.description}`),
+              profile.learningStyle,
+              profile.motivation,
+            ].filter(Boolean).join('\n')}
+            className="rounded-control border border-line bg-surface px-4 py-3"
+          />
+        )}
 
         <section className="rounded-[2.5rem] bg-white border border-slate-100 p-8 shadow-xl">
           <div className="flex items-center justify-between mb-6">

@@ -41,6 +41,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `011_seed_claude_code_portal.sql` | Learning Hub に Claude Code コースのカードを追加 |
 | `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
 | `013_ai_daily_usage.sql` | 有料AI機能の日次利用カウンタ（ユーザー別・接続元アドレス別・全体の合計。日本時間の日付で区切る） |
+| `014_minor_safeguards.sql` | 未成年の保護（Phase 0.5）: `user_age`（生年月のみ。日は常に 1）、`account_consents`（保護者の AI 利用同意。追記のみ、取り消しは `revoked_at`）、`ai_safety_events`（ブロック・報告・相談先の表示。報告の本文は 90 日、イベントは 365 日で整理） |
 
 ### pgvector（RAG のベクトル検索）
 

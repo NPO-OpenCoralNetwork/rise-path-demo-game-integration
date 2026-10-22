@@ -16,12 +16,14 @@ import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
 import { generateImagePreview, isImageGenerationUnavailable } from '../../../services/curriculumApi';
 import { dailyLimitResetAt, dailyLimitScope, nextJstMidnight } from '../../../services/aiDailyLimit';
+import { aiAccessErrorKind } from '../../../services/aiAccessRules';
 import {
     checkTtsAvailable,
     getDisplayName,
     loadTtsPreferences,
 } from '../../../services/ttsPreferencesService';
 import VoiceQuickSwitchSheet from '../settings/VoiceQuickSwitchSheet';
+import { AiNotice } from '../../ui/AiNotice';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -308,6 +310,20 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
             });
         return () => { active = false; };
     }, [language, location.key]);
+
+    // The lesson as plain text, for a report on it (the AI notice under the title).
+    const lessonReportText = useMemo(() => {
+        const lines: string[] = [getText(lesson.title, language), getText(lesson.subtitle, language)];
+        for (const section of lesson.sections ?? []) {
+            lines.push(getText(section.title, language));
+            for (const block of section.content ?? []) {
+                if (block.type === 'text' || block.type === 'callout') lines.push(getText(block.text, language));
+                else if (block.type === 'list') block.items.forEach((item) => lines.push(getText(item, language)));
+                else if (block.type === 'code') lines.push(block.code);
+            }
+        }
+        return lines.filter((line) => line && line.trim()).join('\n');
+    }, [lesson, language]);
 
     const t = {
         en: {
@@ -750,6 +766,14 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                 {getText(lesson.subtitle, language)}
                             </p>
                             {personalization && <PersonalizationBar p={personalization} lang={language} />}
+                            {/* This lesson was written by AI: disclosure and report. */}
+                            <AiNotice
+                                surface="generated_lesson"
+                                answer={lessonReportText}
+                                language={language}
+                                context={{ ...(courseId ? { courseId } : {}), ...(lesson.id ? { lessonId: String(lesson.id) } : {}) }}
+                                className="mt-6 rounded-control border border-line bg-sunken px-3 py-2 text-left"
+                            />
                         </header>
 
                         <div className="space-y-16">
@@ -1433,10 +1457,11 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                     const paused = scope === 'off';
                     imageLimit = { paused, until: paused ? Infinity : dailyLimitResetAt(err) ?? nextJstMidnight(Date.now()) };
                     setLimited(paused ? 'paused' : 'daily');
-                } else if (isImageGenerationUnavailable(err)) {
+                } else if (isImageGenerationUnavailable(err) || aiAccessErrorKind(err)) {
                     // 503 image_generation_unavailable: this deployment does not generate images.
                     // Each block still asks once, since the server answers images it already
-                    // cached (free, before this check); this block does not ask again.
+                    // cached (free, before this check); this block does not ask again. An access
+                    // refusal (403 adults_only for a learner under 18, age_required, …) reads the same.
                     setLimited('unavailable');
                 } else {
                     // Any other failure: this block does not ask again by itself.

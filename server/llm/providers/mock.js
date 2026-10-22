@@ -269,9 +269,24 @@ function mockCourseGenerate(input) {
   };
 }
 
+// --- safety.screen ----------------------------------------------------------------
+
+/**
+ * Explicit fixture, so the mock never blocks by accident: allow unless the screened text holds
+ * "[[mock-block]]" (block, category other) or "[[mock-support]]" (block, self_harm, support).
+ * `input` is { direction, text } from server/safety/moderation.js.
+ */
+function mockSafetyScreen(input) {
+  const text = String(input?.text ?? '');
+  if (text.includes('[[mock-support]]')) return { verdict: 'block', category: 'self_harm', support: 'yes' };
+  if (text.includes('[[mock-block]]')) return { verdict: 'block', category: 'other', support: 'no' };
+  return { verdict: 'allow', category: 'none', support: 'no' };
+}
+
 const FIXTURES = {
   'writing.feedback': mockWritingFeedback,
   'assessment.insight': mockPersonalityInsight,
+  'safety.screen': mockSafetyScreen,
 };
 
 /**

@@ -2738,9 +2738,20 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
 // /ai/generate and /ai/drafts require auth in strict mode, so they go through apiFetch (Bearer
 // token). Errors carry the HTTP status so CourseGeneratorView can tell 401 from 503/504, and
 // error_type, kind, scope and reset_at from the body (with Retry-After) so a daily cap (error_type
-// 'daily_limit_reached', services/aiDailyLimit.ts) is recognised.
-const aiHttpError = (message: string, status: number, body?: unknown, retryAfter?: string | null): Error =>
-  Object.assign(new Error(message), { status, ...dailyLimitFields(body, retryAfter) });
+// 'daily_limit_reached', services/aiDailyLimit.ts) is recognised. The minor safeguards (Phase 0.5)
+// add the access gate's error_type (403 age_required, guardian_consent_required, ai_paused_safety,
+// adults_only) and the safety screen's (422 content_blocked with category and support, 503
+// safety_check_unavailable); the body rides along as `body` for services/safetyApi.ts aiRefusalOf.
+const aiHttpError = (message: string, status: number, body?: unknown, retryAfter?: string | null): Error => {
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  return Object.assign(new Error(message), {
+    status,
+    ...dailyLimitFields(body, retryAfter),
+    ...(typeof record.category === 'string' ? { category: record.category } : {}),
+    ...(typeof record.support === 'boolean' ? { support: record.support } : {}),
+    ...(body && typeof body === 'object' ? { body } : {}),
+  });
+};
 
 export const sendAiChat = async (message: string, sessionId?: string, attachments: any[] = []) => {
   if (USE_DEMO_MODE) {
@@ -2792,7 +2803,9 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
       throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
-      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
+      // A 503 may carry an error_type (safety_check_unavailable, ai_access_unavailable).
+      const err = await response.json().catch(() => ({}));
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status, err);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -2904,7 +2917,9 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
       throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
-      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
+      // A 503 may carry an error_type (safety_check_unavailable, ai_access_unavailable).
+      const err = await response.json().catch(() => ({}));
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status, err);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));

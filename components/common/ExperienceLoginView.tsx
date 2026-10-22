@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ArrowRight, Fingerprint, Lock, Mail, ShieldCheck, Terminal, User, UserCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -62,6 +62,7 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             error: 'Authentication failed. Please check your credentials.',
             errorAlreadyRegistered: 'This email is already registered. Please sign in.',
             placeholder: 'identity@risepath.system',
+            aiSafety: 'AI safety: for children and guardians',
         },
         jp: {
             title: 'システム認証',
@@ -89,6 +90,7 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             error: '認証に失敗しました。情報を確認してください。',
             errorAlreadyRegistered: 'このメールアドレスは既に登録されています。ログインしてください。',
             placeholder: 'identity@risepath.system',
+            aiSafety: 'AI の安全について（子どもと保護者の方へ）',
         },
     } as const;
 
@@ -381,6 +383,12 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                         </button>
                     )}
                 </div>
+
+                <p className="mt-6 text-center text-sm">
+                    <Link to="/ai-safety" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                        {t.aiSafety}
+                    </Link>
+                </p>
 
                 <div className="mt-8 text-center">
                     <div className="inline-flex items-center gap-2 text-[10px] font-mono text-white/20 uppercase tracking-[0.3em]">

@@ -66,6 +66,7 @@ import {
 } from '../tools/core/learnerMemory.js';
 import { requestTts } from '../tools/core/kokoroTts.js';
 import { resolveMcpUserId, TURN_ARG } from '../tools/core/mcpUserScope.js';
+import { adultDraftRefusal } from '../tools/core/mcpAiAccess.js';
 import { verifyMessagesSessionAuth } from './sseMessagesAuth.js';
 import { loadEnv } from '../tools/core/env.js';
 import { DOMAINS } from '../tools/core/domains.js';
@@ -454,8 +455,12 @@ policyTool(
     },
     async (args, extra) => {
         const t = Date.now();
-        try {            const userId = await requireScopedUser(args.user_id, extra, { toolName: 'save-curriculum-draft', startTime: t });
+        try {
+            const userId = await requireScopedUser(args.user_id, extra, { toolName: 'save-curriculum-draft', startTime: t });
             if (typeof userId !== 'string') return userId;
+            // A learner's own JWT session: outside-AI drafts are adults only (tools/core/mcpAiAccess.js).
+            const refusal = await adultDraftRefusal({ extra, sessions });
+            if (refusal) return toolResult(refusal, { toolName: 'save-curriculum-draft', startTime: t });
 
             return toolResult(await saveDraft({
                 portalId: args.portal_id,
@@ -561,6 +566,8 @@ policyTool(
             if (store === 'db') {
                 userId = await requireScopedUser(user_id, extra, { toolName: 'lesson-upsert-draft', startTime: t });
                 if (typeof userId !== 'string') return userId;
+                const refusal = await adultDraftRefusal({ extra, sessions });
+                if (refusal) return toolResult(refusal, { toolName: 'lesson-upsert-draft', startTime: t });
             }
             return toolResult(await upsertLessonDraft({
                 courseSlug: course_slug,
