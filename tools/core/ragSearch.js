@@ -125,6 +125,31 @@ const whereClause = (scope, extra = []) => {
 };
 
 /**
+ * The materials a user may search: their own uploads and materials an operator made visible to
+ * every user (`materials.meta->>'visibility' = 'public'`, the same word curricula.visibility uses),
+ * ready ones only. Uploads are private, so a search is never run without a user.
+ * @param {string} userId
+ * @returns {ChunkScope}
+ */
+function searchableMaterialScope(userId) {
+    return {
+        conditions: ["m.status = 'ready'", "(m.user_id = $1 OR m.meta->>'visibility' = 'public')"],
+        params: [userId],
+    };
+}
+
+/** Most results one search returns. */
+const MAX_SEARCH_RESULTS = 10;
+const DEFAULT_SEARCH_RESULTS = 3;
+
+/** @param {unknown} value @returns {number} an integer in 1..MAX_SEARCH_RESULTS */
+const clampResults = (value) => {
+    const n = Math.trunc(Number(value ?? DEFAULT_SEARCH_RESULTS));
+    if (!Number.isFinite(n)) return DEFAULT_SEARCH_RESULTS;
+    return Math.min(MAX_SEARCH_RESULTS, Math.max(1, n));
+};
+
+/**
  * "Not embedded with the model in `placeholder`" (another model, or NULL). Same rows as
  * `IS DISTINCT FROM`, written so the material_chunks_embedding_model_idx btree index
  * (migration 010) can answer it with range scans.
@@ -265,12 +290,20 @@ export async function keywordSearchChunks(pool, { query, scope, limit }) {
  * @param {Object} params
  * @param {string} params.query - Search query text
  * @param {string} params.domain - Learning domain filter (e.g. 'blender-3d')
- * @param {number} [params.maxResults=3] - Maximum results to return
- * @param {string} [params.userId] - User ID for scoping materials
+ * @param {number} [params.maxResults=3] - Maximum results to return (clamped to 1..MAX_SEARCH_RESULTS)
+ * @param {string} params.userId - Required: searches this user's materials plus public ones
  */
-export async function searchContent({ query, domain, maxResults = 3, userId }) {
+export async function searchContent({ query, domain, maxResults = DEFAULT_SEARCH_RESULTS, userId }) {
+    const owner = typeof userId === 'string' ? userId.trim() : '';
+    if (!owner) {
+        return { results: [], error: 'userId is required: uploaded materials are searched per user', error_type: 'validation' };
+    }
+
     const pool = getPool();
     if (!pool) return { results: [], error: 'DB not configured', error_type: 'db_connection' };
+
+    const scope = searchableMaterialScope(owner);
+    const limit = clampResults(maxResults);
 
     try {
         // First check if pgvector extension is available
@@ -280,9 +313,9 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
         const hasVector = typeCheck.rowCount > 0;
 
         if (hasVector) {
-            return await vectorSearch({ pool, query, domain, maxResults, userId });
+            return await vectorSearch({ pool, query, domain, maxResults: limit, scope });
         } else {
-            return await keywordFallback({ pool, query, domain, maxResults, userId });
+            return await keywordFallback({ pool, query, domain, maxResults: limit, scope });
         }
     } catch (err) {
         const classified = classifyDbError(err, 'ragSearch');
@@ -291,20 +324,14 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
 }
 
 /**
- * Vector search using pgvector cosine distance.
+ * Vector search using pgvector cosine distance over the chunks in `scope`.
  * Generates embedding for query via Gemini, then searches material_chunks.
+ * @param {{ pool: any, query: string, domain?: string, maxResults: number, scope: ChunkScope }} params
  */
-async function vectorSearch({ pool, query, domain, maxResults, userId }) {
+async function vectorSearch({ pool, query, domain, maxResults, scope }) {
     if (!isEmbeddingConfigured()) {
         // No API key — fall back to keyword search
-        return await keywordFallback({ pool, query, domain, maxResults, userId });
-    }
-
-    /** @type {ChunkScope} */
-    const scope = { conditions: ['m.status = \'ready\''], params: [] };
-    if (userId) {
-        scope.params.push(userId);
-        scope.conditions.push(`m.user_id = $${scope.params.length}`);
+        return await keywordFallback({ pool, query, domain, maxResults, scope });
     }
 
     // Vectors from different models are never compared. With no EMBEDDING_MODEL chunks in scope
@@ -312,7 +339,7 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
     const coverage = await embeddingCoverage(pool, scope);
     warnLegacyEmbeddingsOnce(coverage.legacy);
     if (!coverage.current) {
-        return await keywordFallback({ pool, query, domain, maxResults, userId, scope, reason: 'reembed_required' });
+        return await keywordFallback({ pool, query, domain, maxResults, scope, reason: 'reembed_required' });
     }
 
     let queryVector;
@@ -320,33 +347,25 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
         [queryVector] = await embedTexts([query]);
     } catch {
         // Embedding generation failed — fall back to keyword
-        return await keywordFallback({ pool, query, domain, maxResults, userId });
+        return await keywordFallback({ pool, query, domain, maxResults, scope });
     }
 
     // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older rows).
-    const conditions = ['m.status = \'ready\'', 'c.embedding_model = $2'];
-    const params = [JSON.stringify(queryVector), EMBEDDING_MODEL];
-    let paramIdx = 3;
-
-    if (userId) {
-        conditions.push(`m.user_id = $${paramIdx++}`);
-        params.push(userId);
-    }
-
-    // Note: domain filter on materials table (if metadata column exists)
-    // For now, search across all materials and let relevance do the filtering
-
-    params.push(maxResults);
+    // Note: domain is not filtered on materials yet; relevance does the filtering.
+    const params = [...scope.params, JSON.stringify(queryVector), EMBEDDING_MODEL, maxResults];
+    const vectorParam = `$${scope.params.length + 1}`;
+    const modelParam = `$${scope.params.length + 2}`;
+    const limitParam = `$${scope.params.length + 3}`;
 
     const result = await pool.query(
         `SELECT c.content, c.chunk_index,
-                (c.embedding <=> $1::vector) as distance,
+                (c.embedding <=> ${vectorParam}::vector) as distance,
                 m.id as material_id
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
-         ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}
+         ${whereClause(scope, [`c.embedding_model = ${modelParam}`])}
          ORDER BY distance ASC
-         LIMIT $${paramIdx}`,
+         LIMIT ${limitParam}`,
         params
     );
 
@@ -375,18 +394,16 @@ async function vectorSearch({ pool, query, domain, maxResults, userId }) {
 /**
  * Keyword-based fallback when pgvector or Gemini API is unavailable, or when no chunk in `scope`
  * is embedded with EMBEDDING_MODEL (`reason: 'reembed_required'`).
- * Uses PostgreSQL ILIKE for basic text matching.
- * @param {{ pool: any, query: string, domain?: string, maxResults: number, userId?: string,
- *   scope?: ChunkScope, reason?: string }} params
+ * Uses PostgreSQL ILIKE for basic text matching, over the same chunks as the vector search.
+ * @param {{ pool: any, query: string, domain?: string, maxResults: number, scope: ChunkScope,
+ *   reason?: string }} params
  */
-async function keywordFallback({ pool, query, domain, maxResults, userId, scope, reason }) {
+async function keywordFallback({ pool, query, domain, maxResults, scope, reason }) {
     if (extractKeywords(query).length === 0) {
         return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...(reason ? { fallback_reason: reason } : {}) };
     }
 
-    /** @type {ChunkScope} */
-    const searchScope = scope ?? { conditions: userId ? ['m.user_id = $1'] : [], params: userId ? [userId] : [] };
-    const rows = await keywordSearchChunks(pool, { query, scope: searchScope, limit: maxResults });
+    const rows = await keywordSearchChunks(pool, { query, scope, limit: maxResults });
 
     return {
         ...(reason ? { fallback_reason: reason } : {}),
