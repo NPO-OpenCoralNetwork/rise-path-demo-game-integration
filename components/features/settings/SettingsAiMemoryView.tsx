@@ -43,6 +43,7 @@ const SettingsAiMemoryView: React.FC<SettingsAiMemoryViewProps> = ({ onNavigate 
             empty: 'No memories yet. Complete an assessment or tell the coach to remember something in chat.',
             disabled: 'AI memory is off. Enable it in Privacy settings first.',
             degraded: 'Memory service is temporarily unavailable. Try again later.',
+            notConfigured: 'AI personal memory is not offered on this server.',
             delete: 'Remove',
             type: 'Type',
             loading: 'Loading…',
@@ -55,6 +56,7 @@ const SettingsAiMemoryView: React.FC<SettingsAiMemoryViewProps> = ({ onNavigate 
             empty: 'まだ記憶がありません。診断を完了するか、チャットで「覚えておいて」と伝えてください。',
             disabled: 'AI 記憶はオフです。プライバシー設定で有効にしてください。',
             degraded: '記憶サービスが一時的に利用できません。後でもう一度お試しください。',
+            notConfigured: 'このサーバーでは AI 個人記憶を提供していません。',
             delete: '削除',
             type: '種類',
             loading: '読み込み中…',
@@ -70,6 +72,11 @@ const SettingsAiMemoryView: React.FC<SettingsAiMemoryViewProps> = ({ onNavigate 
         try {
             const privacy = await loadAiMemoryPrivacy();
             setEnabled(privacy.enabled);
+            if (!privacy.available) {
+                setMemories([]);
+                setStatus('not_configured');
+                return;
+            }
             if (!privacy.enabled) {
                 setMemories([]);
                 setStatus('disabled');
@@ -102,7 +109,9 @@ const SettingsAiMemoryView: React.FC<SettingsAiMemoryViewProps> = ({ onNavigate 
         }
     }, [t.errorGeneric]);
 
-    const emptyMessage = !enabled
+    const emptyMessage = status === 'not_configured'
+        ? t.notConfigured
+        : !enabled
         ? t.disabled
         : status === 'degraded'
         ? t.degraded
@@ -124,7 +133,7 @@ const SettingsAiMemoryView: React.FC<SettingsAiMemoryViewProps> = ({ onNavigate 
                         <Brain size={28} className="text-indigo-600" />
                         <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
                     </div>
-                    <p className="text-slate-500">{t.subtitle}</p>
+                    {status !== 'not_configured' && <p className="text-slate-500">{t.subtitle}</p>}
                 </header>
 
                 {loading ? (
