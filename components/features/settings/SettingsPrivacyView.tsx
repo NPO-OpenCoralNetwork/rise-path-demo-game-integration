@@ -11,6 +11,7 @@ import {
     saveLifeJournalPrivacy,
 } from '../../../services/lifeJournalPrivacyService';
 import {
+    AiMemorySaveError,
     loadAiMemoryPrivacy,
     purgeAllLearnerMemories,
     saveAiMemoryPrivacy,
@@ -24,6 +25,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
     const { language } = useLanguage();
     const { setTheme } = useTheme();
     const [allowDiaryExcerpts, setAllowDiaryExcerpts] = useState(false);
+    const [aiMemoryAvailable, setAiMemoryAvailable] = useState(true);
+    // The learner opted in before this server stopped offering AI memory: they can still turn it off and purge.
+    const [keptOptIn, setKeptOptIn] = useState(false);
     const [aiMemoryEnabled, setAiMemoryEnabled] = useState(false);
     const [allowConversationCapture, setAllowConversationCapture] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -41,6 +45,8 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             .then(([lifePrefs, memoryPrefs]) => {
                 if (!active) return;
                 setAllowDiaryExcerpts(lifePrefs.allow_diary_excerpts_in_ai);
+                setAiMemoryAvailable(memoryPrefs.available);
+                setKeptOptIn(!memoryPrefs.available && memoryPrefs.enabled);
                 setAiMemoryEnabled(memoryPrefs.enabled);
                 setAllowConversationCapture(memoryPrefs.allow_conversation_capture);
             })
@@ -78,6 +84,8 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             aiMemoryPurgeBody: 'Removes semantic memories only. Life journal data is not affected. Type DELETE to confirm.',
             aiMemoryPurgeDone: 'All AI memories were deleted.',
             aiMemoryExplain: 'AI memory is off. Enable the toggle above to let the coach remember your preferences.',
+            aiMemoryNotOffered: 'Not offered on this server.',
+            aiMemoryKeptOptIn: 'Your earlier opt-in is still saved. You can turn it off.',
             loading: 'Loading…',
             errorGeneric: 'Something went wrong. Please try again.',
         },
@@ -108,6 +116,8 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             aiMemoryPurgeBody: 'セマンティック記憶のみ削除します。ライフジャーナルには影響しません。確認のため DELETE と入力してください。',
             aiMemoryPurgeDone: 'AI 記憶をすべて削除しました。',
             aiMemoryExplain: 'AI 記憶はオフです。上のトグルをオンにすると、コーチがあなたの傾向を覚えられます。',
+            aiMemoryNotOffered: 'このサーバーでは提供していません。',
+            aiMemoryKeptOptIn: '以前のオンの設定が保存されています。オフにできます。',
             loading: '読み込み中…',
             errorGeneric: 'エラーが発生しました。もう一度お試しください。',
         },
@@ -154,9 +164,15 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             });
             setAiMemoryEnabled(saved.enabled);
             setAllowConversationCapture(saved.allow_conversation_capture);
-        } catch {
+        } catch (e) {
             setAiMemoryEnabled(previousEnabled);
             setAllowConversationCapture(previousCapture);
+            if ((e as AiMemorySaveError).errorType === 'ai_memory_not_offered') {
+                // The server stopped offering AI memory since this page loaded; the card says so.
+                setKeptOptIn(previousEnabled);
+                setAiMemoryAvailable(false);
+                return;
+            }
             setError(t.errorGeneric);
         }
     }, [aiMemoryEnabled, allowConversationCapture, t.errorGeneric]);
@@ -168,8 +184,13 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
         try {
             const saved = await saveAiMemoryPrivacy({ allow_conversation_capture: checked });
             setAllowConversationCapture(saved.allow_conversation_capture);
-        } catch {
+        } catch (e) {
             setAllowConversationCapture(!checked);
+            if ((e as AiMemorySaveError).errorType === 'ai_memory_not_offered') {
+                setKeptOptIn(aiMemoryEnabled);
+                setAiMemoryAvailable(false);
+                return;
+            }
             setError(t.errorGeneric);
         }
     }, [aiMemoryEnabled, t.errorGeneric]);
@@ -254,19 +275,37 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                 <Brain size={20} className="text-indigo-600 mt-0.5 shrink-0" />
                                 <div className="space-y-1">
                                     <h2 className="font-semibold text-slate-900">{t.aiMemoryTitle}</h2>
-                                    <p className="text-sm text-slate-500">{t.aiMemoryBody}</p>
+                                    {/* role="status": if a save is refused with 409, the toggle goes away and this text changes. */}
+                                    <p role="status" className="text-sm text-slate-500">
+                                        {aiMemoryAvailable ? t.aiMemoryBody : t.aiMemoryNotOffered}
+                                    </p>
                                 </div>
                             </div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={aiMemoryEnabled}
-                                    onChange={(e) => void handleAiMemoryToggle(e.target.checked)}
-                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-slate-700">{t.aiMemoryEnabled}</span>
-                            </label>
-                            {aiMemoryEnabled ? (
+                            {(aiMemoryAvailable || keptOptIn) && (
+                                <label
+                                    className={`flex items-center gap-3 ${
+                                        aiMemoryAvailable || aiMemoryEnabled ? 'cursor-pointer' : 'cursor-not-allowed'
+                                    }`}
+                                >
+                                    {/* Not offered: the earlier opt-in can only be turned off. aria-disabled, not
+                                        disabled, so keyboard focus stays on the checkbox after it is turned off. */}
+                                    <input
+                                        type="checkbox"
+                                        checked={aiMemoryEnabled}
+                                        aria-disabled={!aiMemoryAvailable && !aiMemoryEnabled ? true : undefined}
+                                        aria-describedby={!aiMemoryAvailable && aiMemoryEnabled ? 'ai-memory-kept-opt-in' : undefined}
+                                        onChange={(e) => {
+                                            if (aiMemoryAvailable || !e.target.checked) void handleAiMemoryToggle(e.target.checked);
+                                        }}
+                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 aria-disabled:opacity-50"
+                                    />
+                                    <span className="text-sm text-slate-700">{t.aiMemoryEnabled}</span>
+                                </label>
+                            )}
+                            {!aiMemoryAvailable && aiMemoryEnabled && (
+                                <p id="ai-memory-kept-opt-in" className="text-sm text-slate-500">{t.aiMemoryKeptOptIn}</p>
+                            )}
+                            {aiMemoryAvailable && (aiMemoryEnabled ? (
                                 <>
                                     <label className="flex items-center gap-3 cursor-pointer ml-1">
                                         <input
@@ -286,29 +325,32 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                         <span>{t.aiMemoryList}</span>
                                         <ChevronRight size={16} className="text-slate-400" />
                                     </button>
-                                    <div className="pt-2 space-y-3 border-t border-slate-100">
-                                        <h3 className="text-sm font-semibold text-rose-800">{t.aiMemoryPurgeTitle}</h3>
-                                        <p className="text-sm text-slate-500">{t.aiMemoryPurgeBody}</p>
-                                        <input
-                                            type="text"
-                                            value={memoryDeleteConfirm}
-                                            onChange={(e) => setMemoryDeleteConfirm(e.target.value)}
-                                            placeholder="DELETE"
-                                            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:ring-2 focus:ring-rose-300 outline-none"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => void handleMemoryPurge()}
-                                            disabled={busy !== null || memoryDeleteConfirm !== 'DELETE'}
-                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
-                                        >
-                                            <Trash2 size={16} />
-                                            {busy === 'memory-purge' ? '…' : t.aiMemoryPurgeTitle}
-                                        </button>
-                                    </div>
                                 </>
                             ) : (
                                 <p className="text-sm text-slate-500">{t.aiMemoryExplain}</p>
+                            ))}
+                            {/* Purge stays for an earlier opt-in even when AI memory is not offered. */}
+                            {(aiMemoryAvailable ? aiMemoryEnabled : keptOptIn) && (
+                                <div className="pt-2 space-y-3 border-t border-slate-100">
+                                    <h3 className="text-sm font-semibold text-rose-800">{t.aiMemoryPurgeTitle}</h3>
+                                    <p className="text-sm text-slate-500">{t.aiMemoryPurgeBody}</p>
+                                    <input
+                                        type="text"
+                                        value={memoryDeleteConfirm}
+                                        onChange={(e) => setMemoryDeleteConfirm(e.target.value)}
+                                        placeholder="DELETE"
+                                        className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:ring-2 focus:ring-rose-300 outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleMemoryPurge()}
+                                        disabled={busy !== null || memoryDeleteConfirm !== 'DELETE'}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
+                                    >
+                                        <Trash2 size={16} />
+                                        {busy === 'memory-purge' ? '…' : t.aiMemoryPurgeTitle}
+                                    </button>
+                                </div>
                             )}
                         </section>
 

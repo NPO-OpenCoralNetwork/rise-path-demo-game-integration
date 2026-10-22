@@ -14,6 +14,7 @@ import {
     deleteLearnerMemory,
     purgeLearnerMemories,
     seedAssessmentMemories,
+    isMemantoEnabled,
     CONTENT_MAX_LEN,
 } from './learnerMemoryBridge.js';
 export const MEMORY_EXPORT_SCHEMA_VERSION = '2026-06-24-memory-v1';
@@ -98,6 +99,7 @@ export function mapBridgeResultToHttpStatus(result) {
     switch (result.error_type) {
         case 'ai_memory_not_allowed': return 403;
         case 'not_found': return 404;
+        case 'ai_memory_not_offered': return 409;
         case 'validation': return 422;
         case 'service_unavailable':
         case 'db_connection':
@@ -154,7 +156,8 @@ async function fetchLatestLearnerProfileForSeed(pool, userId) {
 
 export async function getAiMemoryPrivacySettings(pool, userId) {
     const privacy = await loadAiMemoryPreferences(pool, userId);
-    return { ok: true, privacy };
+    // available: false means this server has no Memanto, so AI memory cannot be offered.
+    return { ok: true, privacy, available: isMemantoEnabled() };
 }
 
 export async function updateAiMemoryPrivacySettings(pool, userId, patch) {
@@ -165,6 +168,19 @@ export async function updateAiMemoryPrivacySettings(pool, userId, patch) {
 
     const previous = await loadAiMemoryPreferences(pool, userId);
     const nextEnabled = patch.enabled ?? previous.enabled;
+    // Only a change from off to on counts: a re-sent enabled:true (the UI sends the whole
+    // state) must not block turning capture off or saving the same values again.
+    const turningOn = (patch.enabled === true && previous.enabled !== true)
+        || (nextEnabled === true
+            && patch.allow_conversation_capture === true
+            && previous.allow_conversation_capture !== true);
+    // Turning AI memory on needs Memanto; turning it off always works.
+    if (turningOn && !isMemantoEnabled()) {
+        return {
+            error: 'AI personal memory is not offered on this server',
+            error_type: 'ai_memory_not_offered',
+        };
+    }
     const nextCapture = nextEnabled
         ? (patch.allow_conversation_capture ?? previous.allow_conversation_capture)
         : false;
@@ -196,6 +212,7 @@ export async function updateAiMemoryPrivacySettings(pool, userId, patch) {
     return {
         ok: true,
         privacy,
+        available: isMemantoEnabled(),
         seed_triggered: seedTriggered,
     };
 }
