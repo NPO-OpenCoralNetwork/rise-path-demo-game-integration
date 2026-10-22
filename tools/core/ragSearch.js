@@ -5,16 +5,21 @@
  * Every search is scoped to one learner's own ready materials (materials.user_id is NOT NULL and
  * there is no shared or public material), like ragService.retrieveContext: without a learner id
  * nothing is searched.
- * Falls back to basic keyword retrieval if pgvector or the embedding key is not available.
+ * Falls back to basic keyword retrieval if pgvector or embeddings are not available.
  * Vectors from different models are never compared: chunks embedded with an older model (or none)
  * are matched by keyword and merged with the vector results until scripts/rag/reembed.mjs
  * re-embeds them.
  *
  * Also owns the embedding call shared with server/ragService.js (ingest + retrieval), so both
  * sides always embed with the same model and dimension.
+ *
+ * Embeddings use Gemini, so they are on only when GEMINI_ALLOWED is exactly "true" and a server
+ * key is set (server/llm/models.config.js isGeminiAllowed; the Gemini API terms do not allow
+ * services that people under 18 use). Otherwise no Gemini client is made: ingestion stores
+ * chunks without vectors and every search is a keyword search.
  */
 import { getPool } from '../../server/db.js';
-import { MODEL_IDS } from '../../server/llm/models.config.js';
+import { MODEL_IDS, isGeminiAllowed } from '../../server/llm/models.config.js';
 import { classifyDbError } from './dbErrors.js';
 
 /** Embedding model for material_chunks; each row records it in `embedding_model`. */
@@ -33,7 +38,10 @@ let embeddingClientKey = '';
 /** @type {any} undefined = use the real SDK client */
 let embeddingClientOverride;
 
-/** Tests: replace the @google/genai client (anything with `models.embedContent`); null = unconfigured. */
+/**
+ * Tests: replace the @google/genai client (anything with `models.embedContent`); null = no key.
+ * GEMINI_ALLOWED still decides whether it is used.
+ */
 export function setEmbeddingClientForTests(client) {
     embeddingClientOverride = client;
 }
@@ -44,11 +52,12 @@ export function resetEmbeddingClientForTests() {
     embeddingClientKey = '';
 }
 
-/** Whether a Gemini key (or a test client) is available for embeddings. */
-export const isEmbeddingConfigured = () =>
-    embeddingClientOverride !== undefined ? Boolean(embeddingClientOverride) : Boolean(readGeminiKey());
+/** Whether embeddings are on: Gemini is allowed and a server key (or a test client) is set. */
+export const isEmbeddingConfigured = () => isGeminiAllowed(process.env)
+    && (embeddingClientOverride !== undefined ? Boolean(embeddingClientOverride) : Boolean(readGeminiKey()));
 
 async function getEmbeddingClient() {
+    if (!isGeminiAllowed(process.env)) return null;
     if (embeddingClientOverride !== undefined) return embeddingClientOverride;
     const apiKey = readGeminiKey();
     if (!apiKey) return null;
@@ -67,7 +76,11 @@ async function getEmbeddingClient() {
 export async function embedTexts(texts) {
     if (!Array.isArray(texts) || texts.length === 0) return [];
     const client = await getEmbeddingClient();
-    if (!client) throw new Error('Gemini API key missing (set GEMINI_API_KEY on the server)');
+    if (!client) {
+        throw new Error(isGeminiAllowed(process.env)
+            ? 'Gemini API key missing (set GEMINI_API_KEY on the server)'
+            : 'Embeddings are off: Gemini is used only when GEMINI_ALLOWED is "true" (and GEMINI_API_KEY is set)');
+    }
 
     /** @type {number[][]} */
     const vectors = [];
@@ -321,11 +334,11 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
 
 /**
  * Vector search using pgvector cosine distance.
- * Generates embedding for query via Gemini, then searches material_chunks.
+ * Generates embedding for query via Gemini (when allowed), then searches material_chunks.
  */
 async function vectorSearch({ pool, query, domain, maxResults, scope }) {
     if (!isEmbeddingConfigured()) {
-        // No API key — fall back to keyword search
+        // Embeddings off (Gemini not allowed, or no key): keyword search over every chunk.
         return await keywordFallback({ pool, query, domain, maxResults, scope });
     }
 
@@ -388,7 +401,7 @@ async function vectorSearch({ pool, query, domain, maxResults, scope }) {
 }
 
 /**
- * Keyword-based fallback when pgvector or Gemini API is unavailable, or when no chunk in `scope`
+ * Keyword-based fallback when pgvector or embeddings are unavailable, or when no chunk in `scope`
  * is embedded with EMBEDDING_MODEL (`reason: 'reembed_required'`).
  * Uses PostgreSQL ILIKE for basic text matching.
  * @param {{ pool: any, query: string, domain?: string, maxResults: number,

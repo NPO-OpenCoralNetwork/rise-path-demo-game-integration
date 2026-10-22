@@ -17,7 +17,7 @@
 Experience learning tailored just for you.
 - **Big5 Personality Integration**: AI dynamically adapts curriculum content, tone, and learning style based on your Big5 personality traits.
 - **Rich Content Generation**: Lessons go beyond summaries, providing 'Why It Matters', 'Key Concepts', 'Action Steps', and 'Analogies'.
-- **Advanced AI Models**: Utilizing **Google Gemini 3.0 Pro** for deep reasoning and **Gemini 2.0 Flash** for high-speed generation.
+- **AI Models**: Claude through the server-side LLM gateway (`server/llm/`). The tutor, writing feedback and course generation run on the cheap Claude model (Claude Haiku) by default. Gemini is off unless `GEMINI_ALLOWED=true` (see below).
 - **RAG (Retrieval-Augmented Generation)**: Integrates with specific knowledge domains (like Blender documentation) to ground AI responses.
 
 ### 2. **Immersive Audio Experience (In Progress)** 🎧
@@ -37,13 +37,13 @@ Experience learning tailored just for you.
 - **Global Communication**: English for global engineers.
 
 ### 5. **MCP Server — AI アシスタント連携** 🔌
-ChatGPT・Claude・Cursor などの AI から Rise Path を直接操作できます。
+Claude Code・Cursor など、自分のパソコンで動く AI から Rise Path のツールを使えます。
 - **9 つの MCP ツール**: 学習進捗・ジャーナル・カリキュラム生成・RAG 検索
-- **Dual Transport**: stdio（ローカル）と SSE（リモート/ChatGPT）
-- **Bridge Token 認証**: セキュアな外部接続
+- **Transport**: stdio（ローカル）。SSE は開発用で、自分のパソコンの中だけで使います（インターネットには公開しません）
+- **リモートの AI（ChatGPT、Claude.ai など）**: 学習者ごとの OAuth ができてから（Phase 1）。ブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡さないでください
 - **ヘルスチェック & Graceful Shutdown**: 本番運用対応
 
-> 📘 **[使い方ガイド（詳細）](doc/usage_guide.md)** — Web アプリ・MCP・カリキュラム作成の完全ガイド
+> 📘 **[使い方ガイド（詳細）](doc/guides/usage_guide.md)** — Web アプリ・MCP・カリキュラム作成の完全ガイド
 
 ---
 
@@ -77,7 +77,7 @@ npm run lessons:preview -- vibe-coding vibe-ch1   # screenshots + metrics.json (
 
 - **Frontend**: [React](https://react.dev/) (v19) + [Vite](https://vitejs.dev/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **AI/LLM**: [Google Gemini API](https://ai.google.dev/) via `@google/genai` SDK
+- **AI/LLM**: [Claude API](https://platform.claude.com/) via `@anthropic-ai/sdk` behind the server gateway; Gemini (`@google/genai`) only on deployments with `GEMINI_ALLOWED=true`
 - **Game Engine**: [Phaser 3](https://phaser.io/) (v3.80)
 - **Visual Coding**: [Blockly](https://developers.google.com/blockly) / Scratch Blocks
 - **Backend/Service**: Node.js (Express) for local proxying and audio handling.
@@ -97,7 +97,7 @@ npm run dev
 # Frontend: http://localhost:3007
 ```
 
-You can browse most screens and use the primary AI features (like the Chat Coach) using a local LLM provider or LLM CLI (e.g., **Hermes** running locally). The in-lesson AI tutor and other model features go through the server's LLM gateway (a built-in mock answers when no key is set); the browser never calls a model API directly.
+You can browse most screens without any key. The in-lesson AI tutor, writing feedback and course generation run on Claude through the server's LLM gateway (`ANTHROPIC_API_KEY`; a built-in mock answers in development when no key is set); the browser never calls a model API directly. The shared Hermes chat (the floating AI coach and `/life-journal/chat`) is not offered to learners: it appears only with `VITE_FEATURE_AGENT_CHAT=true` and a running Hermes, for self-hosting or development.
 
 ### 🏁 Choose Your Setup Mode
 
@@ -107,10 +107,10 @@ Depending on your goals, you can start the platform in two ways:
 flowchart TD
     Start["🚀 Start Project"] --> Choice{"What do you want to explore?"}
     Choice -->|UI Design or Gameplay only| Quick["① Quick Start (UI Only)<br>No API keys required"]
-    Choice -->|AI Chat and Full Features| Full["② Full Feature Start<br>Requires local LLM/Hermes running"]
+    Choice -->|AI tutor and Full Features| Full["② Full Feature Start<br>ANTHROPIC_API_KEY (or the dev mock)"]
     
     Quick --> ExecQuick["1. npm install<br>2. npm run dev"]
-    Full --> ExecFull["1. Create .env.local<br>2. Start Hermes proxy<br>3. npm run dev"]
+    Full --> ExecFull["1. Create .env.local<br>2. Set ANTHROPIC_API_KEY<br>3. npm run dev"]
 
     style Quick fill:#3B82F6,color:#fff
     style Full fill:#10B981,color:#fff
@@ -124,7 +124,7 @@ flowchart TD
 |---|---|---|
 | **Node.js** | `v20.0.0` or higher | Required for development & build |
 | **npm** | `v10.0.0` or higher | Package management |
-| **Local LLM (Hermes)** | Any | Only required for AI Coach/Chat features |
+| **Local LLM (Hermes)** | Any | Optional. Only for the shared Hermes chat (self-hosting or development, with `VITE_FEATURE_AGENT_CHAT=true`) |
 
 ---
 
@@ -134,19 +134,23 @@ Create a [**`.env.local`**](.env.local) file in the root directory to store your
 
 | Variable Name | Default Value | Description | Importance |
 |---|---|---|---|
-| `HERMES_API_URL` | `http://127.0.0.1:8642` | Connection URL for your local LLM proxy (Hermes) | **Recommended** (AI Chat) |
-| `HERMES_API_KEY` | `change-me-local-dev` | Bearer authorization token for Hermes | **Recommended** (AI Chat) |
-| `ANTHROPIC_API_KEY` | (blank) | Server-side key for the LLM gateway | Optional (see below) |
-| `GEMINI_API_KEY` | (blank) | Server-side Gemini key (gateway, legacy generator, RAG embeddings) | Optional |
+| `ANTHROPIC_API_KEY` | (blank) | Server-side key for the LLM gateway (tutor, writing feedback, course generation). Without it, a mock answers in development | **Recommended** (in-app AI) |
+| `VITE_FEATURE_AGENT_CHAT` | (blank = off) | Exactly `true` shows the shared Hermes chat (floating AI coach, `/life-journal/chat`) and lets the API serve `/api/v2/agent/chat`. Not offered to learners | Optional (self-hosting / development) |
+| `HERMES_API_URL` | `http://127.0.0.1:8642` | Connection URL for your local LLM proxy (Hermes) | Optional (with `VITE_FEATURE_AGENT_CHAT=true`) |
+| `HERMES_API_KEY` | `change-me-local-dev` | Bearer authorization token for Hermes | Optional (with `VITE_FEATURE_AGENT_CHAT=true`) |
+| `GEMINI_ALLOWED` | (blank = off) | `true` turns Gemini on. Only for deployments that people under 18 cannot reach (see below) | Optional |
+| `GEMINI_API_KEY` | (blank) | Server-side Gemini key (gateway, RAG embeddings, image generation); used only with `GEMINI_ALLOWED=true` | Optional |
 
 ```env
-# Local LLM Provider (Hermes) Settings (Standard)
-HERMES_API_URL=http://127.0.0.1:8642
-HERMES_API_KEY=change-me-local-dev
-
 # LLM gateway keys (server only)
 # ANTHROPIC_API_KEY=
+# GEMINI_ALLOWED and GEMINI_API_KEY: only for deployments that people under 18 cannot reach
 # GEMINI_API_KEY=
+
+# Optional, self-hosting or development only: the shared Hermes chat
+# VITE_FEATURE_AGENT_CHAT=true
+# HERMES_API_URL=http://127.0.0.1:8642
+# HERMES_API_KEY=change-me-local-dev
 ```
 
 > [!WARNING]
@@ -159,10 +163,11 @@ Every model call goes through the server gateway in `server/llm/`; the browser n
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Enables the Anthropic provider (the default for authoring, tutor and feedback tasks) |
-| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Enables the Gemini provider; also used by RAG embeddings |
+| `ANTHROPIC_API_KEY` | Enables the Anthropic provider (the default for every task) |
+| `GEMINI_ALLOWED` | Gemini (chat, RAG embeddings, image generation) is used only when this is exactly `true`. Unset or anything else is off, even when a Gemini key is set (the server logs a warning). Only for deployments that people under 18 cannot reach |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Enables the Gemini provider, RAG embeddings and image generation when `GEMINI_ALLOWED=true` |
 | `LLM_PROVIDER` | Forces every task onto one provider: `anthropic`, `gemini` or `mock` |
-| `LLM_TASK_<TASK>` | Per-task route, `provider[:model]`, e.g. `LLM_TASK_TUTOR_CHAT=gemini` |
+| `LLM_TASK_<TASK>` | Per-task route, `provider[:model]`, e.g. `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` |
 | `LLM_MOCK_FALLBACK` | `false` turns off the mock fallback when the routed provider has no key |
 | `LLM_TIMEOUT_MS` | Request timeout (default 120000) |
 | `LLM_MAX_RETRIES` | SDK retry count for provider calls |
@@ -170,6 +175,10 @@ Every model call goes through the server gateway in `server/llm/`; the browser n
 | `ANTHROPIC_BASE_URL` | Alternative Anthropic endpoint (proxy or gateway) |
 
 `GET /api/v2/llm/status` shows the active providers and task routes without secrets.
+
+**Default models.** The AI tutor (`tutor.chat`), writing feedback (`writing.feedback`) and course generation (`course.generate`, `/api/v2/ai/generate`) run on the cheap Claude model (Claude Haiku), within the daily caps in `server/middleware/dailyCaps.js`. To move one back to the larger model, set for example `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` (likewise `LLM_TASK_WRITING_FEEDBACK`, `LLM_TASK_COURSE_GENERATE`).
+
+**Why Gemini is off by default.** The [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) forbid using the API in a service "directed towards or likely to be accessed by individuals under the age of 18", and minors use Rise Path. So Gemini is used only when `GEMINI_ALLOWED=true`. With it off, uploaded materials are stored without vectors and found by keyword search (`node scripts/rag/reembed.mjs` embeds them later, once Gemini is allowed), and `/api/v2/image` answers 503 with `error_type: image_generation_unavailable`.
 
 ---
 
@@ -241,7 +250,7 @@ We have successfully migrated to a **LangGraph-based Multi-Agent Backend**.
 - **LangGraph Integration**: State-driven workflow for "Requirements -> Roadmap -> Curriculum" generation with user approval loops.
 - **RAG Architecture**: Document ingestion (PDF/Txt), chunking with `RecursiveCharacterTextSplitter`, and vector search using `pgvector`.
 - **Async Job Worker**: Scalable background processing for document embedding.
-- **Real AI Generation**: Powered by **Gemini 2.0 Flash** via `@google/genai` SDK v1.x.
+- **Real AI Generation**: Each stage is one call to the server LLM gateway (task `course.generate`, the cheap Claude model by default).
 - **Database Persistence**: Full state synchronization with PostgreSQL.
 
 ### Active Issues
@@ -263,7 +272,7 @@ We have successfully migrated to a **LangGraph-based Multi-Agent Backend**.
 
 ### Optional: Full Stack (Advanced)
 If you need the full AI generation flow with backend + database, you’ll need:
-- `GEMINI_API_KEY` set in `.env.local`
+- `ANTHROPIC_API_KEY` set in `.env.local` (without a key, a built-in mock answers outside production)
 - PostgreSQL with `pgvector`
 - DB schema + seed scripts (see `doc/ai-curriculum-spec/local_postgres_phase1.sql` and `scripts/`)
 

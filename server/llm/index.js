@@ -10,11 +10,16 @@
  * failure (5xx, timeout, rate limit, bad key) moves on to the next configured provider.
  * Without any key the gateway uses the mock provider outside production, and throws
  * `no_provider` (HTTP 503) in production.
+ *
+ * The Gemini key counts only when GEMINI_ALLOWED is exactly "true" (models.config.js
+ * isGeminiAllowed: the Gemini API terms exclude services that people under 18 use). A key set
+ * without it is ignored, reported as unconfigured, and logged once as a warning.
  */
 import { LlmError, isLlmError, modelMayHaveRun } from './errors.js';
 import {
   PROVIDER_FALLBACK_ORDER,
   TASKS,
+  isGeminiAllowed,
   modelForTier,
   resolveTaskRoute,
 } from './models.config.js';
@@ -63,6 +68,32 @@ import { createMockProvider } from './providers/mock.js';
 
 const cleanKey = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
 
+/** A Gemini key from the server environment (never a VITE_* variable), allowed or not. */
+const rawGeminiKey = (env) => cleanKey(env.GEMINI_API_KEY) || cleanKey(env.GOOGLE_API_KEY);
+
+/** The warning logged when a Gemini key is set but GEMINI_ALLOWED is not "true". */
+export const GEMINI_KEY_IGNORED_WARNING = '[LLM] GEMINI_API_KEY (or GOOGLE_API_KEY) is set but GEMINI_ALLOWED is not "true", '
+  + 'so Gemini is off: no Gemini chat, embeddings or image generation. The Gemini API terms do not allow services that '
+  + 'people under 18 use. Set GEMINI_ALLOWED=true only on a deployment that people under 18 cannot reach; otherwise '
+  + 'remove the key.';
+
+/**
+ * Whether a Gemini key is set that GEMINI_ALLOWED keeps off (for the startup warning).
+ * @param {Record<string, string | undefined>} [env]
+ */
+export const geminiKeyIgnored = (env = process.env) => Boolean(rawGeminiKey(env)) && !isGeminiAllowed(env);
+
+/**
+ * Log GEMINI_KEY_IGNORED_WARNING when it applies. Returns whether it was logged.
+ * @param {Record<string, string | undefined>} [env]
+ * @param {{ warn: Function }} [logger]
+ */
+export function warnIfGeminiKeyIgnored(env = process.env, logger = console) {
+  if (!geminiKeyIgnored(env)) return false;
+  logger.warn(GEMINI_KEY_IGNORED_WARNING);
+  return true;
+}
+
 /** @type {LlmUsage} */
 const NO_USAGE = Object.freeze({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
 
@@ -84,8 +115,10 @@ export function createGateway(options = {}) {
   const logger = options.logger ?? console;
   const keys = {
     anthropic: cleanKey(env.ANTHROPIC_API_KEY),
-    gemini: cleanKey(env.GEMINI_API_KEY) || cleanKey(env.GOOGLE_API_KEY),
+    gemini: isGeminiAllowed(env) ? rawGeminiKey(env) : '',
   };
+  // The process-wide gateway is built once, so this is one warning per process.
+  warnIfGeminiKeyIgnored(env, logger);
   const timeoutMs = Number.parseInt(env.LLM_TIMEOUT_MS || '', 10) || 120_000;
   const mockDelayMs = Number.parseInt(env.LLM_MOCK_DELAY_MS ?? '', 10);
 
@@ -301,6 +334,19 @@ export function createGateway(options = {}) {
     },
 
     /**
+     * Whether a call for `task` would reach a provider: a configured one, or the mock fallback
+     * outside production. False when it would fail with `no_provider` (or the task is unknown).
+     * @param {string} task
+     */
+    canServe(task) {
+      try {
+        return plan(task).length > 0;
+      } catch {
+        return false;
+      }
+    },
+
+    /**
      * Configuration snapshot for /llm/status. Contains no secrets.
      */
     status() {
@@ -329,7 +375,7 @@ export function createGateway(options = {}) {
         forced_provider: forced,
         providers: {
           anthropic: { configured: Boolean(keys.anthropic) },
-          gemini: { configured: Boolean(keys.gemini) },
+          gemini: { configured: Boolean(keys.gemini), allowed: isGeminiAllowed(env) },
           mock: { available: allowMockFallback(env) || forced === 'mock', forced: forced === 'mock' },
         },
         tasks,

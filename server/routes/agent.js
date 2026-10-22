@@ -26,6 +26,15 @@ import { resolveIncludeDiaryExcerpts } from '../services/lifeJournalPrivacyServi
 const router = express.Router();
 
 /**
+ * The shared Hermes chat is not offered to learners (Phase 0, doc/brushup-2026/ai-access-plan.ja.md).
+ * The server uses the same switch as the front end (config/features.ts): POST /agent/chat runs
+ * only when VITE_FEATURE_AGENT_CHAT is exactly "true", so a stack that still runs Hermes does not
+ * serve it to a hand-made request. Checked before validation and the daily caps (never charged).
+ * @param {Record<string, string | undefined>} [env]
+ */
+export const isAgentChatEnabled = (env = process.env) => env.VITE_FEATURE_AGENT_CHAT === 'true';
+
+/**
  * Hermes did no work: not configured, the turn's learner binding could not be written (Hermes was
  * not called), the connection never opened (hermesFetchFailure), or it refused our API key
  * (401/403). 'hermes_interrupted' (a timeout or reset after the request was sent) and any other
@@ -90,6 +99,9 @@ router.get('/agent/health', (_req, res) => {
 });
 
 router.post('/agent/chat', async (req, res) => {
+    if (!isAgentChatEnabled()) {
+        return res.status(404).json({ error: 'Agent chat is not offered', error_type: 'agent_chat_off' });
+    }
     const validation = validateAgentChatBody(req.body);
     if (!validation.valid) {
         return res.status(422).json({

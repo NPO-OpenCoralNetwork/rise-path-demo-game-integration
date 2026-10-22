@@ -123,7 +123,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
                 throw new LlmError('max_tokens', 'Gemini reply hit the output limit', { provider: 'gemini', model: 'gemini-x', retryable: false });
             },
         });
-        const gateway = createGateway({ env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' }, providers: { gemini: factory }, logger: quietLogger });
+        const gateway = createGateway({ env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' }, providers: { gemini: factory }, logger: quietLogger });
         const events = await collect(gateway.stream({ task: 'tutor.chat', messages: userMessage }));
         assert.deepEqual(events.map((e) => e.type), ['text.delta', 'text.delta', 'done']);
         assert.equal(events.at(-1).result.text, 'Part one, part two');
@@ -140,7 +140,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
             return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
         };
         const part = (text, finishReason) => ({ candidates: [{ content: { role: 'model', parts: text ? [{ text }] : [] }, ...(finishReason ? { finishReason } : {}) }] });
-        const run = () => collect(createGateway({ env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' }, logger: quietLogger })
+        const run = () => collect(createGateway({ env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' }, logger: quietLogger })
             .stream({ task: 'tutor.chat', messages: userMessage }));
         try {
             chunks = [part('Part one, '), { ...part('last part', 'MAX_TOKENS'), usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 10, thoughtsTokenCount: 4000 } }];
@@ -353,7 +353,7 @@ describe('guest budget refunds', () => {
         // Structured call: the first turn returns invalid JSON (billed), the repair turn hits a 503.
         let calls = 0;
         const structured = createGateway({
-            env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' },
+            env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' },
             providers: {
                 gemini: fake('gemini', {
                     async generate() {
@@ -376,7 +376,7 @@ describe('guest budget refunds', () => {
 
         // Stream: Anthropic times out (the model ran), then Gemini is down.
         const fallback = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: {
                 anthropic: fake('anthropic', { async generate() {}, async *stream() { throw new LlmError('timeout', 'slow'); } }),
                 gemini: fake('gemini', { async generate() {}, async *stream() { throw new LlmError('provider_unavailable', 'down'); } }),
@@ -391,7 +391,7 @@ describe('guest budget refunds', () => {
 
         // Both providers down before any model ran: refunded.
         const down = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: {
                 anthropic: fake('anthropic', { async generate() {}, async *stream() { throw new LlmError('provider_unavailable', 'down'); } }),
                 gemini: fake('gemini', { async generate() {}, async *stream() { throw new LlmError('rate_limited', 'busy'); } }),

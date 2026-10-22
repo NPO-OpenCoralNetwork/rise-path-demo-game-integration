@@ -33,6 +33,11 @@ services:
       - "3006:3006"
     environment:
       DATABASE_URL_PHASE1: postgresql://risepath_app:risepath_dev@db:5432/risepath
+      # In-app AI (tutor, writing feedback, /ai/generate) runs on Claude (server/llm/).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Gemini only when GEMINI_ALLOWED is exactly "true" (off by default: under-18 clause in the
+      # Gemini API terms; only for deployments that people under 18 cannot reach).
+      GEMINI_ALLOWED: ${GEMINI_ALLOWED:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       NODE_ENV: production
       PORT: 3006

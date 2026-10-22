@@ -79,7 +79,12 @@ const fakeEmbed = (calls = []) => Object.assign(async (texts) => {
     return texts.map((_, i) => vector(i));
 }, { calls });
 
-afterEach(() => resetEmbeddingClientForTests());
+const savedGeminiAllowed = process.env.GEMINI_ALLOWED;
+afterEach(() => {
+    resetEmbeddingClientForTests();
+    if (savedGeminiAllowed === undefined) delete process.env.GEMINI_ALLOWED;
+    else process.env.GEMINI_ALLOWED = savedGeminiAllowed;
+});
 
 describe('scripts/rag/reembed.mjs selection SQL', () => {
     it('selects chunks not on the current model (NULL included), keyset-paged by id', async () => {
@@ -151,6 +156,7 @@ describe('scripts/rag/reembed.mjs reembedChunks', () => {
     });
 
     it('defaults to the ingestion embedder (embedTexts: configured model at the column width)', async () => {
+        process.env.GEMINI_ALLOWED = 'true'; // embeddings use Gemini only when allowed
         const log = [];
         setEmbeddingClientForTests({
             models: {

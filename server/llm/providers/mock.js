@@ -202,6 +202,73 @@ function sampleFromJsonSchema(node, defs = {}) {
   }
 }
 
+// --- course.generate --------------------------------------------------------------
+
+const localized = (jp, en) => ({ jp, en });
+
+/**
+ * One JSON object per /api/v2/ai/generate stage (server/services/aiPrompts.js output formats),
+ * so the course generator runs end to end without a key. `input` is { stage, message?, modules? }.
+ */
+function mockCourseGenerate(input) {
+  const topic = String(input?.message || input?.intake?.goal || 'Rise Path').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Rise Path';
+  if (input?.stage === 'roadmap') {
+    return {
+      message: `「${topic}」のロードマップ案です（デモ用の応答です）。\n\n- Module 1: 基本を知る\n- Module 2: 手を動かす\n- Module 3: まとめと振り返り`,
+      modules: [1, 2, 3].map((n) => ({
+        module_id: `m${n}`,
+        title: localized(`モジュール ${n}`, `Module ${n}`),
+        objective: localized(`${topic} のステップ ${n} を学ぶ`, `Learn step ${n} of ${topic}`),
+        estimated_hours: 2,
+        lessons: [1, 2].map((l) => ({
+          lesson_id: `m${n}-l${l}`,
+          title: localized(`レッスン ${n}-${l}`, `Lesson ${n}-${l}`),
+          subtitle: localized('デモ用のレッスンです', 'A demo lesson'),
+          estimated_min: 15,
+        })),
+      })),
+    };
+  }
+  if (input?.stage === 'curriculum') {
+    const modules = Array.isArray(input?.modules) && input.modules.length > 0 ? input.modules : mockCourseGenerate({ stage: 'roadmap', message: topic }).modules;
+    const block = (jp, en) => ({ type: 'text', text: localized(jp, en) });
+    return {
+      curriculum: {
+        title: localized(`${topic} 入門（デモ）`, `${topic}: an introduction (demo)`),
+        description: localized('AI プロバイダーのキーがないときのデモ用カリキュラムです。', 'A demo curriculum used when no AI provider key is set.'),
+        ui_template_id: 'doc_chapter',
+        duration: '6 hours',
+        modules: modules.map((module, mi) => ({
+          ...module,
+          lessons: (Array.isArray(module?.lessons) ? module.lessons : []).map((lesson, li) => ({
+            ...lesson,
+            sections: [1, 2, 3].map((s) => ({
+              id: `s${s}`,
+              title: localized(`セクション ${s}`, `Section ${s}`),
+              content: [
+                block(`これはモジュール ${mi + 1}・レッスン ${li + 1} のデモ本文です。`, `Demo text for module ${mi + 1}, lesson ${li + 1}.`),
+                block('キーを設定すると、実際の内容が生成されます。', 'Set a provider key to generate real content.'),
+                { type: 'list', items: [localized('ポイント 1', 'Point 1'), localized('ポイント 2', 'Point 2')], style: 'bullet' },
+              ],
+            })),
+          })),
+        })),
+      },
+    };
+  }
+  return {
+    message: `「${topic}」の学習要件の案です（デモ用の応答です）。\n\n- 目標: ${topic} の基本を理解する\n- 期間: 4週間\n\nこの方向性で進めてよろしいでしょうか？`,
+    intake: {
+      goal: topic,
+      target_audience: '初学者',
+      current_level: '初級',
+      duration_weeks: 4,
+      delivery_style: 'doc_chapter',
+      constraints: '週に3〜5時間',
+    },
+  };
+}
+
 const FIXTURES = {
   'writing.feedback': mockWritingFeedback,
   'assessment.insight': mockPersonalityInsight,
@@ -225,6 +292,7 @@ export function createMockProvider(options = {}) {
       return JSON.stringify(value);
     }
     if (req.task === 'tutor.chat') return mockTutorText(req.input);
+    if (req.task === 'course.generate') return JSON.stringify(mockCourseGenerate(req.input));
     return isJa(req.locale) ? 'これはモックの応答です。' : 'This is a mock response.';
   }
 

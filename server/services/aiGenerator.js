@@ -1,21 +1,27 @@
 /**
  * AI Generator Service — Phase 13-C
- * 
- * Kit → RAG → Gemini → Structured Output
+ *
+ * Kit → RAG → LLM gateway (task 'course.generate') → one JSON object per stage
  * Handles 3-stage curriculum generation:
  *   requirements → roadmap → curriculum
+ *
+ * Every stage is one gateway call (server/llm/index.js). The task runs on the cheap Claude tier
+ * by default (server/llm/models.config.js); an owner can move it with
+ * LLM_TASK_COURSE_GENERATE=anthropic:<model id>. Claude has no JSON mode for free-form replies
+ * and no prefill, so the prompts (aiPrompts.js) ask for exactly one JSON object and
+ * parseJsonReply reads it from plain JSON, a fenced block or the first balanced {...}.
+ * Gateway failures are thrown as LlmError (server/llm/errors.js); the route maps them.
  */
-import { GoogleGenAI } from '@google/genai';
 import { retrieveContext } from '../ragService.js';
 import {
   buildRequirementsPrompt,
   buildRoadmapPrompt,
   buildCurriculumPrompt,
 } from './aiPrompts.js';
-import { MODEL_IDS } from '../llm/models.config.js';
+import { getGateway } from '../llm/index.js';
 
-const MODEL = process.env.AI_GENERATE_MODEL || MODEL_IDS.gemini.flash;
-const TIMEOUT_MS = 45000;
+/** Gateway task for every stage (server/llm/models.config.js TASKS). */
+export const COURSE_GENERATE_TASK = 'course.generate';
 
 // --- Kit Cache (5 min TTL, LRU max 100) ---
 const kitCache = new Map();
@@ -25,7 +31,7 @@ const MAX_CACHE_SIZE = 100;
 export async function getCachedKit(userId, getKitFn) {
   const cached = kitCache.get(userId);
   if (cached && cached.expiresAt > Date.now()) return cached.kit;
-  
+
   // Evict oldest entry if cache is full
   if (kitCache.size >= MAX_CACHE_SIZE) {
     const oldestKey = kitCache.keys().next().value;
@@ -37,71 +43,135 @@ export async function getCachedKit(userId, getKitFn) {
   return kit;
 }
 
-// --- Gemini Call ---
-let _genAI = null;
-/** Server-side and Vite-prefixed env vars are both accepted. */
-const geminiApiKey = () => process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-
-/** Thrown before any Gemini call when no key is set. The route answers 503 for it by `code`. */
-export class GeminiNotConfiguredError extends Error {
-  constructor() {
-    super('GEMINI_API_KEY not configured');
-    this.name = 'GeminiNotConfiguredError';
-    this.code = 'GEMINI_NOT_CONFIGURED';
-  }
+/**
+ * True when the gateway can run a stage: a provider for 'course.generate' is configured, or the
+ * mock provider stands in (outside production). The route answers 503 ai_unavailable otherwise.
+ */
+export function isCourseGenerationAvailable() {
+  const gateway = getGateway();
+  if (typeof gateway.canServe === 'function') return gateway.canServe(COURSE_GENERATE_TASK);
+  // A gateway without canServe (a test double): ask its status snapshot.
+  const task = gateway.status?.()?.tasks?.[COURSE_GENERATE_TASK];
+  return task ? Boolean(task.provider) : true;
 }
 
-/** True when a stage can call Gemini (a key is set, or a test client is injected). */
-export const isGeminiConfigured = () => Boolean(_genAI || geminiApiKey());
+// --- JSON replies ---
 
-function getGenAI() {
-  if (_genAI) return _genAI;
-  const apiKey = geminiApiKey();
-  if (!apiKey) throw new GeminiNotConfiguredError();
-  _genAI = new GoogleGenAI({ apiKey });
-  return _genAI;
-}
+/** Most `{` positions parseJsonReply tries before giving up. */
+const MAX_OBJECT_STARTS = 50;
 
-/** Tests: a fake client with models.generateContent, or null to go back to the env key. */
-export function setGenAIForTests(client) {
-  _genAI = client;
-}
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-async function callGemini(systemPrompt, userMessage) {
-  const genAI = getGenAI();
-
-  const result = await genAI.models.generateContent({
-    model: MODEL,
-    contents: [
-      { role: 'user', parts: [{ text: userMessage }] }
-    ],
-    config: {
-      systemInstruction: systemPrompt,
-      temperature: 0.7,
-      maxOutputTokens: 16384,
-      responseMimeType: 'application/json',
-      timeout: TIMEOUT_MS,
-    },
-  });
-
-  const text = result.text || '';
-  let structuredData = null;
+const tryParseObject = (text) => {
   try {
-    structuredData = JSON.parse(text);
+    const value = JSON.parse(text);
+    return isPlainObject(value) ? value : null;
   } catch {
-    // If JSON parse fails, try extracting JSON from markdown code block
-    const match = text.match(/```json\s*([\s\S]*?)```/);
-    if (match) {
-      try { structuredData = JSON.parse(match[1]); } catch { /* keep null */ }
+    return null;
+  }
+};
+
+/**
+ * The first balanced `{...}` in `text`, skipping braces inside JSON strings; null when none
+ * closes.
+ * @param {string} text
+ * @param {number} from
+ */
+function balancedObjectAt(text, from) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = from; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(from, i + 1);
     }
   }
+  return null;
+}
 
-  return { text, structuredData };
+/**
+ * The JSON object in a model reply: the whole reply, a ```json (or bare ```) fenced block, or
+ * the first balanced {...} that parses. Returns null when there is none (arrays and scalars are
+ * not stage replies).
+ * @param {unknown} text
+ * @returns {Record<string, any> | null}
+ */
+export function parseJsonReply(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim().replace(/^﻿/, '');
+  if (!trimmed) return null;
+
+  const whole = tryParseObject(trimmed);
+  if (whole) return whole;
+
+  for (const match of trimmed.matchAll(/```[a-zA-Z]*[ \t]*\r?\n?([\s\S]*?)```/g)) {
+    const fenced = tryParseObject(match[1].trim());
+    if (fenced) return fenced;
+  }
+
+  // Bounded: each attempt scans to the end of a long reply at worst.
+  let attempts = 0;
+  for (let start = trimmed.indexOf('{'); start !== -1 && attempts < MAX_OBJECT_STARTS; start = trimmed.indexOf('{', start + 1)) {
+    attempts += 1;
+    const candidate = balancedObjectAt(trimmed, start);
+    const parsed = candidate ? tryParseObject(candidate) : null;
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+/**
+ * One gateway call for a stage. Throws LlmError on failure (no provider, rate limit, timeout…).
+ * @param {{ stage: 'requirements'|'roadmap'|'curriculum', system: string, userMessage: string,
+ *   userId?: string, input?: Record<string, unknown>, signal?: AbortSignal }} params
+ */
+async function callCourseModel({ stage, system, userMessage, userId, input = {}, signal }) {
+  const result = await getGateway().generate({
+    task: COURSE_GENERATE_TASK,
+    userId: userId ?? null,
+    system: [{ text: system, cache: true }],
+    messages: [{ role: 'user', content: userMessage }],
+    locale: 'ja',
+    input: { stage, ...input },
+    signal,
+  });
+  const text = typeof result?.text === 'string' ? result.text : '';
+  const parsed = parseJsonReply(text);
+  // parseJsonReply can return a nested piece of a broken reply (say a {en, jp} title), so a
+  // stage only takes an object of its own shape; anything else counts as a reply with no JSON.
+  return { text, structuredData: parsed && isStageReply(stage, parsed) ? parsed : null };
+}
+
+/**
+ * Whether a parsed object has the shape a stage asks for (aiPrompts.js output formats):
+ * requirements an `intake` object, roadmap a `modules` array, curriculum a `curriculum` object
+ * with a non-empty `modules` array.
+ * @param {'requirements'|'roadmap'|'curriculum'} stage
+ * @param {Record<string, any>} value
+ */
+export function isStageReply(stage, value) {
+  if (!isPlainObject(value)) return false;
+  if (stage === 'requirements') return isPlainObject(value.intake);
+  if (stage === 'roadmap') return Array.isArray(value.modules);
+  if (stage === 'curriculum') {
+    return isPlainObject(value.curriculum) && Array.isArray(value.curriculum.modules) && value.curriculum.modules.length > 0;
+  }
+  return false;
 }
 
 // --- Stage Handlers ---
 
-export async function generateRequirements(message, userId, kit) {
+export async function generateRequirements(message, userId, kit, { signal } = {}) {
   // RAG: search for relevant educational content
   let ragContext = '';
   try {
@@ -113,8 +183,8 @@ export async function generateRequirements(message, userId, kit) {
     console.warn('[AI Generator] RAG retrieval failed, continuing without:', e.message);
   }
 
-  const systemPrompt = buildRequirementsPrompt(kit, ragContext);
-  const result = await callGemini(systemPrompt, message);
+  const system = buildRequirementsPrompt(kit, ragContext);
+  const result = await callCourseModel({ stage: 'requirements', system, userMessage: message, userId, input: { message }, signal });
 
   if (!result.structuredData) {
     return {
@@ -125,14 +195,14 @@ export async function generateRequirements(message, userId, kit) {
 
   return {
     message: result.structuredData.message || result.text,
-    intake: result.structuredData.intake || null,
+    intake: result.structuredData.intake,
   };
 }
 
-export async function generateRoadmap(intake, userId, kit) {
-  const systemPrompt = buildRoadmapPrompt(kit);
+export async function generateRoadmap(intake, userId, kit, { signal } = {}) {
+  const system = buildRoadmapPrompt(kit);
   const userMessage = `以下の学習要件に基づきロードマップを作成してください:\n\n${JSON.stringify(intake, null, 2)}`;
-  const result = await callGemini(systemPrompt, userMessage);
+  const result = await callCourseModel({ stage: 'roadmap', system, userMessage, userId, input: { intake }, signal });
 
   if (!result.structuredData) {
     return { message: result.text, modules: null };
@@ -140,20 +210,20 @@ export async function generateRoadmap(intake, userId, kit) {
 
   return {
     message: result.structuredData.message || result.text,
-    modules: result.structuredData.modules || null,
+    modules: result.structuredData.modules,
   };
 }
 
-export async function generateCurriculum(intake, modules, userId, kit) {
-  const systemPrompt = buildCurriculumPrompt(kit);
+export async function generateCurriculum(intake, modules, userId, kit, { signal } = {}) {
+  const system = buildCurriculumPrompt(kit);
   const userMessage = `以下の要件とロードマップに基づき、完全なカリキュラムを生成してください:\n\n## 要件\n${JSON.stringify(intake, null, 2)}\n\n## モジュール構成\n${JSON.stringify(modules, null, 2)}`;
-  const result = await callGemini(systemPrompt, userMessage);
+  const result = await callCourseModel({ stage: 'curriculum', system, userMessage, userId, input: { intake, modules }, signal });
 
   if (!result.structuredData) {
     return { curriculum: null, rawText: result.text };
   }
 
   return {
-    curriculum: result.structuredData.curriculum || result.structuredData,
+    curriculum: result.structuredData.curriculum,
   };
 }

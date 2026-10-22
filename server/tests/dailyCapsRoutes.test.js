@@ -14,8 +14,8 @@ import { resetGatewayForTests, setGatewayForTests } from '../llm/index.js';
 import { LlmError } from '../llm/errors.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 import { resetDailyCapsForTests } from '../middleware/dailyCaps.js';
-import { setGenAIForTests } from '../services/aiGenerator.js';
 import { setImageClientForTests } from '../geminiBackendService.js';
+import { resetEmbeddingClientForTests } from '../../tools/core/ragSearch.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LESSON = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] };
@@ -38,10 +38,11 @@ const CAP_KEYS = ['LLM', 'COURSE_GENERATION', 'IMAGE', 'AGENT_CHAT', 'EMBEDDINGS
 const DEV_USER = '00000000-0000-0000-0000-000000000001';
 const DRAFT_ID = '11111111-2222-4333-8444-555555555555';
 const ENV_KEYS = [
-    'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'VITE_GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK',
+    'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'VITE_GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_ALLOWED', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK',
     'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1',
     'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY',
-    'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'HERMES_API_URL', 'AI_CAP_ALERT_WEBHOOK_URL', ...CAP_KEYS,
+    'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'HERMES_API_URL', 'AI_CAP_ALERT_WEBHOOK_URL',
+    'VITE_FEATURE_AGENT_CHAT', ...CAP_KEYS,
 ];
 
 const withServer = async (handler) => {
@@ -120,19 +121,60 @@ const assertDailyLimit = (result, kind, scope) => {
     assert.ok(Number(result.headers.get('retry-after')) > 0);
 };
 
-/** Fake @google/genai client for the course generator; records each generateContent call. */
-const fakeGenAI = (reply = { message: 'Here is a plan.', intake: { goal: 'SQL basics' } }) => {
+/**
+ * Gateway double for the course generator (task 'course.generate'); records each generate call.
+ * `reply` is the model's text (an object is sent as JSON), or an Error to throw.
+ */
+const fakeCourseGateway = (reply = { message: 'Here is a plan.', intake: { goal: 'SQL basics' } }) => {
     const calls = [];
     return {
         calls,
-        models: {
-            async generateContent(params) {
-                calls.push(params);
-                return { text: JSON.stringify(reply) };
-            },
+        canServe: () => true,
+        status: () => ({}),
+        async generate(req) {
+            calls.push(req);
+            if (reply instanceof Error) throw reply;
+            const text = typeof reply === 'string' ? reply : JSON.stringify(reply);
+            return { provider: 'anthropic', model: 'm', text, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } };
         },
+        async *stream() {},
     };
 };
+
+/**
+ * A mock pool whose ai_daily_usage rows count as Postgres does: RESERVE_SQL takes a slot while
+ * count < $4, REFUND_SQL gives one back. `answer` as in createMockPool.
+ */
+function countingPool(answer) {
+    const counts = new Map();
+    const mock = createMockPool(answer);
+    return {
+        ...mock,
+        async query(sql, params = []) {
+            const text = String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
+            if (text.startsWith('insert into ai_daily_usage')) {
+                mock.queries.push({ sql: text, params });
+                const key = params.slice(0, 3).join('|');
+                const count = counts.get(key) ?? 0;
+                if (count >= params[3]) return { rowCount: 0, rows: [] };
+                counts.set(key, count + 1);
+                return { rowCount: 1, rows: [{ count: count + 1 }] };
+            }
+            if (text.startsWith('update ai_daily_usage')) {
+                mock.queries.push({ sql: text, params });
+                for (const subject of params[2]) {
+                    const key = `${params[0]}|${params[1]}|${subject}`;
+                    counts.set(key, Math.max(0, (counts.get(key) ?? 0) - 1));
+                }
+                return { rowCount: 1, rows: [] };
+            }
+            return mock.query(sql, params);
+        },
+        async connect() {
+            return { query: (sql, params) => this.query(sql, params), release: () => {} };
+        },
+    };
+}
 
 /** A TCP port with nothing listening on it. */
 const closedPort = async () => {
@@ -155,8 +197,8 @@ describe('daily caps on the API routes', () => {
         resetPoolForTests();
         setPoolForTests(null);
         resetDailyCapsForTests();
-        setGenAIForTests(null);
         setImageClientForTests(null);
+        resetEmbeddingClientForTests();
     });
 
     afterEach(() => {
@@ -167,8 +209,8 @@ describe('daily caps on the API routes', () => {
         resetGatewayForTests();
         resetPoolForTests();
         resetDailyCapsForTests();
-        setGenAIForTests(null);
         setImageClientForTests(null);
+        resetEmbeddingClientForTests();
     });
 
     describe('/llm (signed in)', () => {
@@ -271,18 +313,6 @@ describe('daily caps on the API routes', () => {
             });
         });
 
-        it('gives the image back when the Gemini key is missing', async () => {
-            process.env.AI_CAP_USER_IMAGE = '1';
-            const prompt = `daily cap test ${Date.now()} ${Math.random()}`;
-            await withServer(async (base) => {
-                for (let i = 0; i < 2; i += 1) {
-                    const result = await send(`${base}/image`, { prompt, aspect_ratio: '16:9', image_size: '1K' });
-                    assert.equal(result.status, 500, `attempt ${i + 1} is not 429`);
-                    assert.deepEqual(result.json, { error: 'Image generation failed', error_type: 'image_failed' });
-                }
-            });
-        });
-
         /** A Gemini image client whose every call fails like the API does (ApiError carries `status`). */
         const failingImageClient = (status) => {
             const calls = [];
@@ -297,8 +327,42 @@ describe('daily caps on the API routes', () => {
             };
         };
 
+        const IMAGE_UNAVAILABLE = { error: 'Image generation is not available on this server.', error_type: 'image_generation_unavailable' };
+
+        it('answers 503 image_generation_unavailable without charging when Gemini is not allowed, even with a key', async () => {
+            process.env.AI_CAP_USER_IMAGE = '1';
+            process.env.GEMINI_API_KEY = 'AIza-test-key';
+            const client = failingImageClient(500);
+            setImageClientForTests(client);
+            const pool = createMockPool();
+            setPoolForTests(pool);
+            await withServer(async (base) => {
+                for (let i = 0; i < 3; i += 1) {
+                    const result = await send(`${base}/image`, { prompt: `not allowed ${i} ${Math.random()}` });
+                    assert.equal(result.status, 503, `attempt ${i + 1} is not 429`);
+                    assert.deepEqual(result.json, IMAGE_UNAVAILABLE);
+                }
+            });
+            assert.equal(client.calls.length, 0, 'Gemini was never called');
+            assert.deepEqual(pool.usage(), [], 'nothing was charged');
+        });
+
+        it('answers 503 image_generation_unavailable without charging when Gemini is allowed but has no key', async () => {
+            process.env.AI_CAP_USER_IMAGE = '1';
+            process.env.GEMINI_ALLOWED = 'true';
+            const prompt = `daily cap test ${Date.now()} ${Math.random()}`;
+            await withServer(async (base) => {
+                for (let i = 0; i < 2; i += 1) {
+                    const result = await send(`${base}/image`, { prompt, aspect_ratio: '16:9', image_size: '1K' });
+                    assert.equal(result.status, 503, `attempt ${i + 1} is not 429`);
+                    assert.deepEqual(result.json, IMAGE_UNAVAILABLE);
+                }
+            });
+        });
+
         it('gives the image back when Gemini refuses the key (400, 401, 403) or rate limits (429, answered 503); no provider text', async () => {
             process.env.AI_CAP_USER_IMAGE = '1';
+            process.env.GEMINI_ALLOWED = 'true';
             await withServer(async (base) => {
                 for (const status of [400, 401, 403, 429]) {
                     const client = failingImageClient(status);
@@ -314,8 +378,32 @@ describe('daily caps on the API routes', () => {
             });
         });
 
+        it('maps GEMINI_NOT_CONFIGURED from the generator to 503 image_generation_unavailable and gives the image back', async () => {
+            process.env.AI_CAP_USER_IMAGE = '1';
+            process.env.GEMINI_ALLOWED = 'true';
+            // The pre-check passes (a test client is set), then the generator says it cannot run.
+            const calls = [];
+            setImageClientForTests({
+                models: {
+                    async generateContent(params) {
+                        calls.push(params);
+                        throw Object.assign(new Error('not configured'), { code: 'GEMINI_NOT_CONFIGURED' });
+                    },
+                },
+            });
+            await withServer(async (base) => {
+                for (let i = 0; i < 2; i += 1) {
+                    const result = await send(`${base}/image`, { prompt: `not configured ${i} ${Math.random()}` });
+                    assert.equal(result.status, 503, `attempt ${i + 1} is not 429: ${result.text}`);
+                    assert.deepEqual(result.json, IMAGE_UNAVAILABLE);
+                }
+            });
+            assert.equal(calls.length, 2, 'both requests passed the pre-check');
+        });
+
         it('keeps the image charged when Gemini fails after accepting the call (500)', async () => {
             process.env.AI_CAP_USER_IMAGE = '1';
+            process.env.GEMINI_ALLOWED = 'true';
             setImageClientForTests(failingImageClient(500));
             await withServer(async (base) => {
                 const first = await send(`${base}/image`, { prompt: `server error ${Math.random()}` });
@@ -325,8 +413,10 @@ describe('daily caps on the API routes', () => {
             });
         });
 
-        it("answers 429 scope 'off' when image generation is turned off", async () => {
+        it("answers 429 scope 'off' when image generation is turned off (and available)", async () => {
             process.env.AI_CAP_USER_IMAGE = '0';
+            process.env.GEMINI_ALLOWED = 'true';
+            setImageClientForTests(failingImageClient(500));
             await withServer(async (base) => {
                 assertDailyLimit(await send(`${base}/image`, { prompt: `daily cap off ${Date.now()}` }), 'image', 'off');
             });
@@ -351,32 +441,9 @@ describe('daily caps on the API routes', () => {
 
         it('keeps the unit when the stored file cannot be read, so the cap still bounds stored files', async () => {
             process.env.AI_CAP_USER_EMBEDDINGS = '1';
-            // ai_daily_usage counted as Postgres does: RESERVE_SQL takes a slot while count < $4, REFUND_SQL gives one back.
-            const counts = new Map();
-            const mock = createMockPool((sql) => (sql.startsWith('insert into materials')
+            setPoolForTests(countingPool((sql) => (sql.startsWith('insert into materials')
                 ? { rowCount: 1, rows: [{ id: DRAFT_ID, status: 'uploaded' }] }
-                : undefined));
-            setPoolForTests({
-                ...mock,
-                async query(sql, params = []) {
-                    const text = String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
-                    if (text.startsWith('insert into ai_daily_usage')) {
-                        const key = params.slice(0, 3).join('|');
-                        const count = counts.get(key) ?? 0;
-                        if (count >= params[3]) return { rowCount: 0, rows: [] };
-                        counts.set(key, count + 1);
-                        return { rowCount: 1, rows: [{ count: count + 1 }] };
-                    }
-                    if (text.startsWith('update ai_daily_usage')) {
-                        for (const subject of params[2]) {
-                            const key = `${params[0]}|${params[1]}|${subject}`;
-                            counts.set(key, Math.max(0, (counts.get(key) ?? 0) - 1));
-                        }
-                        return { rowCount: 1, rows: [] };
-                    }
-                    return mock.query(sql, params);
-                },
-            });
+                : undefined)));
             const name = `daily-cap-unreadable-${Date.now()}.pdf`;
             const upload = (base) => {
                 const form = new FormData();
@@ -412,6 +479,71 @@ describe('daily caps on the API routes', () => {
             });
         });
 
+        it('stores an upload without vectors when embeddings are off (ready, keyword search), and keeps the unit', async () => {
+            process.env.AI_CAP_USER_EMBEDDINGS = '1';
+            process.env.GEMINI_API_KEY = 'AIza-test-key'; // not used: GEMINI_ALLOWED is not "true"
+            const pool = countingPool((sql) => (sql.startsWith('insert into materials')
+                ? { rowCount: 1, rows: [{ id: DRAFT_ID, status: 'uploaded' }] }
+                : undefined));
+            setPoolForTests(pool);
+            const name = `daily-cap-keyword-${Date.now()}.txt`;
+            const upload = (base) => {
+                const form = new FormData();
+                form.append('file', new Blob(['Rise Path keyword search material. '.repeat(40)], { type: 'text/plain' }), name);
+                return fetch(`${base}/upload`, { method: 'POST', body: form });
+            };
+            const uploads = path.join(ROOT, 'public/uploads');
+            const { log } = console;
+            console.log = () => {};
+            try {
+                await withServer(async (base) => {
+                    const first = await upload(base);
+                    assert.equal(first.status, 200);
+                    assert.equal((await first.json()).status, 'ready', 'stored for keyword search');
+                    const second = await upload(base);
+                    const json = await second.json();
+                    assertDailyLimit({ status: second.status, json, text: JSON.stringify(json), headers: second.headers }, 'embeddings', 'user');
+                });
+            } finally {
+                console.log = log;
+                for (const file of fs.existsSync(uploads) ? fs.readdirSync(uploads) : []) {
+                    if (file.endsWith(name)) fs.unlinkSync(path.join(uploads, file));
+                }
+            }
+            const chunks = pool.queries.filter((q) => q.sql.startsWith('insert into material_chunks'));
+            assert.ok(chunks.length > 0);
+            assert.ok(chunks.every((q) => /values \(\$1, \$2, \$3, null, \$4, null, null\)/.test(q.sql)), 'no vector, no model');
+            assert.ok(pool.queries.some((q) => q.sql.startsWith('update materials set status') && q.params[0] === 'ready'));
+        });
+
+        it('gives the /rag/index unit back when embeddings are off; keeps it when they are on', async () => {
+            process.env.AI_CAP_USER_EMBEDDINGS = '1';
+            const answer = (sql) => {
+                if (sql.startsWith('select 1 from materials')) return { rowCount: 1, rows: [{}] };
+                if (sql.startsWith('insert into jobs')) return { rowCount: 1, rows: [{ id: 'job-1', status: 'queued' }] };
+                return undefined;
+            };
+            setPoolForTests(countingPool(answer));
+            await withServer(async (base) => {
+                for (let i = 0; i < 3; i += 1) {
+                    const result = await send(`${base}/rag/index`, { material_id: DRAFT_ID });
+                    assert.equal(result.status, 200, `attempt ${i + 1} is not 429`);
+                    assert.equal(result.json.status, 'queued');
+                    assert.equal(result.json.embeddings, 'off', 'the answer says embeddings are off');
+                    await new Promise((resolve) => setTimeout(resolve, 10));
+                }
+            });
+
+            resetDailyCapsForTests();
+            setPoolForTests(countingPool(answer));
+            process.env.GEMINI_ALLOWED = 'true';
+            process.env.GEMINI_API_KEY = 'AIza-test-key';
+            await withServer(async (base) => {
+                assert.equal((await send(`${base}/rag/index`, { material_id: DRAFT_ID })).status, 200);
+                assertDailyLimit(await send(`${base}/rag/index`, { material_id: DRAFT_ID }), 'embeddings', 'user');
+            });
+        });
+
         it('refuses a file over 10 MB with 413 and gives the unit back; one file per request', async () => {
             process.env.AI_CAP_USER_EMBEDDINGS = '1';
             const name = `daily-cap-large-${Date.now()}.txt`;
@@ -439,11 +571,14 @@ describe('daily caps on the API routes', () => {
     });
 
     describe('/ai/generate', () => {
-        it('charges a stage call, refunds a 400 sent before Gemini, and checks the database counters', async () => {
+        /** The daily cap refund statements sent for course_generation. */
+        const refunds = (pool) => pool.usage().filter((q) => q.sql.startsWith('update ai_daily_usage'));
+
+        it('charges a stage call, refunds a 400 sent before the model, and checks the database counters', async () => {
             const pool = createMockPool();
             setPoolForTests(pool);
-            const gemini = fakeGenAI();
-            setGenAIForTests(gemini);
+            const gateway = fakeCourseGateway();
+            setGatewayForTests(gateway);
             await withServer(async (base) => {
                 const missing = await send(`${base}/ai/generate`, { stage: 'requirements' });
                 assert.equal(missing.status, 400, missing.text);
@@ -453,18 +588,17 @@ describe('daily caps on the API routes', () => {
                     ['course_generation', '*'],
                 ]);
                 assert.ok(pool.queries.some((q) => q.sql.startsWith('select role from user_profiles')));
-                assert.ok(await waitFor(() => pool.usage().some((q) => q.sql.startsWith('update ai_daily_usage'))), 'the 400 was refunded');
-                const refund = pool.usage().find((q) => q.sql.startsWith('update ai_daily_usage'));
-                assert.deepEqual(refund.params.slice(1), ['course_generation', [DEV_USER, '*']]);
-                assert.equal(gemini.calls.length, 0);
+                assert.ok(await waitFor(() => refunds(pool).length > 0), 'the 400 was refunded');
+                assert.deepEqual(refunds(pool)[0].params.slice(1), ['course_generation', [DEV_USER, '*']]);
+                assert.equal(gateway.calls.length, 0);
             });
         });
 
-        it('rejects a non-UUID curriculum_id or a bad message with 400 before charging or calling Gemini', async () => {
+        it('rejects a non-UUID curriculum_id or a bad message with 400 before charging or calling the model', async () => {
             const pool = createMockPool();
             setPoolForTests(pool);
-            const gemini = fakeGenAI();
-            setGenAIForTests(gemini);
+            const gateway = fakeCourseGateway();
+            setGatewayForTests(gateway);
             await withServer(async (base) => {
                 for (const body of [
                     { message: 'Teach me SQL', curriculum_id: 'API key' },
@@ -479,63 +613,171 @@ describe('daily caps on the API routes', () => {
                     assert.equal(result.json.error_type, 'invalid_body');
                 }
                 assert.deepEqual(pool.usage(), [], 'nothing was charged');
-                assert.equal(gemini.calls.length, 0, 'Gemini was not called');
+                assert.equal(gateway.calls.length, 0, 'the model was not called');
             });
         });
 
-        it('keeps the unit when an error after Gemini mentions "API key" (no refund by message)', async () => {
+        it("runs a stage as one 'course.generate' gateway call and reads its JSON reply", async () => {
+            setPoolForTests(createMockPool());
+            const gateway = fakeCourseGateway('Here is the plan:\n```json\n{"message":"Plan for SQL","intake":{"goal":"SQL basics"}}\n```');
+            setGatewayForTests(gateway);
+            await withServer(async (base) => {
+                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
+                assert.equal(result.status, 200, result.text);
+                assert.equal(result.json.message, 'Plan for SQL');
+                assert.equal(result.json.pending_approval, 'requirements');
+            });
+            assert.equal(gateway.calls.length, 1);
+            assert.equal(gateway.calls[0].task, 'course.generate');
+            assert.equal(gateway.calls[0].userId, DEV_USER);
+            assert.deepEqual(gateway.calls[0].messages, [{ role: 'user', content: 'Teach me SQL' }]);
+            assert.ok(gateway.calls[0].signal instanceof AbortSignal);
+        });
+
+        it('answers 422 and saves nothing when the curriculum reply is broken JSON with a parseable nested piece', async () => {
+            const broken = '{"curriculum": {"title": {"en": "Intro", "jp": "入門"}, "description": {"en": "Learn the "basics"", "jp": "基本"}, "modules": []}}';
+            const pool = createMockPool((sql) => (sql.startsWith('select intake_json, modules_json')
+                ? { rowCount: 1, rows: [{ intake_json: { goal: 'SQL' }, modules_json: [{ module_id: 'm1' }] }] }
+                : undefined));
+            setPoolForTests(pool);
+            const gateway = fakeCourseGateway(broken);
+            setGatewayForTests(gateway);
+            await withServer(async (base) => {
+                const result = await send(`${base}/ai/generate`, { decision: 'approved', stage: 'roadmap', curriculum_id: DRAFT_ID });
+                assert.equal(gateway.calls.length, 1, 'the model ran');
+                assert.equal(result.status, 422, result.text);
+                assert.ok(!result.text.includes('カリキュラムが完成しました'));
+            });
+            const writes = pool.queries.filter((q) => /^(insert into|update) curricul|^begin/.test(q.sql));
+            assert.deepEqual(writes, [], 'no curriculum or version row was written');
+        });
+
+        it('runs on the mock provider in development without keys (no Gemini)', async () => {
+            process.env.GEMINI_API_KEY = 'AIza-test-key'; // ignored: GEMINI_ALLOWED is not "true"
+            const pool = createMockPool((sql) => (sql.startsWith('insert into curricula')
+                ? { rowCount: 1, rows: [{ id: DRAFT_ID }] }
+                : undefined));
+            setPoolForTests(pool);
+            const { warn } = console;
+            console.warn = () => {};
+            try {
+                await withServer(async (base) => {
+                    const result = await send(`${base}/ai/generate`, { message: 'SQL basics' });
+                    assert.equal(result.status, 200, result.text);
+                    assert.equal(result.json.curriculum_id, DRAFT_ID);
+                    assert.match(result.json.message, /SQL basics/);
+                });
+            } finally {
+                console.warn = warn;
+            }
+            const insert = pool.queries.find((q) => q.sql.startsWith('insert into curricula'));
+            assert.equal(JSON.parse(insert.params[2]).goal, 'SQL basics', 'the mock reply parsed into an intake');
+        });
+
+        it('keeps the unit when an error after the model mentions "API key" (no refund by message)', async () => {
             const pool = createMockPool((sql) => {
                 if (sql.startsWith('update curricula')) throw new Error('invalid input syntax for type uuid: "API key GEMINI"');
             });
             setPoolForTests(pool);
-            const gemini = fakeGenAI();
-            setGenAIForTests(gemini);
-            await withServer(async (base) => {
-                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
-                assert.equal(gemini.calls.length, 1, 'Gemini ran');
-                assert.equal(result.status, 503, result.text);
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                assert.ok(!pool.usage().some((q) => q.sql.startsWith('update ai_daily_usage')), 'still charged');
-            });
+            const gateway = fakeCourseGateway();
+            setGatewayForTests(gateway);
+            const { error } = console;
+            console.error = () => {};
+            try {
+                await withServer(async (base) => {
+                    const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
+                    assert.equal(gateway.calls.length, 1, 'the model ran');
+                    assert.equal(result.status, 500, result.text);
+                    assert.deepEqual(result.json, { error: 'Internal server error' });
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    assert.deepEqual(refunds(pool), [], 'still charged');
+                });
+            } finally {
+                console.error = error;
+            }
         });
 
-        it('gives the unit back when Gemini refuses the key (by status, not message)', async () => {
-            const pool = createMockPool();
-            setPoolForTests(pool);
-            const calls = [];
-            setGenAIForTests({
-                models: {
-                    async generateContent(params) {
-                        calls.push(params);
-                        throw Object.assign(new Error('Forbidden'), { status: 403 });
-                    },
-                },
-            });
-            await withServer(async (base) => {
-                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
-                assert.equal(calls.length, 1, 'Gemini was called');
-                assert.equal(result.status, 500, result.text);
-                assert.ok(await waitFor(() => pool.usage().some((q) => q.sql.startsWith('update ai_daily_usage'))), 'refunded');
-                const refund = pool.usage().find((q) => q.sql.startsWith('update ai_daily_usage'));
-                assert.deepEqual(refund.params.slice(1), ['course_generation', [DEV_USER, '*']]);
-            });
+        it('gives the unit back when the gateway fails before any model ran (by LlmError code, not message)', async () => {
+            const cases = [
+                ['auth', 503],
+                ['rate_limited', 429],
+                ['provider_unavailable', 503],
+                ['no_provider', 503],
+            ];
+            const { error } = console;
+            console.error = () => {};
+            try {
+                for (const [code, status] of cases) {
+                    resetDailyCapsForTests();
+                    const pool = createMockPool();
+                    setPoolForTests(pool);
+                    const gateway = fakeCourseGateway(new LlmError(code, 'Gemini API key sk-ant-SECRET rejected'));
+                    setGatewayForTests(gateway);
+                    await withServer(async (base) => {
+                        const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
+                        assert.equal(gateway.calls.length, 1, `${code}: the gateway was called`);
+                        assert.equal(result.status, status, `${code}: ${result.text}`);
+                        assert.equal(result.json.error_type, code === 'no_provider' ? 'ai_unavailable' : code);
+                        assert.ok(!result.text.includes('SECRET'));
+                        assert.ok(await waitFor(() => refunds(pool).length > 0), `${code}: refunded`);
+                        assert.deepEqual(refunds(pool)[0].params.slice(1), ['course_generation', [DEV_USER, '*']]);
+                    });
+                }
+            } finally {
+                console.error = error;
+            }
         });
 
-        it('answers 503 without charging when no Gemini key is set', async () => {
+        it('keeps the unit when a model may have produced output (timeout, cut-off, refusal, or an earlier attempt ran)', async () => {
+            const cases = [
+                [new LlmError('timeout', 'slow'), 504],
+                [new LlmError('max_tokens', 'cut off'), 502],
+                [new LlmError('refusal', 'no'), 422],
+                [new LlmError('rate_limited', 'second provider', { modelRan: true }), 429],
+            ];
+            const { error } = console;
+            console.error = () => {};
+            try {
+                for (const [failure, status] of cases) {
+                    resetDailyCapsForTests();
+                    const pool = createMockPool();
+                    setPoolForTests(pool);
+                    setGatewayForTests(fakeCourseGateway(failure));
+                    await withServer(async (base) => {
+                        const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID });
+                        assert.equal(result.status, status, `${failure.code}: ${result.text}`);
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                        assert.deepEqual(refunds(pool), [], `${failure.code}: still charged`);
+                    });
+                }
+            } finally {
+                console.error = error;
+            }
+        });
+
+        it('answers 503 ai_unavailable without charging when no provider can serve course.generate', async () => {
+            process.env.LLM_MOCK_FALLBACK = 'false';
+            process.env.GEMINI_API_KEY = 'AIza-test-key'; // set, but GEMINI_ALLOWED is not "true"
             const pool = createMockPool();
             setPoolForTests(pool);
-            await withServer(async (base) => {
-                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL' });
-                assert.equal(result.status, 503, result.text);
-                assert.equal(result.json.error_type, 'ai_unavailable');
-                assert.deepEqual(pool.usage(), []);
-            });
+            const { warn } = console;
+            console.warn = () => {};
+            try {
+                await withServer(async (base) => {
+                    const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL' });
+                    assert.equal(result.status, 503, result.text);
+                    assert.equal(result.json.error_type, 'ai_unavailable');
+                    assert.deepEqual(pool.usage(), []);
+                });
+            } finally {
+                console.warn = warn;
+            }
         });
 
         it("answers 429 scope 'off' when course generation is turned off", async () => {
             process.env.AI_CAP_USER_COURSE_GENERATION = '0';
             setPoolForTests(createMockPool());
-            setGenAIForTests(fakeGenAI());
+            setGatewayForTests(fakeCourseGateway());
             await withServer(async (base) => {
                 assertDailyLimit(await send(`${base}/ai/generate`, { message: 'Teach me SQL' }), 'course_generation', 'off');
             });
@@ -543,6 +785,7 @@ describe('daily caps on the API routes', () => {
 
         it('approving the saved curriculum runs no model and is not counted', async () => {
             process.env.AI_CAP_USER_COURSE_GENERATION = '0';
+            process.env.LLM_MOCK_FALLBACK = 'false';
             const pool = createMockPool();
             setPoolForTests(pool);
             await withServer(async (base) => {
@@ -554,7 +797,27 @@ describe('daily caps on the API routes', () => {
         });
     });
 
+    describe('/agent/chat (shared chat off)', () => {
+        it('answers 404 agent_chat_off and charges nothing when VITE_FEATURE_AGENT_CHAT is not "true"', async () => {
+            process.env.HERMES_API_KEY = 'hermes-test-key-0123456789';
+            process.env.AI_CAP_USER_AGENT_CHAT = '5';
+            const pool = createMockPool();
+            setPoolForTests(pool);
+            await withServer(async (base) => {
+                for (const stream of [false, true]) {
+                    const result = await send(`${base}/agent/chat`, { ...AGENT_CHAT, stream });
+                    assert.equal(result.status, 404, result.text);
+                    assert.equal(result.json.error_type, 'agent_chat_off');
+                }
+            });
+            assert.deepEqual(pool.usage(), [], 'nothing was charged');
+        });
+    });
+
     describe('/agent/chat (Hermes not configured)', () => {
+        // The shared chat is on for these tests (routes/agent.js isAgentChatEnabled).
+        beforeEach(() => { process.env.VITE_FEATURE_AGENT_CHAT = 'true'; });
+
         it('gives the chat back when Hermes is not configured', async () => {
             process.env.AI_CAP_USER_AGENT_CHAT = '1';
             await withServer(async (base) => {
@@ -577,6 +840,9 @@ describe('daily caps on the API routes', () => {
     });
 
     describe('/agent/chat (Hermes configured)', () => {
+        // The shared chat is on for these tests (routes/agent.js isAgentChatEnabled).
+        beforeEach(() => { process.env.VITE_FEATURE_AGENT_CHAT = 'true'; });
+
         it('gives the chat back when the connection to Hermes is refused', async () => {
             process.env.AI_CAP_USER_AGENT_CHAT = '1';
             process.env.HERMES_API_KEY = 'test-key';

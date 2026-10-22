@@ -44,7 +44,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 
 ### pgvector（RAG のベクトル検索）
 
-`material_chunks.embedding` の型は、001 を最初に流したときに決まります。VM の db イメージは pgvector 入りなので、新しい空の DB では 000 が `vector` 拡張を作り、001 が `vector(768)` の列と HNSW インデックスを作ります。RAG はベクトル検索で動きます（埋め込みには `GEMINI_API_KEY` が要ります）。
+`material_chunks.embedding` の型は、001 を最初に流したときに決まります。VM の db イメージは pgvector 入りなので、新しい空の DB では 000 が `vector` 拡張を作り、001 が `vector(768)` の列と HNSW インデックスを作ります。RAG はベクトル検索で動きます（埋め込みには `GEMINI_API_KEY` と `GEMINI_ALLOWED=true` が要ります。`GEMINI_ALLOWED` は 18 歳未満の人が使えない環境でだけ設定します。設定しないあいだは、ベクトル列があってもキーワード検索で動きます）。
 
 pgvector の無い Postgres（たとえば `postgres:16-alpine`）では、000 は `vector` を飛ばし、列は `FLOAT8[]` になります。このとき RAG はキーワード検索で動きます。001 は 2 回目以降は流れないので、あとから pgvector 入りのイメージに替えても列は変わりません。ベクトル検索になるのは、新しい空のボリュームから始めたときだけです。
 
