@@ -269,16 +269,39 @@ describe('resolveMcpUserId', () => {
         it('a well-formed rp_turn that is unknown or expired fails closed, with no fallback', async () => {
             await registerAgentSession(`rp:user:${USER_B}`, USER_B); // the development fallback would pick B
             const expired = await registerAgentTurn(USER_C, { ttlMs: -1 });
-            for (const env of ['development', 'production']) {
+            /** The shared agent_session_binding table, without a row for the token. */
+            const sharedTable = { async query() { return { rowCount: 0, rows: [] }; } };
+            for (const [env, pool] of [['production', null], ['production', sharedTable], ['development', sharedTable]]) {
                 process.env.NODE_ENV = env;
+                if (pool) setPoolForTests(pool);
+                else resetPoolForTests();
                 for (const turnToken of ['x'.repeat(32), expired, USER_B]) {
                     assert.ok(isTurnToken(turnToken), turnToken);
                     const result = await resolveMcpUserId({ extra: bridgeExtra(), sessions: bridgeSessions(), turnToken });
-                    assert.equal(result.error_type, 'session_binding_required', `${env} ${turnToken}`);
+                    assert.equal(result.error_type, 'session_binding_required', `${env} ${pool ? 'db' : 'no db'} ${turnToken}`);
                     assert.match(result.error, /rp_turn is unknown or expired/);
                     assert.equal(result.userId, undefined);
                 }
             }
+        });
+
+        it('in development without a database, an rp_turn this process cannot see acts as before turn tokens (operator key, else PHASE1), never as another learner', async () => {
+            // Express minted the token into its own memory; a separate MCP process has no way to read it.
+            await registerAgentSession(`rp:user:${USER_B}`, USER_B); // the no-rp_turn fallback would pick B
+            const expired = await registerAgentTurn(USER_C, { ttlMs: -1 });
+            for (const turnToken of ['x'.repeat(32), expired]) {
+                const sse = await resolveMcpUserId({ extra: bridgeExtra(), sessions: bridgeSessions(), turnToken });
+                assert.equal(sse.userId, USER_A, `bridge SSE ${turnToken}`);
+                const stdio = await resolveMcpUserId({ extra: undefined, sessions: new Map(), turnToken });
+                assert.equal(stdio.userId, USER_A, `stdio ${turnToken}`);
+            }
+            process.env.RISE_PATH_ACTIVE_SESSION_KEY = `rp:user:${USER_C}`;
+            const operator = await resolveMcpUserId({ extra: undefined, sessions: new Map(), turnToken: 'x'.repeat(32) });
+            assert.equal(operator.userId, USER_C);
+            // Production without a database still fails closed.
+            process.env.NODE_ENV = 'production';
+            const prod = await resolveMcpUserId({ extra: bridgeExtra(), sessions: bridgeSessions(), turnToken: 'x'.repeat(32) });
+            assert.equal(prod.error_type, 'session_binding_required');
         });
 
         it('an rp_turn that is not token-shaped (an LLM guess) counts as absent', async () => {

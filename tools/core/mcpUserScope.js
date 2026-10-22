@@ -8,8 +8,9 @@
  *    on that request. Express mints it for each chat turn after verifying the learner's JWT
  *    (registerAgentTurn in server/services/hermesAgentService.js) and gives it to Hermes in
  *    `instructions`. It is a random capability, not a user id. A token-shaped value that is unknown
- *    or expired fails closed; a value that is not token-shaped (an LLM's guess such as 'current')
- *    counts as absent.
+ *    or expired fails closed (in development without a database, where this process cannot see
+ *    Express's in-memory bindings, it falls back to step 3, then PHASE1_USER_ID); a value that is
+ *    not token-shaped (an LLM's guess such as 'current') counts as absent.
  * 3. The operator's own RISE_PATH_ACTIVE_SESSION_KEY (stdio, or a single-learner deployment).
  * 4. Development only (bridge-token SSE sessions and stdio): the learner with a live
  *    agent_session_binding, only when no other learner started a chat turn within
@@ -315,7 +316,13 @@ export async function resolveMcpUserId({ argsUserId: _argsUserId, extra, session
         if (bound) {
             return finalizeScopedUser(bound);
         }
-        return bindingRequired(`${TURN_ARG} is unknown or expired (pass the ${TURN_ARG} value given for this turn)`);
+        if (isProduction() || getPool()) {
+            return bindingRequired(`${TURN_ARG} is unknown or expired (pass the ${TURN_ARG} value given for this turn)`);
+        }
+        // Development without a database: Express keeps the turn binding in its own memory, so
+        // this process cannot check the token. Act as before turn tokens existed (the operator
+        // key, else PHASE1, Express's dev learner), never as another chatting learner.
+        return (await resolveFromOperatorKey(getActiveSessionKeyFromEnv())) ?? finalizeScopedUser(getPhase1UserId());
     }
 
     const fromEnv = await resolveFromOperatorKey(getActiveSessionKeyFromEnv());

@@ -8,6 +8,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -318,6 +319,16 @@ describe('MCP server (stdio, production): rag-search resolves the learner first'
         assert.match(maxResults.description, /1-10/);
     });
 
+    it('the user_id argument sends the model to rp_turn, not to an automatic resolution', async () => {
+        const scoped = (await client.listTools()).tools.filter((t) => t.inputSchema.properties.user_id);
+        assert.ok(scoped.length > 0);
+        for (const tool of scoped) {
+            const desc = tool.inputSchema.properties.user_id.description;
+            assert.match(desc, /rp_turn/, tool.name);
+            assert.doesNotMatch(desc, /自動解決/, tool.name);
+        }
+    });
+
     it('rag-search with max_results 20 is not a validation error (it reaches the learner check)', async () => {
         const result = await client.callTool({ name: 'rag-search', arguments: { query: QUERY, max_results: 20 } });
         assert.equal(parse(result).error_type, 'session_binding_required', result.content[0].text);
@@ -334,6 +345,18 @@ describe('MCP server (stdio, production): rag-search resolves the learner first'
         assert.equal(result.isError, true);
         assert.equal(parse(result).error_type, 'session_binding_required');
         assert.match(parse(result).error, /rp_turn/);
+    });
+});
+
+describe('Hermes skills tell the model to pass rp_turn', () => {
+    it('no skill says user_id is resolved automatically; life-habit-analyst asks for rp_turn', () => {
+        const skillsDir = path.join(ROOT, 'skills');
+        for (const name of fs.readdirSync(skillsDir)) {
+            const file = path.join(skillsDir, name, 'SKILL.md');
+            if (!fs.existsSync(file)) continue;
+            assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /自動解決/, `skills/${name}/SKILL.md`);
+        }
+        assert.match(fs.readFileSync(path.join(skillsDir, 'life-habit-analyst/SKILL.md'), 'utf8'), /`rp_turn` を必ず渡す/);
     });
 });
 

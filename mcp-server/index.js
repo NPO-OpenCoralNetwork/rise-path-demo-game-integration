@@ -138,7 +138,7 @@ const toolError = (err, meta = {}) => {
     };
 };
 
-const USER_ID_DESC = 'ユーザーID。SSE/JWT セッションまたは RISE_PATH_ACTIVE_SESSION_KEY で自動解決されるため LLM 指定は無視されます';
+const USER_ID_DESC = 'ユーザーID。指定しても無視されます。学習者はこのターンの rp_turn（または学習者本人の JWT セッション）で決まります / Ignored: the learner comes from this turn\'s rp_turn (or the learner\'s own JWT session)';
 
 // Session map — populated in SSE mode, empty in stdio mode
 // Declared here so resolveToolUserId can access it before SSE section

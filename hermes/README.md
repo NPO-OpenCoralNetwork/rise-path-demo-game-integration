@@ -21,6 +21,7 @@ Rise Path の LLM 推論ランタイムとして [Hermes Agent](https://hermes-a
 4. Hermes → MCP: 各ツール呼び出しの引数 `rp_turn` にトークンを付ける。MCP の `resolveMcpUserId`（`tools/core/mcpUserScope.js`）が `agent_session_binding` から学習者を引き、その学習者として実行する（`rag-search` も同じ。本人がアップロードした教材だけを検索する）
 
 - 未知・期限切れのトークンは `session_binding_required` で止まる（他の学習者にフォールバックしない）。トークンの形をしていない値（LLM が推測した `current` など）は「指定なし」と同じ扱い
+- 開発環境で `DATABASE_URL_PHASE1` がないときは、Express が binding を自分のメモリにしか持たず MCP からは確かめられないので、`rp_turn` 付きの呼び出しは `RISE_PATH_ACTIVE_SESSION_KEY`、なければ `PHASE1_USER_ID` として動く（ほかの学習者にはならない）。学習者ごとに分けて試すときは DB を設定する
 - クライアントが送る `X-Hermes-Session-Key: rp:user:{uuid}` は**無視される**。UUID は秘密ではないので、Bridge Token を持つ誰もが任意の学習者を名乗れてしまうため。運用者が環境変数で設定する `RISE_PATH_ACTIVE_SESSION_KEY=rp:user:{uuid}`（stdio で学習者 1 人だけの構成）は引き続き使える
 - `rp_turn` のないツール呼び出し: 本番（`NODE_ENV=production`）では `session_binding_required`。開発環境だけの暫定フォールバックとして、直近 15 分以内にチャットを始めた学習者が 1 人だけ（かつ有効な binding がある）ならその学習者、2 人以上なら `session_binding_required`、誰もいなければ `PHASE1_USER_ID` になる
 - MCP は binding を DB から読む（Express とは別プロセス）。Express と MCP には同じ `DATABASE_URL_PHASE1` を設定する
