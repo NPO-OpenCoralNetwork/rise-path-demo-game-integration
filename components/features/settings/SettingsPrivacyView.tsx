@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Brain, ChevronRight, Download, Shield, Trash2 } from 'lucide-react';
 import { ViewState } from '../../../types';
+import { features } from '../../../config/features';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
 import {
@@ -25,6 +26,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
     const { language } = useLanguage();
     const { setTheme } = useTheme();
     const [allowDiaryExcerpts, setAllowDiaryExcerpts] = useState(false);
+    // The Habit & Learning Chat (the only user of this setting) is off (features.agentChat), but the
+    // learner turned excerpts on earlier: they can still turn it off. The saved value is kept.
+    const [keptDiaryOptIn, setKeptDiaryOptIn] = useState(false);
     const [aiMemoryAvailable, setAiMemoryAvailable] = useState(true);
     // The learner opted in before this server stopped offering AI memory: they can still turn it off and purge.
     const [keptOptIn, setKeptOptIn] = useState(false);
@@ -45,6 +49,7 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             .then(([lifePrefs, memoryPrefs]) => {
                 if (!active) return;
                 setAllowDiaryExcerpts(lifePrefs.allow_diary_excerpts_in_ai);
+                setKeptDiaryOptIn(!features.agentChat && lifePrefs.allow_diary_excerpts_in_ai);
                 setAiMemoryAvailable(memoryPrefs.available);
                 setKeptOptIn(!memoryPrefs.available && memoryPrefs.enabled);
                 setAiMemoryEnabled(memoryPrefs.enabled);
@@ -65,6 +70,7 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             diaryTitle: 'AI chat diary excerpts',
             diaryBody: 'When enabled, short diary excerpts may be sent to the AI coach during Habit & Learning Chat (opt-in per session). Default is off.',
             diaryEnabled: 'Allow diary excerpts in AI analysis',
+            diaryNotOffered: 'The Habit & Learning Chat is not offered on this server, so no diary excerpts are sent.',
             exportTitle: 'Export data',
             exportBody: 'Download your journal entries as JSON (up to 366 days).',
             exportButton: 'Download JSON',
@@ -97,6 +103,7 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             diaryTitle: 'AI チャットへの日記抜粋',
             diaryBody: 'オンにすると「生活習慣×学習チャット」で短い日記抜粋を AI に送れます（セッションごとの明示 opt-in も必要）。既定はオフです。',
             diaryEnabled: 'AI 分析に日記抜粋を許可する',
+            diaryNotOffered: 'このサーバーでは「生活習慣×学習チャット」を提供していないため、日記の抜粋は送りません。',
             exportTitle: 'データのエクスポート',
             exportBody: 'ジャーナルを JSON でダウンロードします（最大 366 日）。',
             exportButton: 'JSON をダウンロード',
@@ -256,18 +263,32 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                 <Shield size={20} className="text-indigo-600 mt-0.5 shrink-0" />
                                 <div className="space-y-1">
                                     <h2 className="font-semibold text-slate-900">{t.diaryTitle}</h2>
-                                    <p className="text-sm text-slate-500">{t.diaryBody}</p>
+                                    <p className="text-sm text-slate-500">{features.agentChat ? t.diaryBody : t.diaryNotOffered}</p>
                                 </div>
                             </div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={allowDiaryExcerpts}
-                                    onChange={(e) => void handleDiaryToggle(e.target.checked)}
-                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-slate-700">{t.diaryEnabled}</span>
-                            </label>
+                            {(features.agentChat || keptDiaryOptIn) && (
+                                <label
+                                    className={`flex items-center gap-3 ${
+                                        features.agentChat || allowDiaryExcerpts ? 'cursor-pointer' : 'cursor-not-allowed'
+                                    }`}
+                                >
+                                    {/* Not offered: the earlier opt-in can only be turned off (as for AI memory below). */}
+                                    <input
+                                        type="checkbox"
+                                        checked={allowDiaryExcerpts}
+                                        aria-disabled={!features.agentChat && !allowDiaryExcerpts ? true : undefined}
+                                        aria-describedby={!features.agentChat && allowDiaryExcerpts ? 'diary-kept-opt-in' : undefined}
+                                        onChange={(e) => {
+                                            if (features.agentChat || !e.target.checked) void handleDiaryToggle(e.target.checked);
+                                        }}
+                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 aria-disabled:opacity-50"
+                                    />
+                                    <span className="text-sm text-slate-700">{t.diaryEnabled}</span>
+                                </label>
+                            )}
+                            {!features.agentChat && allowDiaryExcerpts && (
+                                <p id="diary-kept-opt-in" className="text-sm text-slate-500">{t.aiMemoryKeptOptIn}</p>
+                            )}
                         </section>
 
                         <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">

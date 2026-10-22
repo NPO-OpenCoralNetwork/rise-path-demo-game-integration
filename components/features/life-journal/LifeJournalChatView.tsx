@@ -86,7 +86,8 @@ const LifeJournalChatView: React.FC<LifeJournalChatViewProps> = ({ onNavigate })
         'Which days was I most productive this month?',
         'How does exercise relate to my learning time?',
       ],
-      hermesUnavailable: 'The AI coach is not available. Check that Hermes is running and HERMES_API_KEY is set.',
+      // Learners see plain words; operators find the cause in the server log ([Agent Proxy]).
+      hermesUnavailable: "The AI coach isn't available right now. Please try again in a little while.",
       rateLimited: 'Too many requests. Please wait a minute and try again.',
       dailyLimit: "Today's limit for the habit chat has been reached. You can ask again after midnight Japan time.",
       featurePaused: 'The habit chat is paused for now.',
@@ -119,7 +120,7 @@ const LifeJournalChatView: React.FC<LifeJournalChatViewProps> = ({ onNavigate })
         '今月、最も集中できた日の共通点は？',
         '運動と学習時間の関係を教えてください。',
       ],
-      hermesUnavailable: 'AI コーチを利用できません。Hermes の起動と HERMES_API_KEY を確認してください。',
+      hermesUnavailable: 'AI コーチは今使えません。しばらくしてからもう一度お試しください。',
       rateLimited: 'リクエストが多すぎます。1分ほど待ってから再試行してください。',
       dailyLimit: '今日の生活習慣チャットの利用は上限に達しました。日本時間の0時を過ぎたら、また質問できます。',
       featurePaused: '生活習慣チャットは、今は停止しています。',

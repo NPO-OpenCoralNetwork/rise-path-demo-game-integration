@@ -756,7 +756,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Paleolithic cave wall painting of bison and horses, torchlight, ochre pigment, prehistoric style',
-                  src: 'https://image.pollinations.ai/prompt/Paleolithic%20cave%20wall%20painting%20of%20bison%20and%20horses%2C%20torchlight%2C%20ochre%20pigment%2C%20prehistoric%20style?nologo=true',
                   alt: 'Paleolithic cave wall painting of bison and horses',
                   caption: { en: 'Reimagined Lascaux wall under torchlight', jp: '松明の光で浮かぶラスコー壁画の再現イメージ' }
                 },
@@ -791,7 +790,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Deep cave interior lit by torchlight, ritual gathering, silhouettes and smoke',
-                  src: 'https://image.pollinations.ai/prompt/Deep%20cave%20interior%20lit%20by%20torchlight%2C%20ritual%20gathering%2C%20silhouettes%20and%20smoke?nologo=true',
                   alt: 'Deep cave interior lit by torchlight with ritual silhouettes',
                   caption: { en: 'Ritual spaces deep inside the cave', jp: '洞窟奥部にある儀礼空間のイメージ' }
                 },
@@ -837,7 +835,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Prehistoric artist grinding ochre pigment with stone tools, dark cave environment',
-                  src: 'https://image.pollinations.ai/prompt/Prehistoric%20artist%20grinding%20ochre%20pigment%20with%20stone%20tools%2C%20dark%20cave%20environment?nologo=true',
                   alt: 'Prehistoric artist grinding ochre pigment with stone tools',
                   caption: { en: 'Grinding ochre to prepare pigment', jp: '顔料を作るための黄土のすり潰し' }
                 },
@@ -878,7 +875,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Ancient cave hand stencils on rock wall, red ochre, torchlight, high contrast',
-                  src: 'https://image.pollinations.ai/prompt/Ancient%20cave%20hand%20stencils%20on%20rock%20wall%2C%20red%20ochre%2C%20torchlight%2C%20high%20contrast?nologo=true',
                   alt: 'Ancient cave hand stencils on rock wall',
                   caption: { en: 'Hand stencils as a shared signature', jp: '共同体の“署名”としての手形' }
                 },
@@ -2945,6 +2941,21 @@ export const uploadFile = async (file: File) => {
     throw Object.assign(new Error(err.error || 'Upload failed.'), { status: response.status, ...dailyLimitFields(err, response.headers.get('retry-after')) });
   }
   return await response.json();
+};
+
+/** /image error_type when the deployment does not generate images (GEMINI_ALLOWED is not "true"). */
+export const IMAGE_GENERATION_UNAVAILABLE = 'image_generation_unavailable';
+
+/**
+ * True when an error from generateImagePreview means this deployment does not make images, so
+ * asking again will not help: only the server's error_type 'image_generation_unavailable' (at any
+ * status). Other 503s (a provider rate limit, the daily caps' outage share) are short outages,
+ * not "images are never made here".
+ */
+export const isImageGenerationUnavailable = (err: unknown): boolean => {
+  if (err === null || typeof err !== 'object') return false;
+  const { errorType } = err as { errorType?: unknown };
+  return errorType === IMAGE_GENERATION_UNAVAILABLE;
 };
 
 export const generateImagePreview = async (
