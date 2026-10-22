@@ -16,8 +16,13 @@ export interface AgentChatContext extends TutorChatContext {
   ui_language?: AgentUiLanguage;
 }
 
+/**
+ * Learner-facing copy for a failed agent chat. None of it names Hermes or a setting such as
+ * HERMES_API_KEY: learners get plain words, operators find the cause in the server log.
+ */
 export interface AgentChatErrorCopy {
   genericError: string;
+  /** The coach cannot be reached or is not set up (hermes_* error types). */
   hermesUnavailable: string;
   rateLimited: string;
   loginRequired: string;
@@ -29,6 +34,7 @@ export interface AgentChatErrorCopy {
   featurePaused?: string;
 }
 
+/** The text to show for a failed agent chat. Always the app's own copy, never the server's text. */
 export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): string {
   if (err instanceof AgentApiError) {
     // Hermes could not be used (a fixed error_type: the server never forwards Hermes's own text).
@@ -52,8 +58,9 @@ export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): strin
     // 503 ai_unavailable (the daily caps' outage share) or agent_session_unavailable (the turn's
     // learner binding could not be written): the server's English text is not shown.
     if (err.errorType === 'ai_unavailable' || err.errorType === 'agent_session_unavailable') return copy.genericError;
-    if (err.message) return err.message;
   }
+  // Any other failure: the server's English text can name internals (e.g. "Hermes API is not
+  // configured (set HERMES_API_KEY)"), so it stays out of the UI.
   return copy.genericError;
 }
 

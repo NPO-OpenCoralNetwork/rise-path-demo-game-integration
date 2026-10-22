@@ -33,11 +33,12 @@ fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY,,}" != *change-me* ]]; then
   HERMES_KEYED=1
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-full}"
 else
   HERMES_KEYED=0
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 fi
+# Hermes (profile full) starts only when COMPOSE_PROFILES lists it: the shared agent is not offered
+# to learners, so an OpenRouter key alone no longer turns it on (stack.env.example: tts).
+COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
 MEMANTO_STACK=0
@@ -152,6 +153,13 @@ compose run --rm --no-deps -T api npm run db:migrate
 # change, and `up` then stops on mcp's depends_on at once. Recreate it and wait for healthy.
 echo "==> api up (recreate, wait until healthy)"
 compose up -d --no-deps --force-recreate --wait api
+
+# `up` leaves containers of services whose profile is not active alone, so a stack that ran Hermes
+# before (with the full profile) would keep it running after the switch to tts. Remove it.
+if [[ "${HERMES_PROFILE}" -eq 0 && -n "$(compose --profile full ps -aq hermes 2>/dev/null)" ]]; then
+  echo "==> COMPOSE_PROFILES has no full: removing the Hermes container left from an earlier deploy"
+  compose --profile full rm -sf hermes
+fi
 
 echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
 compose up -d

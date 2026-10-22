@@ -270,7 +270,13 @@ const AppContent: React.FC = () => {
 
               {/* Assessment & Profile */}
               <Route path="/assessment" element={<PersonalAssessmentView onNavigate={handleNavigate} />} />
-              <Route path="/life-journal/chat" element={<LifeJournalChatView onNavigate={handleNavigate} />} />
+              {/* The shared Hermes chat is off unless VITE_FEATURE_AGENT_CHAT=true (config/features.ts). */}
+              <Route
+                path="/life-journal/chat"
+                element={features.agentChat
+                  ? <LifeJournalChatView onNavigate={handleNavigate} />
+                  : <Navigate to="/life-journal" replace />}
+              />
               <Route path="/life-journal/insights" element={<LifeJournalInsightsView onNavigate={handleNavigate} />} />
               <Route path="/life-journal/monthly" element={<LifeJournalMonthlyView onNavigate={handleNavigate} />} />
               <Route path="/life-journal" element={<LifeJournalView onNavigate={handleNavigate} />} />
@@ -366,7 +372,9 @@ const AppContent: React.FC = () => {
             </Suspense>
           </Layout>
           )}
-          <FloatingChatbot />
+          {/* Shared Hermes coach: mounted only when features.agentChat is on. The in-lesson tutor
+              (components/lesson/TutorPanel) is separate and always available on /learn and /preview. */}
+          {features.agentChat && <FloatingChatbot />}
         </>
       )}
     </>

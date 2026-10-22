@@ -9,15 +9,20 @@
  * Auth: server.js mounts requireAuth on /ai/generate and /ai/drafts, so req.userId is the
  * authenticated user (or the dev fallback user outside strict mode).
  *
- * Cost: every /ai/generate call that can run a Gemini stage takes one 'course_generation' unit of
+ * Model: each stage is one LLM gateway call, task 'course.generate' (server/services/aiGenerator.js;
+ * the cheap Claude tier by default, server/llm/models.config.js).
+ *
+ * Cost: every /ai/generate call that can run a model stage takes one 'course_generation' unit of
  * the daily caps (server/middleware/dailyCaps.js; one course is at least 3 calls). Approving the
  * final 'curriculum' stage runs no model and is free. Before the unit is taken, the body is
  * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID: 400 invalid_body)
- * and a missing Gemini key answers 503, so neither is charged. After it, the 400 and 404
- * answers that every stage sends before calling Gemini give it back, and so does Gemini refusing
- * the stage's one call (no key, a rejected key, its rate limit: by code and HTTP status); other
- * 422, 500, 503 and 504 answers keep it. A refund never depends on the wording of an error message.
- * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
+ * and a gateway that cannot serve the task (no provider, and no mock fallback in production)
+ * answers 503 ai_unavailable, so neither is charged. After it, the 400 and 404 answers that every
+ * stage sends before calling the model give it back. A gateway failure (LlmError,
+ * server/llm/errors.js) gives it back when no model ran (modelMayHaveRun: no provider, provider
+ * unreachable or overloaded, our key rejected, rate limited) and keeps it when a model may have
+ * produced output (timeouts, refusals, cut-off or invalid replies, a cancelled request). Any other
+ * error (the database, say) keeps it too. A refund never depends on the wording of an error message.
  */
 import express from 'express';
 import { getPool } from '../db.js';
@@ -31,9 +36,10 @@ import {
   generateRequirements,
   generateRoadmap,
   generateCurriculum,
-  isGeminiConfigured,
+  isCourseGenerationAvailable,
 } from '../services/aiGenerator.js';
 import { reserveDailyCap } from '../middleware/dailyCaps.js';
+import { isLlmError, modelMayHaveRun, toClientError } from '../llm/errors.js';
 import { isUuid } from '../utils/ids.js';
 
 const router = express.Router();
@@ -259,9 +265,33 @@ export function invalidGenerateBody(body) {
   return null;
 }
 
+/**
+ * Whether the daily cap unit goes back for an error thrown while a stage ran: only for a gateway
+ * error raised before any model ran. Errors that are not LlmError (database, adapter) keep it.
+ * @param {unknown} error
+ */
+export const refundsCourseGeneration = (error) => isLlmError(error) && !modelMayHaveRun(error);
+
+/**
+ * The response for an error thrown while a stage ran: gateway errors by code
+ * (errors.js toClientError; 'no_provider' answers 503 ai_unavailable like the check before the
+ * cap), anything else 500. Never echoes a provider or database message.
+ * @param {unknown} error
+ * @returns {{ status: number, body: { error: string, error_type?: string } }}
+ */
+export function courseGenerationError(error) {
+  if (!isLlmError(error)) return { status: 500, body: { error: 'Internal server error' } };
+  if (error.code === 'no_provider') {
+    return { status: 503, body: { error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' } };
+  }
+  return toClientError(error);
+}
+
 router.post('/generate', async (req, res) => {
   // Set request timeout
   req.setTimeout(60000);
+  // The model call is not cancelled when the client goes away (the composer gives up after 60 s):
+  // the stage finishes and saves the draft, so a charged unit is not thrown away.
 
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
@@ -277,7 +307,7 @@ router.post('/generate', async (req, res) => {
 
   // Approving the saved curriculum runs no model: it needs no key and is never charged.
   const runsModel = !(decision === 'approved' && stage === 'curriculum');
-  if (runsModel && !isGeminiConfigured()) {
+  if (runsModel && !isCourseGenerationAvailable()) {
     return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
   }
 
@@ -285,7 +315,8 @@ router.post('/generate', async (req, res) => {
   let cap = null;
   try {
     // --- Daily cap (429 daily_limit_reached when used up). Every 400 and 404 below is sent
-    // before Gemini runs, so those give the unit back, as does Gemini refusing the call (below).
+    // before the model runs, so those give the unit back, as does a gateway error raised before
+    // any model ran (below).
     if (runsModel) {
       cap = await reserveDailyCap(req, res, 'course_generation', { refundOnStatus: [400, 404] });
       if (!cap) return;
@@ -482,23 +513,17 @@ router.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request parameters' });
 
   } catch (err) {
-    console.error('[AI Generate] Error:', err);
+    // The gateway logs provider details; the client gets a fixed answer by code.
+    console.error('[AI Generate] Error:', isLlmError(err) ? `${err.code} (${err.provider ?? 'no provider'})` : err);
 
-    // Each request runs one stage, and each stage makes one Gemini call. Gemini refusing it (no
-    // key; a key it does not accept: 400 API_KEY_INVALID, 401, 403; its rate limit: 429) means
-    // nothing was generated, so the unit goes back. Decided by code and status, never by message.
-    if (err?.code === 'GEMINI_NOT_CONFIGURED' || [400, 401, 403, 429].includes(err?.status)) void cap?.refund();
+    // Each request runs one stage, and each stage makes one gateway call. A gateway error raised
+    // before any model ran (no provider, provider unreachable or overloaded, our key rejected,
+    // rate limited) means nothing was generated, so the unit goes back. Decided by code.
+    if (refundsCourseGeneration(err)) void cap?.refund();
 
-    // Gemini-specific errors. Only the status depends on the message; any other error keeps the
-    // daily cap unit (a 503 is not in refundOnStatus), since Gemini may already have run.
-    if (err?.code === 'GEMINI_NOT_CONFIGURED' || err.message?.includes('API key') || err.message?.includes('GEMINI')) {
-      return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
-    }
-    if (err.message?.includes('timeout') || err.code === 'ECONNRESET') {
-      return res.status(504).json({ error: '生成がタイムアウトしました。再試行してください' });
-    }
-
-    return res.status(500).json({ error: 'Internal server error' });
+    const { status, body: errorBody } = courseGenerationError(err);
+    if (res.headersSent) return;
+    return res.status(status).json(errorBody);
   }
 });
 

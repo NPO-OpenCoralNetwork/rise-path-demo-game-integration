@@ -3,14 +3,26 @@
  * The only place model IDs live (PLAN §6.2). Everything else asks this module.
  *
  * Routing per task:
- *   default table below
- *   ← LLM_TASK_<TASK>=provider[:model]   e.g. LLM_TASK_TUTOR_CHAT=gemini:gemini-3.8-flash
+ *   default table below (learner-facing tasks run on the cheap tier: Claude Haiku)
+ *   ← LLM_TASK_<TASK>=provider[:model]   e.g. LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5
  *   ← LLM_PROVIDER=anthropic|gemini|mock (forces every task onto one provider)
  *   ← request override (server code only; never taken from a request body)
  *
  * When the routed provider has no key, the gateway walks PROVIDER_FALLBACK_ORDER, then
  * falls back to `mock` outside production (LLM_MOCK_FALLBACK=false disables that).
+ *
+ * Gemini (chat, embeddings, image generation) is used only when GEMINI_ALLOWED is exactly
+ * "true" (isGeminiAllowed). The Gemini API Additional Terms forbid services directed towards or
+ * likely to be accessed by people under 18, and minors use Rise Path, so it is off by default
+ * even when GEMINI_API_KEY is set. Turn it on only for deployments people under 18 cannot reach.
  */
+
+/**
+ * Whether this deployment may call Gemini at all: only when GEMINI_ALLOWED is exactly "true".
+ * Unset, "1", "TRUE" or anything else is off, whatever keys are set.
+ * @param {Record<string, string | undefined>} [env]
+ */
+export const isGeminiAllowed = (env = process.env) => env?.GEMINI_ALLOWED === 'true';
 
 /** @typedef {'anthropic'|'gemini'|'mock'} ProviderId */
 /** @typedef {'authoring'|'general'|'cheap'} ModelTier */
@@ -76,10 +88,15 @@ export const TASKS = Object.freeze({
   'lesson.author': { tier: 'authoring', provider: 'anthropic', effort: 'medium', maxTokens: 64000, stream: true },
   'lesson.judge': { tier: 'authoring', provider: 'anthropic', effort: 'medium', maxTokens: 8000 },
   'lesson.translate': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 32000, stream: true },
-  'tutor.chat': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 8192 },
-  'writing.feedback': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
+  // Learner-facing, high volume: the cheap tier (Claude Haiku). Owners can move one back with
+  // LLM_TASK_<TASK>=anthropic:<model id>.
+  'tutor.chat': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 8192 },
+  'writing.feedback': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'assessment.insight': { tier: 'general', provider: 'anthropic', effort: 'low', maxTokens: 4096 },
   'text.classify': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 1024 },
+  // /api/v2/ai/generate (server/services/aiGenerator.js): requirements, roadmap and whole
+  // curriculum replies as one JSON object. Long outputs, so streamed.
+  'course.generate': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 32000, stream: true },
 });
 
 /** Provider order tried when the routed provider is unconfigured or fails with a retryable error. */

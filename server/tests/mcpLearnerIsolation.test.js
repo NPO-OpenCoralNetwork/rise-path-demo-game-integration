@@ -115,6 +115,13 @@ const quiet = async (fn) => {
 };
 
 describe('rag-search core (searchContent) reads only the acting learner\'s materials', () => {
+    // The vector paths need embeddings on, which takes GEMINI_ALLOWED=true (tools/core/ragSearch.js).
+    const savedGeminiAllowed = process.env.GEMINI_ALLOWED;
+    before(() => { process.env.GEMINI_ALLOWED = 'true'; });
+    after(() => {
+        if (savedGeminiAllowed === undefined) delete process.env.GEMINI_ALLOWED;
+        else process.env.GEMINI_ALLOWED = savedGeminiAllowed;
+    });
     afterEach(() => {
         resetPoolForTests();
         resetEmbeddingClientForTests();

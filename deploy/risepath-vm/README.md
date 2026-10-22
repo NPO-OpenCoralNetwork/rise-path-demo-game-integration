@@ -13,8 +13,9 @@
 | 月額目安 | **推定**（未確認）。24 時間稼働の `asia-northeast1` で、`e2-medium` は約 $31/月、`e2-standard-2` は約 $63/月。50GB ディスクは別です。どれも第三者のサイト（[gcloud-compute.com](https://gcloud-compute.com/e2-medium.html)）の値で、Google の料金ページでは確かめていません。予算アラートを決める前に、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめます |
 | DB | `pgvector/pgvector:0.8.7-pg16`（Postgres 16 + pgvector。タグと digest を固定）。新しい空のボリュームでは RAG のベクトル検索が有効です |
 | 公開 | API は Cloudflare Tunnel の `https://api.<domain>` だけ。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
-| Mac | `npm run dev` + Tailscale で VM の db/mcp/hermes/kokoro に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
-| Hermes | Compose **`--profile full`**（`nousresearch/hermes-agent`）。使わないなら `COMPOSE_PROFILES=tts`。Mac 単体開発は `hermes -p rise-path gateway` も可 |
+| Mac | `npm run dev` + Tailscale で VM の db/mcp/kokoro（Hermes を有効にしたときは hermes も）に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
+| AI | チューター・文章フィードバック・コース生成は Claude（`ANTHROPIC_API_KEY`。既定は安いモデル）。Gemini は使いません（`GEMINI_ALLOWED` を設定しない。下の表） |
+| Hermes | **学習者には提供しません。** 既定は `COMPOSE_PROFILES=tts`（`hermes` コンテナを起動しません）で、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しません。API も同じ `VITE_FEATURE_AGENT_CHAT` を読み、ちょうど `true` でないと `/api/v2/agent/chat` は 404 を返します（Hermes が動いていても使えません）。前の `stack.env` で `COMPOSE_PROFILES=full` のままなら、`tts`（トンネルを使うなら `tts,tunnel`）に変えて `deploy-stack.sh` を実行し直します。前のデプロイで残った `hermes` コンテナは、そのときに削除されます。自分で運用するときや開発のときだけ、Compose の **`--profile full`**（`nousresearch/hermes-agent`）で起動できます。Mac 単体開発は `hermes -p rise-path gateway` も可 |
 
 ### マシンタイプ
 
@@ -27,7 +28,7 @@
 
 | ファイル | 内容 |
 |----------|------|
-| `docker-compose.yml` | `db` + `api` + `mcp` + `kokoro-tts` + `hermes`（profile `full`）+ `cloudflared`（profile `tunnel`） |
+| `docker-compose.yml` | `db` + `api` + `mcp` + `kokoro-tts`（profile `tts`）+ `hermes`（profile `full`。既定では起動しない）+ `cloudflared`（profile `tunnel`） |
 | `docker-compose.memanto.yml` | Memanto overlay（`ollama` + `moorcheh` + `memanto`、profile `memory`） |
 | `Dockerfile` | `api` / `mcp` マルチターゲット（`api` にフロントの `dist/` は入りません） |
 | `stack.env.example` | 秘密なしテンプレ → `stack.env` |
@@ -35,7 +36,7 @@
 | `scripts/provision-gce.sh` | GCP VM 作成（夜間停止は `NIGHT_STOP=1` のときだけ） |
 | `scripts/bootstrap-vm.sh` | VM 初回セットアップ（Docker、4 GB の swap、`stack.env`、初回デプロイ、デプロイが通ったあとに systemd） |
 | `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env` と tunnel のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
-| `hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP） |
+| `hermes/config.yaml` | Hermes を有効にしたときのプロファイル（SSE MCP） |
 | `systemd/risepath-stack.service` | VM 起動時に compose up |
 
 ## クイックスタート
@@ -94,17 +95,17 @@ exit
 | `DATABASE_URL_PHASE1` | `postgresql://risepath_app:<POSTGRES_PASSWORD と同じ値>@db:5432/risepath` |
 | `SUPABASE_URL` | Supabase プロジェクトの URL（`https://<ref>.supabase.co`） |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase の service role key（サーバー側だけ。Vercel やブラウザには入れない） |
-| `ANTHROPIC_API_KEY` | Anthropic の API キー。チューターなど LLM ゲートウェイが使います。`GEMINI_API_KEY` と両方空だと、チューターは 503 を返します |
-| `GEMINI_API_KEY` | Gemini の API キー。コース生成、画像生成、教材の索引づけ（RAG の埋め込み）に要ります |
-| `HERMES_API_KEY` | `openssl rand -hex 32` の値（16 文字以上）。`init-hermes-profile.sh` と Compose が Hermes の `API_SERVER_KEY` に写します。ほかに Hermes のキーは要りません |
-| `OPENROUTER_API_KEY` | OpenRouter の API キー（Hermes のモデル）。`COMPOSE_PROFILES` に `full` があると必須で、`change-me` のままだと `deploy-stack.sh` が止まります。Hermes を使わないときは `COMPOSE_PROFILES=tts` にします（`hermes` コンテナを起動しません。kokoro は動きます） |
-| `RISE_PATH_BRIDGE_TOKEN` | `openssl rand -hex 32` の値（Hermes → MCP の認証） |
+| `ANTHROPIC_API_KEY` | Anthropic の API キー。AI チューター・文章フィードバック・コース生成が使います（既定は安いモデルの Claude Haiku）。空だと、チューターは 503 を返します |
+| `GEMINI_API_KEY`・`GEMINI_ALLOWED` | **空のまま**にします。Gemini の API 規約は、18 歳未満の人が使う（または使うと見込まれる）サービスでの利用を禁じていて、Rise Path は子どもも使うためです。Gemini を使うのは `GEMINI_ALLOWED=true` のときだけで、それは 18 歳未満の人が届かない環境に限ります。Gemini が無いあいだ、教材の検索はキーワード検索で動き、AI の画像生成は止まります（コース生成とチューターは Claude で動きます） |
+| `HERMES_API_KEY` | Hermes を有効にするとき（`COMPOSE_PROFILES` に `full`）だけ。`openssl rand -hex 32` の値（16 文字以上）。`init-hermes-profile.sh` と Compose が Hermes の `API_SERVER_KEY` に写します。ほかに Hermes のキーは要りません |
+| `OPENROUTER_API_KEY` | Hermes を有効にするときだけ。OpenRouter の API キー（Hermes のモデル）。`COMPOSE_PROFILES` に `full` があると必須で、`change-me` のままだと `deploy-stack.sh` が止まります。既定の `tts` では読みません |
+| `RISE_PATH_BRIDGE_TOKEN` | `openssl rand -hex 32` の値（Hermes → MCP の認証）。ChatGPT などの外部サービスに入れず、MCP のポート（3100）もインターネットに公開しません |
 | `MEMANTO_SECRET_KEY` | Memanto を使うときだけ。`openssl rand -hex 32` の値 |
 | `MEMANTO_ENABLED` | Memanto を使うときだけ `true`。起動時の systemd ユニットがこの値を読みます。秘密を入れて `false` のままだと、`deploy-stack.sh` が止まります |
-| `COMPOSE_PROFILES` | `full` のまま（Memanto を使うなら `full,memory`）。Hermes を使わないなら `tts`（Memanto も使うなら `tts,memory`）。`tunnel` はトンネルを作ってから（下の「Cloudflare Tunnel」） |
+| `COMPOSE_PROFILES` | `tts` のまま（Memanto を使うなら `tts,memory`）。`full` は Hermes を有効にするときだけ（`full,memory`）。`tunnel` はトンネルを作ってから（下の「Cloudflare Tunnel」） |
 | `ORIGIN_SECRET`・`TRUST_PROXY`・`LLM_ALLOWED_ORIGINS` | まだ入れません。トンネルを作るときに入れます |
 
-`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`COMPOSE_PROFILES` に `full` があるときは、`OPENROUTER_API_KEY` と `HERMES_API_KEY`（16 文字以上）も確かめます。`ANTHROPIC_API_KEY` と `GEMINI_API_KEY` は確かめないので、入れたかを自分で見ます。
+`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`COMPOSE_PROFILES` に `full` があるとき（Hermes を有効にしたときだけ）は、`OPENROUTER_API_KEY` と `HERMES_API_KEY`（16 文字以上）も確かめます。`ANTHROPIC_API_KEY` は確かめないので、入れたかを自分で見ます。`GEMINI_API_KEY` と `GEMINI_ALLOWED` が空かも見ます。
 
 #### 2 回目の実行
 
@@ -118,17 +119,18 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–013 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が有効です（埋め込みには `GEMINI_API_KEY` が要ります）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–013 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:<stack.env の POSTGRES_PASSWORD>@risepath-vm:5432/risepath?sslmode=disable
-HERMES_API_URL=http://risepath-vm:8642
-HERMES_API_KEY=<stack.env の HERMES_API_KEY>
+# Hermes を有効にしたときだけ
+# HERMES_API_URL=http://risepath-vm:8642
+# HERMES_API_KEY=<stack.env の HERMES_API_KEY>
 ```
 
-VM を作り直したので、パスワードと `HERMES_API_KEY` は新しい `stack.env` の値に替えます。旧 VM の値のままだと、DB への接続が認証エラーになります。Mac から Hermes を呼ぶ名前は `risepath-vm:8642` です。
+VM を作り直したので、パスワード（と、Hermes を有効にしたなら `HERMES_API_KEY`）は新しい `stack.env` の値に替えます。旧 VM の値のままだと、DB への接続が認証エラーになります。Hermes を有効にしたとき、Mac から Hermes を呼ぶ名前は `risepath-vm:8642` です。
 
 Mac の `~/.ssh/known_hosts` に旧 VM の鍵が残っていると、`scripts/setup-vm-ssh.sh` と `scripts/deploy-from-mac.sh` の ssh が止まります。先に消します。
 
@@ -161,12 +163,13 @@ Mac から Tailscale 経由で検証できるのは、`stack.env` に `ORIGIN_SE
 
 ```bash
 npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100 \
-  --kokoro http://risepath-vm:8880 --hermes http://risepath-vm:8642
+  --kokoro http://risepath-vm:8880
+# Hermes を有効にしたときだけ、最後に --hermes http://risepath-vm:8642 を足す
 ```
 
 Mac のリポジトリ直下で流します。引数なしだと Mac の 127.0.0.1 を見るので、VM は確かめられません。
 
-`npm run smoke:prod:e2e`（`E2E_API_URL=http://risepath-vm:3006`）と `npm run smoke:hermes:e2e:vm` も、Tailscale 経由で使えるのは `ORIGIN_SECRET` を設定する前だけです。設定したあとは 403 で失敗します（`scripts/setup-vm-ssh.sh` はこの E2E を飛ばします）。learner-memory の smoke は `api` コンテナ内で流せます（Bridge Token は `stack.env` から入ります）。
+`npm run smoke:prod:e2e`（`E2E_API_URL=http://risepath-vm:3006`）と `npm run smoke:hermes:e2e:vm`（Hermes を有効にしたときだけ）も、Tailscale 経由で使えるのは `ORIGIN_SECRET` を設定する前だけです。設定したあとは 403 で失敗します（`scripts/setup-vm-ssh.sh` はこの E2E を飛ばします）。learner-memory の smoke は `api` コンテナ内で流せます（Bridge Token は `stack.env` から入ります）。
 
 ```bash
 cd /opt/risepath/deploy/risepath-vm
@@ -212,9 +215,9 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
    ORIGIN_SECRET=<openssl rand -hex 32 の値。Vercel Production と同じ>
    TRUST_PROXY=1
    LLM_ALLOWED_ORIGINS=https://app.<domain>
-   COMPOSE_PROFILES=full,tunnel
-   # Memanto を使うなら COMPOSE_PROFILES=full,memory,tunnel
-   # Hermes を使わないなら COMPOSE_PROFILES=tts,tunnel
+   COMPOSE_PROFILES=tts,tunnel
+   # Memanto を使うなら COMPOSE_PROFILES=tts,memory,tunnel
+   # Hermes を有効にするときだけ full,tunnel（Memanto も使うなら full,memory,tunnel）
    # RISE_PATH_PUBLIC_URL は設定しない
    ```
 
@@ -230,12 +233,12 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
    docker compose --env-file stack.env --profile tunnel rm -sf cloudflared
    ```
 
-2. `stack.env` の `ORIGIN_SECRET` を空にし、`COMPOSE_PROFILES` から `tunnel` だけを外します（例: `full,tunnel` → `full`、`tts,tunnel` → `tts`）。
+2. `stack.env` の `ORIGIN_SECRET` を空にし、`COMPOSE_PROFILES` から `tunnel` だけを外します（例: `tts,tunnel` → `tts`、`full,tunnel` → `full`）。
 3. `./scripts/deploy-stack.sh` を実行します。
 
 `ORIGIN_SECRET` が空のあいだも、Cloudflare を通ってきたリクエスト（`cf-ray`・`cf-connecting-ip` ヘッダー、`cloudflare` を含む `cdn-loop` ヘッダー）には API が 403 を返します。`COMPOSE_PROFILES` に `tunnel` があるのに `ORIGIN_SECRET` が空なら、`api` は起動しません。それ以外のリクエストには、スタックは今までどおりに動きます。
 
-ポートの公開は変えていません。db（5432）・mcp（3100）・hermes（8642）・kokoro（8880）には、Tailscale から今までどおり届きます。api（3006）だけは、`ORIGIN_SECRET` を設定すると `x-origin-secret` が要ります。ヘッダーを付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届きません。VM の api はフロントを配信しません（`api` イメージに `dist/` はありません）。フロントは `app.<domain>` を使います。
+ポートの公開は変えていません。db（5432）・mcp（3100）・kokoro（8880）と、Hermes を有効にしたときの hermes（8642）には、Tailscale から今までどおり届きます。api（3006）だけは、`ORIGIN_SECRET` を設定すると `x-origin-secret` が要ります。ヘッダーを付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届きません。VM の api はフロントを配信しません（`api` イメージに `dist/` はありません）。フロントは `app.<domain>` を使います。
 
 `cloudflared` のイメージは `docker-compose.yml` でタグと digest を固定しています。更新は両方を一緒に上げ、利用の少ない時間に行います。再起動で流れているストリームが切れます。
 
@@ -249,3 +252,5 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
 - Tailscale ACL で `risepath-vm` へのアクセスを限定
 - `stack.env` と `tunnel.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
 - `stack.env` にテンプレの値（`change-me` など）を残さない。DB・Bridge Token・Hermes の値は上の表のとおりに作る
+- `RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。MCP（3100）を ngrok などのトンネルやファイアウォールの開放でインターネットに出さない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供します
+- 学習者向けのスタックでは `GEMINI_ALLOWED` を設定しない（Gemini の API 規約の 18 歳未満の条項）

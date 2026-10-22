@@ -108,7 +108,7 @@ AI に自然言語で話しかけるだけで：
 | **Claude Desktop** | stdio | `claude_desktop_config.json` に追記 |
 | **Cursor** | stdio | Settings → MCP Servers |
 | **Antigravity** | stdio | `mcp_config.json` に追記 |
-| **ChatGPT** | SSE (HTTP) | Settings → Apps & Connectors |
+| **ChatGPT / Claude.ai など（リモート接続）** | — | まだ使えません（下の「リモート接続について」） |
 
 ### 設定例（Claude Desktop / Cursor / Antigravity）
 
@@ -129,19 +129,13 @@ AI に自然言語で話しかけるだけで：
 }
 ```
 
-### 設定例（ChatGPT — SSE モード）
+### リモート接続について（ChatGPT・Claude.ai など）
 
-```bash
-# MCP サーバーを SSE モードで起動
-node mcp-server/index.js --sse 3100
+ChatGPT や Claude.ai など、インターネット越しにつなぐ使い方は、学習者ごとのログイン（OAuth）を用意してから提供します。それまでは次を守ってください。
 
-# 外部公開（ngrok）
-ngrok http 3100
-```
-
-ChatGPT の Settings → Apps & Connectors で：
-- **URL**: `https://xxxx.ngrok.io/sse`
-- **Auth**: Bearer Token（`.env` の `RISE_PATH_BRIDGE_TOKEN`）
+- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れないでください。このトークンは Hermes と MCP サーバーのあいだだけで使う共有の合言葉で、持っている人は誰でも同じ権限で動けてしまいます。
+- MCP サーバーのポート（SSE モードの 3100 など）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しないでください。
+- 自分のパソコンの Claude Desktop・Cursor・Claude Code などから、上の設定例のように stdio でつなぐ使い方は、これまでどおり使えます。
 
 ---
 
@@ -248,8 +242,9 @@ AI がカリキュラム JSON を生成し、`save-curriculum-draft` で DB に�
 |--------|------|---------|
 | `rag-search` | 教材をベクトル/キーワード検索 | 「ループについて教えて」 |
 
-> **Note**: pgvector + Gemini Embedding を使ったセマンティック検索が可能。
-> Gemini API Key が未設定の場合はキーワード検索にフォールバックします。
+> **Note**: 既定ではキーワード検索で動きます。Gemini の埋め込みを使う意味検索（pgvector）は、
+> `GEMINI_ALLOWED=true` と `GEMINI_API_KEY` の両方を設定したときだけ有効です。`GEMINI_ALLOWED` は、
+> 18 歳未満の人が使えない環境でだけ設定します（Gemini API の利用規約のため）。
 
 ---
 
@@ -346,7 +341,7 @@ npm run dev
 # MCP サーバー（stdio — Claude Desktop / Cursor 用）
 node mcp-server/index.js
 
-# MCP サーバー（SSE — ChatGPT / Remote 用）
+# MCP サーバー（SSE — 開発用。自分のマシンの中だけで使い、インターネットに公開しない）
 node mcp-server/index.js --sse 3100
 ```
 
@@ -363,7 +358,7 @@ curl http://localhost:3100/health
 
 ### Q: AI 機能を使わずに触れますか？
 
-**A**: はい。`npm run dev` で Web アプリが起動し、ほとんどの画面は API キーなしで閲覧できます。AI 生成機能を使う場合のみ Gemini API Key が必要です。
+**A**: はい。`npm run dev` で Web アプリが起動し、ほとんどの画面は API キーなしで閲覧できます。AI チューターやコース生成などの AI 機能を使う場合だけ、サーバー側に `ANTHROPIC_API_KEY`（Claude の API キー）が必要です。
 
 ### Q: MCP って何ですか？
 
@@ -371,7 +366,7 @@ curl http://localhost:3100/health
 
 ### Q: どの AI クライアントが一番おすすめですか？
 
-**A**: ローカル開発なら **Claude Desktop**（stdio で最も安定）、外部接続なら **ChatGPT**（SSE モード）がおすすめです。
+**A**: 自分のパソコンから stdio でつなぐ **Claude Desktop**・**Claude Code**・**Cursor** がおすすめです。ChatGPT や Claude.ai からのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供します（上の「リモート接続について」）。
 
 ### Q: カリキュラムのカスタマイズはどこまでできますか？
 

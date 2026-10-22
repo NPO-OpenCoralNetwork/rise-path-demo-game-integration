@@ -14,7 +14,7 @@ import { DocChapter, DocSection, LocalizedDocBlock, LocalizedText, QuizData } fr
 import { GeneratedLesson, CurriculumPersonalization } from '../../../services/curriculumAdapter';
 import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
-import { generateImagePreview } from '../../../services/curriculumApi';
+import { generateImagePreview, isImageGenerationUnavailable } from '../../../services/curriculumApi';
 import { dailyLimitResetAt, dailyLimitScope, nextJstMidnight } from '../../../services/aiDailyLimit';
 import {
     checkTtsAvailable,
@@ -1366,6 +1366,7 @@ const imagePreviewCache = new Map<string, string>();
 let imageLimit: { until: number; paused: boolean } | null = null;
 const imageLimitNow = (): 'daily' | 'paused' | null =>
     imageLimit && Date.now() < imageLimit.until ? (imageLimit.paused ? 'paused' : 'daily') : null;
+type ImageNote = 'daily' | 'paused' | 'unavailable' | 'failed';
 
 const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({ block, language }) => {
     const copy = {
@@ -1373,10 +1374,16 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
             // Blocks on screen do not ask again by themselves: the page has to be opened again.
             daily: "Today's limit for image previews has been reached. Open this page again after midnight Japan time to see them.",
             paused: 'Image previews are paused for now.',
+            unavailable: 'Images are not generated here, so this is a description of the picture.',
+            failed: "This image couldn't be shown. Here is what it would show.",
+            imageLabel: 'Image description',
         },
         jp: {
             daily: '今日の画像生成は上限に達しました。日本時間の0時を過ぎてから、このページを開き直すと表示されます。',
             paused: '画像の生成は、今は停止しています。',
+            unavailable: 'ここでは画像を作らないため、絵の内容を文章でお伝えします。',
+            failed: '画像を表示できませんでした。絵の内容を文章でお伝えします。',
+            imageLabel: '画像の説明',
         },
     } as const;
     const t = copy[language];
@@ -1385,8 +1392,9 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
         block.prompt ? cached || null : block.src || block.fallbackSrc || null
     );
     const [isLoading, setIsLoading] = useState(false);
-    // A daily cap stopped this image: with no fallback image, a static note replaces the skeleton.
-    const [limited, setLimited] = useState<'daily' | 'paused' | null>(null);
+    // A daily cap, an unavailable image service or a failed call stopped this image: with no
+    // fallback image, a static note and the image description replace the skeleton.
+    const [limited, setLimited] = useState<ImageNote | null>(null);
     const analysisRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -1401,7 +1409,7 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
             setIsLoading(false);
             return;
         }
-        const holding = imageLimitNow();
+        const holding: ImageNote | null = imageLimitNow();
         if (holding) {
             setLimited(holding);
             setSrc(block.src || block.fallbackSrc || null);
@@ -1425,6 +1433,14 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                     const paused = scope === 'off';
                     imageLimit = { paused, until: paused ? Infinity : dailyLimitResetAt(err) ?? nextJstMidnight(Date.now()) };
                     setLimited(paused ? 'paused' : 'daily');
+                } else if (isImageGenerationUnavailable(err)) {
+                    // 503 image_generation_unavailable: this deployment does not generate images.
+                    // Each block still asks once, since the server answers images it already
+                    // cached (free, before this check); this block does not ask again.
+                    setLimited('unavailable');
+                } else {
+                    // Any other failure: this block does not ask again by itself.
+                    setLimited('failed');
                 }
                 setSrc(block.src || block.fallbackSrc || null);
             })
@@ -1482,7 +1498,20 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
     if (!src) {
         return (
             <div className={`my-8 ${block.layout === 'full' ? '-mx-4 sm:-mx-6 md:-mx-12' : ''}`}>
-                {limited ? (
+                {limited === 'unavailable' || limited === 'failed' ? (
+                    // No image here: what it would show (caption, else alt text, else the prompt) is
+                    // the content, with a short note under it. Static, no role="alert", as below.
+                    <figure className="w-full min-h-32 rounded-card border border-line bg-sunken flex flex-col items-center justify-center gap-2 px-6 py-6 text-center">
+                        <Image size={20} aria-hidden="true" className="text-fg-3" />
+                        {(getText(block.caption, language) || block.alt || block.prompt) && (
+                            <p className="text-sm text-fg-2 max-w-prose">
+                                <span className="sr-only">{t.imageLabel}: </span>
+                                {getText(block.caption, language) || block.alt || block.prompt}
+                            </p>
+                        )}
+                        <figcaption className="text-xs text-fg-3">{t[limited]}</figcaption>
+                    </figure>
+                ) : limited ? (
                     // Static, no role="alert": several image blocks could otherwise announce at once.
                     // What the image would show (caption, else alt text) stays readable under the note.
                     <div className="w-full min-h-32 rounded-xl border border-line bg-sunken flex flex-col items-center justify-center gap-1 px-6 py-6 text-center">

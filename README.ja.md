@@ -19,7 +19,7 @@
 あなたのためだけにパーソナライズされた学習を体験できます。
 - **Big5パーソナリティ統合**: AIがユーザーの性格特性（Big5）に基づいて、カリキュラムのトーンや学習スタイルを動的に調整します。
 - **リッチなコンテンツ生成**: 単なる要約を超え、「なぜ重要なのか」「主要コンセプト」「アクションステップ」「たとえ話」を豊富に提供します。
-- **高度なAIモデル**: 深い推論には **Google Gemini 3.0 Pro**、高速な生成には **Gemini 2.0 Flash** を使用。
+- **AIモデル**: サーバー側の LLM ゲートウェイ（`server/llm/`）経由で Claude を使います。AI先生、作文フィードバック、コース生成は、既定で安価な Claude モデル（Claude Haiku）で動きます。Gemini は `GEMINI_ALLOWED=true` のときだけ使います（下記参照）。
 - **RAG (検索拡張生成)**: Blenderドキュメントなどの特定のナレッジソースと連携し、AIの回答の正確性を高めます。
 
 ### 2. **没入型のオーディオ体験（開発中）** 🎧
@@ -39,12 +39,12 @@
 - **Global Communication**: グローバルエンジニアのための英語。
 
 ### 5. **MCP（Model Context Protocol）サーバー連携** 🔌
-ChatGPT、Claude、Cursorなどの外部AIから、Rise Pathを直接操作・連携できます。
+Claude Code や Cursor など、自分のパソコンで動く AI から、Rise Path のツールを使えます。
 - **9つのMCPツール**: 学習進捗の取得、ジャーナル記録、カリキュラム生成、RAG検索など。
-- **デュアルトランスポート**: stdio（ローカル）と SSE（リモート/ChatGPT連携）に対応。
-- **Bridge Token認証**: セキュアな外部接続を実現。
+- **トランスポート**: stdio（ローカル）。SSE は開発のときと、VM の中（Hermes や、Tailscale 経由の運用者）だけで使います。インターネットには公開しません。
+- **リモートの AI（ChatGPT、Claude.ai など）**: 学習者ごとの OAuth ができてから（Phase 1）つなげます。ブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡さないでください。
 
-> 📘 **[詳細な使い方ガイド](doc/usage_guide.md)** — Webアプリ、MCP、カリキュラム作成の完全なガイドブック（日本語/英語）
+> 📘 **[詳細な使い方ガイド](doc/guides/usage_guide.md)** — Webアプリ、MCP、カリキュラム作成の完全なガイドブック（日本語/英語）
 
 ---
 
@@ -78,7 +78,7 @@ npm run lessons:preview -- vibe-coding vibe-ch1   # スクリーンショット�
 
 - **フロントエンド**: [React](https://react.dev/) (v19) + [Vite](https://vitejs.dev/)
 - **言語**: [TypeScript](https://www.typescriptlang.org/)
-- **AI/LLM**: [Google Gemini API](https://ai.google.dev/) (公式 `@google/genai` SDKを使用)
+- **AI/LLM**: サーバーのゲートウェイから [Claude API](https://platform.claude.com/)（`@anthropic-ai/sdk`）。Gemini（`@google/genai`）は `GEMINI_ALLOWED=true` の環境だけ
 - **ゲームエンジン**: [Phaser 3](https://phaser.io/) (v3.80)
 - **ビジュアルコーディング**: [Blockly](https://developers.google.com/blockly) / Scratch Blocks
 - **バックエンド/サーバー**: 音声合成やAPIプロキシ用の Node.js (Express)
@@ -97,7 +97,7 @@ npm run dev
 # フロントエンドURL: http://localhost:3007
 ```
 
-主要なAI機能（チャットコーチ等）は、ローカルで起動したLLMプロバイダー（**Hermes**など）経由で動作します。レッスン内のAI先生などは、サーバーの LLM ゲートウェイ（キーがなければモック）を使います。ブラウザから直接モデルの API を呼ぶことはありません。
+ほとんどの画面はキーなしで見られます。レッスン内のAI先生、作文フィードバック、コース生成は、サーバーの LLM ゲートウェイを通して Claude で動きます（`ANTHROPIC_API_KEY`。開発中にキーがなければモックが答えます）。ブラウザから直接モデルの API を呼ぶことはありません。共有の Hermes とのチャット（画面に浮かぶ AI コーチと `/life-journal/chat`）は学習者には提供しません。自分で運用するときや開発のときだけ、`VITE_FEATURE_AGENT_CHAT=true` にして Hermes を起動すると出ます。
 
 ### 🏁 起動モードの選択
 
@@ -107,10 +107,10 @@ npm run dev
 flowchart TD
     Start["🚀 開発開始"] --> Choice{"どの機能を確認しますか？"}
     Choice -->|UIデザインやゲーム画面のみ| Quick["① 簡易起動 (UIのみ)<br>キー不要で即時チェック可能"]
-    Choice -->|AIチャットやフル機能| Full["② フル機能起動 (ローカルLLM連携)<br>Hermesの起動が必要"]
+    Choice -->|AI先生やフル機能| Full["② フル機能起動<br>ANTHROPIC_API_KEY（または開発用モック）"]
     
     Quick --> ExecQuick["1. npm install<br>2. npm run dev"]
-    Full --> ExecFull["1. .env.local を作成<br>2. Hermes プロキシを起動<br>3. npm run dev"]
+    Full --> ExecFull["1. .env.local を作成<br>2. ANTHROPIC_API_KEY を設定<br>3. npm run dev"]
 
     style Quick fill:#3B82F6,color:#fff
     style Full fill:#10B981,color:#fff
@@ -124,7 +124,7 @@ flowchart TD
 |---|---|---|
 | **Node.js** | `v20.0.0` 以上 | 開発・ビルドに必須 |
 | **npm** | `v10.0.0` 以上 | パッケージ管理に使用 |
-| **ローカルLLM (Hermes)** | 任意 | AI機能（チャットコーチ等）を動かす場合のみ必須 |
+| **ローカルLLM (Hermes)** | 任意 | 共有の Hermes チャットを試すときだけ（自分で運用・開発。`VITE_FEATURE_AGENT_CHAT=true` と一緒に） |
 
 ---
 
@@ -134,19 +134,23 @@ flowchart TD
 
 | 環境変数名 | デフォルト設定値 | 役割・説明 | 必須度 |
 |---|---|---|---|
-| `HERMES_API_URL` | `http://127.0.0.1:8642` | ローカルLLMプロキシ（Hermes）の接続先URL | **推奨** (AIチャット用) |
-| `HERMES_API_KEY` | `change-me-local-dev` | HermesのBearerトークン認証キー | **推奨** (AIチャット用) |
-| `ANTHROPIC_API_KEY` | (未設定でOK) | LLM ゲートウェイ用のサーバー側キー | 任意（下記参照） |
-| `GEMINI_API_KEY` | (未設定でOK) | サーバー側の Gemini キー（ゲートウェイ、旧生成機能、RAG の埋め込み） | 任意 |
+| `ANTHROPIC_API_KEY` | (未設定でOK) | LLM ゲートウェイ用のサーバー側キー（AI先生、作文フィードバック、コース生成）。未設定なら開発中はモックが答えます | **推奨** (アプリ内の AI) |
+| `VITE_FEATURE_AGENT_CHAT` | (未設定 = オフ) | ちょうど `true` のときだけ、共有の Hermes チャット（AI コーチ、`/life-journal/chat`）を出し、API も `/api/v2/agent/chat` に答えます。学習者には提供しません | 任意（自分で運用・開発） |
+| `HERMES_API_URL` | `http://127.0.0.1:8642` | ローカルLLMプロキシ（Hermes）の接続先URL | 任意（`VITE_FEATURE_AGENT_CHAT=true` のとき） |
+| `HERMES_API_KEY` | `change-me-local-dev` | HermesのBearerトークン認証キー | 任意（`VITE_FEATURE_AGENT_CHAT=true` のとき） |
+| `GEMINI_ALLOWED` | (未設定 = オフ) | `true` のときだけ Gemini を使います。18歳未満の人が使えない環境専用です（下記参照） | 任意 |
+| `GEMINI_API_KEY` | (未設定でOK) | サーバー側の Gemini キー（ゲートウェイ、RAG の埋め込み、画像生成）。`GEMINI_ALLOWED=true` のときだけ使います | 任意 |
 
 ```env
-# ローカルLLMプロキシ（Hermes）の設定（標準）
-HERMES_API_URL=http://127.0.0.1:8642
-HERMES_API_KEY=change-me-local-dev
-
 # LLM ゲートウェイのキー（サーバー専用）
 # ANTHROPIC_API_KEY=
+# GEMINI_ALLOWED と GEMINI_API_KEY は、18歳未満の人が使えない環境でだけ設定します
 # GEMINI_API_KEY=
+
+# 任意（自分で運用・開発のときだけ）: 共有の Hermes チャット
+# VITE_FEATURE_AGENT_CHAT=true
+# HERMES_API_URL=http://127.0.0.1:8642
+# HERMES_API_KEY=change-me-local-dev
 ```
 
 > [!WARNING]
@@ -159,10 +163,11 @@ HERMES_API_KEY=change-me-local-dev
 
 | 環境変数 | 役割 |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic を有効にする（教材作成、AI先生、フィードバックの既定） |
-| `GEMINI_API_KEY`（または `GOOGLE_API_KEY`） | Gemini を有効にする。RAG の埋め込みにも使う |
-| `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定: `anthropic`、`gemini`、`mock` |
-| `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=gemini` |
+| `ANTHROPIC_API_KEY` | Anthropic を有効にします（すべてのタスクの既定） |
+| `GEMINI_ALLOWED` | ちょうど `true` のときだけ Gemini（チャット、RAG の埋め込み、画像生成）を使います。未設定やそれ以外の値ではオフです。Gemini のキーがあってもオフのままで、サーバーが警告を出します。18歳未満の人が使えない環境専用です |
+| `GEMINI_API_KEY`（または `GOOGLE_API_KEY`） | `GEMINI_ALLOWED=true` のとき、Gemini、RAG の埋め込み、画像生成を有効にします |
+| `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定します: `anthropic`、`gemini`、`mock` |
+| `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` |
 | `LLM_MOCK_FALLBACK` | `false` で、キーがないときのモックへの切り替えを止める |
 | `LLM_TIMEOUT_MS` | リクエストのタイムアウト（既定 120000） |
 | `LLM_MAX_RETRIES` | プロバイダー呼び出しの再試行回数 |
@@ -170,6 +175,10 @@ HERMES_API_KEY=change-me-local-dev
 | `ANTHROPIC_BASE_URL` | Anthropic の別エンドポイント（プロキシなど） |
 
 `GET /api/v2/llm/status` で、有効なプロバイダーとタスクの振り分けを（秘密情報なしで）確認できます。
+
+**既定のモデル。** AI先生（`tutor.chat`）、作文フィードバック（`writing.feedback`）、コース生成（`course.generate`、`/api/v2/ai/generate`）は、既定で安価な Claude モデル（Claude Haiku）で動きます。1 日の上限（`server/middleware/dailyCaps.js`）もそのまま効きます。大きいモデルに戻したいタスクは、たとえば `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` のように設定します（`LLM_TASK_WRITING_FEEDBACK`、`LLM_TASK_COURSE_GENERATE` も同じ書き方です）。
+
+**Gemini が既定でオフの理由。** [Gemini API 追加利用規約](https://ai.google.dev/gemini-api/terms)は、「18歳未満の人に向けた、または18歳未満の人が使う可能性が高い」サービスで API を使うことを禁じています。Rise Path は未成年も使うため、Gemini は `GEMINI_ALLOWED=true` のときだけ使います。オフのあいだ、アップロードした資料はベクトルなしで保存され、キーワード検索で見つかります（Gemini を許可したあとで `node scripts/rag/reembed.mjs` を実行すると埋め込みを作れます）。`/api/v2/image` は 503（`error_type: image_generation_unavailable`）を返します。
 
 ---
 

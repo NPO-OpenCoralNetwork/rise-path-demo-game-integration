@@ -114,12 +114,41 @@ describe('VM secrets stay out of git and the build context', () => {
     assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/*.env'));
   });
 
-  it('stack.env.example leaves the public edge off (empty secret, profile full)', () => {
+  it('stack.env.example leaves the public edge off (empty secret, no tunnel profile)', () => {
     const values = lines(read(path.join(STACK, 'stack.env.example'))).filter((line) => !line.startsWith('#'));
     assert.ok(values.includes('ORIGIN_SECRET='));
     assert.ok(values.includes('LLM_ALLOWED_ORIGINS='));
-    assert.ok(values.includes('COMPOSE_PROFILES=full'));
     assert.ok(!values.some((line) => line.startsWith('RISE_PATH_PUBLIC_URL=')));
+  });
+});
+
+// Phase 0 AI access (doc/brushup-2026/ai-access-plan.ja.md): the shared Hermes agent is not offered
+// to learners, and Gemini stays off unless GEMINI_ALLOWED is exactly "true" (under-18 clause).
+describe('stack.env.example: Phase 0 defaults', () => {
+  const values = lines(read(path.join(STACK, 'stack.env.example'))).filter((line) => !line.startsWith('#'));
+  const profiles = values.filter((line) => line.startsWith('COMPOSE_PROFILES='));
+
+  it('sets COMPOSE_PROFILES=tts once: kokoro-tts without Hermes (no full)', () => {
+    assert.deepEqual(profiles, ['COMPOSE_PROFILES=tts']);
+  });
+
+  it('leaves GEMINI_ALLOWED unset and GEMINI_API_KEY empty', () => {
+    assert.ok(!values.some((line) => line.startsWith('GEMINI_ALLOWED=')), 'GEMINI_ALLOWED stays commented out');
+    assert.ok(values.includes('GEMINI_API_KEY='));
+  });
+
+  it('does not set VITE_FEATURE_AGENT_CHAT', () => {
+    assert.ok(!values.some((line) => line.startsWith('VITE_FEATURE_AGENT_CHAT=')));
+  });
+
+  it('the default profile starts no hermes service in docker-compose.yml', () => {
+    assert.deepEqual(listUnder(services.hermes || '', 'profiles'), ['full']);
+    const kokoro = listUnder(services['kokoro-tts'] || '', 'profiles') || [];
+    assert.ok(kokoro.includes('tts'), 'kokoro-tts runs with tts');
+  });
+
+  it('passes GEMINI_ALLOWED to the api service next to GEMINI_API_KEY', () => {
+    assert.match(services.api || '', /^ {6}GEMINI_ALLOWED: \$\{GEMINI_ALLOWED:-\}\s*$/m);
   });
 });
 
@@ -138,6 +167,15 @@ describe('deploy-stack.sh', () => {
     assert.ok(guard.includes('-z "${LLM_ALLOWED_ORIGINS:-}"'));
     assert.ok(guard.includes('-n "${RISE_PATH_PUBLIC_URL:-}"'));
     assert.ok(guard.includes('exit 1'));
+  });
+
+  it('removes a hermes container left from an earlier full deploy before `up` when full is not listed', () => {
+    const removeAt = script.indexOf('compose --profile full rm -sf hermes');
+    assert.ok(removeAt > 0, 'rm -sf hermes');
+    const guard = script.lastIndexOf('if [[', removeAt);
+    assert.match(script.slice(guard, removeAt), /"\$\{HERMES_PROFILE\}" -eq 0 && -n "\$\(compose --profile full ps -aq hermes/);
+    const upAt = script.search(/^compose up -d$/m);
+    assert.ok(upAt > removeAt, 'before the full `compose up -d`');
   });
 
   it('runs the stack smoke inside the api container (loopback, past the origin gate)', () => {
@@ -171,6 +209,11 @@ describe('deploy-stack.sh', () => {
     assert.ok(guard.includes('if [[ ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then\n  HERMES_PROFILE=1'), 'full as a list item');
     assert.match(guard, /if \[\[ "\$\{HERMES_PROFILE\}" -eq 1 && "\$\{HERMES_KEYED\}" -eq 0 \]\]; then\n\s*PLACEHOLDERS\+=\("OPENROUTER_API_KEY [^"\n]*COMPOSE_PROFILES=tts[^"\n]*"\)/);
     assert.match(guard, /if \[\[ "\$\{HERMES_PROFILE\}" -eq 1 \]\]; then\n\s*value="\$\{HERMES_API_KEY:-\}"/);
+  });
+
+  it('starts Hermes only when COMPOSE_PROFILES lists full (an OpenRouter key alone does not)', () => {
+    assert.ok(!script.includes('${COMPOSE_PROFILES:-full}'), 'no implicit full default');
+    assert.ok(!/COMPOSE_PROFILES=["']?full/.test(script), 'never assigns full');
   });
 
   it('refuses Memanto unless stack.env sets MEMANTO_ENABLED=true (the boot unit reads it)', () => {

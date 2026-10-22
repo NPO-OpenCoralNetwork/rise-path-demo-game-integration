@@ -22,6 +22,7 @@ import {
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
+import { features } from '../../../config/features';
 import {
   getLifeJournalDaily,
   saveLifeJournalDaily,
@@ -600,14 +601,17 @@ const LifeJournalView: React.FC<LifeJournalViewProps> = ({ onNavigate }) => {
           <Sparkles size={16} />
           {t.insights}
         </button>
-        <button
-          type="button"
-          onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-        >
-          <Sparkles size={16} />
-          {t.habitChat}
-        </button>
+        {/* The shared Hermes chat: shown only when features.agentChat is on. */}
+        {features.agentChat && (
+          <button
+            type="button"
+            onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            <Sparkles size={16} />
+            {t.habitChat}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onNavigate(ViewState.PROFILE_DIAGNOSIS)}

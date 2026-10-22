@@ -400,21 +400,13 @@ Cursor も `AGENTS.md` をルールとして読みます。MCP は `.cursor/mcp.
 `rise-path-learning` を `curriculum-builder` プロファイルで起動します。リポジトリのルートで
 `gemini` を起動し、`/mcp` でツールが見えることを確かめてください。
 
-### ChatGPT
+### ChatGPT・Claude.ai などのリモート接続
 
-ChatGPT が接続できるのは、インターネットに公開された**リモート**の MCP サーバーだけです。
+ChatGPT や Claude.ai など、インターネット越しにつなぐ使い方は、学習者ごとのログイン（OAuth）を用意してから提供します（Streamable HTTP（`/mcp`）と OAuth 2.1 への移行は P2 の予定です。計画 §7.4）。それまでは次を守ってください。
 
-1. MCP サーバーを SSE で起動します: `npm run mcp:sse`（ポート 3100、エンドポイント `/sse`）。
-   `RISE_PATH_MCP_PROFILE=curriculum-builder` と、下書きを DB に保存する `RP_LESSON_STORE=db` を
-   設定してください（本番の SSE サーバーは、ファイルへの下書き保存を拒否します）。
-2. HTTPS の公開 URL（リバースプロキシやトンネル）を用意し、認証に `RISE_PATH_BRIDGE_TOKEN`
-   （Bearer トークン）か Supabase の JWT を使います。
-3. ChatGPT の設定でカスタムコネクタ（MCP）として `https://<公開ホスト>/sse` を追加します。
-   画面の名前や手順は変わりやすいので、OpenAI のヘルプで最新の手順を確認してください。
-4. ChatGPT で作った下書きは DB に入ります。リポジトリに取り込むときは、PR にしてから
-   `lessons:validate` と `/review-lesson` を通します（DB からファイルへの取り込みコマンドは今後追加予定）。
-
-Streamable HTTP（`/mcp`）と OAuth 2.1 への移行は P2 の予定です（計画 §7.4）。
+- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れません。Hermes と MCP サーバーのあいだだけで使う共有の合言葉なので、持っている人は誰でも同じ権限で動けてしまいます。
+- MCP サーバーのポート（SSE の 3100）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しません。
+- 上の Claude Code・Claude Desktop・Codex・Cursor のように、自分のパソコンから stdio でつなぐ使い方は、これまでどおり使えます。
 
 ### ほかのモデルに頼むときの注意
 

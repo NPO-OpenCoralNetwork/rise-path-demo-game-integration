@@ -8,7 +8,12 @@ import { ingestMaterial } from '../ragService.js';
 import { getPool } from '../db.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
-import { generateImageWithGemini } from '../geminiBackendService.js';
+import {
+    IMAGE_GENERATION_UNAVAILABLE,
+    generateImageWithGemini,
+    isImageGenerationAvailable,
+} from '../geminiBackendService.js';
+import { isEmbeddingConfigured } from '../../tools/core/ragSearch.js';
 import { dailyCap, reserveDailyCap } from '../middleware/dailyCaps.js';
 import { isUuid } from '../utils/ids.js';
 
@@ -70,8 +75,23 @@ const IMAGE_PROMPT_MAX_CHARS = 4000;
 const IMAGE_ASPECT_RATIOS = new Set(['1:1', '3:4', '4:3', '9:16', '16:9']);
 const IMAGE_SIZES = new Set(['1K', '2K']);
 
-/** Daily 'embeddings' cap for whole-file embedding; given back when the route ends before it. */
+/**
+ * Daily 'embeddings' cap: one unit per file processed (server/middleware/dailyCaps.js).
+ * - /upload: the unit is kept once the file is stored, whether or not anything was embedded
+ *   (embeddings off, or the text could not be read): the cap is also what bounds how many files
+ *   an account can store in a day.
+ * - /rag/index: the job re-reads a file that is already stored (and was counted at upload), so the
+ *   unit pays for embedding only. When embeddings are off (Gemini is not allowed, or no key) the
+ *   job embeds nothing and the unit is given back; the per-minute AI limiter still applies.
+ * Both give it back when the route ends before the work (400, 404, 413, 500, 503).
+ */
 const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 404, 413, 500, 503] });
+
+/** The /image answer when this deployment does not generate images (Gemini not allowed, or no key). */
+const sendImageUnavailable = (res) => res.status(503).json({
+    error: 'Image generation is not available on this server.',
+    error_type: IMAGE_GENERATION_UNAVAILABLE,
+});
 
 /**
  * Gemini refused an image call before generating anything: no key, a key it does not accept
@@ -157,6 +177,7 @@ router.post('/upload', embeddingsCap, receiveFile, async (req, res) => {
         const materialId = result.rows[0].id;
 
         try {
+            // With embeddings off the chunks are stored without vectors (keyword search finds them).
             await ingestMaterial(materialId, absolutePath, req.file.mimetype, req.userId);
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
@@ -189,7 +210,8 @@ router.post('/image', async (req, res) => {
                 : null;
     if (invalid) return res.status(400).json({ error: invalid, error_type: 'invalid_body' });
 
-    // Daily 'image' cap: charged only when Gemini is called (cache hits are free).
+    // Daily 'image' cap: charged only when Gemini is called (cache hits are free). Images already
+    // cached on disk are still served when image generation is off.
     let cap = null;
     try {
         const cacheKey = crypto
@@ -213,6 +235,8 @@ router.post('/image', async (req, res) => {
             return res.json({ ok: true, url, mimeType, text: '', cached: true });
         }
 
+        // Not generated on this deployment: answered before the cap, so nothing is charged.
+        if (!isImageGenerationAvailable()) return sendImageUnavailable(res);
         cap = await reserveDailyCap(req, res, 'image');
         if (!cap) return;
         const result = await generateImageWithGemini({
@@ -237,11 +261,13 @@ router.post('/image', async (req, res) => {
         // The provider's own text stays in this log; the client gets a fixed answer.
         console.error('[Content API] Image Error:', error?.status ?? '', error?.message);
         if (geminiImageNeverRan(error)) void cap?.refund();
+        if (error?.code === 'GEMINI_NOT_CONFIGURED') return sendImageUnavailable(res);
         res.status(error?.status === 429 ? 503 : 500).json({ error: 'Image generation failed', error_type: 'image_failed' });
     }
 });
 
-// POST /api/v2/rag/index — the indexing job embeds the whole file, so it takes an 'embeddings' unit.
+// POST /api/v2/rag/index — the indexing job embeds the whole file, so it takes an 'embeddings' unit
+// (given back when embeddings are off: see embeddingsCap).
 router.post('/rag/index', embeddingsCap, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
@@ -264,7 +290,11 @@ router.post('/rag/index', embeddingsCap, async (req, res) => {
              returning id, status`,
             [req.userId, JSON.stringify({ material_id: materialId })]
         );
-        res.json({ job_id: result.rows[0].id, status: 'queued' });
+        // Embeddings off: the job re-chunks the file and embeds nothing (and keeps a material's
+        // stored vectors: ragService.js ingestMaterial), so the unit goes back.
+        const embeddingsOn = isEmbeddingConfigured();
+        if (!embeddingsOn) void res.locals.refundDailyCap?.();
+        res.json({ job_id: result.rows[0].id, status: 'queued', ...(embeddingsOn ? {} : { embeddings: 'off' }) });
     } catch (error) {
         console.error('Job Queue Error:', error);
         res.status(500).json({ error: 'Failed to queue job' });
