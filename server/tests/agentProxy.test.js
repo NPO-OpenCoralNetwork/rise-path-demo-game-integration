@@ -5,7 +5,7 @@ import {
     validateAgentChatBody,
     buildHermesInput,
     buildConversationKey,
-    buildSessionKey,
+    buildTurnSessionKey,
     extractAnswerFromHermesResponse,
     extractEvidenceFromHermesResponse,
     buildResponseCaveats,
@@ -20,9 +20,23 @@ import {
     registerAgentSession,
     clearAgentChatConsentForTests,
 } from '../../tools/core/agentSessionStore.js';
-import { clearMcpUserScopeForTests } from '../../tools/core/mcpUserScope.js';
+import { clearMcpUserScopeForTests, resolveMcpUserId, isTurnToken, getPhase1UserId } from '../../tools/core/mcpUserScope.js';
+import { setPoolForTests, resetPoolForTests } from '../db.js';
 
 const USER_CONSENT = '00000000-0000-0000-0000-000000000099';
+const LEARNER_A = 'a0000000-0000-4000-8000-00000000000a';
+const LEARNER_B = 'b0000000-0000-4000-8000-00000000000b';
+
+/** The rp_turn token in a Hermes request's instructions (buildTurnInstruction), or null. */
+const turnInInstructions = (body) => /rp_turn="([^"]+)"/.exec(body.instructions)?.[1] ?? null;
+
+/** A pool whose agent_session_binding writes fail (database down, constraint, permissions). */
+const bindingWriteFails = () => ({
+    async query(sql) {
+        if (/INSERT INTO agent_session_binding/.test(sql)) throw new Error('connection terminated unexpectedly');
+        return { rowCount: 0, rows: [] };
+    },
+});
 
 describe('validateAgentChatBody', () => {
     it('accepts valid life-habit-analyst request', () => {
@@ -129,10 +143,10 @@ describe('buildHermesInput', () => {
 });
 
 describe('session keys', () => {
-    it('builds stable conversation and session keys', () => {
+    it('builds a stable conversation key and a per-turn session key', () => {
         const uid = '00000000-0000-0000-0000-000000000099';
         assert.equal(buildConversationKey(uid, 'life-habit-analyst'), `rp:user:${uid}:life-habit-analyst`);
-        assert.equal(buildSessionKey(uid), `rp:user:${uid}`);
+        assert.equal(buildTurnSessionKey('abc'), 'rp:turn:abc');
     });
 });
 
@@ -251,11 +265,73 @@ describe('callHermesResponses', () => {
         assert.equal(result.answer, '分析結果です。');
         assert.equal(capturedUrl, 'http://hermes.test/v1/responses');
         assert.equal(capturedInit.headers.Authorization, 'Bearer test-key');
-        assert.equal(capturedInit.headers['X-Hermes-Session-Key'], 'rp:user:user-abc');
         const body = JSON.parse(capturedInit.body);
+        const turn = turnInInstructions(body);
+        assert.ok(isTurnToken(turn), body.instructions);
+        assert.equal(capturedInit.headers['X-Hermes-Session-Key'], `rp:turn:${turn}`);
         assert.equal(body.conversation, 'rp:user:user-abc:life-habit-analyst');
         assert.ok(body.input.includes('/life-habit-analyst'));
+        assert.ok(!body.input.includes(turn), 'the token is not in the learner-controlled input');
         assert.equal(await getAgentChatConsent('user-abc'), false);
+    });
+
+    it("mints a turn token per call that the MCP server resolves to the caller while another learner chats", async () => {
+        const prevNodeEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+            const bodies = [];
+            const mockFetch = async (_url, init) => {
+                bodies.push(JSON.parse(init.body));
+                return { ok: true, json: async () => ({ output_text: 'ok' }) };
+            };
+            for (const userId of [LEARNER_A, LEARNER_B, LEARNER_A]) {
+                const result = await callHermesResponses({
+                    userId, skill: 'content-search', message: 'find my notes', context: {}, includeDiaryExcerpts: false, fetchImpl: mockFetch,
+                });
+                assert.equal(result.ok, true);
+            }
+            const [turnA, turnB, turnA2] = bodies.map(turnInInstructions);
+            assert.ok([turnA, turnB, turnA2].every(isTurnToken));
+            assert.equal(new Set([turnA, turnB, turnA2]).size, 3, 'a new token every turn');
+            assert.ok(bodies[0].instructions.startsWith('You are Lumina'), 'the skill instructions come first');
+
+            // A and B both have live bindings, so only the token tells the MCP server who is calling.
+            const bridge = { extra: { sessionId: 'bridge' }, sessions: new Map([['bridge', { userId: getPhase1UserId() }]]) };
+            assert.equal((await resolveMcpUserId({ ...bridge, turnToken: turnA })).userId, LEARNER_A);
+            assert.equal((await resolveMcpUserId({ ...bridge, turnToken: turnB })).userId, LEARNER_B);
+            assert.equal((await resolveMcpUserId({ ...bridge, turnToken: turnA2, argsUserId: LEARNER_B })).userId, LEARNER_A);
+            const without = await resolveMcpUserId(bridge);
+            assert.equal(without.userId, undefined, 'no token: no learner in production');
+            assert.equal(without.error_type, 'session_binding_required');
+        } finally {
+            if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+            else process.env.NODE_ENV = prevNodeEnv;
+        }
+    });
+
+    it('never calls Hermes when the turn binding cannot be written', async () => {
+        setPoolForTests(bindingWriteFails());
+        const { error } = console;
+        console.error = () => {};
+        try {
+            let calls = 0;
+            const mockFetch = async () => {
+                calls += 1;
+                return { ok: true, json: async () => ({ output_text: 'should not happen' }) };
+            };
+            for (const call of [callHermesResponses, streamHermesChatCompletions]) {
+                const result = await call({
+                    userId: LEARNER_A, skill: 'content-search', message: 'find my notes', context: {}, includeDiaryExcerpts: false, fetchImpl: mockFetch,
+                });
+                assert.deepEqual(result, {
+                    ok: false, status: 503, error: 'Agent session could not be started', error_type: 'agent_session_unavailable',
+                }, call.name);
+            }
+            assert.equal(calls, 0, 'fetchImpl was never called');
+        } finally {
+            console.error = error;
+            resetPoolForTests();
+        }
     });
 
     it('registers diary consent before forwarding to Hermes', async () => {
@@ -325,6 +401,7 @@ describe('streamHermesChatCompletions', () => {
         assert.equal(capturedBody.conversation, 'rp:user:user-stream:life-habit-analyst');
         assert.equal(capturedBody.stream, true);
         assert.equal(capturedBody.store, true);
+        assert.ok(isTurnToken(turnInInstructions(capturedBody)), capturedBody.instructions);
     });
 });
 

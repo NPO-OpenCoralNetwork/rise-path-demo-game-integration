@@ -17,10 +17,12 @@
  *   RP_LESSON_FS_WRITE   — 1 allows file drafts on a production SSE server (refused by default)
  *   RISE_PATH_PREVIEW_BASE_URL — base of lesson-preview-url (default http://localhost:3007)
  *
- * Auth (user scope):
- *   SSE  — syncAuthUserStub at /sse connect (JWT)
- *   stdio — syncAuthUserStub in resolveMcpUserId + registerAgentSession
- *   See doc/architecture_v3_hermes_agent.md §3.2
+ * Auth (user scope): tools/core/mcpUserScope.js resolveMcpUserId, once per tool call
+ *   SSE with a learner's JWT — that learner (syncAuthUserStub at /sse connect)
+ *   SSE with the bridge token (Hermes) — the learner bound to the call's rp_turn argument, which
+ *     Express mints per chat turn (registerAgentTurn); without one, session_binding_required in
+ *     production (development only: the sole chatting learner, else PHASE1_USER_ID)
+ *   stdio — RISE_PATH_ACTIVE_SESSION_KEY or rp_turn; PHASE1_USER_ID in development only
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,12 +32,12 @@ import { randomUUID } from 'crypto';
 
 // --- Phase 11: Profile filtering & policy ---
 import { activeProfile, isToolAllowed, getToolAnnotations } from './profileFilter.js';
-import { checkPolicy, auditLog, clearSession } from './policy.js';
+import { checkPolicy, auditLog, clearSession, hasCallLimit } from './policy.js';
 
 // --- Shared business logic ---
 import { getProgress, updateProgress } from '../tools/core/learnerState.js';
 import { logEntry, getSummary, getRecent, getAdaptationSignals } from '../tools/core/journal.js';
-import { searchContent } from '../tools/core/ragSearch.js';
+import { searchContent, MAX_SEARCH_RESULTS } from '../tools/core/ragSearch.js';
 import { getKit, validateIntake, saveDraft } from '../tools/core/curriculum.js';
 import {
     SAFE_SLUG,
@@ -63,7 +65,7 @@ import {
     getLearnerPersonalContext,
 } from '../tools/core/learnerMemory.js';
 import { requestTts } from '../tools/core/kokoroTts.js';
-import { resolveMcpUserId } from '../tools/core/mcpUserScope.js';
+import { resolveMcpUserId, TURN_ARG } from '../tools/core/mcpUserScope.js';
 import { verifyMessagesSessionAuth } from './sseMessagesAuth.js';
 import { loadEnv } from '../tools/core/env.js';
 import { DOMAINS } from '../tools/core/domains.js';
@@ -123,12 +125,15 @@ const toolResult = (data, meta = {}) => {
     }
     return { content: [{ type: 'text', text }] };
 };
+// The exception text (driver messages, file paths) goes to stderr only: tool results reach the
+// LLM and can be quoted to a learner.
 const toolError = (err, meta = {}) => {
+    console.error(`[MCP] ${meta.toolName || 'tool'} exception:`, err);
     if (meta.toolName) {
         logToolCall({ toolName: meta.toolName, startTime: meta.startTime, isError: true, errorType: 'exception' });
     }
     return {
-        content: [{ type: 'text', text: JSON.stringify({ error: err.message, error_type: 'exception' }) }],
+        content: [{ type: 'text', text: JSON.stringify({ error: `${meta.toolName || 'tool'} failed (internal error)`, error_type: 'exception' }) }],
         isError: true,
     };
 };
@@ -145,11 +150,23 @@ let isShuttingDown = false;
 let httpServer = null;
 
 /**
- * Resolve session-scoped userId or return a toolResult error payload.
+ * The learner this call acts for. Inside a tool, policyTool resolved it once for the call (with
+ * its rp_turn) as extra.resolveScope; resources resolve from the session and request.
+ * @returns {Promise<{ userId: string } | { error: string, error_type: string }>}
+ */
+function resolveScopeFor(extra) {
+    return typeof extra?.resolveScope === 'function'
+        ? extra.resolveScope()
+        : resolveMcpUserId({ extra, sessions });
+}
+
+/**
+ * Resolve session-scoped userId or return a toolResult error payload. argsUserId (LLM-supplied
+ * user_id) is never used.
  * @returns {Promise<string|object>} userId string, or toolResult-shaped error object
  */
-async function requireScopedUser(argsUserId, extra, meta = {}) {
-    const result = await resolveMcpUserId({ argsUserId, extra, sessions });
+async function requireScopedUser(_argsUserId, extra, meta = {}) {
+    const result = await resolveScopeFor(extra);
     if (result.error) {
         return toolResult(result, meta);
     }
@@ -183,19 +200,32 @@ const server = new McpServer({
     description: `Rise Path パーソナライズ学習プラットフォームのMCP Server (profile: ${activeProfile})`,
 });
 
+// Every tool takes the turn token Express mints per chat turn (tools/core/mcpUserScope.js).
+const turnArgSchema = () => z.string().max(128).optional().describe(
+    'このターンの指示で渡された rp_turn をそのまま渡す（学習者の特定に使う） / The rp_turn value given in this turn\'s instructions, passed unchanged; it identifies the learner'
+);
+
 // Phase 11: Policy-aware tool wrapper
 const policyTool = (name, desc, schema, handler) => {
     if (!isToolAllowed(name)) return; // Profile filter: don't register
     const annotations = getToolAnnotations(name);
-    server.tool(name, desc, schema, annotations, async (args, extra) => {
+    server.tool(name, desc, { ...schema, [TURN_ARG]: turnArgSchema() }, annotations, async (args, extra) => {
+        const { [TURN_ARG]: turnToken, ...toolArgs } = args ?? {};
+        // One learner per call: the call limit, the handler and the audit line all use it.
+        let scope = null;
+        const callExtra = {
+            ...extra,
+            resolveScope: () => (scope ??= resolveMcpUserId({ extra, sessions, turnToken })),
+        };
         const sessionId = extra?.sessionId || 'stdio';
-        const policy = checkPolicy(name, sessionId);
+        const learner = hasCallLimit(name) ? ((await callExtra.resolveScope()).userId || '') : '';
+        const policy = checkPolicy(name, sessionId, learner);
         if (!policy.allowed) {
             return { content: [{ type: 'text', text: JSON.stringify({ error: policy.message, error_type: policy.reason }) }], isError: true };
         }
-        const result = await handler(args, extra);
+        const result = await handler(toolArgs, callExtra);
         if (policy.audit) {
-            const scoped = await resolveMcpUserId({ argsUserId: args?.user_id, extra, sessions });
+            const scoped = await callExtra.resolveScope();
             const userId = scoped.userId || 'unknown';
             let auditPayload = {};
             const auditText = result?.content?.[0]?.text;
@@ -206,7 +236,7 @@ const policyTool = (name, desc, schema, handler) => {
                     auditPayload = { raw: auditText };
                 }
             }
-            auditLog(name, userId, args, auditPayload);
+            auditLog(name, userId, toolArgs, auditPayload);
         }
         return result;
     });
@@ -330,18 +360,23 @@ policyTool(
 );
 
 // --- rag-search ---
+// Searches only the acting learner's own uploaded materials (there is no shared material).
 policyTool(
     'rag-search',
-    '教育コンテンツをベクトル検索する',
+    '学習者本人がアップロードした教材から関連箇所を検索する（他の学習者の教材やコース教材は対象外） / Searches the learner\'s own uploaded materials only',
     {
         query: z.string().describe('検索クエリ'),
-        domain: z.string().optional().describe('検索対象ドメイン (例: blender-3d)。省略時は全ドメイン'),
-        max_results: z.number().optional().describe('最大結果数 (デフォルト: 3)'),
+        domain: z.string().optional().describe('結果にそのまま付けるラベル。絞り込みには使わない / Label echoed in the results; not a filter'),
+        // Not a schema bound: searchContent clamps (an LLM asking for 20 gets 10, not an error).
+        max_results: z.number().optional().describe(`最大結果数 1-${MAX_SEARCH_RESULTS} (デフォルト: 3、上限を超える値は ${MAX_SEARCH_RESULTS} 件) / Maximum results, 1-${MAX_SEARCH_RESULTS} (default 3; larger values return ${MAX_SEARCH_RESULTS})`),
     },
-    async ({ query, domain, max_results }) => {
+    async ({ query, domain, max_results }, extra) => {
         const t = Date.now();
         try {
-            return toolResult(await searchContent({ query, domain, maxResults: max_results }), { toolName: 'rag-search', startTime: t });
+            const userId = await requireScopedUser(undefined, extra, { toolName: 'rag-search', startTime: t });
+            if (typeof userId !== 'string') return userId;
+
+            return toolResult(await searchContent({ query, domain, maxResults: max_results, userId }), { toolName: 'rag-search', startTime: t });
         } catch (err) {
             return toolError(err, { toolName: 'rag-search', startTime: t });
         }
@@ -823,7 +858,7 @@ policyTool(
                 if (typeof userId !== 'string') return userId;
                 resolvedUserId = userId;
             } else {
-                const scoped = await resolveMcpUserId({ argsUserId: undefined, extra, sessions });
+                const scoped = await resolveScopeFor(extra);
                 if (!scoped.error && scoped.userId) {
                     resolvedUserId = scoped.userId;
                 }
@@ -895,7 +930,7 @@ server.resource(
     'learner://profile/me',
     { description: '認証セッションの学習者プロフィール (診断結果・学習スタイル)', mimeType: 'application/json' },
     async (uri, extra) => {
-        const scope = await resolveMcpUserId({ argsUserId: undefined, extra, sessions });
+        const scope = await resolveScopeFor(extra);
         if (scope.error) {
             return {
                 contents: [{
@@ -1002,8 +1037,8 @@ if (args.includes('--sse')) {
 
     const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
     const express = (await import('express')).default;
-    const rateLimitMod = await import('express-rate-limit');
-    const mcpRateLimit = rateLimitMod.default;
+    const { STATUS_CODES } = await import('node:http');
+    const { createMessageRateLimiter } = await import('./messageRateLimit.js');
     const { initSupabase, getSupabase, extractBearerToken } = await import('../server/middleware/auth.js');
     const { PHASE1_USER_ID, syncAuthUserStub } = await import('../server/db.js');
     const app = express();
@@ -1025,16 +1060,19 @@ if (args.includes('--sse')) {
     // Initialize Supabase for JWT validation
     await initSupabase();
 
-    // Rate limit: 30 tool calls/min per session (Phase 8)
-    const mcpLimiter = mcpRateLimit({
-        windowMs: 60 * 1000,
-        max: process.env.NODE_ENV !== 'production' ? 300 : 30,
-        standardHeaders: true,
-        legacyHeaders: false,
-        keyGenerator: (req) => req.params.sessionId || req.ip,
-        message: { error: 'MCP rate limit exceeded. Max 30 tool calls/min.' },
-        validate: { keyGeneratorIpFallback: false },
+    // Rate limit: 30 calls/min (Phase 8) per learner JWT session, and per learner (rp_turn) on the
+    // shared bridge session (mcp-server/messageRateLimit.js).
+    const mcpLimiter = createMessageRateLimiter({
+        sessions,
+        limit: process.env.NODE_ENV !== 'production' ? 300 : 30,
     });
+    // An unknown session answers 404 before its body is read.
+    const requireKnownSession = (req, res, next) => (
+        sessions.has(req.params.sessionId) ? next() : res.status(404).json({ error: 'Session not found' })
+    );
+    // The body is parsed here (the SDK's own 4 MB limit) so the limiter can read a bridge call's
+    // rp_turn; the transport gets it as parsedBody.
+    const parseMessageBody = express.json({ limit: '4mb' });
 
     // Resolve user ID from Bearer token or fallback
     // Priority: Bridge Token > Supabase JWT > dev fallback
@@ -1086,11 +1124,12 @@ if (args.includes('--sse')) {
     // so that tool handlers can look up authenticated userId by sessionId
 
     // ── Phase 10: Health Check Endpoint ─────────────────────────
+    // Unauthenticated on the published port: the body says only whether the database answers.
+    // The driver's error text (host, database, role names) goes to stderr.
     app.get('/health', async (_req, res) => {
         const { getPool } = await import('../server/db.js');
         const pool = getPool();
         let dbStatus = 'not_configured';
-        let dbError = null;
 
         if (pool) {
             try {
@@ -1100,8 +1139,8 @@ if (args.includes('--sse')) {
                 await Promise.race([pool.query('SELECT 1'), timeout]);
                 dbStatus = 'connected';
             } catch (err) {
-                dbStatus = err.message === 'timeout' ? 'timeout' : 'disconnected';
-                dbError = err.message;
+                dbStatus = err?.message === 'timeout' ? 'timeout' : 'disconnected';
+                console.error('[MCP] /health database check failed:', err?.message || err);
             }
         }
 
@@ -1113,7 +1152,6 @@ if (args.includes('--sse')) {
             uptime_seconds: Math.floor((Date.now() - startedAt) / 1000),
             active_sessions: Math.floor(sessions.size / 2),
             db: dbStatus,
-            ...(dbError && { db_error: dbError }),
             timestamp: new Date().toISOString(),
         });
     });
@@ -1150,8 +1188,8 @@ if (args.includes('--sse')) {
         const mcpInstance = createMcpServer();
 
         // Store session by both route sessionId (for Express routing)
-        // and transport.sessionId (for MCP SDK extra.sessionId → resolveToolUserId)
-        const sessionData = { transport, userId, mcpInstance, activeSessionKey: '' };
+        // and transport.sessionId (for MCP SDK extra.sessionId → resolveMcpUserId)
+        const sessionData = { transport, userId, mcpInstance };
         sessions.set(routeSessionId, sessionData);
         sessions.set(transport.sessionId, sessionData); // SDK uses this in extra.sessionId
 
@@ -1169,17 +1207,15 @@ if (args.includes('--sse')) {
         await mcpInstance.connect(transport);
     });
 
-    app.post('/messages/:sessionId', mcpLimiter, async (req, res) => {
+    app.post('/messages/:sessionId', requireKnownSession, parseMessageBody, mcpLimiter, async (req, res) => {
         const session = sessions.get(req.params.sessionId);
         if (!session) {
             return res.status(404).json({ error: 'Session not found' });
         }
 
+        // X-Hermes-Session-Key is not stored on the session: one bridge session carries every
+        // learner's calls. resolveMcpUserId reads an rp:turn key from each request's own headers.
         const resolvedUserId = await resolveUserId(req);
-        const hermesSessionKey = String(req.headers['x-hermes-session-key'] || '').trim();
-        if (hermesSessionKey) {
-            session.activeSessionKey = hermesSessionKey;
-        }
 
         const authFailure = verifyMessagesSessionAuth(resolvedUserId, session.userId);
         if (authFailure) {
@@ -1191,7 +1227,17 @@ if (args.includes('--sse')) {
             return res.status(authFailure.status).json({ error: authFailure.error });
         }
 
-        await session.transport.handlePostMessage(req, res);
+        await session.transport.handlePostMessage(req, res, req.body);
+    });
+
+    // Last: an error no route answered (a body that is not JSON or too large) gets JSON with its
+    // status's standard text, never the parser's message or a stack.
+    app.use((err, req, res, next) => {
+        if (res.headersSent) return next(err);
+        const code = err?.status ?? err?.statusCode;
+        const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
+        if (status >= 500) console.error(`[MCP] ${req.method} ${req.path} failed:`, err);
+        res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
     });
 
     httpServer = app.listen(port, () => {

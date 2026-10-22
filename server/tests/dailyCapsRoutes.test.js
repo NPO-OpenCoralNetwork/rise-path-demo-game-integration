@@ -643,6 +643,39 @@ describe('daily caps on the API routes', () => {
             }
         });
 
+        it('gives the chat back, and never calls Hermes, when the turn binding cannot be written', async () => {
+            process.env.AI_CAP_USER_AGENT_CHAT = '1';
+            process.env.HERMES_API_KEY = 'test-key';
+            let hermesCalls = 0;
+            const hermes = http.createServer((req, res) => {
+                hermesCalls += 1;
+                req.resume();
+                res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"output_text":"should not happen"}');
+            });
+            await new Promise((resolve) => hermes.listen(0, '127.0.0.1', resolve));
+            process.env.HERMES_API_URL = `http://127.0.0.1:${hermes.address().port}`;
+            const pool = createMockPool((sql) => {
+                if (sql.startsWith('insert into agent_session_binding')) throw new Error('connection terminated unexpectedly');
+            });
+            setPoolForTests(pool);
+            const { error } = console;
+            console.error = () => {};
+            try {
+                await withServer(async (base) => {
+                    for (const stream of [false, true]) {
+                        const result = await send(`${base}/agent/chat`, { ...AGENT_CHAT, stream });
+                        assert.equal(result.status, 503, result.text);
+                        assert.deepEqual(result.json, { error: 'Agent session could not be started', error_type: 'agent_session_unavailable' });
+                        assert.ok(await waitFor(() => pool.usage().filter((q) => q.sql.startsWith('update ai_daily_usage')).length === (stream ? 2 : 1)), 'refunded');
+                    }
+                });
+                assert.equal(hermesCalls, 0, 'Hermes was never called');
+            } finally {
+                console.error = error;
+                await new Promise((resolve) => hermes.close(resolve));
+            }
+        });
+
         it('keeps the chat charged when Hermes drops the connection after the request was sent', async () => {
             process.env.AI_CAP_USER_AGENT_CHAT = '1';
             process.env.HERMES_API_KEY = 'test-key';

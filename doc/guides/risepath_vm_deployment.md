@@ -25,7 +25,7 @@
 
 - **VM / Hermes インスタンス** = Rise Path **プロダクト 1 つ分**（マルチテナント）
 - **学習者ごとに VM や Hermes は作らない**
-- ユーザー枠は Supabase JWT → `rp:user:{uuid}` → MCP / DB の `user_id` スコープで分離
+- ユーザー枠は Supabase JWT → Express がチャット 1 ターンごとに発行する `rp_turn`（`agent_session_binding` の `rp:turn:<token>`）→ MCP / DB の `user_id` スコープで分離（[`hermes/README.md`](../../hermes/README.md)「MCP の学習者スコープ」）
 
 ### 1.3 VM 外に置くもの
 
@@ -143,7 +143,7 @@ Hermes 側の `API_SERVER_KEY` は、Compose と `init-hermes-profile.sh` が `H
 | Mac ローカル開発 | stdio（Hermes が子プロセス起動） | `hermes -p rise-path gateway` |
 | `risepath-vm` 本番 | **SSE**（`mcp` サービス） | `url: http://mcp:3100/sse` + Bearer |
 
-**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証し、Express 経由のユーザーチャットでは Express が先に `registerAgentSession(rp:user:{uuid})` する。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向け。
+**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証する。Express 経由のユーザーチャットでは、Express がターンごとに `registerAgentTurn(userId)` でランダムなトークンを発行して `agent_session_binding` に書き込み（失敗したら Hermes を呼ばずに 503）、Hermes には `instructions` とヘッダー `X-Hermes-Session-Key: rp:turn:<token>` で渡す。Hermes は各ツール呼び出しの引数 `rp_turn` にそれを付け、MCP はその学習者として実行する。クライアントが送る `X-Hermes-Session-Key: rp:user:{uuid}` は無視される。`rp_turn` のない Bridge Token の呼び出しは本番では `session_binding_required`（直近 15 分にチャット中の学習者が 1 人だけならその学習者、という暫定フォールバックは開発環境だけ）。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向けで、その JWT の学習者として動く。
 
 stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) §3.2）。
 
