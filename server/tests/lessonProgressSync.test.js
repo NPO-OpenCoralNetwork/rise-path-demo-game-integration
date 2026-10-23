@@ -1282,6 +1282,108 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
     assert.equal(t.api.server.rows.size, 0);
   });
 
+  it('a tab that hears of the logout late (frozen in the background) does not make records written since the learner\'s', async () => {
+    const t = twoTabs();
+    setAccount(t.storage, U1, null);
+    t.a.signIn(U1);
+    t.b.signIn(U1);
+    await t.a.settled();
+    await t.b.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['u1'], updatedAt: iso(1) }));
+    t.b.noteLocalWrite(COURSE, 'l1');
+    // A logs out in tab B while offline: l1 waits for A.
+    t.api.script('put', { error: Object.assign(new Error('offline'), { status: 0 }) });
+    await t.b.signOut();
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    assert.equal(marker(t.storage, 'l1'), iso(1));
+    // Someone without a primary session studies l3 and changes A's l1.
+    putLocal(t.storage, 'l3', record({ seen: ['other'], updatedAt: iso(31) }));
+    putLocal(t.storage, 'l1', record({ seen: ['u1', 'other'], updatedAt: iso(32) }));
+    // Tab A gets its SIGNED_OUT only now, and a late logout there changes nothing either.
+    t.a.stop();
+    await t.a.signOut();
+    assert.equal(marker(t.storage, 'l3'), null);
+    assert.equal(marker(t.storage, 'l1'), iso(1));
+
+    const next = createProgressSync({ storage: t.storage, api: t.api, isSyncable, now: t.clock.now, timers: t.clock.timers });
+    next.signIn(U1);
+    assert.equal(next.getState().status, 'needs_choice');
+    await t.clock.advance(60_000);
+    assert.ok(!t.api.server.rows.has(`${COURSE}:l3`));
+    assert.ok(!t.api.server.rows.has(`${COURSE}:l1`));
+  });
+
+  it('a PUT answered after a logout in another tab does not write cleared records back', async () => {
+    const t = twoTabs();
+    setAccount(t.storage, U1, null);
+    t.a.signIn(U1);
+    t.b.signIn(U1);
+    await t.a.settled();
+    await t.b.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    putLocal(t.storage, 'l2', record({ seen: ['c1'], updatedAt: iso(1) }));
+    t.a.noteLocalWrite(COURSE, 'l1');
+    t.a.noteLocalWrite(COURSE, 'l2');
+    // Tab A's page-hide upload is slow.
+    const releaseA = t.api.hold('put');
+    t.a.flushOnHide();
+    await settle();
+    // A logs out in tab B; B's upload goes through, but l2 changes while it runs, so l2 waits.
+    const releaseB = t.api.hold('put');
+    const out = t.b.signOut();
+    await settle();
+    putLocal(t.storage, 'l2', record({ seen: ['c1', 'c2'], updatedAt: iso(2) }));
+    t.b.noteLocalWrite(COURSE, 'l2');
+    releaseB();
+    await out;
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    // Tab A's answer arrives after the logout: dropped.
+    releaseA();
+    await t.a.settled();
+    await settle();
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.equal(marker(t.storage, 'l2'), iso(2));
+    assert.equal(t.a.getState().status, 'stopped');
+  });
+
+  it('a page that opens after the session ended marks the account left before anyone else writes', async () => {
+    const storage = memoryStorage();
+    setAccount(storage, U1, null);
+    // A closed the browser without a logout; A's record was never uploaded.
+    putLocal(storage, 'l1', record({ seen: ['a1'], updatedAt: iso(1) }));
+    const t = setup({ storage });
+    // A's session ended while no tab was open: this page hears of no session at all.
+    t.sync.stop();
+    assert.deepEqual(account(storage), { userId: U1, epoch: null, loggedOut: true });
+    assert.equal(marker(storage, 'l1'), iso(1));
+    // A second page load changes nothing more.
+    t.sync.stop();
+    assert.equal(marker(storage, 'l1'), iso(1));
+    // Someone without a primary session studies l2; then A signs in.
+    putLocal(storage, 'l2', record({ seen: ['other'], updatedAt: iso(20) }));
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    await t.clock.advance(60_000);
+    assert.equal(t.api.puts().length, 0);
+    t.sync.choose(false);
+    await t.sync.settled();
+    assert.equal(getLocal(storage, 'l2'), null);
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l1']]);
+  });
+
+  it('a page that opens after the session ended, with nobody else studying: A is not asked', async () => {
+    const storage = memoryStorage();
+    setAccount(storage, U1, null);
+    putLocal(storage, 'l1', record({ seen: ['a1'], updatedAt: iso(1) }));
+    const t = setup({ storage });
+    t.sync.stop();
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'hydrating');
+    await t.sync.settled();
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l1']]);
+  });
+
   it('storage that refuses the account stops sync instead of loading again and again', async () => {
     const storage = memoryStorage();
     setAccount(storage, U1, '?');
@@ -1365,6 +1467,14 @@ describe('progress sync: wiring (static)', () => {
     const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /import\.meta/);
     assert.doesNotMatch(code, /\b(window|document)\./);
+  });
+
+  it('AuthContext holds the legacy progress hydrate while the adoption choice is open', () => {
+    const auth = read('context/AuthContext.tsx');
+    const hydrate = auth.slice(auth.indexOf('const hydrateUserData'), auth.indexOf('export const AuthProvider'));
+    assert.match(hydrate, /progressChoicePending\(\) \? Promise\.resolve\(\) : hydrateFromApi\(\)/);
+    const client = read('components/lesson/progressSyncClient.ts');
+    assert.match(client, /if \(applied\) void hydrateFromApi\(\)/);
   });
 
   it('AuthContext runs the owner rule for the primary session before setUser, and logout clears after the AI data line', () => {

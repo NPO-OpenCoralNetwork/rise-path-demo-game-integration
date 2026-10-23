@@ -299,4 +299,23 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     assert.equal(eventsGets, 1);
     assert.ok(!t.storage.getItem('rp_learning_events').includes('guest'));
   });
+  it('the legacy progress hydrate waits for the adoption choice; "Add" runs it after the choice', async () => {
+    let legacyGets = 0;
+    const t = (current = await page({
+      routes: {
+        'GET /user/progress': () => {
+          legacyGets += 1;
+          return json(200, { ok: true, progress: {} });
+        },
+        'GET /user/events': () => json(200, { ok: true, events: [] }),
+      },
+    }));
+    t.storage.setItem(PROGRESS_KEY('l1'), JSON.stringify(record({ seen: ['g1'] })));
+    t.client.signInProgressSync(U1, 'tok-1');
+    assert.equal(t.client.progressChoicePending(), true);
+    t.client.chooseProgressAdoption(true);
+    assert.equal(t.client.progressChoicePending(), false);
+    await until(() => legacyGets === 1);
+    assert.ok(t.storage.getItem(PROGRESS_KEY('l1')));
+  });
 });

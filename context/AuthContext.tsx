@@ -11,7 +11,7 @@ import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
 import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
-import { signInProgressSync, signOutProgressSync, stopProgressSync } from '../components/lesson/progressSyncClient';
+import { progressChoicePending, signInProgressSync, signOutProgressSync, stopProgressSync } from '../components/lesson/progressSyncClient';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -50,10 +50,12 @@ const GUEST_USER: AuthUser = {
     isGuest: true,
 };
 
-// Hydrate user data from backend after login
+// Hydrate user data from backend after login. While the lesson progress adoption choice is open,
+// the device's legacy progress may be someone else's: hydrateFromApi would upload it into this
+// account, so it waits for the choice (chooseProgressAdoption runs it).
 const hydrateUserData = async () => {
     try {
-        await Promise.all([hydrateFromApi(), hydrateNotifications()]);
+        await Promise.all([progressChoicePending() ? Promise.resolve() : hydrateFromApi(), hydrateNotifications()]);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
     }

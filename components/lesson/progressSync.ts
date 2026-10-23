@@ -504,9 +504,11 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
    * them: each marker is set to its record's updatedAt now (the records are theirs at this
    * moment) and the account is marked loggedOut, so a record written or changed later, by
    * someone without a primary session, is not taken for theirs. Without unsent records the
-   * account goes.
+   * account goes. An account already marked loggedOut is left as it is: another tab's logout or
+   * session end set its markers, and what was written since is not this learner's.
    */
   function leave(account: SyncAccount): void {
+    if (account.loggedOut) return;
     let left = 0;
     for (const ref of pendingLessons()) {
       const raw = read(progressKey(ref.courseSlug, ref.lessonId));
@@ -891,6 +893,12 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       const result = await api.put(body, { keepalive });
       const account = readAccount();
       if (gen !== generation || account?.userId !== state.userId) return false;
+      if (account.loggedOut) {
+        // The learner logged out in another tab while this PUT ran: its answer may hold records
+        // that logout cleared. Drop it; the markers stay as the logout left them.
+        setState('stopped');
+        return false;
+      }
       if (account.epoch !== (epoch ?? null)) {
         // Another tab deleted or reset the progress while this PUT ran: its answer may hold
         // deleted records. Drop it and load the server state again (local data stays as it is).
@@ -1008,12 +1016,16 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
 
   function stop(): void {
     const userId = state.userId;
-    if (!userId) return;
     try {
       const account = readAccount();
-      if (account?.userId === userId && state.status !== 'needs_choice') {
-        // The session ended without a logout here (an expiry, or a logout in another tab): every
-        // record with activity is this learner's at this moment, and waits for them like a logout's.
+      // The session ended without a logout here (an expiry, or a logout in another tab), or a page
+      // opened after the account's session had already ended (userId null: this page never signed
+      // in). Every record with activity is the account's at this moment, and waits for them like a
+      // logout's. Not when the account is already marked loggedOut: what was written since is not
+      // theirs.
+      const owned = account && !account.loggedOut
+        && (userId === null || (account.userId === userId && state.status !== 'needs_choice'));
+      if (account && owned) {
         for (const ref of localLessons()) {
           const progress = readRecord(ref);
           if (hasActivity(progress)) setMarker(ref, progress.updatedAt);
@@ -1024,6 +1036,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     } catch {
       // Storage trouble: nothing to keep.
     }
+    if (!userId) return;
     stopActivity();
     epoch = undefined;
     setState('off', null);

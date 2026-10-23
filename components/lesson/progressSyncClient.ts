@@ -176,7 +176,11 @@ export function signInProgressSync(userId: string, accessToken?: string): void {
 /** The primary session ended without this tab's logout (an expiry, or another tab signed out). */
 export function stopProgressSync(): void {
   cachedAuth = null;
-  instance?.stop();
+  try {
+    progressSync().stop();
+  } catch (err) {
+    console.warn('[progressSync] stop failed:', err);
+  }
 }
 
 /** Logout: upload what is pending (≤ 3 s), then clear this learner's lesson data. Never throws. */
@@ -191,13 +195,23 @@ export async function signOutProgressSync(): Promise<void> {
 }
 
 /**
- * "Don't add" also clears the learning events (the other person's streak and history); the
- * learner's own come back from the server (hydrateFromApi sends no event: the account event
- * makes the streak and course maps read them again).
+ * The legacy progress and learning events (services/progressService.ts hydrateFromApi) wait for
+ * the adoption choice: that hydrate uploads the device's legacy progress into the account, and
+ * while the choice is open the device's data may be someone else's (AuthContext hydrateUserData).
+ */
+export function progressChoicePending(): boolean {
+  return instance?.getState().status === 'needs_choice';
+}
+
+/**
+ * After the choice, the legacy hydrate runs: "Add" sends the device's legacy progress with the
+ * rest; "Don't add" has cleared it and the learning events (the other person's streak and
+ * history), so the learner's own come back from the server. hydrateFromApi sends no event: the
+ * account event makes the streak and course maps read them again.
  */
 export function chooseProgressAdoption(add: boolean): void {
   const applied = instance?.choose(add) ?? false;
-  if (applied && !add) void hydrateFromApi().then(() => dispatch(SYNC_ACCOUNT_EVENT));
+  if (applied) void hydrateFromApi().then(() => dispatch(SYNC_ACCOUNT_EVENT));
 }
 
 /** The Privacy page's delete: the account's records on the server (then here), or this device's. */
