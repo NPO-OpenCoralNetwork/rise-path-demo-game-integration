@@ -115,7 +115,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
    - ゾーンが Active になるまで待つ（24〜48 時間かかることがある）
 5. Cloudflare Zero Trust で、ゾーンと同じアカウントに remotely-managed のトンネルを作る。
    - Published application: `api.<domain>` → Service URL `http://api:3006`
-   - ルートはこの 1 つだけにする。Service URL に IP アドレス、`host.docker.internal`、`tcp://` のサービスを使わない。`cloudflared` からは、ホストに公開されたほかのポート（db・mcp・hermes・kokoro）や GCE のメタデータサーバーにも届くため
+   - ルートはこの 1 つだけにする（例外: 大人が自分の AI をつなぐリモート MCP を有効にするときだけ、2 つ目の `mcp.<domain>` → `http://mcp-public:3200` を足す。手順は `doc/guides/byoa-setup.ja.md`）。Service URL に IP アドレス、`host.docker.internal`、`tcp://` のサービスを使わない。`cloudflared` からは、ホストに公開されたほかのポート（db・mcp・hermes・kokoro）や GCE のメタデータサーバーにも届くため
    - HTTP Host Header は空のまま
    - 画面のインストール用コマンドは実行しない（コンテナの `cloudflared` が接続する）。コマンドの中の `eyJ` で始まる文字列だけがトークン。手順 8 で VM の `tunnel.env` にだけ入れる
 6. セキュリティ設定。正規の通信はすべて Vercel の IP から来るので、`api.<domain>` に IP ベースの rate limit ルールを付けない。Bot Fight Mode は off のまま。切り替え後、Security Events で Vercel からのリクエストに challenge が出ていないか見る。任意で、`x-origin-secret` ヘッダーの無い `api.<domain>` へのリクエストを止める WAF カスタムルールを足す。

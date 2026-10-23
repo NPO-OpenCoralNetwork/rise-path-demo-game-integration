@@ -10,6 +10,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -86,15 +88,259 @@ describe('docker-compose.yml: edge network', () => {
     assert.deepEqual(listUnder(services.api || '', 'networks'), ['default', 'edge']);
   });
 
-  it('no other service joins edge', () => {
+  it('no other service joins edge (mcp-public, profile byoa, is the only addition)', () => {
     for (const [name, block] of Object.entries(services)) {
-      if (name === 'api' || name === 'cloudflared') continue;
+      if (name === 'api' || name === 'cloudflared' || name === 'mcp-public') continue;
       assert.ok(!(listUnder(block, 'networks') || []).includes('edge'), name);
     }
   });
 
   it('is declared at the top level', () => {
     assert.match(compose, /^networks:\s*\n {2}edge:/m);
+  });
+});
+
+// Phase 1 (doc/guides/byoa-setup.ja.md): the public remote MCP for adults' own agents. It faces
+// the internet, so it holds nothing it does not need: its own env file with a least-privilege DB
+// role, no stack.env, no bridge token, no service-role or model keys, and no host port.
+const SECRET_NAMES = [
+  'RISE_PATH_BRIDGE_TOKEN',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'ANTHROPIC_API_KEY',
+  'GEMINI_API_KEY',
+  'GEMINI_ALLOWED',
+  'OPENROUTER_API_KEY',
+  'HERMES_API_KEY',
+  'MEMANTO',
+  'ORIGIN_SECRET',
+  'POSTGRES_PASSWORD',
+  'PHASE1_USER_ID',
+  'RISE_PATH_ACTIVE_SESSION_KEY',
+  'AI_ACCESS_DEV_AUDIENCE',
+];
+
+describe('docker-compose.yml: mcp-public (profile byoa)', () => {
+  const block = services['mcp-public'] || '';
+
+  it('exists and starts only with the byoa profile', () => {
+    assert.ok(block, 'mcp-public service');
+    assert.deepEqual(listUnder(block, 'profiles'), ['byoa']);
+  });
+
+  it('runs the mcp image with --http (the remote entry), not the SSE command', () => {
+    assert.match(block, /^ {6}dockerfile: deploy\/risepath-vm\/Dockerfile\s*$/m);
+    assert.match(block, /^ {6}target: mcp\s*$/m);
+    assert.match(block, /^ {4}command: \["node", "mcp-server\/index\.js", "--http"\]\s*$/m);
+    assert.ok(!block.includes('--sse'));
+  });
+
+  it('reads its own env file, never stack.env', () => {
+    assert.match(block, /^ {4}env_file:\s*\n {6}- path: mcp-public\.env\s*\n {8}required: false\s*$/m);
+    assert.ok(!block.includes('stack.env'), 'no stack.env');
+    assert.ok(!block.includes('${'), 'no interpolation from stack.env values');
+  });
+
+  it('fixes production and the learner-remote profile (not admin)', () => {
+    assert.match(block, /^ {6}NODE_ENV: production\s*$/m);
+    assert.match(block, /^ {6}RISE_PATH_MCP_PROFILE: learner-remote\s*$/m);
+    assert.match(block, /^ {6}MCP_HTTP_PORT: "3200"\s*$/m);
+    assert.ok(!/\badmin\b/.test(block), 'no admin profile');
+  });
+
+  it('holds no bridge token, service-role key, model, Hermes or Memanto settings', () => {
+    for (const name of SECRET_NAMES) assert.ok(!block.includes(name), name);
+  });
+
+  it('publishes no host port and joins default and edge (the tunnel reaches it by name)', () => {
+    assert.ok(!/^ {4}ports:/m.test(block), 'no ports');
+    assert.deepEqual(listUnder(block, 'networks'), ['default', 'edge']);
+  });
+
+  it('runs as the node user, read-only, with no capabilities', () => {
+    assert.match(block, /^ {4}user: node\s*$/m);
+    assert.match(block, /^ {4}read_only: true\s*$/m);
+    assert.deepEqual(listUnder(block, 'cap_drop'), ['ALL']);
+    assert.deepEqual(listUnder(block, 'security_opt'), ['no-new-privileges:true']);
+  });
+
+  it('has a healthcheck on 127.0.0.1:3200/health (served before the Host check)', () => {
+    const test = /^ {6}test: (\[.*\])\s*$/m.exec(block)
+      || /^ {6}test:\s*\n((?: {8}.*\n)+)/m.exec(block);
+    assert.ok(test, 'healthcheck test');
+    assert.ok(block.includes("fetch('http://127.0.0.1:3200/health')"));
+  });
+
+  it('the admin mcp service keeps no edge network and no learner-remote profile', () => {
+    const mcp = services.mcp || '';
+    assert.ok(!(listUnder(mcp, 'networks') || []).includes('edge'));
+    assert.ok(!mcp.includes('learner-remote'));
+    assert.ok(!mcp.includes('--http'));
+  });
+});
+
+describe('mcp-public.env.example', () => {
+  const values = lines(read(path.join(STACK, 'mcp-public.env.example'))).filter((line) => !line.startsWith('#'));
+  const keys = values.map((line) => line.split('=')[0]);
+
+  it('sets exactly the variables the remote endpoint needs', () => {
+    assert.deepEqual([...keys].sort(), [
+      'APP_PUBLIC_URL',
+      'DATABASE_URL_PHASE1',
+      'MCP_ALLOWED_ORIGINS',
+      'MCP_PUBLIC_RESOURCE_URL',
+      'NODE_ENV',
+      'RISE_PATH_MCP_PROFILE',
+      'SUPABASE_ANON_KEY',
+      'SUPABASE_URL',
+    ]);
+    assert.ok(values.includes('NODE_ENV=production'));
+    assert.ok(values.includes('RISE_PATH_MCP_PROFILE=learner-remote'));
+  });
+
+  it('leaves the optional APP_PUBLIC_URL empty (a placeholder would reach every refusal)', () => {
+    assert.ok(values.includes('APP_PUBLIC_URL='));
+  });
+
+  it('uses the least-privilege role, not the superuser risepath_app', () => {
+    const url = values.find((line) => line.startsWith('DATABASE_URL_PHASE1='));
+    assert.match(url, /^DATABASE_URL_PHASE1=postgresql:\/\/risepath_mcp_remote:/);
+    assert.ok(!url.includes('risepath_app'));
+  });
+
+  it('has a canonical https resource URL with a path and no trailing slash', () => {
+    const value = values.find((line) => line.startsWith('MCP_PUBLIC_RESOURCE_URL=')).split('=')[1];
+    const url = new URL(value);
+    assert.equal(url.protocol, 'https:');
+    assert.equal(url.pathname, '/mcp');
+    assert.equal(url.href, value);
+  });
+
+  it('sets no secret beyond its own (even commented-out assignments)', () => {
+    const text = read(path.join(STACK, 'mcp-public.env.example'));
+    for (const name of SECRET_NAMES) {
+      assert.ok(!new RegExp(`^#?\\s*${name}\\w*=`, 'm').test(text), name);
+    }
+  });
+
+  it('mcp-public.env stays out of git and the build context', () => {
+    assert.ok(lines(read(path.join(STACK, '.gitignore'))).includes('mcp-public.env'));
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/*.env'));
+  });
+});
+
+describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
+  const sql = read(path.join(STACK, 'sql/mcp_remote_role.sql'));
+  const code = sql.split('\n').filter((line) => !/^\s*--/.test(line)).join('\n');
+  /** Whole-table grants: the learner-remote tools' own tables, the caps and the auth stub. */
+  const TABLE_GRANTS = new Map([
+    ['auth.users', ['SELECT', 'INSERT']],
+    ['ai_daily_usage', ['SELECT', 'INSERT', 'UPDATE']],
+    ['user_progress', ['SELECT', 'INSERT', 'UPDATE']],
+    ['learning_journal', ['SELECT', 'INSERT']],
+    ['mcp_tool_calls', ['INSERT']],
+  ]);
+  /** Every other table is reachable through these column grants only, exactly. */
+  const COLUMN_GRANTS = [
+    'GRANT SELECT (user_id, client_id, revoked_at, first_seen_at, last_used_at) ON mcp_oauth_grants TO risepath_mcp_remote;',
+    'GRANT INSERT (user_id, client_id), UPDATE (first_seen_at, last_used_at) ON mcp_oauth_grants TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
+    'GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;',
+    'GRANT SELECT (id, user_id, status) ON materials TO risepath_mcp_remote;',
+    'GRANT SELECT (material_id, chunk_index, content, embedding, embedding_model, created_at) ON material_chunks TO risepath_mcp_remote;',
+  ];
+
+  it('takes the password from a psql variable and stops without one', () => {
+    assert.match(code, /PASSWORD :'mcp_password'/);
+    assert.match(code, /\\if :\{\?mcp_password\}/);
+    assert.match(code, /RAISE EXCEPTION/);
+    assert.ok(!/PASSWORD '[^']*'/.test(code), 'no literal password');
+  });
+
+  it('creates a plain login role (no superuser, createdb, createrole, replication or bypassrls)', () => {
+    assert.match(code, /ALTER ROLE risepath_mcp_remote WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT\s+NOREPLICATION NOBYPASSRLS/);
+  });
+
+  it('grants whole tables only from the allowed list, and never DELETE, TRUNCATE or ALL', () => {
+    const grants = [...code.matchAll(/^GRANT ([A-Z, ]+) ON (?!SCHEMA|DATABASE)([a-z_., ]+) TO risepath_mcp_remote;$/gm)];
+    const seen = new Set();
+    for (const [, privileges, tables] of grants) {
+      for (const table of tables.split(',').map((t) => t.trim())) {
+        assert.ok(TABLE_GRANTS.has(table), `unexpected whole-table grant on ${table}`);
+        for (const privilege of privileges.split(',').map((p) => p.trim())) {
+          assert.ok(TABLE_GRANTS.get(table).includes(privilege), `${privilege} on ${table}`);
+        }
+        seen.add(table);
+      }
+    }
+    assert.deepEqual([...seen].sort(), [...TABLE_GRANTS.keys()].sort());
+    for (const line of code.split('\n').filter((l) => /^\s*GRANT\b/.test(l))) {
+      assert.ok(!/\b(DELETE|TRUNCATE|ALL|REFERENCES|TRIGGER)\b/.test(line), line);
+    }
+  });
+
+  it('column grants only for the rest: no report text, guardian details, material titles, profile or course content', () => {
+    const columnGrants = code.split('\n').filter((l) => /^GRANT\b.*\(/.test(l));
+    assert.deepEqual(columnGrants, COLUMN_GRANTS);
+    const tables = COLUMN_GRANTS.map((line) => / ON ([a-z_]+) TO /.exec(line)?.[1]);
+    for (const table of tables) {
+      assert.ok(!new RegExp(`^GRANT [A-Z, ]+ ON [a-z_., ]*\\b${table}\\b`, 'm').test(code), `no whole-table grant on ${table}`);
+    }
+    const columns = (table) => COLUMN_GRANTS.filter((line) => line.includes(` ON ${table} `)).join(' ');
+    assert.ok(!/\bdetail\b/.test(columns('ai_safety_events')), 'ai_safety_events.detail (report text) stays admin-only');
+    assert.ok(!/\b(title|storage_path)\b/.test(columns('materials')), 'no material title or storage path');
+    assert.ok(!/\b(client_name)\b/.test(columns('mcp_oauth_grants')), 'no client_name');
+    assert.ok(!/UPDATE \([^)]*revoked_at/.test(columns('mcp_oauth_grants')), 'never writes revoked_at');
+  });
+
+  it('ai_daily_usage: row level security limits the role to the remote kinds, idempotently', () => {
+    assert.match(code, /^ALTER TABLE ai_daily_usage ENABLE ROW LEVEL SECURITY;$/m);
+    assert.ok(!/FORCE ROW LEVEL SECURITY/.test(code), 'the table owner (risepath_app) keeps bypassing RLS');
+    const policies = [...code.matchAll(/^CREATE POLICY (\w+) ON ai_daily_usage FOR (SELECT|INSERT|UPDATE) TO risepath_mcp_remote\n\s+(.+);$/gm)];
+    assert.deepEqual(policies.map((m) => m[2]).sort(), ['INSERT', 'SELECT', 'UPDATE']);
+    for (const [, name, command, clauses] of policies) {
+      assert.match(code, new RegExp(`^DROP POLICY IF EXISTS ${name} ON ai_daily_usage;$`, 'm'), `re-run drops ${name} first`);
+      const expected = { SELECT: ['USING'], INSERT: ['WITH CHECK'], UPDATE: ['USING', 'WITH CHECK'] }[command];
+      for (const clause of expected) {
+        assert.ok(clauses.includes(`${clause} (kind IN ('mcp', 'mcp_write'))`), `${command} ${clause}`);
+      }
+    }
+    assert.equal((code.match(/CREATE POLICY/g) || []).length, 3, 'no other policy');
+    assert.match(sql, /owner[^\n]*bypasses RLS/, 'the header says the owner bypasses RLS');
+  });
+
+  it('starts from a clean slate on every run (revokes before it grants)', () => {
+    const revoke = code.indexOf('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM risepath_mcp_remote');
+    assert.ok(revoke > 0 && revoke < code.indexOf('GRANT SELECT'));
+  });
+});
+
+describe('deploy/supabase/custom_access_token_hook.sql', () => {
+  const sql = read(path.join(ROOT, 'deploy/supabase/custom_access_token_hook.sql'));
+  const code = sql.split('\n').filter((line) => !/^\s*--/.test(line)).join('\n');
+
+  it('changes aud only for OAuth client tokens and keeps the other claims', () => {
+    assert.match(code, /claims->>'client_id'/);
+    assert.match(code, /jsonb_set\(claims, '\{aud\}', to_jsonb\(mcp_resource\)\)/);
+    assert.match(code, /return jsonb_set\(event, '\{claims\}', claims\);/);
+    assert.match(code, /return event;/);
+    assert.ok(!/jsonb_build_object\('claims'/.test(code), 'never a reduced claim set');
+    assert.ok(!/authentication_method/.test(code), 'keys on client_id, not the method (refresh)');
+  });
+
+  it('uses a canonical MCP URL placeholder (https, /mcp, no trailing slash)', () => {
+    const value = /mcp_resource constant text := '([^']+)'/.exec(code)?.[1];
+    assert.ok(value, 'mcp_resource constant');
+    assert.equal(new URL(value).href, value);
+    assert.equal(new URL(value).pathname, '/mcp');
+  });
+
+  it('is not security definer, runs for supabase_auth_admin only', () => {
+    assert.ok(!/security definer/i.test(code));
+    assert.match(code, /grant execute on function public\.risepath_mcp_access_token_hook\(jsonb\) to supabase_auth_admin;/);
+    assert.match(code, /revoke execute on function public\.risepath_mcp_access_token_hook\(jsonb\) from authenticated, anon, public;/);
   });
 });
 
@@ -194,6 +440,124 @@ describe('deploy-stack.sh', () => {
     assert.ok(guard.includes('exit 1'));
   });
 
+  it('refuses byoa without the tunnel, without mcp-public.env, or with stack.env secrets in it', () => {
+    const at = script.indexOf('== *",byoa,"*');
+    const firstCompose = script.search(/^\s*compose \w/m);
+    assert.ok(at > guardAt && at < firstCompose, 'after the tunnel guard, before the first compose call');
+    const guard = script.slice(at, script.indexOf('PLACEHOLDERS=()'));
+    assert.ok(guard.includes('!= *",tunnel,"*'), 'needs the tunnel profile');
+    assert.ok(guard.includes('! -f mcp-public.env'));
+    for (const name of ['DATABASE_URL_PHASE1', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MCP_PUBLIC_RESOURCE_URL']) {
+      assert.match(guard, new RegExp(`for name in [A-Z0-9_ ]*\\b${name}\\b[A-Z0-9_ ]*; do\\n\\s*if ! grep`), `required ${name}`);
+    }
+    for (const name of ['RISE_PATH_BRIDGE_TOKEN', 'SUPABASE_SERVICE_ROLE_KEY', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'MEMANTO_', 'ORIGIN_SECRET', 'RISE_PATH_ACTIVE_SESSION_KEY']) {
+      assert.ok(guard.includes(` ${name}`), `forbidden ${name}`);
+    }
+    assert.ok(guard.includes('risepath_app[:@]'), 'refuses the superuser role');
+    assert.ok(guard.includes('grep -Eiq "${ENV_KEY}APP_PUBLIC_URL${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env'), 'refuses a template APP_PUBLIC_URL');
+    assert.ok(guard.includes('exit 1'));
+    for (const line of guard.split('\n').filter((l) => /^\s*(echo|printf)\b/.test(l))) {
+      assert.ok(!line.includes('${value') && !line.includes('${!'), `prints no value: ${line.trim()}`);
+    }
+  });
+
+  // The guard itself, run by bash on sample env files: Docker Compose reads `export NAME=…`,
+  // spaces around '=' and quoted values, so none of them may slip past it (or be reported missing).
+  describe('byoa guard on dotenv variants', () => {
+    const start = script.indexOf('if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then');
+    const block = script.slice(start, script.indexOf('\nfi\n', start) + 4);
+    const VALID = [
+      'DATABASE_URL_PHASE1=postgresql://risepath_mcp_remote:0123456789abcdef0123456789abcdef@db:5432/risepath',
+      'SUPABASE_URL=https://abcdefghijklmnop.supabase.co',
+      'SUPABASE_ANON_KEY=sb_publishable_test',
+      'MCP_PUBLIC_RESOURCE_URL=https://mcp.example.org/mcp',
+      'APP_PUBLIC_URL=',
+      '# SUPABASE_SERVICE_ROLE_KEY= lives in stack.env only',
+    ];
+    const SECRET = 'do-not-print-0123456789';
+    const runGuard = (envLines) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'byoa-guard-'));
+      try {
+        fs.writeFileSync(path.join(dir, 'mcp-public.env'), `${envLines.join('\n')}\n`);
+        const result = spawnSync('bash', ['-c', `set -euo pipefail\n${block}`], {
+          cwd: dir,
+          env: { PATH: process.env.PATH, COMPOSE_PROFILES: 'tts,tunnel,byoa' },
+          encoding: 'utf8',
+        });
+        return { status: result.status, out: `${result.stdout}${result.stderr}` };
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    };
+    const replace = (name, line) => VALID.map((l) => (l.startsWith(`${name}=`) ? line : l));
+
+    it('extracts the whole guard', () => {
+      assert.ok(start > 0 && block.endsWith('\nfi\n') && block.includes('BYOA_PROBLEMS'));
+    });
+
+    it('passes a valid file, also written with export, spaces around = and quotes', () => {
+      assert.equal(runGuard(VALID).status, 0, runGuard(VALID).out);
+      const styled = [
+        'export DATABASE_URL_PHASE1="postgresql://risepath_mcp_remote:0123456789abcdef0123456789abcdef@db:5432/risepath"',
+        "SUPABASE_URL = 'https://abcdefghijklmnop.supabase.co'",
+        '  SUPABASE_ANON_KEY= "sb_publishable_test"',
+        'export MCP_PUBLIC_RESOURCE_URL =https://mcp.example.org/mcp',
+      ];
+      const result = runGuard(styled);
+      assert.equal(result.status, 0, result.out);
+    });
+
+    for (const line of [
+      'DATABASE_URL_PHASE1="postgresql://risepath_app:SECRET@db:5432/risepath"',
+      "DATABASE_URL_PHASE1='postgres://risepath_app@db:5432/risepath'",
+      'export DATABASE_URL_PHASE1 = postgresql://risepath_app:SECRET@db:5432/risepath',
+      '  DATABASE_URL_PHASE1= "postgresql://risepath_app:SECRET@db/risepath"',
+    ]) {
+      it(`refuses the superuser role: ${line.replace(/SECRET/g, '…')}`, () => {
+        const result = runGuard(replace('DATABASE_URL_PHASE1', line.replace(/SECRET/g, SECRET)));
+        assert.equal(result.status, 1, result.out);
+        assert.match(result.out, /DATABASE_URL_PHASE1 \(mcp-public\.env: use risepath_mcp_remote/);
+        assert.ok(!result.out.includes(SECRET), 'prints no value');
+      });
+    }
+
+    for (const line of [
+      'SUPABASE_SERVICE_ROLE_KEY = SECRET',
+      'SUPABASE_SERVICE_ROLE_KEY="SECRET"',
+      'export RISE_PATH_BRIDGE_TOKEN="SECRET"',
+      '  GEMINI_API_KEY =SECRET',
+      "export\tPOSTGRES_PASSWORD\t=\t'SECRET'",
+      'ANTHROPIC_API_KEY=',
+    ]) {
+      it(`refuses a stack.env secret: ${JSON.stringify(line.replace(/SECRET/g, '…'))}`, () => {
+        const result = runGuard([...VALID, line.replace(/SECRET/g, SECRET)]);
+        assert.equal(result.status, 1, result.out);
+        assert.match(result.out, /must not be there; it belongs to stack\.env only/);
+        assert.ok(!result.out.includes(SECRET), 'prints no value');
+      });
+    }
+
+    for (const [name, line] of [
+      ['SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY=""'],
+      ['SUPABASE_ANON_KEY', "SUPABASE_ANON_KEY = ''"],
+      ['SUPABASE_URL', 'SUPABASE_URL = "https://your-project.supabase.co"'],
+      ['MCP_PUBLIC_RESOURCE_URL', "export MCP_PUBLIC_RESOURCE_URL='https://mcp.your-domain.example/mcp'"],
+      ['DATABASE_URL_PHASE1', 'DATABASE_URL_PHASE1 = "postgresql://risepath_mcp_remote:change-me@db:5432/risepath"'],
+    ]) {
+      it(`refuses an empty or template ${name}: ${line}`, () => {
+        const result = runGuard(replace(name, line));
+        assert.equal(result.status, 1, result.out);
+        assert.ok(result.out.includes(`${name} (mcp-public.env: missing or a template value)`), result.out);
+      });
+    }
+
+    it('refuses a quoted template APP_PUBLIC_URL', () => {
+      const result = runGuard(replace('APP_PUBLIC_URL', 'export APP_PUBLIC_URL = "https://app.your-domain.example"'));
+      assert.equal(result.status, 1, result.out);
+      assert.match(result.out, /APP_PUBLIC_URL \(mcp-public\.env: a template value/);
+    });
+  });
+
   it('removes a hermes container left from an earlier full deploy before `up` when full is not listed', () => {
     const removeAt = script.indexOf('compose --profile full rm -sf hermes');
     assert.ok(removeAt > 0, 'rm -sf hermes');
@@ -259,6 +623,8 @@ describe('deploy-stack.sh', () => {
     assert.ok(wait > script.indexOf('init-memanto-ollama.sh'), 'after the Ollama pull');
     assert.ok(wait < script.indexOf('node scripts/smoke-vm-stack.mjs'), 'before the smoke');
     assert.ok(!/compose up -d --wait\s*$/m.test(script), 'no wait on every service');
+    const byoaWait = script.search(/if \[\[ ",\$\{COMPOSE_PROFILES\/\/ \/\}," == \*",byoa,"\* \]\]; then\n\s*WAIT\+=\(mcp-public\)\n/);
+    assert.ok(byoaWait > 0 && byoaWait < wait, 'with byoa, an mcp-public that never gets healthy fails the deploy');
   });
 });
 
