@@ -38,12 +38,14 @@
  *      tax-inclusive, active and recurring; anything else is 503 billing_misconfigured (C26);
  *   2. the learner's Customer for this mode, or a new one (metadata user_id only; Idempotency-Key
  *      customer:<mode>:<userId>; INSERT … ON CONFLICT (user_id, livemode) DO NOTHING, then the stored id is used);
- *   3. the Customer's other open Checkout Sessions are expired: all but this minute's in this
- *      locale (C24). A timeout, rate limit or 5xx on an expiry stops the checkout (503/502);
+ *   3. the Customer's other open Checkout Sessions are expired: all but this minute's (found by the
+ *      expires_at this server set, whatever its locale) (C24). A timeout, rate limit or 5xx on an
+ *      expiry stops the checkout (503/502);
  *   4. every subscription of that Customer is re-read (billingSync.js); 409 already_subscribed when
  *      one on an accepted price is active, trialing, past_due, unpaid or paused, or incomplete and
  *      under 23 h old (C34);
- *   5. a Session whose parameters are a pure function of the Idempotency-Key
+ *   5. when this minute's Session is in the other locale, its URL is returned as it is; otherwise
+ *      a Session whose parameters are a pure function of the Idempotency-Key
  *      checkout:<mode>:<userId>:<locale>:<minute> (expires 32 minutes after the minute began), so a
  *      double click or a retry within the minute gets the same Session back (C25/C40/C45).
  */
@@ -356,13 +358,20 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
         }
 
         // Expire the other open Sessions first, so one that completes meanwhile is seen by the
-        // subscription check below. Only this minute's Session in this locale is kept: it is the one
-        // the Idempotency-Key replays.
+        // subscription check below. This minute's Session is kept, whatever its locale: it is found by
+        // the expiry this server set (not by Stripe's clock), and it is the one this minute's key
+        // replays, so it must never be expired while the key can still return it.
         const bucketSec = Math.floor(t / 1000 / BUCKET_SEC) * BUCKET_SEC;
+        const currentExpiresAt = bucketSec + SESSION_LIFETIME_SEC;
         const open = await stripeClient.listCheckoutSessions({ customer, status: 'open' });
+        /** @type {any} */
+        let current = null;
         for (const session of open?.data ?? []) {
           if (typeof session?.id !== 'string') continue;
-          if (Number(session.created) >= bucketSec && session.locale === STRIPE_LOCALE[locale]) continue;
+          if (!current && Number(session.expires_at) === currentExpiresAt) {
+            current = session;
+            continue;
+          }
           try {
             await stripeClient.expireCheckoutSession(session.id);
           } catch (error) {
@@ -379,6 +388,12 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
           && (BLOCKING_STATUSES.has(r.status) || (r.status === 'incomplete' && r.createdMs != null && t - r.createdMs < INCOMPLETE_BLOCKS_MS)));
         if (blocking) {
           return refuse(res, 409, 'already_subscribed', 'You already have this plan. Manage it under Payment and cancellation.', { status: blocking.status });
+        }
+
+        if (current && current.locale !== STRIPE_LOCALE[locale] && typeof current.url === 'string' && current.url.startsWith('https://')) {
+          // This minute's Session is in the other language: hand it back rather than open a second
+          // payable Session (a new minute gives a Session in the new language).
+          return res.json({ url: current.url });
         }
 
         const params = checkoutSessionParams({ config, userId, customer, locale, bucketSec, caps: effectiveSupporterCaps(env) });

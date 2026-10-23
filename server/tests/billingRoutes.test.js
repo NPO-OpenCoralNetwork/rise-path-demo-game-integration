@@ -498,17 +498,49 @@ describe('POST /checkout (the router, with a moving clock)', () => {
             assert.equal(stripe.calls(/expire$/).length, 0, 'the current minute\'s Session is never expired');
 
             const en = await checkout(base, 'alice', 'en');
-            assert.notEqual(en.json.url, first.json.url, 'another locale is another key');
-            assert.equal(stripe.calls(/expire$/).length, 1, "this minute's Session in another locale is expired: one payable Session at a time");
-            assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'open']);
+            assert.equal(en.status, 200, en.text);
+            assert.equal(en.json.url, first.json.url, "within the minute, the other locale gets this minute's open Session back");
+            assert.equal(stripe.state.sessions.size, 1, 'no second payable Session');
+            assert.equal(stripe.calls(/expire$/).length, 0);
 
             clock.now += 30_000; // next minute
             const third = await checkout(base);
             assert.notEqual(third.json.url, first.json.url);
-            assert.equal(stripe.calls(/expire$/).length, 2, 'both older open Sessions are expired (C24)');
-            assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'expired', 'open']);
+            assert.equal(stripe.calls(/expire$/).length, 1, 'the older open Session is expired (C24)');
+            assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'open']);
         });
         assert.equal(stripe.calls(/POST \/v1\/customers/).length, 1, 'one Customer');
+    });
+
+    it('jp, then en, then jp within one minute always returns the one open Session (never an expired one)', async () => {
+        const { run, checkout, clock } = setup();
+        await run(async (base) => {
+            const urls = [];
+            for (const [locale, step] of [['jp', 0], ['en', 10_000], ['jp', 10_000], ['en', 10_000]]) {
+                clock.now += step;
+                const result = await checkout(base, 'alice', locale);
+                assert.equal(result.status, 200, result.text);
+                urls.push(result.json.url);
+            }
+            assert.equal(new Set(urls).size, 1);
+            const open = [...stripe.state.sessions.values()].filter((s) => s.status === 'open');
+            assert.equal(open.length, 1);
+            assert.equal(open[0].url, urls[0], 'the URL handed out is the open Session');
+        });
+    });
+
+    it("a click late in a minute (Stripe stamps the next minute): the next minute's click still expires it — one payable Session", async () => {
+        const { run, checkout, clock } = setup({ at: Date.parse('2026-10-23T03:00:59.500Z') });
+        // Stripe receives the create 700 ms later, in the next minute by its clock.
+        stripe.onRequest(/POST \/v1\/checkout\/sessions$/, () => {
+            clock.now += 700;
+        });
+        await run(async (base) => {
+            assert.equal((await checkout(base)).status, 200);
+            clock.now = Date.parse('2026-10-23T03:01:20Z');
+            assert.equal((await checkout(base)).status, 200);
+        });
+        assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'open']);
     });
 
     for (const [label, failure, status] of [['a timeout', 'timeout', 503], ['a 5xx', { status: 500 }, 502]]) {
