@@ -42,6 +42,8 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_AI_MEMORY]: '/settings/ai-memory',
   [ViewState.SETTINGS_AI_ACCESS]: '/settings/ai-access',
   [ViewState.SETTINGS_ADMIN_SAFETY]: '/settings/admin/safety',
+  // Phase 1: the learner's own AI apps connected to the remote MCP endpoint (OAuth).
+  [ViewState.SETTINGS_CONNECTED_APPS]: '/settings/connected-apps',
   // Public guide; open when signed out too (App.tsx renders it outside the Layout then).
   [ViewState.AI_SAFETY]: '/ai-safety',
 

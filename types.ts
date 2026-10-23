@@ -199,6 +199,7 @@ export enum ViewState {
   SETTINGS_AI_ACCESS = 'SETTINGS_AI_ACCESS', // Phase 0.5: birth month and guardian consent for AI
   SETTINGS_ADMIN_SAFETY = 'SETTINGS_ADMIN_SAFETY', // Phase 0.5: admin safety counts, reports, paper consents
   AI_SAFETY = 'AI_SAFETY', // Phase 0.5: public AI safety guide (/ai-safety)
+  SETTINGS_CONNECTED_APPS = 'SETTINGS_CONNECTED_APPS', // Phase 1: AI apps connected through the remote MCP endpoint
 }
 
 // Generated Content Types

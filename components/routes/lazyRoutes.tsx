@@ -166,3 +166,10 @@ export const AiSafetyGuideView = lazy(
 export const AdminSafetyView = lazy(
   () => import('../features/admin/AdminSafetyView')
 );
+/** Phase 1 (bring your own AI app): the OAuth consent page and the connected-apps settings page. */
+export const OAuthConsentView = lazy(
+  () => import('../features/oauth/OAuthConsentView')
+);
+export const ConnectedAppsView = lazy(
+  () => import('../features/settings/ConnectedAppsView')
+);
