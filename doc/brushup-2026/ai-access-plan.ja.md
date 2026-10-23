@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-22
 - 決めた人: オーナー（Phase 0 を承認）
-- 状態: Phase 0 は実施済み。Phase 0.5（未成年のための安全対策）は実施中（この変更。オーナーが「おすすめの既定で進める」と承認）。Phase 1 から先は計画です。
+- 状態: Phase 0 は実施済み。Phase 0.5（未成年のための安全対策）は実施中（オーナーが「おすすめの既定で進める」と承認）。Phase 1（大人が自分の AI をつなぐ）はコードと手順書を作りました（2026-10-23。公開はオーナーの設定と確認のあと）。Phase 2 から先は計画です。
 - 関連: [../legal/README.md](../legal/README.md)（プライバシーポリシーと利用規約の下書き）、[../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)（データの送り先の一覧）、[../guides/safety-operations.ja.md](../guides/safety-operations.ja.md)（安全の運用ガイド）
 
 この文書の工数（何日かかるか）は、どれも**見積もり**です。作って測ったものではありません。費用は**試算**で、前提を変えると変わります。
@@ -10,7 +10,7 @@
 ## 1. 決めたこと
 
 1. **アプリの中の AI は残します。** 安いモデル（Claude Haiku 5.5）で動かし、今ある 1 日の上限（`server/middleware/dailyCaps.js`）をそのまま使います。
-2. **大人の学習者は、あとで自分の AI をつなげるようにします**（Phase 1）。Claude Code、Codex、Claude.ai、自分で動かす Hermes などを、MCP（AI アプリが外部のツールにつながるための共通の決まりごと）でつなぎます。この変更には入っていません。
+2. **大人の学習者は、自分の AI をつなげるようにします**（Phase 1）。Claude Code、Codex、Claude.ai、自分で動かす Hermes などを、MCP（AI アプリが外部のツールにつながるための共通の決まりごと）でつなぎます。作ったものは 5 章です。
 3. **共有のサーバー側 Hermes エージェントは、学習者に出しません。**
 4. **Gemini（Google の AI）は使いません。** 未成年が Rise Path を使うためです（下の 2.2）。
 5. **有料プランはまだ作りません。** 寄付と助成で運営します。
@@ -86,15 +86,15 @@
 
 **共有 Hermes を出さない**
 
-- 画面のスイッチ `VITE_FEATURE_AGENT_CHAT` がちょうど `"true"` のときだけ、共有 Hermes のチャット（右下の AI コーチと `/life-journal/chat`）を出します。既定は off です（`config/features.ts:50`、`App.tsx:286-291`、`App.tsx:392-394`）。
+- 画面のスイッチ `VITE_FEATURE_AGENT_CHAT` がちょうど `"true"` のときだけ、共有 Hermes のチャット（右下の AI コーチと `/life-journal/chat`）を出します。既定は off です（`config/features.ts:50`、`App.tsx:329-334`、`App.tsx:437-439`）。
 - サーバーも同じスイッチを読みます。ちょうど `"true"` でないと、`/api/v2/agent/chat` は 404 を返し、1 日の回数も数えません。前の設定のまま Hermes が動いている VM でも、学習者は共有 Hermes を使えません（`server/routes/agent.js`）。
 - 用語の説明の「AI 先生に聞く」ボタン、ライフジャーナルとプロフィール画面のチャットへのボタンも、off のときは出しません（`components/common/GlossaryText.tsx`、`components/features/life-journal/`、`components/features/dashboard/profile/ProfileDiagnosisView.tsx`）。
 - AI コーチのエラー表示から、設定名（`HERMES_API_KEY` など）を出さないようにしました（`services/agentApi.ts`）。
-- VM の既定の構成を `COMPOSE_PROFILES=tts` にし、Hermes のコンテナを起動しないようにしました（`deploy/risepath-vm/stack.env.example:161`、`deploy/risepath-vm/scripts/deploy-stack.sh`）。
+- VM の既定の構成を `COMPOSE_PROFILES=tts` にし、Hermes のコンテナを起動しないようにしました（`deploy/risepath-vm/stack.env.example:162`、`deploy/risepath-vm/scripts/deploy-stack.sh`）。
 
 **危ない手順書の書き換え**
 
-- ChatGPT に共有のブリッジトークンを入れ、ngrok で MCP サーバーを公開する手順を消しました。代わりに、トークンを外部に入れないこと、ポートを公開しないことを書きました（`doc/guides/usage_guide.md:132-138`）。
+- ChatGPT に共有のブリッジトークンを入れ、ngrok で MCP サーバーを公開する手順を消しました。代わりに、トークンを外部に入れないこと、ポートを公開しないことを書きました（`doc/guides/usage_guide.md:182-183`）。
 
 **設定例と文書**
 
@@ -112,10 +112,10 @@
 ### 3.2 変えていないこと
 
 - 性格インサイト（`assessment.insight`）は中くらいのモデル（Sonnet 5.5）のままです（`server/llm/models.config.js:95`）。
-- サーバーの `/api/v2/agent/chat` は残っています。`VITE_FEATURE_AGENT_CHAT=true` にして Hermes を動かさない限り使えません（`server.js:183-185`、`server/routes/agent.js`）。
-- 本番の MCP コンテナは管理者用の設定のままで、インターネットには出していません（`deploy/risepath-vm/docker-compose.yml:131`）。
-- Memanto（AI メモリ）は既定で止まったままです（`deploy/risepath-vm/stack.env.example:189`）。
-- 1 日の上限の値は変えていません（`server/middleware/dailyCaps.js:71-77`）。
+- サーバーの `/api/v2/agent/chat` は残っています。`VITE_FEATURE_AGENT_CHAT=true` にして Hermes を動かさない限り使えません（`server.js:188-190`、`server/routes/agent.js`）。
+- 本番の MCP コンテナは管理者用の設定のままで、インターネットには出していません（`deploy/risepath-vm/docker-compose.yml:132`）。
+- Memanto（AI メモリ）は既定で止まったままです（`deploy/risepath-vm/stack.env.example:191`）。
+- 1 日の上限の値は変えていません（`server/middleware/dailyCaps.js:82-90`）。
 
 ### 3.3 オーナーの作業
 
@@ -147,10 +147,10 @@
 - 新しい表 3 つ: `user_age`（生まれた年と月だけ）、`account_consents`（同意の記録。保護者の名前は持たない）、`ai_safety_events`（止めた記録と報告）（`server/migrations/014_minor_safeguards.sql`）。年齢や同意を、学習者が書き換えられる場所（`user_profiles.preferences`、Supabase の `user_metadata`）には置いていません。
 - 年齢の計算: 日本時間で、誕生日は生まれた月の最後の日とみなします（`server/safety/age.js:65-83`）。
 - AI を使えるかの判定: `ready`（使える）、`needs_age`（年月が未登録）、`needs_guardian_consent`（同意待ち）、`paused`（その日のお休み）。結果は 60 秒だけ覚え、書き込みのたびに消します（`server/safety/access.js:234-263`）。
-- 入口の関門（ゲート）: AI を呼ぶすべての POST で、1 日の上限より**前**に判定します。断った呼び出しは回数に数えません（`server/middleware/aiAccessGate.js:68-100`、`server/routes/llm.js:176`、`server.js:159`、`:166`、`:172`、`:184`）。`GET /api/v2/llm/status` は今までどおり誰でも見られます。
-- 画像生成（`/api/v2/image`）と AI コーチ（共有 Hermes、`/api/v2/agent/chat`）は、18 歳未満向けの確認と子ども向けの指示がないので、18 歳以上だけにしました。18 歳未満は保護者の同意があっても 403 `adults_only` です（`server.js:170-172`、`:184`）。
+- 入口の関門（ゲート）: AI を呼ぶすべての POST で、1 日の上限より**前**に判定します。断った呼び出しは回数に数えません（`server/middleware/aiAccessGate.js:68-100`、`server/routes/llm.js:176`、`server.js:161`、`:168`、`:174`、`:189`）。`GET /api/v2/llm/status` は今までどおり誰でも見られます。
+- 画像生成（`/api/v2/image`）と AI コーチ（共有 Hermes、`/api/v2/agent/chat`）は、18 歳未満向けの確認と子ども向けの指示がないので、18 歳以上だけにしました。18 歳未満は保護者の同意があっても 403 `adults_only` です（`server.js:172-174`、`:189`）。
 - 学習者の画面とAPI: `/settings/ai-access`（年月の登録、保護者の同意、同意のやめ方、スタッフに見せる番号）と `/api/v2/user/ai-access`（`server/routes/aiAccess.js`、`components/safety/AiAccessSetupView.tsx`）。同意文の版は `guardian-ai-2026-10` です（`server/safety/access.js:30`）。
-- 外部の AI（ChatGPT のアクション、MCP、Nexloom）が作ったコースの下書きの保存と公開は、学習者のログインで呼ぶ場合は 18 歳以上だけにしました。MCP では、学習者が自分のログイン（JWT）で開いた接続から `save-curriculum-draft` と、データベースに保存する `lesson-upsert-draft` を呼ぶと、書き込む前に同じ判定をします（年月が未登録なら `age_required`、18 歳未満なら `adults_only`）。ブリッジトークンは運営用の経路として扱い、手元の stdio の接続も確かめません（`server/routes/chatgptCurriculum.js:68`、`:218`、`:887`、`tools/core/mcpAiAccess.js:34-51`、`mcp-server/index.js:462`、`:569`）。
+- 外部の AI（ChatGPT のアクション、MCP、Nexloom）が作ったコースの下書きの保存と公開は、学習者のログインで呼ぶ場合は 18 歳以上だけにしました。MCP では、学習者が自分のログイン（JWT）で開いた接続から `save-curriculum-draft` と、データベースに保存する `lesson-upsert-draft` を呼ぶと、書き込む前に同じ判定をします（年月が未登録なら `age_required`、18 歳未満なら `adults_only`）。ブリッジトークンは運営用の経路として扱い、手元の stdio の接続も確かめません（`server/routes/chatgptCurriculum.js:68`、`:218`、`:887`、`tools/core/mcpAiAccess.js:124`、`mcp-server/createMcpServer.js:506`、`:613`）。
 
 **確認（モデレーション）**
 
@@ -212,17 +212,97 @@
 
 ## 5. Phase 1: 自分の AI をつなぐ（BYOA、大人向け）
 
-BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です。学習者が自分の契約の AI で Rise Path を使うので、AI の費用は学習者の契約で払われます。
+BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です。学習者が自分の契約の AI で Rise Path を使うので、AI の費用は学習者の契約で払われます。2026-10-23 の作業ツリーで作りました。公開の手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md)、学習者向けのつなぎ方は [../guides/usage_guide.md](../guides/usage_guide.md) の「自分の AI をつなぐ（リモート MCP）」です。
 
-- **つなぎ方**: MCP の新しい標準の通信方式「Streamable HTTP」の入口（`POST /mcp`）を作ります。今の MCP サーバーは古い方式（SSE）だけです（`mcp-server/index.js:1045`、`:1166`、`:1192`）。
-- **ログイン（OAuth）**: 学習者が自分のアカウントで「この AI に Rise Path の利用を許可する」操作をします。Supabase の OAuth 2.1 サーバー機能を使います。この機能は**ベータ版**で、全プランで使えます。別料金はありませんが、OAuth でログインした利用者も月間アクティブユーザー（MAU）に数えます。許可の画面は自分たちで作ります（<https://supabase.com/docs/guides/auth/oauth-server/getting-started>）。
-- **MCP の決まりごとへの対応**: MCP サーバーは「保護されたリソースのメタデータ」（RFC 9728）を出し、401 のときに `WWW-Authenticate` ヘッダーでその場所を知らせます。トークンが自分あてに発行されたものかを確かめ、ほかのトークンは受け付けません（<https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization>）。今の 401 は JSON だけで、このヘッダーがありません（`mcp-server/index.js:1173`）。
-- **アプリの API の守り**: 今の API は、Supabase が認めたトークンなら何でも受け付けます（`server/middleware/auth.js:131-141`）。外部の AI に渡したトークンで、アプリのすべての API（有料の AI 機能をふくむ）が使えないよう、区別して断ります。
-- **学習者の範囲だけのツール**: 学習者用の新しい設定（`learner-remote`）を作り、本人のデータだけを扱うツールにします。生活記録や AI メモリなど、特に私的なデータは既定で出しません。
-- **別の公開ホスト名**: 学習者用の MCP は、別のコンテナと別のホスト名（例: `mcp.<domain>`）で公開します。管理者用の MCP（`deploy/risepath-vm/docker-compose.yml:131`）は公開しません。
-- **大人だけ**: Claude の個人向けプランは 18 歳以上です。未成年はアプリの中の AI を使います。
-- **利用者ごとの上限**: 1 日の上限に、MCP 用の種類を足します（`server/middleware/dailyCaps.js:63`）。
-- 工数（見積もり・未検証）: 開発 6〜8 日、オーナーと運用の作業（Supabase、Cloudflare、実際のクライアントでの確認）2〜3 日。
+### 5.1 作ったもの
+
+**入口（MCP サーバー）**
+
+- `node mcp-server/index.js --http` で、インターネット向けの入口が動きます（`mcp-server/remote.js`）。MCP の通信方式「Streamable HTTP」の `POST /mcp` だけを受け、セッションを持ちません（リクエストごとに新しい MCP サーバーを作り、答えは JSON）。`GET` と `DELETE /mcp` は 405 です。`GET /health` は `{"status":"ok"}` だけを返します。
+- 本番（`NODE_ENV=production`）でしか起動しません。テスト用の `MCP_REMOTE_TEST=1` は 127.0.0.1 だけで待ち受けます。ブリッジトークン、`RISE_PATH_ACTIVE_SESSION_KEY`、`AI_ACCESS_DEV_AUDIENCE` などの開発用の設定は、起動のときに消して使いません。
+- 「保護されたリソースのメタデータ」（RFC 9728）を `/.well-known/oauth-protected-resource/mcp`（とルートの `/.well-known/oauth-protected-resource`）で出します。中身は `resource`（`MCP_PUBLIC_RESOURCE_URL`）、`authorization_servers`（Supabase の issuer `<SUPABASE_URL>/auth/v1`）、`bearer_methods_supported`、`resource_name` だけで、独自のスコープは出しません（Supabase は独自のスコープに対応していないため）。トークンがないか正しくないときは、401 と `WWW-Authenticate: Bearer … resource_metadata="…"` を返します（MCP の SDK の `requireBearerAuth`）。
+- Host は `MCP_PUBLIC_RESOURCE_URL` のホスト名だけを受け付けます。ブラウザの Origin は `MCP_ALLOWED_ORIGINS` にあるものだけで、ほかは 403 です。
+
+**トークンの検証**（`mcp-server/oauthVerifier.js`）
+
+- Supabase に問い合わせる前に、署名の方式（ES256 か RS256）と鍵の ID が、こちらで取ってきた公開鍵（10 分キャッシュ、知らない鍵の ID での取り直しは 1 分に 1 回まで）にあるかを見ます。でたらめなトークンでは Supabase を呼びません。
+- 署名と有効期限は `supabase.auth.getClaims` で確かめます。期限切れや不正は 401（AI アプリがトークンを更新します）、Supabase が答えないときは 503（ログインのやり直しを繰り返させないため）です。
+- そのうえで、issuer が一致すること、`aud` が `MCP_PUBLIC_RESOURCE_URL` であること、`client_id` と `sub` が UUID であること、`role` が `authenticated` であること、匿名のユーザーでないことを確かめます。学習者が接続を解除する前に発行されたトークンかどうかも、`mcp_oauth_grants.revoked_at` で確かめます。答えは利用者・アプリ・発行の時刻（`iat`）ごとに覚えます。「解除されていない」は 5 秒（`NOT_REVOKED_CACHE_MS`）、「解除ずみ」は 30 秒（`REVOCATION_CACHE_MS`）です。そのため、解除は数秒以内に効きます。
+- トークンはログに出さず、ツールにも渡しません。
+
+**Supabase 側**
+
+- Custom Access Token Hook（`deploy/supabase/custom_access_token_hook.sql`）: `client_id` があるトークン（AI アプリに渡すもの）だけ、`aud` を MCP の URL にします。学習者自身のログインは変えません。
+
+**大人だけ**
+
+- `tools/call`、`resources/read`、`prompts/get` のたびに、トークンの利用者の AI の利用設定を確かめます（`server/safety/access.js` の `resolveAiAccess`）。`ready` で 18 歳以上のときだけ通し、ほかは英語と日本語の説明つきのエラー（`age_required`、`adults_only`、`ai_paused_safety`、`ai_access_unavailable`）を返します。`APP_PUBLIC_URL` があれば `/settings/ai-access` を案内します。確認できないときは断ります。`initialize` とツールの一覧は通します。
+- Supabase は、一度許可したアプリには許可の画面を出さずに通します。そのため、許可の画面だけでなく、MCP サーバーで毎回確かめます。
+
+**学習者の範囲だけのツール**（プロファイル `learner-remote`、`mcp-server/tool-registry.json`）
+
+- ツール: `learner-state-get`、`journal-recent`、`learner-adaptation-signals`、`rag-search`（結果は 5 件まで）、`journal-log`、`learner-state-update`（科目の ID を確かめる）。リソース `content://domains`、プロンプト `socratic-tutor`。
+- 出さないもの: 生活記録（`daily-life-*`）、AI メモリ（`learner-memory-*`、`learner-personal-context`）、性格のプロフィール（`learner://profile/me`）、読み上げ（`request-tts`）、`journal-summary`、カリキュラムとレッスンづくりのツール、`author-lesson` のプロンプト。
+- 学習者は、いつも検証したトークンの利用者です（`tools/core/mcpUserScope.js` の最初の手順）。`PHASE1_USER_ID` や開発用の利用者には落ちません。ツールに `user_id` や `rp_turn` の引数はありません。
+
+**上限**
+
+- 1 分あたり: 利用者とアプリの組ごとに 60 回、トークンのないリクエストは接続元（`cf-connecting-ip`）ごとに 30 回（`express-rate-limit`）。1 回のリクエストに入れられるメッセージは 10 件まで。
+- 1 日あたり（日本時間）: 新しい種類 `mcp`（すべての `tools/call`。1 人 300 回、全体 20,000 回）と `mcp_write`（`journal-log`、`learner-state-update`。1 人 50 回、全体 5,000 回）（`server/middleware/dailyCaps.js`）。Claude.ai や ChatGPT は事業者の同じアドレスから来るので、この 2 つには接続元ごとの上限を付けません。超えたら `daily_limit_reached` のエラーです。`dailyCaps` の判定は Express の外からも呼べるようにしました（今までの動きは変えていません）。
+
+**アプリの API の守り**
+
+- `server/middleware/auth.js`（`requireAuth`、`optionalAuth`）、`server/middleware/bridgeAuth.js`、管理者用の MCP の SSE の入口は、`client_id` があるトークンと、`aud` が `authenticated` でないトークンを断ります（`tools/core/oauthToken.js` の `isOAuthClientToken`）。`requireAuth` は 401 `oauth_client_token`、`optionalAuth` はログインしていない人として扱います。Supabase の `getUser` はこうしたトークンも受け付けるため、こちらで区別します。
+
+**接続したアプリの記録と解除**
+
+- 新しい表 `mcp_oauth_grants`（`server/migrations/015_mcp_oauth_grants.sql`）。MCP サーバーが、利用者とアプリの組ごとに最初と最後に使った日時を書きます（最後に使った日時は 1 分に 1 回まで）。`revoked_at` とアプリの名前（`client_name`）を書くのはアプリの API だけです。MCP サーバーの DB ロールは、`user_id`、`client_id` の追加と、`first_seen_at`、`last_used_at` の更新しかできません。一度も呼ばなかったアプリを解除すると、使った日時は空（NULL）のまま行ができ、画面は「まだ使われていません」と出します。
+- `GET /api/v2/user/connected-apps` と `POST /api/v2/user/connected-apps/:clientId/revoke`（`server/routes/connectedApps.js`）。解除は 3 つの手順です（`services/oauthConsentRules.ts` の `revokeConnectedAppWith`）。(1) `revoked_at` を書きます。それより前に発行されたトークンは、数秒以内に 401 になります。(2) 画面が Supabase の `revokeGrant` を呼び、リフレッシュトークンを消します。(3) `revokeGrant` が通ったら、もう一度 `revoked_at` を書きます。(1) と (2) のあいだに AI アプリがトークンを更新しても、そのトークンは (3) で断られます。(3) が 2 回とも失敗したら、画面が「もう一度試す」を出します。解除のときは、Supabase の一覧に出ていたアプリの名前（前後の空白を除き、100 字まで）も保存します。Supabase が許可を消したあとも、解除ずみの欄でアプリを見分けられます。
+
+**画面**
+
+- 許可の画面 `/oauth/consent`（`components/features/oauth/OAuthConsentView.tsx`）: ログインしていなくても開け、サインインやアカウントづくりのあいだも、リクエストを 10 分まで覚えます。アプリの名前（アプリが自分で付けたものと表示）、サイト、戻る先のホスト名（`localhost` などには注意）、読めるもの・書けるもの・見られないもの、データが学習者の AI の会社に送られること、サインイン中のアカウントを出します。「許可する」のすぐ上に、許可したアプリはアカウントのサービス（Supabase Auth）であなた自身と同じ力を持つので、信頼できるアプリだけを許可するよう出します（5.3）。18 歳以上で利用設定が `ready` のときだけ「許可する」を出し、年月が未登録ならその場で登録できます。
+- 「つないでいる AI アプリ」`/settings/connected-apps`（`components/features/settings/ConnectedAppsView.tsx`）: Rise Path の記録と Supabase の `listGrants` をあわせて表示し、解除できます。
+
+**デプロイ**
+
+- Compose のサービス `mcp-public`（プロファイル `byoa`）: `mcp` と同じイメージを `--http` で動かし、ホストにポートを出さず、`edge` ネットワークでトンネルから届きます。読むのは `mcp-public.env` だけで、ブリッジトークン、service_role key、モデルや Memanto のキーを持ちません。`node` ユーザー、読み取り専用、ケイパビリティなしで動きます。
+- 最小権限の DB ロール `risepath_mcp_remote`（`deploy/risepath-vm/sql/mcp_remote_role.sql`）。権限は、リモートのツール・年齢の確認・上限・接続の記録に要る表と列だけです。`ai_safety_events` は判定に使う 4 つの列だけで、報告の文章（`detail`）は読めません。`materials` は `id`、`user_id`、`status` だけで、`material_chunks` は検索に使う列だけです。`user_age` と `account_consents` も判定に使う列だけです。`mcp_oauth_grants` は `client_name` を読めず、`revoked_at` を書けません。`ai_daily_usage` は RLS を on にし、このロールには種類 `mcp` と `mcp_write` の行だけを読み書きするポリシーを作りました。表の持ち主の `risepath_app`（スーパーユーザー）は RLS を通らないので、API は変わりません。手元の Postgres 16 で、全 migration のあとにこのロールで本物の入口を動かし、6 つのツールとリソースとプロンプトが動くことを確かめました。ほかの表（生活記録、AI メモリなど）と、上の外した列が読めないこと、ほかの種類の上限の行が見えず書けないことも確かめました。
+- Cloudflare Tunnel の 2 つ目のルート `mcp.<domain>` → `http://mcp-public:3200`。前に Cloudflare Access やボットのチャレンジを置きません。
+- `deploy-stack.sh` は、`byoa` のとき、`tunnel` がない、`mcp-public.env` がないか見本の値のまま、`stack.env` の秘密や `risepath_app` が入っている、のどれかなら止まります（変数の名前だけを表示）。`export ` 付きの行、`=` の前後の空白、引用符でかこんだ値も、Docker Compose と同じように読みます。
+
+**テスト**: `server/tests/` の `mcpRemote`、`mcpRemoteEntry`、`mcpRemoteScope`、`mcpRemoteVerifier`、`oauthClientTokenGuard`、`connectedAppsRoutes`、`oauthConsentFront`、`dailyCaps`、`mcpAiAccess`、`apiMounts`、`vmStackConfig`。本物の Supabase の代わりに、127.0.0.1 で ES256 の公開鍵を出す偽の Supabase（`server/tests/helpers/fakeSupabase.js`）を使います。
+
+### 5.2 オーナーの作業
+
+[../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の順に行います。ステージングの Supabase プロジェクト → JWT の署名鍵を ES256 に（古い秘密鍵は残す）→ Site URL の確認 → OAuth サーバーを有効にし Authorization Path を `/oauth/consent`、DCR を on（OAuth Apps を毎週見る）→ フック → DB ロールと `mcp-public.env` → Cloudflare の `mcp.<domain>` → `COMPOSE_PROFILES` に `byoa` → MCP Inspector、Claude Code、Codex、Claude.ai のコネクタで確認。戻し方も同じ文書にあります。
+
+### 5.3 受け入れているリスク（Supabase の OAuth 2.1 サーバーはベータ版）
+
+- **宛先（aud）の結びつけは、自分たちのフックに頼っています。** Supabase は RFC 8707 の `resource` を確かめるだけで、`aud` には入れません（2026-10-21 時点の supabase/auth のソースコードと文書で確認。本番の Supabase の版とちがう可能性があります）。フックがないか止まっていると、AI アプリのトークンの `aud` は学習者のログインと同じ `authenticated` になります。そのとき MCP サーバーはすべて 401 にし（安全な側）、アプリの API は `client_id` で断ります。
+- **AI アプリのトークンは、Supabase Auth では学習者本人のログインと同じ力を持ちます。** supabase/auth のソースコード（`internal/api/user.go`、2026-10-21 時点）を読んだかぎりでは、Supabase Auth の `/user` や許可の API は、AI アプリのトークンも受け付けます【本番の Supabase では未検証】。Supabase の設定で、トークンの届く範囲は狭められません。
+  - **パスワードを設定・置き換えて、アプリの API に入れます。** AI アプリは `/user` でアカウントのパスワードを設定するか置き換え、そのパスワードでふつうにログインできます。そのログインは学習者自身のものと同じ形（`client_id` なし、`aud` は `authenticated`）なので、アプリの API の守り（`isOAuthClientToken`）を通り、アプリの API と VM のデータをすべて使えます。メールアドレスの変更も同じ経路です。
+  - **対策（オーナーの設定）**: Authentication → Sign In / Providers → Email で、「Require current password when changing password」（今のパスワードを確かめる）、「Require reauthentication when changing password」（ダッシュボードでは「Secure password change」。ログインから 24 時間をこえたら、メールで届くコードを求める）、「Secure email change」（前と後の両方のアドレスで確かめる）を on にします（<https://supabase.com/docs/guides/auth/password-security>、<https://supabase.com/docs/guides/self-hosting/auth/config>。手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の 6）。
+  - **それでも残るもの**: 今のパスワードの確認は、パスワードのないアカウントでは働きません。AI アプリのセッションは許可した時刻に作られるので、許可から 24 時間はコードも求められません。つまり、パスワードのないアカウントでは、許可から 24 時間のあいだ、AI アプリがパスワードを設定できます。Rise Path の登録画面はパスワードを作りますが、同じ Supabase プロジェクトのほかの入口で作ったアカウントにはないことがあります。
+  - **減らし方**: 許可の画面は「許可する」の上に、アプリが自分と同じ力を持つので信頼できるアプリだけを許可するよう出します。DCR を on にして毎週 OAuth Apps を見るか、DCR を off にして知っているクライアントだけを登録します（下の「DCR の乱用」）。どちらにするかと、このリスクを受け入れるかは、オーナーが決めます（5.4）。
+  - P-School が使う Supabase の表は、RLS に `(auth.jwt() ->> 'client_id') is null` を足すまで、AI アプリのトークンでも読み書きできる可能性があります（`deploy/supabase/README.md`）。Rise Path のアプリの API と VM のデータは、AI アプリのトークンそのものなら上の守りで断ります。
+- **PKCE の `plain` を Supabase が受け付けます**（止められません）。MCP の決まりごとは、クライアントに `S256` を使うよう求めています。Claude と ChatGPT は `S256` を使うと案内しています。危険は小さいと判断しました。
+- **DCR の乱用**: 誰でも AI アプリを登録できます。上のとおり許可したアプリは学習者と同じ力を持つので、許可をだまし取るための登録もできます。Claude は新しく接続するたびに登録します。毎週 OAuth Apps を見て、見覚えのないものや使われていないものを消します。DCR を off にすると、Authentication → OAuth Apps で登録しておいたクライアントだけがつなげます（<https://supabase.com/docs/guides/auth/oauth-server/getting-started>）。ただし、クライアント ID を手で入れられない AI アプリはつなげなくなります【要確認: どのアプリが対応しているか】。登録の制限は接続元の IP アドレスごとなので、Claude.ai や ChatGPT の利用者が増えると、事業者のアドレスで制限にかかるおそれがあります【要確認】。
+- **MCP の SDK 1.29 は、ハンドシェイク（`initialize`）のある古い版（2025-11-25 まで）だけを話します。** 今の最新の版は 2026-07-28 です。新旧の両方に対応したクライアントは古い版に切り替えてつながりますが、新しい版だけのクライアントはつながりません。新しい版の SDK（`@modelcontextprotocol/server` 2.x）は zod 4 が要り、新しい依存関係になるので、オーナーが別に決めます。
+- **CIMD と RFC 9207（認可の応答の `iss`）がありません。** AI アプリは DCR で登録します。ChatGPT は、固定でない戻り先を使います。
+- **解除の効き方**: Rise Path の MCP サーバーでは、解除は数秒以内に効きます。「解除されていない」という答えを 5 秒まで覚えるためです（解除を書くのは API のコンテナで、`mcp-public` の覚えた答えを消せません）。Supabase 側では、`revokeGrant` でリフレッシュトークンが消えますが、発行済みのアクセストークン自体は期限（最大 1 時間）まで有効です。そのため、`revokeGrant` が通ったあとに `revoked_at` をもう一度書き、そのあいだに発行されたトークンも断ります。この 2 回目の書き込みが失敗すると、直前の数秒に発行されたトークンが最大 1 時間通ることがあり、画面は「もう一度試す」を出します。`revokeGrant` だけが失敗すると、AI アプリはリフレッシュで新しいトークンを得られ、そのトークンは `revoked_at` より後に発行されたので通ります（新しい許可と見分けられないため）。画面はこの状態を「解除が終わっていません」と出し、もう一度押すと `revokeGrant` をやり直します。MCP サーバーは `revoked_at` を消さないので、この表示は残ります。
+- **使えない使い方**: 決まったトークン（`Authorization` ヘッダーを手で書く設定）、デバイスフロー（ブラウザのないサーバーの上の Hermes など）。
+- **データの行き先**: AI アプリが読んだ学習の記録は、学習者が選んだ AI の会社に送られ、学習者とその会社との規約で扱われます（[../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)）。
+
+出典: Supabase の OAuth 2.1 サーバー <https://supabase.com/docs/guides/auth/oauth-server/getting-started>、MCP 認証 <https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication>、トークンと RLS <https://supabase.com/docs/guides/auth/oauth-server/token-security>、MCP の認可 <https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization>、Claude のコネクタの認証 <https://claude.com/docs/connectors/building/authentication>。
+
+### 5.4 残っていること
+
+- オーナーの設定と、実際のクライアント（MCP Inspector、Claude Code、Codex、Claude.ai、ChatGPT）での確認。クライアントごとに、プロトコルの版と登録の方式を記録します。
+- Supabase の DCR の制限値（本番）と、引き上げられるか。
+- P-School の表の RLS（`client_id` の条件）を足すか。
+- パスワードの変更の設定（5.3）を on にしたかと、パスワードのないアカウントで許可から 24 時間に残るリスクを受け入れるか。DCR を on にして毎週見るか、off にして知っているクライアントだけを登録するか。決めたことをここに書きます。
+- 工数（見積もり・未検証）: 開発は当初の 6〜8 日の上のほうでした。オーナーと運用の作業（Supabase、Cloudflare、実際のクライアントでの確認）は 2〜3 日の見込みです。
 
 ## 6. Phase 2: 進み具合をサーバーに保存し、学習のツールを足す
 
@@ -235,7 +315,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 
 寄付・助成・無料の枠で費用がまかなえなくなったときだけ検討します。
 
-- 決済は Stripe を使います。プランごとの 1 日の上限を作ります（今の上限はプランの区別がありません: `server/middleware/dailyCaps.js:71-77`）。
+- 決済は Stripe を使います。プランごとの 1 日の上限を作ります（今の上限はプランの区別がありません: `server/middleware/dailyCaps.js:82-90`）。
 - 特定商取引法の表記が要ります。広告には価格、支払いの時期と方法、提供の時期、申し込みの期間、解約の条件などを表示します（第 11 条）。申し込みの最終確認の画面にも、分量や価格などを表示します（第 12 条の 6）（<https://laws.e-gov.go.jp/law/351AC0000000057>）。
 - 価格は税込で表示します（<https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6902.htm>）。
 - NPO の「収益事業」にあたるかどうかを、税理士に確かめます。
@@ -256,6 +336,6 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 - Haiku のチューターと作文フィードバックの質が十分か（試して確かめます）。
 - Anthropic の利用ポリシーのページの「Effective Nov 12, 2026」が、これから有効になる版かどうか。2026-10-22 の調べでは、ページは 2026-11-12 から有効の版を最新として出し、2025-09-15 の版は「新しい版に置き換えられた」として保管されています（<https://www.anthropic.com/legal/aup>、<https://www.anthropic.com/legal/archive/22742366-2ef0-4c7a-a833-6523f10d3944>）。前もって公開された版で、2026-11-12 までは 2025-09-15 の版が効いている、と読めますが、推測です【要確認】。
 - 未成年の安全対策の既定（4.3）を、運用してみて変えるかどうか。
-- Supabase の OAuth で、外部の AI に渡すトークンだけ宛先（aud）を変えること。ドキュメントでは、Custom Access Token Hook で `client_id` ごとに aud を変えられるとされています。実際の環境での確認はまだです（<https://supabase.com/docs/guides/auth/oauth-server/getting-started>）。
+- Supabase の OAuth で、外部の AI に渡すトークンだけ宛先（aud）を変えること。フック（`deploy/supabase/custom_access_token_hook.sql`）は作り、手元の Postgres で動きを確かめました。Supabase の実際の環境での確認はまだです（<https://supabase.com/docs/guides/auth/oauth-server/token-security>）。
 - 工数と費用の数字（どれも見積もりと試算です）。
 - 法律の確認（[../legal/README.md](../legal/README.md) の【要確認】）。
