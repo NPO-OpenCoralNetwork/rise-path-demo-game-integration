@@ -42,6 +42,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 - `VITE_API_BASE_URL` は**設定しない**。未設定ならクライアントは同一オリジンの `/api/v2` を使う（`services/apiClient.ts`）。旧手順の Tailscale 値（`http://risepath-vm:3006/api/v2`）が残っていたら削除する。
 - `VITE_FEATURE_AGENT_CHAT` は**設定しない**。共有の Hermes エージェントとのチャット（画面に浮かぶ AI コーチと `/life-journal/chat`）は、この値がちょうど `true` のときだけ出る。共有の Hermes は学習者に提供しないので、既定のままにする（レッスンの中の AI チューターには関係しない）。
+- `VITE_FEATURE_BILLING`（有料のサポータープランの画面。Phase 3）は、オーナーがテストの方と本番の経路を確かめるとき（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 7.2 の 3）まで**設定しない**。ちょうど `true` のときだけ `/settings/plan` と申し込みの最終確認の画面を出し、入口は API が認めた学習者にだけ出る。変えたらデプロイし直す（ビルドのときに入るため）。Stripe の鍵は Vercel にも `VITE_` にも入れない（鍵は VM の `billing.env` だけ。ブラウザは使わない）。Stripe の Webhook は `https://app.<domain>/api/v2/billing/webhook` を通るので、Production に Deployment Protection やボットのチャレンジをかけない。
 - `VITE_` で始まる値はバンドルに入り、誰でも読める。`API_ORIGIN` と `ORIGIN_SECRET` に `VITE_` を付けない。
 
 ### Preview

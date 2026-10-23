@@ -34,10 +34,11 @@
 | `stack.env.example` | 秘密なしテンプレ → `stack.env` |
 | `tunnel.env.example` | Cloudflare Tunnel のトークン用テンプレ → `tunnel.env`（`cloudflared` だけが読む） |
 | `mcp-public.env.example` | リモート MCP（`mcp-public`）用のテンプレ → `mcp-public.env`（`mcp-public` だけが読む。`stack.env` は読まない） |
+| `billing.env.example` | 有料プラン（Phase 3）用のテンプレ → `billing.env`（`api` だけが読む。Stripe の鍵と課金の設定は、ここだけに書く）。下の「[有料プラン](#有料プランphase-3billingenv)」 |
 | `sql/mcp_remote_role.sql` | `mcp-public` 用の最小権限の DB ロール `risepath_mcp_remote` を作る SQL |
 | `scripts/provision-gce.sh` | GCP VM 作成（夜間停止は `NIGHT_STOP=1` のときだけ） |
 | `scripts/bootstrap-vm.sh` | VM 初回セットアップ（Docker、4 GB の swap、`stack.env`、初回デプロイ、デプロイが通ったあとに systemd） |
-| `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env` と tunnel のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
+| `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env`・tunnel・byoa・billing のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
 | `hermes/config.yaml` | Hermes を有効にしたときのプロファイル（SSE MCP） |
 | `systemd/risepath-stack.service` | VM 起動時に compose up |
 
@@ -116,12 +117,12 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–015 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–017 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–015 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–017 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
@@ -258,13 +259,75 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
 - 確かめる: `docker compose --env-file stack.env ps mcp-public` が healthy、`curl -s https://mcp.<domain>/.well-known/oauth-protected-resource/mcp` の `resource` が `MCP_PUBLIC_RESOURCE_URL` と同じ、`curl -s -o /dev/null -w '%{http_code}\n' -X POST https://mcp.<domain>/mcp` が `401`。
 - 止める: トンネルのルート `mcp.<domain>` を消し、`docker compose --env-file stack.env --profile byoa rm -sf mcp-public` のあと、`COMPOSE_PROFILES` から `byoa` を外して `./scripts/deploy-stack.sh` を実行します（外すだけでは、作成済みのコンテナが残ります）。
 
+## 有料プラン（Phase 3、`billing.env`）
+
+有料のサポータープランの設定です。今は止めていて、Stripe（決済サービス）のテストモードで、オーナーが決めたテストの方だけが使います。オーナーの作業の順番（Stripe の設定、手元での確認、本番の経路での 1 回の確認、売り始める前のチェックリスト）と、困ったときの手順は、[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 7.2 と 7.5 にあります。
+
+- Stripe の鍵と課金の設定は、`billing.env` にだけ書きます。読むのは `api` のコンテナだけです（`docker-compose.yml` の `env_file`。ファイルがなければ読みません）。`mcp` と `mcp-public` は読みません。
+- `billing.env` は Git の管理外です（`.gitignore`）。値は VM の上で入れ、チャット・issue・git に貼りません。
+- ファイルがないか、`BILLING_ENABLED` が空なら、申し込みは止まっています。`deploy-stack.sh` は `==> Billing sales: off` と表示します。
+- migration 017 は、課金を使わないあいだも要ります（`deploy-stack.sh` が当てます）。
+
+作る:
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+cp billing.env.example billing.env && chmod 600 billing.env
+nano billing.env   # 下の表のとおりに入れる
+cd scripts && ./deploy-stack.sh
+```
+
+| 変数 | テストモード（今） | 本番モード（法律と税の確認と、オーナーの OK のあと） |
+|------|------|------|
+| `BILLING_ENABLED` | `true` で申し込みを開く。空なら、申し込みだけが止まる | 同じ。準備ができるまで空にしておく |
+| `BILLING_LIVE` | 空 | `true`（本番の鍵には必須） |
+| `BILLING_TEST_USER_IDS` | テストの方のアカウント ID（Supabase の Authentication → Users の UID）。カンマで区切る。必須 | 見ない |
+| `STRIPE_SECRET_KEY` | テストモードの制限付きキー `rk_test_…` | 本番モードの制限付きキー `rk_live_…` |
+| `STRIPE_WEBHOOK_SECRET` | テストモードのエンドポイントの `whsec_…`（`stripe listen` が表示する鍵ではない）。鍵を替えるあいだは、新旧をカンマでつなぐ | 本番モードのエンドポイントの `whsec_…` |
+| `STRIPE_PRICE_ID` | テストモードのプライス `price_…`（500 円、JPY、1 か月ごと、税込） | 本番モードのプライス |
+| `STRIPE_PRICE_IDS_ACCEPTED` | 空 | 前に売っていたプライスがあれば、カンマで区切る（その契約者もサポーターのまま） |
+| `BILLING_RETURN_ORIGIN` | `https://app.<domain>`（パスは付けない） | 同じ |
+| `BILLING_TOS_URL` | 空でよい | `/terms` のページの URL（必須。Stripe の Public details と同じ） |
+| `AI_CAP_SUPPORTER_GLOBAL_LLM`・`AI_CAP_SUPPORTER_GLOBAL_COURSE_GENERATION` | 空（既定は 1,000 と 200） | 同じ。上げるときは、費用を見てから |
+
+`deploy-stack.sh` は、次のときに、設定の名前だけを表示して、build の前に止まります（値は出しません）。`COMPOSE_PROFILES` に関係なく確かめます。
+
+- `stack.env` か `mcp-public.env` に、`STRIPE_` か `BILLING_` で始まる名前がある（`stack.env` だと `mcp` にも届くため）。
+- `billing.env` に本番の鍵（`sk_live_`・`rk_live_`・`pk_live_`）があるのに、`BILLING_LIVE=true` がない。
+- `BILLING_ENABLED=true` なのに、`STRIPE_SECRET_KEY`・`STRIPE_WEBHOOK_SECRET`・`STRIPE_PRICE_ID`・`BILLING_RETURN_ORIGIN` のどれかがない。テストモードなら `BILLING_TEST_USER_IDS`、本番モードなら `BILLING_TOS_URL` も要る。
+- `BILLING_ENABLED=true` なのに、`STRIPE_SECRET_KEY` が `sk_` か `rk_` で始まらない、または `STRIPE_WEBHOOK_SECRET` が `whsec_` で始まらない。
+
+確かめる:
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env logs api | grep '\[Billing\]'
+# 例: [Billing] billing: test (serviceable, sales open, 2 test users)
+```
+
+- `billing: off` は、設定がない状態です。`billing: off, not serviceable (…)` なら、かっこの中の設定が足りないか、形がちがいます。
+- `sales closed: …` なら、契約中の方へのサービスは動いていて、申し込みだけが止まっています。かっこの中の名前の意味は次のとおりです。
+  - `sales_closed`: `BILLING_ENABLED` がちょうど `true` でない。
+  - `test_user_ids`: テストモードで、`BILLING_TEST_USER_IDS` がないか、ID の形でないものがある。
+  - `tos_url`: 本番モードで `BILLING_TOS_URL` がない、または https の URL でない。
+  - `disclosure_placeholders`: 本番モードで、「特定商取引法に基づく表記」に【要記入】が残っている（`server/services/billingDisclosure.js`）。
+  - `supporter_caps_off:<枠>`、`supporter_caps_not_above_free:<枠>`: その枠の上限が 0 で止まっている、またはサポーターの上限が無料の上限より大きくない。
+- Webhook の URL は `https://app.<domain>/api/v2/billing/webhook` です。Vercel を通るので、合言葉の `x-origin-secret` が付きます。`https://api.<domain>/…` に直接送ると、origin gate が 403 を返します。
+- Webhook が届いたかは、`docker compose --env-file stack.env logs api | grep 'billing/webhook'` で見ます。`POST /api/v2/billing/webhook 200` なら届いています。`[Billing] webhook signature refused` があれば、署名が通っていません（ai-access-plan.ja.md の 7.2 の 3）。
+
+止める:
+
+- 新しい申し込みだけを止める: `billing.env` の `BILLING_ENABLED` を空にして、`./scripts/deploy-stack.sh` を実行します。契約中の方の上限、「お支払いと解約」、Webhook は、そのまま動きます。
+- 鍵を消すのは、Stripe ですべての契約をキャンセルしたあとです。先に消すと、契約中の方が解約の画面を開けないまま、Stripe の請求が続きます（ai-access-plan.ja.md の 7.5）。
+
 ## セキュリティ
 
 - GCP VPC ファイアウォールで **5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。アプリ用の受信ルールは要りません（公開は Cloudflare Tunnel の外向き接続）
 - `ORIGIN_SECRET` を設定すると、API は `api` コンテナ内の loopback 以外から来て `x-origin-secret` が無いリクエストに 403 を返します。Tailscale から :3006 を呼ぶ場合も同じです
 - 正しいヘッダーを持つリクエストは edge 扱いです。Bridge Token は使えず、Supabase JWT が要ります。届くのは `/api/*`・`/audio/cache/`・`/generated/img_*` だけで、`/uploads` はインターネットから読めません
 - Tailscale ACL で `risepath-vm` へのアクセスを限定
-- `stack.env`・`tunnel.env`・`mcp-public.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
+- `stack.env`・`tunnel.env`・`mcp-public.env`・`billing.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
+- Stripe の鍵（`sk_`・`rk_`・`whsec_`）は `billing.env` だけに入れる。`stack.env`・`mcp-public.env`・Vercel・`VITE_*` には入れない（ブラウザは Stripe の値を何も使わない）
 - `stack.env` にテンプレの値（`change-me` など）を残さない。DB・Bridge Token・Hermes の値は上の表のとおりに作る
 - `RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。管理者用の MCP（3100）を ngrok などのトンネルやファイアウォールの開放でインターネットに出さない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を持つ `mcp-public`（profile `byoa`、`https://mcp.<domain>`）だけで提供します
 - `mcp-public.env` に `stack.env` の秘密（ブリッジトークン、service_role key、モデルや Memanto のキー、`risepath_app` のパスワード）を入れない
