@@ -43,6 +43,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `013_ai_daily_usage.sql` | 有料AI機能の日次利用カウンタ（ユーザー別・接続元アドレス別・全体の合計。日本時間の日付で区切る） |
 | `014_minor_safeguards.sql` | 未成年の保護（Phase 0.5）: `user_age`（生年月のみ。日は常に 1）、`account_consents`（保護者の AI 利用同意。追記のみ、取り消しは `revoked_at`）、`ai_safety_events`（ブロック・報告・相談先の表示。報告の本文は 90 日、イベントは 365 日で整理） |
 | `015_mcp_oauth_grants.sql` | 接続したアプリ（Phase 1）: `mcp_oauth_grants`（学習者と OAuth クライアントの組ごとに 1 行。最初と最後に使った日時はリモート MCP サーバーが書く。取り消すと `revoked_at` を入れ（Supabase の `revokeGrant` の前と後の 2 回）、それより前に発行されたトークンは数秒以内に使えなくなる。アプリの名前 `client_name` も取り消しのときに入れる。一度も使わずに取り消したアプリは、使った日時が NULL） |
+| `016_lesson_progress.sql` | レッスンの進み具合（Phase 2）: `lesson_progress`（学習者と公開レッスンの組ごとに 1 行。読んだブロック・解答・チェック・自己評価の記録と、そこから計算した `pct`・`state`。ブラウザから届いた記録はそのまま保存せず、サーバーで整えてから保存済みの記録とまとめる。1 行 64 KiB まで）、`lesson_progress_resets`（「レッスンの進み具合を消す」を使った学習者ごとに 1 行。消すたびに `epoch` が変わり、消す前の記録を持つ端末からの保存は 409 で断る）。リモート MCP のロールには `lesson_progress` の SELECT・INSERT・UPDATE だけを渡す（適用後に `deploy/risepath-vm/sql/mcp_remote_role.sql` を流し直す） |
 
 ### pgvector（RAG のベクトル検索）
 

@@ -20,6 +20,12 @@ import userRoutes from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
 import aiAccessRoutes from './server/routes/aiAccess.js';
 import connectedAppsRoutes from './server/routes/connectedApps.js';
+import {
+    createLessonProgressRouter,
+    lessonProgressBodyErrors,
+    LESSON_PROGRESS_BODY_LIMIT,
+    LESSON_PROGRESS_WRITES_PER_MINUTE,
+} from './server/routes/lessonProgress.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
@@ -102,6 +108,9 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     const openCors = cors();
     const llmCors = cors((req, callback) => callback(null, { origin: isAllowedLlmOrigin(req.headers.origin, req) }));
     app.use((req, res, next) => (req.path.startsWith('/api/v2/llm') ? llmCors : openCors)(req, res, next));
+    // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
+    // then sees the body as already read and skips it.
+    app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
     app.use(express.json({ limit: '50mb' }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
@@ -141,6 +150,18 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         validate: { keyGeneratorIpFallback: false },
     });
 
+    // Lesson progress writes: per learner (after requireAuth), so a classroom behind one address
+    // shares only the global limit above. Not relaxed in dev: the client saves at most every 20 s.
+    const lessonProgressLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: LESSON_PROGRESS_WRITES_PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => `lesson-progress:${req.userId}`,
+        message: { error: 'Too many progress saves. Please try again in a minute.', error_type: 'rate_limited' },
+        validate: { keyGeneratorIpFallback: false },
+    });
+
     // --- Mount V2 Routes ---
     // AI access gate (Phase 0.5 minor safeguards, server/middleware/aiAccessGate.js): every POST
     // that calls a model needs sign-in (guests only with LLM_GUEST_AI=true), a recorded age and, under
@@ -177,6 +198,10 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // Agents the learner connected to the remote MCP endpoint with OAuth (Phase 1). requireAuth
     // refuses an agent's own OAuth token (401 oauth_client_token), so an agent cannot revoke or list.
     app.use('/api/v2/user/connected-apps', requireAuth, connectedAppsRoutes);
+    // The lesson reader's progress, synced across the learner's devices (Phase 2). Not AI-gated:
+    // progress is not an AI feature. requireAuth refuses an agent's OAuth token (agents use the
+    // MCP course-* tools). Before the /api/v2/user mount, whose legacy /progress routes stay.
+    app.use('/api/v2/user/lesson-progress', requireAuth, createLessonProgressRouter({ writeLimiter: lessonProgressLimiter }));
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
     // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).

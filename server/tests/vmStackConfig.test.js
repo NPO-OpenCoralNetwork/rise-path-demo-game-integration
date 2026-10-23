@@ -236,6 +236,7 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     ['auth.users', ['SELECT', 'INSERT']],
     ['ai_daily_usage', ['SELECT', 'INSERT', 'UPDATE']],
     ['user_progress', ['SELECT', 'INSERT', 'UPDATE']],
+    ['lesson_progress', ['SELECT', 'INSERT', 'UPDATE']],
     ['learning_journal', ['SELECT', 'INSERT']],
     ['mcp_tool_calls', ['INSERT']],
   ]);
@@ -309,6 +310,12 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     }
     assert.equal((code.match(/CREATE POLICY/g) || []).length, 3, 'no other policy');
     assert.match(sql, /owner[^\n]*bypasses RLS/, 'the header says the owner bypasses RLS');
+  });
+
+  it('lesson progress: the course tools read and write lesson_progress, never the reset epochs', () => {
+    assert.match(code, /^GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;$/m);
+    assert.ok(!/lesson_progress_resets/.test(code), 'the delete control\'s epochs stay app-only');
+    assert.match(sql, /lesson_progress\s+the course-\* tools/, 'the header maps the grant to its tools');
   });
 
   it('starts from a clean slate on every run (revokes before it grants)', () => {
