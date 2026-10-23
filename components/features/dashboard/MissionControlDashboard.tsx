@@ -6,6 +6,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { getCourse, getLessonEntry, loadLesson } from '../../../content';
 import { getLastLesson, readLessonSummary, readProgress } from '../../lesson/progressStore';
+import { useProgressVersion } from '../../lesson/useProgressVersion';
 import { minutesLeft, resolveLText, type ContentLocale } from '../../lesson/model';
 import type { Course, Lesson } from '../../../shared/lesson/schema.js';
 import PageHeader from '../../ui/PageHeader';
@@ -220,7 +221,9 @@ const ContinueCard: React.FC = () => {
   const t = copy[language];
   const locale: ContentLocale = language;
 
-  const target = useMemo(() => pickResumeTarget(getLastLesson(), lessonExists), []);
+  // Re-read when progress changes (synced progress arriving after the page opened, another tab).
+  const progressVersion = useProgressVersion();
+  const target = useMemo(() => pickResumeTarget(getLastLesson(), lessonExists), [progressVersion]);
   const course = getCourse(target.courseSlug) as Course;
   const entry = getLessonEntry(course, target.lessonId);
   const lessonKey = `${target.courseSlug}/${target.lessonId}`;
@@ -424,12 +427,17 @@ const TrackSection: React.FC = () => {
   const t = copy[language];
 
   // Progress is saved under the course folder name (the slug getCourse takes), not course.id.
+  // progressVersion: re-read when progress changes (synced progress, another tab).
+  const progressVersion = useProgressVersion();
   const vibeCourse = useMemo(() => getCourse(VIBE_COURSE_SLUG) ?? null, []);
-  const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null), [vibeCourse]);
+  const vibe = useMemo(
+    () => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null),
+    [vibeCourse, progressVersion],
+  );
   const claudeCodeCourse = useMemo(() => getCourse(CLAUDE_CODE_COURSE_SLUG) ?? null, []);
   const claudeCode = useMemo(
     () => (claudeCodeCourse ? courseTotals(claudeCodeCourse, readLessonSummary, CLAUDE_CODE_COURSE_SLUG) : null),
-    [claudeCodeCourse],
+    [claudeCodeCourse, progressVersion],
   );
   const tracks = {
     vibe: trackCopy('vibe', language, vibeCourse),

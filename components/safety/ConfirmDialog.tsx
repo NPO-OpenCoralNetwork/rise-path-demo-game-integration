@@ -14,7 +14,14 @@ export interface ConfirmDialogProps {
   onClose: () => void;
   busy?: boolean;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
+  /** 'danger' (default) for destructive actions; 'primary' when confirming is not destructive. */
+  confirmTone?: 'danger' | 'primary';
 }
+
+const CONFIRM_TONE = {
+  danger: 'bg-danger hover:opacity-90',
+  primary: 'bg-primary hover:bg-primary-hover',
+} as const;
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   open,
@@ -26,6 +33,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onClose,
   busy = false,
   returnFocusRef,
+  confirmTone = 'danger',
 }) => {
   const ref = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -86,7 +94,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className="h-10 rounded-control border border-transparent bg-danger px-4 text-body font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
+            className={`h-10 rounded-control border border-transparent px-4 text-body font-semibold text-on-primary disabled:opacity-50 ${CONFIRM_TONE[confirmTone]}`}
           >
             {confirmLabel}
           </button>

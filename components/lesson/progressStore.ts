@@ -1,7 +1,13 @@
 /**
- * Lesson progress in localStorage (PLAN §9.1 contract). Guests and signed-in learners both use
- * it until `/api/v2/user/progress` exists (Phase 2). Every storage access is wrapped in
- * try/catch: private mode, quota errors and corrupt JSON all degrade to "no progress".
+ * Lesson progress in localStorage (PLAN §9.1 contract). Every learner's reader reads and writes
+ * it here, synchronously; this file never talks to the network. For a learner signed in with the
+ * primary Supabase client, progressSyncClient.ts (core: progressSync.ts) also keeps the published
+ * lessons' records in step with /api/v2/user/lesson-progress (Phase 2): every writeProgress below
+ * marks the lesson pending, and server data comes back merged into these same keys (never written
+ * over them) as PROGRESS_EVENT { source: 'server' }. Guests, dev mock users and Nexloom-only
+ * sessions keep their progress on this device only.
+ * Every storage access is wrapped in try/catch: private mode, quota errors and corrupt JSON all
+ * degrade to "no progress".
  *
  * Keys:
  * - `rp:progress:<courseSlug>:<lessonId>` → LessonProgress
@@ -11,6 +17,8 @@
  *     lesson). `answers` is keyed by `<blockId>/<questionId>` because one quiz block can hold
  *     several questions (see answerKey).
  * - `rp:lastLesson` → LastLesson { courseSlug, lessonId, title, pct, at }
+ * - `rp:progressSync:*` (not `rp:progress:`, so scans of the records skip them): whose progress
+ *   this browser holds and the pending uploads (progressSync.ts).
  *
  * The pure `with*` helpers return a new object (or the same one when nothing changed), so React
  * state updates stay cheap. No React or DOM imports: server/tests imports this file directly.
@@ -25,8 +33,14 @@ export { LESSON_STATES, PROGRESS_VERSION, answerKey, emptyProgress, parseProgres
 export type { AnswerRecord, LessonProgress, LessonStateName, ProgressSummary, SelfRating } from '../../shared/lesson/progress.js';
 
 export const LAST_LESSON_KEY = 'rp:lastLesson';
-/** Fired on window after a progress write: detail = { courseSlug, lessonId }. */
+/**
+ * Fired on window after a progress write: detail = ProgressEventDetail. writeProgress (the
+ * learner's own change) sends no source; the sync sends source 'server' after merging server data
+ * into the stored record (open readers merge it in; course maps refresh).
+ */
 export const PROGRESS_EVENT = 'rp:progress-change';
+
+export type ProgressEventDetail = { courseSlug: string; lessonId: string; source?: 'server' };
 
 export type LastLesson = {
   courseSlug: string;

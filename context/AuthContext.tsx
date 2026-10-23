@@ -11,6 +11,7 @@ import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
 import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
+import { signInProgressSync, signOutProgressSync, stopProgressSync } from '../components/lesson/progressSyncClient';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -91,8 +92,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        const handleSession = (session: any) => {
+        // `client`: which Supabase project the session belongs to. Only the primary one is the
+        // identity apiFetch sends, so only it syncs lesson progress (Nexloom-only sessions do not).
+        const handleSession = (session: any, client: 'primary' | 'nexloom') => {
             if (session?.user) {
+                // Lesson progress owner rule (Phase 2, ai-access-plan §6): synchronous, before this
+                // learner is shown, so another learner's progress on a shared device never appears
+                // under their name. Repeated events (INITIAL_SESSION, TOKEN_REFRESHED, SIGNED_IN on
+                // refocus) do not hydrate again.
+                if (client === 'primary' && session.access_token) signInProgressSync(session.user.id);
                 const u: AuthUser = {
                     id: session.user.id,
                     email: session.user.email || '',
@@ -110,13 +118,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get initial sessions
         if (supabase) {
             supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user) handleSession(session);
+                if (session?.user) handleSession(session, 'primary');
                 if (!nexloomSupabase) setIsLoading(false);
             });
         }
         if (nexloomSupabase) {
             nexloomSupabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user) handleSession(session);
+                if (session?.user) handleSession(session, 'nexloom');
                 setIsLoading(false);
             });
         } else if (supabase) {
@@ -130,8 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (supabase) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
                 if (session?.user) {
-                    handleSession(session);
+                    handleSession(session, 'primary');
                 } else if (!_event.startsWith('SIGNED_IN') && !session) {
+                    // The primary session ended (here or in another tab): stop syncing. Logout
+                    // already cleared this learner's lesson data; an expiry keeps it.
+                    stopProgressSync();
                     if (nexloomSupabase) {
                         nexloomSupabase.auth.getSession().then(({ data: { session: ns } }) => {
                             if (!ns) setUser(null);
@@ -147,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (nexloomSupabase) {
             const { data: { subscription } } = nexloomSupabase.auth.onAuthStateChange((_event, session) => {
                 if (session?.user) {
-                    handleSession(session);
+                    handleSession(session, 'nexloom');
                 } else if (!_event.startsWith('SIGNED_IN') && !session) {
                     if (supabase) {
                         supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -272,6 +283,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = useCallback(async () => {
         // First, so a failed remote sign-out still leaves no AI answers on a shared device.
         clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
+        // Lesson progress (Phase 2): upload what is still pending (at most 3 s, while the token is
+        // valid), then clear this learner's lesson records, rp:lastLesson and learning events.
+        // Records still pending stay for this learner's next sign-in; another learner's clears them.
+        await signOutProgressSync();
         const supabase = getSupabaseClient();
         const nexloomSupabase = getNexloomSupabaseClient();
         await Promise.all([

@@ -17,6 +17,7 @@ import {
     purgeAllLearnerMemories,
     saveAiMemoryPrivacy,
 } from '../../../services/learnerMemoryService';
+import LessonProgressDeleteSection from './LessonProgressDeleteSection';
 
 interface SettingsPrivacyViewProps {
     onNavigate: (view: ViewState) => void;
@@ -65,7 +66,7 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
         en: {
             back: 'Settings',
             title: 'Privacy',
-            subtitle: 'Control how your life journal data is used and stored.',
+            subtitle: 'Control how your lesson progress, life journal and AI memory are used and stored.',
             disclaimer: 'Life journal data is for learning habit insights only — not medical or psychological diagnosis.',
             diaryTitle: 'AI chat diary excerpts',
             diaryBody: 'When enabled, short diary excerpts may be sent to the AI coach during Habit & Learning Chat (opt-in per session). Default is off.',
@@ -98,7 +99,7 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
         jp: {
             back: '設定',
             title: 'プライバシー',
-            subtitle: 'ライフジャーナルデータの利用と保存を管理します。',
+            subtitle: 'レッスンの進み具合、ライフジャーナル、AI 記憶の利用と保存を管理します。',
             disclaimer: 'ライフジャーナルは学習習慣の参考情報であり、医療・心理の診断ではありません。',
             diaryTitle: 'AI チャットへの日記抜粋',
             diaryBody: 'オンにすると「生活習慣×学習チャット」で短い日記抜粋を AI に送れます（セッションごとの明示 opt-in も必要）。既定はオフです。',
@@ -411,6 +412,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                         </section>
                     </div>
                 )}
+
+                {/* Lesson progress does not wait for the journal and memory settings to load. */}
+                <LessonProgressDeleteSection />
 
                 {message && (
                     <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
