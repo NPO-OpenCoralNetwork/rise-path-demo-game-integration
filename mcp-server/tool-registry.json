@@ -1,8 +1,8 @@
 {
-  "version": "2026-10-18",
+  "version": "2026-10-23",
   "server": "rise-path-learning",
   "default_profile": "learner",
-  "profiles": ["learner", "curriculum-builder", "coach", "admin"],
+  "profiles": ["learner", "curriculum-builder", "coach", "admin", "learner-remote"],
   "tools": [
     {
       "tool_id": "learner-state-get",
@@ -12,7 +12,7 @@
       "requires_approval": false,
       "audit": false,
       "max_calls_per_session": null,
-      "exposure_profiles": ["learner", "coach", "admin"],
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
       "annotations": {
         "title": "学習進捗を取得",
         "readOnlyHint": true,
@@ -29,7 +29,7 @@
       "requires_approval": false,
       "audit": true,
       "max_calls_per_session": 20,
-      "exposure_profiles": ["learner", "admin"],
+      "exposure_profiles": ["learner", "admin", "learner-remote"],
       "annotations": {
         "title": "レッスン完了を記録",
         "readOnlyHint": false,
@@ -46,7 +46,7 @@
       "requires_approval": false,
       "audit": true,
       "max_calls_per_session": 10,
-      "exposure_profiles": ["learner", "admin"],
+      "exposure_profiles": ["learner", "admin", "learner-remote"],
       "annotations": {
         "title": "学習振り返りを記録",
         "readOnlyHint": false,
@@ -80,7 +80,7 @@
       "requires_approval": false,
       "audit": false,
       "max_calls_per_session": null,
-      "exposure_profiles": ["learner", "coach", "admin"],
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
       "annotations": {
         "title": "直近のジャーナル取得",
         "readOnlyHint": true,
@@ -97,7 +97,7 @@
       "requires_approval": false,
       "audit": false,
       "max_calls_per_session": null,
-      "exposure_profiles": ["learner", "curriculum-builder", "coach", "admin"],
+      "exposure_profiles": ["learner", "curriculum-builder", "coach", "admin", "learner-remote"],
       "annotations": {
         "title": "自分がアップロードした教材を検索",
         "readOnlyHint": true,
@@ -250,7 +250,7 @@
       "requires_approval": false,
       "audit": false,
       "max_calls_per_session": null,
-      "exposure_profiles": ["learner", "coach", "admin"],
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
       "annotations": {
         "title": "学習適応シグナルを取得",
         "readOnlyHint": true,
@@ -411,6 +411,26 @@
         "idempotentHint": false,
         "openWorldHint": false
       }
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "content-domains",
+      "uri": "content://domains",
+      "data_class": "public",
+      "exposure_profiles": ["learner", "curriculum-builder", "coach", "admin", "learner-remote"]
+    },
+    {
+      "resource_id": "learner-profile",
+      "uri": "learner://profile/me",
+      "data_class": "learner_private",
+      "exposure_profiles": ["learner", "curriculum-builder", "coach", "admin"]
+    }
+  ],
+  "prompts": [
+    {
+      "prompt_id": "socratic-tutor",
+      "exposure_profiles": ["learner", "curriculum-builder", "coach", "admin", "learner-remote"]
     }
   ]
 }

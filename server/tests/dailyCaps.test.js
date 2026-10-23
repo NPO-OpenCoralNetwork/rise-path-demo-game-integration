@@ -161,6 +161,8 @@ describe('resolveCapLimits', () => {
             image: { user: 30, ip: 90, global: 300 },
             agent_chat: { user: 40, ip: 120, global: 800 },
             embeddings: { user: 10, ip: 30, global: 100 },
+            mcp: { user: 300, ip: null, global: 20000 },
+            mcp_write: { user: 50, ip: null, global: 5000 },
         });
     });
 

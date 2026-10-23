@@ -108,7 +108,7 @@ AI に自然言語で話しかけるだけで：
 | **Claude Desktop** | stdio | `claude_desktop_config.json` に追記 |
 | **Cursor** | stdio | Settings → MCP Servers |
 | **Antigravity** | stdio | `mcp_config.json` に追記 |
-| **ChatGPT / Claude.ai など（リモート接続）** | — | まだ使えません（下の「リモート接続について」） |
+| **Claude Code・Codex・Claude.ai・Cursor・VS Code・Hermes・ChatGPT（リモート接続、18 歳以上）** | Streamable HTTP + OAuth | `https://mcp.<domain>/mcp` を追加してサインイン（下の「自分の AI をつなぐ（リモート MCP）」） |
 
 ### 設定例（Claude Desktop / Cursor / Antigravity）
 
@@ -129,12 +129,58 @@ AI に自然言語で話しかけるだけで：
 }
 ```
 
-### リモート接続について（ChatGPT・Claude.ai など）
+### 自分の AI をつなぐ（リモート MCP、18 歳以上）
 
-ChatGPT や Claude.ai など、インターネット越しにつなぐ使い方は、学習者ごとのログイン（OAuth）を用意してから提供します。それまでは次を守ってください。
+運営者が公開しているとき（`deploy/risepath-vm` のプロファイル `byoa`）は、自分の AI アプリを、インターネット越しに Rise Path につなげます。URL は `https://mcp.<domain>/mcp` です（`<domain>` は運営者のドメイン）。
 
-- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れないでください。このトークンは Hermes と MCP サーバーのあいだだけで使う共有の合言葉で、持っている人は誰でも同じ権限で動けてしまいます。
-- MCP サーバーのポート（SSE モードの 3100 など）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しないでください。
+- **18 歳以上の方だけ**が使えます。先に Rise Path で生まれた年と月を登録してください（設定 → AI の利用設定）。18 歳未満の方は、アプリの中の AI チューターを使ってください。
+- つなぐと、AI アプリがブラウザで Rise Path の「接続の許可」の画面（`/oauth/consent`）を開きます。Rise Path にサインインし、アプリ名と、アプリが読めるもの・書けるものを確かめてから「許可する」を押します。
+- AI アプリが読めるもの: 科目ごとの進み具合、最近の学習ジャーナル、ジャーナルから求めた学習のシグナル、自分でアップロードした教材の検索、科目の一覧、問いかけで導くチューター用のプロンプト。書けるもの: 学習ジャーナルへの記録、終えたレッスンの記録。ライフジャーナル、AI メモリ、性格のプロフィール、教材づくりのツールは使えません。
+- AI アプリが Rise Path から読んだ内容は、**そのアプリの AI の会社**（Anthropic や OpenAI など）に送られ、あなたとその会社との契約と規約に従って扱われます。
+- 1 日に使える回数に上限があります（呼び出し 300 回、書き込み 50 回。日本時間の 0 時にリセット）。
+- 接続は、設定 → **つないでいる AI アプリ**（`/settings/connected-apps`）でいつでも解除できます。解除すると、そのアプリは数秒以内に使えなくなります。
+- 許可したアプリは、Rise Path のアカウントで、あなた自身と同じ操作（パスワードの設定など）ができる場合があります。信頼できるアプリだけを許可してください。
+- 決まったトークン（API キーや `Authorization` ヘッダーを手で書く設定）ではつなげません。トークンは 1 時間で切れ、AI アプリが自動で更新するためです。下のどのアプリも、サインイン（OAuth）でつなぎます。
+
+| アプリ | つなぎ方 |
+|---|---|
+| **Claude Code** | `claude mcp add --transport http rise-path https://mcp.<domain>/mcp` を実行し、Claude Code の中で `/mcp` を開いて rise-path を選び、ブラウザでサインインします（`claude mcp login rise-path` でも可）。出典: <https://code.claude.com/docs/en/mcp> |
+| **Claude.ai・Claude Desktop** | Customize → Connectors → **+ Add** → **Add custom connector** で、名前と `https://mcp.<domain>/mcp` を入れて追加し、「Connect」でサインインします。Free プランはカスタムコネクタが 1 つまでです。Team・Enterprise では、組織のオーナーが Organization settings → Connectors で追加し、各自が Connect します。出典: <https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp> |
+| **Codex** | `~/.codex/config.toml` に次を足し、`codex mcp login rise-path` を実行します（`codex mcp add rise-path --url https://mcp.<domain>/mcp` でも追加できます）。出典: <https://developers.openai.com/codex/mcp> |
+| **Cursor** | `~/.cursor/mcp.json`（または `.cursor/mcp.json`）の `mcpServers` に `"rise-path": { "url": "https://mcp.<domain>/mcp" }` を足し、表示に従ってサインインします。出典: <https://cursor.com/docs/context/mcp> |
+| **VS Code（Copilot）** | `.vscode/mcp.json`（またはユーザー設定）の `servers` に `"rise-path": { "type": "http", "url": "https://mcp.<domain>/mcp" }` を足します。最初につなぐときにブラウザが開きます。会社の Copilot Business・Enterprise では、管理者が MCP を許可している必要があります。出典: <https://code.visualstudio.com/docs/agents/reference/mcp-configuration> |
+| **自分の Hermes** | `~/.hermes/config.yaml` の `mcp_servers` に下の設定を足し、`hermes mcp login rise-path` を実行します。Rise Path は CIMD に対応していないので `cimd: false`（DCR を使う）にします。Rise Path のログインはデバイスフロー（`--flow device`）に対応していないので、ブラウザでサインインできるパソコンで動かします。出典: <https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference> |
+| **ChatGPT** | 使えるプランとワークスペースの設定（開発者モード）がある場合だけ、chatgpt.com/plugins でカスタムの MCP サーバーを追加し、URL に `https://mcp.<domain>/mcp` を入れます。使えるプランは変わることがあるので、OpenAI の案内を確かめてください。出典: <https://developers.openai.com/apps-sdk/deploy/connect-chatgpt> |
+
+Codex（`~/.codex/config.toml`）:
+
+```toml
+[mcp_servers.rise-path]
+url = "https://mcp.<domain>/mcp"
+```
+
+Hermes（`~/.hermes/config.yaml`）:
+
+```yaml
+mcp_servers:
+  rise-path:
+    url: "https://mcp.<domain>/mcp"
+    auth: oauth
+    oauth:
+      cimd: false
+```
+
+つながらないとき:
+
+- `adults_only` や `age_required` のエラー: Rise Path の設定 → AI の利用設定で、生まれた年と月を登録してください。18 歳未満の方は使えません。
+- `daily_limit_reached`: 今日の上限です。`scope` が `user`（あなたの上限）か `global`（Rise Path 全体の上限）なら、日本時間の 0 時にリセットされます。`off` のときは、運営者が接続した AI エージェントの利用を止めています。時間がたってもリセットされません。
+- 許可の画面に「このリクエストは期限が切れました」と出る: 接続のリクエストは 10 分間有効です。AI アプリに戻って、接続をやり直してください。
+- サインインの画面が出ずに 401 が続く: AI アプリの MCP の設定から、手で書いた `Authorization` ヘッダーを消してください。
+
+運営者向け: 公開の手順は [`byoa-setup.ja.md`](./byoa-setup.ja.md) にあります。次のことは、これまでどおり守ってください。
+
+- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れないでください。このトークンは Hermes と管理者用の MCP サーバーのあいだだけで使う共有の合言葉で、持っている人は誰でも同じ権限で動けてしまいます。
+- 管理者用の MCP サーバーのポート（SSE モードの 3100 など）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しないでください。インターネットに出すのは、学習者ごとのサインインがある `mcp-public` だけです。
 - 自分のパソコンの Claude Desktop・Cursor・Claude Code などから、上の設定例のように stdio でつなぐ使い方は、これまでどおり使えます。
 
 ---
@@ -366,7 +412,7 @@ curl http://localhost:3100/health
 
 ### Q: どの AI クライアントが一番おすすめですか？
 
-**A**: 自分のパソコンから stdio でつなぐ **Claude Desktop**・**Claude Code**・**Cursor** がおすすめです。ChatGPT や Claude.ai からのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供します（上の「リモート接続について」）。
+**A**: 教材づくりなど開発の作業には、自分のパソコンから stdio でつなぐ **Claude Desktop**・**Claude Code**・**Cursor** がおすすめです。学習者として自分の記録を使うだけなら、運営者が公開しているリモート MCP（`https://mcp.<domain>/mcp`、18 歳以上）に、Claude Code・Claude.ai・Codex などからサインインしてつなげます（上の「自分の AI をつなぐ（リモート MCP）」）。
 
 ### Q: カリキュラムのカスタマイズはどこまでできますか？
 

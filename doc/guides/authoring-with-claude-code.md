@@ -126,7 +126,11 @@ the `curriculum-builder` and `admin` profiles.
 - **Cursor**: reads `AGENTS.md`; add the same server to `.cursor/mcp.json` or `~/.cursor/mcp.json`.
 - **Gemini CLI**: already configured in `.gemini/settings.json` (loads `AGENTS.md`, starts the
   server with the `curriculum-builder` profile). Run `gemini` at the repo root and check `/mcp`.
-- **ChatGPT, Claude.ai and other remote clients**: not offered yet. Remote connection comes after
-  per-learner sign-in (OAuth) is in place. Until then, never put `RISE_PATH_BRIDGE_TOKEN` into an
-  outside service and never expose the MCP port (3100) to the internet (no ngrok or other public
-  tunnels, no open firewall ports). Local stdio use, as above, stays as documented.
+- **ChatGPT, Claude.ai and other remote clients**: the public remote MCP endpoint
+  (`https://mcp.<domain>/mcp`, profile `learner-remote`, adults only, per-learner OAuth sign-in)
+  is for learners' own records and has **no authoring tools**: no `lesson-*` tools, no
+  `rp://schema/lesson/v1`, no `author-lesson` prompt, no curriculum tools. Author lessons over
+  local stdio with the `curriculum-builder` profile as above. Never put `RISE_PATH_BRIDGE_TOKEN`
+  into an outside service and never expose the admin MCP port (3100) to the internet (no ngrok
+  or other public tunnels, no open firewall ports). Learner setup: `doc/guides/usage_guide.md`;
+  owner setup: `doc/guides/byoa-setup.ja.md`.

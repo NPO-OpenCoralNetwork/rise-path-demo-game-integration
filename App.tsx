@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import { ViewState, GeneratedCourse, Course } from './types';
 import { ThemeProvider } from './context/ThemeContext';
@@ -93,7 +93,10 @@ import {
   AiAccessSetupView,
   AiSafetyGuideView,
   AdminSafetyView,
+  OAuthConsentView,
+  ConnectedAppsView,
 } from './components/routes/lazyRoutes';
+import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
 /** sessionStorage key for the page to open after sign-in. */
 const RETURN_TO_KEY = 'rp:returnTo';
@@ -102,6 +105,41 @@ const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('
 /** Pages open when signed out; they render outside the Layout then. */
 const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety']);
 const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
+/** Pages that finish a sign-in: when the session is already there, they forward like handleLoginSuccess. */
+const POST_SIGN_IN_PATHS = new Set(['/auth/callback', '/auth/confirm-pending']);
+
+const readLocalStorage = (): Storage | null => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Where to go after sign-in: the saved in-app path, else a pending agent connection request
+ * (/oauth/consent, kept in localStorage so email confirmation in another tab comes back), else
+ * the dashboard. `consume` clears the saved path.
+ */
+const postSignInTarget = (consume: boolean): string => {
+  try {
+    const saved = sessionStorage.getItem(RETURN_TO_KEY);
+    if (consume) sessionStorage.removeItem(RETURN_TO_KEY);
+    if (saved && isInAppPath(saved)) return saved;
+  } catch {
+    // Storage blocked: fall through.
+  }
+  return pendingConsentReturnPath(readLocalStorage()) ?? '/';
+};
+
+/** Signed in on /auth/callback or /auth/confirm-pending (the session arrived first): forward once. */
+const PostSignInRedirect: React.FC = () => {
+  const [target] = useState(() => postSignInTarget(false));
+  useEffect(() => {
+    postSignInTarget(true);
+  }, []);
+  return <Navigate to={target} replace />;
+};
 
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
@@ -132,6 +170,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/profile')) return ViewState.PROFILE;
     if (path.startsWith('/settings/admin/safety')) return ViewState.SETTINGS_ADMIN_SAFETY;
     if (path.startsWith('/settings/ai-access')) return ViewState.SETTINGS_AI_ACCESS;
+    if (path.startsWith('/settings/connected-apps')) return ViewState.SETTINGS_CONNECTED_APPS;
     if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
     if (path.startsWith('/settings/ai-memory')) return ViewState.SETTINGS_AI_MEMORY;
@@ -216,15 +255,7 @@ const AppContent: React.FC = () => {
 
   const handleLoginSuccess = () => {
     setIsLoginPageVisible(false);
-    let target = '/';
-    try {
-      const saved = sessionStorage.getItem(RETURN_TO_KEY);
-      sessionStorage.removeItem(RETURN_TO_KEY);
-      if (saved && isInAppPath(saved)) target = saved;
-    } catch {
-      // Storage blocked: default to the dashboard.
-    }
-    navigate(target, { replace: true });
+    navigate(postSignInTarget(true), { replace: true });
   };
 
   const handleBackToLogin = () => {
@@ -234,6 +265,8 @@ const AppContent: React.FC = () => {
   };
 
   const publicPath = PUBLIC_PATHS.has(normalizePath(location.pathname));
+  // Agent connection consent (Phase 1): outside the Layout, signed in or out, no chat widget.
+  const consentPath = normalizePath(location.pathname) === OAUTH_CONSENT_PATH;
 
   return (
     <>
@@ -241,6 +274,16 @@ const AppContent: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white/50 text-sm font-mono">
           Loading…
         </div>
+      ) : consentPath ? (
+        !isLoggedIn && isLoginPageVisible ? (
+          <LoginView initialMode={authMode} onLoginSuccess={handleLoginSuccess} />
+        ) : (
+          <Suspense fallback={<RouteLoading />}>
+            <OAuthConsentView onSignIn={openAuth} />
+          </Suspense>
+        )
+      ) : isLoggedIn && POST_SIGN_IN_PATHS.has(normalizePath(location.pathname)) ? (
+        <PostSignInRedirect />
       ) : (!isLoggedIn && !publicPath) ? (
         location.pathname === '/auth/callback' ? (
           <AuthCallbackView onSuccess={handleLoginSuccess} />
@@ -308,6 +351,8 @@ const AppContent: React.FC = () => {
               {/* Phase 0.5 minor safeguards: birth month, guardian consent, admin safety page. */}
               <Route path="/settings/ai-access" element={<AiAccessSetupView />} />
               <Route path="/settings/admin/safety" element={<AdminSafetyView />} />
+              {/* Phase 1: AI apps the learner connected to the remote MCP endpoint. */}
+              <Route path="/settings/connected-apps" element={<ConnectedAppsView />} />
               <Route path="/ai-safety" element={<AiSafetyGuideView />} />
               <Route path="/settings" element={<SettingsView onNavigate={handleNavigate} />} />
               <Route path="/notifications" element={<NotificationsView onNavigate={handleNavigate} />} />

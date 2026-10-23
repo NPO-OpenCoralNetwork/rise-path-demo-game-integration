@@ -91,6 +91,50 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* ]]; then
   echo "==> Public edge: tunnel profile enabled (origin gate on)"
 fi
 
+# Profile byoa starts mcp-public, the internet-facing remote MCP (https://mcp.<domain> through the
+# tunnel; doc/guides/byoa-setup.ja.md). Refuse it without the tunnel or without its own
+# mcp-public.env, and refuse an env file that holds stack.env secrets or the superuser DB role.
+# Reads variable names and the DB user only; prints names, never values.
+if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
+  BYOA_PROBLEMS=()
+  if [[ ",${COMPOSE_PROFILES// /}," != *",tunnel,"* ]]; then
+    BYOA_PROBLEMS+=("COMPOSE_PROFILES must list tunnel too (mcp-public has no host port)")
+  fi
+  if [[ ! -f mcp-public.env ]]; then
+    BYOA_PROBLEMS+=("mcp-public.env (cp mcp-public.env.example mcp-public.env && chmod 600 mcp-public.env)")
+  else
+    # Docker Compose also reads `export NAME=…`, `NAME: value`, spaces around '=' and quoted
+    # values, and a bare `NAME` copies the value from the deploy environment, so every pattern
+    # allows them: ENV_KEY starts an assignment line, ENV_EQ is the '=' or ':' and an opening quote.
+    ENV_KEY='^[[:space:]]*(export[[:space:]]+)?'
+    ENV_EQ="[[:space:]]*[=:][[:space:]]*[\"']?"
+    for name in DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_ANON_KEY MCP_PUBLIC_RESOURCE_URL; do
+      if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" mcp-public.env || grep -Eiq "${ENV_KEY}${name}${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
+        BYOA_PROBLEMS+=("${name} (mcp-public.env: missing or a template value)")
+      fi
+    done
+    # Optional, but a template value would put a placeholder link into every adults-only refusal.
+    if grep -Eiq "${ENV_KEY}APP_PUBLIC_URL${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
+      BYOA_PROBLEMS+=("APP_PUBLIC_URL (mcp-public.env: a template value; set the app origin or leave it empty)")
+    fi
+    for name in RISE_PATH_BRIDGE_TOKEN SUPABASE_SERVICE_ROLE_KEY ANTHROPIC_API_KEY GEMINI_ OPENROUTER_API_KEY HERMES_ MEMANTO_ ORIGIN_SECRET RISE_PATH_ACTIVE_SESSION_KEY TUNNEL_TOKEN POSTGRES_PASSWORD; do
+      if grep -Eq "${ENV_KEY}${name}[A-Z0-9_]*[[:space:]]*([=:]|$)" mcp-public.env; then
+        BYOA_PROBLEMS+=("${name}* (mcp-public.env: must not be there; it belongs to stack.env only)")
+      fi
+    done
+    if grep -Eq "${ENV_KEY}DATABASE_URL_PHASE1${ENV_EQ}[A-Za-z]+://risepath_app[:@]" mcp-public.env; then
+      BYOA_PROBLEMS+=("DATABASE_URL_PHASE1 (mcp-public.env: use risepath_mcp_remote from sql/mcp_remote_role.sql, not risepath_app)")
+    fi
+  fi
+  if [[ ${#BYOA_PROBLEMS[@]} -gt 0 ]]; then
+    echo "❌ COMPOSE_PROFILES includes byoa, but these are missing or invalid:"
+    printf '   %s\n' "${BYOA_PROBLEMS[@]}"
+    echo "   Fix them (see mcp-public.env.example and doc/guides/byoa-setup.ja.md), or remove byoa from COMPOSE_PROFILES."
+    exit 1
+  fi
+  echo "==> Public remote MCP: byoa profile enabled (mcp-public.env, least-privilege DB role)"
+fi
+
 # Template values deploy green and then break sign-in (Supabase), keep a known DB password and
 # bridge token, or give Hermes a key it refuses (under 16 characters). Refuse them before anything
 # is built. Prints variable names only, never their values.
@@ -185,6 +229,11 @@ fi
 if [[ "${HERMES_KEYED}" -eq 1 && ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then
   SMOKE_FLAGS+=(--require-hermes)
   WAIT+=(hermes)
+fi
+# mcp-public exits at start on a config readRemoteConfig refuses (trailing slash, http, a bad
+# origin or port), and restart: unless-stopped hides that. Its /health healthcheck fails the deploy.
+if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
+  WAIT+=(mcp-public)
 fi
 echo "==> wait until healthy: ${WAIT[*]}"
 compose up -d --wait "${WAIT[@]}"

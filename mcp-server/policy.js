@@ -52,13 +52,16 @@ export function checkPolicy(toolName, sessionId = 'stdio', learner = '') {
  * @param {string} userId
  * @param {object} args - Tool arguments (keys only logged, not values)
  * @param {object} result - Tool result
+ * @param {{ clientId?: string }} [context] - clientId: the OAuth client (remote endpoint). The
+ *   access token itself is never logged.
  */
-export function auditLog(toolName, userId, args, result) {
+export function auditLog(toolName, userId, args, result, { clientId } = {}) {
     const entry = {
         type: 'mcp_audit',
         timestamp: new Date().toISOString(),
         tool: toolName,
         user_id: userId?.slice(0, 8) + '...',
+        ...(clientId ? { client_id: String(clientId) } : {}),
         args_keys: Object.keys(args || {}),
         success: !result?.error && !result?.error_type,
         risk: toolMeta.get(toolName)?.risk || 'unknown',

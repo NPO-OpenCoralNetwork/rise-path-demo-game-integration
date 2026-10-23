@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, Flag, Globe, Headphones, MessageCircle, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { ArrowLeft, Bell, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -103,6 +103,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             aiAccessPaused: 'AI is resting for today',
             adminSafety: 'Safety administration',
             adminSafetyHint: 'Reports, safety counts, paper consent forms',
+            connectedApps: 'Connected AI apps',
+            connectedAppsHint: 'Your own AI apps connected through MCP (adults)',
         },
         jp: {
             title: '設定',
@@ -142,6 +144,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             aiAccessPaused: '今日は AI をお休みしています',
             adminSafety: '安全の管理',
             adminSafetyHint: '報告、止めた件数、紙の同意書の記録',
+            connectedApps: 'つないでいる AI アプリ',
+            connectedAppsHint: 'MCP でつないだ自分の AI アプリ（18 歳以上）',
         },
     } as const;
 
@@ -254,6 +258,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                             subtext={aiAccessSubtext}
                             onClick={() => onNavigate(ViewState.SETTINGS_AI_ACCESS)}
                         />
+                        {user && !user.isGuest && (
+                            <SettingsRow
+                                icon={<PlugZap size={20} />}
+                                label={t.connectedApps}
+                                subtext={t.connectedAppsHint}
+                                onClick={() => onNavigate(ViewState.SETTINGS_CONNECTED_APPS)}
+                            />
+                        )}
                         {isAdmin && (
                             <SettingsRow
                                 icon={<Flag size={20} />}

@@ -66,8 +66,8 @@ describe('MCP outside-AI drafts: adults only for learner JWT sessions', () => {
         assert.equal(await adultDraftRefusal({ extra: {}, sessions: new Map(), env: ENV }), null);
     });
 
-    it('mcp-server/index.js runs the check in save-curriculum-draft and in lesson-upsert-draft (db store)', () => {
-        const source = readFileSync(new URL('../../mcp-server/index.js', import.meta.url), 'utf8');
+    it('mcp-server/createMcpServer.js runs the check in save-curriculum-draft and in lesson-upsert-draft (db store)', () => {
+        const source = readFileSync(new URL('../../mcp-server/createMcpServer.js', import.meta.url), 'utf8');
         const handler = (name) => {
             const start = source.indexOf(`policyTool(\n    '${name}',`);
             assert.notEqual(start, -1, `${name} is registered`);

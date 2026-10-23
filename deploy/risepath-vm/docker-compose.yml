@@ -1,4 +1,5 @@
 # Rise Path dedicated VM stack (db + api + mcp; kokoro-tts with profile tts; cloudflared with profile
+# tunnel; the public remote MCP mcp-public with profile byoa, which needs mcp-public.env and the
 # tunnel). Default COMPOSE_PROFILES=tts (stack.env.example). Hermes (profile full) is not offered to
 # learners; it stays for self-hosting and development (deploy-stack.sh runs
 # scripts/init-hermes-profile.sh before up when full is listed).
@@ -160,6 +161,59 @@ services:
       api:
         condition: service_healthy
 
+  # Public remote MCP for adults who connect their own agent (Phase 1, compose profile `byoa`;
+  # doc/guides/byoa-setup.ja.md). Same image as mcp, started with --http: stateless Streamable HTTP
+  # on :3200, Supabase OAuth access tokens only, profile learner-remote. The tunnel publishes
+  # https://mcp.<domain> → http://mcp-public:3200; no host port. It reads mcp-public.env only
+  # (never stack.env): a least-privilege DATABASE_URL_PHASE1 (sql/mcp_remote_role.sql), the
+  # Supabase URL and anon key, and its own settings. No bridge token, no service-role key, no
+  # model or Memanto keys, and no ${...} values from stack.env. NODE_ENV and the profile are fixed
+  # here so the env file cannot change them.
+  mcp-public:
+    profiles:
+      - byoa
+    build:
+      context: ../..
+      dockerfile: deploy/risepath-vm/Dockerfile
+      target: mcp
+    restart: unless-stopped
+    command: ["node", "mcp-server/index.js", "--http"]
+    env_file:
+      - path: mcp-public.env
+        required: false
+    environment:
+      NODE_ENV: production
+      RISE_PATH_MCP_PROFILE: learner-remote
+      MCP_HTTP_PORT: "3200"
+    user: node
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3200/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
   hermes:
     image: nousresearch/hermes-agent:latest
     restart: unless-stopped
@@ -223,7 +277,8 @@ services:
         condition: service_healthy
 
 networks:
-  # Plain bridge shared by api and cloudflared only; cloudflared keeps its outbound egress.
+  # Plain bridge shared by api, cloudflared and (profile byoa) mcp-public only; cloudflared keeps
+  # its outbound egress.
   edge: {}
 
 volumes:

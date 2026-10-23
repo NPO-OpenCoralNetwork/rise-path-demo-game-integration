@@ -12,7 +12,7 @@
 | 稼働 | **24 時間**。公開 API が VM に載るため、夜間停止はやめました。`provision-gce.sh` を `NIGHT_STOP=1` で実行すると 09:00–23:00 JST のスケジュールに戻せます |
 | 月額目安 | **推定**（未確認）。24 時間稼働の `asia-northeast1` で、`e2-medium` は約 $31/月、`e2-standard-2` は約 $63/月。50GB ディスクは別です。どれも第三者のサイト（[gcloud-compute.com](https://gcloud-compute.com/e2-medium.html)）の値で、Google の料金ページでは確かめていません。予算アラートを決める前に、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめます |
 | DB | `pgvector/pgvector:0.8.7-pg16`（Postgres 16 + pgvector。タグと digest を固定）。新しい空のボリュームでは RAG のベクトル検索が有効です |
-| 公開 | API は Cloudflare Tunnel の `https://api.<domain>` だけ。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
+| 公開 | API は Cloudflare Tunnel の `https://api.<domain>`。大人が自分の AI をつなぐリモート MCP（Compose のプロファイル `byoa`、`mcp-public`）を有効にしたときだけ、同じトンネルの `https://mcp.<domain>` も公開します。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
 | Mac | `npm run dev` + Tailscale で VM の db/mcp/kokoro（Hermes を有効にしたときは hermes も）に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
 | AI | チューター・文章フィードバック・コース生成は Claude（`ANTHROPIC_API_KEY`。既定は安いモデル）。Gemini は使いません（`GEMINI_ALLOWED` を設定しない。下の表） |
 | Hermes | **学習者には提供しません。** 既定は `COMPOSE_PROFILES=tts`（`hermes` コンテナを起動しません）で、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しません。API も同じ `VITE_FEATURE_AGENT_CHAT` を読み、ちょうど `true` でないと `/api/v2/agent/chat` は 404 を返します（Hermes が動いていても使えません）。前の `stack.env` で `COMPOSE_PROFILES=full` のままなら、`tts`（トンネルを使うなら `tts,tunnel`）に変えて `deploy-stack.sh` を実行し直します。前のデプロイで残った `hermes` コンテナは、そのときに削除されます。自分で運用するときや開発のときだけ、Compose の **`--profile full`**（`nousresearch/hermes-agent`）で起動できます。Mac 単体開発は `hermes -p rise-path gateway` も可 |
@@ -28,11 +28,13 @@
 
 | ファイル | 内容 |
 |----------|------|
-| `docker-compose.yml` | `db` + `api` + `mcp` + `kokoro-tts`（profile `tts`）+ `hermes`（profile `full`。既定では起動しない）+ `cloudflared`（profile `tunnel`） |
+| `docker-compose.yml` | `db` + `api` + `mcp` + `kokoro-tts`（profile `tts`）+ `hermes`（profile `full`。既定では起動しない）+ `cloudflared`（profile `tunnel`）+ `mcp-public`（profile `byoa`。既定では起動しない） |
 | `docker-compose.memanto.yml` | Memanto overlay（`ollama` + `moorcheh` + `memanto`、profile `memory`） |
 | `Dockerfile` | `api` / `mcp` マルチターゲット（`api` にフロントの `dist/` は入りません） |
 | `stack.env.example` | 秘密なしテンプレ → `stack.env` |
 | `tunnel.env.example` | Cloudflare Tunnel のトークン用テンプレ → `tunnel.env`（`cloudflared` だけが読む） |
+| `mcp-public.env.example` | リモート MCP（`mcp-public`）用のテンプレ → `mcp-public.env`（`mcp-public` だけが読む。`stack.env` は読まない） |
+| `sql/mcp_remote_role.sql` | `mcp-public` 用の最小権限の DB ロール `risepath_mcp_remote` を作る SQL |
 | `scripts/provision-gce.sh` | GCP VM 作成（夜間停止は `NIGHT_STOP=1` のときだけ） |
 | `scripts/bootstrap-vm.sh` | VM 初回セットアップ（Docker、4 GB の swap、`stack.env`、初回デプロイ、デプロイが通ったあとに systemd） |
 | `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env` と tunnel のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
@@ -114,12 +116,12 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–013 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–015 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–013 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–015 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
@@ -198,7 +200,7 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
 
 ## Cloudflare Tunnel（公開エッジ）
 
-`https://api.<domain>` → Cloudflare → トンネル → `cloudflared` → `http://api:3006`。`cloudflared` は VM から外向き（TCP/UDP 7844）に接続するので、受信ポートは要りません。`cloudflared` 自身はポートを公開せず、`edge` ネットワークで `api` に名前で届きます。ただし、スタックはポートをホストの全インターフェースに公開しているので、トンネルのルートがホストやゲートウェイの IP を指すと、5432・3006・3100・8642・8880 にも届きます。トンネルの Published application は `http://api:3006` の 1 つだけにします。
+`https://api.<domain>` → Cloudflare → トンネル → `cloudflared` → `http://api:3006`。`cloudflared` は VM から外向き（TCP/UDP 7844）に接続するので、受信ポートは要りません。`cloudflared` 自身はポートを公開せず、`edge` ネットワークで `api` に名前で届きます。ただし、スタックはポートをホストの全インターフェースに公開しているので、トンネルのルートがホストやゲートウェイの IP を指すと、5432・3006・3100・8642・8880 にも届きます。トンネルの Published application は `http://api:3006` だけにします。リモート MCP（下の「[自分の AI をつなぐ（リモート MCP）](#自分の-ai-をつなぐリモート-mcpprofile-byoa)」）を有効にしたときだけ、2 つ目の `mcp.<domain>` → `http://mcp-public:3200` を足します。
 
 1. Cloudflare Zero Trust で remotely-managed のトンネルを作ります。Published application は `api.<domain>` → Service URL `http://api:3006`。HTTP Host Header は空のままにします。
 2. トークンを `tunnel.env` にだけ入れます。Git 管理外で、`cloudflared` サービスだけが読みます（`stack.env` は読みません）。
@@ -244,13 +246,26 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
 
 `ORIGIN_SECRET` のローテーションは [`deploy/vercel/README.md`](../vercel/README.md) の 3 段階（`ORIGIN_SECRET_PREVIOUS` を使う）で行います。
 
+## 自分の AI をつなぐ（リモート MCP、profile `byoa`）
+
+18 歳以上の学習者が、自分の AI（Claude Code、Codex、Claude.ai など）を `https://mcp.<domain>/mcp` につなぐための入口です（Phase 1）。Supabase の OAuth 2.1 サーバー（ベータ）でログインし、学習者ごとのトークンで動きます。オーナーの作業の順番（ステージングの Supabase、署名鍵、OAuth サーバー、フック、DB ロール、Cloudflare、確認、戻し方）は [`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) にあります。
+
+- コンテナ `mcp-public` は、`mcp` と同じイメージを `node mcp-server/index.js --http` で動かします。待ち受けは 3200 で、ホストにポートを公開しません。`edge` ネットワークで `cloudflared` から名前で届きます。
+- 読むのは `mcp-public.env` だけです（`stack.env` は読みません）。DB は最小権限のロール `risepath_mcp_remote`（`sql/mcp_remote_role.sql`）でつなぎ、ブリッジトークン、service_role key、モデルや Memanto のキーは持ちません。`NODE_ENV=production` とプロファイル `learner-remote` は `docker-compose.yml` で固定しています。
+- コンテナは `node` ユーザーで、ファイルシステムは読み取り専用、Linux のケイパビリティはすべて外しています。
+- トンネルのルート: `mcp.<domain>` → Service URL `http://mcp-public:3200`。HTTP Host Header は空のまま。**Cloudflare Access やボット対策のチャレンジを前に置きません**（AI アプリは通れません。このホストの関門は OAuth です）。
+- 有効にする: `mcp-public.env` を作り、`COMPOSE_PROFILES` に `byoa` を足して（例: `tts,tunnel,byoa`）、`./scripts/deploy-stack.sh` を実行します。
+- 確かめる: `docker compose --env-file stack.env ps mcp-public` が healthy、`curl -s https://mcp.<domain>/.well-known/oauth-protected-resource/mcp` の `resource` が `MCP_PUBLIC_RESOURCE_URL` と同じ、`curl -s -o /dev/null -w '%{http_code}\n' -X POST https://mcp.<domain>/mcp` が `401`。
+- 止める: トンネルのルート `mcp.<domain>` を消し、`docker compose --env-file stack.env --profile byoa rm -sf mcp-public` のあと、`COMPOSE_PROFILES` から `byoa` を外して `./scripts/deploy-stack.sh` を実行します（外すだけでは、作成済みのコンテナが残ります）。
+
 ## セキュリティ
 
 - GCP VPC ファイアウォールで **5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。アプリ用の受信ルールは要りません（公開は Cloudflare Tunnel の外向き接続）
 - `ORIGIN_SECRET` を設定すると、API は `api` コンテナ内の loopback 以外から来て `x-origin-secret` が無いリクエストに 403 を返します。Tailscale から :3006 を呼ぶ場合も同じです
 - 正しいヘッダーを持つリクエストは edge 扱いです。Bridge Token は使えず、Supabase JWT が要ります。届くのは `/api/*`・`/audio/cache/`・`/generated/img_*` だけで、`/uploads` はインターネットから読めません
 - Tailscale ACL で `risepath-vm` へのアクセスを限定
-- `stack.env` と `tunnel.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
+- `stack.env`・`tunnel.env`・`mcp-public.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
 - `stack.env` にテンプレの値（`change-me` など）を残さない。DB・Bridge Token・Hermes の値は上の表のとおりに作る
-- `RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。MCP（3100）を ngrok などのトンネルやファイアウォールの開放でインターネットに出さない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供します
+- `RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。管理者用の MCP（3100）を ngrok などのトンネルやファイアウォールの開放でインターネットに出さない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を持つ `mcp-public`（profile `byoa`、`https://mcp.<domain>`）だけで提供します
+- `mcp-public.env` に `stack.env` の秘密（ブリッジトークン、service_role key、モデルや Memanto のキー、`risepath_app` のパスワード）を入れない
 - 学習者向けのスタックでは `GEMINI_ALLOWED` を設定しない（Gemini の API 規約の 18 歳未満の条項）

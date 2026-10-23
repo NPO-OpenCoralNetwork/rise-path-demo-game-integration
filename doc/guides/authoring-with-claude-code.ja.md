@@ -402,11 +402,12 @@ Cursor も `AGENTS.md` をルールとして読みます。MCP は `.cursor/mcp.
 
 ### ChatGPT・Claude.ai などのリモート接続
 
-ChatGPT や Claude.ai など、インターネット越しにつなぐ使い方は、学習者ごとのログイン（OAuth）を用意してから提供します（Streamable HTTP（`/mcp`）と OAuth 2.1 への移行は P2 の予定です。計画 §7.4）。それまでは次を守ってください。
+インターネット上のリモート MCP（`https://mcp.<domain>/mcp`、プロファイル `learner-remote`）は、**学習者が自分の記録を使うための入口で、教材づくりには使えません。** 18 歳以上の学習者がサインイン（OAuth）してつなぎ、使えるのは本人の進み具合・学習ジャーナル・アップロードした教材の検索などだけです。`lesson-*` のツール、`rp://schema/lesson/v1`、`author-lesson` のプロンプト、カリキュラムのツールはありません（`mcp-server/tool-registry.json`）。つなぎ方は [usage_guide.md](./usage_guide.md) の「自分の AI をつなぐ（リモート MCP）」、公開の手順は [byoa-setup.ja.md](./byoa-setup.ja.md) です。
 
-- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れません。Hermes と MCP サーバーのあいだだけで使う共有の合言葉なので、持っている人は誰でも同じ権限で動けてしまいます。
-- MCP サーバーのポート（SSE の 3100）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しません。
-- 上の Claude Code・Claude Desktop・Codex・Cursor のように、自分のパソコンから stdio でつなぐ使い方は、これまでどおり使えます。
+教材を書くときは、これまでどおり上の Claude Code・Claude Desktop・Codex・Cursor のように、自分のパソコンから stdio で `curriculum-builder` プロファイルにつなぎます。次も守ってください。
+
+- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れません。Hermes と管理者用の MCP サーバーのあいだだけで使う共有の合言葉なので、持っている人は誰でも同じ権限で動けてしまいます。
+- 管理者用の MCP サーバーのポート（SSE の 3100）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しません。
 
 ### ほかのモデルに頼むときの注意
 
