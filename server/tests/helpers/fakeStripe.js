@@ -63,6 +63,7 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
     const keys = new Map();
     const requests = [];
     const failures = [];
+    const hooks = [];
     let seq = 0;
 
     const json = (status, body, requestId = `req_${++seq}`) => new Response(JSON.stringify(body), {
@@ -79,6 +80,10 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
         const form = new URLSearchParams(method === 'GET' ? url.search : rawBody);
         const request = { method, path: url.pathname, query: url.search, rawBody, form, headers };
         requests.push(request);
+
+        for (const hook of hooks) {
+            if (hook.pattern.test(`${method} ${url.pathname}`)) hook.fn(request);
+        }
 
         for (const failure of failures) {
             if (failure.pattern.test(`${method} ${url.pathname}`)) {
@@ -124,6 +129,7 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
                 created: Math.floor(now() / 1000),
                 status: 'open',
                 customer: form.get('customer'),
+                locale: form.get('locale'),
                 expires_at: Number(form.get('expires_at')),
             };
             state.sessions.set(id, session);
@@ -167,6 +173,10 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
         },
         clearFailures() {
             failures.length = 0;
+        },
+        /** Runs fn(request) before matching requests are answered (to change state mid-request). @param {RegExp} pattern @param {(request: object) => void} fn */
+        onRequest(pattern, fn) {
+            hooks.push({ pattern, fn });
         },
         /** Add or replace a subscription at "Stripe". @param {object} sub */
         putSubscription(sub) {

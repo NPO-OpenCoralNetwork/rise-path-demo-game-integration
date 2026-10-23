@@ -9,8 +9,9 @@
  *   POST /sync      re-reads the learner's subscriptions from Stripe (after Checkout returns)
  *
  * No Stripe key or price lives in the browser: the client only opens the https URLs the server
- * returns. Failures carry the server's fixed error_type (never Stripe's text), or status 0 when
- * the server could not be reached.
+ * returns. Refusals from the billing router carry its fixed error_type; sign-in (401), the global
+ * limiter (429) and the body parser (400) answer with a status only, so the screens branch on the
+ * status first. Never Stripe's text; status 0 when the server could not be reached.
  */
 import { apiFetch } from './apiClient';
 import { isSafeRedirect, type BillingLang, type BillingMe, type BillingPlanInfo } from './billingRules';

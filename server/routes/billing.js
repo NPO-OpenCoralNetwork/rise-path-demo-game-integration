@@ -25,8 +25,10 @@
  * the dev fallback, the bridge user (PHASE1_USER_ID) and an anonymous Supabase user get 401
  * sign_in_required (C12/C51). Not serviceable: 404 billing_off. Test mode: only testers, others
  * 404 billing_off (/me: 'unavailable'). Limited to 10 requests a minute per learner and route (GET
- * /me 20, for the return page's polling). Every refusal carries a fixed error_type, never Stripe's
- * or the database's text (C14); Checkout and portal URLs are never logged.
+ * /me 20, for the return page's polling). Every refusal from this router (its own checks and its
+ * per-learner limits) carries a fixed error_type; requireAuth's 401/503, the global limiter's 429
+ * and the JSON parser's 400 carry only a fixed text. None ever carries Stripe's or the database's
+ * text (C14). Checkout and portal URLs are never logged.
  *
  * POST /checkout, one at a time per learner (an in-process lock: the api runs as one container):
  *   salesOpen (else 404 billing_off when sales are closed, 503 billing_misconfigured for any other
@@ -36,10 +38,11 @@
  *      tax-inclusive, active and recurring; anything else is 503 billing_misconfigured (C26);
  *   2. the learner's Customer for this mode, or a new one (metadata user_id only; Idempotency-Key
  *      customer:<mode>:<userId>; INSERT … ON CONFLICT (user_id, livemode) DO NOTHING, then the stored id is used);
- *   3. every subscription of that Customer is re-read (billingSync.js); 409 already_subscribed when
+ *   3. the Customer's other open Checkout Sessions are expired: all but this minute's in this
+ *      locale (C24). A timeout, rate limit or 5xx on an expiry stops the checkout (503/502);
+ *   4. every subscription of that Customer is re-read (billingSync.js); 409 already_subscribed when
  *      one on an accepted price is active, trialing, past_due, unpaid or paused, or incomplete and
  *      under 23 h old (C34);
- *   4. the Customer's open Checkout Sessions from an earlier minute are expired (C24);
  *   5. a Session whose parameters are a pure function of the Idempotency-Key
  *      checkout:<mode>:<userId>:<locale>:<minute> (expires 32 minutes after the minute began), so a
  *      double click or a retry within the minute gets the same Session back (C25/C40/C45).
@@ -352,22 +355,30 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
           if (!customer) throw new Error('the customer row was not stored');
         }
 
+        // Expire the other open Sessions first, so one that completes meanwhile is seen by the
+        // subscription check below. Only this minute's Session in this locale is kept: it is the one
+        // the Idempotency-Key replays.
+        const bucketSec = Math.floor(t / 1000 / BUCKET_SEC) * BUCKET_SEC;
+        const open = await stripeClient.listCheckoutSessions({ customer, status: 'open' });
+        for (const session of open?.data ?? []) {
+          if (typeof session?.id !== 'string') continue;
+          if (Number(session.created) >= bucketSec && session.locale === STRIPE_LOCALE[locale]) continue;
+          try {
+            await stripeClient.expireCheckoutSession(session.id);
+          } catch (error) {
+            // Stripe's refusal (the Session completed or expired meanwhile) is fine: the check below
+            // sees a completed one. A timeout, rate limit or 5xx leaves the Session payable, so no
+            // second one is created.
+            const status = /** @type {any} */ (error)?.status;
+            if (!(typeof status === 'number' && status >= 400 && status < 500 && status !== 429)) throw error;
+          }
+        }
+
         const synced = await syncCustomer(pool, customer);
         const blocking = synced.find((r) => r.priceAccepted && r.status
           && (BLOCKING_STATUSES.has(r.status) || (r.status === 'incomplete' && r.createdMs != null && t - r.createdMs < INCOMPLETE_BLOCKS_MS)));
         if (blocking) {
           return refuse(res, 409, 'already_subscribed', 'You already have this plan. Manage it under Payment and cancellation.', { status: blocking.status });
-        }
-
-        const bucketSec = Math.floor(t / 1000 / BUCKET_SEC) * BUCKET_SEC;
-        const open = await stripeClient.listCheckoutSessions({ customer, status: 'open' });
-        for (const session of open?.data ?? []) {
-          if (typeof session?.id !== 'string' || !(Number(session.created) < bucketSec)) continue;
-          try {
-            await stripeClient.expireCheckoutSession(session.id);
-          } catch {
-            // Completed or expired meanwhile: the subscription check above or the next one sees it.
-          }
         }
 
         const params = checkoutSessionParams({ config, userId, customer, locale, bucketSec, caps: effectiveSupporterCaps(env) });

@@ -507,7 +507,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
   - `POST /checkout`: Stripe の支払いの画面の URL を作ります。その前に、プライスが画面の説明と同じか（500 円、円だけ、1 か月ごと、税込）を確かめます。ちがえば 503 で断ります。すでに契約があれば、409 `already_subscribed` で断ります。同じ人の申し込みは 1 つずつ順に処理し、同じ 1 分の中の二度押しには、同じ支払いの画面を返します。Stripe の画面にも、分量、価格と更新、支払いの時期、提供の時期、解約、返金、18 歳以上だけ、表記のページへのリンクを書き添えます（1,200 字まで）。外国の通貨で価格を出す Stripe の機能（Adaptive Pricing）は、申し込みごとに止めます。
   - `POST /portal`: 「お支払いと解約」の画面の URL を作ります。年齢は確かめません。年齢を未成年に直された方や、その日の AI のお休みの方も、いつでも解約できるようにするためです。
   - `POST /sync`: その方の契約を、Stripe から読み直します（支払いの画面から戻ったときなど）。
-  - `/me`・`/checkout`・`/portal`・`/sync` は、Rise Path のアカウントでログインした方だけが使えます。1 人 1 分 10 回までです（`/me` は 20 回）。エラーは決まった種類（`error_type`）だけを返し、Stripe やデータベースの文は返しません。支払いの画面の URL は、ログに出しません。
+  - `/me`・`/checkout`・`/portal`・`/sync` は、Rise Path のアカウントでログインした方だけが使えます。1 人 1 分 10 回までです（`/me` は 20 回）。請求の処理が断るときは、決まった種類（`error_type`）を返します。ログインの確認（401）、全体の回数制限（429）、送られた内容が読めないとき（400）は、決まった文だけを返します。どの場合も、Stripe やデータベースの文は返しません。支払いの画面の URL は、ログに出しません。
 - Webhook `POST /api/v2/billing/webhook`（`server/services/billingWebhook.js`）: 署名（`Stripe-Signature`）を確かめます。時刻のずれは 5 分まで、鍵を替えるあいだは 2 つの鍵のどちらでも通します。届いたバイトをそのまま確かめるため、このパスだけは JSON に直さずに受け取ります（512 KB まで）。ログと全体の回数の上限は、ほかの API と同じようにかかります。「使える」でないときは 503 を返し、Stripe にあとで送り直してもらいます。
 - 契約の読み直し（`server/services/billingSync.js`）: Webhook、`/sync`、`/checkout` が同じ処理を使います。データベースの接続を持ったまま Stripe を待つことはしません。だれの契約かは、`billing_customers` だけで決めます。
 - サポーターかどうか（`server/services/billingEntitlement.js`）: 次のすべてにあてはまる方です。モードが今の設定と同じ。受け付けるプライス（`STRIPE_PRICE_ID` と `STRIPE_PRICE_IDS_ACCEPTED`）の契約。`active`（利用中）か `trialing` なら期間の終わりの 2 日後まで、`past_due` なら期間の始まりの 2 日後まで。18 歳以上と記録されている。結果は 60 秒覚え、契約が変わるとすぐに忘れます。データベースが答えないときは無料の扱いにし、その結果は覚えません。
@@ -551,7 +551,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 上から順に行います。本番モード（5）は、法律と税の確認と、オーナーの OK のあとです。
 
 1. **Stripe のテストモードを設定します。** Stripe のダッシュボードを、テストモード（サンドボックス）に切り替えてから行います。設定はモードごとに別なので、本番モードでも、あとで同じことをします。画面の項目の名前は、2026-10-23 の Stripe の文書によるもので、変わることがあります【要確認】。
-   - **商品とプライス**: 商品の名前は「サポータープラン（月額・自動更新）」。価格は 500、通貨は JPY、継続（1 か月ごと）、税の扱いは「税込」（inclusive）にします。税の扱いはあとから変えられないので、まちがえたら新しいプライスを作ります。ほかの通貨の価格は足しません（足すと、申し込みを断ります）。プライスの ID（`price_…`）を、あとで `STRIPE_PRICE_ID` に入れます。
+   - **商品とプライス**: 商品の名前は「サポータープラン（月額・自動更新）」。価格は 500、通貨は JPY、継続（1 か月ごと）、税の扱いは「税込」（inclusive）にします。税の扱いはあとから変えられないので、まちがえたら新しいプライスを作ります。ほかの通貨の価格は足しません（足すと、10 分以内に申し込みを断ります）。プライスの ID（`price_…`）を、あとで `STRIPE_PRICE_ID` に入れます。
    - **カスタマーポータル**（Settings → Billing → Customer portal）: 解約を on にし、「期間の終わりに解約」だけにします。プランの変更と数量の変更は off にします。カードの変更と請求の履歴は on にします。ビジネスの名前と見出しを入れます（必須）。解約の理由を聞く手順を、とばせるかを確かめます【要確認】。画面の言語は、アプリが日本語か英語を渡します。
    - **1 人 1 つの契約に限る**（Limit customers to one subscription）: on にします。すでに契約がある方の戻り先は「your website」にして、`https://app.<domain>/settings/plan` を入れます。
    - **支払いに失敗したとき**（再請求の設定）: 再請求のあと、最後は「サブスクリプションをキャンセルする」にします。「past_due のまま」にはしません（ずっと払わずに使えてしまうため）。
@@ -587,14 +587,14 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
    - **署名が通らない（Stripe の画面で `400`、ログに `webhook signature refused (mismatch)`）ときは、そこで止めます。** 鍵が正しいのに通らないなら、Vercel か Cloudflare の途中で、中身が変わっています。Webhook のエンドポイントを止め、`billing.env` の `BILLING_ENABLED` を空にして、`deploy-stack.sh` を実行し直します。代わりの方法（このパスだけ、合言葉の関門 origin gate を通さない）は作っていません。作るかどうかを、別に決めます。
    - 終わったら、テストの契約をダッシュボードでキャンセルします。`VITE_FEATURE_BILLING` は外してもかまいません（外すと、テストの方も画面を開けません）。
 4. **法律と税の確認を頼みます。** [../legal/README.md](../legal/README.md) の「有料プランを始める前に」のチェックリストを使います。
-5. **本番モードで売り始めます**（売り始める前のチェックリスト）。1 つでも終わっていなければ、本番の鍵を入れません。
+5. **本番モードで売り始めます**（売り始める前のチェックリスト）。1 つでも終わっていなければ、`BILLING_ENABLED` を `true` にしません。
    - [ ] 弁護士に確かめた: NPO が特定商取引法の「役務提供事業者」にあたるか（たぶんあたります。NPO だけを外す決まりはありません）。最終確認の画面（`/settings/plan/confirm`）と Stripe の画面で足りるか。返金の方針（日割りなし）。年齢を申告で確かめること（未成年の契約の取り消し。民法 第 5 条・第 21 条）。利用規約の有料プランの条。プランの名前（「サポーター」は、寄付や、性格診断のタイプの名前とまぎらわしいかもしれません）。
    - [ ] 税理士に確かめた: 有料プランが法人税の「収益事業」にあたるか。消費税の課税事業者か（税込の表示と、インボイスに関わります）。お支払いの記録を何年残すか。
-   - [ ] 表記の事実を埋めた: `server/services/billingDisclosure.js` の `OWNER_FACTS`（登記上の名称、代表者または通信販売の責任者、所在地、つながる電話番号と受付時間、メールアドレス）。コードの変更なので、プルリクエストで直します。マージと VM の更新のあと、`/legal/commerce` に表が出ることを確かめます。
+   - [ ] 表記の事実を埋めた: `server/services/billingDisclosure.js` の `OWNER_FACTS`（登記上の名称、代表者または通信販売の責任者、所在地、つながる電話番号と受付時間、メールアドレス）。コードの変更なので、プルリクエストで直します。表は本番モードでだけ出るので、確かめるのは下の `billing.env` の項目のあとです。
    - [ ] 利用規約の有料プランの条（[../legal/terms-of-use.draft.ja.md](../legal/terms-of-use.draft.ja.md) の第 9 条の下書き）を確定し、`/terms` のページに載せた。その URL を、`BILLING_TOS_URL` と、Stripe の Public details に入れた。
    - [ ] プライバシーポリシーの Stripe の部分（[../legal/privacy-policy.draft.ja.md](../legal/privacy-policy.draft.ja.md)）を確定し、`/privacy` のページに載せた。
    - [ ] Stripe の本番モードで、1 と 3 の Stripe の設定をした（本番のアカウントの審査が要ります【要確認】）。
-   - [ ] `billing.env` を本番の値にした: `STRIPE_SECRET_KEY`（`rk_live_…`）、`STRIPE_WEBHOOK_SECRET`（本番のエンドポイントの鍵）、`STRIPE_PRICE_ID`（本番のプライス）、`BILLING_TOS_URL`、`BILLING_LIVE=true`。準備ができるまで `BILLING_ENABLED` は空にしておき、最後に `true` にします。本番モードでは `BILLING_TEST_USER_IDS` を見ません。`deploy-stack.sh` のあと、ログが `[Billing] billing: live (serviceable, sales open)` になっている。
+   - [ ] `billing.env` を本番の値にした: `STRIPE_SECRET_KEY`（`rk_live_…`）、`STRIPE_WEBHOOK_SECRET`（本番のエンドポイントの鍵）、`STRIPE_PRICE_ID`（本番のプライス）、`BILLING_TOS_URL`、`BILLING_LIVE=true`。準備ができるまで `BILLING_ENABLED` は空にしておき、最後に `true` にします。本番モードでは `BILLING_TEST_USER_IDS` を見ません。`BILLING_ENABLED` を空のまま `deploy-stack.sh` を実行したあと、`/legal/commerce` に表と「現在、新しいお申し込みは受け付けていません」が出ることを確かめる。最後に `BILLING_ENABLED=true` にして `deploy-stack.sh` を実行したあと、ログが `[Billing] billing: live (serviceable, sales open)` になっている。
    - [ ] Vercel の Production に `VITE_FEATURE_BILLING=true` がある。Production に Deployment Protection やボットのチャレンジをかけていない（かけると Webhook が届きません）。
    - [ ] オーナーが本番で 1 回申し込み、Webhook が届くこと、「お支払いと解約」で解約できることを確かめた。そのあと、7.5 の「返金したい」の手順で、キャンセルと返金をした。
 

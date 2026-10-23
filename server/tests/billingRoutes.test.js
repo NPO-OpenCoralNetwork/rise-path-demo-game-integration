@@ -499,6 +499,8 @@ describe('POST /checkout (the router, with a moving clock)', () => {
 
             const en = await checkout(base, 'alice', 'en');
             assert.notEqual(en.json.url, first.json.url, 'another locale is another key');
+            assert.equal(stripe.calls(/expire$/).length, 1, "this minute's Session in another locale is expired: one payable Session at a time");
+            assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'open']);
 
             clock.now += 30_000; // next minute
             const third = await checkout(base);
@@ -507,6 +509,40 @@ describe('POST /checkout (the router, with a moving clock)', () => {
             assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['expired', 'expired', 'open']);
         });
         assert.equal(stripe.calls(/POST \/v1\/customers/).length, 1, 'one Customer');
+    });
+
+    for (const [label, failure, status] of [['a timeout', 'timeout', 503], ['a 5xx', { status: 500 }, 502]]) {
+        it(`an older Session that cannot be expired (${label}) stops the checkout: never two payable Sessions (C24)`, async () => {
+            const { run, checkout, clock } = setup();
+            await run(async (base) => {
+                assert.equal((await checkout(base)).status, 200);
+                clock.now += 60_000; // next minute
+                stripe.fail(/expire$/, failure);
+                const second = await checkout(base);
+                assert.equal(second.status, status, second.text);
+            });
+            assert.equal(sessions().length, 1, 'no second Session is created');
+            assert.deepEqual([...stripe.state.sessions.values()].map((s) => s.status), ['open']);
+        });
+    }
+
+    it('a Session that completes while checkout runs is seen by the subscription check: 409, no new Session', async () => {
+        const { run, checkout, clock } = setup();
+        await run(async (base) => {
+            assert.equal((await checkout(base)).status, 200);
+            const [first] = [...stripe.state.sessions.values()];
+            clock.now += 60_000;
+            // The learner pays in the first tab just as the second checkout lists the open Sessions.
+            stripe.onRequest(/expire$/, () => {
+                first.status = 'complete';
+                const created = Math.floor(clock.now / 1000);
+                stripe.putSubscription(subscription({ id: 'sub_paid', customer: first.customer, status: 'active', created, start: created }));
+            });
+            const second = await checkout(base);
+            assert.equal(second.status, 409, second.text);
+            assert.equal(second.json.error_type, 'already_subscribed');
+        });
+        assert.equal(sessions().length, 1);
     });
 
     it('two concurrent clicks are serialized per learner and get one Session', async () => {
