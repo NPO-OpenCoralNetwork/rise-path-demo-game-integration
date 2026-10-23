@@ -31,7 +31,6 @@ import ProfileGeneratedView from './components/features/dashboard/profile/Profil
 import ProfileEditView from './components/features/dashboard/profile/ProfileEditView';
 import LearningMirrorView from './components/features/dashboard/profile/LearningMirrorView';
 import NotificationsView from './components/features/dashboard/NotificationsView';
-import SubscriptionView from './components/features/dashboard/SubscriptionView';
 import SettingsView from './components/features/settings/SettingsView';
 import SettingsVoiceView from './components/features/settings/SettingsVoiceView';
 import SettingsDialogueVoiceView from './components/features/settings/SettingsDialogueVoiceView';
@@ -96,6 +95,9 @@ import {
   AdminSafetyView,
   OAuthConsentView,
   ConnectedAppsView,
+  PlanView,
+  PlanConfirmView,
+  CommerceDisclosureView,
 } from './components/routes/lazyRoutes';
 import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
@@ -104,7 +106,7 @@ const RETURN_TO_KEY = 'rp:returnTo';
 /** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
 const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
 /** Pages open when signed out; they render outside the Layout then. */
-const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety']);
+const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce']);
 const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 /** Pages that finish a sign-in: when the session is already there, they forward like handleLoginSuccess. */
 const POST_SIGN_IN_PATHS = new Set(['/auth/callback', '/auth/confirm-pending']);
@@ -172,7 +174,10 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/settings/admin/safety')) return ViewState.SETTINGS_ADMIN_SAFETY;
     if (path.startsWith('/settings/ai-access')) return ViewState.SETTINGS_AI_ACCESS;
     if (path.startsWith('/settings/connected-apps')) return ViewState.SETTINGS_CONNECTED_APPS;
+    if (path.startsWith('/settings/plan/confirm')) return ViewState.SETTINGS_PLAN_CONFIRM;
+    if (path.startsWith('/settings/plan')) return ViewState.SETTINGS_PLAN;
     if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
+    if (path.startsWith('/legal/commerce')) return ViewState.LEGAL_COMMERCE;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
     if (path.startsWith('/settings/ai-memory')) return ViewState.SETTINGS_AI_MEMORY;
     if (path.startsWith('/settings/privacy')) return ViewState.SETTINGS_PRIVACY;
@@ -180,7 +185,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/settings/voice')) return ViewState.SETTINGS_VOICE;
     if (path.startsWith('/settings')) return ViewState.SETTINGS;
     if (path.startsWith('/notifications')) return ViewState.NOTIFICATIONS;
-    if (path.startsWith('/subscription')) return ViewState.SUBSCRIPTION;
+    if (path.startsWith('/subscription')) return ViewState.SETTINGS;
     if (path.startsWith('/life-journal/chat')) return ViewState.LIFE_JOURNAL_CHAT;
     if (path.startsWith('/life-journal/insights')) return ViewState.LIFE_JOURNAL_INSIGHTS;
     if (path.startsWith('/life-journal/monthly')) return ViewState.LIFE_JOURNAL_MONTHLY;
@@ -303,6 +308,8 @@ const AppContent: React.FC = () => {
                 <Route path="/aidj" element={<AidjCurriculumView />} />
                 {/* Public guide for children and guardians (signed out: its own header, no Layout). */}
                 <Route path="/ai-safety" element={<AiSafetyGuideView />} />
+                {/* Phase 3: 特定商取引法に基づく表記 (public; Stripe's commerce disclosure link). */}
+                <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
               </Routes>
             </Suspense>
           ) : (
@@ -354,10 +361,16 @@ const AppContent: React.FC = () => {
               <Route path="/settings/admin/safety" element={<AdminSafetyView />} />
               {/* Phase 1: AI apps the learner connected to the remote MCP endpoint. */}
               <Route path="/settings/connected-apps" element={<ConnectedAppsView />} />
+              {/* Phase 3: the supporter plan and its final confirmation screen, only with
+                  VITE_FEATURE_BILLING=true (config/features.ts); otherwise Settings. */}
+              <Route path="/settings/plan" element={features.billing ? <PlanView /> : <Navigate to="/settings" replace />} />
+              <Route path="/settings/plan/confirm" element={features.billing ? <PlanConfirmView /> : <Navigate to="/settings" replace />} />
               <Route path="/ai-safety" element={<AiSafetyGuideView />} />
+              <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
               <Route path="/settings" element={<SettingsView onNavigate={handleNavigate} />} />
               <Route path="/notifications" element={<NotificationsView onNavigate={handleNavigate} />} />
-              <Route path="/subscription" element={<SubscriptionView onNavigate={handleNavigate} />} />
+              {/* The old mock plans page is gone: its URL goes to the plan page, or Settings while billing is off. */}
+              <Route path="/subscription" element={<Navigate to={features.billing ? '/settings/plan' : '/settings'} replace />} />
               <Route path="/library" element={<Library />} />
               <Route path="/characters" element={<AICharacterIntroView onNavigate={handleNavigate} onSelectCharacter={(id) => navigate(`/character/${id}`)} />} />
               <Route path="/character/:characterId" element={<AICharacterDetailViewWrapper onNavigate={handleNavigate} />} />

@@ -175,7 +175,6 @@ export enum ViewState {
   MY_CONTENT = 'MY_CONTENT', // User generated content
   GENERATED_COURSE_PATH = 'GENERATED_COURSE_PATH', // The roadmap for a generated course
   GENERATED_LESSON_VIEW = 'GENERATED_LESSON_VIEW', // The actual player for generated content
-  BALANCE = 'BALANCE', // Wallet and Earnings
   COURSE_GENERATOR = 'COURSE_GENERATOR', // New: AI Course Generator Input View
   MULTI_FORMAT_DEMO = 'MULTI_FORMAT_DEMO', // Full demo
   DEMO_CONCEPT = 'DEMO_CONCEPT',
@@ -189,7 +188,6 @@ export enum ViewState {
   P_SCHOOL = 'P_SCHOOL',
   PROFILE_EDIT = 'PROFILE_EDIT',
   NOTIFICATIONS = 'NOTIFICATIONS',
-  SUBSCRIPTION = 'SUBSCRIPTION',
   SETTINGS = 'SETTINGS',
   SETTINGS_VOICE = 'SETTINGS_VOICE',
   SETTINGS_DIALOGUE_VOICE = 'SETTINGS_DIALOGUE_VOICE',
@@ -200,6 +198,9 @@ export enum ViewState {
   SETTINGS_ADMIN_SAFETY = 'SETTINGS_ADMIN_SAFETY', // Phase 0.5: admin safety counts, reports, paper consents
   AI_SAFETY = 'AI_SAFETY', // Phase 0.5: public AI safety guide (/ai-safety)
   SETTINGS_CONNECTED_APPS = 'SETTINGS_CONNECTED_APPS', // Phase 1: AI apps connected through the remote MCP endpoint
+  SETTINGS_PLAN = 'SETTINGS_PLAN', // Phase 3: the supporter plan (/settings/plan, VITE_FEATURE_BILLING)
+  SETTINGS_PLAN_CONFIRM = 'SETTINGS_PLAN_CONFIRM', // Phase 3: final confirmation screen before Stripe Checkout
+  LEGAL_COMMERCE = 'LEGAL_COMMERCE', // Phase 3: public 特定商取引法に基づく表記 (/legal/commerce)
 }
 
 // Generated Content Types

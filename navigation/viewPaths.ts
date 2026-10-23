@@ -31,8 +31,6 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.PROFILE_MIRROR]: '/profile/mirror',
   [ViewState.PROFILE_EDIT]: '/profile/edit',
   [ViewState.NOTIFICATIONS]: '/notifications',
-  [ViewState.SUBSCRIPTION]: '/subscription',
-  [ViewState.BALANCE]: '/subscription',
 
   [ViewState.SETTINGS]: '/settings',
   [ViewState.SETTINGS_VOICE]: '/settings/voice',
@@ -46,6 +44,11 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_CONNECTED_APPS]: '/settings/connected-apps',
   // Public guide; open when signed out too (App.tsx renders it outside the Layout then).
   [ViewState.AI_SAFETY]: '/ai-safety',
+  // Phase 3: the supporter plan (VITE_FEATURE_BILLING; the old /subscription redirects here) and
+  // the public 特定商取引法に基づく表記 (open when signed out, like /ai-safety).
+  [ViewState.SETTINGS_PLAN]: '/settings/plan',
+  [ViewState.SETTINGS_PLAN_CONFIRM]: '/settings/plan/confirm',
+  [ViewState.LEGAL_COMMERCE]: '/legal/commerce',
 
   // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',
