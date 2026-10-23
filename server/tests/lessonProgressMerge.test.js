@@ -1,7 +1,7 @@
 // Shared lesson progress (shared/lesson/progress.js, progressMerge.js): the import allowlist of
 // the browser-safe shared modules, parity with the reader's progressStore/model, the lesson
 // index, the structural sanitiser and the cross-device merge.
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +26,15 @@ const NOW = Date.parse('2026-10-23T12:00:00.000Z');
 const at = (minutes) => new Date(NOW + minutes * 60_000).toISOString();
 
 const record = (patch = {}) => ({ ...emptyProgress(), updatedAt: at(0), ...patch });
+/** Runs fn with the clock at NOW + minutes (the store's with* helpers read new Date()). */
+const atMinute = (minutes, fn) => {
+  mock.timers.enable({ apis: ['Date'], now: NOW + minutes * 60_000 });
+  try {
+    return fn();
+  } finally {
+    mock.timers.reset();
+  }
+};
 const answer = (attempts, correct, chosen, firstTry, revealed = false) => ({
   attempts, correct, chosen, firstTry, ...(revealed ? { revealed: true } : {}),
 });
@@ -80,11 +89,22 @@ describe('progress.js is the reader\'s progress code (parity)', () => {
     p = store.withAnswer(p, 'q/1', { chosen: ['x'], correct: true });
     p = store.withRevealed(p, 'q/2');
     assert.equal(p.editedAt, undefined);
+    assert.equal(p.editedKeys, undefined);
     const checked = store.withCheck(p, 'checklist:c/1', true);
     assert.equal(checked.editedAt, checked.updatedAt);
     const rated = store.withRating(emptyProgress(), 'o1', 2);
     assert.equal(rated.editedAt, rated.updatedAt);
     assert.equal(store.withCheck(checked, 'checklist:c/1', true), checked, 'no change, same object');
+  });
+
+  it('withCheck and withRating also give the edited key its own time; ratings under "rating:<id>"', () => {
+    let p = atMinute(1, () => store.withCheck(emptyProgress(), 'card:f/c1', false));
+    p = atMinute(2, () => store.withRating(p, 'o1', 3));
+    p = atMinute(3, () => store.withCheck(p, 'card:f/c2', true));
+    assert.deepEqual(p.editedKeys, { 'card:f/c1': at(1), 'rating:o1': at(2), 'card:f/c2': at(3) });
+    assert.equal(shared.ratingClockKey('o1'), 'rating:o1');
+    assert.equal(p.editedAt, at(3));
+    assert.equal(atMinute(4, () => store.withSeen(p, ['b'])).editedKeys, p.editedKeys, 'passive writes keep the clocks');
   });
 
   it('parseProgress keeps editedAt and accepts an already-parsed value', () => {
@@ -95,8 +115,18 @@ describe('progress.js is the reader\'s progress code (parity)', () => {
     assert.deepEqual(parseProgress(null), emptyProgress());
   });
 
+  it('parseProgress keeps editedKeys (string times only)', () => {
+    const value = { v: 1, seen: [], answers: {}, checks: { x: true }, lastBlockId: null, updatedAt: at(0) };
+    const parsed = parseProgress(JSON.stringify({ ...value, editedKeys: { x: at(-1), 'rating:o1': at(-2), y: 5, z: '' } }));
+    assert.deepEqual(parsed.editedKeys, { x: at(-1), 'rating:o1': at(-2) });
+    assert.equal(parseProgress({ ...value, editedKeys: { y: 5 } }).editedKeys, undefined);
+    assert.equal(parseProgress({ ...value, editedKeys: [at(0)] }).editedKeys, undefined);
+    const proto = parseProgress('{"v":1,"editedKeys":{"__proto__":"2026-10-23T12:00:00.000Z"}}');
+    assert.equal(proto.editedKeys, undefined);
+  });
+
   it('parseProgress never lets a "__proto__" key replace a prototype', () => {
-    const parsed = parseProgress('{"v":1,"answers":{"__proto__":{"attempts":1}},"checks":{"__proto__":true},"ratings":{"__proto__":2}}');
+    const parsed = parseProgress('{"v":1,"answers":{"__proto__":{"attempts":1}},"checks":{"__proto__":true},"ratings":{"__proto__":2},"editedKeys":{"__proto__":"x"}}');
     assert.equal(Object.getPrototypeOf(parsed.answers), Object.prototype);
     assert.equal(Object.getPrototypeOf(parsed.checks), Object.prototype);
     assert.deepEqual(Object.keys(parsed.answers), []);
@@ -216,16 +246,20 @@ describe('sanitizeProgress (structural, no lesson)', () => {
 
   it('caps every collection', () => {
     const ids = (n, prefix) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+    const checkKeys = ids(PROGRESS_LIMITS.checks + 5, 'i').map((i) => `checklist:c/${i}`);
+    const ratingIds = ids(PROGRESS_LIMITS.ratings + 5, 'o');
     const clean = sanitizeProgress(record({
       seen: ids(PROGRESS_LIMITS.seen + 5, 'b'),
       answers: Object.fromEntries(ids(PROGRESS_LIMITS.answers + 5, 'q').map((q) => [`blk/${q}`, answer(500, false, ids(20, 'o'), false)])),
-      checks: Object.fromEntries(ids(PROGRESS_LIMITS.checks + 5, 'i').map((i) => [`checklist:c/${i}`, true])),
-      ratings: Object.fromEntries(ids(PROGRESS_LIMITS.ratings + 5, 'o').map((o) => [o, 2])),
+      checks: Object.fromEntries(checkKeys.map((key) => [key, true])),
+      ratings: Object.fromEntries(ratingIds.map((o) => [o, 2])),
+      editedKeys: Object.fromEntries([...checkKeys, ...ratingIds.map(shared.ratingClockKey), ...ids(50, 'checklist:x/')].map((key) => [key, at(0)])),
     }), { now: NOW });
     assert.equal(clean.seen.length, PROGRESS_LIMITS.seen);
     assert.equal(Object.keys(clean.answers).length, PROGRESS_LIMITS.answers);
     assert.equal(Object.keys(clean.checks).length, PROGRESS_LIMITS.checks);
     assert.equal(Object.keys(clean.ratings).length, PROGRESS_LIMITS.ratings);
+    assert.equal(Object.keys(clean.editedKeys).length, PROGRESS_LIMITS.checks + PROGRESS_LIMITS.ratings, 'one time per kept check and rating');
     const first = clean.answers['blk/q0'];
     assert.equal(first.attempts, PROGRESS_LIMITS.attempts);
     assert.equal(first.chosen.length, PROGRESS_LIMITS.chosen);
@@ -242,6 +276,28 @@ describe('sanitizeProgress (structural, no lesson)', () => {
     assert.equal(clean(at(0), at(30)).editedAt, new Date(NOW + MAX_CLOCK_SKEW_MS).toISOString());
     assert.equal(clean(at(0)).editedAt, undefined);
     assert.equal(sanitizeProgress({ v: 1, updatedAt: 12 }, { now: NOW }).updatedAt, '1970-01-01T00:00:00.000Z');
+  });
+
+  it('keeps edit times only for the checks and ratings it keeps, re-serialised and clamped', () => {
+    const clean = sanitizeProgress(record({
+      checks: { 'checklist:c/i': true, 'checklist:c/j': false, 'Bad:c/k': true },
+      ratings: { o1: 2 },
+      editedKeys: {
+        'checklist:c/i': '2026-10-23T21:00:00+09:00',
+        'checklist:c/j': at(60),
+        'rating:o1': 'garbage',
+        'Bad:c/k': at(1),
+        'checklist:gone/x': at(1),
+        'rating:o9': at(1),
+        o1: at(1),
+      },
+    }), { now: NOW });
+    assert.deepEqual(clean.editedKeys, {
+      'checklist:c/i': '2026-10-23T12:00:00.000Z',
+      'checklist:c/j': new Date(NOW + MAX_CLOCK_SKEW_MS).toISOString(),
+      'rating:o1': '1970-01-01T00:00:00.000Z',
+    });
+    assert.equal(sanitizeProgress(record({ checks: { 'checklist:c/i': true }, editedKeys: { 'checklist:c/z': at(0) } }), { now: NOW }).editedKeys, undefined);
   });
 
   it('turns anything that is not a v1 record into empty progress', () => {
@@ -272,7 +328,12 @@ describe('mergeProgress', () => {
       record({ answers: { 'x/1': answer(1, false, ['a'], false) } }),
       record({ updatedAt: at(10), answers: { 'x/1': answer(1, true, ['b'], true) } }),
     );
-    assert.deepEqual(tie.answers['x/1'], answer(1, false, ['a'], false), 'tie → the server record, coherent');
+    assert.deepEqual(tie.answers['x/1'], answer(1, true, ['b'], false), 'a correct client answer is kept; firstTry from the server');
+    const wrongTie = mergeProgress(
+      record({ answers: { 'x/1': answer(1, false, ['a'], false) } }),
+      record({ updatedAt: at(10), answers: { 'x/1': answer(1, false, ['c'], false) } }),
+    );
+    assert.deepEqual(wrongTie.answers['x/1'], answer(1, false, ['a'], false), 'tie, neither correct → the server record, coherent');
     const more = mergeProgress(
       record({ answers: { 'x/1': answer(1, false, ['a'], false) } }),
       record({ answers: { 'x/1': answer(2, true, ['b'], true) } }),
@@ -283,6 +344,26 @@ describe('mergeProgress', () => {
       record({ answers: { 'x/1': answer(1, true, ['b'], true) } }),
     );
     assert.deepEqual(shownOnServer.answers['x/1'], answer(1, true, ['b'], true, true), 'no server attempt: the client firstTry');
+  });
+
+  it('a correct answer on either side is kept, in both arrival orders (an open tab and course-quiz-check)', () => {
+    // The tab hydrated before the AI app's wrong course-quiz-check; the learner then got it right there.
+    const wrong = record({ answers: { 'x/1': answer(1, false, ['a'], false) } });
+    const right = record({ updatedAt: at(5), answers: { 'x/1': answer(1, true, ['b'], true) } });
+    for (const [server, client] of [[wrong, right], [right, wrong]]) {
+      const merged = mergeProgress(server, client);
+      assert.equal(merged.answers['x/1'].correct, true);
+      assert.deepEqual(merged.answers['x/1'].chosen, ['b']);
+      assert.equal(merged.answers['x/1'].firstTry, server.answers['x/1'].firstTry, 'firstTry from the server\'s first submission');
+      // The PUT response merged back into the tab (takeIn) and into the stored row again: still correct.
+      assert.deepEqual(mergeProgress(merged, client).answers['x/1'], merged.answers['x/1']);
+      assert.deepEqual(mergeProgress(merged, server).answers['x/1'], merged.answers['x/1']);
+    }
+    const moreWrongOnServer = mergeProgress(
+      record({ answers: { 'x/1': answer(2, false, ['a'], false, true) } }),
+      right,
+    );
+    assert.deepEqual(moreWrongOnServer.answers['x/1'], answer(2, true, ['b'], false, true), 'kept even with fewer attempts');
   });
 
   it('checks and ratings: the newer editedAt wins per key, keys from one side are kept (K15)', () => {
@@ -303,6 +384,15 @@ describe('mergeProgress', () => {
     assert.deepEqual(merged.ratings, { o1: 3, lesson: 2 });
     assert.equal(merged.updatedAt, at(5));
     assert.equal(merged.editedAt, at(2));
+    // Every kept value keeps the clock it won with, as its own time.
+    assert.deepEqual(merged.editedKeys, {
+      'checklist:c/1': at(2),
+      'checklist:c/2': at(1),
+      'card:f/1': at(1),
+      'step:s/1': at(2),
+      'rating:o1': at(2),
+      'rating:lesson': at(2),
+    });
     // A passive write (seen/resume) moves only updatedAt and does not win over an edit.
     const passive = mergeProgress(client, { ...server, updatedAt: at(9) });
     assert.equal(passive.checks['checklist:c/1'], false, 'the older edit clock loses even with a newer updatedAt');
@@ -312,6 +402,18 @@ describe('mergeProgress', () => {
     const server = record({ updatedAt: at(3), checks: { k: true } });
     assert.equal(mergeProgress(server, record({ updatedAt: at(4), checks: { k: false } })).checks.k, false);
     assert.equal(mergeProgress(server, record({ updatedAt: at(3), checks: { k: false } })).checks.k, true);
+  });
+
+  it('a key without its own time falls back to editedAt, and then keeps the clock it won with', () => {
+    const server = record({ updatedAt: at(10), editedAt: at(10), checks: { 'checklist:c/1': true }, editedKeys: { 'checklist:c/1': at(10) } });
+    // A bundle from before per-key times (no editedKeys) unticked it at +15.
+    const older = record({ updatedAt: at(15), editedAt: at(15), checks: { 'checklist:c/1': false } });
+    const merged = mergeProgress(server, older);
+    assert.equal(merged.checks['checklist:c/1'], false);
+    assert.equal(merged.editedKeys['checklist:c/1'], at(15));
+    // A device that ticked it at +12 (before that edit) and uploads later does not undo it.
+    const stale = record({ updatedAt: at(20), editedAt: at(20), checks: { 'checklist:c/1': true }, editedKeys: { 'checklist:c/1': at(12) } });
+    assert.equal(mergeProgress(merged, stale).checks['checklist:c/1'], false);
   });
 
   it('lastBlockId comes from the side with the newer updatedAt', () => {
@@ -354,6 +456,53 @@ describe('mergeProgress', () => {
   });
 });
 
+describe('mergeProgress: a clock per check and rating (two devices, one tab left open)', () => {
+  /** The server's save (tools/core/lessonProgress.js): sanitize the client record, merge it into the row. */
+  const save = (stored, local) => mergeProgress(stored, sanitizeProgress(local, { now: NOW + 24 * 60 * 60_000 }));
+  /** A device's hydrate (progressSync takeIn): the server record merged with the local one. */
+  const hydrate = (server, local) => mergeProgress(server, local);
+
+  it('a flashcard marked known on A is not undone by B\'s explicit "still learning" for it', () => {
+    // +0: B marks both cards "still learning" (explicit false) and uploads; A loads that.
+    let b = atMinute(0, () => store.withCheck(store.withCheck(emptyProgress(), 'card:f/c1', false), 'card:f/c2', false));
+    let server = save(null, b);
+    let a = hydrate(server, emptyProgress());
+    assert.deepEqual(a.checks, { 'card:f/c1': false, 'card:f/c2': false });
+    // +60: A marks c1 known and uploads.
+    a = atMinute(60, () => store.withCheck(a, 'card:f/c1', true));
+    server = save(server, a);
+    a = hydrate(server, a);
+    // +65: B, still open since +0 (c1 false there), marks c2 known and uploads.
+    b = atMinute(65, () => store.withCheck(b, 'card:f/c2', true));
+    server = save(server, b);
+    assert.deepEqual(server.checks, { 'card:f/c1': true, 'card:f/c2': true });
+    assert.deepEqual(server.editedKeys, { 'card:f/c1': at(60), 'card:f/c2': at(65) });
+    // Each device's next load keeps both marks.
+    assert.deepEqual(hydrate(server, a).checks, { 'card:f/c1': true, 'card:f/c2': true });
+    assert.deepEqual(hydrate(server, b).checks, { 'card:f/c1': true, 'card:f/c2': true });
+  });
+
+  it('a rating changed on A is not undone by B rating another objective', () => {
+    let a = atMinute(0, () => store.withRating(emptyProgress(), 'o1', 1));
+    let server = save(null, a);
+    const b0 = hydrate(server, emptyProgress());
+    a = atMinute(60, () => store.withRating(a, 'o1', 3));
+    server = save(server, a);
+    const b = atMinute(65, () => store.withRating(b0, 'o2', 2));
+    server = save(server, b);
+    assert.deepEqual(server.ratings, { o1: 3, o2: 2 });
+    assert.deepEqual(hydrate(server, a).ratings, { o1: 3, o2: 2 });
+    assert.deepEqual(server.editedKeys, { 'rating:o1': at(60), 'rating:o2': at(65) });
+  });
+
+  it('the newer edit of the same key still wins, in both arrival orders', () => {
+    const early = atMinute(10, () => store.withCheck(emptyProgress(), 'checklist:c/1', true));
+    const late = atMinute(20, () => store.withCheck(emptyProgress(), 'checklist:c/1', false));
+    assert.equal(save(save(null, early), late).checks['checklist:c/1'], false);
+    assert.equal(save(save(null, late), early).checks['checklist:c/1'], false);
+  });
+});
+
 describe('progressContentEqual', () => {
   const base = record({
     seen: ['a', 'b'],
@@ -364,7 +513,7 @@ describe('progressContentEqual', () => {
   });
 
   it('ignores timestamps, the summary, seen order and chosen order', () => {
-    assert.ok(progressContentEqual(base, { ...base, updatedAt: at(9), editedAt: at(9), summary: { pct: 50, state: 'read' } }));
+    assert.ok(progressContentEqual(base, { ...base, updatedAt: at(9), editedAt: at(9), editedKeys: { k: at(9) }, summary: { pct: 50, state: 'read' } }));
     assert.ok(progressContentEqual(base, { ...base, seen: ['b', 'a'], answers: { 'x/1': answer(1, false, ['c', 'a'], false) } }));
     assert.ok(progressContentEqual({ ...base, ratings: undefined }, { ...base, ratings: {} }));
   });

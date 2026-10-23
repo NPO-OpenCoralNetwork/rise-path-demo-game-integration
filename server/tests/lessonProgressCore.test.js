@@ -17,8 +17,10 @@ import {
 } from '../../tools/core/lessonProgress.js';
 import { getPublishedLesson } from '../../tools/core/courseCatalog.js';
 import { classifyDbError } from '../../tools/core/dbErrors.js';
-import { lessonPct, lessonState } from '../../shared/lesson/progress.js';
+import { lessonPct, lessonState, ratingClockKey } from '../../shared/lesson/progress.js';
+import { PROGRESS_LIMITS, lessonIndex, mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
 import { createLessonProgressPool, jsonbText, norm, SQL } from './helpers/lessonProgressPool.js';
+import { publishedLessons } from './helpers/publishedLessons.js';
 
 const ALICE = 'aaaaaaaa-1111-4000-8000-000000000001';
 const BOB = 'aaaaaaaa-1111-4000-8000-000000000002';
@@ -327,6 +329,21 @@ describe('saveLessonProgress (REST PUT) and the reset epoch', () => {
         assert.deepEqual(pool.queries.find((q) => q.sql === SQL.advisoryLock).params, [ALICE]);
     });
 
+    it('keeps an edit time per check across saves, so a device left open does not undo a newer mark', async () => {
+        const at = (hour) => `2026-10-23T0${hour}:00:00.000Z`;
+        const cards = { 'card:cards/c1': false, 'card:cards/c2': false };
+        const loaded = { checks: cards, updatedAt: at(1), editedAt: at(1), editedKeys: { 'card:cards/c1': at(1), 'card:cards/c2': at(1) } };
+        const edited = (key, hour) => record({ ...loaded, checks: { ...cards, [key]: true }, updatedAt: at(hour), editedAt: at(hour), editedKeys: { ...loaded.editedKeys, [key]: at(hour) } });
+        await save({ records: [{ courseSlug: VIBE, lessonId: CH1, progress: record(loaded) }] });
+        // Device A marks c1 known; device B, still holding c1 "still learning", then marks c2 known.
+        await save({ records: [{ courseSlug: VIBE, lessonId: CH1, progress: edited('card:cards/c1', 2) }] });
+        const result = await save({ records: [{ courseSlug: VIBE, lessonId: CH1, progress: edited('card:cards/c2', 3) }] });
+        const stored = pool.row(ALICE, VIBE, CH1).progress;
+        assert.deepEqual(stored.checks, { 'card:cards/c1': true, 'card:cards/c2': true });
+        assert.deepEqual(stored.editedKeys, { 'card:cards/c1': at(2), 'card:cards/c2': at(3) });
+        assert.deepEqual(result.records[0].progress.editedKeys, stored.editedKeys);
+    });
+
     it('locks rows in one order (course/lesson), rejects unknown lessons per record and returns each lesson once', async () => {
         const result = await save({
             records: [
@@ -453,11 +470,31 @@ describe('sizes and errors', () => {
         const samples = [
             {},
             record(),
-            record({ seen: ['a', 'b'], answers: { 'x/y': { attempts: 1, correct: true, chosen: ['a', 'b'], firstTry: true, revealed: true } }, checks: { 'card:c/d': false }, ratings: { lesson: 3 }, editedAt: NOW.toISOString() }),
+            record({ seen: ['a', 'b'], answers: { 'x/y': { attempts: 1, correct: true, chosen: ['a', 'b'], firstTry: true, revealed: true } }, checks: { 'card:c/d': false }, ratings: { lesson: 3 }, editedAt: NOW.toISOString(), editedKeys: { 'card:c/d': NOW.toISOString(), 'rating:lesson': NOW.toISOString() } }),
             { nested: [[], [1, [2, {}]], { a: null }], text: 'é漢字' },
         ];
         for (const sample of samples) assert.equal(progressTextBytes(sample), Buffer.byteLength(jsonbText(sample), 'utf8'), JSON.stringify(sample));
         assert.equal(PROGRESS_MAX_BYTES, 65536);
+    });
+
+    it('the fullest record of every published lesson, with an edit time per check and rating, stays far below the cap', () => {
+        const iso = NOW.toISOString();
+        for (const { lesson } of publishedLessons()) {
+            const index = lessonIndex(lesson);
+            const full = record({
+                seen: [...index.blockIds],
+                answers: Object.fromEntries([...index.questions].map(([key, entry]) => [key, { attempts: PROGRESS_LIMITS.attempts, correct: true, chosen: entry.question.options.map((o) => o.id), firstTry: true, revealed: true }])),
+                checks: Object.fromEntries([...index.checkKeys].map((key) => [key, true])),
+                ratings: Object.fromEntries([...index.ratingKeys].map((key) => [key, 3])),
+                lastBlockId: [...index.blockIds].at(-1),
+                updatedAt: iso,
+                editedAt: iso,
+                editedKeys: Object.fromEntries([...index.checkKeys, ...[...index.ratingKeys].map(ratingClockKey)].map((key) => [key, iso])),
+            });
+            const clean = sanitizeProgress(full, { now: NOW });
+            assert.equal(Object.keys(clean.editedKeys).length, index.checkKeys.size + index.ratingKeys.size, lesson.id);
+            assert.ok(progressTextBytes(mergeProgress(clean, clean)) < PROGRESS_MAX_BYTES / 4, lesson.id);
+        }
     });
 
     it('42501 (no grant yet) maps to permission_denied without the table name', async () => {

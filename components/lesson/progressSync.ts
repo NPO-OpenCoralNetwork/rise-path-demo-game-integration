@@ -10,9 +10,10 @@
  *
  * - Sign-in (signIn, synchronous, before the app shows the learner): `rp:progressSync:account`
  *   = { userId, epoch } says whose progress this browser holds. Another learner's sign-in clears
- *   every local lesson record, pending marker, rp:lastLesson and rp_learning_events first.
- *   Progress nobody owns (saved before this release, or by a guest) joins the account only when
- *   the learner says so: status 'needs_choice' until choose(add) here or in another tab.
+ *   every local lesson record, pending marker, rp:lastLesson, rp_learning_events and the legacy
+ *   rp_learning_progress first. Progress nobody owns (saved before this release, by a guest, or
+ *   written after the learner left: see Logout) joins the account only when the learner says so:
+ *   status 'needs_choice' until choose(add) here or in another tab.
  * - Hydrate (once per learner per page load): GET (retried on 429/5xx/network), then each server
  *   record is merged into the local one and announced as PROGRESS_EVENT { source: 'server' };
  *   local records whose merge with the server's adds something are uploaded. A reset epoch that
@@ -20,17 +21,23 @@
  *   another device: local records are cleared first, so nothing deleted comes back. epoch '?' =
  *   not known yet (nothing to compare). An answer (GET or PUT) that may predate a delete or reset
  *   another tab made meanwhile is never written locally: the GET is repeated, a PUT's answer is
- *   dropped and the server state is loaded again.
+ *   dropped and the server state is loaded again. A failed hydrate, or uploads stopped by a 401
+ *   or 503, start again on the learner's next session event (signIn) and at logout. refresh()
+ *   (the tab is visible again) repeats the GET at most once a minute while sync is on and idle.
  * - Writes: each local write of a syncable lesson sets `rp:progressSync:pending:<course>:<lesson>`
  *   to the record's updatedAt, even while sync is off. Flushes PUT the marked records 5 s after
  *   the last change (at most 60 s after the first), at most once per 20 s, with backoff up to
  *   5 min on failure; on page hide one keepalive PUT (body ≤ 60 KB). A marker is removed only
  *   when it still holds the updatedAt that was sent and the server's record holds every seen
  *   block, answer and check that was sent. 409 progress_reset resets local data and hydrates
- *   again; 401 stops sync until the next sign-in, 503 for this page load.
- * - Logout (signOut): flush (≤ 3 s), then clear every lesson record without a pending marker,
- *   rp:lastLesson and rp_learning_events. Pending records and the account stay only while
- *   markers remain: the same learner's next sign-in uploads them, another learner's clears them.
+ *   again; 401 and 503 stop uploads until the next sign-in or session event.
+ * - Logout (signOut): flush (≤ 3 s; a stopped sync hydrates first), then clear every lesson
+ *   record without a pending marker, rp:lastLesson, rp_learning_events and rp_learning_progress.
+ *   Pending records and the account stay only while markers remain, and the account is marked
+ *   loggedOut, each marker naming its record's updatedAt. The same learner's next sign-in uploads
+ *   them; a record written or changed after that (no primary session: nobody syncs it) is not
+ *   theirs and is asked about first. Another learner's sign-in clears them. A session that ends
+ *   without a logout (stop) leaves every record with activity this way.
  * - Delete (deleteAll, the Privacy page): DELETE first; only on success clear local data and
  *   store the new epoch. Without a primary session or API: this device only.
  *
@@ -52,6 +59,11 @@ export const SYNC_ACCOUNT_EVENT = 'rp:progress-account';
 export const PROGRESS_KEY_PREFIX = 'rp:progress:';
 /** services/progressService.ts learning events (streak and history), cleared at logout. */
 export const LEARNING_EVENTS_KEY = 'rp_learning_events';
+/**
+ * services/progressService.ts course progress (STORAGE_KEY: Blender stages and steps), cleared
+ * with the learning events: hydrateFromApi would otherwise send it to the next learner's account.
+ */
+export const LEGACY_PROGRESS_KEY = 'rp_learning_progress';
 
 /** The one id rule for course slugs and lesson ids the server stores (tools/core/lessons.js). */
 export const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
@@ -74,6 +86,8 @@ export const SYNC_TIMING = Object.freeze({
   getRetryBaseMs: 1_000,
   /** GETs per hydrate while another tab keeps changing the account during the request. */
   getPasses: 3,
+  /** refresh() (the tab is visible again) loads the server state again at most this often. */
+  refreshAfterMs: 60_000,
 });
 
 export const SYNC_LIMITS = Object.freeze({
@@ -87,7 +101,12 @@ export const SYNC_LIMITS = Object.freeze({
 
 /** A server reset epoch (null: never reset), or '?' while this browser does not know it yet. */
 export type SyncEpoch = string | null;
-export type SyncAccount = { userId: string; epoch: SyncEpoch | '?' };
+/**
+ * loggedOut: the learner left this browser (logout, or the session ended) with records still
+ * unsent; nobody syncs it now. Records whose pending marker no longer names their updatedAt were
+ * written since, by someone else.
+ */
+export type SyncAccount = { userId: string; epoch: SyncEpoch | '?'; loggedOut?: true };
 
 /**
  * off: no primary session. needs_choice: waiting for the adoption choice. hydrating: GET running.
@@ -151,17 +170,22 @@ export type ProgressSyncOptions = {
 export type ProgressSync = {
   /** The primary Supabase session's user signed in (or the session was restored). Synchronous owner rule, then hydrate. */
   signIn(userId: string): void;
-  /** The adoption choice for progress nobody owns: add it to the account, or clear it. */
-  choose(add: boolean): void;
+  /**
+   * The adoption choice for progress nobody owns: add it to the account, or clear it (with the
+   * learning events). True when this tab applied it (false: nothing asked, or chosen elsewhere).
+   */
+  choose(add: boolean): boolean;
   /** Another tab changed the account key (a storage event): an adoption choice made there applies here. */
   accountChanged(): void;
   /** progressStore.writeProgress wrote this lesson (PROGRESS_EVENT without source 'server'). */
   noteLocalWrite(courseSlug: string, lessonId: string): void;
   /** visibilitychange hidden / pagehide: one PUT now, with keepalive when the body is small. */
   flushOnHide(): void;
+  /** visibilitychange visible: load the server state again (merge only), at most once a minute. */
+  refresh(): void;
   /** Logout: flush (≤ 3 s), then clear this learner's local data. Never throws. */
   signOut(): Promise<void>;
-  /** The primary session ended elsewhere (another tab signed out): stop, keep local data. */
+  /** The primary session ended without this tab's logout: stop, keep local data for this learner. */
   stop(): void;
   /** Delete every lesson record of the learner (server first), or this device's when not signed in. */
   deleteAll(): Promise<DeleteResult>;
@@ -178,9 +202,13 @@ export function parseSyncAccount(raw: string | null | undefined): SyncAccount | 
   try {
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-    const { userId, epoch } = data as { userId?: unknown; epoch?: unknown };
+    const { userId, epoch, loggedOut } = data as { userId?: unknown; epoch?: unknown; loggedOut?: unknown };
     if (typeof userId !== 'string' || !userId) return null;
-    return { userId, epoch: epoch === null ? null : typeof epoch === 'string' && epoch ? epoch : '?' };
+    return {
+      userId,
+      epoch: epoch === null ? null : typeof epoch === 'string' && epoch ? epoch : '?',
+      ...(loggedOut === true ? { loggedOut: true as const } : {}),
+    };
   } catch {
     return null;
   }
@@ -188,8 +216,9 @@ export function parseSyncAccount(raw: string | null | undefined): SyncAccount | 
 
 /**
  * True when the account string changed in a way that makes an open reader's in-memory record
- * stale: another learner (or none) now owns the browser, or a known epoch changed (the progress
- * was deleted or reset). '?' → epoch is the first successful hydrate and keeps local data.
+ * stale: another learner (or none: a logout, also one that left records pending) now owns the
+ * browser, or a known epoch changed (the progress was deleted or reset). '?' → epoch is the
+ * first successful hydrate and keeps local data.
  */
 export function isAccountSwitch(before: string | null, after: string | null): boolean {
   if (before === after) return false;
@@ -197,8 +226,14 @@ export function isAccountSwitch(before: string | null, after: string | null): bo
   const b = parseSyncAccount(after);
   if (!a && !b) return false;
   if (!a || !b) return true;
-  if (a.userId !== b.userId) return true;
+  if (a.userId !== b.userId || Boolean(a.loggedOut) !== Boolean(b.loggedOut)) return true;
   return a.epoch !== '?' && a.epoch !== b.epoch;
+}
+
+/** Nobody is signed in to sync this browser: no account, or one whose learner left (loggedOut). */
+export function isSignedOutAccount(raw: string | null): boolean {
+  const account = parseSyncAccount(raw);
+  return !account || account.loggedOut === true;
 }
 
 /**
@@ -235,6 +270,7 @@ export function pendingKey(courseSlug: string, lessonId: string): string {
 type LessonRef = { courseSlug: string; lessonId: string };
 type BatchItem = LessonRef & { progress: LessonProgress; sentAt: string; bytes: number };
 type FlushMode = 'scheduled' | 'all' | 'hide';
+type HydrateMode = 'load' | 'retry' | 'refresh';
 
 const refKey = (ref: LessonRef) => `${ref.courseSlug}:${ref.lessonId}`;
 function hasOwn(object: object, key: string): boolean {
@@ -264,11 +300,18 @@ function summaryOf(record: ServerRecord): ProgressSummary | null {
   return { pct: Math.max(0, Math.min(100, Math.round(pct))), state: record.state as LessonStateName };
 }
 
-/** Same stored record: content, both clocks and the summary. */
+/** Same per-key edit times (editedKeys). */
+function sameClocks(a: Record<string, string> = {}, b: Record<string, string> = {}): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => hasOwn(b, key) && a[key] === b[key]);
+}
+
+/** Same stored record: content, every clock and the summary. */
 const sameStored = (a: LessonProgress, b: LessonProgress) =>
   progressContentEqual(a, b)
   && a.updatedAt === b.updatedAt
   && (a.editedAt ?? null) === (b.editedAt ?? null)
+  && sameClocks(a.editedKeys, b.editedKeys)
   && a.summary?.pct === b.summary?.pct
   && a.summary?.state === b.summary?.state;
 
@@ -307,6 +350,8 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   let flushTimer: unknown = null;
   let firstChangeAt: number | null = null;
   let lastPutAt = Number.NEGATIVE_INFINITY;
+  /** When the last GET was sent (refresh() waits SYNC_TIMING.refreshAfterMs after it). */
+  let lastGetAt = Number.NEGATIVE_INFINITY;
   let retryAt = 0;
   let failures = 0;
 
@@ -419,9 +464,23 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
 
   const hasLocalActivity = () => localLessons().some((ref) => hasActivity(readRecord(ref)));
 
+  /** The record is still as its learner left it (leave()): its pending marker names its updatedAt. */
+  function leftUnchanged(ref: LessonRef): boolean {
+    const raw = read(progressKey(ref.courseSlug, ref.lessonId));
+    return raw !== null && getMarker(ref) === parseProgress(raw).updatedAt;
+  }
+  /** Activity written after the learner left (no marker, or changed since): not theirs. */
+  const hasActivitySinceLeft = () => localLessons().some((ref) => hasActivity(readRecord(ref)) && !leftUnchanged(ref));
+  /** This learner's account as they left it (loggedOut), or null. */
+  function leftAccount(userId: string): SyncAccount | null {
+    const account = readAccount();
+    return account?.userId === userId && account.loggedOut ? account : null;
+  }
+
   /**
    * Removes lesson records (all of them, or those without a pending marker), markers (unless
-   * kept) and rp:lastLesson; with learningEvents also rp_learning_events.
+   * kept) and rp:lastLesson; with learningEvents also rp_learning_events and the legacy
+   * rp_learning_progress (the streak, history and Blender progress of whoever studied here).
    */
   function clearLocal({ keepPending = false, learningEvents = false } = {}): void {
     const keys = allKeys();
@@ -434,7 +493,32 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       }
     }
     remove(LAST_LESSON_KEY);
-    if (learningEvents) remove(LEARNING_EVENTS_KEY);
+    if (learningEvents) {
+      remove(LEARNING_EVENTS_KEY);
+      remove(LEGACY_PROGRESS_KEY);
+    }
+  }
+
+  /**
+   * The learner leaves this browser (logout, or the session ended). Records still unsent wait for
+   * them: each marker is set to its record's updatedAt now (the records are theirs at this
+   * moment) and the account is marked loggedOut, so a record written or changed later, by
+   * someone without a primary session, is not taken for theirs. Without unsent records the
+   * account goes.
+   */
+  function leave(account: SyncAccount): void {
+    let left = 0;
+    for (const ref of pendingLessons()) {
+      const raw = read(progressKey(ref.courseSlug, ref.lessonId));
+      if (raw === null) {
+        removeMarker(ref);
+      } else {
+        setMarker(ref, parseProgress(raw).updatedAt);
+        left += 1;
+      }
+    }
+    if (left) write(SYNC_ACCOUNT_KEY, JSON.stringify({ userId: account.userId, epoch: account.epoch, loggedOut: true }));
+    else remove(SYNC_ACCOUNT_KEY);
   }
 
   /**
@@ -474,15 +558,31 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     retryAt = 0;
   }
 
+  /** The GET failed, or uploads stopped (401, 503): nothing uploads until a hydrate succeeds. */
+  const stalled = () => state.status === 'offline' || state.status === 'stopped';
+
   function signIn(userId: string): void {
     if (!userId || !storage) return;
-    // INITIAL_SESSION, TOKEN_REFRESHED and SIGNED_IN on refocus: one hydrate per learner per page load.
-    if (state.userId === userId && state.status !== 'off') return;
+    const again = state.userId === userId && state.status !== 'off';
+    if (again) {
+      // INITIAL_SESSION, TOKEN_REFRESHED and SIGNED_IN on refocus: one hydrate per learner per page
+      // load. A stalled one starts again (one GET per event), while the account here is still this
+      // learner's (one a takeover in another tab gave to another learner stays theirs).
+      if (!(stalled() && readAccount()?.userId === userId)) return;
+    }
     stopActivity();
     epoch = undefined;
     const account = readAccount();
     if (account?.userId === userId) {
-      // This browser already holds this learner's progress.
+      // This browser already holds this learner's progress, or what they left at logout. Records
+      // written or changed since they left are not theirs: ask first.
+      if (account.loggedOut) {
+        if (hasActivitySinceLeft()) {
+          setState('needs_choice', userId);
+          return;
+        }
+        writeAccount({ userId, epoch: account.epoch });
+      }
     } else if (account) {
       // Another learner's progress (and streak): gone before this learner sees anything.
       clearLocal({ learningEvents: true });
@@ -494,37 +594,54 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     } else {
       writeAccount({ userId, epoch: '?' });
     }
-    startHydrate(userId);
+    startHydrate(userId, again ? 'retry' : 'load');
   }
 
   /**
    * The adoption choice was already made in another tab (or another learner signed in there):
    * follow what is stored instead of asking again, so "Don't add" in one tab never undoes "Add"
-   * in another. False when nothing is stored yet.
+   * in another. False when nothing is stored yet, or only this learner's account as they left it.
    */
   function choiceMadeElsewhere(userId: string): boolean {
     const account = readAccount();
-    if (!account) return false;
+    if (!account || (account.userId === userId && account.loggedOut)) return false;
     if (account.userId === userId) startHydrate(userId);
     else stop();
     return true;
   }
 
-  function choose(add: boolean): void {
+  function choose(add: boolean): boolean {
     const userId = state.userId;
-    if (!userId || state.status !== 'needs_choice') return;
-    if (choiceMadeElsewhere(userId)) return;
+    if (!userId || state.status !== 'needs_choice') return false;
+    if (choiceMadeElsewhere(userId)) return false;
+    // The learner is back after a logout: their records as they left them stay theirs either way,
+    // and so does the epoch (a delete made elsewhere meanwhile still clears them).
+    const left = leftAccount(userId);
     if (add) {
       // Pending until uploaded, so a logout before the upload keeps them.
       for (const ref of localLessons()) {
         const progress = readRecord(ref);
         if (hasActivity(progress)) setMarker(ref, progress.updatedAt);
       }
+    } else if (left) {
+      // Only what was written after they left goes, with the streak and history kept since.
+      for (const key of allKeys()) {
+        if (!key.startsWith(PROGRESS_KEY_PREFIX)) continue;
+        const ref = refOf(key, PROGRESS_KEY_PREFIX);
+        if (ref && leftUnchanged(ref)) continue;
+        remove(key);
+        if (ref) removeMarker(ref);
+      }
+      remove(LAST_LESSON_KEY);
+      remove(LEARNING_EVENTS_KEY);
+      remove(LEGACY_PROGRESS_KEY);
     } else {
-      clearLocal();
+      // The other person's lesson records, and their streak and history.
+      clearLocal({ learningEvents: true });
     }
-    writeAccount({ userId, epoch: '?' });
+    writeAccount({ userId, epoch: left ? left.epoch : '?' });
     startHydrate(userId);
+    return true;
   }
 
   function accountChanged(): void {
@@ -541,11 +658,16 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     startHydrate(userId);
   }
 
-  function startHydrate(userId: string): void {
+  /**
+   * load: the GET is retried (429, 5xx, network). retry (a stalled sync's next session event) and
+   * refresh (sync was on: refresh()) send one GET; the next event tries again. A failed refresh
+   * leaves sync on (uploads go on) instead of offline.
+   */
+  function startHydrate(userId: string, mode: HydrateMode = 'load'): void {
     const gen = generation;
     setState('hydrating', userId);
-    const run = hydrate(userId, gen).catch(() => {
-      if (gen === generation) setState('offline');
+    const run = hydrate(userId, gen, mode).catch(() => {
+      if (gen === generation) getFailed(mode);
     });
     hydration = run;
     void run.finally(() => {
@@ -553,30 +675,40 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     });
   }
 
-  async function getWithRetry(gen: number) {
+  function getFailed(mode: HydrateMode): void {
+    if (mode !== 'refresh') {
+      setState('offline');
+      return;
+    }
+    setState('on');
+    if (pendingLessons().length) scheduleFlush();
+  }
+
+  async function getWithRetry(gen: number, retries: number) {
     for (let attempt = 0; ; attempt += 1) {
       try {
+        lastGetAt = now();
         return await api.get();
       } catch (err) {
-        if (attempt >= SYNC_TIMING.getRetries || !retryable(err) || gen !== generation) throw err;
+        if (attempt >= retries || !retryable(err) || gen !== generation) throw err;
         await sleep(SYNC_TIMING.getRetryBaseMs * 2 ** attempt * (0.5 + random()));
         if (gen !== generation) throw err;
       }
     }
   }
 
-  async function hydrate(userId: string, gen: number): Promise<void> {
+  async function hydrate(userId: string, gen: number, mode: HydrateMode): Promise<void> {
     if (!apiEnabled()) {
-      setState('offline');
+      getFailed(mode);
       return;
     }
     let result: Awaited<ReturnType<ProgressApi['get']>>;
     for (let pass = 1; ; pass += 1) {
       const before = read(SYNC_ACCOUNT_KEY);
       try {
-        result = await getWithRetry(gen);
+        result = await getWithRetry(gen, mode === 'load' ? SYNC_TIMING.getRetries : 0);
       } catch {
-        if (gen === generation) setState('offline');
+        if (gen === generation) getFailed(mode);
         return;
       }
       if (gen !== generation || state.userId !== userId) return;
@@ -585,8 +717,8 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       if (read(SYNC_ACCOUNT_KEY) === before || pass >= SYNC_TIMING.getPasses) break;
     }
     const account = readAccount();
-    if (!account || account.userId !== userId) {
-      // Another tab signed another learner in meanwhile.
+    if (!account || account.userId !== userId || account.loggedOut) {
+      // Another tab signed another learner in meanwhile, or signed this one out.
       setState('stopped');
       return;
     }
@@ -655,7 +787,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   function canFlush(): boolean {
     if (state.status !== 'on' || epoch === undefined || !state.userId || !apiEnabled()) return false;
     const account = readAccount();
-    if (!account || account.userId !== state.userId) {
+    if (!account || account.userId !== state.userId || account.loggedOut) {
       setState('stopped');
       return false;
     }
@@ -833,6 +965,14 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     if (state.status === 'on') void flush('hide');
   }
 
+  function refresh(): void {
+    const userId = state.userId;
+    // Idle: no GET or PUT running, no upload waiting and no backoff.
+    if (!userId || state.status !== 'on' || hydration || inFlight || flushTimer !== null || failures > 0) return;
+    if (now() - lastGetAt < SYNC_TIMING.refreshAfterMs || !apiEnabled()) return;
+    startHydrate(userId, 'refresh');
+  }
+
   async function signOut(): Promise<void> {
     const userId = state.userId;
     if (!userId) return;
@@ -844,12 +984,20 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
         setState('off', null);
         return;
       }
-      if (state.status === 'on') {
+      // A stalled sync (the GET failed, or a 401/503 stopped uploads) tries once more while the
+      // session is still valid: the hydrate ends with the upload of what is pending.
+      const account = readAccount();
+      const retry = stalled() && account?.userId === userId && !account.loggedOut;
+      if (retry) rehydrate();
+      if (retry && hydration) {
+        await Promise.race([hydration, sleep(SYNC_TIMING.logoutFlushMs)]);
+      } else if (state.status === 'on') {
         await Promise.race([flush('all'), sleep(SYNC_TIMING.logoutFlushMs)]);
       }
       stopActivity();
       clearLocal({ keepPending: true, learningEvents: true });
-      if (!pendingLessons().length && readAccount()?.userId === userId) remove(SYNC_ACCOUNT_KEY);
+      const stored = readAccount();
+      if (stored?.userId === userId) leave(stored);
     } catch {
       // Storage trouble: nothing more to clear.
     }
@@ -859,7 +1007,23 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   }
 
   function stop(): void {
-    if (!state.userId) return;
+    const userId = state.userId;
+    if (!userId) return;
+    try {
+      const account = readAccount();
+      if (account?.userId === userId && state.status !== 'needs_choice') {
+        // The session ended without a logout here (an expiry, or a logout in another tab): every
+        // record with activity is this learner's at this moment, and waits for them like a logout's.
+        for (const ref of localLessons()) {
+          const progress = readRecord(ref);
+          if (hasActivity(progress)) setMarker(ref, progress.updatedAt);
+        }
+        leave(account);
+        emitAccount();
+      }
+    } catch {
+      // Storage trouble: nothing to keep.
+    }
     stopActivity();
     epoch = undefined;
     setState('off', null);
@@ -904,6 +1068,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     accountChanged,
     noteLocalWrite,
     flushOnHide,
+    refresh,
     signOut,
     stop,
     deleteAll,

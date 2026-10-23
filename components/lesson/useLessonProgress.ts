@@ -22,7 +22,7 @@ import {
   type SelfRating,
 } from './progressStore.ts';
 import { lessonPct, lessonState, lessonStateEvents, sectionByBlock, type LessonEventType, type LessonState } from './model.ts';
-import { SYNC_ACCOUNT_EVENT, SYNC_ACCOUNT_KEY, readerMustDrop } from './progressSync.ts';
+import { SYNC_ACCOUNT_EVENT, SYNC_ACCOUNT_KEY, isSignedOutAccount, readerMustDrop } from './progressSync.ts';
 
 /** A block counts as seen after ≥60% of it (or of the viewport) is visible for this long. */
 const SEEN_DWELL_MS = 1500;
@@ -165,7 +165,7 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
     if (before === now) return false;
     const stored = readProgress(courseSlug, lesson.id);
     if (!readerMustDrop(before, now, stored, persisted.current)) return false;
-    signedOut.current = now === null;
+    signedOut.current = isSignedOutAccount(now);
     dirty.current = false;
     persisted.current = stored;
     lastState.current = lessonState(lesson, stored);

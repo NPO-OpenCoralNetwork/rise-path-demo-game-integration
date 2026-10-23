@@ -10,8 +10,11 @@ import { deleteLessonProgress, useProgressSyncState } from '../../lesson/progres
  * §6). Signed in with sync: the server's records go first (every course, every device, quiz
  * answers included), and only then this device's; a failure changes nothing. Otherwise (guests,
  * no API): this device only. A confirm dialog, not "type DELETE": children use this page.
- * The streak and learning history (/user/events) and what AI apps saved through the learner-state
- * tools stay.
+ * The learning history (/user/events: lessons started and finished) and what AI apps saved
+ * through the learner-state tools stay. The streak can get shorter: it also counts the days of
+ * the deleted records (components/ui/ProgressCluster.tsx), so days when the learner only read go.
+ * The button stays enabled while deleting (the open dialog makes it inert), so the dialog can
+ * return focus to it however it closes.
  */
 
 const copy = {
@@ -20,7 +23,7 @@ const copy = {
     body: 'Deletes what the lessons saved for you in every course: what you read, your quiz answers, checklists, self-ratings and where to continue.',
     scopeAccount: 'It is deleted on every device where you are signed in. This cannot be undone.',
     scopeDevice: 'It is deleted on this device. This cannot be undone.',
-    kept: 'Not deleted: your streak and learning history, and records that AI apps saved with the learner-state tools.',
+    kept: 'Not deleted: your learning history (lessons you started and finished) and records that AI apps saved with the learner-state tools. Your streak can get shorter, because days when you only read lessons no longer count.',
     button: 'Delete lesson progress',
     dialogTitle: 'Delete all your lesson progress?',
     dialogAccount: 'Every course, on every device, quiz answers included. This cannot be undone.',
@@ -37,7 +40,7 @@ const copy = {
     body: 'すべてのコースについて、レッスンに記録された内容を消します。読んだところ、確認問題の答え、チェックリスト、自己評価、続きの位置です。',
     scopeAccount: 'ログインしているすべての端末から消えます。元に戻すことはできません。',
     scopeDevice: 'この端末から消えます。元に戻すことはできません。',
-    kept: '連続記録と学習の履歴、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。',
+    kept: '学習の履歴（レッスンを始めた・終えた記録）と、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。連続記録は、レッスンを読んだだけの日が数えられなくなるため、短くなることがあります。',
     button: '学習の進み具合を消す',
     dialogTitle: '学習の進み具合をすべて消しますか？',
     dialogAccount: 'すべてのコース、すべての端末が対象で、確認問題の答えも消えます。元に戻すことはできません。',
@@ -102,7 +105,6 @@ const LessonProgressDeleteSection: React.FC = () => {
         size="sm"
         leadingIcon={<Trash2 size={14} aria-hidden="true" />}
         aria-describedby={bodyId}
-        disabled={busy}
         onClick={() => setConfirmOpen(true)}
       >
         {t.button}

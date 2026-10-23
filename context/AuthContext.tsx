@@ -99,8 +99,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Lesson progress owner rule (Phase 2, ai-access-plan §6): synchronous, before this
                 // learner is shown, so another learner's progress on a shared device never appears
                 // under their name. Repeated events (INITIAL_SESSION, TOKEN_REFRESHED, SIGNED_IN on
-                // refocus) do not hydrate again.
-                if (client === 'primary' && session.access_token) signInProgressSync(session.user.id);
+                // refocus) do not hydrate again unless the last try failed; they keep the access
+                // token current for the page-hide upload.
+                if (client === 'primary' && session.access_token) signInProgressSync(session.user.id, session.access_token);
                 const u: AuthUser = {
                     id: session.user.id,
                     email: session.user.email || '',
@@ -141,7 +142,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     handleSession(session, 'primary');
                 } else if (!_event.startsWith('SIGNED_IN') && !session) {
                     // The primary session ended (here or in another tab): stop syncing. Logout
-                    // already cleared this learner's lesson data; an expiry keeps it.
+                    // already cleared this learner's lesson data; an expiry keeps it for their
+                    // next sign-in (what someone else writes meanwhile is asked about first).
                     stopProgressSync();
                     if (nexloomSupabase) {
                         nexloomSupabase.auth.getSession().then(({ data: { session: ns } }) => {
@@ -284,8 +286,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // First, so a failed remote sign-out still leaves no AI answers on a shared device.
         clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
         // Lesson progress (Phase 2): upload what is still pending (at most 3 s, while the token is
-        // valid), then clear this learner's lesson records, rp:lastLesson and learning events.
-        // Records still pending stay for this learner's next sign-in; another learner's clears them.
+        // valid; a stalled sync loads and uploads once more), then clear this learner's lesson
+        // records, rp:lastLesson, learning events and legacy course progress. Records still
+        // pending stay for this learner's next sign-in; another learner's clears them.
         await signOutProgressSync();
         const supabase = getSupabaseClient();
         const nexloomSupabase = getNexloomSupabaseClient();

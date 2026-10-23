@@ -12,10 +12,10 @@
  * Keys:
  * - `rp:progress:<courseSlug>:<lessonId>` → LessonProgress
  *     { v:1, seen, answers, checks, lastBlockId, updatedAt } plus the optional `editedAt` (last
- *     check or rating edit), `ratings` (self-rating per objective) and `summary` ({pct, state} at
- *     the last write, so course maps and the dashboard can show a status without loading the
- *     lesson). `answers` is keyed by `<blockId>/<questionId>` because one quiz block can hold
- *     several questions (see answerKey).
+ *     check or rating edit), `editedKeys` (last edit per check and per rating), `ratings`
+ *     (self-rating per objective) and `summary` ({pct, state} at the last write, so course maps
+ *     and the dashboard can show a status without loading the lesson). `answers` is keyed by
+ *     `<blockId>/<questionId>` because one quiz block can hold several questions (see answerKey).
  * - `rp:lastLesson` → LastLesson { courseSlug, lessonId, title, pct, at }
  * - `rp:progressSync:*` (not `rp:progress:`, so scans of the records skip them): whose progress
  *   this browser holds and the pending uploads (progressSync.ts).
@@ -24,7 +24,7 @@
  * state updates stay cheap. No React or DOM imports: server/tests imports this file directly.
  */
 
-import { emptyProgress, parseProgress } from '../../shared/lesson/progress.js';
+import { emptyProgress, parseProgress, ratingClockKey } from '../../shared/lesson/progress.js';
 import type { AnswerRecord, LessonProgress, ProgressSummary, SelfRating } from '../../shared/lesson/progress.js';
 
 // The record shape, its parser and the answer key live in shared/lesson/progress.js (the server
@@ -74,12 +74,14 @@ const touch = (p: LessonProgress, patch: Partial<LessonProgress>): LessonProgres
 });
 
 /**
- * touch() for a learner's own edit of a check or a rating: also moves `editedAt`, the clock the
- * cross-device merge uses for those keys (passive seen/resume writes must not win over them).
+ * touch() for a learner's own edit of a check or a rating: also moves `editedAt` and the edited
+ * key's own time in `editedKeys` (`clockKey`: the check key, or ratingClockKey(objectiveId)), the
+ * clocks the cross-device merge uses for those keys. Passive seen/resume writes must not win over
+ * them, and an edit of one key must not win for keys this device did not touch.
  */
-const edit = (p: LessonProgress, patch: Partial<LessonProgress>): LessonProgress => {
+const edit = (p: LessonProgress, patch: Partial<LessonProgress>, clockKey: string): LessonProgress => {
   const now = new Date().toISOString();
-  return { ...p, ...patch, updatedAt: now, editedAt: now };
+  return { ...p, ...patch, updatedAt: now, editedAt: now, editedKeys: { ...p.editedKeys, [clockKey]: now } };
 };
 
 export function withSeen(p: LessonProgress, blockIds: readonly string[]): LessonProgress {
@@ -122,12 +124,12 @@ export function withRevealed(p: LessonProgress, key: string): LessonProgress {
 
 export function withCheck(p: LessonProgress, id: string, value: boolean): LessonProgress {
   if (p.checks[id] === value) return p;
-  return edit(p, { checks: { ...p.checks, [id]: value } });
+  return edit(p, { checks: { ...p.checks, [id]: value } }, id);
 }
 
 export function withRating(p: LessonProgress, objectiveId: string, rating: SelfRating): LessonProgress {
   if (p.ratings?.[objectiveId] === rating) return p;
-  return edit(p, { ratings: { ...(p.ratings ?? {}), [objectiveId]: rating } });
+  return edit(p, { ratings: { ...(p.ratings ?? {}), [objectiveId]: rating } }, ratingClockKey(objectiveId));
 }
 
 export function withLastBlock(p: LessonProgress, blockId: string | null): LessonProgress {

@@ -1,8 +1,9 @@
 // Lesson progress sync, the client core (components/lesson/progressSync.ts, Phase 2 design §4):
 // the sign-in owner rules (including the adoption choice), hydrate (epoch reset, merge into local,
 // uploads of content differences only, chunks), pending markers and flush timing, the PUT response
-// rules (merge, marker removal, rejections, 409, 401/503, backoff), logout clearing, keepalive
-// size, delete, single-flight, plus static checks of the wiring (AuthContext order, imports).
+// rules (merge, marker removal, rejections, 409, 401/503, backoff), restarts after a stall,
+// refresh on a visible tab, logout clearing (and who owns what is left), keepalive size, delete,
+// single-flight, plus static checks of the wiring (AuthContext order, imports).
 // Storage, API, timers and clock are fakes; the fake server merges with the real shared modules.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import ts from 'typescript';
 import {
   LEARNING_EVENTS_KEY,
+  LEGACY_PROGRESS_KEY,
   MAX_SLUG_LENGTH,
   SAFE_SLUG,
   SYNC_ACCOUNT_KEY,
@@ -19,6 +21,7 @@ import {
   SYNC_TIMING,
   createProgressSync,
   isAccountSwitch,
+  isSignedOutAccount,
   parseSyncAccount,
   pendingKey,
   readerMustDrop,
@@ -235,7 +238,7 @@ describe('progress sync: sign-in owner rules (design §4.2)', () => {
     assert.equal(t.sync.getState().status, 'on');
   });
 
-  it("another learner's sign-in clears records, markers, rp:lastLesson and learning events synchronously, before any request", () => {
+  it("another learner's sign-in clears records, markers, rp:lastLesson, learning events and legacy progress synchronously, before any request", () => {
     const storage = memoryStorage({
       [progressKey(COURSE, 'l1')]: JSON.stringify(record({ seen: ['b1'] })),
       [progressKey('dev-blocks', 'gallery')]: JSON.stringify(record({ seen: ['x'] })),
@@ -243,6 +246,8 @@ describe('progress sync: sign-in owner rules (design §4.2)', () => {
       [LAST_LESSON_KEY]: JSON.stringify({ courseSlug: COURSE, lessonId: 'l1', title: 'x', pct: 10, at: iso(-60) }),
       // The previous learner's streak and history (their session ended without a logout).
       [LEARNING_EVENTS_KEY]: JSON.stringify([{ id: 'e1', type: 'lesson_start', title: { en: 'A lesson', jp: 'A' } }]),
+      // Their Blender progress, which hydrateFromApi would otherwise send to this learner's account.
+      [LEGACY_PROGRESS_KEY]: JSON.stringify({ blender: { courseId: 'blender', completedStages: ['s1'], completedSteps: {} } }),
       'rp:reader-settings': '{}',
     });
     setAccount(storage, U1, E1);
@@ -281,10 +286,13 @@ describe('progress sync: sign-in owner rules (design §4.2)', () => {
   it('"Add" makes the progress the learner\'s and uploads it; a later close of the dialog changes nothing', async () => {
     const t = setup();
     putLocal(t.storage, 'l1', record({ seen: ['b1', 'b2'] }));
+    t.storage.setItem(LEARNING_EVENTS_KEY, '[{"id":"e1"}]');
     t.sync.signIn(U1);
-    t.sync.choose(true);
-    t.sync.choose(false);
+    assert.equal(t.sync.choose(true), true);
+    assert.equal(t.sync.choose(false), false);
     await t.sync.settled();
+    // The learning events that go with the added progress stay too.
+    assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), '[{"id":"e1"}]');
     assert.deepEqual(account(t.storage), { userId: U1, epoch: null });
     assert.equal(t.api.puts().length, 1);
     assert.deepEqual(t.api.puts()[0].body.records.map((r) => r.lessonId), ['l1']);
@@ -292,12 +300,17 @@ describe('progress sync: sign-in owner rules (design §4.2)', () => {
     assert.equal(marker(t.storage, 'l1'), null);
   });
 
-  it('"Don\'t add" clears the progress here, then loads the learner\'s own', async () => {
+  it('"Don\'t add" clears the progress here with the learning events, then loads the learner\'s own', async () => {
     const t = setup({ rows: [row('l2', record({ seen: ['s1'], updatedAt: iso(-5) }))] });
     putLocal(t.storage, 'l1', record({ seen: ['b1'] }));
     t.storage.setItem(LAST_LESSON_KEY, JSON.stringify({ courseSlug: COURSE, lessonId: 'l1', title: 'x', pct: 10, at: iso(-60) }));
+    // The other person's streak and history (lesson titles), and their Blender progress.
+    t.storage.setItem(LEARNING_EVENTS_KEY, JSON.stringify([{ id: 'g1', type: 'lesson_complete', title: { en: 'Done: their lesson', jp: '完了: ほかの子のレッスン' } }]));
+    t.storage.setItem(LEGACY_PROGRESS_KEY, '{"blender":{}}');
     t.sync.signIn(U1);
-    t.sync.choose(false);
+    assert.equal(t.sync.choose(false), true);
+    assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), null);
+    assert.equal(t.storage.getItem(LEGACY_PROGRESS_KEY), null);
     await t.sync.settled();
     assert.equal(getLocal(t.storage, 'l1'), null);
     assert.deepEqual(getLocal(t.storage, 'l2').seen, ['s1']);
@@ -334,6 +347,25 @@ describe('progress sync: hydrate (design §4.3)', () => {
     assert.deepEqual(l1.summary, { pct: 55, state: 'checked' });
     assert.equal(l1.updatedAt, iso(-2000));
     assert.equal(t.api.puts().length, 0);
+  });
+
+  it('takes in per-key edit times when nothing else differs, so a later edit here does not undo a newer one elsewhere', async () => {
+    // This browser's record predates per-key times; the server row holds the same check with its own time.
+    const values = { checks: { 'card:f/c1': false }, updatedAt: iso(-30), editedAt: iso(-30) };
+    const t = syncedSetup({ rows: [row('l1', record({ ...values, editedKeys: { 'card:f/c1': iso(-30) } }))] });
+    putLocal(t.storage, 'l1', record({ ...values, summary: { pct: 40, state: 'in_progress' } }));
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    assert.deepEqual(getLocal(t.storage, 'l1').editedKeys, { 'card:f/c1': iso(-30) });
+    assert.equal(t.api.puts().length, 0);
+    // Another device then marks c1 known; this tab, which has not seen that, marks c2 known.
+    t.api.server.rows.get(`${COURSE}:l1`).progress = record({ checks: { 'card:f/c1': true }, updatedAt: iso(-10), editedAt: iso(-10), editedKeys: { 'card:f/c1': iso(-10) } });
+    const local = getLocal(t.storage, 'l1');
+    putLocal(t.storage, 'l1', { ...local, checks: { ...local.checks, 'card:f/c2': true }, updatedAt: iso(1), editedAt: iso(1), editedKeys: { ...local.editedKeys, 'card:f/c2': iso(1) } });
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    await t.clock.advance(5_000);
+    assert.equal(t.api.puts().length, 1);
+    assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.checks, { 'card:f/c1': true, 'card:f/c2': true });
   });
 
   it('a new device points "continue" at the most recently updated server lesson, in the UI language', async () => {
@@ -405,7 +437,7 @@ describe('progress sync: hydrate (design §4.3)', () => {
     assert.equal([...t.storage.map.keys()].filter((key) => key.startsWith('rp:progressSync:pending:')).length, 0);
   });
 
-  it('retries the GET on 429/5xx/network, then stays off for the page load; local writes are still marked', async () => {
+  it('retries the GET on 429/5xx/network, then waits for the learner\'s next session event; local writes are still marked', async () => {
     const t = syncedSetup();
     for (let i = 0; i < 4; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: i % 2 ? 429 : 0 }) });
     t.sync.signIn(U1);
@@ -415,10 +447,21 @@ describe('progress sync: hydrate (design §4.3)', () => {
     putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
     t.sync.noteLocalWrite(COURSE, 'l1');
     assert.equal(marker(t.storage, 'l1'), iso(1));
+    await t.clock.advance(600_000);
+    assert.equal(t.api.puts().length, 0);
+    // TOKEN_REFRESHED or SIGNED_IN on refocus: one GET per event (the next event tries again)…
+    t.api.script('get', { error: Object.assign(new Error('x'), { status: 503 }) });
     t.sync.signIn(U1);
     await t.clock.advance(60_000);
-    assert.equal(t.api.puts().length, 0);
-    assert.equal(t.api.gets().length, 4);
+    assert.equal(t.api.gets().length, 5);
+    assert.equal(t.sync.getState().status, 'offline');
+    // …until the hydrate runs and uploads what is pending.
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    assert.equal(t.api.gets().length, 6);
+    assert.equal(t.sync.getState().status, 'on');
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l1']]);
+    assert.equal(marker(t.storage, 'l1'), null);
   });
 
   it('a 401 GET is not retried', async () => {
@@ -567,7 +610,7 @@ describe('progress sync: writes and flushes (design §4.5)', () => {
     assert.ok(t.api.server.rows.has(`${COURSE}:l2`));
   });
 
-  it('401 and 503 stop uploads (markers stay for the next sign-in or page load)', async () => {
+  it('401 and 503 stop uploads until the learner\'s next session event (markers stay)', async () => {
     for (const status of [401, 503]) {
       const t = await onlineSetup();
       t.api.script('put', { error: Object.assign(new Error('x'), { status }) });
@@ -578,6 +621,13 @@ describe('progress sync: writes and flushes (design §4.5)', () => {
       await t.clock.advance(600_000);
       assert.equal(t.api.puts().length, 1, `status ${status}`);
       assert.equal(marker(t.storage, 'l1'), iso(2));
+      // The learner's next session event (a token refresh) starts sync again.
+      t.sync.signIn(U1);
+      await t.sync.settled();
+      assert.equal(t.sync.getState().status, 'on', `status ${status}`);
+      assert.equal(t.api.puts().length, 2, `status ${status}`);
+      assert.equal(marker(t.storage, 'l1'), null);
+      assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.seen, ['b1', 'b2']);
     }
   });
 
@@ -618,18 +668,89 @@ describe('progress sync: writes and flushes (design §4.5)', () => {
     assert.equal(last.keepalive, false);
   });
 
-  it('stops when another tab signed another learner in', async () => {
+  it('stops when another tab signed another learner in, and a session event of the old one does not start it again', async () => {
     const t = await onlineSetup();
-    setAccount(t.storage, U2, '?');
     write(t, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    setAccount(t.storage, U2, '?');
+    write(t, 'l2', record({ seen: ['c1'], updatedAt: iso(2) }));
     await t.clock.advance(60_000);
     assert.equal(t.api.puts().length, 0);
-    assert.equal(marker(t.storage, 'l1'), null);
+    assert.equal(marker(t.storage, 'l2'), null);
+    assert.equal(t.sync.getState().status, 'stopped');
+    // A late session event of the old learner neither starts it again nor clears the new one's data.
+    t.sync.signIn(U1);
+    await t.clock.advance(60_000);
+    assert.equal(t.api.gets().length, 1);
+    assert.deepEqual(account(t.storage), { userId: U2, epoch: '?' });
+    assert.deepEqual(getLocal(t.storage, 'l2').seen, ['c1']);
+  });
+});
+
+describe('progress sync: refresh when the tab is visible again', () => {
+  it('loads what an AI app saved meanwhile, merged into local data, at most once a minute', async () => {
+    const t = syncedSetup({ rows: [row('l1', record({ seen: ['b1'], updatedAt: iso(-10) }))] });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    // course-quiz-check records an answer on the server.
+    t.api.server.rows.get(`${COURSE}:l1`).progress = record({ seen: ['b1'], answers: { 'q/q1': answer(1, true, ['b']) }, updatedAt: iso(0.5) });
+    t.sync.refresh();
+    await t.sync.settled();
+    assert.equal(t.api.gets().length, 1);
+    assert.deepEqual(getLocal(t.storage, 'l1').answers, {});
+    await t.clock.advance(SYNC_TIMING.refreshAfterMs);
+    const before = t.events.progress.length;
+    t.sync.refresh();
+    t.sync.refresh();
+    await t.sync.settled();
+    assert.equal(t.api.gets().length, 2);
+    assert.deepEqual(getLocal(t.storage, 'l1').answers['q/q1'], answer(1, true, ['b']));
+    assert.ok(t.events.progress.slice(before).some((d) => d.lessonId === 'l1' && d.source === 'server'));
+    assert.equal(t.sync.getState().status, 'on');
+    assert.equal(t.api.puts().length, 0);
+  });
+
+  it('waits while an upload is due, and a failed refresh (one GET) leaves sync on', async () => {
+    const t = syncedSetup();
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    await t.clock.advance(SYNC_TIMING.refreshAfterMs);
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    t.sync.refresh();
+    assert.equal(t.sync.getState().status, 'on');
+    await t.clock.advance(5_000);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.api.gets().length, 1);
+    t.api.script('get', { error: Object.assign(new Error('x'), { status: 0 }) });
+    t.sync.refresh();
+    await t.sync.settled();
+    assert.equal(t.api.gets().length, 2);
+    assert.equal(t.sync.getState().status, 'on');
+    t.sync.refresh();
+    assert.equal(t.api.gets().length, 2);
+    // Later writes still upload.
+    putLocal(t.storage, 'l1', record({ seen: ['b1', 'b2'], updatedAt: iso(2) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    await t.clock.advance(20_000);
+    assert.equal(t.api.puts().length, 2);
+    assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.seen, ['b1', 'b2']);
+  });
+
+  it('does nothing unless sync is on', async () => {
+    const t = setup();
+    putLocal(t.storage, 'l1', record({ seen: ['x'] }));
+    t.sync.refresh();
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    await t.clock.advance(SYNC_TIMING.refreshAfterMs);
+    t.sync.refresh();
+    await t.clock.advance(1_000);
+    assert.equal(t.api.calls.length, 0);
   });
 });
 
 describe('progress sync: logout (design §4.7)', () => {
-  it('flushes, then clears records, rp:lastLesson and learning events; the account goes when nothing is pending', async () => {
+  it('flushes, then clears records, rp:lastLesson, learning events and legacy progress; the account goes when nothing is pending', async () => {
     const t = syncedSetup();
     t.sync.signIn(U1);
     await t.sync.settled();
@@ -638,6 +759,7 @@ describe('progress sync: logout (design §4.7)', () => {
     t.storage.setItem(progressKey('dev-blocks', 'gallery'), JSON.stringify(record({ seen: ['x'] })));
     t.storage.setItem(LAST_LESSON_KEY, '{}');
     t.storage.setItem(LEARNING_EVENTS_KEY, '[]');
+    t.storage.setItem(LEGACY_PROGRESS_KEY, '{"blender":{"courseId":"blender","completedStages":["s1"]}}');
     t.storage.setItem('rp:reader-settings', '{}');
     await t.sync.signOut();
     assert.equal(t.api.puts().length, 1);
@@ -645,7 +767,7 @@ describe('progress sync: logout (design §4.7)', () => {
     assert.deepEqual(t.sync.getState(), { status: 'off', userId: null });
   });
 
-  it('keeps records that are still pending, and the account, when the upload fails', async () => {
+  it('keeps records that are still pending, and the account marked loggedOut, when the upload fails', async () => {
     const t = syncedSetup();
     t.sync.signIn(U1);
     await t.sync.settled();
@@ -657,10 +779,13 @@ describe('progress sync: logout (design §4.7)', () => {
     assert.deepEqual(getLocal(t.storage, 'l1').seen, ['b1']);
     assert.equal(marker(t.storage, 'l1'), iso(1));
     assert.equal(getLocal(t.storage, 'l2'), null);
-    assert.deepEqual(account(t.storage), { userId: U1, epoch: null });
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
 
-    // The same learner's next sign-in uploads them; another learner's clears them.
+    // The same learner's next sign-in uploads them without asking (nothing changed since);
+    // another learner's clears them.
     t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'hydrating');
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null });
     await t.sync.settled();
     assert.equal(t.api.puts().length, 2);
     assert.equal(marker(t.storage, 'l1'), null);
@@ -702,18 +827,65 @@ describe('progress sync: logout (design §4.7)', () => {
     assert.equal(getLocal(t.storage, 'l1').summary, undefined);
   });
 
-  it('while the GET failed (sync off) logout still clears what is not pending', async () => {
+  it('while the GET failed (sync off) logout loads and uploads once more before clearing', async () => {
     const t = syncedSetup();
     for (let i = 0; i < 4; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: 503 }) });
     putLocal(t.storage, 'l2', record({ seen: ['old'] }));
     t.sync.signIn(U1);
     await t.clock.advance(60_000);
+    assert.equal(t.sync.getState().status, 'offline');
     putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
     t.sync.noteLocalWrite(COURSE, 'l1');
+    // The API is back: the logout hydrates (this learner's records the server lacks) and uploads.
     await t.sync.signOut();
+    assert.equal(t.api.gets().length, 5);
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l1', 'l2']]);
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.equal(getLocal(t.storage, 'l2'), null);
+    assert.equal(account(t.storage), null);
+  });
+
+  it('when that last try fails too, logout keeps only what is pending, for at most 3 s', async () => {
+    const t = syncedSetup();
+    for (let i = 0; i < 8; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: 0 }) });
+    putLocal(t.storage, 'l2', record({ seen: ['old'] }));
+    t.sync.signIn(U1);
+    await t.clock.advance(60_000);
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    let done = false;
+    const out = t.sync.signOut().then(() => {
+      done = true;
+    });
+    await t.clock.advance(2_900);
+    assert.equal(done, false);
+    await t.clock.advance(200);
+    await out;
     assert.equal(getLocal(t.storage, 'l2'), null);
     assert.deepEqual(getLocal(t.storage, 'l1').seen, ['b1']);
     assert.equal(t.api.puts().length, 0);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    // The GET that was still retrying ends with the logout.
+    await t.clock.advance(60_000);
+    assert.ok(t.api.gets().length <= 7, `gets ${t.api.gets().length}`);
+  });
+
+  it('after a 503 stopped uploads, logout uploads what is pending', async () => {
+    const t = syncedSetup();
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    t.api.script('put', { error: Object.assign(new Error('x'), { status: 503 }) });
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    await t.clock.advance(5_000);
+    assert.equal(t.sync.getState().status, 'stopped');
+    putLocal(t.storage, 'l1', record({ seen: ['b1', 'b2'], updatedAt: iso(30) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    await t.clock.advance(3_600_000);
+    await t.sync.signOut();
+    assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.seen, ['b1', 'b2']);
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.equal(account(t.storage), null);
   });
 
   it('a new sign-in after logout hydrates again', async () => {
@@ -796,26 +968,173 @@ function twoTabs({ storage = memoryStorage(), rows = [], epoch = null } = {}) {
 }
 
 describe('progress sync: shared tablets and other tabs (verification scenarios)', () => {
-  it("child A's GET fails, A signs out, child B signs in: B never sees or uploads A's records", async () => {
+  it("child A's GET fails, A signs out, child B signs in: A's work reaches A's account, and B never sees or uploads it", async () => {
     const t = syncedSetup({ epoch: E1 });
     putLocal(t.storage, 'l2', record({ seen: ['a-old'] }));
     for (let i = 0; i < 4; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: 429 }) });
     t.sync.signIn(U1);
     await t.clock.advance(60_000);
     assert.equal(t.sync.getState().status, 'offline');
-    putLocal(t.storage, 'l1', record({ seen: ['a-new'], updatedAt: iso(1) }));
+    // An hour of study with the API healthy again.
+    putLocal(t.storage, 'l1', record({ seen: ['a-new'], updatedAt: iso(60) }));
     t.sync.noteLocalWrite(COURSE, 'l1');
+    await t.clock.advance(3_600_000);
     t.storage.setItem(LEARNING_EVENTS_KEY, '[{"id":"a"}]');
     await t.sync.signOut();
-    // A's pending record waits for A; nothing else of A's is left.
+    // The logout uploaded A's records; nothing of A's is left here.
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l1', 'l2']]);
+    const rowsA = t.api.server.rows;
+    assert.deepEqual(rowsA.get(`${COURSE}:l1`).progress.seen, ['a-new']);
+    assert.equal(getLocal(t.storage, 'l1'), null);
     assert.equal(getLocal(t.storage, 'l2'), null);
     assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), null);
+    assert.equal(account(t.storage), null);
+    // B's account on the server.
+    t.api.server.rows = new Map();
     t.sync.signIn(U2);
-    assert.equal(getLocal(t.storage, 'l1'), null);
-    assert.equal(marker(t.storage, 'l1'), null);
     await t.sync.settled();
-    assert.equal(t.api.puts().length, 0);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.api.server.rows.size, 0);
+    assert.equal(getLocal(t.storage, 'l1'), null);
     assert.deepEqual(account(t.storage), { userId: U2, epoch: E1 });
+  });
+
+  it("A logs out offline and someone without a primary session studies here: A's next sign-in asks first, and \"Don't add\" keeps only A's own unsent work", async () => {
+    const t = syncedSetup({ epoch: E1 });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['a1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    t.api.script('put', { error: Object.assign(new Error('offline'), { status: 0 }) });
+    await t.sync.signOut();
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: E1, loggedOut: true });
+    // A Nexloom-only user (no primary session: sync is off) reads l3, with its streak and history.
+    putLocal(t.storage, 'l3', record({ seen: ['n-only'], updatedAt: iso(20) }));
+    t.sync.noteLocalWrite(COURSE, 'l3');
+    t.storage.setItem(LEARNING_EVENTS_KEY, '[{"id":"n"}]');
+    assert.equal(marker(t.storage, 'l3'), null);
+
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    await t.clock.advance(60_000);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.api.gets().length, 1);
+    assert.equal(t.api.server.rows.size, 0);
+
+    assert.equal(t.sync.choose(false), true);
+    await t.sync.settled();
+    assert.equal(getLocal(t.storage, 'l3'), null);
+    assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), null);
+    assert.deepEqual(t.api.puts().slice(1).map((call) => call.body.records.map((r) => r.lessonId)), [['l1']]);
+    assert.deepEqual(t.api.puts().at(-1).body.epoch, E1);
+    assert.deepEqual([...t.api.server.rows.keys()], [`${COURSE}:l1`]);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: E1 });
+  });
+
+  it("a change to A's unsent record made after A left is asked about too; \"Add\" uploads it", async () => {
+    const t = syncedSetup();
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['a1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    t.api.script('put', { error: Object.assign(new Error('offline'), { status: 0 }) });
+    await t.sync.signOut();
+    putLocal(t.storage, 'l1', record({ seen: ['a1', 'n1'], updatedAt: iso(20) }));
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    assert.equal(t.sync.choose(true), true);
+    await t.sync.settled();
+    assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.seen, ['a1', 'n1']);
+  });
+
+  it('a delete made elsewhere while A was away still clears what A left, whatever A chooses', async () => {
+    const t = syncedSetup({ epoch: E1 });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['a1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    t.api.script('put', { error: Object.assign(new Error('offline'), { status: 0 }) });
+    await t.sync.signOut();
+    putLocal(t.storage, 'l3', record({ seen: ['n-only'], updatedAt: iso(20) }));
+    // A deleted their progress on another device.
+    t.api.server.epoch = E2;
+    t.sync.signIn(U1);
+    t.sync.choose(true);
+    await t.sync.settled();
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.equal(getLocal(t.storage, 'l3'), null);
+    assert.equal(t.api.server.rows.size, 0);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: E2 });
+  });
+
+  it("A's session ends without a logout and someone else studies here: A's next sign-in asks first and uploads nothing before the answer", async () => {
+    const t = syncedSetup({ rows: [row('l1', record({ seen: ['a1'], updatedAt: iso(-30) }))] });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l2', record({ seen: ['a2'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l2');
+    // The session expires before the flush.
+    t.sync.stop();
+    assert.equal(t.sync.getState().status, 'off');
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    putLocal(t.storage, 'l3', record({ seen: ['n-only'], updatedAt: iso(20) }));
+    await t.clock.advance(60_000);
+
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    await t.clock.advance(60_000);
+    assert.equal(t.api.puts().length, 0);
+    assert.equal(t.api.gets().length, 1);
+    t.sync.choose(false);
+    await t.sync.settled();
+    // A's synced l1 and unsent l2 stay; only l2 needed uploading.
+    assert.equal(getLocal(t.storage, 'l3'), null);
+    assert.deepEqual(getLocal(t.storage, 'l1').seen, ['a1']);
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l2']]);
+    assert.ok(!t.api.server.rows.has(`${COURSE}:l3`));
+  });
+
+  it('a logout in one tab: the other tab, until its session ends too, keeps marking but uploads nothing; A is not asked about it later', async () => {
+    const t = twoTabs();
+    setAccount(t.storage, U1, null);
+    t.a.signIn(U1);
+    t.b.signIn(U1);
+    await t.a.settled();
+    await t.b.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    t.b.noteLocalWrite(COURSE, 'l1');
+    t.api.script('put', { error: Object.assign(new Error('offline'), { status: 0 }) });
+    await t.b.signOut();
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    // Tab A has not heard of the logout yet.
+    putLocal(t.storage, 'l2', record({ seen: ['c1'], updatedAt: iso(2) }));
+    t.a.noteLocalWrite(COURSE, 'l2');
+    await t.clock.advance(60_000);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.a.getState().status, 'stopped');
+    // Its SIGNED_OUT arrives; then A signs in again: both records are A's.
+    t.a.stop();
+    t.a.signIn(U1);
+    assert.equal(t.a.getState().status, 'hydrating');
+    await t.a.settled();
+    assert.deepEqual(t.api.puts().at(-1).body.records.map((r) => r.lessonId), ['l1', 'l2']);
+  });
+
+  it("A's session ends without a logout and nobody else studies here: A's next sign-in asks nothing", async () => {
+    const t = syncedSetup({ rows: [row('l1', record({ seen: ['a1'], updatedAt: iso(-30) }))] });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l2', record({ seen: ['a2'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l2');
+    t.sync.stop();
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'hydrating');
+    await t.sync.settled();
+    assert.equal(t.sync.getState().status, 'on');
+    assert.deepEqual(t.api.puts().map((call) => call.body.records.map((r) => r.lessonId)), [['l2']]);
+    assert.equal(marker(t.storage, 'l1'), null);
+    assert.equal(marker(t.storage, 'l2'), null);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null });
   });
 
   it("A's session ends without a logout (expiry): B's sign-in still clears A's records and streak first", async () => {
@@ -1010,6 +1329,21 @@ describe('progress sync: the reader guard and ids', () => {
     assert.equal(isAccountSwitch(null, acc(U1, '?')), true);
     assert.equal(parseSyncAccount('{"userId":""}'), null);
     assert.deepEqual(parseSyncAccount('{"userId":"u","epoch":5}'), { userId: 'u', epoch: '?' });
+    // The learner left with records pending: nobody is signed in, so an open reader drops its record.
+    const left = JSON.stringify({ userId: U1, epoch: E1, loggedOut: true });
+    assert.deepEqual(parseSyncAccount(left), { userId: U1, epoch: E1, loggedOut: true });
+    assert.deepEqual(parseSyncAccount('{"userId":"u","epoch":null,"loggedOut":"yes"}'), { userId: 'u', epoch: null });
+    assert.equal(isAccountSwitch(acc(U1, E1), left), true);
+    assert.equal(isAccountSwitch(left, acc(U1, E1)), true);
+    assert.equal(isSignedOutAccount(left), true);
+    assert.equal(isSignedOutAccount(null), true);
+    assert.equal(isSignedOutAccount(acc(U1, E1)), false);
+  });
+
+  it('clears the keys services/progressService.ts keeps learning events and legacy course progress under', () => {
+    const text = read('services/progressService.ts');
+    assert.match(text, new RegExp(`const STORAGE_KEY = '${LEGACY_PROGRESS_KEY}';`));
+    assert.match(text, new RegExp(`const EVENTS_KEY = '${LEARNING_EVENTS_KEY}';`));
   });
 
   it('uses the server id rule and keys outside the rp:progress: record scan', () => {
@@ -1036,7 +1370,7 @@ describe('progress sync: wiring (static)', () => {
   it('AuthContext runs the owner rule for the primary session before setUser, and logout clears after the AI data line', () => {
     const text = read('context/AuthContext.tsx');
     const handle = text.slice(text.indexOf('const handleSession'), text.indexOf('// Get initial sessions'));
-    assert.ok(handle.indexOf("client === 'primary' && session.access_token) signInProgressSync(session.user.id)") > 0);
+    assert.ok(handle.indexOf("client === 'primary' && session.access_token) signInProgressSync(session.user.id, session.access_token)") > 0);
     assert.ok(handle.indexOf('signInProgressSync(') < handle.indexOf('setUser(u)'));
     assert.match(text, /getSession\(\)\.then\(\(\{ data: \{ session \} \}\) => \{\s*if \(session\?\.user\) handleSession\(session, 'primary'\)/);
     assert.match(text, /handleSession\(session, 'nexloom'\)/);
@@ -1050,9 +1384,11 @@ describe('progress sync: wiring (static)', () => {
   it('the browser wiring sends requests only for the learner whose session it is, and hears choices made in other tabs', () => {
     const text = read('components/lesson/progressSyncClient.ts');
     assert.match(text, /get: \(\) => asSyncedLearner\(getLessonProgressRecords\)/);
-    assert.match(text, /put: \(body, \{ keepalive \}\) => asSyncedLearner\(\(\) => putLessonProgressRecords\(/);
+    assert.match(text, /put: \(body, \{ keepalive \}\) => putProgress\(body, keepalive\)/);
+    // Only the page-hide upload skips the session check, with the token of this learner's own session.
+    assert.match(text, /if \(keepalive && auth && auth\.userId === instance\?\.getState\(\)\.userId\) \{\s*return putLessonProgressRecords\(body, \{ keepalive: true, token: auth\.token \}\);\s*\}\s*return asSyncedLearner\(\(\) => putLessonProgressRecords\(body, \{ keepalive \}\)\);/);
     assert.match(text, /del: \(\) => asSyncedLearner\(deleteLessonProgressRecords\)/);
-    assert.match(text, /if \(!expected \|\| current !== expected\)/);
+    assert.match(text, /if \(!expected \|\| \(current !== null && current !== expected\)\)/);
     assert.match(text, /event\.key === SYNC_ACCOUNT_KEY \|\| event\.key === null\) sync\.accountChanged\(\)/);
   });
 

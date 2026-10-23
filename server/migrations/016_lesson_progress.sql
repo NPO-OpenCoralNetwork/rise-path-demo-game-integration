@@ -8,8 +8,8 @@
 -- lowercase letters, digits and "-", at most 80 characters (tools/core/courseCatalog.js leaves out
 -- any lesson that breaks it, so a stored record never fails these CHECKs).
 -- - progress: the merged record ({v, seen, answers, checks, lastBlockId, updatedAt, editedAt?,
---   ratings?}), never a client's record as sent: the server sanitizes and merges it into the row
---   it locked (shared/lesson/progressMerge.js). At most 64 KiB of jsonb text.
+--   editedKeys?, ratings?}), never a client's record as sent: the server sanitizes and merges it
+--   into the row it locked (shared/lesson/progressMerge.js). At most 64 KiB of jsonb text.
 -- - pct, state: derived with shared/lesson/progress.js against the published lesson whose hash
 --   is content_hash (shared/lesson/hash.js lessonHash); recomputed when the lesson changes.
 -- - progress_updated_at: the record's own updatedAt (the learner's last change, by the device's

@@ -86,13 +86,20 @@ export async function getLessonProgressRecords(): Promise<{ epoch: string | null
 
 /**
  * Merges up to 25 records into the stored ones (the server merges; it never stores a record as
- * sent). `keepalive` lets the request finish after the page is hidden (body ≤ 64 KiB).
+ * sent). `keepalive` lets the request finish after the page is hidden (body ≤ 64 KiB). `token`:
+ * this access token instead of the session's; apiFetch then calls fetch before its first await
+ * (the page-hide upload must start inside the event handler).
  */
 export async function putLessonProgressRecords(
   payload: LessonProgressPutBody,
-  { keepalive = false }: { keepalive?: boolean } = {},
+  { keepalive = false, token }: { keepalive?: boolean; token?: string } = {},
 ): Promise<{ epoch: string | null; records: LessonProgressRecordOut[]; rejected: LessonProgressRejection[] }> {
-  const body = await send({ method: 'PUT', body: JSON.stringify(payload), ...(keepalive ? { keepalive: true } : {}) });
+  const body = await send({
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    ...(keepalive ? { keepalive: true } : {}),
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  });
   const rejected = Array.isArray(body.rejected)
     ? body.rejected.filter((item): item is LessonProgressRejection => isRecord(item) && typeof item.error_type === 'string')
     : [];

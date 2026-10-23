@@ -14,13 +14,13 @@ import { chooseProgressAdoption, useProgressSyncState } from './progressSyncClie
 const copy = {
   en: {
     title: 'Add the learning progress saved on this device to your account?',
-    body: 'If someone else studied on this device, choose "Don\'t add". "Don\'t add" removes the progress saved on this device.',
+    body: 'If someone else studied on this device, choose "Don\'t add". "Don\'t add" removes this progress from this device.',
     add: 'Add',
     dontAdd: "Don't add",
   },
   jp: {
     title: 'この端末に保存されている学習の記録を、あなたのアカウントに追加しますか？',
-    body: 'ほかの人がこの端末で学習していた場合は「追加しない」を選んでください。追加しない場合、この端末の記録は消えます。',
+    body: 'ほかの人がこの端末で学習していた場合は「追加しない」を選んでください。「追加しない」を選ぶと、この記録はこの端末から消えます。',
     add: '追加する',
     dontAdd: '追加しない',
   },

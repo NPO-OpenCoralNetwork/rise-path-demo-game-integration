@@ -11,9 +11,10 @@
  *
  * Record `rp:progress:<courseSlug>:<lessonId>` → LessonProgress
  *   { v:1, seen, answers, checks, lastBlockId, updatedAt } plus the optional `editedAt` (last
- *   check or rating edit, the merge clock for those), `ratings` (self-rating per objective) and
- *   `summary` ({pct, state} at the last write, so course maps can show a status without loading
- *   the lesson). `answers` is keyed by `<blockId>/<questionId>` (see answerKey).
+ *   check or rating edit), `editedKeys` (the last edit of each check and rating: the merge clock
+ *   for those, editedAt the fallback), `ratings` (self-rating per objective) and `summary`
+ *   ({pct, state} at the last write, so course maps can show a status without loading the
+ *   lesson). `answers` is keyed by `<blockId>/<questionId>` (see answerKey).
  *
  * @typedef {import('./schema.js').Lesson} Lesson
  * @typedef {import('./schema.js').Block} Block
@@ -54,7 +55,10 @@ export const LESSON_STATES = /** @type {const} */ (['not_started', 'in_progress'
  * @property {Record<string, boolean>} checks Ticked checklist items, completed steps, flashcards marked as known, …
  * @property {string | null} lastBlockId Block to resume at; null means the top of the lesson.
  * @property {string} updatedAt ISO time of the last change of any kind.
- * @property {string} [editedAt] ISO time of the last check or rating edit (their merge clock).
+ * @property {string} [editedAt] ISO time of the last check or rating edit (the fallback clock
+ *   for a check or rating without its own time in editedKeys).
+ * @property {Record<string, string>} [editedKeys] ISO time of the last edit per check key and per
+ *   ratingClockKey(objectiveId): the merge clock of each check and rating.
  * @property {Record<string, SelfRating>} [ratings]
  * @property {ProgressSummary} [summary]
  */
@@ -66,6 +70,16 @@ export const LESSON_STATES = /** @type {const} */ (['not_started', 'in_progress'
  */
 export function answerKey(blockId, questionId) {
   return `${blockId}/${questionId}`;
+}
+
+/**
+ * The editedKeys key of a self-rating. A check key always holds a "/" and an objective id never
+ * does, so the two cannot collide.
+ * @param {string} objectiveId
+ * @returns {string}
+ */
+export function ratingClockKey(objectiveId) {
+  return `rating:${objectiveId}`;
 }
 
 /** @returns {LessonProgress} */
@@ -163,6 +177,13 @@ export function parseProgress(raw) {
       if (value === 1 || value === 2 || value === 3) ratings[key] = value;
     }
   }
+  /** @type {Record<string, string>} */
+  const editedKeys = {};
+  if (isRecord(data.editedKeys)) {
+    for (const [key, value] of entriesOf(data.editedKeys)) {
+      if (typeof value === 'string' && value) editedKeys[key] = value;
+    }
+  }
   const summary = parseSummary(data.summary);
   return {
     v: PROGRESS_VERSION,
@@ -172,6 +193,7 @@ export function parseProgress(raw) {
     lastBlockId: typeof data.lastBlockId === 'string' && data.lastBlockId ? data.lastBlockId : null,
     updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : new Date(0).toISOString(),
     ...(typeof data.editedAt === 'string' && data.editedAt ? { editedAt: data.editedAt } : {}),
+    ...(Object.keys(editedKeys).length ? { editedKeys } : {}),
     ...(Object.keys(ratings).length ? { ratings } : {}),
     ...(summary ? { summary } : {}),
   };

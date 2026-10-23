@@ -3,8 +3,9 @@
  * Lesson progress across devices: the lesson index, the structural sanitiser for records that
  * arrive from a client, and the merge the server (and the client, when it takes in server data)
  * uses. The merge only adds information: seen is a union, answers keep the most attempts and a
- * final correct answer, and checks/ratings/resume position are last-writer-wins with their own
- * clocks (`editedAt` for checks and ratings, `updatedAt` for the resume block).
+ * correct answer, and checks/ratings/resume position are last-writer-wins with their own clocks
+ * (per key for checks and ratings: `editedKeys`, falling back to `editedAt`; `updatedAt` for the
+ * resume block).
  *
  * Keys the current lesson does not have are kept when they are well-formed, because the web
  * bundle and the server catalog deploy separately (version skew): progress.js lessonPct and
@@ -20,7 +21,7 @@
  * @typedef {import('./grading.js').QuizMode} QuizMode
  */
 import { ID_PATTERN } from './constants.js';
-import { PROGRESS_VERSION, answerKey, parseProgress } from './progress.js';
+import { PROGRESS_VERSION, answerKey, parseProgress, ratingClockKey } from './progress.js';
 
 /** Size caps for a stored record (each comfortably above the largest lesson: 58 blocks, 13 questions). */
 export const PROGRESS_LIMITS = Object.freeze({
@@ -110,6 +111,13 @@ export function lessonIndex(lesson) {
  */
 const isId = (value) => typeof value === 'string' && value.length <= PROGRESS_LIMITS.idLength && ID_PATTERN.test(value);
 
+/**
+ * Own key check without Object.hasOwn (the client sync runs this in browsers down to Safari 14).
+ * @param {object} object
+ * @param {string} key
+ */
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
 /** `<blockId>/<questionId>` (ids cannot contain "/"). */
 const isAnswerKey = (/** @type {string} */ key) => {
   const parts = key.split('/');
@@ -147,8 +155,9 @@ const nowMsOf = (now) => {
  * client on another version of the lesson loses nothing). Parses the v1 shape, keeps
  * well-formed keys (ids match ID_PATTERN, ≤ 80 chars), caps every collection, drops answer
  * records that say "not answered" (attempts 0 and not revealed), keeps firstTry and correct
- * only with an attempt, re-serialises the timestamps (invalid → epoch 0, at most 5 minutes
- * ahead of `now`) and drops the derived summary.
+ * only with an attempt, keeps edit times only for checks and ratings the record has,
+ * re-serialises the timestamps (invalid → epoch 0, at most 5 minutes ahead of `now`) and drops
+ * the derived summary.
  *
  * @param {unknown} raw JSON text or a parsed value
  * @param {{ now?: number | Date }} [options]
@@ -189,6 +198,14 @@ export function sanitizeProgress(raw, { now } = {}) {
     ratings[key] = value;
   }
 
+  // One edit time per check and rating at most, so this map stays within checks + ratings.
+  const clocked = new Set([...Object.keys(checks), ...Object.keys(ratings).map(ratingClockKey)]);
+  /** @type {Record<string, string>} */
+  const editedKeys = {};
+  for (const [key, value] of Object.entries(parsed.editedKeys ?? {}).filter(([k]) => clocked.has(k)).slice(0, PROGRESS_LIMITS.checks + PROGRESS_LIMITS.ratings)) {
+    editedKeys[key] = cleanTime(value, nowMs);
+  }
+
   return {
     v: PROGRESS_VERSION,
     seen: parsed.seen.filter(isId).slice(0, PROGRESS_LIMITS.seen),
@@ -197,18 +214,12 @@ export function sanitizeProgress(raw, { now } = {}) {
     lastBlockId: isId(parsed.lastBlockId) ? parsed.lastBlockId : null,
     updatedAt: cleanTime(parsed.updatedAt, nowMs),
     ...(parsed.editedAt !== undefined ? { editedAt: cleanTime(parsed.editedAt, nowMs) } : {}),
+    ...(Object.keys(editedKeys).length ? { editedKeys } : {}),
     ...(Object.keys(ratings).length ? { ratings } : {}),
   };
 }
 
 // --- Merging ----------------------------------------------------------------------------------
-
-/**
- * Own key check without Object.hasOwn (the client sync runs this in browsers down to Safari 14).
- * @param {object} object
- * @param {string} key
- */
-const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
 /** @param {string | undefined} iso */
 const timeOf = (iso) => {
@@ -246,8 +257,20 @@ function mergeAnswer(server, client) {
   const revealed = server.revealed === true || client.revealed === true;
   // A correct answer on the server is final: keep it whole, OR in only the reveal.
   if (server.correct && server.attempts > 0) return { ...copyAnswer(server), ...(revealed ? { revealed: true } : {}) };
-  // The latest submission is the one with more attempts; a tie keeps the server's, the same
-  // side firstTry comes from, so the record stays coherent.
+  // A correct answer on the client is kept too, whatever the attempt counts: a tie means each
+  // side missed the other's submission (a tab open since before an AI app's course-quiz-check).
+  // firstTry still comes from the server's first submission when it has one.
+  if (client.correct && client.attempts > 0) {
+    return {
+      attempts: Math.max(server.attempts, client.attempts),
+      correct: true,
+      chosen: [...client.chosen],
+      firstTry: server.attempts > 0 ? server.firstTry : client.firstTry,
+      ...(revealed ? { revealed: true } : {}),
+    };
+  }
+  // Neither is correct: the latest submission is the one with more attempts; a tie keeps the
+  // server's, the same side firstTry comes from, so the record stays coherent.
   const latest = client.attempts > server.attempts ? client : server;
   return {
     attempts: Math.max(server.attempts, client.attempts),
@@ -259,34 +282,66 @@ function mergeAnswer(server, client) {
 }
 
 /**
- * Per-key last-writer-wins on a record-level clock; keys only on one side are kept.
+ * The merge clock of one check or rating: its own edit time (editedKeys), else the record's
+ * editedAt (records from before per-key times), else updatedAt.
+ * @param {LessonProgress} record
+ * @param {string} clockKey the check key, or ratingClockKey(objectiveId)
+ * @returns {string}
+ */
+const clockOf = (record, clockKey) => (record.editedKeys && hasOwn(record.editedKeys, clockKey)
+  ? record.editedKeys[clockKey]
+  : record.editedAt ?? record.updatedAt);
+
+/**
+ * Per-key last-writer-wins on per-key clocks (clockOf; a tie keeps the server's); keys only on
+ * one side are kept. Writes the clock of every kept value into `clocks` (for a key both sides
+ * have, the later of the two), so a value keeps the clock it won with: a value that won on the
+ * editedAt fallback is not undone later by an edit older than that fallback.
  * @template T
- * @param {Record<string, T>} server
- * @param {Record<string, T>} client
- * @param {boolean} clientNewer
+ * @param {Record<string, T>} serverValues
+ * @param {Record<string, T>} clientValues
+ * @param {{ server: LessonProgress, client: LessonProgress, clockKey: (key: string) => string, clocks: Record<string, string> }} context
  * @returns {Record<string, T>}
  */
-function mergeKeyed(server, client, clientNewer) {
+function mergeKeyed(serverValues, clientValues, { server, client, clockKey, clocks }) {
   /** @type {Record<string, T>} */
   const out = {};
-  for (const [key, value] of Object.entries(server)) out[key] = value;
-  for (const [key, value] of Object.entries(client)) {
-    if (clientNewer || !hasOwn(server, key)) out[key] = value;
+  for (const [key, value] of Object.entries(serverValues)) {
+    out[key] = value;
+    clocks[clockKey(key)] = clockOf(server, clockKey(key));
+  }
+  for (const [key, value] of Object.entries(clientValues)) {
+    const name = clockKey(key);
+    const clientClock = clockOf(client, name);
+    if (!hasOwn(serverValues, key)) {
+      out[key] = value;
+      clocks[name] = clientClock;
+    } else if (timeOf(clientClock) > timeOf(clocks[name])) {
+      out[key] = value;
+      clocks[name] = clientClock;
+    }
   }
   return out;
 }
+
+/** A check is clocked under its own key. @param {string} key */
+const checkClockKey = (key) => key;
 
 /**
  * Merges a client record into the server's (or into nothing). Never loses an answer, a seen
  * block or a key only one side has. The result has no summary (it is derived: recompute it).
  *
  * - seen: union, server order first.
- * - answers: one side only → it. Both: a server record with correct && attempts > 0 is final
- *   (revealed is OR-ed in). Otherwise attempts = max; chosen/correct from the side with more
- *   attempts (tie → server); firstTry from the server when it has an attempt, else the client;
- *   revealed = OR.
- * - checks, ratings: per key, the side with the newer editedAt (fallback updatedAt) wins; a tie
- *   keeps the server's.
+ * - answers: one side only → it. Both: a correct record (correct && attempts > 0) on either
+ *   side is final: a correct server record is kept whole (revealed is OR-ed in); else a correct
+ *   client record gives correct/chosen, with attempts = max. Otherwise attempts = max;
+ *   chosen/correct from the side with more attempts (tie → server). firstTry from the server
+ *   when it has an attempt, else the client; revealed = OR.
+ * - checks, ratings: per key, the side with the newer clock for that key wins (its editedKeys
+ *   time, else editedAt, else updatedAt); a tie keeps the server's. Ratings are clocked under
+ *   ratingClockKey(objectiveId).
+ * - editedKeys: the clock of every check and rating kept, from the side it was kept from (so
+ *   keys that had only the editedAt fallback get their own time).
  * - lastBlockId: from the side with the newer updatedAt (tie → server).
  * - updatedAt and editedAt: the later of the two.
  *
@@ -307,6 +362,7 @@ export function mergeProgress(server, client) {
       lastBlockId: client.lastBlockId ?? null,
       updatedAt: client.updatedAt,
       ...(client.editedAt !== undefined ? { editedAt: client.editedAt } : {}),
+      ...(client.editedKeys && Object.keys(client.editedKeys).length ? { editedKeys: { ...client.editedKeys } } : {}),
       ...(client.ratings && Object.keys(client.ratings).length ? { ratings: { ...client.ratings } } : {}),
     };
   }
@@ -323,9 +379,10 @@ export function mergeProgress(server, client) {
     if (!hasOwn(server.answers, key)) answers[key] = copyAnswer(record);
   }
 
-  const clientEditedNewer = timeOf(client.editedAt ?? client.updatedAt) > timeOf(server.editedAt ?? server.updatedAt);
-  const checks = mergeKeyed(server.checks, client.checks, clientEditedNewer);
-  const ratings = mergeKeyed(server.ratings ?? {}, client.ratings ?? {}, clientEditedNewer);
+  /** @type {Record<string, string>} */
+  const editedKeys = {};
+  const checks = mergeKeyed(server.checks, client.checks, { server, client, clockKey: checkClockKey, clocks: editedKeys });
+  const ratings = mergeKeyed(server.ratings ?? {}, client.ratings ?? {}, { server, client, clockKey: ratingClockKey, clocks: editedKeys });
   const clientUpdatedNewer = timeOf(client.updatedAt) > timeOf(server.updatedAt);
   const editedAt = laterTime(server.editedAt, client.editedAt);
 
@@ -337,6 +394,7 @@ export function mergeProgress(server, client) {
     lastBlockId: (clientUpdatedNewer ? client.lastBlockId : server.lastBlockId) ?? null,
     updatedAt: /** @type {string} */ (laterTime(server.updatedAt, client.updatedAt)),
     ...(editedAt !== undefined ? { editedAt } : {}),
+    ...(Object.keys(editedKeys).length ? { editedKeys } : {}),
     ...(Object.keys(ratings).length ? { ratings } : {}),
   };
 }

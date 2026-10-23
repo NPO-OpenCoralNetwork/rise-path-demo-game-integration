@@ -2,7 +2,12 @@ import React, { useEffect, useId, useRef } from 'react';
 
 /**
  * Small confirmation dialog on the native <dialog> element (modal): the browser keeps focus
- * inside it and Esc closes it; on close, focus returns to `returnFocusRef`.
+ * inside it and Esc closes it; on close, focus returns to `returnFocusRef` (keep that element
+ * enabled while busy, or focus has nowhere to go).
+ *
+ * While `busy` (the confirmed action is running and cannot be called back), both buttons are
+ * aria-disabled, not disabled, so focus stays on the pressed button; Cancel does nothing and
+ * Esc is refused (best effort: Chromium closes anyway on a repeated Esc).
  */
 export interface ConfirmDialogProps {
   open: boolean;
@@ -72,6 +77,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       ref={ref}
       aria-labelledby={titleId}
       aria-describedby={bodyId}
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
+      }}
       className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-hero border border-line bg-raised p-0 text-fg shadow-3 backdrop:bg-overlay"
     >
       <div className="p-5">
@@ -85,16 +93,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <button
             ref={cancelRef}
             type="button"
-            onClick={() => ref.current?.close()}
-            className="h-10 rounded-control border border-line bg-surface px-4 text-body font-semibold text-fg hover:bg-sunken"
+            aria-disabled={busy || undefined}
+            onClick={() => {
+              if (!busy) ref.current?.close();
+            }}
+            className="h-10 rounded-control border border-line bg-surface px-4 text-body font-semibold text-fg hover:bg-sunken aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            className={`h-10 rounded-control border border-transparent px-4 text-body font-semibold text-on-primary disabled:opacity-50 ${CONFIRM_TONE[confirmTone]}`}
+            aria-disabled={busy || undefined}
+            onClick={busy ? undefined : onConfirm}
+            className={`h-10 rounded-control border border-transparent px-4 text-body font-semibold text-on-primary aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${CONFIRM_TONE[confirmTone]}`}
           >
             {confirmLabel}
           </button>
