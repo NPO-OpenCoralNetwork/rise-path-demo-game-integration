@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { ArrowLeft, Bell, CreditCard, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useUserRole } from '../../../hooks/useUserRole';
+import { usePlanEntry } from '../../../hooks/usePlanEntry';
 import { useAuth } from '../../../context/AuthContext';
 import { getAiAccess, type AiAccessStatus } from '../../../services/aiAccessApi';
 import { checkTtsAvailable, getDisplayName, loadTtsPreferences } from '../../../services/ttsPreferencesService';
@@ -22,6 +23,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     const { setTheme } = useTheme();
     const { isAdmin } = useUserRole();
     const { user } = useAuth();
+    // Phase 3: only with VITE_FEATURE_BILLING and a GET /billing/me with eligibility 'ok' or a subscription.
+    const showPlan = usePlanEntry();
     const [aiAccess, setAiAccess] = useState<AiAccessStatus | null>(null);
     const [voiceLabel, setVoiceLabel] = useState('');
     const [ttsStatus, setTtsStatus] = useState<'ok' | 'unavailable' | 'loading'>('loading');
@@ -83,6 +86,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             languageHint: 'Tap to switch display language',
             profile: 'Edit Profile',
             notifications: 'Notifications',
+            plan: 'Plan',
+            planHint: 'Payment and cancellation',
             ai: 'AI features',
             aiChecking: 'Checking…',
             aiLive: (provider: string | null) => `Runs securely on the server${provider ? ` · ${provider}` : ''}`,
@@ -124,6 +129,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             languageHint: 'タップして表示言語を切り替え',
             profile: 'プロフィール編集',
             notifications: '通知',
+            plan: 'プラン',
+            planHint: 'お支払いと解約',
             ai: 'AI 機能',
             aiChecking: '確認中…',
             aiLive: (provider: string | null) => `サーバーで安全に実行中${provider ? `・${provider}` : ''}`,
@@ -249,6 +256,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                             label={t.notifications}
                             onClick={() => onNavigate(ViewState.NOTIFICATIONS)}
                         />
+                        {showPlan && (
+                            <SettingsRow
+                                icon={<CreditCard size={20} />}
+                                label={t.plan}
+                                subtext={t.planHint}
+                                onClick={() => onNavigate(ViewState.SETTINGS_PLAN)}
+                            />
+                        )}
                     </SettingsSection>
 
                     <SettingsSection title={t.safety}>

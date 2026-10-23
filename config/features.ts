@@ -11,6 +11,11 @@
  *   (doc/brushup-2026/ai-access-plan.ja.md). On only when VITE_FEATURE_AGENT_CHAT is exactly
  *   "true". The in-lesson tutor (components/lesson/TutorPanel, /api/v2/llm) is not Hermes and
  *   does not depend on this flag.
+ * - billing: the supporter plan's entry points (Settings → Account 「プラン」, the profile link) and
+ *   the /settings/plan pages (doc/brushup-2026/ai-access-plan.ja.md §7). Off by default; on only
+ *   when VITE_FEATURE_BILLING is exactly "true". Even then an entry point shows only after GET
+ *   /api/v2/billing/me answers eligibility 'ok' or a subscription (services/billingRules.ts), and
+ *   every price and cap comes from the server. The public /legal/commerce page does not depend on it.
  */
 
 const DEV_SAMPLES_KEY = 'rp:dev-samples';
@@ -48,6 +53,8 @@ export const features = {
   frLocale: import.meta.env.VITE_FEATURE_FR === 'true',
   // Shared Hermes chats: off by default (see the note above and ai-access-plan.ja.md).
   agentChat: import.meta.env.VITE_FEATURE_AGENT_CHAT === 'true',
+  // Supporter plan screens: off by default (see the note above).
+  billing: import.meta.env.VITE_FEATURE_BILLING === 'true',
   labs: {
     sonic: labsEnabled,
     teacherBot: labsEnabled,

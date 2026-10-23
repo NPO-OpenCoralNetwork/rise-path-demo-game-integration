@@ -10,7 +10,8 @@
  *   … --allow <file>                                      # allowlist (default scripts/ci/scan-secrets.allow.json)
  *
  * Rules (ids are used in the allowlist): google-api-key, anthropic-api-key, openai-api-key,
- * github-token, slack-token, private-key, service-role-jwt, absolute-personal-path. Values that
+ * github-token, slack-token, stripe-secret-key, stripe-webhook-secret, private-key,
+ * service-role-jwt, absolute-personal-path. Values that
  * are obviously placeholders (a run of 8 identical characters, "example", "your_", …) are not
  * reported. Binary files (a NUL byte in the first 8000 bytes) and node_modules/ or dist/ are skipped.
  *
@@ -123,6 +124,11 @@ export const RULES = [
     /(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{50,255})(?![A-Za-z0-9_])/g, 4),
   tokenRule('slack-token', 'Slack token (xoxa-, xoxb-, xoxp-, xoxr-)', /(?<![A-Za-z0-9_-])xox[abpr]-[A-Za-z0-9-]{10,}/g, 5,
     (value) => /\d/.test(value.slice(5))),
+  // Stripe secret and restricted keys (test and live) and webhook signing secrets. Publishable
+  // keys (pk_) are public. At least 20 key characters, so short test fixtures are not reported.
+  tokenRule('stripe-secret-key', 'Stripe secret or restricted key (sk_test_, sk_live_, rk_test_, rk_live_)',
+    /(?<![A-Za-z0-9_])[sr]k_(?:test|live)_[A-Za-z0-9]{20,}(?![A-Za-z0-9_])/g, 8),
+  tokenRule('stripe-webhook-secret', 'Stripe webhook signing secret (whsec_)', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9+/=]{20,}/g, 6),
   {
     id: 'private-key',
     description: 'PEM private key block',

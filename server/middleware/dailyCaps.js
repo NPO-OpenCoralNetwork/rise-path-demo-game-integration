@@ -42,6 +42,23 @@
  * turned off (a limit of 0) is off for guests too.
  * Admins (user_profiles.role = 'admin') skip the user and address caps, not the global one.
  *
+ * Supporters (Phase 3, the paid plan): server.js calls setPlanResolver once with the billing
+ * resolver (server/services/billingEntitlement.js createSupporterCapResolver); mcp-public never
+ * does, so it never loads billing code and its mcp kinds keep the free caps. The resolver answers
+ * null for kinds the plan does not raise (no lookup), so only those kinds depend on it. For a
+ * supporter the user limit is the resolver's (the plan cap, or the free cap when that is higher),
+ * there is no per-address charge (a household or class shares one address), and the all-users
+ * subject is '*supporter' (AI_CAP_SUPPORTER_GLOBAL_<KIND>) instead of '*', so free use never uses
+ * up the paid pool and the two totals together are the cost breaker. A 0 in AI_CAP_USER/IP/
+ * GLOBAL_<KIND> still turns the kind off for everyone; a supporter pool of 0 turns it off for
+ * supporters. The outage share and the owner alerts cover '*supporter' on their own. A resolver
+ * that fails counts the caller as free. Free users keep exactly the subjects and SQL above.
+ * With a resolver set, a 429 body also carries plan: 'free' | 'supporter'.
+ *
+ * usageFor({ kind, userId }) reads today's count of the caller's own subject (Postgres, or this
+ * process's memory when there is no pool or the read fails) with the plan-aware user limit (GET
+ * /api/v2/billing/me shows it).
+ *
  * reserveFor({ kind, userId, ip }) is the same check without Express (the remote MCP endpoint): it
  * answers { handle } or { refusal: { status, headers, body } } with the body and headers below.
  *
@@ -68,6 +85,13 @@ import { modelMayHaveRun } from '../llm/errors.js';
 /** @typedef {{ user: number, ip: number | null, global: number }} CapLimit  ip null: no per-address cap */
 /** @typedef {{ refund: () => Promise<void> }} CapHandle */
 /** @typedef {{ status: number, headers: Record<string, string>, body: Record<string, unknown> }} CapRefusal */
+/** @typedef {'free'|'supporter'} CapPlan */
+/**
+ * What a plan resolver answers for one caller and kind: null when the kind has no plan limits (the
+ * free caps apply), { plan: 'free' }, or a supporter's user limit and all-supporters limit.
+ * @typedef {null | { plan: 'free' } | { plan: 'supporter', user: number, global: number }} PlanLimits
+ * @typedef {(caller: { kind: CapKind, userId: string }) => Promise<PlanLimits>} PlanResolver
+ */
 
 /** @type {readonly CapKind[]} */
 export const CAP_KINDS = Object.freeze(['llm', 'course_generation', 'image', 'agent_chat', 'embeddings', 'mcp', 'mcp_write']);
@@ -93,6 +117,8 @@ const DEFAULT_LIMITS = Object.freeze({
 const IP_CAP_FACTOR = 3;
 
 const GLOBAL_SUBJECT = '*';
+/** The supporters' all-users subject (Phase 3); its limit comes from the plan resolver. */
+export const SUPPORTER_GLOBAL_SUBJECT = '*supporter';
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 // Japan has had no daylight saving time since 1951, so JST is always UTC+9. A fixed offset gives
@@ -125,6 +151,9 @@ ON CONFLICT (usage_day, kind, subject)
 DO UPDATE SET count = ai_daily_usage.count + 1, updated_at = now()
 WHERE ai_daily_usage.count < $4
 RETURNING count`;
+
+/** Today's count of one subject (usageFor). */
+const READ_SQL = 'SELECT count FROM ai_daily_usage WHERE usage_day = $1::date AND kind = $2 AND subject = $3';
 
 /** Give slots back on the day they were charged, so a refund after midnight never adds to the new day. */
 const REFUND_SQL = `UPDATE ai_daily_usage SET count = count - 1, updated_at = now()
@@ -212,20 +241,22 @@ export function resolveCapLimits(env = process.env, { logger = console, warned =
 
 /**
  * The 429 daily_limit_reached answer, with Retry-After and reset_at at the next 00:00 JST. Scope
- * 'off' (a cap set to 0) has neither: nothing resets it but a configuration change.
- * @param {{ kind: CapKind, scope: CapScope, now?: number, message?: string }} options
+ * 'off' (a cap set to 0) has neither: nothing resets it but a configuration change. `plan` (only
+ * when a plan resolver is set) says which plan's limit refused the call.
+ * @param {{ kind: CapKind, scope: CapScope, now?: number, message?: string, plan?: CapPlan }} options
  * @returns {CapRefusal}
  */
-export function dailyLimitRefusal({ kind, scope, now = Date.now(), message }) {
+export function dailyLimitRefusal({ kind, scope, now = Date.now(), message, plan }) {
   const error = message ?? DEFAULT_MESSAGE[scope] ?? DEFAULT_MESSAGE.user;
+  const planField = plan ? { plan } : {};
   if (scope === 'off') {
-    return { status: 429, headers: {}, body: { error, error_type: 'daily_limit_reached', kind, scope } };
+    return { status: 429, headers: {}, body: { error, error_type: 'daily_limit_reached', kind, scope, ...planField } };
   }
   const resetAt = nextJstMidnight(now);
   return {
     status: 429,
     headers: { 'Retry-After': String(Math.max(1, Math.ceil((resetAt - now) / 1000))) },
-    body: { error, error_type: 'daily_limit_reached', kind, scope, reset_at: new Date(resetAt).toISOString() },
+    body: { error, error_type: 'daily_limit_reached', kind, scope, reset_at: new Date(resetAt).toISOString(), ...planField },
   };
 }
 
@@ -252,6 +283,7 @@ export function sendDailyLimit(res, options) {
  * @property {(day: string, kind: string, subject: string, limit: number) => Promise<number | null>} reserve
  *   the count after taking a slot, or null when the cap is reached
  * @property {(day: string, kind: string, subjects: string[]) => Promise<void>} refund
+ * @property {(day: string, kind: string, subject: string) => Promise<number>} read today's count (0 for none)
  */
 
 /**
@@ -286,6 +318,10 @@ function createMemoryStore() {
         else counts.delete(key);
       }
     },
+    /** @type {CapStore['read']} */
+    async read(day, kind, subject) {
+      return counts.get(`${day}|${kind}|${subject}`) ?? 0;
+    },
     clear() {
       counts.clear();
       currentDay = '';
@@ -307,6 +343,11 @@ const createPgStore = (pool) => ({
   },
   async refund(day, kind, subjects) {
     await pool.query(REFUND_SQL, [day, kind, subjects]);
+  },
+  async read(day, kind, subject) {
+    const result = await pool.query(READ_SQL, [day, kind, subject]);
+    const count = Number(result?.rows?.[0]?.count ?? 0);
+    return Number.isFinite(count) ? count : 0;
   },
 });
 
@@ -388,6 +429,8 @@ export function createDailyCaps({
   const lastDbWarnAt = new Map();
   /** The last AI_CAP_ALERT_WEBHOOK_URL value read, and what it parsed to. */
   let webhook = { raw: '', parsed: /** @type {URL | string} */ ('') };
+  /** @type {PlanResolver | null} */
+  let planResolver = null;
 
   /**
    * A warning logged at most once a minute per key.
@@ -444,7 +487,7 @@ export function createDailyCaps({
       } catch (error) {
         warnDb('reserving a daily cap slot', error, MEMORY_FALLBACK);
         outage = true;
-        if (subject === GLOBAL_SUBJECT) memoryLimit = Math.max(1, Math.ceil(limit * OUTAGE_GLOBAL_SHARE));
+        if (subject === GLOBAL_SUBJECT || subject === SUPPORTER_GLOBAL_SUBJECT) memoryLimit = Math.max(1, Math.ceil(limit * OUTAGE_GLOBAL_SHARE));
       }
     }
     const count = await memory.reserve(day, kind, subject, memoryLimit);
@@ -487,21 +530,29 @@ export function createDailyCaps({
   };
 
   /**
-   * Tell the owner, once a day per kind and level: 'warning' at GLOBAL_WARN_SHARE of a global cap,
-   * 'reached' when it refuses everyone. Logged as an error, and posted to the alert webhook.
+   * Tell the owner, once a day per kind, level and all-users subject: 'warning' at
+   * GLOBAL_WARN_SHARE of a global cap, 'reached' when it refuses everyone. Logged as an error, and
+   * posted to the alert webhook.
    * @param {'warning'|'reached'} level @param {string} day @param {CapKind} kind @param {number} limit
+   * @param {string} [subject]  GLOBAL_SUBJECT or SUPPORTER_GLOBAL_SUBJECT
    */
-  const alertGlobal = (level, day, kind, limit) => {
+  const alertGlobal = (level, day, kind, limit, subject = GLOBAL_SUBJECT) => {
     if (day !== alertedDay) {
       alerted.clear();
       alertedDay = day;
     }
-    const key = `${level}|${kind}`;
+    const supporters = subject === SUPPORTER_GLOBAL_SUBJECT;
+    const key = supporters ? `${level}|${kind}|${subject}` : `${level}|${kind}`;
     if (alerted.has(key)) return;
     alerted.add(key);
-    const line = level === 'reached'
-      ? `[AI caps] global daily cap reached: ${kind} (${limit}) on ${day} JST. Signed-in users are refused this feature until 00:00 JST (AI_CAP_GLOBAL_${kind.toUpperCase()}).`
-      : `[AI caps] global daily cap ${Math.round(GLOBAL_WARN_SHARE * 100)}% used: ${kind} (${limit}) on ${day} JST (AI_CAP_GLOBAL_${kind.toUpperCase()}).`;
+    const KIND = kind.toUpperCase();
+    const line = supporters
+      ? (level === 'reached'
+        ? `[AI caps] supporter global daily cap reached: ${kind} (${limit}) on ${day} JST. Supporters are refused this feature until 00:00 JST (AI_CAP_SUPPORTER_GLOBAL_${KIND}).`
+        : `[AI caps] supporter global daily cap ${Math.round(GLOBAL_WARN_SHARE * 100)}% used: ${kind} (${limit}) on ${day} JST (AI_CAP_SUPPORTER_GLOBAL_${KIND}).`)
+      : level === 'reached'
+        ? `[AI caps] global daily cap reached: ${kind} (${limit}) on ${day} JST. Signed-in users are refused this feature until 00:00 JST (AI_CAP_GLOBAL_${KIND}).`
+        : `[AI caps] global daily cap ${Math.round(GLOBAL_WARN_SHARE * 100)}% used: ${kind} (${limit}) on ${day} JST (AI_CAP_GLOBAL_${KIND}).`;
     logger.error(line);
     const raw = env.AI_CAP_ALERT_WEBHOOK_URL?.trim() ?? '';
     if (!raw || !fetchImpl) return;
@@ -510,6 +561,32 @@ export function createDailyCaps({
       if (typeof webhook.parsed === 'string') logger.warn(`[AI caps] ${webhook.parsed}: alerts are not posted.`);
     }
     if (typeof webhook.parsed !== 'string') void postAlert(webhook.parsed.href, line, fetchImpl, logger);
+  };
+
+  /** A limit the resolver may hand back: a whole number in range. @param {unknown} value */
+  const isLimit = (value) => Number.isInteger(value) && /** @type {number} */ (value) >= 0 && /** @type {number} */ (value) <= MAX_LIMIT;
+
+  /**
+   * The caller's plan for `kind` when a resolver is set: undefined without one; 'free' for a guest,
+   * for the mcp kinds (never looked up), for a kind the plan does not raise (the resolver answers
+   * null), or when the resolver fails (warned at most once a minute).
+   * @param {CapKind} kind @param {string} userId
+   * @returns {Promise<{ plan: CapPlan | undefined, supporter: { user: number, global: number } | null }>}
+   */
+  const planOf = async (kind, userId) => {
+    if (!planResolver) return { plan: undefined, supporter: null };
+    // The mcp kinds run on the learner's own model and never resolve a plan (mcp-public sets no
+    // resolver either); guests have none.
+    if (!userId || NO_ADDRESS_CAP.has(kind)) return { plan: 'free', supporter: null };
+    try {
+      const resolved = await planResolver({ kind, userId });
+      if (resolved?.plan === 'supporter' && isLimit(resolved.user) && isLimit(resolved.global)) {
+        return { plan: 'supporter', supporter: { user: resolved.user, global: resolved.global } };
+      }
+    } catch (error) {
+      warnEveryMinute('plan resolver', () => `[AI caps] the plan lookup failed (${error instanceof Error ? error.message : String(error)}): the caller gets the free caps.`);
+    }
+    return { plan: 'free', supporter: null };
   };
 
   /**
@@ -527,34 +604,44 @@ export function createDailyCaps({
       const limits = resolveCapLimits(env, { logger, warned: warnedLimits })[kind];
       if (!limits) throw new Error(`Unknown daily cap kind: ${kind}`);
       const t = now();
+      const userId = rawUserId ? String(rawUserId) : '';
       // Off is off for everyone, guests included (they are not counted, but not served either).
       if (limits.user === 0 || limits.ip === 0 || limits.global === 0) {
-        return { refusal: dailyLimitRefusal({ kind, scope: 'off', now: t }) };
+        const { plan } = await planOf(kind, userId);
+        return { refusal: dailyLimitRefusal({ kind, scope: 'off', now: t, plan }) };
       }
-      const userId = rawUserId ? String(rawUserId) : '';
       if (!userId) return { handle: NOOP_HANDLE };
+      const { plan, supporter } = await planOf(kind, userId);
+      // A supporter pool of 0: the kind is off for supporters (the free caps stay as they are).
+      if (supporter && (supporter.user === 0 || supporter.global === 0)) {
+        return { refusal: dailyLimitRefusal({ kind, scope: 'off', now: t, plan }) };
+      }
+      const userLimit = supporter ? supporter.user : limits.user;
+      const globalSubject = supporter ? SUPPORTER_GLOBAL_SUBJECT : GLOBAL_SUBJECT;
+      const globalLimit = supporter ? supporter.global : limits.global;
       const day = jstDay(t);
       const pool = poolFn();
       const store = storeFor(pool);
       /** @type {{ store: CapStore, subject: string }[]} */
       const charges = [];
       if (!(await isAdmin(userId, pool))) {
-        const user = await charge(store, day, kind, userId, limits.user);
+        const user = await charge(store, day, kind, userId, userLimit);
         if (!user.store) {
-          return { refusal: dailyLimitRefusal({ kind, scope: 'user', now: t }) };
+          return { refusal: dailyLimitRefusal({ kind, scope: 'user', now: t, plan }) };
         }
         charges.push({ store: user.store, subject: userId });
-        const address = limits.ip === null ? null : ipSubject(ip);
+        // Supporters are not charged per address: their own cap and pool bound them.
+        const address = limits.ip === null || supporter ? null : ipSubject(ip);
         if (address && limits.ip !== null) {
           const network = await charge(store, day, kind, address, limits.ip);
           if (!network.store) {
             await giveBack(day, kind, charges);
-            return { refusal: dailyLimitRefusal({ kind, scope: 'ip', now: t }) };
+            return { refusal: dailyLimitRefusal({ kind, scope: 'ip', now: t, plan }) };
           }
           charges.push({ store: network.store, subject: address });
         }
       }
-      const all = await charge(store, day, kind, GLOBAL_SUBJECT, limits.global);
+      const all = await charge(store, day, kind, globalSubject, globalLimit);
       if (!all.store) {
         // The caller's own slots go back: a refused request uses nothing.
         await giveBack(day, kind, charges);
@@ -562,7 +649,8 @@ export function createDailyCaps({
           // Only this process's outage share is used up, not the daily cap: no 'reached' alert
           // (it would hide the real one for the rest of the day) and no reset time to promise.
           const KIND = kind.toUpperCase();
-          warnEveryMinute(`outage share|${kind}`, () => `[AI caps] all-users outage share used up: ${kind} (${Math.max(1, Math.ceil(limits.global * OUTAGE_GLOBAL_SHARE))} of AI_CAP_GLOBAL_${KIND}=${limits.global}) in this process while the database does not answer. Callers get 503 until it does.`);
+          const name = supporter ? `AI_CAP_SUPPORTER_GLOBAL_${KIND}` : `AI_CAP_GLOBAL_${KIND}`;
+          warnEveryMinute(`outage share|${kind}|${globalSubject}`, () => `[AI caps] ${supporter ? 'supporter ' : ''}all-users outage share used up: ${kind} (${Math.max(1, Math.ceil(globalLimit * OUTAGE_GLOBAL_SHARE))} of ${name}=${globalLimit}) in this process while the database does not answer. Callers get 503 until it does.`);
           return {
             refusal: {
               status: 503,
@@ -571,11 +659,11 @@ export function createDailyCaps({
             },
           };
         }
-        alertGlobal('reached', day, kind, limits.global);
-        return { refusal: dailyLimitRefusal({ kind, scope: 'global', now: t }) };
+        alertGlobal('reached', day, kind, globalLimit, globalSubject);
+        return { refusal: dailyLimitRefusal({ kind, scope: 'global', now: t, plan }) };
       }
-      charges.push({ store: all.store, subject: GLOBAL_SUBJECT });
-      if (all.count >= Math.ceil(limits.global * GLOBAL_WARN_SHARE)) alertGlobal('warning', day, kind, limits.global);
+      charges.push({ store: all.store, subject: globalSubject });
+      if (all.count >= Math.ceil(globalLimit * GLOBAL_WARN_SHARE)) alertGlobal('warning', day, kind, globalLimit, globalSubject);
 
       let refunded = false;
       /** @type {CapHandle} */
@@ -636,15 +724,52 @@ export function createDailyCaps({
     };
   }
 
-  /** Clear the in-memory counts, the role cache and today's alerts (tests). */
+  /**
+   * Today's use of `kind` by the caller and their plan-aware user limit (0 when the kind is off),
+   * without charging anything. Reads Postgres, or this process's memory without a pool or when the
+   * read fails (an outage counts there). Admins get the same numbers (they are not refused by them).
+   * @param {{ kind: CapKind, userId: unknown }} caller
+   * @returns {Promise<{ used: number, limit: number, plan: CapPlan }>}
+   */
+  async function usageFor({ kind, userId: rawUserId }) {
+    const limits = resolveCapLimits(env, { logger, warned: warnedLimits })[kind];
+    if (!limits) throw new Error(`Unknown daily cap kind: ${kind}`);
+    const userId = rawUserId ? String(rawUserId) : '';
+    const { plan, supporter } = await planOf(kind, userId);
+    const off = limits.user === 0 || limits.ip === 0 || limits.global === 0 || supporter?.user === 0 || supporter?.global === 0;
+    const limit = off ? 0 : supporter ? supporter.user : limits.user;
+    if (!userId) return { used: 0, limit, plan: plan ?? 'free' };
+    const day = jstDay(now());
+    const pool = poolFn();
+    const store = storeFor(pool);
+    let used = 0;
+    try {
+      used = await store.read(day, kind, userId);
+    } catch (error) {
+      warnDb('reading a daily cap count', error, 'the count from this process\'s memory is shown.');
+      used = await memory.read(day, kind, userId);
+    }
+    return { used, limit, plan: plan ?? 'free' };
+  }
+
+  /**
+   * Set (or with null clear) the plan resolver: server.js once per app, with the billing resolver.
+   * @param {PlanResolver | null} fn
+   */
+  function setPlanResolver(fn) {
+    planResolver = typeof fn === 'function' ? fn : null;
+  }
+
+  /** Clear the in-memory counts, the role cache, today's alerts and the plan resolver (tests). */
   function reset() {
     memory.clear();
     roles.clear();
     alerted.clear();
     alertedDay = '';
+    planResolver = null;
   }
 
-  return { reserve, reserveFor, middleware, reset };
+  return { reserve, reserveFor, middleware, usageFor, setPlanResolver, reset };
 }
 
 const dailyCaps = createDailyCaps();
@@ -653,6 +778,10 @@ export const reserveDailyCap = dailyCaps.reserve;
 /** reserveFor of the process-wide caps (see createDailyCaps): the same counts as the Express routes. */
 export const reserveDailyCapFor = dailyCaps.reserveFor;
 export const dailyCap = dailyCaps.middleware;
+/** usageFor of the process-wide caps (GET /api/v2/billing/me). */
+export const dailyCapUsageFor = dailyCaps.usageFor;
+/** The process-wide plan resolver: server.js createApp only (mcp-server never calls it). */
+export const setPlanResolver = dailyCaps.setPlanResolver;
 export const resetDailyCapsForTests = dailyCaps.reset;
 
 /**

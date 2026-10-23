@@ -173,3 +173,13 @@ export const OAuthConsentView = lazy(
 export const ConnectedAppsView = lazy(
   () => import('../features/settings/ConnectedAppsView')
 );
+/** Phase 3 (the supporter plan): the plan page, its final confirmation screen and the public 特商法 page. */
+export const PlanView = lazy(
+  () => import('../features/settings/PlanView')
+);
+export const PlanConfirmView = lazy(
+  () => import('../features/settings/PlanConfirmView')
+);
+export const CommerceDisclosureView = lazy(
+  () => import('../features/legal/CommerceDisclosureView')
+);

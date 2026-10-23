@@ -14,6 +14,7 @@ import {
     sendDailyLimit,
 } from '../middleware/dailyCaps.js';
 import { LlmError } from '../llm/errors.js';
+import { SUPPORTER_GLOBAL_SUBJECT, dailyLimitRefusal, resetDailyCapsForTests, setPlanResolver } from '../middleware/dailyCaps.js';
 
 const quiet = { warn: () => {}, error: () => {} };
 const NOON_JST = Date.parse('2026-10-22T03:00:00Z');
@@ -634,5 +635,215 @@ describe('database outage and owner alerts', () => {
         assert.match(log, /AI_CAP_ALERT_WEBHOOK_URL must use https:\/\//);
         assert.ok(!log.includes('SECRET'), log);
         assert.ok(!log.includes('hooks.example'), log);
+    });
+});
+
+// Phase 3: supporters (the paid plan). The resolver is the only seam: without one (mcp-public, and
+// the API while billing is off) nothing changes; with one, only the kinds it answers for get the
+// supporter's limit, no per-address charge and the '*supporter' pool.
+describe('supporter plan resolver', () => {
+    /** A resolver answering supporter for `users` on llm and course_generation, null for others. */
+    const resolverFor = (users, { user = 100, global = 1000, calls = [] } = {}) => async ({ kind, userId }) => {
+        calls.push([kind, userId]);
+        if (kind !== 'llm' && kind !== 'course_generation') return null;
+        return users.includes(userId) ? { plan: 'supporter', user, global } : { plan: 'free' };
+    };
+
+    it('without a resolver the 429 body and the SQL are exactly as before (no plan field)', async () => {
+        const pool = fakePool();
+        const { call } = setup({ env: { AI_CAP_USER_LLM: '1' }, pool });
+        assert.equal((await call('llm', 'user-a', undefined, '203.0.113.7')).status, 200);
+        const refused = await call('llm', 'user-a', undefined, '203.0.113.7');
+        assert.deepEqual(Object.keys(refused.body).sort(), ['error', 'error_type', 'kind', 'reset_at', 'scope']);
+        assert.deepEqual(pool.queries.filter((q) => q.sql.startsWith('insert')).map((q) => q.params.slice(1)), [
+            ['llm', 'user-a', 1], ['llm', 'ip:203.0.113.7', 3], ['llm', '*', 1500], ['llm', 'user-a', 1],
+        ]);
+        assert.equal('plan' in dailyLimitRefusal({ kind: 'llm', scope: 'user' }).body, false);
+    });
+
+    it('a free user keeps exactly today\'s subjects and SQL; the 429 says plan free', async () => {
+        const pool = fakePool();
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '1' }, pool });
+        caps.setPlanResolver(resolverFor([]));
+        assert.equal((await call('llm', 'user-a', undefined, '203.0.113.7')).status, 200);
+        const refused = await call('llm', 'user-a', undefined, '203.0.113.7');
+        assert.equal(refused.status, 429);
+        assert.equal(refused.body.scope, 'user');
+        assert.equal(refused.body.plan, 'free');
+        assert.deepEqual(pool.queries.map((q) => [q.sql.split(' ').slice(0, 3).join(' '), ...q.params.slice(1)]), [
+            ['select role from', undefined, undefined],
+            ['insert into ai_daily_usage', 'llm', 'user-a', 1],
+            ['insert into ai_daily_usage', 'llm', 'ip:203.0.113.7', 3],
+            ['insert into ai_daily_usage', 'llm', '*', 1500],
+            ['insert into ai_daily_usage', 'llm', 'user-a', 1],
+        ].map((r) => r.filter((v) => v !== undefined)));
+    });
+
+    it("a supporter: the resolver's user limit, no per-address charge, the '*supporter' pool", async () => {
+        const pool = fakePool();
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '1', AI_CAP_IP_LLM: '1' }, pool });
+        caps.setPlanResolver(resolverFor(['fan'], { user: 2, global: 1000 }));
+        assert.equal((await call('llm', 'fan', undefined, '203.0.113.7')).status, 200);
+        assert.equal((await call('llm', 'fan', undefined, '203.0.113.7')).status, 200, 'past the free cap of 1 and the address cap of 1');
+        const third = await call('llm', 'fan', undefined, '203.0.113.7');
+        assert.equal(third.status, 429);
+        assert.equal(third.body.scope, 'user');
+        assert.equal(third.body.plan, 'supporter');
+        const inserts = pool.queries.filter((q) => q.sql.startsWith('insert into ai_daily_usage')).map((q) => q.params);
+        assert.deepEqual(inserts.slice(0, 2), [['2026-10-22', 'llm', 'fan', 2], ['2026-10-22', 'llm', SUPPORTER_GLOBAL_SUBJECT, 1000]]);
+        assert.ok(!inserts.some((p) => String(p[2]).startsWith('ip:')), 'no address subject');
+        assert.ok(!inserts.some((p) => p[2] === '*'), 'not the free pool');
+        assert.equal(SUPPORTER_GLOBAL_SUBJECT, '*supporter');
+        // A free user at the same address is still counted there and in '*'.
+        assert.equal((await call('llm', 'free-1', undefined, '203.0.113.7')).status, 200);
+        assert.deepEqual(pool.queries.filter((q) => q.sql.startsWith('insert')).slice(-3).map((q) => q.params[2]), ['free-1', 'ip:203.0.113.7', '*']);
+    });
+
+    it('the supporter pool stops supporters only; the free pool does not stop them', async () => {
+        const { caps, call } = setup({ env: { AI_CAP_GLOBAL_COURSE_GENERATION: '1' } });
+        caps.setPlanResolver(resolverFor(['fan-1', 'fan-2'], { user: 30, global: 1 }));
+        assert.equal((await call('course_generation', 'free-1')).status, 200);
+        assert.equal((await call('course_generation', 'free-2')).body.scope, 'global', 'the free pool of 1 is used up');
+        assert.equal((await call('course_generation', 'fan-1')).status, 200, 'supporters have their own pool');
+        const refused = await call('course_generation', 'fan-2');
+        assert.equal(refused.body.scope, 'global');
+        assert.equal(refused.body.plan, 'supporter');
+    });
+
+    it('0 in the free caps turns the kind off for supporters too; a supporter pool of 0 only for supporters', async () => {
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '0' } });
+        caps.setPlanResolver(resolverFor(['fan'], { user: 100, global: 1000 }));
+        const off = await call('llm', 'fan');
+        assert.equal(off.body.scope, 'off');
+        assert.equal(off.body.plan, 'supporter');
+        const second = setup({});
+        second.caps.setPlanResolver(resolverFor(['fan'], { user: 100, global: 0 }));
+        assert.equal((await second.call('llm', 'fan')).body.scope, 'off');
+        assert.equal((await second.call('llm', 'free')).status, 200);
+    });
+
+    it('the mcp kinds never consult the resolver; other kinds get null and stay free', async () => {
+        const calls = [];
+        const { caps, call } = setup({ env: { AI_CAP_USER_IMAGE: '1' } });
+        caps.setPlanResolver(async (caller) => {
+            calls.push(caller.kind);
+            return { plan: 'supporter', user: 9999, global: 9999 };
+        });
+        for (const kind of ['mcp', 'mcp_write']) {
+            const { handle } = await caps.reserveFor({ kind, userId: 'fan' });
+            assert.ok(handle, kind);
+        }
+        assert.deepEqual(calls, [], 'mcp kinds are not looked up');
+        const nullCaps = setup({ env: { AI_CAP_USER_IMAGE: '1' } });
+        nullCaps.caps.setPlanResolver(resolverFor(['fan']));
+        assert.equal((await nullCaps.call('image', 'fan')).status, 200);
+        const refused = await nullCaps.call('image', 'fan');
+        assert.equal(refused.body.scope, 'user', 'image keeps the free cap of 1');
+        assert.equal(refused.body.plan, 'free');
+    });
+
+    it('a resolver that fails or answers nonsense counts the caller as free (warned once a minute)', async () => {
+        const logger = recorder();
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '1' }, logger });
+        caps.setPlanResolver(async () => {
+            throw new Error('billing db down');
+        });
+        assert.equal((await call('llm', 'fan')).status, 200);
+        const refused = await call('llm', 'fan');
+        assert.equal(refused.body.scope, 'user');
+        assert.equal(refused.body.plan, 'free');
+        assert.equal(logger.lines.filter((l) => l.includes('plan lookup failed')).length, 1);
+        for (const answer of [{ plan: 'supporter', user: -1, global: 10 }, { plan: 'supporter', user: 1.5, global: 10 }, { plan: 'gold', user: 10, global: 10 }]) {
+            const other = setup({ env: { AI_CAP_USER_LLM: '1' } });
+            other.caps.setPlanResolver(async () => answer);
+            await other.call('llm', 'fan');
+            assert.equal((await other.call('llm', 'fan')).body.plan, 'free', JSON.stringify(answer));
+        }
+    });
+
+    it('an admin supporter skips the user cap and is charged to the supporter pool', async () => {
+        const pool = fakePool({ role: 'admin' });
+        const { caps, call } = setup({ pool });
+        caps.setPlanResolver(resolverFor(['admin-1'], { user: 100, global: 1000 }));
+        assert.equal((await call('llm', 'admin-1', undefined, '203.0.113.7')).status, 200);
+        assert.deepEqual(pool.queries.filter((q) => q.sql.startsWith('insert')).map((q) => q.params[2]), [SUPPORTER_GLOBAL_SUBJECT]);
+    });
+
+    it("the outage share and the owner alerts cover '*supporter' on their own", async () => {
+        const logger = recorder();
+        const posted = [];
+        const pool = fakePool({ fail: /ai_daily_usage/ });
+        const { caps, call } = setup({
+            env: { AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.example/alert', AI_CAP_GLOBAL_LLM: '5' },
+            pool,
+            logger,
+            fetch: async (url, init) => {
+                posted.push(JSON.parse(init.body).text);
+                return { ok: true, status: 200 };
+            },
+        });
+        caps.setPlanResolver(resolverFor(['fan-1', 'fan-2', 'fan-3'], { user: 100, global: 20 }));
+        assert.equal((await call('llm', 'fan-1')).status, 200);
+        assert.equal((await call('llm', 'fan-2')).status, 200);
+        const busy = await call('llm', 'fan-3');
+        assert.equal(busy.status, 503, 'a tenth of the supporter pool of 20');
+        assert.match(logger.lines.join('\n'), /supporter all-users outage share used up: llm \(2 of AI_CAP_SUPPORTER_GLOBAL_LLM=20\)/);
+        assert.equal((await call('llm', 'free-1')).status, 200, 'the free outage share is separate');
+
+        pool.setFail(null);
+        const fans = setup({ env: { AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.example/alert' }, logger, fetch: async (url, init) => {
+            posted.push(JSON.parse(init.body).text);
+            return { ok: true, status: 200 };
+        } });
+        fans.caps.setPlanResolver(resolverFor(['a', 'b', 'c', 'd', 'e', 'f'], { user: 100, global: 5 }));
+        for (const user of ['a', 'b', 'c', 'd', 'e', 'f']) await fans.call('llm', user);
+        await tick();
+        assert.ok(posted.some((t) => /supporter global daily cap 80% used: llm \(5\).*AI_CAP_SUPPORTER_GLOBAL_LLM/.test(t)), posted.join('\n'));
+        assert.ok(posted.some((t) => /supporter global daily cap reached: llm \(5\).*Supporters are refused/.test(t)), posted.join('\n'));
+        assert.ok(!posted.some((t) => t.startsWith('[AI caps] global daily cap')), 'the free pool alert stays free for the real one');
+    });
+
+    it('usageFor reads the caller\'s count with the plan-aware limit (memory and Postgres)', async () => {
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '40' } });
+        assert.deepEqual(await caps.usageFor({ kind: 'llm', userId: 'fan' }), { used: 0, limit: 40, plan: 'free' });
+        caps.setPlanResolver(resolverFor(['fan'], { user: 100, global: 1000 }));
+        await call('llm', 'fan');
+        await call('llm', 'fan');
+        assert.deepEqual(await caps.usageFor({ kind: 'llm', userId: 'fan' }), { used: 2, limit: 100, plan: 'supporter' });
+        assert.deepEqual(await caps.usageFor({ kind: 'course_generation', userId: 'other' }), { used: 0, limit: 20, plan: 'free' });
+        assert.deepEqual(await caps.usageFor({ kind: 'llm', userId: '' }), { used: 0, limit: 40, plan: 'free' });
+
+        const pool = fakePool();
+        const pg = setup({ env: { AI_CAP_USER_COURSE_GENERATION: '0' }, pool });
+        pool.rows.set('2026-10-22|llm|user-a', 7);
+        const orig = pool.query.bind(pool);
+        pool.query = async (text, params) => {
+            const sql = String(text).replace(/\s+/g, ' ').trim().toLowerCase();
+            if (sql.startsWith('select count from ai_daily_usage')) {
+                pool.queries.push({ sql, params });
+                const count = pool.rows.get(`${params[0]}|${params[1]}|${params[2]}`);
+                return { rows: count === undefined ? [] : [{ count }] };
+            }
+            return orig(text, params);
+        };
+        assert.deepEqual(await pg.caps.usageFor({ kind: 'llm', userId: 'user-a' }), { used: 7, limit: 50, plan: 'free' });
+        assert.equal(pool.queries.at(-1).sql, 'select count from ai_daily_usage where usage_day = $1::date and kind = $2 and subject = $3');
+        assert.deepEqual(pool.queries.at(-1).params, ['2026-10-22', 'llm', 'user-a']);
+        assert.deepEqual(await pg.caps.usageFor({ kind: 'course_generation', userId: 'user-a' }), { used: 0, limit: 0, plan: 'free' }, 'off: limit 0');
+        await assert.rejects(pg.caps.usageFor({ kind: 'nope', userId: 'x' }));
+    });
+
+    it('reset() clears the resolver; the process-wide setter is the singleton\'s', async () => {
+        const { caps, call } = setup({ env: { AI_CAP_USER_LLM: '1' } });
+        caps.setPlanResolver(resolverFor(['fan'], { user: 5, global: 1000 }));
+        caps.reset();
+        await call('llm', 'fan');
+        const refused = await call('llm', 'fan');
+        assert.equal(refused.body.scope, 'user');
+        assert.equal('plan' in refused.body, false, 'no resolver after reset');
+        assert.equal(typeof setPlanResolver, 'function');
+        setPlanResolver(resolverFor(['fan']));
+        resetDailyCapsForTests();
+        caps.setPlanResolver(null);
     });
 });

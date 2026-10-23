@@ -3,6 +3,7 @@ import { LogOut, RotateCcw, Bell, Settings, ShieldCheck } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
+import { usePlanEntry } from '../../../hooks/usePlanEntry';
 import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
 import { getTotalXp, getLevel, getStreak } from '../../../services/gamificationService';
 
@@ -14,6 +15,8 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
     const { language } = useLanguage();
     const { user: authUser, logout } = useAuth();
     const [isFlipped, setIsFlipped] = useState(false);
+    // Phase 3: the plan link only with VITE_FEATURE_BILLING and a GET /billing/me with eligibility 'ok' or a subscription.
+    const showPlan = usePlanEntry();
     const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null);
     const [llmStatusFailed, setLlmStatusFailed] = useState(false);
     const copy = {
@@ -38,7 +41,7 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
             settings: 'Settings',
             editProfile: 'Edit profile details',
             mirror: 'Learning mirror',
-            subscription: 'Manage subscription',
+            plan: 'Plan',
             notifications: 'Notifications',
             signOut: 'Sign out',
             footnote: 'Your card keeps your level, XP and settings in one place.',
@@ -72,7 +75,7 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
             settings: '設定',
             editProfile: 'プロフィール編集',
             mirror: '学習の鏡',
-            subscription: 'サブスクリプション管理',
+            plan: 'プラン',
             notifications: '通知',
             signOut: 'ログアウト',
             footnote: 'レベル・XP・設定を、このカードにまとめています。',
@@ -311,13 +314,16 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                         {t.mirror}
                                         <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
                                     </button>
-                                    <button
-                                        onClick={() => onNavigate(ViewState.SUBSCRIPTION)}
-                                        className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
-                                    >
-                                        {t.subscription}
-                                        <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
-                                    </button>
+                                    {showPlan && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onNavigate(ViewState.SETTINGS_PLAN)}
+                                            className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"
+                                        >
+                                            {t.plan}
+                                            <span className="text-slate-600 group-hover:translate-x-1 transition-transform">→</span>
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => onNavigate(ViewState.NOTIFICATIONS)}
                                         className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 transition-colors flex justify-between items-center group"

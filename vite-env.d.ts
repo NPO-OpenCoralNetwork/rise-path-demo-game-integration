@@ -8,4 +8,6 @@ declare module '*?raw' {
 interface ImportMetaEnv {
   /** "true" shows the shared Hermes chats (config/features.ts → features.agentChat). Default off. */
   readonly VITE_FEATURE_AGENT_CHAT?: string;
+  /** "true" shows the supporter plan's entry points and pages (config/features.ts → features.billing). Default off. */
+  readonly VITE_FEATURE_BILLING?: string;
 }

@@ -106,7 +106,8 @@ export const OAUTH_CLIENT_TOKEN_REFUSAL = Object.freeze({
 // ─── Middleware ──────────────────────────────────────────────
 
 /**
- * Require authentication. Sets req.userId and req.authMethod.
+ * Require authentication. Sets req.userId and req.authMethod (and req.isAnonymous for a Supabase
+ * session: true for an anonymous user).
  */
 export const requireAuth = async (req, res, next) => {
     const token = extractBearerToken(req);
@@ -154,6 +155,9 @@ export const requireAuth = async (req, res, next) => {
         }
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';
+        // An anonymous Supabase user (if the project ever enables anonymous sign-in) cannot sign
+        // back in after losing the session: routes that keep records for a person (billing) refuse it.
+        req.isAnonymous = data.user.is_anonymous === true;
         await syncAuthUserStub(req.userId);
         next();
     } catch (err) {

@@ -61,6 +61,13 @@ else
 fi
 export COMPOSE_PROFILES
 
+# The env-file guards below read assignment lines the way Docker Compose does: it also reads
+# `export NAME=…`, `NAME: value`, spaces around '=' and quoted values, and a bare `NAME` copies the
+# value from the deploy environment, so every pattern allows them: ENV_KEY starts an assignment
+# line, ENV_EQ is the '=' or ':' and an opening quote. Set here, outside any profile's block.
+ENV_KEY='^[[:space:]]*(export[[:space:]]+)?'
+ENV_EQ="[[:space:]]*[=:][[:space:]]*[\"']?"
+
 # Profile tunnel publishes the api as https://api.<domain> (Cloudflare Tunnel). Refuse it until the
 # origin gate and the tunnel token are in place. Prints variable names only, never their values.
 if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* ]]; then
@@ -103,11 +110,7 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
   if [[ ! -f mcp-public.env ]]; then
     BYOA_PROBLEMS+=("mcp-public.env (cp mcp-public.env.example mcp-public.env && chmod 600 mcp-public.env)")
   else
-    # Docker Compose also reads `export NAME=…`, `NAME: value`, spaces around '=' and quoted
-    # values, and a bare `NAME` copies the value from the deploy environment, so every pattern
-    # allows them: ENV_KEY starts an assignment line, ENV_EQ is the '=' or ':' and an opening quote.
-    ENV_KEY='^[[:space:]]*(export[[:space:]]+)?'
-    ENV_EQ="[[:space:]]*[=:][[:space:]]*[\"']?"
+    # ENV_KEY and ENV_EQ: see above (Compose's dotenv variants).
     for name in DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_ANON_KEY MCP_PUBLIC_RESOURCE_URL; do
       if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" mcp-public.env || grep -Eiq "${ENV_KEY}${name}${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
         BYOA_PROBLEMS+=("${name} (mcp-public.env: missing or a template value)")
@@ -134,6 +137,56 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
   fi
   echo "==> Public remote MCP: byoa profile enabled (mcp-public.env, least-privilege DB role)"
 fi
+
+# The paid plan (Phase 3) reads billing.env, which only the api service loads (billing.env.example).
+# STRIPE_* and BILLING_* belong there only: in stack.env they would reach the mcp container too, and
+# mcp-public must never hold them. With BILLING_ENABLED=true the keys must be set, and a live key
+# (sk_live_/rk_live_) needs BILLING_LIVE=true: test mode only until the legal and tax checks.
+# Runs whatever COMPOSE_PROFILES lists. Reads names and key prefixes only; prints names, never values.
+BILLING_PROBLEMS=()
+for file in stack.env mcp-public.env; do
+  if [[ -f "${file}" ]] && grep -Eq "${ENV_KEY}(STRIPE|BILLING)_[A-Z0-9_]*[[:space:]]*([=:]|$)" "${file}"; then
+    BILLING_PROBLEMS+=("STRIPE_* / BILLING_* (${file}: must not be there; they belong to billing.env only)")
+  fi
+done
+BILLING_MODE=off
+if [[ -f billing.env ]]; then
+  BILLING_LIVE_KEY=0
+  if grep -Eq "${ENV_KEY}[A-Z0-9_]+${ENV_EQ}(sk|rk|pk)_live_" billing.env; then
+    BILLING_LIVE_KEY=1
+    if ! grep -Eq "${ENV_KEY}BILLING_LIVE${ENV_EQ}true[\"']?[[:space:]]*$" billing.env; then
+      BILLING_PROBLEMS+=("BILLING_LIVE (billing.env: a live Stripe key needs BILLING_LIVE=true; sell in test mode only until the legal and tax checks)")
+    fi
+  fi
+  if grep -Eq "${ENV_KEY}BILLING_ENABLED${ENV_EQ}true[\"']?[[:space:]]*$" billing.env; then
+    BILLING_REQUIRED=(STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_ID BILLING_RETURN_ORIGIN)
+    if [[ "${BILLING_LIVE_KEY}" -eq 1 ]]; then
+      BILLING_REQUIRED+=(BILLING_TOS_URL)
+      BILLING_MODE=live
+    else
+      BILLING_REQUIRED+=(BILLING_TEST_USER_IDS)
+      BILLING_MODE=test
+    fi
+    for name in "${BILLING_REQUIRED[@]}"; do
+      if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" billing.env; then
+        BILLING_PROBLEMS+=("${name} (billing.env: missing; BILLING_ENABLED=true needs it)")
+      fi
+    done
+    if ! grep -Eq "${ENV_KEY}STRIPE_SECRET_KEY${ENV_EQ}(sk|rk)_(test|live)_[A-Za-z0-9]" billing.env; then
+      BILLING_PROBLEMS+=("STRIPE_SECRET_KEY (billing.env: not a secret or restricted key, sk_… or rk_…)")
+    fi
+    if ! grep -Eq "${ENV_KEY}STRIPE_WEBHOOK_SECRET${ENV_EQ}whsec_" billing.env; then
+      BILLING_PROBLEMS+=("STRIPE_WEBHOOK_SECRET (billing.env: not a webhook signing secret, whsec_…)")
+    fi
+  fi
+fi
+if [[ ${#BILLING_PROBLEMS[@]} -gt 0 ]]; then
+  echo "❌ Billing settings are missing or in the wrong place:"
+  printf '   %s\n' "${BILLING_PROBLEMS[@]}"
+  echo "   Fix them (see billing.env.example). BILLING_ENABLED= (empty) keeps sales off."
+  exit 1
+fi
+echo "==> Billing sales: ${BILLING_MODE} (BILLING_ENABLED in billing.env, read by the api only)"
 
 # Template values deploy green and then break sign-in (Supabase), keep a known DB password and
 # bridge token, or give Hermes a key it refuses (under 16 characters). Refuse them before anything

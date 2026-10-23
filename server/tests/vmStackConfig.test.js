@@ -50,6 +50,18 @@ function listUnder(block, key) {
 
 const services = serviceBlocks(compose);
 
+/**
+ * deploy-stack.sh's ENV_KEY and ENV_EQ lines (set once, above every env-file guard), so a guard
+ * block can run on its own under `set -euo pipefail`.
+ * @param {string} script
+ */
+function envPatterns(script) {
+  const key = /^ENV_KEY=.*$/m.exec(script);
+  const eq = /^ENV_EQ=.*$/m.exec(script);
+  assert.ok(key && eq, 'ENV_KEY and ENV_EQ at the top level of deploy-stack.sh');
+  return `${key[0]}\n${eq[0]}`;
+}
+
 describe('docker-compose.yml: cloudflared', () => {
   const block = services.cloudflared || '';
 
@@ -472,7 +484,8 @@ describe('deploy-stack.sh', () => {
   // spaces around '=' and quoted values, so none of them may slip past it (or be reported missing).
   describe('byoa guard on dotenv variants', () => {
     const start = script.indexOf('if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then');
-    const block = script.slice(start, script.indexOf('\nfi\n', start) + 4);
+    // ENV_KEY and ENV_EQ are set once above every guard (hoisted: the billing guard runs without byoa).
+    const block = `${envPatterns(script)}\n${script.slice(start, script.indexOf('\nfi\n', start) + 4)}`;
     const VALID = [
       'DATABASE_URL_PHASE1=postgresql://risepath_mcp_remote:0123456789abcdef0123456789abcdef@db:5432/risepath',
       'SUPABASE_URL=https://abcdefghijklmnop.supabase.co',
@@ -500,6 +513,7 @@ describe('deploy-stack.sh', () => {
 
     it('extracts the whole guard', () => {
       assert.ok(start > 0 && block.endsWith('\nfi\n') && block.includes('BYOA_PROBLEMS'));
+      assert.ok(!script.slice(start, script.indexOf('\nfi\n', start)).includes("ENV_KEY='"), 'ENV_KEY is not (re)defined inside the byoa block');
     });
 
     it('passes a valid file, also written with export, spaces around = and quotes', () => {
@@ -710,5 +724,156 @@ describe('Dockerfile: api stage', () => {
     assert.ok(api, 'api stage');
     assert.ok(!api.includes('/app/dist'), 'no /app/dist');
     assert.ok(!api.includes('--from=builder'), 'nothing from the builder stage');
+  });
+});
+
+// Phase 3 (the supporter plan): the Stripe keys and billing switches live in billing.env, which
+// only the api reads; every env file compose loads stays out of git; deploy-stack.sh refuses
+// billing names elsewhere, a live key without BILLING_LIVE=true, and BILLING_ENABLED=true without
+// its keys, whatever COMPOSE_PROFILES lists (run here with byoa off).
+describe('billing.env (Phase 3)', () => {
+  const composeFiles = ['docker-compose.yml', 'docker-compose.memanto.yml'];
+
+  it('only the api service reads billing.env (after stack.env, so its values win)', () => {
+    assert.match(services.api || '', /^ {4}env_file:\s*\n {6}- path: stack\.env\s*\n {8}required: false\s*\n {6}- path: billing\.env\s*\n {8}required: false\s*$/m);
+    for (const [name, block] of Object.entries(services)) {
+      if (name !== 'api') assert.ok(!block.includes('billing.env'), name);
+    }
+    assert.ok(!read(path.join(STACK, 'docker-compose.memanto.yml')).includes('billing.env'));
+  });
+
+  it('every env file a compose file loads is git-ignored and out of the build context', () => {
+    const ignored = lines(read(path.join(STACK, '.gitignore')));
+    const paths = new Set();
+    for (const file of composeFiles) {
+      for (const m of read(path.join(STACK, file)).matchAll(/^\s*- path: (\S+)\s*$/gm)) paths.add(m[1]);
+      for (const m of read(path.join(STACK, file)).matchAll(/^\s*env_file:\s*(?!\s*$)(\S+)\s*$/gm)) paths.add(m[1]);
+    }
+    assert.ok(paths.has('billing.env') && paths.has('stack.env'), [...paths].join(', '));
+    for (const envFile of paths) {
+      assert.ok(ignored.includes(envFile), `${envFile} in deploy/risepath-vm/.gitignore`);
+      const check = spawnSync('git', ['check-ignore', '-q', path.join('deploy/risepath-vm', envFile)], { cwd: ROOT });
+      assert.equal(check.status, 0, `git check-ignore ${envFile}`);
+    }
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/*.env'));
+  });
+
+  it('billing.env.example lists exactly the names billingConfig reads, all empty', async () => {
+    const { BILLING_ENV_KEYS } = await import('../services/billingConfig.js');
+    const values = lines(read(path.join(STACK, 'billing.env.example'))).filter((line) => !line.startsWith('#'));
+    assert.deepEqual(values, BILLING_ENV_KEYS.map((key) => `${key}=`));
+  });
+
+  it('stack.env.example and mcp-public.env.example set no STRIPE_ or BILLING_ name', () => {
+    for (const file of ['stack.env.example', 'mcp-public.env.example']) {
+      assert.ok(!/^\s*(export\s+)?(STRIPE|BILLING)_/m.test(read(path.join(STACK, file))), file);
+    }
+  });
+
+  describe('deploy-stack.sh billing guard', () => {
+    const script = read(path.join(STACK, 'scripts/deploy-stack.sh'));
+    const start = script.indexOf('BILLING_PROBLEMS=()');
+    const endMarker = 'echo "==> Billing sales:';
+    const end = script.indexOf('\n', script.indexOf(endMarker));
+    const guard = `${envPatterns(script)}\n${script.slice(start, end + 1)}`;
+    const SECRET = 'do-not-print-0123456789';
+    const TEST_ON = [
+      'BILLING_ENABLED=true',
+      'BILLING_TEST_USER_IDS=aaaaaaaa-1111-4000-8000-000000000001',
+      'STRIPE_SECRET_KEY=rk_test_fake1',
+      'STRIPE_WEBHOOK_SECRET=whsec_fake1',
+      'STRIPE_PRICE_ID=price_fake1',
+      'BILLING_RETURN_ORIGIN=https://app.example.org',
+    ];
+    /** @param {Record<string, string[]>} files */
+    const runGuard = (files) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'billing-guard-'));
+      try {
+        for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), `${content.join('\n')}\n`);
+        const result = spawnSync('bash', ['-c', `set -euo pipefail\n${guard}`], {
+          cwd: dir,
+          env: { PATH: process.env.PATH, COMPOSE_PROFILES: 'tts' },
+          encoding: 'utf8',
+        });
+        return { status: result.status, out: `${result.stdout}${result.stderr}` };
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    };
+
+    it('sits at the top level, after ENV_KEY/ENV_EQ and before the first compose call', () => {
+      const firstCompose = script.search(/^\s*compose \w/m);
+      assert.ok(start > 0 && end > start && start < firstCompose);
+      assert.ok(script.search(/^ENV_KEY=/m) < script.indexOf('== *",tunnel,"*'), 'ENV_KEY is set before the first guard');
+      assert.ok(!/^\s+ENV_KEY=/m.test(script), 'not redefined inside a block');
+      assert.ok(!/^\s*if \[\[[^\n]*byoa/m.test(script.slice(start, end)), 'not inside the byoa block');
+      for (const line of script.slice(start, end).split('\n').filter((l) => /^\s*(echo|printf)\b/.test(l))) {
+        assert.ok(!line.includes('${value') && !line.includes('${!'), `prints no value: ${line.trim()}`);
+      }
+    });
+
+    it('passes without billing.env (sales off) and with a complete test-mode file', () => {
+      const off = runGuard({ 'stack.env': ['POSTGRES_PASSWORD=x'] });
+      assert.equal(off.status, 0, off.out);
+      assert.match(off.out, /Billing sales: off/);
+      const test = runGuard({ 'billing.env': TEST_ON });
+      assert.equal(test.status, 0, test.out);
+      assert.match(test.out, /Billing sales: test/);
+      const styled = runGuard({ 'billing.env': TEST_ON.map((l, i) => (i % 2 ? `export ${l.replace('=', ' = "')}"` : l.replace('=', ': '))) });
+      assert.equal(styled.status, 0, styled.out);
+      const disabled = runGuard({ 'billing.env': ['BILLING_ENABLED=', 'STRIPE_SECRET_KEY='] });
+      assert.equal(disabled.status, 0, disabled.out);
+      assert.match(disabled.out, /Billing sales: off/);
+    });
+
+    for (const [file, line] of [
+      ['stack.env', `STRIPE_SECRET_KEY=${SECRET}`],
+      ['stack.env', `export STRIPE_WEBHOOK_SECRET = "${SECRET}"`],
+      ['stack.env', 'BILLING_ENABLED=true'],
+      ['mcp-public.env', `STRIPE_SECRET_KEY: ${SECRET}`],
+      ['mcp-public.env', 'BILLING_TEST_USER_IDS'],
+    ]) {
+      it(`refuses billing names outside billing.env: ${file} ${line.replace(SECRET, '…')}`, () => {
+        const result = runGuard({ [file]: [line] });
+        assert.equal(result.status, 1, result.out);
+        assert.ok(result.out.includes(`(${file}: must not be there; they belong to billing.env only)`), result.out);
+        assert.ok(!result.out.includes(SECRET), 'prints no value');
+      });
+    }
+
+    it('refuses a live key unless BILLING_LIVE=true, even with sales off', () => {
+      for (const key of ['sk_live_fake1', 'rk_live_fake1', '"sk_live_fake1"']) {
+        const result = runGuard({ 'billing.env': ['BILLING_ENABLED=', `STRIPE_SECRET_KEY=${key}`] });
+        assert.equal(result.status, 1, result.out);
+        assert.match(result.out, /BILLING_LIVE \(billing\.env: a live Stripe key needs BILLING_LIVE=true/);
+        assert.ok(!result.out.includes('fake1'), 'prints no value');
+      }
+      const live = runGuard({
+        'billing.env': [...TEST_ON.filter((l) => !l.startsWith('STRIPE_SECRET_KEY=') && !l.startsWith('BILLING_TEST_USER_IDS=')),
+          'STRIPE_SECRET_KEY=rk_live_fake1', 'BILLING_LIVE=true', 'BILLING_TOS_URL=https://app.example.org/terms'],
+      });
+      assert.equal(live.status, 0, live.out);
+      assert.match(live.out, /Billing sales: live/);
+    });
+
+    it('with BILLING_ENABLED=true, names each missing key (testers in test mode, the terms URL in live mode)', () => {
+      for (const name of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID', 'BILLING_RETURN_ORIGIN', 'BILLING_TEST_USER_IDS']) {
+        const result = runGuard({ 'billing.env': TEST_ON.map((l) => (l.startsWith(`${name}=`) ? `${name}=` : l)) });
+        assert.equal(result.status, 1, `${name}: ${result.out}`);
+        assert.ok(result.out.includes(`${name} (billing.env: missing; BILLING_ENABLED=true needs it)`), result.out);
+      }
+      const live = runGuard({ 'billing.env': [...TEST_ON.filter((l) => !l.startsWith('STRIPE_SECRET_KEY=')), 'STRIPE_SECRET_KEY=sk_live_fake1', 'BILLING_LIVE=true'] });
+      assert.equal(live.status, 1, live.out);
+      assert.ok(live.out.includes('BILLING_TOS_URL (billing.env: missing'), live.out);
+    });
+
+    it('refuses a publishable key or a swapped webhook secret', () => {
+      const pk = runGuard({ 'billing.env': TEST_ON.map((l) => (l.startsWith('STRIPE_SECRET_KEY=') ? 'STRIPE_SECRET_KEY=pk_test_fake1' : l)) });
+      assert.equal(pk.status, 1, pk.out);
+      assert.match(pk.out, /STRIPE_SECRET_KEY \(billing\.env: not a secret or restricted key/);
+      const swapped = runGuard({ 'billing.env': TEST_ON.map((l) => (l.startsWith('STRIPE_WEBHOOK_SECRET=') ? 'STRIPE_WEBHOOK_SECRET=rk_test_fake1' : l)) });
+      assert.equal(swapped.status, 1, swapped.out);
+      assert.match(swapped.out, /STRIPE_WEBHOOK_SECRET \(billing\.env: not a webhook signing secret/);
+    });
   });
 });

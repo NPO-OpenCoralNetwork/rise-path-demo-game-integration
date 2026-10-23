@@ -31,7 +31,12 @@ import { pruneSafetyEvents } from './server/safety/events.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
-import { dailyCap } from './server/middleware/dailyCaps.js';
+import { dailyCap, setPlanResolver } from './server/middleware/dailyCaps.js';
+import { createBillingRouter } from './server/routes/billing.js';
+import { billingStartupLine, checkBillingServiceable, readBillingConfig } from './server/services/billingConfig.js';
+import { createSupporterCapResolver } from './server/services/billingEntitlement.js';
+import { BILLING_WEBHOOK_BODY_LIMIT, BILLING_WEBHOOK_PATH, createBillingWebhook } from './server/services/billingWebhook.js';
+import { createStripeClient } from './server/services/stripeClient.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
@@ -89,6 +94,13 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         app.set('trust proxy', Number.isFinite(hops) ? hops : trustProxy === 'true');
     }
 
+    // Billing (Phase 3): read once per app. The supporter caps resolve through it on the shared
+    // daily caps (dailyCaps.js); mcp-public never sets a resolver. Off (no resolver, no plan field in
+    // 429 bodies) unless billing is serviceable (server/services/billingConfig.js).
+    const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    const stripe = billingConfig.serviceable ? createStripeClient({ secretKey: billingConfig.secretKey }) : null;
+    setPlanResolver(billingConfig.serviceable ? createSupporterCapResolver({ config: billingConfig }) : null);
+
     // --- Middleware ---
     // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
     // get 403 before CORS, body parsing, logging or the limiters run (and before a 50 MB body is read).
@@ -111,6 +123,10 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
     // then sees the body as already read and skips it.
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
+    // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
+    // parser below then skips the body); the handler is mounted with the billing routes, after the
+    // logger and the global limiter.
+    app.post(BILLING_WEBHOOK_PATH, express.raw({ type: 'application/json', limit: BILLING_WEBHOOK_BODY_LIMIT }));
     app.use(express.json({ limit: '50mb' }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
@@ -168,6 +184,10 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // 18, a guardian's consent. It runs after auth and before the daily caps, so a refused call is
     // never charged, and sets res.locals.aiAudience for the safety checks.
     app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
+    // The supporter plan (Phase 3): Stripe's webhook (signed, no JWT) and the billing routes (public
+    // GET /plan; requireAuth inside for the rest). Before the requireAuth catch-all below.
+    app.post(BILLING_WEBHOOK_PATH, createBillingWebhook({ config: billingConfig, stripe }));
+    app.use('/api/v2/billing', createBillingRouter({ config: billingConfig, stripe }));
     // LLM gateway: mounted before the blanket /api/v2 auth below so guests are not 401'd in strict
     // mode; optionalAuth sets req.userId when a token is present; the AI limiter covers its POSTs.
     // GET /status stays public and ungated; the POSTs run the gate inside guarded() (llm.js).
@@ -294,6 +314,10 @@ async function main() {
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
     for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
+    // One line, names only; an owner alert when subscribers exist but billing cannot serve them.
+    const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    console.log(billingStartupLine(billingConfig));
+    void checkBillingServiceable(billingConfig);
 
     // Checked before createApp so a weak value stops startup with a clear error; never logs values.
     const originSecrets = readOriginSecrets(process.env).length;
