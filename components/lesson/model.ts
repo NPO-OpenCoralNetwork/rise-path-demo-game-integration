@@ -4,7 +4,14 @@
  */
 import type { Block, Course, LText, Lesson, Md, Section } from '../../shared/lesson/schema.js';
 import { resolveText, toBcp47 } from '../../shared/lesson/text.js';
-import { answerKey, type LessonProgress, type LessonStateName } from './progressStore.ts';
+import { LESSON_DONE_STATES, allBlocks, blockDone, quizAnswered } from '../../shared/lesson/progress.js';
+import type { LessonProgress, LessonStateName } from './progressStore.ts';
+
+// The progress maths (answered, pct, state) live in shared/lesson/progress.js so the server
+// computes exactly what the reader shows; re-exported here for the reader.
+export {
+  LESSON_DONE_STATES, allBlocks, blockDone, isAnswered, lessonPct, lessonState, quizAnswered,
+} from '../../shared/lesson/progress.js';
 
 export type ContentLocale = 'jp' | 'en' | 'fr';
 
@@ -41,64 +48,7 @@ export function isQuiz(block: Block): block is QuizBlockData {
   return block.type === 'quiz';
 }
 
-/** A question counts as answered once it was submitted or its answer was revealed. */
-export function isAnswered(progress: LessonProgress, blockId: string, questionId: string): boolean {
-  const record = progress.answers[answerKey(blockId, questionId)];
-  return Boolean(record && (record.attempts > 0 || record.revealed));
-}
-
-export function quizAnswered(block: QuizBlockData, progress: LessonProgress): boolean {
-  return block.questions.every((q) => isAnswered(progress, block.id, q.id));
-}
-
-/** A block is done when seen; a quiz when every question is answered. */
-export function blockDone(block: Block, progress: LessonProgress, seen: ReadonlySet<string>): boolean {
-  if (isQuiz(block)) return quizAnswered(block, progress);
-  return seen.has(block.id);
-}
-
-export function allBlocks(lesson: Lesson): Block[] {
-  return lesson.sections.flatMap((section) => section.blocks);
-}
-
-/** Share of blocks done, 0–100. */
-export function lessonPct(lesson: Lesson, progress: LessonProgress): number {
-  const blocks = allBlocks(lesson);
-  if (!blocks.length) return 0;
-  const seen = new Set(progress.seen);
-  const done = blocks.filter((block) => blockDone(block, progress, seen)).length;
-  return Math.round((done / blocks.length) * 100);
-}
-
 export type LessonState = LessonStateName;
-
-/**
- * PLAN §5.6: not_started → in_progress → read (≥90% of non-quiz blocks seen) →
- * checked (also every inline/predict question answered) → mastered (exam ≥80% right first try).
- */
-export function lessonState(lesson: Lesson, progress: LessonProgress): LessonState {
-  const blocks = allBlocks(lesson);
-  const seen = new Set(progress.seen);
-  const anyActivity = progress.seen.length > 0 || Object.keys(progress.answers).length > 0;
-  if (!anyActivity) return 'not_started';
-
-  const reading = blocks.filter((b) => !isQuiz(b));
-  const seenCount = reading.filter((b) => seen.has(b.id)).length;
-  const read = reading.length === 0 || seenCount / reading.length >= 0.9;
-  if (!read) return 'in_progress';
-
-  const checks = blocks.filter(isQuiz).filter((b) => b.mode !== 'exam');
-  if (!checks.every((b) => quizAnswered(b, progress))) return 'read';
-
-  const exams = blocks.filter(isQuiz).filter((b) => b.mode === 'exam');
-  if (!exams.length) return 'checked';
-  const questions = exams.flatMap((b) => b.questions.map((q) => progress.answers[answerKey(b.id, q.id)]));
-  const firstTry = questions.filter((a) => a?.firstTry && a.attempts > 0).length;
-  return questions.length && firstTry / questions.length >= 0.8 ? 'mastered' : 'checked';
-}
-
-/** States that count as a finished lesson (course maps and learning events). */
-export const LESSON_DONE_STATES: ReadonlySet<LessonState> = new Set<LessonState>(['read', 'checked', 'mastered']);
 
 export type LessonEventType = 'lesson_start' | 'lesson_complete';
 
