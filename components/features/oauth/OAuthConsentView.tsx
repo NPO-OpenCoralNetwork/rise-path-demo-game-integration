@@ -638,6 +638,19 @@ const ConsentCard: React.FC<ConsentCardProps> = ({
   const [busy, setBusy] = useState<'allow' | 'deny' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const eligibility = consentEligibility(access);
+  // Saving the birth month moves the decision card (it sits before the details unless the
+  // learner may allow): focus follows it, so the trust warning or the refusal is read next.
+  const decisionRef = useRef<HTMLElement>(null);
+  const focusDecision = useRef(false);
+  const onAgeSaved = (next: AiAccessStatus) => {
+    focusDecision.current = true;
+    onAccessChange(next);
+  };
+  useEffect(() => {
+    if (!focusDecision.current || eligibility === 'needs_age') return;
+    focusDecision.current = false;
+    decisionRef.current?.focus();
+  }, [eligibility]);
   const name = request.client.name ?? t.unnamed;
 
   const run = async (action: 'allow' | 'deny') => {
@@ -653,8 +666,8 @@ const ConsentCard: React.FC<ConsentCardProps> = ({
 
   // Approving is the last step; when it is not possible, say why first.
   const decisionCard = (
-    <section className={cardClasses}>
-      {eligibility === 'needs_age' && <AgeForm t={t} onSaved={onAccessChange} />}
+    <section ref={decisionRef} tabIndex={-1} className={`${cardClasses} focus:outline-none`}>
+      {eligibility === 'needs_age' && <AgeForm t={t} onSaved={onAgeSaved} />}
       {eligibility === 'minor' && <Refusal heading={t.adultOnly} text={t.minorBody} />}
       {eligibility === 'paused' && <Refusal heading={t.pausedHeading} text={t.pausedBody} />}
       {eligibility === 'unavailable' && (

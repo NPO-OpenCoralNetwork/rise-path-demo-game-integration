@@ -103,10 +103,11 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
   if [[ ! -f mcp-public.env ]]; then
     BYOA_PROBLEMS+=("mcp-public.env (cp mcp-public.env.example mcp-public.env && chmod 600 mcp-public.env)")
   else
-    # Docker Compose also reads `export NAME=…`, spaces around '=' and quoted values, so every
-    # pattern allows them: ENV_KEY starts an assignment line, ENV_EQ is the '=' and an opening quote.
+    # Docker Compose also reads `export NAME=…`, `NAME: value`, spaces around '=' and quoted
+    # values, and a bare `NAME` copies the value from the deploy environment, so every pattern
+    # allows them: ENV_KEY starts an assignment line, ENV_EQ is the '=' or ':' and an opening quote.
     ENV_KEY='^[[:space:]]*(export[[:space:]]+)?'
-    ENV_EQ="[[:space:]]*=[[:space:]]*[\"']?"
+    ENV_EQ="[[:space:]]*[=:][[:space:]]*[\"']?"
     for name in DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_ANON_KEY MCP_PUBLIC_RESOURCE_URL; do
       if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" mcp-public.env || grep -Eiq "${ENV_KEY}${name}${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
         BYOA_PROBLEMS+=("${name} (mcp-public.env: missing or a template value)")
@@ -117,7 +118,7 @@ if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
       BYOA_PROBLEMS+=("APP_PUBLIC_URL (mcp-public.env: a template value; set the app origin or leave it empty)")
     fi
     for name in RISE_PATH_BRIDGE_TOKEN SUPABASE_SERVICE_ROLE_KEY ANTHROPIC_API_KEY GEMINI_ OPENROUTER_API_KEY HERMES_ MEMANTO_ ORIGIN_SECRET RISE_PATH_ACTIVE_SESSION_KEY TUNNEL_TOKEN POSTGRES_PASSWORD; do
-      if grep -Eq "${ENV_KEY}${name}[A-Z0-9_]*[[:space:]]*=" mcp-public.env; then
+      if grep -Eq "${ENV_KEY}${name}[A-Z0-9_]*[[:space:]]*([=:]|$)" mcp-public.env; then
         BYOA_PROBLEMS+=("${name}* (mcp-public.env: must not be there; it belongs to stack.env only)")
       fi
     done

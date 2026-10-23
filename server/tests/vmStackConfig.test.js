@@ -512,6 +512,7 @@ describe('deploy-stack.sh', () => {
       "DATABASE_URL_PHASE1='postgres://risepath_app@db:5432/risepath'",
       'export DATABASE_URL_PHASE1 = postgresql://risepath_app:SECRET@db:5432/risepath',
       '  DATABASE_URL_PHASE1= "postgresql://risepath_app:SECRET@db/risepath"',
+      'DATABASE_URL_PHASE1: postgresql://risepath_app:SECRET@db:5432/risepath',
     ]) {
       it(`refuses the superuser role: ${line.replace(/SECRET/g, '…')}`, () => {
         const result = runGuard(replace('DATABASE_URL_PHASE1', line.replace(/SECRET/g, SECRET)));
@@ -528,6 +529,11 @@ describe('deploy-stack.sh', () => {
       '  GEMINI_API_KEY =SECRET',
       "export\tPOSTGRES_PASSWORD\t=\t'SECRET'",
       'ANTHROPIC_API_KEY=',
+      // Compose also reads `NAME: value`, and a bare name copies the value from the environment.
+      'ANTHROPIC_API_KEY: SECRET',
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'export RISE_PATH_BRIDGE_TOKEN',
+      'TUNNEL_TOKEN\r',
     ]) {
       it(`refuses a stack.env secret: ${JSON.stringify(line.replace(/SECRET/g, '…'))}`, () => {
         const result = runGuard([...VALID, line.replace(/SECRET/g, SECRET)]);

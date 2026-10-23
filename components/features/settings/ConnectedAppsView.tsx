@@ -73,6 +73,7 @@ const copy = {
     retryingConfirm: 'Trying again…',
     retryFailed: (name: string) =>
       `We still could not save the last step for ${name}. Please try again in a little while.`,
+    reloadFailed: 'The list could not be refreshed, so what you see may be out of date.',
     failed: 'This could not be disconnected. Please try again in a little while.',
   },
   jp: {
@@ -120,6 +121,7 @@ const copy = {
     retryingConfirm: 'もう一度試しています…',
     retryFailed: (name: string) =>
       `${name} の最後の記録は、まだ保存できていません。少し時間をおいて、もう一度お試しください。`,
+    reloadFailed: '一覧を新しくできませんでした。表示が古いかもしれません。',
     failed: '解除できませんでした。少し時間をおいてお試しください。',
   },
 } as const;
@@ -205,8 +207,10 @@ const ConnectedAppsView: React.FC = () => {
         focusNoticeAfterLoad.current = true;
         void load();
       } else {
-        // Keep the retry button, and say that this attempt failed too.
+        // Keep the retry button, and say that this attempt failed too. The button was disabled
+        // while it had focus, so focus goes to the new notice.
         setNotice({ tone: 'warn', text: t.retryFailed(target.name ?? t.unnamed), retry: target });
+        focusNoticeAfterLoad.current = true;
       }
     } finally {
       setConfirming(false);
@@ -250,6 +254,18 @@ const ConnectedAppsView: React.FC = () => {
                 {confirming ? t.retryingConfirm : t.retryConfirm}
               </Button>
             )}
+          </div>
+        )}
+
+        {loadError === 'failed' && apps && !loading && (
+          <div role="alert" className="rounded-control border border-line bg-surface px-4 py-3">
+            <p className="flex items-start gap-2 text-body text-fg">
+              <CircleAlert size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />
+              {t.reloadFailed}
+            </p>
+            <Button className="mt-3" variant="secondary" size="sm" onClick={() => void load()}>
+              {t.retry}
+            </Button>
           </div>
         )}
 
