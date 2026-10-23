@@ -358,6 +358,21 @@ describe('wiring', () => {
     assert.match(view, /終えたレッスンを記録/);
   });
 
+  it('both pages say an app reads the lessons and progress, checks quiz answers as the learner\'s attempts and marks lessons read', () => {
+    const consent = read('components/features/oauth/OAuthConsentView.tsx');
+    assert.match(consent, /'The lessons of Rise Path courses, without the quiz answers'/);
+    assert.match(consent, /'Rise Path のコースのレッスン（クイズの答えは除く）'/);
+    assert.match(consent, /Your progress in each lesson \(sections read, quiz results\)/);
+    assert.match(consent, /レッスンごとの進み具合（読んだセクション、クイズの結果）/);
+    assert.match(consent, /'Check your quiz answers\. Each check is saved as your own attempt'/);
+    assert.match(consent, /クイズの答えを確かめる（確かめるたびに、あなた自身の解答として記録されます）/);
+    assert.match(consent, /'Mark the lesson sections you worked through as read'/);
+    assert.match(consent, /読み終えたと記録する/);
+    const apps = read('components/features/settings/ConnectedAppsView.tsx');
+    assert.match(apps, /can read Rise Path lessons, your learning progress and journal\. It can check your quiz answers \(each check is saved as your own attempt\), mark lessons read/);
+    assert.match(apps, /Rise Path のレッスンと、学習の進み具合やジャーナルを読めます。クイズの答えを確かめたり（確かめるたびに、あなた自身の解答として記録されます）、レッスンを読み終えたと記録したり/);
+  });
+
   it('disconnecting goes through the tested sequence and sends the app name', () => {
     const api = read('services/connectedAppsApi.ts');
     assert.match(api, /return revokeConnectedAppWith\(target, \{/);

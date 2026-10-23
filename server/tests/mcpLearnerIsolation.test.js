@@ -316,6 +316,9 @@ describe('MCP server (stdio, production): rag-search resolves the learner first'
     it('every tool takes an optional rp_turn; rag-search documents its 1-10 cap without enforcing it in the schema', async () => {
         const { tools } = await client.listTools();
         assert.ok(tools.length > 0);
+        for (const id of ['course-list', 'course-lesson-get', 'course-quiz-check', 'course-progress-get', 'course-progress-update']) {
+            assert.ok(tools.some((t) => t.name === id), `${id} is a learner tool (so it takes rp_turn too)`);
+        }
         for (const tool of tools) {
             assert.equal(tool.inputSchema.properties.rp_turn?.type, 'string', tool.name);
             assert.ok(!(tool.inputSchema.required || []).includes('rp_turn'), tool.name);

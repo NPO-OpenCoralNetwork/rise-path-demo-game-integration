@@ -10,13 +10,16 @@
  * - charge(userId, toolName): the daily caps (server/middleware/dailyCaps.js): 'mcp' for every
  *   tools/call, plus 'mcp_write' for the write tools. A refusal is a tool error
  *   (daily_limit_reached); the slots of a call refused by its second kind are given back.
+ *   course-quiz-check is charged 'mcp' only: it writes, but the reader's attempt rules bound its
+ *   writes (at most two graded submissions per question), and a learner answering a lesson
+ *   should not run out of the write cap.
  */
 import { reserveDailyCapFor } from '../server/middleware/dailyCaps.js';
 import { resolveMcpUserId } from '../tools/core/mcpUserScope.js';
 import { aiAccessRefusal, aiAccessSettingsUrl, remoteAccessEnv } from '../tools/core/mcpAiAccess.js';
 
-/** Remote tools that write learner data: charged to 'mcp_write' as well. */
-export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update']);
+/** Remote tools that write learner data: charged to 'mcp_write' as well (not course-quiz-check: see above). */
+export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update', 'course-progress-update']);
 
 /**
  * daily_limit_reached text by the refusal's scope: the learner's own cap, the cap shared by every
