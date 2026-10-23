@@ -4,6 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { getLevel, getXpForNextLevel } from '../../services/gamificationService';
 import { getLearningEvents } from '../../services/progressService';
 import { parseProgress, PROGRESS_EVENT } from '../lesson/progressStore';
+import { SYNC_ACCOUNT_EVENT } from '../lesson/progressSync';
 import { activeDaysFrom, streakFromDays, type StreakInfo } from './activity';
 
 /**
@@ -82,10 +83,14 @@ const ProgressCluster: React.FC<ProgressClusterProps> = ({ className = '' }) => 
 
   useEffect(() => {
     const refresh = () => setData(readSnapshot());
+    // Synced progress arrives as PROGRESS_EVENT; a reset, delete or learner switch clears records
+    // and announces SYNC_ACCOUNT_EVENT.
     window.addEventListener(PROGRESS_EVENT, refresh);
+    window.addEventListener(SYNC_ACCOUNT_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
       window.removeEventListener(PROGRESS_EVENT, refresh);
+      window.removeEventListener(SYNC_ACCOUNT_EVENT, refresh);
       window.removeEventListener('storage', refresh);
     };
   }, []);

@@ -12,6 +12,12 @@
  * - Per-session call counters (policy.js) are not used: a stateless endpoint has no session.
  * - rag-search returns at most REMOTE_RAG_MAX_RESULTS results; learner-state-update accepts only a
  *   known domain (tools/core/domains.js).
+ *
+ * The course-* tools (course-list, course-lesson-get, course-quiz-check, course-progress-get,
+ * course-progress-update) teach the published risepath.lesson/v1 lessons: lessons are read without
+ * answers, quiz answers are graded on the server with the reader's attempt rules, and progress is
+ * the same lesson_progress record the web reader syncs (tools/core/courseLessons.js and
+ * lessonProgress.js). They act for the scoped learner only and return compact JSON.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -51,7 +57,9 @@ import {
 import { requestTts } from '../tools/core/kokoroTts.js';
 import { resolveMcpUserId, TURN_ARG } from '../tools/core/mcpUserScope.js';
 import { adultDraftRefusal } from '../tools/core/mcpAiAccess.js';
-import { DOMAINS } from '../tools/core/domains.js';
+import { DOMAINS, DOMAIN_COURSE_SLUGS } from '../tools/core/domains.js';
+import { getCourseLesson, getCourseProgress, listCourses, tutorCourseNote } from '../tools/core/courseLessons.js';
+import { applyQuizCheck, markLessonProgress } from '../tools/core/lessonProgress.js';
 
 /** rag-search results per call on the remote endpoint (the stdio/SSE cap is MAX_SEARCH_RESULTS). */
 export const REMOTE_RAG_MAX_RESULTS = 5;
@@ -281,7 +289,7 @@ const policyTool = (name, desc, schema, handler) => {
 // --- learner-state ---
 policyTool(
     'learner-state-get',
-    '学習者の現在の進捗・マスタリーレベルを取得する',
+    '科目（ドメイン）ごとの旧形式の進捗とマスタリーを取得する。vibe-coding と claude-code のレッスンの進み具合は course-progress-get で取得する / Legacy per-domain progress and mastery. For the lessons of vibe-coding and claude-code (domains with a course_slug in content://domains), use course-progress-get.',
     {
         user_id: z.string().optional().describe(USER_ID_DESC),
         domain: z.string().optional().describe('学習ドメイン (例: blender-3d)。省略時は全ドメイン'),
@@ -300,7 +308,7 @@ policyTool(
 
 policyTool(
     'learner-state-update',
-    '学習者の進捗を更新する',
+    '旧形式の科目（ドメイン）の進捗に、終えたレッスンを記録する。vibe-coding と claude-code のレッスンには course-progress-update と course-quiz-check を使う（この記録は Web のレッスン画面には反映されない） / Records a finished lesson in a legacy domain\'s progress. For vibe-coding and claude-code lessons use course-progress-update and course-quiz-check: this record does not reach the web lesson reader.',
     {
         user_id: z.string().optional().describe(USER_ID_DESC),
         domain: z.string().describe('学習ドメイン'),
@@ -646,6 +654,143 @@ policyTool(
     }
 );
 
+// --- courses (published lessons for learners; tools/core/courseLessons.js, lessonProgress.js) ---
+// Named course-* (not lesson-*: those are the authoring tools). Reads need no database; quiz
+// checks and progress act for the scoped learner only. Results are compact JSON (a lesson read is
+// several thousand tokens).
+const courseLocale = () => z.string().max(16).optional().describe('jp または en（ja、en-US も可）。レッスンにない言語なら元の言語 / jp or en (ja, en-US also work); a lesson without that language uses its source language');
+const courseItemId = () => z.string().min(1).max(80);
+const courseSlugArg = () => lessonSlug().describe(`コースのスラッグ（例: vibe-coding）。course-list の course_slug / Course slug from course-list, e.g. vibe-coding (${LESSON_SLUG_DESC})`);
+const courseLessonArg = () => lessonSlug().describe('レッスンID（例: vibe-ch1）。course-list の lessons[].id / Lesson id from course-list, e.g. vibe-ch1');
+
+policyTool(
+    'course-list',
+    'Rise Path の公開コースと、そのモジュール・レッスン（問題数、確認テストの有無）の一覧 / Lists the published Rise Path courses with their modules and lessons (number of questions, whether there is an exam).',
+    {
+        locale: courseLocale(),
+    },
+    async ({ locale }) => {
+        const t = Date.now();
+        try {
+            return toolResult(listCourses({ locale }), { toolName: 'course-list', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'course-list', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'course-lesson-get',
+    'レッスンを読む（クイズの答え・解説・ヒントは含まない。選択肢は "1"〜"n" のラベル）。section_id なしなら目次と、学習者がまだ終えていない最初のセクション。tutor_protocol に従って教える / Reads a lesson without quiz answers, explanations or hints (options are labelled "1".."n"). Without section_id: the outline plus the first section the learner has not finished. Follow the returned tutor_protocol.',
+    {
+        course_slug: courseSlugArg(),
+        lesson_id: courseLessonArg(),
+        section_id: courseItemId().optional().describe('読むセクションの id（目次の sections[].id）。"all" でレッスン全体（大きいので、ふつうは1セクションずつ読む） / A section id from the outline, or "all" for the whole lesson (large: prefer one section at a time)'),
+        locale: courseLocale(),
+    },
+    async ({ course_slug, lesson_id, section_id, locale }, extra) => {
+        const t = Date.now();
+        try {
+            // Only the first read (no section_id) looks at progress; a learner who cannot be
+            // resolved still gets the lesson, from its first section.
+            let userId = null;
+            if (section_id === undefined) {
+                const scope = await resolveScopeFor(extra);
+                if (!scope.error && typeof scope.userId === 'string') userId = scope.userId;
+            }
+            return toolResult(await getCourseLesson({
+                courseSlug: course_slug, lessonId: lesson_id, sectionId: section_id, locale, userId,
+            }), { toolName: 'course-lesson-get', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'course-lesson-get', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'course-quiz-check',
+    'クイズの答えを Rise Path で採点し、学習者の解答として記録する。呼ぶたびに学習者自身の解答として残り、取り消せない。学習者が選んだ答えだけを送り、エージェントが選択肢を選んだり試したりしない。reveal は、不正解のあと学習者が答えを見たいと言ったときだけ使う。不正解はエラーではなく通常の結果（フィードバックつき） / Grades a quiz answer on Rise Path and records it as the learner\'s attempt. Each call permanently records the learner\'s own attempt: submit only the learner\'s choice, and never pick or probe options yourself. Use reveal only when the learner asks for the answer after a miss. A wrong answer is a normal result with feedback, not an error.',
+    {
+        course_slug: courseSlugArg(),
+        lesson_id: courseLessonArg(),
+        question_id: courseItemId().describe('問題の id（course-lesson-get の questions[].id） / Question id from course-lesson-get'),
+        block_id: courseItemId().optional().describe('問題のブロック id（省略可） / The question\'s block id (optional)'),
+        choices: z.array(z.union([z.string().max(8), z.number()])).max(12).optional().describe('学習者が選んだ選択肢のラベル（"1"〜"n" または 1〜n）。multiple: true の問題だけ複数 / The option labels the learner chose ("1".."n" or 1..n); several only for multiple: true questions'),
+        reveal: z.boolean().optional().describe('不正解のあと学習者が答えを求めたときだけ true（choices は送らない） / true only when the learner asks for the answer after a miss (send no choices)'),
+        content_hash: z.string().max(80).optional().describe('course-lesson-get の content_hash。レッスンが変わっていたら採点せず lesson_changed / content_hash from course-lesson-get; if the lesson changed since, nothing is graded (lesson_changed)'),
+        locale: courseLocale(),
+    },
+    async ({ course_slug, lesson_id, question_id, block_id, choices, reveal, content_hash, locale }, extra) => {
+        const t = Date.now();
+        try {
+            const userId = await requireScopedUser(undefined, extra, { toolName: 'course-quiz-check', startTime: t });
+            if (typeof userId !== 'string') return userId;
+            return toolResult(await applyQuizCheck({
+                userId,
+                courseSlug: course_slug,
+                lessonId: lesson_id,
+                questionId: question_id,
+                blockId: block_id,
+                choices,
+                reveal: reveal === true,
+                contentHash: content_hash,
+                locale,
+            }), { toolName: 'course-quiz-check', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'course-quiz-check', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'course-progress-get',
+    'レッスンの進み具合を取得する。lesson_id なし: 公開レッスンごとの pct と state。course_slug と lesson_id あり: セクションごとの進み具合、問題ごとの解答状況（答えは含まない）、再開位置、確認テストの初回正答 / The learner\'s lesson progress. Without lesson_id: pct and state of every published lesson (of course_slug, or of every course). With course_slug and lesson_id: sections done, each question\'s status (no answers), where to resume and the exam first-try score.',
+    {
+        course_slug: lessonSlug().optional().describe(`コースのスラッグ。省略するとすべてのコース / Course slug; omitted: every course (${LESSON_SLUG_DESC})`),
+        lesson_id: lessonSlug().optional().describe('レッスンID（course_slug と一緒に） / Lesson id (with course_slug)'),
+        locale: courseLocale(),
+    },
+    async ({ course_slug, lesson_id, locale }, extra) => {
+        const t = Date.now();
+        try {
+            const userId = await requireScopedUser(undefined, extra, { toolName: 'course-progress-get', startTime: t });
+            if (typeof userId !== 'string') return userId;
+            return toolResult(await getCourseProgress({
+                userId, courseSlug: course_slug, lessonId: lesson_id, locale,
+            }), { toolName: 'course-progress-get', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'course-progress-get', startTime: t });
+        }
+    }
+);
+
+policyTool(
+    'course-progress-update',
+    '学習者が取り組んだセクションを読み終えたと記録し、再開位置を設定する。学習者が実際に取り組んだセクションだけを記録する。確認問題に答えていないセクションは記録されず skipped に入る（先に course-quiz-check） / Marks sections the learner worked through as read and sets where to resume. Mark only sections the learner actually worked through. A section whose check questions are unanswered is skipped (answer them with course-quiz-check first).',
+    {
+        course_slug: courseSlugArg(),
+        lesson_id: courseLessonArg(),
+        read_section_ids: z.array(courseItemId()).max(50).optional().describe('読み終えたセクションの id / Ids of the sections the learner worked through'),
+        last_block_id: courseItemId().optional().describe('次に再開するブロックの id / Id of the block to resume at'),
+    },
+    async ({ course_slug, lesson_id, read_section_ids, last_block_id }, extra) => {
+        const t = Date.now();
+        try {
+            const userId = await requireScopedUser(undefined, extra, { toolName: 'course-progress-update', startTime: t });
+            if (typeof userId !== 'string') return userId;
+            return toolResult(await markLessonProgress({
+                userId,
+                courseSlug: course_slug,
+                lessonId: lesson_id,
+                readSectionIds: read_section_ids,
+                lastBlockId: last_block_id,
+            }), { toolName: 'course-progress-update', startTime: t, compact: true });
+        } catch (err) {
+            return toolError(err, { toolName: 'course-progress-update', startTime: t });
+        }
+    }
+);
+
 // --- daily-life (Phase 16-6a) ---
 policyTool(
     'daily-life-log',
@@ -964,7 +1109,7 @@ policyTool(
 if (isEntryExposed('resources', 'content-domains', profile)) server.resource(
     'content-domains',
     'content://domains',
-    { description: '利用可能な学習ドメインの一覧', mimeType: 'application/json' },
+    { description: '利用可能な学習ドメインの一覧（course_slug のあるドメインは course-* ツールで学ぶ） / Learning domains; a domain with a course_slug is taught with the course-* tools', mimeType: 'application/json' },
     async (uri, extra) => {
         await remoteGateOrThrow(extra);
         return {
@@ -974,6 +1119,7 @@ if (isEntryExposed('resources', 'content-domains', profile)) server.resource(
                 text: JSON.stringify({
                     domains: DOMAINS.map(d => ({
                         id: d.id, name: d.name, description: d.description, lessons: d.maxStages,
+                        ...(DOMAIN_COURSE_SLUGS[d.id] ? { course_slug: DOMAIN_COURSE_SLUGS[d.id] } : {}),
                     })),
                 }, null, 2),
             }],
@@ -1033,12 +1179,28 @@ if (isToolAllowed('lesson-schema-get')) {
 // Prompts
 // ============================================================
 
+// With course_slug (and lesson_id), where the profile has the course tools: the lesson, how to use
+// those tools and the tutoring protocol that course-lesson-get also returns.
+const tutorTakesCourse = isToolAllowed('course-lesson-get');
 if (isEntryExposed('prompts', 'socratic-tutor', profile)) server.prompt(
     'socratic-tutor',
-    'ソクラテス式対話で学習者を導くためのプロンプト',
-    { topic: z.string().max(500).describe('学習トピック') },
-    async ({ topic }, extra) => {
+    tutorTakesCourse
+        ? 'ソクラテス式対話で学習者を導くためのプロンプト。course_slug と lesson_id を渡すと、そのレッスンを course-* ツールで教える / Prompt to guide the learner with Socratic questions; with course_slug and lesson_id it teaches that lesson with the course-* tools'
+        : 'ソクラテス式対話で学習者を導くためのプロンプト',
+    {
+        topic: z.string().max(500).describe('学習トピック'),
+        ...(tutorTakesCourse ? {
+            course_slug: lessonSlug().optional().describe('コースのスラッグ（例: vibe-coding） / Course slug, e.g. vibe-coding'),
+            lesson_id: lessonSlug().optional().describe('レッスンID（例: vibe-ch1。course_slug と一緒に） / Lesson id, e.g. vibe-ch1 (with course_slug)'),
+        } : {}),
+    },
+    async ({ topic, course_slug, lesson_id }, extra) => {
         await remoteGateOrThrow(extra);
+        const course = tutorTakesCourse ? tutorCourseNote({ courseSlug: course_slug, lessonId: lesson_id }) : { text: '' };
+        if ('error' in course) {
+            // JSON-RPC invalid params (-32602): the named course or lesson is not published.
+            throw Object.assign(new Error(course.error), { code: -32602, data: { error_type: course.error_type } });
+        }
         return {
         messages: [{
             role: 'user',
@@ -1053,7 +1215,7 @@ if (isEntryExposed('prompts', 'socratic-tutor', profile)) server.prompt(
 - 答えを直接教えず、質問で導く
 - 学習者の理解度を確認しながら進める
 - 具体的な例やアナロジーを使う
-- 成功したら称賛し、つまずいたら共感する`,
+- 成功したら称賛し、つまずいたら共感する${course.text ? `\n\n${course.text}` : ''}`,
             },
         }],
         };

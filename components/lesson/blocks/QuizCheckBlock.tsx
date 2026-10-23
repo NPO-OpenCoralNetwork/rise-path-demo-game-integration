@@ -4,6 +4,7 @@ import type { BlockProps } from './registry';
 import { MdText, Txt } from '../Md';
 import { useReader } from '../ReaderContext';
 import { plainText } from '../model';
+import { isCorrectChoice } from '../../../shared/lesson/grading.js';
 import { useLanguage } from '../../../context/LanguageContext';
 
 /**
@@ -77,9 +78,6 @@ const copy = {
 
 type Phase = 'answering' | 'wrong' | 'correct' | 'revealed' | 'predicted';
 
-const sameSet = (a: readonly string[], b: readonly string[]) =>
-  a.length === b.length && a.every((id) => b.includes(id));
-
 function QuestionView({
   block,
   question,
@@ -139,7 +137,7 @@ function QuestionView({
       setNudge(true);
       return;
     }
-    const correct = sameSet(selected, question.answer);
+    const correct = isCorrectChoice(question, selected);
     const attempts = (record?.attempts ?? 0) + 1;
     progress.recordAnswer(block.id, question.id, {
       chosen: selected,

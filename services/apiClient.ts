@@ -23,9 +23,10 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
         ...(options.headers as Record<string, string> || {}),
     };
 
-    // Primary: Supabase JWT as Bearer token
+    // Primary: Supabase JWT as Bearer token, unless the caller already set one (the page-hide
+    // progress upload: getSession waits for a lock, and fetch must start before the page is gone).
     const supabase = getSupabaseClient();
-    if (supabase) {
+    if (supabase && !headers['Authorization']) {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.access_token) {

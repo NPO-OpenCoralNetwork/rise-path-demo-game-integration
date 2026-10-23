@@ -38,9 +38,9 @@ Experience learning tailored just for you.
 
 ### 5. **MCP Server — AI アシスタント連携** 🔌
 Claude Code・Cursor など、自分のパソコンで動く AI から Rise Path のツールを使えます。
-- **9 つの MCP ツール**: 学習進捗・ジャーナル・カリキュラム生成・RAG 検索
+- **MCP ツール**: 公開レッスンを AI と学ぶツール（答えなしで読む・答え合わせ・進み具合。`course-*`）、学習進捗・ジャーナル・カリキュラム生成・教材づくり・RAG 検索など（一覧は `mcp-server/tool-registry.json`）
 - **Transport**: stdio（ローカル）。SSE は開発のときと、VM の中（Hermes や、Tailscale 経由の運用者）だけで使います。インターネットには公開しません
-- **リモートの AI（ChatGPT、Claude.ai など）**: 学習者ごとの OAuth ができてから（Phase 1）。ブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡さないでください
+- **リモートの AI（ChatGPT、Claude.ai など）**: 18 歳以上の学習者が、学習者ごとの OAuth でつなぎます（Phase 1。運営者の公開の手順は [`doc/guides/byoa-setup.ja.md`](doc/guides/byoa-setup.ja.md)）。ブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡さないでください
 - **ヘルスチェック & Graceful Shutdown**: 本番運用対応
 
 > 📘 **[使い方ガイド（詳細）](doc/guides/usage_guide.md)** — Web アプリ・MCP・カリキュラム作成の完全ガイド

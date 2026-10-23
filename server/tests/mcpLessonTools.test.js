@@ -672,11 +672,13 @@ describe('MCP server (stdio) lesson tools', () => {
         assert.equal(traversal.isError, true);
     });
 
-    it('hides the lesson tools, resource and prompt from the learner profile', async () => {
+    it('hides the lesson tools, resource and prompt from the learner profile (which learns with course-*)', async () => {
         const learner = await connect('learner');
         try {
             const names = (await learner.listTools()).tools.map((t) => t.name);
             assert.deepEqual(names.filter((n) => n.startsWith('lesson-')), []);
+            assert.deepEqual(names.filter((n) => n.startsWith('course-')).sort(), ['course-lesson-get', 'course-list', 'course-progress-get', 'course-progress-update', 'course-quiz-check']);
+            assert.deepEqual((await builder.listTools()).tools.map((t) => t.name).filter((n) => n.startsWith('course-')), [], 'authoring profile: no learner course tools');
             const resources = (await learner.listResources()).resources.map((r) => r.uri);
             assert.equal(resources.includes('rp://schema/lesson/v1'), false);
             const prompts = (await learner.listPrompts()).prompts.map((p) => p.name);

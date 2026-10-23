@@ -33,7 +33,7 @@ const copy = {
     eyebrow: 'Settings',
     title: 'Connected AI apps',
     description:
-      'AI apps you connected to Rise Path, such as Claude Code, Codex or ChatGPT. A connected app can read your learning progress and journal, add journal entries and record finished lessons.',
+      'AI apps you connected to Rise Path, such as Claude Code, Codex or ChatGPT. A connected app can read Rise Path lessons, your learning progress and journal. It can check your quiz answers (each check is saved as your own attempt), mark lessons read, add journal entries and record finished lessons.',
     loading: 'Loading…',
     retry: 'Try again',
     loadFailed: 'We could not load your connected apps right now. Please try again in a little while.',
@@ -81,7 +81,7 @@ const copy = {
     eyebrow: '設定',
     title: 'つないでいる AI アプリ',
     description:
-      'Rise Path につないだ AI アプリ（Claude Code、Codex、ChatGPT など）です。つないだアプリは、学習の進み具合やジャーナルを読み、ジャーナルに記録を追加したり、終えたレッスンを記録したりできます。',
+      'Rise Path につないだ AI アプリ（Claude Code、Codex、ChatGPT など）です。つないだアプリは、Rise Path のレッスンと、学習の進み具合やジャーナルを読めます。クイズの答えを確かめたり（確かめるたびに、あなた自身の解答として記録されます）、レッスンを読み終えたと記録したり、ジャーナルに記録を追加したり、終えたレッスンを記録したりもできます。',
     loading: '読み込んでいます…',
     retry: 'もう一度試す',
     loadFailed: 'いまは一覧を読み込めませんでした。少し時間をおいてお試しください。',

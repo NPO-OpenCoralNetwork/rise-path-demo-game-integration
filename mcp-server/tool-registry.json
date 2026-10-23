@@ -14,7 +14,7 @@
       "max_calls_per_session": null,
       "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
       "annotations": {
-        "title": "学習進捗を取得",
+        "title": "科目の進捗を取得（旧形式）",
         "readOnlyHint": true,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -31,7 +31,7 @@
       "max_calls_per_session": 20,
       "exposure_profiles": ["learner", "admin", "learner-remote"],
       "annotations": {
-        "title": "レッスン完了を記録",
+        "title": "科目の進捗に記録（旧形式）",
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -237,6 +237,91 @@
       "annotations": {
         "title": "教材のプレビュー URL を取得",
         "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-list",
+      "category": "content_read",
+      "risk": "read",
+      "data_class": "public",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
+      "annotations": {
+        "title": "コースとレッスンの一覧",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-lesson-get",
+      "category": "content_read",
+      "risk": "read",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
+      "annotations": {
+        "title": "レッスンを読む（答えなし）",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-quiz-check",
+      "category": "progress_write",
+      "risk": "write",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": true,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner", "admin", "learner-remote"],
+      "annotations": {
+        "title": "クイズの答えを確かめて記録",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-progress-get",
+      "category": "progress_read",
+      "risk": "read",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner", "coach", "admin", "learner-remote"],
+      "annotations": {
+        "title": "レッスンの進み具合を取得",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-progress-update",
+      "category": "progress_write",
+      "risk": "write",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": true,
+      "max_calls_per_session": 50,
+      "exposure_profiles": ["learner", "admin", "learner-remote"],
+      "annotations": {
+        "title": "読んだセクションを記録",
+        "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
         "openWorldHint": false

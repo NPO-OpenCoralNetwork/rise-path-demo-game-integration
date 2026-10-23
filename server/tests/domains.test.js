@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { COURSES_DIR, DOMAINS, DOMAIN_MAX_STAGES, calculateMastery, countCourseLessons } from '../../tools/core/domains.js';
+import { COURSES_DIR, DOMAINS, DOMAIN_COURSE_SLUGS, DOMAIN_MAX_STAGES, calculateMastery, countCourseLessons } from '../../tools/core/domains.js';
 
 const vibeCourseFile = path.join(COURSES_DIR, 'vibe-coding', 'course.json');
 const vibeCourse = JSON.parse(fs.readFileSync(vibeCourseFile, 'utf8'));
@@ -40,6 +40,12 @@ describe('domains', () => {
         assert.equal(Object.hasOwn(cc, 'courseSlug'), false, 'internal courseSlug is not exposed');
         assert.ok(calculateMastery(5, 'claude-code') < 1);
         assert.equal(calculateMastery(ccLessonCount, 'claude-code'), 1);
+    });
+
+    it('DOMAIN_COURSE_SLUGS names the course of the domains taught by one (content://domains course_slug)', () => {
+        assert.deepEqual(DOMAIN_COURSE_SLUGS, { 'vibe-coding': 'vibe-coding', 'claude-code': 'claude-code' });
+        assert.ok(Object.isFrozen(DOMAIN_COURSE_SLUGS));
+        for (const slug of Object.values(DOMAIN_COURSE_SLUGS)) assert.ok(fs.existsSync(path.join(COURSES_DIR, slug, 'course.json')), slug);
     });
 
     it('countCourseLessons returns null for a missing, invalid or empty course file', (t) => {

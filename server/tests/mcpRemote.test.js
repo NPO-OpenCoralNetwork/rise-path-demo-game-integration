@@ -11,27 +11,26 @@
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { createClient } from '@supabase/supabase-js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { discoverOAuthProtectedResourceMetadata } from '@modelcontextprotocol/sdk/client/auth.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 import { resetAiAccessForTests } from '../safety/access.js';
 import { createDailyCaps } from '../middleware/dailyCaps.js';
-import { createOAuthVerifier } from '../../mcp-server/oauthVerifier.js';
-import { createRemoteApp, readRemoteConfig } from '../../mcp-server/remote.js';
+import { readRemoteConfig } from '../../mcp-server/remote.js';
 import { createRemotePolicy } from '../../mcp-server/remotePolicy.js';
-import { createMcpServer, REMOTE_ACCESS_REFUSED, REMOTE_RAG_MAX_RESULTS, remoteRagResults } from '../../mcp-server/createMcpServer.js';
+import { REMOTE_ACCESS_REFUSED, REMOTE_RAG_MAX_RESULTS, remoteRagResults } from '../../mcp-server/createMcpServer.js';
 import { createAiAccessPool } from './helpers/aiAccessPool.js';
 import { startFakeSupabase } from './helpers/fakeSupabase.js';
+import { ALLOWED_ORIGIN, connectRemoteClient, startRemoteEndpoint } from './helpers/remoteMcpEndpoint.js';
 
 const ADULT = 'a1a1a1a1-0000-4000-8000-0000000000a1';
 const ADULT_2 = 'a2a2a2a2-0000-4000-8000-0000000000a2';
 const MINOR = 'b1b1b1b1-0000-4000-8000-0000000000b1';
 const NO_AGE = 'c3c3c3c3-0000-4000-8000-0000000000c3';
 const CLIENT = 'c1c1c1c1-0000-4000-8000-000000000001';
-const REMOTE_TOOLS = ['journal-log', 'journal-recent', 'learner-adaptation-signals', 'learner-state-get', 'learner-state-update', 'rag-search'];
-const ALLOWED_ORIGIN = 'https://inspector.example.org';
+const REMOTE_TOOLS = [
+    'course-lesson-get', 'course-list', 'course-progress-get', 'course-progress-update', 'course-quiz-check',
+    'journal-log', 'journal-recent', 'learner-adaptation-signals', 'learner-state-get', 'learner-state-update', 'rag-search',
+];
 
 /** Everything the endpoint logs while these tests run (checked for the token at the end). */
 const logs = [];
@@ -91,33 +90,8 @@ const INIT = {
 };
 const MCP_HEADERS = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' };
 
-/** Start the endpoint on a free port; the resource URL carries that port. */
-async function startEndpoint({ fake, env = {}, limits, capsEnv = {} }) {
-    const server = http.createServer();
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const port = server.address().port;
-    const config = readRemoteConfig({
-        MCP_REMOTE_TEST: '1',
-        MCP_PUBLIC_RESOURCE_URL: `http://127.0.0.1:${port}/mcp`,
-        SUPABASE_URL: fake.url,
-        SUPABASE_ANON_KEY: 'anon-key-for-tests',
-        MCP_ALLOWED_ORIGINS: ALLOWED_ORIGIN,
-        ...env,
-    });
-    const supabase = createClient(fake.url, 'anon-key-for-tests', { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-    const verifier = createOAuthVerifier({ issuer: config.issuer, resource: config.resource, supabase, logger });
-    const caps = createDailyCaps({ env: capsEnv, getPool: () => null, logger });
-    const policy = createRemotePolicy({ env: { APP_PUBLIC_URL: 'https://app.example.org' }, reserveCap: caps.reserveFor });
-    const app = createRemoteApp({
-        config,
-        verifier,
-        logger,
-        limits: limits ?? { userPerMinute: 1000, unauthenticatedPerMinute: 1000 },
-        createServer: () => createMcpServer({ profile: 'learner-remote', remote: policy }),
-    });
-    server.on('request', app);
-    return { port, resource: config.resource, config, close: () => new Promise((resolve) => server.close(resolve)) };
-}
+/** Start the endpoint on a free port (helpers/remoteMcpEndpoint.js), logging into `logs`. */
+const startEndpoint = (options) => startRemoteEndpoint({ logger, ...options });
 
 const parse = (result) => JSON.parse(result.content[0].text);
 
@@ -134,11 +108,7 @@ describe('remote MCP endpoint (in process)', () => {
     };
     const clients = [];
     const connect = async (token) => {
-        const client = new Client({ name: 'remote-test', version: '1.0.0' });
-        const transport = new StreamableHTTPClientTransport(new URL(endpoint.resource), {
-            requestInit: { headers: { Authorization: `Bearer ${token}` } },
-        });
-        await client.connect(transport);
+        const client = await connectRemoteClient(endpoint, token);
         clients.push(client);
         return client;
     };

@@ -1,6 +1,6 @@
 # 自分の AI をつなぐ（BYOA）: オーナーの設定手順
 
-- 対象: Phase 1（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 5 章）。18 歳以上の学習者が、自分の AI（Claude Code、Codex、Claude.ai、Cursor、VS Code、自分の Hermes、ChatGPT）を、インターネット上の Rise Path の MCP サーバーにつなぎます。
+- 対象: Phase 1（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 5 章）。18 歳以上の学習者が、自分の AI（Claude Code、Codex、Claude.ai、Cursor、VS Code、自分の Hermes、ChatGPT）を、インターネット上の Rise Path の MCP サーバーにつなぎます。Phase 2（同じ文書の 6 章）で、公開レッスンを AI と学ぶツールを 5 つ足しました。すでに `byoa` を動かしているときは、手順 7 の「Phase 2 の更新」を行います。
 - 書いた日: 2026-10-23。Supabase の OAuth 2.1 サーバーは**ベータ版**です。画面の名前や動きは変わることがあります。各手順の出典のページを開いて、今の表示と合っているか確かめてから進めてください。
 - 学習者向けのつなぎ方: [`usage_guide.md`](./usage_guide.md) の「自分の AI をつなぐ（リモート MCP）」。
 
@@ -95,7 +95,7 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
 
 ### 7. VM: migration と最小権限の DB ロール
 
-1. `main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）を当てます（まだ `byoa` は足しません）。
+1. `main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）と 016（`lesson_progress`、Phase 2）を当てます（まだ `byoa` は足しません）。
 2. VM でリモート MCP 用のロールを作ります。`risepath_app` はスーパーユーザーなので、インターネットに出す `mcp-public` には渡しません。
 
    ```bash
@@ -109,8 +109,14 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
    このロールに渡すのは、リモートのツール、年齢の確認、1 日の上限、接続したアプリの記録に要る表と列だけです（一覧と理由は `sql/mcp_remote_role.sql` の先頭）。
    - いくつかの表は、要る列だけを渡します。安全の記録（`ai_safety_events`）は報告の文章（`detail`）を読めません。教材（`materials`）は題名や保存場所を読めず、`id`、`user_id`、`status` だけです。年齢と同意の表は、判定に使う列だけです。`mcp_oauth_grants` は `revoked_at` を書けず、`client_name` を読めません。書けるのは行の追加（`user_id`、`client_id`）と、`first_seen_at`、`last_used_at` の更新だけです。
    - 1 日の上限の表（`ai_daily_usage`）は、行ごとの守り（RLS）を on にします。このロールが読み書きできるのは、種類が `mcp` と `mcp_write` の行だけです。表の持ち主の `risepath_app`（VM ではスーパーユーザー）は RLS を通らないので、API はこれまでどおり動きます。持ち主でもスーパーユーザーでもないロールを別に足すと、そのロールのポリシーを作るまで、この表の行が見えません。
+   - レッスンの進み具合（`lesson_progress`、Phase 2）は、読む・行を足す・書き換えるだけです。行を消せません。「学習の進み具合を消す」の記録（`lesson_progress_resets`）は読み書きできません。記録を消せるのは、学習者がアプリの画面で行う操作だけです。
    - ライフジャーナル、AI メモリ、性格のプロフィールなどの表は読めません。
    - あとの migration でリモートのツールに表や列が増えたら、SQL に足して実行し直します。実行し直すと、SQL にない権限は外れます。
+
+   **Phase 2 の更新（すでに `byoa` を動かしているとき）**: Phase 2 のコードで `./scripts/deploy-stack.sh` を実行すると、migration 016 が当たり、`mcp-public` も新しいツールで動き始めます。そのすぐあとに、上と同じコマンドでロールの SQL を流し直します。
+   - SQL はパスワードも設定し直します。`MCP_DB_PASSWORD` には、新しい値ではなく、今の値を入れます。今の値は、`mcp-public.env` の `DATABASE_URL_PHASE1` の、`risepath_mcp_remote:` と `@` のあいだの文字です。新しい値を入れると、`mcp-public` がデータベースにつながらなくなります。
+   - 流し直すまで、`course-quiz-check`、`course-progress-get`、`course-progress-update` は `permission_denied`（`server setup incomplete`）を返します。`course-list` と `course-lesson-get` は動きます。`docker compose --env-file stack.env logs mcp-public` に「re-run the role SQL after the migration」と出ていたら、この状態です。
+   - 流し直したら、手順 10 の 1（MCP Inspector）でツールが 11 あることと、`course-progress-get` がエラーにならないことを確かめます。
 
 3. `mcp-public.env` を作ります。
 
@@ -170,7 +176,7 @@ Cloudflare Zero Trust → **Networking → Tunnels** → 今のトンネル → 
    npx @modelcontextprotocol/inspector --server-url https://mcp.<domain>/mcp --transport http
    ```
 
-   ログインして許可したあと、ツールの一覧が 6 つ（`learner-state-get`、`learner-state-update`、`journal-log`、`journal-recent`、`rag-search`、`learner-adaptation-signals`）、リソースが `content://domains`、プロンプトが `socratic-tutor` だけであることを見ます。ブラウザから直接つなぐ設定で 403（Origin）が出たら、ステージングだけ `MCP_ALLOWED_ORIGINS` に Inspector の表示しているオリジンを足します。
+   ログインして許可したあと、ツールの一覧が 11（Phase 1 の `learner-state-get`、`learner-state-update`、`journal-log`、`journal-recent`、`rag-search`、`learner-adaptation-signals` と、Phase 2 の `course-list`、`course-lesson-get`、`course-quiz-check`、`course-progress-get`、`course-progress-update`）、リソースが `content://domains`、プロンプトが `socratic-tutor` だけであることを見ます。ブラウザから直接つなぐ設定で 403（Origin）が出たら、ステージングだけ `MCP_ALLOWED_ORIGINS` に Inspector の表示しているオリジンを足します。
 2. **Claude Code**: `claude mcp add --transport http rise-path https://mcp.<domain>/mcp` → セッションの中で `/mcp` → ブラウザで許可（<https://code.claude.com/docs/en/mcp>）。
 3. **Codex**: `~/.codex/config.toml` に `[mcp_servers.rise-path]` と `url` → `codex mcp login rise-path`（<https://developers.openai.com/codex/mcp>）。
 4. **Claude.ai のカスタムコネクタ**: Customize → Connectors → Add custom connector に `https://mcp.<domain>/mcp`（<https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp>）。
@@ -180,6 +186,7 @@ Cloudflare Zero Trust → **Networking → Tunnels** → 今のトンネル → 
 
 - 許可の画面に、アプリ名・戻る先のホスト名・読めるもの・書けるもの・「サインイン中のアカウント」が出る。
 - 18 歳以上: ツールが動く。`journal-recent` などで自分のデータだけが返る。
+- 18 歳以上: `course-lesson-get`（例: `course_slug` に `vibe-coding`、`lesson_id` に `vibe-ch1`）の結果で、クイズの問題（`questions`）に、正解（`answer`）、解説（`explanation`）、ヒント（`hint`）、選択肢へのひとこと（`feedback`）が入っていない（手順やプロンプトの `hint` は出てかまいません）。`course-quiz-check` でまちがえると、選んだ選択肢へのひとこと（`feedback`）とヒントだけが返り、正解（`correct_labels`）は返らない。同じアカウントで、新しいタブで Web のそのレッスンを開くと、その答えが出ている。前から開いていたタブでも、ほかのウィンドウからブラウザに戻ると出る（そのタブが前にサーバーの記録を読んでから 1 分たたないと読み直さないので、1 分ほど待ってから戻る）。
 - 18 歳未満: 許可の画面で「拒否」しか押せない。年月が未登録: 許可の画面に年月を登録する欄が出て、18 歳以上と登録するまで「許可」は出ない。
 - すでに許可したアプリでも、呼び出しのときに 18 歳以上でなければ `adults_only` や `age_required` のエラーになる（Supabase は、一度許可したアプリには許可の画面を出さずに通すため、毎回 MCP サーバーで確かめています）。
 - 「つないでいる AI アプリ」で解除して **10 秒ほど待ってから**呼ぶと、401 になり、AI アプリがログインをやり直す。MCP サーバーは「解除されていない」という答えを 5 秒まで覚えるので、解除の直後の呼び出しはまだ通ることがあります。

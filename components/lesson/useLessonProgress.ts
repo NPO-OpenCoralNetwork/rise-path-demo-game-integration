@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { LText, Lesson } from '../../shared/lesson/schema.js';
 import { resolveText } from '../../shared/lesson/text.js';
+import { mergeProgress, progressContentEqual } from '../../shared/lesson/progressMerge.js';
 import { addLearningEvent } from '../../services/progressService';
 import {
+  PROGRESS_EVENT,
   answerKey,
   readProgress,
   setLastLesson,
@@ -16,9 +18,11 @@ import {
   writeProgress,
   type AnswerRecord,
   type LessonProgress,
+  type ProgressEventDetail,
   type SelfRating,
 } from './progressStore.ts';
 import { lessonPct, lessonState, lessonStateEvents, sectionByBlock, type LessonEventType, type LessonState } from './model.ts';
+import { SYNC_ACCOUNT_EVENT, SYNC_ACCOUNT_KEY, isSignedOutAccount, readerMustDrop } from './progressSync.ts';
 
 /** A block counts as seen after ≥60% of it (or of the viewport) is visible for this long. */
 const SEEN_DWELL_MS = 1500;
@@ -50,6 +54,12 @@ export type LessonProgressApi = {
   getCheck: (id: string) => boolean | undefined;
   setCheck: (id: string, value: boolean) => void;
   setRating: (objectiveId: string, rating: SelfRating) => void;
+  /**
+   * How many times synced server data was merged into this lesson's progress since it loaded.
+   * LessonReader re-applies the resume position on a change while the learner has not
+   * interacted yet.
+   */
+  serverMerges: number;
 };
 
 type Options = {
@@ -93,12 +103,28 @@ function recordLessonEvent(type: LessonEventType, lesson: Lesson, courseTitle: L
 const blockElements = (article: HTMLElement | null) =>
   article ? Array.from(article.querySelectorAll<HTMLElement>('[data-rp-block]')) : [];
 
+/** Whose progress this browser holds (progressSync.ts), as stored. */
+function readSyncAccount(): string | null {
+  try {
+    return window.localStorage.getItem(SYNC_ACCOUNT_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function useLessonProgress({ courseSlug, lesson, title, articleRef, container, trackPosition, recordLastLesson = true, courseTitle }: Options): LessonProgressApi {
   const [progress, setProgress] = useState<LessonProgress>(() => readProgress(courseSlug, lesson.id));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [topBlockId, setTopBlockId] = useState<string | null>(null);
+  const [serverMerges, setServerMerges] = useState(0);
   const loadedKey = useRef(`${courseSlug}/${lesson.id}`);
   const dirty = useRef(false);
+  // Whose progress the in-memory record belongs to (rp:progressSync:account when it was read).
+  const account = useRef<string | null>(readSyncAccount());
+  // The record as this reader last read or wrote it in storage (readerMustDrop: was it cleared?).
+  const persisted = useRef<LessonProgress>(progress);
+  // The learner signed out (in another tab) while this reader is open: rp:lastLesson stays cleared.
+  const signedOut = useRef(false);
 
   // Another lesson in the same reader instance: reload its progress.
   useEffect(() => {
@@ -106,9 +132,13 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
     if (loadedKey.current === key) return;
     loadedKey.current = key;
     dirty.current = false;
-    setProgress(readProgress(courseSlug, lesson.id));
+    account.current = readSyncAccount();
+    const stored = readProgress(courseSlug, lesson.id);
+    persisted.current = stored;
+    setProgress(stored);
     setActiveBlockId(null);
     setTopBlockId(null);
+    setServerMerges(0);
   }, [courseSlug, lesson.id]);
 
   const update = useCallback((fn: (p: LessonProgress) => LessonProgress) => {
@@ -123,6 +153,63 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
   const state = useMemo(() => lessonState(lesson, progress), [lesson, progress]);
   const lastState = useRef<LessonState>(state);
 
+  /**
+   * Another learner signed in (this tab or another), or the progress was deleted or reset: the
+   * in-memory record belongs to the old owner. It is dropped for what is stored now (never
+   * written back), without learning events. Returns true when that happened.
+   */
+  const dropIfAccountSwitched = useCallback((): boolean => {
+    const before = account.current;
+    const now = readSyncAccount();
+    account.current = now;
+    if (before === now) return false;
+    const stored = readProgress(courseSlug, lesson.id);
+    if (!readerMustDrop(before, now, stored, persisted.current)) return false;
+    signedOut.current = isSignedOutAccount(now);
+    dirty.current = false;
+    persisted.current = stored;
+    lastState.current = lessonState(lesson, stored);
+    setProgress(stored);
+    return true;
+  }, [courseSlug, lesson]);
+
+  useEffect(() => {
+    const check = () => {
+      dropIfAccountSwitched();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === SYNC_ACCOUNT_KEY || event.key === null) check();
+    };
+    window.addEventListener(SYNC_ACCOUNT_EVENT, check);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(SYNC_ACCOUNT_EVENT, check);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [dropIfAccountSwitched]);
+
+  // Synced server data for this lesson (PROGRESS_EVENT source 'server'): merge it into the
+  // in-memory record. The merged state becomes the baseline first, so server data never fires
+  // lesson_start / lesson_complete; it is written back only when it holds more than the stored one.
+  useEffect(() => {
+    const onProgress = (event: Event) => {
+      const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
+      if (!detail || detail.source !== 'server' || detail.courseSlug !== courseSlug || detail.lessonId !== lesson.id) return;
+      if (dropIfAccountSwitched()) return;
+      const stored = readProgress(courseSlug, lesson.id);
+      persisted.current = stored;
+      setProgress((prev) => {
+        const merged = mergeProgress(stored, prev);
+        lastState.current = lessonState(lesson, merged);
+        dirty.current = dirty.current || !progressContentEqual(merged, stored);
+        return merged;
+      });
+      setServerMerges((n) => n + 1);
+    };
+    window.addEventListener(PROGRESS_EVENT, onProgress);
+    return () => window.removeEventListener(PROGRESS_EVENT, onProgress);
+  }, [courseSlug, lesson, dropIfAccountSwitched]);
+
   // Persist after each change (with the pct/state snapshot for course maps), and remember this
   // lesson for "continue" on the dashboard. Only changes the learner made (dirty, not a reload)
   // add learning events.
@@ -131,13 +218,16 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
     lastState.current = state;
     if (dirty.current) {
       dirty.current = false;
-      writeProgress(courseSlug, lesson.id, withSummary(progress, { pct, state }));
+      // Never write another learner's (or deleted) progress back: re-read instead.
+      if (dropIfAccountSwitched()) return;
+      const record = withSummary(progress, { pct, state });
+      if (writeProgress(courseSlug, lesson.id, record)) persisted.current = record;
       if (recordLastLesson) {
         for (const type of lessonStateEvents(before, state)) recordLessonEvent(type, lesson, courseTitle);
       }
     }
-    if (recordLastLesson) setLastLesson({ courseSlug, lessonId: lesson.id, title, pct });
-  }, [courseSlug, lesson, progress, title, pct, state, recordLastLesson, courseTitle]);
+    if (recordLastLesson && !signedOut.current) setLastLesson({ courseSlug, lessonId: lesson.id, title, pct });
+  }, [courseSlug, lesson, progress, title, pct, state, recordLastLesson, courseTitle, dropIfAccountSwitched]);
 
   // --- seen: IntersectionObserver rooted on the scrolling <main> ---
   useEffect(() => {
@@ -267,5 +357,6 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
     getCheck,
     setCheck,
     setRating,
+    serverMerges,
   };
 }

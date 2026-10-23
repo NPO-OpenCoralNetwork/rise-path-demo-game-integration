@@ -4,6 +4,7 @@ import { ViewState, GeneratedCourse, Course } from './types';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
 import { VIEW_PATHS } from './navigation/viewPaths';
 import { features } from './config/features';
 
@@ -517,6 +518,8 @@ const App: React.FC = () => (
       <AuthProvider>
         <ThemeProvider>
           <AppContent />
+          {/* Lesson progress nobody owns on this device: ask before adding it to the account. */}
+          <ProgressAdoptDialog />
         </ThemeProvider>
       </AuthProvider>
     </LanguageProvider>

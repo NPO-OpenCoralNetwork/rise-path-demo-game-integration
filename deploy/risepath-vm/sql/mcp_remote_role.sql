@@ -2,7 +2,8 @@
 -- byoa; doc/guides/byoa-setup.ja.md). The api, mcp and migrations keep using risepath_app, which
 -- the postgres image makes a superuser; the internet-facing mcp-public must not hold that.
 --
--- Run on the VM after the migrations (015 creates mcp_oauth_grants), from deploy/risepath-vm:
+-- Run on the VM after the migrations (015 creates mcp_oauth_grants, 016 lesson_progress), from
+-- deploy/risepath-vm:
 --
 --   MCP_DB_PASSWORD="$(openssl rand -hex 24)"
 --   docker compose --env-file stack.env exec -T db \
@@ -33,6 +34,11 @@
 --   user_profiles         role lookup only (admins skip the per-user cap): columns user_id, role,
 --                         never display_name, big5, learning_style, preferences or history
 --   user_progress         learner-state-get, learner-state-update (tools/core/learnerState.js)
+--   lesson_progress       the course-* tools (tools/core/lessonProgress.js): read the learner's lesson
+--                         progress, record quiz answers and sections read (INSERT … ON CONFLICT DO
+--                         NOTHING, then SELECT … FOR UPDATE and UPDATE). No DELETE: only the learner's
+--                         delete control in the app removes rows, together with lesson_progress_resets,
+--                         which this role cannot read or write
 --   learning_journal      journal-recent, journal-log, learner-adaptation-signals (tools/core/journal.js)
 --   curricula             ownership check for journal-log and journal-recent (read only): columns
 --                         id, user_id, title, never the generated course content
@@ -107,6 +113,7 @@ CREATE POLICY mcp_remote_update ON ai_daily_usage FOR UPDATE TO risepath_mcp_rem
   USING (kind IN ('mcp', 'mcp_write')) WITH CHECK (kind IN ('mcp', 'mcp_write'));
 
 GRANT SELECT, INSERT, UPDATE ON user_progress TO risepath_mcp_remote;
+GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;
 GRANT SELECT, INSERT ON learning_journal TO risepath_mcp_remote;
 GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;
 GRANT SELECT (id, user_id, status) ON materials TO risepath_mcp_remote;

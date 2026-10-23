@@ -185,6 +185,10 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const { container, scrollToElement, scrollToTop } = useScrollContainer(rootRef);
   const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition, recordLastLesson, courseTitle: course.title });
   const initialProgress = useRef(progress.progress);
+  // Synced progress that arrives after the reader opened (a new device) moves the resume
+  // position, but only until the learner scrolls, taps or types.
+  const interacted = useRef(false);
+  const [resumeRun, setResumeRun] = useState(0);
 
   const sections = useMemo(() => sectionByBlock(lesson), [lesson]);
   const figures = useMemo(() => figureNumbers(lesson), [lesson]);
@@ -236,8 +240,32 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     focusable?.focus({ preventScroll: true });
   }, [scrollToElement]);
 
+  useEffect(() => {
+    interacted.current = false;
+    if (!container) return;
+    const mark = () => {
+      interacted.current = true;
+    };
+    const interactions = ['wheel', 'touchstart', 'pointerdown'] as const;
+    interactions.forEach((type) => container.addEventListener(type, mark, { passive: true }));
+    window.addEventListener('keydown', mark);
+    return () => {
+      interactions.forEach((type) => container.removeEventListener(type, mark));
+      window.removeEventListener('keydown', mark);
+    };
+  }, [container, lesson]);
+
+  useEffect(() => {
+    if (!progress.serverMerges || interacted.current) return;
+    initialProgress.current = progress.progress;
+    setResumeRun((n) => n + 1);
+    // Only a new merge counts; progress.progress is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress.serverMerges]);
+
   // Resume: URL hash first, then the saved block. Layout shifts while diagrams render, so the
-  // target is re-aligned until the learner interacts (or 2.5 s pass).
+  // target is re-aligned until the learner interacts (or 2.5 s pass). Runs again (resumeRun)
+  // when synced progress arrives before the learner interacted.
   useEffect(() => {
     if (!container) return;
     const target = resumeTarget(window.location.hash, initialProgress.current, lesson);
@@ -278,7 +306,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
       done = true;
       cleanup();
     };
-  }, [container, lesson]);
+  }, [container, lesson, resumeRun]);
 
   // The notice fades on its own.
   useEffect(() => {
