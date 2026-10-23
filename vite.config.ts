@@ -6,8 +6,9 @@ import tailwindcss from '@tailwindcss/vite';
 // Model-provider keys and service-role keys must never reach the browser. VITE_* values are
 // public by design, and any whole-object `import.meta.env` read inlines all of them, so these
 // are forced to `undefined` in the client even if someone sets them. Keys belong on the server
-// (GEMINI_API_KEY / ANTHROPIC_API_KEY, read by server/llm).
-const CLIENT_SECRET_ENV = /^VITE_(?:GEMINI|GOOGLE|ANTHROPIC|CLAUDE|OPENAI)_\w*KEY$|^VITE_\w*SERVICE_ROLE\w*$/;
+// (GEMINI_API_KEY / ANTHROPIC_API_KEY, read by server/llm). No Stripe value at all: the client
+// only calls /api/v2/billing (Stripe keys live in billing.env on the server).
+const CLIENT_SECRET_ENV = /^VITE_(?:GEMINI|GOOGLE|ANTHROPIC|CLAUDE|OPENAI)_\w*KEY$|^VITE_\w*SERVICE_ROLE\w*$|^VITE_STRIPE_\w*$/;
 
 export default defineConfig(({ mode }) => {
     // Only VITE_* values are read here; never `define` server secrets into the bundle.

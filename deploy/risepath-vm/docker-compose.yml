@@ -6,6 +6,7 @@
 #
 #   cp stack.env.example stack.env && chmod 600 stack.env
 #   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=tts,tunnel
+#   cp billing.env.example billing.env && chmod 600 billing.env # only for the paid plan (api only)
 #   ./scripts/deploy-stack.sh   # build -> up --wait db -> run --rm --no-deps api npm run db:migrate -> up -d
 #   (apply migrations before the new api starts: its healthcheck fails while one is pending)
 
@@ -40,8 +41,12 @@ services:
       dockerfile: deploy/risepath-vm/Dockerfile
       target: api
     restart: unless-stopped
+    # billing.env (Phase 3, billing.env.example): the Stripe keys and billing switches reach the
+    # api only, never mcp or mcp-public. deploy-stack.sh refuses STRIPE_/BILLING_ names in stack.env.
     env_file:
       - path: stack.env
+        required: false
+      - path: billing.env
         required: false
     environment:
       DATABASE_URL_PHASE1: ${DATABASE_URL_PHASE1}

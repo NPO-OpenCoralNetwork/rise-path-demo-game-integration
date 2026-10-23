@@ -144,6 +144,10 @@ jobs:
           DATABASE_URL_PHASE1: ci-leak-sentinel-DATABASE_URL_PHASE1
           ORIGIN_SECRET: ci-leak-sentinel-ORIGIN_SECRET
           TUNNEL_TOKEN: ci-leak-sentinel-TUNNEL_TOKEN
+          STRIPE_SECRET_KEY: ci-leak-sentinel-STRIPE_SECRET_KEY
+          VITE_STRIPE_SECRET_KEY: ci-leak-sentinel-VITE_STRIPE_SECRET_KEY
+          STRIPE_WEBHOOK_SECRET: ci-leak-sentinel-STRIPE_WEBHOOK_SECRET
+          BILLING_TEST_USER_IDS: ci-leak-sentinel-BILLING_TEST_USER_IDS
         run: npm run build:prod -- --outDir "$RUNNER_TEMP/dist" --emptyOutDir
 
       - name: Fail if a sentinel key reached the bundle
