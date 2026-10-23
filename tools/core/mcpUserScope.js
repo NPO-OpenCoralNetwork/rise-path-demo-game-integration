@@ -2,6 +2,11 @@
  * MCP user scoping — which learner a tool call or resource read acts for.
  *
  * resolveMcpUserId, in order:
+ * 0. The remote endpoint (mcp-server/remote.js, OAuth): the user of the verified access token
+ *    (extra.authInfo.extra.userId, set by mcp-server/oauthVerifier.js). On a remote server
+ *    (`remote: true`), or whenever a call carries authInfo, this is the only step: a missing or
+ *    malformed user id fails closed, and nothing below runs (no session, no rp_turn argument or
+ *    header, no RISE_PATH_ACTIVE_SESSION_KEY, no dev fallback, never PHASE1_USER_ID).
  * 1. An SSE session opened with a learner's own Supabase JWT: that learner, whatever else the call
  *    carries.
  * 2. A turn token: the `rp_turn` tool argument, or an `X-Hermes-Session-Key: rp:turn:<token>` header
@@ -46,6 +51,7 @@ export const RECENT_TURN_WINDOW_MS = 15 * 60 * 1000;
 export const TURN_ARG = 'rp_turn';
 export const TURN_KEY_PREFIX = 'rp:turn:';
 const TURN_TOKEN = /^[A-Za-z0-9_-]{24,64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** @type {Map<string, { userId: string, expiresAt: number, updatedAt?: number }>} */
 const bindingMemory = new Map();
@@ -77,6 +83,18 @@ export function isTurnToken(value) {
 function getSessionContext(extra, sessions) {
     if (!extra?.sessionId || !sessions?.has(extra.sessionId)) return null;
     return sessions.get(extra.sessionId);
+}
+
+/**
+ * The user of a verified OAuth access token (remote endpoint), or null. Only the verifier sets
+ * authInfo (requireBearerAuth stores it as req.auth; a client cannot send it), and its user id
+ * must be a UUID.
+ * @param {any} extra
+ * @returns {string | null}
+ */
+export function oauthUserId(extra) {
+    const userId = extra?.authInfo?.extra?.userId;
+    return typeof userId === 'string' && UUID.test(userId) ? userId : null;
 }
 
 /** The turn token in an X-Hermes-Session-Key request header (SSE), or ''. Other keys are ignored. */
@@ -302,11 +320,20 @@ const bindingRequired = (detail) => ({
 
 /**
  * Resolve the learner for an MCP tool call or resource read (order in the header comment).
- * @param {{ argsUserId?: unknown, extra?: any, sessions?: Map<string, any>, turnToken?: unknown }} params
- *   argsUserId is ignored (LLM-supplied); turnToken is the call's rp_turn argument
+ * @param {{ argsUserId?: unknown, extra?: any, sessions?: Map<string, any>, turnToken?: unknown, remote?: boolean }} params
+ *   argsUserId is ignored (LLM-supplied); turnToken is the call's rp_turn argument; remote: the
+ *   call reached the remote OAuth endpoint (step 0 only)
  * @returns {Promise<{ userId: string } | { error: string, error_type: 'session_binding_required' }>}
  */
-export async function resolveMcpUserId({ argsUserId: _argsUserId, extra, sessions, turnToken } = {}) {
+export async function resolveMcpUserId({ argsUserId: _argsUserId, extra, sessions, turnToken, remote = false } = {}) {
+    // Step 0 returns before the session map and the rp:turn header are read.
+    if (remote || extra?.authInfo) {
+        const userId = oauthUserId(extra);
+        return userId
+            ? finalizeScopedUser(userId)
+            : bindingRequired('this endpoint needs a verified OAuth access token');
+    }
+
     const sessionCtx = getSessionContext(extra, sessions);
 
     if (sessionCtx?.userId && !isBridgePlaceholderUserId(sessionCtx.userId)) {

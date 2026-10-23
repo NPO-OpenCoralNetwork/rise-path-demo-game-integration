@@ -42,6 +42,7 @@ VM では、新しい `api` イメージを起動する前に適用します。�
 | `012_update_claude_code_portal_copy.sql` | Claude Code カードの説明文を更新（011 の文面のままの行だけ。管理者が編集した説明は残す） |
 | `013_ai_daily_usage.sql` | 有料AI機能の日次利用カウンタ（ユーザー別・接続元アドレス別・全体の合計。日本時間の日付で区切る） |
 | `014_minor_safeguards.sql` | 未成年の保護（Phase 0.5）: `user_age`（生年月のみ。日は常に 1）、`account_consents`（保護者の AI 利用同意。追記のみ、取り消しは `revoked_at`）、`ai_safety_events`（ブロック・報告・相談先の表示。報告の本文は 90 日、イベントは 365 日で整理） |
+| `015_mcp_oauth_grants.sql` | 接続したアプリ（Phase 1）: `mcp_oauth_grants`（学習者と OAuth クライアントの組ごとに 1 行。最初と最後に使った日時はリモート MCP サーバーが書く。取り消すと `revoked_at` を入れ（Supabase の `revokeGrant` の前と後の 2 回）、それより前に発行されたトークンは数秒以内に使えなくなる。アプリの名前 `client_name` も取り消しのときに入れる。一度も使わずに取り消したアプリは、使った日時が NULL） |
 
 ### pgvector（RAG のベクトル検索）
 

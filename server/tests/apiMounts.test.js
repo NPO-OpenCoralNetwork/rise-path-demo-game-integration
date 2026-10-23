@@ -91,6 +91,43 @@ describe('server.js /api/v2 mounts (production)', () => {
         });
     });
 
+    it('the connected-apps mount wants a JWT, not the bridge token', async () => {
+        await withApp(undefined, async (base) => {
+            assert.equal((await fetch(`${base}/api/v2/user/connected-apps`)).status, 401);
+            assert.equal((await fetch(`${base}/api/v2/user/connected-apps`, { headers: bridge })).status, 401);
+            const revoke = await fetch(`${base}/api/v2/user/connected-apps/11111111-2222-4000-8000-000000000001/revoke`, { method: 'POST', headers: bridge });
+            assert.equal(revoke.status, 401);
+        });
+    });
+
+    it('a connected agent\'s OAuth token is refused on JWT, bridge/JWT and LLM mounts', async () => {
+        const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+        const agentToken = `${b64({ alg: 'ES256', kid: 'k1' })}.${b64({
+            sub: 'cccccccc-0000-4000-8000-000000000001', aud: 'https://mcp.example.org/mcp', role: 'authenticated',
+            client_id: 'dddddddd-0000-4000-8000-000000000001', exp: 4_000_000_000,
+        })}.c2ln`;
+        const agent = { Authorization: `Bearer ${agentToken}` };
+        await withApp(undefined, async (base) => {
+            for (const path of ['/api/v2/user/connected-apps', '/api/v2/user/ai-access', '/api/v2/curricula', '/api/v2/learner-memory', '/api/v2/agent/health']) {
+                const response = await fetch(`${base}${path}`, { headers: agent });
+                assert.equal(response.status, 401, path);
+                assert.equal((await response.json()).error_type, 'oauth_client_token', path);
+            }
+            // optionalAuth (the LLM gateway): the agent counts as a guest, so an AI POST wants sign-in.
+            const tutor = await fetch(`${base}/api/v2/llm/tutor`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...agent },
+                body: JSON.stringify({
+                    message: 'hi',
+                    lesson: { courseId: 'vibe', lessonId: 'ch1', title: 'Vibe Coding', objectives: ['explain the flow'] },
+                    anchor: { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'Write the goal first.' },
+                }),
+            });
+            assert.equal(tutor.status, 401);
+            assert.equal((await tutor.json()).error_type, 'sign_in_required');
+        });
+    });
+
     it('AI POSTs: guests get 401 sign_in_required, GET /llm/status stays public', async () => {
         process.env.AI_ACCESS_DEV_AUDIENCE = 'adult'; // ignored in production
         await withApp(undefined, async (base) => {

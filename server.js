@@ -19,6 +19,7 @@ import contentRoutes from './server/routes/content.js';
 import userRoutes from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
 import aiAccessRoutes from './server/routes/aiAccess.js';
+import connectedAppsRoutes from './server/routes/connectedApps.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
@@ -173,6 +174,9 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     app.post('/api/v2/image', aiAccessGate({ adultsOnly: true })); // before its daily cap (content.js)
     // The learner's age and guardian consent (server/routes/aiAccess.js).
     app.use('/api/v2/user/ai-access', requireAuth, aiAccessRoutes);
+    // Agents the learner connected to the remote MCP endpoint with OAuth (Phase 1). requireAuth
+    // refuses an agent's own OAuth token (401 oauth_client_token), so an agent cannot revoke or list.
+    app.use('/api/v2/user/connected-apps', requireAuth, connectedAppsRoutes);
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
     // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).

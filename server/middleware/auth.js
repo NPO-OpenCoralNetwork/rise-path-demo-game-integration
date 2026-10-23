@@ -9,12 +9,18 @@
  *   Dev/demo mode:
  *     - token missing → PHASE1_USER_ID fallback
  *     - Supabase not configured → PHASE1_USER_ID fallback
+ *   Always:
+ *     - a token Supabase's OAuth server issued to a connected agent (payload has client_id, or aud
+ *       is not 'authenticated'; tools/core/oauthToken.js) is never an app session: requireAuth
+ *       answers 401 oauth_client_token, optionalAuth treats the caller as anonymous. Agents reach
+ *       Rise Path only through the remote MCP endpoint (mcp-server/oauthVerifier.js).
  *
  * @module server/middleware/auth
  */
 
 import { PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
+import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -91,6 +97,12 @@ export const extractBearerToken = (req) => {
     return null;
 };
 
+/** The 401 body for a connected agent's OAuth token sent to the app API. */
+export const OAUTH_CLIENT_TOKEN_REFUSAL = Object.freeze({
+    error: 'This token belongs to a connected app. Sign in to Rise Path to use this API.',
+    error_type: 'oauth_client_token',
+});
+
 // ─── Middleware ──────────────────────────────────────────────
 
 /**
@@ -111,6 +123,11 @@ export const requireAuth = async (req, res, next) => {
             error: 'Authentication required',
             hint: 'Include Authorization: Bearer <supabase-jwt> header',
         });
+    }
+
+    // Checked before Supabase (and before any dev fallback): getUser accepts these tokens too.
+    if (isOAuthClientToken(token)) {
+        return res.status(401).json(OAUTH_CLIENT_TOKEN_REFUSAL);
     }
 
     // Token provided — validate with Supabase
@@ -152,6 +169,12 @@ export const requireAuth = async (req, res, next) => {
 export const optionalAuth = async (req, res, next) => {
     const token = extractBearerToken(req);
     if (!token) {
+        req.userId = null;
+        req.authMethod = 'anonymous';
+        return next();
+    }
+
+    if (isOAuthClientToken(token)) {
         req.userId = null;
         req.authMethod = 'anonymous';
         return next();

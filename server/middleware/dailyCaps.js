@@ -9,12 +9,16 @@
  *   agent_chat        each POST /api/v2/agent/chat that reaches Hermes
  *   embeddings        POST /api/v2/upload and POST /api/v2/rag/index (one file, at most
  *                     MAX_CHUNKS_PER_MATERIAL chunks: server/ragService.js)
+ *   mcp               each tools/call on the remote MCP endpoint (mcp-server/remote.js)
+ *   mcp_write         each write tool call there (journal-log, learner-state-update), on top of mcp
  * Limits come from AI_CAP_USER_<KIND>, AI_CAP_IP_<KIND> (default: 3 × the user cap) and
- * AI_CAP_GLOBAL_<KIND> (defaults in DEFAULT_LIMITS), read on every reservation. 0 turns a feature
+ * AI_CAP_GLOBAL_<KIND> (defaults in DEFAULT_LIMITS), read on every reservation. The mcp kinds have
+ * no per-address cap (ip: null; AI_CAP_IP_MCP* is ignored): connected agents such as Claude.ai and
+ * ChatGPT call from their vendors' clouds, so one address carries many learners. 0 turns a feature
  * off for everyone, admins included (429 scope 'off', with no reset time). There is no
  * "unlimited" value: the global cap is the cost breaker and is always on.
  *
- * Subjects counted per call: the user id; 'ip:<address>' (an IPv6 caller by its /56, the block a
+ * Subjects counted per call: the user id; 'ip:<address>' (kinds with a per-address cap) (an IPv6 caller by its /56, the block a
  * home or office connection usually gets), so a few accounts made from one network cannot use up
  * the global cap alone; and '*', all users. The address is req.ip (the visitor behind the edge:
  * originGate.js, or TRUST_PROXY). Loopback and private addresses (local dev, the tailnet, a proxy
@@ -36,6 +40,9 @@
  * turned off (a limit of 0) is off for guests too.
  * Admins (user_profiles.role = 'admin') skip the user and address caps, not the global one.
  *
+ * reserveFor({ kind, userId, ip }) is the same check without Express (the remote MCP endpoint): it
+ * answers { handle } or { refusal: { status, headers, body } } with the body and headers below.
+ *
  * Over a cap: 429 { error, error_type: 'daily_limit_reached', kind, scope, reset_at } with
  * Retry-After set to the seconds left until 00:00 JST. scope is 'user', 'ip', 'global' or
  * 'guest'; a feature turned off answers scope 'off' without reset_at or Retry-After.
@@ -54,13 +61,17 @@ import { ipKeyGenerator } from 'express-rate-limit';
 import { getPool } from '../db.js';
 import { modelMayHaveRun } from '../llm/errors.js';
 
-/** @typedef {'llm'|'course_generation'|'image'|'agent_chat'|'embeddings'} CapKind */
+/** @typedef {'llm'|'course_generation'|'image'|'agent_chat'|'embeddings'|'mcp'|'mcp_write'} CapKind */
 /** @typedef {'user'|'ip'|'global'|'guest'|'off'} CapScope */
-/** @typedef {{ user: number, ip: number, global: number }} CapLimit */
+/** @typedef {{ user: number, ip: number | null, global: number }} CapLimit  ip null: no per-address cap */
 /** @typedef {{ refund: () => Promise<void> }} CapHandle */
+/** @typedef {{ status: number, headers: Record<string, string>, body: Record<string, unknown> }} CapRefusal */
 
 /** @type {readonly CapKind[]} */
-export const CAP_KINDS = Object.freeze(['llm', 'course_generation', 'image', 'agent_chat', 'embeddings']);
+export const CAP_KINDS = Object.freeze(['llm', 'course_generation', 'image', 'agent_chat', 'embeddings', 'mcp', 'mcp_write']);
+
+/** Kinds without a per-address cap: their callers share vendor-cloud addresses. */
+const NO_ADDRESS_CAP = new Set(['mcp', 'mcp_write']);
 
 /**
  * Sized for a small free launch. An owner who needs more sets a larger number. The per-address
@@ -74,6 +85,8 @@ const DEFAULT_LIMITS = Object.freeze({
   image: { user: 30, global: 300 },
   agent_chat: { user: 40, global: 800 },
   embeddings: { user: 10, global: 100 },
+  mcp: { user: 300, global: 20000 },
+  mcp_write: { user: 50, global: 5000 },
 });
 const IP_CAP_FACTOR = 3;
 
@@ -189,27 +202,47 @@ export function resolveCapLimits(env = process.env, { logger = console, warned =
     const user = read(`AI_CAP_USER_${name}`, DEFAULT_LIMITS[kind].user);
     return [kind, {
       user,
-      ip: read(`AI_CAP_IP_${name}`, Math.min(user * IP_CAP_FACTOR, MAX_LIMIT)),
+      ip: NO_ADDRESS_CAP.has(kind) ? null : read(`AI_CAP_IP_${name}`, Math.min(user * IP_CAP_FACTOR, MAX_LIMIT)),
       global: read(`AI_CAP_GLOBAL_${name}`, DEFAULT_LIMITS[kind].global),
     }];
   })));
 }
 
 /**
- * Answer 429 daily_limit_reached, with Retry-After and reset_at at the next 00:00 JST. Scope
+ * The 429 daily_limit_reached answer, with Retry-After and reset_at at the next 00:00 JST. Scope
  * 'off' (a cap set to 0) has neither: nothing resets it but a configuration change.
+ * @param {{ kind: CapKind, scope: CapScope, now?: number, message?: string }} options
+ * @returns {CapRefusal}
+ */
+export function dailyLimitRefusal({ kind, scope, now = Date.now(), message }) {
+  const error = message ?? DEFAULT_MESSAGE[scope] ?? DEFAULT_MESSAGE.user;
+  if (scope === 'off') {
+    return { status: 429, headers: {}, body: { error, error_type: 'daily_limit_reached', kind, scope } };
+  }
+  const resetAt = nextJstMidnight(now);
+  return {
+    status: 429,
+    headers: { 'Retry-After': String(Math.max(1, Math.ceil((resetAt - now) / 1000))) },
+    body: { error, error_type: 'daily_limit_reached', kind, scope, reset_at: new Date(resetAt).toISOString() },
+  };
+}
+
+/**
+ * Write a refusal to an Express response.
+ * @param {import('express').Response} res @param {CapRefusal} refusal
+ */
+function sendRefusal(res, { status, headers, body }) {
+  for (const [name, value] of Object.entries(headers)) res.set(name, value);
+  res.status(status).json(body);
+}
+
+/**
+ * Answer 429 daily_limit_reached (see dailyLimitRefusal).
  * @param {import('express').Response} res
  * @param {{ kind: CapKind, scope: CapScope, now?: number, message?: string }} options
  */
-export function sendDailyLimit(res, { kind, scope, now = Date.now(), message }) {
-  const error = message ?? DEFAULT_MESSAGE[scope] ?? DEFAULT_MESSAGE.user;
-  if (scope === 'off') {
-    res.status(429).json({ error, error_type: 'daily_limit_reached', kind, scope });
-    return;
-  }
-  const resetAt = nextJstMidnight(now);
-  res.set('Retry-After', String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
-  res.status(429).json({ error, error_type: 'daily_limit_reached', kind, scope, reset_at: new Date(resetAt).toISOString() });
+export function sendDailyLimit(res, options) {
+  sendRefusal(res, dailyLimitRefusal(options));
 }
 
 /**
@@ -478,29 +511,26 @@ export function createDailyCaps({
   };
 
   /**
-   * Charge one use of `kind` to the caller, to their address and to the all-users total. Answers
-   * 429 itself and returns null when a cap is reached (or the feature is off, for guests too), or
-   * 503 when only a database outage's share of the all-users cap is used up; otherwise returns a
-   * handle whose refund() gives the use back once. Never throws.
-   * @param {import('express').Request & { userId?: unknown }} req  req.userId from the auth middleware
-   * @param {import('express').Response} res
-   * @param {CapKind} kind
-   * @param {{ refundOnStatus?: number[] }} [options] refund automatically when the response
-   *   finishes with one of these statuses (paths that end before any paid call)
-   * @returns {Promise<CapHandle | null>}
+   * Charge one use of `kind` to the caller, to their address (kinds with a per-address cap) and to
+   * the all-users total, without Express. Never throws.
+   * @param {{ kind: CapKind, userId?: unknown, ip?: unknown }} caller  userId '' or absent: a guest,
+   *   not counted (but refused when the feature is off); ip: the caller's address (req.ip)
+   * @returns {Promise<{ handle: CapHandle, refusal?: undefined } | { handle?: undefined, refusal: CapRefusal }>}
+   *   refusal: 429 when a cap is reached (or the feature is off), 503 ai_unavailable when only a
+   *   database outage's share of the all-users cap is used up, 500 when the check itself failed;
+   *   otherwise a handle whose refund() gives the use back once
    */
-  async function reserve(req, res, kind, { refundOnStatus = [] } = {}) {
+  async function reserveFor({ kind, userId: rawUserId, ip }) {
     try {
       const limits = resolveCapLimits(env, { logger, warned: warnedLimits })[kind];
       if (!limits) throw new Error(`Unknown daily cap kind: ${kind}`);
       const t = now();
       // Off is off for everyone, guests included (they are not counted, but not served either).
       if (limits.user === 0 || limits.ip === 0 || limits.global === 0) {
-        sendDailyLimit(res, { kind, scope: 'off', now: t });
-        return null;
+        return { refusal: dailyLimitRefusal({ kind, scope: 'off', now: t }) };
       }
-      const userId = req.userId ? String(req.userId) : '';
-      if (!userId) return NOOP_HANDLE;
+      const userId = rawUserId ? String(rawUserId) : '';
+      if (!userId) return { handle: NOOP_HANDLE };
       const day = jstDay(t);
       const pool = poolFn();
       const store = storeFor(pool);
@@ -509,17 +539,15 @@ export function createDailyCaps({
       if (!(await isAdmin(userId, pool))) {
         const user = await charge(store, day, kind, userId, limits.user);
         if (!user.store) {
-          sendDailyLimit(res, { kind, scope: 'user', now: t });
-          return null;
+          return { refusal: dailyLimitRefusal({ kind, scope: 'user', now: t }) };
         }
         charges.push({ store: user.store, subject: userId });
-        const address = ipSubject(req.ip || req.socket?.remoteAddress);
-        if (address) {
+        const address = limits.ip === null ? null : ipSubject(ip);
+        if (address && limits.ip !== null) {
           const network = await charge(store, day, kind, address, limits.ip);
           if (!network.store) {
             await giveBack(day, kind, charges);
-            sendDailyLimit(res, { kind, scope: 'ip', now: t });
-            return null;
+            return { refusal: dailyLimitRefusal({ kind, scope: 'ip', now: t }) };
           }
           charges.push({ store: network.store, subject: address });
         }
@@ -533,13 +561,16 @@ export function createDailyCaps({
           // (it would hide the real one for the rest of the day) and no reset time to promise.
           const KIND = kind.toUpperCase();
           warnEveryMinute(`outage share|${kind}`, () => `[AI caps] all-users outage share used up: ${kind} (${Math.max(1, Math.ceil(limits.global * OUTAGE_GLOBAL_SHARE))} of AI_CAP_GLOBAL_${KIND}=${limits.global}) in this process while the database does not answer. Callers get 503 until it does.`);
-          res.set('Retry-After', String(OUTAGE_RETRY_AFTER_S));
-          res.status(503).json({ error: 'This AI feature is busy right now. Please try again in a few minutes.', error_type: 'ai_unavailable' });
-          return null;
+          return {
+            refusal: {
+              status: 503,
+              headers: { 'Retry-After': String(OUTAGE_RETRY_AFTER_S) },
+              body: { error: 'This AI feature is busy right now. Please try again in a few minutes.', error_type: 'ai_unavailable' },
+            },
+          };
         }
         alertGlobal('reached', day, kind, limits.global);
-        sendDailyLimit(res, { kind, scope: 'global', now: t });
-        return null;
+        return { refusal: dailyLimitRefusal({ kind, scope: 'global', now: t }) };
       }
       charges.push({ store: all.store, subject: GLOBAL_SUBJECT });
       if (all.count >= Math.ceil(limits.global * GLOBAL_WARN_SHARE)) alertGlobal('warning', day, kind, limits.global);
@@ -553,18 +584,40 @@ export function createDailyCaps({
           await giveBack(day, kind, charges);
         },
       };
-      if (refundOnStatus.length > 0) {
-        res.once('finish', () => {
-          if (refundOnStatus.includes(res.statusCode)) void handle.refund();
-        });
-      }
-      if (res.locals) res.locals.refundDailyCap = handle.refund;
-      return handle;
+      return { handle };
     } catch (error) {
       logger.error('[AI caps] daily cap check failed:', error);
-      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+      return { refusal: { status: 500, headers: {}, body: { error: 'Internal server error' } } };
+    }
+  }
+
+  /**
+   * Charge one use of `kind` to the caller, to their address and to the all-users total. Answers
+   * 429 itself and returns null when a cap is reached (or the feature is off, for guests too), or
+   * 503 when only a database outage's share of the all-users cap is used up; otherwise returns a
+   * handle whose refund() gives the use back once. Never throws.
+   * @param {import('express').Request & { userId?: unknown }} req  req.userId from the auth middleware
+   * @param {import('express').Response} res
+   * @param {CapKind} kind
+   * @param {{ refundOnStatus?: number[] }} [options] refund automatically when the response
+   *   finishes with one of these statuses (paths that end before any paid call)
+   * @returns {Promise<CapHandle | null>}
+   */
+  async function reserve(req, res, kind, { refundOnStatus = [] } = {}) {
+    const { handle, refusal } = await reserveFor({ kind, userId: req.userId, ip: req.ip || req.socket?.remoteAddress });
+    if (refusal) {
+      // A failed check (500) may come after a route already answered.
+      if (refusal.status !== 500 || !res.headersSent) sendRefusal(res, refusal);
       return null;
     }
+    if (handle === NOOP_HANDLE) return handle;
+    if (refundOnStatus.length > 0) {
+      res.once('finish', () => {
+        if (refundOnStatus.includes(res.statusCode)) void handle.refund();
+      });
+    }
+    if (res.locals) res.locals.refundDailyCap = handle.refund;
+    return handle;
   }
 
   /**
@@ -589,12 +642,14 @@ export function createDailyCaps({
     alertedDay = '';
   }
 
-  return { reserve, middleware, reset };
+  return { reserve, reserveFor, middleware, reset };
 }
 
 const dailyCaps = createDailyCaps();
 
 export const reserveDailyCap = dailyCaps.reserve;
+/** reserveFor of the process-wide caps (see createDailyCaps): the same counts as the Express routes. */
+export const reserveDailyCapFor = dailyCaps.reserveFor;
 export const dailyCap = dailyCaps.middleware;
 export const resetDailyCapsForTests = dailyCaps.reset;
 
