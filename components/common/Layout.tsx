@@ -34,6 +34,10 @@ interface LayoutProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
   onLogout?: () => void;
+  /** A bar above the page (Phase 4: components/legal/LegalNoticeBar). It sits in the same frame as
+   *  ordinary pages, also above full-bleed ones (the dashboard, lessons). With the flag on the frame
+   *  is always there: it holds the bar's live region, which has no height while it is empty. */
+  notice?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -62,7 +66,10 @@ const LANGUAGE_OPTIONS: { value: SelectedLanguage; short: string; name: string; 
   { value: 'fr', short: 'FR', name: 'Français', lang: 'fr' },
 ];
 
-const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, children }) => {
+/** The content frame of ordinary (not full-bleed) pages; the notice slot uses it on every page. */
+const CONTENT_FRAME = 'max-w-wide 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8';
+
+const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, notice, children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
@@ -544,11 +551,12 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
         inert={isMobileMenuOpen || undefined}
         className={`flex-1 min-w-0 overflow-y-auto h-full w-full ${railMode ? '' : 'pt-14 md:pt-0'} relative overflow-x-hidden focus:outline-none ${styles.main}`}
       >
+        {notice ? <div className={CONTENT_FRAME}>{notice}</div> : null}
         <div
           className={`min-h-full w-full ${
             isFullBleedView
               ? ''
-              : 'max-w-wide 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8'
+              : CONTENT_FRAME
           }`}
         >
           <div key={location.pathname} className="page-transition">

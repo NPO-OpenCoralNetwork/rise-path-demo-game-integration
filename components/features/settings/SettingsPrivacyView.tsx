@@ -99,6 +99,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             deleteAccountLead: 'To delete your whole account, use ',
             deleteAccountLink: 'Delete account',
             deleteAccountTail: '.',
+            policyLead: 'For details, see the ',
+            policyLink: 'Privacy Policy',
+            policyTail: ' (in Japanese).',
         },
         jp: {
             back: '設定',
@@ -135,6 +138,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             deleteAccountLead: 'アカウントごと消すときは、',
             deleteAccountLink: '「アカウントを削除する」',
             deleteAccountTail: 'から手続きできます。',
+            policyLead: 'くわしくは',
+            policyLink: 'プライバシーポリシー',
+            policyTail: 'を見てください。',
         },
     } as const;
 
@@ -257,6 +263,17 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                     <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
                     <p className="text-slate-500">{t.subtitle}</p>
                 </header>
+
+                {/* Phase 4: the policy, once published (VITE_FEATURE_LEGAL_PAGES=true). */}
+                {features.legalPages && (
+                    <p className="text-body text-fg-2">
+                        {t.policyLead}
+                        <Link to="/privacy" className="rounded-chip font-medium text-primary-text underline underline-offset-4">
+                            {t.policyLink}
+                        </Link>
+                        {t.policyTail}
+                    </p>
+                )}
 
                 {/* Phase 4 (D1): the whole account, not only these records. */}
                 <p className="text-body text-fg-2">

@@ -47,3 +47,5 @@ AI アプリに発行したトークンも `role` は `authenticated` です。P
 ## 要確認: AI アプリのトークンでのパスワードとメールアドレスの変更
 
 AI アプリのトークンでも、Supabase Auth の `/user` でパスワードの設定やメールアドレスの変更を呼べます（ソースコードを読んだかぎり。本番では未検証）。この SQL やフックでは防げません。Authentication → Sign In / Providers → Email の設定で防ぎます。設定の名前と、それでも残るリスク（パスワードのないアカウントで、許可から 24 時間）は、[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6 にあります。
+
+**アカウントの削除（Phase 4）も同じ前提です。** AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」でその方の Rise Path のデータを消せます。なので、`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、この 3 つの設定を入れてステージングで確かめる（byoa-setup.ja.md の手順 10）まで、API の `ACCOUNT_DELETION_ENABLED=false` のままにします。

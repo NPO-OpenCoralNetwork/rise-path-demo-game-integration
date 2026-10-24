@@ -198,9 +198,11 @@ describe('forgetDeletedAccountOnDevice (services/accountDeviceData.ts)', () => {
       'rp:oauthPending': 'services/oauthConsentRules.ts',
       teacherBotSessionId: 'components/features/blender/TeacherBotLiveView.tsx',
       'rp:returnTo': 'App.tsx',
+      // The consent flow (stage 6): the sign-up marker and the dismissed change notices.
+      'rp:legal:signupAcceptance': 'services/legalConsentApi.ts',
+      'rp:legal:noticeSeen': 'components/legal/legalGateClient.ts',
     };
     for (const [key, file] of Object.entries(writers)) assert.ok(read(file).includes(`'${key}'`), `${key} in ${file}`);
-    // The rp:legal:* markers come with the consent flow (stage 6); listed now so a deletion clears them then.
   });
 
   it('survives storage that throws, and no storage at all', () => {
@@ -872,6 +874,10 @@ describe('the delete page and the deleted page (rendered)', () => {
     assert.equal(m.props.href, 'mailto:help@example.org');
     assert.equal(m.props.target, undefined);
     assert.match(textOf(mail), /^Contact:/);
+    // Under a heading that already says "Contact" (Settings, stage 6): the link alone.
+    const bare = render(pages.SupportContact, { contact: { href: 'mailto:help@example.org', label: 'help@example.org', kind: 'mail' }, showLabel: false });
+    assert.equal(textOf(bare), 'help@example.org');
+    assert.equal(textOf(render(pages.SupportContact, { contact: null, showLabel: false })), 'ご利用の拠点のスタッフにお伝えください。');
     assert.equal(textOf(render(pages.SupportContact, { contact: null })), 'ご利用の拠点のスタッフにお伝えください。');
     assert.equal(textOf(render(pages.SupportContact, { contact: null }, 'en')), 'Please tell the staff at your learning site.');
     // The app's default (VITE_SUPPORT_CONTACT unset in this bundle): the fallback line, no link.

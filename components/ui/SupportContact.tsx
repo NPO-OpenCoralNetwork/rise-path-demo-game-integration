@@ -25,18 +25,20 @@ const copy = {
 
 export type SupportContactProps = {
   className?: string;
+  /** false under a heading that already says 「お問い合わせ」 / "Contact" (Settings): the link alone. */
+  showLabel?: boolean;
   /** For tests; the app uses VITE_SUPPORT_CONTACT. */
   contact?: SupportContactInfo | null;
 };
 
-export const SupportContact: React.FC<SupportContactProps> = ({ className = '', contact = SUPPORT_CONTACT }) => {
+export const SupportContact: React.FC<SupportContactProps> = ({ className = '', showLabel = true, contact = SUPPORT_CONTACT }) => {
   const { language } = useLanguage();
   const t = copy[language];
   if (!contact) return <p className={`text-body text-fg-2 ${className}`}>{t.staff}</p>;
   const external = contact.kind === 'url';
   return (
     <p className={`text-body text-fg-2 ${className}`}>
-      {t.contact}{' '}
+      {showLabel ? <>{t.contact}{' '}</> : null}
       <a
         href={contact.href}
         {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}

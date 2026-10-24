@@ -12,6 +12,7 @@ import { LEGAL_DOCUMENTS, isDraftLegalVersion, type LegalDocumentName } from '..
 import { legalHeadingId } from '../../../shared/legal/headingId.js';
 import { legalTextProblems, problemCount } from '../../../scripts/legal/legalText.mjs';
 import { legalPageTitle, setPageTitle } from './pageTitle';
+import { formatEffectiveDate } from '../../legal/legalDate';
 
 /**
  * One legal text page, /terms or /privacy (Phase 4, design §2.4). The text is the generated
@@ -61,16 +62,8 @@ const copy = {
 type Lang = keyof typeof copy;
 type Copy = (typeof copy)[Lang];
 
-/** 'YYYY-MM-DD' → 「2026 年 12 月 1 日」 / "December 1, 2026"; null when it is not a date. */
-export function formatEffectiveDate(iso: string | null, language: Lang): string | null {
-  const match = iso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso) : null;
-  if (!match) return null;
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  if (language === 'jp') return `${year} 年 ${month} 月 ${day} 日`;
-  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' }).format(
-    Date.UTC(year, month - 1, day),
-  );
-}
+/** 'YYYY-MM-DD' → 「2026 年 12 月 1 日」 / "December 1, 2026" (components/legal/legalDate.ts, shared with the consent flow). */
+export { formatEffectiveDate };
 
 /** The generated text without its first line when that is an HTML comment (the sentinel). */
 export const legalBody = (text: string) => text.replace(/^<!--[^\n]*-->\n+/, '');

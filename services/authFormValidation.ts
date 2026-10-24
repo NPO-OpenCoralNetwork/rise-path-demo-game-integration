@@ -3,11 +3,18 @@ export type SignupFormInput = {
     password: string;
     passwordConfirm: string;
     displayName?: string;
+    /** Phase 4: the sign-up checkbox 「利用規約に同意し、プライバシーポリシーを読みました」. */
+    acceptedLegal?: boolean;
 };
 
 export type SignupFormError = {
-    field: 'email' | 'password' | 'passwordConfirm' | 'displayName' | 'form';
+    field: 'email' | 'password' | 'passwordConfirm' | 'displayName' | 'legal' | 'form';
     message: string;
+};
+
+export type SignupFormOptions = {
+    /** features.legalPages: the checkbox must be ticked (off by default: today's form). */
+    requireLegalAcceptance?: boolean;
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,7 +29,10 @@ export function deriveDisplayName(email: string, displayName?: string): string {
     return (email.split('@')[0] || 'Learner').slice(0, 40);
 }
 
-export function validateSignupForm(input: SignupFormInput): SignupFormError | null {
+export function validateSignupForm(
+    input: SignupFormInput,
+    { requireLegalAcceptance = false }: SignupFormOptions = {},
+): SignupFormError | null {
     const email = normalizeAuthEmail(input.email);
     if (!email) {
         return { field: 'email', message: 'Email is required.' };
@@ -45,6 +55,10 @@ export function validateSignupForm(input: SignupFormInput): SignupFormError | nu
     const name = input.displayName?.trim();
     if (name && name.length > 40) {
         return { field: 'displayName', message: 'Display name must be 40 characters or fewer.' };
+    }
+
+    if (requireLegalAcceptance && input.acceptedLegal !== true) {
+        return { field: 'legal', message: 'Agree to the terms of use to create an account.' };
     }
 
     return null;

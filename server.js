@@ -27,6 +27,7 @@ import {
     LESSON_PROGRESS_WRITES_PER_MINUTE,
 } from './server/routes/lessonProgress.js';
 import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
+import { LEGAL_BODY_LIMIT, createLegalRouter } from './server/routes/legal.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
@@ -130,6 +131,8 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
     // Account deletion (Phase 4) takes only a confirm word: 1 kb, refused before the 50 MB parser.
     app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
+    // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 50 MB parser too.
+    app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
     // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
@@ -237,6 +240,14 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         requireAuth,
         requireSignedIn('Sign in with a Rise Path account to delete it.'),
         createAccountRouter({ billing: { config: billingConfig, stripe } }),
+    );
+    // Accepting the terms of use (Phase 4, server/routes/legal.js): a real learner's session only;
+    // the acceptance is recorded under the shared account lock (never for an account deleted meanwhile).
+    app.use(
+        '/api/v2/user/legal',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to accept the terms.'),
+        createLegalRouter(),
     );
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's

@@ -43,6 +43,9 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - `VITE_API_BASE_URL` は**設定しない**。未設定ならクライアントは同一オリジンの `/api/v2` を使う（`services/apiClient.ts`）。旧手順の Tailscale 値（`http://risepath-vm:3006/api/v2`）が残っていたら削除する。
 - `VITE_FEATURE_AGENT_CHAT` は**設定しない**。共有の Hermes エージェントとのチャット（画面に浮かぶ AI コーチと `/life-journal/chat`）は、この値がちょうど `true` のときだけ出る。共有の Hermes は学習者に提供しないので、既定のままにする（レッスンの中の AI チューターには関係しない）。
 - `VITE_FEATURE_BILLING`（有料のサポータープランの画面。Phase 3）は、オーナーがテストの方と本番の経路を確かめるとき（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 7.2 の 3）まで**設定しない**。ちょうど `true` のときだけ `/settings/plan` と申し込みの最終確認の画面を出し、入口は API が認めた学習者にだけ出る。変えたらデプロイし直す（ビルドのときに入るため）。Stripe の鍵は Vercel にも `VITE_` にも入れない（鍵は VM の `billing.env` だけ。ブラウザは使わない）。Stripe の Webhook は `https://app.<domain>/api/v2/billing/webhook` を通るので、Production に Deployment Protection やボットのチャレンジをかけない。
+- `VITE_FEATURE_LEGAL_PAGES`（利用規約・プライバシーポリシーのページと登録の同意。Phase 4）は、公開のときまで**設定しない**。設定しないあいだ、`/terms` と `/privacy` は「準備中」を出し、登録画面に同意はない。**そのあいだは一般の登録を受け付けない**（拠点とテスターだけ）。公開するときは、弁護士の確認のあと、[`doc/legal/README.md`](../../doc/legal/README.md) の「ページを公開する手順」のとおりに `true` にして Redeploy する。文が下書きのままだと、ビルドが止まり、足りないものの一覧が出る。
+- `VITE_SUPPORT_CONTACT`（Phase 4）: 学習者の問い合わせ先。フォームの `https://` の URL か、アドレス 1 つの `mailto:`。アカウントの削除のページ、削除のあとのページ、同意のページ、設定の「このサービスについて」に出る。設定しないと「ご利用の拠点のスタッフにお伝えください」と出る。公開の前に設定し、規約の【要記入: 連絡先】と同じ窓口にする。秘密の値ではない。
+- **マージすると、すぐに画面（フロント）がデプロイされる**（Git 連携、Production Branch は `main`）。API は VM で `deploy-stack.sh` を実行するまで古いまま。新しい画面は古い API でも止まらないように作っているが、**同じ日に `deploy-stack.sh` を実行する**（[`deploy/risepath-vm/README.md`](../risepath-vm/README.md)）。
 - `VITE_` で始まる値はバンドルに入り、誰でも読める。`API_ORIGIN` と `ORIGIN_SECRET` に `VITE_` を付けない。
 
 ### Preview
@@ -172,7 +175,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 ### D. Vercel
 
-13. Vercel Pro で GitHub リポジトリを import する（Git 連携。Production Branch は `main`）。ゾーンを待つあいだに import 済みなら、そのプロジェクトを使う。Production env に上の表の 6 つを入れる。`VITE_API_BASE_URL` があれば消す。`VITE_FEATURE_AGENT_CHAT` は入れない（あれば消す）。Preview には `API_ORIGIN` と `ORIGIN_SECRET` を入れず、プレビューの Deployment Protection を有効にする。
+13. Vercel Pro で GitHub リポジトリを import する（Git 連携。Production Branch は `main`）。ゾーンを待つあいだに import 済みなら、そのプロジェクトを使う。Production env に上の表の 6 つを入れる。`VITE_API_BASE_URL` があれば消す。`VITE_FEATURE_AGENT_CHAT` は入れない（あれば消す）。`VITE_FEATURE_LEGAL_PAGES` は公開のときまで入れない。`VITE_SUPPORT_CONTACT` は、窓口が決まったら入れる。Preview には `API_ORIGIN` と `ORIGIN_SECRET` を入れず、プレビューの Deployment Protection を有効にする。
     - env を足したり消したりしたら（`VITE_API_BASE_URL` の削除も含む）、Deployments で最新の Production デプロイを Redeploy する。ビルドキャッシュは使わない。env の変更は次のデプロイから効き、`VITE_` の値はビルド時にバンドルへ入る。import 直後のデプロイは env なしでビルドされていることがある。
     - 手順 15 のビルド確認と、手順 17 の `npm run smoke:edge` は、この新しいデプロイに対して行う。
     - Settings → Environment Variables で、6 つが Production だけに付いていて、Preview のスコープに何も保存されていないことを確かめる（import 画面で入れた値も見る）。

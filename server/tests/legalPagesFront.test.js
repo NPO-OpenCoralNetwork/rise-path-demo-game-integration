@@ -121,6 +121,20 @@ describe('keeping the legal text out of a flag-off bundle', () => {
     assert.match(lazyRoutes, /^import LegalPagesOff from '\.\.\/features\/legal\/LegalPagesOff';$/m);
   });
 
+  it('lazyRoutes imports the re-consent page only with features.legalPages (stage 6), and nothing else imports it', () => {
+    const lazyRoutes = read('components/routes/lazyRoutes.tsx');
+    assert.match(
+      lazyRoutes,
+      /export const LegalConsentView = lazy\(\s*\(\) => \(features\.legalPages \? import\('\.\.\/legal\/LegalConsentView'\) : Promise\.resolve\(\{ default: \(\) => null \}\)\)\s*\);/,
+      'the consent page must be imported only behind the flag',
+    );
+    const importers = [];
+    for (const file of frontFiles()) {
+      for (const spec of importsOf(file)) if (/(?:^|\/)legal\/LegalConsentView$/.test(spec)) importers.push(file);
+    }
+    assert.deepEqual(importers, ['components/routes/lazyRoutes.tsx']);
+  });
+
   it('only TermsPage and PrivacyPage import content/legal/, and only the two routes import the pages', () => {
     const importers = { content: [], pages: [], document: [], legalText: [] };
     for (const file of frontFiles()) {

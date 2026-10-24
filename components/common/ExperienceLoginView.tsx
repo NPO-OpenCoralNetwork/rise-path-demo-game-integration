@@ -1,11 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ArrowRight, Fingerprint, Lock, Mail, ShieldCheck, Terminal, User, UserCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { allowGuestLogin } from '../../services/authPolicy';
-import { mapSignupErrorMessage, validateSignupForm } from '../../services/authFormValidation.ts';
+import { mapSignupErrorMessage, validateSignupForm, type SignupFormError } from '../../services/authFormValidation.ts';
+import { forgetSignupAcceptance } from '../../services/legalConsentApi';
+import { features } from '../../config/features';
+import { LegalNewTabLink } from '../legal/LegalLinks';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -29,6 +32,14 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const [displayName, setDisplayName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorField, setErrorField] = useState<SignupFormError['field'] | null>(null);
+    // Phase 4: unticked until the person ticks it (never pre-checked).
+    const [acceptedLegal, setAcceptedLegal] = useState(false);
+    const legalRef = useRef<HTMLInputElement | null>(null);
+    const legalId = useId();
+    const purposeId = useId();
+    const minorsId = useId();
+    const errorId = useId();
     const [notice, setNotice] = useState<string | null>(null);
     const [useNexloom, setUseNexloom] = useState(false);
     const hasSupabase = isSupabaseConfigured();
@@ -63,6 +74,19 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             errorAlreadyRegistered: 'This email is already registered. Please sign in.',
             placeholder: 'identity@risepath.system',
             aiSafety: 'AI safety: for children and guardians',
+            // Phase 4 (only with VITE_FEATURE_LEGAL_PAGES=true): the purpose notice and the checkbox.
+            purpose: 'We use the information you register for the purposes in section 3 of the Privacy Policy (in Japanese).',
+            purposeLink: 'Read the purposes',
+            legalBefore: 'I agree to the ',
+            legalTerms: 'Terms of Use',
+            legalMiddle: ' and have read the ',
+            legalPrivacy: 'Privacy Policy',
+            legalAfter: '. (Both are in Japanese; the Japanese text is official.)',
+            legalMinors: 'If you are under 18, get your parent’s or guardian’s consent before you sign up.',
+            legalRequired: 'To create an account, please agree to the Terms of Use.',
+            newTab: '(opens in a new tab)',
+            footerTerms: 'Terms of Use',
+            footerPrivacy: 'Privacy Policy',
         },
         jp: {
             title: 'システム認証',
@@ -91,6 +115,18 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             errorAlreadyRegistered: 'このメールアドレスは既に登録されています。ログインしてください。',
             placeholder: 'identity@risepath.system',
             aiSafety: 'AI の安全について（子どもと保護者の方へ）',
+            purpose: 'ご登録の情報は、プライバシーポリシーの「3. 利用目的」に書いた目的で使います。',
+            purposeLink: '利用目的を読む',
+            legalBefore: '',
+            legalTerms: '利用規約',
+            legalMiddle: 'に同意し、',
+            legalPrivacy: 'プライバシーポリシー',
+            legalAfter: 'を読みました。',
+            legalMinors: '18 歳未満の方は、保護者の方の同意を得てから登録してください。',
+            legalRequired: '登録するには、利用規約への同意が必要です。',
+            newTab: '（新しいタブで開きます）',
+            footerTerms: '利用規約',
+            footerPrivacy: 'プライバシーポリシー',
         },
     } as const;
 
@@ -100,6 +136,8 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const switchMode = (next: AuthMode) => {
         setMode(next);
         setError(null);
+        setErrorField(null);
+        setAcceptedLegal(false);
         setNotice(null);
         setUseNexloom(false);
     };
@@ -126,28 +164,38 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setErrorField(null);
         setNotice(null);
 
-        const validationError = validateSignupForm({
-            email,
-            password,
-            passwordConfirm,
-            displayName,
-        });
+        const validationError = validateSignupForm(
+            { email, password, passwordConfirm, displayName, acceptedLegal },
+            { requireLegalAcceptance: features.legalPages },
+        );
         if (validationError) {
-            setError(validationError.message);
+            setErrorField(validationError.field);
+            if (validationError.field === 'legal') {
+                setError(t.legalRequired);
+                legalRef.current?.focus();
+            } else {
+                setError(validationError.message);
+            }
             return;
         }
 
         setIsLoading(true);
         try {
-            const result = await signUp(email, password, { displayName: displayName.trim() || undefined });
+            const result = await signUp(email, password, {
+                displayName: displayName.trim() || undefined,
+                legalAccepted: features.legalPages && acceptedLegal,
+            });
             if (result.status === 'session_ready') {
                 onLoginSuccess();
                 return;
             }
             navigate(`/auth/confirm-pending?email=${encodeURIComponent(result.email)}`, { replace: true });
         } catch (err: unknown) {
+            // No account was made: the sign-up marker must not answer for a later sign-in.
+            forgetSignupAcceptance();
             const message = err instanceof Error ? err.message : t.error;
             if (mapSignupErrorMessage(message) === 'already_registered') {
                 setError(t.errorAlreadyRegistered);
@@ -328,8 +376,52 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                             </>
                         )}
 
+                        {/* Phase 4 (APPI Art. 21(2), terms 第1条): the purposes before the button, and an unticked checkbox. */}
+                        {isSignup && features.legalPages && (
+                            <div className="space-y-3 rounded-card border border-white/10 bg-white/5 p-4">
+                                <p id={purposeId} className="text-sm text-white/80">
+                                    {t.purpose}{' '}
+                                    <LegalNewTabLink to="/privacy#section-3" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                        {t.purposeLink}
+                                    </LegalNewTabLink>
+                                </p>
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        id={legalId}
+                                        ref={legalRef}
+                                        type="checkbox"
+                                        checked={acceptedLegal}
+                                        onChange={(e) => {
+                                            setAcceptedLegal(e.target.checked);
+                                            if (e.target.checked && errorField === 'legal') {
+                                                setError(null);
+                                                setErrorField(null);
+                                            }
+                                        }}
+                                        aria-invalid={errorField === 'legal' ? true : undefined}
+                                        aria-describedby={`${purposeId} ${minorsId}${errorField === 'legal' ? ` ${errorId}` : ''}`}
+                                        className="mt-1 size-5 shrink-0 accent-rose-500"
+                                    />
+                                    <label htmlFor={legalId} className="text-sm text-white/80">
+                                        {t.legalBefore}
+                                        <LegalNewTabLink to="/terms" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                            {t.legalTerms}
+                                        </LegalNewTabLink>
+                                        {t.legalMiddle}
+                                        <LegalNewTabLink to="/privacy" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                            {t.legalPrivacy}
+                                        </LegalNewTabLink>
+                                        {t.legalAfter}
+                                    </label>
+                                </div>
+                                <p id={minorsId} className="text-sm text-white/80">
+                                    {t.legalMinors}
+                                </p>
+                            </div>
+                        )}
+
                         {error && (
-                            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
+                            <div id={errorId} role="alert" className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
                                 [ERROR]: {error}
                             </div>
                         )}
@@ -384,10 +476,21 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                     )}
                 </div>
 
-                <p className="mt-6 text-center text-sm">
+                <p className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-sm">
                     <Link to="/ai-safety" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
                         {t.aiSafety}
                     </Link>
+                    {/* Phase 4: only once the texts are published (VITE_FEATURE_LEGAL_PAGES=true). */}
+                    {features.legalPages && (
+                        <>
+                            <Link to="/terms" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                {t.footerTerms}
+                            </Link>
+                            <Link to="/privacy" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                {t.footerPrivacy}
+                            </Link>
+                        </>
+                    )}
                 </p>
 
                 <div className="mt-8 text-center">

@@ -91,6 +91,7 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
   出典: パスワードの 2 つは <https://supabase.com/docs/guides/auth/password-security>（「Require reauthentication when changing password」「Require current password when changing password」）、メールアドレスは <https://supabase.com/docs/guides/self-hosting/auth/config>（`GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED`）。
 
   **残るリスク**: 今のパスワードの確認は、パスワードのないアカウントでは働きません（ソースコードでは、初めてパスワードを設定するときは確かめません）。Rise Path の登録画面はパスワードを作りますが、同じ Supabase プロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。また、AI アプリのセッションは許可した時刻に作られるので、許可から 24 時間は確認のコードも求められません。つまり、**パスワードのないアカウントでは、許可から 24 時間のあいだ、AI アプリがパスワードを設定できます**。許可の画面は「許可する」の上に、このアプリがアカウントのサービスであなた自身と同じ力を持つこと、信頼できるアプリだけを許可することを出します。DCR をどうするか（手順 4）とあわせて、オーナーがこのリスクを受け入れるかを決めます（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 5.3）。
+- **アカウントの削除（Phase 4）**: この 3 つが on になり、手順 10 のパスワードの確かめ（`current_password_required`）が通るまで、`stack.env` の `ACCOUNT_DELETION_ENABLED=false` のままにします。AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」で、その方の Rise Path のデータを消せてしまうためです（パスワードを入れ直す確認も、そのパスワードで通ってしまいます）。3 つを on にしても、上の「残るリスク」（パスワードのないアカウント、許可から 24 時間）は削除にも同じです（[account-deletion-operations.ja.md](./account-deletion-operations.ja.md) の 7 章）。
 - **セッション**: Authentication → Sessions のアクセストークンの有効期間は 1 時間（既定）のままにし、リフレッシュトークンのローテーションと再利用の検出も既定のままにします。
 
 ### 7. VM: migration と最小権限の DB ロール
@@ -112,6 +113,8 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
    - レッスンの進み具合（`lesson_progress`、Phase 2）は、読む・行を足す・書き換えるだけです。行を消せません。「学習の進み具合を消す」の記録（`lesson_progress_resets`）は読み書きできません。記録を消せるのは、学習者がアプリの画面で行う操作だけです。
    - ライフジャーナル、AI メモリ、性格のプロフィールなどの表は読めません。
    - あとの migration でリモートのツールに表や列が増えたら、SQL に足して実行し直します。実行し直すと、SQL にない権限は外れます。
+
+   **Phase 4 の更新**: migration 018（`account_deletions` など）を当てたあとも、上と同じコマンドでロールの SQL を流し直します（パスワードは今の値）。018 は、ロールがあればその場で `account_deletions` を読む権限を渡しますが、流し直すと、これからもその権限が SQL のとおりに保たれます。`mcp-public` は、この表を読めないと AI アプリの呼び出しをすべて 503 で断ります（安全な側）。削除したアカウントの AI アプリは、削除の前のトークンでは断られるので、その方がまたログインしたあとに、つなぎ直す必要があります。
 
    **Phase 2 の更新（すでに `byoa` を動かしているとき）**: Phase 2 のコードで `./scripts/deploy-stack.sh` を実行すると、migration 016 が当たり、`mcp-public` も新しいツールで動き始めます。そのすぐあとに、上と同じコマンドでロールの SQL を流し直します。
    - SQL はパスワードも設定し直します。`MCP_DB_PASSWORD` には、新しい値ではなく、今の値を入れます。今の値は、`mcp-public.env` の `DATABASE_URL_PHASE1` の、`risepath_mcp_remote:` と `@` のあいだの文字です。新しい値を入れると、`mcp-public` がデータベースにつながらなくなります。

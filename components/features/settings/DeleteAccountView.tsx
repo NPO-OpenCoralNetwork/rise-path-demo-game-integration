@@ -8,6 +8,7 @@ import PageHeader from '../../ui/PageHeader';
 import { Button } from '../../ui/Button';
 import { SupportContact } from '../../ui/SupportContact';
 import { ConfirmDialog } from '../../safety/ConfirmDialog';
+import { LegalNewTabLink } from '../../legal/LegalLinks';
 import { getSupabaseClient } from '../../../services/supabaseClient';
 import { openBillingPortal } from '../../../services/billingApi';
 import {
@@ -73,6 +74,10 @@ const copy = {
     keptLogs: 'Server logs (the oldest are removed automatically)',
     keptAiCompany: 'What was sent to the AI company (up to 30 days under its rules; up to 2 years when checking for violations)',
     keptBackups: 'Copies of the database that the operator made by hand (backups) may keep data from before the deletion for a while.',
+    keptPolicyLead: 'How long each record is kept: section 8 of the ',
+    keptPolicyLink: 'Privacy Policy',
+    keptPolicyTail: ' (in Japanese).',
+    newTab: '(opens in a new tab)',
     otherDevices: 'Other devices are signed out and cleared the next time Rise Path opens there.',
     minors: 'If you are under 18, please check this with a parent or guardian.',
     passwordLabel: 'Enter your password to confirm it’s you',
@@ -142,6 +147,10 @@ const copy = {
     keptLogs: 'サーバーのログ（古いものから自動で消えます）',
     keptAiCompany: 'AI の会社に送った内容（その会社の決まりで最長 30 日。違反の確認では最長 2 年）',
     keptBackups: '運営者が手作業でとったデータベースの控え（バックアップ）には、削除の前のデータがしばらく残ることがあります。',
+    keptPolicyLead: '残す期間は、',
+    keptPolicyLink: 'プライバシーポリシーの「8. 保存期間」',
+    keptPolicyTail: 'に書いています。',
+    newTab: '（新しいタブで開きます）',
     otherDevices: 'ほかの端末では、次に開いたときにログアウトされ、その端末の記録も消えます。',
     minors: '18 歳未満の方は、保護者の方といっしょに確かめてください。',
     passwordLabel: '確認のため、パスワードを入れてください',
@@ -348,6 +357,16 @@ export const DeletionExplainer: React.FC<{ language: Lang; usedApps: boolean }> 
             <li key={item}>{item}</li>
           ))}
         </ul>
+        {/* Phase 4: once the policy is published (VITE_FEATURE_LEGAL_PAGES=true); a new tab keeps the password field. */}
+        {features.legalPages ? (
+          <p className="mt-3 text-body text-fg-2">
+            {t.keptPolicyLead}
+            <LegalNewTabLink to="/privacy#section-8" newTab={t.newTab} className="rounded-chip font-medium text-primary-text underline underline-offset-4">
+              {t.keptPolicyLink}
+            </LegalNewTabLink>
+            {t.keptPolicyTail}
+          </p>
+        ) : null}
       </section>
       <div className="space-y-2 text-body text-fg-2">
         <p>{t.otherDevices}</p>

@@ -197,3 +197,7 @@ export const TermsRoute = lazy(
 export const PrivacyRoute = lazy(
   () => ((import.meta.env.DEV || features.legalPages) ? import('../features/legal/PrivacyPage') : Promise.resolve({ default: LegalPagesOff }))
 );
+/** The re-consent page (App.tsx). No legal text inside; gated anyway so a flag-off bundle carries none of it. */
+export const LegalConsentView = lazy(
+  () => (features.legalPages ? import('../legal/LegalConsentView') : Promise.resolve({ default: () => null }))
+);

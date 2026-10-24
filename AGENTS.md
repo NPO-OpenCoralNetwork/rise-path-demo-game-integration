@@ -31,6 +31,9 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Legal texts: edit the drafts `doc/legal/*.draft.ja.md`, then `node scripts/legal/build-legal-text.mjs`
   (writes `content/legal/`, prints the version and hash for `shared/legal/versions.js`); `/terms` and
   `/privacy` publish only with `VITE_FEATURE_LEGAL_PAGES=true` (the build refuses drafts). `doc/legal/README.md`.
+- Account data: learner data deletion goes through `server/services/accountDeletion.js` (staff:
+  `scripts/delete-account-data.mjs`); account ids go through `canonicalUserId` and the `rp:account:`
+  lock key is built from `<id>::uuid::text` (`tools/core/accountDeletions.js`). Retention: `server/services/retention.js`.
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).

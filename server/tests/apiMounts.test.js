@@ -125,6 +125,18 @@ describe('server.js /api/v2 mounts (production)', () => {
         });
     });
 
+    it('the legal mount (Phase 4) wants a JWT, not the bridge token', async () => {
+        await withApp(undefined, async (base) => {
+            const body = JSON.stringify({ termsVersion: 'terms-draft-2026-10-22', privacyVersion: 'privacy-draft-2026-10-22' });
+            for (const [method, path] of [['GET', '/api/v2/user/legal'], ['POST', '/api/v2/user/legal/acceptance']]) {
+                const init = method === 'POST' ? { method, headers: { 'Content-Type': 'application/json' }, body } : { method };
+                assert.equal((await fetch(`${base}${path}`, init)).status, 401, `${method} without a JWT`);
+                const viaBridge = await fetch(`${base}${path}`, { ...init, headers: { ...init.headers, ...bridge } });
+                assert.equal(viaBridge.status, 401, `${method} bridge`);
+            }
+        });
+    });
+
     it('a connected agent\'s OAuth token is refused on JWT, bridge/JWT and LLM mounts', async () => {
         const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
         const agentToken = `${b64({ alg: 'ES256', kid: 'k1' })}.${b64({
@@ -133,7 +145,7 @@ describe('server.js /api/v2 mounts (production)', () => {
         })}.c2ln`;
         const agent = { Authorization: `Bearer ${agentToken}` };
         await withApp(undefined, async (base) => {
-            for (const path of ['/api/v2/user/connected-apps', '/api/v2/user/ai-access', '/api/v2/user/lesson-progress', '/api/v2/user/account/deletion', '/api/v2/curricula', '/api/v2/learner-memory', '/api/v2/agent/health']) {
+            for (const path of ['/api/v2/user/connected-apps', '/api/v2/user/ai-access', '/api/v2/user/lesson-progress', '/api/v2/user/account/deletion', '/api/v2/user/legal', '/api/v2/curricula', '/api/v2/learner-memory', '/api/v2/agent/health']) {
                 const response = await fetch(`${base}${path}`, { headers: agent });
                 assert.equal(response.status, 401, path);
                 assert.equal((await response.json()).error_type, 'oauth_client_token', path);
@@ -144,6 +156,12 @@ describe('server.js /api/v2 mounts (production)', () => {
                 body: JSON.stringify({ confirm: 'delete-my-account' }),
             });
             assert.deepEqual([deletion.status, (await deletion.json()).error_type], [401, 'oauth_client_token'], 'an agent can never delete the account');
+            const acceptance = await fetch(`${base}/api/v2/user/legal/acceptance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...agent },
+                body: JSON.stringify({ termsVersion: 'terms-draft-2026-10-22', privacyVersion: 'privacy-draft-2026-10-22' }),
+            });
+            assert.deepEqual([acceptance.status, (await acceptance.json()).error_type], [401, 'oauth_client_token'], 'an agent never accepts the terms for the person');
             // optionalAuth (the LLM gateway): the agent counts as a guest, so an AI POST wants sign-in.
             const tutor = await fetch(`${base}/api/v2/llm/tutor`, {
                 method: 'POST',

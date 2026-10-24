@@ -13,6 +13,8 @@ import { clearUserProfileCache } from '../services/userProfileService';
 import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
 import { forgetDeletedAccountOnDevice, signOutThisBrowser } from '../services/accountDeviceData';
 import { ACCOUNT_DELETED_EVENT, ACCOUNT_DELETED_PATH, accountDeletedUrl, markDeletionInFlight, type DeletedBy } from '../services/accountDeletionState';
+import { forgetSignupAcceptance, rememberSignupAcceptance, signUpMadeNoAccount } from '../services/legalConsentApi';
+import { features } from '../config/features';
 import {
     forgetProgressAccount,
     progressChoicePending,
@@ -28,6 +30,8 @@ export type SignUpResult =
 
 export type SignUpOptions = {
     displayName?: string;
+    /** Phase 4: the sign-up form's terms checkbox was ticked (only with VITE_FEATURE_LEGAL_PAGES=true). */
+    legalAccepted?: boolean;
 };
 
 export interface AuthUser {
@@ -247,6 +251,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const supabase = getSupabaseClient();
 
         if (supabase) {
+            // Phase 4 (design §4.2): the first session of this email on this device records the acceptance.
+            if (features.legalPages && options?.legalAccepted === true) await rememberSignupAcceptance(normalizedEmail);
             const { data, error } = await supabase.auth.signUp({
                 email: normalizedEmail,
                 password,
@@ -274,6 +280,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return { status: 'session_ready' };
             }
 
+            // An address that is already registered gets the same answer as a new one (Supabase hides
+            // which addresses exist), but no account was made: the marker must not answer for the
+            // owner's later sign-in on this device.
+            if (signUpMadeNoAccount(data.user)) forgetSignupAcceptance();
             return { status: 'email_confirmation_required', email: normalizedEmail };
         }
 
