@@ -42,18 +42,31 @@ export function getHermesConfig() {
     return { baseUrl, apiKey, model, configured: Boolean(apiKey) };
 }
 
-export function buildConversationKey(userId, skill) {
-    return `rp:user:${userId}:${skill}`;
+/**
+ * The account generation as a key suffix (Phase 4, tools/core/accountDeletions.js): '' for an
+ * account that was never deleted (null: today's keys and stored conversations stay as they are),
+ * ':g<epoch seconds of the re-open>' for an account re-opened after a deletion, so its Hermes
+ * conversation (stored with store: true) never continues the deleted account's. Anything that is
+ * not a positive whole number counts as null.
+ * @param {unknown} generation
+ */
+const generationSuffix = (generation) => (Number.isSafeInteger(generation) && /** @type {number} */ (generation) > 0 ? `:g${generation}` : '');
+
+/** @param {string} userId @param {string} skill @param {number | null} [generation] req.accountGeneration */
+export function buildConversationKey(userId, skill, generation = null) {
+    return `rp:user:${userId}:${skill}${generationSuffix(generation)}`;
 }
 
 /**
  * The X-Hermes-Session-Key Express sends Hermes: stable per learner, because Hermes scopes its own
  * per-channel state by it (a key that changes every turn would start a new scope each time). Hermes
  * does not forward it to the MCP server, and the MCP server ignores rp:user keys from clients; the
- * learner for tool calls comes only from the turn token in `instructions`.
+ * learner for tool calls comes only from the turn token in `instructions`. A re-opened account
+ * (generation set) gets its own scope, as buildConversationKey.
+ * @param {string} userId @param {number | null} [generation] req.accountGeneration
  */
-export function buildSessionKey(userId) {
-    return `rp:user:${userId}`;
+export function buildSessionKey(userId, generation = null) {
+    return `rp:user:${userId}${generationSuffix(generation)}`;
 }
 
 // Lesson context from openTutor() (PLAN §9.1 AskTutorDetail). Every field is learner-controlled,
@@ -343,7 +356,7 @@ export function hermesFetchFailure(err) {
  * @returns {Promise<{ ok: true, conversation: string, input: string, instructions: string, sessionKey: string }
  *   | { ok: false, status: number, error: string, error_type: string }>}
  */
-async function beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts }) {
+async function beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation = null }) {
     const turn = await registerAgentTurn(userId);
     if (!turn) {
         return {
@@ -356,10 +369,10 @@ async function beginHermesTurn({ userId, skill, message, context, includeDiaryEx
     await setAgentChatConsent(userId, { includeDiaryExcerpts });
     return {
         ok: true,
-        conversation: buildConversationKey(userId, skill),
+        conversation: buildConversationKey(userId, skill, generation),
         input: buildHermesInput({ skill, message, context }),
         instructions: [buildSkillInstructions(skill), buildTurnInstruction(turn)].join('\n'),
-        sessionKey: buildSessionKey(userId),
+        sessionKey: buildSessionKey(userId, generation),
     };
 }
 
@@ -369,6 +382,7 @@ export async function callHermesResponses({
     message,
     context,
     includeDiaryExcerpts,
+    generation = null,
     fetchImpl = fetch,
 }) {
     const { baseUrl, apiKey, model, configured } = getHermesConfig();
@@ -381,7 +395,7 @@ export async function callHermesResponses({
         };
     }
 
-    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation });
     if (!turn.ok) return turn;
     const { conversation, input, instructions, sessionKey } = turn;
 
@@ -440,6 +454,7 @@ export async function streamHermesChatCompletions({
     message,
     context,
     includeDiaryExcerpts,
+    generation = null,
     fetchImpl = fetch,
 }) {
     const { baseUrl, apiKey, model, configured } = getHermesConfig();
@@ -452,7 +467,7 @@ export async function streamHermesChatCompletions({
         };
     }
 
-    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation });
     if (!turn.ok) return turn;
     const { conversation, input, instructions, sessionKey } = turn;
 

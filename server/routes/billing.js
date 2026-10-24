@@ -37,7 +37,9 @@
  *   1. the Price is checked against the plan (cached 10 min): ¥priceJpy, JPY only, monthly,
  *      tax-inclusive, active and recurring; anything else is 503 billing_misconfigured (C26);
  *   2. the learner's Customer for this mode, or a new one (metadata user_id only; Idempotency-Key
- *      customer:<mode>:<userId>; INSERT … ON CONFLICT (user_id, livemode) DO NOTHING, then the stored id is used);
+ *      customer:<mode>:<userId>, plus :g<generation> for an account re-opened after a deletion
+ *      (Phase 4, req.accountGeneration), so it gets a new Customer instead of Stripe replaying the
+ *      deleted account's; INSERT … ON CONFLICT (user_id, livemode) DO NOTHING, then the stored id is used);
  *   3. the Customer's other open Checkout Sessions are expired: all but this minute's (found by the
  *      expires_at this server set, whatever its locale) (C24). A timeout, rate limit or 5xx on an
  *      expiry stops the checkout (503/502);
@@ -47,7 +49,8 @@
  *   5. when this minute's Session is in the other locale, its URL is returned as it is; otherwise
  *      a Session whose parameters are a pure function of the Idempotency-Key
  *      checkout:<mode>:<userId>:<locale>:<minute> (expires 32 minutes after the minute began), so a
- *      double click or a retry within the minute gets the same Session back (C25/C40/C45).
+ *      double click or a retry within the minute gets the same Session back (C25/C40/C45). A
+ *      re-opened account's key ends in :g<generation> too (its Customer differs from the deleted one's).
  */
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -144,8 +147,18 @@ export function checkoutSessionParams({ config, userId, customer, locale, bucket
   };
 }
 
-/** @param {BillingConfig} config @param {string} userId @param {'jp'|'en'} locale @param {number} bucketSec */
-export const checkoutIdempotencyKey = (config, userId, locale, bucketSec) => `checkout:${config.mode}:${userId}:${locale}:${bucketSec}`;
+/**
+ * ':g<generation>' for an account re-opened after a deletion (tools/core/accountDeletions.js), ''
+ * otherwise (null: the keys of accounts that were never deleted are unchanged).
+ * @param {unknown} generation
+ */
+const generationSuffix = (generation) => (Number.isSafeInteger(generation) && /** @type {number} */ (generation) > 0 ? `:g${generation}` : '');
+
+/** @param {BillingConfig} config @param {string} userId @param {'jp'|'en'} locale @param {number} bucketSec @param {number | null} [generation] */
+export const checkoutIdempotencyKey = (config, userId, locale, bucketSec, generation = null) => `checkout:${config.mode}:${userId}:${locale}:${bucketSec}${generationSuffix(generation)}`;
+
+/** @param {BillingConfig} config @param {string} userId @param {number | null} [generation] req.accountGeneration */
+export const customerIdempotencyKey = (config, userId, generation = null) => `customer:${config.mode}:${userId}${generationSuffix(generation)}`;
 
 /**
  * @param {{
@@ -311,6 +324,7 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
 
   router.post('/checkout', ...learner, limitCheckout, serviceable, async (req, res) => {
     const userId = userIdOf(req);
+    const generation = /** @type {any} */ (req).accountGeneration ?? null;
     if (!billingAudienceAllows(config, userId)) return billingOff(res);
     if (!config.salesOpen) {
       if (config.salesProblems.includes('sales_closed')) return billingOff(res);
@@ -350,7 +364,7 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
 
         let customer = await storedCustomer(pool, userId);
         if (!customer) {
-          const created = await stripeClient.createCustomer({ metadata: { user_id: userId }, idempotencyKey: `customer:${config.mode}:${userId}` });
+          const created = await stripeClient.createCustomer({ metadata: { user_id: userId }, idempotencyKey: customerIdempotencyKey(config, userId, generation) });
           if (typeof created?.id !== 'string') throw new Error('Stripe returned no customer id');
           await pool.query(SQL.insertCustomer, [created.id, userId, config.live]);
           customer = await storedCustomer(pool, userId);
@@ -397,7 +411,7 @@ export function createBillingRouter({ config, stripe, now = () => Date.now(), en
         }
 
         const params = checkoutSessionParams({ config, userId, customer, locale, bucketSec, caps: effectiveSupporterCaps(env) });
-        const session = await stripeClient.createCheckoutSession(params, { idempotencyKey: checkoutIdempotencyKey(config, userId, locale, bucketSec) });
+        const session = await stripeClient.createCheckoutSession(params, { idempotencyKey: checkoutIdempotencyKey(config, userId, locale, bucketSec, generation) });
         if (typeof session?.url !== 'string' || !session.url.startsWith('https://')) {
           logger.error('[Billing] Stripe returned a Checkout Session without an https url.');
           return refuse(res, 502, 'payment_provider_error', 'The payment service refused the request. Please try again later.');

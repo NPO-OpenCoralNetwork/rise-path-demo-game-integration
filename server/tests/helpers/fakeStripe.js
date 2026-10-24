@@ -49,9 +49,14 @@ export function subscription({ id, customer, status = 'active', price = 'price_s
 }
 
 /**
- * @param {{ prices?: object[], subscriptions?: object[], now?: () => number }} [seed]
+ * @param {{ prices?: object[], subscriptions?: object[], now?: () => number, hasMore?: { sessions?: boolean, subscriptions?: boolean }, missingCustomers?: string[] }} [seed]
+ *   hasMore: the Checkout Session list or the subscription list answers has_more: true on every page
+ *   (as Stripe does when more objects exist than one page holds).
+ *   missingCustomers: Customers this Stripe account no longer has (deleted, or "Delete all test
+ *   data"); a Checkout Session or subscription list filtered by one answers 400
+ *   invalid_request_error resource_missing (param customer). Not checked against live Stripe.
  */
-export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], now = () => Date.now() } = {}) {
+export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], now = () => Date.now(), hasMore = {}, missingCustomers = [] } = {}) {
     const state = {
         customers: new Map(),
         prices: new Map(prices.map((p) => [p.id, p])),
@@ -135,9 +140,12 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
             state.sessions.set(id, session);
             return remember(session);
         }
+        if (method === 'GET' && (p === '/v1/checkout/sessions' || p === '/v1/subscriptions') && missingCustomers.includes(form.get('customer'))) {
+            return json(400, { error: { type: 'invalid_request_error', code: 'resource_missing', param: 'customer', message: `No such customer: '${form.get('customer')}'` } });
+        }
         if (method === 'GET' && p === '/v1/checkout/sessions') {
             const data = [...state.sessions.values()].filter((s) => s.customer === form.get('customer') && (!form.get('status') || s.status === form.get('status')));
-            return json(200, { object: 'list', data, has_more: false });
+            return json(200, { object: 'list', data, has_more: hasMore.sessions === true });
         }
         if (method === 'POST' && (m = /^\/v1\/checkout\/sessions\/([^/]+)\/expire$/.exec(p))) {
             const session = state.sessions.get(decodeURIComponent(m[1]));
@@ -156,7 +164,7 @@ export function createFakeStripe({ prices = [goodPrice()], subscriptions = [], n
         }
         if (method === 'GET' && p === '/v1/subscriptions') {
             const data = [...state.subscriptions.values()].filter((s) => s.customer === form.get('customer'));
-            return json(200, { object: 'list', data, has_more: false });
+            return json(200, { object: 'list', data, has_more: hasMore.subscriptions === true });
         }
         return error(404, 'invalid_request_error', 'resource_missing', `Unrecognized request URL (${method}: ${p})`);
     }

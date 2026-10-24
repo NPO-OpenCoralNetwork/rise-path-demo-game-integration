@@ -26,6 +26,7 @@ import {
     LESSON_PROGRESS_BODY_LIMIT,
     LESSON_PROGRESS_WRITES_PER_MINUTE,
 } from './server/routes/lessonProgress.js';
+import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
@@ -40,6 +41,8 @@ import { createStripeClient } from './server/services/stripeClient.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
+import { requireSignedIn } from './server/middleware/signedIn.js';
+import { smallBodyErrors } from './server/middleware/smallBody.js';
 import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
 import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
@@ -123,6 +126,8 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
     // then sees the body as already read and skips it.
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
+    // Account deletion (Phase 4) takes only a confirm word: 1 kb, refused before the 50 MB parser.
+    app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
     // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
@@ -222,6 +227,14 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // progress is not an AI feature. requireAuth refuses an agent's OAuth token (agents use the
     // MCP course-* tools). Before the /api/v2/user mount, whose legacy /progress routes stay.
     app.use('/api/v2/user/lesson-progress', requireAuth, createLessonProgressRouter({ writeLimiter: lessonProgressLimiter }));
+    // Deleting one's own Rise Path account (Phase 4, server/routes/account.js): a real learner's
+    // session only, re-authenticated with the password; the shared Supabase login stays.
+    app.use(
+        '/api/v2/user/account',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to delete it.'),
+        createAccountRouter({ billing: { config: billingConfig, stripe } }),
+    );
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
     // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).

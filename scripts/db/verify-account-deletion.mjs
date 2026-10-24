@@ -28,15 +28,22 @@
  *   R6  a seeded learner deleted in one transaction: what goes, what stays, what is marked
  *   R7  version archive rows never change; a version id must match its document
  *   R8  the lock key is canonical: an upper-case id locks what the trigger locks
- *   Later stages add R9 (the deletion service against a concurrent acceptance), R10 (retention)
- *   and R11 (the db log without DETAIL).
+ *   R9  the deletion service (server/services/accountDeletion.js) on a seeded learner: a terms
+ *       acceptance started during it waits for the shared lock and inserts nothing (control:
+ *       without the lock it leaves a live row); one started before it is marked; every proof row
+ *       carries the tombstone's deleted_at to the microsecond; a second call answers already; the
+ *       lesson-progress `restarted` statement after a re-open
+ *   Later stages add R10 (retention) and R11 (the db log without DETAIL).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import os from 'node:os';
 import { accountGeneration, accountLockKey, readAccountState, reopenAccount } from '../../tools/core/accountDeletions.js';
+import { RESTARTED_SQL } from '../../tools/core/lessonProgress.js';
 import { isGrantRevoked } from '../../mcp-server/oauthVerifier.js';
+import { deleteAccountData, SQL as DELETION_SQL } from '../../server/services/accountDeletion.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
@@ -267,6 +274,12 @@ async function r4(pool) {
         check('R4', rows.length === 1 && rows[0].restarted === true && stubs === 1 && generation === accountGeneration(rows[0].reopened_at)
             && JSON.stringify(second) === JSON.stringify(first),
             `re-open in one transaction: restarted ${rows[0]?.restarted}, stub ${stubs}, one epoch, the same generation twice (${generation})`);
+        // The lesson-progress GET's own statement (tools/core/lessonProgress.js), then after a normal reset.
+        const flag = async () => (await pool.query(RESTARTED_SQL, [id.toUpperCase()])).rows[0]?.restarted;
+        const before = await flag();
+        await pool.query('UPDATE lesson_progress_resets SET epoch = gen_random_uuid(), reset_at = now() + interval \'1 second\' WHERE user_id = $1::uuid', [id]);
+        const afterReset = await flag();
+        check('R4', before === true && afterReset === false, `RESTARTED_SQL: true after the re-open (${before}), false after a normal reset (${afterReset})`);
         const old = await readAccountState(pool, id, nowS() - 3600, { mayReopen: true });
         check('R4', old.state === 'deleted', `a session from before the deletion stays refused after the re-open (${old.state})`);
     }
@@ -477,6 +490,231 @@ async function r8(pool) {
         `a deletion locking with the upper-case id blocks the trigger's lower-case lock: the stub insert waited ${blocked.waited} ms (stub ${blocked.stubs})`);
 }
 
+/** The acceptance transaction of the legal routes (design §4.4), on its own client. */
+const ACCEPT_LOCKED = `INSERT INTO legal_acceptances (user_id, terms_version, privacy_version)
+    SELECT $1::uuid, $2, $3 WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid)
+    ON CONFLICT (user_id, terms_version, privacy_version) WHERE account_deleted_at IS NULL DO NOTHING
+    RETURNING accepted_at`;
+
+/**
+ * Runs the acceptance on `client` (BEGIN … COMMIT), with or without the shared account lock, and
+ * holds holdMs before COMMIT. Returns how long the lock (or the insert) waited, the rows inserted
+ * and whether a not re-opened tombstone was seen (the 401 account_deleted path).
+ * @param {pg.PoolClient} client @param {string} id @param {{ lock: boolean, holdMs?: number, terms: string, privacy: string }} options
+ */
+async function acceptance(client, id, { lock, holdMs = 0, terms, privacy }) {
+    await client.query('BEGIN');
+    try {
+        const t0 = Date.now();
+        if (lock) await client.query(`SELECT pg_advisory_xact_lock_shared(${accountLockKey(1)})`, [id]);
+        const inserted = (await client.query(ACCEPT_LOCKED, [id, terms, privacy])).rowCount ?? 0;
+        const waited = Date.now() - t0;
+        const tombstone = (await client.query('SELECT 1 FROM account_deletions WHERE user_id = $1::uuid AND reopened_at IS NULL', [id])).rowCount ?? 0;
+        if (holdMs) await client.query('SELECT pg_sleep($1)', [holdMs / 1000]);
+        await client.query('COMMIT');
+        return { inserted, waited, deletedSeen: tombstone === 1 };
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    }
+}
+
+/**
+ * A pool for deleteAccountData whose transaction holds holdMs after DELETE FROM auth.users (before
+ * COMMIT), so another session can run into the deletion while it holds the account lock.
+ * @param {pg.Pool} pool @param {number} holdMs
+ */
+const holdingPool = (pool, holdMs) => ({
+    query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => pool.query(sql, params),
+    connect: async () => {
+        const client = await pool.connect();
+        return {
+            query: async (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
+                const result = await client.query(sql, params);
+                if (sql === DELETION_SQL.deleteStub && holdMs) await client.query('SELECT pg_sleep($1)', [holdMs / 1000]);
+                return result;
+            },
+            release: (/** @type {any} */ error) => client.release(error),
+        };
+    },
+});
+
+/** @param {pg.Pool} pool */
+async function r9(pool) {
+    const terms = 'terms-draft-2026-10-01';
+    const privacy = 'privacy-draft-2026-10-01';
+    const today = "(now() AT TIME ZONE 'Asia/Tokyo')::date";
+    const uploadRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rp-verify-'));
+    /** @type {string[]} */
+    const lines = [];
+    const service = (/** @type {any} */ p, /** @type {string} */ userId) => deleteAccountData({
+        pool: p,
+        userId,
+        requestedBy: 'self',
+        authTime: null,
+        billing: { config: null, stripe: null },
+        logger: { log: (line) => lines.push(line), warn: (line) => lines.push(line) },
+        uploadRoot,
+        memory: { enabled: () => false, purge: async () => ({ ok: true }) },
+        invalidateCaches: () => {},
+    });
+    const seed = async (/** @type {string} */ id, /** @type {string} */ other) => {
+        const [G1, G2] = ['g1', 'g2'].map(uid);
+        const rows = [
+            ['INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [id]],
+            ['INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [other]],
+            ["INSERT INTO account_consents (user_id, kind, policy_version, method, relationship) VALUES ($1, 'guardian_ai', 'guardian-ai-2026-10', 'guardian_on_device', 'parent')", [id]],
+            ["INSERT INTO mcp_oauth_grants (user_id, client_id, client_name, first_seen_at, last_used_at) VALUES ($1, $2, 'used app', now() - interval '3 days', now())", [id, G1]],
+            // As server/routes/connectedApps.js writes a revoked app that never called the endpoint.
+            ["INSERT INTO mcp_oauth_grants (user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at) VALUES ($1, $2, 'never used', NULL, NULL, now())", [id, G2]],
+            ["INSERT INTO jobs (user_id, type, status) VALUES ($1, 'ingest', 'running'), ($2, 'ingest', 'done')", [id, other]],
+            ["INSERT INTO materials (user_id, type, storage_path) VALUES ($1, 'txt', 'public/uploads/1700000000000-r9.txt')", [id]],
+            [`INSERT INTO ai_daily_usage (usage_day, kind, subject, count) VALUES (${today}, 'llm', $1, 3), (${today} - 3, 'llm', $1, 2)`, [id]],
+            ["INSERT INTO legal_document_versions (version, document, sha256) VALUES ($1, 'terms', repeat('a', 64)), ($2, 'privacy', repeat('b', 64)) ON CONFLICT DO NOTHING", [terms, privacy]],
+        ];
+        for (const [sql, params] of rows) await pool.query(/** @type {string} */ (sql), /** @type {unknown[]} */ (params));
+    };
+    const n = async (/** @type {string} */ sql, /** @type {unknown[]} */ params) => count(pool, sql, params);
+    /**
+     * The proof rows of `id` (marked acceptances, consent proofs, provision records), how many of them
+     * differ from the tombstone's deleted_at (compared in the database, to the microsecond), and the
+     * tombstone's microseconds.
+     * @param {string} id
+     */
+    const proofTimes = async (id) => {
+        const { rows: [row] } = await pool.query(`SELECT
+              (SELECT count(*) FROM legal_acceptances x WHERE x.user_id = d.user_id AND x.account_deleted_at IS NOT NULL)::int
+            + (SELECT count(*) FROM account_consent_proofs x WHERE x.user_id = d.user_id)::int
+            + (SELECT count(*) FROM ai_app_provision_records x WHERE x.user_id = d.user_id)::int AS proofs,
+              (SELECT count(*) FROM legal_acceptances x WHERE x.user_id = d.user_id AND x.account_deleted_at IS NOT NULL AND x.account_deleted_at <> d.deleted_at)::int
+            + (SELECT count(*) FROM account_consent_proofs x WHERE x.user_id = d.user_id AND x.account_deleted_at <> d.deleted_at)::int
+            + (SELECT count(*) FROM ai_app_provision_records x WHERE x.user_id = d.user_id AND x.account_deleted_at <> d.deleted_at)::int AS off,
+            to_char(d.deleted_at, 'US') AS us
+            FROM account_deletions d WHERE d.user_id = $1::uuid`, [id]);
+        return row ?? { proofs: 0, off: 0, us: null };
+    };
+    try {
+        // R9a: the service (upper-case id) holds the lock; an acceptance LEAD_MS later waits and inserts nothing.
+        {
+            const A = uid('r9a');
+            const B = uid('r9b');
+            await seed(A, B);
+            const running = service(holdingPool(pool, HOLD_MS), A.toUpperCase());
+            await sleep(LEAD_MS);
+            const c2 = await pool.connect();
+            let accepted;
+            try {
+                accepted = await acceptance(c2, A, { lock: true, terms, privacy });
+            } finally {
+                c2.release();
+            }
+            const result = await running;
+            const got = {
+                result: result.status,
+                live: await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NULL', [A]),
+                stub: await n('SELECT count(*) AS n FROM auth.users WHERE id = $1', [A]),
+                consentProofs: await n("SELECT count(*) AS n FROM account_consent_proofs WHERE user_id = $1 AND policy_version = 'guardian-ai-2026-10'", [A]),
+                provision: (await pool.query('SELECT client_name FROM ai_app_provision_records WHERE user_id = $1', [A])).rows.map((r) => r.client_name).join(),
+                usageToday: await n(`SELECT count(*) AS n FROM ai_daily_usage WHERE subject = $1 AND usage_day = ${today}`, [A]),
+                usageOlder: await n(`SELECT count(*) AS n FROM ai_daily_usage WHERE subject = $1 AND usage_day < ${today}`, [A]),
+                consents: await n('SELECT count(*) AS n FROM account_consents WHERE user_id = $1', [A]),
+                jobsA: await n('SELECT count(*) AS n FROM jobs WHERE user_id = $1', [A]),
+                jobsB: await n('SELECT count(*) AS n FROM jobs WHERE user_id = $1', [B]),
+                tombstone: (await pool.query('SELECT requested_by, reopened_at FROM account_deletions WHERE user_id = $1', [A])).rows.map((r) => `${r.requested_by}/${r.reopened_at}`).join(),
+            };
+            const want = { result: 'deleted', live: 0, stub: 0, consentProofs: 1, provision: 'used app', usageToday: 1, usageOlder: 0, consents: 0, jobsA: 0, jobsB: 1, tombstone: 'self/null' };
+            const wrong = Object.keys(want).filter((k) => got[k] !== want[k]);
+            check('R9', accepted.waited >= BLOCKED_MS && accepted.inserted === 0 && accepted.deletedSeen && wrong.length === 0,
+                wrong.length ? `unexpected after the service: ${wrong.map((k) => `${k}=${got[k]} (want ${want[k]})`).join(', ')}`
+                    : `an acceptance during the service waited ${accepted.waited} ms, inserted ${accepted.inserted}, saw the tombstone (401 path); after: live acceptances 0, stub 0, 1 consent proof, the used grant only, today's usage kept, jobs A 0 / B 1`);
+            const timesA = await proofTimes(A);
+            check('R9', timesA.proofs === 2 && timesA.off === 0,
+                `the consent proof and the provision record carry the tombstone's deleted_at exactly (${timesA.proofs} proof rows, ${timesA.off} off; tombstone microseconds ${timesA.us})`);
+            const done = lines.find((l) => l.startsWith('[Account] Rise Path data deleted for '));
+            check('R9', Boolean(done && /^\[Account\] Rise Path data deleted for [0-9a-f]{8}… \(self; files 1\/1; memory skipped\) in \d+ms$/.test(done) && !done.includes(A)),
+                `the service's one log line: ${done}`);
+            const again = await service(pool, A);
+            check('R9', again.status === 'already', `a second call answers ${again.status}`);
+        }
+        // R9 control: the same acceptance without the shared lock leaves a live row for the deleted account.
+        {
+            const C = uid('r9c');
+            await seed(C, uid('r9x'));
+            const running = service(holdingPool(pool, HOLD_MS), C);
+            await sleep(LEAD_MS);
+            const c2 = await pool.connect();
+            let accepted;
+            try {
+                accepted = await acceptance(c2, C, { lock: false, terms, privacy });
+            } finally {
+                c2.release();
+            }
+            const result = await running;
+            const live = await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NULL', [C]);
+            check('R9', result.status === 'deleted' && accepted.inserted === 1 && live === 1,
+                `control, acceptance without the shared lock: inserted ${accepted.inserted}, live acceptances after the deletion ${live} (the lock is needed)`);
+        }
+        // R9b: an acceptance that started first holds the shared lock; the service waits, then marks its row.
+        {
+            const D = uid('r9d');
+            await seed(D, uid('r9y'));
+            const c1 = await pool.connect();
+            let accepted;
+            let result;
+            let waited = 0;
+            try {
+                const holding = acceptance(c1, D, { lock: true, holdMs: HOLD_MS, terms, privacy });
+                await sleep(LEAD_MS);
+                const t0 = Date.now();
+                result = await service(pool, D);
+                waited = Date.now() - t0;
+                accepted = await holding;
+            } finally {
+                c1.release();
+            }
+            const marked = await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NOT NULL', [D]);
+            const live = await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NULL', [D]);
+            check('R9', result?.status === 'deleted' && accepted?.inserted === 1 && waited >= BLOCKED_MS && marked === 1 && live === 0,
+                `an acceptance started first: the service waited ${waited} ms for it, then marked its row (marked ${marked}, live ${live})`);
+            const timesD = await proofTimes(D);
+            check('R9', timesD.proofs === 3 && timesD.off === 0,
+                `the marked acceptance and both copies carry the tombstone's deleted_at exactly (${timesD.proofs} proof rows, ${timesD.off} off; tombstone microseconds ${timesD.us})`);
+        }
+        // R9e: the plan rows by Stripe mode ($2 = the api is live). A live api leaves a test-mode row
+        // out (it never syncs one again); a live row counts on either; then the service on a live api.
+        {
+            const E = uid('r9e');
+            const F = uid('r9f');
+            await seed(E, F);
+            const sub = (/** @type {string} */ user, /** @type {boolean} */ livemode) => pool.query(
+                "INSERT INTO billing_subscriptions (stripe_subscription_id, stripe_customer_id, user_id, status, livemode, synced_at) VALUES ($1, $2, $3, 'active', $4, now())",
+                [`sub_${livemode ? 'live' : 'test'}_${user}`, `cus_${user}`, user, livemode]);
+            await sub(E, false);
+            await sub(F, true);
+            const rows = async (/** @type {string} */ sql, /** @type {string} */ id, /** @type {boolean} */ live) => (await pool.query(sql, [id, live])).rows.length;
+            const got = [
+                await rows(DELETION_SQL.renewingLocal, E, true), await rows(DELETION_SQL.renewingLocal, E, false),
+                await rows(DELETION_SQL.renewingLocal, F, true), await rows(DELETION_SQL.renewingLocal, F, false),
+                await rows(DELETION_SQL.openSubscriptions, E, true), await rows(DELETION_SQL.openSubscriptions, E, false),
+            ].join(' ');
+            check('R9', got === '0 1 1 1 0 1', `plan rows (test-mode row on a live / a test api, live row on a live / a test api, preflight test-mode row live / test): ${got} (want 0 1 1 1 0 1)`);
+            // No billing_customers rows for E and F, so the client object is never called.
+            const liveApi = { config: { live: true }, stripe: /** @type {any} */ ({}) };
+            const onLive = (/** @type {string} */ userId) => deleteAccountData({
+                pool, userId, requestedBy: 'staff', authTime: null, billing: liveApi, uploadRoot,
+                logger: { log: () => {}, warn: () => {} }, memory: { enabled: () => false, purge: async () => ({ ok: true }) }, invalidateCaches: () => {},
+            });
+            const [e, f] = [await onLive(E), await onLive(F)];
+            const kept = await n('SELECT count(*) AS n FROM billing_subscriptions WHERE stripe_subscription_id = $1 AND user_id IS NULL', [`sub_test_${E}`]);
+            const stubs = [await n('SELECT count(*) AS n FROM auth.users WHERE id = $1', [E]), await n('SELECT count(*) AS n FROM auth.users WHERE id = $1', [F])].join('/');
+            check('R9', e.status === 'deleted' && f.status === 'refused' && 'reason' in f && f.reason === 'subscription_active' && kept === 1 && stubs === '0/1',
+                `a live api: the tester's test-mode row ${e.status} (row kept, unlinked ${kept}), the live row ${f.status}${'reason' in f ? `/${f.reason}` : ''}; stubs E/F ${stubs}`);
+        }
+    } finally {
+        await fs.rm(uploadRoot, { recursive: true, force: true });
+    }
+}
+
 export async function main(argv = process.argv.slice(2)) {
     const { url, help } = parseArgs(argv);
     if (help || !url) {
@@ -511,6 +749,7 @@ export async function main(argv = process.argv.slice(2)) {
         await r6(pool);
         await r7(pool);
         await r8(pool);
+        await r9(pool);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {

@@ -54,11 +54,12 @@ const epochSeconds = (value) => (value ? new Date(/** @type {any} */ (value)).ge
 
 /**
  * Whether a session that signed in at authTime belongs to the account deleted at deletedAt.
- * A missing or unreadable time counts as belonging to it (fail closed).
+ * A missing or unreadable time counts as belonging to it (fail closed). Also used by the deletion
+ * service (server/services/accountDeletion.js) for its "already deleted" answer.
  * @param {number | null | undefined} authTime
  * @param {unknown} deletedAt
  */
-const signedInBeforeDeletion = (authTime, deletedAt) => {
+export const signedInBeforeDeletion = (authTime, deletedAt) => {
     const deleted = epochSeconds(deletedAt);
     if (typeof authTime !== 'number' || !Number.isFinite(authTime) || !Number.isFinite(deleted)) return true;
     return authTime <= deleted + ACCOUNT_SKEW_SECONDS;
