@@ -14,7 +14,8 @@
  * against the VM's database or a Supabase project. It applies every server/migrations/*.sql twice,
  * each in its own transaction (as scripts/db-migrate.mjs does once), seeds test rows, runs the
  * checks with two or three connections and timed waits, prints one line per check and exits 1 on
- * any mismatch. It creates the role risepath_mcp_remote for R5 and drops it again at the end. The
+ * any mismatch, or 3 when a check could not run here (R11 without a readable server log) unless
+ * --allow-skip is given: a skipped check is not a pass, so a gate never goes green without it. It creates the role risepath_mcp_remote for R5 and drops it again at the end. The
  * database keeps the test rows: drop it (or the whole cluster) afterwards.
  *
  * Checks (doc: Phase 4 design, Appendix V):
@@ -33,7 +34,14 @@
  *       without the lock it leaves a live row); one started before it is marked; every proof row
  *       carries the tombstone's deleted_at to the microsecond; a second call answers already; the
  *       lesson-progress `restarted` statement after a re-open
- *   Later stages add R10 (retention) and R11 (the db log without DETAIL).
+ *   R10 the retention run (server/services/retention.js) on seeded rows: what each period keeps and
+ *       deletes (usage counts by Japan-time day, jobs in every status, MCP records, the proofs of
+ *       deleted accounts, tombstones), batches of 5000, orphan upload files, and the advisory lock
+ *       (a run while another session holds it deletes nothing)
+ *   R11 a foreign key refusal in the server log: with the default log_error_verbosity the DETAIL
+ *       line carries the full id; with terse (docker-compose.yml's db command) it does not, and the
+ *       STATEMENT line holds $1. The log is read from --log-file <path> when given, else from
+ *       pg_current_logfile() (logging_collector on); without either, R11 is skipped (exit 3).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -44,6 +52,7 @@ import { accountGeneration, accountLockKey, readAccountState, reopenAccount } fr
 import { RESTARTED_SQL } from '../../tools/core/lessonProgress.js';
 import { isGrantRevoked } from '../../mcp-server/oauthVerifier.js';
 import { deleteAccountData, SQL as DELETION_SQL } from '../../server/services/accountDeletion.js';
+import { BATCH_LIMIT, RETENTION_LOCK_SQL, readRetentionConfig, runRetention } from '../../server/services/retention.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
@@ -75,11 +84,29 @@ function check(id, ok, label) {
     results.push({ id, ok });
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${id.padEnd(4)} ${label}`);
 }
+/** Checks that could not run here (not a pass, not a failure). @type {string[]} */
+const skipped = [];
+/** @param {string} id @param {string} label */
+function skip(id, label) {
+    skipped.push(id);
+    console.log(`skip ${id.padEnd(4)} ${label}`);
+}
 
 /** @param {string[]} argv */
-function parseArgs(argv) {
+export function parseArgs(argv) {
     const url = argv.includes('--url') ? argv[argv.indexOf('--url') + 1] : '';
-    return { url, help: argv.includes('--help') || argv.includes('-h') };
+    const logFile = argv.includes('--log-file') ? argv[argv.indexOf('--log-file') + 1] ?? '' : '';
+    return { url, logFile, allowSkip: argv.includes('--allow-skip'), help: argv.includes('--help') || argv.includes('-h') };
+}
+
+/**
+ * 1 when a check failed; 3 when one was skipped (not a pass) and --allow-skip was not given; else 0.
+ * @param {{ failed: number, skipped: number, allowSkip: boolean }} counts
+ */
+export function exitCode({ failed, skipped, allowSkip }) {
+    if (failed > 0) return 1;
+    if (skipped > 0 && !allowSkip) return 3;
+    return 0;
 }
 
 /** @param {pg.Pool} pool @param {string} sql @param {unknown[]} [params] */
@@ -715,10 +742,192 @@ async function r9(pool) {
     }
 }
 
+/** @param {pg.Pool} pool */
+async function r10(pool) {
+    const today = "(now() AT TIME ZONE 'Asia/Tokyo')::date";
+    const uploadRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rp-verify-retention-'));
+    /** @type {string[]} */
+    const lines = [];
+    const logger = { log: (/** @type {string} */ line) => lines.push(line), warn: (/** @type {string} */ line) => lines.push(line) };
+    const n = async (/** @type {string} */ sql, /** @type {unknown[]} */ params = []) => count(pool, sql, params);
+    try {
+        const C = uid('r10c');
+        const [S1, S2] = [uid('r10s'), uid('r10t')];
+        const tag = `r10-${C.slice(-6)}`;
+        const terms = 'terms-draft-2026-10-02';
+        const privacy = 'privacy-draft-2026-10-02';
+        const [gone, kept] = [uid('r10g'), uid('r10k')];
+        const rows = [
+            ['INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [C]],
+            // Usage counts: today, 30 days before (kept) and 31 days before (deleted), for an id, an ip: subject and the total.
+            [`INSERT INTO ai_daily_usage (usage_day, kind, subject, count)
+              SELECT ${today} - d, 'llm', s, 1 FROM unnest(ARRAY[0, 30, 31]) AS d, unnest(ARRAY[$1, 'ip:${tag}', '*${tag}']) AS s`, [C]],
+            // 12001 counts of one old day: three batches of BATCH_LIMIT.
+            [`INSERT INTO ai_daily_usage (usage_day, kind, subject, count) SELECT ${today} - 40, 'llm', 'ip:${tag}-' || g, 1 FROM generate_series(1, 12001) g`, []],
+            // Jobs of C: 400 days old in every status, and one left running 10 days ago.
+            ["INSERT INTO jobs (user_id, type, status, updated_at) VALUES ($1, 'ingest', 'running', now() - interval '400 days'), ($1, 'ingest', 'queued', now() - interval '400 days'), ($1, 'ingest', 'done', now() - interval '400 days'), ($1, 'ingest', 'error', now() - interval '400 days'), ($1, 'ingest', 'running', now() - interval '10 days')", [C]],
+            // MCP: an old session (with a tool call of its own), a recent one, an old and a recent call without a session.
+            ["INSERT INTO mcp_sessions (id, user_id, started_at) VALUES ($1, $3, now() - interval '400 days'), ($2, $3, now() - interval '10 days')", [S1, S2, C]],
+            ["INSERT INTO mcp_tool_calls (session_id, tool_name, created_at) VALUES ($1, 'r10-old-session', now() - interval '400 days'), ($2, 'r10-recent-session', now() - interval '10 days'), (NULL, 'r10-old', now() - interval '400 days'), (NULL, 'r10-recent', now() - interval '10 days')", [S1, S2]],
+            // The proofs of two deleted accounts: one deleted 5 years + 1 day ago (3 years + 1 day for the AI-app record), one a day short.
+            ["INSERT INTO legal_document_versions (version, document, sha256) VALUES ($1, 'terms', repeat('c', 64)), ($2, 'privacy', repeat('d', 64)) ON CONFLICT DO NOTHING", [terms, privacy]],
+            [`INSERT INTO legal_acceptances (user_id, terms_version, privacy_version, accepted_at, account_deleted_at) VALUES
+              ($1, $3, $4, now() - interval '5 years 2 days', now() - interval '5 years 1 day'),
+              ($2, $3, $4, now() - interval '5 years', now() - interval '5 years' + interval '1 day'),
+              ($5, $3, $4, now() - interval '6 years', NULL)`, [gone, kept, terms, privacy, C]],
+            [`INSERT INTO account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, account_deleted_at) VALUES
+              (gen_random_uuid(), $1, 'guardian_ai', 'guardian-ai-2026-10', 'guardian_on_device', now() - interval '6 years', now() - interval '5 years 1 day'),
+              (gen_random_uuid(), $2, 'guardian_ai', 'guardian-ai-2026-10', 'guardian_on_device', now() - interval '6 years', now() - interval '5 years' + interval '1 day')`, [gone, kept]],
+            [`INSERT INTO ai_app_provision_records (user_id, client_id, client_name, account_deleted_at) VALUES
+              ($1, gen_random_uuid(), 'old app', now() - interval '3 years 1 day'),
+              ($2, gen_random_uuid(), 'recent app', now() - interval '3 years' + interval '1 day')`, [gone, kept]],
+            [`INSERT INTO account_deletions (user_id, deleted_at, requested_by) VALUES
+              ($1, now() - interval '5 years 1 day', 'self'), ($2, now() - interval '5 years' + interval '1 day', 'staff')`, [gone, kept]],
+            ["INSERT INTO materials (user_id, type, storage_path) VALUES ($1, 'txt', 'public/uploads/1700000000001-r10-referenced.txt')", [C]],
+        ];
+        for (const [sql, params] of rows) await pool.query(/** @type {string} */ (sql), /** @type {unknown[]} */ (params));
+        const dir = path.join(uploadRoot, 'public', 'uploads');
+        await fs.mkdir(dir, { recursive: true });
+        const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+        for (const name of ['1700000000000-r10-orphan.txt', '1700000000001-r10-referenced.txt', '1700000000002-r10-fresh.txt']) {
+            await fs.writeFile(path.join(dir, name), 'x');
+            if (!name.includes('fresh')) await fs.utimes(path.join(dir, name), old, old);
+        }
+        const snapshot = async () => ({
+            usage: (await pool.query(`SELECT string_agg((${today} - usage_day)::text, ',' ORDER BY usage_day DESC) AS days FROM (SELECT DISTINCT usage_day FROM ai_daily_usage WHERE subject IN ($1, 'ip:${tag}', '*${tag}')) d`, [C])).rows[0].days,
+            bulk: await n(`SELECT count(*) AS n FROM ai_daily_usage WHERE subject LIKE 'ip:${tag}-%'`),
+            jobs: (await pool.query("SELECT string_agg(status, ',' ORDER BY status) AS s FROM jobs WHERE user_id = $1", [C])).rows[0].s,
+            sessions: await n('SELECT count(*) AS n FROM mcp_sessions WHERE id IN ($1, $2)', [S1, S2]),
+            calls: (await pool.query("SELECT string_agg(tool_name, ',' ORDER BY tool_name) AS s FROM mcp_tool_calls WHERE tool_name LIKE 'r10-%'")).rows[0].s,
+            acceptances: (await pool.query(`SELECT string_agg(who, ',' ORDER BY who) AS s FROM (SELECT CASE user_id WHEN $1::uuid THEN 'gone' WHEN $2::uuid THEN 'kept' ELSE 'live' END AS who
+                FROM legal_acceptances WHERE user_id IN ($1, $2, $3)) a`, [gone, kept, C])).rows[0].s,
+            consents: (await pool.query("SELECT string_agg(CASE user_id WHEN $1::uuid THEN 'gone' ELSE 'kept' END, ',') AS s FROM account_consent_proofs WHERE user_id IN ($1, $2)", [gone, kept])).rows[0].s,
+            apps: (await pool.query("SELECT string_agg(client_name, ',') AS s FROM ai_app_provision_records WHERE user_id IN ($1, $2)", [gone, kept])).rows[0].s,
+            tombstones: (await pool.query("SELECT string_agg(requested_by, ',') AS s FROM account_deletions WHERE user_id IN ($1, $2)", [gone, kept])).rows[0].s,
+            files: (await fs.readdir(dir)).sort().join(','),
+        });
+        const before = await snapshot();
+        const config = readRetentionConfig({});
+
+        // The lock held by another session (a second api container): the run deletes nothing.
+        const holder = await pool.connect();
+        let blocked;
+        try {
+            await holder.query(RETENTION_LOCK_SQL);
+            blocked = await runRetention({ pool: /** @type {any} */ (pool), config, logger, uploadRoot });
+        } finally {
+            await holder.query("SELECT pg_advisory_unlock(hashtextextended('risepath:retention', 0))").catch(() => {});
+            holder.release();
+        }
+        const whileLocked = await snapshot();
+        check('R10', blocked.ran === false && JSON.stringify(whileLocked) === JSON.stringify(before),
+            `while another session holds the retention lock: ran ${blocked.ran}, nothing deleted (${JSON.stringify(whileLocked) === JSON.stringify(before)})`);
+
+        const result = await runRetention({ pool: /** @type {any} */ (pool), config, logger, uploadRoot });
+        const after = await snapshot();
+        const want = {
+            usage: '0,30', bulk: 0, jobs: 'running', sessions: 1, calls: 'r10-recent,r10-recent-session',
+            acceptances: 'kept,live', consents: 'kept', apps: 'recent app', tombstones: 'staff',
+            files: '1700000000001-r10-referenced.txt,1700000000002-r10-fresh.txt',
+        };
+        const wrong = Object.keys(want).filter((k) => /** @type {any} */ (after)[k] !== /** @type {any} */ (want)[k]);
+        check('R10', result.ran === true && wrong.length === 0,
+            wrong.length ? `unexpected after the run: ${wrong.map((k) => `${k}=${/** @type {any} */ (after)[k]} (want ${/** @type {any} */ (want)[k]})`).join(', ')}`
+                : `usage days left ${after.usage} (today and 30 days before), jobs left: the one running 10 days ago (400-day-old running/queued/done/error gone), MCP: the old session with its call and the old call gone, `
+                + 'proofs deleted 5 years + 1 day ago gone and those a day short kept (live acceptance kept), AI-app record 3 years + 1 day gone, the old tombstone gone, the orphan file gone (referenced and fresh kept)');
+        const deleted = result.deleted;
+        check('R10', deleted.ai_daily_usage >= 12001 + 3 && deleted.jobs >= 4 && deleted.uploads === 1 && deleted.account_deletions >= 1,
+            `counts: ai_daily_usage=${deleted.ai_daily_usage} (≥ 12004, ${Math.ceil(deleted.ai_daily_usage / BATCH_LIMIT)} batches of ${BATCH_LIMIT}) jobs=${deleted.jobs} mcp_tool_calls=${deleted.mcp_tool_calls} mcp_sessions=${deleted.mcp_sessions} `
+            + `legal_acceptances=${deleted.legal_acceptances} account_consent_proofs=${deleted.account_consent_proofs} ai_app_provision_records=${deleted.ai_app_provision_records} account_deletions=${deleted.account_deletions} uploads=${deleted.uploads}`);
+        const summary = lines.find((line) => line.startsWith('[Retention] deleted '));
+        check('R10', Boolean(summary) && !lines.some((line) => line.includes('failed')) && !lines.some((line) => line.includes(C) || line.includes(gone)),
+            `one summary line, no failed step, no id: ${summary}`);
+        const again = await runRetention({ pool: /** @type {any} */ (pool), config, logger, uploadRoot });
+        check('R10', again.ran === true && Object.values(again.deleted).every((v) => v === 0),
+            `a second run deletes nothing (${Object.values(again.deleted).reduce((a, b) => a + b, 0)} rows)`);
+    } finally {
+        await fs.rm(uploadRoot, { recursive: true, force: true });
+    }
+}
+
+/**
+ * The server log as text from `offset` on: --log-file, else the server's own file when the logging
+ * collector runs (pg_read_file, superuser). null when neither is available.
+ * @param {pg.Pool} pool @param {string} logFile @param {number} [offset]
+ */
+async function readServerLog(pool, logFile, offset = 0) {
+    if (logFile) {
+        const handle = await fs.open(logFile, 'r');
+        try {
+            const { size } = await handle.stat();
+            const length = Math.max(0, size - offset);
+            const buffer = Buffer.alloc(length);
+            await handle.read(buffer, 0, length, offset);
+            return { text: buffer.toString('utf8'), size, source: '--log-file' };
+        } finally {
+            await handle.close();
+        }
+    }
+    const { rows: [row] } = await pool.query("SELECT pg_current_logfile('stderr') AS file");
+    if (!row?.file) return null;
+    const { rows: [stat] } = await pool.query('SELECT size FROM pg_stat_file($1)', [row.file]);
+    const size = Number(stat.size);
+    const { rows: [read] } = await pool.query('SELECT pg_read_file($1, $2, $3) AS text', [row.file, offset, Math.max(0, size - offset)]);
+    return { text: String(read.text ?? ''), size, source: 'pg_current_logfile()' };
+}
+
+/** @param {pg.Pool} pool @param {string} logFile */
+async function r11(pool, logFile) {
+    const start = await readServerLog(pool, logFile);
+    if (!start) {
+        skip('R11', 'the server log is not readable here: pass --log-file <path of the cluster log> or run the cluster with logging_collector=on (--allow-skip accepts the gap)');
+        return;
+    }
+    const nonce = uid('r11').slice(-8);
+    const cases = /** @type {const} */ (['default', 'terse']);
+    /** @type {Record<string, string>} */
+    const ids = {};
+    const client = await pool.connect();
+    try {
+        for (const verbosity of cases) {
+            ids[verbosity] = uid(`r11${verbosity[0]}`);
+            await client.query(`SET log_error_verbosity = ${verbosity}`);
+            // A foreign key refusal with a bound parameter, as the api's statements are sent.
+            await client.query(`/* r11-${verbosity}-${nonce} */ INSERT INTO jobs (user_id, type) VALUES ($1::uuid, 'ingest')`, [ids[verbosity]])
+                .then(() => { throw new Error('the insert was not refused'); }, (error) => {
+                    if (/** @type {any} */ (error)?.code !== '23503') throw error;
+                });
+        }
+        await client.query('RESET log_error_verbosity');
+    } finally {
+        client.release();
+    }
+    await sleep(300); // the server writes its log asynchronously
+    const log = await readServerLog(pool, logFile, start.size);
+    const entries = (log?.text ?? '').split('\n');
+    /** The ERROR … STATEMENT lines of one case. @param {string} verbosity */
+    const block = (verbosity) => {
+        const end = entries.findIndex((line) => line.includes(`STATEMENT:`) && line.includes(`r11-${verbosity}-${nonce}`));
+        if (end < 0) return null;
+        let begin = end;
+        while (begin > 0 && !/\bERROR:/.test(entries[begin])) begin -= 1;
+        return entries.slice(begin, end + 1);
+    };
+    const def = block('default');
+    const terse = block('terse');
+    const detail = (/** @type {string[] | null} */ b) => Boolean(b?.some((line) => /\bDETAIL:/.test(line)));
+    check('R11', Boolean(def) && detail(def) && Boolean(def?.some((line) => line.includes(ids.default))),
+        `default verbosity (${log?.source}): the refusal is logged with ${detail(def) ? 'a DETAIL line holding the full id' : 'no DETAIL line (unexpected)'}`);
+    const terseText = (terse ?? []).join('\n');
+    check('R11', Boolean(terse) && !detail(terse) && !terseText.includes(ids.terse) && /STATEMENT:.*\$1/.test(terseText) && !(log?.text ?? '').includes(ids.terse),
+        `log_error_verbosity=terse: ${terse ? `${terse.length} lines (ERROR, STATEMENT with $1), no DETAIL, the id nowhere in the log` : 'no entry found'}`);
+}
+
 export async function main(argv = process.argv.slice(2)) {
-    const { url, help } = parseArgs(argv);
+    const { url, logFile, allowSkip, help } = parseArgs(argv);
     if (help || !url) {
-        console.log('Usage: node scripts/db/verify-account-deletion.mjs --url postgres://<user>@<host>:<port>/<empty throwaway database>');
+        console.log('Usage: node scripts/db/verify-account-deletion.mjs --url postgres://<user>@<host>:<port>/<empty throwaway database> [--log-file <the cluster log, for R11>] [--allow-skip]');
+        console.log('Exit: 0 all passed, 1 a check failed, 2 refused or usage, 3 a check was skipped (without --allow-skip).');
         return help ? 0 : 2;
     }
     const pool = new pg.Pool({ connectionString: url, max: 6 });
@@ -750,6 +959,8 @@ export async function main(argv = process.argv.slice(2)) {
         await r7(pool);
         await r8(pool);
         await r9(pool);
+        await r10(pool);
+        await r11(pool, logFile);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {
@@ -760,8 +971,10 @@ export async function main(argv = process.argv.slice(2)) {
         await pool.end();
     }
     const failed = results.filter((r) => !r.ok);
-    console.log(`# ${results.length - failed.length} passed, ${failed.length} failed`);
-    return failed.length ? 1 : 0;
+    console.log(`# ${results.length - failed.length} passed, ${failed.length} failed${skipped.length ? `, ${skipped.length} skipped (${skipped.join(', ')})` : ''}`);
+    const code = exitCode({ failed: failed.length, skipped: skipped.length, allowSkip });
+    if (code === 3) console.log('# exit 3: a skipped check is not a pass (give --log-file, or --allow-skip to accept the gap)');
+    return code;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

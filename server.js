@@ -29,6 +29,8 @@ import {
 import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
+import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
+import { describeError, redactUrl } from './server/utils/redactUrl.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -135,13 +137,14 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     app.use(express.json({ limit: '50mb' }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
-    // path when a scoped middleware (e.g. /api/v2/agent auth) answers.
+    // path when a scoped middleware (e.g. /api/v2/agent auth) answers. redactUrl (Phase 4): no query
+    // string, ids cut to 8 characters, no dates, emails, file names or tokens (server/utils/redactUrl.js).
     app.use((req, res, next) => {
         const start = Date.now();
         res.on('finish', () => {
             const ms = Date.now() - start;
             const auth = req.authMethod || '-';
-            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms auth=${auth}`);
+            console.log(`[${new Date().toISOString()}] ${req.method} ${redactUrl(req.originalUrl)} ${res.statusCode} ${ms}ms auth=${auth}`);
         });
         next();
     });
@@ -309,12 +312,13 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
 
     // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
     // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
-    // sent: Express's own handler sends the stack (database text included) outside production.
+    // sent: Express's own handler sends the stack (database text included) outside production. The
+    // line has its name, code and message only: a pg error's detail holds values (Phase 4).
     app.use((err, req, res, next) => {
         if (res.headersSent) return next(err);
         const code = err?.status ?? err?.statusCode;
         const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
-        if (status >= 500) console.error(`[Server] ${req.method} ${req.originalUrl} failed:`, err);
+        if (status >= 500) console.error(`[Server] ${req.method} ${redactUrl(req.originalUrl)} failed: ${describeError(err)}`);
         res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
     });
 
@@ -348,6 +352,15 @@ async function main() {
     // records a new event; the admin queries also enforce it.
     void pruneSafetyEvents(undefined, { force: true });
     setInterval(() => void pruneSafetyEvents(undefined, { force: true }), 60 * 60 * 1000).unref();
+    // Retention (Phase 4, server/services/retention.js): old usage counts, processing records and
+    // the proofs of deleted accounts, hourly. An invalid setting turns its rule off (logged).
+    const retention = readRetentionConfig(process.env);
+    for (const problem of retention.problems) console.warn(`[Retention] ${problem}`);
+    console.log(retentionStartupLine(retention));
+    if (retention.enabled) {
+        void runRetention({ config: retention });
+        setInterval(() => void runRetention({ config: retention }), RETENTION_INTERVAL_MS).unref();
+    }
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);
