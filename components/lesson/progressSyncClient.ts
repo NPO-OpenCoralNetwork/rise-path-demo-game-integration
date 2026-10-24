@@ -12,6 +12,9 @@
  * - ProgressAdoptDialog shows the adoption choice (useProgressSyncState, chooseProgressAdoption);
  *   a choice made in another tab closes it here (storage event on the account key).
  * - The Privacy page calls deleteLessonProgress.
+ * - Account deletion (Phase 4, design §5.11): AuthContext.endDeletedAccountSession calls
+ *   forgetProgressAccount (no upload); whenAccountKnown holds the legacy progress hydrate until
+ *   this page load's GET has settled (§5.10).
  * - Every request goes out only while the primary session still belongs to the learner the sync
  *   runs for: another tab can switch that session to another learner before this tab hears of it.
  *   The page-hide upload is the exception: fetch must start inside the pagehide/visibilitychange
@@ -204,6 +207,31 @@ export function progressChoicePending(): boolean {
 }
 
 /**
+ * Resolves when this page load's lesson-progress GET has settled: 'known' after a successful GET
+ * (a re-opened account's old epoch rule has run, design §5.10), 'unknown' after its last failure
+ * or when sync does not run for this learner (guests, mock and Nexloom-only sessions). No timer:
+ * the GET retries are bounded. The legacy hydrate uploads local-only course progress only when
+ * 'known' (AuthContext hydrateUserData, chooseProgressAdoption).
+ */
+export function whenAccountKnown(): Promise<'known' | 'unknown'> {
+  return instance ? instance.whenKnown() : Promise.resolve('unknown');
+}
+
+/**
+ * The account was deleted (here or on another device): stop syncing and clear this browser's
+ * lesson records, markers, the account key, learning events and legacy progress. Nothing is
+ * uploaded (an upload would only get 401 account_deleted). Never throws.
+ */
+export function forgetProgressAccount(): void {
+  cachedAuth = null;
+  try {
+    progressSync().forget();
+  } catch (err) {
+    console.warn('[progressSync] forget failed:', err);
+  }
+}
+
+/**
  * After the choice, the legacy hydrate runs: "Add" sends the device's legacy progress with the
  * rest; "Don't add" has cleared it and the learning events (the other person's streak and
  * history), so the learner's own come back from the server. hydrateFromApi sends no event: the
@@ -211,7 +239,7 @@ export function progressChoicePending(): boolean {
  */
 export function chooseProgressAdoption(add: boolean): void {
   const applied = instance?.choose(add) ?? false;
-  if (applied) void hydrateFromApi().then(() => dispatch(SYNC_ACCOUNT_EVENT));
+  if (applied) void whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known' })).then(() => dispatch(SYNC_ACCOUNT_EVENT));
 }
 
 /** The Privacy page's delete: the account's records on the server (then here), or this device's. */

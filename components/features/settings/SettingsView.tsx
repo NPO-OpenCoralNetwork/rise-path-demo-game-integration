@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, CreditCard, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { ArrowLeft, Bell, CreditCard, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, Trash2, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -88,6 +88,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             notifications: 'Notifications',
             plan: 'Plan',
             planHint: 'Payment and cancellation',
+            deleteAccount: 'Delete account',
+            deleteAccountHint: 'Delete your Rise Path data. Your sign-in stays.',
             ai: 'AI features',
             aiChecking: 'Checking…',
             aiLive: (provider: string | null) => `Runs securely on the server${provider ? ` · ${provider}` : ''}`,
@@ -131,6 +133,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             notifications: '通知',
             plan: 'プラン',
             planHint: 'お支払いと解約',
+            deleteAccount: 'アカウントを削除する',
+            deleteAccountHint: 'Rise Path のデータを削除します。ログインは残ります。',
             ai: 'AI 機能',
             aiChecking: '確認中…',
             aiLive: (provider: string | null) => `サーバーで安全に実行中${provider ? `・${provider}` : ''}`,
@@ -262,6 +266,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                                 label={t.plan}
                                 subtext={t.planHint}
                                 onClick={() => onNavigate(ViewState.SETTINGS_PLAN)}
+                            />
+                        )}
+                        {/* Phase 4 (D1): deleting one's own Rise Path data. Guests have none on the server. */}
+                        {user && !user.isGuest && (
+                            <SettingsRow
+                                icon={<Trash2 size={20} />}
+                                label={t.deleteAccount}
+                                subtext={t.deleteAccountHint}
+                                onClick={() => onNavigate(ViewState.SETTINGS_DELETE_ACCOUNT)}
                             />
                         )}
                     </SettingsSection>

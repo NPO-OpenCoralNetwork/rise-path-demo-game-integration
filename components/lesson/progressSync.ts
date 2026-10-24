@@ -40,6 +40,11 @@
  *   without a logout (stop) leaves every record with activity this way.
  * - Delete (deleteAll, the Privacy page): DELETE first; only on success clear local data and
  *   store the new epoch. Without a primary session or API: this device only.
+ * - Account deleted (forget, Phase 4 design §5.11): stop, then clear every lesson record, marker,
+ *   the account key, rp:lastLesson, learning events and legacy progress, with no upload. A known
+ *   epoch that changed on a re-opened account (the GET says `restarted`) also clears the learning
+ *   events and legacy progress (§5.10): they belonged to the deleted account. whenKnown() tells
+ *   the legacy hydrate (services/progressService.ts) whether this page load's GET succeeded.
  *
  * Keys start with `rp:progressSync:` so the `rp:progress:` scans (ProgressCluster) skip them.
  * No React, DOM or import.meta, and explicit import extensions: storage, API, timers, clock and
@@ -131,7 +136,8 @@ export type PutBody = { epoch: SyncEpoch; records: { courseSlug: string; lessonI
 
 /** services/lessonProgressApi.ts. Failures throw an ApiFailure-shaped error. */
 export type ProgressApi = {
-  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[] }>;
+  /** restarted: the account was deleted and opened again since its last reset (server GET, Phase 4). */
+  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean }>;
   put(body: PutBody, options: { keepalive: boolean }): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; rejected: RejectedRecord[] }>;
   del(): Promise<{ deleted: number; epoch: string }>;
 };
@@ -189,6 +195,17 @@ export type ProgressSync = {
   stop(): void;
   /** Delete every lesson record of the learner (server first), or this device's when not signed in. */
   deleteAll(): Promise<DeleteResult>;
+  /**
+   * The account was deleted (here or on another device): stop, clear every lesson record, marker,
+   * the account key, rp:lastLesson, learning events and legacy progress. No upload. Never throws.
+   */
+  forget(): void;
+  /**
+   * 'known' once this page load's GET succeeded (the epoch rule ran), 'unknown' after its last
+   * failure or when sync does not run for this learner. Waits while the GET (and its bounded
+   * retries) runs; adds no timer of its own.
+   */
+  whenKnown(): Promise<'known' | 'unknown'>;
   getState(): SyncState;
   subscribe(listener: () => void): () => void;
   /** Resolves when no hydrate or upload is running (tests). */
@@ -354,10 +371,20 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   let lastGetAt = Number.NEGATIVE_INFINITY;
   let retryAt = 0;
   let failures = 0;
+  /** whenKnown() callers waiting for the GET that runs now. */
+  let knownWaiters: Array<(result: 'known' | 'unknown') => void> = [];
 
   function setState(status: SyncStatus, userId: string | null = state.userId): void {
     if (state.status === status && state.userId === userId) return;
+    const wasHydrating = state.status === 'hydrating';
     state = { status, userId };
+    if (wasHydrating && status !== 'hydrating' && knownWaiters.length) {
+      // The GET settled: 'on' only after a successful one (or a failed refresh, epoch still known).
+      const result = status === 'on' && epoch !== undefined ? 'known' : 'unknown';
+      const waiting = knownWaiters;
+      knownWaiters = [];
+      for (const resolve of waiting) resolve(result);
+    }
     for (const listener of [...listeners]) {
       try {
         listener();
@@ -725,8 +752,11 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       return;
     }
     const serverEpoch = result.epoch ?? null;
-    // The learner deleted their progress elsewhere since this browser last synced.
-    if (account.epoch !== '?' && account.epoch !== serverEpoch) clearLocal();
+    // The learner deleted their progress elsewhere since this browser last synced. When the whole
+    // account was deleted and opened again (restarted), the streak, history and legacy progress
+    // here were the deleted account's too. A '?' device keeps what it has: it was written or
+    // adopted by the learner signed in now (a first sign-in, an account switch, "Add").
+    if (account.epoch !== '?' && account.epoch !== serverEpoch) clearLocal({ learningEvents: result.restarted === true });
     epoch = serverEpoch;
     writeAccount({ userId, epoch: serverEpoch });
     if (readAccount()?.epoch !== serverEpoch) {
@@ -1067,6 +1097,24 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     return { ok: true, scope: 'account' };
   }
 
+  function forget(): void {
+    try {
+      stopActivity();
+      epoch = undefined;
+      clearLocal({ keepPending: false, learningEvents: true });
+      remove(SYNC_ACCOUNT_KEY);
+    } catch {
+      // Storage trouble: nothing more to clear.
+    }
+    setState('off', null);
+    emitAccount();
+  }
+
+  function whenKnown(): Promise<'known' | 'unknown'> {
+    if (state.status === 'hydrating') return new Promise((resolve) => knownWaiters.push(resolve));
+    return Promise.resolve(state.status === 'on' && epoch !== undefined ? 'known' : 'unknown');
+  }
+
   async function settled(): Promise<void> {
     for (let i = 0; i < 50; i += 1) {
       const running = hydration ?? inFlight;
@@ -1085,6 +1133,8 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     signOut,
     stop,
     deleteAll,
+    forget,
+    whenKnown,
     getState: () => state,
     subscribe(listener) {
       listeners.add(listener);

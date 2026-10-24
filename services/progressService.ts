@@ -78,7 +78,14 @@ const syncEventToApi = (event: Omit<LearningEvent, 'id' | 'timestamp'>): void =>
 
 // --- Hydrate from API (call once on app boot) ---
 
-export const hydrateFromApi = async (): Promise<void> => {
+/**
+ * Loads the learner's course progress and learning events. `pushLocal` (default true): also
+ * upload course progress that only this device has. AuthContext and the adoption choice pass
+ * false unless this page load's lesson-progress GET succeeded (whenAccountKnown, Phase 4 design
+ * §5.10): until then a re-opened account's old epoch rule has not run, and this device's legacy
+ * progress may still be the deleted account's.
+ */
+export const hydrateFromApi = async ({ pushLocal = true }: { pushLocal?: boolean } = {}): Promise<void> => {
     if (!isApiAvailable()) return;
     try {
         const [progressRes, eventsRes] = await Promise.all([
@@ -104,7 +111,7 @@ export const hydrateFromApi = async (): Promise<void> => {
                 if (!remote || localData.completedStages.length > remote.completedStages.length) {
                     store[courseId] = localData;
                     // Push local-only data to API
-                    syncProgressToApi(courseId, localData);
+                    if (pushLocal) syncProgressToApi(courseId, localData);
                 }
             }
             saveStore(store);

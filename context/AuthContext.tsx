@@ -11,7 +11,16 @@ import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
 import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
-import { progressChoicePending, signInProgressSync, signOutProgressSync, stopProgressSync } from '../components/lesson/progressSyncClient';
+import { forgetDeletedAccountOnDevice, signOutThisBrowser } from '../services/accountDeviceData';
+import { ACCOUNT_DELETED_EVENT, ACCOUNT_DELETED_PATH, accountDeletedUrl, markDeletionInFlight, type DeletedBy } from '../services/accountDeletionState';
+import {
+    forgetProgressAccount,
+    progressChoicePending,
+    signInProgressSync,
+    signOutProgressSync,
+    stopProgressSync,
+    whenAccountKnown,
+} from '../components/lesson/progressSyncClient';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -38,6 +47,8 @@ interface AuthContextType {
     signUp: (email: string, password: string, options?: SignUpOptions) => Promise<SignUpResult>;
     logout: () => Promise<void>;
     updateProfile: (updates: Partial<Pick<AuthUser, 'name' | 'avatar'>>) => void;
+    /** Phase 4: this account's Rise Path data is gone (here: by 'self'; elsewhere: 'other'). Never resolves into the app again. */
+    endDeletedAccountSession: (outcome: { by: DeletedBy; at?: string | null }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -52,13 +63,30 @@ const GUEST_USER: AuthUser = {
 
 // Hydrate user data from backend after login. While the lesson progress adoption choice is open,
 // the device's legacy progress may be someone else's: hydrateFromApi would upload it into this
-// account, so it waits for the choice (chooseProgressAdoption runs it).
+// account, so it waits for the choice (chooseProgressAdoption runs it). It also waits for this page
+// load's lesson-progress GET (Phase 4, design §5.10): on a re-opened account that GET's epoch rule
+// clears the deleted account's legacy progress first; when the GET failed, nothing local is pushed.
 const hydrateUserData = async () => {
     try {
-        await Promise.all([progressChoicePending() ? Promise.resolve() : hydrateFromApi(), hydrateNotifications()]);
+        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known' })), hydrateNotifications()]);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
     }
+};
+
+/**
+ * What a deleted account leaves on this page and in this browser (design §5.11 steps 2–3): lesson
+ * progress (forgotten, no upload), the account's local keys and AI data (P-School and device
+ * preferences stay), the profile cache, the api identity. endDeletedAccountSession runs it before
+ * the sign-outs and again after them: meanwhile a token refresh inside signOut (TOKEN_REFRESHED →
+ * handleSession) writes rp_auth_user back and restarts the progress sync, and a lesson page may
+ * still write its records. Idempotent.
+ */
+const forgetDeletedAccountHere = () => {
+    forgetProgressAccount();
+    forgetDeletedAccountOnDevice();
+    clearUserProfileCache();
+    setAuthProvider(() => null);
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -233,7 +261,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (error) throw new Error(error.message);
 
             if (data.session) {
-                await hydrateUserData();
+                // Not awaited: the legacy hydrate waits for this page load's lesson-progress GET and
+                // its bounded retries (whenAccountKnown), which must not hold the sign-up screen.
+                // handleSession (SIGNED_IN) has started the same hydrate already.
+                void hydrateUserData();
                 try {
                     await apiPut('/user/profile', { display_name: displayName });
                     clearUserProfileCache();
@@ -284,6 +315,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }, []);
 
+    /**
+     * Phase 4 (design §5.11): the account's Rise Path data was deleted, here (by 'self', with the
+     * deletion time when known) or on another device or by staff ('other'). Not the logout below: its
+     * progress upload would only get 401, and its sign-out is global (Nexloom's sessions too).
+     * 1. hold the "deleted elsewhere" signal for good; 2–3. forget lesson progress (no upload) and
+     * clear what the account left in this browser; 4. sign this browser out of both clients, scope
+     * 'local' only, at most 5 s, and remove a stored session auth-js kept; 2–3 again, for what
+     * was written meanwhile; 5. a full load of the deleted page, the outcome in its URL (not in
+     * storage).
+     */
+    const endDeletedAccountSession = useCallback(async ({ by, at = null }: { by: DeletedBy; at?: string | null }) => {
+        markDeletionInFlight();
+        forgetDeletedAccountHere();
+        await signOutThisBrowser([getSupabaseClient(), getNexloomSupabaseClient()]);
+        forgetDeletedAccountHere();
+        // Already on the deleted page (a sign-in there within the 30 s margin, or a session that
+        // outlived the sign-out, answered 401 again): stay, so the page never reloads itself in a loop.
+        const path = window.location.pathname.replace(/\/+$/, '');
+        if (path.endsWith(ACCOUNT_DELETED_PATH)) return;
+        window.location.replace(accountDeletedUrl(import.meta.env.BASE_URL || '/', by, at));
+    }, []);
+
+    // The server answered 401 account_deleted to a request of this tab (services/apiClient.ts),
+    // outside a deletion made here: the account was deleted on another device or by staff.
+    useEffect(() => {
+        const onDeleted = () => {
+            void endDeletedAccountSession({ by: 'other' });
+        };
+        window.addEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
+        return () => window.removeEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
+    }, [endDeletedAccountSession]);
+
     const logout = useCallback(async () => {
         // First, so a failed remote sign-out still leaves no AI answers on a shared device.
         clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
@@ -314,6 +377,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signUp,
             logout,
             updateProfile,
+            endDeletedAccountSession,
         }}>
             {children}
         </AuthContext.Provider>

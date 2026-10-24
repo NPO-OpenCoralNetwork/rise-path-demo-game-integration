@@ -183,3 +183,6 @@ export const PlanConfirmView = lazy(
 export const CommerceDisclosureView = lazy(
   () => import('../features/legal/CommerceDisclosureView')
 );
+/** Phase 4 (account deletion): the delete page in Settings and the public page after a deletion. */
+export const DeleteAccountView = lazy(() => import('../features/settings/DeleteAccountView'));
+export const AccountDeletedView = lazy(() => import('../features/settings/AccountDeletedView'));

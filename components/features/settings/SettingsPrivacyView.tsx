@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowLeft, Brain, ChevronRight, Download, Shield, Trash2 } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { features } from '../../../config/features';
@@ -95,6 +96,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             aiMemoryKeptOptIn: 'Your earlier opt-in is still saved. You can turn it off.',
             loading: 'Loading…',
             errorGeneric: 'Something went wrong. Please try again.',
+            deleteAccountLead: 'To delete your whole account, use ',
+            deleteAccountLink: 'Delete account',
+            deleteAccountTail: '.',
         },
         jp: {
             back: '設定',
@@ -128,6 +132,9 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
             aiMemoryKeptOptIn: '以前のオンの設定が保存されています。オフにできます。',
             loading: '読み込み中…',
             errorGeneric: 'エラーが発生しました。もう一度お試しください。',
+            deleteAccountLead: 'アカウントごと消すときは、',
+            deleteAccountLink: '「アカウントを削除する」',
+            deleteAccountTail: 'から手続きできます。',
         },
     } as const;
 
@@ -250,6 +257,15 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                     <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
                     <p className="text-slate-500">{t.subtitle}</p>
                 </header>
+
+                {/* Phase 4 (D1): the whole account, not only these records. */}
+                <p className="text-body text-fg-2">
+                    {t.deleteAccountLead}
+                    <Link to="/settings/delete-account" className="rounded-chip font-medium text-primary-text underline underline-offset-4">
+                        {t.deleteAccountLink}
+                    </Link>
+                    {t.deleteAccountTail}
+                </p>
 
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                     {t.disclaimer}

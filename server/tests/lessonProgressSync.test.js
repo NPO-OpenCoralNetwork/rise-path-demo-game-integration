@@ -3,7 +3,8 @@
 // uploads of content differences only, chunks), pending markers and flush timing, the PUT response
 // rules (merge, marker removal, rejections, 409, 401/503, backoff), restarts after a stall,
 // refresh on a visible tab, logout clearing (and who owns what is left), keepalive size, delete,
-// single-flight, plus static checks of the wiring (AuthContext order, imports).
+// single-flight, plus static checks of the wiring (AuthContext order, imports). Phase 4: forget()
+// after an account deletion, the `restarted` rule of a re-opened account, and whenKnown().
 // Storage, API, timers and clock are fakes; the fake server merges with the real shared modules.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -173,7 +174,8 @@ function fakeApi({ epoch = null, rows = [], clock } = {}) {
       calls.push({ kind: 'get' });
       const step = await nextStep('get');
       if (step?.respond) return step.respond();
-      return { epoch: server.epoch, records: [...server.rows.values()].map(clone) };
+      // restarted: the account was deleted and opened again (Phase 4, server/routes/lessonProgress.js).
+      return { epoch: server.epoch, records: [...server.rows.values()].map(clone), ...(server.restarted ? { restarted: true } : {}) };
     },
     async put(body, { keepalive }) {
       calls.push({ kind: 'put', body: clone(body), keepalive, bytes: JSON.stringify(body).length, at: clock?.now() });
@@ -1418,6 +1420,161 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
   });
 });
 
+describe('progress sync: account deletion (Phase 4 design §5.10–5.11)', () => {
+  const EVENTS = JSON.stringify([{ id: 'e1', type: 'lesson_start', title: { en: 'Old', jp: '古い' } }]);
+  const LEGACY = JSON.stringify({ blender: { courseId: 'blender', completedStages: ['s1'], completedSteps: {} } });
+
+  it('forget() clears every lesson record, marker, the account, rp:lastLesson, learning events and legacy progress, and never uploads', async () => {
+    const t = syncedSetup({ epoch: E1 });
+    t.api.server.epoch = E1;
+    t.storage.setItem(LEARNING_EVENTS_KEY, EVENTS);
+    t.storage.setItem(LEGACY_PROGRESS_KEY, LEGACY);
+    t.storage.setItem('rp:reader-settings', '{}');
+    t.storage.setItem('playerData', '{"level":3}');
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    putLocal(t.storage, 'l2', record({ seen: ['c1'], updatedAt: iso(1) }));
+    t.storage.setItem(LAST_LESSON_KEY, JSON.stringify({ courseSlug: COURSE, lessonId: 'l1', title: 'x', pct: 10, at: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    t.sync.noteLocalWrite(COURSE, 'l2');
+    assert.equal(marker(t.storage, 'l1'), iso(1));
+    const accountEvents = t.events.account;
+    t.sync.forget();
+    assert.deepEqual([...t.storage.map.keys()].sort(), ['playerData', 'rp:reader-settings']);
+    assert.deepEqual(t.sync.getState(), { status: 'off', userId: null });
+    assert.ok(t.events.account > accountEvents, 'readers hear the account change');
+    // The scheduled flush, a page hide and a later refresh upload nothing.
+    t.sync.flushOnHide();
+    t.sync.refresh();
+    await t.clock.advance(10 * 60_000);
+    assert.equal(t.api.puts().length, 0);
+  });
+
+  it('forget() during an upload: the answer writes nothing back', async () => {
+    const t = syncedSetup({ epoch: E1 });
+    t.api.server.epoch = E1;
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    putLocal(t.storage, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    t.sync.noteLocalWrite(COURSE, 'l1');
+    const release = t.api.hold('put');
+    await t.clock.advance(6_000);
+    assert.equal(t.api.puts().length, 1);
+    t.sync.forget();
+    release();
+    await t.clock.advance(60_000);
+    assert.equal(getLocal(t.storage, 'l1'), null);
+    assert.equal(account(t.storage), null);
+    assert.equal(t.api.puts().length, 1);
+  });
+
+  it('a changed known epoch on a re-opened account (restarted) also clears learning events and legacy progress; a plain reset keeps them', async () => {
+    for (const restarted of [true, false]) {
+      const t = syncedSetup({ epoch: E1 });
+      t.api.server.epoch = E2;
+      t.api.server.restarted = restarted;
+      putLocal(t.storage, 'l1', record({ seen: ['b1'] }));
+      t.storage.setItem(LEARNING_EVENTS_KEY, EVENTS);
+      t.storage.setItem(LEGACY_PROGRESS_KEY, LEGACY);
+      t.sync.signIn(U1);
+      await t.sync.settled();
+      assert.equal(getLocal(t.storage, 'l1'), null, `restarted ${restarted}: records cleared`);
+      assert.deepEqual(account(t.storage), { userId: U1, epoch: E2 });
+      assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), restarted ? null : EVENTS, `restarted ${restarted}: learning events`);
+      assert.equal(t.storage.getItem(LEGACY_PROGRESS_KEY), restarted ? null : LEGACY, `restarted ${restarted}: legacy progress`);
+      assert.equal(t.api.puts().length, 0);
+    }
+  });
+
+  it("a '?' device after \"Add\" on a re-opened account keeps the adopted records and events, and uploads them", async () => {
+    const t = setup({ epoch: E2 });
+    t.api.server.restarted = true;
+    putLocal(t.storage, 'l1', record({ seen: ['b1', 'b2'] }));
+    t.storage.setItem(LEARNING_EVENTS_KEY, EVENTS);
+    t.storage.setItem(LEGACY_PROGRESS_KEY, LEGACY);
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'needs_choice');
+    assert.equal(t.sync.choose(true), true);
+    await t.sync.settled();
+    assert.deepEqual(getLocal(t.storage, 'l1').seen, ['b1', 'b2']);
+    assert.equal(t.storage.getItem(LEARNING_EVENTS_KEY), EVENTS);
+    assert.equal(t.storage.getItem(LEGACY_PROGRESS_KEY), LEGACY);
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: E2 });
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.api.puts()[0].body.epoch, E2);
+  });
+
+  it("a '?' device with fresh pending records keeps them on a re-opened account", async () => {
+    const storage = memoryStorage();
+    setAccount(storage, U1, '?');
+    const t = setup({ storage, epoch: E2 });
+    t.api.server.restarted = true;
+    putLocal(storage, 'l1', record({ seen: ['b1'], updatedAt: iso(-1) }));
+    storage.setItem(pendingKey(COURSE, 'l1'), iso(-1));
+    storage.setItem(LEARNING_EVENTS_KEY, EVENTS);
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    assert.deepEqual(getLocal(storage, 'l1').seen, ['b1']);
+    assert.equal(storage.getItem(LEARNING_EVENTS_KEY), EVENTS);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(marker(storage, 'l1'), null);
+  });
+
+  it("whenKnown(): 'known' after a successful GET, 'unknown' after the last failed retry, with no timer of its own", async () => {
+    const ok = syncedSetup();
+    ok.sync.signIn(U1);
+    const known = ok.sync.whenKnown();
+    await ok.sync.settled();
+    assert.equal(await known, 'known');
+    assert.equal(await ok.sync.whenKnown(), 'known');
+
+    const t = syncedSetup();
+    for (let i = 0; i <= SYNC_TIMING.getRetries; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: 503 }) });
+    let timersSet = 0;
+    const setTimeoutOf = t.clock.timers.setTimeout;
+    t.clock.timers.setTimeout = (fn, ms) => {
+      timersSet += 1;
+      return setTimeoutOf(fn, ms);
+    };
+    t.sync.signIn(U1);
+    await settle();
+    const before = timersSet;
+    let answer = null;
+    void t.sync.whenKnown().then((value) => {
+      answer = value;
+    });
+    await settle();
+    assert.equal(timersSet, before, 'whenKnown sets no timer');
+    assert.equal(answer, null, 'still waiting while the GET retries');
+    await t.clock.advance(60_000);
+    assert.equal(t.api.gets().length, 1 + SYNC_TIMING.getRetries);
+    assert.equal(t.sync.getState().status, 'offline');
+    assert.equal(answer, 'unknown');
+    assert.equal(await t.sync.whenKnown(), 'unknown');
+  });
+
+  it("whenKnown(): 'unknown' without sync (never signed in, waiting for the choice) and when forget() ends a waiting GET", async () => {
+    const off = setup();
+    assert.equal(await off.sync.whenKnown(), 'unknown');
+    const choice = setup();
+    putLocal(choice.storage, 'l1', record({ seen: ['b1'] }));
+    choice.sync.signIn(U1);
+    assert.equal(choice.sync.getState().status, 'needs_choice');
+    assert.equal(await choice.sync.whenKnown(), 'unknown');
+
+    const t = syncedSetup();
+    const release = t.api.hold('get');
+    t.sync.signIn(U1);
+    const waiting = t.sync.whenKnown();
+    t.sync.forget();
+    assert.equal(await waiting, 'unknown');
+    release();
+    await t.clock.advance(1_000);
+    assert.equal(account(t.storage), null, 'the late GET answer writes no account back');
+  });
+});
+
 describe('progress sync: the reader guard and ids', () => {
   it('isAccountSwitch: another learner, a logout or a changed known epoch; not the first hydrate', () => {
     const acc = (userId, epoch) => JSON.stringify({ userId, epoch });
@@ -1469,12 +1626,13 @@ describe('progress sync: wiring (static)', () => {
     assert.doesNotMatch(code, /\b(window|document)\./);
   });
 
-  it('AuthContext holds the legacy progress hydrate while the adoption choice is open', () => {
+  it('AuthContext holds the legacy progress hydrate while the adoption choice is open, and until this page load\'s GET settled', () => {
     const auth = read('context/AuthContext.tsx');
     const hydrate = auth.slice(auth.indexOf('const hydrateUserData'), auth.indexOf('export const AuthProvider'));
-    assert.match(hydrate, /progressChoicePending\(\) \? Promise\.resolve\(\) : hydrateFromApi\(\)/);
+    // Phase 4 (design §5.10): local-only legacy progress is pushed only after a successful GET.
+    assert.match(hydrate, /progressChoicePending\(\) \? Promise\.resolve\(\) : whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known' \}\)\)/);
     const client = read('components/lesson/progressSyncClient.ts');
-    assert.match(client, /if \(applied\) void hydrateFromApi\(\)/);
+    assert.match(client, /if \(applied\) void whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known' \}\)\)/);
   });
 
   it('AuthContext runs the owner rule for the primary session before setUser, and logout clears after the AI data line', () => {

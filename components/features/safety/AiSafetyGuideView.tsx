@@ -17,7 +17,8 @@ import { AI_ACCESS_SETUP_PATH, CONSENT_POLICY_VERSION } from '../../../services/
  *
  * Keep every statement true to the code: server/safety/* (age, consent, screening, pause),
  * server/routes/safety.js (reports), server/safety/events.js (retention), context/AuthContext.tsx
- * (logout clears AI answers kept in this browser). No invented facts.
+ * (logout clears AI answers kept in this browser), DeleteAccountView.tsx (the delete page; the
+ * server can turn deletion off, so the line only says where to go). No invented facts.
  */
 
 const LINKS = {
@@ -113,6 +114,7 @@ const copy = {
         },
         { text: 'AI answers are shown with a note that AI wrote them.' },
         { text: 'Our privacy policy and terms of use are being prepared. We will link them from this page once they are published.' },
+        { text: 'To delete your account, open Settings → Delete account.' },
         { text: 'If you have questions about this page, please ask the staff at the site where you use Rise Path.' },
       ],
     },
@@ -201,6 +203,7 @@ const copy = {
         },
         { text: 'AI がつくった答えには、AI がつくったことを表示します。' },
         { text: 'プライバシーポリシーと利用規約は、いま準備しています。公開したら、このページからリンクします。' },
+        { text: 'アカウントを削除するときは、設定の「アカウントを削除する」を開いてください。' },
         { text: 'このページについてのご質問は、ご利用の拠点のスタッフにお伝えください。' },
       ],
     },

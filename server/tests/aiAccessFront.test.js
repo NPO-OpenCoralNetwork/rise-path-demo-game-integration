@@ -105,8 +105,9 @@ describe('contract values', () => {
     assert.match(viewPaths, /'\/settings\/ai-access'/);
     assert.match(viewPaths, /'\/settings\/admin\/safety'/);
     assert.match(viewPaths, /'\/ai-safety'/);
-    // Public when signed out, like /aidj (and Phase 3's /legal/commerce, billingFront.test.js).
-    assert.match(read('App.tsx'), /PUBLIC_PATHS = new Set\(\['\/aidj', '\/ai-safety', '\/legal\/commerce'\]\)/);
+    // Public when signed out, like /aidj (and Phase 3's /legal/commerce, billingFront.test.js, and
+    // Phase 4's /account/deleted, accountDeletionFront.test.js).
+    assert.match(read('App.tsx'), /PUBLIC_PATHS = new Set\(\['\/aidj', '\/ai-safety', '\/legal\/commerce', '\/account\/deleted'\]\)/);
   });
 
   it('validates user ids for the admin lookup', () => {

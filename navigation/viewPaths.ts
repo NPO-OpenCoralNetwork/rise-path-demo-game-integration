@@ -49,6 +49,9 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_PLAN]: '/settings/plan',
   [ViewState.SETTINGS_PLAN_CONFIRM]: '/settings/plan/confirm',
   [ViewState.LEGAL_COMMERCE]: '/legal/commerce',
+  // Phase 4: deleting one's own account, and the public page after it (open when signed out).
+  [ViewState.SETTINGS_DELETE_ACCOUNT]: '/settings/delete-account',
+  [ViewState.ACCOUNT_DELETED]: '/account/deleted',
 
   // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',
