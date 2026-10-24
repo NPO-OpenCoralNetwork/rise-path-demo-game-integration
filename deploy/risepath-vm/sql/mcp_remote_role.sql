@@ -2,8 +2,8 @@
 -- byoa; doc/guides/byoa-setup.ja.md). The api, mcp and migrations keep using risepath_app, which
 -- the postgres image makes a superuser; the internet-facing mcp-public must not hold that.
 --
--- Run on the VM after the migrations (015 creates mcp_oauth_grants, 016 lesson_progress), from
--- deploy/risepath-vm:
+-- Run on the VM after the migrations (015 creates mcp_oauth_grants, 016 lesson_progress, 018
+-- account_deletions), from deploy/risepath-vm:
 --
 --   MCP_DB_PASSWORD="$(openssl rand -hex 24)"
 --   docker compose --env-file stack.env exec -T db \
@@ -17,6 +17,11 @@
 --
 -- What each grant is for (learner-remote profile, mcp-server/tool-registry.json):
 --   auth.users            the user-id stub (server/db.js ensureAuthUser: INSERT … ON CONFLICT DO NOTHING)
+--   account_deletions     the stub trigger and the token check: 018's trigger on auth.users reads
+--                         user_id and reopened_at as the inserting role (no stub for a deleted
+--                         account), and the verifier (mcp-server/oauthVerifier.js) refuses a deleted
+--                         account's tokens with deleted_at too. Columns user_id, deleted_at,
+--                         reopened_at; never requested_by. 018 grants the same when this role exists.
 --   mcp_oauth_grants      the verifier's revocation check and the (user, client) record with
 --                         first_seen_at and last_used_at (mcp-server/remote.js): columns user_id,
 --                         client_id, revoked_at, first_seen_at, last_used_at; it never writes
@@ -95,6 +100,7 @@ GRANT SELECT (user_id, client_id, revoked_at, first_seen_at, last_used_at) ON mc
 GRANT INSERT (user_id, client_id), UPDATE (first_seen_at, last_used_at) ON mcp_oauth_grants TO risepath_mcp_remote;
 GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;
 GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;
+GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;
 GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;
 GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;
 

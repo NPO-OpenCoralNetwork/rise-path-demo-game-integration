@@ -258,6 +258,7 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT INSERT (user_id, client_id), UPDATE (first_seen_at, last_used_at) ON mcp_oauth_grants TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;',

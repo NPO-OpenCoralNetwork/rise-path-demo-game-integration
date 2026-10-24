@@ -14,13 +14,23 @@
  *       is not 'authenticated'; tools/core/oauthToken.js) is never an app session: requireAuth
  *       answers 401 oauth_client_token, optionalAuth treats the caller as anonymous. Agents reach
  *       Rise Path only through the remote MCP endpoint (mcp-server/oauthVerifier.js).
+ *     - a Supabase session of a deleted Rise Path account (tools/core/accountDeletions.js: it signed
+ *       in no later than the deletion) is refused: requireAuth answers 401 account_deleted,
+ *       optionalAuth treats the caller as anonymous; neither recreates the auth.users stub. A
+ *       session that signed in after the deletion re-opens a new, empty account. When the check
+ *       cannot run (database error), requireAuth answers 503 auth_unavailable (fail closed).
+ *       req.accountGeneration is that account's generation (null unless it was re-opened; null on
+ *       the dev fallbacks too, as in bridgeAuth.js).
+ *       This release reads account_deletions on every signed-in request: apply migration 018
+ *       (npm run db:migrate) before starting the api, also on a local dev database.
  *
  * @module server/middleware/auth
  */
 
-import { PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
+import { getPool, PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
-import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
+import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../tools/core/oauthToken.js';
+import { readAccountState } from '../../tools/core/accountDeletions.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -103,11 +113,38 @@ export const OAUTH_CLIENT_TOKEN_REFUSAL = Object.freeze({
     error_type: 'oauth_client_token',
 });
 
+/** The 401 body for a session of a deleted Rise Path account (signed in before the deletion). */
+export const ACCOUNT_DELETED_REFUSAL = Object.freeze({
+    error: 'This Rise Path account was deleted. Sign in again to start a new, empty account.',
+    error_type: 'account_deleted',
+});
+
+/** The 503 body when the account check cannot run (database error): never let through. */
+export const AUTH_UNAVAILABLE = Object.freeze({
+    error: 'Sign-in cannot be checked right now. Please try again.',
+    error_type: 'auth_unavailable',
+});
+
+/**
+ * The account state for a Supabase session token that getUser accepted for userId
+ * (tools/core/accountDeletions.js). The app API may re-open a deleted account for a session that
+ * signed in after the deletion. Throws when the database cannot answer.
+ * @param {string} token
+ * @param {string} userId
+ */
+export const readSessionAccountState = (token, userId) => readAccountState(
+    getPool(),
+    userId,
+    sessionAuthTime(decodeTokenClaims(token)),
+    { mayReopen: true },
+);
+
 // ─── Middleware ──────────────────────────────────────────────
 
 /**
- * Require authentication. Sets req.userId and req.authMethod (and req.isAnonymous for a Supabase
- * session: true for an anonymous user).
+ * Require authentication. Sets req.userId, req.authMethod and req.accountGeneration
+ * (tools/core/accountDeletions.js: null on the dev fallbacks, whose PHASE1 user is never deleted),
+ * and for a Supabase session req.isAnonymous (true for an anonymous user).
  */
 export const requireAuth = async (req, res, next) => {
     const token = extractBearerToken(req);
@@ -117,6 +154,7 @@ export const requireAuth = async (req, res, next) => {
         if (allowDevAuthFallback()) {
             req.userId = PHASE1_USER_ID;
             req.authMethod = 'dev-fallback';
+            req.accountGeneration = null;
             await syncAuthUserStub(req.userId);
             return next();
         }
@@ -137,6 +175,7 @@ export const requireAuth = async (req, res, next) => {
         if (allowDevAuthFallback()) {
             req.userId = PHASE1_USER_ID;
             req.authMethod = 'no-supabase-fallback';
+            req.accountGeneration = null;
             console.warn('[Auth] Token provided but Supabase not configured. Using dev fallback.');
             await syncAuthUserStub(req.userId);
             return next();
@@ -153,8 +192,19 @@ export const requireAuth = async (req, res, next) => {
             if (error) console.warn('[Auth] token rejected:', error?.message || error);
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
+        // A session of a deleted account is refused before anything is written (no stub). Its own
+        // try: a database error is 503 auth_unavailable, not the generic 500 below.
+        let account;
+        try {
+            account = await readSessionAccountState(token, data.user.id);
+        } catch (err) {
+            console.warn('[Auth] account state check failed:', err?.message || err);
+            return res.status(503).json(AUTH_UNAVAILABLE);
+        }
+        if (account.state === 'deleted') return res.status(401).json(ACCOUNT_DELETED_REFUSAL);
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';
+        req.accountGeneration = account.generation;
         // An anonymous Supabase user (if the project ever enables anonymous sign-in) cannot sign
         // back in after losing the session: routes that keep records for a person (billing) refuse it.
         req.isAnonymous = data.user.is_anonymous === true;
@@ -167,7 +217,8 @@ export const requireAuth = async (req, res, next) => {
 };
 
 /**
- * Optional auth: set req.userId when a valid token is present; otherwise anonymous.
+ * Optional auth: set req.userId and req.accountGeneration (as requireAuth) when a valid token is
+ * present; otherwise anonymous (req.userId null, no generation).
  * Invalid or expired tokens do not block the request (unlike requireAuth).
  */
 export const optionalAuth = async (req, res, next) => {
@@ -189,6 +240,7 @@ export const optionalAuth = async (req, res, next) => {
         if (allowDevAuthFallback()) {
             req.userId = PHASE1_USER_ID;
             req.authMethod = 'no-supabase-fallback';
+            req.accountGeneration = null;
             await syncAuthUserStub(req.userId);
             return next();
         }
@@ -204,8 +256,22 @@ export const optionalAuth = async (req, res, next) => {
             req.authMethod = 'anonymous';
             return next();
         }
+        // A deleted account's session, or a check that cannot run, is anonymous (no stub).
+        let account;
+        try {
+            account = await readSessionAccountState(token, data.user.id);
+        } catch (err) {
+            console.warn('[Auth] optionalAuth account state check failed:', err?.message || err);
+            account = null;
+        }
+        if (!account || account.state === 'deleted') {
+            req.userId = null;
+            req.authMethod = 'anonymous';
+            return next();
+        }
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';
+        req.accountGeneration = account.generation;
         await syncAuthUserStub(req.userId);
         return next();
     } catch (err) {

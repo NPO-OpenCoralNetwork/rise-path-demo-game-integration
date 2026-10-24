@@ -17,18 +17,24 @@
  *    UUIDs; role 'authenticated'; is_anonymous !== true; numeric exp and iat.
  * 5. Not revoked: mcp_oauth_grants.revoked_at later than the token's iat for that user and client
  *    (the connected-apps page writes it before Supabase deletes the grant, and again after) is a
- *    401. A failed lookup is a 503 (fail closed). The answer is cached per (user, client, iat)
+ *    401. So is a deleted Rise Path account (account_deletions, migration 018): refused while it
+ *    is not re-opened (this endpoint never re-opens one), and for a session that signed in (newest
+ *    amr time, tools/core/oauthToken.js sessionAuthTime: for an agent the authorization time,
+ *    kept across refreshes) no later than deleted_at + 30 s, or that has no sign-in time. A failed
+ *    lookup is a 503 (fail closed). The answer is cached per (user, client, iat, auth time)
  *    and concurrent lookups share one query: this step runs before the per-minute limiters, so
  *    without the cache every request with a validly signed token, even one answered 429, would
  *    cost a database query. A 'not revoked' answer is reused for NOT_REVOKED_CACHE_MS only, so a
- *    revoke takes effect within a few seconds; a 'revoked' answer never turns back (revoked_at
- *    only moves forward) and is kept for REVOCATION_CACHE_MS.
+ *    revoke or an account deletion takes effect within a few seconds; a 'revoked' answer is kept
+ *    for REVOCATION_CACHE_MS (it turns back only when a deleted account is re-opened, for an agent
+ *    authorized after the deletion: that waits at most this long).
  *
- * Returns the SDK's AuthInfo: { token, clientId, scopes: [], expiresAt, extra: { userId } }.
+ * Returns the SDK's AuthInfo: { token, clientId, scopes: [], expiresAt, extra: { userId, iat, authTime } }.
  * Error messages are generic and never contain the token: they reach WWW-Authenticate.
  */
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { getPool } from '../server/db.js';
+import { sessionAuthTime } from '../tools/core/oauthToken.js';
 
 /** Supabase did not answer (JWKS fetch, getClaims network error) or the grants lookup failed: 503. */
 export class AuthUnavailableError extends Error {
@@ -43,7 +49,7 @@ export const JWKS_TTL_MS = 10 * 60 * 1000;
 export const UNKNOWN_KID_REFETCH_MS = 60 * 1000;
 /** While no keys could be fetched at all: retry this often, answering 503 in between. */
 const EMPTY_JWKS_RETRY_MS = 5 * 1000;
-/** How long a 'revoked' answer is reused for the same (user, client, iat). */
+/** How long a 'revoked' answer is reused for the same (user, client, iat, auth time). */
 export const REVOCATION_CACHE_MS = 30 * 1000;
 /**
  * How long a 'not revoked' answer is reused: the longest a disconnect can wait to apply on this
@@ -98,14 +104,24 @@ function isNetworkError(error) {
 }
 
 /**
- * The grants lookup: true when the token's user revoked this client after the token was issued.
- * @param {{ query: Function }} pool @param {{ userId: string, clientId: string, iat: number }} token
+ * The grants lookup: true when the token's user revoked this client after the token was issued,
+ * or when the token belongs to a deleted Rise Path account (account_deletions, migration 018: not
+ * re-opened, or this session signed in no later than deleted_at + 30 s, or it has no sign-in time;
+ * the same rule as tools/core/accountDeletions.js readAccountState without re-opening). The
+ * grants branch stays first, with $1-$3 where they were.
+ * @param {{ query: Function }} pool
+ * @param {{ userId: string, clientId: string, iat: number, authTime?: number | null }} token
  */
-export async function isGrantRevoked(pool, { userId, clientId, iat }) {
+export async function isGrantRevoked(pool, { userId, clientId, iat, authTime = null }) {
     const result = await pool.query(
         `SELECT 1 FROM mcp_oauth_grants
-         WHERE user_id = $1 AND client_id = $2 AND revoked_at IS NOT NULL AND revoked_at > to_timestamp($3)`,
-        [userId, clientId, iat],
+         WHERE user_id = $1 AND client_id = $2 AND revoked_at IS NOT NULL AND revoked_at > to_timestamp($3)
+         UNION ALL
+         SELECT 1 FROM account_deletions
+         WHERE user_id = $1
+           AND (reopened_at IS NULL OR $4::double precision IS NULL OR to_timestamp($4) <= deleted_at + interval '30 seconds')
+         LIMIT 1`,
+        [userId, clientId, iat, authTime],
     );
     return Boolean(result?.rows?.length);
 }
@@ -154,12 +170,12 @@ export function createOAuthVerifier({
     const revocations = new Map();
 
     /**
-     * isGrantRevoked, reused per (user, client, iat) for the entry's ttl; a failed lookup is not
-     * kept, so the next request asks again.
-     * @param {any} pool @param {{ userId: string, clientId: string, iat: number }} grant
+     * isGrantRevoked, reused per (user, client, iat, auth time) for the entry's ttl; a failed
+     * lookup is not kept, so the next request asks again.
+     * @param {any} pool @param {{ userId: string, clientId: string, iat: number, authTime: number | null }} grant
      */
     const revokedCached = (pool, grant) => {
-        const key = `${grant.userId}|${grant.clientId}|${grant.iat}`;
+        const key = `${grant.userId}|${grant.clientId}|${grant.iat}|${grant.authTime}`;
         const t = now();
         const hit = revocations.get(key);
         if (hit && t - hit.at < hit.ttl) return hit.answer;
@@ -276,17 +292,18 @@ export function createOAuthVerifier({
 
         const userId = claims.sub.toLowerCase();
         const clientId = claims.client_id.toLowerCase();
+        const authTime = sessionAuthTime(claims);
         const pool = poolFn();
         if (!pool) throw new AuthUnavailableError('Database not configured');
         let revoked;
         try {
-            revoked = await revokedCached(pool, { userId, clientId, iat: claims.iat });
+            revoked = await revokedCached(pool, { userId, clientId, iat: claims.iat, authTime });
         } catch (error) {
             throw new AuthUnavailableError('Grant lookup failed', error);
         }
         if (revoked) throw new InvalidTokenError('Access for this app was revoked');
 
-        return { token, clientId, scopes: [], expiresAt: claims.exp, extra: { userId, iat: claims.iat } };
+        return { token, clientId, scopes: [], expiresAt: claims.exp, extra: { userId, iat: claims.iat, authTime } };
     }
 
     return {

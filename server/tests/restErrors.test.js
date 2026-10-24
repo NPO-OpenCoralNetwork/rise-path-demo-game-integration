@@ -28,16 +28,25 @@ const EMPTY = { rowCount: 0, rows: [] };
 const norm = (sql) => String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The deleted-account check every signed-in request makes first (tools/core/accountDeletions.js). */
+const ACCOUNT_STATE_READ = 'select deleted_at, reopened_at from account_deletions';
+
 /**
  * Mock pool. Like Postgres, a parameter used as a uuid (CAST($n AS uuid), $n::uuid, or the
  * implicit cast of notifications.id = $1) that is not a UUID fails the statement with 22P02.
- * `fail`: every query throws SECRET; `connectFails`: pool.connect() rejects with it.
+ * `fail`: every query throws SECRET, except the deleted-account check of sign-in (no tombstone),
+ * so each route reaches its own failure; `failAccountState`: only that check throws SECRET;
+ * `connectFails`: pool.connect() rejects with it.
  */
-function createPool({ fail = false, connectFails = false } = {}) {
+function createPool({ fail = false, failAccountState = false, connectFails = false } = {}) {
     const queries = [];
     const run = async (sql, params = []) => {
         const text = norm(sql);
         queries.push({ sql: text, params });
+        if (text.startsWith(ACCOUNT_STATE_READ)) {
+            if (failAccountState) throw new Error(SECRET);
+            return EMPTY;
+        }
         if (fail) throw new Error(SECRET);
         const uuidParams = [...text.matchAll(/cast\(\$(\d+) as uuid\)|\$(\d+)::uuid/g)].map(([, a, b]) => Number(a ?? b));
         if (text.startsWith('update notifications set read = true where id = $1')) uuidParams.push(1);
@@ -266,6 +275,30 @@ describe('REST error answers', () => {
             assert.deepEqual(malformed.json, { error: 'Bad Request' });
             assertNoLeak(malformed, 'invalid JSON');
         });
+    });
+
+    it('a failed deleted-account check at sign-in is 503 auth_unavailable without the database text, and nothing is written', async () => {
+        const pool = createPool({ failAccountState: true });
+        setPoolForTests(pool);
+        const { warn } = console;
+        console.warn = () => {};
+        try {
+            await withServer(async (base) => {
+                // requireAuth (curricula) and requireBridgeOrAuth (life journal) both fail closed.
+                for (const urlPath of ['/curricula', '/life-journal/daily/2026-01-05?timezone=UTC']) {
+                    const result = await call(base, 'GET', urlPath);
+                    assert.equal(result.status, 503, `${urlPath}: ${result.text.slice(0, 300)}`);
+                    assert.deepEqual(result.json, {
+                        error: 'Sign-in cannot be checked right now. Please try again.',
+                        error_type: 'auth_unavailable',
+                    });
+                    assertNoLeak(result, urlPath);
+                }
+            });
+        } finally {
+            console.warn = warn;
+        }
+        assert.ok(pool.queries.length > 0 && pool.queries.every((q) => q.sql.startsWith(ACCOUNT_STATE_READ)), 'no stub insert and no route query after the failed check');
     });
 
     it("a rejected token is 401 without the auth provider's text", async () => {
