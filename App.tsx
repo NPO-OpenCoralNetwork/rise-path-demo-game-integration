@@ -100,6 +100,8 @@ import {
   CommerceDisclosureView,
   DeleteAccountView,
   AccountDeletedView,
+  TermsRoute,
+  PrivacyRoute,
 } from './components/routes/lazyRoutes';
 import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
@@ -108,7 +110,7 @@ const RETURN_TO_KEY = 'rp:returnTo';
 /** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
 const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
 /** Pages open when signed out; they render outside the Layout then. */
-const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/account/deleted']);
+const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/terms', '/privacy', '/account/deleted']);
 const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 /** Pages that finish a sign-in: when the session is already there, they forward like handleLoginSuccess. */
 const POST_SIGN_IN_PATHS = new Set(['/auth/callback', '/auth/confirm-pending']);
@@ -180,6 +182,8 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/settings/plan')) return ViewState.SETTINGS_PLAN;
     if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
     if (path.startsWith('/legal/commerce')) return ViewState.LEGAL_COMMERCE;
+    if (normalizePath(path) === '/terms') return ViewState.LEGAL_TERMS;
+    if (normalizePath(path) === '/privacy') return ViewState.LEGAL_PRIVACY;
     if (path === '/account/deleted') return ViewState.ACCOUNT_DELETED;
     if (path.startsWith('/settings/delete-account')) return ViewState.SETTINGS_DELETE_ACCOUNT;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
@@ -314,6 +318,9 @@ const AppContent: React.FC = () => {
                 <Route path="/ai-safety" element={<AiSafetyGuideView />} />
                 {/* Phase 3: 特定商取引法に基づく表記 (public; Stripe's commerce disclosure link). */}
                 <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+                {/* Phase 4: 利用規約 and プライバシーポリシー (LegalPagesOff unless VITE_FEATURE_LEGAL_PAGES=true). */}
+                <Route path="/terms" element={<TermsRoute />} />
+                <Route path="/privacy" element={<PrivacyRoute />} />
                 {/* Phase 4: after an account deletion (this device is signed out by then). */}
                 <Route path="/account/deleted" element={<AccountDeletedView />} />
               </Routes>
@@ -373,6 +380,8 @@ const AppContent: React.FC = () => {
               <Route path="/settings/plan/confirm" element={features.billing ? <PlanConfirmView /> : <Navigate to="/settings" replace />} />
               <Route path="/ai-safety" element={<AiSafetyGuideView />} />
               <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+              <Route path="/terms" element={<TermsRoute />} />
+              <Route path="/privacy" element={<PrivacyRoute />} />
               {/* Phase 4: delete one's own Rise Path account; the page after it (signed in again). */}
               <Route path="/settings/delete-account" element={<DeleteAccountView />} />
               <Route path="/account/deleted" element={<AccountDeletedView />} />

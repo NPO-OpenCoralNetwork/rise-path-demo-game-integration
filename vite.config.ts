@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
     if (secretEnvKeys.length) {
         console.warn(`[vite] Not exposing ${secretEnvKeys.join(', ')} to the client; model keys belong on the server.`);
     }
+    // Set by the legal-release-guard plugin once Vite has resolved the config (null until then).
+    const legalGuard: { clientIsDev: boolean | null } = { clientIsDev: null };
     return {
       base: appBasePath,
       server: {
@@ -41,7 +43,36 @@ export default defineConfig(({ mode }) => {
           ]
         }
       },
-      plugins: [react(), tailwindcss()],
+      plugins: [
+        react(),
+        tailwindcss(),
+        // Phase 4: a build that publishes the legal pages (VITE_FEATURE_LEGAL_PAGES=true, from a .env
+        // file or the host's env, e.g. Vercel) stops while the text is a draft or not archived. The
+        // problem list comes from scripts/legal/check-legal-release.mjs. Dev servers are not affected.
+        // A build whose client gets import.meta.env.DEV = true (NODE_ENV=development, or a .env file
+        // with NODE_ENV=development) would ship the draft text through the DEV branch of
+        // components/routes/lazyRoutes.tsx, so it stops too, unless LEGAL_DRAFT_PREVIEW_BUILD=true
+        // says it is a local draft preview that is never deployed.
+        {
+          name: 'legal-release-guard',
+          apply: 'build',
+          configResolved(config) {
+            legalGuard.clientIsDev = !config.isProduction;
+          },
+          async buildStart() {
+            if (legalGuard.clientIsDev !== false && process.env.LEGAL_DRAFT_PREVIEW_BUILD !== 'true') {
+              this.error(
+                `This build gives the client import.meta.env.DEV = true (NODE_ENV=${process.env.NODE_ENV ?? 'unset'}), so /terms and /privacy would ship the draft legal text. ` +
+                  'Build with NODE_ENV=production (npm run build:prod), or set LEGAL_DRAFT_PREVIEW_BUILD=true for a local draft preview that is never deployed.',
+              );
+            }
+            if (env.VITE_FEATURE_LEGAL_PAGES !== 'true') return;
+            const { legalReleaseProblems } = await import('./scripts/legal/check-legal-release.mjs');
+            const problems = await legalReleaseProblems({ root: path.resolve(__dirname) });
+            if (problems.length) this.error(`VITE_FEATURE_LEGAL_PAGES=true but the legal text is not publishable:\n- ${problems.join('\n- ')}`);
+          },
+        },
+      ],
       build: {
         chunkSizeWarningLimit: 600,
         rollupOptions: {

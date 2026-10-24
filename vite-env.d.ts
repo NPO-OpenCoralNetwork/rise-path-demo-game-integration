@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_FEATURE_AGENT_CHAT?: string;
   /** "true" shows the supporter plan's entry points and pages (config/features.ts → features.billing). Default off. */
   readonly VITE_FEATURE_BILLING?: string;
+  /** "true" publishes /terms and /privacy and the consent flow (config/features.ts → features.legalPages). Default off. */
+  readonly VITE_FEATURE_LEGAL_PAGES?: string;
   /** https URL or mailto: where deletion and other requests arrive (config/support.ts). Unset: "tell the staff". */
   readonly VITE_SUPPORT_CONTACT?: string;
 }
