@@ -34,6 +34,10 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Account data: learner data deletion goes through `server/services/accountDeletion.js` (staff:
   `scripts/delete-account-data.mjs`); account ids go through `canonicalUserId` and the `rp:account:`
   lock key is built from `<id>::uuid::text` (`tools/core/accountDeletions.js`). Retention: `server/services/retention.js`.
+- Phase 5: one-lesson reset `POST /api/v2/user/lesson-progress/lesson-reset` (per-lesson generation in
+  `lesson_progress_lesson_resets`, kept until the account is deleted, and in each local record's `lessonGen`;
+  never move `lesson_progress_resets` for one lesson); XP, badges and streak `GET /api/v2/user/achievements`
+  (`tools/core/achievements.js`, tables `xp_awards`, `learning_days`, migration 019, none granted to the MCP role).
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
@@ -69,5 +73,7 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.
 - No `git push --force`, and no rewriting shared history.
+- Don't compute XP or badges in the browser, award XP or learning days from `POST /user/events`, or write
+  XP inside a lesson-progress save transaction (reconcile from server records instead).
 - Don't merge, cherry-pick or patch in anything from the private personal repository; rebuild a
   feature as new commits on `main`. What not to port and why: `doc/brushup-2026/integration/do-not-port.ja.md`.

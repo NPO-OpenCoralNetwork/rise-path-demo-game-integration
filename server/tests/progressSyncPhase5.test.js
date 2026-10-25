@@ -176,6 +176,79 @@ describe('Phase 5 save view: the core', () => {
     assert.ok(t.api.server.rows.get(`${COURSE}:l1`));
   });
 
+  it('three 503s in a row are "stopped" whatever comes meanwhile: a refresh racing the first upload, focus refreshes, session events, an offline blip, storage events (in-app S1)', async () => {
+    const t = p5();
+    await on(t);
+    // As in the app's S1: an upload failed offline and went through once the browser was back online.
+    t.sync.networkChanged(false);
+    t.api.server.offline = true;
+    write(t, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    await t.clock.advance(SYNC_TIMING.flushDelayMs);
+    assert.equal(t.sync.getView().failures, 1);
+    t.api.server.offline = false;
+    t.sync.networkChanged(true);
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs);
+    assert.deepEqual([t.sync.getView().state, t.sync.getView().failures], ['saved', 0]);
+
+    // Every second: a focus or visibility refresh, a session event (TOKEN_REFRESHED, SIGNED_IN on
+    // refocus), an 'online' event while online, a storage event. None of them may reset the count.
+    const poke = () => {
+      t.sync.refresh();
+      t.sync.signIn(U1);
+      t.sync.networkChanged(true);
+      t.sync.storageChanged();
+    };
+    /** Three 503s from a write (seen block `block`): "saving", "saving", "stopped"; then the backoff's upload saves. */
+    async function threeFailures(block, { race }) {
+      for (let i = 0; i < 3; i += 1) t.api.script('put', fail(503, 'progress_unavailable'));
+      let release = null;
+      if (race) {
+        // A background refresh is on its way (the tab came back) when the learner answers.
+        release = t.api.hold('get');
+        t.sync.refresh();
+        assert.equal(t.sync.getState().status, 'hydrating');
+      }
+      write(t, 'l1', record({ seen: ['b1', block], updatedAt: new Date(t.clock.now()).toISOString() }));
+      const gets = t.api.gets().length;
+      const puts = t.api.puts().length;
+      release?.();
+      const counts = [];
+      let blip = false;
+      for (let i = 0; i < 300 && t.api.puts().length - puts < 3; i += 1) {
+        const before = t.api.puts().length;
+        poke();
+        if (!blip && t.api.puts().length - puts === 1) {
+          // An offline blip between the first and the second 503: "offline", then back to "saving".
+          blip = true;
+          t.sync.networkChanged(false);
+          assert.equal(t.sync.getView().state, 'offline');
+          t.sync.networkChanged(true);
+        }
+        await t.clock.advance(1_000);
+        if (t.api.puts().length > before) counts.push([t.sync.getView().failures, t.sync.getView().state]);
+      }
+      assert.ok(blip);
+      assert.equal(t.api.puts().length - puts, 3, 'three uploads, each answered 503');
+      assert.deepEqual(counts, [[1, 'saving'], [2, 'saving'], [3, 'stopped']]);
+      assert.deepEqual([t.sync.getView().state, t.sync.getView().reason, t.sync.getView().pending], ['stopped', 'server', 1]);
+      assert.equal(t.api.gets().length, gets, 'no GET meanwhile: nothing started the load again');
+      // It stays "stopped" while the events go on, until the backoff's next upload succeeds.
+      for (let i = 0; i < 10; i += 1) {
+        poke();
+        await t.clock.advance(1_000);
+        assert.equal(t.sync.getView().state, 'stopped');
+      }
+      await t.clock.advance(SYNC_TIMING.maxBackoffMs);
+      assert.deepEqual([t.sync.getView().state, t.sync.getView().failures], ['saved', 0]);
+      assert.ok(t.api.server.rows.get(`${COURSE}:l1`).progress.seen.includes(block));
+    }
+    await t.clock.advance(SYNC_TIMING.refreshAfterMs);
+    await threeFailures('b2', { race: true });
+    // Again with the last GET long ago: a focus refresh would be due if the backoff let it run.
+    await t.clock.advance(SYNC_TIMING.refreshAfterMs);
+    await threeFailures('b3', { race: false });
+  });
+
   it('network failures three times: "stopped" (network)', async () => {
     const t = p5();
     await on(t);

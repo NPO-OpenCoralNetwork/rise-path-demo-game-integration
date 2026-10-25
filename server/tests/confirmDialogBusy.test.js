@@ -5,7 +5,9 @@
 //   event) is refused: the action cannot be called back, so nothing may look as if it was;
 // - the delete section's trigger stays enabled while deleting, so the dialog can return focus to
 //   it however it closes (Chromium force-closes on a repeated Esc);
-// - its copy no longer says the streak is kept (the streak also counts the deleted records' days).
+// - its copy says what stays by scope (Phase 5, owner decision O2): signed in, the history, the XP
+//   record, badges, learning days (the streak, from the server's days) and the lessons started over
+//   are kept; on this device only (guests) the history. The streak no longer gets shorter.
 // There is no DOM here: the components are bundled with esbuild (as in agentChatError.test.js)
 // against a React stub whose jsx() returns { type, props } and whose hooks record what they
 // return, and the element trees are checked directly.
@@ -58,7 +60,7 @@ const STUBS = {
   dialog: "export const ConfirmDialog = 'ConfirmDialog';",
   sync: `
     export const deleteLessonProgress = async () => ({ ok: true, scope: 'account' });
-    export const useProgressSyncState = () => ({ status: 'on', userId: 'u1' });
+    export const useProgressSyncState = () => ({ status: 'on', userId: 'syncUser' in globalThis ? globalThis.syncUser : 'u1' });
   `,
 };
 
@@ -188,15 +190,29 @@ describe('LessonProgressDeleteSection', () => {
     assert.equal(dialog.props.returnFocusRef, trigger.props.ref);
   });
 
-  it('does not say the streak is kept (it also counts the days of the deleted records)', () => {
+  it('says what stays by scope: signed in, XP, badges, learning days and restarted lessons stay (O2); the streak no longer gets shorter', () => {
+    const kept = {
+      en: 'Not deleted: your learning history (lessons you started and finished), the record of the XP you earned (which lessons and stages you started or finished, and when), your badges, the days you learned (your streak), which lessons you started over and when, and records that AI apps saved with the learner-state tools.',
+      jp: '学習の履歴（レッスンを始めた・終えた記録）、XP の記録（どのレッスンやステージを始めた・終えたか、いつか）とバッジ、学んだ日の記録（連続記録）、やり直したレッスンとその日時、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。',
+    };
+    const device = {
+      en: 'Not deleted: your learning history (lessons you started and finished).',
+      jp: '学習の履歴（レッスンを始めた・終えた記録）は消えません。',
+    };
     for (const language of ['en', 'jp']) {
       globalThis.__language = language;
       try {
-        const text = textOf(mod.React.render(mod.Section, {}));
-        assert.match(text, language === 'en' ? /Your streak can get shorter/ : /連続記録は、.*短くなることがあります/);
-        assert.doesNotMatch(text, language === 'en' ? /Not deleted: your streak/ : /連続記録と学習の履歴/);
+        const account = textOf(mod.React.render(mod.Section, {}));
+        assert.ok(account.includes(kept[language]), `${language}: the signed-in kept line`);
+        assert.ok(!account.includes(device[language]), `${language}: not the device line`);
+        assert.doesNotMatch(account, /streak can get shorter|短くなることがあります/);
+        globalThis.syncUser = null;
+        const guest = textOf(mod.React.render(mod.Section, {}));
+        assert.ok(guest.includes(device[language]), `${language}: the device kept line`);
+        assert.doesNotMatch(guest, /XP|badges|バッジ|連続記録|learner-state|started over|やり直した/, `${language}: guests have none of these`);
       } finally {
         delete globalThis.__language;
+        delete globalThis.syncUser;
       }
     }
   });

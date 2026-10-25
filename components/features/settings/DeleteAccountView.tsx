@@ -54,7 +54,7 @@ const copy = {
     loading: 'Loading…',
     deletedTitle: 'What is deleted',
     deleted: [
-      'Lesson progress and answers, learning history',
+      'Lesson progress and answers, learning history, XP, badges, learning days and the lessons you started over',
       'Courses you made and materials you uploaded',
       'Life journal (diary and daily records)',
       'AI memories and AI chat settings',
@@ -128,7 +128,7 @@ const copy = {
     loading: '読み込んでいます…',
     deletedTitle: '消えるもの',
     deleted: [
-      '学習の進み具合と解答、学習の履歴',
+      '学習の進み具合と解答、学習の履歴、XP とバッジ、学んだ日、やり直したレッスンの記録',
       '作ったコースとアップロードした教材',
       'ライフジャーナル（日記と生活の記録）',
       'AI の記憶と AI チャットの設定',

@@ -18,7 +18,9 @@
  *
  * Not here on purpose (design §6.3): ai_safety_events (own prune, server/safety/events.js),
  * billing rows (tax), legal_document_versions (append-only, not personal), live accounts'
- * consents, learning events and profiles, generated images and the TTS cache.
+ * consents, learning events and profiles, live accounts' XP ledger, learning days and lesson reset
+ * rows (Phase 5, migration 019: kept while the account exists, deleted with it by the cascade),
+ * generated images and the TTS cache.
  *
  * Env (api only; none is a secret): RETENTION_ENABLED (false/0/off/no turn it all off; unset,
  * empty, true/1/on/yes leave it on; any other value turns it off with a warning: this job deletes;

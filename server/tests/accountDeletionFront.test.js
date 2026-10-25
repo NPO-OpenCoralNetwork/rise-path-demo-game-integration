@@ -963,12 +963,14 @@ describe('the delete page and the deleted page (rendered)', () => {
 
   it('the page says what is deleted and what stays; the AI apps line only when an app was used', () => {
     const text = textOf(render(pages.DeletionExplainer, { language: 'jp', usedApps: false }));
-    for (const line of ['消えるもの', '学習の進み具合と解答、学習の履歴', 'ライフジャーナル（日記と生活の記録）', 'この端末に保存された Rise Path の記録', '消えないもの', 'Nexloom と P-School と共通なので', 'P-School のゲームの記録', '（アカウント ID・版・日時だけ。5 年）', '決済サービス Stripe の記録にはアカウント ID が残ります', '最長 365 日', '今日の分だけ。30 日まで', 'バックアップ', 'ほかの端末では、次に開いたときにログアウトされ', '18 歳未満の方は、保護者の方といっしょに確かめてください。', 'ご利用の拠点のスタッフにお伝えください。']) {
+    for (const line of ['消えるもの', '学習の進み具合と解答、学習の履歴、XP とバッジ、学んだ日、やり直したレッスンの記録', 'ライフジャーナル（日記と生活の記録）', 'この端末に保存された Rise Path の記録', '消えないもの', 'Nexloom と P-School と共通なので', 'P-School のゲームの記録', '（アカウント ID・版・日時だけ。5 年）', '決済サービス Stripe の記録にはアカウント ID が残ります', '最長 365 日', '今日の分だけ。30 日まで', 'バックアップ', 'ほかの端末では、次に開いたときにログアウトされ', '18 歳未満の方は、保護者の方といっしょに確かめてください。', 'ご利用の拠点のスタッフにお伝えください。']) {
       assert.ok(text.includes(line), line);
     }
     assert.doesNotMatch(text, /使ったことのある AI アプリ/);
     assert.match(textOf(render(pages.DeletionExplainer, { language: 'jp', usedApps: true })), /使ったことのある AI アプリの名前と、使い始めた日・最後に使った日（3 年）/);
     assert.match(textOf(render(pages.DeletionExplainer, { language: 'en', usedApps: true })), /The names of AI apps you used/);
+    // Phase 5: the XP ledger, learning days and lesson reset rows cascade with the account (019).
+    assert.match(textOf(render(pages.DeletionExplainer, { language: 'en', usedApps: false })), /Lesson progress and answers, learning history, XP, badges, learning days and the lessons you started over/);
   });
 
   it('the payment line names no fixed period while privacy §8 leaves it open and no retention rule deletes billing rows', async () => {

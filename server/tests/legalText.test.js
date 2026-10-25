@@ -260,6 +260,26 @@ describe('the committed public texts (content/legal/*.ja.md)', () => {
     assert.doesNotMatch(inventory, /コース生成などのジョブ/u);
   });
 
+  it('the privacy policy and the inventory say what Phase 5 keeps: XP and learning days survive a reset or a delete (O2) and go with the account', () => {
+    const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
+    assert.match(privacy, /XP（経験値）の記録（どのレッスンやステージで、いつ、いくつ）と、学んだ日（日本時間の日付だけ）を当法人のサーバーに保存し/u);
+    assert.match(privacy, /「このレッスンを最初からやり直す」で、1 つのレッスンの記録だけを、すべての端末から消すこともできます。/u);
+    assert.match(privacy, /XP の記録と学んだ日の記録は、進み具合を消したりやり直したりしても残り、アカウントを削除するまで保存します。/u);
+    // The logout question is promised only where the code asks (logoutGuard.ts): a "sign in again"
+    // button (reason 'reauth') and an expired session never ask; their records stay all the same.
+    assert.match(privacy, /ご自分でログアウトするときに、まだサーバーへ送れていない進み具合があれば画面でお知らせし、ログアウトするかを選んでいただきます（そのあいだは、まだログアウトしていません）。/u);
+    assert.match(privacy, /もう一度ログインするためのボタン（「ログインし直す」など）を押したときや、ログインが切れたときは、おたずねしませんが、送れていない進み具合は上のとおり端末に残します。/u);
+    assert.doesNotMatch(privacy, /。ログアウトのときに、まだサーバーへ送れていない進み具合があれば/u, 'not every logout asks');
+    assert.doesNotMatch(privacy, /連続して学んだ日数などの表示に使います/u, 'the streak no longer comes from the history');
+    const inventory = read('doc/legal/ai-data-inventory.ja.md');
+    assert.match(inventory, /^\| XP・バッジ・学んだ日（Phase 5） \|/mu);
+    assert.match(inventory, /\*\*AI アプリからは読めません\*\*/u);
+    assert.match(inventory, /本人がログアウトするときに、まだサーバーへ送れていない記録があれば/u);
+    assert.match(inventory, /ログインが切れたとき、Nexloom だけのログインでは聞きません。/u);
+    // The three Phase 5 tables are all named (vmStackConfig.test.js pins that none is granted to the MCP role).
+    for (const table of ['lesson_progress_lesson_resets', 'xp_awards', 'learning_days']) assert.ok(inventory.includes(`\`${table}\``), table);
+  });
+
   it('the privacy policy names the processing records the code really writes (jobs: material indexing only)', () => {
     // POST /rag/index is the only jobs insert (type 'ingest'); the worker runs 'ingest' only.
     assert.match(read('server/jobWorker.js'), /'ingest'/);

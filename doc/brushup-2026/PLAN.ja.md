@@ -1091,7 +1091,7 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
     - 表紙は World のグラデーションと記号で生成する。画像を使う場合は `onError` で生成表紙に切り替える。`alt=""`。
     - 2 行で省略するタイトル、メタ情報（レッスン数・所要時間）、進捗バー。
   - `EmptyState.tsx`
-  - `ProgressCluster.tsx`（連続日数と Lv / XP は `gamificationService` の実データ。ゼロ状態の文言付き。`.tabular`）
+  - `ProgressCluster.tsx`（連続日数と Lv / XP は実データ。ゼロ状態の文言付き。`.tabular`。作った当時はブラウザの `gamificationService` から計算していました。Phase 5 からは、サーバーの記録から数えた値（`useAchievements`。[ai-access-plan.ja.md](ai-access-plan.ja.md) の 9 章）を出します）
 - **変更するファイル:**
   - `components/features/dashboard/MissionControlDashboard.tsx`
     - 見出しは `PageHeader`（ゴシックの H1「おかえりなさい、{name} さん」。字間を広げた小見出しは使わない）。
