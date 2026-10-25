@@ -1,6 +1,6 @@
 # 法務まわりの文書（doc/legal）
 
-> 更新日: 2026-10-24（Phase 4: 公開のページ、登録の同意、アカウントの削除、保存期間）
+> 更新日: 2026-10-25（Phase 4: 公開のページ、登録の同意、アカウントの削除、保存期間。画面からの削除ははじめ止まっていて、公開の前に使えるようにします）
 > このフォルダの文書は、どれも**下書き**です。法律の専門家の確認はまだです。
 > **一般の登録は、`VITE_FEATURE_LEGAL_PAGES=true` にするまで受け付けません（拠点とテスターだけ）。** 下の「ページを公開する手順」を見てください。
 
@@ -116,7 +116,7 @@ Anthropic の利用ポリシーは、18 歳未満を未成年とし、未成年�
 - [ ] 保護者がアカウントを登録する仕組み（年齢の線を決めてから）。
 - [x] AI の答えの近くに「AI が作った答えです。まちがえることがあります」と表示し、報告ボタンを付けます（Phase 0.5。`components/ui/AiNotice.tsx`）。
 - [ ] AI への入力欄に「個人情報を書かないでください」と案内します。
-- [x] アカウントの削除（Phase 4）。設定の「アカウントを削除する」から、パスワードを入れて、すぐに削除します。Rise Path のデータだけを消し、Nexloom と P-School と共通のログインは残します（ログインも消したい方は、スタッフが手で消します）。削除のあとも残すもの: 利用規約に同意した記録・保護者の同意の記録・削除した記録（アカウント ID・版・日時だけ、5 年）、使ったことのある AI アプリの記録（3 年）、お支払いの記録（アカウントとのつながりを外して。Stripe にはアカウント ID が残ります）、今日の AI の利用回数（30 日まで）、安全のための記録（つながりを外して、最長 365 日）、サーバーのログ。運用は [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md)。
+- [x] アカウントの削除（Phase 4）。設定の「アカウントを削除する」から、パスワードを入れて、すぐに削除します。**はじめは止まっています**（API の `ACCOUNT_DELETION_ENABLED` が未設定）。止まっているあいだは、スタッフが消します。利用規約 第 10 条 3 とプライバシーポリシー 9 の 4 は、画面から削除できる前提で書いているので、公開の前に使えるようにします（下の「ページを公開する手順」の 8）。Rise Path のデータだけを消し、Nexloom と P-School と共通のログインは残します（ログインも消したい方は、スタッフが手で消します）。削除のあとも残すもの: 利用規約に同意した記録・保護者の同意の記録・削除した記録（アカウント ID・版・日時だけ、5 年）、使ったことのある AI アプリの記録（3 年）、お支払いの記録（アカウントとのつながりを外して。Stripe にはアカウント ID が残ります）、今日の AI の利用回数（30 日まで）、安全のための記録（つながりを外して、最長 365 日）、サーバーのログ。運用は [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md)。
 - [x] 保存期間と、期限が来たら消す仕組み（Phase 4。`server/services/retention.js`、1 時間ごと）: AI の利用回数 30 日、処理の記録と AI アプリからの呼び出しの記録 1 年、削除したアカウントの同意の記録と削除の記録 5 年、AI アプリの記録 3 年、サーバーのログは 1 つのサービスあたり約 50 MB まで。安全の記録（365 日）と報告の文章（90 日）は Phase 0.5 から。使っていないアカウントは、自動では消しません。お支払いの記録の期間は、税理士の確認のあとで決めます。
 - [x] 共有の端末で、ログアウトのときに AI の答えをふくむブラウザの保存を消します（Phase 0.5。`services/sharedDeviceData.ts`）。
 
@@ -168,8 +168,9 @@ Anthropic の利用ポリシーは、18 歳未満を未成年とし、未成年�
 5. `node scripts/legal/build-legal-text.mjs` で公開の文を作り、表示された `sha256` を入れ、`node scripts/legal/build-legal-text.mjs --archive` で版の控えを `content/legal/archive/` に作ります。`node scripts/legal/check-legal-release.mjs` が何も出さなくなるまで直します。
 6. プルリクエストでマージします。Vercel が、すぐに画面（フロント）を作り直します。
 7. **同じ日に** `deploy-stack.sh` を実行して、API を新しくします。しばらくは新しい画面が古い API と動きますが、そのあいだ同意のページは出ません（止まることはありません）。
-8. Vercel で `VITE_FEATURE_LEGAL_PAGES=true` にして、Redeploy します。文に印が残っていると、ビルドが止まります（`vite.config.ts` の `legal-release-guard`）。
-9. 有料プランを始めるときは、`BILLING_TOS_URL` と Stripe の Public details（上の「有料プランを始める前に」）。
+8. **`VITE_FEATURE_LEGAL_PAGES=true` にする前に、ご本人の削除を使えるようにします。** 利用規約 第 10 条 3 とプライバシーポリシー 9 の 4 は、設定の「アカウントを削除する」から削除できる前提で書いています。ご本人の削除は、はじめ止まっています（API の `ACCOUNT_DELETION_ENABLED` が未設定）。[../brushup-2026/ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 8.2 の 2 と 3 を済ませてから、VM の `stack.env` に `ACCOUNT_DELETION_ENABLED=true` を書き、`deploy-stack.sh` を実行し直します。設定の「アカウントを削除する」を開き、「いまはこの画面から削除できません」が出ないことを確かめます（[../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) の 7 章）。止めたまま公開すると、規約が、使えない機能を約束することになります。止めたまま公開するときは、先に第 10 条 3 と 9 の 4 を、連絡先からスタッフが消す書き方に直し、版を新しくします（上の「公開の文の作り方」）。これも自動の確かめはありません（画面のビルドからは API の設定が見えないため）。
+9. Vercel で `VITE_FEATURE_LEGAL_PAGES=true` にして、Redeploy します。文に印が残っていると、ビルドが止まります（`vite.config.ts` の `legal-release-guard`）。
+10. 有料プランを始めるときは、`BILLING_TOS_URL` と Stripe の Public details（上の「有料プランを始める前に」）。
 
 公開のあとの動き: 登録画面に利用目的のお知らせ（`/privacy#section-3` への 1 クリック）と、外れた状態のチェックが出ます。前からのアカウントには、アプリを開いたときに同意のページが出ます。同意しなくても、保護者の AI の同意の取り消し、記録の削除、AI アプリの解除、プランの解約（`/settings/plan`）、アカウントの削除は、いつでもできます（`App.tsx` の `LEGAL_GATE_EXEMPT`）。同意は画面で求めるもので、API とリモートの MCP は、同意のない方を止めません（下の「弁護士に確かめること（Phase 4）」）。
 
