@@ -14,7 +14,12 @@
  * them to lesson_progress), the XP ledger (xp_awards, with the amount CHECK), learning days (Japan
  * time of the transaction's now()) and the legacy user_progress rows the Blender reconcile reads.
  * Any other statement naming xp_awards, learning_days or user_progress throws, like one naming
- * lesson_progress. `clock` (default: the real clock) gives each transaction its now().
+ * lesson_progress. `clock` (default: the real clock) gives each transaction its now() (a statement
+ * outside a transaction gets the clock at that statement). Stage 2: the achievements read (ledger,
+ * days, today) and the learning history (learning_events: the POST and GET of server/routes/user.js;
+ * any other statement naming it throws too). The XP lock records the key Postgres hashes ('xp:' and
+ * the canonical uuid text, xpLockKeys(); a non-uuid fails 22P02 as the cast does), and any other
+ * statement with an 'xp:' key throws.
  * `interleave(when, fn)` runs fn once right before the first statement `when` matches: another
  * connection's write that commits just then (an AI app's MCP write during a delete-all).
  * Not a test file (npm test runs *.test.js).
@@ -49,11 +54,17 @@ export const SQL = Object.freeze({
     selectRowsWithEpochs: 'select p.course_slug, p.lesson_id, p.progress, p.pct, p.state, p.content_hash, p.progress_updated_at, r.lesson_epoch, r.reset_at from lesson_progress p left join lesson_progress_lesson_resets r on r.user_id = p.user_id and r.course_slug = p.course_slug and r.lesson_id = p.lesson_id where p.user_id = $1 order by p.course_slug, p.lesson_id',
     upsertLessonEpoch: 'insert into lesson_progress_lesson_resets (user_id, course_slug, lesson_id) values ($1, $2, $3) on conflict (user_id, course_slug, lesson_id) do update set lesson_epoch = gen_random_uuid(), reset_at = now() returning lesson_epoch, reset_at',
     selectStoredRow: 'select progress, progress_updated_at from lesson_progress where user_id = $1 and course_slug = $2 and lesson_id = $3',
-    xpLock: "select pg_advisory_xact_lock(hashtext('xp:' || $1))",
+    xpLock: "select pg_advisory_xact_lock(hashtext('xp:' || $1::uuid::text))",
     xpReconcileLessons: "insert into xp_awards (user_id, source, item_key, milestone, xp) select p.user_id, 'lesson', p.course_slug || '/' || p.lesson_id, m.milestone, m.xp from lesson_progress p join (values ('start', 10), ('done', 40)) as m (milestone, xp) on m.milestone = 'start' or p.state in ('read', 'checked', 'mastered') where p.state <> 'not_started' and p.user_id = $1 order by 3, 4 on conflict (user_id, source, item_key, milestone) do nothing",
     deleteLessonsKeepingXp: "with gone as ( delete from lesson_progress where user_id = $1 returning user_id, course_slug, lesson_id, state ), awarded as ( insert into xp_awards (user_id, source, item_key, milestone, xp) select p.user_id, 'lesson', p.course_slug || '/' || p.lesson_id, m.milestone, m.xp from gone p join (values ('start', 10), ('done', 40)) as m (milestone, xp) on m.milestone = 'start' or p.state in ('read', 'checked', 'mastered') where p.state <> 'not_started' order by 3, 4 on conflict (user_id, source, item_key, milestone) do nothing ) select count(*)::int as deleted from gone",
     xpReconcileStages: "insert into xp_awards (user_id, source, item_key, milestone, xp) select distinct u.user_id, 'blender_stage', 'blender/' || s.stage, 'done', 80 from user_progress u cross join lateral unnest(u.completed_stages) as s (stage) where u.course_id = 'blender' and s.stage in ('1', '2', '3', '4') and u.user_id = $1 order by 3 on conflict (user_id, source, item_key, milestone) do nothing returning item_key",
     learningDay: "insert into learning_days (user_id, day) values ($1, (now() at time zone 'asia/tokyo')::date) on conflict (user_id, day) do nothing",
+    xpAwards: 'select source, item_key, milestone, xp from xp_awards where user_id = $1 order by source, item_key, milestone',
+    selectDays: "select to_char(day, 'yyyy-mm-dd') as day from learning_days where user_id = $1 order by day",
+    selectToday: "select to_char((now() at time zone 'asia/tokyo')::date, 'yyyy-mm-dd') as today",
+    // The learning history (server/routes/user.js): history only, never XP or a day.
+    eventsInsert: 'insert into learning_events (user_id, type, title, description) values ($1, $2, $3, $4) returning id, created_at as timestamp',
+    eventsSelect: 'select id, type, title, description, created_at as timestamp from learning_events where user_id = $1 order by created_at desc limit 50',
     // The legacy Blender progress routes (server/routes/user.js), which feed the stage awards.
     legacyProgressUpsert: 'insert into user_progress (user_id, course_id, completed_stages, completed_steps) values ($1, $2, $3, $4) on conflict (user_id, course_id) do update set completed_stages = $3, completed_steps = $4',
     legacyProgressSelect: 'select course_id, completed_stages, completed_steps from user_progress where user_id = $1',
@@ -111,6 +122,7 @@ function checkRow(row) {
 export function createLessonProgressPool({ rows = [], resets = {}, tombstones = {}, lessonResets = [], userProgress = [], awards = [], days = [], clock = () => new Date() } = {}) {
     const key = (user, course, lesson) => `${user}|${course}|${lesson}`;
     const awardKey = (user, source, item, milestone) => `${user}|${source}|${item}|${milestone}`;
+    const EVENT_TYPES = new Set(['lesson_start', 'lesson_complete', 'stage_complete', 'course_complete', 'diagnosis_complete', 'course_generated']);
     let state = {
         rows: new Map(rows.map((row) => [key(row.user_id, row.course_slug, row.lesson_id), {
             pct: 0,
@@ -136,17 +148,21 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
             return [awardKey(a.user_id, a.source, a.item_key, a.milestone), { ...a, awarded_at: new Date('2026-10-01T00:00:00Z') }];
         })),
         days: new Set(days.map((d) => `${d.user_id}|${d.day}`)),
+        /** learning_events rows, oldest first */
+        events: [],
     };
     let snapshot = null;
     /** now() of the open transaction (one value per transaction, as in Postgres), else null. */
     let txNow = null;
-    const now = () => txNow ?? new Date();
+    const now = () => txNow ?? clock();
     const queries = [];
     /** @type {{ when: (text: string) => boolean, fn: () => void } | null} */
     let interleaving = null;
     let failure = null;
     let connectFailure = null;
     const released = [];
+    /** The text each XP_LOCK_SQL hashed, in order ($1::uuid::text: lower case). */
+    const xpLockKeys = [];
 
     /** Inserts the lesson awards the given rows earn and the ledger lacks (ORDER BY item, milestone); returns how many. */
     const awardLessons = (user, rowsOf) => {
@@ -326,8 +342,13 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
                     ? { rowCount: 1, rows: [structuredClone({ progress: row.progress, progress_updated_at: row.progress_updated_at })] }
                     : { rowCount: 0, rows: [] };
             }
-            case SQL.xpLock:
+            case SQL.xpLock: {
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(p1))) {
+                    throw Object.assign(new Error(`invalid input syntax for type uuid: "${p1}"`), { code: '22P02' });
+                }
+                xpLockKeys.push(`xp:${String(p1).toLowerCase()}`);
                 return { rowCount: 1, rows: [{ pg_advisory_xact_lock: '' }] };
+            }
             case SQL.xpReconcileLessons:
                 return { rowCount: awardLessons(p1, [...state.rows.values()].filter((row) => row.user_id === p1)), rows: [] };
             case SQL.deleteLessonsKeepingXp: {
@@ -361,6 +382,29 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
                 state.days.add(k);
                 return { rowCount: 1, rows: [] };
             }
+            case SQL.xpAwards: {
+                const found = [...state.awards.values()].filter((a) => a.user_id === p1)
+                    .sort((a, b) => (a.source !== b.source ? (a.source < b.source ? -1 : 1) : a.item_key !== b.item_key ? (a.item_key < b.item_key ? -1 : 1) : a.milestone < b.milestone ? -1 : a.milestone > b.milestone ? 1 : 0))
+                    .map((a) => ({ source: a.source, item_key: a.item_key, milestone: a.milestone, xp: a.xp }));
+                return { rowCount: found.length, rows: found };
+            }
+            case SQL.selectDays: {
+                const found = [...state.days].filter((d) => d.startsWith(`${p1}|`)).map((d) => d.split('|')[1]).sort().map((day) => ({ day }));
+                return { rowCount: found.length, rows: found };
+            }
+            case SQL.selectToday:
+                return { rowCount: 1, rows: [{ today: jstDay(now()) }] };
+            case SQL.eventsInsert: {
+                if (!EVENT_TYPES.has(p2)) throw checkViolation('learning_events_type_check', 'learning_events');
+                const event = { id: randomUUID(), user_id: p1, type: p2, title: JSON.parse(p3), description: JSON.parse(p4), created_at: now() };
+                state.events.push(event);
+                return { rowCount: 1, rows: [{ id: event.id, timestamp: new Date(event.created_at) }] };
+            }
+            case SQL.eventsSelect: {
+                const found = state.events.filter((e) => e.user_id === p1).slice(-50).reverse()
+                    .map((e) => structuredClone({ id: e.id, type: e.type, title: e.title, description: e.description, timestamp: e.created_at }));
+                return { rowCount: found.length, rows: found };
+            }
             case SQL.legacyProgressUpsert:
                 state.userProgress.set(`${p1}|${p2}`, { completed_stages: [...(p3 ?? [])], completed_steps: JSON.parse(p4 ?? '{}') });
                 return { rowCount: 1, rows: [] };
@@ -370,7 +414,7 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
                 return { rowCount: found.length, rows: found };
             }
             default:
-                if (/lesson_progress|account_deletions|xp_awards|learning_days|user_progress/.test(text)) {
+                if (/lesson_progress|account_deletions|xp_awards|learning_days|user_progress|learning_events|'xp:'/.test(text)) {
                     throw new Error(`lessonProgressPool: unexpected statement: ${text} ${JSON.stringify([p1, p2, p3, p5, p6, p7, p8])}`);
                 }
                 return { rowCount: 0, rows: [] };
@@ -400,6 +444,10 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
         xpOf: (user) => [...state.awards.values()].filter((a) => a.user_id === user).reduce((n, a) => n + a.xp, 0),
         /** The learner's learning days (YYYY-MM-DD, Japan time), sorted (Phase 5). */
         daysOf: (user) => [...state.days].filter((d) => d.startsWith(`${user}|`)).map((d) => d.split('|')[1]).sort(),
+        /** The key text of every XP lock taken so far, in order (what hashtext hashed). */
+        xpLockKeys: () => [...xpLockKeys],
+        /** The learner's learning_events rows, oldest first (stage 2). */
+        eventsOf: (user) => state.events.filter((e) => e.user_id === user).map((e) => structuredClone(e)),
         /**
          * Statements (normalized) that touch lesson progress, the XP tables or their locks, in
          * order. The sign-in stub upsert (insert into auth.users) is not one of them.

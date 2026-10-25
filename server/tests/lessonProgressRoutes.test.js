@@ -37,8 +37,10 @@ const EPOCH = 'cccccccc-0000-4000-8000-000000000001';
 
 const record = (overrides = {}) => ({ v: 1, seen: [], answers: {}, checks: {}, lastBlockId: null, updatedAt: '2026-10-20T00:00:00.000Z', ...overrides });
 
+// The after-save hook (Phase 5 stage 2: XP and the learning day) is a no-op here, so the statement
+// pins below see only the save's own SQL (server/tests/lessonResetRoutes.test.js tests the hook).
 const withServer = async (handler) => {
-    const app = await createApp({ serveStatic: false });
+    const app = await createApp({ serveStatic: false, lessonProgress: { afterSave: () => {} } });
     const server = await new Promise((resolve) => {
         const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });

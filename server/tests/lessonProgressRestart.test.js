@@ -29,8 +29,8 @@ const auth = (t) => ({ Authorization: `Bearer ${t}` });
 const record = (overrides = {}) => ({ v: 1, seen: ['hook-b1'], answers: {}, checks: {}, lastBlockId: null, updatedAt: '2026-10-20T00:00:00.000Z', ...overrides });
 
 const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'TRUST_PROXY'];
-/** GET's capabilities (Phase 5 stage 1: the one-lesson reset). */
-const CAPABILITIES = { lessonReset: true };
+/** GET's capabilities (Phase 5: the one-lesson reset, stage 1; XP and badges, stage 2). */
+const CAPABILITIES = { lessonReset: true, achievements: true };
 
 async function call(url, { method = 'GET', headers = {}, body } = {}) {
     const init = { method, headers: { ...headers } };
@@ -44,7 +44,7 @@ async function call(url, { method = 'GET', headers = {}, body } = {}) {
 }
 
 const withServer = async (handler) => {
-    const app = await createApp({ serveStatic: false });
+    const app = await createApp({ serveStatic: false, lessonProgress: { afterSave: () => {} } });
     const server = await new Promise((resolve) => {
         const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });

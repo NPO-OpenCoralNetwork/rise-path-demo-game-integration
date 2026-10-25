@@ -7,14 +7,15 @@
  * and a per-user limit on writes. Not gated by AI access: progress is not an AI feature, so
  * minors keep it.
  *
- * GET    /  → { ok, epoch, capabilities: { lessonReset: true },
+ * GET    /  → { ok, epoch, capabilities: { lessonReset: true, achievements: true },
  *               records: [{ courseSlug, lessonId, progress, pct, state, updatedAt, lessonEpoch, lessonResetAt }] }
  *             epoch: the learner's reset epoch (null until the first DELETE). pct and state are
  *             the server's, against the published lesson. restarted: true (only then present, before
  *             capabilities) when the epoch was written by re-opening a deleted account (Phase 4): a
  *             device that knew another epoch clears its learning events too. capabilities (Phase 5):
- *             what this server offers (an older one sends none). lessonEpoch / lessonResetAt: the
- *             lesson's generation and when it was last started over (null, null: never).
+ *             what this server offers (an older one sends none): the one-lesson reset below, and
+ *             GET /api/v2/user/achievements (server/routes/achievements.js). lessonEpoch /
+ *             lessonResetAt: the lesson's generation and when it was last started over (null, null: never).
  * PUT    /  body { epoch: string | null, records: [{ courseSlug, lessonId, progress, lessonEpoch? }] } (1–25)
  *          → { ok, epoch, records, rejected: [{ courseSlug, lessonId, error_type, lessonEpoch?, lessonResetAt?, record? }] }
  *             Each record is sanitized and merged into the stored one (never stored as sent); the
@@ -26,6 +27,10 @@
  *             one): the lesson was started over since the device's copy was made.
  *             409 { error_type: 'progress_reset', epoch } when `epoch` is not the current one: the
  *             learner deleted their progress since this device loaded it. Nothing is saved.
+ *             After the answer, when a saved record's content changed and it is not not_started
+ *             (the learner learned something), the afterSave hook runs: by default
+ *             tools/core/achievements.js noteLearning (XP and today as a learning day, Phase 5). It
+ *             never changes the answer, and its failure is only logged.
  *             400 { error_type: 'validation' } for a malformed body (a lessonEpoch that is present
  *             must be null or a uuid).
  * POST   /lesson-reset  body { epoch: string | null, courseSlug, lessonId } (Phase 5)
@@ -57,6 +62,7 @@ import {
   resetLessonProgress,
   saveLessonProgress,
 } from '../../tools/core/lessonProgress.js';
+import { noteLearning } from '../../tools/core/achievements.js';
 
 /** Largest PUT body (25 records; the client keeps its batches well under this). */
 export const LESSON_PROGRESS_BODY_LIMIT = '256kb';
@@ -114,16 +120,38 @@ export function lessonProgressBodyErrors(err, req, res, next) {
 }
 
 /** What this server offers the reader (GET capabilities; an older server sends none). */
-export const LESSON_PROGRESS_CAPABILITIES = Object.freeze({ lessonReset: true });
+export const LESSON_PROGRESS_CAPABILITIES = Object.freeze({ lessonReset: true, achievements: true });
 
 /** @param {unknown} value */
 const isUuidOrNull = (value) => value === null || isUuid(value);
 
 /**
- * @param {{ writeLimiter?: import('express').RequestHandler }} [options]
- *   writeLimiter: runs before PUT, DELETE and POST /lesson-reset (server.js passes a per-user rate limiter)
+ * @typedef {(params: { userId: string }) => unknown} AfterSave
  */
-export function createLessonProgressRouter({ writeLimiter } = {}) {
+
+/**
+ * Runs the after-save hook without waiting for it: a throw or a rejection is logged, never
+ * answered (the save was already answered).
+ * @param {AfterSave} afterSave
+ * @param {string} userId
+ */
+function runAfterSave(afterSave, userId) {
+  /** @param {unknown} error */
+  const log = (error) => console.warn('[lessonProgress] after-save hook failed:', /** @type {any} */ (error)?.code ?? 'error');
+  try {
+    Promise.resolve(afterSave({ userId })).catch(log);
+  } catch (error) {
+    log(error);
+  }
+}
+
+/**
+ * @param {{ writeLimiter?: import('express').RequestHandler, afterSave?: AfterSave }} [options]
+ *   writeLimiter: runs before PUT, DELETE and POST /lesson-reset (server.js passes a per-user rate limiter)
+ *   afterSave: called after a PUT that taught something was answered (default noteLearning; route
+ *   tests pass a no-op or a recorder: server.js createApp({ lessonProgress: { afterSave } }))
+ */
+export function createLessonProgressRouter({ writeLimiter, afterSave = noteLearning } = {}) {
   const router = express.Router();
   /** @type {import('express').RequestHandler} */
   const limitWrites = writeLimiter ?? ((req, res, next) => next());
@@ -167,6 +195,7 @@ export function createLessonProgressRouter({ writeLimiter } = {}) {
       return failed(res, result);
     }
     res.json({ ok: true, epoch: result.epoch, records: result.records, rejected: result.rejected });
+    if (result.learned) runAfterSave(afterSave, userIdOf(req));
   });
 
   router.post('/lesson-reset', limitWrites, async (req, res) => {

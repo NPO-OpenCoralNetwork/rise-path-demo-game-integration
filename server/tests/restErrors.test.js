@@ -170,6 +170,10 @@ const FAILING_ROUTES = [
     ['DELETE', '/life-journal/data', { confirm: 'DELETE', scope: 'all' }, 500, 'Failed to delete life journal data'],
     ['POST', '/life-journal/advice?timezone=UTC', { from: '2026-01-01', to: '2026-01-07' }, 500, 'Failed to fetch life journal advice'],
     ['PUT', `/user/notifications/${GOOD}/read`, {}, 500, 'Failed to mark read'],
+    // Phase 5: XP and badges, and the learning history (with error_type now).
+    ['GET', '/user/achievements', undefined, 500, 'XP and badges could not be read.'],
+    ['GET', '/user/events', undefined, 500, 'Failed to load events'],
+    ['POST', '/user/events', { type: 'lesson_start', title: { en: 'Started: x', jp: '開始: x' }, description: {} }, 500, 'Failed to add event'],
 ];
 
 describe('REST error answers', () => {

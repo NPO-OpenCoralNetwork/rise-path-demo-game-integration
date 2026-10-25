@@ -141,6 +141,19 @@ describe('server.js /api/v2 mounts (production)', () => {
         });
     });
 
+    it('the achievements and learning-history mounts (Phase 5) want a JWT, not the bridge token', async () => {
+        await withApp(undefined, async (base) => {
+            for (const [method, path] of [['GET', '/api/v2/user/achievements'], ['GET', '/api/v2/user/events'], ['POST', '/api/v2/user/events']]) {
+                const init = method === 'POST'
+                    ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lesson_start', title: {}, description: {} }) }
+                    : { method };
+                assert.equal((await fetch(`${base}${path}`, init)).status, 401, `${method} ${path} without a JWT`);
+                const viaBridge = await fetch(`${base}${path}`, { ...init, headers: { ...init.headers, ...bridge } });
+                assert.equal(viaBridge.status, 401, `${method} ${path} bridge`);
+            }
+        });
+    });
+
     it('a connected agent\'s OAuth token is refused on JWT, bridge/JWT and LLM mounts', async () => {
         const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
         const agentToken = `${b64({ alg: 'ES256', kid: 'k1' })}.${b64({
@@ -149,7 +162,7 @@ describe('server.js /api/v2 mounts (production)', () => {
         })}.c2ln`;
         const agent = { Authorization: `Bearer ${agentToken}` };
         await withApp(undefined, async (base) => {
-            for (const path of ['/api/v2/user/connected-apps', '/api/v2/user/ai-access', '/api/v2/user/lesson-progress', '/api/v2/user/account/deletion', '/api/v2/user/legal', '/api/v2/curricula', '/api/v2/learner-memory', '/api/v2/agent/health']) {
+            for (const path of ['/api/v2/user/connected-apps', '/api/v2/user/ai-access', '/api/v2/user/lesson-progress', '/api/v2/user/account/deletion', '/api/v2/user/legal', '/api/v2/user/achievements', '/api/v2/user/events', '/api/v2/curricula', '/api/v2/learner-memory', '/api/v2/agent/health']) {
                 const response = await fetch(`${base}${path}`, { headers: agent });
                 assert.equal(response.status, 401, path);
                 assert.equal((await response.json()).error_type, 'oauth_client_token', path);

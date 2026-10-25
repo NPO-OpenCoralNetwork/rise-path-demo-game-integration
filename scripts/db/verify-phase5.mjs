@@ -27,15 +27,21 @@
  *       functions (applyQuizCheck, markLessonProgress, getLessonProgress) work on a restarted lesson;
  *       the REST read with the generations is refused (control)
  *   P5  two reconciles of one learner at once: the second waits on the XP lock, no deadlock, no
- *       duplicate; a reset and a reconcile in both orders: no deadlock
+ *       duplicate; a reset and a reconcile in both orders: no deadlock. Stage 2: the achievements
+ *       read (getAchievements) waits for a reset holding the XP lock and then counts what the reset
+ *       kept; reads, the two after-save hooks and a reset all at once: no deadlock, each award once;
+ *       the XP lock is one per learner whatever the id's case (a reset sent with the upper-case id
+ *       waits for a transaction holding it under the lower-case id)
  *   P6  delete-all keeps the reset rows, the ledger and the days; then the kept generation saves and
  *       null is refused with lessonResetAt and no record. An AI app's write (the MCP writers lock only
  *       their row) that commits while delete-all waits for the row: the row is deleted as written,
  *       with its awards. Control: the earlier order (reconcile, then a plain DELETE) loses 'done'
- *   P7  deleting the stub cascades all three tables; an insert afterwards fails 23503
+ *   P7  deleting the stub cascades all three tables; an insert afterwards fails 23503, and the
+ *       after-save hooks then only log (false), never throw
  *   P8  the backfill on seeded lesson_progress, user_progress and learning_events: the expected
  *       awards and days (the Japan-time day boundary, never diagnosis or course generation); a
- *       re-run adds nothing
+ *       re-run adds nothing; the achievements read then shows exactly the backfill (XP, counts,
+ *       days, today from the server clock in Japan time) and adds nothing
  *   P9  every statement of the previous api image (before Phase 5) runs on the migrated schema
  *   P10 a reset and an account deletion (server/services/accountDeletion.js lock, lockStub,
  *       deleteStub) in both orders: no deadlock, the deletion completes; deletion first → the reset
@@ -62,7 +68,9 @@ import {
     resetLessonProgress,
     saveLessonProgress,
 } from '../../tools/core/lessonProgress.js';
-import { BLENDER_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL } from '../../tools/core/achievements.js';
+import {
+    BLENDER_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL, getAchievements, noteBlenderProgress, noteLearning,
+} from '../../tools/core/achievements.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
@@ -406,6 +414,81 @@ async function p5(pool) {
     }
 }
 
+/**
+ * Stage 2: the achievements read against a reset that holds the XP lock, then everything at once;
+ * then the XP lock's key against the case of the id.
+ * @param {pg.Pool} pool
+ */
+async function p5Read(pool) {
+    {
+        const inst = instrument(pool);
+        const user = await learner(pool, 'p5a');
+        const hold = inst.holdBefore((text) => text === 'commit');
+        const resetP = resetLessonProgress({ userId: user, epoch: null, courseSlug: COURSE, lessonId: LESSON });
+        await hold.reached;
+        const t0 = Date.now();
+        const readP = getAchievements({ userId: user }).then((r) => ({ r, waited: Date.now() - t0 }));
+        await sleep(HOLD_MS - LEAD_MS);
+        hold.release();
+        const reset = await resetP;
+        const { r: read, waited } = await readP;
+        const ok = !('error_type' in reset) && !('error_type' in read) && !inst.state.errors.includes('40P01');
+        check('P5', ok && waited >= BLOCKED_MS && /** @type {any} */ (read).xp.total === 10 && /** @type {any} */ (read).counts.lessonsStarted === 1,
+            `the achievements read waited ${waited} ms for a reset holding the XP lock, then counted what the reset kept: ${/** @type {any} */ (read).xp?.total ?? /** @type {any} */ (read).error_type} XP (start 10 of the restarted lesson)`);
+    }
+    const rounds = 4;
+    const bad = [];
+    for (let round = 0; round < rounds; round += 1) {
+        const inst = instrument(pool);
+        const user = await learner(pool, `p5g${round}`);
+        await pool.query("INSERT INTO user_progress (user_id, course_id, completed_stages) VALUES ($1, 'blender', ARRAY['1', '2'])", [user]);
+        const [a, b, lesson, stage, reset, c] = await Promise.all([
+            getAchievements({ userId: user }),
+            getAchievements({ userId: user }),
+            noteLearning({ userId: user }),
+            noteBlenderProgress({ userId: user }),
+            resetLessonProgress({ userId: user, epoch: null, courseSlug: COURSE, lessonId: LESSON }),
+            getAchievements({ userId: user }),
+        ]);
+        const after = await getAchievements({ userId: user });
+        const awards = (await pool.query("SELECT source || ' ' || item_key || ' ' || milestone AS a FROM xp_awards WHERE user_id = $1 ORDER BY 1", [user])).rows.map((r) => r.a);
+        const days = await count(pool, 'SELECT count(*) AS n FROM learning_days WHERE user_id = $1', [user]);
+        const reads = [a, b, c, after];
+        const fine = reads.every((r) => !('error_type' in r)) && lesson === true && stage === true && !('error_type' in reset)
+            && !inst.state.errors.includes('40P01') && inst.state.errors.length === 0
+            && awards.join('|') === 'blender_stage blender/1 done|blender_stage blender/2 done|lesson vibe-coding/vibe-ch1 start'
+            && /** @type {any} */ (after).xp.total === 170 && days === 1
+            && reads.every((r) => [10, 160, 170].includes(/** @type {any} */ (r).xp?.total));
+        if (!fine) bad.push(`round ${round}: reads ${reads.map((r) => /** @type {any} */ (r).xp?.total ?? /** @type {any} */ (r).error_type).join('/')}, hooks ${lesson}/${stage}, reset ${/** @type {any} */ (reset).error_type ?? 'ok'}, errors [${inst.state.errors.join(',')}], awards ${awards.join('; ')}, days ${days}`);
+    }
+    check('P5', bad.length === 0, bad.length ? bad.join(' || ') : `${rounds} rounds of three achievements reads, noteLearning, noteBlenderProgress and a reset of one learner at once: no deadlock or error, each award once (170 XP), one learning day`);
+    // The lock key is the canonical uuid text: a transaction holding the XP lock under the lower-case
+    // id (a read or a hook) makes a reset sent with the upper-case id wait. It holds nothing else.
+    {
+        const inst = instrument(pool);
+        const user = await learner(pool, 'p5c');
+        const c = await pool.connect();
+        try {
+            await c.query('BEGIN');
+            await c.query(XP_LOCK_SQL, [user]);
+            const t0 = Date.now();
+            const resetP = resetLessonProgress({ userId: user.toUpperCase(), epoch: null, courseSlug: COURSE, lessonId: LESSON })
+                .then((r) => ({ r, waited: Date.now() - t0 }));
+            await sleep(HOLD_MS - LEAD_MS);
+            await c.query('COMMIT');
+            const { r, waited } = await resetP;
+            const n = await count(pool, 'SELECT count(*) AS n FROM xp_awards WHERE user_id = $1', [user]);
+            check('P5', !('error_type' in r) && waited >= BLOCKED_MS && inst.state.errors.length === 0 && n === 1,
+                `one XP lock per learner whatever the id's case: a reset sent with the upper-case id waited ${waited} ms for a transaction holding the lock under the lower-case id (${/** @type {any} */ (r).error_type ?? 'ok'}; ${n} award)`);
+        } catch (error) {
+            await c.query('ROLLBACK').catch(() => {});
+            check('P5', false, `XP lock and the id's case: ${/** @type {any} */ (error).code} ${/** @type {Error} */ (error).message}`);
+        } finally {
+            c.release();
+        }
+    }
+}
+
 /** @param {pg.Pool} pool */
 async function p6(pool) {
     instrument(pool);
@@ -490,7 +573,7 @@ async function deleteAllBefore(pool, userId) {
 
 /** @param {pg.Pool} pool */
 async function p7(pool) {
-    instrument(pool);
+    const inst = instrument(pool);
     const id = await learner(pool, 'p7');
     await resetLessonProgress({ userId: id, epoch: null, courseSlug: COURSE, lessonId: LESSON });
     await pool.query(LEARNING_DAY_SQL, [id]);
@@ -504,6 +587,15 @@ async function p7(pool) {
         await codeOf(pool.query(LEARNING_DAY_SQL, [id])),
     ];
     check('P7', codes.every((c) => c === '23503'), `inserts for the deleted account fail their foreign key: ${codes.join(', ')}`);
+    // A save answered just before the deletion: its after-save hooks run on a deleted account.
+    // noteLearning's day fails its foreign key (logged, false); noteBlenderProgress finds no
+    // user_progress row (it cascaded too) and writes nothing.
+    const errorsBefore = inst.state.errors.length;
+    const notes = await quietly(async () => [await noteLearning({ userId: id }), await noteBlenderProgress({ userId: id })]);
+    const left = await Promise.all(TABLES.map((t) => count(pool, `SELECT count(*) AS n FROM ${t} WHERE user_id = $1`, [id])));
+    const hookErrors = inst.state.errors.slice(errorsBefore);
+    check('P7', notes[0] === false && hookErrors.join() === '23503' && left.every((x) => x === 0),
+        `after the deletion the after-save hooks never throw: noteLearning ${notes[0]} (${hookErrors.join(', ') || 'no error'}, logged), noteBlenderProgress ${notes[1]}; nothing written (${left.join(', ')})`);
 }
 
 /** @param {pg.Pool} pool */
@@ -538,6 +630,19 @@ async function p8(pool) {
     check('P8', gotDays.join() === wantDays.join(), `backfilled days (Japan time; 14:59:59Z → the 24th, 15:00:00Z → the 25th; a clock ahead → today ${today}; no diagnosis or generation day): ${gotDays.join(', ')}`);
     await applyMigration(pool, '019_phase5_learning.sql');
     check('P8', (await awards()).join('|') === got.join('|') && (await days()).join() === gotDays.join(), 'a re-run of 019 adds nothing');
+    // Stage 2: the achievements read shows the backfill as it is, and adds nothing.
+    instrument(pool);
+    const read = /** @type {any} */ (await getAchievements({ userId: id.toUpperCase() }));
+    const firstCourse = read.badges?.find((/** @type {any} */ b) => b.id === 'first_course');
+    const fiveLessons = read.badges?.find((/** @type {any} */ b) => b.id === 'five_lessons');
+    check('P8', !read.error_type && read.learnerId === id
+        && JSON.stringify(read.xp) === JSON.stringify({ total: 270, level: 3, intoLevel: 70, levelSize: 100, toNextLevel: 30 })
+        && JSON.stringify(read.counts) === JSON.stringify({ lessonsStarted: 3, lessonsDone: 2, stagesDone: 2 })
+        && read.streak?.today === today && read.streak?.timeZone === 'Asia/Tokyo' && read.streak?.activeToday === true && read.streak?.best >= 2
+        && fiveLessons?.current === 4 && fiveLessons?.earned === false
+        && firstCourse?.course === 'blender' && firstCourse?.current === 2 && firstCourse?.goal === 4,
+        `the achievements read of the backfilled learner: ${read.xp?.total ?? read.error_type} XP, level ${read.xp?.level}, counts ${JSON.stringify(read.counts)}, today ${read.streak?.today} (server, Japan time), best ${read.streak?.best}, five_lessons ${fiveLessons?.current}/5, first_course ${firstCourse?.course} ${firstCourse?.current}/${firstCourse?.goal}`);
+    check('P8', (await awards()).join('|') === got.join('|') && (await days()).join() === gotDays.join(), 'the read added no award and no day (the backfill already held them)');
 }
 
 /** @param {pg.Pool} pool */
@@ -730,6 +835,7 @@ export async function main(argv = process.argv.slice(2)) {
         roleRan = true;
         await p4(pool, url);
         await p5(pool);
+        await p5Read(pool);
         await p6(pool);
         await p7(pool);
         await p8(pool);

@@ -51,7 +51,8 @@ describe('verify-phase5: options and exit codes', () => {
         for (const name of ['resetLessonProgress', 'saveLessonProgress', 'deleteAllLessonProgress', 'applyQuizCheck', 'markLessonProgress', 'getLessonProgress', 'ACCOUNT_STUB_SHARE_SQL', 'RESET_LESSON_EPOCH_SQL']) {
             assert.match(source, new RegExp(`\\b${name}\\b[\\s\\S]*from '\\.\\./\\.\\./tools/core/lessonProgress\\.js'`), name);
         }
-        assert.match(source, /import \{ BLENDER_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL \} from '\.\.\/\.\.\/tools\/core\/achievements\.js';/);
+        assert.match(source, /import \{\n {4}BLENDER_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL, getAchievements, noteBlenderProgress, noteLearning,\n\} from '\.\.\/\.\.\/tools\/core\/achievements\.js';/);
+        assert.match(source, /await p5Read\(pool\);/, 'stage 2: the achievements read and the hooks on Postgres');
         assert.match(source, /import \{ SQL as DELETION_SQL \} from '\.\.\/\.\.\/server\/services\/accountDeletion\.js';/);
         assert.match(source, /'deploy', 'risepath-vm', 'sql', 'mcp_remote_role\.sql'/);
         assert.match(source, /spawnSync\('psql', \['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', `mcp_password=\$\{password\}`, '-d', url, '-f', ROLE_SQL\]/);
