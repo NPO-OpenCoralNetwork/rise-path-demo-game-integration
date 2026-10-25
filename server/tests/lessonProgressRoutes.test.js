@@ -125,11 +125,13 @@ describe('/api/v2/user/lesson-progress', () => {
                 pct: 5,
                 state: 'in_progress',
                 updatedAt: '2026-10-20T00:00:00.000Z',
+                lessonEpoch: null,
+                lessonResetAt: null,
             }]);
             const bob = await call(base, { headers: as('bob') });
             assert.equal(bob.json.epoch, EPOCH);
             assert.deepEqual(bob.json.records.map((r) => r.progress.seen), [['s1-b1']]);
-            const reads = pool.queries.filter((q) => q.sql === SQL.selectEpoch || q.sql === SQL.selectRows);
+            const reads = pool.queries.filter((q) => q.sql === SQL.selectEpoch || q.sql === SQL.selectRowsWithEpochs);
             assert.deepEqual(reads.map((q) => [q.sql === SQL.selectEpoch ? 'epoch' : 'rows', q.params]), [
                 ['epoch', [ALICE]], ['rows', [ALICE]], ['epoch', [BOB]], ['rows', [BOB]],
             ], 'the epoch is read before the rows; the user id comes from the token only');
@@ -160,7 +162,7 @@ describe('/api/v2/user/lesson-progress', () => {
             assert.equal(merged.updatedAt, '2026-10-21T00:00:00.000Z');
             assert.deepEqual(pool.row(ALICE, VIBE, CH1).progress, merged.progress);
             assert.deepEqual(pool.row(BOB, VIBE, CH1).progress.seen, ['s1-b1'], 'Bob untouched');
-            assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.selectEpoch, SQL.insertPlaceholder, SQL.lockRow, SQL.updateRow, 'commit']);
+            assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.selectEpoch, SQL.selectLessonEpochs, SQL.insertPlaceholder, SQL.lockRow, SQL.updateRow, 'commit']);
             const update = pool.queries.find((q) => q.sql === SQL.updateRow);
             assert.deepEqual(update.params.slice(0, 3), [ALICE, VIBE, CH1]);
             assert.equal(update.params[6], ch1.hash, 'content_hash = the catalog lesson the pct/state came from');
@@ -260,7 +262,8 @@ describe('/api/v2/user/lesson-progress', () => {
             assert.deepEqual([insert.params[0], insert.params[1], insert.params[2].length], [ALICE, 'vibe-coding', completedStages.length]);
             const get = await call(legacy, { headers: as('alice') });
             assert.equal(get.status, 200, get.text);
-            assert.deepEqual(get.json, { ok: true, progress: {} });
+            assert.deepEqual(Object.keys(get.json.progress), ['vibe-coding']);
+            assert.equal(get.json.progress['vibe-coding'].completedStages.length, completedStages.length, 'the legacy row as stored');
             assert.equal(pool.progressStatements().length, 0, 'lesson_progress untouched');
         });
     });

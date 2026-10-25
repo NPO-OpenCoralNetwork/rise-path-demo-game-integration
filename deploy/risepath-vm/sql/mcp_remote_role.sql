@@ -43,7 +43,8 @@
 --                         progress, record quiz answers and sections read (INSERT … ON CONFLICT DO
 --                         NOTHING, then SELECT … FOR UPDATE and UPDATE). No DELETE: only the learner's
 --                         delete control in the app removes rows, together with lesson_progress_resets,
---                         which this role cannot read or write
+--                         which this role cannot read or write (nor lesson_progress_lesson_resets: a
+--                         lesson started over in the app reads like an untouched one here)
 --   learning_journal      journal-recent, journal-log, learner-adaptation-signals (tools/core/journal.js)
 --   curricula             ownership check for journal-log and journal-recent (read only): columns
 --                         id, user_id, title, never the generated course content
@@ -53,8 +54,11 @@
 --                         material_chunks only the columns the search reads
 --   mcp_tool_calls        the per-call log (mcp-server/createMcpServer.js, insert only)
 -- Nothing else: no life journal, learner memory, learner profiles, agent session bindings,
--- curriculum writes or admin tables. Grants are per table or per column, so a table or column
--- added later is not reachable until it is listed here.
+-- curriculum writes or admin tables. Grants are per table or per column. A table added later is not
+-- reachable until it is listed here, but a column added to a table granted whole (auth.users,
+-- ai_daily_usage, user_progress, lesson_progress, learning_journal, mcp_tool_calls) is reachable at
+-- once, so per-learner state this role must not see goes into its own table (Phase 5:
+-- lesson_progress_lesson_resets, xp_awards, learning_days).
 
 \set ON_ERROR_STOP on
 

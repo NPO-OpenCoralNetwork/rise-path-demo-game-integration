@@ -13,6 +13,12 @@
  * - deleteAllLessonProgress (REST): the learner's "delete my lesson progress"; it also moves the
  *   reset epoch, so a device that still holds old records gets 409 progress_reset on its next save
  *   instead of uploading them again.
+ * - resetLessonProgress (REST, Phase 5): starts ONE lesson over. It empties that lesson's row (a
+ *   tombstone, written even for a lesson never opened) and moves the lesson's own generation
+ *   (lesson_progress_lesson_resets.lesson_epoch); the account epoch above is never touched, so other
+ *   lessons and devices are unaffected. A saved record must name the lesson's current generation
+ *   (lessonEpoch; none or null for a lesson never started over), else that record is refused
+ *   'lesson_reset', so a device holding the old record cannot merge it back.
  * - applyQuizCheck (MCP course-quiz-check): grades on the server with the reader's attempt rules
  *   (shared/lesson/grading.js). A wrong answer is a normal result, never an error_type.
  * - markLessonProgress (MCP course-progress-update): marks sections read, only once their check
@@ -25,17 +31,30 @@
  * then lock it (SELECT … FOR UPDATE), so two writers of one lesson merge one after the other.
  * REST saves and the delete also take a per-user advisory lock, which orders them against each
  * other (no deadlock between a multi-row save and the delete) and makes the epoch check exact.
- * The MCP functions need neither: they touch one row and never read lesson_progress_resets, so
- * the remote role (deploy/risepath-vm/sql/mcp_remote_role.sql) has no grant on it.
+ * The MCP functions need neither: they touch one row and never read lesson_progress_resets or
+ * lesson_progress_lesson_resets, so the remote role (deploy/risepath-vm/sql/mcp_remote_role.sql) has
+ * no grant on them. The reset and the delete take the account stub's KEY SHARE lock right after the
+ * advisory lock, before any row lock, as account deletion takes the stub before the rows it cascades
+ * to (server/services/accountDeletion.js): a reset can never hold a row lock while it waits for the
+ * stub. Owner decision O2 (earned XP stays, tools/core/achievements.js): the reset reconciles XP
+ * after it locked the row and before it empties it; the delete awards from exactly the rows it
+ * deletes, in the DELETE statement itself, because the MCP writers lock only their row (a row an
+ * AI app changes while the delete runs is deleted together with what it earned; one it adds after
+ * the DELETE started stays). A save never writes XP. A REST save takes no stub lock: a save of
+ * several records can still deadlock with an account deletion (it holds a row, then a new row's
+ * foreign key check waits for the stub the deletion holds); Postgres ends one of the two (40P01:
+ * the save answers 500 and the client retries, or the deletion fails and is run again).
  *
  * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
  */
 import { getPool } from '../../server/db.js';
 import { isUuid } from '../../server/utils/ids.js';
 import { classifyDbError } from './dbErrors.js';
+import { inTransaction, noDatabase } from './dbTransaction.js';
+import { deleteLessonsKeepingXp, reconcileLessonXp } from './achievements.js';
 import { getPublishedLesson, isSafeSlug } from './courseCatalog.js';
 import { answerKey, emptyProgress, isAnswered, lessonPct, lessonState, parseProgress } from '../../shared/lesson/progress.js';
-import { mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
+import { mergeProgress, progressContentEqual, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
 import { applyReveal, applySubmission, isCorrectChoice, normalizeChoice, quizFeedback } from '../../shared/lesson/grading.js';
 import { learnerLocale, optionIdForLabel } from '../../shared/lesson/learnerView.js';
 
@@ -45,8 +64,8 @@ import { learnerLocale, optionIdForLabel } from '../../shared/lesson/learnerView
  * @typedef {import('../../shared/lesson/progress.js').LessonStateName} LessonStateName
  * @typedef {import('../../shared/lesson/progressMerge.js').QuestionEntry} QuestionEntry
  * @typedef {import('./courseCatalog.js').PublishedLesson} PublishedLesson
- * @typedef {{ error: string, error_type: string }} CoreError
- * @typedef {{ query: (sql: string, params?: unknown[]) => Promise<{ rows: any[], rowCount: number | null }> }} Queryable
+ * @typedef {import('./dbTransaction.js').CoreError} CoreError
+ * @typedef {import('./dbTransaction.js').Queryable} Queryable
  *
  * @typedef {object} StoredRecord
  * @property {string} courseSlug
@@ -55,6 +74,12 @@ import { learnerLocale, optionIdForLabel } from '../../shared/lesson/learnerView
  * @property {number} pct
  * @property {LessonStateName} state
  * @property {string} updatedAt
+ * @property {string | null} [lessonEpoch] the lesson's generation (REST only; null: never started over)
+ * @property {string | null} [lessonResetAt] when it was last started over (server clock), or null
+ *
+ * @typedef {{ courseSlug: string | null, lessonId: string | null, error_type: string,
+ *   lessonEpoch?: string | null, lessonResetAt?: string | null, record?: StoredRecord }} RejectedRecord
+ *   lessonEpoch, lessonResetAt and (when the row exists) record come only with 'lesson_reset'
  */
 
 /** Largest stored record, in bytes of its jsonb text (the lesson_progress CHECK). */
@@ -71,6 +96,40 @@ export const SAVE_BATCH_MAX = 25;
  */
 export const RESTARTED_SQL = `SELECT EXISTS (SELECT 1 FROM account_deletions d WHERE d.user_id = $1::uuid
    AND d.reopened_at = (SELECT r.reset_at FROM lesson_progress_resets r WHERE r.user_id = d.user_id)) AS restarted`;
+
+/** Orders a learner's REST saves, resets and delete against each other (transaction advisory lock). */
+export const LEARNER_LOCK_SQL = "SELECT pg_advisory_xact_lock(hashtext('lesson_progress:' || $1))";
+
+/**
+ * The account stub, KEY SHARE: taken by the reset and the delete right after LEARNER_LOCK_SQL and
+ * before any row lock. Account deletion takes the stub FOR UPDATE before it deletes it (and with it,
+ * by cascade, the progress rows), so whichever of the two takes the stub first goes first.
+ */
+export const ACCOUNT_STUB_SHARE_SQL = 'SELECT 1 FROM auth.users WHERE id = $1 FOR KEY SHARE';
+
+/** The learner's lesson generations (REST saves, under LEARNER_LOCK_SQL). */
+export const LESSON_EPOCHS_SQL = 'SELECT course_slug, lesson_id, lesson_epoch, reset_at FROM lesson_progress_lesson_resets WHERE user_id = $1';
+
+/** A new generation for one lesson (its first reset inserts the row). */
+export const RESET_LESSON_EPOCH_SQL = `INSERT INTO lesson_progress_lesson_resets (user_id, course_slug, lesson_id) VALUES ($1, $2, $3)
+  ON CONFLICT (user_id, course_slug, lesson_id) DO UPDATE SET lesson_epoch = gen_random_uuid(), reset_at = now()
+  RETURNING lesson_epoch, reset_at`;
+
+/**
+ * The stored record of one lesson, returned with a 'lesson_reset' rejection (under LEARNER_LOCK_SQL).
+ * pct and state are recomputed against the published lesson (storedRecordOf), as GET does.
+ */
+export const STORED_RECORD_SQL = `SELECT progress, progress_updated_at FROM lesson_progress
+  WHERE user_id = $1 AND course_slug = $2 AND lesson_id = $3`;
+
+/** REST GET only: rows and lesson generations in one statement (one snapshot), after the account epoch. */
+export const ROWS_WITH_LESSON_EPOCHS_SQL = `SELECT p.course_slug, p.lesson_id, p.progress, p.pct, p.state, p.content_hash,
+       p.progress_updated_at, r.lesson_epoch, r.reset_at
+  FROM lesson_progress p
+  LEFT JOIN lesson_progress_lesson_resets r
+    ON r.user_id = p.user_id AND r.course_slug = p.course_slug AND r.lesson_id = p.lesson_id
+ WHERE p.user_id = $1
+ ORDER BY p.course_slug, p.lesson_id`;
 
 /** Stored in a placeholder row until the same transaction writes the real record. */
 const PLACEHOLDER = JSON.stringify(emptyProgress());
@@ -97,9 +156,6 @@ export function progressTextBytes(value) {
 
 /** @param {string} message @returns {CoreError} */
 const invalid = (message) => ({ error: message, error_type: 'validation' });
-
-/** @returns {CoreError} */
-const noDatabase = () => ({ error: 'DB not configured', error_type: 'db_connection' });
 
 /** An argument echoed in an error message, short and quoted. @param {unknown} value */
 const quote = (value) => JSON.stringify(String(value).slice(0, 80));
@@ -131,42 +187,6 @@ const laterIso = (a, b) => ((Date.parse(b) || 0) > (Date.parse(a) || 0) ? b : a)
  * @param {LessonProgress} progress
  */
 const summaryOf = (entry, progress) => ({ pct: lessonPct(entry.lesson, progress), state: lessonState(entry.lesson, progress) });
-
-/**
- * Runs `work` in one transaction on its own connection. `work` decides whether to commit (a
- * read-only outcome rolls back, which also drops a placeholder row it inserted). Resolves to the
- * value `work` returned, or a CoreError when a statement failed.
- * @param {string} operation
- * @param {(db: Queryable) => Promise<{ commit: boolean, value: any }>} work
- * @returns {Promise<any>}
- */
-async function inTransaction(operation, work) {
-    const pool = getPool();
-    if (!pool) return noDatabase();
-    /** @type {any} */
-    let client;
-    try {
-        client = await pool.connect();
-    } catch (err) {
-        return classifyDbError(/** @type {any} */ (err), operation);
-    }
-    let broken = false;
-    try {
-        await client.query('BEGIN');
-        const { commit, value } = await work(client);
-        await client.query(commit ? 'COMMIT' : 'ROLLBACK');
-        return value;
-    } catch (err) {
-        try {
-            await client.query('ROLLBACK');
-        } catch {
-            broken = true;
-        }
-        return classifyDbError(/** @type {any} */ (err), operation);
-    } finally {
-        client.release(broken);
-    }
-}
 
 /**
  * Locks the learner's row for a lesson, creating a placeholder when there is none.
@@ -219,7 +239,37 @@ async function writeRow(db, userId, entry, progress) {
 }
 
 /** @param {Queryable} db @param {string} userId */
-const lockUser = (db, userId) => db.query("SELECT pg_advisory_xact_lock(hashtext('lesson_progress:' || $1))", [userId]);
+const lockUser = (db, userId) => db.query(LEARNER_LOCK_SQL, [userId]);
+
+/**
+ * A lesson's generation as the API states it: the epoch (null: never started over) and when.
+ * @typedef {{ epoch: string | null, at: string | null }} LessonGeneration
+ */
+
+/** @type {LessonGeneration} */
+const NEVER_RESET = Object.freeze({ epoch: null, at: null });
+
+/**
+ * The record a 'lesson_reset' rejection carries: the stored one, with the lesson's generation. pct
+ * and state are computed against the published lesson, so they match what the next GET answers
+ * even when the lesson changed since the row was written.
+ * @param {PublishedLesson} entry
+ * @param {{ progress: unknown, progress_updated_at: unknown }} row
+ * @param {LessonGeneration} gen
+ * @returns {StoredRecord}
+ */
+function storedRecordOf(entry, row, gen) {
+    const progress = parseProgress(row.progress);
+    return {
+        courseSlug: entry.courseSlug,
+        lessonId: entry.lesson.id,
+        progress,
+        ...summaryOf(entry, progress),
+        updatedAt: isoOf(row.progress_updated_at) ?? progress.updatedAt,
+        lessonEpoch: gen.epoch,
+        lessonResetAt: gen.at,
+    };
+}
 
 // ─── Read ──────────────────────────────────────────────────────
 
@@ -230,11 +280,16 @@ const lockUser = (db, userId) => db.query("SELECT pg_advisory_xact_lock(hashtext
  *
  * @param {{ userId: string, courseSlug?: string, lessonId?: string, withEpoch?: boolean }} params
  *   withEpoch: also read the reset epoch (the REST API; the MCP role cannot read it) and, when
- *   there is one, whether it is the epoch of a re-opened deleted account (RESTARTED_SQL)
+ *   there is one, whether it is the epoch of a re-opened deleted account (RESTARTED_SQL); every
+ *   record then also carries its lesson's generation (lessonEpoch, lessonResetAt; null for a lesson
+ *   never started over), read with the rows in one statement (ROWS_WITH_LESSON_EPOCHS_SQL). It reads
+ *   every course: it cannot be combined with courseSlug. Without it (every MCP caller) the SQL never
+ *   names lesson_progress_resets or lesson_progress_lesson_resets.
  * @returns {Promise<{ epoch?: string | null, restarted?: boolean, records: StoredRecord[] } | CoreError>}
  */
 export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoch = false }) {
     if (!isUuid(userId)) return invalid('A signed-in learner is required.');
+    if (withEpoch && (courseSlug !== undefined || lessonId !== undefined)) return invalid('withEpoch reads every course: pass no course_slug or lesson_id.');
     if (courseSlug !== undefined && !isSafeSlug(courseSlug)) return invalid(`Invalid course_slug ${quote(courseSlug)}.`);
     if (lessonId !== undefined && (courseSlug === undefined || !isSafeSlug(lessonId))) {
         return invalid(courseSlug === undefined ? 'lesson_id needs course_slug.' : `Invalid lesson_id ${quote(lessonId)}.`);
@@ -253,13 +308,15 @@ export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoc
             if (epoch) restarted = (await pool.query(RESTARTED_SQL, [userId]))?.rows?.[0]?.restarted === true;
         }
         const params = [userId, ...(courseSlug !== undefined ? [courseSlug] : []), ...(lessonId !== undefined ? [lessonId] : [])];
-        const { rows } = await pool.query(
-            `SELECT course_slug, lesson_id, progress, pct, state, content_hash, progress_updated_at
-               FROM lesson_progress
-              WHERE user_id = $1${courseSlug !== undefined ? ' AND course_slug = $2' : ''}${lessonId !== undefined ? ' AND lesson_id = $3' : ''}
-              ORDER BY course_slug, lesson_id`,
-            params,
-        );
+        const { rows } = withEpoch
+            ? await pool.query(ROWS_WITH_LESSON_EPOCHS_SQL, [userId])
+            : await pool.query(
+                `SELECT course_slug, lesson_id, progress, pct, state, content_hash, progress_updated_at
+                   FROM lesson_progress
+                  WHERE user_id = $1${courseSlug !== undefined ? ' AND course_slug = $2' : ''}${lessonId !== undefined ? ' AND lesson_id = $3' : ''}
+                  ORDER BY course_slug, lesson_id`,
+                params,
+            );
         /** @type {StoredRecord[]} */
         const records = [];
         /** @type {[string, string, number, string, string][]} */
@@ -281,6 +338,7 @@ export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoc
                 pct,
                 state,
                 updatedAt: isoOf(row.progress_updated_at) ?? progress.updatedAt,
+                ...(withEpoch ? { lessonEpoch: row.lesson_epoch ? String(row.lesson_epoch) : null, lessonResetAt: isoOf(row.reset_at) } : {}),
             });
         }
         for (const [slug, id, pct, state, hash] of stale) {
@@ -311,11 +369,16 @@ const echoId = (value) => (typeof value === 'string' ? value.slice(0, 120) : nul
  * refused as a whole (409 progress_reset) when `epoch` is not the learner's current reset
  * epoch (null until the first delete): the device's records predate a delete.
  * A record for a lesson that is not published (or breaks the id rule) is rejected
- * 'unknown_lesson'; one whose merged record would exceed PROGRESS_MAX_BYTES 'too_large'. The
- * other records are saved.
+ * 'unknown_lesson'; one whose merged record would exceed PROGRESS_MAX_BYTES 'too_large'; one
+ * whose lessonEpoch is not the lesson's current generation 'lesson_reset' (absent or not a uuid
+ * counts as null, the generation of a lesson never started over), with the generation and the
+ * stored record, so the device can drop its old copy. The other records are saved, each with its
+ * lesson's generation.
+ * learned (never sent to the client): a saved record's content changed and it is not
+ * not_started, i.e. the learner learned something (the post-save XP hook, Phase 5 stage 2).
  *
- * @param {{ userId: string, epoch: string | null, records: { courseSlug?: unknown, lessonId?: unknown, progress?: unknown }[], now?: Date | number }} params
- * @returns {Promise<{ epoch: string | null, records: StoredRecord[], rejected: { courseSlug: string | null, lessonId: string | null, error_type: string }[] } | (CoreError & { epoch?: string | null })>}
+ * @param {{ userId: string, epoch: string | null, records: { courseSlug?: unknown, lessonId?: unknown, progress?: unknown, lessonEpoch?: unknown }[], now?: Date | number }} params
+ * @returns {Promise<{ epoch: string | null, records: StoredRecord[], rejected: RejectedRecord[], learned: boolean } | (CoreError & { epoch?: string | null })>}
  */
 export async function saveLessonProgress({ userId, epoch, records, now }) {
     if (!isUuid(userId)) return invalid('A signed-in learner is required.');
@@ -323,9 +386,9 @@ export async function saveLessonProgress({ userId, epoch, records, now }) {
     if (!Array.isArray(records) || records.length < 1 || records.length > SAVE_BATCH_MAX) {
         return invalid(`records must hold 1 to ${SAVE_BATCH_MAX} records.`);
     }
-    /** @type {{ courseSlug: string | null, lessonId: string | null, error_type: string }[]} */
+    /** @type {RejectedRecord[]} */
     const rejected = [];
-    /** @type {{ entry: PublishedLesson, client: LessonProgress }[]} */
+    /** @type {{ entry: PublishedLesson, client: LessonProgress, lessonEpoch: string | null }[]} */
     const prepared = [];
     for (const record of records) {
         const courseSlug = record?.courseSlug;
@@ -342,7 +405,9 @@ export async function saveLessonProgress({ userId, epoch, records, now }) {
             rejected.push({ courseSlug: entry.courseSlug, lessonId: entry.lesson.id, error_type: 'too_large' });
             continue;
         }
-        prepared.push({ entry, client });
+        const sent = record?.lessonEpoch;
+        const lessonEpoch = typeof sent === 'string' && isUuid(sent) ? sent.toLowerCase() : null;
+        prepared.push({ entry, client, lessonEpoch });
     }
     // One lock order for every writer of several rows.
     const keyOf = (/** @type {{ entry: PublishedLesson }} */ p) => `${p.entry.courseSlug}/${p.entry.lesson.id}`;
@@ -362,10 +427,30 @@ export async function saveLessonProgress({ userId, epoch, records, now }) {
                 },
             };
         }
+        // The lessons' generations, once, under the learner's lock: no reset can commit in between.
+        /** @type {Map<string, LessonGeneration>} */
+        const generations = new Map((await db.query(LESSON_EPOCHS_SQL, [userId])).rows
+            .map((row) => [`${row.course_slug}/${row.lesson_id}`, { epoch: String(row.lesson_epoch), at: isoOf(row.reset_at) }]));
         /** @type {Map<string, StoredRecord>} */
         const saved = new Map();
+        let learned = false;
         for (const item of prepared) {
             const { entry, client } = item;
+            const gen = generations.get(keyOf(item)) ?? NEVER_RESET;
+            if (item.lessonEpoch !== gen.epoch) {
+                // The record builds on another generation of this lesson (or does not say, as an old
+                // bundle): merging it would bring back what the learner started over from.
+                const { rows } = await db.query(STORED_RECORD_SQL, [userId, entry.courseSlug, entry.lesson.id]);
+                rejected.push({
+                    courseSlug: entry.courseSlug,
+                    lessonId: entry.lesson.id,
+                    error_type: 'lesson_reset',
+                    lessonEpoch: gen.epoch,
+                    lessonResetAt: gen.at,
+                    ...(rows[0] ? { record: storedRecordOf(entry, rows[0], gen) } : {}),
+                });
+                continue;
+            }
             const { created, stored } = await lockRow(db, userId, entry.courseSlug, entry.lesson.id);
             const merged = mergeProgress(stored, client);
             if (progressTextBytes(merged) > PROGRESS_MAX_BYTES) {
@@ -376,15 +461,76 @@ export async function saveLessonProgress({ userId, epoch, records, now }) {
                 continue;
             }
             const { pct, state } = await writeRow(db, userId, entry, merged);
-            saved.set(keyOf(item), { courseSlug: entry.courseSlug, lessonId: entry.lesson.id, progress: merged, pct, state, updatedAt: merged.updatedAt });
+            if (state !== 'not_started' && !progressContentEqual(stored ?? emptyProgress(), merged)) learned = true;
+            saved.set(keyOf(item), {
+                courseSlug: entry.courseSlug,
+                lessonId: entry.lesson.id,
+                progress: merged,
+                pct,
+                state,
+                updatedAt: merged.updatedAt,
+                lessonEpoch: gen.epoch,
+                lessonResetAt: gen.at,
+            });
         }
-        return { commit: true, value: { epoch: current, records: [...saved.values()], rejected } };
+        return { commit: true, value: { epoch: current, records: [...saved.values()], rejected, learned } };
+    });
+}
+
+/**
+ * Starts ONE published lesson over for the learner: empties its record (a tombstone row: empty
+ * progress, pct 0, not_started, clock 1970; written even for a lesson never opened, so another
+ * device's unsent copy has nothing to merge into) and gives the lesson a new generation, in one
+ * transaction under the learner's lock. What the record earned so far is reconciled into the XP
+ * ledger first (O2). The account epoch is checked like a save's (409 progress_reset when the
+ * learner deleted everything elsewhere) and never moved: other lessons and devices are untouched,
+ * and the Phase 4 restarted signal stays.
+ *
+ * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the lesson's row, then the XP lock.
+ *
+ * @param {{ userId: string, epoch: string | null, courseSlug: unknown, lessonId: unknown }} params
+ * @returns {Promise<{ epoch: string | null, courseSlug: string, lessonId: string, lessonEpoch: string, lessonResetAt: string | null, record: StoredRecord } | (CoreError & { epoch?: string | null })>}
+ */
+export async function resetLessonProgress({ userId, epoch, courseSlug, lessonId }) {
+    if (!isUuid(userId)) return invalid('A signed-in learner is required.');
+    if (epoch !== null && !isUuid(epoch)) return invalid('epoch must be null or the epoch the last GET returned.');
+    const entry = getPublishedLesson(courseSlug, lessonId);
+    if (!entry) return { error: 'Only a published lesson can be started over.', error_type: 'unknown_lesson' };
+    return inTransaction('resetLessonProgress', async (db) => {
+        await lockUser(db, userId);
+        await db.query(ACCOUNT_STUB_SHARE_SQL, [userId]);
+        const reset = await db.query('SELECT epoch FROM lesson_progress_resets WHERE user_id = $1', [userId]);
+        const current = reset.rows[0]?.epoch ? String(reset.rows[0].epoch) : null;
+        if (current !== (epoch === null ? null : epoch.toLowerCase())) {
+            return {
+                commit: false,
+                value: { error: 'This lesson progress was deleted. Load it again before starting over.', error_type: 'progress_reset', epoch: current },
+            };
+        }
+        await lockRow(db, userId, entry.courseSlug, entry.lesson.id);
+        await reconcileLessonXp(db, userId);
+        const empty = emptyProgress();
+        const { pct, state } = await writeRow(db, userId, entry, empty);
+        const { rows } = await db.query(RESET_LESSON_EPOCH_SQL, [userId, entry.courseSlug, entry.lesson.id]);
+        const lessonEpoch = String(rows[0].lesson_epoch);
+        const lessonResetAt = isoOf(rows[0].reset_at);
+        /** @type {StoredRecord} */
+        const record = { courseSlug: entry.courseSlug, lessonId: entry.lesson.id, progress: empty, pct, state, updatedAt: empty.updatedAt, lessonEpoch, lessonResetAt };
+        return { commit: true, value: { epoch: current, courseSlug: entry.courseSlug, lessonId: entry.lesson.id, lessonEpoch, lessonResetAt, record } };
     });
 }
 
 /**
  * Deletes every lesson record of the learner (every course) and starts a new reset epoch, in one
  * transaction under the learner's advisory lock (so no save of the old epoch commits after it).
+ * The XP the deleted records earned is awarded by the DELETE statement itself and stays (O2), also
+ * for a row an AI app changes while the delete waits for it; the lessons' generations
+ * (lesson_progress_lesson_resets), the XP ledger and the learning days are kept.
+ *
+ * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the XP lock, then the rows (the DELETE).
+ * The reset takes its row before the XP lock, but both hold the learner lock first, so they never
+ * run at the same time; the reconciles take the XP lock and lock no lesson_progress row, and the
+ * MCP writers lock one row and never take the XP lock: no cycle.
  *
  * @param {{ userId: string }} params
  * @returns {Promise<{ deleted: number, epoch: string } | CoreError>}
@@ -393,14 +539,15 @@ export async function deleteAllLessonProgress({ userId }) {
     if (!isUuid(userId)) return invalid('A signed-in learner is required.');
     return inTransaction('deleteAllLessonProgress', async (db) => {
         await lockUser(db, userId);
-        const deleted = await db.query('DELETE FROM lesson_progress WHERE user_id = $1', [userId]);
+        await db.query(ACCOUNT_STUB_SHARE_SQL, [userId]);
+        const deleted = await deleteLessonsKeepingXp(db, userId);
         const { rows } = await db.query(
             `INSERT INTO lesson_progress_resets (user_id) VALUES ($1)
              ON CONFLICT (user_id) DO UPDATE SET epoch = gen_random_uuid(), reset_at = now()
              RETURNING epoch`,
             [userId],
         );
-        return { commit: true, value: { deleted: deleted.rowCount ?? 0, epoch: String(rows[0].epoch) } };
+        return { commit: true, value: { deleted, epoch: String(rows[0].epoch) } };
     });
 }
 

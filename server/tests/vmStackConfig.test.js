@@ -295,6 +295,15 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     }
   });
 
+  it('Phase 5: the lesson generations, the XP ledger and learning days are never granted (AI apps see none of them)', () => {
+    for (const table of ['lesson_progress_lesson_resets', 'xp_awards', 'learning_days']) {
+      assert.ok(!new RegExp(`\\b${table}\\b`).test(code), `${table} in a statement`);
+    }
+    // The comment says why such state gets its own table: a column on a table granted whole is reachable at once.
+    assert.match(sql, /a column added to a table granted whole \(auth\.users,\s+--\s+ai_daily_usage, user_progress, lesson_progress, learning_journal, mcp_tool_calls\) is reachable at\s+--\s+once/);
+    assert.doesNotMatch(sql, /so a table or column\s+--\s+added later is not reachable/);
+  });
+
   it('column grants only for the rest: no report text, guardian details, material titles, profile or course content', () => {
     const columnGrants = code.split('\n').filter((l) => /^GRANT\b.*\(/.test(l));
     assert.deepEqual(columnGrants, COLUMN_GRANTS);

@@ -109,6 +109,10 @@ describe('server.js /api/v2 mounts (production)', () => {
                 assert.equal((await fetch(`${base}/api/v2/user/lesson-progress`, init)).status, 401, `${method} without a JWT`);
                 assert.equal((await fetch(`${base}/api/v2/user/lesson-progress`, { ...init, headers: { ...init.headers, ...bridge } })).status, 401, `${method} bridge`);
             }
+            // Phase 5: starting one lesson over, on the same mount.
+            const reset = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ epoch: null, courseSlug: 'vibe-coding', lessonId: 'vibe-ch1' }) };
+            assert.equal((await fetch(`${base}/api/v2/user/lesson-progress/lesson-reset`, reset)).status, 401, 'POST /lesson-reset without a JWT');
+            assert.equal((await fetch(`${base}/api/v2/user/lesson-progress/lesson-reset`, { ...reset, headers: { ...reset.headers, ...bridge } })).status, 401, 'POST /lesson-reset bridge');
         });
     });
 

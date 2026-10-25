@@ -3,7 +3,7 @@
 // reopened_at and the new epoch's reset_at are the same now()), the GET then says restarted: true,
 // and a device that still holds the deleted account's records (an old or null epoch) is refused
 // with 409 progress_reset. A later normal reset ends the flag; it is absent otherwise, so the
-// existing deepEqual pins of the GET body hold.
+// existing deepEqual pins of the GET body hold. A one-lesson reset (Phase 5) keeps it (G17).
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../server.js';
@@ -29,6 +29,8 @@ const auth = (t) => ({ Authorization: `Bearer ${t}` });
 const record = (overrides = {}) => ({ v: 1, seen: ['hook-b1'], answers: {}, checks: {}, lastBlockId: null, updatedAt: '2026-10-20T00:00:00.000Z', ...overrides });
 
 const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'TRUST_PROXY'];
+/** GET's capabilities (Phase 5 stage 1: the one-lesson reset). */
+const CAPABILITIES = { lessonReset: true };
 
 async function call(url, { method = 'GET', headers = {}, body } = {}) {
     const init = { method, headers: { ...headers } };
@@ -90,7 +92,7 @@ describe('lesson progress of a re-opened account (restarted)', () => {
         await withServer(async (base) => {
             const get = await call(base, { headers: auth(fresh) });
             assert.equal(get.status, 200, get.text);
-            assert.deepEqual(Object.keys(get.json), ['ok', 'epoch', 'restarted', 'records']);
+            assert.deepEqual(Object.keys(get.json), ['ok', 'epoch', 'restarted', 'capabilities', 'records']);
             assert.equal(get.json.restarted, true);
             assert.deepEqual(get.json.records, []);
             assert.match(get.json.epoch, /^[0-9a-f-]{36}$/);
@@ -118,18 +120,36 @@ describe('lesson progress of a re-opened account (restarted)', () => {
             const reset = await call(base, { method: 'DELETE', headers: auth(fresh) });
             assert.equal(reset.status, 200);
             const after = await call(base, { headers: auth(fresh) });
-            assert.deepEqual(after.json, { ok: true, epoch: reset.json.epoch, records: [] }, 'no restarted key after a normal reset');
+            assert.deepEqual(after.json, { ok: true, epoch: reset.json.epoch, capabilities: CAPABILITIES, records: [] }, 'no restarted key after a normal reset');
 
             const never = await call(base, { headers: auth(token(B, nowS())) });
-            assert.deepEqual(never.json, { ok: true, epoch: OLD_EPOCH, records: [] });
+            assert.deepEqual(never.json, { ok: true, epoch: OLD_EPOCH, capabilities: CAPABILITIES, records: [] });
         });
         const noEpoch = createLessonProgressPool();
         setPoolForTests(noEpoch);
         await withServer(async (base) => {
             const res = await call(base, { headers: auth(token(B, nowS())) });
-            assert.deepEqual(res.json, { ok: true, epoch: null, records: [] });
+            assert.deepEqual(res.json, { ok: true, epoch: null, capabilities: CAPABILITIES, records: [] });
         });
         assert.ok(!noEpoch.queries.some((q) => q.sql === SQL.selectRestarted), 'no epoch, no restarted read');
+    });
+
+    it('G17: starting one lesson over (Phase 5) never moves the account epoch, so restarted stays', async () => {
+        const pool = createLessonProgressPool({ tombstones: { [A]: { deletedAt: DELETED_AT } } });
+        setPoolForTests(pool);
+        const fresh = token(A, nowS());
+        await withServer(async (base) => {
+            const get = await call(base, { headers: auth(fresh) });
+            assert.equal(get.json.restarted, true);
+            const put = await call(base, { method: 'PUT', headers: auth(fresh), body: { epoch: get.json.epoch, records: [{ courseSlug: VIBE, lessonId: CH1, progress: record() }] } });
+            assert.equal(put.status, 200, put.text);
+            const reset = await call(`${base}/lesson-reset`, { method: 'POST', headers: auth(fresh), body: { epoch: get.json.epoch, courseSlug: VIBE, lessonId: CH1 } });
+            assert.equal(reset.status, 200, reset.text);
+            assert.equal(reset.json.epoch, get.json.epoch);
+            const after = await call(base, { headers: auth(fresh) });
+            assert.deepEqual([after.json.epoch, after.json.restarted], [get.json.epoch, true], 'same epoch, still restarted');
+            assert.equal(pool.queries.filter((q) => q.sql === SQL.upsertEpoch || q.sql === SQL.reopenEpoch).length, 1, 'only the re-open wrote the account epoch');
+        });
     });
 
     it('a session from before the deletion is refused before any lesson-progress statement', async () => {

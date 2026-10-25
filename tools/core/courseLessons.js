@@ -99,6 +99,15 @@ function firstUnfinishedSection(entry, progress) {
 }
 
 /**
+ * When the learner last changed a stored record, or null when there is no record or it is a
+ * restarted lesson's empty one (its clock is 1970-01-01, tools/core/lessonProgress.js
+ * resetLessonProgress): AI apps see a restarted lesson exactly like an untouched one.
+ * @param {{ updatedAt: string } | null | undefined} stored
+ * @returns {string | null}
+ */
+const changedAt = (stored) => (stored && Date.parse(stored.updatedAt) > 0 ? stored.updatedAt : null);
+
+/**
  * The learner's stored record of one lesson; null when none is stored, a CoreError when it
  * cannot be read.
  * @param {string} userId
@@ -275,7 +284,7 @@ function resumeOf(entry, progress) {
 /**
  * The learner's lesson progress.
  * - Without lessonId: every published lesson (of courseSlug, or of every course) with pct, state
- *   and updated_at (not_started and null when untouched).
+ *   and updated_at (not_started and null when untouched, or started over in the app).
  * - With courseSlug and lessonId: that lesson's sections (blocks done/total), questions (status
  *   only), resume position and exam first-try score.
  *
@@ -299,7 +308,7 @@ export async function getCourseProgress({ userId, courseSlug, lessonId, locale }
             title: lessonTitle(entry, used),
             pct: stored?.pct ?? 0,
             state: stored?.state ?? 'not_started',
-            updated_at: stored?.updatedAt ?? null,
+            updated_at: changedAt(stored),
             sections: sectionStatuses(entry, progress, used),
             questions: questionStatuses(entry, progress),
             resume: resumeOf(entry, progress),
@@ -321,7 +330,7 @@ export async function getCourseProgress({ userId, courseSlug, lessonId, locale }
             title: lessonTitle(entry, learnerLocale(entry.lesson, locale)),
             pct: record?.pct ?? 0,
             state: record?.state ?? 'not_started',
-            updated_at: record?.updatedAt ?? null,
+            updated_at: changedAt(record),
         };
     });
     return { ...(slug !== undefined ? { course_slug: slug } : {}), lessons };
