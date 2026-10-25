@@ -5,11 +5,13 @@ import { useLanguage } from '../../context/LanguageContext';
 import { ProgressRing } from './ProgressRing';
 import { useOptionalReader } from './ReaderContext';
 import { practiceProgress } from './blocks/blockText';
+import { SaveChip } from './SaveChip';
 
 /**
  * Sticky (never fixed) bar inside <main>: back, breadcrumb, mode tabs (only "Read" works yet;
- * "Practice" already counts answered checks, 練習 x/y), reading progress, Aa settings and the AI
- * tutor. A 3px progress line runs along its bottom.
+ * "Practice" already counts answered checks, 練習 x/y), where the record is saved (Phase 5,
+ * SaveChip, for lessons the server stores), reading progress, Aa settings and the AI tutor. A 3px
+ * progress line runs along its bottom.
  */
 
 const copy = {
@@ -63,8 +65,10 @@ type LessonBarProps = {
   onAskTutor: () => void;
   tutorButtonRef: React.RefObject<HTMLButtonElement | null>;
   tutorExpanded: boolean;
-  /** Transient message under the bar (e.g. "resumed where you left off"). */
+  /** Transient message under the bar (e.g. "resumed where you left off"), and the reader's status line. */
   notice?: React.ReactNode;
+  /** Phase 5: show where the record is saved (SaveChip): only for lessons the server stores. */
+  showSaveState?: boolean;
 };
 
 export function LessonBar({
@@ -84,6 +88,7 @@ export function LessonBar({
   tutorButtonRef,
   tutorExpanded,
   notice,
+  showSaveState = false,
 }: LessonBarProps) {
   const { language } = useLanguage();
   const text = copy[language];
@@ -146,6 +151,7 @@ export function LessonBar({
             <span>{text.outline}</span>
             <span className="tabular text-fg-3">{sectionIndex + 1}/{sectionCount}</span>
           </button>
+          {showSaveState ? <SaveChip /> : null}
           <ProgressRing pct={pct} label={text.progress(pct)} />
           <button
             ref={settingsButtonRef}

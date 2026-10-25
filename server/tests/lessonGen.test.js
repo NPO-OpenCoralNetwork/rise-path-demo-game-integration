@@ -1,7 +1,8 @@
 // Lesson generation stamps (Phase 5, design p5 §2.3, §2.5): the pure helpers of
 // components/lesson/progressStore.ts (lessonGenOf, keepsLocal, bornSurvives, stampedRecord,
 // writeProgress with a stamp) and components/lesson/progressSync.ts (serverGenOf, readerStartGen,
-// readerGenChange, leftRecordCount), plus two scenarios that run the core and the reader's
+// readerGenChange, leftRecordCount: also after a session that ended without a logout, only what was
+// unsent then), plus two scenarios that run the core and the reader's
 // decisions over one memory storage: G22 (an old bundle took the stamp off: the reader writes its
 // record again, stamped, and it saves), the same for a lesson never started over (the old bundle's
 // answers are merged in, not reverted; a reset meanwhile still drops them) and G31 (a reset always
@@ -12,6 +13,7 @@ import {
   SYNC_ACCOUNT_KEY,
   SYNC_TIMING,
   leftRecordCount,
+  parseSyncAccount,
   pendingKey,
   readerGenChange,
   readerStartGen,
@@ -29,7 +31,7 @@ import {
 } from '../../components/lesson/progressStore.ts';
 import { parseProgress } from '../../shared/lesson/progress.js';
 import { mergeProgress } from '../../shared/lesson/progressMerge.js';
-import { COURSE, iso, memoryStorage, setAccount, setup } from './helpers/progressSyncFakes.js';
+import { COURSE, iso, isSyncable, memoryStorage, setAccount, setup, twoTabs } from './helpers/progressSyncFakes.js';
 
 const U1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const X1 = '33333333-3333-4333-8333-333333333333';
@@ -210,6 +212,75 @@ describe('leftRecordCount: what a learner who left still has here', () => {
     assert.equal(leftRecordCount(null), 0);
     const broken = { getItem() { throw new Error('blocked'); }, key: () => null, length: 0 };
     assert.equal(leftRecordCount(broken), 0);
+  });
+
+  it('lessons the server does not store are not counted (they never save)', () => {
+    const storage = memoryStorage();
+    for (const lessonId of ['l1', 'gone']) {
+      storage.setItem(progressKey(COURSE, lessonId), JSON.stringify(record({ seen: ['a'], updatedAt: iso(1) })));
+      storage.setItem(pendingKey(COURSE, lessonId), iso(1));
+    }
+    storage.setItem(SYNC_ACCOUNT_KEY, JSON.stringify({ userId: U1, epoch: null, loggedOut: true }));
+    assert.equal(leftRecordCount(storage), 2, 'no catalog given: every marker');
+    assert.equal(leftRecordCount(storage, isSyncable), 1);
+    assert.equal(leftRecordCount(storage, () => { throw new Error('catalog'); }), 0, 'never throws');
+  });
+
+  it('a session that ended without a logout (expiry, logout elsewhere) counts only what was unsent then, not what the server has', async () => {
+    const storage = memoryStorage();
+    setAccount(storage, U1, null);
+    const t = setup({ storage, rows: [{ courseSlug: COURSE, lessonId: 'l1', progress: record({ seen: ['a'], updatedAt: iso(-30) }), pct: 10, state: 'in_progress', updatedAt: iso(-30) }] });
+    t.sync.signIn(U1);
+    await t.sync.settled();
+    assert.equal(storage.getItem(pendingKey(COURSE, 'l1')), null, 'l1 is on the server');
+    storage.setItem(progressKey(COURSE, 'l2'), JSON.stringify(record({ seen: ['b'], updatedAt: iso(1) })));
+    t.sync.noteLocalWrite(COURSE, 'l2');
+    // The session ends before the upload (the auth listener's stop()).
+    t.sync.stop();
+    // Both records wait for U1 as theirs (the next sign-in asks nothing)…
+    assert.equal(storage.getItem(pendingKey(COURSE, 'l1')), iso(-30));
+    assert.equal(storage.getItem(pendingKey(COURSE, 'l2')), iso(1));
+    // …but only l2 is unsaved.
+    assert.equal(leftRecordCount(storage, isSyncable), 1);
+    // Another tab's later stop() changes nothing; U1's sign-in takes the account back.
+    t.sync.stop();
+    assert.equal(leftRecordCount(storage, isSyncable), 1);
+    t.sync.signIn(U1);
+    assert.equal(t.sync.getState().status, 'hydrating');
+    assert.equal(leftRecordCount(storage, isSyncable), 0);
+    assert.deepEqual(JSON.parse(storage.getItem(SYNC_ACCOUNT_KEY)), { userId: U1, epoch: null });
+  });
+
+  it('a tab that has not heard of the session end yet: what it writes meanwhile is counted too', async () => {
+    const t = twoTabs();
+    setAccount(t.storage, U1, null);
+    t.a.signIn(U1);
+    t.b.signIn(U1);
+    await t.a.settled();
+    await t.b.settled();
+    t.storage.setItem(progressKey(COURSE, 'l2'), JSON.stringify(record({ seen: ['a'], updatedAt: iso(1) })));
+    t.a.noteLocalWrite(COURSE, 'l2');
+    // Tab A hears of the session end first (l2 not uploaded yet).
+    t.a.stop();
+    assert.equal(leftRecordCount(t.storage, isSyncable), 1);
+    // Tab B, still signed in for a moment, writes l1.
+    t.storage.setItem(progressKey(COURSE, 'l1'), JSON.stringify(record({ seen: ['b'], updatedAt: iso(2) })));
+    t.b.noteLocalWrite(COURSE, 'l1');
+    t.b.noteLocalWrite(COURSE, 'l1');
+    assert.deepEqual(JSON.parse(t.storage.getItem(SYNC_ACCOUNT_KEY)).unsent, [`${COURSE}:l2`, `${COURSE}:l1`], 'added once');
+    assert.equal(leftRecordCount(t.storage, isSyncable), 2);
+    t.b.stop();
+    assert.equal(leftRecordCount(t.storage, isSyncable), 2);
+  });
+
+  it('SyncAccount.unsent is read only with loggedOut, as a bounded list of strings', () => {
+    const left = (unsent) => JSON.stringify({ userId: U1, epoch: null, loggedOut: true, unsent });
+    assert.deepEqual(parseSyncAccount(left([`${COURSE}:l1`])).unsent, [`${COURSE}:l1`]);
+    assert.deepEqual(parseSyncAccount(left([])).unsent, []);
+    for (const bad of ['x', null, [1], ['a'.repeat(200)], Array.from({ length: 2_001 }, () => 'c:l')]) {
+      assert.equal(parseSyncAccount(left(bad)).unsent, undefined, JSON.stringify(bad).slice(0, 40));
+    }
+    assert.equal(parseSyncAccount(JSON.stringify({ userId: U1, epoch: null, unsent: ['c:l'] })).unsent, undefined, 'signed in: no list');
   });
 });
 

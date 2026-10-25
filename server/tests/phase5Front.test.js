@@ -3,15 +3,21 @@
 //   (G28); no dialog host, nothing that syncs or nothing unsaved: no question; the upload always
 //   runs first; one question at a time, each with a new `ask` (G29: the dialog mounts fresh); the
 //   return target is the element focused at the call; focus falls back to the menu button, then
-//   #main-content (G30).
+//   #main-content (G30); the session ending elsewhere closes the question (the logout finishes).
 // - components/ui/achievementsClient.ts (createAchievementsStore): no_account without a synced
 //   learner, the learner binding of answers, the capability rule, a 404 without error_type latched
 //   as "unsupported" for the page load (G14), errors, the debounce, single flight.
 // - services/achievementsApi.ts: the answer's shape, refusals and an older server's HTML 404.
 // The modules are bundled with esbuild (a Vite dependency) with their imports stubbed, and loaded
 // fresh for each test (module-level state).
+// Stage 4, the UI (rendered against a React stub; see the second half): SaveChip, ReaderStatus,
+// SaveStoppedNotice (and its focus move), UnsavedLogoutDialog (G29, G30), LessonEnd (G32, the
+// reset control, its helper by reason, a dialog closed before the request ends, focus fallback),
+// LessonReader's keyed sections (G16), LeftRecordsNotice, ProgressCluster, ProfilePassport and
+// the badges page (G20, G33), the logout callers (G12, G28) and the copy and token rules.
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -198,6 +204,36 @@ describe('logoutGuard: the question before a logout (O4)', () => {
     assert.deepEqual(g.getLogoutPhase(), { kind: 'asking', unsaved: 2, ask: 1 });
     g.answerUnsavedLearning(false);
     assert.equal(await within(next), false);
+  });
+
+  it('the session ends while asking (expiry, a logout elsewhere): the question goes and the logout finishes; later questions are fresh', async () => {
+    const g = await guard({ prepare: () => ({ unsaved: 2 }) });
+    g.registerLogoutDialog();
+    const answer = g.confirmUnsavedLearning();
+    await wait(5);
+    assert.equal(g.getLogoutPhase().kind, 'asking');
+    g.endUnsavedLearningQuestion();
+    assert.equal(g.getLogoutPhase().kind, 'idle', 'the dialog goes away');
+    assert.equal(await within(answer), true, 'the learner is signed out already: the logout they asked for finishes');
+    g.endUnsavedLearningQuestion(); // nothing open: nothing happens
+    assert.equal(g.getLogoutPhase().kind, 'idle');
+    const next = g.confirmUnsavedLearning();
+    await wait(5);
+    assert.deepEqual(g.getLogoutPhase(), { kind: 'asking', unsaved: 2, ask: 2 }, 'a session end before a logout does not answer it');
+    g.answerUnsavedLearning(false);
+    assert.equal(await within(next), false);
+  });
+
+  it('the session ends while the upload runs: no question afterwards, the logout finishes', async () => {
+    let release;
+    const g = await guard({ prepare: () => new Promise((resolve) => { release = () => resolve({ unsaved: 2 }); }) });
+    g.registerLogoutDialog();
+    const answer = g.confirmUnsavedLearning();
+    await wait(5);
+    g.endUnsavedLearningQuestion();
+    release();
+    assert.equal(await within(answer), true);
+    assert.equal(g.getLogoutPhase().kind, 'idle', 'never asked');
   });
 
   it('G30: the return target is the element focused at the call; focus falls back to the menu button, then #main-content', async () => {
@@ -541,5 +577,909 @@ describe('achievementsApi: the answer and its refusals', () => {
     }
     const capped = mod.parseAchievements({ ...ACHIEVEMENTS(), badges: [{ id: 'five_lessons', earned: true, current: 9, goal: 5 }] });
     assert.equal(capped.badges[0].current, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Stage 4: the UI (design §2.6, §3.7, §4.2–§4.4). The components are bundled with esbuild against
+// a React stub whose jsx() returns { type, props, key } and whose hooks count calls (useState
+// takes overrides by index from globalThis.__state and records setter calls in globalThis.__sets),
+// as legalConsentFront.test.js does; function components are expanded into host elements.
+
+const UI_ICONS = [
+  'ArrowLeft', 'ArrowRight', 'Award', 'Bell', 'BookOpenCheck', 'CircleCheck', 'Cloud', 'CloudAlert', 'CloudCheck',
+  'CloudOff', 'CloudUpload', 'Flag', 'Flame', 'GraduationCap', 'Layers', 'ListChecks', 'LockKeyhole', 'LogIn', 'LogOut',
+  'Medal', 'PartyPopper', 'RotateCcw', 'RotateCw', 'Settings', 'ShieldCheck', 'Trophy',
+];
+const UI_STUBS = {
+  react: `
+    let index = 0;
+    let refIndex = 0;
+    export const __resetHooks = () => { index = 0; refIndex = 0; };
+    export const useState = (initial) => {
+      const i = index++;
+      const o = globalThis.__state;
+      const value = o && i in o ? o[i] : (typeof initial === 'function' ? initial() : initial);
+      return [value, (v) => { (globalThis.__sets ??= []).push([i, typeof v === 'function' ? v(value) : v]); }];
+    };
+    // Refs persist across renders only when a test passes globalThis.__refs (by call order).
+    export const useRef = (value) => {
+      const i = refIndex++;
+      const store = globalThis.__refs;
+      if (!store) return { current: value ?? null };
+      return (store[i] ??= { current: value ?? null });
+    };
+    let ids = 0;
+    export const useId = () => ':r' + (ids += 1) + ':';
+    export const useEffect = (fn) => { (globalThis.__effects ??= []).push(fn); };
+    export const useLayoutEffect = useEffect;
+    export const useCallback = (fn) => fn;
+    export const useMemo = (fn) => fn();
+    export const useSyncExternalStore = (subscribe, get) => get();
+    export const forwardRef = (fn) => fn;
+    export const createContext = () => ({});
+    export const useContext = () => null;
+    export const Fragment = 'Fragment';
+    export default { useState, useRef, useId, useEffect, useLayoutEffect, useCallback, useMemo, useSyncExternalStore, forwardRef, createContext, useContext, Fragment };
+  `,
+  'react/jsx-runtime': "export const jsx = (type, props, key) => ({ type, props, key }); export const jsxs = jsx; export const Fragment = 'Fragment';",
+  'react-router-dom': "export const Link = 'Link';",
+  'lucide-react': UI_ICONS.map((name) => `export const ${name} = '${name}';`).join('\n'),
+  language: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp' });",
+  theme: 'export const useTheme = () => ({ setTheme() {} });',
+  auth: 'export const useAuth = () => globalThis.__auth ?? ({ user: null, logout: async () => true });',
+  dialog: "export const ConfirmDialog = 'ConfirmDialog'; export default 'ConfirmDialog';",
+  reader: 'export const useReader = () => globalThis.__reader; export const useOptionalReader = () => globalThis.__reader ?? null;',
+  md: "export const MdText = 'MdText'; export const Txt = 'Txt';",
+  syncClient: `
+    export const useProgressSaveView = () => globalThis.__view;
+    export const getProgressSaveView = () => globalThis.__view;
+    export const useProgressSyncState = () => globalThis.__sync ?? { status: 'on', userId: 'u1' };
+    export const progressCapabilities = () => (globalThis.__caps === undefined ? { lessonReset: true, achievements: true } : globalThis.__caps);
+    export const isSyncableLesson = () => globalThis.__syncable ?? true;
+    export const retryProgressSync = () => { globalThis.__retries = (globalThis.__retries ?? 0) + 1; };
+  `,
+  guard: `
+    export const answerUnsavedLearning = (v) => { (globalThis.__answers ??= []).push(v); };
+    export const getLogoutPhase = () => globalThis.__phase;
+    export const subscribeLogoutPhase = () => () => {};
+    export const registerLogoutDialog = () => () => {};
+    export const logoutReturnTarget = () => globalThis.__target ?? null;
+    export const restoreLogoutFocus = (t) => { (globalThis.__restored ??= []).push(t); return t; };
+  `,
+  achievements: `
+    export const useAchievements = () => globalThis.__ach;
+    export const reloadAchievements = async () => { globalThis.__reloads = (globalThis.__reloads ?? 0) + 1; };
+  `,
+  content: "export const getCourse = (slug) => (slug === 'vibe-coding' ? { id: 'vibe-coding', locale: 'jp', title: 'バイブコーディング入門：AIと作る' } : undefined);",
+  plan: 'export const usePlanEntry = () => false;',
+  llm: `
+    export const clearLegacyBrowserKey = () => {};
+    export const getLlmStatus = () => new Promise(() => {});
+    export const primaryProviderLabel = () => null;
+    export const summarizeLlmStatus = () => 'checking';
+  `,
+};
+
+async function bundleUi(entry) {
+  const result = await build({
+    stdin: { contents: entry, resolveDir: ROOT, loader: 'tsx' },
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'browser',
+    jsx: 'automatic',
+    define: { 'import.meta.env': '{"PROD":true}' },
+    plugins: [{
+      name: 'ui-stubs',
+      setup(b) {
+        const stub = (filter, name) => b.onResolve({ filter }, () => ({ path: name, namespace: 'stub' }));
+        stub(/^react$/, 'react');
+        stub(/^react\/jsx-runtime$/, 'react/jsx-runtime');
+        stub(/^react-router-dom$/, 'react-router-dom');
+        stub(/^lucide-react$/, 'lucide-react');
+        stub(/context\/LanguageContext$/, 'language');
+        stub(/context\/ThemeContext$/, 'theme');
+        stub(/context\/AuthContext$/, 'auth');
+        stub(/safety\/ConfirmDialog$/, 'dialog');
+        stub(/\/ReaderContext$/, 'reader');
+        stub(/\/Md$/, 'md');
+        stub(/\/progressSyncClient$/, 'syncClient');
+        stub(/\/logoutGuard$/, 'guard');
+        stub(/\/achievementsClient$/, 'achievements');
+        stub(/(^|\/)content$/, 'content');
+        stub(/hooks\/usePlanEntry$/, 'plan');
+        stub(/services\/llmApi$/, 'llm');
+        b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: UI_STUBS[args.path], loader: 'js' }));
+      },
+    }],
+    logLevel: 'silent',
+  });
+  return result.outputFiles[0].text;
+}
+
+/** Calls function components until only host elements and stubs ('Link', 'ConfirmDialog', …) are left. */
+function expand(node) {
+  if (Array.isArray(node)) return node.map(expand);
+  if (node && typeof node === 'object' && 'type' in node) {
+    if (typeof node.type === 'function') return expand(node.type(node.props ?? {}));
+    return { type: node.type, key: node.key, props: { ...node.props, children: expand(node.props?.children) } };
+  }
+  return node;
+}
+function walk(node, out = []) {
+  if (Array.isArray(node)) for (const child of node) walk(child, out);
+  else if (node && typeof node === 'object' && 'type' in node) {
+    out.push({ el: node });
+    walk(node.props?.children, out);
+  } else if (typeof node === 'string' || typeof node === 'number') out.push({ text: String(node) });
+  return out;
+}
+const textOf = (tokens) => tokens.filter((t) => 'text' in t).map((t) => t.text).join('');
+const elementsOf = (tokens) => tokens.filter((t) => 'el' in t).map((t) => t.el);
+const textOfElement = (el) => textOf(walk(el.props?.children));
+const byClass = (els, cls) => els.filter((el) => typeof el.props?.className === 'string' && el.props.className.split(/\s+/).includes(cls));
+const ICON_NAMES = new Set(UI_ICONS);
+const iconsOf = (els) => els.filter((el) => typeof el.type === 'string' && ICON_NAMES.has(el.type)).map((el) => el.type);
+
+/** Renders `component(props)` with globals set for the stubs; returns the element tokens. */
+function renderUi(mod, component, props = {}, globals = {}) {
+  Object.assign(globalThis, { __sets: [], __effects: [], ...globals });
+  mod.__resetHooks();
+  try {
+    return walk(expand(component(props)));
+  } finally {
+    for (const key of Object.keys(globals)) delete globalThis[key];
+  }
+}
+
+const VIEW = (patch = {}) => ({ state: 'saved', reason: null, userId: U1, pending: 0, failures: 0, busy: false, savedAt: null, online: true, ...patch });
+const readFile = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const TOKEN_RULE = /\[#[0-9a-fA-F]{3,8}\]|rounded-\[|text-\[(9|10|11)px\]|text-slate-400/;
+
+/** A fake document for focus calls. */
+function focusDocument() {
+  const main = { id: 'main-content', focused: 0, focus(opts) { this.focused += 1; this.opts = opts; } };
+  return { main, body: {}, activeElement: null, getElementById: (id) => (id === 'main-content' ? main : null) };
+}
+
+let ui = null;
+before(async () => {
+  ui = await fresh(await bundleUi([
+    "export { __resetHooks } from 'react';",
+    "export { SaveChipView, saveLongText, saveLabel, SAVE_ICONS } from './components/lesson/SaveChip';",
+    "export { ReaderStatusView, readerStatusText, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
+    "export { SaveStoppedNoticeView, default as SaveStoppedNotice } from './components/lesson/SaveStoppedNotice';",
+    "export { LeftRecordsNoticeView, default as LeftRecordsNotice } from './components/lesson/LeftRecordsNotice';",
+    "export { UnsavedLogoutDialogView } from './components/lesson/UnsavedLogoutDialog';",
+    "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf } from './components/lesson/LessonEnd';",
+    "export { ProgressClusterView } from './components/ui/ProgressCluster';",
+    "export { ProfileBadgesBody, nextBadge, badgeProgressText } from './components/features/dashboard/profile/ProfileBadgesView';",
+    "export { default as ProfilePassport, notReadyText } from './components/features/dashboard/ProfilePassport';",
+    "export { SYNC_ACCOUNT_KEY, SYNC_PENDING_PREFIX } from './components/lesson/progressSync';",
+  ].join('\n')));
+});
+
+describe('SaveChip: where the record is (design §4.2)', () => {
+  const CASES = [
+    [{ state: 'saved' }, 'CloudCheck', '保存済み', '学習の記録は、アカウントに保存されています。'],
+    [{ state: 'saving' }, 'CloudUpload', '保存しています', '学習の記録を、アカウントに保存しています。'],
+    [{ state: 'loading' }, 'Cloud', '読み込み中', '学習の記録を読み込んでいます。'],
+    [{ state: 'offline' }, 'CloudOff', 'この端末に保存中', 'いまはサーバーにつながらないため、この端末に記録しています。つながると、アカウントに保存します。'],
+    [{ state: 'stopped', reason: 'network' }, 'CloudAlert', '保存が止まっています', '学習の記録を、アカウントに保存できていません。この端末には残っています。'],
+    [{ state: 'stopped', reason: 'server' }, 'CloudAlert', '保存が止まっています', '学習の記録を、アカウントに保存できていません。この端末には残っています。'],
+    [{ state: 'stopped', reason: 'auth' }, 'CloudAlert', '保存が止まっています', 'ログインの確認ができないため、保存が止まっています。この端末には残っていて、ログインし直すと保存します。'],
+    [{ state: 'stopped', reason: 'account' }, 'CloudAlert', '保存が止まっています', 'ほかのタブでログアウトしたか、別のアカウントでログインしたため、このタブでは保存していません。この端末には残っています。'],
+    [{ state: 'stopped', reason: 'storage' }, 'CloudAlert', '保存が止まっています', 'この端末の保存領域がいっぱいか使えないため、アカウントへの保存が止まっています。'],
+    [{ state: 'local' }, 'CloudOff', 'この端末だけ', '学習の記録は、この端末だけに保存されます。'],
+  ];
+
+  it('each state and reason: icon, short label (visual), long text (title and screen readers); not interactive, no live region', () => {
+    for (const [patch, icon, label, long] of CASES) {
+      const els = elementsOf(renderUi(ui, ui.SaveChipView, { view: VIEW(patch), language: 'jp' }));
+      const chip = els[0];
+      assert.equal(chip.type, 'span', JSON.stringify(patch));
+      assert.equal(chip.props['data-state'], patch.state);
+      assert.equal(chip.props.title, long);
+      assert.equal(chip.props.role, undefined, 'no live region: it changes with every save');
+      assert.deepEqual(iconsOf(els), [icon]);
+      assert.equal(els.find((el) => el.type === icon).props['aria-hidden'], 'true');
+      assert.equal(textOfElement(byClass(els, 'rp-save-label')[0]), label);
+      assert.equal(textOfElement(byClass(els, 'sr-only')[0]), long);
+      assert.ok(!els.some((el) => el.type === 'button' || el.props?.tabIndex !== undefined), 'nothing to press');
+    }
+    const en = elementsOf(renderUi(ui, ui.SaveChipView, { view: VIEW({ state: 'offline' }), language: 'en' }));
+    assert.equal(textOfElement(byClass(en, 'rp-save-label')[0]), 'On this device for now');
+  });
+
+  it('colour repeats the state with tokens only: danger only while stopped; the label shows from 640 px', () => {
+    const css = readFile('components/lesson/reader.css');
+    const rules = [...css.matchAll(/(\.rp-save[^{]*)\{([^}]*)\}/g)].map((m) => [m[1].trim(), m[2]]);
+    const danger = rules.filter(([, body]) => body.includes('--rp-danger')).map(([sel]) => sel);
+    assert.deepEqual(danger, ['.rp-save[data-state="stopped"]']);
+    for (const [, body] of rules) assert.doesNotMatch(body, /#[0-9a-fA-F]{3,8}\b/, 'tokens only');
+    assert.match(css, /\.rp-save-label \{\s*display: none;\s*\}\s*@media \(min-width: 640px\) \{\s*\.rp-save-label \{\s*display: inline;/);
+  });
+});
+
+describe('ReaderStatus: the reader\'s status line (finding 11)', () => {
+  it('the region is always mounted (role=status, polite) and empty until there is a message', () => {
+    const els = elementsOf(renderUi(ui, ui.ReaderStatusView, { language: 'jp', message: null, onDismiss() {} }));
+    assert.equal(els.length, 1);
+    assert.equal(els[0].props.role, 'status');
+    assert.equal(els[0].props['aria-live'], 'polite');
+    assert.equal(els[0].props.children, null);
+  });
+
+  it('stall and reset messages: icon, text, a labelled close button that also moves focus to main', () => {
+    const cases = [
+      [{ kind: 'stall', state: 'offline', reason: null, id: 1 }, 'CloudOff', /この端末に記録しています/],
+      [{ kind: 'stall', state: 'stopped', reason: 'auth', id: 2 }, 'CloudAlert', /ログインし直すと保存します/],
+      [{ kind: 'reset', id: 3 }, 'RotateCcw', /^このレッスンの記録を消しました。最初から学べます。$/],
+    ];
+    for (const [message, icon, text] of cases) {
+      let dismissed = 0;
+      const doc = focusDocument();
+      globalThis.document = doc;
+      const els = elementsOf(renderUi(ui, ui.ReaderStatusView, { language: 'jp', message, onDismiss: () => { dismissed += 1; } }));
+      assert.equal(els[0].props.role, 'status', 'the same region');
+      const card = byClass(els, 'rp-status-card')[0];
+      assert.ok(card, 'a card');
+      assert.deepEqual(iconsOf(els), [icon]);
+      assert.match(textOfElement(byClass(els, 'rp-status-text')[0]), text);
+      const close = els.find((el) => el.type === 'button');
+      assert.equal(close.props['aria-label'], '閉じる');
+      close.props.onClick();
+      assert.equal(dismissed, 1);
+      assert.deepEqual([doc.main.focused, doc.main.opts], [1, { preventScroll: true }]);
+      delete globalThis.document;
+    }
+    assert.equal(ui.readerStatusText('en', { kind: 'reset', id: 1 }), "This lesson's record was deleted. You can start from the beginning.");
+  });
+
+  it('a stall is said once per kind: "on this device" or "stopped" (by reason) with something unsaved; never saving ↔ saved', () => {
+    const key = (patch, syncable = true) => ui.stallKeyOf(VIEW(patch), syncable);
+    assert.equal(key({ state: 'offline', pending: 1 }), 'offline:');
+    assert.equal(key({ state: 'stopped', reason: 'auth', pending: 2 }), 'stopped:auth');
+    assert.equal(key({ state: 'stopped', reason: 'network', pending: 1 }), 'stopped:network');
+    for (const patch of [{ state: 'offline', pending: 0 }, { state: 'stopped', reason: 'auth', pending: 0 }, { state: 'saving', pending: 3 }, { state: 'saved' }, { state: 'local', pending: 2 }, { state: 'loading', pending: 1 }]) {
+      assert.equal(key(patch), null, JSON.stringify(patch));
+    }
+    assert.equal(key({ state: 'offline', pending: 1 }, false), null, 'a lesson the server does not store');
+    assert.deepEqual(ui.stallMessageOf('stopped:auth', 4), { kind: 'stall', state: 'stopped', reason: 'auth', id: 4 });
+    assert.deepEqual(ui.stallMessageOf('offline:', 5), { kind: 'stall', state: 'offline', reason: null, id: 5 });
+    // The reader reads only the key (a string): it does not re-render on every save.
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /const stallKey = useSyncExternalStore\(\s*subscribeProgressSaveView,\s*\(\) => stallKeyOf\(getProgressSaveView\(\), syncable\),/);
+    assert.doesNotMatch(reader, /useProgressSaveView\(/);
+  });
+
+  it('the card wraps at any width (no nowrap, no ellipsis) and does not move under reduced motion', () => {
+    const css = readFile('components/lesson/reader.css');
+    const block = css.slice(css.indexOf('.rp-status {'), css.indexOf('.rp-status-card .rp-notice-x'));
+    assert.match(block, /\.rp-status-card \{[^}]*white-space: normal;/);
+    assert.doesNotMatch(block, /nowrap|text-overflow|ellipsis/);
+    // .rp-reader * animations are cut to 1 ms under prefers-reduced-motion (the card is inside the reader).
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.rp-reader \*,/);
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /<ReaderStatus message=\{statusMessage\} onDismiss=\{\(\) => setStatusMessage\(null\)\} \/>/);
+    assert.match(reader, /\{resumed && !statusMessage \? \(/, 'a message hides the "resumed" pill');
+  });
+});
+
+describe('SaveStoppedNotice: the app notice while saving has stopped (design §4.3)', () => {
+  const render = (view, language = 'jp', extra = {}) => elementsOf(renderUi(ui, ui.SaveStoppedNoticeView, { language, view, onRetry() {}, onSignIn() {}, ...extra }));
+
+  it('always mounted; empty unless stopped with something unsaved', () => {
+    for (const view of [VIEW({ pending: 2 }), VIEW({ state: 'saving', pending: 2 }), VIEW({ state: 'offline', pending: 2 }), VIEW({ state: 'stopped', reason: 'network', pending: 0 })]) {
+      const els = render(view);
+      assert.equal(els.length, 1, JSON.stringify(view));
+      assert.equal(els[0].props.role, 'status');
+      assert.equal(els[0].props.children, null);
+    }
+  });
+
+  it('count, reason and last save; one button by reason: retry (network, server), sign in again (auth), none (account, storage)', () => {
+    const savedAt = new Date(2026, 9, 25, 9, 5).getTime();
+    let retries = 0;
+    const els = render(VIEW({ state: 'stopped', reason: 'network', pending: 3, savedAt }), 'jp', { onRetry: () => { retries += 1; } });
+    const text = textOfElement(els[0]);
+    assert.match(text, /^まだ保存できていない学習があります（3 件）。学習の記録を、アカウントに保存できていません。この端末には残っています。最後に保存できたのは 09:05 です。もう一度保存する$/);
+    assert.deepEqual(iconsOf(els), ['CloudAlert', 'RotateCw']);
+    assert.match(els.find((el) => el.type === 'CloudAlert').props.className, /text-danger/);
+    const retry = els.find((el) => el.type === 'button');
+    assert.equal(retry.props['aria-disabled'], undefined);
+    retry.props.onClick();
+    assert.equal(retries, 1);
+
+    const busy = render(VIEW({ state: 'stopped', reason: 'server', pending: 1, busy: true }), 'jp', { onRetry: () => { retries += 1; } });
+    const busyButton = busy.find((el) => el.type === 'button');
+    assert.equal(busyButton.props['aria-disabled'], true, 'aria-disabled, not disabled: focus stays on it');
+    assert.equal(busyButton.props.disabled, undefined);
+    assert.match(textOfElement(busyButton), /保存しています…/);
+    busyButton.props.onClick();
+    assert.equal(retries, 1, 'nothing while a request runs');
+
+    let signIns = 0;
+    const auth = render(VIEW({ state: 'stopped', reason: 'auth', pending: 1 }), 'jp', { onSignIn: () => { signIns += 1; } });
+    const signIn = auth.find((el) => el.type === 'button');
+    assert.match(textOfElement(signIn), /ログインし直す/);
+    assert.match(textOfElement(auth[0]), /ログインの確認ができないため/);
+    signIn.props.onClick();
+    assert.equal(signIns, 1);
+
+    for (const reason of ['account', 'storage']) {
+      const none = render(VIEW({ state: 'stopped', reason, pending: 1 }));
+      assert.ok(!none.some((el) => el.type === 'button'), reason);
+      assert.match(textOfElement(none[0]), /（1 件）/);
+    }
+  });
+
+  it('English counts have a singular', () => {
+    assert.match(textOfElement(render(VIEW({ state: 'stopped', reason: 'storage', pending: 1 }), 'en')[0]), /^Some learning isn't saved yet \(one lesson\)\. /);
+    assert.match(textOfElement(render(VIEW({ state: 'stopped', reason: 'storage', pending: 2 }), 'en')[0]), /\(2 lessons\)\./);
+  });
+
+  it('the page notice: retry is retryProgressSync; 「ログインし直す」 is logout with reason reauth (no question)', () => {
+    const calls = [];
+    const auth = { logout: async (options) => { calls.push(options); return true; } };
+    const view = VIEW({ state: 'stopped', reason: 'network', pending: 1 });
+    globalThis.__retries = 0;
+    const els = elementsOf(renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view, __auth: auth }));
+    els.find((el) => el.type === 'button').props.onClick();
+    assert.equal(globalThis.__retries, 1);
+    const authEls = elementsOf(renderUi(ui, ui.SaveStoppedNotice, {}, { __view: VIEW({ state: 'stopped', reason: 'auth', pending: 1 }), __auth: auth }));
+    authEls.find((el) => el.type === 'button').props.onClick();
+    assert.deepEqual(calls, [{ reason: 'reauth' }]);
+    const app = readFile('App.tsx');
+    assert.match(app, /notice=\{<>\{features\.legalPages \? <LegalNoticeBar \/> : null\}<SaveStoppedNotice \/><\/>\}/);
+  });
+
+  it('the notice goes away while its button had focus (the retry worked): focus moves to #main-content, only from the page body', () => {
+    const stopped = VIEW({ state: 'stopped', reason: 'network', pending: 1 });
+    /** Renders the page notice with refs kept across renders; returns its elements and effects. */
+    const mount = (refs, view) => {
+      const els = elementsOf(renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view, __refs: refs }));
+      return { els, effects: globalThis.__effects };
+    };
+    const runEffects = (effects, activeElement) => {
+      const doc = focusDocument();
+      doc.activeElement = activeElement === 'body' ? doc.body : activeElement;
+      globalThis.document = doc;
+      try {
+        for (const effect of effects) effect();
+      } finally {
+        delete globalThis.document;
+      }
+      return doc;
+    };
+    // The button had focus; then the records were saved: the notice empties.
+    let refs = {};
+    let { els, effects } = mount(refs, stopped);
+    assert.equal(runEffects(effects, 'body').main.focused, 0, 'still shown: nothing moves');
+    els.find((el) => el.type === 'button').props.onFocus();
+    ({ effects } = mount(refs, VIEW({ state: 'saved', pending: 0 })));
+    const doc = runEffects(effects, 'body');
+    assert.equal(doc.main.focused, 1, 'focus left with the button: main takes it');
+    assert.deepEqual(doc.main.opts, { preventScroll: true });
+    assert.equal(runEffects(effects, 'body').main.focused, 0, 'once');
+    // Focus already somewhere else (the learner moved on): left alone.
+    refs = {};
+    ({ els } = mount(refs, stopped));
+    els.find((el) => el.type === 'button').props.onFocus();
+    ({ effects } = mount(refs, VIEW({ state: 'saved', pending: 0 })));
+    assert.equal(runEffects(effects, { name: 'a link' }).main.focused, 0);
+    // The button never had focus: nothing moves.
+    refs = {};
+    mount(refs, stopped);
+    ({ effects } = mount(refs, VIEW({ state: 'saved', pending: 0 })));
+    assert.equal(runEffects(effects, 'body').main.focused, 0);
+  });
+});
+
+describe('UnsavedLogoutDialog: the logout question (O4, findings 6, 9, 10, 14)', () => {
+  const render = (phase, language = 'jp') => elementsOf(renderUi(ui, ui.UnsavedLogoutDialogView, { language, phase }));
+
+  it('idle: only the empty status region; checking: a status line, never a dialog (G29)', () => {
+    const idle = render({ kind: 'idle' });
+    assert.equal(idle.filter((el) => el.type === 'ConfirmDialog').length, 0);
+    const region = idle.find((el) => el.props?.role === 'status');
+    assert.equal(region.props['aria-live'], 'polite');
+    assert.equal(region.props.children, null);
+    const checking = render({ kind: 'checking' });
+    assert.equal(checking.filter((el) => el.type === 'ConfirmDialog').length, 0, 'not a dialog');
+    assert.equal(textOfElement(checking.find((el) => el.props?.role === 'status')), '学習の記録を保存しています…');
+    assert.ok(!checking.some((el) => el.type === 'button'), 'no buttons');
+  });
+
+  it('asking: a fresh dialog for every question (keyed by ask); stay signed in first; the body starts 「まだログアウトしていません。」', () => {
+    const first = render({ kind: 'asking', unsaved: 2, ask: 1 }).find((el) => el.type === 'ConfirmDialog');
+    const second = render({ kind: 'asking', unsaved: 2, ask: 2 }).find((el) => el.type === 'ConfirmDialog');
+    assert.equal(first.key, 1);
+    assert.equal(second.key, 2, 'a new key: mounted fresh (showModal, focus on Cancel)');
+    const p = first.props;
+    assert.equal(p.open, true);
+    assert.equal(p.cancelLabel, 'ログアウトしない', 'ConfirmDialog focuses Cancel first');
+    assert.equal(p.confirmLabel, 'このままログアウト');
+    assert.equal(p.confirmTone, 'danger');
+    assert.equal(p.returnFocusRef, undefined, 'focus goes back through restoreLogoutFocus');
+    assert.equal(p.title, 'まだ保存できていない学習があります');
+    assert.equal(p.body, 'まだログアウトしていません。2 件のレッスンの記録を、まだアカウントに保存できていません。このままログアウトすると、記録はこの端末に残り、次に同じアカウントでログインしたときに保存します。その前に別のアカウントでログインすると、この記録は消えます。');
+    const en = render({ kind: 'asking', unsaved: 1, ask: 3 }, 'en').find((el) => el.type === 'ConfirmDialog').props;
+    assert.equal(en.body, "You are still signed in. One lesson record isn't saved to your account yet. If you log out now, it stays on this device and is saved the next time you sign in with this account. If someone signs in with a different account first, it is deleted.");
+    assert.match(render({ kind: 'asking', unsaved: 3, ask: 4 }, 'en').find((el) => el.type === 'ConfirmDialog').props.body, /^You are still signed in\. 3 lesson records aren't saved/);
+    assert.deepEqual([en.cancelLabel, en.confirmLabel], ['Stay signed in', 'Log out anyway']);
+  });
+
+  it('Esc or 「ログアウトしない」 (the dialog closes): "stay", then focus back through the fallback chain (G30); 「このままログアウト」: "log out"', () => {
+    globalThis.__answers = [];
+    globalThis.__restored = [];
+    const target = { name: 'logout button' };
+    globalThis.__target = target;
+    const dialog = render({ kind: 'asking', unsaved: 1, ask: 1 }).find((el) => el.type === 'ConfirmDialog');
+    dialog.props.onClose();
+    assert.deepEqual(globalThis.__answers, [false]);
+    assert.deepEqual(globalThis.__restored, [target]);
+    dialog.props.onConfirm();
+    assert.deepEqual(globalThis.__answers, [false, true]);
+    delete globalThis.__target;
+    const host = readFile('App.tsx');
+    assert.match(host, /<ProgressAdoptDialog \/>\s*\{\/\*[^*]*\*\/\}\s*<UnsavedLogoutDialog \/>/, 'mounted once in App, outside the Layout');
+  });
+});
+
+describe('LessonEnd: where the rating went (G32) and 「このレッスンを最初からやり直す」 (design §2.6)', () => {
+  const LESSON = {
+    id: 'vibe-ch1',
+    objectives: [{ id: 'o1', text: 'Goal one' }],
+    sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }] }],
+  };
+  const reader = ({ ratings = {}, seen = ['b1'], resetLesson = async () => ({ ok: true }), rated = [] } = {}) => ({
+    lesson: LESSON,
+    courseSlug: 'vibe-coding',
+    scrollToBlock() {},
+    progress: {
+      progress: { v: 1, seen, answers: {}, checks: {}, ratings, lastBlockId: null, updatedAt: '2026-10-25T00:00:00.000Z' },
+      pct: 50,
+      getCheck: () => undefined,
+      setRating: (id, r) => rated.push([id, r]),
+      resetLesson,
+    },
+  });
+  const render = (props = {}, globals = {}) => elementsOf(renderUi(ui, ui.LessonEnd, { next: null, prev: null, backTo: '/c', resettable: true, ...props }, {
+    __view: VIEW(),
+    __sync: { status: 'on', userId: U1 },
+    __reader: reader(),
+    ...globals,
+  }));
+  const savedLine = (els) => textOfElement(byClass(els, 'rp-end-saved')[0]);
+  const resetButton = (els) => byClass(els, 'rp-reset-btn')[0] ?? null;
+
+  it('G32: the line is chosen when the learner rates and later save-state changes never change it', () => {
+    const rated = [];
+    const before = renderUi(ui, ui.LessonEnd, { next: null, prev: null, backTo: '/c' }, { __view: VIEW({ state: 'saved' }), __sync: { status: 'on', userId: U1 }, __reader: reader({ rated }) });
+    assert.equal(savedLine(elementsOf(before)), '', 'nothing before a rating');
+    const radio = elementsOf(before).find((el) => el.type === 'input' && el.props.type === 'radio');
+    globalThis.__sets = [];
+    globalThis.__view = VIEW({ state: 'saved' });
+    globalThis.__reader = reader({ rated });
+    radio.props.onChange();
+    const [index, where] = globalThis.__sets.find(([, v]) => v === 'account' || v === 'device');
+    assert.equal(where, 'account');
+    assert.deepEqual(rated, [['o1', 1]]);
+    delete globalThis.__view;
+    delete globalThis.__reader;
+    // Then the device goes offline: the text stays (no re-announcement on the flip).
+    const later = render({}, { __view: VIEW({ state: 'offline', pending: 1 }), __reader: reader({ ratings: { o1: 1 } }), __state: { [index]: 'account' } });
+    assert.equal(savedLine(later), '記録しました。「まだ不安」の目標は、あとで読み返しましょう。');
+    // Rated while offline: "on this device", also once back online.
+    const device = render({}, { __view: VIEW({ state: 'saved' }), __reader: reader({ ratings: { o1: 1 } }), __state: { [index]: 'device' } });
+    assert.equal(savedLine(device), 'この端末に記録しました。「まだ不安」の目標は、あとで読み返しましょう。');
+    // Ratings already there at mount: chosen once from the view then.
+    assert.equal(savedLine(render({}, { __view: VIEW({ state: 'local' }), __reader: reader({ ratings: { o1: 2 } }) })), 'この端末に記録しました。「まだ不安」の目標は、あとで読み返しましょう。');
+    assert.equal(savedLine(render({}, { __view: VIEW({ state: 'saving', pending: 1 }), __reader: reader({ ratings: { o1: 2 } }) })), '記録しました。「まだ不安」の目標は、あとで読み返しましょう。');
+    // A lesson that never syncs (drafts, the gallery): this device.
+    assert.equal(ui.savedWhereOf({ state: 'saved' }, false), 'device');
+    for (const state of ['offline', 'stopped', 'local']) assert.equal(ui.savedWhereOf({ state }, true), 'device', state);
+    for (const state of ['saved', 'saving', 'loading']) assert.equal(ui.savedWhereOf({ state }, true), 'account', state);
+  });
+
+  it('the control: hidden without the reader\'s permission, a synced learner, the server\'s offer or anything to delete', () => {
+    assert.ok(resetButton(render()), 'shown');
+    assert.equal(resetButton(render({ resettable: false })), null, 'not allowed by the reader (preview, gallery)');
+    assert.equal(resetButton(render({}, { __sync: { status: 'off', userId: null } })), null, 'guests, mock, Nexloom-only');
+    assert.equal(resetButton(render({}, { __caps: { lessonReset: false, achievements: true } })), null, 'an older server');
+    assert.equal(resetButton(render({}, { __caps: null })), null, 'not known yet');
+    assert.equal(resetButton(render({}, { __reader: reader({ seen: [] }) })), null, 'nothing to delete');
+    const status = byClass(render({ resettable: false }), 'rp-end-reset-status')[0];
+    assert.equal(status.props.role, 'status', 'the reason line is always mounted');
+  });
+
+  it('sync not on: aria-disabled with a helper line that says why; on (or a background refresh): enabled and opens the dialog', () => {
+    const OFFLINE = 'いまはサーバーとつながっていないため、やり直せません。つながってから、もう一度お試しください。';
+    const LATER = 'いまはやり直せません。';
+    for (const [sync, view, text] of [
+      [{ status: 'offline', userId: U1 }, VIEW({ state: 'offline' }), OFFLINE],
+      [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'network' }), OFFLINE],
+      [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'server' }), OFFLINE],
+      [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'auth' }), 'ログインし直すと、やり直せます。'],
+      [{ status: 'offline', userId: U1 }, VIEW({ state: 'stopped', reason: 'auth' }), 'ログインし直すと、やり直せます。'],
+      [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'account' }), LATER],
+      [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'storage' }), LATER],
+      [{ status: 'hydrating', userId: U1 }, VIEW({ state: 'loading' }), '読み込みが終わると、やり直せます。'],
+      [{ status: 'needs_choice', userId: U1 }, VIEW({ state: 'local' }), LATER],
+    ]) {
+      const els = render({}, { __sync: sync, __view: view });
+      const button = resetButton(els);
+      assert.equal(button.props['aria-disabled'], true, sync.status);
+      const help = els.find((el) => el.props?.id === button.props['aria-describedby']);
+      assert.equal(textOfElement(help), text, `${sync.status} ${view.state} ${view.reason}`);
+      globalThis.__sets = [];
+      button.props.onClick();
+      assert.deepEqual(globalThis.__sets, [], 'a click does nothing');
+    }
+    assert.equal(ui.resetHelpOf({ state: 'stopped', reason: 'auth' }), 'auth');
+    const en = render({}, { __language: 'en', __sync: { status: 'stopped', userId: U1 }, __view: VIEW({ state: 'stopped', reason: 'auth' }) });
+    assert.equal(textOfElement(en.find((el) => el.props?.id === resetButton(en).props['aria-describedby'])), 'You can start over after you sign in again.');
+    for (const [sync, view] of [[{ status: 'on', userId: U1 }, VIEW()], [{ status: 'hydrating', userId: U1 }, VIEW({ state: 'saved' })]]) {
+      const els = render({}, { __sync: sync, __view: view });
+      const button = resetButton(els);
+      assert.equal(button.props['aria-disabled'], undefined, sync.status);
+      assert.equal(button.props['aria-describedby'], undefined);
+      assert.equal(textOfElement(button), 'このレッスンを最初からやり直す');
+      assert.deepEqual(iconsOf(elementsOf(walk(button))), ['RotateCcw']);
+      globalThis.__sets = [];
+      button.props.onClick();
+      assert.ok(globalThis.__sets.some(([, v]) => v === true), 'opens the dialog');
+    }
+  });
+
+  it('the dialog: Cancel first, danger, what goes and what stays; success tells the reader only once it has closed', async () => {
+    let resets = 0;
+    const els = render({ onLessonReset: () => { resets += 1; } }, { __reader: reader({ resetLesson: async () => ({ ok: true }) }) });
+    const dialog = els.find((el) => el.type === 'ConfirmDialog');
+    assert.equal(dialog.props.open, false, 'always mounted, closed');
+    assert.equal(dialog.props.title, 'このレッスンを最初からやり直しますか？');
+    assert.deepEqual([dialog.props.cancelLabel, dialog.props.confirmLabel, dialog.props.confirmTone], ['やめる', 'やり直す', 'danger']);
+    const body = textOf(walk(dialog.props.body));
+    assert.match(body, /^このレッスンで読んだところ、確認問題の答え、チェック、自己評価、続きの位置を消します。ログインしているすべての端末から消え、元に戻すことはできません。/);
+    assert.match(body, /もらった XP とバッジ、学んだ日、学習の履歴は残ります。このレッスンで、もう一度 XP をもらうことはありません。AI アプリにすでに渡した内容は消えません。$/);
+    // The button opens the dialog and is where focus returns (Cancel, Esc, a refusal).
+    const button = resetButton(els);
+    button.props.ref.current = { name: 'reset button', isConnected: true };
+    button.props.onClick();
+    assert.equal(dialog.props.returnFocusRef.current?.name, 'reset button', 'focus returns to the button');
+    globalThis.__sets = [];
+    globalThis.document = focusDocument();
+    await dialog.props.onConfirm();
+    await wait(1);
+    assert.equal(resets, 0, 'not while the dialog is still open');
+    assert.ok(globalThis.__sets.some(([, v]) => v === false), 'the dialog closes');
+    assert.equal(dialog.props.returnFocusRef.current, null, 'no focus back to a button that goes');
+    dialog.props.onClose();
+    assert.equal(resets, 1, 'after the close: status line, top, focus on the title');
+    dialog.props.onClose();
+    assert.equal(resets, 1, 'once');
+    delete globalThis.document;
+  });
+
+  it('the dialog closed before the request ended (Chromium: a repeated Esc while busy): the reader is told at once, and only once', async () => {
+    let resets = 0;
+    let release;
+    const els = render({ onLessonReset: () => { resets += 1; } }, { __reader: reader({ resetLesson: () => new Promise((resolve) => { release = resolve; }) }) });
+    const button = resetButton(els);
+    const dialog = els.find((el) => el.type === 'ConfirmDialog');
+    button.props.ref.current = { name: 'reset button', isConnected: true };
+    button.props.onClick();
+    globalThis.document = focusDocument();
+    dialog.props.onConfirm();
+    dialog.props.onClose(); // closed while busy
+    assert.equal(resets, 0, 'nothing done yet');
+    release({ ok: true });
+    await wait(1);
+    assert.equal(resets, 1, 'no close event will come: told when the request ends');
+    assert.equal(dialog.props.returnFocusRef.current, null);
+    // The next time the dialog is opened and cancelled, nothing is said.
+    button.props.onClick();
+    dialog.props.onClose();
+    assert.equal(resets, 1, 'no stale success');
+    delete globalThis.document;
+  });
+
+  it('opening the dialog starts clean: a success never closed by its dialog is not reported by the next one', async () => {
+    let resets = 0;
+    const els = render({ onLessonReset: () => { resets += 1; } }, { __reader: reader({ resetLesson: async () => ({ ok: true }) }) });
+    const button = resetButton(els);
+    const dialog = els.find((el) => el.type === 'ConfirmDialog');
+    button.props.ref.current = { name: 'reset button', isConnected: true };
+    button.props.onClick();
+    dialog.props.onConfirm();
+    await wait(1);
+    assert.equal(resets, 0, 'still open: waits for the close');
+    button.props.onClick(); // (no close event came, e.g. the dialog was replaced)
+    globalThis.document = focusDocument();
+    dialog.props.onClose();
+    delete globalThis.document;
+    assert.equal(resets, 0);
+  });
+
+  it('a refusal: the reason under the button, focus back to it, the reader is not told', async () => {
+    let resets = 0;
+    const els = render({ onLessonReset: () => { resets += 1; } }, { __reader: reader({ resetLesson: async () => ({ ok: false, reason: 'rate_limited' }) }) });
+    const button = resetButton(els);
+    const dialog = els.find((el) => el.type === 'ConfirmDialog');
+    const ref = { name: 'reset button', isConnected: true };
+    button.props.ref.current = ref;
+    button.props.onClick();
+    globalThis.__sets = [];
+    await dialog.props.onConfirm();
+    await wait(1);
+    const [failureIndex] = globalThis.__sets.find(([, v]) => v === 'rate_limited');
+    let doc = focusDocument();
+    globalThis.document = doc;
+    dialog.props.onClose();
+    assert.equal(dialog.props.returnFocusRef.current, ref, 'ConfirmDialog returns focus to the button');
+    assert.equal(doc.main.focused, 0, 'the button is there: main is left alone');
+    // The button went meanwhile (another device deleted the progress: 'reloaded'): focus goes to main.
+    button.props.onClick();
+    await dialog.props.onConfirm();
+    await wait(1);
+    ref.isConnected = false;
+    doc = focusDocument();
+    globalThis.document = doc;
+    dialog.props.onClose();
+    assert.equal(doc.main.focused, 1);
+    assert.deepEqual(doc.main.opts, { preventScroll: true });
+    delete globalThis.document;
+    assert.equal(resets, 0);
+    const after = render({}, { __state: { [failureIndex]: 'rate_limited' } });
+    assert.equal(textOfElement(byClass(after, 'rp-end-reset-status')[0]), '操作が続いたため、少し待ってからもう一度お試しください。');
+    const reasons = { unsupported: 'いまはやり直せません。', not_published: 'このレッスンは、やり直しの対象ではありません。', failed: '何も変更していません', unconfirmed: 'このページを開き直してください', reloaded: 'ほかの端末で消されていたため' };
+    for (const [reason, text] of Object.entries(reasons)) {
+      assert.match(textOfElement(byClass(render({}, { __state: { [failureIndex]: reason } }), 'rp-end-reset-status')[0]), new RegExp(text), reason);
+    }
+  });
+
+  it('the reader: sections keyed by drops (G16), the title focusable, LessonEnd and the header outside; only the learn route allows a reset', () => {
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    const keyed = /<React\.Fragment key=\{progress\.drops\}>\s*\{lesson\.sections\.map\(\(section\) => \{[\s\S]*?<\/React\.Fragment>\s*<LessonEnd next=\{next\} prev=\{prev\} backTo=\{backTo\} resettable=\{allowReset && syncable\} onLessonReset=\{onLessonReset\} \/>/;
+    assert.match(reader, keyed);
+    assert.ok(reader.indexOf('<LessonHeader lesson={lesson} entry={entry} />') < reader.indexOf('<React.Fragment key={progress.drops}>'), 'the header stays mounted');
+    assert.match(reader, /showSaveState=\{syncable\}/);
+    assert.match(reader, /document\.getElementById\(lessonTitleId\(lesson\.id\)\)\?\.focus\(\{ preventScroll: true \}\);/);
+    assert.match(readFile('components/lesson/LessonHeader.tsx'), /<h1 id=\{lessonTitleId\(lesson\.id\)\} className="rp-title" tabIndex=\{-1\}/);
+    assert.match(readFile('components/routes/LearnRoute.tsx'), /allowReset=\{mode === 'learn'\}/);
+    assert.doesNotMatch(readFile('components/routes/DevBlocksRoute.tsx'), /allowReset/);
+  });
+});
+
+describe('LeftRecordsNotice: records left on this device, on the sign-in view', () => {
+  function storageWith(entries) {
+    const map = new Map(Object.entries(entries));
+    return {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => map.set(k, String(v)),
+      removeItem: (k) => map.delete(k),
+      key: (i) => [...map.keys()][i] ?? null,
+      get length() { return map.size; },
+    };
+  }
+  const record = (updatedAt) => JSON.stringify({ v: 1, seen: ['b1'], answers: {}, checks: {}, lastBlockId: null, updatedAt });
+  const AT = '2026-10-25T01:00:00.000Z';
+
+  it('shown for a logged-out account with unchanged markers (the count, no lesson names); hidden otherwise', () => {
+    const left = {
+      [ui.SYNC_ACCOUNT_KEY]: JSON.stringify({ userId: U1, epoch: null, loggedOut: true }),
+      'rp:progress:vibe-coding:vibe-ch1': record(AT),
+      [`${ui.SYNC_PENDING_PREFIX}vibe-coding:vibe-ch1`]: AT,
+      'rp:progress:vibe-coding:vibe-ch2': record(AT),
+      [`${ui.SYNC_PENDING_PREFIX}vibe-coding:vibe-ch2`]: AT,
+    };
+    globalThis.window = { localStorage: storageWith(left) };
+    try {
+      const tokens = renderUi(ui, ui.LeftRecordsNotice);
+      const els = elementsOf(tokens);
+      const text = textOf(tokens);
+      assert.equal(text, 'この端末に、まだ保存できていない学習の記録があります（2 件）。前と同じアカウントでログインすると保存します。別のアカウントでログインすると、この記録は消えます。');
+      assert.doesNotMatch(text, /vibe/);
+      assert.ok(!els.some((el) => el.props?.role), 'present at mount: not a live region');
+      assert.deepEqual(iconsOf(els), ['CloudOff']);
+      globalThis.window = { localStorage: storageWith({ ...left, [ui.SYNC_ACCOUNT_KEY]: JSON.stringify({ userId: U1, epoch: null }) }) };
+      assert.deepEqual(elementsOf(renderUi(ui, ui.LeftRecordsNotice)), [], 'still signed in: nothing');
+      globalThis.window = { localStorage: storageWith({ ...left, 'rp:progress:vibe-coding:vibe-ch1': record('2026-10-25T02:00:00.000Z'), 'rp:progress:vibe-coding:vibe-ch2': record('2026-10-25T02:00:00.000Z') }) };
+      assert.deepEqual(elementsOf(renderUi(ui, ui.LeftRecordsNotice)), [], 'changed since (another learner wrote): nothing');
+      // A session that ended without a logout: only what was unsent then (the server has ch2).
+      globalThis.window = { localStorage: storageWith({ ...left, [ui.SYNC_ACCOUNT_KEY]: JSON.stringify({ userId: U1, epoch: null, loggedOut: true, unsent: ['vibe-coding:vibe-ch1'] }) }) };
+      assert.match(textOf(renderUi(ui, ui.LeftRecordsNotice)), /（1 件）/);
+      globalThis.window = { localStorage: storageWith({ ...left, [ui.SYNC_ACCOUNT_KEY]: JSON.stringify({ userId: U1, epoch: null, loggedOut: true, unsent: [] }) }) };
+      assert.deepEqual(elementsOf(renderUi(ui, ui.LeftRecordsNotice)), [], 'nothing was unsent: nothing');
+      // Lessons the server does not store never save: not counted.
+      globalThis.window = { localStorage: storageWith(left) };
+      assert.deepEqual(elementsOf(renderUi(ui, ui.LeftRecordsNotice, {}, { __syncable: false })), [], 'not a lesson the server stores');
+    } finally {
+      delete globalThis.window;
+    }
+    assert.match(textOf(walk(expand(ui.LeftRecordsNoticeView({ language: 'en', count: 1 })))), /^This device has learning that isn't saved yet \(one lesson\)\. Sign in with the same account to save it\. If you sign in with a different account, it is deleted\.$/);
+    assert.match(readFile('components/common/ExperienceLoginView.tsx'), /<LeftRecordsNotice \/>\s*\n\s*<div className="flex rounded-full/, 'above the form');
+  });
+});
+
+const SNAP = (status, data = null) => ({ status, learnerId: data ? U1 : null, data, at: data ? 1 : null });
+const DATA = (patch = {}) => ({
+  learnerId: U1,
+  xp: { total: 230, level: 3, intoLevel: 30, levelSize: 100, toNextLevel: 70 },
+  counts: { lessonsStarted: 5, lessonsDone: 4, stagesDone: 1 },
+  streak: { current: 0, best: 5, activeToday: false, today: '2026-10-25', timeZone: 'Asia/Tokyo' },
+  badges: [
+    { id: 'first_lesson', earned: true, current: 1, goal: 1 },
+    { id: 'five_lessons', earned: true, current: 5, goal: 5 },
+    { id: 'fifteen_lessons', earned: false, current: 5, goal: 15 },
+    { id: 'first_course', earned: false, current: 9, goal: 13, course: 'vibe-coding' },
+    { id: 'three_courses', earned: false, current: 0, goal: 3 },
+    { id: 'streak_3', earned: true, current: 3, goal: 3 },
+    { id: 'streak_7', earned: false, current: 0, goal: 7 },
+  ],
+  ...patch,
+});
+const NOT_READY = ['idle', 'loading', 'unavailable', 'unsupported', 'no_account'];
+
+describe('XP and badges on screen (design §3.7): server data only, nothing made up', () => {
+  it('ProgressCluster: the chips only with an answer; otherwise nothing (no zero)', () => {
+    for (const status of NOT_READY) assert.equal(ui.ProgressClusterView({ snapshot: SNAP(status), language: 'jp' }), null, status);
+    const tokens = renderUi(ui, ui.ProgressClusterView, { snapshot: SNAP('ready', DATA({ streak: { current: 3, best: 5, activeToday: false, today: '2026-10-25', timeZone: 'Asia/Tokyo' } })), language: 'jp' });
+    const els = elementsOf(tokens);
+    const text = textOf(tokens);
+    assert.match(text, /連続 3 日 — 今日読むと続きます/);
+    assert.match(text, /Lv 3/);
+    assert.match(text, /30 \/ 100 XP/);
+    const bar = els.find((el) => el.props?.role === 'progressbar');
+    assert.deepEqual([bar.props['aria-valuenow'], bar.props['aria-valuemax']], [30, 100]);
+    assert.match(textOf(renderUi(ui, ui.ProgressClusterView, { snapshot: SNAP('ready', DATA()), language: 'jp' })), /連続 0 日 — 今日の1レッスンでスタート/);
+  });
+
+  it('ProfilePassport: level, XP and streak from the server; otherwise 「—」 with a screen-reader text per status', () => {
+    const passportTokens = (snapshot, language = 'jp') => renderUi(ui, ui.ProfilePassport, { onNavigate() {} }, {
+      __ach: snapshot, __language: language, __auth: { user: { name: 'Aki', isGuest: false, avatar: '' }, logout: async () => true },
+    });
+    const passport = (snapshot, language) => elementsOf(passportTokens(snapshot, language));
+    const ready = textOf(passportTokens(SNAP('ready', DATA({ streak: { current: 4, best: 5, activeToday: true, today: '2026-10-25', timeZone: 'Asia/Tokyo' } }))));
+    assert.match(ready, /レベル3XP230/);
+    assert.match(ready, /連続日数4日合計XP230/);
+    const expected = {
+      idle: '読み込んでいます', loading: '読み込んでいます', unavailable: '読み込めませんでした',
+      unsupported: 'XP とバッジは、まもなく使えるようになります', no_account: 'XP とバッジは、Rise Path のアカウントでログインすると記録されます',
+    };
+    for (const status of NOT_READY) {
+      const els = passport(SNAP(status));
+      const dashes = els.filter((el) => el.props?.['aria-hidden'] === 'true' && textOfElement(el) === '—');
+      assert.equal(dashes.length, 4, `${status}: level, XP, streak, total`);
+      const sr = byClass(els, 'sr-only').map(textOfElement).filter((t) => t === expected[status]);
+      assert.equal(sr.length, 4, status);
+      assert.doesNotMatch(textOf(passportTokens(SNAP(status))), /\d+日|レベル\d/, `${status}: no number`);
+    }
+    assert.equal(ui.notReadyText('en', 'no_account'), 'XP and badges are recorded when you sign in with a Rise Path account');
+    assert.equal(ui.notReadyText('en', 'unsupported'), 'XP and badges will be available soon');
+  });
+
+  it('badges: award words only on earned badges (G20); unearned streak badges show the current streak (G33); the next badge', () => {
+    const tokens = renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('ready', DATA()), onRetry() {} });
+    const els = elementsOf(tokens);
+    const items = els.filter((el) => el.type === 'li');
+    assert.equal(items.length, 7);
+    for (const item of items) {
+      const text = textOfElement(item);
+      if (item.props['data-earned']) {
+        assert.match(text, /獲得済み/);
+        assert.ok(!elementsOf(walk(item)).some((el) => el.props?.role === 'progressbar'));
+      } else {
+        assert.doesNotMatch(text, /獲得済み|記念|レジェンド|おめでとう/, text);
+        const bar = elementsOf(walk(item)).find((el) => el.props?.role === 'progressbar');
+        assert.ok(bar, 'progress, with a name');
+        assert.ok(bar.props['aria-label']);
+        assert.ok(elementsOf(walk(item)).some((el) => el.type === 'LockKeyhole'), 'not only colour: a lock');
+      }
+    }
+    const streak7 = textOfElement(items[6]);
+    assert.match(streak7, /^7 日つづけて学習7 日つづけて学ぶ（日本時間）いまの連続 0 日。あと 7 日つづけると獲得$/, 'the current streak (0), not the best (5)');
+    assert.match(textOfElement(items[3]), /バイブコーディング入門：9 \/ 13・あと 4/, 'the course nearest to done, by name');
+    assert.match(textOf(tokens), /いちばん長い連続: 5 日/);
+    const next = els.find((el) => el.type === 'section');
+    assert.match(textOfElement(next), /^次のバッジ: コース修了1 つのコースの、いま公開されているレッスンをすべて終える/);
+    assert.doesNotMatch(textOfElement(next), /獲得済み/);
+    assert.equal(ui.nextBadge(DATA().badges).id, 'first_course', '9/13 is the nearest');
+    assert.equal(ui.nextBadge(DATA().badges.map((b) => ({ ...b, earned: true }))), null);
+    const all = textOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('ready', DATA({ badges: DATA().badges.map((b) => ({ ...b, earned: true, current: b.goal })) })), onRetry() {} }));
+    assert.match(all, /すべてのバッジを獲得しました/);
+    assert.equal(ui.badgeProgressText('en', { id: 'streak_7', earned: false, current: 1, goal: 7 }), '1 day in a row now; 6 more days in a row to earn it');
+    assert.equal(ui.badgeProgressText('en', { id: 'streak_3', earned: false, current: 2, goal: 3 }), '2 days in a row now; 1 more day in a row to earn it');
+    assert.equal(ui.badgeProgressText('en', { id: 'five_lessons', earned: false, current: 2, goal: 5 }), '2 / 5 · 3 to go');
+  });
+
+  it('badges: loading is a status line; unavailable offers "try again"; unsupported and no_account say so with no button', () => {
+    const bodyTokens = (status) => renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP(status), onRetry: () => { globalThis.__retried = (globalThis.__retried ?? 0) + 1; } });
+    const body = (status) => elementsOf(bodyTokens(status));
+    for (const status of ['idle', 'loading']) {
+      const els = body(status);
+      assert.equal(els[0].props.role, 'status');
+      assert.equal(textOfElement(els[0]), '読み込んでいます…');
+    }
+    const unavailable = body('unavailable');
+    assert.match(textOf(bodyTokens('unavailable')), /いまはバッジを表示できません。しばらくしてから、もう一度お試しください。/);
+    const retry = unavailable.find((el) => el.type === 'button');
+    assert.match(textOfElement(retry), /もう一度読み込む/);
+    globalThis.__retried = 0;
+    retry.props.onClick();
+    assert.equal(globalThis.__retried, 1);
+    assert.match(textOf(bodyTokens('unsupported')), /^バッジは、まもなく使えるようになります。$/);
+    assert.match(textOf(bodyTokens('no_account')), /^XP とバッジは、Rise Path のアカウントでログインすると記録されます。$/);
+    for (const status of ['unsupported', 'no_account']) assert.ok(!body(status).some((el) => el.type === 'button'), status);
+  });
+
+  it('the old local XP is gone: no gamificationService, no ui/activity, no legacy badges or trophy', () => {
+    assert.equal(fs.existsSync(path.join(ROOT, 'services/gamificationService.ts')), false);
+    assert.equal(fs.existsSync(path.join(ROOT, 'components/ui/activity.ts')), false);
+    for (const file of ['components/ui/ProgressCluster.tsx', 'components/features/dashboard/ProfilePassport.tsx', 'components/features/dashboard/profile/ProfileBadgesView.tsx']) {
+      const text = readFile(file);
+      assert.doesNotMatch(text, /gamificationService|ui\/activity|from '\.\/activity'|getLearningEvents|getAllProgress/, file);
+      assert.match(text, /useAchievements\(\)/, file);
+    }
+    const badges = readFile('components/features/dashboard/profile/ProfileBadgesView.tsx');
+    assert.doesNotMatch(badges, /初ビルド|First Build|AI探究者|AI Explorer|学習の守護者|マスター|レジェンド|Legendary|記念|Milestone Trophy/);
+    assert.match(badges, /setTheme\('default'\)/);
+  });
+});
+
+describe('logout callers and copy rules (static)', () => {
+  it('AuthContext: the question first ("stay" returns false before anything is cleared); account deletion never asks', () => {
+    const auth = readFile('context/AuthContext.tsx');
+    const logout = auth.slice(auth.indexOf('const logout = useCallback'));
+    const gate = logout.indexOf('if (!(await confirmUnsavedLearning(options))) return false;');
+    assert.ok(gate > 0 && gate < logout.indexOf('clearSharedDeviceAiData('), 'G12');
+    assert.match(auth, /logout: \(options\?: \{ reason\?: 'reauth' \}\) => Promise<boolean>;/);
+    const deletion = auth.slice(auth.indexOf('const endDeletedAccountSession'), auth.indexOf('const logout = useCallback'));
+    assert.doesNotMatch(deletion, /confirmUnsavedLearning/);
+    // The primary session ending elsewhere closes an open question (it would no longer be true).
+    assert.match(auth, /\} else if \(!_event\.startsWith\('SIGNED_IN'\) && !session\) \{\s*(\/\/[^\n]*\n\s*)*stopProgressSync\(\);\s*(\/\/[^\n]*\n\s*)*endUnsavedLearningQuestion\(\);/);
+  });
+
+  it('the four callers that navigate stay when the learner chose to stay; the seven "sign in again" buttons never ask', () => {
+    assert.match(readFile('App.tsx'), /logout\(\)\s*\.then\(\(done\) => \{ if \(done !== false\) navigate\('\/', \{ replace: true \}\); \}\)/);
+    assert.match(readFile('components/legal/LegalConsentView.tsx'), /logout\(\)\s*\.then\(\(done\) => \{ if \(done !== false\) navigate\('\/', \{ replace: true \}\); \}\)/);
+    assert.match(readFile('components/features/dashboard/ProfilePassport.tsx'), /if \(\(await logout\(\)\) === false\) return;\s*window\.location\.href = '\/';/);
+    assert.match(readFile('components/features/oauth/OAuthConsentView.tsx'), /try \{\s*\/\/[^\n]*\n\s*if \(\(await logout\(\)\) === false\) return;/);
+    const reauth = {
+      'components/features/ai/CourseGeneratorView.tsx': 2,
+      'components/features/dashboard/assessment/PersonalAssessmentView.tsx': 1,
+      'components/common/LessonView.tsx': 1,
+      'components/safety/AiAccessSetupView.tsx': 1,
+      'components/lesson/TutorPanel.tsx': 2,
+      'components/lesson/SaveStoppedNotice.tsx': 1,
+    };
+    for (const [file, n] of Object.entries(reauth)) {
+      const text = readFile(file);
+      assert.equal(text.split("logout({ reason: 'reauth' })").length - 1, n, file);
+      assert.doesNotMatch(text, /logout\(\)/, `${file}: no bare logout()`);
+    }
+  });
+
+  it('new and rewritten UI: design tokens only, copy in both languages, です・ます without 「簡単です」「誰でも」', () => {
+    const files = [
+      'components/lesson/SaveChip.tsx', 'components/lesson/ReaderStatus.tsx', 'components/lesson/SaveStoppedNotice.tsx',
+      'components/lesson/LeftRecordsNotice.tsx', 'components/lesson/UnsavedLogoutDialog.tsx', 'components/lesson/LessonEnd.tsx',
+      'components/lesson/LessonBar.tsx', 'components/ui/ProgressCluster.tsx', 'components/features/dashboard/profile/ProfileBadgesView.tsx',
+      'components/features/dashboard/ProfilePassport.tsx',
+    ];
+    for (const file of files) {
+      const text = readFile(file);
+      if (file !== 'components/features/dashboard/ProfilePassport.tsx') assert.doesNotMatch(text, TOKEN_RULE, file);
+      assert.doesNotMatch(text, /簡単です|誰でも/, file);
+      assert.match(text, /const copy = \{\s*en: \{/, file);
+      assert.match(text, /\bjp: \{/, file);
+    }
+    // ProfilePassport keeps its old palette classes (design §3.7) and gains none.
+    assert.equal((readFile('components/features/dashboard/ProfilePassport.tsx').match(TOKEN_RULE) ?? []).length, 0);
+    const css = readFile('components/lesson/reader.css');
+    const added = css.slice(css.indexOf('/* Phase 5: where the record is saved (SaveChip).'), css.indexOf('/* Progress ring */'));
+    assert.doesNotMatch(added, /#[0-9a-fA-F]{3,8}\b/, 'reader.css Phase 5 rules: tokens only');
   });
 });

@@ -9,8 +9,9 @@ design tokens only: no hex colors, no `slate-*`, no `rounded-[…]`, nothing bel
 | `PageHeader.tsx` | Eyebrow line (e.g. the date), the page's single `h1`, a description and an actions slot. |
 | `CourseCard.tsx` | Track / course card with a cover generated from the `data-world` accent, an optional image that falls back on error, meta and a progress bar with its number. The whole card is one link or button. |
 | `EmptyState.tsx` | Honest "nothing here yet" panel: icon tile, title, what will appear here, optional action. |
-| `ProgressCluster.tsx` | Streak and level / XP chips from real data, with zero-state copy. |
-| `activity.ts`, `lessonResume.ts` | Pure helpers (no React) behind ProgressCluster and the dashboard's "続きから" card. Tested in `server/tests/dashboardModel.test.js`. |
+| `ProgressCluster.tsx` | Streak and level / XP chips from the server (`achievementsClient.ts`), with zero-state copy; nothing while there is no answer. |
+| `achievementsClient.ts` | The page's memory-only store of the learner's XP, streak and badges (GET `/api/v2/user/achievements`), read with `useAchievements()`. |
+| `lessonResume.ts` | Pure helper (no React) behind the dashboard's "続きから" card. Tested in `server/tests/dashboardModel.test.js`. |
 | `links.ts` | Stable outbound links, such as the authoring guide. |
 
 ## Why `components/ui/` and not `components/common/ui/`

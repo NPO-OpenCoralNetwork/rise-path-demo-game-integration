@@ -737,7 +737,7 @@ function TurnView({ turn, text, sourceChip, onRetry, question, reportContext }: 
 
       {turn.status === 'error' && refusal && (
         <div className="mt-2" data-rp-tutor-refusal={turn.error}>
-          <AiRefusalNotice refusal={refusal} onSignIn={() => { void logout(); }} />
+          <AiRefusalNotice refusal={refusal} onSignIn={() => { void logout({ reason: 'reauth' }); }} />
           {onRetry && !tutorErrorIsFinal(turn.error) && (
             <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={onRetry}>
               <RotateCcw size={14} aria-hidden="true" />
@@ -812,7 +812,7 @@ function LimitMessage({ kind, text }: { kind: TutorLimitKind; text: Copy }) {
         <span>{text.errors[kind]}</span>
       </p>
       {kind === 'daily_limit_guest' && (
-        <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={() => { void logout(); }}>
+        <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={() => { void logout({ reason: 'reauth' }); }}>
           <LogIn size={14} aria-hidden="true" />
           {text.signIn}
         </button>

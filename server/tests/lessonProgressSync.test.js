@@ -909,7 +909,8 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
     // The session expires before the flush.
     t.sync.stop();
     assert.equal(t.sync.getState().status, 'off');
-    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    // Both records are A's now; only l2 was unsent (Phase 5: the sign-in view counts that one).
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true, unsent: [`${COURSE}:l2`] });
     putLocal(t.storage, 'l3', record({ seen: ['n-only'], updatedAt: iso(20) }));
     await t.clock.advance(60_000);
 
@@ -1195,7 +1196,8 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
     const t = setup({ storage });
     // A's session ended while no tab was open: this page hears of no session at all.
     t.sync.stop();
-    assert.deepEqual(account(storage), { userId: U1, epoch: null, loggedOut: true });
+    // No pending marker: nothing this browser knew to be unsent (the sign-in view counts none).
+    assert.deepEqual(account(storage), { userId: U1, epoch: null, loggedOut: true, unsent: [] });
     assert.equal(marker(storage, 'l1'), iso(1));
     // A second page load changes nothing more.
     t.sync.stop();
@@ -1486,6 +1488,10 @@ describe('progress sync: wiring (static)', () => {
     const progressLine = logout.indexOf('await signOutProgressSync()');
     const remoteSignOut = logout.indexOf('auth.signOut()');
     assert.ok(aiLine >= 0 && aiLine < progressLine && progressLine < remoteSignOut);
+    // Phase 5 (G12, owner O4): the unsaved-learning question comes first; "stay signed in" returns
+    // before anything is cleared.
+    const gate = logout.indexOf('if (!(await confirmUnsavedLearning(options))) return false;');
+    assert.ok(gate >= 0 && gate < aiLine, 'the logout gate runs before the AI data is cleared');
   });
 
   it('the browser wiring sends requests only for the learner whose session it is, and hears choices made in other tabs', () => {

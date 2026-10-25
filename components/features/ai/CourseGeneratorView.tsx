@@ -829,7 +829,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                     {/* Access gate or safety screen (Phase 0.5): what is needed, or a calm note. */}
                     {aiRefusal && (
                         <div ref={refusalRef} tabIndex={-1} className="mx-0 sm:mx-6 mb-4 focus:outline-none" data-ai-refusal-panel="">
-                            <AiRefusalNotice refusal={aiRefusal} variant={refusalVariant} onSignIn={() => { void logout(); }} />
+                            <AiRefusalNotice refusal={aiRefusal} variant={refusalVariant} onSignIn={() => { void logout({ reason: 'reauth' }); }} />
                         </div>
                     )}
 
@@ -861,7 +861,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                         {aiBlocked === 'daily_limit' || aiBlocked === 'paused' ? null : aiBlocked === 'auth' ? (
                                             <button
                                                 type="button"
-                                                onClick={() => { void logout(); }}
+                                                onClick={() => { void logout({ reason: 'reauth' }); }}
                                                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary-hover transition-colors"
                                             >
                                                 <LogIn size={16} aria-hidden="true" />

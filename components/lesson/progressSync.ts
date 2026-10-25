@@ -37,7 +37,8 @@
  *   loggedOut, each marker naming its record's updatedAt. The same learner's next sign-in uploads
  *   them; a record written or changed after that (no primary session: nobody syncs it) is not
  *   theirs and is asked about first. Another learner's sign-in clears them. A session that ends
- *   without a logout (stop) leaves every record with activity this way.
+ *   without a logout (stop) leaves every record with activity this way; the account then names
+ *   the records that were really unsent (SyncAccount.unsent: the sign-in view counts only those).
  * - Delete (deleteAll, the Privacy page): DELETE first; only on success clear local data and
  *   store the new epoch. Without a primary session or API: this device only.
  * - Account deleted (forget, Phase 4 design §5.11): stop, then clear every lesson record, marker,
@@ -139,8 +140,15 @@ export type SyncEpoch = string | null;
  * unsent; nobody syncs it now. Records whose pending marker no longer names their updatedAt were
  * written since, by someone else. lessonMark (Phase 5): changes whenever a tab changes a lesson's
  * generation here, so another tab's answer computed before it is repeated (GET) or dropped (PUT).
+ * unsent (Phase 5, only with loggedOut): a session that ended without a logout (stop) marks every
+ * record with activity as the learner's, also those the server already has; these are the
+ * `<course>:<lesson>` of the records that were really unsent then (the sign-in view's count).
+ * Without it every marker is an unsent record (a logout keeps only those).
  */
-export type SyncAccount = { userId: string; epoch: SyncEpoch | '?'; loggedOut?: true; lessonMark?: string };
+export type SyncAccount = { userId: string; epoch: SyncEpoch | '?'; loggedOut?: true; lessonMark?: string; unsent?: string[] };
+
+/** At most this many entries in SyncAccount.unsent (more: the field is ignored). */
+const MAX_UNSENT = 2_000;
 
 /**
  * off: no primary session. needs_choice: waiting for the adoption choice. hydrating: GET running.
@@ -350,13 +358,16 @@ export function parseSyncAccount(raw: string | null | undefined): SyncAccount | 
   try {
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-    const { userId, epoch, loggedOut, lessonMark } = data as { userId?: unknown; epoch?: unknown; loggedOut?: unknown; lessonMark?: unknown };
+    const { userId, epoch, loggedOut, lessonMark, unsent } = data as { userId?: unknown; epoch?: unknown; loggedOut?: unknown; lessonMark?: unknown; unsent?: unknown };
     if (typeof userId !== 'string' || !userId) return null;
+    const unsentOk = loggedOut === true && Array.isArray(unsent) && unsent.length <= MAX_UNSENT
+      && unsent.every((entry) => typeof entry === 'string' && entry.length <= 2 * MAX_SLUG_LENGTH + 1);
     return {
       userId,
       epoch: epoch === null ? null : typeof epoch === 'string' && epoch ? epoch : '?',
       ...(loggedOut === true ? { loggedOut: true as const } : {}),
       ...(typeof lessonMark === 'string' && lessonMark && lessonMark.length <= 40 ? { lessonMark } : {}),
+      ...(unsentOk ? { unsent: unsent as string[] } : {}),
     };
   } catch {
     return null;
@@ -466,14 +477,18 @@ export function readerGenChange(loaded: ReaderGen, raw: string | null, persisted
 }
 
 /**
- * Lesson records this browser still holds for a learner who left it (the account is loggedOut):
- * pending markers whose record exists and still names the marker's updatedAt (what they left).
- * The sign-in view's notice (LeftRecordsNotice). Never throws.
+ * Unsent lesson records this browser still holds for a learner who left it (the account is
+ * loggedOut): pending markers whose record exists and still names the marker's updatedAt (what
+ * they left), of lessons the server stores (`isSyncable`, when given), and, after a session that
+ * ended without a logout, only those that were unsent then (SyncAccount.unsent). The sign-in
+ * view's notice (LeftRecordsNotice). Never throws.
  */
-export function leftRecordCount(storage: SyncStorage | null): number {
+export function leftRecordCount(storage: SyncStorage | null, isSyncable?: (courseSlug: string, lessonId: string) => boolean): number {
   if (!storage) return 0;
   try {
-    if (!parseSyncAccount(storage.getItem(SYNC_ACCOUNT_KEY))?.loggedOut) return 0;
+    const account = parseSyncAccount(storage.getItem(SYNC_ACCOUNT_KEY));
+    if (!account?.loggedOut) return 0;
+    const unsent = account.unsent ? new Set(account.unsent) : null;
     const keys: string[] = [];
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i);
@@ -482,7 +497,8 @@ export function leftRecordCount(storage: SyncStorage | null): number {
     let count = 0;
     for (const key of keys) {
       const ref = refOf(key, SYNC_PENDING_PREFIX);
-      if (!ref) continue;
+      if (!ref || (unsent && !unsent.has(refKey(ref)))) continue;
+      if (isSyncable && !isSyncable(ref.courseSlug, ref.lessonId)) continue;
       const raw = storage.getItem(progressKey(ref.courseSlug, ref.lessonId));
       if (raw !== null && storage.getItem(key) === parseProgress(raw).updatedAt) count += 1;
     }
@@ -902,9 +918,10 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
    * moment) and the account is marked loggedOut, so a record written or changed later, by
    * someone without a primary session, is not taken for theirs. Without unsent records the
    * account goes. An account already marked loggedOut is left as it is: another tab's logout or
-   * session end set its markers, and what was written since is not this learner's.
+   * session end set its markers, and what was written since is not this learner's. unsent: the
+   * records that were really unsent (stop() marks more), kept in the account for the count.
    */
-  function leave(account: SyncAccount): void {
+  function leave(account: SyncAccount, unsent?: string[]): void {
     if (account.loggedOut) return;
     let left = 0;
     for (const ref of pendingLessons()) {
@@ -916,7 +933,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
         left += 1;
       }
     }
-    if (left) write(SYNC_ACCOUNT_KEY, JSON.stringify({ userId: account.userId, epoch: account.epoch, loggedOut: true }));
+    if (left) write(SYNC_ACCOUNT_KEY, JSON.stringify({ userId: account.userId, epoch: account.epoch, loggedOut: true, ...(unsent ? { unsent } : {}) }));
     else remove(SYNC_ACCOUNT_KEY);
   }
 
@@ -1476,10 +1493,16 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     const userId = state.userId;
     if (!userId || state.status === 'needs_choice') return;
     const ref = { courseSlug, lessonId };
-    if (!syncable(ref) || readAccount()?.userId !== userId) return;
+    const account = readAccount();
+    if (!syncable(ref) || account?.userId !== userId) return;
     const raw = read(progressKey(courseSlug, lessonId));
     if (raw === null) return;
     setMarker(ref, parseProgress(raw).updatedAt);
+    // Another tab ended this learner's session (stop) before this one heard of it: what this tab
+    // writes meanwhile is unsent too, so the sign-in view counts it.
+    if (account.loggedOut && account.unsent && !account.unsent.includes(refKey(ref)) && account.unsent.length < MAX_UNSENT) {
+      write(SYNC_ACCOUNT_KEY, JSON.stringify({ ...account, unsent: [...account.unsent, refKey(ref)] }));
+    }
     scheduleFlush();
     updateView();
   }
@@ -1571,11 +1594,16 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       const owned = account && !account.loggedOut
         && (userId === null || (account.userId === userId && state.status !== 'needs_choice'));
       if (account && owned) {
+        // What was really unsent before the markers below (the sign-in view counts only these).
+        const unsent = pendingLessons()
+          .filter((ref) => read(progressKey(ref.courseSlug, ref.lessonId)) !== null)
+          .map(refKey)
+          .slice(0, MAX_UNSENT);
         for (const ref of localLessons()) {
           const progress = readRecord(ref);
           if (hasActivity(progress)) setMarker(ref, progress.updatedAt);
         }
-        leave(account);
+        leave(account, unsent);
         emitAccount();
       }
     } catch {

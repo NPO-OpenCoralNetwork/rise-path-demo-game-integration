@@ -310,7 +310,7 @@ const AiAccessSetupView: React.FC = () => {
             )}
             {loadError === 'signin' && (
               // Signing out of the guest session leads to the sign-in page.
-              <Button className="mt-3" size="sm" onClick={() => void logout()}>
+              <Button className="mt-3" size="sm" onClick={() => void logout({ reason: 'reauth' })}>
                 {t.signIn}
               </Button>
             )}

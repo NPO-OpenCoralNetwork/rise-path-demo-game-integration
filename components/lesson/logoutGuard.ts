@@ -15,6 +15,9 @@
  *   nothing that syncs (guests, Nexloom-only, no API: the save view is 'local'), or nothing unsaved.
  * - A second call while one is open gets the same answer. The last dialog going away answers: while
  *   the upload runs, no question (true); while asking, 「ログアウトしない」 (false).
+ * - The session ending meanwhile (an expiry, a logout in another tab or on another device:
+ *   AuthContext calls endUnsavedLearningQuestion) answers "log out": the learner is signed out
+ *   already, so the question would no longer be true; the logout they asked for finishes.
  * Account deletion never comes here (AuthContext.endDeletedAccountSession does not log out).
  */
 import { getProgressSaveView, prepareProgressSignOut } from './progressSyncClient';
@@ -32,6 +35,8 @@ let hosts = 0;
 let open: Promise<boolean> | null = null;
 let answer: ((logOut: boolean) => void) | null = null;
 let returnTarget: HTMLElement | null = null;
+/** Counts session ends, so a check that was uploading when the session ended asks nothing. */
+let sessionEnds = 0;
 const listeners = new Set<() => void>();
 
 function setPhase(next: LogoutPhase): void {
@@ -59,6 +64,7 @@ function focusedElement(): HTMLElement | null {
 }
 
 async function check(): Promise<boolean> {
+  const ends = sessionEnds;
   const timer = setTimeout(() => {
     if (phase.kind === 'idle') setPhase({ kind: 'checking' });
   }, LOGOUT_CHECKING_DELAY_MS);
@@ -70,9 +76,9 @@ async function check(): Promise<boolean> {
   } finally {
     clearTimeout(timer);
   }
-  // Nothing unsaved, or the last dialog went away during the upload: no question (nothing could
-  // answer it, and the logout would never end).
-  if (!(unsaved > 0) || hosts === 0) {
+  // Nothing unsaved, the last dialog went away during the upload (nothing could answer, and the
+  // logout would never end) or the session ended meanwhile (the learner is signed out): no question.
+  if (!(unsaved > 0) || hosts === 0 || sessionEnds !== ends) {
     setPhase(IDLE);
     return true;
   }
@@ -115,6 +121,15 @@ export function answerUnsavedLearning(logOut: boolean): void {
   answer = null;
   setPhase(IDLE);
   resolve(logOut === true);
+}
+
+/**
+ * The primary session ended without this logout (AuthContext's auth listener): an open question
+ * is answered "log out" and goes away, and a check still uploading asks nothing.
+ */
+export function endUnsavedLearningQuestion(): void {
+  sessionEnds += 1;
+  answerUnsavedLearning(true);
 }
 
 /**

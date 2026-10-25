@@ -408,7 +408,8 @@ const OAuthConsentView: React.FC<OAuthConsentViewProps> = ({ onSignIn }) => {
 
   const switchAccount = async () => {
     try {
-      await logout();
+      // Phase 5: the learner chose to stay signed in (lesson records still unsaved): stay here.
+      if ((await logout()) === false) return;
     } catch {
       // Signed out locally anyway.
     }

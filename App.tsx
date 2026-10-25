@@ -5,6 +5,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
+import UnsavedLogoutDialog from './components/lesson/UnsavedLogoutDialog';
+import SaveStoppedNotice from './components/lesson/SaveStoppedNotice';
 import { VIEW_PATHS } from './navigation/viewPaths';
 import { features } from './config/features';
 import { syncLegalGate, useLegalGate } from './components/legal/legalGateClient';
@@ -251,10 +253,11 @@ const AppContent: React.FC = () => {
     navigate('/');
   };
 
+  // Phase 5 (O4): false = the learner chose to stay signed in (unsaved lesson records): stay here.
   const handleLogout = () => {
     logout()
-      .catch((error) => console.warn('Logout failed:', error))
-      .finally(() => navigate('/', { replace: true }));
+      .then((done) => { if (done !== false) navigate('/', { replace: true }); })
+      .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
   };
 
   const handleCourseSelect = async (course: Course) => {
@@ -357,7 +360,8 @@ const AppContent: React.FC = () => {
             </Suspense>
           ) : (
             // Phase 4: notice = a changed text (dismissible), or "please agree" on an exempt page.
-            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout} notice={features.legalPages ? <LegalNoticeBar /> : null}>
+            // Phase 5: and, while saving has stopped with lesson records unsaved, SaveStoppedNotice.
+            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout} notice={<>{features.legalPages ? <LegalNoticeBar /> : null}<SaveStoppedNotice /></>}>
               <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/" element={<Dashboard onNavigate={handleNavigate} />} />
@@ -582,6 +586,8 @@ const App: React.FC = () => (
           <AppContent />
           {/* Lesson progress nobody owns on this device: ask before adding it to the account. */}
           <ProgressAdoptDialog />
+          {/* Phase 5 (O4): lesson records still unsaved at logout: ask before logging out. */}
+          <UnsavedLogoutDialog />
         </ThemeProvider>
       </AuthProvider>
     </LanguageProvider>

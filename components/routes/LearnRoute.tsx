@@ -293,6 +293,8 @@ function LessonPage({ course, courseSlug, lessonId, mode }: { course: Course; co
       next={next}
       prev={prev}
       banner={mode === 'preview' ? <PreviewReport loaded={loaded} report={report} /> : undefined}
+      // Phase 5: only the published reader offers 「最初からやり直す」 (never the draft preview).
+      allowReset={mode === 'learn'}
     />
   );
 }

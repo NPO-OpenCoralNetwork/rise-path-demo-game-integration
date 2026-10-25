@@ -9,6 +9,7 @@ import { mapSignupErrorMessage, validateSignupForm, type SignupFormError } from 
 import { forgetSignupAcceptance } from '../../services/legalConsentApi';
 import { features } from '../../config/features';
 import { LegalNewTabLink } from '../legal/LegalLinks';
+import LeftRecordsNotice from '../lesson/LeftRecordsNotice';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -247,6 +248,9 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                             <h1 className="text-2xl font-bold tracking-tight text-white mb-2 uppercase font-mono">{t.title}</h1>
                             <p className="text-white/40 text-sm">{isSignup ? t.signupSubtitle : t.subtitle}</p>
                         </div>
+
+                        {/* Phase 5: lesson records a learner left on this device unsaved (who saves them, who deletes them). */}
+                        <LeftRecordsNotice />
 
                         <div className="flex rounded-full bg-white/5 border border-white/10 p-1 mb-8">
                             <button

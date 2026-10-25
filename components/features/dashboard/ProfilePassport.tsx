@@ -5,7 +5,45 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { usePlanEntry } from '../../../hooks/usePlanEntry';
 import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
-import { getTotalXp, getLevel, getStreak } from '../../../services/gamificationService';
+import { useAchievements, type AchievementsStatus } from '../../ui/achievementsClient';
+
+/**
+ * Phase 5: level, XP and the streak come from the server (useAchievements). Until there is an
+ * answer for this learner the card shows 「—」, with a screen-reader text that says why.
+ */
+const NOT_READY_COPY = {
+    en: {
+        loading: 'Loading',
+        unavailable: "Couldn't load",
+        unsupported: 'XP and badges will be available soon',
+        no_account: 'XP and badges are recorded when you sign in with a Rise Path account',
+    },
+    jp: {
+        loading: '読み込んでいます',
+        unavailable: '読み込めませんでした',
+        unsupported: 'XP とバッジは、まもなく使えるようになります',
+        no_account: 'XP とバッジは、Rise Path のアカウントでログインすると記録されます',
+    },
+} as const;
+
+/** The screen-reader text for a status that has no numbers to show (exported for tests). */
+export function notReadyText(language: 'en' | 'jp', status: AchievementsStatus): string {
+    const t = NOT_READY_COPY[language];
+    if (status === 'unavailable') return t.unavailable;
+    if (status === 'unsupported') return t.unsupported;
+    if (status === 'no_account') return t.no_account;
+    return t.loading;
+}
+
+/** A number from the server, or 「—」 with the status's screen-reader text. */
+const Stat: React.FC<{ value: string | null; language: 'en' | 'jp'; status: AchievementsStatus }> = ({ value, language, status }) => (
+    value !== null ? <>{value}</> : (
+        <>
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">{notReadyText(language, status)}</span>
+        </>
+    )
+);
 
 interface ProfilePassportProps {
     onNavigate: (view: ViewState) => void;
@@ -14,6 +52,8 @@ interface ProfilePassportProps {
 const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
     const { language } = useLanguage();
     const { user: authUser, logout } = useAuth();
+    const achievements = useAchievements();
+    const stats = achievements.status === 'ready' ? achievements.data : null;
     const [isFlipped, setIsFlipped] = useState(false);
     // Phase 3: the plan link only with VITE_FEATURE_BILLING and a GET /billing/me with eligibility 'ok' or a subscription.
     const showPlan = usePlanEntry();
@@ -113,9 +153,9 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
     const user = {
         name: authUser?.name || 'Guest Explorer',
         role: !authUser || authUser.isGuest ? t.roleGuest : t.roleMember,
-        level: getLevel(),
-        xp: getTotalXp(),
-        streak: getStreak(),
+        level: stats ? String(stats.xp.level) : null,
+        xp: stats ? String(stats.xp.total) : null,
+        streak: stats ? t.streakValue(stats.streak.current) : null,
         // No stock photo of a stranger: the learner's own avatar, else their initials.
         avatar: authUser?.avatar || null,
     };
@@ -206,11 +246,11 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                     <div className="flex gap-5">
                                         <div>
                                             <div className="eyebrow text-fg-3">{t.level}</div>
-                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5">{user.level}</div>
+                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5"><Stat value={user.level} language={language} status={achievements.status} /></div>
                                         </div>
                                         <div>
                                             <div className="eyebrow text-fg-3">{t.xp}</div>
-                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5">{user.xp}</div>
+                                            <div className="tabular text-h3 font-bold text-fg leading-none mt-0.5"><Stat value={user.xp} language={language} status={achievements.status} /></div>
                                         </div>
                                     </div>
 
@@ -262,11 +302,11 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5">
                                         <div className="eyebrow text-fg-3 mb-1">{t.streak}</div>
-                                        <div className="tabular text-h2 text-fg">{t.streakValue(user.streak)}</div>
+                                        <div className="tabular text-h2 text-fg"><Stat value={user.streak} language={language} status={achievements.status} /></div>
                                     </div>
                                     <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5">
                                         <div className="eyebrow text-fg-3 mb-1">{t.totalXp}</div>
-                                        <div className="tabular text-h2 text-fg">{user.xp}</div>
+                                        <div className="tabular text-h2 text-fg"><Stat value={user.xp} language={language} status={achievements.status} /></div>
                                     </div>
                                 </div>
 
@@ -333,7 +373,8 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                                     </button>
                                     <button
                                         onClick={async () => {
-                                            await logout();
+                                            // Phase 5: false = stayed signed in (lesson records still unsaved).
+                                            if ((await logout()) === false) return;
                                             window.location.href = '/';
                                         }}
                                         className="w-full text-left p-2 hover:bg-red-500/10 rounded-lg text-xs font-medium text-red-400 transition-colors flex items-center gap-2 mt-2"

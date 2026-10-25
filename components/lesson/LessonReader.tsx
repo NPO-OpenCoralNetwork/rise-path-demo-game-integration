@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CircleDot, ListTree, Sparkles } from 'lucide-react';
 import type { Block, Course, LText, Lesson, Section } from '../../shared/lesson/schema.js';
@@ -28,8 +28,10 @@ import {
 import { BlockView } from './blocks/registry';
 import { nextPracticeBlockId, practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
-import { LessonHeader } from './LessonHeader';
+import { LessonHeader, lessonTitleId } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
+import { ReaderStatus, stallKeyOf, stallMessageOf, type ReaderStatusMessage } from './ReaderStatus';
+import { getProgressSaveView, isSyncableLesson, subscribeProgressSaveView } from './progressSyncClient';
 import { Outline } from './Outline';
 import { MarginPanel, type MarginAnchor } from './MarginPanel';
 import { ReaderSheet } from './ReaderSheet';
@@ -49,6 +51,13 @@ import './reader.css';
  * AI tutor (WP-11): openTutor() requests that carry `lesson` stream into TutorPanel, a card at
  * the top of the margin at ≥1280px, a right drawer at 1024–1279px and a bottom sheet below
  * (also a drawer in focus mode, which hides the margin). The glossary card is MarginPanel.
+ *
+ * Phase 5 (lessons the server stores): the LessonBar shows where the record is saved (SaveChip);
+ * a status line under it (ReaderStatus) says when saving moved to "this device" or stopped with
+ * something unsaved, and that the lesson was started over. LessonEnd offers 「最初からやり直す」
+ * where `allowReset` (LearnRoute in learn mode). When the in-memory record is dropped for the
+ * stored one (a reset here or elsewhere, another learner), the sections remount (keyed by
+ * `progress.drops`), so quiz, flashcard and step blocks drop their own state.
  */
 
 const copy = {
@@ -139,9 +148,11 @@ export type LessonReaderProps = {
   banner?: React.ReactNode;
   /** False keeps the lesson out of the dashboard's "continue" record (dev gallery). Default true. */
   recordLastLesson?: boolean;
+  /** Phase 5: LessonEnd may offer to start the lesson over (LearnRoute in learn mode). Default false. */
+  allowReset?: boolean;
 };
 
-export default function LessonReader({ course, courseSlug, lesson, backTo, entry, next, prev, banner, recordLastLesson = true }: LessonReaderProps) {
+export default function LessonReader({ course, courseSlug, lesson, backTo, entry, next, prev, banner, recordLastLesson = true, allowReset = false }: LessonReaderProps) {
   const { language } = useLanguage();
   const text = copy[language];
   const locale: ContentLocale = language;
@@ -315,6 +326,42 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     return () => window.clearTimeout(timer);
   }, [resumed]);
 
+  // --- Phase 5: save state and the status line ---------------------------------------------
+
+  const syncable = useMemo(() => isSyncableLesson(courseSlug, lesson.id), [courseSlug, lesson.id]);
+  const stallKey = useSyncExternalStore(
+    subscribeProgressSaveView,
+    () => stallKeyOf(getProgressSaveView(), syncable),
+    () => null,
+  );
+  const [statusMessage, setStatusMessage] = useState<ReaderStatusMessage | null>(null);
+  const messageCount = useRef(0);
+  const showStatus = useCallback((message: ReaderStatusMessage) => {
+    setStatusMessage(message);
+    setResumed(false); // one message at a time
+  }, []);
+  // Saving moved to "on this device" or stopped while something is unsaved (or its reason
+  // changed): said once. Saving ↔ saved flips are never announced; a stall message goes when
+  // saving works again.
+  const lastStallKey = useRef<string | null>(null);
+  useEffect(() => {
+    const before = lastStallKey.current;
+    lastStallKey.current = stallKey;
+    if (stallKey === before) return;
+    if (stallKey === null) {
+      setStatusMessage((message) => (message?.kind === 'stall' ? null : message));
+      return;
+    }
+    messageCount.current += 1;
+    showStatus(stallMessageOf(stallKey, messageCount.current));
+  }, [stallKey, showStatus]);
+  // The status line clears itself, like the "resumed" pill.
+  useEffect(() => {
+    if (!statusMessage) return;
+    const timer = window.setTimeout(() => setStatusMessage(null), 8000);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
   // Once the learner reads past a #s-/#b- deep link, drop it so a reload resumes where they are.
   useEffect(() => {
     if (!trackPosition || !progress.topBlockId) return;
@@ -331,6 +378,15 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
       // ignore
     }
   }, [progress.topBlockId, trackPosition, sections]);
+
+  // LessonEnd started the lesson over (its dialog has closed): say so, go to the top and put
+  // focus on the title (the sections remounted empty; focus was on the dialog).
+  const onLessonReset = useCallback(() => {
+    messageCount.current += 1;
+    showStatus({ kind: 'reset', id: messageCount.current });
+    scrollToTop();
+    document.getElementById(lessonTitleId(lesson.id))?.focus({ preventScroll: true });
+  }, [showStatus, scrollToTop, lesson.id]);
 
   // --- Tutor -------------------------------------------------------------------------------
 
@@ -605,24 +661,30 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           onAskTutor={() => openTutorPanel(tutorButtonRef.current)}
           tutorButtonRef={tutorButtonRef}
           tutorExpanded={tutorOpen}
-          notice={resumed ? (
-            <div className="rp-notice" role="status">
-              <span>{text.resumed}</span>
-              <button
-                type="button"
-                className="rp-link-btn"
-                onClick={() => {
-                  setResumed(false);
-                  scrollToTop();
-                }}
-              >
-                {text.fromStart}
-              </button>
-              <button type="button" className="rp-link-btn rp-notice-x" aria-label={text.dismiss} onClick={() => setResumed(false)}>
-                ×
-              </button>
-            </div>
-          ) : null}
+          showSaveState={syncable}
+          notice={(
+            <>
+              {resumed && !statusMessage ? (
+                <div className="rp-notice" role="status">
+                  <span>{text.resumed}</span>
+                  <button
+                    type="button"
+                    className="rp-link-btn"
+                    onClick={() => {
+                      setResumed(false);
+                      scrollToTop();
+                    }}
+                  >
+                    {text.fromStart}
+                  </button>
+                  <button type="button" className="rp-link-btn rp-notice-x" aria-label={text.dismiss} onClick={() => setResumed(false)}>
+                    ×
+                  </button>
+                </div>
+              ) : null}
+              <ReaderStatus message={statusMessage} onDismiss={() => setStatusMessage(null)} />
+            </>
+          )}
         />
 
         {/* Phones: fixed to the bottom of the screen, but early in the tab order (right after the
@@ -707,28 +769,32 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
 
           <article ref={articleRef} className="rp-prose" aria-label={text.article}>
             <LessonHeader lesson={lesson} entry={entry} />
-            {lesson.sections.map((section) => {
-              const title = tx(section.title);
-              const { num, title: label } = splitSectionTitle(title.value);
-              return (
-                <section
-                  key={section.id}
-                  id={`s-${section.id}`}
-                  className="rp-section"
-                  data-role={section.role}
-                  aria-labelledby={`s-${section.id}-title`}
-                >
-                  <h2 id={`s-${section.id}-title`} className="rp-h2" tabIndex={-1} lang={title.lang}>
-                    {num && <span className="rp-h2-num">{num}</span>}
-                    <span>{label}</span>
-                  </h2>
-                  {section.blocks.map((block) => (
-                    <BlockView key={block.id} block={block} section={section} />
-                  ))}
-                </section>
-              );
-            })}
-            <LessonEnd next={next} prev={prev} backTo={backTo} />
+            {/* Keyed by drops (Phase 5, G16): a dropped record remounts the blocks, so quiz,
+                flashcard and step state from before goes with it. The header and LessonEnd stay. */}
+            <React.Fragment key={progress.drops}>
+              {lesson.sections.map((section) => {
+                const title = tx(section.title);
+                const { num, title: label } = splitSectionTitle(title.value);
+                return (
+                  <section
+                    key={section.id}
+                    id={`s-${section.id}`}
+                    className="rp-section"
+                    data-role={section.role}
+                    aria-labelledby={`s-${section.id}-title`}
+                  >
+                    <h2 id={`s-${section.id}-title`} className="rp-h2" tabIndex={-1} lang={title.lang}>
+                      {num && <span className="rp-h2-num">{num}</span>}
+                      <span>{label}</span>
+                    </h2>
+                    {section.blocks.map((block) => (
+                      <BlockView key={block.id} block={block} section={section} />
+                    ))}
+                  </section>
+                );
+              })}
+            </React.Fragment>
+            <LessonEnd next={next} prev={prev} backTo={backTo} resettable={allowReset && syncable} onLessonReset={onLessonReset} />
           </article>
 
           <aside className="rp-col-margin" aria-label={text.side}>
