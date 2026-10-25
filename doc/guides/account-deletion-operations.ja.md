@@ -35,7 +35,8 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 - `--find-email` と `--orphans` には `SUPABASE_SERVICE_ROLE_KEY` が要ります（anon のキーではユーザーを調べられません）。
 - 続いている有料プランがあると止まります（終了コード 2）。先に Stripe のダッシュボードで解約してから、もう一度実行します。
 - `ACCOUNT_DELETION_ENABLED=false` でも動きます（止まるのは、ご本人の画面からの削除だけです）。
-- 終了コード: 0 = 消した（または、もう消えていた）、2 = 断った（理由が出ます。何も消していません）、3 = いまは使えない（DB、Supabase、Stripe、Memanto のどれか）、1 = 使い方や設定のまちがい。
+- 終了コード: 0 = 消した（または、もう消えていた）、2 = 断った（続いている有料プランなど。理由が出ます）、3 = いまは使えない（DB、Supabase、Stripe、Memanto のどれか。Stripe や Memanto につながらないとき（`payment_provider_unavailable`、`memory_service_unavailable`）もここです。しばらくしてから、もう一度実行します）、1 = 使い方や設定のまちがい。
+- 表示された JSON に `"memoryDeleted":true` があるとき（終了コード 2 か 3）は、AI の記憶だけが消えて、ほかのデータは残っています。同じ `--yes` をもう一度実行します（5 章の `partial` の行）。
 - 削除の記録の `requested_by` は `staff` になります（ご本人の削除は `self`、定期の確認は `orphan`）。
 
 ### AI アプリについて（先にすること）
@@ -73,20 +74,30 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 
 - **月に 1 回**と、Nexloom や P-School の担当がログインを消したあとに実行します。Nexloom と P-School の担当には、「共有のログインを消したら、Rise Path の担当に知らせる」ことを書面で頼んでおきます（オーナーの作業）。
 - Supabase が「そのユーザーはいない」（404 / `user_not_found`）と答えたものだけを、消えたログインとみなします。ほかの答え（つながらない、5xx など）が 1 つでもあると、何も消さずに止まります（終了コード 3）。
-- 調べたうち、知らないものが 10 % をこえる（かつ 6 件以上）、または 1 つも知っているものがないときは、断ります（終了コード 2）。`SUPABASE_URL` がちがうプロジェクトを指しているかもしれないからです。`Refused: none of the N checked stubs is known to this Supabase project …` と出たら、`SUPABASE_URL` を確かめるか、`--limit` を上げます。
+- 調べたものが 1 つも Supabase にないときは、断ります（終了コード 2）。`SUPABASE_URL` がちがうプロジェクトを指しているかもしれないからです。`Refused: none of the N checked stubs is known to this Supabase project …` と出たら、`SUPABASE_URL` を確かめるか、`--limit` を上げます。
+- 知らないものが 10 % をこえる（かつ 6 件以上）ときも、断ります（終了コード 2）。このときは、知らない ID の先頭 8 文字を一覧にして、`Refused: 40 of 300 checked stubs (more than 10 %) are unknown …` のように件数を出します。まず `SUPABASE_URL` を確かめてください。Nexloom や P-School の担当が、まとめてログインを消したとき（年度の終わりなど）は、次の順に進めます。
+  1. 一覧だけを実行します（`--yes` なし）。件数と ID の先頭 8 文字が出ます。
+  2. その件数と先頭 8 文字を、ほかのサービスの担当が消したログインの一覧と比べます。
+  3. 合っていたら、その件数を付けて消します: `--orphans --expect-orphans 40 --yes`。件数がちがうと、何も消さずに断ります（終了コード 2）。`--expect-orphans` を付けても、1 つも Supabase にないときは断ります。
 - 1 回に調べるのは ID の順に最大 `--limit`（既定 500）件です。`Stopped at --limit 500: more stubs were not checked. … --after 1a2b3c4d …` と出たら、続きは `--after <その 8 文字>` を付けて実行します。
 - **公開の前に 1 回（オーナー）**: 一覧だけ（`--orphans --limit 20`、`--yes` なし）を、ステージングか本番のプロジェクトで実行し、知らない ID が 404 / `user_not_found`、知っている ID がユーザーを返すことを確かめます。開発の環境には本物のプロジェクトがないため、まだ確かめていません。
 
 ## 5. ログに出る行と、すること
 
+API のログは消えやすいので、決まった時に読みます。
+
+- `deploy-stack.sh` は、デプロイのたびに API のコンテナを作り直します。そのとき、`docker compose logs api` の古いログは消えます。ログは約 50 MB をこえても、古いものから消えます。
+- なので、スタッフはデプロイの前と、週に 1 回、次の行がないか確かめます: `docker compose --env-file stack.env logs api | grep -E '\[Account\]|deleted Rise Path account|deleted_account_renewing'`
+- 続いている契約の行（`deleted_account_renewing`）は、オーナーへの知らせ（`AI_CAP_ALERT_WEBHOOK_URL`）にも送ります。有料プランを始める前に、オーナーはこの Webhook を設定してください。
+
 | ログの行（`docker compose logs api`） | すること |
 |---|---|
 | `[Account] Rise Path data deleted for 1a2b3c4d… (self; files 2/2; memory skipped) in 840ms` | 正常です。 |
-| `[Account] a renewing subscription exists after deleting 1a2b3c4d… (cancel it in the Stripe Dashboard)` | 削除のあいだに支払いが終わった契約が残っています。`account_deletions` で、先頭 8 文字と `deleted_at` から ID を探し、Stripe のダッシュボードで解約します。削除は元に戻しません。 |
+| `[Billing] deleted_account_renewing: a renewing subscription exists after deleting 1a2b3c4d…: cancel it in the Stripe Dashboard` | 削除のあいだに支払いが終わった契約が残っています。`account_deletions` で、先頭 8 文字と `deleted_at` から ID を探し、Stripe のダッシュボードで解約します。削除は元に戻しません。 |
 | `[Account] could not re-check subscriptions at Stripe after deleting …` / `could not expire checkout sessions after deleting …` | Stripe に届きませんでした。Stripe のダッシュボードで、その顧客に続いている契約や、開いている支払いの画面がないか確かめます。 |
 | `[Account] a Stripe customer of … no longer exists at Stripe (nothing to check there)` | Stripe にその顧客がいません。Stripe のアカウントを変えたあとなら、古いアカウントの契約を先に解約してください。 |
 | `[Account] re-checks after deleting … did not finish within 10000 ms` | 削除は終わっています。続く行（上の 2 つ）を見ます。 |
-| `[Billing] subscription … belongs to a deleted Rise Path account … it still renews: cancel it in the Stripe Dashboard` | 削除したアカウントの契約が続いています。Stripe のダッシュボードで解約します。 |
+| `[Billing] deleted_account_renewing: subscription … belongs to a deleted Rise Path account … and still renews: cancel it in the Stripe Dashboard.` | 削除したアカウントの契約が続いています。Stripe のダッシュボードで解約します。 |
 | `[Account] partial: AI memories deleted, other data kept for …` | AI の記憶だけが消えて、ほかは残りました。同じ削除をもう一度します（ご本人の画面か、2 章の `--yes`）。 |
 | `[Account] … upload file(s) of … not removed (retention removes orphans)` | 消せなかったファイルは、保存期間の処理が 24 時間後に消します。 |
 | `[Account] ACCOUNT_DELETION_ENABLED has an unrecognised value: account deletion is off` | `stack.env` の値を `true` か `false` にします。 |
@@ -105,7 +116,9 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 
 ## 7. 受け入れているリスク（オーナーの判断）
 
-- **自分の AI をつなぐ機能（`byoa`）とパスワード**: Supabase の設定によっては、つないだ AI アプリが、その方のパスワードを設定し、ログインして、アカウントを削除できてしまいます。なので、`byoa` を動かす（または動かす予定の）あいだは、[byoa-setup.ja.md](./byoa-setup.ja.md) の手順 6 の 3 つの設定を入れて、確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` のままにします。3 つの設定を入れても、パスワードのないアカウントは、AI アプリを許可してから 24 時間は、同じことができます。Rise Path の登録は必ずパスワードを決めますが、共有のプロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。
+- **ログインしたままの端末とパスワード（どの環境でも）**: Supabase の「Require current password when updating」（いまのパスワードがないと、パスワードを変えられない設定）が切ってあると、ログインしたままの端末やトークンを持っている人が、新しいパスワードを設定し、ログインし直して、パスワードの確認を通り、アカウントを削除できてしまいます。拠点で共有するタブレットが、その例です。なので、`byoa` を使うかどうかにかかわらず、この設定を入れて、下の確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` のままにします。「Secure password change」（ログインから 24 時間をこえると、メールの確認がないとパスワードを変えられない設定）だけでは、ログインから 24 時間以内の端末を防げません。
+  - 確かめ方（ステージング）: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT {SUPABASE_URL}/auth/v1/user` に `{"password":"…"}` を送ります。400 `current_password_required` が返れば合格です。
+- **自分の AI をつなぐ機能（`byoa`）とパスワード**: Supabase の設定によっては、つないだ AI アプリも、その方のパスワードを設定し、ログインして、アカウントを削除できてしまいます。なので、`byoa` を動かす（または動かす予定の）あいだは、[byoa-setup.ja.md](./byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れて、確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` のままにします。3 つの設定を入れても、パスワードのないアカウントは、AI アプリを許可してから 24 時間は、同じことができます。Rise Path の登録は必ずパスワードを決めますが、共有のプロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。
 - パスワードを忘れた方は、画面から消せません（パスワードの再設定の画面がないため）。スタッフの削除（2 章）で対応します。
 - スタッフが消したとき、AI アプリの許可は Supabase に残ります（2 章の「AI アプリについて」）。
 - ほかのサービスで消されたログインの Rise Path のデータは、次の定期の確認（4 章）まで残ります。

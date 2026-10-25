@@ -13,9 +13,12 @@ import { getSupabaseClient } from '../../../services/supabaseClient';
 import { openBillingPortal } from '../../../services/billingApi';
 import {
   deleteAccount,
+  deletionAppNames,
   getConnectedAppRecords,
   getDeletionPreflight,
+  getSupabaseGrants,
   usedConnectedApps,
+  type DeletionAppName,
   type DeletionErrorKind,
   type PreflightResult,
 } from '../../../services/accountDeletionApi';
@@ -68,7 +71,7 @@ const copy = {
       'Records that you accepted the Terms of Use, of a guardian’s consent, and of this deletion (account ID, version and dates only; 5 years)',
     keptApps: 'The names of AI apps you used, with the first and last day of use (3 years)',
     keptPayments:
-      'Payment records of the supporter plan (only if you used it; 7 years for tax and accounting). Rise Path’s database unlinks them from your account, but the records at the payment service Stripe keep your account ID.',
+      'Payment records of the supporter plan (only if you used it; kept for tax and accounting, for about 7 years — the exact period is still being decided). Rise Path’s database unlinks them from your account, but the records at the payment service Stripe keep your account ID.',
     keptSafety: 'Safety records (unlinked from your account, up to 365 days)',
     keptUsage: 'Today’s AI usage count (kept up to 30 days)',
     keptLogs: 'Server logs (the oldest are removed automatically)',
@@ -141,7 +144,7 @@ const copy = {
     keptProofs: '利用規約に同意した記録、保護者の同意の記録、アカウントを削除した記録（アカウント ID・版・日時だけ。5 年）',
     keptApps: '使ったことのある AI アプリの名前と、使い始めた日・最後に使った日（3 年）',
     keptPayments:
-      '有料プランのお支払いの記録（使った方だけ。税と会計のため 7 年）。Rise Path のデータベースではアカウントとのつながりを外しますが、決済サービス Stripe の記録にはアカウント ID が残ります。',
+      '有料プランのお支払いの記録（使った方だけ。税と会計のために残します。期間は目安 7 年で、いま決めているところです）。Rise Path のデータベースではアカウントとのつながりを外しますが、決済サービス Stripe の記録にはアカウント ID が残ります。',
     keptSafety: '安全のための記録（アカウントとのつながりを外して、最長 365 日）',
     keptUsage: 'AI の 1 日の利用回数（今日の分だけ。30 日まで）',
     keptLogs: 'サーバーのログ（古いものから自動で消えます）',
@@ -591,6 +594,7 @@ const DeleteAccountView: React.FC = () => {
   const [attempt, setAttempt] = useState(0);
   const [account, setAccount] = useState<{ id: string; email: string } | null>(null);
   const [appIds, setAppIds] = useState<string[]>([]);
+  const [appNames, setAppNames] = useState<DeletionAppName[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DeletionError | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -619,9 +623,15 @@ const DeleteAccountView: React.FC = () => {
         return;
       }
       setAccount(found);
-      const [preflight, records] = await Promise.all([getDeletionPreflight(controller.signal), getConnectedAppRecords(controller.signal)]);
+      const [preflight, records, grants] = await Promise.all([
+        getDeletionPreflight(controller.signal),
+        getConnectedAppRecords(controller.signal),
+        getSupabaseGrants(),
+      ]);
       if (!active) return;
       setAppIds((records ?? []).map((record) => record.clientId));
+      // Supabase's names of the apps used, kept with the provision record (the server knows only ids).
+      setAppNames(deletionAppNames(records, grants));
       setState(deletePageState(preflight, records));
     })();
     return () => {
@@ -658,6 +668,7 @@ const DeleteAccountView: React.FC = () => {
       email: account.email,
       userId: account.id,
       password,
+      apps: appNames,
       connectedAppIds: appIds,
       endSession: endDeletedAccountSession,
     });

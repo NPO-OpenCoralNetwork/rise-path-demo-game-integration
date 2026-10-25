@@ -17,6 +17,7 @@ import { createStripeClient } from '../services/stripeClient.js';
 import { TERMINAL_STATUSES } from '../services/billingEntitlement.js';
 import { createDeletionPool, jstDay, norm, shiftDay, SQL } from './helpers/deletionPool.js';
 import { createFakeStripe, subscription } from './helpers/fakeStripe.js';
+import { createBillingAlerts } from '../services/billingAlerts.js';
 
 const A = 'abcdef01-2345-4678-9abc-def012345678';
 const B = 'bcdef012-3456-4789-8bcd-ef0123456789';
@@ -147,7 +148,9 @@ describe('deleteAccountData: the order of the pipeline', () => {
             'sql:tombstone', 'sql:renewingLocal', 'sql:customers',
             'stripe:GET /v1/checkout/sessions', 'stripe:POST /v1/checkout/sessions/cs_open_1/expire', 'stripe:GET /v1/subscriptions',
             `memanto:DELETE /api/v2/agents/rp-user-${A}`, 'sql:memoryMeta',
-            'sql:begin', 'sql:lockTimeout', 'sql:statementTimeout', 'sql:lock', 'sql:tombstoneForUpdate', 'sql:renewingLocal', 'sql:uploads',
+            // The stub, consents and grants are locked right after the account lock, before the copies (finding: a
+            // consent or grant written between the copies and the stub DELETE was cascaded with no proof).
+            'sql:begin', 'sql:lockTimeout', 'sql:statementTimeout', 'sql:lock', 'sql:lockStub', 'sql:lockConsents', 'sql:lockGrants', 'sql:tombstoneForUpdate', 'sql:renewingLocal', 'sql:uploads',
             'sql:writeTombstone', 'sql:markAcceptances', 'sql:copyConsents', 'sql:copyGrants', 'sql:deleteOldUsage', 'sql:customers', 'sql:deleteStub', 'sql:commit',
         ]);
         assert.deepEqual(between(events, 'sql:begin', 'sql:commit').filter((e) => !e.startsWith('sql:')), [], 'no HTTP call while the account lock is held');
@@ -200,7 +203,7 @@ describe('deleteAccountData: the order of the pipeline', () => {
         for (const name of ['markAcceptances', 'copyConsents', 'copyGrants']) {
             const sent = pool.queries.filter((q) => q.sql === SQL[name]);
             assert.equal(sent.length, 1, name);
-            assert.deepEqual(sent[0].params, [A], `${name}: only the id is sent`);
+            assert.deepEqual(sent[0].params, name === 'copyGrants' ? [A, [], []] : [A], `${name}: only the id is sent (copyGrants: no app names from staff)`);
         }
         const lock = pool.queries.find((q) => q.sql === SQL.lock);
         assert.match(lock.sql, /hashtextextended\('rp:account:' \|\| \$1::uuid::text, 0\)/);
@@ -223,10 +226,53 @@ describe('deleteAccountData: the order of the pipeline', () => {
         // JavaScript Date passed back as a parameter (node-pg keeps milliseconds only).
         for (const name of ['markAcceptances', 'copyConsents', 'copyGrants']) {
             assert.match(SERVICE_SQL[name], /, \(SELECT deleted_at FROM account_deletions WHERE user_id = \$1::uuid\)|= \(SELECT deleted_at FROM account_deletions WHERE user_id = \$1::uuid\)/, name);
-            assert.doesNotMatch(SERVICE_SQL[name], /\$[2-9]/, `${name}: no second parameter`);
+            // copyGrants' $2/$3 are the page's app ids and names (unnest), never a time.
+            assert.doesNotMatch(SERVICE_SQL[name].replace('unnest($2::uuid[], $3::text[])', ''), /\$[2-9]/, `${name}: no second parameter`);
         }
         assert.match(SERVICE_SQL.deleteOldUsage, /usage_day < \(now\(\) AT TIME ZONE 'Asia\/Tokyo'\)::date/);
         assert.deepEqual([...TERMINAL_STATUSES], ['canceled', 'incomplete_expired']);
+    });
+});
+
+describe('deleteAccountData: the AI apps\' names in the provision records', () => {
+    const USED = '11111111-0000-4000-8000-00000000000a';
+    const NAMED = '11111111-0000-4000-8000-00000000000b';
+    // As mcp-server/remote.js writes a used app (it cannot write client_name), and as the revoke route
+    // writes a name.
+    const grants = [
+        { user_id: A, client_id: USED, client_name: null, first_seen_at: new Date('2026-10-02T00:00:00Z'), last_used_at: new Date('2026-10-20T00:00:00Z') },
+        { user_id: A, client_id: NAMED, client_name: 'Name at revocation', first_seen_at: new Date('2026-10-02T00:00:00Z'), last_used_at: new Date('2026-10-03T00:00:00Z'), revoked_at: new Date('2026-10-04T00:00:00Z') },
+    ];
+    const names = (pool) => Object.fromEntries(pool.state.provision.map((p) => [p.client_id, p.client_name]));
+
+    it('a used app that was never disconnected keeps the name the page read from Supabase; a stored name wins', async () => {
+        const pool = createDeletionPool(seedFor(A, { grants }));
+        const result = await run(pool, { appNames: [{ clientId: USED.toUpperCase(), clientName: 'Claude Code' }, { clientId: NAMED, clientName: 'Other name' }] });
+        assert.equal(result.status, 'deleted');
+        assert.deepEqual(names(pool), { [USED]: 'Claude Code', [NAMED]: 'Name at revocation' });
+        const sent = pool.queries.find((q) => q.sql === SQL.copyGrants);
+        assert.deepEqual(sent.params, [A, [USED, NAMED], ['Claude Code', 'Other name']]);
+    });
+
+    it('without names (staff, orphans) the record keeps the id; entries that are not an id and a name are left out', async () => {
+        const pool = createDeletionPool(seedFor(A, { grants }));
+        await run(pool, { appNames: [{ clientId: 'not-a-uuid', clientName: 'x' }, { clientId: USED, clientName: 42 }, { clientId: USED, clientName: '' }, null, 'str'] });
+        assert.deepEqual(names(pool), { [USED]: null, [NAMED]: 'Name at revocation' });
+        assert.deepEqual(pool.queries.find((q) => q.sql === SQL.copyGrants).params, [A, [], []]);
+        const staff = createDeletionPool(seedFor(A, { grants }));
+        await run(staff, { requestedBy: 'staff' });
+        assert.deepEqual(names(staff), { [USED]: null, [NAMED]: 'Name at revocation' });
+    });
+
+    it('at most 20 names, one per id, each at most 100 characters', async () => {
+        const many = Array.from({ length: 25 }, (_, i) => ({ clientId: `22222222-0000-4000-8000-${String(i).padStart(12, '0')}`, clientName: `app ${i}` }));
+        const pool = createDeletionPool(seedFor(A, { grants }));
+        await run(pool, { appNames: [{ clientId: USED, clientName: 'first' }, { clientId: USED, clientName: 'second' }, { clientId: NAMED, clientName: 'x'.repeat(101) }, ...many] });
+        const [, ids, sentNames] = pool.queries.find((q) => q.sql === SQL.copyGrants).params;
+        assert.equal(ids.length, 20);
+        assert.equal(ids[0], USED);
+        assert.equal(sentNames[0], 'first');
+        assert.ok(!ids.includes(NAMED), 'a name over 100 characters is left out');
     });
 });
 
@@ -679,8 +725,10 @@ describe('deleteAccountData: after COMMIT', () => {
         assert.deepEqual(pool.state.customers.map((c) => c.user_id), [null, null, null], 'every Customer row is unlinked by the cascade');
     });
 
-    it('a Session paid during the transaction (its webhook not arrived): the deletion stands and the renewing subscription is logged for staff', async () => {
-        const RENEWING = '[Account] a renewing subscription exists after deleting abcdef01… (cancel it in the Stripe Dashboard)';
+    it('a Session paid during the transaction (its webhook not arrived): the deletion stands and the renewing subscription raises the owner alert', async () => {
+        // An owner alert (AI_CAP_ALERT_WEBHOOK_URL), not only a log line: a deploy recreates the api
+        // container and erases its log before anyone reads it.
+        const ALERT = '[Billing] deleted_account_renewing: a renewing subscription exists after deleting abcdef01…: cancel it in the Stripe Dashboard';
         // cus_a: a Customer step 1 saw; cus_new: one first seen by the read inside the transaction.
         for (const [customer, sub, wantLine] of [
             ['cus_a', { status: 'active' }, true],
@@ -691,6 +739,17 @@ describe('deleteAccountData: after COMMIT', () => {
             const label = `${customer} ${JSON.stringify(sub)}`;
             events.length = 0;
             logs.length = 0;
+            const alertLines = [];
+            const posted = [];
+            const alerts = createBillingAlerts({
+                env: { AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.example.org/billing' },
+                fetch: async (url, init) => {
+                    posted.push(JSON.parse(String(init.body)));
+                    return new Response('ok');
+                },
+                logger: { warn: (line) => alertLines.push(['warn', line]), error: (line) => alertLines.push(['error', line]) },
+                now: () => NOW.getTime(),
+            });
             const fake = createFakeStripe();
             const pool = createDeletionPool(seedFor(A, { events, customers: [{ stripe_customer_id: 'cus_a', user_id: A, livemode: false }] }));
             const realConnect = pool.connect;
@@ -710,14 +769,16 @@ describe('deleteAccountData: after COMMIT', () => {
                     },
                 };
             };
-            const result = await run(pool, { billing: { config: { live: false }, stripe: stripeWith(fake) } });
+            const result = await run(pool, { billing: { config: { live: false }, stripe: stripeWith(fake) }, alerts });
+            await new Promise((resolve) => setImmediate(resolve)); // the webhook post is not awaited
             assert.equal(result.status, 'deleted', label);
             assert.equal(pool.state.stubs.has(A), false, label);
             const afterCommit = events.slice(events.indexOf('sql:commit') + 1);
             assert.ok(afterCommit.includes('stripe:GET /v1/subscriptions'), `${label}: the subscriptions are read again after COMMIT`);
             assert.ok(fake.calls(/GET \/v1\/subscriptions$/).some((r) => r.form.get('customer') === customer && r.form.get('status') === 'all'), label);
-            assert.deepEqual(logs.filter(([, line]) => line === RENEWING).map(([level]) => level), wantLine ? ['warn'] : [], label);
-            assert.ok(logs.every(([, line]) => !line.includes(A)), `${label}: 8 characters only`);
+            assert.deepEqual(alertLines, wantLine ? [['error', ALERT]] : [], label);
+            assert.equal(posted.length, wantLine ? 1 : 0, `${label}: posted to the owner webhook`);
+            assert.ok([...logs, ...alertLines].every(([, line]) => !line.includes(A)) && !JSON.stringify(posted).includes(A), `${label}: 8 characters only`);
         }
     });
 

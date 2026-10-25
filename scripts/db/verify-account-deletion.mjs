@@ -33,11 +33,17 @@
  *       acceptance started during it waits for the shared lock and inserts nothing (control:
  *       without the lock it leaves a live row); one started before it is marked; every proof row
  *       carries the tombstone's deleted_at to the microsecond; a second call answers already; the
- *       lesson-progress `restarted` statement after a re-open
+ *       lesson-progress `restarted` statement after a re-open; a guardian consent whose INSERT is in
+ *       flight when the deletion starts is copied to the proofs (the deletion waits for it), and a
+ *       consent or AI-app grant written while the deletion is between its copies and the stub
+ *       waits and then fails its foreign key (control: without the row locks both are cascaded
+ *       with no proof); an app name from the page fills a grant row that has none
  *   R10 the retention run (server/services/retention.js) on seeded rows: what each period keeps and
  *       deletes (usage counts by Japan-time day, jobs in every status, MCP records, the proofs of
  *       deleted accounts, tombstones), batches of 5000, orphan upload files, and the advisory lock
- *       (a run while another session holds it deletes nothing)
+ *       (a run while another session holds it deletes nothing); a tombstone past its period that a
+ *       second deletion rewrites while the run's DELETE waits on its row lock is kept (control:
+ *       without the outer age test the fresh tombstone is deleted)
  *   R11 a foreign key refusal in the server log: with the default log_error_verbosity the DETAIL
  *       line carries the full id; with terse (docker-compose.yml's db command) it does not, and the
  *       STATEMENT line holds $1. The log is read from --log-file <path> when given, else from
@@ -566,6 +572,62 @@ const holdingPool = (pool, holdMs) => ({
     },
 });
 
+/** The row locks the deletion takes right after the account lock (finding: proofs lost to a write in between). */
+const ROW_LOCKS = () => /** @type {string[]} */ ([DELETION_SQL.lockStub, DELETION_SQL.lockConsents, DELETION_SQL.lockGrants]);
+
+/**
+ * A pool for deleteAccountData whose transaction pauses just before DELETE FROM auth.users (after
+ * the copies; nothing committed) until `gate` resolves; reached() is called there. skipRowLocks:
+ * the control without the stub, consent and grant row locks.
+ * @param {pg.Pool} pool @param {{ gate?: Promise<void>, reached?: () => void, skipRowLocks?: boolean }} options
+ */
+const gatedPool = (pool, { gate, reached, skipRowLocks = false }) => ({
+    query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => pool.query(sql, params),
+    connect: async () => {
+        const client = await pool.connect();
+        return {
+            query: async (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
+                if (skipRowLocks && ROW_LOCKS().includes(sql)) return { rows: [], rowCount: 0 };
+                if (sql === DELETION_SQL.deleteStub && gate) {
+                    reached?.();
+                    await gate;
+                }
+                return client.query(sql, params);
+            },
+            release: (/** @type {any} */ error) => client.release(error),
+        };
+    },
+});
+
+/** A gate the test opens: { gate, open, reached, whenReached }. */
+const makeGate = () => {
+    /** @type {() => void} */
+    let open = () => {};
+    /** @type {() => void} */
+    let reached = () => {};
+    const gate = new Promise((resolve) => { open = () => resolve(undefined); });
+    const whenReached = new Promise((resolve) => { reached = () => resolve(undefined); });
+    return { gate, open, reached, whenReached };
+};
+
+/**
+ * Waits (up to 5 s) until a session's statement matching `pattern` (ILIKE) waits on a lock.
+ * @param {pg.Pool} pool @param {string} pattern
+ */
+async function waitsOnLock(pool, pattern) {
+    for (let i = 0; i < 200; i += 1) {
+        const { rows } = await pool.query("SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE $1 AND pid <> pg_backend_pid()", [pattern]);
+        if (rows.length) return true;
+        await sleep(25);
+    }
+    return false;
+}
+
+/** mcp-server/remote.js TOUCH_SQL: an AI app's call through mcp-public (a first use inserts the grant row). */
+const TOUCH_GRANT = `INSERT INTO mcp_oauth_grants (user_id, client_id) VALUES ($1, $2)
+ON CONFLICT (user_id, client_id) DO UPDATE SET first_seen_at = COALESCE(mcp_oauth_grants.first_seen_at, now()), last_used_at = now()`;
+const PAPER_CONSENT = "INSERT INTO account_consents (user_id, kind, policy_version, method, relationship) VALUES ($1, 'guardian_ai', 'guardian-ai-2026-10', 'staff_paper_form', 'parent')";
+
 /** @param {pg.Pool} pool */
 async function r9(pool) {
     const terms = 'terms-draft-2026-10-01';
@@ -737,6 +799,89 @@ async function r9(pool) {
             check('R9', e.status === 'deleted' && f.status === 'refused' && 'reason' in f && f.reason === 'subscription_active' && kept === 1 && stubs === '0/1',
                 `a live api: the tester's test-mode row ${e.status} (row kept, unlinked ${kept}), the live row ${f.status}${'reason' in f ? `/${f.reason}` : ''}; stubs E/F ${stubs}`);
         }
+        const methods = async (/** @type {string} */ id) => (await pool.query('SELECT method FROM account_consent_proofs WHERE user_id = $1 ORDER BY method', [id])).rows.map((r) => r.method).join(',');
+        // R9f: a paper consent whose INSERT runs (its FK check holds KEY SHARE on the stub) but has not
+        // committed when the deletion starts: the deletion waits at the stub lock, then copies it.
+        for (const skipRowLocks of [false, true]) {
+            const F = uid(skipRowLocks ? 'r9h' : 'r9f');
+            await seed(F, uid('r9z'));
+            const c2 = await pool.connect();
+            /** @type {{ status: string } | undefined} */
+            let result;
+            let finishedEarly = false;
+            try {
+                await c2.query('BEGIN');
+                await c2.query(PAPER_CONSENT, [F]);
+                const running = service(gatedPool(pool, { skipRowLocks }), F).then((r) => {
+                    result = r;
+                    return r;
+                });
+                await sleep(HOLD_MS);
+                finishedEarly = result !== undefined;
+                await c2.query('COMMIT');
+                await running;
+            } finally {
+                c2.release();
+            }
+            const got = await methods(F);
+            if (!skipRowLocks) {
+                check('R9', result?.status === 'deleted' && !finishedEarly && got === 'guardian_on_device,staff_paper_form',
+                    `a consent INSERT in flight when the deletion starts: the deletion was still waiting after ${HOLD_MS} ms (${!finishedEarly}), then copied both consents (proofs ${got})`);
+            } else {
+                check('R9', result?.status === 'deleted' && got === 'guardian_on_device',
+                    `control, without the row locks: the in-flight consent is cascaded with no proof (proofs ${got}; the locks are needed)`);
+            }
+        }
+        // R9g: the deletion paused between its copies and the stub DELETE; meanwhile a paper consent, a
+        // first-use grant and the first use of a revoked never-used grant row (G2 of the seed) arrive.
+        for (const skipRowLocks of [false, true]) {
+            const G = uid(skipRowLocks ? 'r9j' : 'r9g');
+            await seed(G, uid('r9w'));
+            const [NEW_APP, NAMELESS] = [uid('r9n'), uid('r9m')];
+            // A used grant as mcp-server/remote.js writes it (no name); the page sends its name.
+            await pool.query("INSERT INTO mcp_oauth_grants (user_id, client_id, first_seen_at, last_used_at) VALUES ($1, $2, now() - interval '2 days', now())", [G, NAMELESS]);
+            const revokedNeverUsed = (await pool.query("SELECT client_id FROM mcp_oauth_grants WHERE user_id = $1 AND client_name = 'never used'", [G])).rows[0].client_id;
+            const { gate, open, reached, whenReached } = makeGate();
+            const running = deleteAccountData({
+                pool: gatedPool(pool, { gate, reached, skipRowLocks }), userId: G, requestedBy: 'self', authTime: null,
+                appNames: [{ clientId: NAMELESS, clientName: 'Claude Code' }],
+                billing: { config: null, stripe: null }, logger: { log: () => {}, warn: () => {} }, uploadRoot,
+                memory: { enabled: () => false, purge: async () => ({ ok: true }) }, invalidateCaches: () => {},
+            });
+            await whenReached;
+            const clients = await Promise.all([pool.connect(), pool.connect(), pool.connect()]);
+            /** @type {string[]} */
+            let writes = [];
+            let blocked = false;
+            try {
+                const outcome = (/** @type {Promise<unknown>} */ p) => p.then(() => 'committed', (error) => String(error?.code ?? 'error'));
+                const pending = Promise.all([
+                    outcome(clients[0].query(PAPER_CONSENT, [G])),
+                    outcome(clients[1].query(TOUCH_GRANT, [G, NEW_APP])),
+                    outcome(clients[2].query(TOUCH_GRANT, [G, revokedNeverUsed])),
+                ]);
+                if (!skipRowLocks) blocked = await waitsOnLock(pool, '%INSERT INTO account_consents%') && await waitsOnLock(pool, '%INSERT INTO mcp_oauth_grants%');
+                else writes = await pending;
+                open();
+                if (!skipRowLocks) writes = await pending;
+            } finally {
+                for (const c of clients) c.release();
+            }
+            const result = await running;
+            const got = {
+                proofs: await methods(G),
+                provision: (await pool.query('SELECT client_id::text AS id, client_name FROM ai_app_provision_records WHERE user_id = $1 ORDER BY client_name', [G])).rows
+                    .map((r) => (r.id === NEW_APP ? 'new app' : r.id === revokedNeverUsed ? 'revoked app' : r.client_name)).join(','),
+                left: await n('SELECT (SELECT count(*) FROM account_consents WHERE user_id = $1) + (SELECT count(*) FROM mcp_oauth_grants WHERE user_id = $1) AS n', [G]),
+            };
+            if (!skipRowLocks) {
+                check('R9', result.status === 'deleted' && blocked && writes.join() === '23503,23503,23503' && got.proofs === 'guardian_on_device' && got.provision === 'Claude Code,used app' && got.left === 0,
+                    `writes while the deletion sits between its copies and the stub: they waited (${blocked}) and then failed their foreign key (${writes.join(', ')}); proofs ${got.proofs}, provision records ${got.provision} (the page's name for the nameless grant), nothing left ${got.left}`);
+            } else {
+                check('R9', result.status === 'deleted' && writes.join() === 'committed,committed,committed' && got.proofs === 'guardian_on_device' && !got.provision.includes('new app') && !got.provision.includes('revoked app'),
+                    `control, without the row locks: the writes committed (${writes.join(', ')}) and were cascaded with no proof (proofs ${got.proofs}, provision ${got.provision}; the locks are needed)`);
+            }
+        }
     } finally {
         await fs.rm(uploadRoot, { recursive: true, force: true });
     }
@@ -845,6 +990,40 @@ async function r10(pool) {
         const again = await runRetention({ pool: /** @type {any} */ (pool), config, logger, uploadRoot });
         check('R10', again.ran === true && Object.values(again.deleted).every((v) => v === 0),
             `a second run deletes nothing (${Object.values(again.deleted).reduce((a, b) => a + b, 0)} rows)`);
+
+        // R10b: a tombstone past its period (deleted 6 years ago, re-opened 5.5 years ago) whose account
+        // is deleted again while the run's DELETE FROM account_deletions waits on the row lock. READ
+        // COMMITTED re-checks only the target row's own WHERE on the new row version: the age test
+        // must be there. Control: the statement without it deletes the fresh tombstone.
+        const OLD_TOMBSTONE_SQL = 'DELETE FROM account_deletions WHERE user_id IN (SELECT user_id FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) LIMIT $2)';
+        for (const control of [false, true]) {
+            const T = uid(control ? 'r10x' : 'r10r');
+            await pool.query("INSERT INTO account_deletions (user_id, deleted_at, requested_by, reopened_at) VALUES ($1, now() - interval '6 years', 'self', now() - interval '5 years 6 months')", [T]);
+            await pool.query('INSERT INTO auth.users (id) VALUES ($1)', [T]);
+            const { gate, open, reached, whenReached } = makeGate();
+            const deletion = deleteAccountData({
+                pool: gatedPool(pool, { gate, reached }), userId: T, requestedBy: 'staff', authTime: null,
+                billing: { config: null, stripe: null }, logger: { log: () => {}, warn: () => {} }, uploadRoot,
+                memory: { enabled: () => false, purge: async () => ({ ok: true }) }, invalidateCaches: () => {},
+            });
+            await whenReached; // the tombstone is rewritten (deleted_at now, reopened_at NULL), not committed
+            const sweep = control
+                ? pool.query(OLD_TOMBSTONE_SQL, [5, BATCH_LIMIT]).then((r) => r.rowCount ?? 0)
+                : runRetention({ pool: /** @type {any} */ (pool), config, logger, uploadRoot }).then((r) => r.deleted.account_deletions);
+            const waited = await waitsOnLock(pool, '%DELETE FROM account_deletions%');
+            open();
+            const done = await deletion;
+            const swept = await sweep;
+            const row = (await pool.query("SELECT deleted_at > now() - interval '1 minute' AS fresh, reopened_at FROM account_deletions WHERE user_id = $1", [T])).rows[0];
+            const state = await readAccountState(pool, T, Math.floor(Date.now() / 1000) - 365 * 86400, { mayReopen: true });
+            if (!control) {
+                check('R10', done.status === 'deleted' && waited && swept === 0 && row?.fresh === true && row?.reopened_at === null && state.state === 'deleted',
+                    `a second deletion of an expired, re-opened tombstone during the run: the run waited on its row (${waited}), deleted ${swept}, the fresh tombstone is kept (${row ? `fresh ${row.fresh}, reopened_at ${row.reopened_at}` : 'gone'}), a session from before it is ${state.state}`);
+            } else {
+                check('R10', done.status === 'deleted' && waited && swept === 1 && !row && state.state === 'ok',
+                    `control, without the outer age test: the run deleted ${swept} row, the fresh tombstone is ${row ? 'kept (unexpected)' : 'gone'} and an old session is ${state.state} (the guard is needed)`);
+            }
+        }
     } finally {
         await fs.rm(uploadRoot, { recursive: true, force: true });
     }

@@ -34,6 +34,8 @@ import { formatEffectiveDate } from '../../legal/legalDate';
 
 const copy = {
   en: {
+    /** The language of the UI strings below: they sit inside <article lang="ja">. */
+    lang: 'en',
     titles: { terms: 'Terms of Use', privacy: 'Privacy Policy' } as Record<LegalDocumentName, string>,
     version: (version: string, from: string | null) => (from ? `Version ${version} (from ${from})` : `Version ${version} (draft)`),
     japaneseOnly:
@@ -47,6 +49,7 @@ const copy = {
       `The Japanese text is the official version of this document. Version: ${version} / first 12 characters of the SHA-256: ${hash}`,
   },
   jp: {
+    lang: 'ja',
     titles: { terms: '利用規約', privacy: 'プライバシーポリシー' } as Record<LegalDocumentName, string>,
     version: (version: string, from: string | null) => (from ? `版 ${version}（${from}から）` : `版 ${version}（下書き）`),
     japaneseOnly: '',
@@ -140,13 +143,15 @@ export function legalComponents(t: Copy): Components {
     hr: () => <hr className="mt-8 border-line" />,
     code: ({ node: _node, ...props }) => <code className="rounded-chip bg-sunken px-1 font-mono text-body wrap-anywhere" {...props} />,
     table: ({ node: _node, ...props }) => (
+      // The region's name is in the UI language; the table itself stays Japanese.
       <div
         role="region"
+        lang={t.lang}
         aria-label={t.tableLabel}
         tabIndex={0}
         className="mt-4 overflow-x-auto rounded-card border border-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus print:overflow-visible"
       >
-        <table className="w-full min-w-160 border-collapse text-left" {...props} />
+        <table lang="ja" className="w-full min-w-160 border-collapse text-left" {...props} />
       </div>
     ),
     th: ({ node: _node, ...props }) => <th className="border-b border-line bg-sunken px-3 py-2 align-top text-body font-semibold text-fg" {...props} />,
@@ -171,7 +176,7 @@ export function legalComponents(t: Copy): Components {
           <a href={href} target="_blank" rel="noopener noreferrer" className={linkClasses}>
             {children}
             <ExternalLink size={14} aria-hidden="true" className="ml-0.5 inline align-baseline" />
-            <span className="sr-only">{t.newTab}</span>
+            <span lang={t.lang} className="sr-only">{t.newTab}</span>
           </a>
         );
       }

@@ -1,5 +1,5 @@
 // Deleting one's own account (Phase 4, server/routes/account.js at /api/v2/user/account) on the
-// real server.js stack: requireAuth and requireSignedIn, the 1 kb body parser registered before
+// real server.js stack: requireAuth and requireSignedIn, the 16 kb body parser registered before
 // the 50 MB one, the per-learner limit, the off switch, the password re-authentication (amr), the
 // deletion itself against helpers/deletionPool.js, and what a deleted account's sessions get
 // afterwards. The answer for every service result is checked on the router alone.
@@ -10,7 +10,7 @@ import { createApp } from '../../server.js';
 import { PHASE1_USER_ID, resetPoolForTests, setPoolForTests } from '../db.js';
 import { setSupabaseForTests } from '../middleware/auth.js';
 import { requireSignedIn } from '../middleware/signedIn.js';
-import { ACCOUNT_DELETIONS_PER_MINUTE, createAccountRouter, readDeletionSwitch } from '../routes/account.js';
+import { ACCOUNT_DELETIONS_PER_MINUTE, createAccountRouter, deletionAppNames, readDeletionSwitch } from '../routes/account.js';
 import { decodeTokenClaims } from '../../tools/core/oauthToken.js';
 import { createDeletionPool } from './helpers/deletionPool.js';
 
@@ -160,15 +160,15 @@ describe('/api/v2/user/account on the server.js stack', () => {
         assert.equal(pool.state.tombstones.size, 0);
     });
 
-    it('400 confirm_required without the confirm word; a body over 1 kb 413 body_too_large (JSON); a non-JSON body 400 invalid_body', async () => {
+    it('400 confirm_required without the confirm word; a body over 16 kb 413 body_too_large (JSON); a non-JSON body 400 invalid_body', async () => {
         const fresh = token(A);
         await withServer(async (base) => {
             for (const body of [{}, { confirm: 'yes' }, [CONFIRM], { confirm: 'DELETE-MY-ACCOUNT' }]) {
                 const res = await call(base, DELETION, { method: 'POST', headers: auth(fresh), body });
                 assert.deepEqual([res.status, res.json.error_type], [400, 'confirm_required'], JSON.stringify(body));
             }
-            const big = await call(base, DELETION, { method: 'POST', headers: auth(fresh), body: { ...CONFIRM, pad: 'x'.repeat(2048) } });
-            assert.deepEqual([big.status, big.json], [413, { error: 'The request body is larger than 1kb.', error_type: 'body_too_large' }]);
+            const big = await call(base, DELETION, { method: 'POST', headers: auth(fresh), body: { ...CONFIRM, pad: 'x'.repeat(17 * 1024) } });
+            assert.deepEqual([big.status, big.json], [413, { error: 'The request body is larger than 16kb.', error_type: 'body_too_large' }]);
             const broken = await call(base, DELETION, { method: 'POST', headers: auth(fresh), rawBody: '{"confirm":' });
             assert.deepEqual([broken.status, broken.json], [400, { error: 'The request body is not valid JSON.', error_type: 'invalid_body' }]);
         });
@@ -327,8 +327,33 @@ describe('createAccountRouter: the answer for every service result', () => {
                 }
             });
             assert.equal(calls.length, 1);
-            assert.deepEqual({ ...calls[0], billing: undefined }, { userId: A, requestedBy: 'self', authTime: NOW / 1000, billing: undefined });
+            assert.deepEqual({ ...calls[0], billing: undefined }, { userId: A, requestedBy: 'self', authTime: NOW / 1000, appNames: [], billing: undefined });
         }
+    });
+
+    it('the page\'s AI app names reach the service cleaned (trimmed, at most 100 characters, lower-case UUID ids); anything else is dropped and never refuses', async () => {
+        const APP = '11111111-AAAA-4000-8000-000000000001';
+        const OTHER = '11111111-0000-4000-8000-000000000002';
+        const many = Array.from({ length: 30 }, (_, i) => ({ clientId: `22222222-0000-4000-8000-${String(i).padStart(12, '0')}`, clientName: `app ${i}` }));
+        for (const [apps, want] of [
+            [[{ clientId: APP, clientName: '  Claude\u202e Code \n' }, { clientId: OTHER, clientName: 'y'.repeat(150) }],
+                [{ clientId: APP.toLowerCase(), clientName: 'Claude Code' }, { clientId: OTHER, clientName: 'y'.repeat(100) }]],
+            [[{ clientId: 'not-a-uuid', clientName: 'x' }, { clientId: APP, clientName: '   ' }, { clientId: APP, clientName: 7 }, null, 'str', { clientId: OTHER, clientName: 'ok' }, { clientId: OTHER, clientName: 'again' }],
+                [{ clientId: OTHER, clientName: 'ok' }]],
+            ['not a list', []],
+            [many, many.slice(0, 20)],
+        ]) {
+            const calls = [];
+            await withRouter(async (input) => {
+                calls.push(input);
+                return { status: 'deleted', deletedAt: null };
+            }, async (base) => {
+                const res = await call(base, '/deletion', { method: 'POST', headers: auth(fresh()), body: { ...CONFIRM, apps } });
+                assert.equal(res.status, 200);
+            });
+            assert.deepEqual(calls.map((c) => c.appNames), [want], JSON.stringify(apps).slice(0, 80));
+        }
+        assert.deepEqual(deletionAppNames(undefined), []);
     });
 
     it('the re-auth window is [now − 120 s, now + 60 s]; the service is never called outside it', async () => {

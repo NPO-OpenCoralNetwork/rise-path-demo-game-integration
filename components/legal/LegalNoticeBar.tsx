@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Info, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -15,7 +15,10 @@ import type { LegalNotice } from '../../services/legalConsentApi';
  *   - needed, on a page that stays open without agreeing (App.tsx LEGAL_GATE_EXEMPT, e.g.
  *     /settings/ai-access): 「Rise Path を使い続けるには、利用規約への同意が必要です。」 + "Review",
  *     which goes to the re-consent page.
- * role="status": announced politely, never steals focus. The live region is always there while the
+ * Focus: "Close" removes its own button, so focus moves to the Layout's main (focusAfterDismiss;
+ * the reading position stays); after "Agree and continue" the consent page is replaced by the app,
+ * and the bar, mounted in the Layout's main, focuses main once (the gate's takeFocusAfterAccept).
+ * role="status": announced politely, never steals focus on its own. The live region is always there while the
  * flag is on (empty, with no height, when there is nothing to say): screen readers announce what
  * appears inside a region that already exists, not a region that mounts already filled. Nothing at
  * all while the flag is off.
@@ -55,7 +58,9 @@ export const LegalNoticeBarBody: React.FC<{
   status: string;
   notice: LegalNotice[];
   onDismiss: (version: string) => void;
-}> = ({ language, status, notice, onDismiss }) => {
+  /** Called after onDismiss: the pressed button is about to unmount. */
+  focusAfterDismiss?: () => void;
+}> = ({ language, status, notice, onDismiss, focusAfterDismiss }) => {
   const t = copy[language];
   let content: React.ReactNode = null;
   if (status === 'needed') {
@@ -84,7 +89,10 @@ export const LegalNoticeBarBody: React.FC<{
           </Link>
           <button
             type="button"
-            onClick={() => onDismiss(item.version)}
+            onClick={() => {
+              onDismiss(item.version);
+              focusAfterDismiss?.();
+            }}
             aria-label={t.closeLabel(t.names[item.document])}
             className="inline-flex h-8 items-center gap-1 rounded-control px-2 font-medium text-fg-2 hover:bg-surface hover:text-fg"
           >
@@ -99,9 +107,19 @@ export const LegalNoticeBarBody: React.FC<{
   return <div role="status">{content}</div>;
 };
 
+/** The Layout's main (tabIndex -1), without scrolling it. */
+export const focusMainContent = () => {
+  if (typeof document === 'undefined') return;
+  document.getElementById('main-content')?.focus({ preventScroll: true });
+};
+
 const LegalNoticeBar: React.FC = () => {
   const { language } = useLanguage();
   const state = useLegalGate(features.legalPages);
+  // Mounted with the Layout right after a successful "Agree and continue": focus leaves the body.
+  useEffect(() => {
+    if (features.legalPages && legalGate(features.legalPages).takeFocusAfterAccept()) focusMainContent();
+  }, []);
   if (!features.legalPages) return null;
   return (
     <LegalNoticeBarBody
@@ -109,6 +127,7 @@ const LegalNoticeBar: React.FC = () => {
       status={state.status}
       notice={state.notice}
       onDismiss={(version) => legalGate(features.legalPages).dismissNotice(version)}
+      focusAfterDismiss={focusMainContent}
     />
   );
 };

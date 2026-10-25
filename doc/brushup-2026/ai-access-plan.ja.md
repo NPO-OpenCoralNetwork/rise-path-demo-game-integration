@@ -647,6 +647,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 | 支払いへの異議の申し立て（チャージバック）があった（`charge_dispute`） | その契約をすぐにキャンセルします（次の請求で、また申し立てにならないため）。そのあと、Stripe で申し立てに答えます。Stripe の手数料がかかります（日本の料金のページでは 1 件 1,500 円。2026-10-23 の調べ） |
 | 年齢が 18 歳未満に直された（`minor_with_subscription`） | サポーターの上限は、自動で止まります。その契約をすぐにキャンセルし、返金します（未成年の契約は、取り消せる場合があるため。民法 第 5 条）。本人と保護者の方に連絡します |
 | 二重に申し込まれた（`duplicate_subscription`） | 新しいほうの契約をすぐにキャンセルし、返金します |
+| 削除したアカウントの契約が続いている（`deleted_account_renewing`。Phase 4） | Stripe でその契約を解約します。アカウントの削除は元に戻しません（[../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) の 5 章） |
 | 知らない顧客の契約（`unknown_customer`） | Rise Path が作っていない顧客の契約です（同じ Stripe のアカウントの寄付など）。Rise Path は記録しません。Stripe で中身を確かめます |
 | 契約の中のアカウント ID と、顧客のアカウントがちがう（`user_mismatch`） | 顧客の対応（`billing_customers`）のほうを使っています。Stripe で確かめ、まちがいなら、キャンセルと返金をします |
 | 知らないプライスの契約（`unknown_price`） | 記録しますが、サポーターの上限は出しません。前に売っていたプライスなら、`STRIPE_PRICE_IDS_ACCEPTED` に足して、`deploy-stack.sh` を実行します |
@@ -682,7 +683,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 ### 8.2 オーナーの作業
 
 1. **公開の関門**: 一般の登録は、`VITE_FEATURE_LEGAL_PAGES=true` にするまで受け付けません（拠点とテスターだけ）。`true` にするのは、弁護士の確認のあとです。止めているあいだは、登録画面に利用目的のお知らせも同意もありません（個人情報保護法 第 21 条第 2 項、利用規約 第 1 条）。自動の確かめはありません。手順は [../legal/README.md](../legal/README.md) の「ページを公開する手順」です。
-2. **自分の AI をつなぐ機能と削除**: `byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、[../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 6 の 3 つの設定を入れ、手順 10 のパスワードの確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` にします。設定がないと、つないだ AI アプリがパスワードを設定してログインし、アカウントを削除できます。
+2. **パスワードの設定と削除（どの環境でも）**: Supabase の「Require current password when updating」を入れ、ステージングで確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` にします。確かめ方: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT /auth/v1/user {"password":"…"}` を送り、400 `current_password_required` が返ること。設定がないと、ログインしたままの端末を持っている人が、新しいパスワードを設定してログインし直し、パスワードの確認を通って、アカウントを削除できます（「Secure password change」だけでは、ログインから 24 時間以内のセッションを防げません）。`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、さらに [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れ、手順 10 のパスワードの確かめが通るまで止めたままにします。設定がないと、つないだ AI アプリもパスワードを設定してログインし、アカウントを削除できます。
 3. **本番の `amr` の確かめ**: 本番で新しくログインしたアクセストークンを読み、`amr: [{"method":"password","timestamp":…}]` があることを確かめます。ないと、削除は `reauth_required` になり、削除したアカウントのログインは、ずっと断られます（安全な側）。削除を使い始める前の関門です。
 4. **デプロイの順番**: マージすると、Vercel がすぐに画面を作り直します。API は `deploy-stack.sh` を実行するまで古いままです。**同じ日に** `deploy-stack.sh` を実行します（migration 018 を当てます）。そのあと `sql/mcp_remote_role.sql` を流し直します。ログの設定が変わるので、最初のデプロイでは、動いているコンテナがすべて一度作り直されます（`db` は「db up」のときに数秒止まり、古い API が 503 を返します。そのあと API、最後に「docker compose up」で cloudflared、読み上げ、mcp、mcp-public、hermes と memanto。トンネルが少し止まり、読み上げのモデルを読み直します）。018 を当てる前に、この版の API、mcp、mcp-public を動かさないでください（手元の開発の DB も `npm run db:migrate`）。
 5. **お問い合わせ**: `VITE_SUPPORT_CONTACT`（Vercel）を設定し、下書きの【要記入: 連絡先】に同じ窓口を書きます。だれが読むかを [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) に書きます。
@@ -712,7 +713,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 - ほかのサービスで消されたログインの Rise Path のデータは、次の `--orphans` まで残ります。
 - Stripe には、アカウント ID が残ります（顧客、支払いの画面、契約の情報）。画面にもそう書いています。
 - 決済が動かせない状態（今）では、続いているプランの確かめは、DB の写しだけで行います（テストモードの行です）。
-- 削除の直前に始まった申し込みが、削除のあとに支払いの画面を開くことがあります（最大 32 分）。そのあいだに支払いが終わると、削除したアカウントに続く契約が残ることがあり、ログに `[Account] a renewing subscription exists after deleting …` が出ます。スタッフが Stripe で解約します。
+- 削除の直前に始まった申し込みが、削除のあとに支払いの画面を開くことがあります（最大 32 分）。そのあいだに支払いが終わると、削除したアカウントに続く契約が残ることがあり、オーナーへの知らせ `deleted_account_renewing`（ログの `[Billing] deleted_account_renewing: …` と、`AI_CAP_ALERT_WEBHOOK_URL`）が出ます。スタッフが Stripe で解約します。
 - Stripe に顧客がいない（`resource_missing`）ときは「Stripe には何もない」とみなします。Stripe のアカウントを替えるときは、先に古いアカウントの契約を解約します。Memanto への呼び出しには時間の上限がありません（Memanto は既定で止まっています）。
 
 ### 8.4 残っていること

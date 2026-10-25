@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { requireAuth, optionalAuth, setSupabaseForTests, extractBearerToken } from '../middleware/auth.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
+import { aiAccessGate } from '../middleware/aiAccessGate.js';
 import { PHASE1_USER_ID, setPoolForTests, resetPoolForTests } from '../db.js';
 import { createSseUserResolver } from '../../mcp-server/sseUserAuth.js';
 import { readAccountState } from '../../tools/core/accountDeletions.js';
@@ -172,6 +173,40 @@ for (const mode of ['production', 'development']) {
                 assert.deepEqual((await get('/optional', session(OTHER, { signedIn: DELETED_S }))).json,
                     { userId: null, authMethod: 'anonymous', accountGeneration: 'unset' });
             });
+            assert.deepEqual(stubInserts(pool), []);
+        });
+
+        it('optionalAuth + the AI gate: a failing tombstone read is 503 ai_access_unavailable (try again), never 401 sign_in_required or the guest path', async () => {
+            const pool = createAccountDeletionPool({ failRead: true });
+            setPoolForTests(pool);
+            const app = express();
+            app.post('/ai', optionalAuth, aiAccessGate(), (req, res) => res.json({ served: true, userId: req.userId ?? null }));
+            const server = await new Promise((resolve) => {
+                const s = app.listen(0, '127.0.0.1', () => resolve(s));
+            });
+            const savedGuest = process.env.LLM_GUEST_AI;
+            try {
+                for (const guest of [undefined, 'true']) {
+                    if (guest === undefined) delete process.env.LLM_GUEST_AI;
+                    else process.env.LLM_GUEST_AI = guest;
+                    const response = await fetch(`http://127.0.0.1:${server.address().port}/ai`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${session(OTHER, { signedIn: DELETED_S })}` },
+                    });
+                    const label = `LLM_GUEST_AI=${guest}`;
+                    assert.equal(response.status, 503, label);
+                    assert.equal(response.headers.get('retry-after'), '60', label);
+                    assert.equal((await response.json()).error_type, 'ai_access_unavailable', label);
+                }
+                // Without a token the gate is unchanged: 401 sign_in_required (guests off).
+                delete process.env.LLM_GUEST_AI;
+                const anonymous = await fetch(`http://127.0.0.1:${server.address().port}/ai`, { method: 'POST' });
+                assert.equal(anonymous.status, 401);
+            } finally {
+                if (savedGuest === undefined) delete process.env.LLM_GUEST_AI;
+                else process.env.LLM_GUEST_AI = savedGuest;
+                await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+            }
             assert.deepEqual(stubInserts(pool), []);
         });
 

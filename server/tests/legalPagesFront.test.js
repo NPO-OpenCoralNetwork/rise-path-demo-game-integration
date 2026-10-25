@@ -342,7 +342,12 @@ describe('the legal pages (rendered)', () => {
       assert.ok(elementsOf(walk(region.props.children)).some((el) => el.type === 'table'));
     }
     const en = elementsOf(render(pages.LegalDocumentBody, { document: 'privacy', text: privacyText, language: 'en' }));
-    assert.equal(en.find((el) => el.props?.role === 'region').props['aria-label'], 'Table (scrolls sideways)');
+    const region = en.find((el) => el.props?.role === 'region');
+    assert.equal(region.props['aria-label'], 'Table (scrolls sideways)');
+    // Inside <article lang="ja">: the English name is marked English, the table stays Japanese (WCAG 3.1.2).
+    assert.equal(region.props.lang, 'en');
+    assert.equal(elementsOf(walk(region.props.children)).find((el) => el.type === 'table').props.lang, 'ja');
+    assert.equal(regions[0].props.lang, 'ja');
   });
 
   it('links: https in a new tab with the hint, /privacy through the router, anything else as text', () => {
@@ -354,6 +359,12 @@ describe('the legal pages (rendered)', () => {
       assert.equal(a.props.target, '_blank');
       assert.equal(a.props.rel, 'noopener noreferrer');
       assert.match(textOfElement(a), /（新しいタブで開きます）$/);
+    }
+    const en = elementsOf(render(pages.LegalDocumentBody, { document: 'terms', text: termsText, language: 'en' })).filter((el) => el.type === 'a');
+    for (const a of en) {
+      const hint = elementsOf(walk(a.props.children)).find((el) => el.type === 'span' && textOfElement(el) === '(opens in a new tab)');
+      assert.ok(hint, a.props.href);
+      assert.equal(hint.props.lang, 'en', 'the English hint is read with the English voice');
     }
     const internal = els.filter((el) => el.type === 'Link').map((el) => el.props.to);
     assert.ok(internal.includes('/privacy'), 'the link between the drafts goes through the router');

@@ -129,7 +129,7 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
     // then sees the body as already read and skips it.
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
-    // Account deletion (Phase 4) takes only a confirm word: 1 kb, refused before the 50 MB parser.
+    // Account deletion (Phase 4) takes a confirm word and the AI apps' names: 16 kb, refused before the 50 MB parser.
     app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
     // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 50 MB parser too.
     app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
@@ -364,8 +364,9 @@ async function main() {
     void pruneSafetyEvents(undefined, { force: true });
     setInterval(() => void pruneSafetyEvents(undefined, { force: true }), 60 * 60 * 1000).unref();
     // Retention (Phase 4, server/services/retention.js): old usage counts, processing records and
-    // the proofs of deleted accounts, hourly. An invalid setting turns its rule off (logged).
-    const retention = readRetentionConfig(process.env);
+    // the proofs of deleted accounts, hourly. An invalid setting turns its rule off (logged). Outside
+    // NODE_ENV=production it runs only with RETENTION_ENABLED=true (a laptop api on the VM database).
+    const retention = readRetentionConfig(process.env, { nodeEnv: process.env.NODE_ENV });
     for (const problem of retention.problems) console.warn(`[Retention] ${problem}`);
     console.log(retentionStartupLine(retention));
     if (retention.enabled) {

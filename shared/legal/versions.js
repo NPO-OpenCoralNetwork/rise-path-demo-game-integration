@@ -10,7 +10,9 @@
  * legal_document_versions.version (server/migrations/018_account_deletion_and_legal.sql).
  *
  * When the generated text changes (node scripts/legal/build-legal-text.mjs prints both), change
- * version AND sha256; server/tests/legalText.test.js fails until they match. A released version
+ * version AND sha256, and add the new pair to LEGAL_PINNED_HASHES (append only: a version id names
+ * one text forever, so a reused draft id never meets another text in a database that already holds
+ * it); server/tests/legalText.test.js and `build-legal-text.mjs --check` fail until all three agree. A released version
  * also needs its archive file (`node scripts/legal/build-legal-text.mjs --archive`), and when it is
  * replaced, its entry moves to LEGAL_HISTORY (append only) and its archive file stays.
  *
@@ -54,14 +56,25 @@ export const LEGAL_DOCUMENTS = Object.freeze({
     generated: 'content/legal/terms.ja.md',
   }),
   privacy: Object.freeze({
-    version: 'privacy-draft-2026-10-22.2',
-    sha256: '4ff97adbf90a4886a59bbe8022569460e88233cd1e77eef9a6ddf89d5a29122d',
+    version: 'privacy-draft-2026-10-22.3',
+    sha256: '059e634bafd05491fdf59a93bf416967e7a9ca6ad4977dd3c8c5e494656b7535',
     effectiveDate: null,
     requiresAcceptance: false,
     include: Object.freeze({ billing: false, byoa: false }),
     source: 'doc/legal/privacy-policy.draft.ja.md',
     generated: 'content/legal/privacy.ja.md',
   }),
+});
+
+/**
+ * Every version id ever pinned (current, history and earlier drafts), with its text's sha256.
+ * Append only: a visible change gets a new id and a new line here, never a new hash for an old id.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const LEGAL_PINNED_HASHES = Object.freeze({
+  'terms-draft-2026-10-22.2': 'c0cdc61708f43945b9bd0d7782124b3da272d3163fa679ffd2292be57d05e81d',
+  'privacy-draft-2026-10-22.2': '4ff97adbf90a4886a59bbe8022569460e88233cd1e77eef9a6ddf89d5a29122d',
+  'privacy-draft-2026-10-22.3': '059e634bafd05491fdf59a93bf416967e7a9ca6ad4977dd3c8c5e494656b7535',
 });
 
 /**
@@ -124,4 +137,22 @@ export function acceptableLegalVersions(document, { documents = LEGAL_DOCUMENTS,
     if (entry.requiresAcceptance === true) start = i;
   });
   return start === -1 ? null : chain.slice(start).map((entry) => entry.version);
+}
+
+/**
+ * The documents whose last accepted version no longer counts (acceptableLegalVersions), in
+ * LEGAL_DOCUMENT_NAMES order: what the re-consent page says changed. [] without a last acceptance
+ * (a first agreement). The page may use the bundle's tables: the gate is `unavailable` whenever the
+ * server's current versions differ from them.
+ * @param {{ termsVersion?: unknown, privacyVersion?: unknown } | null | undefined} lastAccepted
+ * @param {{ documents?: Readonly<Record<LegalDocumentName, Readonly<LegalDocumentEntry>>>, history?: readonly Readonly<LegalHistoryEntry>[] }} [sources]
+ * @returns {LegalDocumentName[]}
+ */
+export function documentsToAcceptAgain(lastAccepted, sources) {
+  if (!lastAccepted) return [];
+  const accepted = { terms: lastAccepted.termsVersion, privacy: lastAccepted.privacyVersion };
+  return LEGAL_DOCUMENT_NAMES.filter((document) => {
+    const ok = acceptableLegalVersions(document, sources);
+    return ok !== null && !ok.includes(/** @type {string} */ (accepted[document]));
+  });
 }

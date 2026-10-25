@@ -116,7 +116,13 @@ export async function syncSubscription(subscriptionId, { stripe, pool, config, n
     // The account was deleted (server/services/accountDeletion.js); its subscription's later events
     // (an ending plan's customer.subscription.deleted, say) still name it in the metadata.
     const renewing = !TERMINAL_STATUSES.includes(status) && sub?.cancel_at_period_end !== true && (sub?.cancel_at === null || sub?.cancel_at === undefined);
-    logger.warn(`[Billing] subscription ${id} (${status}) belongs to a deleted Rise Path account (customer ${customerId}): stored without a user${renewing ? '; it still renews: cancel it in the Stripe Dashboard' : ''}.`);
+    if (renewing) {
+      // Someone has to act: an owner alert (the api log is erased when a deploy recreates the container).
+      alerts.alert('deleted_account_renewing', id,
+        `subscription ${id} (${status}) belongs to a deleted Rise Path account (customer ${customerId}) and still renews: cancel it in the Stripe Dashboard.`);
+    } else {
+      logger.warn(`[Billing] subscription ${id} (${status}) belongs to a deleted Rise Path account (customer ${customerId}): stored without a user.`);
+    }
   } else if (metadataUser && metadataUser.toLowerCase() !== userId.toLowerCase()) {
     alerts.alert('user_mismatch', id,
       `subscription ${id} names another user in its metadata than its customer ${customerId} maps to (${userTag(userId)}): the customer mapping is used.`);

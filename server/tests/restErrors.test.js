@@ -301,6 +301,28 @@ describe('REST error answers', () => {
         assert.ok(pool.queries.length > 0 && pool.queries.every((q) => q.sql.startsWith(ACCOUNT_STATE_READ)), 'no stub insert and no route query after the failed check');
     });
 
+    it('a failed deleted-account check on the LLM gateway (optionalAuth) is 503 ai_access_unavailable, never "sign in", without the database text; TTS stays anonymous', async () => {
+        const pool = createPool({ failAccountState: true });
+        setPoolForTests(pool);
+        const { warn } = console;
+        console.warn = () => {};
+        const lesson = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] };
+        const anchor = { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'プロンプトは「目的・制約・例」の順に書く。' };
+        try {
+            await withServer(async (base) => {
+                const result = await call(base, 'POST', '/llm/tutor', { body: { message: 'これは何？', lesson, anchor } });
+                assert.equal(result.status, 503, result.text.slice(0, 300));
+                assert.equal(result.json.error_type, 'ai_access_unavailable');
+                assertNoLeak(result, 'llm/tutor');
+                // An ungated optionalAuth route still answers as anonymous (no 503 there).
+                const status = await call(base, 'GET', '/llm/status');
+                assert.equal(status.status, 200, status.text.slice(0, 200));
+            });
+        } finally {
+            console.warn = warn;
+        }
+    });
+
     it("a rejected token is 401 without the auth provider's text", async () => {
         process.env.NODE_ENV = 'production';
         setPoolForTests(createPool());

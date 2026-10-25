@@ -927,6 +927,21 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
     }
   });
 
+  it('the api keeps NODE_ENV production by default, so retention there is on unless turned off (outside production it is opt-in)', () => {
+    assert.match(services.api || '', /^ {6}NODE_ENV: \$\{NODE_ENV:-production\}\s*$/m);
+  });
+
+  it('ACCOUNT_DELETION_ENABLED: "Require current password" is a precondition in every deployment, not only with byoa', () => {
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Account deletion and retention'), stack.indexOf('# ACCOUNT_DELETION_ENABLED='));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    const sentence = text.split(/(?<=\.)\s+/).find((part) => part.includes('Require current password'));
+    assert.ok(sentence, 'the comment names the Supabase setting');
+    assert.match(sentence, /whatever COMPOSE_PROFILES says/);
+    assert.doesNotMatch(sentence, /while COMPOSE_PROFILES lists byoa/);
+    assert.match(text, /current_password_required/, 'the staging check');
+  });
+
   it('stack.env.example documents them commented out; mcp-public.env.example never names them', () => {
     const stack = read(path.join(STACK, 'stack.env.example'));
     const values = lines(stack).filter((line) => !line.startsWith('#'));

@@ -7,8 +7,12 @@
  *      background request of this tab that gets 401 account_deleted after the deletion committed
  *      no longer starts the "deleted elsewhere" flow, whose page change would abort steps 6–7;
  *   2. a password sign-in with an ephemeral client (createReauthClient: nothing stored, not the
- *      app's session); a wrong password or another account's session stops here;
- *   3. the POST with that sign-in's token (the server wants a password sign-in ≤ 120 s old);
+ *      app's session), at most REAUTH_SIGN_IN_WAIT_MS (a Supabase that never answers: "can't
+ *      delete right now", nothing sent); a wrong password or another account's session stops here;
+ *   3. the POST with that sign-in's token (the server wants a password sign-in ≤ 120 s old) and
+ *      the names of the AI apps the account used, as Supabase's listGrants shows them
+ *      (deletionAppNames: the remote MCP server knows an app only by id, so the kept provision
+ *      record would otherwise have no name);
  *   4. the ephemeral session is signed out (scope 'local'), whatever happened;
  *   5. the outcome: 200 → deleted here ('self', with the time); 401 account_deleted to this POST
  *      (a second request after the first one committed) → 'self' too; anything else →
@@ -23,8 +27,8 @@
 import { apiFetch } from './apiClient';
 import { createReauthClient, getSupabaseClient } from './supabaseClient';
 import { clearDeletionInFlight, markDeletionInFlight, type DeletedBy } from './accountDeletionState';
-import { listConnectedAppRecords } from './connectedAppsApi';
-import type { ConnectedAppRecord } from './oauthConsentRules';
+import { listConnectedAppRecords, listSupabaseGrants } from './connectedAppsApi';
+import { revocationClientName, type ConnectedAppRecord, type SupabaseGrantLike } from './oauthConsentRules';
 
 const PATH = '/user/account/deletion';
 /** The body word server/routes/account.js wants (CONFIRM_WORD). */
@@ -38,9 +42,15 @@ export const DELETION_REQUEST_TIMEOUT_MS = 120_000;
 export const GRANT_REVOKE_WAIT_MS = 5_000;
 /** Signing the ephemeral session out waits at most this long. */
 export const REAUTH_SIGN_OUT_WAIT_MS = 3_000;
+/** The password sign-in waits at most this long (well inside the server's 120 s re-auth window). */
+export const REAUTH_SIGN_IN_WAIT_MS = 30_000;
 
-/** The two waits of steps 2–4 (tests pass short ones). */
-export type DeletionWaits = { requestTimeoutMs?: number; signOutWaitMs?: number };
+/** The waits of steps 2–4 (tests pass short ones). */
+export type DeletionWaits = { requestTimeoutMs?: number; signOutWaitMs?: number; signInWaitMs?: number };
+
+/** The most app names sent with the deletion (server/routes/account.js takes as many). */
+export const DELETION_APP_NAMES_MAX = 20;
+export type DeletionAppName = { clientId: string; clientName: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -107,9 +117,47 @@ export async function getConnectedAppRecords(signal?: AbortSignal): Promise<Conn
   }
 }
 
+/** Supabase's grants of this login (the apps' names), or null when they could not be read. */
+export async function getSupabaseGrants(): Promise<SupabaseGrantLike[] | null> {
+  try {
+    return await listSupabaseGrants();
+  } catch {
+    return null;
+  }
+}
+
 /** Records an AI app was really used with (the server keeps those 3 years: ai_app_provision_records). */
 export const usedConnectedApps = (records: readonly ConnectedAppRecord[] | null): ConnectedAppRecord[] =>
   (records ?? []).filter((record) => Boolean(record.firstSeenAt || record.lastUsedAt));
+
+/**
+ * The names to send with the deletion (pure): for each used record without a stored name (only
+ * the revoke route stores one), the name Supabase's listGrants gives that client, trimmed and
+ * capped like a revocation's; only Rise Path's own clients (the records), UUID ids, at most
+ * DELETION_APP_NAMES_MAX. A stored name wins on the server anyway.
+ */
+export function deletionAppNames(
+  records: readonly ConnectedAppRecord[] | null,
+  grants: readonly SupabaseGrantLike[] | null,
+): DeletionAppName[] {
+  const names = new Map<string, string>();
+  for (const grant of grants ?? []) {
+    const id = typeof grant?.client?.id === 'string' ? grant.client.id.toLowerCase() : '';
+    const name = revocationClientName(grant?.client?.name);
+    if (UUID.test(id) && name && !names.has(id)) names.set(id, name);
+  }
+  const out: DeletionAppName[] = [];
+  const seen = new Set<string>();
+  for (const record of usedConnectedApps(records)) {
+    const id = typeof record.clientId === 'string' ? record.clientId.toLowerCase() : '';
+    const name = names.get(id);
+    if (!name || seen.has(id) || (typeof record.clientName === 'string' && record.clientName)) continue;
+    seen.add(id);
+    out.push({ clientId: id, clientName: name });
+    if (out.length >= DELETION_APP_NAMES_MAX) break;
+  }
+  return out;
+}
 
 const memoryDeletedOf = (body: unknown) => isRecord(body) && body.memory_deleted === true;
 const isoOrNull = (value: unknown): string | null => {
@@ -166,17 +214,35 @@ export function readSignInError(error: AuthErrorLike): DeletionErrorKind {
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const SIGN_IN_TIMED_OUT = Symbol('signInTimedOut');
+
+type DeletionInput = { email: string; userId: string; password: string; apps?: readonly DeletionAppName[] };
 
 async function attempt(
-  { email, userId, password }: { email: string; userId: string; password: string },
-  { requestTimeoutMs, signOutWaitMs }: Required<DeletionWaits>,
+  { email, userId, password, apps = [] }: DeletionInput,
+  { requestTimeoutMs, signOutWaitMs, signInWaitMs }: Required<DeletionWaits>,
 ): Promise<DeletionOutcome> {
   const reauth = createReauthClient();
   if (!reauth) return { kind: 'error', error: 'unavailable', memoryDeleted: false };
   try {
     let token: string | null = null;
     try {
-      const { data, error } = await reauth.auth.signInWithPassword({ email, password });
+      // A Supabase that takes the connection and never answers (a captive portal, an outage) would
+      // keep the dialog busy for good: cut off, nothing was sent.
+      const signIn = reauth.auth.signInWithPassword({ email, password });
+      let signInTimer: ReturnType<typeof setTimeout> | undefined;
+      const signInResult = await Promise.race([
+        signIn,
+        new Promise<typeof SIGN_IN_TIMED_OUT>((resolve) => {
+          signInTimer = setTimeout(() => resolve(SIGN_IN_TIMED_OUT), signInWaitMs);
+        }),
+      ]).finally(() => clearTimeout(signInTimer));
+      if (signInResult === SIGN_IN_TIMED_OUT) {
+        // A sign-in that still succeeds later leaves no session behind at Supabase.
+        void signIn.then((late) => (late?.data?.session ? reauth.auth.signOut({ scope: 'local' }) : undefined)).catch(() => undefined);
+        return { kind: 'error', error: 'unavailable', memoryDeleted: false };
+      }
+      const { data, error } = signInResult;
       if (error) return { kind: 'error', error: readSignInError(error), memoryDeleted: false };
       // Another account's sign-in (a shared device, the wrong email): never send its token.
       const signedIn = data?.session?.user?.id ?? '';
@@ -195,7 +261,7 @@ async function attempt(
       const res = await apiFetch(PATH, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ confirm: CONFIRM_WORD }),
+        body: JSON.stringify(apps.length ? { confirm: CONFIRM_WORD, apps: apps.slice(0, DELETION_APP_NAMES_MAX) } : { confirm: CONFIRM_WORD }),
         signal: controller.signal,
       });
       return readDeletionAnswer(res.status, await jsonOf(res));
@@ -213,13 +279,13 @@ async function attempt(
 
 /** Steps 1–5: the password check and the POST, with the "deleted elsewhere" signal held meanwhile. */
 export async function deleteAccountWithPassword(
-  input: { email: string; userId: string; password: string },
-  { requestTimeoutMs = DELETION_REQUEST_TIMEOUT_MS, signOutWaitMs = REAUTH_SIGN_OUT_WAIT_MS }: DeletionWaits = {},
+  input: DeletionInput,
+  { requestTimeoutMs = DELETION_REQUEST_TIMEOUT_MS, signOutWaitMs = REAUTH_SIGN_OUT_WAIT_MS, signInWaitMs = REAUTH_SIGN_IN_WAIT_MS }: DeletionWaits = {},
 ): Promise<DeletionOutcome> {
   markDeletionInFlight();
   let outcome: DeletionOutcome;
   try {
-    outcome = await attempt(input, { requestTimeoutMs, signOutWaitMs });
+    outcome = await attempt(input, { requestTimeoutMs, signOutWaitMs, signInWaitMs });
   } catch {
     outcome = { kind: 'error', error: 'unavailable', memoryDeleted: false };
   }
@@ -247,16 +313,19 @@ export async function deleteAccount({
   email,
   userId,
   password,
+  apps = [],
   connectedAppIds,
   endSession,
 }: {
   email: string;
   userId: string;
   password: string;
+  /** The used apps' names from listGrants (deletionAppNames). */
+  apps?: readonly DeletionAppName[];
   connectedAppIds: readonly string[];
   endSession: (outcome: { by: DeletedBy; at?: string | null }) => Promise<void>;
 }): Promise<DeletionOutcome> {
-  const outcome = await deleteAccountWithPassword({ email, userId, password });
+  const outcome = await deleteAccountWithPassword({ email, userId, password, apps });
   if (outcome.kind !== 'self') return outcome;
   // Best effort: a failed revoke never keeps this device signed in to the deleted account.
   await revokeRisePathGrants(connectedAppIds).catch(() => undefined);

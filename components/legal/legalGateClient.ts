@@ -25,8 +25,17 @@
  * A marker whose POST fails for a network reason stays for the next try (the person did tick the
  * box; only the recording is late).
  *
- * The notice bar's dismissal is kept per version in localStorage (NOTICE_SEEN_KEY); blocked
- * storage only shows the bar again.
+ * The notice bar's dismissal is kept per account and version in localStorage (NOTICE_SEEN_KEY,
+ * entries `<account id>:<version>`, the last NOTICE_SEEN_MAX): on a tablet children share, one
+ * learner's "Close" never hides the bar for another. Blocked storage only shows the bar again.
+ *
+ * A 409 legal_version_mismatch to "Agree and continue" means the api has other versions than this
+ * page (deploy skew; the page always posts its own versions): the page stays and offers a reload,
+ * which loads the new texts. Another status read would only answer `unavailable` and drop it.
+ *
+ * After a successful "Agree and continue" the consent page is replaced by the app: the gate keeps a
+ * one-shot hint (takeFocusAfterAccept) so the notice bar, which mounts in the Layout's main, moves
+ * focus there instead of leaving it on the document body.
  */
 import { useSyncExternalStore } from 'react';
 import { currentLegalVersions } from '../../shared/legal/versions.js';
@@ -46,6 +55,8 @@ import {
 } from '../../services/legalConsentApi';
 
 export const NOTICE_SEEN_KEY = 'rp:legal:noticeSeen';
+/** Dismissals kept (several children may share a device; dropping an old one only shows a bar again). */
+export const NOTICE_SEEN_MAX = 50;
 /** An unavailable status is read again after this long (and when the window gets focus). */
 export const LEGAL_RETRY_MS = 60_000;
 
@@ -89,7 +100,10 @@ export const OFF_STATE: LegalGateState = Object.freeze({ status: 'off', notice: 
 
 const sameId = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-/** Versions whose notice was dismissed on this device. */
+/** A dismissal entry: the account and the version (one learner's "Close" is not another's). */
+export const seenNoticeEntry = (userId: string, version: string) => `${userId.toLowerCase()}:${version}`;
+
+/** Dismissal entries on this device (seenNoticeEntry). */
 export function readSeenNotices(storage: StorageLike | null): Set<string> {
   try {
     const raw = storage?.getItem(NOTICE_SEEN_KEY);
@@ -100,11 +114,12 @@ export function readSeenNotices(storage: StorageLike | null): Set<string> {
   }
 }
 
-function rememberSeenNotice(storage: StorageLike | null, version: string): void {
+function rememberSeenNotice(storage: StorageLike | null, entry: string): void {
   try {
     const seen = readSeenNotices(storage);
-    seen.add(version);
-    storage?.setItem(NOTICE_SEEN_KEY, JSON.stringify([...seen].slice(-20)));
+    seen.delete(entry);
+    seen.add(entry);
+    storage?.setItem(NOTICE_SEEN_KEY, JSON.stringify([...seen].slice(-NOTICE_SEEN_MAX)));
   } catch {
     // Blocked storage: the bar comes back on the next load.
   }
@@ -118,6 +133,8 @@ export function createLegalGate(deps: LegalGateDeps) {
   let run = 0;
   let retry: Timer | null = null;
   let warned = false;
+  /** Set by a successful accept(); read once by the notice bar in the Layout (focus). */
+  let focusAfterAccept = false;
   const listeners = new Set<() => void>();
 
   const set = (next: LegalGateState) => {
@@ -128,9 +145,9 @@ export function createLegalGate(deps: LegalGateDeps) {
     if (retry !== null) deps.clearTimer(retry);
     retry = null;
   };
-  const unseen = (notice: LegalNotice[]) => {
+  const unseen = (notice: LegalNotice[], userId: string) => {
     const seen = readSeenNotices(deps.storage());
-    return notice.filter((n) => !seen.has(n.version));
+    return notice.filter((n) => !seen.has(seenNoticeEntry(userId, n.version)));
   };
   const unavailable = (why: string) => {
     if (!warned) {
@@ -174,7 +191,7 @@ export function createLegalGate(deps: LegalGateDeps) {
     if (status.current.terms !== deps.current.terms || status.current.privacy !== deps.current.privacy) {
       return unavailable('the server and this page show different versions');
     }
-    if (status.accepted) return set({ status: 'accepted', notice: unseen(status.notice), lastAccepted: status.lastAccepted });
+    if (status.accepted) return set({ status: 'accepted', notice: unseen(status.notice, me.id), lastAccepted: status.lastAccepted });
 
     // Not accepted: a sign-up on this device for this email and these versions counts as the answer.
     const storage = deps.storage();
@@ -233,20 +250,26 @@ export function createLegalGate(deps: LegalGateDeps) {
       if (mine !== run) return 'failed';
       if (result.kind === 'accepted') {
         deps.forgetMarker(deps.storage());
+        focusAfterAccept = true;
         set({ status: 'accepted', notice: [], lastAccepted: null });
         return 'accepted';
       }
-      if (result.kind === 'version_mismatch') {
-        await load();
-        return 'version_mismatch';
-      }
+      // The server has newer versions than this page; only a reload shows them (the page offers it).
+      // Status stays `needed`: another read would answer `unavailable` (skew) and drop the page.
+      if (result.kind === 'version_mismatch') return 'version_mismatch';
       if (result.kind === 'account_deleted') return 'account_deleted';
       return 'failed';
     },
-    /** The notice bar's "Close": remembered for this version on this device. */
+    /** The notice bar's "Close": remembered for this account and version on this device. */
     dismissNotice(version: string) {
-      rememberSeenNotice(deps.storage(), version);
+      if (user) rememberSeenNotice(deps.storage(), seenNoticeEntry(user.id, version));
       if (state.status === 'accepted') set({ ...state, notice: state.notice.filter((n) => n.version !== version) });
+    },
+    /** True once after a successful accept() (the notice bar then focuses the Layout's main). */
+    takeFocusAfterAccept() {
+      const take = focusAfterAccept;
+      focusAfterAccept = false;
+      return take;
     },
   };
 }

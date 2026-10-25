@@ -3,7 +3,7 @@
  * Deleting one's own Rise Path account from Settings (Phase 4, owner decisions D1 and D3; design
  * §5.4). Mounted by server.js at /api/v2/user/account behind requireAuth and requireSignedIn (the
  * dev fallback, the bridge user and an anonymous user get 401 sign_in_required; an agent's own
- * OAuth token 401 oauth_client_token), with its own 1 kb JSON body parser registered before the
+ * OAuth token 401 oauth_client_token), with its own 16 kb JSON body parser registered before the
  * 50 MB one (server/middleware/smallBody.js: 413 body_too_large, 400 invalid_body).
  *
  * GET  /deletion → 200 { ok, enabled, subscription: 'none' | 'renewing' | 'ending', reauthWindowSeconds }
@@ -11,8 +11,13 @@
  *      read at the deletion). 503 deletion_unavailable without a database or when it fails.
  *      The POST can take longer than an ordinary call: the Stripe checks before the deletion (8 s
  *      per call at most) and, after it, up to AFTER_COMMIT_WAIT_MS (10 s) of re-checks.
- * POST /deletion body { "confirm": "delete-my-account" }, sent with the access token of a password
- *      sign-in made for this (the browser signs in again with an ephemeral client). In order:
+ * POST /deletion body { "confirm": "delete-my-account", "apps"?: [{ "clientId", "clientName" }] },
+ *      sent with the access token of a password sign-in made for this (the browser signs in again
+ *      with an ephemeral client). apps: the learner's AI apps as the page read them from Supabase's
+ *      listGrants, so the 3-year provision record names an app the remote MCP server only knew by
+ *      id (the same trust as the revoke route's clientName); at most DELETION_APP_NAMES_MAX, UUID
+ *      ids only, names cleaned like the revoke route's; anything else is dropped and never refuses
+ *      the deletion. In order:
  *      per-learner limit 5/min (429 rate_limited); ACCOUNT_DELETION_ENABLED off → 503
  *      deletion_disabled (unset, empty, true/1/on/yes in any case → on; false/0/off/no → off; any
  *      other value → off with one warning); 400 confirm_required; re-auth: the token's newest `password` amr time
@@ -31,12 +36,14 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { getPool } from '../db.js';
 import { extractBearerToken } from '../middleware/auth.js';
-import { deleteAccountData as defaultDeleteAccountData, readDeletionState as defaultReadDeletionState, REAUTH_MAX_AGE_S } from '../services/accountDeletion.js';
+import { DELETION_APP_NAMES_MAX, deleteAccountData as defaultDeleteAccountData, readDeletionState as defaultReadDeletionState, REAUTH_MAX_AGE_S } from '../services/accountDeletion.js';
+import { cleanClientName } from './connectedApps.js';
+import { isUuid } from '../utils/ids.js';
 import { canonicalUserId } from '../../tools/core/accountDeletions.js';
 import { decodeTokenClaims, passwordAuthTime, sessionAuthTime } from '../../tools/core/oauthToken.js';
 
-/** Largest body (the confirm word only). */
-export const ACCOUNT_BODY_LIMIT = '1kb';
+/** Largest body: the confirm word and up to DELETION_APP_NAMES_MAX app ids with names of at most 100 characters. */
+export const ACCOUNT_BODY_LIMIT = '16kb';
 /** Deletion attempts per learner per minute. */
 export const ACCOUNT_DELETIONS_PER_MINUTE = 5;
 /** A password sign-in may lie this far ahead of the server clock (Supabase's clock). */
@@ -78,6 +85,24 @@ const refuse = (res, status, errorType, error, extra = {}) => {
 
 /** @param {import('express').Request} req */
 const userIdOf = (req) => String(/** @type {any} */ (req).userId ?? '');
+
+/**
+ * The body's app names for the deletion: UUID ids (lower case, one per id) with a cleaned name, at
+ * most DELETION_APP_NAMES_MAX; anything else is dropped.
+ * @param {unknown} apps
+ * @returns {{ clientId: string, clientName: string }[]}
+ */
+export function deletionAppNames(apps) {
+    /** @type {Map<string, string>} */
+    const byId = new Map();
+    for (const entry of Array.isArray(apps) ? apps.slice(0, DELETION_APP_NAMES_MAX * 2) : []) {
+        if (byId.size >= DELETION_APP_NAMES_MAX) break;
+        const clientId = typeof entry?.clientId === 'string' && isUuid(entry.clientId) ? entry.clientId.toLowerCase() : null;
+        const clientName = cleanClientName(entry?.clientName);
+        if (clientId && clientName && !byId.has(clientId)) byId.set(clientId, clientName);
+    }
+    return [...byId].map(([clientId, clientName]) => ({ clientId, clientName }));
+}
 
 /**
  * @param {{
@@ -155,7 +180,7 @@ export function createAccountRouter({
 
         let result;
         try {
-            result = await deleteAccountData({ userId, requestedBy: 'self', authTime: sessionAuthTime(claims), billing });
+            result = await deleteAccountData({ userId, requestedBy: 'self', authTime: sessionAuthTime(claims), appNames: deletionAppNames(body.apps), billing });
         } catch (error) {
             logger.warn(`[Account] deletion threw (${/** @type {any} */ (error)?.name ?? 'Error'})`);
             return refuse(res, 503, 'deletion_unavailable', REASONS.deletion_unavailable.error, { memory_deleted: false });

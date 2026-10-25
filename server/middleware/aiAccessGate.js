@@ -16,7 +16,10 @@
  *   403 adults_only                a minor on an adults-only route
  *   403 guardian_consent_required  a minor without an active guardian consent
  *   403 ai_paused_safety           too many blocked inputs today (paused_until: next 00:00 JST)
- *   503 ai_access_unavailable      production without a database, or the lookup failed (fail closed)
+ *   503 ai_access_unavailable      production without a database, or the lookup failed (fail closed);
+ *                                  also a session whose deleted-account check could not run
+ *                                  (optionalAuth sets req.accountCheckUnavailable), even with
+ *                                  LLM_GUEST_AI=true: a signed-in learner is never told to sign in
  */
 import { AiAccessUnavailableError, resolveAiAccess } from '../safety/access.js';
 
@@ -68,6 +71,10 @@ export function aiAccessStartupWarnings(env = process.env) {
 export function aiAccessGate({ adultsOnly = false } = {}) {
   return async (req, res, next) => {
     const userId = /** @type {any} */ (req).userId;
+    if (/** @type {any} */ (req).accountCheckUnavailable) {
+      res.set('Retry-After', '60');
+      return refuse(res, 503, 'ai_access_unavailable');
+    }
     if (!userId) {
       if (!guestAiAllowed(process.env)) return refuse(res, 401, 'sign_in_required');
       res.locals.aiAudience = 'adult';

@@ -229,6 +229,8 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
+# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
+RETENTION_ENABLED=false
 # Hermes を有効にしたときだけ
 # HERMES_API_URL=http://risepath-vm:8642
 # HERMES_API_KEY=***

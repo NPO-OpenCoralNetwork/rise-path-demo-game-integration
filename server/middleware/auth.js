@@ -256,13 +256,16 @@ export const optionalAuth = async (req, res, next) => {
             req.authMethod = 'anonymous';
             return next();
         }
-        // A deleted account's session, or a check that cannot run, is anonymous (no stub).
+        // A deleted account's session, or a check that cannot run, is anonymous (no stub). A check
+        // that could not run is flagged: the AI gate answers 503 ai_access_unavailable to it (try
+        // again), never 401 sign_in_required or the guest path to a signed-in learner.
         let account;
         try {
             account = await readSessionAccountState(token, data.user.id);
         } catch (err) {
             console.warn('[Auth] optionalAuth account state check failed:', err?.message || err);
             account = null;
+            req.accountCheckUnavailable = true;
         }
         if (!account || account.state === 'deleted') {
             req.userId = null;

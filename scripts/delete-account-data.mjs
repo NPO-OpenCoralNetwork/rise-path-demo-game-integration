@@ -12,7 +12,7 @@
  *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --find-email someone@example.com
  *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --user <uuid> --dry-run
  *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --user <uuid> --yes
- *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --orphans [--limit 500] [--after <8 characters>] [--yes]
+ *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --orphans [--limit 500] [--after <8 characters>] [--expect-orphans <n>] [--yes]
  *
  * --find-email  the Supabase user(s) with that email: id, created, last sign-in. Deletes nothing.
  *               Needs SUPABASE_SERVICE_ROLE_KEY (the anon key cannot list users).
@@ -22,16 +22,21 @@
  * --orphans     Rise Path stubs whose shared login was deleted outside Rise Path (by Nexloom or
  *               P-School operators, or a dashboard delete). Each stub is looked up at Supabase; an
  *               id is an orphan only when Supabase answers 404 / user_not_found. Any other answer
- *               stops the run (exit 3) and lists nothing. When more than 10 % (and more than 5) of
- *               the checked stubs are unknown, or none of them is known, it refuses (exit 2): that
- *               is a wrong SUPABASE_URL, not mass deletion. Without --yes: the list (8-character
- *               ids). With --yes: deletes each (requested_by 'orphan'), one at a time. Needs
- *               SUPABASE_SERVICE_ROLE_KEY.
+ *               stops the run (exit 3) and lists nothing. When none of the checked stubs is known it
+ *               refuses (exit 2): that is a wrong SUPABASE_URL, not mass deletion. When more than
+ *               10 % (and more than 5) of them are unknown it refuses too (exit 2) and lists them,
+ *               unless --expect-orphans gives exactly that count (Nexloom or P-School deleted that
+ *               many logins: confirm the count with them first). --expect-orphans <n> always needs
+ *               the count to match. Without --yes: the list (8-character ids). With --yes: deletes
+ *               each (requested_by 'orphan'), one at a time. Needs SUPABASE_SERVICE_ROLE_KEY.
  *               Stubs are checked in id order, at most --limit (500) per run; when more remain it
  *               says so and names where to go on: --after <the first 8 characters it printed>.
  *
- * Exit: 0 done (deleted or already deleted, every one), 2 refused (any), 3 unavailable (database,
- * Supabase, Stripe or Memanto), 1 usage or setup. Works with ACCOUNT_DELETION_ENABLED=false. Full
+ * Exit: 0 done (deleted or already deleted, every one), 2 refused (a renewing plan, a refused id,
+ * the --orphans guards), 3 unavailable (database, Supabase, Stripe or Memanto: the service's
+ * payment_provider_unavailable and memory_service_unavailable too; try again later), 1 usage or
+ * setup. A JSON line with memoryDeleted true (exit 2 or 3): the AI memories are gone and the rest
+ * was kept; run the same --yes again. Works with ACCOUNT_DELETION_ENABLED=false. Full
  * ids are printed only for --find-email and --user (the staff terminal).
  */
 import { realpathSync } from 'node:fs';
@@ -47,7 +52,7 @@ export const USAGE = [
     '  node scripts/delete-account-data.mjs --find-email <email>',
     '  node scripts/delete-account-data.mjs --user <uuid> --dry-run',
     '  node scripts/delete-account-data.mjs --user <uuid> --yes',
-    '  node scripts/delete-account-data.mjs --orphans [--limit <n>] [--after <id or its first 8 characters>] [--yes]',
+    '  node scripts/delete-account-data.mjs --orphans [--limit <n>] [--after <id or its first 8 characters>] [--expect-orphans <n>] [--yes]',
 ].join('\n');
 
 export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3 });
@@ -99,7 +104,7 @@ export function orphanStart(value) {
 
 /** @param {string[]} argv */
 export function parseArgs(argv) {
-    /** @type {{ findEmail?: string, user?: string, orphans: boolean, dryRun: boolean, yes: boolean, limit: number, after?: string, help: boolean, error?: string }} */
+    /** @type {{ findEmail?: string, user?: string, orphans: boolean, dryRun: boolean, yes: boolean, limit: number, after?: string, expectOrphans?: number, help: boolean, error?: string }} */
     const out = { orphans: false, dryRun: false, yes: false, limit: ORPHAN_DEFAULT_LIMIT, help: false };
     for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i];
@@ -127,6 +132,11 @@ export function parseArgs(argv) {
             const start = raw ? orphanStart(raw) : null;
             if (!start) out.error ??= '--after must be an account id or its first 1 to 8 characters';
             else out.after = start;
+        } else if (arg === '--expect-orphans') {
+            const raw = value();
+            const n = Number(raw);
+            if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n) || n < 1 || n > 100000) out.error ??= '--expect-orphans must be a whole number from 1 to 100000';
+            else out.expectOrphans = n;
         } else if (arg === '--help' || arg === '-h') out.help = true;
         else out.error = `unknown argument ${arg}`;
     }
@@ -136,13 +146,19 @@ export function parseArgs(argv) {
     if (!out.error && out.findEmail !== undefined && (out.dryRun || out.yes)) out.error = '--find-email deletes nothing (no --dry-run or --yes)';
     if (!out.error && out.orphans && out.dryRun) out.error = '--orphans lists without --yes (no --dry-run)';
     if (!out.error && out.after !== undefined && !out.orphans) out.error = '--after only goes with --orphans';
+    if (!out.error && out.expectOrphans !== undefined && !out.orphans) out.error = '--expect-orphans only goes with --orphans';
     return out;
 }
 
+/** Refusals that mean a dependency is down, not a decision (the API answers 503 for them): try again later. */
+const UNAVAILABLE_REASONS = new Set(['payment_provider_unavailable', 'memory_service_unavailable']);
+
 /** @param {import('../server/services/accountDeletion.js').DeletionResult} result */
-const exitOf = (result) => (result.status === 'deleted' || result.status === 'already'
-    ? EXIT.ok
-    : result.status === 'refused' ? EXIT.refused : EXIT.unavailable);
+export const exitOf = (result) => {
+    if (result.status === 'deleted' || result.status === 'already') return EXIT.ok;
+    if (result.status === 'refused' && !UNAVAILABLE_REASONS.has(result.reason)) return EXIT.refused; // subscription_active, invalid_user
+    return EXIT.unavailable;
+};
 
 /** @param {string} email @param {Deps} deps */
 async function findEmail(email, deps) {
@@ -232,8 +248,8 @@ async function deleteOne(id, deps) {
     return exitOf(result);
 }
 
-/** @param {{ limit: number, yes: boolean, after?: string }} options @param {Deps} deps */
-async function orphans({ limit, yes, after: startAfter }, deps) {
+/** @param {{ limit: number, yes: boolean, after?: string, expectOrphans?: number }} options @param {Deps} deps */
+async function orphans({ limit, yes, after: startAfter, expectOrphans }, deps) {
     const admin = await deps.createAdminClient();
     if (!admin) {
         deps.log('Refused: --orphans needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (the anon key cannot look users up).');
@@ -300,14 +316,21 @@ async function orphans({ limit, yes, after: startAfter }, deps) {
     if (more) {
         deps.log(`Stopped at --limit ${limit}: more stubs were not checked. Raise --limit, or run again with --after ${after.slice(0, 8)} to go on from here.`);
     }
-    if (found.length > 5 && found.length * 10 > checked) {
-        deps.log('Refused: most stubs are unknown to this Supabase project; check SUPABASE_URL. Nothing was deleted.');
-        return EXIT.refused;
-    }
-    // A small --limit keeps the count above at 5 or fewer, so it alone does not catch a wrong
-    // project. In the right one at least one checked stub is a live login.
+    // In the right project at least one checked stub is a live login (a small --limit keeps the
+    // count at 5 or fewer, under the 10 % rule). Never bypassed by --expect-orphans.
     if (found.length && found.length === checked) {
         deps.log(`Refused: none of the ${checked} checked stubs is known to this Supabase project; check SUPABASE_URL, or check more stubs (a higher --limit or an earlier --after). Nothing was deleted.`);
+        return EXIT.refused;
+    }
+    // More than 10 % unknown: a wrong project, or a real batch of shared-login deletions. Only the
+    // count the other operator confirmed (--expect-orphans) lets the run go on; when it is given,
+    // it must match whatever the count is.
+    const tooMany = found.length > 5 && found.length * 10 > checked;
+    if ((tooMany && expectOrphans === undefined) || (expectOrphans !== undefined && expectOrphans !== found.length)) {
+        for (const id of found) deps.log(`  orphan ${tag(id)}`);
+        deps.log(expectOrphans === undefined
+            ? `Refused: ${found.length} of ${checked} checked stubs (more than 10 %) are unknown to this Supabase project. Check SUPABASE_URL. If Nexloom or P-School deleted that many logins, confirm the count with them and run again with --expect-orphans ${found.length}. Nothing was deleted.`
+            : `Refused: --expect-orphans ${expectOrphans}, but ${found.length} of ${checked} checked stubs are unknown to this Supabase project. Confirm the count again (and SUPABASE_URL). Nothing was deleted.`);
         return EXIT.refused;
     }
     if (!yes) {

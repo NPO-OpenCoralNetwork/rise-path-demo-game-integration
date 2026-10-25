@@ -21,7 +21,9 @@
  *      before the markdown is parsed, so the list or table stays one);
  *   4. drop every paragraph (up to the next blank line) that starts with （根拠: or （作成メモ:
  *      (half- or full-width colon). Notes inside a 【要確認 …】 stay and the release guard reports
- *      them;
+ *      them. A line inside such a note that starts a new Markdown block (a heading, a list item, a
+ *      quote, a table row) is a LegalTextError with file:line: Markdown shows it as its own block
+ *      to the person editing the draft, and dropping it with the note would lose it silently;
  *   5. rewrite the links between the two drafts to /terms and /privacy; any other relative link is
  *      left and reported by legalTextProblems();
  *   6. collapse 3+ newlines to 2, put the sentinel line first, end with one newline.
@@ -38,6 +40,9 @@ export const LEGAL_TEXT_SENTINEL = 'risepath-legal-text';
 
 /** Paragraphs that start with one of these are notes for the owner and the lawyer. */
 const NOTE_PREFIXES = Object.freeze(['（根拠:', '（根拠：', '（作成メモ:', '（作成メモ：']);
+
+/** A line that starts a new Markdown block even right after a paragraph line. */
+const BLOCK_START = /^(?:#{1,6}(?:\s|$)|[-*+]\s|\d{1,9}[.)]\s|>|\|)/;
 
 const FENCE = /^<!-- legal:(?:if ([a-z]+)|(else)|(end)) -->$/;
 
@@ -139,13 +144,16 @@ export function publicLegalText(raw, include, { document, source = `doc/legal/${
   const kept = [];
   let dropping = false;
   let atParagraphStart = true;
-  for (const { text: value } of shown) {
+  for (const { text: value, line } of shown) {
     const trimmed = value.trim();
     if (trimmed === '') {
       dropping = false;
       atParagraphStart = true;
       kept.push('');
       continue;
+    }
+    if (dropping && !atParagraphStart && BLOCK_START.test(trimmed)) {
+      throw new LegalTextError('a （根拠 or （作成メモ paragraph must end with a blank line before this line', { source, line });
     }
     if (atParagraphStart) dropping = NOTE_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
     atParagraphStart = false;

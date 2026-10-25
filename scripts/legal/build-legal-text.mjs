@@ -14,7 +14,9 @@
  *                                                      differs from the pinned one, say which version
  *                                                      id and sha256 to put in shared/legal/versions.js
  *   node scripts/legal/build-legal-text.mjs --check    write nothing; exit 1 when a file is out of
- *                                                      date or its hash is not the pinned one
+ *                                                      date, its hash is not the pinned one, or its
+ *                                                      version id is pinned to another text
+ *                                                      (LEGAL_PINNED_HASHES)
  *   node scripts/legal/build-legal-text.mjs --archive  for a released current version: write
  *                                                      content/legal/archive/<version>.ja.md (the same
  *                                                      bytes); never overwrites another text
@@ -26,7 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LegalTextError, publicLegalText } from './legalText.mjs';
-import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_NAMES, isDraftLegalVersion } from '../../shared/legal/versions.js';
+import { LEGAL_DOCUMENTS, LEGAL_DOCUMENT_NAMES, LEGAL_PINNED_HASHES, isDraftLegalVersion } from '../../shared/legal/versions.js';
 
 /** @typedef {import('../../shared/legal/versions.js').LegalDocumentEntry} LegalDocumentEntry */
 /** @typedef {import('../../shared/legal/versions.js').LegalDocumentName} LegalDocumentName */
@@ -65,17 +67,31 @@ export function bumpMessage(name, entry, computed) {
   return [
     `The public text of ${name} changed. Give it a new version in shared/legal/versions.js`,
     `(a draft: ${nextDraft}; a released text: the new effective date),`,
-    `set sha256 to ${computed}, and decide requiresAcceptance.`,
+    `set sha256 to ${computed}, add the new version and sha256 to LEGAL_PINNED_HASHES, and decide requiresAcceptance.`,
     'For a released version, move the old entry to LEGAL_HISTORY and keep',
     `${draft ? `${ARCHIVE_DIR}/<old>.ja.md` : archivePathOf(entry.version)}.`,
   ].join(' ');
 }
 
 /**
- * Regenerates each document and compares it with the committed file and the pin.
- * @param {{ root?: string, documents?: Readonly<Record<LegalDocumentName, Readonly<LegalDocumentEntry>>> }} [options]
+ * The message for a version id that LEGAL_PINNED_HASHES does not pin to its sha256 (a reused id,
+ * or a new one not added yet), or null when it does.
+ * @param {LegalDocumentName} name @param {LegalDocumentEntry} entry @param {Readonly<Record<string, string>>} pinnedHashes
  */
-export function legalTextStatus({ root = REPO_ROOT, documents = LEGAL_DOCUMENTS } = {}) {
+export function pinMapMessage(name, entry, pinnedHashes) {
+  const pinned = pinnedHashes[entry.version];
+  if (pinned === entry.sha256) return null;
+  if (pinned === undefined) return `${name}: ${entry.version} is not in LEGAL_PINNED_HASHES (shared/legal/versions.js): add '${entry.version}': '${entry.sha256}'.`;
+  return `${name}: ${entry.version} names another text in LEGAL_PINNED_HASHES (sha256 ${pinned}); a version id names one text forever. `
+    + `Give this text a new version (a draft: ${nextLegalVersion(entry.version)}) and add it to LEGAL_PINNED_HASHES.`;
+}
+
+/**
+ * Regenerates each document and compares it with the committed file and the pin (pinned: the hash
+ * is the entry's, and LEGAL_PINNED_HASHES pins the entry's version id to that hash).
+ * @param {{ root?: string, documents?: Readonly<Record<LegalDocumentName, Readonly<LegalDocumentEntry>>>, pinnedHashes?: Readonly<Record<string, string>> }} [options]
+ */
+export function legalTextStatus({ root = REPO_ROOT, documents = LEGAL_DOCUMENTS, pinnedHashes = LEGAL_PINNED_HASHES } = {}) {
   return LEGAL_DOCUMENT_NAMES.map((name) => {
     const entry = documents[name];
     const raw = fs.readFileSync(path.join(root, entry.source), 'utf8');
@@ -89,7 +105,8 @@ export function legalTextStatus({ root = REPO_ROOT, documents = LEGAL_DOCUMENTS 
       text,
       sha256: computed,
       upToDate: committed === text,
-      pinned: computed === entry.sha256,
+      pinned: computed === entry.sha256 && pinnedHashes[entry.version] === entry.sha256,
+      pinMessage: computed === entry.sha256 ? pinMapMessage(name, entry, pinnedHashes) : bumpMessage(name, entry, computed),
     };
   });
 }
@@ -97,10 +114,10 @@ export function legalTextStatus({ root = REPO_ROOT, documents = LEGAL_DOCUMENTS 
 /**
  * @param {string[]} argv
  * @param {{ root?: string, documents?: Readonly<Record<LegalDocumentName, Readonly<LegalDocumentEntry>>>,
- *   out?: (line: string) => void, err?: (line: string) => void }} [deps]
+ *   pinnedHashes?: Readonly<Record<string, string>>, out?: (line: string) => void, err?: (line: string) => void }} [deps]
  * @returns {number} exit code
  */
-export function run(argv, { root = REPO_ROOT, documents = LEGAL_DOCUMENTS, out = console.log, err = console.error } = {}) {
+export function run(argv, { root = REPO_ROOT, documents = LEGAL_DOCUMENTS, pinnedHashes = LEGAL_PINNED_HASHES, out = console.log, err = console.error } = {}) {
   const known = new Set(['--check', '--archive']);
   const unknown = argv.filter((arg) => !known.has(arg));
   if (unknown.length) {
@@ -117,7 +134,7 @@ export function run(argv, { root = REPO_ROOT, documents = LEGAL_DOCUMENTS, out =
   /** @type {ReturnType<typeof legalTextStatus>} */
   let status;
   try {
-    status = legalTextStatus({ root, documents });
+    status = legalTextStatus({ root, documents, pinnedHashes });
   } catch (error) {
     if (error instanceof LegalTextError) {
       err(`Cannot build the legal text: ${error.message}`);
@@ -135,7 +152,7 @@ export function run(argv, { root = REPO_ROOT, documents = LEGAL_DOCUMENTS, out =
       }
       if (!s.pinned) {
         ok = false;
-        err(bumpMessage(s.name, s.entry, s.sha256));
+        err(s.pinMessage ?? bumpMessage(s.name, s.entry, s.sha256));
       }
       if (s.upToDate && s.pinned) out(`${s.name}: ${s.entry.generated} is up to date (${s.entry.version}, sha256 ${s.sha256}).`);
     }
@@ -179,7 +196,7 @@ export function run(argv, { root = REPO_ROOT, documents = LEGAL_DOCUMENTS, out =
       fs.writeFileSync(target, s.text);
     }
     out(`${s.name}: ${s.upToDate ? 'unchanged' : 'wrote'} ${s.entry.generated} (sha256 ${s.sha256}).`);
-    if (!s.pinned) out(`  ${bumpMessage(s.name, s.entry, s.sha256)}`);
+    if (!s.pinned) out(`  ${s.pinMessage ?? bumpMessage(s.name, s.entry, s.sha256)}`);
   }
   return 0;
 }

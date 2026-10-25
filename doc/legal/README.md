@@ -22,7 +22,7 @@ Rise Path を一般に公開する前に必要な、プライバシーポリシ�
 
 - **【要記入】**: オーナーが書き入れる箇所です。
 - **【要確認】**: 専門家や、使っている会社への確認が要る箇所です。
-- **（根拠: …）（作成メモ: …）**: 下書きのための説明です。公開のページには出ません（生成のときに外します）。
+- **（根拠: …）（作成メモ: …）**: 下書きのための説明です。公開のページには出ません（生成のときに外します）。この段落は、空の行で終えてください。すぐ下の行に見出しや箇条書きを続けると、生成のときにエラーになります（ファイル名と行の番号を出します）。
 - **`<!-- legal:if billing -->` などの行**: その部分を、どの版の公開のページに載せるかの印です（下の「条件つきの部分」）。消さないでください。
 
 ### 条件つきの部分（`legal:if`）
@@ -46,9 +46,9 @@ Rise Path を一般に公開する前に必要な、プライバシーポリシ�
 ### 公開の文の作り方
 
 - 下書き（`doc/legal/*.draft.ja.md`）を直したら、`node scripts/legal/build-legal-text.mjs` を実行します。`content/legal/*.ja.md` を書き直し、ハッシュと、次に使う版の名前を表示します。
-- 見える文が 1 文字でも変わったら、`shared/legal/versions.js` の `version` と `sha256` を、表示されたとおりに変えます（下書きは `terms-draft-2026-10-22.3` のように番号を足します）。変えないと `npm test`（`server/tests/legalText.test.js`）が通りません。（根拠: …）（作成メモ: …）だけの変更なら、見える文は変わらないので、版はそのままです。
+- 見える文が 1 文字でも変わったら、`shared/legal/versions.js` の `version` と `sha256` を、表示されたとおりに変えます（下書きは `terms-draft-2026-10-22.3` のように番号を足します）。新しい `version` と `sha256` の組は、同じファイルの `LEGAL_PINNED_HASHES` にも 1 行足します（消したり書きかえたりはしません。1 つの版の名前は、1 つの文だけを指します）。この 3 つがそろわないと、`npm test`（`server/tests/legalText.test.js`）と `node scripts/legal/build-legal-text.mjs --check` が通りません。古い版の名前のまま `sha256` だけを変えると、その版がすでに入っている DB では同意の記録がすべて 500 `legal_version_conflict` になります。（根拠: …）（作成メモ: …）だけの変更なら、見える文は変わらないので、版はそのままです。
 - 確かめるだけなら `node scripts/legal/build-legal-text.mjs --check`（何も書きません）。公開できる状態かは `node scripts/legal/check-legal-release.mjs` で確かめます（残っている印を一覧にします）。
-- 開発用のサーバー（`npm run dev`）では、`/terms` と `/privacy` に下書きの文が、残っている印の数の帯つきで出ます。手元で本番用のビルドに下書きを入れて見たいときだけ、`LEGAL_DRAFT_PREVIEW_BUILD=true` を付けます（`NODE_ENV=development` のビルドは、これがないと止まります）。本番のビルドでは使いません。
+- 開発用のサーバー（`npm run dev`）では、`/terms` と `/privacy` に下書きの文が、残っている印の数の帯つきで出ます。手元でビルドしたものに下書きを入れて見たいときだけ、`NODE_ENV=development LEGAL_DRAFT_PREVIEW_BUILD=true npx vite build --outDir <一時フォルダ>` でビルドし、`npx vite preview --outDir <一時フォルダ>` で開きます（`NODE_ENV=development` のビルドは、`LEGAL_DRAFT_PREVIEW_BUILD=true` がないと止まります）。このビルドはデプロイしません。`npm run build:prod` に `LEGAL_DRAFT_PREVIEW_BUILD=true` を付けても、下書きは入りません。
 
 ## オーナーが書き入れること（【要記入】）
 

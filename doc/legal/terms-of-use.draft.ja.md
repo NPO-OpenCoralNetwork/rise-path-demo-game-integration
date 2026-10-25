@@ -3,7 +3,7 @@
 > - 作成日: 2026-10-22 ／ 状態: 下書き（未公開・未確認）
 > - 【要記入】はオーナーが埋める箇所、【要確認】は専門家への確認が要る箇所です。
 > - 本文は Phase 0、Phase 0.5、Phase 1（18 歳以上の方が自分の AI をつなぐ機能）、Phase 3（有料のサポータープラン。作ったが止めていて、第 9 条はその下書き）、Phase 4（アカウントの削除と、記録の保存期間）のあとの状態（基本は無料、AI 機能は Claude Haiku 5.5、Gemini・共有 Hermes は使わない、AI を使う前の年齢の登録と 18 歳未満の保護者の同意、18 歳未満の入力と答えの確認、報告、AI の一時停止）を前提に書いています。データの扱いは [privacy-policy.draft.ja.md](./privacy-policy.draft.ja.md) と [ai-data-inventory.ja.md](./ai-data-inventory.ja.md) を見てください。
-> - 「（根拠: …）」や「（作成メモ: …）」の段落は、公開のページには載りません（`scripts/legal/build-legal-text.mjs` が外します）。
+> - 「（根拠: …）」や「（作成メモ: …）」の段落は、公開のページには載りません（`scripts/legal/build-legal-text.mjs` が外します）。この段落は空の行で終えてください（すぐ下に見出しや箇条書きを続けると、生成がエラーで止まります）。
 > - `legal:if billing` などの HTML コメントの行は、その部分を公開のページに載せる版を決める印です（`shared/legal/versions.js` の `include`）。消さないでください。
 > - この下書きを直したら `node scripts/legal/build-legal-text.mjs` を実行し、表示された版と SHA-256 を `shared/legal/versions.js` に書いてください（`doc/legal/README.md`）。
 

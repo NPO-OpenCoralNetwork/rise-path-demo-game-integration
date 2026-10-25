@@ -572,6 +572,51 @@ describe('apiFetch and the deletion flow (services/accountDeletionApi.ts)', () =
     assert.deepEqual(t.steps(), ['signIn', 'post', 'reauthSignOut']);
   });
 
+  it('a password sign-in that never answers is cut off: nothing sent, "can\'t delete right now", the held signal released', async () => {
+    const t = await flowPage({ signIn: never });
+    let outcome = null;
+    const done = t.mod.deleteAccountWithPassword({ email: 'a@example.org', userId: U1, password: 'pw' }, { signInWaitMs: 20, signOutWaitMs: 20 }).then((o) => {
+      outcome = o;
+    });
+    assert.equal(await settledWithin(done), true, 'bounded');
+    assert.deepEqual(outcome, { kind: 'error', error: 'unavailable', memoryDeleted: false });
+    assert.deepEqual(t.steps(), ['signIn', 'reauthSignOut'], 'no POST');
+    assert.equal(t.mod.deletionInFlight(), false, 'the held signal is released');
+  });
+
+  it('a sign-in that answers after the cut-off is signed out again (no session left at Supabase)', async () => {
+    let answer;
+    const t = await flowPage({ signIn: () => new Promise((resolve) => { answer = resolve; }) });
+    const outcome = await t.mod.deleteAccountWithPassword({ email: 'a@example.org', userId: U1, password: 'pw' }, { signInWaitMs: 20, signOutWaitMs: 20 });
+    assert.deepEqual(outcome, { kind: 'error', error: 'unavailable', memoryDeleted: false });
+    answer({ data: { session: { user: { id: U1 }, access_token: 'tok-late' } }, error: null });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.deepEqual(t.steps(), ['signIn', 'reauthSignOut', 'reauthSignOut'], 'the late session is signed out; still no POST');
+  });
+
+  it('the POST carries the names Supabase gives the used apps (the server knows only ids), never another app\'s', async () => {
+    const t = await flowPage();
+    const records = [
+      { clientId: APP1.toUpperCase(), clientName: null, firstSeenAt: '2026-10-01T00:00:00.000Z', lastUsedAt: '2026-10-20T00:00:00.000Z', revokedAt: null },
+      { clientId: APP2, clientName: 'Kept at revocation', firstSeenAt: '2026-10-01T00:00:00.000Z', lastUsedAt: null, revokedAt: '2026-10-02T00:00:00.000Z' },
+      { clientId: '11111111-2222-4000-8000-000000000003', clientName: null, firstSeenAt: null, lastUsedAt: null, revokedAt: '2026-10-02T00:00:00.000Z' },
+    ];
+    const grants = [
+      { client: { id: APP1, name: '  Claude Code  ' } },
+      { client: { id: APP2, name: 'Other name' } },
+      { client: { id: '11111111-2222-4000-8000-000000000003', name: 'never used' } },
+      { client: { id: '99999999-2222-4000-8000-000000000009', name: 'Nexloom app (not a Rise Path record)' } },
+      { client: { id: 'not-a-uuid', name: 'x' } },
+    ];
+    const apps = t.mod.deletionAppNames(records, grants);
+    assert.deepEqual(apps, [{ clientId: APP1, clientName: 'Claude Code' }]);
+    assert.deepEqual(t.mod.deletionAppNames(records, null), [], 'listGrants failed: no names');
+    assert.deepEqual(t.mod.deletionAppNames(null, grants), []);
+    const outcome = await t.mod.deleteAccount({ email: 'a@example.org', userId: U1, password: 'pw', apps, connectedAppIds: [APP1], endSession: endSessionInto(t.log) });
+    assert.equal(outcome.kind, 'self');
+    assert.deepEqual(t.log.find((e) => e.step === 'post').call.body, { confirm: 'delete-my-account', apps: [{ clientId: APP1, clientName: 'Claude Code' }] });
+  });
+
   it('an ephemeral sign-out that never answers does not hold the outcome', async () => {
     const t = await flowPage({ reauthSignOut: never });
     let outcome = null;
@@ -629,15 +674,16 @@ describe('apiFetch and the deletion flow (services/accountDeletionApi.ts)', () =
     assert.deepEqual(t.log.at(-1), { step: 'endSession', outcome: { by: 'self', at: '2026-10-24T05:05:00.000Z' } });
   });
 
-  it('the waits: 120 s for the POST, 3 s for the ephemeral sign-out, 5 s for the revokes, used by default', async () => {
+  it('the waits: 30 s for the password sign-in, 120 s for the POST, 3 s for the ephemeral sign-out, 5 s for the revokes, used by default', async () => {
     const t = await flowPage();
+    assert.equal(t.mod.REAUTH_SIGN_IN_WAIT_MS, 30_000);
     assert.equal(t.mod.DELETION_REQUEST_TIMEOUT_MS, 120_000);
     assert.equal(t.mod.REAUTH_SIGN_OUT_WAIT_MS, 3_000);
     assert.equal(t.mod.GRANT_REVOKE_WAIT_MS, 5_000);
     const code = read('services/accountDeletionApi.ts');
-    assert.match(code, /\{ requestTimeoutMs = DELETION_REQUEST_TIMEOUT_MS, signOutWaitMs = REAUTH_SIGN_OUT_WAIT_MS \}: DeletionWaits = \{\}/);
+    assert.match(code, /\{ requestTimeoutMs = DELETION_REQUEST_TIMEOUT_MS, signOutWaitMs = REAUTH_SIGN_OUT_WAIT_MS, signInWaitMs = REAUTH_SIGN_IN_WAIT_MS \}: DeletionWaits = \{\}/);
     assert.match(code, /waitMs: number = GRANT_REVOKE_WAIT_MS/);
-    assert.match(code, /const outcome = await deleteAccountWithPassword\(\{ email, userId, password \}\);\n[^\n]*\n[^\n]*\n {2}await revokeRisePathGrants\(connectedAppIds\)\.catch\(/);
+    assert.match(code, /const outcome = await deleteAccountWithPassword\(\{ email, userId, password, apps \}\);\n[^\n]*\n[^\n]*\n {2}await revokeRisePathGrants\(connectedAppIds\)\.catch\(/);
   });
 
   it('readDeletionAnswer maps every answer of server/routes/account.js', async () => {
@@ -925,6 +971,21 @@ describe('the delete page and the deleted page (rendered)', () => {
     assert.match(textOf(render(pages.DeletionExplainer, { language: 'en', usedApps: true })), /The names of AI apps you used/);
   });
 
+  it('the payment line names no fixed period while privacy §8 leaves it open and no retention rule deletes billing rows', async () => {
+    const { RETENTION_RULES } = await import('../services/retention.js');
+    const policy = read('doc/legal/privacy-policy.draft.ja.md');
+    const billingLine = policy.split('\n').find((line) => line.startsWith('- 有料プランのお支払いの記録'));
+    assert.ok(billingLine, 'privacy §8 has the payment line');
+    if (billingLine.includes('【要記入: 期間') && !RETENTION_RULES.some((rule) => /billing/.test(rule.name))) {
+      const jp = textOf(render(pages.DeletionExplainer, { language: 'jp', usedApps: false }));
+      const en = textOf(render(pages.DeletionExplainer, { language: 'en', usedApps: false }));
+      assert.doesNotMatch(jp, /税と会計のため 7 年/);
+      assert.doesNotMatch(en, /7 years for tax/);
+      assert.match(jp, /期間は目安 7 年で、いま決めているところです/);
+      assert.match(en, /the exact period is still being decided/);
+    }
+  });
+
   it('the form: a labelled current-password field with a show toggle, a submit button, and a danger dialog naming "What stays"', () => {
     const form = render(pages.DeletionForm, { language: 'jp', busy: false, billing: false, error: null, onConfirm() {}, onClearError() {} });
     const els = elementsOf(form);
@@ -1011,10 +1072,10 @@ describe('the delete page and the deleted page (rendered)', () => {
   });
 
   it('the page wires the error box\'s portal button to the Stripe portal', async () => {
-    // DeleteAccountView's useState order: state, attempt, account, appIds, busy, error, …
+    // DeleteAccountView's useState order: state, attempt, account, appIds, appNames, busy, error, …
     const tokens = render(pages.DeleteAccountView, {}, 'en', {
       __billing: true,
-      __stateQueue: [{ kind: 'ready', usedApps: false }, undefined, undefined, undefined, undefined, { error: 'subscription_active', memoryDeleted: false }],
+      __stateQueue: [{ kind: 'ready', usedApps: false }, undefined, undefined, undefined, undefined, undefined, { error: 'subscription_active', memoryDeleted: false }],
     });
     const button = elementsOf(tokens).find((el) => el.type === 'Button' && textOf(walk(el.props.children)) === 'Payment and cancellation');
     assert.ok(button, 'shown in the error box');

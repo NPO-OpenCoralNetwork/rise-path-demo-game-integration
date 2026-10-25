@@ -124,6 +124,13 @@ describe('legalReleaseProblems (scripts/legal/check-legal-release.mjs)', () => {
 });
 
 describe('vite.config.ts legal-release-guard', () => {
+  it('doc/legal/README.md gives the whole draft preview build: LEGAL_DRAFT_PREVIEW_BUILD=true only lifts the NODE_ENV=development refusal', () => {
+    // A production build (npm run build:prod) never has import.meta.env.DEV, so the variable alone puts no draft in it.
+    const lines = read('doc/legal/README.md').split('\n').filter((line) => line.includes('LEGAL_DRAFT_PREVIEW_BUILD=true'));
+    assert.ok(lines.length > 0);
+    for (const line of lines) assert.match(line, /`NODE_ENV=development LEGAL_DRAFT_PREVIEW_BUILD=true npx vite build --outDir [^`]+`/);
+  });
+
   const ENV_KEYS = ['VITE_FEATURE_LEGAL_PAGES', 'NODE_ENV', 'VITE_USER_NODE_ENV', 'LEGAL_DRAFT_PREVIEW_BUILD'];
   const setEnv = (key, value) => {
     if (value === undefined) delete process.env[key];

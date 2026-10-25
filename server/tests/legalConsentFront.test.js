@@ -107,7 +107,7 @@ const ENTRY = [
   "export * from './components/legal/legalGateClient';",
   "export { hashEmail, rememberSignupAcceptance, readSignupAcceptance, forgetSignupAcceptance, signUpMadeNoAccount, readLegalStatus, readAcceptanceAnswer, getLegalStatus, postLegalAcceptance, SIGNUP_ACCEPTANCE_KEY } from './services/legalConsentApi';",
   "export { LegalConsentBody, CONSENT_PAGE_LINKS } from './components/legal/LegalConsentView';",
-  "export { LegalNoticeBarBody, default as LegalNoticeBar } from './components/legal/LegalNoticeBar';",
+  "export { LegalNoticeBarBody, focusMainContent, default as LegalNoticeBar } from './components/legal/LegalNoticeBar';",
   "export { default as LoginView } from './components/common/ExperienceLoginView';",
   "export { features } from './config/features';",
   "export { __resetHooks } from 'react';",
@@ -664,7 +664,7 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     assert.ok(t.timers.every((x) => !x.live), 'the 60 s retry was cancelled by the focus read');
   });
 
-  it('accept(): accepted → the app; version mismatch → status read again; account_deleted → left to the deleted-account flow', async () => {
+  it('accept(): accepted → the app; version mismatch → the page stays (reload offered); account_deleted → left to the deleted-account flow', async () => {
     const t = fakeGate({ statuses: [okStatus()], posts: [{ kind: 'accepted', acceptedAt: null }] });
     t.gate.setUser(USER);
     assert.equal((await until(t.gate)).status, 'needed');
@@ -676,7 +676,10 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     m.gate.setUser(USER);
     await until(m.gate);
     assert.equal(await m.gate.accept(), 'version_mismatch');
-    assert.equal(m.calls.filter((c) => c === 'get').length, 2);
+    // A 409 only means the api has other versions than this page: a second read would answer
+    // `unavailable` (skew) and drop the page with nothing recorded and nothing said.
+    assert.equal(m.gate.getState().status, 'needed');
+    assert.equal(m.calls.filter((c) => c === 'get').length, 1, 'no skew re-read removes the page');
 
     const d = fakeGate({ posts: [{ kind: 'account_deleted' }] });
     d.gate.setUser(USER);
@@ -688,6 +691,23 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     await until(f.gate);
     assert.equal(await f.gate.accept(), 'failed');
     assert.equal(f.gate.getState().status, 'needed');
+  });
+
+  it('takeFocusAfterAccept: true once after an accepted "Agree and continue" (focus moves to the app), false after a mismatch or a failure', async () => {
+    const t = fakeGate({ statuses: [okStatus()], posts: [{ kind: 'accepted', acceptedAt: null }] });
+    t.gate.setUser(USER);
+    await until(t.gate);
+    assert.equal(t.gate.takeFocusAfterAccept(), false, 'nothing accepted yet');
+    assert.equal(await t.gate.accept(), 'accepted');
+    assert.equal(t.gate.takeFocusAfterAccept(), true);
+    assert.equal(t.gate.takeFocusAfterAccept(), false, 'once');
+    for (const kind of ['version_mismatch', 'failed', 'account_deleted']) {
+      const other = fakeGate({ statuses: [okStatus()], posts: [{ kind }] });
+      other.gate.setUser(USER);
+      await until(other.gate);
+      await other.gate.accept();
+      assert.equal(other.gate.takeFocusAfterAccept(), false, kind);
+    }
   });
 
   it('a change of user while a status read runs: the old answer is dropped', async () => {
@@ -725,7 +745,34 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     assert.equal(gate.getState().status, 'accepted', 'U1\'s late "not accepted" never shows for U2');
   });
 
-  it('dismissNotice: remembered per version on this device; another version still shows; blocked storage shows the bar again, no crash', async () => {
+  it('dismissNotice on a shared device: one learner\'s "Close" never hides the bar for another; the same learner keeps it hidden', async () => {
+    const notice = [{ document: 'privacy', version: 'privacy-2027-04-01', effectiveDate: '2027-04-01' }];
+    const storage = memoryStorage();
+    const a = fakeGate({ storage, statuses: [okStatus({ accepted: true, notice })] });
+    a.gate.setUser(USER);
+    await until(a.gate);
+    a.gate.dismissNotice('privacy-2027-04-01');
+    assert.deepEqual(a.gate.getState().notice, []);
+    const b = fakeGate({ storage, session: { userId: U2, email: 'b@example.com' }, statuses: [okStatus({ accepted: true, notice })] });
+    b.gate.setUser({ id: U2, email: 'b@example.com', isGuest: false });
+    assert.deepEqual((await until(b.gate)).notice.map((n) => n.version), ['privacy-2027-04-01'], 'child B still sees the change');
+    const again = fakeGate({ storage, statuses: [okStatus({ accepted: true, notice })] });
+    again.gate.setUser({ ...USER, id: U1.toUpperCase() });
+    assert.deepEqual((await until(again.gate)).notice, [], 'child A (any case of the id) keeps it hidden');
+    // Many learners: the newest NOTICE_SEEN_MAX entries are kept.
+    for (let i = 0; i < on.NOTICE_SEEN_MAX + 5; i += 1) {
+      const id = `bbbbbbbb-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      const g = fakeGate({ storage, session: { userId: id, email: EMAIL }, statuses: [okStatus({ accepted: true, notice })] });
+      g.gate.setUser({ id, email: EMAIL, isGuest: false });
+      await until(g.gate);
+      g.gate.dismissNotice('privacy-2027-04-01');
+    }
+    const kept = JSON.parse(storage.getItem(on.NOTICE_SEEN_KEY));
+    assert.equal(kept.length, on.NOTICE_SEEN_MAX);
+    assert.equal(kept.at(-1), `bbbbbbbb-0000-4000-8000-${String(on.NOTICE_SEEN_MAX + 4).padStart(12, '0')}:privacy-2027-04-01`);
+  });
+
+  it('dismissNotice: remembered per account and version on this device; another version still shows; blocked storage shows the bar again, no crash', async () => {
     const notice = [
       { document: 'privacy', version: 'privacy-2027-04-01', effectiveDate: '2027-04-01' },
       { document: 'terms', version: 'terms-2027-04-01', effectiveDate: '2027-04-01' },
@@ -735,7 +782,7 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     await until(t.gate);
     t.gate.dismissNotice('privacy-2027-04-01');
     assert.deepEqual(t.gate.getState().notice.map((n) => n.version), ['terms-2027-04-01']);
-    assert.deepEqual(JSON.parse(t.storage.getItem(on.NOTICE_SEEN_KEY)), ['privacy-2027-04-01']);
+    assert.deepEqual(JSON.parse(t.storage.getItem(on.NOTICE_SEEN_KEY)), [`${U1}:privacy-2027-04-01`]);
     const again = fakeGate({ storage: t.storage, statuses: [okStatus({ accepted: true, notice })] });
     again.gate.setUser(USER);
     assert.deepEqual((await until(again.gate)).notice.map((n) => n.version), ['terms-2027-04-01'], 'the next page load remembers');
@@ -819,7 +866,7 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
 // The re-consent page and the notice bar (rendered)
 
 describe('the re-consent page (components/legal/LegalConsentView.tsx)', () => {
-  const props = (over = {}) => ({ language: 'jp', changed: false, ticked: false, busy: false, error: null, onTick() {}, onAgree() {}, onSignOut() {}, ...over });
+  const props = (over = {}) => ({ language: 'jp', changed: [], ticked: false, busy: false, error: null, onTick() {}, onAgree() {}, onSignOut() {}, ...over });
 
   it('first time: the texts in a new tab, an unticked labelled checkbox, "Agree and continue" disabled until ticked, "Sign out"', () => {
     const tokens = render(on, on.LegalConsentBody, props());
@@ -857,16 +904,33 @@ describe('the re-consent page (components/legal/LegalConsentView.tsx)', () => {
   });
 
   it('after a terms change that requires acceptance; errors are announced; English', () => {
-    assert.match(textOf(render(on, on.LegalConsentBody, props({ changed: true }))), /利用規約を改定しました。続けて使うには、新しい利用規約への同意が必要です。/);
-    const mismatch = elementsOf(render(on, on.LegalConsentBody, props({ error: 'mismatch' }))).find((el) => el.props?.role === 'alert');
-    assert.match(textOfElement(mismatch), /文が新しくなりました。もう一度読んでから同意してください。/);
+    assert.match(textOf(render(on, on.LegalConsentBody, props({ changed: ['terms'] }))), /利用規約を改定しました。続けて使うには、新しい利用規約への同意が必要です。/);
+    const reloads = [];
+    const mismatchEls = elementsOf(render(on, on.LegalConsentBody, props({ error: 'mismatch', onReload: () => reloads.push('reload') })));
+    const mismatch = mismatchEls.find((el) => el.props?.role === 'alert');
+    assert.match(textOfElement(mismatch), /文が新しくなりました。ページを読み込み直して、もう一度読んでから同意してください。/);
+    const reload = mismatchEls.find((el) => el.type === 'Button' && textOfElement(el) === '読み込み直す');
+    assert.ok(reload, 'a 409 offers a reload (only a reload shows the new texts)');
+    reload.props.onClick();
+    assert.deepEqual(reloads, ['reload']);
+    assert.ok(!elementsOf(render(on, on.LegalConsentBody, props({ error: 'failed', onReload() {} }))).some((el) => el.type === 'Button' && textOfElement(el) === '読み込み直す'), 'no reload for a network failure');
+    assert.match(textOf(render(on, on.LegalConsentBody, props({ language: 'en', error: 'mismatch', onReload() {} }))), /The text has changed\. Reload the page, read it again, then agree\.Reload/);
     const failed = elementsOf(render(on, on.LegalConsentBody, props({ error: 'failed' }))).find((el) => el.props?.role === 'alert');
     assert.match(textOfElement(failed), /記録できませんでした。通信を確かめて、もう一度お試しください。/);
     assert.equal(failed.props.tabIndex, -1, 'focusable, so focus can move there');
-    const en = textOf(render(on, on.LegalConsentBody, props({ language: 'en', changed: true })));
+    const en = textOf(render(on, on.LegalConsentBody, props({ language: 'en', changed: ['terms'] })));
     assert.match(en, /Please review our Terms of Use and Privacy Policy/);
     assert.match(en, /We updated the Terms of Use\. To keep using Rise Path, please agree to the new Terms of Use\./);
     assert.match(en, /If you are under 18, get your parent’s or guardian’s consent before you press “Agree and continue”\./);
+  });
+
+  it('a privacy version that needs acceptance names the Privacy Policy, not the Terms; both changed names both', () => {
+    const privacy = textOf(render(on, on.LegalConsentBody, props({ changed: ['privacy'] })));
+    assert.match(privacy, /プライバシーポリシーを改定しました。続けて使うには、新しいプライバシーポリシーへの同意が必要です。/);
+    assert.doesNotMatch(privacy, /利用規約を改定しました/);
+    assert.match(textOf(render(on, on.LegalConsentBody, props({ changed: ['terms', 'privacy'] }))), /利用規約とプライバシーポリシーを改定しました。続けて使うには、新しい内容への同意が必要です。/);
+    assert.match(textOf(render(on, on.LegalConsentBody, props({ language: 'en', changed: ['privacy'] }))), /We updated the Privacy Policy\. To keep using Rise Path, please agree to the new Privacy Policy\./);
+    assert.match(read('components/legal/LegalConsentView.tsx'), /changed=\{documentsToAcceptAgain\(gate\.lastAccepted\)\}/);
   });
 
   it('the view focuses its heading, names the tab, uses the gate\'s accept() and the app\'s logout', () => {
@@ -925,6 +989,28 @@ describe('the notice bar (components/legal/LegalNoticeBar.tsx)', () => {
     }
   });
 
+  it('"Close" moves focus to the Layout\'s main (its own button unmounts); the bar focuses main once after an accepted agreement', () => {
+    const dismissed = [];
+    let focused = 0;
+    const tokens = render(on, on.LegalNoticeBarBody, { language: 'jp', status: 'accepted', notice, onDismiss: (v) => dismissed.push(v), focusAfterDismiss: () => { focused += 1; } });
+    elementsOf(tokens).find((el) => el.type === 'button').props.onClick();
+    assert.deepEqual(dismissed, ['privacy-2027-04-01']);
+    assert.equal(focused, 1);
+    const savedDocument = globalThis.document;
+    const calls = [];
+    globalThis.document = { getElementById: (id) => (id === 'main-content' ? { focus: (options) => calls.push(options) } : null) };
+    try {
+      on.focusMainContent();
+    } finally {
+      if (savedDocument === undefined) delete globalThis.document;
+      else globalThis.document = savedDocument;
+    }
+    assert.deepEqual(calls, [{ preventScroll: true }]);
+    const code = read('components/legal/LegalNoticeBar.tsx');
+    assert.match(code, /focusAfterDismiss=\{focusMainContent\}/);
+    assert.match(code, /useEffect\(\(\) => \{\s*if \(features\.legalPages && legalGate\(features\.legalPages\)\.takeFocusAfterAccept\(\)\) focusMainContent\(\);\s*\}, \[\]\);/);
+  });
+
   it('flag off: the bar renders nothing', () => {
     assert.equal(off.LegalNoticeBar(), null);
     assert.equal(off.features.legalPages, false);
@@ -969,6 +1055,22 @@ describe('App.tsx: the gate branch and its exemptions', () => {
     assert.match(app, /<Layout currentView=\{getCurrentViewState\(\)\} onNavigate=\{handleNavigate\} onLogout=\{handleLogout\} notice=\{features\.legalPages \? <LegalNoticeBar \/> : null\}>\s*<Suspense/);
   });
 
+  it('the Layout prints the whole page: the frame grows in print and the app chrome is hidden (a signed-in /privacy printout was one page)', () => {
+    const layout = read('components/common/Layout.tsx');
+    assert.match(layout, /<div className="flex h-screen[^"]*print:h-auto[^"]*print:overflow-visible[^"]*">/, 'the root frame');
+    const main = /<main\s+id="main-content"[\s\S]*?className=\{`([^`]+)`\}/.exec(layout);
+    assert.ok(main, '<main id="main-content">');
+    for (const cls of ['print:h-auto', 'print:overflow-visible', 'print:pt-0']) assert.ok(main[1].includes(cls), cls);
+    assert.match(/id="app-sidebar"[\s\S]*?className=\{`([^`]+)`\}/.exec(layout)?.[1] ?? '', /print:hidden/, 'the sidebar');
+    assert.match(/<header[\s\S]*?className=\{`([^`]+)`\}/.exec(layout)?.[1] ?? '', /md:hidden fixed[^`]*print:hidden/, 'the fixed phone header');
+  });
+
+  it('the Layout\'s main pads its scroll area under the fixed phone header (a #section heading lands below it, not under it)', () => {
+    const layout = read('components/common/Layout.tsx');
+    const main = /<main\s+id="main-content"[\s\S]*?className=\{`([^`]+)`\}/.exec(layout)?.[1] ?? '';
+    assert.match(main, /'pt-14 scroll-pt-14 md:pt-0 md:scroll-pt-0'/, 'scroll padding wherever the header padding is');
+  });
+
   it('the Layout puts the notice slot in the content frame on every page, full-bleed ones too (the dashboard, lessons)', () => {
     const layout = read('components/common/Layout.tsx');
     const frame = /const CONTENT_FRAME = '([^']+)';/.exec(layout);
@@ -987,6 +1089,16 @@ describe('link sites (design §2.6)', () => {
     assert.match(login, /\{features\.legalPages && \(\s*<>\s*<Link to="\/terms"[\s\S]*?<Link to="\/privacy"/);
     assert.match(login, /\{isSignup && features\.legalPages && \(/);
     assert.doesNotMatch(login, /defaultChecked|checked=\{true\}/);
+  });
+
+  it('the login and sign-up screen scrolls: the root box scrolls and an inner min-h-full wrapper centres (the form with the legal block is taller than a laptop or phone screen)', () => {
+    const login = read('components/common/ExperienceLoginView.tsx');
+    const root = /<div className="(fixed inset-0 z-\[100\][^"]*)">/.exec(login);
+    assert.ok(root, 'the fixed root');
+    assert.match(root[1], /overflow-y-auto/);
+    assert.doesNotMatch(root[1], /\bflex\b|items-center/, 'centring a fixed box pushes the top and the bottom off screen');
+    const after = login.slice(root.index + root[0].length);
+    assert.match(after, /^[\s\S]*?<div className="[^"]*min-h-full[^"]*items-center[^"]*justify-center/);
   });
 
   it('Settings: terms and privacy rows with the flag, the contact line always; Privacy page: the policy line with the flag', () => {

@@ -28,6 +28,10 @@ export const SQL = Object.freeze({
     lockTimeout: "set local lock_timeout = '10s'",
     statementTimeout: "set local statement_timeout = '60s'",
     lock: "select pg_advisory_xact_lock(hashtextextended('rp:account:' || $1::uuid::text, 0))",
+    // The stub, the consents and the grants locked before the copies (a consent, grant or upload in flight finishes first).
+    lockStub: 'select 1 from auth.users where id = $1::uuid for update',
+    lockConsents: 'select 1 from account_consents where user_id = $1::uuid for update',
+    lockGrants: 'select 1 from mcp_oauth_grants where user_id = $1::uuid for update',
     tombstoneForUpdate: 'select deleted_at, reopened_at from account_deletions where user_id = $1::uuid for update',
     uploads: 'select storage_path from materials where user_id = $1::uuid and storage_path is not null',
     writeTombstone: norm(`insert into account_deletions (user_id, deleted_at, requested_by) values ($1::uuid, clock_timestamp(), $2)
@@ -38,9 +42,11 @@ export const SQL = Object.freeze({
     copyConsents: norm(`insert into account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
         select id, user_id, kind, policy_version, method, given_at, revoked_at, (select deleted_at from account_deletions where user_id = $1::uuid) from account_consents where user_id = $1::uuid
         on conflict (consent_id) do nothing`),
+    // $2/$3: app ids and names from the delete page; a name stored on the grant row wins.
     copyGrants: norm(`insert into ai_app_provision_records (user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at, account_deleted_at)
-        select user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at, (select deleted_at from account_deletions where user_id = $1::uuid) from mcp_oauth_grants
-        where user_id = $1::uuid and (first_seen_at is not null or last_used_at is not null)
+        select g.user_id, g.client_id, coalesce(g.client_name, n.client_name), g.first_seen_at, g.last_used_at, g.revoked_at, (select deleted_at from account_deletions where user_id = $1::uuid) from mcp_oauth_grants g
+        left join unnest($2::uuid[], $3::text[]) as n(client_id, client_name) on n.client_id = g.client_id
+        where g.user_id = $1::uuid and (g.first_seen_at is not null or g.last_used_at is not null)
         on conflict do nothing`),
     deleteOldUsage: "delete from ai_daily_usage where subject = $1::uuid::text and usage_day < (now() at time zone 'asia/tokyo')::date",
     deleteStub: 'delete from auth.users where id = $1::uuid',
@@ -186,6 +192,16 @@ export function createDeletionPool(seed = {}) {
             case SQL.lock:
             case SQL.reopenLock:
                 return { rowCount: 1, rows: [{}] };
+            case SQL.lockStub:
+                return state.stubs.has(id) ? { rowCount: 1, rows: [{ '?column?': 1 }] } : EMPTY;
+            case SQL.lockConsents: {
+                const rows = state.consents.filter((c) => c.user_id === id).map(() => ({ '?column?': 1 }));
+                return { rowCount: rows.length, rows };
+            }
+            case SQL.lockGrants: {
+                const rows = state.grants.filter((g) => g.user_id === id).map(() => ({ '?column?': 1 }));
+                return { rowCount: rows.length, rows };
+            }
             case SQL.uploads: {
                 const rows = state.materials.filter((m) => m.user_id === id && m.storage_path !== null).map((m) => ({ storage_path: m.storage_path }));
                 return { rowCount: rows.length, rows };
@@ -217,10 +233,14 @@ export function createDeletionPool(seed = {}) {
                 return { rowCount: n, rows: [] };
             }
             case SQL.copyGrants: {
+                if (!Array.isArray(params[1]) || !Array.isArray(params[2]) || params[1].length !== params[2].length) {
+                    throw new TypeError('copyGrants: $2 (app ids) and $3 (app names) must be arrays of the same length');
+                }
+                const names = new Map(params[1].map((clientId, i) => [String(clientId).toLowerCase(), params[2][i]]));
                 const at = tombstoneTime(id);
                 let n = 0;
                 for (const g of state.grants.filter((x) => x.user_id === id && (x.first_seen_at !== null || x.last_used_at !== null))) {
-                    state.provision.push({ ...g, account_deleted_at: at });
+                    state.provision.push({ ...g, client_name: g.client_name ?? names.get(g.client_id) ?? null, account_deleted_at: at });
                     n += 1;
                 }
                 return { rowCount: n, rows: [] };

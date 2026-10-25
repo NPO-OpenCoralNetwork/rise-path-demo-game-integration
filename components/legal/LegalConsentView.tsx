@@ -7,7 +7,7 @@ import { features } from '../../config/features';
 import { Button } from '../ui/Button';
 import { PublicPageShell } from '../ui/PublicPageShell';
 import { SupportContact } from '../ui/SupportContact';
-import { LEGAL_DOCUMENTS } from '../../shared/legal/versions.js';
+import { LEGAL_DOCUMENTS, documentsToAcceptAgain, type LegalDocumentName } from '../../shared/legal/versions.js';
 import { legalPageTitle, setPageTitle } from '../features/legal/pageTitle';
 import { formatEffectiveDate } from './legalDate';
 import { LegalNewTabLink } from './LegalLinks';
@@ -25,7 +25,10 @@ import { legalGate, useLegalGate, type AcceptOutcome } from './legalGateClient';
  * - Without agreeing, the person can still withdraw the guardian's AI consent, delete records,
  *   delete the account and reach the support contact (those pages are exempt: App.tsx
  *   LEGAL_GATE_EXEMPT).
- * - Focus starts on the heading; an error is announced (role="alert") and focused.
+ * - The first line names what changed: the Terms, the Privacy Policy or both
+ *   (documentsToAcceptAgain), each with its own effective date; a first agreement says so.
+ * - Focus starts on the heading; an error is announced (role="alert") and focused. A 409 (the
+ *   server has newer texts than this page) says to reload and offers a reload button.
  * Nothing is collected here: the server records the account id, the versions and the time (D5).
  */
 
@@ -34,8 +37,14 @@ const copy = {
     title: 'Please review our Terms of Use and Privacy Policy',
     first:
       'To use Rise Path, please agree to the Terms of Use. The Privacy Policy explains why and how we use personal information.',
-    changed: (date: string | null) =>
-      `We updated the Terms of Use${date ? ` (from ${date})` : ''}. To keep using Rise Path, please agree to the new Terms of Use.`,
+    changed: {
+      terms: (date: string | null) =>
+        `We updated the Terms of Use${date ? ` (from ${date})` : ''}. To keep using Rise Path, please agree to the new Terms of Use.`,
+      privacy: (date: string | null) =>
+        `We updated the Privacy Policy${date ? ` (from ${date})` : ''}. To keep using Rise Path, please agree to the new Privacy Policy.`,
+      both: (terms: string | null, privacy: string | null) =>
+        `We updated the Terms of Use${terms ? ` (from ${terms})` : ''} and the Privacy Policy${privacy ? ` (from ${privacy})` : ''}. To keep using Rise Path, please agree to the new texts.`,
+    },
     readTerms: 'Read the Terms of Use',
     readPrivacy: 'Read the Privacy Policy',
     newTab: '(opens in a new tab)',
@@ -52,15 +61,22 @@ const copy = {
     withdraw: 'Withdraw the guardian’s consent to AI features',
     privacySettings: 'Privacy settings (delete records)',
     deleteAccount: 'Delete your account',
-    mismatch: 'The text has changed. Please read it again before you agree.',
+    mismatch: 'The text has changed. Reload the page, read it again, then agree.',
+    reload: 'Reload',
     failed: 'We could not record your answer. Check your connection and try again.',
   },
   jp: {
     title: '利用規約とプライバシーポリシーのご確認',
     first:
       'Rise Path を使うには、利用規約への同意が必要です。プライバシーポリシーには、個人情報の利用目的と扱い方を書いています。',
-    changed: (date: string | null) =>
-      `利用規約を改定しました${date ? `（${date}から）` : ''}。続けて使うには、新しい利用規約への同意が必要です。`,
+    changed: {
+      terms: (date: string | null) =>
+        `利用規約を改定しました${date ? `（${date}から）` : ''}。続けて使うには、新しい利用規約への同意が必要です。`,
+      privacy: (date: string | null) =>
+        `プライバシーポリシーを改定しました${date ? `（${date}から）` : ''}。続けて使うには、新しいプライバシーポリシーへの同意が必要です。`,
+      both: (terms: string | null, privacy: string | null) =>
+        `利用規約${terms ? `（${terms}から）` : ''}とプライバシーポリシー${privacy ? `（${privacy}から）` : ''}を改定しました。続けて使うには、新しい内容への同意が必要です。`,
+    },
     readTerms: '利用規約を読む',
     readPrivacy: 'プライバシーポリシーを読む',
     newTab: '（新しいタブで開きます）',
@@ -77,7 +93,8 @@ const copy = {
     withdraw: 'AI 機能への保護者の同意をやめる',
     privacySettings: 'プライバシーの設定（記録を消す）',
     deleteAccount: 'アカウントを削除する',
-    mismatch: '文が新しくなりました。もう一度読んでから同意してください。',
+    mismatch: '文が新しくなりました。ページを読み込み直して、もう一度読んでから同意してください。',
+    reload: '読み込み直す',
     failed: '記録できませんでした。通信を確かめて、もう一度お試しください。',
   },
 } as const;
@@ -96,21 +113,31 @@ const linkClasses = 'rounded-chip font-medium text-primary-text underline underl
 /** What the page says (exported for server/tests/legalConsentFront.test.js). */
 export const LegalConsentBody: React.FC<{
   language: Lang;
-  changed: boolean;
+  /** The documents that need agreement again ([]: a first agreement). */
+  changed: readonly LegalDocumentName[];
   ticked: boolean;
   busy: boolean;
   error: 'mismatch' | 'failed' | null;
   onTick: (ticked: boolean) => void;
   onAgree: () => void;
   onSignOut: () => void;
+  /** The mismatch error's reload button (window.location.reload on the page). */
+  onReload?: () => void;
   titleId?: string;
   titleRef?: React.Ref<HTMLHeadingElement>;
   errorRef?: React.Ref<HTMLParagraphElement>;
   checkboxId?: string;
   minorsId?: string;
-}> = ({ language, changed, ticked, busy, error, onTick, onAgree, onSignOut, titleId, titleRef, errorRef, checkboxId = 'legal-consent', minorsId = 'legal-consent-minors' }) => {
+}> = ({ language, changed, ticked, busy, error, onTick, onAgree, onSignOut, onReload, titleId, titleRef, errorRef, checkboxId = 'legal-consent', minorsId = 'legal-consent-minors' }) => {
   const t = copy[language];
-  const date = formatEffectiveDate(LEGAL_DOCUMENTS.terms.effectiveDate, language);
+  const dateOf = (document: LegalDocumentName) => formatEffectiveDate(LEGAL_DOCUMENTS[document].effectiveDate, language);
+  const lead = changed.includes('terms') && changed.includes('privacy')
+    ? t.changed.both(dateOf('terms'), dateOf('privacy'))
+    : changed.includes('terms')
+      ? t.changed.terms(dateOf('terms'))
+      : changed.includes('privacy')
+        ? t.changed.privacy(dateOf('privacy'))
+        : t.first;
   const errorId = `${checkboxId}-error`;
   return (
     <div className="mx-auto max-w-read px-4 pb-20 pt-8 sm:px-6">
@@ -120,7 +147,7 @@ export const LegalConsentBody: React.FC<{
         </h1>
       </header>
       <div className="mt-6 space-y-4 rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
-        <p className="text-body-lg text-fg">{changed ? t.changed(date) : t.first}</p>
+        <p className="text-body-lg text-fg">{lead}</p>
         <ul className="flex flex-col gap-2 text-body sm:flex-row sm:gap-6">
           <li>
             <LegalNewTabLink to="/terms" newTab={t.newTab} className={linkClasses}>
@@ -170,6 +197,11 @@ export const LegalConsentBody: React.FC<{
               <CircleAlert size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
               {error === 'mismatch' ? t.mismatch : t.failed}
             </p>
+          ) : null}
+          {error === 'mismatch' && onReload ? (
+            <Button type="button" variant="secondary" onClick={onReload}>
+              {t.reload}
+            </Button>
           ) : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={!ticked || busy}>
@@ -259,7 +291,7 @@ const LegalConsentView: React.FC = () => {
     <PublicPageShell>
       <LegalConsentBody
         language={language}
-        changed={gate.lastAccepted !== null}
+        changed={documentsToAcceptAgain(gate.lastAccepted)}
         ticked={ticked}
         busy={busy}
         error={error}
@@ -269,6 +301,7 @@ const LegalConsentView: React.FC = () => {
         }}
         onAgree={() => void agree()}
         onSignOut={signOut}
+        onReload={() => window.location.reload()}
         titleId={titleId}
         titleRef={titleRef}
         errorRef={errorRef}

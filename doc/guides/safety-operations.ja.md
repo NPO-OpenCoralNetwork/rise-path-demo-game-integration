@@ -206,7 +206,7 @@ VM では `deploy/risepath-vm/stack.env` に書きます（例: `deploy/risepath
 | `SAFETY_ALERT_WEBHOOK_URL` | 未設定（`AI_CAP_ALERT_WEBHOOK_URL` を使う） | 安全の通知を送る Slack や Discord の Incoming Webhook。`https://` だけ。URL は秘密の値です |
 | `AI_ACCESS_DEV_AUDIENCE` | 未設定 | 開発用。本番（`NODE_ENV=production`）では無視し、設定されていると起動時に警告を出します。VM では設定しません |
 | `ACCOUNT_DELETION_ENABLED` | 未設定（削除できる） | `false` で、設定の「アカウントを削除する」を止めます（`true`/`false`。ほかの値は止める側になり、警告を出します）。自分の AI をつなぐ機能（`byoa`）を、Supabase のパスワードの 3 つの設定なしで動かすあいだは `false` にします（[byoa-setup.ja.md](./byoa-setup.ja.md) の手順 6） |
-| `RETENTION_ENABLED` | 未設定（動く） | `false` で、保存期間の処理をすべて止めます。ほかの値は止める側になり、警告を出します |
+| `RETENTION_ENABLED` | 未設定（`NODE_ENV=production` の API では動く。ほかでは `true` のときだけ動く） | `false` で、保存期間の処理をすべて止めます。ほかの値は止める側になり、警告を出します |
 | `RETENTION_AI_USAGE_DAYS` | 30（2〜400） | AI の利用回数を残す日数（日本時間の日で数えます） |
 | `RETENTION_PROCESSING_DAYS` | 365（30〜3650） | 処理の記録（ジョブ）と AI アプリからの呼び出しの記録を残す日数 |
 | `RETENTION_DELETION_PROOF_YEARS` | 5（1〜10） | 削除したアカウントの、利用規約への同意の記録・保護者の同意の証拠・削除の記録を残す年数 |

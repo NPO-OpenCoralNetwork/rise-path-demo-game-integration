@@ -3,7 +3,9 @@
  * What the api's request logger and its last-resort 5xx line may print about a request (Phase 4,
  * owner decision D4; server.js). The docker logs on the VM are kept for a while (compose
  * x-logging: about 50 MB per container), so they get the shape of a request, not the person:
- *   - the query string and the hash are dropped (search terms, filters, tokens)
+ *   - the query string and the hash are dropped (search terms, filters, tokens), except the edge
+ *     smoke id (scripts/smoke-public-edge.mjs check 8: smoke=<12 hex characters>, random, no
+ *     personal data), kept so the owner's `logs api | grep smoke=<id>` shows the query arrived
  *   - a UUID keeps its first 8 characters (admin paths name learners by id)
  *   - a date becomes :date (diary entries are addressed by day)
  *   - a path segment with an @ (or %40) becomes :email
@@ -20,14 +22,17 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
  * @returns {string}
  */
 export function redactUrl(url) {
-    const path = String(url ?? '').split('?')[0].split('#')[0]; // query strings are never logged
+    const raw = String(url ?? '').split('#')[0];
+    const path = raw.split('?')[0]; // query strings are never logged…
+    // …except the edge smoke id: exactly 12 lower-case hex characters, nothing else of the query.
+    const smoke = /[?&]smoke=([0-9a-f]{12})(?:&|$)/.exec(raw);
     return path
         .replace(UUID, (id) => `${id.slice(0, 8)}…`)
         .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ':date')
         .replace(/[^/]*(?:@|%40)[^/]*/gi, ':email')
         .replace(/\b(\d{13})-[^/]+/g, '$1-:name')
         .replace(/[A-Za-z0-9_-]{32,}/g, ':token')
-        .slice(0, 200);
+        .slice(0, 200) + (smoke ? `?smoke=${smoke[1]}` : '');
 }
 
 /**

@@ -21,14 +21,20 @@
  *   2. Memanto (when enabled): the learner's memories, before anything else, because no HTTP call
  *      may run inside the transaction (it would hold the account lock)
  *   3. one transaction under the exclusive account lock (the auth.users trigger and every re-open
- *      take it shared): tombstone again (FOR UPDATE), the plan again, the upload paths, the
+ *      take it shared): the stub row, then the learner's consents and grants, locked FOR UPDATE (a
+ *      consent, AI-app grant or upload whose INSERT is in flight holds a KEY SHARE lock on the stub
+ *      for its foreign key: the deletion waits for it, so the copies below see it; one started
+ *      later waits for COMMIT and then fails its foreign key; an UPDATE of a consent or grant row
+ *      waits too), tombstone again (FOR UPDATE), the plan again, the upload paths, the
  *      tombstone row (clock_timestamp: after the lock wait), the proofs kept by D5 (legal
  *      acceptances marked, guardian consents and used AI-app grants copied, each with the
- *      tombstone's exact deleted_at), older AI usage counts, the Stripe Customers again, then the
- *      stub. A lock wait over 10 s is account_busy; any other error rolls back.
+ *      tombstone's exact deleted_at; an app's name from the page when the grant row has none),
+ *      older AI usage counts, the Stripe Customers again, then the stub. A lock wait over 10 s is
+ *      account_busy; any other error rolls back.
  *   4. after COMMIT, best effort (a failure is logged and never undoes the deletion): upload files,
  *      this process's caches, then the network re-checks: open Checkout Sessions again and the
- *      subscriptions read again (a renewing one, paid before COMMIT, is logged for staff), Memanto
+ *      subscriptions read again (a renewing one, paid before COMMIT, raises the owner alert
+ *      deleted_account_renewing: server/services/billingAlerts.js), Memanto
  *      again. The answer waits for them at most AFTER_COMMIT_WAIT_MS (they go on and log their own
  *      result after it); one log line with an 8-character id and no file names.
  *
@@ -42,6 +48,7 @@ import { fileURLToPath } from 'node:url';
 import { getPool, PHASE1_USER_ID } from '../db.js';
 import { invalidateAiAccess } from '../safety/access.js';
 import { accountLockKey, canonicalUserId, signedInBeforeDeletion } from '../../tools/core/accountDeletions.js';
+import { billingAlerts as defaultBillingAlerts } from './billingAlerts.js';
 import { invalidatePlan, TERMINAL_STATUSES } from './billingEntitlement.js';
 import { isMemantoEnabled, purgeLearnerMemories } from './learnerMemoryBridge.js';
 
@@ -81,6 +88,12 @@ export const SQL = Object.freeze({
     lockTimeout: "SET LOCAL lock_timeout = '10s'",
     statementTimeout: "SET LOCAL statement_timeout = '60s'",
     lock: `SELECT pg_advisory_xact_lock(${accountLockKey(1)})`,
+    // FOR UPDATE conflicts with the KEY SHARE lock of a foreign key check (a consent, grant or
+    // upload INSERT), and the row locks below with an UPDATE of a consent or grant (a revocation,
+    // an AI app's first use of a grant row the revoke route wrote): those finish first or wait.
+    lockStub: 'SELECT 1 FROM auth.users WHERE id = $1::uuid FOR UPDATE',
+    lockConsents: 'SELECT 1 FROM account_consents WHERE user_id = $1::uuid FOR UPDATE',
+    lockGrants: 'SELECT 1 FROM mcp_oauth_grants WHERE user_id = $1::uuid FOR UPDATE',
     tombstoneForUpdate: 'SELECT deleted_at, reopened_at FROM account_deletions WHERE user_id = $1::uuid FOR UPDATE',
     uploads: 'SELECT storage_path FROM materials WHERE user_id = $1::uuid AND storage_path IS NOT NULL',
     writeTombstone: `INSERT INTO account_deletions (user_id, deleted_at, requested_by) VALUES ($1::uuid, clock_timestamp(), $2)
@@ -90,9 +103,12 @@ export const SQL = Object.freeze({
     copyConsents: `INSERT INTO account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
      SELECT id, user_id, kind, policy_version, method, given_at, revoked_at, ${TOMBSTONE_TIME} FROM account_consents WHERE user_id = $1::uuid
      ON CONFLICT (consent_id) DO NOTHING`,
+    // $2/$3: the app ids and names the delete page read from Supabase (only the revoke route
+    // stores a name; the remote MCP server cannot): a name stored at revocation wins.
     copyGrants: `INSERT INTO ai_app_provision_records (user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at, account_deleted_at)
-     SELECT user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at, ${TOMBSTONE_TIME} FROM mcp_oauth_grants
-      WHERE user_id = $1::uuid AND (first_seen_at IS NOT NULL OR last_used_at IS NOT NULL)
+     SELECT g.user_id, g.client_id, COALESCE(g.client_name, n.client_name), g.first_seen_at, g.last_used_at, g.revoked_at, ${TOMBSTONE_TIME} FROM mcp_oauth_grants g
+      LEFT JOIN unnest($2::uuid[], $3::text[]) AS n(client_id, client_name) ON n.client_id = g.client_id
+      WHERE g.user_id = $1::uuid AND (g.first_seen_at IS NOT NULL OR g.last_used_at IS NOT NULL)
      ON CONFLICT DO NOTHING`,
     deleteOldUsage: "DELETE FROM ai_daily_usage WHERE subject = $1::uuid::text AND usage_day < (now() AT TIME ZONE 'Asia/Tokyo')::date",
     deleteStub: 'DELETE FROM auth.users WHERE id = $1::uuid',
@@ -122,6 +138,29 @@ const toIso = (value) => {
     const ms = new Date(/** @type {any} */ (value)).getTime();
     return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 };
+
+/** The most app names one deletion takes (server/routes/account.js caps the body the same way). */
+export const DELETION_APP_NAMES_MAX = 20;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The app names for copyGrants: lower-case UUID ids, string names of at most 100 characters (the
+ * route cleaned them), one per id, at most DELETION_APP_NAMES_MAX; anything else is left out.
+ * @param {unknown} appNames
+ * @returns {{ ids: string[], names: string[] }}
+ */
+export function appNameParams(appNames) {
+    /** @type {Map<string, string>} */
+    const byId = new Map();
+    for (const entry of Array.isArray(appNames) ? appNames : []) {
+        if (byId.size >= DELETION_APP_NAMES_MAX) break;
+        const clientId = typeof entry?.clientId === 'string' ? entry.clientId.toLowerCase() : '';
+        const clientName = entry?.clientName;
+        if (!UUID.test(clientId) || byId.has(clientId) || typeof clientName !== 'string' || !clientName || Array.from(clientName).length > 100) continue;
+        byId.set(clientId, clientName);
+    }
+    return { ids: [...byId.keys()], names: [...byId.values()] };
+}
 
 /**
  * A subscription that will charge again: not ended, and no cancellation scheduled (neither
@@ -261,10 +300,11 @@ async function checkAtStripe(stripe, customers, onMissing) {
 /**
  * Step 4's network re-checks, best effort (each failure is logged; nothing is undone), never
  * throws: for each Customer, open Checkout Sessions expired again and the subscriptions read again
- * (a renewing one, paid between step 1 and COMMIT, is logged for staff); then Memanto again.
- * @param {{ id: string, stripe: import('./stripeClient.js').StripeClient | null, customers: string[], memory: { purge: (input: { pool: any, userId: string }) => Promise<any> } | null, pool: unknown, logger: Logger }} input
+ * (a renewing one, paid between step 1 and COMMIT, raises the owner alert deleted_account_renewing:
+ * a log line alone is lost when a deploy recreates the api container); then Memanto again.
+ * @param {{ id: string, stripe: import('./stripeClient.js').StripeClient | null, customers: string[], memory: { purge: (input: { pool: any, userId: string }) => Promise<any> } | null, pool: unknown, logger: Logger, alerts: Pick<import('./billingAlerts.js').BillingAlerts, 'alert'> }} input
  */
-async function recheckAfterCommit({ id, stripe, customers, memory, pool, logger }) {
+async function recheckAfterCommit({ id, stripe, customers, memory, pool, logger, alerts }) {
     if (stripe && customers.length) {
         let expiryFailed = false;
         let renewing = false;
@@ -286,7 +326,13 @@ async function recheckAfterCommit({ id, stripe, customers, memory, pool, logger 
             }
         }
         if (expiryFailed) logger.warn(`[Account] could not expire checkout sessions after deleting ${tag(id)}`);
-        if (renewing) logger.warn(`[Account] a renewing subscription exists after deleting ${tag(id)} (cancel it in the Stripe Dashboard)`);
+        if (renewing) {
+            try {
+                alerts.alert('deleted_account_renewing', tag(id), `a renewing subscription exists after deleting ${tag(id)}: cancel it in the Stripe Dashboard`);
+            } catch {
+                logger.warn(`[Account] a renewing subscription exists after deleting ${tag(id)} (cancel it in the Stripe Dashboard)`);
+            }
+        }
         if (readFailed) logger.warn(`[Account] could not re-check subscriptions at Stripe after deleting ${tag(id)}`);
     }
     if (memory) {
@@ -332,7 +378,9 @@ const defaultInvalidate = (id) => {
  *   userId: unknown,
  *   requestedBy: 'self' | 'staff' | 'orphan',
  *   authTime?: number | null,
+ *   appNames?: ReadonlyArray<{ clientId: string, clientName: string }>,
  *   billing?: BillingDeps,
+ *   alerts?: Pick<import('./billingAlerts.js').BillingAlerts, 'alert'>,
  *   logger?: Logger,
  *   uploadRoot?: string,
  *   memory?: { enabled: () => boolean, purge: (input: { pool: any, userId: string }) => Promise<any> },
@@ -343,6 +391,9 @@ const defaultInvalidate = (id) => {
  *   authTime: the session's sign-in time (tools/core/oauthToken.js sessionAuthTime) for a
  *   deletion from Settings; null for staff. A tombstone that is not re-opened answers 'already'
  *   when authTime is null or not later than deleted_at + 30 s (the same rule as sign-in).
+ *   appNames: the names of the learner's AI apps as the delete page read them from Supabase
+ *   (server/routes/account.js); used only for a grant row without a name. Staff: none.
+ *   alerts: the billing owner alerts (a renewing subscription found after COMMIT).
  *   memory, invalidateCaches, now, afterCommitWaitMs: test seams (Memanto, this process's caches,
  *   the clock, how long the answer waits for the re-checks after COMMIT).
  * @returns {Promise<DeletionResult>}
@@ -352,7 +403,9 @@ export async function deleteAccountData({
     userId,
     requestedBy,
     authTime = null,
+    appNames = [],
     billing = { config: null, stripe: null },
+    alerts = defaultBillingAlerts,
     logger = console,
     uploadRoot = PROJECT_ROOT,
     memory = defaultMemory,
@@ -449,6 +502,9 @@ export async function deleteAccountData({
         await client.query(SQL.lockTimeout);
         await client.query(SQL.statementTimeout);
         await client.query(SQL.lock, [id]);
+        await client.query(SQL.lockStub, [id]);
+        await client.query(SQL.lockConsents, [id]);
+        await client.query(SQL.lockGrants, [id]);
         const tombstone = (await client.query(SQL.tombstoneForUpdate, [id]))?.rows?.[0];
         if (tombstone && !tombstone.reopened_at && signedInBeforeDeletion(authTime, tombstone.deleted_at)) {
             // Another request deleted it while this one waited for the lock.
@@ -466,7 +522,8 @@ export async function deleteAccountData({
         // The proofs take deleted_at from the tombstone row itself (TOMBSTONE_TIME), not from JavaScript.
         await client.query(SQL.markAcceptances, [id]);
         await client.query(SQL.copyConsents, [id]);
-        await client.query(SQL.copyGrants, [id]);
+        const apps = appNameParams(appNames);
+        await client.query(SQL.copyGrants, [id, apps.ids, apps.names]);
         await client.query(SQL.deleteOldUsage, [id]);
         // The Customers again, just before the stub (its cascade sets their user_id NULL): a checkout
         // that passed requireAuth before this deletion may have stored one after step 1, and its
@@ -507,6 +564,7 @@ export async function deleteAccountData({
         memory: memoryOn ? memory : null,
         pool,
         logger,
+        alerts,
     });
     if (!(await settlesWithin(rechecks, afterCommitWaitMs))) {
         logger.warn(`[Account] re-checks after deleting ${tag(id)} did not finish within ${afterCommitWaitMs} ms: answered without them (they log their own result)`);

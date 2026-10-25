@@ -128,6 +128,8 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:<stack.env の POSTGRES_PASSWORD>@risepath-vm:5432/risepath?sslmode=disable
+# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
+RETENTION_ENABLED=false
 # Hermes を有効にしたときだけ
 # HERMES_API_URL=http://risepath-vm:8642
 # HERMES_API_KEY=<stack.env の HERMES_API_KEY>
@@ -341,8 +343,8 @@ docker compose --env-file stack.env logs api | grep '\[Billing\]'
 
 | 変数 | 既定 | 中身 |
 |---|---|---|
-| `ACCOUNT_DELETION_ENABLED` | 未設定（削除できる） | `false` で、設定の「アカウントを削除する」を止めます。`true` か `false` を書きます（ほかの値は止める側になり、警告を出します）。`byoa` を Supabase のパスワードの 3 つの設定なしで動かすあいだは `false`（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6） |
-| `RETENTION_ENABLED` | 未設定（動く） | `false` で、保存期間の処理をすべて止めます |
+| `ACCOUNT_DELETION_ENABLED` | 未設定（削除できる） | `false` で、設定の「アカウントを削除する」を止めます。`true` か `false` を書きます（ほかの値は止める側になり、警告を出します）。Supabase の「Require current password when updating」を入れて確かめるまでは、`byoa` を使うかどうかにかかわらず `false`（[`doc/guides/account-deletion-operations.ja.md`](../../doc/guides/account-deletion-operations.ja.md) の 7 章）。`byoa` を動かすあいだは、さらにパスワードの 3 つの設定が要ります（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6） |
+| `RETENTION_ENABLED` | 未設定（`NODE_ENV=production` の `api` では動く。ほかでは `true` のときだけ動く） | `false` で、保存期間の処理をすべて止めます。止めるのは、この VM の `api` だけです。手元の API を VM の DB につなぐときは、手元の `.env.local` にも `RETENTION_ENABLED=false` を書きます（3 章） |
 | `RETENTION_AI_USAGE_DAYS` | 30 | AI の利用回数を残す日数（2〜400） |
 | `RETENTION_PROCESSING_DAYS` | 365 | 処理の記録と AI アプリからの呼び出しの記録を残す日数（30〜3650） |
 | `RETENTION_DELETION_PROOF_YEARS` | 5 | 削除したアカウントの同意の記録・保護者の同意の証拠・削除の記録を残す年数（1〜10） |

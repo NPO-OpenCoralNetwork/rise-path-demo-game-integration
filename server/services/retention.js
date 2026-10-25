@@ -21,7 +21,9 @@
  * consents, learning events and profiles, generated images and the TTS cache.
  *
  * Env (api only; none is a secret): RETENTION_ENABLED (false/0/off/no turn it all off; unset,
- * empty, true/1/on/yes leave it on; any other value turns it off with a warning: this job deletes),
+ * empty, true/1/on/yes leave it on; any other value turns it off with a warning: this job deletes;
+ * the api outside NODE_ENV=production treats unset or empty as off, so a developer's local api on
+ * the VM database never deletes with the laptop's settings: only an explicit true/1/on/yes runs it),
  * and per rule a whole number within its range (RETENTION_RULES). A value that is not one turns
  * THAT rule off and is reported at start and on every run: deleting with a fallback would be
  * irreversible, keeping is not.
@@ -111,7 +113,10 @@ export const RETENTION_STEPS = Object.freeze(/** @type {RetentionStep[]} */ ([
     {
         step: 'account_deletions',
         rule: 'deletion_proof',
-        sql: 'DELETE FROM account_deletions WHERE user_id IN (SELECT user_id FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) LIMIT $2)',
+        // The age test is repeated on the target row: a deletion that rewrites an expired tombstone
+        // (re-opened, deleted again) while this statement waits on its row lock commits a fresh
+        // deleted_at, and READ COMMITTED re-checks only the outer WHERE on that new row version.
+        sql: 'DELETE FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) AND user_id IN (SELECT user_id FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) LIMIT $2)',
     },
 ]).map((step) => Object.freeze(step)));
 
@@ -124,7 +129,7 @@ const SWITCH_ON = ['', 'true', '1', 'on', 'yes'];
 const SWITCH_OFF = ['false', '0', 'off', 'no'];
 
 /**
- * @typedef {{ enabled: boolean, values: Record<RetentionRule['name'], number | null>, problems: string[] }} RetentionConfig
+ * @typedef {{ enabled: boolean, values: Record<RetentionRule['name'], number | null>, problems: string[], notProduction?: true }} RetentionConfig
  * @typedef {Pick<Console, 'log' | 'warn'>} Logger
  * @typedef {{ query: (sql: string, params?: unknown[]) => Promise<any>, release: (error?: unknown) => void }} PoolClient
  * @typedef {{ connect: () => Promise<PoolClient> }} RetentionPool
@@ -139,14 +144,20 @@ const messageOf = (error) => String(/** @type {any} */ (error)?.message ?? error
 /**
  * Reads the retention settings. Never throws.
  * @param {Record<string, string | undefined>} [env]
+ * @param {{ nodeEnv?: string | undefined }} [options] when the key is given (server.js passes
+ *   process.env.NODE_ENV) and is not 'production', an unset or empty RETENTION_ENABLED means off
+ *   (optIn): only the VM api deletes unless a developer turns it on on purpose. Without the key
+ *   (the verify script, runRetention's default) unset means on.
  * @returns {RetentionConfig}
  */
-export function readRetentionConfig(env = process.env) {
+export function readRetentionConfig(env = process.env, options = {}) {
     /** @type {string[]} */
     const problems = [];
     const raw = String(env.RETENTION_ENABLED ?? '').trim().toLowerCase();
+    const optIn = 'nodeEnv' in options && options.nodeEnv !== 'production';
     let enabled = true;
-    if (SWITCH_OFF.includes(raw)) enabled = false;
+    if (raw === '' && optIn) enabled = false;
+    else if (SWITCH_OFF.includes(raw)) enabled = false;
     else if (!SWITCH_ON.includes(raw)) {
         enabled = false;
         problems.push("RETENTION_ENABLED has an unrecognised value: retention is off (use 'true' or 'false')");
@@ -168,7 +179,7 @@ export function readRetentionConfig(env = process.env) {
             problems.push(`${rule.env}=${shown(text)} is not a whole number from ${rule.min} to ${rule.max}: ${rule.kept} until it is fixed`);
         }
     }
-    return { enabled, values: /** @type {RetentionConfig['values']} */ (values), problems };
+    return { enabled, values: /** @type {RetentionConfig['values']} */ (values), problems, ...(raw === '' && optIn ? { notProduction: true } : {}) };
 }
 
 /**
@@ -177,6 +188,7 @@ export function readRetentionConfig(env = process.env) {
  */
 export function retentionStartupLine(config) {
     if (!config.enabled) {
+        if (config.notProduction) return '[Retention] off (not production; set RETENTION_ENABLED=true to run it here)';
         return config.problems.some((p) => p.startsWith('RETENTION_ENABLED'))
             ? '[Retention] off (RETENTION_ENABLED has an unrecognised value)'
             : '[Retention] off (RETENTION_ENABLED=false)';

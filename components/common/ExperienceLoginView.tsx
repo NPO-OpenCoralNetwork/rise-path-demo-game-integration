@@ -230,9 +230,12 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
+        // The box scrolls and the inner wrapper centres: the sign-up form with the legal block is
+        // taller than a 1366x768 laptop or a phone screen, and a centred fixed box cannot scroll.
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black">
+            <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 
+            <div className="relative flex min-h-full items-center justify-center py-8">
             <div className="relative w-full max-w-md p-1 px-6">
                 <div className="absolute inset-0 bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
 
@@ -499,6 +502,7 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                         Secure Neural Channel: Active
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );

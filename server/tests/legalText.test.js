@@ -28,9 +28,11 @@ import {
   LEGAL_DOCUMENTS,
   LEGAL_DOCUMENT_NAMES,
   LEGAL_HISTORY,
+  LEGAL_PINNED_HASHES,
   LEGAL_VERSION_PATTERN,
   acceptableLegalVersions,
   currentLegalVersions,
+  documentsToAcceptAgain,
   isDraftLegalVersion,
   legalVersionDocument,
 } from '../../shared/legal/versions.js';
@@ -105,6 +107,21 @@ describe('publicLegalText (scripts/legal/legalText.mjs)', () => {
     const out = gen(DRAFT);
     assert.doesNotMatch(out, /根拠|作成メモ|二行目もメモ/);
     assert.deepEqual(legalTextProblems(out), []);
+  });
+
+  it('a note directly followed by a heading, list item, quote or table row is an error with file:line (never dropped silently)', () => {
+    // Markdown (GitHub, the editor) shows such a line as its own block after the note paragraph.
+    for (const next of ['## 第 2 条（b）', '- item', '2. two', '> quote', '| a | b |']) {
+      assert.throws(
+        () => publicLegalText(`# T（下書き）\n\n## 第 1 条（a）\n\n（根拠: 民法）\n${next}\n`, OFF, { document: 'terms', source: 'doc/legal/x.draft.ja.md' }),
+        (e) => e instanceof LegalTextError && e.line === 6 && /^doc\/legal\/x\.draft\.ja\.md:6: /.test(e.message),
+        next,
+      );
+    }
+    // A fence line between the note and the heading is removed first: still an error.
+    assert.throws(() => gen('# T\n\n（作成メモ: x）\n<!-- legal:if billing -->\n## 第 2 条（b）\n<!-- legal:end -->\n', ON), LegalTextError);
+    // A plain second line still belongs to the note, and a blank line ends it.
+    assert.equal(gen('# T\n\n（根拠: a）\n二行目もメモ\n\n## 第 2 条（b）\n'), `${legalTextSentinel('terms', 'doc/legal/x.draft.ja.md')}\n\n## 第 2 条（b）\n`);
   });
 
   it('resolves fences both ways; the placeholder paragraph keeps the numbering; table rows stay one table', () => {
@@ -227,6 +244,28 @@ describe('the committed public texts (content/legal/*.ja.md)', () => {
     assert.equal(privacy.split('アカウント ID と、同意の種類・同意文の版・方法・日時だけを 5 年').length - 1, 2, '7.5 and §8: the guardian consent proof');
     const on = publicLegalText(read(LEGAL_DOCUMENTS.privacy.source), ON, { document: 'privacy', source: LEGAL_DOCUMENTS.privacy.source });
     assert.equal(on.split('アカウント ID と、使ったことのある AI アプリの ID と名前、使い始めた日・最後に使った日・解除した日だけを 3 年').length - 1, 2, '4.4-5 and §8 (byoa versions)');
+    // Safety events and report text stay after a deletion with user_id NULL (014 ON DELETE SET NULL).
+    assert.match(read('server/migrations/014_minor_safeguards.sql'), /user_id +uuid +NULL REFERENCES auth\.users\(id\) ON DELETE SET NULL/);
+    assert.match(privacy, /アカウントを削除しても、安全のための記録と報告の文章は、アカウントとのつながりを外して/u, 'privacy §8: safety events keep user_id NULL after a deletion');
+    assert.match(privacy, /当法人の DB に保存した情報は、アカウントを削除したときに消します（このあとに書いた、削除のあとも残すものを除きます）/u);
+    // One tombstone per id (account_deletions' primary key is user_id): a second deletion replaces the first.
+    assert.match(read('server/migrations/018_account_deletion_and_legal.sql'), /CREATE TABLE IF NOT EXISTS account_deletions \(\n {2}user_id +uuid +PRIMARY KEY,/);
+    assert.match(privacy, /同じアカウント ID でもう一度削除したときは、アカウントを削除した記録は、最後に削除したときの分だけを残します/u);
+  });
+
+  it('the data inventory (the base of the policy and the lawyer review) has no stale Phase 4 line and no line-numbered compose pointer', () => {
+    const inventory = read('doc/legal/ai-data-inventory.ja.md');
+    assert.doesNotMatch(inventory, /アカウントごと消す機能はまだありません/u);
+    assert.doesNotMatch(inventory, /docker-compose\.yml:\d/, 'name the compose service (`db`, `cloudflared`), not a line that moves');
+    assert.doesNotMatch(inventory, /コース生成などのジョブ/u);
+  });
+
+  it('the privacy policy names the processing records the code really writes (jobs: material indexing only)', () => {
+    // POST /rag/index is the only jobs insert (type 'ingest'); the worker runs 'ingest' only.
+    assert.match(read('server/jobWorker.js'), /'ingest'/);
+    const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
+    assert.doesNotMatch(privacy, /コース生成などの処理/u);
+    assert.match(privacy, /処理の記録（アップロードした教材を検索できるようにする処理の状態）は、\*\*1 年\*\*たったら消します/u);
   });
 
   it('terms 第 9 条 keeps its numbering without billing (1, the placeholder, then 12 with its sub-list)', () => {
@@ -240,7 +279,7 @@ describe('the committed public texts (content/legal/*.ja.md)', () => {
     assert.match(terms, /設定の「アカウントを削除する」から、Rise Path のデータをいつでも削除できます。削除はすぐに行い、元に戻せません。/);
     assert.doesNotMatch(terms, /アプリ内にアカウント削除の機能がない/);
     const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
-    assert.match(privacy, /当法人の DB に保存した情報は、アカウントを削除したときに消します。/);
+    assert.match(privacy, /当法人の DB に保存した情報は、アカウントを削除したときに消します（このあとに書いた、削除のあとも残すものを除きます）。/);
     assert.match(privacy, /\*\*30 日\*\*たったら消します/);
   });
 });
@@ -267,6 +306,18 @@ describe('shared/legal/versions.js', () => {
     for (const bad of ['terms-2026-1-01', 'other-2026-10-22', 'terms-draft-2026-10-22.123', 'terms-2026-10-22-x', null, 3]) {
       assert.equal(legalVersionDocument(bad), null, String(bad));
     }
+  });
+
+  it('every version id is pinned to its text in LEGAL_PINNED_HASHES (a version id names one text forever)', () => {
+    for (const entry of [...LEGAL_DOCUMENT_NAMES.map((name) => LEGAL_DOCUMENTS[name]), ...LEGAL_HISTORY]) {
+      assert.equal(LEGAL_PINNED_HASHES[entry.version], entry.sha256,
+        `${entry.version} is pinned to another text (or not listed): give the new text a new version and add it to LEGAL_PINNED_HASHES`);
+    }
+    for (const [version, hash] of Object.entries(LEGAL_PINNED_HASHES)) {
+      assert.match(version, LEGAL_VERSION_PATTERN, version);
+      assert.match(hash, /^[0-9a-f]{64}$/, version);
+    }
+    assert.ok(Object.isFrozen(LEGAL_PINNED_HASHES));
   });
 
   it('requiresAcceptance is a boolean everywhere and at least one terms version requires it', () => {
@@ -306,6 +357,25 @@ describe('shared/legal/versions.js', () => {
     // Today: the current terms draft requires acceptance, privacy does not.
     assert.deepEqual(acceptableLegalVersions('terms'), [LEGAL_DOCUMENTS.terms.version]);
     assert.equal(acceptableLegalVersions('privacy'), null);
+  });
+
+  it('documentsToAcceptAgain: which documents the re-consent page names (a privacy version may need acceptance too)', () => {
+    const doc = (version, requiresAcceptance) => ({ version, requiresAcceptance, sha256: 'x', effectiveDate: null, include: OFF, source: '', generated: '' });
+    const history = [
+      { document: 'terms', version: 'terms-2026-12-01', requiresAcceptance: true },
+      { document: 'privacy', version: 'privacy-2026-12-01', requiresAcceptance: false },
+    ];
+    const last = { termsVersion: 'terms-2026-12-01', privacyVersion: 'privacy-2026-12-01', acceptedAt: null };
+    const privacyBump = { terms: doc('terms-2026-12-01', true), privacy: doc('privacy-2027-04-01', true) };
+    assert.deepEqual(documentsToAcceptAgain(last, { documents: privacyBump, history: history.filter((h) => h.document === 'privacy') }), ['privacy']);
+    const termsBump = { terms: doc('terms-2027-04-01', true), privacy: doc('privacy-2026-12-01', false) };
+    assert.deepEqual(documentsToAcceptAgain(last, { documents: termsBump, history: history.filter((h) => h.document === 'terms') }), ['terms']);
+    const both = { terms: doc('terms-2027-04-01', true), privacy: doc('privacy-2027-04-01', true) };
+    assert.deepEqual(documentsToAcceptAgain(last, { documents: both, history }), ['terms', 'privacy']);
+    const editorial = { terms: doc('terms-2027-04-01', false), privacy: doc('privacy-2027-04-01', false) };
+    assert.deepEqual(documentsToAcceptAgain(last, { documents: editorial, history }), []);
+    assert.deepEqual(documentsToAcceptAgain(null, { documents: both, history }), [], 'no last acceptance: a first agreement');
+    assert.deepEqual(documentsToAcceptAgain({ termsVersion: 'terms-draft-2026-10-01', privacyVersion: 'privacy-draft-2026-10-01', acceptedAt: null }), ['terms'], 'today: only terms can need it');
   });
 
   it('holds no legal text and none of the CI bundle markers', () => {
@@ -359,19 +429,24 @@ describe('scripts/legal/build-legal-text.mjs', () => {
     const lines = { out: [], err: [] };
     return { lines, out: (l) => lines.out.push(l), err: (l) => lines.err.push(l) };
   };
+  /** The build with LEGAL_PINNED_HASHES of the given documents (their version ids pinned to their hashes). */
+  const runPinned = (argv, deps) => runBuild(argv, {
+    pinnedHashes: Object.fromEntries(Object.values(deps.documents ?? LEGAL_DOCUMENTS).map((entry) => [entry.version, entry.sha256])),
+    ...deps,
+  });
 
   it('--check fails while the files are missing, writing fixes it, --check then passes', () => {
     const { root, documents } = make();
     try {
       let io = capture();
-      assert.equal(runBuild(['--check'], { root, documents: documents(), ...io }), 1);
+      assert.equal(runPinned(['--check'], { root, documents: documents(), ...io }), 1);
       assert.match(io.lines.err.join('\n'), /content\/legal\/terms\.ja\.md is out of date/);
       assert.equal(fs.existsSync(path.join(root, 'content/legal/terms.ja.md')), false, '--check writes nothing');
       io = capture();
-      assert.equal(runBuild([], { root, documents: documents(), ...io }), 0);
+      assert.equal(runPinned([], { root, documents: documents(), ...io }), 0);
       assert.match(io.lines.out.join('\n'), /terms: wrote content\/legal\/terms\.ja\.md \(sha256 [0-9a-f]{64}\)/);
       io = capture();
-      assert.equal(runBuild(['--check'], { root, documents: documents(), ...io }), 0);
+      assert.equal(runPinned(['--check'], { root, documents: documents(), ...io }), 0);
       assert.match(io.lines.out.join('\n'), /is up to date/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -381,20 +456,33 @@ describe('scripts/legal/build-legal-text.mjs', () => {
   it('a changed draft: write says which version and hash to pin, --check fails with the bump message', () => {
     const { root, documents } = make();
     try {
-      runBuild([], { root, documents: documents(), ...capture() });
+      runPinned([], { root, documents: documents(), ...capture() });
       const source = path.join(root, LEGAL_DOCUMENTS.terms.source);
       fs.writeFileSync(source, fs.readFileSync(source, 'utf8').replace('一つめ。', '一つめ（直しました）。'));
       let io = capture();
-      assert.equal(runBuild(['--check'], { root, documents: documents({ terms: { sha256: sha256('old') } }), ...io }), 1);
+      assert.equal(runPinned(['--check'], { root, documents: documents({ terms: { sha256: sha256('old') } }), ...io }), 1);
       const message = io.lines.err.join('\n');
       const next = escapeRegExp(nextLegalVersion(LEGAL_DOCUMENTS.terms.version));
-      assert.match(message, new RegExp(`The public text of terms changed\\. Give it a new version in shared/legal/versions\\.js \\(a draft: ${next}; a released text: the new effective date\\), set sha256 to [0-9a-f]{64}, and decide requiresAcceptance\\.`));
+      assert.match(message, new RegExp(`The public text of terms changed\\. Give it a new version in shared/legal/versions\\.js \\(a draft: ${next}; a released text: the new effective date\\), set sha256 to [0-9a-f]{64}, add the new version and sha256 to LEGAL_PINNED_HASHES, and decide requiresAcceptance\\.`));
       io = capture();
-      assert.equal(runBuild([], { root, documents: documents({ terms: { sha256: sha256('old') } }), ...io }), 0);
+      assert.equal(runPinned([], { root, documents: documents({ terms: { sha256: sha256('old') } }), ...io }), 0);
       assert.match(io.lines.out.join('\n'), new RegExp(`terms: wrote [\\s\\S]*a draft: ${next}`));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('a reused version id with a new text: --check fails, naming LEGAL_PINNED_HASHES (on a database that holds the id, every acceptance would be 500 legal_version_conflict)', () => {
+    // The owner edits the draft, rebuilds and copies only the printed sha256, keeping the old id.
+    const reused = { ...LEGAL_DOCUMENTS, privacy: { ...LEGAL_DOCUMENTS.privacy, version: 'privacy-draft-2026-10-22.2' } };
+    const io = capture();
+    assert.equal(runBuild(['--check'], { documents: reused, ...io }), 1);
+    assert.match(io.lines.err.join('\n'), /privacy: privacy-draft-2026-10-22\.2 names another text in LEGAL_PINNED_HASHES .*Give this text a new version \(a draft: privacy-draft-2026-10-22\.3\)/);
+    const unlisted = { ...LEGAL_DOCUMENTS, privacy: { ...LEGAL_DOCUMENTS.privacy, version: 'privacy-draft-2026-10-22.9' } };
+    const io2 = capture();
+    assert.equal(runBuild(['--check'], { documents: unlisted, ...io2 }), 1);
+    assert.match(io2.lines.err.join('\n'), /privacy-draft-2026-10-22\.9 is not in LEGAL_PINNED_HASHES/);
+    assert.equal(runBuild(['--check'], { ...capture() }), 0, 'the committed state passes');
   });
 
   it('a fence error stops the build with file:line', () => {
@@ -403,9 +491,9 @@ describe('scripts/legal/build-legal-text.mjs', () => {
       const source = path.join(root, LEGAL_DOCUMENTS.privacy.source);
       fs.writeFileSync(source, fs.readFileSync(source, 'utf8').replace('<!-- legal:if byoa -->', '<!-- legal:if sales -->'));
       const io = capture();
-      assert.equal(runBuild([], { root, documents: documents(), ...io }), 1);
+      assert.equal(runPinned([], { root, documents: documents(), ...io }), 1);
       assert.match(io.lines.err.join('\n'), /doc\/legal\/privacy-policy\.draft\.ja\.md:\d+: unknown fence condition "sales"/);
-      assert.equal(runBuild(['--bogus'], { root, documents: documents(), ...capture() }), 1);
+      assert.equal(runPinned(['--bogus'], { root, documents: documents(), ...capture() }), 1);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -415,18 +503,18 @@ describe('scripts/legal/build-legal-text.mjs', () => {
     const { root, text, documents } = make();
     try {
       const released = documents({ terms: { version: 'terms-2026-12-01', effectiveDate: '2026-12-01' } });
-      runBuild([], { root, documents: released, ...capture() });
+      runPinned([], { root, documents: released, ...capture() });
       let io = capture();
-      assert.equal(runBuild(['--archive'], { root, documents: released, ...io }), 0);
+      assert.equal(runPinned(['--archive'], { root, documents: released, ...io }), 0);
       assert.match(io.lines.out.join('\n'), new RegExp(`privacy: ${escapeRegExp(LEGAL_DOCUMENTS.privacy.version)} is not released; drafts are not archived\\.`));
       const archived = path.join(root, 'content/legal/archive/terms-2026-12-01.ja.md');
       assert.equal(fs.readFileSync(archived, 'utf8'), text('terms'));
       io = capture();
-      assert.equal(runBuild(['--archive'], { root, documents: released, ...io }), 0);
+      assert.equal(runPinned(['--archive'], { root, documents: released, ...io }), 0);
       assert.match(io.lines.out.join('\n'), /already archived/);
       fs.writeFileSync(archived, 'another text\n');
       io = capture();
-      assert.equal(runBuild(['--archive'], { root, documents: released, ...io }), 1);
+      assert.equal(runPinned(['--archive'], { root, documents: released, ...io }), 1);
       assert.match(io.lines.err.join('\n'), /exists with another text; an archived text is never overwritten/);
       assert.equal(fs.readFileSync(archived, 'utf8'), 'another text\n');
     } finally {

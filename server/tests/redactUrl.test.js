@@ -20,6 +20,16 @@ describe('redactUrl', () => {
         assert.equal(redactUrl('/api/v2/health'), '/api/v2/health');
     });
 
+    it('keeps only the edge smoke id of a query (scripts/smoke-public-edge.mjs check 8: 12 hex characters, no personal data)', () => {
+        assert.equal(redactUrl('/api/v2/llm/status?smoke=0123456789ab'), '/api/v2/llm/status?smoke=0123456789ab');
+        assert.equal(redactUrl('/api/v2/llm/status?q=diary&smoke=0123456789ab'), '/api/v2/llm/status?smoke=0123456789ab', 'other parameters are still dropped');
+        assert.equal(redactUrl('/api/v2/llm/status?smoke=0123456789ab&q=diary#x'), '/api/v2/llm/status?smoke=0123456789ab');
+        for (const value of ['me@example.org', '0123456789abcdef', '0123456789AB', '0123456789a', 'zzzzzzzzzzzz']) {
+            assert.equal(redactUrl(`/x?smoke=${value}`), '/x', value);
+        }
+        assert.equal(redactUrl('/x?notsmoke=0123456789ab'), '/x');
+    });
+
     it('keeps 8 characters of a UUID, in any case', () => {
         assert.equal(redactUrl(`/api/v2/admin/safety/learners/${ID}/age`), '/api/v2/admin/safety/learners/aaaaaaaa…/age');
         assert.equal(redactUrl(`/api/v2/curricula/${ID.toUpperCase()}/publish`), '/api/v2/curricula/AAAAAAAA…/publish');

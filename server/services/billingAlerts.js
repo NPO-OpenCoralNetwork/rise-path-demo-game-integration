@@ -9,13 +9,18 @@
  * card details or URLs.
  *
  * Kinds: billing_unserviceable, unknown_customer, user_mismatch, unknown_price,
- * duplicate_subscription, minor_with_subscription, charge_refunded, charge_dispute.
+ * duplicate_subscription, minor_with_subscription, charge_refunded, charge_dispute,
+ * deleted_account_renewing (a subscription of a deleted Rise Path account still renews: cancel it
+ * in the Stripe Dashboard; from server/services/billingSync.js and the deletion's re-check after
+ * COMMIT, server/services/accountDeletion.js; the key is the subscription id or the 8-character
+ * account tag).
  */
 import { jstDay, parseAlertWebhook, postAlert } from '../middleware/dailyCaps.js';
 
 export const BILLING_ALERT_KINDS = Object.freeze([
   'billing_unserviceable', 'unknown_customer', 'user_mismatch', 'unknown_price',
   'duplicate_subscription', 'minor_with_subscription', 'charge_refunded', 'charge_dispute',
+  'deleted_account_renewing',
 ]);
 
 /** Keys kept per day before the set is cleared (a flood must not grow memory). */

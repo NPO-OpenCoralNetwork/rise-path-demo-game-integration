@@ -115,11 +115,14 @@ describe('scripts/delete-account-data.mjs: usage and --user', () => {
         assert.deepEqual(JSON.parse(lines.at(-1)), { userId: A, status: 'deleted', deletedAt: '2026-10-24T05:00:00.000Z' });
     });
 
-    it('exit codes: already 0, refused 2, failed 3', async () => {
+    it('exit codes: already 0, a refusal 2 (a renewing plan), Stripe or Memanto down 3 (as the API\'s 503), failed 3', async () => {
         for (const [result, code] of [
             [{ status: 'already', deletedAt: null }, EXIT.ok],
             [{ status: 'refused', reason: 'subscription_active', memoryDeleted: false }, EXIT.refused],
-            [{ status: 'refused', reason: 'payment_provider_unavailable', memoryDeleted: false }, EXIT.refused],
+            [{ status: 'refused', reason: 'subscription_active', memoryDeleted: true }, EXIT.refused],
+            [{ status: 'refused', reason: 'invalid_user', memoryDeleted: false }, EXIT.refused],
+            [{ status: 'refused', reason: 'payment_provider_unavailable', memoryDeleted: false }, EXIT.unavailable],
+            [{ status: 'refused', reason: 'memory_service_unavailable', memoryDeleted: false }, EXIT.unavailable],
             [{ status: 'failed', reason: 'account_busy', memoryDeleted: true }, EXIT.unavailable],
         ]) {
             const { deps } = makeDeps({ result });
@@ -264,7 +267,7 @@ describe('scripts/delete-account-data.mjs: --orphans', () => {
         }
     });
 
-    it('refuses (exit 2) when more than 10 % of the checked stubs, and more than 5, are unknown (a wrong SUPABASE_URL)', async () => {
+    it('refuses (exit 2) when more than 10 % of the checked stubs, and more than 5, are unknown (a wrong SUPABASE_URL), and lists them', async () => {
         const unknown = (n) => new Set(ids.slice(n));
         // 6 of 40 unknown (15 %): refused; 4 of 40 (10 %, but not more than 5): listed.
         for (const [known, want] of [[unknown(6), EXIT.refused], [unknown(4), EXIT.ok]]) {
@@ -274,10 +277,46 @@ describe('scripts/delete-account-data.mjs: --orphans', () => {
                 assert.equal(code, want === EXIT.ok && argv.includes('--yes') ? EXIT.ok : want, `${known.size} known, ${argv.join(' ')}`);
                 if (want === EXIT.refused) {
                     assert.equal(calls.length, 0);
-                    assert.match(lines.join('\n'), /most stubs are unknown to this Supabase project; check SUPABASE_URL/);
+                    assert.ok(lines.includes('Refused: 6 of 40 checked stubs (more than 10 %) are unknown to this Supabase project. Check SUPABASE_URL. If Nexloom or P-School deleted that many logins, confirm the count with them and run again with --expect-orphans 6. Nothing was deleted.'), argv.join(' '));
+                    // The ids staff compare with the other operator's report (8 characters).
+                    assert.deepEqual(lines.filter((l) => l.startsWith('  orphan ')), ids.slice(0, 6).map((id) => `  orphan ${id.slice(0, 8)}…`), argv.join(' '));
                 }
             }
         }
+    });
+
+    it('a real batch of shared-login deletions over 10 %: --expect-orphans with the confirmed count deletes exactly those; another count, or no known stub, refuses', async () => {
+        const known = new Set(ids.slice(6)); // 6 of 40 unknown (15 %)
+        const ok = makeDeps({ admin: adminWith(known), pool: stubPool(ids) });
+        assert.equal(await run(['--orphans', '--expect-orphans', '6', '--yes'], ok.deps), EXIT.ok);
+        assert.deepEqual(ok.calls.map((c) => [c.userId, c.requestedBy, c.authTime]), ids.slice(0, 6).map((id) => [id, 'orphan', null]));
+        const listed = makeDeps({ admin: adminWith(known), pool: stubPool(ids) });
+        assert.equal(await run(['--orphans', '--expect-orphans', '6'], listed.deps), EXIT.ok);
+        assert.equal(listed.lines.filter((l) => l.startsWith('  orphan ')).length, 6);
+        assert.equal(listed.calls.length, 0, 'without --yes nothing is deleted');
+        for (const wrong of ['5', '7']) {
+            const t = makeDeps({ admin: adminWith(known), pool: stubPool(ids) });
+            assert.equal(await run(['--orphans', '--expect-orphans', wrong, '--yes'], t.deps), EXIT.refused, wrong);
+            assert.equal(t.calls.length, 0, wrong);
+            assert.ok(t.lines.includes(`Refused: --expect-orphans ${wrong}, but 6 of 40 checked stubs are unknown to this Supabase project. Confirm the count again (and SUPABASE_URL). Nothing was deleted.`), wrong);
+        }
+        // A wrong project: every checked stub unknown. --expect-orphans never bypasses this.
+        const none = makeDeps({ admin: adminWith(new Set()), pool: stubPool(ids) });
+        assert.equal(await run(['--orphans', '--limit', '10', '--expect-orphans', '10', '--yes'], none.deps), EXIT.refused);
+        assert.equal(none.calls.length, 0);
+        assert.ok(none.lines.includes('Refused: none of the 10 checked stubs is known to this Supabase project; check SUPABASE_URL, or check more stubs (a higher --limit or an earlier --after). Nothing was deleted.'));
+    });
+
+    it('--orphans --yes: a Stripe or Memanto outage on one orphan makes the run exit 3 (try again), over a refusal on another', async () => {
+        const known = new Set(ids.slice(2));
+        const { deps } = makeDeps({
+            admin: adminWith(known),
+            pool: stubPool(ids),
+            result: (input) => (input.userId === ids[0]
+                ? { status: 'refused', reason: 'subscription_active', memoryDeleted: false }
+                : { status: 'refused', reason: 'payment_provider_unavailable', memoryDeleted: false }),
+        });
+        assert.equal(await run(['--orphans', '--yes'], deps), EXIT.unavailable);
     });
 
     it('a small --limit cannot hide a wrong project: when no checked stub is known it refuses (exit 2), with or without --yes', async () => {
@@ -354,5 +393,14 @@ describe('scripts/delete-account-data.mjs: --orphans', () => {
         }
         assert.match(parseArgs(['--orphans', '--after']).error, /needs a value/);
         assert.match(parseArgs(['--user', A, '--yes', '--after', 'abcd01a4']).error, /--after only goes with --orphans/);
+    });
+
+    it('parseArgs: --expect-orphans takes a whole number from 1 to 100000, only with --orphans', () => {
+        assert.equal(parseArgs(['--orphans', '--expect-orphans', '40']).expectOrphans, 40);
+        for (const bad of ['0', 'x', '-3', '1.5', '100001']) {
+            assert.match(parseArgs(['--orphans', '--expect-orphans', bad]).error, /--expect-orphans must be a whole number from 1 to 100000/, bad);
+        }
+        assert.match(parseArgs(['--orphans', '--expect-orphans']).error, /needs a value/);
+        assert.match(parseArgs(['--user', A, '--yes', '--expect-orphans', '3']).error, /--expect-orphans only goes with --orphans/);
     });
 });

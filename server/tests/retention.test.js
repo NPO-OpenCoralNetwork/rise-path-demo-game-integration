@@ -92,6 +92,21 @@ const run = (fake, { env = {}, logger = quietLogger().logger, uploadRoot = empty
     runRetention({ pool: fake.pool, config: readRetentionConfig(env), logger, uploadRoot, now });
 
 describe('retention settings (readRetentionConfig)', () => {
+    it('R: outside NODE_ENV=production (server.js passes it) unset or empty means off: a laptop api on the VM database never deletes with its own settings', () => {
+        for (const nodeEnv of ['development', '', 'test', undefined]) {
+            const off = readRetentionConfig({}, { nodeEnv });
+            assert.equal(off.enabled, false, String(nodeEnv));
+            assert.equal(readRetentionConfig({ RETENTION_ENABLED: '  ' }, { nodeEnv }).enabled, false, `${nodeEnv}: empty`);
+            assert.equal(retentionStartupLine(off), '[Retention] off (not production; set RETENTION_ENABLED=true to run it here)');
+            for (const on of ['true', '1', 'On', 'yes']) assert.equal(readRetentionConfig({ RETENTION_ENABLED: on }, { nodeEnv }).enabled, true, `${nodeEnv}: ${on}`);
+            assert.equal(readRetentionConfig({ RETENTION_ENABLED: 'false' }, { nodeEnv }).enabled, false);
+        }
+        // The VM api (docker-compose.yml NODE_ENV: ${NODE_ENV:-production}): on by default, the default periods.
+        assert.deepEqual(readRetentionConfig({}, { nodeEnv: 'production' }), { enabled: true, values: DEFAULTS, problems: [] });
+        // Without the option (scripts/db/verify-account-deletion.mjs, runRetention's default): unchanged.
+        assert.equal(readRetentionConfig({}).enabled, true);
+    });
+
     it('four rules with the D4/D5 defaults; on with nothing set', () => {
         assert.deepEqual(RETENTION_RULES.map((r) => [r.name, r.env, r.unit, r.def, r.min, r.max]), [
             ['ai_daily_usage', 'RETENTION_AI_USAGE_DAYS', 'days', 30, 2, 400],
@@ -206,10 +221,16 @@ describe('retention statements (exact SQL, design §6.2)', () => {
         assert.equal(sqlOf('legal_acceptances'), 'DELETE FROM legal_acceptances WHERE id IN (SELECT id FROM legal_acceptances WHERE account_deleted_at < now() - make_interval(years => $1) LIMIT $2)');
         assert.equal(sqlOf('account_consent_proofs'), 'DELETE FROM account_consent_proofs WHERE consent_id IN (SELECT consent_id FROM account_consent_proofs WHERE account_deleted_at < now() - make_interval(years => $1) LIMIT $2)');
         assert.equal(sqlOf('ai_app_provision_records'), 'DELETE FROM ai_app_provision_records r USING (SELECT user_id, client_id, account_deleted_at FROM ai_app_provision_records WHERE account_deleted_at < now() - make_interval(years => $1) LIMIT $2) d WHERE r.user_id = d.user_id AND r.client_id = d.client_id AND r.account_deleted_at = d.account_deleted_at');
-        assert.equal(sqlOf('account_deletions'), 'DELETE FROM account_deletions WHERE user_id IN (SELECT user_id FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) LIMIT $2)');
+        assert.equal(sqlOf('account_deletions'), 'DELETE FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) AND user_id IN (SELECT user_id FROM account_deletions WHERE deleted_at < now() - make_interval(years => $1) LIMIT $2)');
         assert.equal(UPLOAD_REFERENCES_SQL, 'SELECT storage_path FROM materials WHERE storage_path = ANY($1)');
         assert.equal(RETENTION_LOCK_SQL, "SELECT pg_try_advisory_lock(hashtextextended('risepath:retention', 0)) AS locked");
         assert.equal(RETENTION_UNLOCK_SQL, "SELECT pg_advisory_unlock(hashtextextended('risepath:retention', 0))");
+    });
+
+    it('R: a tombstone rewritten by a deletion while the statement waits on its row lock is kept (the target row carries the age test)', () => {
+        // READ COMMITTED re-checks only the outer WHERE on the updated row (EvalPlanQual); the
+        // subquery's earlier result is reused. scripts/db/verify-account-deletion.mjs R10 runs the race.
+        assert.match(sqlOf('account_deletions'), /^DELETE FROM account_deletions WHERE deleted_at < now\(\) - make_interval\(years => \$1\) AND user_id IN \(/);
     });
 
     it('R: the module deletes only from its eight tables: never auth.users, profiles, learning events, progress, live consents or billing', () => {
@@ -434,7 +455,7 @@ describe('server.js: the retention timer', () => {
     const createApp = SERVER.slice(SERVER.indexOf('export async function createApp'), SERVER.indexOf('async function main()'));
 
     it('R: main() reads the settings once, logs the problems and the start-up line, runs at start and hourly (unref)', () => {
-        assert.match(main, /const retention = readRetentionConfig\(process\.env\);\n\s*for \(const problem of retention\.problems\) console\.warn\(`\[Retention\] \$\{problem\}`\);\n\s*console\.log\(retentionStartupLine\(retention\)\);\n\s*if \(retention\.enabled\) \{\n\s*void runRetention\(\{ config: retention \}\);\n\s*setInterval\(\(\) => void runRetention\(\{ config: retention \}\), RETENTION_INTERVAL_MS\)\.unref\(\);\n\s*\}/);
+        assert.match(main, /const retention = readRetentionConfig\(process\.env, \{ nodeEnv: process\.env\.NODE_ENV \}\);\n\s*for \(const problem of retention\.problems\) console\.warn\(`\[Retention\] \$\{problem\}`\);\n\s*console\.log\(retentionStartupLine\(retention\)\);\n\s*if \(retention\.enabled\) \{\n\s*void runRetention\(\{ config: retention \}\);\n\s*setInterval\(\(\) => void runRetention\(\{ config: retention \}\), RETENTION_INTERVAL_MS\)\.unref\(\);\n\s*\}/);
         assert.equal(RETENTION_INTERVAL_MS, 60 * 60 * 1000);
     });
 
