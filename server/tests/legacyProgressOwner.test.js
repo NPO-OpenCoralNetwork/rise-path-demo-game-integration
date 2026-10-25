@@ -119,6 +119,7 @@ async function page({ session = { user: { id: U1 }, access_token: 'tok-session' 
     storage,
     auth,
     calls,
+    routes,
     stagePuts: () => calls.filter((c) => c.method === 'PUT' && c.url.startsWith('/user/progress/')),
     eventPosts: () => calls.filter((c) => c.method === 'POST' && c.url === '/user/events'),
     gets: () => calls.filter((c) => c.url === '/user/lesson-progress' && c.method === 'GET'),
@@ -551,6 +552,10 @@ describe('legacy Blender progress and learning events belong to a learner (G25)'
     t.storage.setItem(LEGACY_KEY, JSON.stringify({
       blender: { courseId: 'blender', progress: 0, completedStages: ['1', '2'], completedSteps: {}, lastAccessedAt: '2026-10-20T09:00:00.000Z', ownerId: U1 },
     }));
+    let stale = 0;
+    window.addEventListener('rp:achievements-stale', () => {
+      stale += 1;
+    });
     await signedIn(t, U1, 'tok-1');
     await t.client.hydrateFromApi({ pushLocal: true, learnerId: U1 });
     await until(() => t.stagePuts().length === 1);
@@ -558,6 +563,40 @@ describe('legacy Blender progress and learning events belong to a learner (G25)'
     assert.deepEqual(Object.keys(t.legacy()).sort(), ['blender', 'other']);
     assert.equal(t.legacy().other.ownerId, U1);
     assert.equal(t.legacy().blender.ownerId, U1);
+    // The pushed stages may earn XP on the server: the badges and XP are read again.
+    await until(() => stale >= 1);
+    await wait(30);
+    assert.equal(stale, t.stagePuts().length, 'once per push the server took');
+  });
+
+  it('the hydrate puts the learner\'s unmerged stage on top of their server entry: once the server took it, the badges are told', async () => {
+    const t = (current = await page({
+      routes: {
+        'GET /user/progress': () => json(200, { ok: true, progress: { blender: { completedStages: ['1'], completedSteps: {} } } }),
+        'PUT /user/progress/blender': () => json(500, { ok: false }),
+      },
+    }));
+    t.storage.setItem(LEGACY_KEY, JSON.stringify({
+      blender: { courseId: 'blender', progress: 0, completedStages: ['1', '2'], completedSteps: {}, lastAccessedAt: '2026-10-20T09:00:00.000Z', ownerId: U1, unmerged: true },
+    }));
+    let stale = 0;
+    window.addEventListener('rp:achievements-stale', () => {
+      stale += 1;
+    });
+    await signedIn(t, U1, 'tok-1');
+    // A hydrate whose push fails: nothing was taken, nothing to tell.
+    await t.client.hydrateFromApi({ pushLocal: true, learnerId: U1 });
+    await until(() => t.stagePuts().length === 1);
+    await wait(30);
+    assert.equal(stale, 0);
+    assert.equal(t.legacy().blender.unmerged, true);
+    t.routes['PUT /user/progress/blender'] = () => json(200, { ok: true });
+    const before = t.stagePuts().length;
+    await t.client.hydrateFromApi({ pushLocal: true, learnerId: U1 });
+    await until(() => t.stagePuts().length === before + 1 && stale === 1);
+    assert.deepEqual(t.stagePuts().at(-1).body.completedStages, ['1', '2']);
+    await wait(30);
+    assert.equal(stale, 1);
   });
 
   it('"Add" adopts unowned legacy progress: stamped with the learner and pushed with their session', async () => {

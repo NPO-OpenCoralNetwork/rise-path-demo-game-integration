@@ -53,7 +53,7 @@ const copy = {
     reset: 'Start this lesson over',
     resetTitle: 'Start this lesson over?',
     resetBody: 'This deletes what you read in this lesson, your quiz answers, checks, self-ratings and where to continue. It is deleted on every device where you are signed in, and cannot be undone.',
-    resetKept: 'Your XP, badges, learning days and history stay. This lesson does not give XP again. What AI apps already received is not deleted.',
+    resetKept: 'Your XP, badges, learning days and history stay. XP you already earned for this lesson is not given again. What AI apps already received is not deleted.',
     resetConfirm: 'Start over',
     resetBusy: 'Deleting…',
     resetCancel: 'Cancel',
@@ -94,7 +94,7 @@ const copy = {
     reset: 'このレッスンを最初からやり直す',
     resetTitle: 'このレッスンを最初からやり直しますか？',
     resetBody: 'このレッスンで読んだところ、確認問題の答え、チェック、自己評価、続きの位置を消します。ログインしているすべての端末から消え、元に戻すことはできません。',
-    resetKept: 'もらった XP とバッジ、学んだ日、学習の履歴は残ります。このレッスンで、もう一度 XP をもらうことはありません。AI アプリにすでに渡した内容は消えません。',
+    resetKept: 'もらった XP とバッジ、学んだ日、学習の履歴は残ります。すでにもらった XP は、このレッスンでもう一度もらうことはありません。AI アプリにすでに渡した内容は消えません。',
     resetConfirm: 'やり直す',
     resetBusy: '消しています…',
     resetCancel: 'やめる',
@@ -120,13 +120,13 @@ type ResetFailure = Extract<LessonResetResult, { ok: false }>['reason'];
 
 /**
  * Why the reset control is disabled, for its helper line (from the save view). offline: no
- * connection (also a stop for the network or the server); auth: the sign-in has to be renewed;
- * loading: the first load runs; later: anything else (another tab's logout or learner, device
- * storage, the adoption question). Pure (tests).
+ * connection (the browser is offline, also with nothing pending, or a stop for the network or
+ * the server); auth: the sign-in has to be renewed; loading: the first load runs; later: anything
+ * else (another tab's logout or learner, device storage, the adoption question). Pure (tests).
  */
 export type ResetHelp = 'offline' | 'auth' | 'loading' | 'later';
-export function resetHelpOf(view: Pick<SaveView, 'state' | 'reason'>): ResetHelp {
-  if (view.state === 'offline') return 'offline';
+export function resetHelpOf(view: Pick<SaveView, 'state' | 'reason' | 'online'>): ResetHelp {
+  if (view.state === 'offline' || view.online === false) return 'offline';
   if (view.state === 'loading') return 'loading';
   if (view.state === 'stopped') {
     if (view.reason === 'network' || view.reason === 'server') return 'offline';
@@ -142,17 +142,19 @@ export function savedWhereOf(view: Pick<SaveView, 'state'>, syncs: boolean): Sav
 }
 
 /**
- * The reset control (design §2.6): hidden, disabled (sync not on) or enabled. Pure (tests).
+ * The reset control (design §2.6): hidden, disabled (sync not on, or the browser offline: the
+ * status stays 'on' when only uploads fail) or enabled. Pure (tests).
  * A background refresh (status hydrating, the save view not 'loading') counts as on.
  */
 export function resetControlOf({ resettable, sync, view, offered, active }: {
   resettable: boolean;
   sync: SyncState;
-  view: Pick<SaveView, 'state'>;
+  view: Pick<SaveView, 'state' | 'online'>;
   offered: boolean;
   active: boolean;
 }): 'hidden' | 'disabled' | 'enabled' {
   if (!resettable || sync.userId === null || !offered || !active) return 'hidden';
+  if (view.state === 'offline' || view.online === false) return 'disabled';
   const ready = sync.status === 'on' || (sync.status === 'hydrating' && view.state !== 'loading' && view.state !== 'local');
   return ready ? 'enabled' : 'disabled';
 }

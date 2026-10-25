@@ -149,6 +149,8 @@ describe('the open reader: readerStartGen and readerGenChange', () => {
 
   const persisted = record({ seen: ['mine'] });
   const kept = raw(record({ seen: ['mine', 'server'] }), { epoch: X1, resetAt: iso(0) });
+  // A lesson never started over: the core keeps legacy content only there (keepsLocal).
+  const keptNeverReset = raw(record({ seen: ['mine', 'server'] }), { epoch: null, resetAt: null });
   const tombstone = raw(record({ updatedAt: new Date(0).toISOString() }), { epoch: X2, resetAt: iso(5) });
   const cases = [
     ['known, same stamp stored', known(X1), kept, 'none'],
@@ -157,7 +159,9 @@ describe('the open reader: readerStartGen and readerGenChange', () => {
     ['born and nothing written yet: take the stamp', { kind: 'born', bornAt: null }, tombstone, 'adopt'],
     ['born: the sync kept and stamped it (covers what was written)', born(iso(1)), kept, 'adopt'],
     ['born: the sync dropped it for the reset', born(iso(1)), tombstone, 'restart'],
-    ['legacy: kept and stamped', UNKNOWN, kept, 'adopt'],
+    ['legacy: kept and stamped (never started over)', UNKNOWN, keptNeverReset, 'adopt'],
+    ['legacy under a reset generation: the core dropped it', UNKNOWN, kept, 'restart'],
+    ['born before the reset: the core dropped it, though the new generation\'s record holds it all', born(iso(-1)), kept, 'restart'],
     ['legacy: dropped', UNKNOWN, tombstone, 'restart'],
     ['known, the stamp was taken off (an old bundle)', known(X1), raw(record({ seen: ['mine'] })), 'foreign'],
     ['known never started over, the stamp was taken off (an old bundle): merged in', known(null), raw(record({ seen: ['x'] })), 'merge'],
@@ -187,10 +191,27 @@ describe('the open reader: readerStartGen and readerGenChange', () => {
     const redone = raw(record({ seen: ['mine', 'other'] }), { epoch: X2, resetAt: iso(5) });
     assert.equal(readerGenChange(born(iso(1)), redone, rated), 'restart');
     assert.equal(readerGenChange(UNKNOWN, redone, rated), 'restart');
-    // A record the core kept merges the reader's ratings in.
+    // A record the core kept merges the reader's ratings in (legacy content: only where the lesson
+    // was never started over).
     const keptRated = raw(record({ seen: ['mine', 'server'], ratings: { o1: 2 } }), { epoch: X1, resetAt: iso(0) });
     assert.equal(readerGenChange(born(iso(1)), keptRated, rated), 'adopt');
-    assert.equal(readerGenChange(UNKNOWN, keptRated, rated), 'adopt');
+    const keptRatedNeverReset = raw(record({ seen: ['mine', 'server'], ratings: { o1: 2 } }), { epoch: null, resetAt: null });
+    assert.equal(readerGenChange(UNKNOWN, keptRatedNeverReset, rated), 'adopt');
+  });
+
+  it('a born or legacy reader never adopts a newer generation\'s record that was redone elsewhere and holds every key it wrote', () => {
+    // Answered q1 correctly at iso(60), not uploaded; the lesson was started over at iso(120) on
+    // another device and redone there with q1 wrong. The core drops this reader's record
+    // (keepsLocal); adopting would merge the correct answer from before the reset back in.
+    const answered = record({ seen: ['b1'], answers: { 'q/q1': { attempts: 1, correct: true, chosen: ['b'], firstTry: true } } });
+    const redone = raw(
+      record({ seen: ['b1', 'b2'], answers: { 'q/q1': { attempts: 1, correct: false, chosen: ['a'], firstTry: false } } }),
+      { epoch: X1, resetAt: iso(120) },
+    );
+    assert.equal(readerGenChange(born(iso(60)), redone, answered), 'restart');
+    assert.equal(readerGenChange(UNKNOWN, redone, answered), 'restart');
+    // Control: born after that reset, the core keeps (and merges) it.
+    assert.equal(readerGenChange(born(iso(130)), redone, answered), 'adopt');
   });
 });
 
@@ -349,6 +370,37 @@ describe('the core and the reader over one storage', () => {
     assert.deepEqual(row.progress.answers['b1/q1'].chosen, ['b']);
     assert.deepEqual(lessonGenOf(storage.getItem(key)), known(null));
   });
+
+  for (const [name, localGen] of [['a born record from before the reset', born(iso(60))], ['legacy content (no stamp)', UNKNOWN]]) {
+    it(`started over and redone elsewhere while this tab was away: ${name} is dropped by the core, and the reader restarts instead of merging it back`, async () => {
+      const storage = memoryStorage();
+      setAccount(storage, U1, null);
+      const q1 = 'q/q1';
+      // The server: started over at iso(120) on another device and redone there, q1 wrong.
+      const redone = record({ seen: ['b1', 'b2'], answers: { [q1]: { attempts: 1, correct: false, chosen: ['a'], firstTry: false } }, updatedAt: iso(130) });
+      const t = setup({ storage, phase5: true, rows: [{ courseSlug: COURSE, lessonId: 'l1', progress: redone, pct: 20, state: 'in_progress', updatedAt: iso(130) }] });
+      const E1 = '55555555-5555-4555-8555-555555555555';
+      t.api.server.resets.set(`${COURSE}:l1`, { epoch: E1, at: iso(120) });
+      // This tab answered q1 correctly at iso(60), before the reset, and never uploaded it.
+      const key = progressKey(COURSE, 'l1');
+      const persisted = record({ seen: ['b1'], answers: { [q1]: { attempts: 1, correct: true, chosen: ['b'], firstTry: true } }, updatedAt: iso(60) });
+      writeProgress(COURSE, 'l1', persisted, storage, localGen);
+      storage.setItem(pendingKey(COURSE, 'l1'), iso(60));
+      t.sync.signIn(U1);
+      await t.clock.advance(1_000);
+      assert.deepEqual(lessonGenOf(storage.getItem(key)), known(E1, iso(120)), 'the core took the server\'s record');
+      const change = readerGenChange(localGen, storage.getItem(key), persisted);
+      assert.equal(change, 'restart');
+      // What the reader's adopt would do (useLessonProgress): merge its record in and write it back.
+      if (change === 'adopt') {
+        const stored = storage.getItem(key);
+        writeProgress(COURSE, 'l1', mergeProgress(parseProgress(stored), persisted), storage, lessonGenOf(stored));
+        t.sync.noteLocalWrite(COURSE, 'l1');
+      }
+      await t.clock.advance(SYNC_TIMING.minPutIntervalMs + SYNC_TIMING.flushDelayMs);
+      assert.equal(t.api.server.rows.get(`${COURSE}:l1`).progress.answers[q1].correct, false, 'the answer from before the reset stays out');
+    });
+  }
 
   it('… and when it was started over elsewhere meanwhile, the merged record is refused and the reader restarts', async () => {
     const { t, storage, key, loaded, merged, reset } = await oldBundleWrite({ resetMeanwhile: true });

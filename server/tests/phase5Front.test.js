@@ -423,13 +423,63 @@ describe('achievementsClient: the XP store', () => {
     await s.settled();
     assert.equal(s.getSnapshot().status, 'unavailable');
     s.consumerMounted();
-    await s.reload();
-    assert.equal(env.loads, 1, 'one probe per page load while the capabilities are unknown');
+    s.stale();
+    s.serverProgress();
+    await env.advance(60_000);
+    assert.equal(env.loads, 1, 'one background probe per page load while the capabilities are unknown');
     fails = false;
     env.caps = { lessonReset: true, achievements: true };
     s.syncChanged();
     await s.settled();
     assert.equal(env.loads, 2, 'the capabilities arrived: fetched');
+    assert.equal(s.getSnapshot().status, 'ready');
+  });
+
+  it('the try-again button probes again while the capabilities are unknown; background triggers do not', async () => {
+    let fails = true;
+    const { s, env } = store({ caps: null, load: () => {
+      if (fails) throw new mod.AchievementsApiError('Network error', 0, 'network');
+      return mod.parseAchievements(ACHIEVEMENTS(U1));
+    } });
+    s.consumerMounted();
+    await s.settled();
+    assert.deepEqual([s.getSnapshot().status, env.loads], ['unavailable', 1]);
+    s.consumerMounted();
+    s.stale();
+    await s.settled();
+    assert.equal(env.loads, 1, 'background: still the one probe');
+    // The button: a request, at once "loading" (the page keeps its panel while it runs).
+    const pressed = s.reload();
+    assert.equal(s.getSnapshot().status, 'loading');
+    await pressed;
+    assert.deepEqual([s.getSnapshot().status, env.loads], ['unavailable', 2], 'failed again: said so');
+    fails = false;
+    await s.reload();
+    assert.deepEqual([s.getSnapshot().status, env.loads], ['ready', 3]);
+    // An older VM's 404 is latched before that: the button never probes it again (G14 holds).
+    const old = store({ caps: null, load: () => { throw new mod.AchievementsApiError('Request failed (404)', 404); } });
+    old.s.consumerMounted();
+    await old.s.settled();
+    await old.s.reload();
+    assert.deepEqual([old.s.getSnapshot().status, old.env.loads], ['unsupported', 1]);
+  });
+
+  it('a try-again pressed while a request runs runs once after it, still as the button\'s', async () => {
+    let release = null;
+    let fails = true;
+    const { s, env } = store({ caps: null, load: () => new Promise((resolve, reject) => {
+      release = () => (fails ? reject(new mod.AchievementsApiError('Network error', 0, 'network')) : resolve(mod.parseAchievements(ACHIEVEMENTS(U1))));
+    }) });
+    s.consumerMounted();
+    const pressed = s.reload();
+    assert.equal(env.loads, 1);
+    release();
+    await wait(5);
+    assert.equal(env.loads, 2, 'the probe that was running failed; the press runs after it');
+    fails = false;
+    release();
+    await pressed;
+    await s.settled();
     assert.equal(s.getSnapshot().status, 'ready');
   });
 
@@ -494,6 +544,36 @@ describe('achievementsClient: the XP store', () => {
     s.consumerMounted();
     await s.settled();
     assert.equal(env.loads, 4);
+  });
+
+  it('the page store\'s window events: the server took this tab\'s records (rp:progress-saved) → one fetch 2 s later with a consumer; without one, the next consumer fetches', async () => {
+    const { s, env } = store();
+    const handlers = new Map();
+    const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
+    const fire = (type, detail) => (handlers.get(type) ?? []).forEach((fn) => fn({ type, detail }));
+    mod.listenForAchievementChanges(s, target);
+    const unmount = s.consumerMounted();
+    await s.settled();
+    assert.equal(env.loads, 1);
+    // An ordinary save: no server progress event (nothing changed here), the save signal only.
+    fire('rp:progress-saved');
+    await env.advance(mod.ACHIEVEMENTS_DEBOUNCE_MS - 1);
+    assert.equal(env.loads, 1, 'trailing: the post-save hook commits first');
+    await env.advance(1);
+    assert.equal(env.loads, 2);
+    // A local write (no source) is not a save; a server-sourced record is.
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l' });
+    await env.advance(60_000);
+    assert.equal(env.loads, 2);
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l', source: 'server' });
+    await env.advance(mod.ACHIEVEMENTS_DEBOUNCE_MS);
+    assert.equal(env.loads, 3);
+    unmount();
+    fire('rp:progress-saved');
+    assert.equal(s.getSnapshot().at, null, 'marked stale');
+    s.consumerMounted();
+    await s.settled();
+    assert.equal(env.loads, 4, 'fetched within 30 s of the last');
   });
 
   it('ACHIEVEMENTS_STALE_EVENT (a Blender stage): fetched at once with a consumer; a request asked for meanwhile runs once after', async () => {
@@ -748,13 +828,13 @@ before(async () => {
   ui = await fresh(await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { SaveChipView, saveLongText, saveLabel, SAVE_ICONS } from './components/lesson/SaveChip';",
-    "export { ReaderStatusView, readerStatusText, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
+    "export { ReaderStatus, ReaderStatusView, readerStatusText, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
     "export { SaveStoppedNoticeView, default as SaveStoppedNotice } from './components/lesson/SaveStoppedNotice';",
     "export { LeftRecordsNoticeView, default as LeftRecordsNotice } from './components/lesson/LeftRecordsNotice';",
     "export { UnsavedLogoutDialogView } from './components/lesson/UnsavedLogoutDialog';",
     "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf } from './components/lesson/LessonEnd';",
     "export { ProgressClusterView } from './components/ui/ProgressCluster';",
-    "export { ProfileBadgesBody, nextBadge, badgeProgressText } from './components/features/dashboard/profile/ProfileBadgesView';",
+    "export { ProfileBadgesBody, nextBadge, badgeProgressText, default as ProfileBadgesView } from './components/features/dashboard/profile/ProfileBadgesView';",
     "export { default as ProfilePassport, notReadyText } from './components/features/dashboard/ProfilePassport';",
     "export { SYNC_ACCOUNT_KEY, SYNC_PENDING_PREFIX } from './components/lesson/progressSync';",
   ].join('\n')));
@@ -837,6 +917,58 @@ describe('ReaderStatus: the reader\'s status line (finding 11)', () => {
     assert.equal(ui.readerStatusText('en', { kind: 'reset', id: 1 }), "This lesson's record was deleted. You can start from the beginning.");
   });
 
+  it('the card goes by itself (8 s, or saving works again) while its close button had focus: focus moves to #main-content, once, only from the page body', () => {
+    const message = { kind: 'reset', id: 1 };
+    const mount = (refs, msg, onDismiss = () => {}) => {
+      const els = elementsOf(renderUi(ui, ui.ReaderStatus, { message: msg, onDismiss }, { __refs: refs }));
+      return { els, effects: globalThis.__effects };
+    };
+    const runEffects = (effects, activeElement) => {
+      const doc = focusDocument();
+      doc.activeElement = activeElement === 'body' ? doc.body : activeElement;
+      globalThis.document = doc;
+      try {
+        for (const effect of effects) effect();
+      } finally {
+        delete globalThis.document;
+      }
+      return doc;
+    };
+    let refs = {};
+    let { els, effects } = mount(refs, message);
+    assert.equal(runEffects(effects, 'body').main.focused, 0, 'still shown: nothing moves');
+    els.find((el) => el.type === 'button').props.onFocus();
+    ({ effects } = mount(refs, null));
+    const doc = runEffects(effects, 'body');
+    assert.equal(doc.main.focused, 1, 'focus left with the button: main takes it');
+    assert.deepEqual(doc.main.opts, { preventScroll: true });
+    assert.equal(runEffects(effects, 'body').main.focused, 0, 'once');
+    // Focus already elsewhere (the learner moved on): left alone.
+    refs = {};
+    ({ els } = mount(refs, message));
+    els.find((el) => el.type === 'button').props.onFocus();
+    ({ effects } = mount(refs, null));
+    assert.equal(runEffects(effects, { name: 'a link' }).main.focused, 0);
+    // The button never had focus: nothing moves.
+    refs = {};
+    mount(refs, message);
+    ({ effects } = mount(refs, null));
+    assert.equal(runEffects(effects, 'body').main.focused, 0);
+    // Closed with the button: its click moves focus; the effect does not again.
+    refs = {};
+    let dismissed = 0;
+    ({ els } = mount(refs, message, () => { dismissed += 1; }));
+    const close = els.find((el) => el.type === 'button');
+    close.props.onFocus();
+    const clickDoc = focusDocument();
+    globalThis.document = clickDoc;
+    close.props.onClick();
+    delete globalThis.document;
+    assert.deepEqual([dismissed, clickDoc.main.focused], [1, 1]);
+    ({ effects } = mount(refs, null));
+    assert.equal(runEffects(effects, 'body').main.focused, 0);
+  });
+
   it('a stall is said once per kind: "on this device" or "stopped" (by reason) with something unsaved; never saving ↔ saved', () => {
     const key = (patch, syncable = true) => ui.stallKeyOf(VIEW(patch), syncable);
     assert.equal(key({ state: 'offline', pending: 1 }), 'offline:');
@@ -892,7 +1024,7 @@ describe('SaveStoppedNotice: the app notice while saving has stopped (design §4
     retry.props.onClick();
     assert.equal(retries, 1);
 
-    const busy = render(VIEW({ state: 'stopped', reason: 'server', pending: 1, busy: true }), 'jp', { onRetry: () => { retries += 1; } });
+    const busy = render(VIEW({ state: 'stopped', reason: 'server', pending: 1, busy: true }), 'jp', { onRetry: () => { retries += 1; }, retrying: true });
     const busyButton = busy.find((el) => el.type === 'button');
     assert.equal(busyButton.props['aria-disabled'], true, 'aria-disabled, not disabled: focus stays on it');
     assert.equal(busyButton.props.disabled, undefined);
@@ -913,6 +1045,37 @@ describe('SaveStoppedNotice: the app notice while saving has stopped (design §4
       assert.ok(!none.some((el) => el.type === 'button'), reason);
       assert.match(textOfElement(none[0]), /（1 件）/);
     }
+  });
+
+  it('an automatic retry (busy, nothing pressed) changes no text in the live region; the learner\'s press says 「保存しています…」 until its request ends', () => {
+    const view = (busy) => VIEW({ state: 'stopped', reason: 'network', pending: 2, busy });
+    const mount = (busy, state) => {
+      const tokens = renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view(busy), __refs: {}, ...(state ? { __state: state } : {}) });
+      return { els: elementsOf(tokens), text: textOf(tokens), effects: globalThis.__effects };
+    };
+    const runEffects = (effects) => {
+      globalThis.__sets = [];
+      for (const effect of effects) effect();
+      return globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v);
+    };
+    // The core's own retry on its backoff: aria-disabled only (an attribute is not read again).
+    const auto = mount(true);
+    const autoButton = auto.els.find((el) => el.type === 'button');
+    assert.equal(textOfElement(autoButton), 'もう一度保存する');
+    assert.doesNotMatch(auto.text, /保存しています…/);
+    assert.equal(autoButton.props['aria-disabled'], true);
+    // The learner presses: pressed, and the retry runs.
+    globalThis.__retries = 0;
+    const idle = mount(false);
+    idle.els.find((el) => el.type === 'button').props.onClick();
+    assert.deepEqual(globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v), [true]);
+    assert.equal(globalThis.__retries, 1);
+    // Its request runs: the label says so; it stays pressed.
+    const running = mount(true, { 0: true });
+    assert.match(textOfElement(running.els.find((el) => el.type === 'button')), /保存しています…/);
+    assert.deepEqual(runEffects(running.effects), []);
+    // The request ended (busy false): no longer pressed, the next automatic retry says nothing.
+    assert.deepEqual(runEffects(mount(false, { 0: true }).effects), [false]);
   });
 
   it('English counts have a singular', () => {
@@ -1108,6 +1271,11 @@ describe('LessonEnd: where the rating went (G32) and 「このレッスンを最
       [{ status: 'stopped', userId: U1 }, VIEW({ state: 'stopped', reason: 'storage' }), LATER],
       [{ status: 'hydrating', userId: U1 }, VIEW({ state: 'loading' }), '読み込みが終わると、やり直せます。'],
       [{ status: 'needs_choice', userId: U1 }, VIEW({ state: 'local' }), LATER],
+      // The browser is offline while the sync stays 'on' (only uploads fail): pending or not.
+      [{ status: 'on', userId: U1 }, VIEW({ state: 'offline', pending: 1, online: false }), OFFLINE],
+      [{ status: 'on', userId: U1 }, VIEW({ state: 'saved', online: false }), OFFLINE],
+      // A retry load while offline with something pending.
+      [{ status: 'hydrating', userId: U1 }, VIEW({ state: 'offline', pending: 1, online: false }), OFFLINE],
     ]) {
       const els = render({}, { __sync: sync, __view: view });
       const button = resetButton(els);
@@ -1143,7 +1311,14 @@ describe('LessonEnd: where the rating went (G32) and 「このレッスンを最
     assert.deepEqual([dialog.props.cancelLabel, dialog.props.confirmLabel, dialog.props.confirmTone], ['やめる', 'やり直す', 'danger']);
     const body = textOf(walk(dialog.props.body));
     assert.match(body, /^このレッスンで読んだところ、確認問題の答え、チェック、自己評価、続きの位置を消します。ログインしているすべての端末から消え、元に戻すことはできません。/);
-    assert.match(body, /もらった XP とバッジ、学んだ日、学習の履歴は残ります。このレッスンで、もう一度 XP をもらうことはありません。AI アプリにすでに渡した内容は消えません。$/);
+    // XP is kept per milestone (start 10, done 40): a lesson only started still earns 'done' when
+    // finished after the reset, so the copy promises only that earned XP is not given again.
+    assert.match(body, /もらった XP とバッジ、学んだ日、学習の履歴は残ります。すでにもらった XP は、このレッスンでもう一度もらうことはありません。AI アプリにすでに渡した内容は消えません。$/);
+    assert.doesNotMatch(body, /このレッスンで、もう一度 XP をもらうことはありません/);
+    const enDialog = render({}, { __language: 'en' }).find((el) => el.type === 'ConfirmDialog');
+    const enBody = textOf(walk(enDialog.props.body));
+    assert.match(enBody, /XP you already earned for this lesson is not given again\./);
+    assert.doesNotMatch(enBody, /This lesson does not give XP again/);
     // The button opens the dialog and is where focus returns (Cancel, Esc, a refusal).
     const button = resetButton(els);
     button.props.ref.current = { name: 'reset button', isConnected: true };
@@ -1379,6 +1554,18 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
         assert.ok(elementsOf(walk(item)).some((el) => el.type === 'LockKeyhole'), 'not only colour: a lock');
       }
     }
+    // The JP rule has a counter before the verb (finding 10).
+    assert.match(textOfElement(items[2]), /レッスンかステージを 15 個終える/);
+    for (const item of items) assert.doesNotMatch(textOfElement(item), /\d+ 終える/, 'a number needs a counter before the verb');
+    // Headings: the badge names sit under their own list heading, not under the next-badge card.
+    const headingsOf = (list) => list.filter((el) => /^h[1-6]$/.test(el.type));
+    const parentOfFirstBadge = (list) => {
+      const headings = headingsOf(list);
+      return headings.slice(0, headings.findIndex((el) => el.type === 'h3')).reverse().find((el) => el.type === 'h2');
+    };
+    assert.equal(textOfElement(parentOfFirstBadge(els)), 'すべてのバッジ', 'badge names sit under their own list heading');
+    assert.equal(headingsOf(els).filter((el) => el.type === 'h3').length, 7);
+    assert.equal(els.find((el) => el.props?.id === 'rp-next-badge').props.tabIndex, -1, 'focus target after a successful retry');
     const streak7 = textOfElement(items[6]);
     assert.match(streak7, /^7 日つづけて学習7 日つづけて学ぶ（日本時間）いまの連続 0 日。あと 7 日つづけると獲得$/, 'the current streak (0), not the best (5)');
     assert.match(textOfElement(items[3]), /バイブコーディング入門：9 \/ 13・あと 4/, 'the course nearest to done, by name');
@@ -1388,8 +1575,11 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     assert.doesNotMatch(textOfElement(next), /獲得済み/);
     assert.equal(ui.nextBadge(DATA().badges).id, 'first_course', '9/13 is the nearest');
     assert.equal(ui.nextBadge(DATA().badges.map((b) => ({ ...b, earned: true }))), null);
-    const all = textOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('ready', DATA({ badges: DATA().badges.map((b) => ({ ...b, earned: true, current: b.goal })) })), onRetry() {} }));
+    const allTokens = renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('ready', DATA({ badges: DATA().badges.map((b) => ({ ...b, earned: true, current: b.goal })) })), onRetry() {} });
+    const all = textOf(allTokens);
     assert.match(all, /すべてのバッジを獲得しました/);
+    assert.equal(textOfElement(parentOfFirstBadge(elementsOf(allTokens))), 'すべてのバッジ', 'not under 「すべてのバッジを獲得しました」');
+    assert.equal(elementsOf(allTokens).find((el) => el.props?.id === 'rp-next-badge').props.tabIndex, -1);
     assert.equal(ui.badgeProgressText('en', { id: 'streak_7', earned: false, current: 1, goal: 7 }), '1 day in a row now; 6 more days in a row to earn it');
     assert.equal(ui.badgeProgressText('en', { id: 'streak_3', earned: false, current: 2, goal: 3 }), '2 days in a row now; 1 more day in a row to earn it');
     assert.equal(ui.badgeProgressText('en', { id: 'five_lessons', earned: false, current: 2, goal: 5 }), '2 / 5 · 3 to go');
@@ -1410,9 +1600,63 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     globalThis.__retried = 0;
     retry.props.onClick();
     assert.equal(globalThis.__retried, 1);
+    // The learner's retry while it loads: the same panel, its button aria-disabled (focus stays
+    // on it), a status line; a click does nothing. When it fails again, the status line says so.
+    const busyTokens = renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('loading'), retry: 'busy', onRetry: () => { globalThis.__retried += 1; } });
+    const busy = elementsOf(busyTokens);
+    assert.ok(busy.some((el) => el.type === 'section'), 'still the panel');
+    const busyButton = busy.find((el) => el.type === 'button');
+    assert.equal(busyButton.props['aria-disabled'], true);
+    assert.match(textOfElement(busyButton), /読み込んでいます…/);
+    globalThis.__retried = 0;
+    busyButton.props.onClick();
+    assert.equal(globalThis.__retried, 0, 'a click while it loads does nothing');
+    assert.equal(textOfElement(busy.find((el) => el.props?.role === 'status')), '読み込んでいます…');
+    const idleStatus = unavailable.find((el) => el.props?.role === 'status');
+    assert.equal(textOfElement(idleStatus), '', 'always mounted; silent before a retry');
+    assert.equal(retry.props['aria-disabled'], undefined);
+    const failed = elementsOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('unavailable'), retry: 'failed', onRetry() {} }));
+    assert.equal(textOfElement(failed.find((el) => el.props?.role === 'status')), 'まだバッジを表示できません。しばらくしてから、もう一度お試しください。');
+    // Not the learner's retry (a background load): the plain loading line.
+    const background = elementsOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('loading'), retry: null, onRetry() {} }));
+    assert.equal(background[0].type, 'p');
     assert.match(textOf(bodyTokens('unsupported')), /^バッジは、まもなく使えるようになります。$/);
     assert.match(textOf(bodyTokens('no_account')), /^XP とバッジは、Rise Path のアカウントでログインすると記録されます。$/);
     for (const status of ['unsupported', 'no_account']) assert.ok(!body(status).some((el) => el.type === 'button'), status);
+  });
+
+  it('the badges page: a retry is the learner\'s until it ends; failed again → the status line says so; the badges arrived → focus on the next-badge heading', () => {
+    const runEffects = (effects) => {
+      const heading = { focused: 0, focus(opts) { this.focused += 1; this.opts = opts; } };
+      globalThis.document = { getElementById: (id) => (id === 'rp-next-badge' ? heading : null) };
+      globalThis.__sets = [];
+      try {
+        for (const effect of effects) effect();
+      } finally {
+        delete globalThis.document;
+      }
+      return { heading, sets: globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v) };
+    };
+    globalThis.__reloads = 0;
+    const els = elementsOf(renderUi(ui, ui.ProfileBadgesView, {}, { __ach: SNAP('unavailable') }));
+    els.find((el) => el.type === 'button').props.onClick();
+    assert.deepEqual(globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v), ['busy']);
+    assert.equal(globalThis.__reloads, 1);
+    // While it loads: the panel stays, nothing changes.
+    const loading = renderUi(ui, ui.ProfileBadgesView, {}, { __ach: SNAP('loading'), __state: { 0: 'busy' } });
+    assert.equal(elementsOf(loading).find((el) => el.type === 'button').props['aria-disabled'], true);
+    assert.deepEqual(runEffects(globalThis.__effects).sets, []);
+    renderUi(ui, ui.ProfileBadgesView, {}, { __ach: SNAP('unavailable'), __state: { 0: 'busy' } });
+    assert.deepEqual(runEffects(globalThis.__effects).sets, ['failed']);
+    renderUi(ui, ui.ProfileBadgesView, {}, { __ach: SNAP('ready', DATA()), __state: { 0: 'busy' } });
+    const done = runEffects(globalThis.__effects);
+    assert.deepEqual(done.sets, [null]);
+    assert.equal(done.heading.focused, 1, 'the button is gone: focus on the next-badge heading');
+    assert.deepEqual(done.heading.opts, { preventScroll: true });
+    // A load that was not the learner's retry moves nothing.
+    renderUi(ui, ui.ProfileBadgesView, {}, { __ach: SNAP('ready', DATA()) });
+    const quiet = runEffects(globalThis.__effects);
+    assert.deepEqual([quiet.sets, quiet.heading.focused], [[], 0]);
   });
 
   it('the old local XP is gone: no gamificationService, no ui/activity, no legacy badges or trophy', () => {

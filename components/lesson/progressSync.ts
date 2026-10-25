@@ -89,6 +89,11 @@ export const SYNC_ACCOUNT_KEY = 'rp:progressSync:account';
 export const SYNC_PENDING_PREFIX = 'rp:progressSync:pending:';
 /** Fired on window when this tab changed the account (sign-in, reset, logout, delete). */
 export const SYNC_ACCOUNT_EVENT = 'rp:progress-account';
+/**
+ * Fired on window when the server took lesson records from this tab (a PUT answered with them):
+ * its post-save hook may have awarded XP or a learning day (the achievements store refetches).
+ */
+export const PROGRESS_SAVED_EVENT = 'rp:progress-saved';
 /** Lesson records (progressStore.progressKey). */
 export const PROGRESS_KEY_PREFIX = 'rp:progress:';
 /** services/progressService.ts learning events (streak and history), cleared at logout. */
@@ -208,6 +213,11 @@ export type SyncEvents = {
   progress?(detail: ServerProgressDetail): void;
   /** The account key changed in this tab (readers re-check it; course maps refresh). */
   account?(): void;
+  /**
+   * The server stored lesson records this tab sent (dispatch PROGRESS_SAVED_EVENT). A save that
+   * changes nothing here emits no `progress` event, yet its hook may award XP ('done' 40).
+   */
+  saved?(): void;
 };
 
 export type DeleteResult = { ok: true; scope: 'account' | 'device' } | { ok: false };
@@ -461,16 +471,19 @@ export function readerStartGen(raw: string | null): ReaderGen {
  * merge: the same for a lesson never started over (known(null)): the other write is of the same
  * lesson, so it is merged into the reader's record and written back stamped; had the lesson been
  * reset meanwhile, the server refuses the null stamp and the sync drops the record (G10).
- * Decided by content, never by clocks: the core keeps a born or legacy record only by merging it
- * into the server's, which then covers what the reader wrote; a dropped record or a reset's
- * emptied record does not.
+ * A born or legacy reader adopts a known stamp only where the core kept its record: the core's
+ * rule (keepsLocal) and the content. A record of a newer generation that holds the same keys
+ * (redone elsewhere) is not this reader's, and adopting it would merge answers from before the
+ * reset back in. A clock running ahead passes keepsLocal but still restarts on a reset's emptied
+ * record, which does not hold what the reader wrote (G31).
  */
 export function readerGenChange(loaded: ReaderGen, raw: string | null, persisted: LessonProgress): 'none' | 'adopt' | 'restart' | 'foreign' | 'merge' {
   const stored = lessonGenOf(raw);
   if (stored.kind === 'known') {
     if (loaded.kind === 'known') return loaded.epoch === stored.epoch ? 'none' : 'restart';
     if (loaded.kind === 'born' && loaded.bornAt === null) return 'adopt'; // nothing written yet
-    return readerCovers(parseProgress(raw), persisted) ? 'adopt' : 'restart';
+    if (!keepsLocal(loaded, { epoch: stored.epoch, resetAt: stored.resetAt })) return 'restart'; // the core dropped it
+    return readerCovers(parseProgress(raw), persisted) ? 'adopt' : 'restart'; // G31: an emptied record never covers
   }
   if (loaded.kind === 'known' && raw !== null) return loaded.epoch === null ? 'merge' : 'foreign';
   return 'none'; // as before Phase 5: the last writer wins
@@ -633,6 +646,8 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   let hydration: Promise<void> | null = null;
   let inFlight: Promise<void> | null = null;
   let flushAgain = false;
+  /** A lesson_reset rejection re-stamped a born record during this flush: it can go again now. */
+  let restamped = false;
   let flushTimer: unknown = null;
   let firstChangeAt: number | null = null;
   let lastPutAt = Number.NEGATIVE_INFINITY;
@@ -1328,6 +1343,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
           }
           setMarker(item, readRecord(item).updatedAt);
           flushAgain = true;
+          restamped = true;
         } else {
           dropLocal(item);
           // The server's record of the new generation (an emptied one when it has none, e.g. after
@@ -1425,6 +1441,13 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       putFailure = null;
       savedAt = now();
       if (applyPutResult(batch, result)) context.account = read(SYNC_ACCOUNT_KEY);
+      if ((result.records ?? []).length > 0) {
+        try {
+          events.saved?.();
+        } catch {
+          // A broken listener must not stop the sync.
+        }
+      }
       // Stopped while taking the answer in (storage refused a record): no further batch.
       return state.status === 'on';
     } catch (err) {
@@ -1436,7 +1459,10 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
 
   /**
    * scheduled: one batch (the timer keeps the 20 s spacing). all: every batch now (hydrate and
-   * logout). hide: one batch now, keepalive when small.
+   * logout), and once more for records a lesson_reset re-stamped (born after the reset): the
+   * logout question then counts only what really could not be saved. A second refusal drops
+   * the record (its known stamp no longer passes keepsLocal), so this never loops. hide: one batch
+   * now, keepalive when small.
    */
   async function flush(mode: FlushMode): Promise<void> {
     while (inFlight) {
@@ -1453,16 +1479,20 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     const gen = generation;
     let more = false;
     const run = (async () => {
-      // Read with the records, in the same step: the lessonMark check in sendBatch compares with it.
-      const context: FlushContext = { account: read(SYNC_ACCOUNT_KEY) };
-      const batches = collectBatches();
-      const toSend = mode === 'all' ? batches : batches.slice(0, 1);
-      more = batches.length > toSend.length;
-      for (const batch of toSend) {
-        if (gen !== generation || !(await sendBatch(batch, gen, mode === 'hide', context))) {
-          more = false;
-          return;
+      for (let pass = 0; pass < (mode === 'all' ? 2 : 1); pass += 1) {
+        restamped = false;
+        // Read with the records, in the same step: the lessonMark check in sendBatch compares with it.
+        const context: FlushContext = { account: read(SYNC_ACCOUNT_KEY) };
+        const batches = collectBatches();
+        const toSend = mode === 'all' ? batches : batches.slice(0, 1);
+        more = batches.length > toSend.length;
+        for (const batch of toSend) {
+          if (gen !== generation || !(await sendBatch(batch, gen, mode === 'hide', context))) {
+            more = false;
+            return;
+          }
         }
+        if (!restamped) return;
       }
     })();
     inFlight = run;
@@ -1658,7 +1688,9 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       apiOn = false;
     }
     const ready = state.status === 'on' || (state.status === 'hydrating' && hydrateMode === 'refresh');
-    if (!userId || !ready || epoch === undefined || !apiOn) return { ok: false, reason: 'not_ready' };
+    // The browser is offline: nothing is sent (the control is disabled then; a dialog opened before
+    // the connection dropped gets 'not connected', not 'unconfirmed').
+    if (!userId || !ready || !online || epoch === undefined || !apiOn) return { ok: false, reason: 'not_ready' };
     if (caps?.lessonReset !== true) return { ok: false, reason: 'unsupported' };
     if (!syncable(ref)) return { ok: false, reason: 'not_published' };
     let result: Awaited<ReturnType<ProgressApi['resetLesson']>>;

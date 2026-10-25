@@ -26,7 +26,8 @@
  *   prepareProgressSignOut (logoutGuard.ts: upload, then count what is unsaved, before logout asks);
  *   resetLessonProgress (LessonEnd's 「このレッスンを最初からやり直す」); progressCapabilities (what
  *   the server offers); syncedLearnerId and runAsSyncedLearner (XP, legacy progress: only the
- *   learner the sync runs for).
+ *   learner the sync runs for); PROGRESS_SAVED_EVENT when the server took records (the XP store
+ *   refetches: the save's hook may have awarded XP).
  */
 import { useSyncExternalStore } from 'react';
 import { getCourse, getLessonEntry } from '../../content';
@@ -43,6 +44,7 @@ import {
 } from '../../services/lessonProgressApi';
 import { PROGRESS_EVENT, type ProgressEventDetail } from './progressStore.ts';
 import {
+  PROGRESS_SAVED_EVENT,
   SYNC_ACCOUNT_EVENT,
   SYNC_ACCOUNT_KEY,
   SYNC_PENDING_PREFIX,
@@ -155,6 +157,7 @@ function progressSync(): ProgressSync {
     events: {
       progress: (detail) => dispatch(PROGRESS_EVENT, detail),
       account: () => dispatch(SYNC_ACCOUNT_EVENT),
+      saved: () => dispatch(PROGRESS_SAVED_EVENT),
     },
   });
   instance = sync;

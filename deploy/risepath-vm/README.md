@@ -117,12 +117,12 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–018 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–019 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–018 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–019 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
@@ -363,6 +363,18 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 ```
 
 **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs --url <使い捨ての PostgreSQL 16>` は、migration 018 と削除・同意・保存期間の動きを本物の PostgreSQL で確かめます。`public` か `auth` に表がある DB、`risepath_mcp_remote` のロールがあるクラスタ、スーパーユーザーでない接続では動きません（VM の DB には決して向けないでください）。R11 はサーバーのログを読むので、ログを標準出力に出すクラスタでは `--log-file <ログのパス>` を付けます。確かめられなかった項目があると終了コード 3 になります（`--allow-skip` を付けたときだけ 0）。
+
+## 保存の様子・レッスンのやり直し・XP（Phase 5）
+
+学習の記録を保存できているかの表示、1 つのレッスンのやり直し、サーバーの記録から数える XP・バッジ・学んだ日です。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 9 章です。
+
+**この版の最初のデプロイ**
+
+- migration 019 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
+- `sql/mcp_remote_role.sql` は流し直さなくてかまいません（019 の表は、どれもリモート MCP のロールに渡しません）。
+- 019 を当てるあいだは、アカウントの削除をしません。スタッフの削除（`--yes`）は待ちます。画面からの削除を使えるようにしているとき（`ACCOUNT_DELETION_ENABLED=true`）は、人の少ない時間にデプロイします。重なると、Postgres がデッドロック（40P01）でどちらかを止めます。止まったほうは何も変えずに戻ります（019 は 1 つのトランザクションです）。migrate が 40P01 で止まったら `./scripts/deploy-stack.sh` をもう一度実行し、削除が終了コード 3 で止まったら、デプロイのあとにもう一度実行します。
+- 画面（Vercel）と VM の順番は、計画の 9.2 の 1 です。
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase5.mjs` は、019 と、やり直し・XP の数え直し・削除との重なりを本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 019 の行）。VM の DB には決して向けないでください。
 
 ## セキュリティ
 

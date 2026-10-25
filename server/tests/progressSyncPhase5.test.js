@@ -15,6 +15,8 @@ import {
   saveViewOf,
 } from '../../components/lesson/progressSync.ts';
 import { LAST_LESSON_KEY, lessonGenOf, progressKey } from '../../components/lesson/progressStore.ts';
+import { parseProgress } from '../../shared/lesson/progress.js';
+import { mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
 import {
   COURSE,
   account,
@@ -331,6 +333,44 @@ describe('Phase 5 save view: the core', () => {
     t.storage.setItem(SYNC_ACCOUNT_KEY, JSON.stringify({ userId: U2, epoch: null }));
     t.sync.storageChanged();
     assert.equal(t.sync.getView().pending, 0, 'another learner\'s browser now');
+  });
+});
+
+describe('Phase 5 XP refresh: the server took this tab\'s records (saved)', () => {
+  it('an ordinary save that changes nothing here emits no server progress event, but tells the XP store once', async () => {
+    const row = { courseSlug: COURSE, lessonId: 'l1', progress: record({ seen: ['a'], updatedAt: iso(-5), summary: { pct: 10, state: 'in_progress' } }), pct: 10, state: 'in_progress', updatedAt: iso(-5) };
+    const t = p5({ rows: [row] });
+    await on(t);
+    assert.deepEqual(genOf(t.storage, 'l1'), { kind: 'known', epoch: null, resetAt: null });
+    t.events.progress.length = 0;
+    // The reader finishes the lesson: every block seen, summary 'read' (useLessonProgress).
+    write(t, 'l1', stamped(record({ seen: ['a', 'b'], updatedAt: iso(1), summary: { pct: 100, state: 'read' } }), { epoch: null, resetAt: null }));
+    // The server merges like tools/core/lessonProgress.js and counts the same summary.
+    t.api.script('put', { respond: (body) => {
+      const sent = body.records[0];
+      const merged = mergeProgress(parseProgress(row.progress), sanitizeProgress(sent.progress, { now: t.clock.now() }));
+      return { epoch: null, rejected: [], records: [{ courseSlug: COURSE, lessonId: 'l1', progress: merged, pct: 100, state: 'read', updatedAt: merged.updatedAt, lessonEpoch: null, lessonResetAt: null }] };
+    } });
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs + SYNC_TIMING.flushDelayMs);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(marker(t.storage, 'l1'), null, 'saved');
+    assert.deepEqual(t.events.progress, [], 'nothing changed here: no server progress event');
+    assert.equal(t.events.saved, 1, 'the XP store hears of the save (its hook may have awarded done 40)');
+  });
+
+  it('no saved signal for a PUT that took no record (refused, failed)', async () => {
+    const t = p5();
+    await on(t);
+    write(t, 'l1', stamped(record({ seen: ['a'], updatedAt: iso(1) }), { epoch: null, resetAt: null }));
+    t.api.script('put', fail(500));
+    await t.clock.advance(SYNC_TIMING.flushDelayMs);
+    assert.equal(t.api.puts().length, 1);
+    assert.equal(t.events.saved, 0);
+    write(t, 'l-new', record({ seen: ['a'], updatedAt: iso(2) }));
+    t.storage.removeItem(pendingKey(COURSE, 'l1'));
+    await t.clock.advance(SYNC_TIMING.maxBackoffMs + SYNC_TIMING.flushDelayMs);
+    assert.equal(t.api.puts().at(-1).body.records[0].lessonId, 'l-new');
+    assert.equal(t.events.saved, 0, 'unknown_lesson: nothing stored');
   });
 });
 
@@ -748,6 +788,21 @@ describe('Phase 5 generations: what a device keeps after a lesson was started ov
     assert.equal(marker(t.storage, 'l1'), null);
   });
 
+  it('G23: a lesson_reset of a record born after the reset during the logout upload: sent again in the same upload, nothing unsaved', async () => {
+    const t = p5();
+    await on(t);
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs);
+    write(t, 'l1', stamped(record({ seen: ['new'], updatedAt: iso(30) }), { bornAt: iso(30) }));
+    // Started over earlier (another device, or before a delete-all that left no row).
+    const { gen } = t.api.resetOnServer(COURSE, 'l1', START + 10_000);
+    const prepared = t.sync.prepareSignOut();
+    await t.clock.advance(SYNC_TIMING.logoutFlushMs);
+    assert.deepEqual(await prepared, { unsaved: 0 });
+    assert.deepEqual(t.api.puts().map((p) => p.body.records[0].lessonEpoch), [null, gen.epoch]);
+    assert.deepEqual(t.api.server.rows.get(`${COURSE}:l1`).progress.seen, ['new']);
+    assert.equal(marker(t.storage, 'l1'), null);
+  });
+
   it('a lesson_reset of a record born after the reset whose stamped copy storage refuses: "stopped" (storage), not sent again and again', async () => {
     const storage = memoryStorage();
     let refuse = false;
@@ -868,7 +923,16 @@ describe('Phase 5 resetLesson (server first, local only on success)', () => {
 
     const guest = setup({ phase5: true });
     assert.deepEqual(await guest.sync.resetLesson(COURSE, 'l1'), { ok: false, reason: 'not_ready' });
-    for (const s of [offline, loading, old, t, guest]) assert.equal(s.api.resets().length, 0);
+
+    // The browser went offline while the sync stays 'on' (only uploads fail): nothing is sent,
+    // so the learner is told it is not connected, never that the result is unknown.
+    const net = p5();
+    await on(net);
+    net.sync.networkChanged(false);
+    net.api.server.offline = true;
+    assert.equal(net.sync.getState().status, 'on');
+    assert.deepEqual(await net.sync.resetLesson(COURSE, 'l1'), { ok: false, reason: 'not_ready' });
+    for (const s of [offline, loading, old, t, guest, net]) assert.equal(s.api.resets().length, 0);
   });
 
   it('G14: a 404 without error_type is an older server: "unsupported" for this page load, nothing changed here', async () => {

@@ -290,8 +290,13 @@ export const hydrateFromApi = async ({ pushLocal = true, learnerId = null, adopt
                 }
                 if (!remote || localData.completedStages.length > remote.completedStages.length) {
                     store[courseId] = learnerId ? { ...localData, ownerId: learnerId } : localData;
-                    // Push local-only data to API (only to the learner it belongs to)
-                    if (pushLocal && learnerId) void syncProgressToApi(courseId, store[courseId], learnerId);
+                    // Push local-only data to API (only to the learner it belongs to). Its stages may
+                    // earn XP on the server: the XP store refetches.
+                    if (pushLocal && learnerId) {
+                        void syncProgressToApi(courseId, store[courseId], learnerId).then((sent) => {
+                            if (sent) dispatchWindowEvent(ACHIEVEMENTS_STALE_EVENT);
+                        });
+                    }
                 }
             }
             saveStore(store);
@@ -299,7 +304,9 @@ export const hydrateFromApi = async ({ pushLocal = true, learnerId = null, adopt
             if (owner) {
                 for (const [courseId, merged] of pushes) {
                     void syncProgressToApi(courseId, merged, owner).then((sent) => {
-                        if (sent) settleSent(courseId, owner, merged);
+                        if (!sent) return;
+                        settleSent(courseId, owner, merged);
+                        dispatchWindowEvent(ACHIEVEMENTS_STALE_EVENT);
                     });
                 }
             }

@@ -27,8 +27,9 @@ import {
     resetLessonProgress,
     saveLessonProgress,
 } from '../../tools/core/lessonProgress.js';
-import { BLENDER_XP_SQL, DELETE_LESSONS_KEEPING_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL } from '../../tools/core/achievements.js';
-import { lessonPct, lessonState } from '../../shared/lesson/progress.js';
+import { BLENDER_XP_SQL, DELETE_LESSONS_KEEPING_XP_SQL, LEARNING_DAY_SQL, LESSON_XP_SQL, XP_LOCK_SQL, noteLearning } from '../../tools/core/achievements.js';
+import { lessonPct, lessonState, parseProgress } from '../../shared/lesson/progress.js';
+import { mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
 import { getCourseProgress } from '../../tools/core/courseLessons.js';
 import { getPublishedLesson } from '../../tools/core/courseCatalog.js';
 import { createLessonProgressPool, norm, PHASE5_TABLES, SQL } from './helpers/lessonProgressPool.js';
@@ -144,6 +145,22 @@ describe('resetLessonProgress (POST /lesson-reset)', () => {
         await reset();
         assert.equal(pool.xpOf(ALICE), 50);
         assert.deepEqual(pool.awardsOf(ALICE), [`lesson ${VIBE}/${CH1} done 40`, `lesson ${VIBE}/${CH1} start 10`]);
+    });
+
+    it('G4: an in_progress lesson started over keeps start 10 and still earns done 40 when finished (the dialog: XP already earned is not given again)', async () => {
+        use({ rows: [ch1Row('in_progress')] });
+        const first = await reset();
+        assert.deepEqual(pool.awardsOf(ALICE), [`lesson ${VIBE}/${CH1} start 10`]);
+        assert.equal(pool.xpOf(ALICE), 10);
+        // Read to the end under the new generation; the save's hook reconciles.
+        const done = await save([{ courseSlug: VIBE, lessonId: CH1, lessonEpoch: first.lessonEpoch, progress: record({ seen: [...ch1.index.readingBlockIds], updatedAt: NOW.toISOString() }) }]);
+        assert.equal(done.records[0].state, 'read');
+        assert.equal(await noteLearning({ userId: ALICE }), true);
+        assert.deepEqual(pool.awardsOf(ALICE), [`lesson ${VIBE}/${CH1} done 40`, `lesson ${VIBE}/${CH1} start 10`]);
+        assert.equal(pool.xpOf(ALICE), 50);
+        // Started over again from 'read': both milestones are earned, nothing more.
+        await reset();
+        assert.equal(pool.xpOf(ALICE), 50);
     });
 
     it('a lesson never opened still gets a tombstone row and a generation; a second reset gives a new epoch and a later reset_at', async () => {
@@ -300,6 +317,27 @@ describe('getLessonProgress with the generations (REST GET)', () => {
         ]);
         assert.deepEqual(pool.progressStatements().filter((sql) => sql !== SQL.writeBack), [SQL.selectEpoch, SQL.selectRowsWithEpochs]);
         assert.equal((await getLessonProgress({ userId: ALICE, withEpoch: true, courseSlug: VIBE })).error_type, 'validation', 'withEpoch reads every course');
+    });
+});
+
+describe('a VM rolled back to a pre-Phase 5 api (R14; the runbook row of plan 8.5)', () => {
+    it('a pre-reset copy the old api merged into the tombstone comes back after going forward as the current generation\'s record', async () => {
+        use({ rows: [ch1Row('in_progress')] });
+        const gen = await reset();
+        // The Phase 4 save path: lock, merge, write, no generation check.
+        const preReset = record({ seen: ['hook-b1'], answers: answered, updatedAt: '2026-10-24T00:00:00.000Z' });
+        const { rows } = await pool.query(SQL.lockRow, [ALICE, VIBE, CH1]);
+        const merged = mergeProgress(parseProgress(rows[0].progress), sanitizeProgress(preReset, { now: NOW }));
+        const pct = lessonPct(ch1.lesson, merged);
+        await pool.query(SQL.updateRow, [ALICE, VIBE, CH1, JSON.stringify(merged), pct, lessonState(ch1.lesson, merged), ch1.hash, merged.updatedAt]);
+        // Back on the Phase 5 api: the old answers are the current generation's record (the runbook
+        // says so; the learner can start the lesson over again). Later pre-reset copies are refused.
+        const all = await getLessonProgress({ userId: ALICE, withEpoch: true });
+        const ch1Record = all.records.find((r) => r.lessonId === CH1);
+        assert.equal(ch1Record.lessonEpoch, gen.lessonEpoch);
+        assert.deepEqual(ch1Record.progress.answers, answered);
+        const later = await save([{ courseSlug: VIBE, lessonId: CH1, lessonEpoch: null, progress: record({ seen: ['s1-b1'], updatedAt: NOW.toISOString() }) }]);
+        assert.deepEqual(later.rejected.map((r) => r.error_type), ['lesson_reset']);
     });
 });
 

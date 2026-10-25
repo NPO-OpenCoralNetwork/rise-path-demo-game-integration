@@ -56,8 +56,8 @@ export const LEGAL_DOCUMENTS = Object.freeze({
     generated: 'content/legal/terms.ja.md',
   }),
   privacy: Object.freeze({
-    version: 'privacy-draft-2026-10-22.4',
-    sha256: 'dc1d732ddba453063f1bdb1067e4a9f76878b8692113a586401967cd90205ccb',
+    version: 'privacy-draft-2026-10-22.5',
+    sha256: '7fded89014bbd55c1745a49732f58bdd35fa1772f894a6417a6612daa32a616a',
     effectiveDate: null,
     requiresAcceptance: false,
     include: Object.freeze({ billing: false, byoa: false }),
@@ -76,6 +76,7 @@ export const LEGAL_PINNED_HASHES = Object.freeze({
   'privacy-draft-2026-10-22.2': '4ff97adbf90a4886a59bbe8022569460e88233cd1e77eef9a6ddf89d5a29122d',
   'privacy-draft-2026-10-22.3': '059e634bafd05491fdf59a93bf416967e7a9ca6ad4977dd3c8c5e494656b7535',
   'privacy-draft-2026-10-22.4': 'dc1d732ddba453063f1bdb1067e4a9f76878b8692113a586401967cd90205ccb',
+  'privacy-draft-2026-10-22.5': '7fded89014bbd55c1745a49732f58bdd35fa1772f894a6417a6612daa32a616a',
 });
 
 /**

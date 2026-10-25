@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CloudAlert, CloudOff, RotateCcw } from 'lucide-react';
 import { useLanguage, type Language } from '../../context/LanguageContext';
 import { saveLongText } from './SaveChip';
@@ -13,7 +13,9 @@ import type { SaveView, StopReason } from './progressSync.ts';
  * Messages, one at a time (LessonReader picks them; each clears itself after 8 s):
  *   - stall: saving moved to "on this device" or "stopped" while something is unsaved;
  *   - reset: the lesson was started over (LessonEnd).
- * "Close" empties it and moves focus to the page's main area (the button is gone).
+ * "Close" empties it and moves focus to the page's main area (the button is gone). When the card
+ * goes by itself (8 s, or saving works again) after its button had focus and focus fell to the
+ * page body, the main area takes it too (as SaveStoppedNotice does).
  */
 
 const copy = {
@@ -60,10 +62,11 @@ function focusMain(): void {
   document.getElementById('main-content')?.focus({ preventScroll: true });
 }
 
-export function ReaderStatusView({ language, message, onDismiss }: {
+export function ReaderStatusView({ language, message, onDismiss, onButtonFocus }: {
   language: Language;
   message: ReaderStatusMessage | null;
   onDismiss: () => void;
+  onButtonFocus?: () => void;
 }) {
   const text = copy[language];
   let content: React.ReactNode = null;
@@ -77,6 +80,7 @@ export function ReaderStatusView({ language, message, onDismiss }: {
           type="button"
           className="rp-link-btn rp-notice-x"
           aria-label={text.close}
+          onFocus={onButtonFocus}
           onClick={() => {
             onDismiss();
             focusMain();
@@ -97,7 +101,28 @@ export function ReaderStatusView({ language, message, onDismiss }: {
 
 export function ReaderStatus({ message, onDismiss }: { message: ReaderStatusMessage | null; onDismiss: () => void }) {
   const { language } = useLanguage();
-  return <ReaderStatusView language={language} message={message} onDismiss={onDismiss} />;
+  const hadFocus = useRef(false);
+  // The card went away by itself (8 s, or saving works again) after its button had focus, and focus
+  // fell to the page body (a removed element takes focus with it): the page's main area takes it.
+  useEffect(() => {
+    if (message || !hadFocus.current) return;
+    hadFocus.current = false;
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!active || active === document.body) focusMain();
+  }, [message]);
+  return (
+    <ReaderStatusView
+      language={language}
+      message={message}
+      onDismiss={() => {
+        hadFocus.current = false; // the button's own click moves focus
+        onDismiss();
+      }}
+      onButtonFocus={() => {
+        hadFocus.current = true;
+      }}
+    />
+  );
 }
 
 export default ReaderStatus;

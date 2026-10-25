@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CloudAlert, LogIn, RotateCw } from 'lucide-react';
 import { useLanguage, type Language } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +12,9 @@ import type { SaveView } from './progressSync.ts';
  * does not have yet. It says how many, why (the reason's long text), when the server last
  * confirmed them, and offers one action:
  *   - network / server: 「もう一度保存する」 (retryProgressSync: one GET or PUT now, at most every
- *     10 s); aria-disabled while a request runs, so focus stays on it;
+ *     10 s); aria-disabled while a request runs, so focus stays on it; 「保存しています…」 only for
+ *     a request the learner started (the core's own retries on its backoff change no text in the
+ *     live region, so nothing is read again while the learner reads);
  *   - auth: 「ログインし直す」 (logout with reason 'reauth': no question first; the records stay on
  *     this device and are saved at the same learner's next sign-in);
  *   - account (another tab's logout or learner), storage: no button (nothing here can fix it).
@@ -49,7 +51,7 @@ const barClasses = 'mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-car
 const buttonClasses = 'inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-small font-semibold text-fg hover:bg-raised aria-disabled:cursor-not-allowed aria-disabled:opacity-60';
 
 /** The notice for a given view (exported for server/tests/phase5Front.test.js). */
-export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, buttonRef, onButtonFocus }: {
+export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, buttonRef, onButtonFocus, retrying = false }: {
   language: Language;
   view: SaveView;
   onRetry: () => void;
@@ -57,6 +59,8 @@ export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, butto
   buttonRef?: React.Ref<HTMLButtonElement>;
   /** The button got focus (the notice moves focus to main if it goes away from under it). */
   onButtonFocus?: () => void;
+  /** A request the learner started with the button runs (its label says so). */
+  retrying?: boolean;
 }) {
   const t = copy[language];
   const shown = view.state === 'stopped' && view.pending > 0;
@@ -85,7 +89,7 @@ export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, butto
             onFocus={onButtonFocus}
           >
             <RotateCw size={14} aria-hidden="true" />
-            {view.busy ? t.retrying : t.retry}
+            {retrying ? t.retrying : t.retry}
           </button>
         ) : reason === 'auth' ? (
           <button
@@ -112,6 +116,14 @@ const SaveStoppedNotice: React.FC = () => {
   const view = useProgressSaveView();
   const shown = view.state === 'stopped' && view.pending > 0;
   const hadFocus = useRef(false);
+  /** The learner pressed 「もう一度保存する」 and its request has not ended yet. */
+  const [pressed, setPressed] = useState(false);
+
+  // The press starts a request at once (busy in the same render); it ends when busy does, also when
+  // the press started none (at most one every 10 s) or the notice went away.
+  useEffect(() => {
+    if (pressed && !(shown && view.busy)) setPressed(false);
+  }, [pressed, shown, view.busy]);
 
   // The notice went away (saved, or the learner left) after its button had focus, and focus fell
   // to the page body (a removed element takes focus with it): the page's main area takes it.
@@ -126,7 +138,11 @@ const SaveStoppedNotice: React.FC = () => {
     <SaveStoppedNoticeView
       language={language}
       view={view}
-      onRetry={retryProgressSync}
+      retrying={pressed && view.busy}
+      onRetry={() => {
+        setPressed(true);
+        retryProgressSync();
+      }}
       onSignIn={() => {
         hadFocus.current = false;
         void logout({ reason: 'reauth' });

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Award,
   BookOpenCheck,
@@ -33,7 +33,13 @@ import type { Badge, BadgeId } from '../../../../services/achievementsApi';
  * shows the unearned badge nearest to done.
  * States: loading (a status line), unavailable (try again), unsupported (an older server) and
  * no_account (no Rise Path account signed in) say so without numbers.
+ * Try again keeps its button mounted while it loads (aria-disabled, focus stays on it); a status
+ * line says it is loading and, when it fails again, that badges still can't be shown; on success
+ * focus goes to the next-badge heading. Headings: h1, the next badge (h2), all badges (h2) over
+ * each badge's name (h3).
  */
+/** The try-again button's request: running, or it failed again (the status line says so). */
+export type BadgesRetry = 'busy' | 'failed' | null;
 
 const copy = {
   en: {
@@ -50,6 +56,7 @@ const copy = {
     unavailableTitle: "Badges can't be shown right now.",
     unavailableBody: 'Please try again later.',
     retry: 'Try again',
+    retryFailed: "Badges still can't be shown. Please try again later.",
     unsupported: 'Badges will be available soon.',
     noAccount: 'XP and badges are recorded when you sign in with a Rise Path account.',
     listLabel: 'All badges',
@@ -77,13 +84,14 @@ const copy = {
     unavailableTitle: 'いまはバッジを表示できません。',
     unavailableBody: 'しばらくしてから、もう一度お試しください。',
     retry: 'もう一度読み込む',
+    retryFailed: 'まだバッジを表示できません。しばらくしてから、もう一度お試しください。',
     unsupported: 'バッジは、まもなく使えるようになります。',
     noAccount: 'XP とバッジは、Rise Path のアカウントでログインすると記録されます。',
     listLabel: 'すべてのバッジ',
     badges: {
       first_lesson: { name: 'はじめてのレッスン完了', rule: 'レッスンかステージを 1 つ終える' },
       five_lessons: { name: '5 つのレッスン完了', rule: 'レッスンかステージを 5 つ終える' },
-      fifteen_lessons: { name: '15 のレッスン完了', rule: 'レッスンかステージを 15 終える' },
+      fifteen_lessons: { name: '15 個のレッスン完了', rule: 'レッスンかステージを 15 個終える' },
       first_course: { name: 'コース修了', rule: '1 つのコースの、いま公開されているレッスンをすべて終える' },
       three_courses: { name: '3 コース修了', rule: '3 つのコースのレッスンをすべて終える' },
       streak_3: { name: '3 日つづけて学習', rule: '3 日つづけて学ぶ（日本時間）' },
@@ -182,15 +190,18 @@ function BadgeItem({ badge, language }: { badge: Badge; language: Language }) {
 }
 
 /** The page body for a snapshot (exported for server/tests/phase5Front.test.js). */
-export function ProfileBadgesBody({ language, snapshot, onRetry }: {
+export function ProfileBadgesBody({ language, snapshot, onRetry, retry = null }: {
   language: Language;
   snapshot: AchievementsSnapshot;
   onRetry: () => void;
+  retry?: BadgesRetry;
 }) {
   const t = copy[language];
   const data = snapshot.status === 'ready' ? snapshot.data : null;
   if (!data) {
-    if (snapshot.status === 'unavailable') {
+    // While the learner's own retry loads, the same panel stays (the focused button is not unmounted).
+    const busy = retry === 'busy' && snapshot.status === 'loading';
+    if (snapshot.status === 'unavailable' || busy) {
       return (
         <EmptyState
           headingLevel={2}
@@ -198,9 +209,20 @@ export function ProfileBadgesBody({ language, snapshot, onRetry }: {
           title={t.unavailableTitle}
           description={t.unavailableBody}
           action={(
-            <Button variant="secondary" size="sm" leadingIcon={<RotateCw size={14} aria-hidden="true" />} onClick={onRetry}>
-              {t.retry}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<RotateCw size={14} aria-hidden="true" />}
+                aria-disabled={busy || undefined}
+                onClick={() => {
+                  if (!busy) onRetry();
+                }}
+              >
+                {busy ? t.loading : t.retry}
+              </Button>
+              <p role="status" className="sr-only">{busy ? t.loading : retry === 'failed' ? t.retryFailed : ''}</p>
+            </>
           )}
         />
       );
@@ -223,7 +245,7 @@ export function ProfileBadgesBody({ language, snapshot, onRetry }: {
               <LockKeyhole size={22} />
             </span>
             <div className="min-w-0 flex-1 space-y-2">
-              <h2 id="rp-next-badge" className="text-h3 text-fg">{t.next(upcomingCopy.name)}</h2>
+              <h2 id="rp-next-badge" tabIndex={-1} className="text-h3 text-fg">{t.next(upcomingCopy.name)}</h2>
               <p className="text-small text-fg-2">{upcomingCopy.rule}</p>
               <ProgressBar badge={upcoming} label={upcomingCopy.name} />
               <p className="tabular text-small text-fg-2">{badgeProgressText(language, upcoming)}</p>
@@ -234,14 +256,17 @@ export function ProfileBadgesBody({ language, snapshot, onRetry }: {
             <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-control bg-sun-soft text-sun-text">
               <Trophy size={22} />
             </span>
-            <h2 id="rp-next-badge" className="text-h3 text-fg">{t.allEarned}</h2>
+            <h2 id="rp-next-badge" tabIndex={-1} className="text-h3 text-fg">{t.allEarned}</h2>
           </div>
         )}
       </section>
 
-      <ul aria-label={t.listLabel} className="grid gap-3 sm:grid-cols-2">
-        {data.badges.map((badge) => <BadgeItem key={badge.id} badge={badge} language={language} />)}
-      </ul>
+      <section aria-labelledby="rp-all-badges" className="space-y-3">
+        <h2 id="rp-all-badges" className="text-h3 text-fg">{t.listLabel}</h2>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {data.badges.map((badge) => <BadgeItem key={badge.id} badge={badge} language={language} />)}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -250,16 +275,37 @@ const ProfileBadgesView: React.FC = () => {
   const { language } = useLanguage();
   const { setTheme } = useTheme();
   const snapshot = useAchievements();
+  const [retry, setRetry] = useState<BadgesRetry>(null);
 
   useEffect(() => {
     setTheme('default');
   }, [setTheme]);
 
+  // The learner's retry ended: failed again (the status line says so), or the badges are here
+  // (focus to the next-badge heading, where the button was).
+  useEffect(() => {
+    if (retry !== 'busy' || snapshot.status === 'loading') return;
+    if (snapshot.status === 'unavailable') {
+      setRetry('failed');
+      return;
+    }
+    setRetry(null);
+    if (snapshot.status === 'ready' && typeof document !== 'undefined') document.getElementById('rp-next-badge')?.focus({ preventScroll: true });
+  }, [retry, snapshot.status]);
+
   const t = copy[language];
   return (
     <div className="mx-auto max-w-5xl space-y-8 py-8 md:py-12">
       <PageHeader title={t.title} description={t.subtitle} />
-      <ProfileBadgesBody language={language} snapshot={snapshot} onRetry={() => void reloadAchievements()} />
+      <ProfileBadgesBody
+        language={language}
+        snapshot={snapshot}
+        retry={retry}
+        onRetry={() => {
+          setRetry('busy');
+          void reloadAchievements();
+        }}
+      />
     </div>
   );
 };

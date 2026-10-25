@@ -10,12 +10,15 @@
  *   at answer time is dropped and fetched once more.
  * - unsupported: the sync's GET said the server has no achievements (capabilities), or the route
  *   answered 404 without error_type (an older server: latched for this page load, which also
- *   spares its AI limiter). While the sync's GET has not succeeded yet, one probe per page load.
+ *   spares its AI limiter). While the sync's GET has not succeeded yet, one background probe per
+ *   page load; the "try again" button may probe again (an older VM's 404 is latched before that).
  * - When it fetches: a consumer mounts and there is no data for this learner or it is older than
- *   30 s; a server-sourced lesson record arrives while a consumer is mounted (trailing 2 s, at most
- *   every 15 s: the post-save hook commits first); ACHIEVEMENTS_STALE_EVENT (a Blender stage was
- *   saved); reloadAchievements (the "try again" button); the sync's capabilities become known, or
- *   start offering achievements.
+ *   30 s; a server-sourced lesson record arrives, or the server took this tab's lesson records
+ *   (PROGRESS_SAVED_EVENT: an ordinary save changes nothing here, yet its hook may award XP),
+ *   while a consumer is mounted (trailing 2 s, at most every 15 s: the post-save hook commits
+ *   first; without a consumer the data is marked stale); ACHIEVEMENTS_STALE_EVENT (a Blender stage
+ *   was saved); reloadAchievements (the "try again" button); the sync's capabilities become known,
+ *   or start offering achievements.
  *   Never on focus. One request at a time (a request asked for meanwhile runs once after it).
  * - Errors (401, network, 5xx, a malformed answer): 'unavailable' when there is nothing to show;
  *   data of the same learner is kept and shown (status stays 'ready').
@@ -24,7 +27,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { ACHIEVEMENTS_STALE_EVENT, getAchievements, type Achievements } from '../../services/achievementsApi';
 import { PROGRESS_EVENT, type ProgressEventDetail } from '../lesson/progressStore.ts';
-import { SYNC_ACCOUNT_EVENT, type SyncCapabilities } from '../lesson/progressSync.ts';
+import { PROGRESS_SAVED_EVENT, SYNC_ACCOUNT_EVENT, type SyncCapabilities } from '../lesson/progressSync.ts';
 import {
   progressCapabilities,
   runAsSyncedLearner,
@@ -60,7 +63,7 @@ export type AchievementsStore = {
   subscribe(listener: () => void): () => void;
   /** A consumer mounted (fetches when needed); the returned function unmounts it. */
   consumerMounted(): () => void;
-  /** A server-sourced lesson record was stored (PROGRESS_EVENT source 'server'). */
+  /** A server-sourced lesson record was stored (PROGRESS_EVENT source 'server'), or the server took this tab's records (PROGRESS_SAVED_EVENT). */
   serverProgress(): void;
   /** Something the server counts changed (ACHIEVEMENTS_STALE_EVENT). */
   stale(): void;
@@ -85,6 +88,8 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
   let consumers = 0;
   let inFlight: Promise<void> | null = null;
   let again = false;
+  /** The request asked for meanwhile is the learner's "try again" (it may probe again). */
+  let againExplicit = false;
   /** A 404 without error_type this page load: the route does not exist here. */
   let latched = false;
   /** A request went out while the sync did not know the capabilities yet. */
@@ -170,9 +175,11 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
     if (!(snap.data && snap.learnerId === current)) set({ status: current ? 'unavailable' : 'no_account', learnerId: current, data: null, at: null });
   }
 
-  function fetchNow(): Promise<void> {
+  /** explicit: the "try again" button, which may probe again while the capabilities are unknown. */
+  function fetchNow(explicit = false): Promise<void> {
     if (inFlight) {
       again = true;
+      if (explicit) againExplicit = true;
       return inFlight;
     }
     const verdict = gate();
@@ -185,12 +192,14 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
       set({ status: 'unsupported', learnerId: learner(), data: null, at: null });
       return Promise.resolve();
     }
-    if (verdict === 'wait') return Promise.resolve();
+    if (verdict === 'wait' && !explicit) return Promise.resolve();
     const run = request().finally(() => {
       if (inFlight === run) inFlight = null;
       if (again) {
+        const repeatExplicit = againExplicit;
         again = false;
-        void fetchNow();
+        againExplicit = false;
+        void fetchNow(repeatExplicit);
       }
     });
     inFlight = run;
@@ -260,7 +269,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
       }
     },
     reload() {
-      return fetchNow();
+      return fetchNow(true);
     },
     async settled() {
       for (let i = 0; i < 10 && inFlight; i += 1) await inFlight;
@@ -269,6 +278,17 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
 }
 
 // --- The page's store ---------------------------------------------------------------------------
+
+/** The window events the page's store follows (exported for tests). */
+export function listenForAchievementChanges(s: AchievementsStore, target: Pick<Window, 'addEventListener'>): void {
+  target.addEventListener(PROGRESS_EVENT, (event) => {
+    const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
+    if (detail?.source === 'server') s.serverProgress();
+  });
+  target.addEventListener(PROGRESS_SAVED_EVENT, () => s.serverProgress());
+  target.addEventListener(ACHIEVEMENTS_STALE_EVENT, () => s.stale());
+  target.addEventListener(SYNC_ACCOUNT_EVENT, () => s.syncChanged());
+}
 
 let store: AchievementsStore | null = null;
 
@@ -281,12 +301,7 @@ function pageStore(): AchievementsStore {
   });
   store = created;
   if (typeof window !== 'undefined') {
-    window.addEventListener(PROGRESS_EVENT, (event) => {
-      const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
-      if (detail?.source === 'server') created.serverProgress();
-    });
-    window.addEventListener(ACHIEVEMENTS_STALE_EVENT, () => created.stale());
-    window.addEventListener(SYNC_ACCOUNT_EVENT, () => created.syncChanged());
+    listenForAchievementChanges(created, window);
     subscribeProgressSaveView(() => created.syncChanged());
   }
   return created;

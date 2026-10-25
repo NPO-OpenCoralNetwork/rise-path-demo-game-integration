@@ -232,7 +232,7 @@ export function fakeApi({ epoch = null, rows = [], clock, phase5 = false } = {})
 export function setup({ storage = memoryStorage(), rows = [], epoch = null, apiEnabled, phase5 = false, random = () => 0.5 } = {}) {
   const clock = fakeClock();
   const api = fakeApi({ epoch, rows, clock, phase5 });
-  const events = { progress: [], account: 0 };
+  const events = { progress: [], account: 0, saved: 0 };
   const sync = createProgressSync({
     storage,
     api,
@@ -246,6 +246,9 @@ export function setup({ storage = memoryStorage(), rows = [], epoch = null, apiE
       progress: (detail) => events.progress.push(detail),
       account: () => {
         events.account += 1;
+      },
+      saved: () => {
+        events.saved += 1;
       },
     },
   });
