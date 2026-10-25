@@ -1269,7 +1269,7 @@ describe('wiring (static)', () => {
     assert.match(settings, /deleteAccount: 'Delete account'/);
     assert.match(read('components/features/settings/SettingsPrivacyView.tsx'), /<Link to="\/settings\/delete-account"/);
     const safety = read('components/features/safety/AiSafetyGuideView.tsx');
-    // True also while deletion is turned off on the server (ACCOUNT_DELETION_ENABLED=false): it only says where to go.
+    // True also while deletion is off on the server (the default until ACCOUNT_DELETION_ENABLED=true): it only says where to go.
     assert.ok(safety.includes("'アカウントを削除するときは、設定の「アカウントを削除する」を開いてください。'"));
     assert.ok(safety.includes("'To delete your account, open Settings → Delete account.'"));
     assert.doesNotMatch(safety, /いつでも削除|at any time from Settings/);

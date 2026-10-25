@@ -36,7 +36,8 @@ import type { ConnectedAppRecord } from '../../../services/oauthConsentRules';
  *   - guests, Nexloom-only and dev mock sessions: no records on the server, the Privacy page link;
  *   - preflight 404 (an api without this route: the front deploys first), network error or 5xx:
  *     "not available yet" with a retry, no form;
- *   - enabled false (ACCOUNT_DELETION_ENABLED): "not from this page right now", no form;
+ *   - enabled false (the server's ACCOUNT_DELETION_ENABLED is not true: deletion starts off until
+ *     the owner turns it on): "not from this page right now", no form;
  *   - a renewing supporter plan: cancel first (the Stripe portal when billing is on), no form;
  *   - otherwise the form. A 409 subscription_active (Stripe has a renewing plan the local copy
  *     missed) shows the same portal button in the error box when billing is on.

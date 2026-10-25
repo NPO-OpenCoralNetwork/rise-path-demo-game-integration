@@ -19,8 +19,9 @@
  *      ids only, names cleaned like the revoke route's; anything else is dropped and never refuses
  *      the deletion. In order:
  *      per-learner limit 5/min (429 rate_limited); ACCOUNT_DELETION_ENABLED off → 503
- *      deletion_disabled (unset, empty, true/1/on/yes in any case → on; false/0/off/no → off; any
- *      other value → off with one warning); 400 confirm_required; re-auth: the token's newest `password` amr time
+ *      deletion_disabled (off by default: only true/1/on/yes, trimmed and in any case, turn it on;
+ *      unset, empty and false/0/off/no leave it off; any other value → off with one warning);
+ *      400 confirm_required; re-auth: the token's newest `password` amr time
  *      within [now − 120 s, now + 60 s] and its sub the signed-in user, else 401 reauth_required;
  *      then server/services/accountDeletion.js deleteAccountData (requestedBy 'self').
  *      200 { ok, status: 'deleted', deletedAt } (repeated: true when it was already deleted);
@@ -50,20 +51,24 @@ export const ACCOUNT_DELETIONS_PER_MINUTE = 5;
 export const REAUTH_FUTURE_SKEW_S = 60;
 export const CONFIRM_WORD = 'delete-my-account';
 
-/** ACCOUNT_DELETION_ENABLED values that leave deletion on (trimmed, any case); unset or empty is on too. */
+/** The only ACCOUNT_DELETION_ENABLED values that turn deletion on (trimmed, any case). */
 const SWITCH_ON = new Set(['true', '1', 'on', 'yes']);
-/** Values that turn it off on purpose (any other value turns it off too, with a warning: a safety switch fails closed). */
-const SWITCH_OFF = new Set(['false', '0', 'off', 'no']);
+/** Values that leave it off on purpose, as unset and empty do (any other value leaves it off too, with a warning). */
+const SWITCH_OFF = new Set(['', 'false', '0', 'off', 'no']);
 
 /**
- * Whether deleting from Settings is on. The switch is also the BYOA precondition (design §10.1),
- * so a misspelt value ("flase", "disabled") turns deletion off rather than leaving it on.
+ * Whether deleting from Settings is on. It is off until the owner sets the switch: without the
+ * Supabase setting "Require current password when updating", anyone holding a signed-in session
+ * can set a new password through /auth/v1/user and pass the password re-entry, and the production
+ * `amr` check comes first too (ai-access-plan §8.2 items 2 and 3). The switch is also the BYOA
+ * precondition (design §10.1), so a misspelt value ("ture", "enabled") leaves deletion off.
+ * The staff script (scripts/delete-account-data.mjs) does not read it.
  * @param {string | undefined} raw
  * @returns {{ on: boolean, recognised: boolean }}
  */
 export function readDeletionSwitch(raw) {
     const value = String(raw ?? '').trim().toLowerCase();
-    if (value === '' || SWITCH_ON.has(value)) return { on: true, recognised: true };
+    if (SWITCH_ON.has(value)) return { on: true, recognised: true };
     return { on: false, recognised: SWITCH_OFF.has(value) };
 }
 

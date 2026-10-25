@@ -36,8 +36,9 @@
  * the --orphans guards), 3 unavailable (database, Supabase, Stripe or Memanto: the service's
  * payment_provider_unavailable and memory_service_unavailable too; try again later), 1 usage or
  * setup. A JSON line with memoryDeleted true (exit 2 or 3): the AI memories are gone and the rest
- * was kept; run the same --yes again. Works with ACCOUNT_DELETION_ENABLED=false. Full
- * ids are printed only for --find-email and --user (the staff terminal).
+ * was kept; run the same --yes again. Works whatever ACCOUNT_DELETION_ENABLED says (it switches
+ * only the Settings page, and starts off). Full ids are printed only for --find-email and --user
+ * (the staff terminal).
  */
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

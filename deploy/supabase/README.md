@@ -48,4 +48,4 @@ AI アプリに発行したトークンも `role` は `authenticated` です。P
 
 AI アプリのトークンでも、Supabase Auth の `/user` でパスワードの設定やメールアドレスの変更を呼べます（ソースコードを読んだかぎり。本番では未検証）。この SQL やフックでは防げません。Authentication → Sign In / Providers → Email の設定で防ぎます。設定の名前と、それでも残るリスク（パスワードのないアカウントで、許可から 24 時間）は、[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6 にあります。
 
-**アカウントの削除（Phase 4）も同じ前提です。** AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」でその方の Rise Path のデータを消せます。なので、`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、この 3 つの設定を入れてステージングで確かめる（byoa-setup.ja.md の手順 10）まで、API の `ACCOUNT_DELETION_ENABLED=false` のままにします。
+**アカウントの削除（Phase 4）も同じ前提です。** AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」でその方の Rise Path のデータを消せます。ご本人の削除は、はじめ止まっています（API の `ACCOUNT_DELETION_ENABLED` が未設定）。`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、この 3 つの設定を入れてステージングで確かめる（byoa-setup.ja.md の手順 10）まで、`ACCOUNT_DELETION_ENABLED=true` にしません。`byoa` を使わないときも、「Require current password when updating」の確かめと本番の `amr` の確かめ（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 8.2 の 2 と 3）が先です。

@@ -2,7 +2,8 @@
 // real server.js stack: requireAuth and requireSignedIn, the 16 kb body parser registered before
 // the 50 MB one, the per-learner limit, the off switch, the password re-authentication (amr), the
 // deletion itself against helpers/deletionPool.js, and what a deleted account's sessions get
-// afterwards. The answer for every service result is checked on the router alone.
+// afterwards. The answer for every service result is checked on the router alone. Deletion starts
+// off (ACCOUNT_DELETION_ENABLED unset); the cases that test the chain past the switch turn it on.
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -84,6 +85,8 @@ describe('/api/v2/user/account on the server.js stack', () => {
         for (const key of ENV_KEYS) saved[key] = process.env[key];
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'production';
+        // On for the chain below; 'deletion starts off' deletes it again.
+        process.env.ACCOUNT_DELETION_ENABLED = 'true';
         pool = createDeletionPool({
             stubs: [A, B],
             owned: { lesson_progress: [A, B] },
@@ -175,6 +178,25 @@ describe('/api/v2/user/account on the server.js stack', () => {
         assert.ok(pool.state.stubs.has(A), 'nothing was deleted');
     });
 
+    it('deletion starts off: with ACCOUNT_DELETION_ENABLED unset or empty, the preflight says enabled false and a POST with a fresh password sign-in is 503 deletion_disabled, without a warning; nothing is deleted', async () => {
+        const warnings = [];
+        console.warn = (...args) => warnings.push(args.join(' '));
+        for (const value of [undefined, '', '  ']) {
+            if (value === undefined) delete process.env.ACCOUNT_DELETION_ENABLED;
+            else process.env.ACCOUNT_DELETION_ENABLED = value;
+            await withServer(async (base) => {
+                const preflight = await call(base, DELETION, { headers: auth(token(A)) });
+                assert.deepEqual([preflight.status, preflight.json], [200, { ok: true, enabled: false, subscription: 'none', reauthWindowSeconds: 120 }], JSON.stringify(value));
+                const res = await call(base, DELETION, { method: 'POST', headers: auth(token(A)), body: CONFIRM });
+                assert.deepEqual([res.status, res.json], [503, { error: 'Deleting an account from this page is turned off right now.', error_type: 'deletion_disabled' }], JSON.stringify(value));
+            });
+        }
+        assert.deepEqual(warnings.filter((line) => line.includes('ACCOUNT_DELETION_ENABLED')), [], 'unset and empty are the default, not a mistake');
+        assert.ok(pool.state.stubs.has(A) && pool.state.stubs.has(B));
+        assert.equal(pool.state.tombstones.size, 0);
+        assert.deepEqual(pool.state.owned.lesson_progress, [A, B]);
+    });
+
     it(`the ${ACCOUNT_DELETIONS_PER_MINUTE + 1}th POST in a minute is 429 rate_limited (per learner); ACCOUNT_DELETION_ENABLED=false → 503 deletion_disabled`, async () => {
         await withServer(async (base) => {
             for (let i = 0; i < ACCOUNT_DELETIONS_PER_MINUTE; i += 1) {
@@ -258,7 +280,8 @@ describe('createAccountRouter: the answer for every service result', () => {
     const NOW = Date.parse('2026-10-24T05:00:00Z');
     const fresh = (sub = A, at = NOW / 1000) => token(sub, { amr: [{ method: 'password', timestamp: at }] });
 
-    const withRouter = async (deleteAccountData, handler, { env = {}, userId = A, logger = { warn: () => {} } } = {}) => {
+    /** env: deletion on unless a case passes its own (the switch starts off). */
+    const withRouter = async (deleteAccountData, handler, { env = { ACCOUNT_DELETION_ENABLED: 'true' }, userId = A, logger = { warn: () => {} } } = {}) => {
         const app = express();
         app.use(express.json());
         app.use((req, res, next) => {
@@ -270,11 +293,12 @@ describe('createAccountRouter: the answer for every service result', () => {
         await listen(app, handler);
     };
 
-    it('ACCOUNT_DELETION_ENABLED: unset, empty, true/1/on/yes (any case) leave it on; false/0/off/no turn it off; any other value turns it off with one warning', async () => {
+    it('ACCOUNT_DELETION_ENABLED: only true/1/on/yes (trimmed, any case) turn it on; unset, empty and false/0/off/no leave it off; any other value leaves it off with one warning', async () => {
         const cases = [
-            [undefined, true], ['', true], ['true', true], [' TRUE ', true], ['1', true], ['On', true], ['yes', true],
+            ['true', true], [' TRUE ', true], ['True', true], ['1', true], ['On', true], ['yes', true], [' YES\n', true],
+            [undefined, false], ['', false], ['   ', false],
             ['false', false], ['False', false], ['FALSE', false], [' false\n', false], ['0', false], ['off', false], ['No', false],
-            ['flase', false, 'warn'], ['disabled', false, 'warn'],
+            ['flase', false, 'warn'], ['disabled', false, 'warn'], ['ture', false, 'warn'], ['enabled', false, 'warn'],
         ];
         for (const [value, on, warn] of cases) {
             const label = JSON.stringify(value);
@@ -296,7 +320,9 @@ describe('createAccountRouter: the answer for every service result', () => {
         }
         assert.deepEqual(readDeletionSwitch('Off'), { on: false, recognised: true });
         assert.deepEqual(readDeletionSwitch('nope'), { on: false, recognised: false });
-        assert.deepEqual(readDeletionSwitch(undefined), { on: true, recognised: true });
+        assert.deepEqual(readDeletionSwitch(undefined), { on: false, recognised: true }, 'unset: off, the default');
+        assert.deepEqual(readDeletionSwitch(''), { on: false, recognised: true }, 'empty: off, the default');
+        assert.deepEqual(readDeletionSwitch(' Yes '), { on: true, recognised: true });
     });
 
     it('maps deleted, already, refused and failed to fixed answers with memory_deleted', async () => {
@@ -400,7 +426,7 @@ describe('createAccountRouter: the answer for every service result', () => {
             },
             billing,
             now: () => NOW,
-            env: {},
+            env: { ACCOUNT_DELETION_ENABLED: 'true' },
             getPool: () => ({}),
             logger: { warn: () => {} },
         }));

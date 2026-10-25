@@ -343,7 +343,7 @@ docker compose --env-file stack.env logs api | grep '\[Billing\]'
 
 | 変数 | 既定 | 中身 |
 |---|---|---|
-| `ACCOUNT_DELETION_ENABLED` | 未設定（削除できる） | `false` で、設定の「アカウントを削除する」を止めます。`true` か `false` を書きます（ほかの値は止める側になり、警告を出します）。Supabase の「Require current password when updating」を入れて確かめるまでは、`byoa` を使うかどうかにかかわらず `false`（[`doc/guides/account-deletion-operations.ja.md`](../../doc/guides/account-deletion-operations.ja.md) の 7 章）。`byoa` を動かすあいだは、さらにパスワードの 3 つの設定が要ります（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6） |
+| `ACCOUNT_DELETION_ENABLED` | 未設定（画面からの削除は止まっている） | `true` で、設定の「アカウントを削除する」が使えるようになります。未設定と `false` では止まったままです（ほかの値も止める側になり、警告を出します）。`byoa` を使うかどうかにかかわらず、Supabase の「Require current password when updating」の確かめと、本番の `amr` の確かめが済むまでは `true` にしません（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 8.2 の 2 と 3、[`doc/guides/account-deletion-operations.ja.md`](../../doc/guides/account-deletion-operations.ja.md) の 7 章）。`byoa` を動かすあいだは、さらにパスワードの 3 つの設定が要ります（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6） |
 | `RETENTION_ENABLED` | 未設定（`NODE_ENV=production` の `api` では動く。ほかでは `true` のときだけ動く） | `false` で、保存期間の処理をすべて止めます。止めるのは、この VM の `api` だけです。手元の API を VM の DB につなぐときは、手元の `.env.local` にも `RETENTION_ENABLED=false` を書きます（3 章） |
 | `RETENTION_AI_USAGE_DAYS` | 30 | AI の利用回数を残す日数（2〜400） |
 | `RETENTION_PROCESSING_DAYS` | 365 | 処理の記録と AI アプリからの呼び出しの記録を残す日数（30〜3650） |

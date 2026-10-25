@@ -931,15 +931,23 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
     assert.match(services.api || '', /^ {6}NODE_ENV: \$\{NODE_ENV:-production\}\s*$/m);
   });
 
-  it('ACCOUNT_DELETION_ENABLED: "Require current password" is a precondition in every deployment, not only with byoa', () => {
+  it('ACCOUNT_DELETION_ENABLED starts off; "Require current password" and the production amr check come first in every deployment, not only with byoa', () => {
     const stack = read(path.join(STACK, 'stack.env.example'));
     const block = stack.slice(stack.indexOf('# --- Account deletion and retention'), stack.indexOf('# ACCOUNT_DELETION_ENABLED='));
     const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
     const sentence = text.split(/(?<=\.)\s+/).find((part) => part.includes('Require current password'));
     assert.ok(sentence, 'the comment names the Supabase setting');
     assert.match(sentence, /whatever COMPOSE_PROFILES says/);
+    assert.match(sentence, /§8\.2 items 2-3/);
+    assert.match(sentence, /production amr check/);
     assert.doesNotMatch(sentence, /while COMPOSE_PROFILES lists byoa/);
     assert.match(text, /current_password_required/, 'the staging check');
+    assert.match(text, /Deletion starts off/);
+    assert.doesNotMatch(text, /unset or empty = on/);
+    for (const file of [path.join(STACK, 'stack.env.example'), path.join(ROOT, '.env.example')]) {
+      const documented = lines(read(file)).filter((line) => line.startsWith('# ACCOUNT_DELETION_ENABLED='));
+      assert.deepEqual(documented, ['# ACCOUNT_DELETION_ENABLED=true'], `${file}: the line to uncomment turns it on`);
+    }
   });
 
   it('stack.env.example documents them commented out; mcp-public.env.example never names them', () => {

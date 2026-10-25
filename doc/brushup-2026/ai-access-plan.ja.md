@@ -285,7 +285,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
   - **パスワードを設定・置き換えて、アプリの API に入れます。** AI アプリは `/user` でアカウントのパスワードを設定するか置き換え、そのパスワードでふつうにログインできます。そのログインは学習者自身のものと同じ形（`client_id` なし、`aud` は `authenticated`）なので、アプリの API の守り（`isOAuthClientToken`）を通り、アプリの API と VM のデータをすべて使えます。メールアドレスの変更も同じ経路です。
   - **対策（オーナーの設定）**: Authentication → Sign In / Providers → Email で、「Require current password when changing password」（今のパスワードを確かめる）、「Require reauthentication when changing password」（ダッシュボードでは「Secure password change」。ログインから 24 時間をこえたら、メールで届くコードを求める）、「Secure email change」（前と後の両方のアドレスで確かめる）を on にします（<https://supabase.com/docs/guides/auth/password-security>、<https://supabase.com/docs/guides/self-hosting/auth/config>。手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の 6）。
   - **それでも残るもの**: 今のパスワードの確認は、パスワードのないアカウントでは働きません。AI アプリのセッションは許可した時刻に作られるので、許可から 24 時間はコードも求められません。つまり、パスワードのないアカウントでは、許可から 24 時間のあいだ、AI アプリがパスワードを設定できます。Rise Path の登録画面はパスワードを作りますが、同じ Supabase プロジェクトのほかの入口で作ったアカウントにはないことがあります。
-  - **アカウントの削除にも届きます（Phase 4）**: パスワードを設定してログインした AI アプリは、設定の「アカウントを削除する」のパスワードの確認も通るので、その方の Rise Path のデータを削除できます。なので、上の 3 つの設定を入れて確かめるまで、`ACCOUNT_DELETION_ENABLED=false` にします（8.2 の 2）。設定のあとも、パスワードのないアカウントの 24 時間は残ります（8.3）。
+  - **アカウントの削除にも届きます（Phase 4）**: パスワードを設定してログインした AI アプリは、設定の「アカウントを削除する」のパスワードの確認も通るので、その方の Rise Path のデータを削除できます。なので、削除ははじめ止まっています。上の 3 つの設定を入れて確かめるまで、`ACCOUNT_DELETION_ENABLED=true` にしません（8.2 の 2）。設定のあとも、パスワードのないアカウントの 24 時間は残ります（8.3）。
   - **減らし方**: 許可の画面は「許可する」の上に、アプリが自分と同じ力を持つので信頼できるアプリだけを許可するよう出します。DCR を on にして毎週 OAuth Apps を見るか、DCR を off にして知っているクライアントだけを登録します（下の「DCR の乱用」）。どちらにするかと、このリスクを受け入れるかは、オーナーが決めます（5.4）。
   - P-School が使う Supabase の表は、RLS に `(auth.jwt() ->> 'client_id') is null` を足すまで、AI アプリのトークンでも読み書きできる可能性があります（`deploy/supabase/README.md`）。Rise Path のアプリの API と VM のデータは、AI アプリのトークンそのものなら上の守りで断ります。
 - **PKCE の `plain` を Supabase が受け付けます**（止められません）。MCP の決まりごとは、クライアントに `S256` を使うよう求めています。Claude と ChatGPT は `S256` を使うと案内しています。危険は小さいと判断しました。
@@ -672,7 +672,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 
 - **DB**（migration 018）: 削除の記録 `account_deletions`（5 年）、利用規約への同意の記録 `legal_acceptances` と版ごとのハッシュ `legal_document_versions`、削除したアカウントの保護者の同意の証拠 `account_consent_proofs`（5 年）と AI アプリの記録 `ai_app_provision_records`（3 年）。`auth.users` の行がなくなっても、これらは残ります。削除したアカウントのログインで、データがまた作られないようにする仕組み（`auth.users` のトリガーと、アカウントごとのロック）。
 - **ログインの確かめ**: 削除より前にログインしたセッション（JWT の `amr` の時刻で判断）は、アプリの API が 401 `account_deleted`、リモート MCP と SSE の MCP も断ります。削除のあとに改めてログインすると、新しい空のアカウントになります（`tools/core/accountDeletions.js`）。
-- **ご本人の削除**: 設定の「アカウントを削除する」（`/settings/delete-account`）。消えるもの・消えないものを出し、パスワードを入れ直して、確認のダイアログのあとに消します。ほかの端末は、次に開いたときにログアウトして記録を消します。削除のあとのページ `/account/deleted`。続いている有料プランがあると止まります（`server/services/accountDeletion.js`、`server/routes/account.js`）。
+- **ご本人の削除**: 設定の「アカウントを削除する」（`/settings/delete-account`）。消えるもの・消えないものを出し、パスワードを入れ直して、確認のダイアログのあとに消します。ほかの端末は、次に開いたときにログアウトして記録を消します。削除のあとのページ `/account/deleted`。続いている有料プランがあると止まります（`server/services/accountDeletion.js`、`server/routes/account.js`）。**はじめは止まっています**（`ACCOUNT_DELETION_ENABLED` が未設定のとき。画面には「いまはこの画面から削除できません」と出ます）。8.2 の 2 と 3 が済んでから、オーナーが `ACCOUNT_DELETION_ENABLED=true` にすると使えます。スタッフの削除は、この設定にかかわらず使えます。
 - **スタッフの削除**: `scripts/delete-account-data.mjs`（メールアドレスで探す、件数を見る、消す、ほかのサービスで消されたログインを探す `--orphans`）。運用は [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md)。
 - **保存期間**: `server/services/retention.js`（API の起動時と 1 時間ごと）。サーバーのログは、すべてのサービスで 10 MB × 5 ファイルまで、DB のエラーには値を出さない（`log_error_verbosity=terse`）、API のログは URL のクエリを残さずアカウント ID を 8 文字にする（`server/utils/redactUrl.js`）。
 - **規約のページ**: `/terms` と `/privacy`。下書き（`doc/legal/*.draft.ja.md`）から、作成メモと根拠を外した公開の文（`content/legal/*.ja.md`）を作り、版とハッシュを `shared/legal/versions.js` で決めます。開発のサーバーでは下書きを帯つきで出し、本番では `VITE_FEATURE_LEGAL_PAGES=true` にするまで「準備中」を出します。下書きのまま `true` にすると、本番のビルドが止まります。CI は、止めているビルドに規約の文が入っていないことを確かめます。
@@ -683,8 +683,8 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 ### 8.2 オーナーの作業
 
 1. **公開の関門**: 一般の登録は、`VITE_FEATURE_LEGAL_PAGES=true` にするまで受け付けません（拠点とテスターだけ）。`true` にするのは、弁護士の確認のあとです。止めているあいだは、登録画面に利用目的のお知らせも同意もありません（個人情報保護法 第 21 条第 2 項、利用規約 第 1 条）。自動の確かめはありません。手順は [../legal/README.md](../legal/README.md) の「ページを公開する手順」です。
-2. **パスワードの設定と削除（どの環境でも）**: Supabase の「Require current password when updating」を入れ、ステージングで確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` にします。確かめ方: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT /auth/v1/user {"password":"…"}` を送り、400 `current_password_required` が返ること。設定がないと、ログインしたままの端末を持っている人が、新しいパスワードを設定してログインし直し、パスワードの確認を通って、アカウントを削除できます（「Secure password change」だけでは、ログインから 24 時間以内のセッションを防げません）。`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、さらに [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れ、手順 10 のパスワードの確かめが通るまで止めたままにします。設定がないと、つないだ AI アプリもパスワードを設定してログインし、アカウントを削除できます。
-3. **本番の `amr` の確かめ**: 本番で新しくログインしたアクセストークンを読み、`amr: [{"method":"password","timestamp":…}]` があることを確かめます。ないと、削除は `reauth_required` になり、削除したアカウントのログインは、ずっと断られます（安全な側）。削除を使い始める前の関門です。
+2. **パスワードの設定と削除（どの環境でも）**: ご本人の削除は、はじめ止まっています（`ACCOUNT_DELETION_ENABLED` が未設定）。Supabase の「Require current password when updating」を入れ、ステージングで確かめます。確かめ方: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT /auth/v1/user {"password":"…"}` を送り、400 `current_password_required` が返ること。設定がないと、ログインしたままの端末を持っている人が、新しいパスワードを設定してログインし直し、パスワードの確認を通って、アカウントを削除できます（「Secure password change」だけでは、ログインから 24 時間以内のセッションを防げません）。`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、さらに [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れ、手順 10 のパスワードの確かめが通るまで止めたままにします。設定がないと、つないだ AI アプリもパスワードを設定してログインし、アカウントを削除できます。確かめが通り、3 も済んだら、VM の `stack.env` に `ACCOUNT_DELETION_ENABLED=true` を書いて、`deploy-stack.sh` を実行し直します。
+3. **本番の `amr` の確かめ**: 本番で新しくログインしたアクセストークンを読み、`amr: [{"method":"password","timestamp":…}]` があることを確かめます。ないと、削除は `reauth_required` になり、削除したアカウントのログインは、ずっと断られます（安全な側）。削除を使い始める前の関門です。2 とこれが済んだら、`ACCOUNT_DELETION_ENABLED=true` にします（2 の終わりの手順）。
 4. **デプロイの順番**: マージすると、Vercel がすぐに画面を作り直します。API は `deploy-stack.sh` を実行するまで古いままです。**同じ日に** `deploy-stack.sh` を実行します（migration 018 を当てます）。そのあと `sql/mcp_remote_role.sql` を流し直します。ログの設定が変わるので、最初のデプロイでは、動いているコンテナがすべて一度作り直されます（`db` は「db up」のときに数秒止まり、古い API が 503 を返します。そのあと API、最後に「docker compose up」で cloudflared、読み上げ、mcp、mcp-public、hermes と memanto。トンネルが少し止まり、読み上げのモデルを読み直します）。018 を当てる前に、この版の API、mcp、mcp-public を動かさないでください（手元の開発の DB も `npm run db:migrate`）。
 5. **お問い合わせ**: `VITE_SUPPORT_CONTACT`（Vercel）を設定し、下書きの【要記入: 連絡先】に同じ窓口を書きます。だれが読むかを [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) に書きます。
 6. **Supabase のダッシュボードで確かめること**: JWT の有効期間、メールの確認（Confirm email）が on か off か、本番で `VITE_NEXLOOM_SUPABASE_*` を設定しているか（Nexloom だけのセッションは、削除も同意もサーバーに届きません）、セッションの期限の設定があるか（5 年より古いセッションは、また入れてしまいます）。
@@ -730,13 +730,13 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 
 | こんなとき | すること |
 |---|---|
-| アカウントを消したいと言われた | ご本人に、設定の「アカウントを削除する」を案内します。パスワードを忘れた、画面から消せないときは、スタッフが消します（[../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) の 2 章）。続いているプランがあると止まるので、先に解約してもらいます |
+| アカウントを消したいと言われた | 画面の削除を使えるようにしてあれば（`ACCOUNT_DELETION_ENABLED=true`）、ご本人に、設定の「アカウントを削除する」を案内します。止めているとき、パスワードを忘れた、画面から消せないときは、スタッフが消します（[../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) の 2 章）。続いているプランがあると止まるので、先に解約してもらいます |
 | ログインも消したいと言われた | 同じガイドの 3 章。先に Rise Path のデータを消し、Nexloom と P-School も使えなくなることを書面で伝え、P-School の外部キーを確かめてから、ダッシュボードで消します |
 | ほかのサービスでログインが消された | 同じガイドの 4 章（`--orphans`）。月に 1 回も実行します |
 | 規約を改定する | [../legal/README.md](../legal/README.md) の「改定するとき」。下書きを直し、`node scripts/legal/build-legal-text.mjs` で文と版を作り、マージした日に `deploy-stack.sh` を実行します。あらためて同意をお願いするのは、重要な変更のときだけ（`requiresAcceptance`） |
 | Memanto を止める前に | 一度でも動かしたなら、ボリュームを消します（8.2 の 8） |
 | Hermes や AI チャットを学習者に出す前に | 削除したアカウントの会話をどうするかを決めます（8.2 の 9） |
-| 削除が「いまは使えません」になる | API の `ACCOUNT_DELETION_ENABLED` を確かめます（`false` か、知らない値で止まります）。`byoa` を動かしているなら、8.2 の 2 が済むまで止めたままにします |
+| 削除が「いまは使えません」になる | 削除は、はじめ止まっています。API の `ACCOUNT_DELETION_ENABLED` を確かめます（`true` のときだけ使えます。`1`、`on`、`yes` も同じです。未設定、`false`、知らない値では止まります）。8.2 の 2 と 3 が済むまでは、止めたままにします。そのあいだは、スタッフが消します（[../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) の 2 章） |
 | 全員が 503 `auth_unavailable` になる | migration 018 が当たっているか（`account_deletions` の表があるか）、DB が動いているかを確かめます |
 
 ## 9. やらないこと

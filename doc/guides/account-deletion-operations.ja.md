@@ -8,6 +8,7 @@ Rise Path のアカウントの削除は、オーナーの決定 D1〜D5 に沿�
 
 - **消すのは Rise Path のデータだけです**（D2）。ログイン（メールアドレス、パスワード、登録したときの名前）は、Nexloom と P-School と共通の Supabase のプロジェクトにあるので、残します。ログインも消したいと言われたときは、スタッフが手で消します（下の 3 章）。
 - **ご本人は、設定の「アカウントを削除する」から、パスワードを入れて、すぐに削除できます**（D3）。待つ期間はありません。元に戻せません。
+- **画面からの削除は、はじめ止まっています。** 7 章の 2 つの確かめが済んでから、オーナーが API の `ACCOUNT_DELETION_ENABLED=true` にすると使えます。止まっているあいだ、画面には「いまはこの画面から削除できません」と出るので、スタッフが消します（2 章）。
 - **削除のあとも残すもの**: 利用規約に同意した記録・保護者の同意の記録・削除した記録（アカウント ID・版・日時だけ。5 年）、使ったことのある AI アプリの記録（3 年）、お支払いの記録（アカウントとのつながりを外して。Stripe にはアカウント ID が残ります）、今日の AI の利用回数（30 日まで）、安全のための記録（つながりを外して、最長 365 日）、サーバーのログ、運営者が手でとった DB の控え（D4、D5）。
 
 コードの場所: サービス `server/services/accountDeletion.js`、画面 `components/features/settings/DeleteAccountView.tsx`、API `server/routes/account.js`、スタッフのスクリプト `scripts/delete-account-data.mjs`。
@@ -20,7 +21,7 @@ Rise Path のアカウントの削除は、オーナーの決定 D1〜D5 に沿�
 
 ## 2. ご本人の代わりに Rise Path のデータを消す（スタッフ）
 
-ご本人がパスワードを忘れた、画面から消せない、などのときです。API が動いている VM で、API のコンテナの中で実行します（アップロードしたファイルはコンテナの中にあり、DB と Supabase と決済の設定もそこにあります）。
+ご本人がパスワードを忘れた、画面から消せない（画面からの削除が、まだ止まっているときもふくみます）、などのときです。API が動いている VM で、API のコンテナの中で実行します（アップロードしたファイルはコンテナの中にあり、DB と Supabase と決済の設定もそこにあります）。
 
 ```sh
 cd deploy/risepath-vm
@@ -34,7 +35,7 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 
 - `--find-email` と `--orphans` には `SUPABASE_SERVICE_ROLE_KEY` が要ります（anon のキーではユーザーを調べられません）。
 - 続いている有料プランがあると止まります（終了コード 2）。先に Stripe のダッシュボードで解約してから、もう一度実行します。
-- `ACCOUNT_DELETION_ENABLED=false` でも動きます（止まるのは、ご本人の画面からの削除だけです）。
+- `ACCOUNT_DELETION_ENABLED` の値にかかわらず動きます（この設定が切りかえるのは、ご本人の画面からの削除だけです）。
 - 終了コード: 0 = 消した（または、もう消えていた）、2 = 断った（続いている有料プランなど。理由が出ます）、3 = いまは使えない（DB、Supabase、Stripe、Memanto のどれか。Stripe や Memanto につながらないとき（`payment_provider_unavailable`、`memory_service_unavailable`）もここです。しばらくしてから、もう一度実行します）、1 = 使い方や設定のまちがい。
 - 表示された JSON に `"memoryDeleted":true` があるとき（終了コード 2 か 3）は、AI の記憶だけが消えて、ほかのデータは残っています。同じ `--yes` をもう一度実行します（5 章の `partial` の行）。
 - 削除の記録の `requested_by` は `staff` になります（ご本人の削除は `self`、定期の確認は `orphan`）。
@@ -100,7 +101,7 @@ API のログは消えやすいので、決まった時に読みます。
 | `[Billing] deleted_account_renewing: subscription … belongs to a deleted Rise Path account … and still renews: cancel it in the Stripe Dashboard.` | 削除したアカウントの契約が続いています。Stripe のダッシュボードで解約します。 |
 | `[Account] partial: AI memories deleted, other data kept for …` | AI の記憶だけが消えて、ほかは残りました。同じ削除をもう一度します（ご本人の画面か、2 章の `--yes`）。 |
 | `[Account] … upload file(s) of … not removed (retention removes orphans)` | 消せなかったファイルは、保存期間の処理が 24 時間後に消します。 |
-| `[Account] ACCOUNT_DELETION_ENABLED has an unrecognised value: account deletion is off` | `stack.env` の値を `true` か `false` にします。 |
+| `[Account] ACCOUNT_DELETION_ENABLED has an unrecognised value: account deletion is off` | `stack.env` の値を直します。使うときは `true`（7 章の確かめのあと）、止めるときは `false` にするか、行を消します（消しても止まります）。 |
 
 ## 6. よくある質問への答え方
 
@@ -116,9 +117,11 @@ API のログは消えやすいので、決まった時に読みます。
 
 ## 7. 受け入れているリスク（オーナーの判断）
 
-- **ログインしたままの端末とパスワード（どの環境でも）**: Supabase の「Require current password when updating」（いまのパスワードがないと、パスワードを変えられない設定）が切ってあると、ログインしたままの端末やトークンを持っている人が、新しいパスワードを設定し、ログインし直して、パスワードの確認を通り、アカウントを削除できてしまいます。拠点で共有するタブレットが、その例です。なので、`byoa` を使うかどうかにかかわらず、この設定を入れて、下の確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` のままにします。「Secure password change」（ログインから 24 時間をこえると、メールの確認がないとパスワードを変えられない設定）だけでは、ログインから 24 時間以内の端末を防げません。
+- **ログインしたままの端末とパスワード（どの環境でも）**: Supabase の「Require current password when updating」（いまのパスワードがないと、パスワードを変えられない設定）が切ってあると、ログインしたままの端末やトークンを持っている人が、新しいパスワードを設定し、ログインし直して、パスワードの確認を通り、アカウントを削除できてしまいます。拠点で共有するタブレットが、その例です。なので、ご本人の削除は、はじめ止まっています。`byoa` を使うかどうかにかかわらず、この設定を入れて、下の 2 つの確かめが通るまで、`ACCOUNT_DELETION_ENABLED=true` にしません。「Secure password change」（ログインから 24 時間をこえると、メールの確認がないとパスワードを変えられない設定）だけでは、ログインから 24 時間以内の端末を防げません。
   - 確かめ方（ステージング）: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT {SUPABASE_URL}/auth/v1/user` に `{"password":"…"}` を送ります。400 `current_password_required` が返れば合格です。
-- **自分の AI をつなぐ機能（`byoa`）とパスワード**: Supabase の設定によっては、つないだ AI アプリも、その方のパスワードを設定し、ログインして、アカウントを削除できてしまいます。なので、`byoa` を動かす（または動かす予定の）あいだは、[byoa-setup.ja.md](./byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れて、確かめが通るまで、`ACCOUNT_DELETION_ENABLED=false` のままにします。3 つの設定を入れても、パスワードのないアカウントは、AI アプリを許可してから 24 時間は、同じことができます。Rise Path の登録は必ずパスワードを決めますが、共有のプロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。
+  - 本番の `amr` の確かめ: [ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 8.2 の 3 です。
+  - 2 つが通ったら、VM の `stack.env` に `ACCOUNT_DELETION_ENABLED=true` を書いて、`deploy-stack.sh` を実行し直します。設定の「アカウントを削除する」を開き、「いまはこの画面から削除できません」が出なくなったことを確かめます。
+- **自分の AI をつなぐ機能（`byoa`）とパスワード**: Supabase の設定によっては、つないだ AI アプリも、その方のパスワードを設定し、ログインして、アカウントを削除できてしまいます。なので、`byoa` を動かす（または動かす予定の）あいだは、[byoa-setup.ja.md](./byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れて、確かめが通るまで、`ACCOUNT_DELETION_ENABLED=true` にしません。3 つの設定を入れても、パスワードのないアカウントは、AI アプリを許可してから 24 時間は、同じことができます。Rise Path の登録は必ずパスワードを決めますが、共有のプロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。
 - パスワードを忘れた方は、画面から消せません（パスワードの再設定の画面がないため）。スタッフの削除（2 章）で対応します。
 - スタッフが消したとき、AI アプリの許可は Supabase に残ります（2 章の「AI アプリについて」）。
 - ほかのサービスで消されたログインの Rise Path のデータは、次の定期の確認（4 章）まで残ります。

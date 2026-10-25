@@ -4,6 +4,7 @@
 // orphan; any other answer stops the run; a wrong project is refused) and the exit codes.
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { PHASE1_USER_ID } from '../db.js';
 import { DRY_RUN_TABLES, EXIT, ORPHAN_PAGE, STUB_PAGE_SQL, defaultDeps, parseArgs, run } from '../../scripts/delete-account-data.mjs';
 
@@ -113,6 +114,26 @@ describe('scripts/delete-account-data.mjs: usage and --user', () => {
         assert.equal(await run(['--user', A.toUpperCase(), '--yes'], deps), EXIT.ok);
         assert.deepEqual(calls, [{ userId: A, requestedBy: 'staff', authTime: null, billing: { config: { live: false }, stripe: null } }]);
         assert.deepEqual(JSON.parse(lines.at(-1)), { userId: A, status: 'deleted', deletedAt: '2026-10-24T05:00:00.000Z' });
+    });
+
+    it('works whatever ACCOUNT_DELETION_ENABLED says (the switch is for the Settings page only and starts off)', async () => {
+        const saved = process.env.ACCOUNT_DELETION_ENABLED;
+        try {
+            for (const value of [undefined, '', 'false', 'true', 'flase']) {
+                if (value === undefined) delete process.env.ACCOUNT_DELETION_ENABLED;
+                else process.env.ACCOUNT_DELETION_ENABLED = value;
+                const { deps, calls } = makeDeps();
+                assert.equal(await run(['--user', A, '--yes'], deps), EXIT.ok, JSON.stringify(value));
+                assert.equal(calls.length, 1, JSON.stringify(value));
+            }
+        } finally {
+            if (saved === undefined) delete process.env.ACCOUNT_DELETION_ENABLED;
+            else process.env.ACCOUNT_DELETION_ENABLED = saved;
+        }
+        for (const file of ['../../scripts/delete-account-data.mjs', '../services/accountDeletion.js']) {
+            const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+            assert.doesNotMatch(source, /env\.ACCOUNT_DELETION_ENABLED|readDeletionSwitch|from '[^']*routes\/account/, `${file} never reads the switch`);
+        }
     });
 
     it('exit codes: already 0, a refusal 2 (a renewing plan), Stripe or Memanto down 3 (as the API\'s 503), failed 3', async () => {

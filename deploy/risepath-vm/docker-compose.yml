@@ -88,9 +88,10 @@ services:
       SAFETY_BLOCKS_BEFORE_PAUSE: ${SAFETY_BLOCKS_BEFORE_PAUSE:-}
       SAFETY_ALERT_WEBHOOK_URL: ${SAFETY_ALERT_WEBHOOK_URL:-}
       AI_ACCESS_DEV_AUDIENCE: ${AI_ACCESS_DEV_AUDIENCE:-}
-      # Account deletion and retention (Phase 4; stack.env.example). Empty = on, with the defaults
-      # (30 days of AI usage counts, 365 days of processing records, 5 years of deletion proofs, 3 years
-      # of AI-app records). An invalid retention value turns its rule off; the api logs it.
+      # Account deletion and retention (Phase 4; stack.env.example). Empty: deletion from Settings
+      # stays off (true turns it on, after ai-access-plan §8.2 items 2-3), and retention runs with the
+      # defaults (30 days of AI usage counts, 365 days of processing records, 5 years of deletion
+      # proofs, 3 years of AI-app records). An invalid retention value turns its rule off; the api logs it.
       ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-}
       RETENTION_ENABLED: ${RETENTION_ENABLED:-}
       RETENTION_AI_USAGE_DAYS: ${RETENTION_AI_USAGE_DAYS:-}
