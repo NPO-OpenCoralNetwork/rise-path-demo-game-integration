@@ -354,6 +354,7 @@ const AUTH_STUBS = {
     export const forgetProgressAccount = () => {}; export const progressChoicePending = () => false;
     export const signInProgressSync = () => {}; export const signOutProgressSync = () => {};
     export const stopProgressSync = () => {}; export const whenAccountKnown = async () => 'known';
+    export const syncedLearnerId = () => null;
   `,
 };
 

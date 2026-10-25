@@ -21,27 +21,38 @@
  *   handler, and getSession waits for a lock (a later task, after the page is gone). It sends the
  *   token of this learner's last session event instead (cachedAuth); it is this learner's own
  *   token, so the upload can only reach their own account.
+ * - Phase 5: the save state (useProgressSaveView, SaveChip and the notices), online/offline and
+ *   other tabs' pending markers feed it; retryProgressSync (the notice's button);
+ *   prepareProgressSignOut (logoutGuard.ts: upload, then count what is unsaved, before logout asks);
+ *   resetLessonProgress (LessonEnd's 「このレッスンを最初からやり直す」); progressCapabilities (what
+ *   the server offers); syncedLearnerId and runAsSyncedLearner (XP, legacy progress: only the
+ *   learner the sync runs for).
  */
 import { useSyncExternalStore } from 'react';
 import { getCourse, getLessonEntry } from '../../content';
 import { resolveText } from '../../shared/lesson/text.js';
 import { isApiAvailable } from '../../services/apiClient';
-import { hydrateFromApi } from '../../services/progressService';
+import { hydrateFromApi, setProgressTabLearner } from '../../services/progressService';
 import { getSupabaseClient } from '../../services/supabaseClient';
 import {
   LessonProgressApiError,
   deleteLessonProgressRecords,
   getLessonProgressRecords,
   putLessonProgressRecords,
+  resetLessonProgressRecord,
 } from '../../services/lessonProgressApi';
 import { PROGRESS_EVENT, type ProgressEventDetail } from './progressStore.ts';
 import {
   SYNC_ACCOUNT_EVENT,
   SYNC_ACCOUNT_KEY,
+  SYNC_PENDING_PREFIX,
   createProgressSync,
   isSafeSlug,
   type DeleteResult,
+  type LessonResetResult,
   type ProgressSync,
+  type SaveView,
+  type SyncCapabilities,
   type SyncState,
   type SyncStorage,
 } from './progressSync.ts';
@@ -62,6 +73,9 @@ function isSyncable(courseSlug: string, lessonId: string): boolean {
   const course = getCourse(courseSlug);
   return Boolean(course && getLessonEntry(course, lessonId));
 }
+
+/** Phase 5: the reader shows the save chip and the reset control only for these lessons. */
+export const isSyncableLesson = isSyncable;
 
 /** The lesson title in the UI language (LanguageContext's stored choice; fr reads en). */
 function lessonTitle(courseSlug: string, lessonId: string): string {
@@ -133,6 +147,7 @@ function progressSync(): ProgressSync {
       get: () => asSyncedLearner(getLessonProgressRecords),
       put: (body, { keepalive }) => putProgress(body, keepalive),
       del: () => asSyncedLearner(deleteLessonProgressRecords),
+      resetLesson: (body) => asSyncedLearner(() => resetLessonProgressRecord(body)),
     },
     apiEnabled: isApiAvailable,
     isSyncable,
@@ -151,7 +166,14 @@ function progressSync(): ProgressSync {
     });
     window.addEventListener('storage', (event) => {
       if (event.key === SYNC_ACCOUNT_KEY || event.key === null) sync.accountChanged();
+      // Phase 5: another tab's markers (or its logout) change what is still unsaved here.
+      if (event.key === null || event.key === SYNC_ACCOUNT_KEY || event.key.startsWith(SYNC_PENDING_PREFIX)) sync.storageChanged();
     });
+    // Phase 5: back online → one retry (with jitter). The value at creation is set without one.
+    const onLine = () => (typeof navigator === 'undefined' || navigator.onLine !== false);
+    sync.networkChanged(onLine());
+    window.addEventListener('online', () => sync.networkChanged(onLine()));
+    window.addEventListener('offline', () => sync.networkChanged(onLine()));
     window.addEventListener('pagehide', () => sync.flushOnHide());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') sync.flushOnHide();
@@ -239,7 +261,8 @@ export function forgetProgressAccount(): void {
  */
 export function chooseProgressAdoption(add: boolean): void {
   const applied = instance?.choose(add) ?? false;
-  if (applied) void whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known' })).then(() => dispatch(SYNC_ACCOUNT_EVENT));
+  // "Add" also adopts the device's unowned legacy progress (Phase 5: it is then this learner's).
+  if (applied) void whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId(), adoptUnowned: add })).then(() => dispatch(SYNC_ACCOUNT_EVENT));
 }
 
 /** The Privacy page's delete: the account's records on the server (then here), or this device's. */
@@ -254,4 +277,74 @@ const snapshot = () => instance?.getState() ?? OFF;
 
 export function useProgressSyncState(): SyncState {
   return useSyncExternalStore(subscribe, snapshot, () => OFF);
+}
+
+// --- Phase 5 ------------------------------------------------------------------------------------
+
+/** The learner the sync runs for (a primary session's), or null (guests, mock, Nexloom-only, signed out). */
+export function syncedLearnerId(): string | null {
+  return instance?.getState().userId ?? null;
+}
+
+// Legacy Blender progress writes only for this tab's own primary learner (progressService.ts
+// ownerForWrite), not the learner AuthContext shows (it can be a Nexloom session beside it).
+setProgressTabLearner(syncedLearnerId);
+
+/**
+ * Runs `call` only while the primary session is the synced learner's (the lesson-progress rule):
+ * otherwise it fails with LessonProgressApiError (401 session_changed, or 0 no_session).
+ */
+export const runAsSyncedLearner = asSyncedLearner;
+
+/** What the server offers, from this learner's last successful GET on this page; null before. */
+export function progressCapabilities(): SyncCapabilities | null {
+  return instance?.capabilities() ?? null;
+}
+
+/** The view shown before the sync exists, and on the server (no learner: this device only). */
+const LOCAL_VIEW: SaveView = Object.freeze({
+  state: 'local', reason: null, userId: null, pending: 0, failures: 0, busy: false, savedAt: null, online: true,
+});
+
+export function getProgressSaveView(): SaveView {
+  return instance?.getView() ?? LOCAL_VIEW;
+}
+
+export function subscribeProgressSaveView(listener: () => void): () => void {
+  return progressSync().subscribeView(listener);
+}
+
+/** The reader's save chip, the app notice, LessonEnd. */
+export function useProgressSaveView(): SaveView {
+  return useSyncExternalStore(subscribeProgressSaveView, getProgressSaveView, () => LOCAL_VIEW);
+}
+
+/** The notice's 「もう一度保存する」: one GET or one PUT now (at most once per 10 s). Never throws. */
+export function retryProgressSync(): void {
+  try {
+    instance?.retryNow();
+  } catch (err) {
+    console.warn('[progressSync] retry failed:', err);
+  }
+}
+
+/** Logout, step 1 (logoutGuard.ts): upload (≤ 3 s), then how many lesson records are still unsaved. Never throws. */
+export async function prepareProgressSignOut(): Promise<{ unsaved: number }> {
+  if (!instance) return { unsaved: 0 };
+  try {
+    return await instance.prepareSignOut();
+  } catch (err) {
+    console.warn('[progressSync] prepare sign-out failed:', err);
+    return { unsaved: 0 };
+  }
+}
+
+/** LessonEnd's 「このレッスンを最初からやり直す」: the server first, then this browser. Never throws. */
+export async function resetLessonProgress(courseSlug: string, lessonId: string): Promise<LessonResetResult> {
+  try {
+    return await progressSync().resetLesson(courseSlug, lessonId);
+  } catch (err) {
+    console.warn('[progressSync] lesson reset failed:', err);
+    return { ok: false, reason: 'failed' };
+  }
 }

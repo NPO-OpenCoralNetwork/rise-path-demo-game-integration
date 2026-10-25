@@ -53,6 +53,40 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
     return res;
 };
 
+/**
+ * Phase 5: the learner this tab's AuthContext shows (the auth provider's id), or null. Another
+ * tab can have switched the browser to another learner meanwhile (progressService.ts compares).
+ */
+export const currentAuthUserId = (): string | null => {
+    try {
+        return _getUserId() || null;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Phase 5: apiFetch only while the primary Supabase session is `expectedUserId`'s, with that
+ * session's token (read once, so the request cannot pick up another learner's session in
+ * between). Otherwise nothing is sent and null is returned: data recorded for one learner (legacy
+ * Blender progress, learning events) never reaches another learner's account.
+ */
+export const apiFetchAs = async (expectedUserId: string, path: string, options: RequestInit = {}): Promise<Response | null> => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !expectedUserId) return null;
+    let session: { access_token?: string; user?: { id?: string } } | null = null;
+    try {
+        ({ data: { session } } = await supabase.auth.getSession());
+    } catch {
+        return null;
+    }
+    if (!session?.access_token || session.user?.id !== expectedUserId) return null;
+    return apiFetch(path, {
+        ...options,
+        headers: { ...(options.headers as Record<string, string> || {}), Authorization: `Bearer ${session.access_token}` },
+    });
+};
+
 /** Reads a 401's error_type from a copy of the body; account_deleted → reportAccountDeleted(). */
 async function noteAccountDeleted(res: Response): Promise<void> {
     try {

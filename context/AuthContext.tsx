@@ -21,6 +21,7 @@ import {
     signInProgressSync,
     signOutProgressSync,
     stopProgressSync,
+    syncedLearnerId,
     whenAccountKnown,
 } from '../components/lesson/progressSyncClient';
 
@@ -70,9 +71,10 @@ const GUEST_USER: AuthUser = {
 // account, so it waits for the choice (chooseProgressAdoption runs it). It also waits for this page
 // load's lesson-progress GET (Phase 4, design §5.10): on a re-opened account that GET's epoch rule
 // clears the deleted account's legacy progress first; when the GET failed, nothing local is pushed.
+// Phase 5: only the synced learner's own legacy entries are kept and pushed, through their own session.
 const hydrateUserData = async () => {
     try {
-        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known' })), hydrateNotifications()]);
+        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId() })), hydrateNotifications()]);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
     }

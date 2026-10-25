@@ -45,6 +45,22 @@
  *   epoch that changed on a re-opened account (the GET says `restarted`) also clears the learning
  *   events and legacy progress (§5.10): they belonged to the deleted account. whenKnown() tells
  *   the legacy hydrate (services/progressService.ts) whether this page load's GET succeeded.
+ * - Phase 5 (doc/brushup-2026/ai-access-plan.ja.md §9), one lesson started over
+ *   (resetLesson: POST …/lesson-reset first, local data only on success): every lesson has a
+ *   generation on the server; each stored record carries the one its content builds on
+ *   (`lessonGen`, progressStore.ts LessonGen), and every PUT record sends it (`lessonEpoch`). The
+ *   generation is taken from each response that names one (an older server names none: stamps are
+ *   left alone and nothing is dropped). A record of an older generation, or one with content from
+ *   before the reset, is dropped for the server's (keepsLocal); a record started on this device
+ *   after the reset is kept, stamped and uploaded. A generation change bumps `lessonMark` in the
+ *   account key, so another tab's GET or PUT answer computed before it is repeated or dropped.
+ * - Phase 5, save state on screen: getView() is a SaveView (saved, saving, loading, offline,
+ *   stopped with a reason, local) with the count of this learner's unsaved records. A PUT 503
+ *   from a server that sent capabilities is retried like a 500; three failures in a row show
+ *   "stopped". networkChanged (online again: one GET or an early PUT, with jitter), retryNow (the
+ *   notice's button) and storageChanged (another tab's markers). Logout is split in two:
+ *   prepareSignOut uploads (≤ 3 s, also while a load or refresh runs) and counts what is left,
+ *   then signOut clears without waiting again.
  *
  * Keys start with `rp:progressSync:` so the `rp:progress:` scans (ProgressCluster) skip them.
  * No React, DOM or import.meta, and explicit import extensions: storage, API, timers, clock and
@@ -53,8 +69,20 @@
  */
 import { LESSON_STATES } from '../../shared/lesson/progress.js';
 import { mergeProgress, progressContentEqual } from '../../shared/lesson/progressMerge.js';
-import { LAST_LESSON_KEY, parseProgress, progressKey, setLastLesson, withSummary } from './progressStore.ts';
-import type { LessonProgress, LessonStateName, ProgressSummary } from './progressStore.ts';
+import {
+  LAST_LESSON_KEY,
+  emptyProgress,
+  keepsLocal,
+  lessonGenOf,
+  parseLastLesson,
+  parseProgress,
+  progressKey,
+  sameLessonGen,
+  setLastLesson,
+  stampedRecord,
+  withSummary,
+} from './progressStore.ts';
+import type { LessonGen, LessonProgress, LessonStateName, ProgressSummary, ServerGen } from './progressStore.ts';
 
 export const SYNC_ACCOUNT_KEY = 'rp:progressSync:account';
 export const SYNC_PENDING_PREFIX = 'rp:progressSync:pending:';
@@ -109,9 +137,10 @@ export type SyncEpoch = string | null;
 /**
  * loggedOut: the learner left this browser (logout, or the session ended) with records still
  * unsent; nobody syncs it now. Records whose pending marker no longer names their updatedAt were
- * written since, by someone else.
+ * written since, by someone else. lessonMark (Phase 5): changes whenever a tab changes a lesson's
+ * generation here, so another tab's answer computed before it is repeated (GET) or dropped (PUT).
  */
-export type SyncAccount = { userId: string; epoch: SyncEpoch | '?'; loggedOut?: true };
+export type SyncAccount = { userId: string; epoch: SyncEpoch | '?'; loggedOut?: true; lessonMark?: string };
 
 /**
  * off: no primary session. needs_choice: waiting for the adoption choice. hydrating: GET running.
@@ -123,6 +152,7 @@ export type SyncState = { readonly status: SyncStatus; readonly userId: string |
 
 export type SyncStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key'> & { readonly length: number };
 
+/** lessonEpoch / lessonResetAt (Phase 5): the lesson's generation; an older server sends neither. */
 export type ServerRecord = {
   courseSlug: string;
   lessonId: string;
@@ -130,16 +160,31 @@ export type ServerRecord = {
   pct?: number;
   state?: string;
   updatedAt?: string;
+  lessonEpoch?: string | null;
+  lessonResetAt?: string | null;
 };
-export type RejectedRecord = { courseSlug: string | null; lessonId: string | null; error_type: string };
-export type PutBody = { epoch: SyncEpoch; records: { courseSlug: string; lessonId: string; progress: LessonProgress }[] };
+/** lesson_reset rejections (Phase 5) carry the lesson's generation and the stored record, when there is one. */
+export type RejectedRecord = {
+  courseSlug: string | null;
+  lessonId: string | null;
+  error_type: string;
+  lessonEpoch?: string | null;
+  lessonResetAt?: string | null;
+  record?: ServerRecord;
+};
+/** lessonEpoch: the generation the record's content builds on (null: unknown, born here, or never started over). */
+export type PutBody = { epoch: SyncEpoch; records: { courseSlug: string; lessonId: string; progress: LessonProgress; lessonEpoch: string | null }[] };
+/** What the server offers (GET capabilities, Phase 5); an older server sends none. */
+export type SyncCapabilities = { lessonReset: boolean; achievements: boolean };
 
 /** services/lessonProgressApi.ts. Failures throw an ApiFailure-shaped error. */
 export type ProgressApi = {
   /** restarted: the account was deleted and opened again since its last reset (server GET, Phase 4). */
-  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean }>;
+  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean; capabilities?: { lessonReset?: boolean; achievements?: boolean } }>;
   put(body: PutBody, options: { keepalive: boolean }): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; rejected: RejectedRecord[] }>;
   del(): Promise<{ deleted: number; epoch: string }>;
+  /** POST …/lesson-reset (Phase 5). record: the lesson's emptied record (null when the answer had none). */
+  resetLesson(body: { epoch: SyncEpoch; courseSlug: string; lessonId: string }): Promise<{ epoch: SyncEpoch; lessonEpoch: string; lessonResetAt: string | null; record: ServerRecord | null }>;
 };
 /** What the api functions throw: the HTTP status (0 = network) and the server's error_type. */
 export type ApiFailure = { status?: number; errorType?: string; epoch?: SyncEpoch };
@@ -148,7 +193,8 @@ export type SyncTimers = {
   setTimeout(fn: () => void, ms: number): unknown;
   clearTimeout(handle: unknown): void;
 };
-export type ServerProgressDetail = { courseSlug: string; lessonId: string; source: 'server' };
+/** reset: the lesson was started over (its emptied record was stored): open readers restart. */
+export type ServerProgressDetail = { courseSlug: string; lessonId: string; source: 'server'; reset?: true };
 export type SyncEvents = {
   /** A server-sourced write of one lesson record (dispatch PROGRESS_EVENT with source 'server'). */
   progress?(detail: ServerProgressDetail): void;
@@ -157,6 +203,68 @@ export type SyncEvents = {
 };
 
 export type DeleteResult = { ok: true; scope: 'account' | 'device' } | { ok: false };
+
+/**
+ * resetLesson (Phase 5). not_ready: sync is not on (offline, stopped, a load, needs_choice, no
+ * API); unsupported: the server has no reset (no capability, or it answered 404); not_published:
+ * not a lesson the server stores; reloaded: the progress was deleted on another device (loaded
+ * again); unconfirmed: the connection dropped after sending; failed: nothing changed here.
+ */
+export type LessonResetResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_ready' | 'unsupported' | 'not_published' | 'rate_limited' | 'failed' | 'unconfirmed' | 'reloaded' };
+
+/** How the reader's save state looks (Phase 5, SaveChip and the notices). */
+export type SaveState = 'saved' | 'saving' | 'loading' | 'offline' | 'stopped' | 'local';
+/**
+ * Why saving stopped. network/server: retrying with backoff (or the server cannot store
+ * progress); auth: sign in again; account: another tab's logout or learner; storage: the account
+ * key could not be stored.
+ */
+export type StopReason = 'network' | 'server' | 'auth' | 'account' | 'storage';
+export type SaveView = Readonly<{
+  state: SaveState;
+  /** Set only when state is 'stopped'. */
+  reason: StopReason | null;
+  userId: string | null;
+  /**
+   * This learner's records here the server does not have yet: pending markers of syncable lessons
+   * with a record, while the stored account's userId is this learner's (also when another tab
+   * marked it loggedOut: what this tab writes still waits for them). 0 when userId is null.
+   */
+  pending: number;
+  /** Consecutive failed PUTs (0 after a successful PUT or hydrate). */
+  failures: number;
+  /** A PUT, or a GET that is not a background refresh, is running. */
+  busy: boolean;
+  /** When the server last confirmed this learner's data on this page (successful GET or PUT); null before. */
+  savedAt: number | null;
+  /** The last navigator.onLine the client reported (true until told otherwise). */
+  online: boolean;
+}>;
+/** Consecutive failed PUTs after which a view with pending records shows 'stopped' (about 1.5–2 min). */
+export const STALL_AFTER_FAILURES = 3;
+/** load: the page's first GET; retry: a stalled sync's next try; refresh: a background reload while on. */
+export type HydrateMode = 'load' | 'retry' | 'refresh';
+/** Inputs of saveViewOf (the core's private state). */
+export type SaveViewInput = {
+  status: SyncStatus;
+  userId: string | null;
+  apiEnabled: boolean;
+  /** The mode of the running (or last) hydrate; null before the first. */
+  hydrateMode: HydrateMode | null;
+  /** The last failed GET (status 0: network); null after a successful one. */
+  getFailure: { status: number; errorType?: string } | null;
+  /** Why status is 'stopped'. */
+  stopReason: StopReason | null;
+  /** The last failed PUT that was retried with backoff. */
+  putFailure: 'network' | 'server' | null;
+  pending: number;
+  failures: number;
+  busy: boolean;
+  savedAt: number | null;
+  online: boolean;
+};
 
 export type ProgressSyncOptions = {
   storage: SyncStorage | null;
@@ -210,6 +318,29 @@ export type ProgressSync = {
   subscribe(listener: () => void): () => void;
   /** Resolves when no hydrate or upload is running (tests). */
   settled(): Promise<void>;
+  /** Phase 5: the save state (a new frozen object on every change). */
+  getView(): SaveView;
+  /** Called on every SaveView change (not on status changes alone). */
+  subscribeView(listener: () => void): () => void;
+  /**
+   * navigator.onLine changed. Back online (at most once per 30 s, after 1–5 s of jitter): a
+   * failed load is retried with one GET, a failing upload goes at once (the 20 s PUT spacing
+   * still holds). 'stopped' is left alone.
+   */
+  networkChanged(online: boolean): void;
+  /** The notice's "try saving again" (at most once per 10 s): as networkChanged, and a server stop retries one GET. */
+  retryNow(): void;
+  /** Another tab changed pending markers: recount. */
+  storageChanged(): void;
+  /**
+   * Logout, step 1: upload what is pending (≤ 3 s in all, also while a load or refresh runs) and
+   * count what is still unsaved. signOut() right after it does not wait again.
+   */
+  prepareSignOut(): Promise<{ unsaved: number }>;
+  /** Phase 5: start one published lesson over (server first; local data only on success). */
+  resetLesson(courseSlug: string, lessonId: string): Promise<LessonResetResult>;
+  /** What the server offers, from this learner's last successful GET on this page; null before. */
+  capabilities(): SyncCapabilities | null;
 };
 
 // --- Helpers shared with the reader -----------------------------------------------------------
@@ -219,12 +350,13 @@ export function parseSyncAccount(raw: string | null | undefined): SyncAccount | 
   try {
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-    const { userId, epoch, loggedOut } = data as { userId?: unknown; epoch?: unknown; loggedOut?: unknown };
+    const { userId, epoch, loggedOut, lessonMark } = data as { userId?: unknown; epoch?: unknown; loggedOut?: unknown; lessonMark?: unknown };
     if (typeof userId !== 'string' || !userId) return null;
     return {
       userId,
       epoch: epoch === null ? null : typeof epoch === 'string' && epoch ? epoch : '?',
       ...(loggedOut === true ? { loggedOut: true as const } : {}),
+      ...(typeof lessonMark === 'string' && lessonMark && lessonMark.length <= 40 ? { lessonMark } : {}),
     };
   } catch {
     return null;
@@ -282,12 +414,123 @@ export function pendingKey(courseSlug: string, lessonId: string): string {
   return `${SYNC_PENDING_PREFIX}${courseSlug}:${lessonId}`;
 }
 
+// --- Phase 5: lesson generations ----------------------------------------------------------------
+
+const GENERATION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The generation a server answer (a record, a rejection) names: only when it has its own
+ * `lessonEpoch` that is null or a uuid; resetAt when `lessonResetAt` parses as a date. null: this
+ * answer says nothing about generations (an older server), so stamps stay and nothing is dropped.
+ */
+export function serverGenOf(value: unknown): ServerGen | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !hasOwn(value, 'lessonEpoch')) return null;
+  const { lessonEpoch, lessonResetAt } = value as { lessonEpoch?: unknown; lessonResetAt?: unknown };
+  if (!(lessonEpoch === null || (typeof lessonEpoch === 'string' && GENERATION_UUID.test(lessonEpoch)))) return null;
+  const resetAt = typeof lessonResetAt === 'string' && Number.isFinite(Date.parse(lessonResetAt)) ? lessonResetAt : null;
+  return { epoch: typeof lessonEpoch === 'string' ? lessonEpoch.toLowerCase() : null, resetAt };
+}
+
+/** The reader's stamp: born with bornAt null until its first write fixes the time. */
+export type ReaderGen = LessonGen | { kind: 'born'; bornAt: null };
+
+/** What a reader opened on this stored record (raw JSON) writes with. */
+export function readerStartGen(raw: string | null): ReaderGen {
+  const gen = lessonGenOf(raw);
+  if (gen.kind !== 'unknown') return gen;
+  if (raw === null || !hasActivity(parseProgress(raw))) return { kind: 'born', bornAt: null }; // nothing old to carry
+  return gen; // legacy content
+}
+
+/**
+ * How the stored record's stamp changed for an open reader. restart: drop the in-memory record
+ * for the stored one. adopt: take the stored stamp and merge the stored record in. foreign: a
+ * write took a known stamp of a lesson started over off (an old bundle, or a stale write of another
+ * tab); overwrite it with the reader's own record (G22: it may hold content from before the reset).
+ * merge: the same for a lesson never started over (known(null)): the other write is of the same
+ * lesson, so it is merged into the reader's record and written back stamped; had the lesson been
+ * reset meanwhile, the server refuses the null stamp and the sync drops the record (G10).
+ * Decided by content, never by clocks: the core keeps a born or legacy record only by merging it
+ * into the server's, which then covers what the reader wrote; a dropped record or a reset's
+ * emptied record does not.
+ */
+export function readerGenChange(loaded: ReaderGen, raw: string | null, persisted: LessonProgress): 'none' | 'adopt' | 'restart' | 'foreign' | 'merge' {
+  const stored = lessonGenOf(raw);
+  if (stored.kind === 'known') {
+    if (loaded.kind === 'known') return loaded.epoch === stored.epoch ? 'none' : 'restart';
+    if (loaded.kind === 'born' && loaded.bornAt === null) return 'adopt'; // nothing written yet
+    return readerCovers(parseProgress(raw), persisted) ? 'adopt' : 'restart';
+  }
+  if (loaded.kind === 'known' && raw !== null) return loaded.epoch === null ? 'merge' : 'foreign';
+  return 'none'; // as before Phase 5: the last writer wins
+}
+
+/**
+ * Lesson records this browser still holds for a learner who left it (the account is loggedOut):
+ * pending markers whose record exists and still names the marker's updatedAt (what they left).
+ * The sign-in view's notice (LeftRecordsNotice). Never throws.
+ */
+export function leftRecordCount(storage: SyncStorage | null): number {
+  if (!storage) return 0;
+  try {
+    if (!parseSyncAccount(storage.getItem(SYNC_ACCOUNT_KEY))?.loggedOut) return 0;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (key !== null && key.startsWith(SYNC_PENDING_PREFIX)) keys.push(key);
+    }
+    let count = 0;
+    for (const key of keys) {
+      const ref = refOf(key, SYNC_PENDING_PREFIX);
+      if (!ref) continue;
+      const raw = storage.getItem(progressKey(ref.courseSlug, ref.lessonId));
+      if (raw !== null && storage.getItem(key) === parseProgress(raw).updatedAt) count += 1;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+/** The save state, first match wins (design §4.1). Pure. */
+export function saveViewOf(input: SaveViewInput): SaveView {
+  const base = {
+    userId: input.userId,
+    pending: input.userId ? input.pending : 0,
+    failures: input.failures,
+    busy: input.busy,
+    savedAt: input.savedAt,
+    online: input.online,
+  };
+  const view = (state: SaveState, reason: StopReason | null = null): SaveView => Object.freeze({ state, reason, ...base });
+  const { status } = input;
+  if (status === 'off' || status === 'needs_choice' || !input.apiEnabled) return view('local');
+  if (status === 'stopped') return view('stopped', input.stopReason ?? 'server');
+  if (status === 'offline') {
+    const failure = input.getFailure;
+    const code = failure?.status ?? 0;
+    // 401 and other 4xx will not recover with the network: sign in again, or the server refuses.
+    if (failure && code !== 0 && code !== 429 && code < 500) {
+      if (code === 401) return view('stopped', failure.errorType === 'session_changed' ? 'account' : 'auth');
+      return view('stopped', 'server');
+    }
+    return view('offline');
+  }
+  if (base.pending > 0 && !input.online) return view('offline');
+  if (status === 'hydrating' && input.hydrateMode !== 'refresh') return view('loading');
+  if (base.pending > 0 && input.failures >= STALL_AFTER_FAILURES) return view('stopped', input.putFailure ?? 'server');
+  if (base.pending > 0) return view('saving');
+  return view('saved');
+}
+
 // --- Core -------------------------------------------------------------------------------------
 
 type LessonRef = { courseSlug: string; lessonId: string };
-type BatchItem = LessonRef & { progress: LessonProgress; sentAt: string; bytes: number };
+/** lessonEpoch: what the PUT says the content builds on; sentGen: the stored stamp as it was read. */
+type BatchItem = LessonRef & { progress: LessonProgress; sentAt: string; bytes: number; lessonEpoch: string | null; sentGen: LessonGen };
 type FlushMode = 'scheduled' | 'all' | 'hide';
-type HydrateMode = 'load' | 'retry' | 'refresh';
+/** The account key as one flush read it (with the records); updated when this tab moves the mark itself. */
+type FlushContext = { account: string | null };
 
 const refKey = (ref: LessonRef) => `${ref.courseSlug}:${ref.lessonId}`;
 function hasOwn(object: object, key: string): boolean {
@@ -340,6 +583,16 @@ function covers(outer: LessonProgress, inner: LessonProgress): boolean {
     && Object.keys(inner.checks).every((key) => hasOwn(outer.checks, key));
 }
 
+/**
+ * covers, and every self-rating too: the stored record holds all an open reader wrote. A record
+ * the core kept merges the reader's ratings in; a new generation's record made elsewhere need not
+ * hold them, and adopting it would bring ratings from before the reset back.
+ */
+function readerCovers(outer: LessonProgress, inner: LessonProgress): boolean {
+  const ratings = outer.ratings ?? {};
+  return covers(outer, inner) && Object.keys(inner.ratings ?? {}).every((key) => hasOwn(ratings, key));
+}
+
 /** Rejections that will not change on a retry: the marker goes, the local record stays. */
 const FINAL_REJECTIONS = new Set(['unknown_lesson', 'too_large']);
 
@@ -374,10 +627,81 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   /** whenKnown() callers waiting for the GET that runs now. */
   let knownWaiters: Array<(result: 'known' | 'unknown') => void> = [];
 
+  // Phase 5 state (save view, capabilities, generations, logout).
+  /** From this learner's last successful GET on this page (null before; cleared when the learner changes). */
+  let caps: SyncCapabilities | null = null;
+  let hydrateMode: HydrateMode | null = null;
+  let getFailure: SaveViewInput['getFailure'] = null;
+  let stopReason: StopReason | null = null;
+  let putFailure: SaveViewInput['putFailure'] = null;
+  let savedAt: number | null = null;
+  let online = true;
+  let lastNetworkRetryAt = Number.NEGATIVE_INFINITY;
+  let lastRetryNowAt = Number.NEGATIVE_INFINITY;
+  let markCounter = 0;
+  /** prepareSignOut ran at this generation: signOut() right after it does not wait again. */
+  let prepared: { generation: number; at: number } | null = null;
+  let view: SaveView = saveViewOf({
+    status: 'off', userId: null, apiEnabled: true, hydrateMode: null, getFailure: null, stopReason: null,
+    putFailure: null, pending: 0, failures: 0, busy: false, savedAt: null, online: true,
+  });
+  const viewListeners = new Set<() => void>();
+
+  function notify(set: Set<() => void>): void {
+    for (const listener of [...set]) {
+      try {
+        listener();
+      } catch {
+        // A broken listener must not stop the sync.
+      }
+    }
+  }
+
+  /** Recomputes the save view; listeners hear only a change of some field. */
+  function updateView(): void {
+    let apiOn = true;
+    try {
+      apiOn = apiEnabled();
+    } catch {
+      apiOn = false;
+    }
+    const next = saveViewOf({
+      status: state.status,
+      userId: state.userId,
+      apiEnabled: apiOn,
+      hydrateMode,
+      getFailure,
+      stopReason,
+      putFailure,
+      pending: countPending(),
+      failures,
+      busy: inFlight !== null || (hydration !== null && hydrateMode !== 'refresh'),
+      savedAt,
+      online,
+    });
+    const keys = Object.keys(next) as (keyof SaveView)[];
+    if (keys.every((key) => next[key] === view[key])) return;
+    view = next;
+    notify(viewListeners);
+  }
+
+  /** The learner changed (or left): what this page knew about the last one goes. */
+  function forgetLearnerState(): void {
+    caps = null;
+    savedAt = null;
+    getFailure = null;
+    stopReason = null;
+    putFailure = null;
+    prepared = null;
+  }
+
   function setState(status: SyncStatus, userId: string | null = state.userId): void {
     if (state.status === status && state.userId === userId) return;
     const wasHydrating = state.status === 'hydrating';
+    if (state.userId !== userId) forgetLearnerState();
+    if (status !== 'stopped') stopReason = null;
     state = { status, userId };
+    updateView();
     if (wasHydrating && status !== 'hydrating' && knownWaiters.length) {
       // The GET settled: 'on' only after a successful one (or a failed refresh, epoch still known).
       const result = status === 'on' && epoch !== undefined ? 'known' : 'unknown';
@@ -447,10 +771,35 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       // ignore
     }
   };
+  /**
+   * Stores the account. A rewrite of the same learner and epoch keeps the stored lessonMark, so a
+   * routine write (another tab's hydrate) does not look like a generation change.
+   */
   function writeAccount(account: SyncAccount | null): void {
-    if (account) write(SYNC_ACCOUNT_KEY, JSON.stringify(account));
-    else remove(SYNC_ACCOUNT_KEY);
+    if (account) {
+      const stored = readAccount();
+      const keep = !account.lessonMark && stored?.lessonMark && stored.userId === account.userId && stored.epoch === account.epoch
+        ? { lessonMark: stored.lessonMark }
+        : {};
+      write(SYNC_ACCOUNT_KEY, JSON.stringify({ ...account, ...keep }));
+    } else {
+      remove(SYNC_ACCOUNT_KEY);
+    }
     emitAccount();
+  }
+
+  /**
+   * A lesson's generation changed here (a reset, or a generation this tab learned): a new
+   * lessonMark in the account key, so another tab's GET still on its way is repeated and its PUT
+   * answers are dropped and loaded again. Only on this learner's account. No account event.
+   */
+  function bumpLessonMark(): void {
+    const userId = state.userId;
+    const account = readAccount();
+    if (!userId || !account || account.userId !== userId || account.loggedOut) return;
+    markCounter += 1;
+    const lessonMark = `${now().toString(36)}.${Math.floor(random() * 2 ** 31).toString(36)}.${markCounter.toString(36)}`.slice(0, 40);
+    write(SYNC_ACCOUNT_KEY, JSON.stringify({ ...account, lessonMark }));
   }
 
   const syncable = (ref: LessonRef) => {
@@ -488,6 +837,27 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   const getMarker = (ref: LessonRef) => read(pendingKey(ref.courseSlug, ref.lessonId));
   const setMarker = (ref: LessonRef, updatedAt: string) => write(pendingKey(ref.courseSlug, ref.lessonId), updatedAt);
   const removeMarker = (ref: LessonRef) => remove(pendingKey(ref.courseSlug, ref.lessonId));
+
+  /** SaveView.pending: this learner's marked, syncable records that exist (0 without a learner). */
+  function countPending(): number {
+    const userId = state.userId;
+    if (!userId || readAccount()?.userId !== userId) return 0;
+    let count = 0;
+    for (const ref of pendingLessons()) {
+      if (syncable(ref) && read(progressKey(ref.courseSlug, ref.lessonId)) !== null) count += 1;
+    }
+    return count;
+  }
+
+  const localGen = (ref: LessonRef): LessonGen => lessonGenOf(read(progressKey(ref.courseSlug, ref.lessonId)));
+
+  /** The stored record goes (its content predates the lesson's generation), with its marker and "continue". */
+  function dropLocal(ref: LessonRef): void {
+    remove(progressKey(ref.courseSlug, ref.lessonId));
+    removeMarker(ref);
+    const last = parseLastLesson(read(LAST_LESSON_KEY));
+    if (last && last.courseSlug === ref.courseSlug && last.lessonId === ref.lessonId) remove(LAST_LESSON_KEY);
+  }
 
   const hasLocalActivity = () => localLessons().some((ref) => hasActivity(readRecord(ref)));
 
@@ -553,21 +923,28 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
   /**
    * Writes merge(server, stored local) with the server's pct/state, keeping the merged clocks,
    * and announces it as server data. Nothing is written when the stored record already says it.
+   * gen (Phase 5): the server named the lesson's generation: the written record is stamped
+   * known(gen), i.e. from now on it is that generation's content. Without gen the stored stamp
+   * stays as it is. Returns true when it wrote a known non-null epoch the stored record did not
+   * carry (a generation this tab learned: the caller bumps the lesson mark).
    */
-  function takeIn(ref: LessonRef, server: LessonProgress, summary: ProgressSummary | null): void {
+  function takeIn(ref: LessonRef, server: LessonProgress, summary: ProgressSummary | null, gen?: ServerGen, options: { reset?: boolean } = {}): boolean {
     const key = progressKey(ref.courseSlug, ref.lessonId);
     const raw = read(key);
     const local = parseProgress(raw);
+    const storedGen = lessonGenOf(raw);
+    const nextGen: LessonGen = gen ? { kind: 'known', epoch: gen.epoch, resetAt: gen.resetAt } : storedGen;
     let next = mergeProgress(server, local);
     const keep = summary ?? local.summary ?? null;
     if (keep) next = withSummary(next, keep);
-    if (raw !== null && sameStored(local, next)) return;
-    if (!write(key, JSON.stringify(next))) return;
+    if (raw !== null && sameStored(local, next) && sameLessonGen(storedGen, nextGen) && !options.reset) return false;
+    if (!write(key, JSON.stringify(stampedRecord(next, nextGen)))) return false;
     try {
-      events.progress?.({ courseSlug: ref.courseSlug, lessonId: ref.lessonId, source: 'server' });
+      events.progress?.({ courseSlug: ref.courseSlug, lessonId: ref.lessonId, source: 'server', ...(options.reset ? { reset: true as const } : {}) });
     } catch {
       // ignore
     }
+    return nextGen.kind === 'known' && nextGen.epoch !== null && !(storedGen.kind === 'known' && storedGen.epoch === nextGen.epoch);
   }
 
   // --- Lifecycle ---
@@ -694,23 +1071,36 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
    */
   function startHydrate(userId: string, mode: HydrateMode = 'load'): void {
     const gen = generation;
+    hydrateMode = mode;
     setState('hydrating', userId);
-    const run = hydrate(userId, gen, mode).catch(() => {
-      if (gen === generation) getFailed(mode);
+    const run = hydrate(userId, gen, mode).catch((err: unknown) => {
+      if (gen === generation) getFailed(mode, err);
     });
     hydration = run;
+    updateView();
     void run.finally(() => {
       if (hydration === run) hydration = null;
+      updateView();
     });
   }
 
-  function getFailed(mode: HydrateMode): void {
+  function getFailed(mode: HydrateMode, err: unknown): void {
     if (mode !== 'refresh') {
+      const failure = (err ?? null) as ApiFailure | null;
+      getFailure = { status: statusOf(err), ...(typeof failure?.errorType === 'string' ? { errorType: failure.errorType } : {}) };
       setState('offline');
+      updateView();
       return;
     }
     setState('on');
     if (pendingLessons().length) scheduleFlush();
+  }
+
+  /** Status 'stopped' with its reason (the save view says why). */
+  function stopWith(reason: StopReason): void {
+    stopReason = reason;
+    setState('stopped');
+    updateView();
   }
 
   async function getWithRetry(gen: number, retries: number) {
@@ -728,16 +1118,17 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
 
   async function hydrate(userId: string, gen: number, mode: HydrateMode): Promise<void> {
     if (!apiEnabled()) {
-      getFailed(mode);
+      getFailed(mode, null);
       return;
     }
     let result: Awaited<ReturnType<ProgressApi['get']>>;
     for (let pass = 1; ; pass += 1) {
+      // Phase 5: a lessonMark another tab writes after a generation change also repeats the GET.
       const before = read(SYNC_ACCOUNT_KEY);
       try {
         result = await getWithRetry(gen, mode === 'load' ? SYNC_TIMING.getRetries : 0);
-      } catch {
-        if (gen === generation) getFailed(mode);
+      } catch (err) {
+        if (gen === generation) getFailed(mode, err);
         return;
       }
       if (gen !== generation || state.userId !== userId) return;
@@ -745,10 +1136,14 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       // answer may predate a delete, and must not bring deleted records or the old epoch back.
       if (read(SYNC_ACCOUNT_KEY) === before || pass >= SYNC_TIMING.getPasses) break;
     }
+    // What this server offers (Phase 5): only the reset control, XP and the 503 rule depend on it.
+    const offered = result.capabilities;
+    caps = { lessonReset: offered?.lessonReset === true, achievements: offered?.achievements === true };
+    getFailure = null;
     const account = readAccount();
     if (!account || account.userId !== userId || account.loggedOut) {
       // Another tab signed another learner in meanwhile, or signed this one out.
-      setState('stopped');
+      stopWith('account');
       return;
     }
     const serverEpoch = result.epoch ?? null;
@@ -762,21 +1157,31 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     if (readAccount()?.epoch !== serverEpoch) {
       // Storage refused the account (full or blocked): uploads could not tell this tab's epoch from
       // another tab's (and would load again and again). Stop for this page load.
-      setState('stopped');
+      stopWith('storage');
       return;
     }
+    savedAt = now();
 
     const server = new Map<string, LessonProgress>();
     let latest: { record: ServerRecord; at: number } | null = null;
+    let learned = false;
     for (const record of result.records) {
       const ref = { courseSlug: record.courseSlug, lessonId: record.lessonId };
       if (!syncable(ref)) continue;
       const progress = parseProgress(record.progress);
+      // Phase 5: a stored record whose content predates the lesson's generation goes first; a
+      // kept one (same generation, born here after the reset, or legacy where no reset happened)
+      // is merged into the server's record and stamped with its generation.
+      const gen = serverGenOf(record);
+      if (gen && read(progressKey(ref.courseSlug, ref.lessonId)) !== null && !keepsLocal(localGen(ref), gen)) dropLocal(ref);
       server.set(refKey(ref), progress);
-      takeIn(ref, progress, summaryOf(record));
+      learned = takeIn(ref, progress, summaryOf(record), gen ?? undefined) || learned;
+      // A lesson started over (emptied) never becomes "continue".
+      if (record.state === 'not_started') continue;
       const at = Date.parse(record.updatedAt ?? progress.updatedAt);
       if (Number.isFinite(at) && (!latest || at > latest.at)) latest = { record, at };
     }
+    if (learned) bumpLessonMark();
     // A new device: "continue" points at the lesson the learner read last anywhere.
     if (latest && read(LAST_LESSON_KEY) === null) {
       const { record } = latest;
@@ -796,17 +1201,20 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       if (lacking) setMarker(ref, local.updatedAt);
       else removeMarker(ref);
     }
+    failures = 0;
     setState('on');
+    updateView();
     if (pendingLessons().length) await flush('all');
   }
 
   // --- Uploads ---
 
-  function scheduleFlush(): void {
+  /** soon: no debounce (a retry the learner or the network asked for); the PUT spacing and backoff still hold. */
+  function scheduleFlush({ soon = false }: { soon?: boolean } = {}): void {
     if (state.status !== 'on') return;
     const t = now();
     if (firstChangeAt === null) firstChangeAt = t;
-    const debounced = Math.min(t + SYNC_TIMING.flushDelayMs, firstChangeAt + SYNC_TIMING.flushMaxWaitMs);
+    const debounced = soon ? t : Math.min(t + SYNC_TIMING.flushDelayMs, firstChangeAt + SYNC_TIMING.flushMaxWaitMs);
     const due = Math.max(debounced, lastPutAt + SYNC_TIMING.minPutIntervalMs, retryAt);
     clearFlushTimer();
     const gen = generation;
@@ -820,7 +1228,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     if (state.status !== 'on' || epoch === undefined || !state.userId || !apiEnabled()) return false;
     const account = readAccount();
     if (!account || account.userId !== state.userId || account.loggedOut) {
-      setState('stopped');
+      stopWith('account');
       return false;
     }
     return true;
@@ -840,8 +1248,11 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       const { summary: _summary, ...progress } = record;
       // The marker now names exactly what is sent.
       setMarker(ref, record.updatedAt);
-      const bytes = JSON.stringify({ courseSlug: ref.courseSlug, lessonId: ref.lessonId, progress }).length + 1;
-      items.push({ ...ref, progress, sentAt: record.updatedAt, bytes });
+      // Phase 5: the generation the content builds on goes with it (an older server ignores it).
+      const sentGen = lessonGenOf(raw);
+      const lessonEpoch = sentGen.kind === 'known' ? sentGen.epoch : null;
+      const bytes = JSON.stringify({ courseSlug: ref.courseSlug, lessonId: ref.lessonId, progress, lessonEpoch }).length + 1;
+      items.push({ ...ref, progress, sentAt: record.updatedAt, bytes, lessonEpoch, sentGen });
     }
     const batches: BatchItem[][] = [];
     let batch: BatchItem[] = [];
@@ -859,22 +1270,63 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     return batches;
   }
 
-  function applyPutResult(batch: BatchItem[], result: Awaited<ReturnType<ProgressApi['put']>>): void {
+  /** Returns true when it changed a lesson's generation here (the lesson mark moved). */
+  function applyPutResult(batch: BatchItem[], result: Awaited<ReturnType<ProgressApi['put']>>): boolean {
     const returned = new Map<string, ServerRecord>();
     for (const record of result.records ?? []) returned.set(refKey(record), record);
-    const rejected = new Map<string, string>();
-    for (const item of result.rejected ?? []) rejected.set(`${item.courseSlug}:${item.lessonId}`, item.error_type);
+    const rejected = new Map<string, RejectedRecord>();
+    for (const item of result.rejected ?? []) rejected.set(`${item.courseSlug}:${item.lessonId}`, item);
+    let learned = false;
+    let refused = false;
     for (const item of batch) {
       const record = returned.get(refKey(item));
       if (record) {
         const server = parseProgress(record.progress);
-        takeIn(item, server, summaryOf(record));
+        // A born or unknown record of a lesson never started over becomes known(null) here. The
+        // stamp goes only on what was sent (or what that generation would keep anyway): an unstamped
+        // write that landed meanwhile (an old bundle holding pre-reset content) keeps its own stamp,
+        // so its next PUT is refused (lesson_reset) and dropped instead of saved as this generation.
+        const gen = serverGenOf(record);
+        const now = localGen(item);
+        const stamp = gen && (sameLessonGen(now, item.sentGen) || keepsLocal(now, gen)) ? gen : undefined;
+        learned = takeIn(item, server, summaryOf(record), stamp) || learned;
         if (getMarker(item) === item.sentAt && covers(server, item.progress)) removeMarker(item);
-      } else if (FINAL_REJECTIONS.has(rejected.get(refKey(item)) ?? '')) {
+        continue;
+      }
+      const rejection = rejected.get(refKey(item));
+      const gen = rejection?.error_type === 'lesson_reset' ? serverGenOf(rejection) : null;
+      if (rejection && gen) {
+        // Phase 5: the lesson was started over since this content was made. Unless a newer write
+        // came meanwhile (it goes again with its own stamp), the record follows the server.
+        if (getMarker(item) !== item.sentAt || !sameLessonGen(localGen(item), item.sentGen)) continue;
+        const stored = rejection.record ?? null;
+        if (keepsLocal(localGen(item), gen)) {
+          // Born on this device after the reset: all of it is new. Stamped, it goes again.
+          learned = takeIn(item, stored ? parseProgress(stored.progress) : readRecord(item), stored ? summaryOf(stored) : null, gen) || learned;
+          const stamp = localGen(item);
+          if (stamp.kind !== 'known' || stamp.epoch !== gen.epoch) {
+            // Storage refused the stamped record: sent again it would be refused again, forever.
+            refused = true;
+            continue;
+          }
+          setMarker(item, readRecord(item).updatedAt);
+          flushAgain = true;
+        } else {
+          dropLocal(item);
+          // The server's record of the new generation (an emptied one when it has none, e.g. after
+          // a delete-all), so an open reader restarts instead of writing the old content again.
+          learned = takeIn(item, stored ? parseProgress(stored.progress) : emptyProgress(), stored ? summaryOf(stored) : null, gen) || learned;
+        }
+        continue;
+      }
+      if (FINAL_REJECTIONS.has(rejection?.error_type ?? '')) {
         // Local stays as it is; a later change or hydrate offers it again.
         removeMarker(item);
       }
     }
+    if (learned) bumpLessonMark();
+    if (refused) stopWith('storage');
+    return learned;
   }
 
   /** 409: local data predates a delete. Reset unless another tab already did, then hydrate again. */
@@ -896,10 +1348,18 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       resetTo(failure.epoch ?? null);
       return;
     }
-    if (status === 401 || status === 503) {
-      // 401: until the next sign-in. 503: no lesson progress on this server for this page load.
+    if (status === 401) {
+      // Until the next sign-in. session_changed: another learner's session (progressSyncClient.ts).
       clearFlushTimer();
-      setState('stopped');
+      stopWith(failure.errorType === 'session_changed' ? 'account' : 'auth');
+      return;
+    }
+    if (status === 503 && caps?.lessonReset !== true) {
+      // A server without the Phase 5 tables, or an older one (Phase 2's rule): no lesson progress
+      // on this server for this page load. A server that sent capabilities answers 503 only while
+      // its database is briefly unreachable: retried with backoff below, like a 500.
+      clearFlushTimer();
+      stopWith('server');
       return;
     }
     if (status === 413 && batch.length === 1) {
@@ -907,15 +1367,17 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       return;
     }
     failures += 1;
+    putFailure = status === 0 ? 'network' : 'server';
     const backoff = Math.min(SYNC_TIMING.maxBackoffMs, SYNC_TIMING.minPutIntervalMs * 2 ** (failures - 1));
     retryAt = now() + backoff * (0.5 + random() * 0.5);
     scheduleFlush();
   }
 
-  async function sendBatch(batch: BatchItem[], gen: number, keepaliveWanted: boolean): Promise<boolean> {
+  async function sendBatch(batch: BatchItem[], gen: number, keepaliveWanted: boolean, context: FlushContext): Promise<boolean> {
     const body: PutBody = {
       epoch: epoch ?? null,
-      records: batch.map(({ courseSlug, lessonId, progress }) => ({ courseSlug, lessonId, progress })),
+      // Phase 5: always with the generation (null when unknown, born here or never started over).
+      records: batch.map(({ courseSlug, lessonId, progress, lessonEpoch }) => ({ courseSlug, lessonId, progress, lessonEpoch })),
     };
     const keepalive = keepaliveWanted && JSON.stringify(body).length <= SYNC_LIMITS.keepaliveBytes;
     lastPutAt = now();
@@ -926,7 +1388,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       if (account.loggedOut) {
         // The learner logged out in another tab while this PUT ran: its answer may hold records
         // that logout cleared. Drop it; the markers stay as the logout left them.
-        setState('stopped');
+        stopWith('account');
         return false;
       }
       if (account.epoch !== (epoch ?? null)) {
@@ -935,10 +1397,19 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
         rehydrate();
         return false;
       }
+      if (read(SYNC_ACCOUNT_KEY) !== context.account) {
+        // Another tab changed a lesson's generation meanwhile (lessonMark): this answer may hold a
+        // record from before it. Drop it and load the server state again.
+        rehydrate();
+        return false;
+      }
       failures = 0;
       retryAt = 0;
-      applyPutResult(batch, result);
-      return true;
+      putFailure = null;
+      savedAt = now();
+      if (applyPutResult(batch, result)) context.account = read(SYNC_ACCOUNT_KEY);
+      // Stopped while taking the answer in (storage refused a record): no further batch.
+      return state.status === 'on';
     } catch (err) {
       if (gen !== generation) return false;
       handlePutFailure(err, batch);
@@ -965,23 +1436,36 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     const gen = generation;
     let more = false;
     const run = (async () => {
+      // Read with the records, in the same step: the lessonMark check in sendBatch compares with it.
+      const context: FlushContext = { account: read(SYNC_ACCOUNT_KEY) };
       const batches = collectBatches();
       const toSend = mode === 'all' ? batches : batches.slice(0, 1);
       more = batches.length > toSend.length;
       for (const batch of toSend) {
-        if (gen !== generation || !(await sendBatch(batch, gen, mode === 'hide'))) {
+        if (gen !== generation || !(await sendBatch(batch, gen, mode === 'hide', context))) {
           more = false;
           return;
         }
       }
     })();
     inFlight = run;
+    updateView();
     try {
       await run;
     } finally {
       if (inFlight === run) inFlight = null;
+      updateView();
     }
-    if (gen !== generation || state.status !== 'on') return;
+    if (state.status !== 'on') return;
+    if (gen !== generation) {
+      // Dropped (a reset, delete or reload meanwhile). A flush asked for since then waited for
+      // this one: it goes now.
+      if (flushAgain && !inFlight) {
+        flushAgain = false;
+        scheduleFlush();
+      }
+      return;
+    }
     if (flushAgain || more) {
       flushAgain = false;
       scheduleFlush();
@@ -997,6 +1481,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     if (raw === null) return;
     setMarker(ref, parseProgress(raw).updatedAt);
     scheduleFlush();
+    updateView();
   }
 
   function flushOnHide(): void {
@@ -1011,6 +1496,41 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     startHydrate(userId, 'refresh');
   }
 
+  /**
+   * The last upload before a logout, ≤ 3 s in all. A stalled sync (the GET failed, or a 401/503
+   * stopped uploads) tries once more while the session is still valid; a load, retry or refresh
+   * that runs now is waited for: each ends with the upload of what is pending (Phase 5: before,
+   * a logout during a load sent nothing).
+   */
+  async function waitForUploads(): Promise<void> {
+    const userId = state.userId;
+    let timer: unknown = null;
+    const deadline = new Promise<void>((resolve) => {
+      timer = timers.setTimeout(resolve, SYNC_TIMING.logoutFlushMs);
+    });
+    try {
+      const account = readAccount();
+      if (stalled() && account?.userId === userId && !account.loggedOut) rehydrate();
+      if (hydration) await Promise.race([hydration, deadline]);
+      else if (state.status === 'on') await Promise.race([flush('all'), deadline]);
+    } finally {
+      timers.clearTimeout(timer);
+    }
+  }
+
+  async function prepareSignOut(): Promise<{ unsaved: number }> {
+    const userId = state.userId;
+    try {
+      if (!userId || state.status === 'needs_choice' || !apiEnabled()) return { unsaved: 0 };
+      await waitForUploads();
+      prepared = { generation, at: now() };
+      updateView();
+      return { unsaved: state.userId === userId ? countPending() : 0 };
+    } catch {
+      return { unsaved: 0 };
+    }
+  }
+
   async function signOut(): Promise<void> {
     const userId = state.userId;
     if (!userId) return;
@@ -1022,16 +1542,10 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
         setState('off', null);
         return;
       }
-      // A stalled sync (the GET failed, or a 401/503 stopped uploads) tries once more while the
-      // session is still valid: the hydrate ends with the upload of what is pending.
-      const account = readAccount();
-      const retry = stalled() && account?.userId === userId && !account.loggedOut;
-      if (retry) rehydrate();
-      if (retry && hydration) {
-        await Promise.race([hydration, sleep(SYNC_TIMING.logoutFlushMs)]);
-      } else if (state.status === 'on') {
-        await Promise.race([flush('all'), sleep(SYNC_TIMING.logoutFlushMs)]);
-      }
+      // prepareSignOut just waited (nothing reloaded since): the learner never waits twice.
+      const fresh = prepared && prepared.generation === generation && now() - prepared.at <= 15_000;
+      prepared = null;
+      if (!fresh) await waitForUploads();
       stopActivity();
       clearLocal({ keepPending: true, learningEvents: true });
       const stored = readAccount();
@@ -1041,6 +1555,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     }
     epoch = undefined;
     setState('off', null);
+    updateView();
     emitAccount();
   }
 
@@ -1094,7 +1609,113 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     writeAccount({ userId, epoch });
     // The server holds nothing now and the epoch is known: sync can run.
     setState('on');
+    updateView();
     return { ok: true, scope: 'account' };
+  }
+
+  /**
+   * Phase 5: starts one published lesson over. The server first (POST …/lesson-reset, its own
+   * transaction); only on success this browser drops the lesson's record, marker and "continue"
+   * and stores the emptied record stamped with the new generation (PROGRESS_EVENT reset: open
+   * readers restart). Answers still on their way in this tab are dropped; other tabs repeat or
+   * drop theirs (lessonMark); other devices drop their copy at their next load or save.
+   */
+  async function resetLesson(courseSlug: string, lessonId: string): Promise<LessonResetResult> {
+    const userId = state.userId;
+    const ref = { courseSlug, lessonId };
+    let apiOn = false;
+    try {
+      apiOn = apiEnabled();
+    } catch {
+      apiOn = false;
+    }
+    const ready = state.status === 'on' || (state.status === 'hydrating' && hydrateMode === 'refresh');
+    if (!userId || !ready || epoch === undefined || !apiOn) return { ok: false, reason: 'not_ready' };
+    if (caps?.lessonReset !== true) return { ok: false, reason: 'unsupported' };
+    if (!syncable(ref)) return { ok: false, reason: 'not_published' };
+    let result: Awaited<ReturnType<ProgressApi['resetLesson']>>;
+    try {
+      result = await api.resetLesson({ epoch: epoch ?? null, courseSlug, lessonId });
+    } catch (err) {
+      const status = statusOf(err);
+      const failure = (err ?? {}) as ApiFailure;
+      if (status === 404 && !failure.errorType) {
+        // An older server: no such route. The control stays hidden for this page load.
+        if (state.userId === userId && caps) caps = { ...caps, lessonReset: false };
+        updateView();
+        return { ok: false, reason: 'unsupported' };
+      }
+      if (status === 409 && failure.errorType === 'progress_reset') {
+        if (state.userId === userId) resetTo(failure.epoch ?? null);
+        return { ok: false, reason: 'reloaded' };
+      }
+      if (failure.errorType === 'unknown_lesson') return { ok: false, reason: 'not_published' };
+      if (status === 429) return { ok: false, reason: 'rate_limited' };
+      if (status === 0 && failure.errorType === 'network') return { ok: false, reason: 'unconfirmed' };
+      // A 2xx the client could not read: the server did start the lesson over. The next load
+      // drops the old record here (its stamp is of the old generation).
+      if (status >= 200 && status < 300) return { ok: false, reason: 'unconfirmed' };
+      return { ok: false, reason: 'failed' };
+    }
+    if (state.userId !== userId) return { ok: true };
+    const was = state.status;
+    // An answer still on its way in this tab (GET or PUT) may hold the old record: dropped.
+    stopActivity();
+    dropLocal(ref);
+    takeIn(ref, result.record ? parseProgress(result.record.progress) : emptyProgress(), result.record ? summaryOf(result.record) : null,
+      { epoch: result.lessonEpoch.toLowerCase(), resetAt: result.lessonResetAt }, { reset: true });
+    // Another tab's answer still on its way is repeated (GET) or dropped (PUT).
+    bumpLessonMark();
+    // A background refresh was running (the only hydrate a reset waits for): it runs again. The
+    // account epoch stays known, so a failure leaves sync on and uploading, as a refresh does.
+    if (was === 'hydrating') startHydrate(userId, 'refresh');
+    else if (pendingLessons().length) scheduleFlush();
+    updateView();
+    return { ok: true };
+  }
+
+  /** Back online (or the notice's button): one GET for a failed load, an early PUT for failing uploads. */
+  function retryAfterOutage(fromButton: boolean): void {
+    const userId = state.userId;
+    if (!userId) return;
+    const account = readAccount();
+    const mine = account?.userId === userId && !account.loggedOut;
+    if (state.status === 'offline' || (fromButton && state.status === 'stopped' && stopReason === 'server')) {
+      // A 401 or another learner's session is not a network problem: session events restart them.
+      if (!mine) return;
+      stopActivity();
+      epoch = undefined;
+      startHydrate(userId, 'retry');
+    } else if (state.status === 'on' && failures > 0) {
+      retryAt = 0;
+      scheduleFlush({ soon: true });
+    }
+  }
+
+  function networkChanged(next: boolean): void {
+    const was = online;
+    online = next === true;
+    updateView();
+    if (!online || was) return;
+    const t = now();
+    if (t - lastNetworkRetryAt < 30_000) return;
+    lastNetworkRetryAt = t;
+    // A classroom coming back online at once: spread over 1–5 s.
+    const gen = generation;
+    timers.setTimeout(() => {
+      if (gen === generation) retryAfterOutage(false);
+    }, 1_000 + random() * 4_000);
+  }
+
+  function retryNow(): void {
+    const t = now();
+    if (t - lastRetryNowAt < 10_000) return;
+    lastRetryNowAt = t;
+    retryAfterOutage(true);
+  }
+
+  function storageChanged(): void {
+    updateView();
   }
 
   function forget(): void {
@@ -1107,6 +1728,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       // Storage trouble: nothing more to clear.
     }
     setState('off', null);
+    updateView();
     emitAccount();
   }
 
@@ -1143,5 +1765,18 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       };
     },
     settled,
+    getView: () => view,
+    subscribeView(listener) {
+      viewListeners.add(listener);
+      return () => {
+        viewListeners.delete(listener);
+      };
+    },
+    networkChanged,
+    retryNow,
+    storageChanged,
+    prepareSignOut,
+    resetLesson,
+    capabilities: () => caps,
   };
 }
