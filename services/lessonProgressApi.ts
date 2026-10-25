@@ -78,10 +78,13 @@ async function send(init: RequestInit): Promise<Record<string, unknown>> {
   return body;
 }
 
-/** Every stored lesson record of the learner, and the learner's reset epoch (null: never reset). */
-export async function getLessonProgressRecords(): Promise<{ epoch: string | null; records: LessonProgressRecordOut[] }> {
+/**
+ * Every stored lesson record of the learner, and the learner's reset epoch (null: never reset).
+ * restarted: the account was deleted and opened again since (Phase 4; the server sends it only then).
+ */
+export async function getLessonProgressRecords(): Promise<{ epoch: string | null; records: LessonProgressRecordOut[]; restarted: boolean }> {
   const body = await send({ method: 'GET' });
-  return { epoch: epochOf(body.epoch), records: recordsOf(body.records) };
+  return { epoch: epochOf(body.epoch), records: recordsOf(body.records), restarted: body.restarted === true };
 }
 
 /**

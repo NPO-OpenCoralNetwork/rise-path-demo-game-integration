@@ -53,3 +53,24 @@ export const getNexloomSupabaseClient = (): SupabaseClient | null => {
     });
     return _nexloomClient;
 };
+
+/** The storage key of the re-authentication client (never the main session's key). */
+export const REAUTH_STORAGE_KEY = 'rp-reauth';
+
+/**
+ * A short-lived client for the password check before an account deletion (Phase 4, design §5.11):
+ * nothing is stored, nothing refreshes, and AuthContext never subscribes to it, so its sign-in
+ * never becomes the app's session (handleSession and signInProgressSync do not run). The caller
+ * signs it out with { scope: 'local' } when done, which ends only that one session.
+ */
+export const createReauthClient = (): SupabaseClient | null => {
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    return createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storageKey: REAUTH_STORAGE_KEY,
+        },
+    });
+};

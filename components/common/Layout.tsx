@@ -34,6 +34,10 @@ interface LayoutProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
   onLogout?: () => void;
+  /** A bar above the page (Phase 4: components/legal/LegalNoticeBar). It sits in the same frame as
+   *  ordinary pages, also above full-bleed ones (the dashboard, lessons). With the flag on the frame
+   *  is always there: it holds the bar's live region, which has no height while it is empty. */
+  notice?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -62,7 +66,10 @@ const LANGUAGE_OPTIONS: { value: SelectedLanguage; short: string; name: string; 
   { value: 'fr', short: 'FR', name: 'Français', lang: 'fr' },
 ];
 
-const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, children }) => {
+/** The content frame of ordinary (not full-bleed) pages; the notice slot uses it on every page. */
+const CONTENT_FRAME = 'max-w-wide 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8';
+
+const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, notice, children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
@@ -415,8 +422,10 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
     mainRef.current?.focus();
   };
 
+  // Print (the legal pages, design §2.4): the frame grows with its content and the app's chrome is
+  // hidden, so a printout carries the whole page and not only the first screen of <main>.
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-canvas">
+    <div className="flex h-screen w-full overflow-hidden bg-canvas print:h-auto print:overflow-visible">
       <a
         href="#main-content"
         onClick={skipToContent}
@@ -429,7 +438,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
       {!railMode && (
         <header
           data-theme={styles.dark ? 'dark' : undefined}
-          className={`md:hidden fixed inset-x-0 top-0 z-50 h-14 border-b px-4 flex justify-between items-center ${styles.mobileHeader}`}
+          className={`md:hidden fixed inset-x-0 top-0 z-50 h-14 border-b px-4 flex justify-between items-center print:hidden ${styles.mobileHeader}`}
         >
           <div className="flex items-center gap-2">
             <BrandMark size={28} />
@@ -454,7 +463,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
         id="app-sidebar"
         data-theme={styles.dark ? 'dark' : undefined}
         className={`
-          fixed md:relative z-40 h-full border-r flex flex-col transition-all duration-300 ease-in-out
+          fixed md:relative z-40 h-full border-r flex flex-col transition-all duration-300 ease-in-out print:hidden
           ${styles.sidebar}
           ${isMobileMenuOpen ? 'translate-x-0' : 'max-md:invisible -translate-x-full md:translate-x-0'}
           w-(--rp-sidebar) ${collapsed ? 'md:w-(--rp-rail)' : 'md:w-(--rp-sidebar)'}
@@ -542,13 +551,16 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, chil
         ref={mainRef}
         tabIndex={-1}
         inert={isMobileMenuOpen || undefined}
-        className={`flex-1 min-w-0 overflow-y-auto h-full w-full ${railMode ? '' : 'pt-14 md:pt-0'} relative overflow-x-hidden focus:outline-none ${styles.main}`}
+        // scroll-pt-14: a heading scrolled or focused into view (a #section link, the table of
+        // contents) lands below the fixed phone header, not under it.
+        className={`flex-1 min-w-0 overflow-y-auto h-full w-full ${railMode ? '' : 'pt-14 scroll-pt-14 md:pt-0 md:scroll-pt-0'} relative overflow-x-hidden focus:outline-none print:h-auto print:overflow-visible print:pt-0 ${styles.main}`}
       >
+        {notice ? <div className={CONTENT_FRAME}>{notice}</div> : null}
         <div
           className={`min-h-full w-full ${
             isFullBleedView
               ? ''
-              : 'max-w-wide 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8'
+              : CONTENT_FRAME
           }`}
         >
           <div key={location.pathname} className="page-transition">

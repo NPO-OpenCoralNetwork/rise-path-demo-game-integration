@@ -63,6 +63,15 @@ export const PROGRESS_MAX_BYTES = 65536;
 /** Most records one save takes (the REST PUT's limit). */
 export const SAVE_BATCH_MAX = 25;
 
+/**
+ * Whether the learner's current epoch was written by re-opening a deleted account (Phase 4,
+ * tools/core/accountDeletions.js reopenAccount writes reopened_at and reset_at with the same
+ * now()). The GET answers restarted: true so a device that knew the old epoch also clears the
+ * learning events of the deleted account. A later normal reset moves reset_at and ends it.
+ */
+export const RESTARTED_SQL = `SELECT EXISTS (SELECT 1 FROM account_deletions d WHERE d.user_id = $1::uuid
+   AND d.reopened_at = (SELECT r.reset_at FROM lesson_progress_resets r WHERE r.user_id = d.user_id)) AS restarted`;
+
 /** Stored in a placeholder row until the same transaction writes the real record. */
 const PLACEHOLDER = JSON.stringify(emptyProgress());
 
@@ -220,8 +229,9 @@ const lockUser = (db, userId) => db.query("SELECT pg_advisory_xact_lock(hashtext
  * one and written back (best effort: a failed write-back is logged, the answer stays right).
  *
  * @param {{ userId: string, courseSlug?: string, lessonId?: string, withEpoch?: boolean }} params
- *   withEpoch: also read the reset epoch (the REST API; the MCP role cannot read it)
- * @returns {Promise<{ epoch?: string | null, records: StoredRecord[] } | CoreError>}
+ *   withEpoch: also read the reset epoch (the REST API; the MCP role cannot read it) and, when
+ *   there is one, whether it is the epoch of a re-opened deleted account (RESTARTED_SQL)
+ * @returns {Promise<{ epoch?: string | null, restarted?: boolean, records: StoredRecord[] } | CoreError>}
  */
 export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoch = false }) {
     if (!isUuid(userId)) return invalid('A signed-in learner is required.');
@@ -236,9 +246,11 @@ export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoc
         // old epoch with fewer rows (a later save answers 409), never as old rows under a new epoch.
         /** @type {string | null} */
         let epoch = null;
+        let restarted = false;
         if (withEpoch) {
             const reset = await pool.query('SELECT epoch FROM lesson_progress_resets WHERE user_id = $1', [userId]);
             epoch = reset.rows[0]?.epoch ? String(reset.rows[0].epoch) : null;
+            if (epoch) restarted = (await pool.query(RESTARTED_SQL, [userId]))?.rows?.[0]?.restarted === true;
         }
         const params = [userId, ...(courseSlug !== undefined ? [courseSlug] : []), ...(lessonId !== undefined ? [lessonId] : [])];
         const { rows } = await pool.query(
@@ -283,7 +295,7 @@ export async function getLessonProgress({ userId, courseSlug, lessonId, withEpoc
                 console.warn('[lessonProgress] pct/state write-back failed:', /** @type {any} */ (err)?.code || '', /** @type {any} */ (err)?.message || err);
             }
         }
-        return withEpoch ? { epoch, records } : { records };
+        return withEpoch ? { epoch, restarted, records } : { records };
     } catch (err) {
         return classifyDbError(/** @type {any} */ (err), 'getLessonProgress');
     }

@@ -112,6 +112,8 @@ router.post('/agent/chat', async (req, res) => {
 
     const { skill, message, context, includeDiaryExcerpts: requestedDiary, stream } = validation.parsed;
     const userId = req.userId;
+    // A re-opened account (Phase 4) gets its own Hermes conversation and session keys.
+    const generation = req.accountGeneration ?? null;
 
     const includeDiaryExcerpts = await resolveIncludeDiaryExcerpts(
         getPool(),
@@ -136,6 +138,7 @@ router.post('/agent/chat', async (req, res) => {
             message,
             context,
             includeDiaryExcerpts,
+            generation,
         });
 
         if (!streamResult.ok) {
@@ -180,6 +183,7 @@ router.post('/agent/chat', async (req, res) => {
         message,
         context,
         includeDiaryExcerpts,
+        generation,
     });
 
     if (!result.ok) {

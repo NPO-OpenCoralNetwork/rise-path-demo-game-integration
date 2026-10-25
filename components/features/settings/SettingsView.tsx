@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, CreditCard, Flag, Globe, Headphones, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { ArrowLeft, Bell, CreditCard, FileText, Flag, Globe, Headphones, LifeBuoy, Lock, MessageCircle, PlugZap, Shield, ShieldCheck, Sparkles, Trash2, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -7,6 +7,8 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useUserRole } from '../../../hooks/useUserRole';
 import { usePlanEntry } from '../../../hooks/usePlanEntry';
 import { useAuth } from '../../../context/AuthContext';
+import { features } from '../../../config/features';
+import { SupportContact } from '../../ui/SupportContact';
 import { getAiAccess, type AiAccessStatus } from '../../../services/aiAccessApi';
 import { checkTtsAvailable, getDisplayName, loadTtsPreferences } from '../../../services/ttsPreferencesService';
 import { clearLegacyBrowserKey, getLlmStatus, primaryProviderLabel, summarizeLlmStatus, type LlmStatus } from '../../../services/llmApi';
@@ -88,6 +90,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             notifications: 'Notifications',
             plan: 'Plan',
             planHint: 'Payment and cancellation',
+            deleteAccount: 'Delete account',
+            deleteAccountHint: 'Delete your Rise Path data. Your sign-in stays.',
             ai: 'AI features',
             aiChecking: 'Checking…',
             aiLive: (provider: string | null) => `Runs securely on the server${provider ? ` · ${provider}` : ''}`,
@@ -110,6 +114,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             adminSafetyHint: 'Reports, safety counts, paper consent forms',
             connectedApps: 'Connected AI apps',
             connectedAppsHint: 'Your own AI apps connected through MCP (adults)',
+            about: 'About this service',
+            terms: 'Terms of Use',
+            privacyPolicy: 'Privacy Policy',
+            legalHint: 'In Japanese',
+            contact: 'Contact',
         },
         jp: {
             title: '設定',
@@ -131,6 +140,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             notifications: '通知',
             plan: 'プラン',
             planHint: 'お支払いと解約',
+            deleteAccount: 'アカウントを削除する',
+            deleteAccountHint: 'Rise Path のデータを削除します。ログインは残ります。',
             ai: 'AI 機能',
             aiChecking: '確認中…',
             aiLive: (provider: string | null) => `サーバーで安全に実行中${provider ? `・${provider}` : ''}`,
@@ -153,6 +164,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             adminSafetyHint: '報告、止めた件数、紙の同意書の記録',
             connectedApps: 'つないでいる AI アプリ',
             connectedAppsHint: 'MCP でつないだ自分の AI アプリ（18 歳以上）',
+            about: 'このサービスについて',
+            terms: '利用規約',
+            privacyPolicy: 'プライバシーポリシー',
+            legalHint: '',
+            contact: 'お問い合わせ',
         },
     } as const;
 
@@ -264,6 +280,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                                 onClick={() => onNavigate(ViewState.SETTINGS_PLAN)}
                             />
                         )}
+                        {/* Phase 4 (D1): deleting one's own Rise Path data. Guests have none on the server. */}
+                        {user && !user.isGuest && (
+                            <SettingsRow
+                                icon={<Trash2 size={20} />}
+                                label={t.deleteAccount}
+                                subtext={t.deleteAccountHint}
+                                onClick={() => onNavigate(ViewState.SETTINGS_DELETE_ACCOUNT)}
+                            />
+                        )}
                     </SettingsSection>
 
                     <SettingsSection title={t.safety}>
@@ -303,6 +328,33 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
                             label={t.privacy}
                             onClick={() => onNavigate(ViewState.SETTINGS_PRIVACY)}
                         />
+                    </SettingsSection>
+
+                    {/* Phase 4: the legal texts (only once published: VITE_FEATURE_LEGAL_PAGES) and the one contact line (always). */}
+                    <SettingsSection title={t.about}>
+                        {features.legalPages && (
+                            <>
+                                <SettingsRow
+                                    icon={<FileText size={20} />}
+                                    label={t.terms}
+                                    subtext={t.legalHint || undefined}
+                                    onClick={() => onNavigate(ViewState.LEGAL_TERMS)}
+                                />
+                                <SettingsRow
+                                    icon={<Lock size={20} />}
+                                    label={t.privacyPolicy}
+                                    subtext={t.legalHint || undefined}
+                                    onClick={() => onNavigate(ViewState.LEGAL_PRIVACY)}
+                                />
+                            </>
+                        )}
+                        <div className="flex items-start gap-3 rounded-card border border-line bg-surface p-4 shadow-1">
+                            <LifeBuoy size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-primary-text" />
+                            <div className="min-w-0">
+                                <h3 className="text-body font-medium text-fg">{t.contact}</h3>
+                                <SupportContact className="mt-1" showLabel={false} />
+                            </div>
+                        </div>
                     </SettingsSection>
                 </div>
             </div>

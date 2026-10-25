@@ -23,7 +23,8 @@
  *
  * Auth (user scope): tools/core/mcpUserScope.js resolveMcpUserId, once per tool call
  *   --http with a Supabase OAuth access token — its user, always (mcp-server/oauthVerifier.js)
- *   SSE with a learner's JWT — that learner (syncAuthUserStub at /sse connect)
+ *   SSE with a learner's JWT — that learner (syncAuthUserStub at /sse connect); a session of a
+ *     deleted Rise Path account is refused on connect and on every message (sseUserAuth.js)
  *   SSE with the bridge token (Hermes) — the learner bound to the call's rp_turn argument, which
  *     Express mints per chat turn (registerAgentTurn); without one, session_binding_required in
  *     production (development only: the sole chatting learner, else PHASE1_USER_ID)
@@ -38,8 +39,9 @@ import { activeProfile } from './profileFilter.js';
 import { clearSession } from './policy.js';
 import { createMcpServer as buildMcpServer } from './createMcpServer.js';
 import { verifyMessagesSessionAuth } from './sseMessagesAuth.js';
+import { createSseUserResolver } from './sseUserAuth.js';
 import { loadEnv } from '../tools/core/env.js';
-import { isOAuthClientToken } from '../tools/core/oauthToken.js';
+import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../tools/core/oauthToken.js';
 
 const args = process.argv.slice(2);
 const REMOTE_MODE = args.includes('--http');
@@ -95,7 +97,7 @@ if (REMOTE_MODE) {
     const { STATUS_CODES } = await import('node:http');
     const { createMessageRateLimiter } = await import('./messageRateLimit.js');
     const { initSupabase, getSupabase, extractBearerToken } = await import('../server/middleware/auth.js');
-    const { PHASE1_USER_ID, syncAuthUserStub } = await import('../server/db.js');
+    const { PHASE1_USER_ID, syncAuthUserStub, getPool } = await import('../server/db.js');
     const app = express();
 
     // Phase 10-8: CORS configuration
@@ -129,57 +131,23 @@ if (REMOTE_MODE) {
     // rp_turn; the transport gets it as parsedBody.
     const parseMessageBody = express.json({ limit: '4mb' });
 
-    // Resolve user ID from Bearer token or fallback
-    // Priority: Bridge Token > Supabase JWT > dev fallback
+    // Resolve user ID from Bearer token or fallback (mcp-server/sseUserAuth.js)
+    // Priority: Bridge Token > Supabase JWT (refused for a deleted Rise Path account) > dev fallback
     // ChatGPT Apps & Connectors uses a fixed token, so Bridge Token is essential.
-    async function resolveUserId(req) {
-        const token = extractBearerToken(req);
-        const bridgeToken = (process.env.RISE_PATH_BRIDGE_TOKEN || '').trim();
-
-        // 1. x-nexloom-bridge-token header (dedicated bridge header)
-        if (bridgeToken) {
-            const provided = (req.headers['x-nexloom-bridge-token'] || '').trim();
-            if (provided && provided === bridgeToken) {
-                req.authMethod = 'bridge-header';
-                return PHASE1_USER_ID; // Bridge uses shared user
-            }
-        }
-
-        // 2. Bearer token — check if it's Bridge Token first
-        if (token && bridgeToken && token === bridgeToken) {
-            req.authMethod = 'bridge-bearer';
-            return PHASE1_USER_ID;
-        }
-
-        // 3. Bearer token — try Supabase JWT. A connected agent's OAuth token (client_id, or an aud
-        // other than 'authenticated': tools/core/oauthToken.js) belongs to the remote endpoint
-        // only and is never an SSE session.
-        if (token && isOAuthClientToken(token)) {
-            req.authMethod = 'oauth-client-refused';
-            return null;
-        }
-        if (token) {
-            const supabase = getSupabase();
-            if (supabase) {
-                try {
-                    const { data, error } = await supabase.auth.getUser(token);
-                    if (!error && data?.user) {
-                        req.authMethod = 'supabase-jwt';
-                        return data.user.id;
-                    }
-                } catch { /* fall through */ }
-            }
-        }
-
-        // 4. Dev mode fallback (disabled in strict auth — see server/middleware/authPolicy.js)
-        const { allowDevAuthFallback } = await import('../server/middleware/authPolicy.js');
-        if (allowDevAuthFallback()) {
-            req.authMethod = 'dev-fallback';
-            return PHASE1_USER_ID;
-        }
-
-        return null;
-    }
+    const { allowDevAuthFallback } = await import('../server/middleware/authPolicy.js');
+    const { readAccountState } = await import('../tools/core/accountDeletions.js');
+    const resolveUserId = createSseUserResolver({
+        getSupabase,
+        getPool,
+        readAccountState,
+        decodeTokenClaims,
+        sessionAuthTime,
+        isOAuthClientToken,
+        extractBearerToken,
+        bridgeToken: () => process.env.RISE_PATH_BRIDGE_TOKEN,
+        allowDevFallback: allowDevAuthFallback,
+        phase1UserId: PHASE1_USER_ID,
+    });
 
     // Use the module-level sessions Map (declared near resolveToolUserId)
     // so that tool handlers can look up authenticated userId by sessionId

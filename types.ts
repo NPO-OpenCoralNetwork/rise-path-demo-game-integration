@@ -201,6 +201,10 @@ export enum ViewState {
   SETTINGS_PLAN = 'SETTINGS_PLAN', // Phase 3: the supporter plan (/settings/plan, VITE_FEATURE_BILLING)
   SETTINGS_PLAN_CONFIRM = 'SETTINGS_PLAN_CONFIRM', // Phase 3: final confirmation screen before Stripe Checkout
   LEGAL_COMMERCE = 'LEGAL_COMMERCE', // Phase 3: public 特定商取引法に基づく表記 (/legal/commerce)
+  ACCOUNT_DELETED = 'ACCOUNT_DELETED', // Phase 4: public page after an account deletion (/account/deleted)
+  SETTINGS_DELETE_ACCOUNT = 'SETTINGS_DELETE_ACCOUNT', // Phase 4: delete one's own Rise Path account
+  LEGAL_TERMS = 'LEGAL_TERMS', // Phase 4: public 利用規約 (/terms, VITE_FEATURE_LEGAL_PAGES)
+  LEGAL_PRIVACY = 'LEGAL_PRIVACY', // Phase 4: public プライバシーポリシー (/privacy, VITE_FEATURE_LEGAL_PAGES)
 }
 
 // Generated Content Types

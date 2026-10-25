@@ -4,6 +4,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.repl
 
 import { getSupabaseClient } from './supabaseClient';
 import { shouldSendLegacyUserIdHeader } from './authPolicy';
+import { reportAccountDeleted } from './accountDeletionState';
 
 // Legacy fallback for Guest users (no Supabase session)
 let _getUserId: (() => string | null) = () => null;
@@ -45,8 +46,24 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
         }
     }
 
-    return fetch(`${API_BASE}${path}`, { ...options, headers });
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    // Phase 4 (design §5.11): this account was deleted (here or on another device). AuthContext
+    // hears the signal and ends the session on this device; callers get the response unchanged.
+    if (res.status === 401) await noteAccountDeleted(res);
+    return res;
 };
+
+/** Reads a 401's error_type from a copy of the body; account_deleted → reportAccountDeleted(). */
+async function noteAccountDeleted(res: Response): Promise<void> {
+    try {
+        const body = await res.clone().json();
+        if (body && typeof body === 'object' && (body as { error_type?: unknown }).error_type === 'account_deleted') {
+            reportAccountDeleted();
+        }
+    } catch {
+        // Not JSON (a proxy page): not the server's answer.
+    }
+}
 
 export const apiGet = async <T = any>(path: string): Promise<T> => {
     const res = await apiFetch(path);

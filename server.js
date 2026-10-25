@@ -26,8 +26,12 @@ import {
     LESSON_PROGRESS_BODY_LIMIT,
     LESSON_PROGRESS_WRITES_PER_MINUTE,
 } from './server/routes/lessonProgress.js';
+import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
+import { LEGAL_BODY_LIMIT, createLegalRouter } from './server/routes/legal.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
+import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
+import { describeError, redactUrl } from './server/utils/redactUrl.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -40,6 +44,8 @@ import { createStripeClient } from './server/services/stripeClient.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
+import { requireSignedIn } from './server/middleware/signedIn.js';
+import { smallBodyErrors } from './server/middleware/smallBody.js';
 import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
 import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
@@ -123,6 +129,10 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
     // then sees the body as already read and skips it.
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
+    // Account deletion (Phase 4) takes a confirm word and the AI apps' names: 16 kb, refused before the 50 MB parser.
+    app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
+    // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 50 MB parser too.
+    app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
     // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
@@ -130,13 +140,14 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     app.use(express.json({ limit: '50mb' }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
-    // path when a scoped middleware (e.g. /api/v2/agent auth) answers.
+    // path when a scoped middleware (e.g. /api/v2/agent auth) answers. redactUrl (Phase 4): no query
+    // string, ids cut to 8 characters, no dates, emails, file names or tokens (server/utils/redactUrl.js).
     app.use((req, res, next) => {
         const start = Date.now();
         res.on('finish', () => {
             const ms = Date.now() - start;
             const auth = req.authMethod || '-';
-            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms auth=${auth}`);
+            console.log(`[${new Date().toISOString()}] ${req.method} ${redactUrl(req.originalUrl)} ${res.statusCode} ${ms}ms auth=${auth}`);
         });
         next();
     });
@@ -222,6 +233,22 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
     // progress is not an AI feature. requireAuth refuses an agent's OAuth token (agents use the
     // MCP course-* tools). Before the /api/v2/user mount, whose legacy /progress routes stay.
     app.use('/api/v2/user/lesson-progress', requireAuth, createLessonProgressRouter({ writeLimiter: lessonProgressLimiter }));
+    // Deleting one's own Rise Path account (Phase 4, server/routes/account.js): a real learner's
+    // session only, re-authenticated with the password; the shared Supabase login stays.
+    app.use(
+        '/api/v2/user/account',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to delete it.'),
+        createAccountRouter({ billing: { config: billingConfig, stripe } }),
+    );
+    // Accepting the terms of use (Phase 4, server/routes/legal.js): a real learner's session only;
+    // the acceptance is recorded under the shared account lock (never for an account deleted meanwhile).
+    app.use(
+        '/api/v2/user/legal',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to accept the terms.'),
+        createLegalRouter(),
+    );
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
     // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
     // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).
@@ -296,12 +323,13 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
 
     // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
     // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
-    // sent: Express's own handler sends the stack (database text included) outside production.
+    // sent: Express's own handler sends the stack (database text included) outside production. The
+    // line has its name, code and message only: a pg error's detail holds values (Phase 4).
     app.use((err, req, res, next) => {
         if (res.headersSent) return next(err);
         const code = err?.status ?? err?.statusCode;
         const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
-        if (status >= 500) console.error(`[Server] ${req.method} ${req.originalUrl} failed:`, err);
+        if (status >= 500) console.error(`[Server] ${req.method} ${redactUrl(req.originalUrl)} failed: ${describeError(err)}`);
         res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
     });
 
@@ -335,6 +363,16 @@ async function main() {
     // records a new event; the admin queries also enforce it.
     void pruneSafetyEvents(undefined, { force: true });
     setInterval(() => void pruneSafetyEvents(undefined, { force: true }), 60 * 60 * 1000).unref();
+    // Retention (Phase 4, server/services/retention.js): old usage counts, processing records and
+    // the proofs of deleted accounts, hourly. An invalid setting turns its rule off (logged). Outside
+    // NODE_ENV=production it runs only with RETENTION_ENABLED=true (a laptop api on the VM database).
+    const retention = readRetentionConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    for (const problem of retention.problems) console.warn(`[Retention] ${problem}`);
+    console.log(retentionStartupLine(retention));
+    if (retention.enabled) {
+        void runRetention({ config: retention });
+        setInterval(() => void runRetention({ config: retention }), RETENTION_INTERVAL_MS).unref();
+    }
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);

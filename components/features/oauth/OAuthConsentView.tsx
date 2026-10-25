@@ -122,6 +122,8 @@ const copy = {
     trustBody:
       'Allowing gives this app a sign-in for your Rise Path account. At the account service, that sign-in has the same power as your own, so allow only apps you trust.',
     safetyLink: 'About AI safety at Rise Path',
+    termsLink: 'Terms of Use (in Japanese)',
+    privacyLink: 'Privacy Policy (in Japanese)',
     newTab: '(opens in a new tab)',
     approve: 'Allow',
     deny: 'Deny',
@@ -222,6 +224,8 @@ const copy = {
     trustBody:
       '許可すると、このアプリは Rise Path アカウントのサインインを受け取ります。アカウントのサービスでは、あなた自身と同じ力で動けます。信頼できるアプリだけを許可してください。',
     safetyLink: 'Rise Path の AI の安全について',
+    termsLink: '利用規約',
+    privacyLink: 'プライバシーポリシー',
     newTab: '（新しいタブで開きます）',
     approve: '許可する',
     deny: '拒否する',
@@ -798,6 +802,27 @@ const ConsentCard: React.FC<ConsentCardProps> = ({
             <span className="sr-only">{t.newTab}</span>
           </Link>
         </p>
+        {/* Phase 4: the legal texts, once published (VITE_FEATURE_LEGAL_PAGES=true); a new tab keeps this page. */}
+        {features.legalPages && (
+          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-body">
+            {[
+              { to: '/terms', label: t.termsLink },
+              { to: '/privacy', label: t.privacyLink },
+            ].map((page) => (
+              <Link
+                key={page.to}
+                to={page.to}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-1 font-medium text-primary-text underline underline-offset-4"
+              >
+                {page.label}
+                <ExternalLink size={14} aria-hidden="true" />
+                <span className="sr-only">{t.newTab}</span>
+              </Link>
+            ))}
+          </p>
+        )}
       </section>
 
       {eligibility === 'allowed' && decisionCard}

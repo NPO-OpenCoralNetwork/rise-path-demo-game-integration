@@ -14,7 +14,8 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
   `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references
   `--check`, change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for
   `check-assets.mjs`: credits in `assets/credits.json` for assets over 1 MiB), and `build:prod`
-  with dummy keys that must not appear in the bundle. Run them before opening a PR.
+  with dummy keys that must not appear in the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES`
+  unset). Run them before opening a PR.
 
 ## Where things live
 - Learning material (教材): `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json`
@@ -27,6 +28,12 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Design: tokens in `styles/tokens.css`, rules in `doc/design/design-system.md`, shared UI in
   `components/ui/`. Routes: `navigation/viewPaths.ts`; flags: `config/features.ts`.
 - Plan and research: `doc/brushup-2026/`. Authoring guide: `doc/guides/authoring-with-claude-code.ja.md`.
+- Legal texts: edit the drafts `doc/legal/*.draft.ja.md`, then `node scripts/legal/build-legal-text.mjs`
+  (writes `content/legal/`, prints the version and hash for `shared/legal/versions.js`); `/terms` and
+  `/privacy` publish only with `VITE_FEATURE_LEGAL_PAGES=true` (the build refuses drafts). `doc/legal/README.md`.
+- Account data: learner data deletion goes through `server/services/accountDeletion.js` (staff:
+  `scripts/delete-account-data.mjs`); account ids go through `canonicalUserId` and the `rp:account:`
+  lock key is built from `<id>::uuid::text` (`tools/core/accountDeletions.js`). Retention: `server/services/retention.js`.
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
@@ -56,7 +63,8 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No API keys in browser code or `VITE_*` variables; model keys live on the server only.
 - Model IDs appear only in `server/llm/models.config.js`; never hard-code them elsewhere.
 - Don't publish to the database or mark lessons published from an authoring flow; drafts + PR.
-- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`) by hand.
+- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`,
+  `content/legal/*.ja.md`, `content/legal/archive/`) by hand.
 - Don't touch P-School (`components/features/PSchool`, `data/curricula/p_school`, `public/p_school`).
 - No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.

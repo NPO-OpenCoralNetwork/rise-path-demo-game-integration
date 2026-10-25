@@ -7,6 +7,8 @@
 //   session is a 401.
 // - The tab becoming visible or focused again refreshes (at most once a minute).
 // - "Don't add" clears the other person's learning events and loads this learner's own again.
+// - Phase 4: the legacy progress push waits for this page load's GET (whenAccountKnown) and is
+//   skipped when it failed; forgetProgressAccount (account deleted) uploads nothing.
 // The client imports Vite modules (import.meta.env, import.meta.glob in content/index.ts), so it is
 // bundled with esbuild (a Vite dependency, as in agentChatError.test.js) with the bundled course
 // outline, Supabase and React stubbed, and run against a fake window, document, storage and fetch.
@@ -299,6 +301,49 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     assert.equal(eventsGets, 1);
     assert.ok(!t.storage.getItem('rp_learning_events').includes('guest'));
   });
+  it('Phase 4: after "Add", local-only legacy progress is pushed only when this page load\'s GET succeeded', async () => {
+    const legacy = JSON.stringify({ blender: { courseId: 'blender', progress: 0, completedStages: ['s1'], completedSteps: {}, lastAccessedAt: '2026-10-20T09:00:00.000Z' } });
+    for (const getOk of [false, true]) {
+      const t = (current = await page({
+        routes: {
+          ...(getOk ? {} : { 'GET /user/lesson-progress': () => json(401, { error: 'Invalid token', error_type: 'invalid_token' }) }),
+          'GET /user/progress': () => json(200, { ok: true, progress: {} }),
+          'GET /user/events': () => json(200, { ok: true, events: [] }),
+          'PUT /user/progress/blender': () => json(200, { ok: true }),
+        },
+      }));
+      t.storage.setItem(PROGRESS_KEY('l1'), JSON.stringify(record({ seen: ['g1'] })));
+      t.storage.setItem('rp_learning_progress', legacy);
+      t.client.signInProgressSync(U1, 'tok-1');
+      t.client.chooseProgressAdoption(true);
+      assert.equal(await t.client.whenAccountKnown(), getOk ? 'known' : 'unknown');
+      await until(() => t.calls.some((c) => c.url === '/user/events'));
+      await wait(30);
+      const pushes = t.calls.filter((c) => c.method === 'PUT' && c.url === '/user/progress/blender');
+      assert.equal(pushes.length, getOk ? 1 : 0, `GET ${getOk ? 'ok' : 'failed'}`);
+      // The legacy progress stays on the device either way.
+      assert.ok(t.storage.getItem('rp_learning_progress').includes('"s1"'));
+      current.client.stopProgressSync();
+      current = null;
+      await wait(30);
+    }
+  });
+
+  it('Phase 4: forgetProgressAccount clears this browser\'s lesson data and uploads nothing, not even on page hide', async () => {
+    const t = (current = await page());
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    writeLocal(t, 'l1', record({ seen: ['b1'] }));
+    t.storage.setItem('rp_learning_events', '[{"id":"e1"}]');
+    t.client.forgetProgressAccount();
+    t.dispatch(window, new Event('pagehide'));
+    await wait(50);
+    assert.equal(t.puts().length, 0);
+    assert.deepEqual([...t.storage.map.keys()], []);
+    assert.equal(await t.client.whenAccountKnown(), 'unknown');
+  });
+
   it('the legacy progress hydrate waits for the adoption choice; "Add" runs it after the choice', async () => {
     let legacyGets = 0;
     const t = (current = await page({

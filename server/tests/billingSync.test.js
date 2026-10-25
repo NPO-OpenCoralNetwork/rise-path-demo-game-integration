@@ -136,6 +136,50 @@ describe('syncSubscription', () => {
         assert.ok(!logger.lines.join('\n').includes(BOB), 'no full user id');
     });
 
+    it('a Customer of a deleted account (user_id NULL after the deletion) is stored without a user; only a renewing one alerts the owner', async () => {
+        // Phase 4: deleting the account sets billing_customers.user_id NULL; the subscription's later
+        // events (an ending plan's customer.subscription.deleted) still name the old id in metadata.
+        // A renewing one needs someone to cancel it: an owner alert (deleted_account_renewing), since
+        // a log line alone is erased when a deploy recreates the api container.
+        const posted = [];
+        const webhookAlerts = createBillingAlerts({
+            env: { AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.example.org/billing' },
+            fetch: async (url, init) => {
+                posted.push(JSON.parse(String(init.body)).text);
+                return new Response('ok');
+            },
+            logger,
+            now: () => NOW,
+        });
+        pool.customers.set('cus_gone', { stripe_customer_id: 'cus_gone', user_id: null, livemode: false, created_at: new Date() });
+        for (const [sub, renews] of [
+            [subscription({ id: 'sub_end', customer: 'cus_gone', start: START, metadata: { user_id: BOB }, status: 'canceled' }), false],
+            [subscription({ id: 'sub_cut', customer: 'cus_gone', start: START, metadata: { user_id: BOB }, cancel_at_period_end: true }), false],
+            [subscription({ id: 'sub_on', customer: 'cus_gone', start: START, metadata: { user_id: BOB } }), true],
+            [subscription({ id: 'sub_nometa', customer: 'cus_gone', start: START, status: 'canceled' }), false],
+        ]) {
+            logger.lines.length = 0;
+            posted.length = 0;
+            stripe.putSubscription(sub);
+            const result = await sync(sub.id, { alerts: webhookAlerts });
+            await new Promise((resolve) => setImmediate(resolve)); // the post is not awaited
+            assert.equal(result.outcome, 'synced', sub.id);
+            assert.equal(result.userId, null, sub.id);
+            assert.equal(pool.subscriptions.get(sub.id).user_id, null, sub.id);
+            assert.ok(!logger.lines.some((l) => l.includes('user_mismatch')), `${sub.id}: not a mismatch`);
+            const renewingLine = `[Billing] deleted_account_renewing: subscription ${sub.id} (${sub.status}) belongs to a deleted Rise Path account (customer cus_gone) and still renews: cancel it in the Stripe Dashboard.`;
+            assert.deepEqual(logger.lines, [renews ? renewingLine : `[Billing] subscription ${sub.id} (${sub.status}) belongs to a deleted Rise Path account (customer cus_gone): stored without a user.`], sub.id);
+            assert.deepEqual(posted, renews ? [renewingLine] : [], `${sub.id}: posted only when it still renews`);
+            assert.ok(!logger.lines.join('\n').includes(BOB) && !posted.join('\n').includes(BOB), `${sub.id}: no full user id`);
+        }
+        // The next event of the same subscription on the same day: no second alert.
+        logger.lines.length = 0;
+        posted.length = 0;
+        await sync('sub_on', { alerts: webhookAlerts });
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.deepEqual(posted, [], 'deduplicated per subscription per Japan-time day');
+    });
+
     it('a price that is not accepted is stored, alerts, and gives no supporter caps', async () => {
         stripe.putSubscription(subscription({ id: 'sub_1', customer: 'cus_alice', start: START, price: 'price_donation' }));
         const result = await sync('sub_1');

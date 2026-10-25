@@ -9,7 +9,8 @@
  *   2. Find the learner ONLY through billing_customers (customer id + mode): a Customer Rise Path
  *      did not create (a donation on the same Stripe account, say) is not stored ('unknown_customer',
  *      owner alert). The subscription's metadata user_id is only cross-checked ('user_mismatch',
- *      the mapping wins).
+ *      the mapping wins). A Customer whose user_id is NULL belonged to a deleted Rise Path account
+ *      (Phase 4; migration 017 ON DELETE SET NULL): one log line, not a mismatch alert.
  *   3. One upsert whose synced_at is fetchStartedAt; it replaces a row only when the stored
  *      synced_at is not newer, so the read that started last wins. Every state change sends an
  *      event whose read starts after the change, so the row converges.
@@ -111,7 +112,18 @@ export async function syncSubscription(subscriptionId, { stripe, pool, config, n
   }
   const userId = owner.rows[0].user_id ? String(owner.rows[0].user_id) : null;
   const metadataUser = typeof sub?.metadata?.user_id === 'string' ? sub.metadata.user_id : null;
-  if (metadataUser && metadataUser.toLowerCase() !== (userId ?? '').toLowerCase()) {
+  if (!userId) {
+    // The account was deleted (server/services/accountDeletion.js); its subscription's later events
+    // (an ending plan's customer.subscription.deleted, say) still name it in the metadata.
+    const renewing = !TERMINAL_STATUSES.includes(status) && sub?.cancel_at_period_end !== true && (sub?.cancel_at === null || sub?.cancel_at === undefined);
+    if (renewing) {
+      // Someone has to act: an owner alert (the api log is erased when a deploy recreates the container).
+      alerts.alert('deleted_account_renewing', id,
+        `subscription ${id} (${status}) belongs to a deleted Rise Path account (customer ${customerId}) and still renews: cancel it in the Stripe Dashboard.`);
+    } else {
+      logger.warn(`[Billing] subscription ${id} (${status}) belongs to a deleted Rise Path account (customer ${customerId}): stored without a user.`);
+    }
+  } else if (metadataUser && metadataUser.toLowerCase() !== userId.toLowerCase()) {
     alerts.alert('user_mismatch', id,
       `subscription ${id} names another user in its metadata than its customer ${customerId} maps to (${userTag(userId)}): the customer mapping is used.`);
   }

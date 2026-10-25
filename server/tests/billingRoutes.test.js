@@ -299,6 +299,32 @@ describe('/api/v2/billing on the server.js stack', () => {
         assert.equal([...pool.customers.values()].filter((c) => c.user_id === ALICE).length, 1);
     });
 
+    it('a re-opened account (Phase 4) gets a new Customer: the Idempotency-Keys carry its generation', async () => {
+        Object.assign(process.env, BILLING_ENV);
+        // ALICE deleted her account 10 minutes ago and signed in again 5 minutes ago: requireAuth
+        // reads the re-opened tombstone and sets req.accountGeneration (tools/core/accountDeletions.js).
+        const deletedAt = new Date(Date.now() - 10 * 60 * 1000);
+        const reopenedAt = new Date(Date.now() - 5 * 60 * 1000);
+        const generation = Math.floor(reopenedAt.getTime() / 1000);
+        const inner = pool;
+        setPoolForTests({
+            ...inner,
+            query: async (sql, params) => (String(sql).replace(/\s+/g, ' ').trim().toLowerCase().startsWith('select deleted_at, reopened_at from account_deletions')
+                ? { rowCount: 1, rows: [{ deleted_at: deletedAt, reopened_at: reopenedAt }] }
+                : inner.query(sql, params)),
+        });
+        const jwt = `${b64({ alg: 'ES256' })}.${b64({ sub: ALICE, aud: 'authenticated', role: 'authenticated', exp: 4_000_000_000, amr: [{ method: 'password', timestamp: Math.floor(reopenedAt.getTime() / 1000) }] })}.c2ln`;
+        setSupabaseForTests({ auth: { getUser: async (token) => ({ data: { user: token === jwt ? { id: ALICE } : null }, error: null }) } });
+        await withApp(async (api) => {
+            const result = await call(`${api}/billing/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${jwt}` }, body: { locale: 'jp' } });
+            assert.equal(result.status, 200, result.text);
+        });
+        const [customer] = stripe.calls(/POST \/v1\/customers/);
+        assert.equal(customer.headers['idempotency-key'], `customer:test:${ALICE}:g${generation}`);
+        const [session] = stripe.calls(/POST \/v1\/checkout\/sessions$/);
+        assert.match(session.headers['idempotency-key'], new RegExp(`^checkout:test:${ALICE}:jp:\\d+:g${generation}$`));
+    });
+
     it('/me: the plan, the subscription summary, the customer flag and today\'s usage with the plan\'s limits', async () => {
         Object.assign(process.env, BILLING_ENV);
         pool.customers.set('cus_alice', { stripe_customer_id: 'cus_alice', user_id: ALICE, livemode: false });

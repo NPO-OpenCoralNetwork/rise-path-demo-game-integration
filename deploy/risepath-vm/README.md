@@ -117,17 +117,19 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–017 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–018 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–017 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–018 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:<stack.env の POSTGRES_PASSWORD>@risepath-vm:5432/risepath?sslmode=disable
+# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
+RETENTION_ENABLED=false
 # Hermes を有効にしたときだけ
 # HERMES_API_URL=http://risepath-vm:8642
 # HERMES_API_KEY=<stack.env の HERMES_API_KEY>
@@ -287,7 +289,7 @@ cd scripts && ./deploy-stack.sh
 | `STRIPE_PRICE_ID` | テストモードのプライス `price_…`（500 円、JPY、1 か月ごと、税込） | 本番モードのプライス |
 | `STRIPE_PRICE_IDS_ACCEPTED` | 空 | 前に売っていたプライスがあれば、カンマで区切る（その契約者もサポーターのまま） |
 | `BILLING_RETURN_ORIGIN` | `https://app.<domain>`（パスは付けない） | 同じ |
-| `BILLING_TOS_URL` | 空でよい | `/terms` のページの URL（必須。Stripe の Public details と同じ） |
+| `BILLING_TOS_URL` | 空でよい | `/terms` のページの URL（必須。Stripe の Public details と同じ）。`https://app.<domain>/terms` を入れるのは、有料プランの条を載せた版（`shared/legal/versions.js` の `include.billing: true`）を公開してから（[`doc/legal/README.md`](../../doc/legal/README.md) の「ページを公開する手順」） |
 | `AI_CAP_SUPPORTER_GLOBAL_LLM`・`AI_CAP_SUPPORTER_GLOBAL_COURSE_GENERATION` | 空（既定は 1,000 と 200） | 同じ。上げるときは、費用を見てから |
 
 `deploy-stack.sh` は、次のときに、設定の名前だけを表示して、build の前に止まります（値は出しません）。`COMPOSE_PROFILES` に関係なく確かめます。
@@ -319,6 +321,48 @@ docker compose --env-file stack.env logs api | grep '\[Billing\]'
 
 - 新しい申し込みだけを止める: `billing.env` の `BILLING_ENABLED` を空にして、`./scripts/deploy-stack.sh` を実行します。契約中の方の上限、「お支払いと解約」、Webhook は、そのまま動きます。
 - 鍵を消すのは、Stripe ですべての契約をキャンセルしたあとです。先に消すと、契約中の方が解約の画面を開けないまま、Stripe の請求が続きます（ai-access-plan.ja.md の 7.5）。
+
+## アカウントの削除・保存期間・ログ（Phase 4）
+
+学習者が自分の Rise Path のデータを消す機能、期限が来た記録を消す処理、ログの上限です。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 8 章、スタッフの作業は [`doc/guides/account-deletion-operations.ja.md`](../../doc/guides/account-deletion-operations.ja.md) です。
+
+**この版の最初のデプロイ**
+
+- migration 018 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません（ログインした呼び出しのたびに `account_deletions` を読むため）。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
+- `byoa` を使っているなら、そのあとに `sql/mcp_remote_role.sql` を流し直します（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 7。パスワードは今の値）。
+- すべてのサービスにログの上限（`x-logging`）が付くので、動いているコンテナがすべて一度作り直されます。`db` は「db up」のときに数秒止まり、そのあいだ古い `api` は 503 を返します。そのあと `api` が作り直され、最後の `docker compose up -d` で cloudflared（トンネルが少し止まります）、kokoro-tts（モデルを読み直します）、`mcp`、`mcp-public`、`hermes` と Memanto（有効なら）が作り直されます。人の少ない時間に実行します。
+- 画面（Vercel）はマージですぐに新しくなります。`deploy-stack.sh` は**同じ日に**実行します。
+
+**ログ**
+
+- すべてのサービスが json-file で、1 ファイル 10 MB、5 ファイルまで（約 50 MB をこえると古いものから消えます）。見るときは `docker compose --env-file stack.env logs --since 1h api` のようにします。
+- `db` は `log_error_verbosity=terse` で動きます。外部キーのエラーなどの `DETAIL` の行（アカウント ID の全体などの値が入る）を出しません。
+- API の通信の行は、クエリを残さず、アカウント ID を先頭 8 文字にし、日付・メールアドレス・ファイル名・トークンを伏せます（`server/utils/redactUrl.js`）。5xx の行は、エラーの名前・コード・文だけです。
+
+**設定（`stack.env`。どれも秘密の値ではありません。`api` だけが読みます）**
+
+| 変数 | 既定 | 中身 |
+|---|---|---|
+| `ACCOUNT_DELETION_ENABLED` | 未設定（画面からの削除は止まっている） | `true` で、設定の「アカウントを削除する」が使えるようになります。未設定と `false` では止まったままです（ほかの値も止める側になり、警告を出します）。`byoa` を使うかどうかにかかわらず、Supabase の「Require current password when updating」の確かめと、本番の `amr` の確かめが済むまでは `true` にしません（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 8.2 の 2 と 3、[`doc/guides/account-deletion-operations.ja.md`](../../doc/guides/account-deletion-operations.ja.md) の 7 章）。`byoa` を動かすあいだは、さらにパスワードの 3 つの設定が要ります（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 6） |
+| `RETENTION_ENABLED` | 未設定（`NODE_ENV=production` の `api` では動く。ほかでは `true` のときだけ動く） | `false` で、保存期間の処理をすべて止めます。止めるのは、この VM の `api` だけです。手元の API を VM の DB につなぐときは、手元の `.env.local` にも `RETENTION_ENABLED=false` を書きます（3 章） |
+| `RETENTION_AI_USAGE_DAYS` | 30 | AI の利用回数を残す日数（2〜400） |
+| `RETENTION_PROCESSING_DAYS` | 365 | 処理の記録と AI アプリからの呼び出しの記録を残す日数（30〜3650） |
+| `RETENTION_DELETION_PROOF_YEARS` | 5 | 削除したアカウントの同意の記録・保護者の同意の証拠・削除の記録を残す年数（1〜10） |
+| `RETENTION_AI_APP_RECORD_YEARS` | 3 | 削除したアカウントの、使っていた AI アプリの記録を残す年数（1〜10） |
+
+保存期間の処理は、`api` の起動時と 1 時間ごとに動きます（2 つの `api` が同時に動いても、1 つだけが消します）。値がまちがっていると、その規則だけを止め、起動時のログに出します（`[Retention] …`）。
+
+**スタッフの削除**（`api` コンテナの中で。手順と終了コードは運用ガイド）
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --find-email someone@example.com
+docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --user <uuid> --dry-run
+docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --user <uuid> --yes
+docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --orphans        # 月に 1 回。一覧を見てから --yes
+```
+
+**DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs --url <使い捨ての PostgreSQL 16>` は、migration 018 と削除・同意・保存期間の動きを本物の PostgreSQL で確かめます。`public` か `auth` に表がある DB、`risepath_mcp_remote` のロールがあるクラスタ、スーパーユーザーでない接続では動きません（VM の DB には決して向けないでください）。R11 はサーバーのログを読むので、ログを標準出力に出すクラスタでは `--log-file <ログのパス>` を付けます。確かめられなかった項目があると終了コード 3 になります（`--allow-skip` を付けたときだけ 0）。
 
 ## セキュリティ
 

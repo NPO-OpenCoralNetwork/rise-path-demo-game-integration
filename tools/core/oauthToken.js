@@ -48,3 +48,55 @@ export function isOAuthClientToken(token) {
     if (payload.client_id !== undefined && payload.client_id !== null) return true;
     return !isAppAudience(payload.aud);
 }
+
+/**
+ * The payload of a token, or null when it is not JWT-shaped or does not decode. Like the check
+ * above it never verifies a signature: call it only on a token that was already verified
+ * (supabase.auth.getUser for the app, getClaims for mcp-public), and only to read its times.
+ * @param {unknown} token
+ * @returns {Record<string, unknown> | null}
+ */
+export function decodeTokenClaims(token) {
+    if (typeof token !== 'string') return null;
+    const parts = token.trim().split('.');
+    if (parts.length !== 3) return null;
+    return decodeSegment(parts[1]);
+}
+
+/**
+ * The newest numeric `amr[].timestamp` among object entries that `accept` takes, else null.
+ * String entries (RFC 8176 style) and non-numeric or non-finite timestamps are ignored.
+ * @param {unknown} claims
+ * @param {(entry: Record<string, unknown>) => boolean} accept
+ * @returns {number | null}
+ */
+function newestAmrTime(claims, accept) {
+    const amr = claims && typeof claims === 'object' ? /** @type {Record<string, unknown>} */ (claims).amr : undefined;
+    if (!Array.isArray(amr)) return null;
+    /** @type {number | null} */
+    let newest = null;
+    for (const entry of amr) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !accept(entry)) continue;
+        const time = entry.timestamp;
+        if (typeof time === 'number' && Number.isFinite(time) && (newest === null || time > newest)) newest = time;
+    }
+    return newest;
+}
+
+/**
+ * When the token's session signed in (epoch seconds): the newest `amr` timestamp. Supabase keeps
+ * it across refreshes, so it tells a session started before an account deletion from one started
+ * after it (tools/core/accountDeletions.js). Deliberately no `iat` fallback: `iat` moves on every
+ * refresh, so an old session would look new. null when the token has no usable `amr`.
+ * @param {unknown} claims decoded payload (decodeTokenClaims) or verified claims (getClaims)
+ * @returns {number | null}
+ */
+export const sessionAuthTime = (claims) => newestAmrTime(claims, () => true);
+
+/**
+ * When the session last proved the password (epoch seconds): the newest `amr` entry with
+ * method 'password', else null. Account deletion asks for a recent one (re-authentication).
+ * @param {unknown} claims
+ * @returns {number | null}
+ */
+export const passwordAuthTime = (claims) => newestAmrTime(claims, (entry) => entry.method === 'password');

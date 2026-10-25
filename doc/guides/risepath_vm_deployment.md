@@ -94,6 +94,8 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate
 docker compose --env-file stack.env up -d
 ```
 
+migration（018 をふくむ）は、`api` と `mcp` を起動する前に流す（上の順のとおり）。
+
 `/api/v2/health` は未適用の migration が 1 つでもあると 503 を返し、`api` の healthcheck はこれを見る。`mcp` は `api` の healthy を、`hermes`（有効にしたときだけ）は `mcp` を待つ。新しい migration を含むイメージを先に起動すると、`up` が unhealthy で止まり、`mcp` と `hermes` が更新されない。
 
 前の失敗で unhealthy な `api` が残っていると、設定もイメージも同じなので `up -d` はそれを作り直さず、`mcp` の依存待ちですぐ止まる。そのときは migrate のあと `docker compose --env-file stack.env up -d --no-deps --force-recreate --wait api` を挟んでから `up -d` する（`deploy-stack.sh` は毎回挟む）。
@@ -218,13 +220,17 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 #### migration の確認（適用前）
 
 - `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
-- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–013 の 14 件を一度に流す。そのあとの `db:migrate:status` は、14 件すべて適用済み（未適用 0 件）になる。
+- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が `server/migrations/` のすべて（2026-10-24 時点で 000–018）を一度に流す。そのあとの `db:migrate:status` は、すべて適用済み（未適用 0 件）になる。
+- **018（Phase 4、アカウントの削除）**: ログインした呼び出しのたびに `account_deletions` を読むので、この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る。`deploy-stack.sh` は migrate のあとに作り直すので、この順になる。手で動かすとき（§4.4）や手元の開発の DB（`npm run db:migrate`）でも、先に流す。未適用のままだと、ログインした呼び出しはアプリで 503 `auth_unavailable`、SSE の MCP で 401、リモート MCP で 503 になる（安全な側）。`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。
+- **Phase 4 の最初のデプロイ**では、すべてのサービスにログの上限（`x-logging`）が付くので、動いているコンテナがすべて一度作り直される。`db` は「db up」のときに数秒止まり（そのあいだ古い `api` は 503）、そのあと `api`、最後の `up -d` で cloudflared（トンネルが少し止まる）、kokoro（モデルを読み直す）、`mcp`、`mcp-public`、`hermes` と Memanto（有効なら）。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「アカウントの削除・保存期間・ログ」。
 - 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（新しい DB では空なので、すぐ終わる）。
 
 ### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
+# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
+RETENTION_ENABLED=false
 # Hermes を有効にしたときだけ
 # HERMES_API_URL=http://risepath-vm:8642
 # HERMES_API_KEY=***
@@ -261,7 +267,7 @@ docker compose --env-file stack.env up -d
    ```
 
 2. `provision-gce.sh` で作る（§4.1。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`）。
-3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration 000–013 をまとめて流す。
+3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration をすべて（000–018）まとめて流す。
 4. Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（§4.3）。`ORIGIN_SECRET` を入れる前に、Mac から `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。
 5. 初回サインインのあと、自分の `user_profiles.role` を `admin` にする（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「[管理者にする](../../deploy/risepath-vm/README.md#5-管理者にする初回サインインのあと)」）。
 

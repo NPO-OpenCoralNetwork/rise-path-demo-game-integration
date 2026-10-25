@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
 import { VIEW_PATHS } from './navigation/viewPaths';
 import { features } from './config/features';
+import { syncLegalGate, useLegalGate } from './components/legal/legalGateClient';
+import LegalNoticeBar from './components/legal/LegalNoticeBar';
 
 // Common Components
 import Layout from './components/common/Layout';
@@ -98,6 +100,11 @@ import {
   PlanView,
   PlanConfirmView,
   CommerceDisclosureView,
+  DeleteAccountView,
+  AccountDeletedView,
+  TermsRoute,
+  PrivacyRoute,
+  LegalConsentView,
 } from './components/routes/lazyRoutes';
 import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
@@ -106,8 +113,25 @@ const RETURN_TO_KEY = 'rp:returnTo';
 /** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
 const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
 /** Pages open when signed out; they render outside the Layout then. */
-const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce']);
+const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/terms', '/privacy', '/account/deleted']);
 const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
+/**
+ * Pages that stay open while the signed-in learner has not accepted a terms version that requires
+ * acceptance (Phase 4, design §4.3, finding 17): reading the texts and every public page, deleting
+ * the account, withdrawing the guardian's AI consent, disconnecting AI apps, the privacy deletes,
+ * AI memory and cancelling a plan (the portal; checkout is /settings/plan/confirm) never depend on
+ * accepting new text. Everything else, P-School and /oauth/consent included, shows the
+ * re-consent page (LegalConsentView) instead.
+ */
+const LEGAL_GATE_EXEMPT = new Set([
+  ...PUBLIC_PATHS,
+  '/settings/delete-account',
+  '/settings/ai-access',
+  '/settings/connected-apps',
+  '/settings/privacy',
+  '/settings/ai-memory',
+  '/settings/plan',
+]);
 /** Pages that finish a sign-in: when the session is already there, they forward like handleLoginSuccess. */
 const POST_SIGN_IN_PATHS = new Set(['/auth/callback', '/auth/confirm-pending']);
 
@@ -146,9 +170,15 @@ const PostSignInRedirect: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
-  const { isLoggedIn, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoggedIn, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Phase 4: whether the terms are accepted (components/legal/legalGateClient.ts; off unless
+  // VITE_FEATURE_LEGAL_PAGES=true). Only `needed` blocks, and only outside LEGAL_GATE_EXEMPT.
+  const legal = useLegalGate(features.legalPages);
+  useEffect(() => {
+    syncLegalGate(features.legalPages, user ? { id: user.id, email: user.email, isGuest: user.isGuest } : null);
+  }, [user?.id, user?.email, user?.isGuest]);
 
   // UI state
   const [isLoginPageVisible, setIsLoginPageVisible] = useState(false);
@@ -178,6 +208,10 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/settings/plan')) return ViewState.SETTINGS_PLAN;
     if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
     if (path.startsWith('/legal/commerce')) return ViewState.LEGAL_COMMERCE;
+    if (normalizePath(path) === '/terms') return ViewState.LEGAL_TERMS;
+    if (normalizePath(path) === '/privacy') return ViewState.LEGAL_PRIVACY;
+    if (path === '/account/deleted') return ViewState.ACCOUNT_DELETED;
+    if (path.startsWith('/settings/delete-account')) return ViewState.SETTINGS_DELETE_ACCOUNT;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
     if (path.startsWith('/settings/ai-memory')) return ViewState.SETTINGS_AI_MEMORY;
     if (path.startsWith('/settings/privacy')) return ViewState.SETTINGS_PRIVACY;
@@ -280,6 +314,10 @@ const AppContent: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white/50 text-sm font-mono">
           Loading…
         </div>
+      ) : isLoggedIn && legal.status === 'needed' && !LEGAL_GATE_EXEMPT.has(normalizePath(location.pathname)) ? (
+        <Suspense fallback={<RouteLoading />}>
+          <LegalConsentView />
+        </Suspense>
       ) : consentPath ? (
         !isLoggedIn && isLoginPageVisible ? (
           <LoginView initialMode={authMode} onLoginSuccess={handleLoginSuccess} />
@@ -310,10 +348,16 @@ const AppContent: React.FC = () => {
                 <Route path="/ai-safety" element={<AiSafetyGuideView />} />
                 {/* Phase 3: 特定商取引法に基づく表記 (public; Stripe's commerce disclosure link). */}
                 <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+                {/* Phase 4: 利用規約 and プライバシーポリシー (LegalPagesOff unless VITE_FEATURE_LEGAL_PAGES=true). */}
+                <Route path="/terms" element={<TermsRoute />} />
+                <Route path="/privacy" element={<PrivacyRoute />} />
+                {/* Phase 4: after an account deletion (this device is signed out by then). */}
+                <Route path="/account/deleted" element={<AccountDeletedView />} />
               </Routes>
             </Suspense>
           ) : (
-            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout}>
+            // Phase 4: notice = a changed text (dismissible), or "please agree" on an exempt page.
+            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout} notice={features.legalPages ? <LegalNoticeBar /> : null}>
               <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/" element={<Dashboard onNavigate={handleNavigate} />} />
@@ -367,6 +411,11 @@ const AppContent: React.FC = () => {
               <Route path="/settings/plan/confirm" element={features.billing ? <PlanConfirmView /> : <Navigate to="/settings" replace />} />
               <Route path="/ai-safety" element={<AiSafetyGuideView />} />
               <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+              <Route path="/terms" element={<TermsRoute />} />
+              <Route path="/privacy" element={<PrivacyRoute />} />
+              {/* Phase 4: delete one's own Rise Path account; the page after it (signed in again). */}
+              <Route path="/settings/delete-account" element={<DeleteAccountView />} />
+              <Route path="/account/deleted" element={<AccountDeletedView />} />
               <Route path="/settings" element={<SettingsView onNavigate={handleNavigate} />} />
               <Route path="/notifications" element={<NotificationsView onNavigate={handleNavigate} />} />
               {/* The old mock plans page is gone: its URL goes to the plan page, or Settings while billing is off. */}

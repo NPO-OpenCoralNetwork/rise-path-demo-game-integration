@@ -9,7 +9,9 @@
  *
  * GET    /  → { ok, epoch, records: [{ courseSlug, lessonId, progress, pct, state, updatedAt }] }
  *             epoch: the learner's reset epoch (null until the first DELETE). pct and state are
- *             the server's, against the published lesson.
+ *             the server's, against the published lesson. restarted: true (only then present)
+ *             when the epoch was written by re-opening a deleted account (Phase 4): a device that
+ *             knew another epoch clears its learning events too.
  * PUT    /  body { epoch: string | null, records: [{ courseSlug, lessonId, progress }] } (1–25)
  *          → { ok, epoch, records, rejected: [{ courseSlug, lessonId, error_type }] }
  *             Each record is sanitized and merged into the stored one (never stored as sent); the
@@ -104,7 +106,7 @@ export function createLessonProgressRouter({ writeLimiter } = {}) {
     if (!getPool()) return unavailable(res);
     const result = await getLessonProgress({ userId: userIdOf(req), withEpoch: true });
     if ('error_type' in result) return failed(res, result);
-    res.json({ ok: true, epoch: result.epoch ?? null, records: result.records });
+    res.json({ ok: true, epoch: result.epoch ?? null, ...(result.restarted === true ? { restarted: true } : {}), records: result.records });
   });
 
   router.put('/', limitWrites, async (req, res) => {

@@ -16,6 +16,18 @@
  *   when VITE_FEATURE_BILLING is exactly "true". Even then an entry point shows only after GET
  *   /api/v2/billing/me answers eligibility 'ok' or a subscription (services/billingRules.ts), and
  *   every price and cap comes from the server. The public /legal/commerce page does not depend on it.
+ * - legalPages: /terms and /privacy with the published text, the sign-up checkbox, the re-consent
+ *   page and change notices (doc/legal/README.md). Off by default; on only when
+ *   VITE_FEATURE_LEGAL_PAGES is exactly "true". The dev server always shows the pages (with the
+ *   draft banner) for the owner and the lawyer; the production build refuses "true" while the text
+ *   is a draft (scripts/legal/check-legal-release.mjs, run by vite.config.ts), and refuses a client
+ *   with import.meta.env.DEV = true unless LEGAL_DRAFT_PREVIEW_BUILD=true. Public sign-up opens only
+ *   with this flag on. The legal text loads only through the conditional imports in
+ *   components/routes/lazyRoutes.tsx, so with the flag off Rollup drops it from the bundle.
+ *
+ * Read single flags only (`features.legalPages`). Never spread `features`, pass it whole, call
+ * Object.keys/values/entries on it or index it with `features[…]`: Rollup folds a flag only while
+ * every use is a plain property read (server/tests/legalPagesFront.test.js).
  */
 
 const DEV_SAMPLES_KEY = 'rp:dev-samples';
@@ -55,6 +67,8 @@ export const features = {
   agentChat: import.meta.env.VITE_FEATURE_AGENT_CHAT === 'true',
   // Supporter plan screens: off by default (see the note above).
   billing: import.meta.env.VITE_FEATURE_BILLING === 'true',
+  // Legal pages, sign-up checkbox, re-consent page and notices: off by default (see the note above).
+  legalPages: import.meta.env.VITE_FEATURE_LEGAL_PAGES === 'true',
   labs: {
     sonic: labsEnabled,
     teacherBot: labsEnabled,

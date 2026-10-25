@@ -1,5 +1,7 @@
 import { lazy } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { features } from '../../config/features';
+import LegalPagesOff from '../features/legal/LegalPagesOff';
 
 export const RouteLoading = () => {
   const { language } = useLanguage();
@@ -182,4 +184,20 @@ export const PlanConfirmView = lazy(
 );
 export const CommerceDisclosureView = lazy(
   () => import('../features/legal/CommerceDisclosureView')
+);
+/** Phase 4 (account deletion): the delete page in Settings and the public page after a deletion. */
+export const DeleteAccountView = lazy(() => import('../features/settings/DeleteAccountView'));
+export const AccountDeletedView = lazy(() => import('../features/settings/AccountDeletedView'));
+/** Phase 4: the generated legal text ships only in dev builds or with VITE_FEATURE_LEGAL_PAGES=true.
+ *  Otherwise Rollup drops these imports (CI step "Fail if draft legal text reached the bundle") and
+ *  /terms and /privacy show LegalPagesOff. Keep `features.legalPages` a plain property read here. */
+export const TermsRoute = lazy(
+  () => ((import.meta.env.DEV || features.legalPages) ? import('../features/legal/TermsPage') : Promise.resolve({ default: LegalPagesOff }))
+);
+export const PrivacyRoute = lazy(
+  () => ((import.meta.env.DEV || features.legalPages) ? import('../features/legal/PrivacyPage') : Promise.resolve({ default: LegalPagesOff }))
+);
+/** The re-consent page (App.tsx). No legal text inside; gated anyway so a flag-off bundle carries none of it. */
+export const LegalConsentView = lazy(
+  () => (features.legalPages ? import('../legal/LegalConsentView') : Promise.resolve({ default: () => null }))
 );

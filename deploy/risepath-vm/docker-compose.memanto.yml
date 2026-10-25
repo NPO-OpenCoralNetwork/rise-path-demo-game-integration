@@ -8,10 +8,19 @@
 #   docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
 #     --env-file stack.env exec ollama ollama pull nomic-embed-text
 
+# The same log limits as docker-compose.yml (anchors do not cross files): json-file, at most 5 files
+# of 10 MB per container. Adding or changing them recreates these containers at the next deploy.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    logging: *default-logging
     profiles:
       - memory
       - full
@@ -27,6 +36,7 @@ services:
   moorcheh:
     image: moorcheh/server:v0.1.3@sha256:9e74f8b291b363d137b3893c5184a646a38ac4bcb164a15fd1a2a617f7ef1eeb
     restart: unless-stopped
+    logging: *default-logging
     user: "65532:65532"
     profiles:
       - memory
@@ -65,6 +75,7 @@ services:
       context: .
       dockerfile: Dockerfile.memanto
     restart: unless-stopped
+    logging: *default-logging
     user: "1001:1001"
     profiles:
       - memory

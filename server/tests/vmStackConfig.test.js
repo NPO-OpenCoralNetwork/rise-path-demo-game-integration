@@ -258,6 +258,7 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT INSERT (user_id, client_id), UPDATE (first_seen_at, last_used_at) ON mcp_oauth_grants TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;',
@@ -875,5 +876,104 @@ describe('billing.env (Phase 3)', () => {
       assert.equal(swapped.status, 1, swapped.out);
       assert.match(swapped.out, /STRIPE_WEBHOOK_SECRET \(billing\.env: not a webhook signing secret/);
     });
+  });
+});
+
+// Phase 4 (owner decision D4; design §6.6–6.7): every container's docker log is size-capped
+// (json-file, 5 × 10 MB), Postgres logs errors without DETAIL (a foreign key refusal names the
+// full account id there), and the account-deletion and retention settings reach the api only.
+describe('docker-compose: log limits, db error verbosity and the Phase 4 settings', () => {
+  const stripComments = (text) => text.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n');
+  const files = {
+    'docker-compose.yml': stripComments(read(path.join(STACK, 'docker-compose.yml'))),
+    'docker-compose.memanto.yml': stripComments(read(path.join(STACK, 'docker-compose.memanto.yml'))),
+  };
+  const PHASE4_VARS = ['ACCOUNT_DELETION_ENABLED', 'RETENTION_ENABLED', 'RETENTION_AI_USAGE_DAYS', 'RETENTION_PROCESSING_DAYS', 'RETENTION_DELETION_PROOF_YEARS', 'RETENTION_AI_APP_RECORD_YEARS'];
+
+  it('both files define the json-file anchor at the top level, before services (anchors do not cross files)', () => {
+    for (const [file, text] of Object.entries(files)) {
+      assert.match(text, /^x-logging: &default-logging\n {2}driver: json-file\n {2}options:\n {4}max-size: "10m"\n {4}max-file: "5"\n/m, file);
+      assert.ok(text.indexOf('x-logging:') < text.search(/^services:/m), `${file}: before services`);
+    }
+  });
+
+  it('every service of both files uses it (the 10 services of every profile)', () => {
+    const all = [];
+    for (const [file, text] of Object.entries(files)) {
+      for (const [name, block] of Object.entries(serviceBlocks(text))) {
+        all.push(name);
+        assert.match(block, /^ {4}logging: \*default-logging\s*$/m, `${file}: ${name}`);
+        assert.doesNotMatch(block, /^ {4}logging:\s*$/m, `${file}: ${name} has no inline logging block`);
+      }
+    }
+    assert.deepEqual(all.sort(), ['api', 'cloudflared', 'db', 'hermes', 'kokoro-tts', 'mcp', 'mcp-public', 'memanto', 'moorcheh', 'ollama']);
+  });
+
+  it('db logs errors with log_error_verbosity=terse (no DETAIL with the values)', () => {
+    assert.match(services.db || '', /^ {4}command: \["postgres", "-c", "log_error_verbosity=terse"\]\s*$/m);
+  });
+
+  it('the six account-deletion and retention settings reach the api with empty defaults, and no other service', async () => {
+    const { RETENTION_ENV_KEYS } = await import('../services/retention.js');
+    assert.deepEqual(PHASE4_VARS, ['ACCOUNT_DELETION_ENABLED', ...RETENTION_ENV_KEYS], 'every name retention reads is passed');
+    for (const name of PHASE4_VARS) {
+      assert.match(services.api || '', new RegExp(`^ {6}${name}: \\$\\{${name}:-\\}\\s*$`, 'm'), name);
+    }
+    for (const [file, text] of Object.entries(files)) {
+      for (const [name, block] of Object.entries(serviceBlocks(text))) {
+        if (file === 'docker-compose.yml' && name === 'api') continue;
+        for (const variable of PHASE4_VARS) assert.ok(!block.includes(variable), `${file}: ${name} has ${variable}`);
+      }
+    }
+  });
+
+  it('the api keeps NODE_ENV production by default, so retention there is on unless turned off (outside production it is opt-in)', () => {
+    assert.match(services.api || '', /^ {6}NODE_ENV: \$\{NODE_ENV:-production\}\s*$/m);
+  });
+
+  it('ACCOUNT_DELETION_ENABLED starts off; "Require current password" and the production amr check come first in every deployment, not only with byoa', () => {
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Account deletion and retention'), stack.indexOf('# ACCOUNT_DELETION_ENABLED='));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    const sentence = text.split(/(?<=\.)\s+/).find((part) => part.includes('Require current password'));
+    assert.ok(sentence, 'the comment names the Supabase setting');
+    assert.match(sentence, /whatever COMPOSE_PROFILES says/);
+    assert.match(sentence, /§8\.2 items 2-3/);
+    assert.match(sentence, /production amr check/);
+    assert.doesNotMatch(sentence, /while COMPOSE_PROFILES lists byoa/);
+    assert.match(text, /current_password_required/, 'the staging check');
+    assert.match(text, /Deletion starts off/);
+    assert.doesNotMatch(text, /unset or empty = on/);
+    for (const file of [path.join(STACK, 'stack.env.example'), path.join(ROOT, '.env.example')]) {
+      const documented = lines(read(file)).filter((line) => line.startsWith('# ACCOUNT_DELETION_ENABLED='));
+      assert.deepEqual(documented, ['# ACCOUNT_DELETION_ENABLED=true'], `${file}: the line to uncomment turns it on`);
+    }
+  });
+
+  it('stack.env.example documents them commented out; mcp-public.env.example never names them', () => {
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const values = lines(stack).filter((line) => !line.startsWith('#'));
+    for (const name of PHASE4_VARS) {
+      assert.ok(!values.some((line) => line.startsWith(`${name}=`)), `${name} is not set in stack.env.example`);
+      assert.match(stack, new RegExp(`^# ${name}=`, 'm'), `${name} is documented`);
+      assert.ok(!read(path.join(STACK, 'mcp-public.env.example')).includes(name), `${name} in mcp-public.env.example`);
+      assert.match(read(path.join(ROOT, '.env.example')), new RegExp(`^# ${name}=`, 'm'), `${name} in .env.example`);
+    }
+  });
+
+  // The log limits put docker-compose.memanto.yml into scan-secrets' --diff, which reports the
+  // memanto volume's mount point inside its container. The allowlist works per file and rule, so
+  // this keeps that exemption from hiding a real personal path added to the file later.
+  it('scan-secrets allowlists docker-compose.memanto.yml for one container path only: the memanto volume target', async () => {
+    const { scanText, loadAllowlist } = await import('../../scripts/ci/scan-secrets.mjs');
+    const rel = 'deploy/risepath-vm/docker-compose.memanto.yml';
+    const raw = read(path.join(ROOT, rel));
+    const rawLines = raw.split(/\r?\n/);
+    const hits = scanText(raw).filter((f) => f.rule === 'absolute-personal-path').map((f) => rawLines[f.line - 1]);
+    assert.equal(hits.length, 1, `exactly one absolute path in ${rel}: ${hits.length}`);
+    assert.match(hits[0], /^ {6}- risepath_memanto_data:\/home\/memanto\/\.memanto$/, 'the memanto service volume target');
+    assert.match(serviceBlocks(files['docker-compose.memanto.yml']).memanto || '', /^ {6}- risepath_memanto_data:\/home\/memanto\/\.memanto$/m, 'inside the memanto service');
+    const entries = loadAllowlist(path.join(ROOT, 'scripts', 'ci', 'scan-secrets.allow.json')).filter((e) => e.re.test(rel));
+    assert.deepEqual(entries.map((e) => [e.path, e.rule]), [[rel, 'absolute-personal-path']], 'one entry, this file and this rule only');
   });
 });

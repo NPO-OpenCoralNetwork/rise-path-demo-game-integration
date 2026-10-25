@@ -17,7 +17,8 @@ import { AI_ACCESS_SETUP_PATH, CONSENT_POLICY_VERSION } from '../../../services/
  *
  * Keep every statement true to the code: server/safety/* (age, consent, screening, pause),
  * server/routes/safety.js (reports), server/safety/events.js (retention), context/AuthContext.tsx
- * (logout clears AI answers kept in this browser). No invented facts.
+ * (logout clears AI answers kept in this browser), DeleteAccountView.tsx (the delete page; the
+ * server can turn deletion off, so the line only says where to go). No invented facts.
  */
 
 const LINKS = {
@@ -112,7 +113,13 @@ const copy = {
           link2: { href: LINKS.aup, label: 'Anthropic Usage Policy' },
         },
         { text: 'AI answers are shown with a note that AI wrote them.' },
-        { text: 'Our privacy policy and terms of use are being prepared. We will link them from this page once they are published.' },
+        { text: 'Our privacy policy and terms of use are being prepared. We will link them from this page once they are published.', when: 'legalPagesOff' },
+        {
+          text: 'Our privacy policy and terms of use are on these pages (in Japanese; the Japanese text is official).',
+          when: 'legalPagesOn',
+          pages: [{ to: '/privacy', label: 'Privacy Policy' }, { to: '/terms', label: 'Terms of Use' }],
+        },
+        { text: 'To delete your account, open Settings → Delete account.' },
         { text: 'If you have questions about this page, please ask the staff at the site where you use Rise Path.' },
       ],
     },
@@ -200,14 +207,30 @@ const copy = {
           link2: { href: LINKS.aup, label: 'Anthropic 利用ポリシー（英語）' },
         },
         { text: 'AI がつくった答えには、AI がつくったことを表示します。' },
-        { text: 'プライバシーポリシーと利用規約は、いま準備しています。公開したら、このページからリンクします。' },
+        { text: 'プライバシーポリシーと利用規約は、いま準備しています。公開したら、このページからリンクします。', when: 'legalPagesOff' },
+        {
+          text: 'プライバシーポリシーと利用規約は、次のページで読めます。',
+          when: 'legalPagesOn',
+          pages: [{ to: '/privacy', label: 'プライバシーポリシー' }, { to: '/terms', label: '利用規約' }],
+        },
+        { text: 'アカウントを削除するときは、設定の「アカウントを削除する」を開いてください。' },
         { text: 'このページについてのご質問は、ご利用の拠点のスタッフにお伝えください。' },
       ],
     },
   },
 } as const;
 
-type ComplianceItem = { text: string; link?: { href: string; label: string }; link2?: { href: string; label: string } };
+type ComplianceItem = {
+  text: string;
+  link?: { href: string; label: string };
+  link2?: { href: string; label: string };
+  /** Phase 4: in-app pages (the legal texts). */
+  pages?: readonly { to: string; label: string }[];
+  /** Phase 4: shown only while the legal pages are off / on (VITE_FEATURE_LEGAL_PAGES), so every line stays true. */
+  when?: 'legalPagesOff' | 'legalPagesOn';
+};
+
+const shownNow = (item: ComplianceItem) => !item.when || (item.when === 'legalPagesOn') === features.legalPages;
 
 const sectionClasses = 'scroll-mt-6 rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6';
 
@@ -331,9 +354,18 @@ const AiSafetyGuideView: React.FC = () => {
             {t.compliance.title}
           </SectionTitle>
           <ul className="mt-3 space-y-3 text-body text-fg-2">
-            {(t.compliance.items as readonly ComplianceItem[]).map((item) => (
+            {(t.compliance.items as readonly ComplianceItem[]).filter(shownNow).map((item) => (
               <li key={item.text} className="border-l-2 border-line pl-3">
                 <p>{item.text}</p>
+                {item.pages ? (
+                  <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-small">
+                    {item.pages.map((page) => (
+                      <Link key={page.to} to={page.to} className="rounded-chip font-medium text-primary-text underline underline-offset-4">
+                        {page.label}
+                      </Link>
+                    ))}
+                  </p>
+                ) : null}
                 {item.link || item.link2 ? (
                   <p className="mt-1 flex flex-col gap-1 text-small">
                     {item.link ? <External {...item.link} newTab={t.newTab} /> : null}
