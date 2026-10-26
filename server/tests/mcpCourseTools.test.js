@@ -25,7 +25,7 @@ import { getPublishedLesson, listPublishedLessons } from '../../tools/core/cours
 import { clearMcpUserScopeForTests, registerAgentTurn } from '../../tools/core/mcpUserScope.js';
 import { TUTOR_PROTOCOL, availableLocales } from '../../shared/lesson/learnerView.js';
 import { createAiAccessPool } from './helpers/aiAccessPool.js';
-import { createLessonProgressPool } from './helpers/lessonProgressPool.js';
+import { createLessonProgressPool, PHASE5_TABLES } from './helpers/lessonProgressPool.js';
 import { startFakeSupabase } from './helpers/fakeSupabase.js';
 import { connectRemoteClient, startRemoteEndpoint } from './helpers/remoteMcpEndpoint.js';
 
@@ -122,6 +122,13 @@ describe('MCP course tools over the remote endpoint', () => {
         db = coursePool();
         setPoolForTests(db.pool);
         resetAiAccessForTests();
+    });
+
+    // G9 (Phase 5): the remote role has no grant on the lesson generations, the XP ledger or the
+    // learning days, so no course tool may ever name them.
+    afterEach(() => {
+        const named = [...db.pool.queries, ...db.progress.queries].filter((q) => PHASE5_TABLES.test(q.sql));
+        assert.deepEqual(named.map((q) => q.sql), [], 'no MCP statement names a Phase 5 table');
     });
 
     it('tools/list: the five course tools with the registry annotations; learner-state-* send agents to them', async () => {

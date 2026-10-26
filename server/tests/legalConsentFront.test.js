@@ -55,7 +55,7 @@ const throwingStorage = () => ({
 // ---------------------------------------------------------------------------------------------
 // Bundles (flag on and off) against stubs; React's jsx() returns { type, props }
 
-const ICONS = ['ArrowRight', 'CircleAlert', 'ExternalLink', 'Fingerprint', 'Info', 'Lock', 'Mail', 'ShieldCheck', 'Terminal', 'User', 'UserCircle', 'X'];
+const ICONS = ['ArrowRight', 'CircleAlert', 'CloudOff', 'ExternalLink', 'Fingerprint', 'Info', 'Lock', 'Mail', 'ShieldCheck', 'Terminal', 'User', 'UserCircle', 'X'];
 const STUBS = {
   // useState records its setter calls by hook index (globalThis.__sets) and takes overrides
   // (globalThis.__state[index]); hooks are counted from __resetHooks().
@@ -90,7 +90,7 @@ const STUBS = {
   'lucide-react': ICONS.map((name) => `export const ${name} = '${name}';`).join('\n'),
   language: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp', selectedLanguage: globalThis.__language ?? 'jp', setLanguage() {} });",
   auth: `export const useAuth = () => globalThis.__auth ?? ({
-    login: async () => {}, loginAsGuest() {}, signUp: async () => ({ status: 'session_ready' }), logout: async () => {},
+    login: async () => {}, loginAsGuest() {}, signUp: async () => ({ status: 'session_ready' }), logout: async () => true,
   });`,
   button: "export const Button = 'Button'; export const ButtonLink = 'ButtonLink'; export default 'Button';",
   shell: "export const PublicPageShell = 'PublicPageShell'; export default 'PublicPageShell';",
@@ -101,6 +101,8 @@ const STUBS = {
     export const getNexloomSupabaseClient = () => null;
     export const createReauthClient = () => null;
   `,
+  // LeftRecordsNotice (Phase 5) asks which lessons sync; the real client loads the course glob.
+  lessonSync: 'export const isSyncableLesson = () => true;',
 };
 
 const ENTRY = [
@@ -136,6 +138,7 @@ async function bundle(env) {
         stub(/ui\/PublicPageShell$/, 'shell');
         stub(/ui\/SupportContact$/, 'support');
         stub(/supabaseClient$/, 'supabase');
+        stub(/\/progressSyncClient$/, 'lessonSync');
         b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: STUBS[args.path], loader: 'js', resolveDir: ROOT }));
       },
     }],
@@ -354,6 +357,8 @@ const AUTH_STUBS = {
     export const forgetProgressAccount = () => {}; export const progressChoicePending = () => false;
     export const signInProgressSync = () => {}; export const signOutProgressSync = () => {};
     export const stopProgressSync = () => {}; export const whenAccountKnown = async () => 'known';
+    export const syncedLearnerId = () => null;
+    export const confirmUnsavedLearning = async () => true; export const endUnsavedLearningQuestion = () => {};
   `,
 };
 
@@ -375,6 +380,7 @@ async function bundleAuth(env) {
         stub(/supabaseClient$/, 'supabase');
         stub(/services\/(progressService|notificationService|userProfileService|sharedDeviceData|accountDeviceData|apiClient)$/, 'quiet');
         stub(/lesson\/progressSyncClient$/, 'quiet');
+        stub(/lesson\/logoutGuard$/, 'quiet');
         b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: AUTH_STUBS[args.path], loader: 'js', resolveDir: ROOT }));
       },
     }],
@@ -1051,8 +1057,9 @@ describe('App.tsx: the gate branch and its exemptions', () => {
     assert.match(app.slice(gate, consent), /<Suspense fallback=\{<RouteLoading \/>\}>\s*<LegalConsentView \/>\s*<\/Suspense>/);
     assert.match(app, /const legal = useLegalGate\(features\.legalPages\);/);
     assert.match(app, /syncLegalGate\(features\.legalPages, user \? \{ id: user\.id, email: user\.email, isGuest: user\.isGuest \} : null\);/);
-    // The notice bar goes in the Layout's notice slot, above the routes.
-    assert.match(app, /<Layout currentView=\{getCurrentViewState\(\)\} onNavigate=\{handleNavigate\} onLogout=\{handleLogout\} notice=\{features\.legalPages \? <LegalNoticeBar \/> : null\}>\s*<Suspense/);
+    // The notice bar goes in the Layout's notice slot, above the routes (Phase 5: beside the
+    // save-stopped notice; the flag still folds the legal bar away).
+    assert.match(app, /<Layout currentView=\{getCurrentViewState\(\)\} onNavigate=\{handleNavigate\} onLogout=\{handleLogout\} notice=\{<>\{features\.legalPages \? <LegalNoticeBar \/> : null\}<SaveStoppedNotice \/><\/>\}>\s*<Suspense/);
   });
 
   it('the Layout prints the whole page: the frame grows in print and the app chrome is hidden (a signed-in /privacy printout was one page)', () => {

@@ -325,7 +325,7 @@ describe('saveLessonProgress (REST PUT) and the reset epoch', () => {
         const stored = pool.row(ALICE, VIBE, CH1);
         assert.deepEqual(stored.progress, merged.progress);
         assert.equal(stored.progress_updated_at.toISOString(), '2026-10-21T00:00:00.000Z');
-        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.selectEpoch, SQL.insertPlaceholder, SQL.lockRow, SQL.updateRow, 'commit']);
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.selectEpoch, SQL.selectLessonEpochs, SQL.insertPlaceholder, SQL.lockRow, SQL.updateRow, 'commit']);
         assert.deepEqual(pool.queries.find((q) => q.sql === SQL.advisoryLock).params, [ALICE]);
     });
 
@@ -415,7 +415,7 @@ describe('deleteAllLessonProgress and getLessonProgress', () => {
         assert.equal(first.deleted, 2);
         assert.match(first.epoch, /^[0-9a-f-]{36}$/);
         assert.deepEqual(pool.rows().map((r) => r.user_id), [BOB]);
-        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.deleteAll, SQL.upsertEpoch, 'commit']);
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.upsertEpoch, 'commit']);
         const second = await deleteAllLessonProgress({ userId: ALICE });
         assert.equal(second.deleted, 0);
         assert.notEqual(second.epoch, first.epoch);

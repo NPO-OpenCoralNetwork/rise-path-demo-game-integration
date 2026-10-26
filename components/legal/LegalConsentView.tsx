@@ -280,11 +280,12 @@ const LegalConsentView: React.FC = () => {
     }
   };
 
-  // The app's own logout (App.tsx handleLogout): then the home page.
+  // The app's own logout (App.tsx handleLogout): then the home page, unless the learner chose to
+  // stay signed in (Phase 5: lesson records still unsaved).
   const signOut = () => {
     logout()
-      .catch((e) => console.warn('Logout failed:', e))
-      .finally(() => navigate('/', { replace: true }));
+      .then((done) => { if (done !== false) navigate('/', { replace: true }); })
+      .catch((e) => { console.warn('Logout failed:', e); navigate('/', { replace: true }); });
   };
 
   return (

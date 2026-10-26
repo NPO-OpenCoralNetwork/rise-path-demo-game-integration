@@ -98,7 +98,7 @@ const LessonView: React.FC<LessonViewProps> = ({ onBack, courseId }) => {
     } catch {
       // Storage blocked: sign-in still works; the draft is not kept.
     }
-    void logout();
+    void logout({ reason: 'reauth' });
   };
 
   const lesson = getLessonForCourse(courseId || '');

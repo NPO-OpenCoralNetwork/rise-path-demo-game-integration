@@ -21,8 +21,10 @@ import {
     signInProgressSync,
     signOutProgressSync,
     stopProgressSync,
+    syncedLearnerId,
     whenAccountKnown,
 } from '../components/lesson/progressSyncClient';
+import { confirmUnsavedLearning, endUnsavedLearningQuestion } from '../components/lesson/logoutGuard';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -49,7 +51,12 @@ interface AuthContextType {
     login: (email: string, password: string, options?: { useNexloomAuth?: boolean }) => Promise<void>;
     loginAsGuest: () => void;
     signUp: (email: string, password: string, options?: SignUpOptions) => Promise<SignUpResult>;
-    logout: () => Promise<void>;
+    /**
+     * Phase 5 (O4): resolves false when the learner chose to stay signed in (lesson records still
+     * unsaved: 「ログアウトしない」), true once logged out. reason 'reauth' (a "sign in again" button)
+     * never asks.
+     */
+    logout: (options?: { reason?: 'reauth' }) => Promise<boolean>;
     updateProfile: (updates: Partial<Pick<AuthUser, 'name' | 'avatar'>>) => void;
     /** Phase 4: this account's Rise Path data is gone (here: by 'self'; elsewhere: 'other'). Never resolves into the app again. */
     endDeletedAccountSession: (outcome: { by: DeletedBy; at?: string | null }) => Promise<void>;
@@ -70,9 +77,10 @@ const GUEST_USER: AuthUser = {
 // account, so it waits for the choice (chooseProgressAdoption runs it). It also waits for this page
 // load's lesson-progress GET (Phase 4, design §5.10): on a re-opened account that GET's epoch rule
 // clears the deleted account's legacy progress first; when the GET failed, nothing local is pushed.
+// Phase 5: only the synced learner's own legacy entries are kept and pushed, through their own session.
 const hydrateUserData = async () => {
     try {
-        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known' })), hydrateNotifications()]);
+        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId() })), hydrateNotifications()]);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
     }
@@ -179,6 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     // already cleared this learner's lesson data; an expiry keeps it for their
                     // next sign-in (what someone else writes meanwhile is asked about first).
                     stopProgressSync();
+                    // A logout question still open is no longer true: the learner is signed out.
+                    endUnsavedLearningQuestion();
                     if (nexloomSupabase) {
                         nexloomSupabase.auth.getSession().then(({ data: { session: ns } }) => {
                             if (!ns) setUser(null);
@@ -357,7 +367,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => window.removeEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
     }, [endDeletedAccountSession]);
 
-    const logout = useCallback(async () => {
+    const logout = useCallback(async (options?: { reason?: 'reauth' }): Promise<boolean> => {
+        // Phase 5 (owner O4): upload first (≤ 3 s); a learner whose lesson records are still unsaved
+        // chooses. Nothing is cleared before this line, so "stay signed in" keeps everything.
+        if (!(await confirmUnsavedLearning(options))) return false;
         // First, so a failed remote sign-out still leaves no AI answers on a shared device.
         clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
         // Lesson progress (Phase 2): upload what is still pending (at most 3 s, while the token is
@@ -375,6 +388,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('rp_auth_user');
         clearUserProfileCache();
         setAuthProvider(() => null);
+        return true;
     }, [user?.isGuest]);
 
     return (

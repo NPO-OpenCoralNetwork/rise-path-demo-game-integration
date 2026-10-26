@@ -16,6 +16,12 @@
  *     (self-rating per objective) and `summary` ({pct, state} at the last write, so course maps
  *     and the dashboard can show a status without loading the lesson). `answers` is keyed by
  *     `<blockId>/<questionId>` because one quiz block can hold several questions (see answerKey).
+ *     Phase 5: the record may also hold `lessonGen` (LessonGen below), the lesson's generation the
+ *     content builds on: { epoch, resetAt } when it builds on a generation the server named
+ *     (epoch null: the lesson was never started over), { bornAt } when it started from nothing on
+ *     this device before the generation was known. parseProgress drops it, so every reader of the
+ *     record keeps working and it is never sent inside `progress`. Written by writeProgress (the
+ *     reader passes its stamp) and by the sync core (progressSync.ts) when it stores server data.
  * - `rp:lastLesson` → LastLesson { courseSlug, lessonId, title, pct, at }
  * - `rp:progressSync:*` (not `rp:progress:`, so scans of the records skip them): whose progress
  *   this browser holds and the pending uploads (progressSync.ts).
@@ -40,7 +46,90 @@ export const LAST_LESSON_KEY = 'rp:lastLesson';
  */
 export const PROGRESS_EVENT = 'rp:progress-change';
 
-export type ProgressEventDetail = { courseSlug: string; lessonId: string; source?: 'server' };
+/** reset: the sync core stored this lesson's record after the learner started it over (Phase 5). */
+export type ProgressEventDetail = { courseSlug: string; lessonId: string; source?: 'server'; reset?: true };
+
+/**
+ * A stored record's generation stamp (Phase 5, one-lesson reset). known: the content builds on
+ * the generation the server named (epoch null: never started over; resetAt: when it last was,
+ * server clock). born: the record started from nothing on this device before the generation was
+ * known, and all its content was written here since bornAt (this device's clock). unknown: no
+ * stamp (an older bundle, a test or the dev gallery wrote it).
+ */
+export type LessonGen =
+  | { kind: 'known'; epoch: string | null; resetAt: string | null }
+  | { kind: 'born'; bornAt: string }
+  | { kind: 'unknown' };
+/** A lesson's generation as the server reported it (GET, PUT, a lesson_reset rejection, the reset). */
+export type ServerGen = { epoch: string | null; resetAt: string | null };
+
+const UNKNOWN_GEN: LessonGen = Object.freeze({ kind: 'unknown' }) as LessonGen;
+const GEN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isDateText = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value));
+
+/** The stamp of a stored record (raw JSON); unknown for null, a parse error or no valid lessonGen. */
+export function lessonGenOf(raw: string | null | undefined): LessonGen {
+  if (!raw) return UNKNOWN_GEN;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return UNKNOWN_GEN;
+  }
+  if (!isRecord(data) || !isRecord(data.lessonGen)) return UNKNOWN_GEN;
+  const gen = data.lessonGen;
+  const hasEpoch = Object.prototype.hasOwnProperty.call(gen, 'epoch');
+  const hasBorn = Object.prototype.hasOwnProperty.call(gen, 'bornAt');
+  if (hasEpoch && !hasBorn) {
+    const { epoch, resetAt } = gen;
+    if (!(epoch === null || (typeof epoch === 'string' && GEN_UUID.test(epoch)))) return UNKNOWN_GEN;
+    if (resetAt !== undefined && resetAt !== null && !isDateText(resetAt)) return UNKNOWN_GEN;
+    return { kind: 'known', epoch: typeof epoch === 'string' ? epoch.toLowerCase() : null, resetAt: isDateText(resetAt) ? resetAt : null };
+  }
+  if (hasBorn && !hasEpoch && isDateText(gen.bornAt)) return { kind: 'born', bornAt: gen.bornAt };
+  return UNKNOWN_GEN;
+}
+
+export function readLessonGen(courseSlug: string, lessonId: string, storage: StorageLike | null = defaultStorage()): LessonGen {
+  if (!storage) return UNKNOWN_GEN;
+  try {
+    return lessonGenOf(storage.getItem(progressKey(courseSlug, lessonId)));
+  } catch {
+    return UNKNOWN_GEN;
+  }
+}
+
+export function sameLessonGen(a: LessonGen, b: LessonGen): boolean {
+  if (a.kind === 'known' && b.kind === 'known') return a.epoch === b.epoch && a.resetAt === b.resetAt;
+  if (a.kind === 'born' && b.kind === 'born') return a.bornAt === b.bornAt;
+  return a.kind === 'unknown' && b.kind === 'unknown';
+}
+
+/**
+ * A record born on this device after the lesson's last reset holds no older content: all of it
+ * was written since bornAt. Unparsable times never survive a reset.
+ */
+export function bornSurvives(bornAt: string, server: ServerGen): boolean {
+  if (server.epoch === null) return true; // never started over: nothing to protect
+  const born = Date.parse(bornAt);
+  const reset = Date.parse(server.resetAt ?? '');
+  return Number.isFinite(born) && Number.isFinite(reset) && born > reset;
+}
+
+/** The sync core: keep the stored record (merge it into the server's) or drop it. */
+export function keepsLocal(local: LessonGen, server: ServerGen): boolean {
+  if (local.kind === 'known') return local.epoch === server.epoch;
+  if (local.kind === 'born') return bornSurvives(local.bornAt, server);
+  return server.epoch === null; // legacy content: only where no reset happened
+}
+
+/** The record as stored: known and born stamps go into `lessonGen`; unknown stores it plain. */
+export function stampedRecord(progress: LessonProgress, gen?: LessonGen): LessonProgress & { lessonGen?: unknown } {
+  const { lessonGen: _drop, ...plain } = progress as LessonProgress & { lessonGen?: unknown };
+  if (gen?.kind === 'known') return { ...plain, lessonGen: { epoch: gen.epoch, resetAt: gen.resetAt } };
+  if (gen?.kind === 'born') return { ...plain, lessonGen: { bornAt: gen.bornAt } };
+  return plain;
+}
 
 export type LastLesson = {
   courseSlug: string;
@@ -156,15 +245,20 @@ export function readProgress(courseSlug: string, lessonId: string, storage: Stor
   }
 }
 
+/**
+ * The learner's own write. `gen`: the reader's stamp (known or born is stored in `lessonGen`);
+ * without one the record is stored unstamped ("unknown"), the side that can never undo a reset.
+ */
 export function writeProgress(
   courseSlug: string,
   lessonId: string,
   progress: LessonProgress,
   storage: StorageLike | null = defaultStorage(),
+  gen?: LessonGen,
 ): boolean {
   if (!storage) return false;
   try {
-    storage.setItem(progressKey(courseSlug, lessonId), JSON.stringify(progress));
+    storage.setItem(progressKey(courseSlug, lessonId), JSON.stringify(stampedRecord(progress, gen)));
   } catch {
     return false;
   }

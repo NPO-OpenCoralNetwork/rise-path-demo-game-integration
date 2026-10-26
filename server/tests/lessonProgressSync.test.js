@@ -5,12 +5,12 @@
 // refresh on a visible tab, logout clearing (and who owns what is left), keepalive size, delete,
 // single-flight, plus static checks of the wiring (AuthContext order, imports). Phase 4: forget()
 // after an account deletion, the `restarted` rule of a re-opened account, and whenKnown().
-// Storage, API, timers and clock are fakes; the fake server merges with the real shared modules.
+// Storage, API, timers and clock are fakes (helpers/progressSyncFakes.js, shared with the Phase 5
+// tests in progressSyncPhase5.test.js); the fake server merges with the real shared modules.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import ts from 'typescript';
 import {
   LEARNING_EVENTS_KEY,
@@ -28,194 +28,32 @@ import {
   readerMustDrop,
 } from '../../components/lesson/progressSync.ts';
 import { LAST_LESSON_KEY, progressKey } from '../../components/lesson/progressStore.ts';
-import { mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
-import { parseProgress } from '../../shared/lesson/progress.js';
+import {
+  COURSE,
+  account,
+  getLocal,
+  iso,
+  isSyncable,
+  marker,
+  memoryStorage,
+  putLocal,
+  setAccount,
+  settle,
+  setup,
+  twoTabs,
+} from './helpers/progressSyncFakes.js';
 import { MAX_SLUG_LENGTH as SERVER_MAX_SLUG, SAFE_SLUG as SERVER_SAFE_SLUG } from '../../tools/core/lessons.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
-const START = Date.parse('2026-10-20T09:00:00.000Z');
-const iso = (minutes) => new Date(START + minutes * 60_000).toISOString();
 const E1 = '11111111-1111-4111-8111-111111111111';
 const E2 = '22222222-2222-4222-8222-222222222222';
 const U1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const U2 = 'aaaaaaaa-0000-4000-8000-000000000002';
 
-const COURSE = 'course-a';
-/** The client bundle's syncable lessons: course-a lessons named l*. */
-const isSyncable = (courseSlug, lessonId) => courseSlug === COURSE && lessonId.startsWith('l');
-/** The server catalog knows them all except l-new (version skew: a newer front end). */
-const serverKnows = (courseSlug, lessonId) => isSyncable(courseSlug, lessonId) && lessonId !== 'l-new';
-
 const record = (patch = {}) => ({ v: 1, seen: [], answers: {}, checks: {}, lastBlockId: null, updatedAt: iso(-60), ...patch });
 const answer = (attempts, correct, chosen) => ({ attempts, correct, chosen, firstTry: correct && attempts === 1 });
-
-function memoryStorage(initial = {}) {
-  const map = new Map(Object.entries(initial));
-  return {
-    map,
-    get length() {
-      return map.size;
-    },
-    key: (i) => [...map.keys()][i] ?? null,
-    getItem: (key) => (map.has(key) ? map.get(key) : null),
-    setItem: (key, value) => {
-      map.set(key, String(value));
-    },
-    removeItem: (key) => {
-      map.delete(key);
-    },
-  };
-}
-
-const putLocal = (storage, lessonId, progress) => storage.setItem(progressKey(COURSE, lessonId), JSON.stringify(progress));
-const getLocal = (storage, lessonId) => {
-  const raw = storage.getItem(progressKey(COURSE, lessonId));
-  return raw === null ? null : JSON.parse(raw);
-};
-const marker = (storage, lessonId) => storage.getItem(pendingKey(COURSE, lessonId));
-const account = (storage) => parseSyncAccount(storage.getItem(SYNC_ACCOUNT_KEY));
-const setAccount = (storage, userId, epoch) => storage.setItem(SYNC_ACCOUNT_KEY, JSON.stringify({ userId, epoch }));
-
-const settle = async () => {
-  for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve));
-};
-
-function fakeClock() {
-  let t = START;
-  let seq = 0;
-  const queue = [];
-  return {
-    now: () => t,
-    timers: {
-      setTimeout(fn, ms) {
-        const handle = { at: t + Math.max(0, ms), fn, seq: (seq += 1) };
-        queue.push(handle);
-        return handle;
-      },
-      clearTimeout(handle) {
-        const i = queue.indexOf(handle);
-        if (i >= 0) queue.splice(i, 1);
-      },
-    },
-    /** Runs every timer due within `ms`, letting promises settle between them. */
-    async advance(ms) {
-      const end = t + ms;
-      for (;;) {
-        await settle();
-        queue.sort((a, b) => a.at - b.at || a.seq - b.seq);
-        const next = queue[0];
-        if (!next || next.at > end) break;
-        queue.shift();
-        t = next.at;
-        next.fn();
-      }
-      t = end;
-      await settle();
-    },
-  };
-}
-
-/**
- * The REST API with an in-memory server that merges like tools/core/lessonProgress.js (sanitize,
- * mergeProgress, 409 on a stale epoch, unknown_lesson per record). Steps queued with `script`
- * run instead of the default for the next call: { error } throws it, { hold } waits for release,
- * { respond } answers with that function's result.
- */
-function fakeApi({ epoch = null, rows = [], clock } = {}) {
-  const server = { epoch, rows: new Map(rows.map((row) => [`${row.courseSlug}:${row.lessonId}`, row])) };
-  const calls = [];
-  const scripts = { get: [], put: [], del: [] };
-  const clone = (value) => JSON.parse(JSON.stringify(value));
-  const nextStep = async (kind) => {
-    const step = scripts[kind].shift();
-    if (step?.hold) await step.hold;
-    if (step?.error) throw step.error;
-    return step;
-  };
-  const defaultPut = (body) => {
-    if (body.epoch !== server.epoch) {
-      throw Object.assign(new Error('reset'), { status: 409, errorType: 'progress_reset', epoch: server.epoch });
-    }
-    const records = [];
-    const rejected = [];
-    for (const item of body.records) {
-      if (!serverKnows(item.courseSlug, item.lessonId)) {
-        rejected.push({ courseSlug: item.courseSlug, lessonId: item.lessonId, error_type: 'unknown_lesson' });
-        continue;
-      }
-      const key = `${item.courseSlug}:${item.lessonId}`;
-      const stored = server.rows.get(key);
-      const merged = mergeProgress(stored ? parseProgress(stored.progress) : null, sanitizeProgress(item.progress, { now: clock?.now() }));
-      const row = { courseSlug: item.courseSlug, lessonId: item.lessonId, progress: merged, pct: Math.min(100, merged.seen.length * 10), state: 'in_progress', updatedAt: merged.updatedAt };
-      server.rows.set(key, row);
-      records.push(clone(row));
-    }
-    return { epoch: server.epoch, records, rejected };
-  };
-  return {
-    server,
-    calls,
-    puts: () => calls.filter((call) => call.kind === 'put'),
-    gets: () => calls.filter((call) => call.kind === 'get'),
-    script(kind, step) {
-      scripts[kind].push(step);
-    },
-    hold(kind) {
-      let release;
-      const hold = new Promise((resolve) => {
-        release = resolve;
-      });
-      scripts[kind].push({ hold });
-      return release;
-    },
-    async get() {
-      calls.push({ kind: 'get' });
-      const step = await nextStep('get');
-      if (step?.respond) return step.respond();
-      // restarted: the account was deleted and opened again (Phase 4, server/routes/lessonProgress.js).
-      return { epoch: server.epoch, records: [...server.rows.values()].map(clone), ...(server.restarted ? { restarted: true } : {}) };
-    },
-    async put(body, { keepalive }) {
-      calls.push({ kind: 'put', body: clone(body), keepalive, bytes: JSON.stringify(body).length, at: clock?.now() });
-      const step = await nextStep('put');
-      if (step?.respond) return step.respond(body);
-      return defaultPut(body);
-    },
-    async del() {
-      calls.push({ kind: 'del' });
-      await nextStep('del');
-      const deleted = server.rows.size;
-      server.rows.clear();
-      server.epoch = randomUUID();
-      return { deleted, epoch: server.epoch };
-    },
-  };
-}
-
-function setup({ storage = memoryStorage(), rows = [], epoch = null, apiEnabled } = {}) {
-  const clock = fakeClock();
-  const api = fakeApi({ epoch, rows, clock });
-  const events = { progress: [], account: 0 };
-  const sync = createProgressSync({
-    storage,
-    api,
-    isSyncable,
-    apiEnabled,
-    now: clock.now,
-    timers: clock.timers,
-    random: () => 0.5,
-    lessonTitle: (courseSlug, lessonId) => `Title of ${lessonId}`,
-    events: {
-      progress: (detail) => events.progress.push(detail),
-      account: () => {
-        events.account += 1;
-      },
-    },
-  });
-  return { sync, storage, api, clock, events };
-}
 
 /** A learner already synced on this browser (account with a known epoch). */
 function syncedSetup(options = {}) {
@@ -962,13 +800,6 @@ describe('progress sync: delete (design §4.8)', () => {
 });
 
 /** Two tabs of one browser: one localStorage, one server, one clock, a sync core each. */
-function twoTabs({ storage = memoryStorage(), rows = [], epoch = null } = {}) {
-  const clock = fakeClock();
-  const api = fakeApi({ epoch, rows, clock });
-  const make = () => createProgressSync({ storage, api, isSyncable, now: clock.now, timers: clock.timers, random: () => 0.5 });
-  return { storage, api, clock, a: make(), b: make() };
-}
-
 describe('progress sync: shared tablets and other tabs (verification scenarios)', () => {
   it("child A's GET fails, A signs out, child B signs in: A's work reaches A's account, and B never sees or uploads it", async () => {
     const t = syncedSetup({ epoch: E1 });
@@ -1078,7 +909,8 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
     // The session expires before the flush.
     t.sync.stop();
     assert.equal(t.sync.getState().status, 'off');
-    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true });
+    // Both records are A's now; only l2 was unsent (Phase 5: the sign-in view counts that one).
+    assert.deepEqual(account(t.storage), { userId: U1, epoch: null, loggedOut: true, unsent: [`${COURSE}:l2`] });
     putLocal(t.storage, 'l3', record({ seen: ['n-only'], updatedAt: iso(20) }));
     await t.clock.advance(60_000);
 
@@ -1184,12 +1016,19 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
 
   it('a logout during the GET backoff makes no further GET', async () => {
     const t = syncedSetup();
-    t.api.script('get', { error: Object.assign(new Error('x'), { status: 0 }) });
+    for (let i = 0; i < 4; i += 1) t.api.script('get', { error: Object.assign(new Error('x'), { status: 0 }) });
     t.sync.signIn(U1);
     await settle();
-    await t.sync.signOut();
+    // Phase 5 (G11): the logout waits (≤ 3 s) for the load that runs; its retries inside that
+    // wait are part of it. With random() 0.5 they go at +1 s and +3 s: the first is inside the
+    // wait, the second is due with the deadline, which was set first and ends the wait. After the
+    // logout, nothing more.
+    const out = t.sync.signOut();
+    await t.clock.advance(3_000);
+    await out;
+    assert.equal(t.api.gets().length, 2, 'the first GET and one retry inside the logout wait');
     await t.clock.advance(60_000);
-    assert.equal(t.api.gets().length, 1);
+    assert.equal(t.api.gets().length, 2);
   });
 
   it('"Add" in one tab: the other tab stops asking, and its "Don\'t add" no longer clears', async () => {
@@ -1357,7 +1196,8 @@ describe('progress sync: shared tablets and other tabs (verification scenarios)'
     const t = setup({ storage });
     // A's session ended while no tab was open: this page hears of no session at all.
     t.sync.stop();
-    assert.deepEqual(account(storage), { userId: U1, epoch: null, loggedOut: true });
+    // No pending marker: nothing this browser knew to be unsent (the sign-in view counts none).
+    assert.deepEqual(account(storage), { userId: U1, epoch: null, loggedOut: true, unsent: [] });
     assert.equal(marker(storage, 'l1'), iso(1));
     // A second page load changes nothing more.
     t.sync.stop();
@@ -1630,9 +1470,10 @@ describe('progress sync: wiring (static)', () => {
     const auth = read('context/AuthContext.tsx');
     const hydrate = auth.slice(auth.indexOf('const hydrateUserData'), auth.indexOf('export const AuthProvider'));
     // Phase 4 (design §5.10): local-only legacy progress is pushed only after a successful GET.
-    assert.match(hydrate, /progressChoicePending\(\) \? Promise\.resolve\(\) : whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known' \}\)\)/);
+    // Phase 5: only the synced learner's own legacy entries are kept and pushed ("Add" adopts unowned ones).
+    assert.match(hydrate, /progressChoicePending\(\) \? Promise\.resolve\(\) : whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known', learnerId: syncedLearnerId\(\) \}\)\)/);
     const client = read('components/lesson/progressSyncClient.ts');
-    assert.match(client, /if \(applied\) void whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known' \}\)\)/);
+    assert.match(client, /if \(applied\) void whenAccountKnown\(\)\.then\(\(s\) => hydrateFromApi\(\{ pushLocal: s === 'known', learnerId: syncedLearnerId\(\), adoptUnowned: add \}\)\)/);
   });
 
   it('AuthContext runs the owner rule for the primary session before setUser, and logout clears after the AI data line', () => {
@@ -1647,6 +1488,10 @@ describe('progress sync: wiring (static)', () => {
     const progressLine = logout.indexOf('await signOutProgressSync()');
     const remoteSignOut = logout.indexOf('auth.signOut()');
     assert.ok(aiLine >= 0 && aiLine < progressLine && progressLine < remoteSignOut);
+    // Phase 5 (G12, owner O4): the unsaved-learning question comes first; "stay signed in" returns
+    // before anything is cleared.
+    const gate = logout.indexOf('if (!(await confirmUnsavedLearning(options))) return false;');
+    assert.ok(gate >= 0 && gate < aiLine, 'the logout gate runs before the AI data is cleared');
   });
 
   it('the browser wiring sends requests only for the learner whose session it is, and hears choices made in other tabs', () => {
@@ -1656,15 +1501,37 @@ describe('progress sync: wiring (static)', () => {
     // Only the page-hide upload skips the session check, with the token of this learner's own session.
     assert.match(text, /if \(keepalive && auth && auth\.userId === instance\?\.getState\(\)\.userId\) \{\s*return putLessonProgressRecords\(body, \{ keepalive: true, token: auth\.token \}\);\s*\}\s*return asSyncedLearner\(\(\) => putLessonProgressRecords\(body, \{ keepalive \}\)\);/);
     assert.match(text, /del: \(\) => asSyncedLearner\(deleteLessonProgressRecords\)/);
+    // Phase 5 (G3 in lessonProgressSyncClient.test.js): the reset goes through the same session check.
+    assert.match(text, /resetLesson: \(body\) => asSyncedLearner\(\(\) => resetLessonProgressRecord\(body\)\)/);
     assert.match(text, /if \(!expected \|\| \(current !== null && current !== expected\)\)/);
     assert.match(text, /event\.key === SYNC_ACCOUNT_KEY \|\| event\.key === null\) sync\.accountChanged\(\)/);
   });
 
   it('the reader drops its record on an account switch and merges server data without lesson events', () => {
     const text = read('components/lesson/useLessonProgress.ts');
-    assert.match(text, /if \(dropIfAccountSwitched\(\)\) return;\s*const record = withSummary\(progress, \{ pct, state \}\);\s*if \(writeProgress\(courseSlug, lesson\.id, record\)\) persisted\.current = record;/);
+    // Phase 5: the reader writes with its generation stamp (writeGen).
+    assert.match(text, /if \(dropIfAccountSwitched\(\)\) return;\s*const record = withSummary\(progress, \{ pct, state \}\);\s*if \(writeProgress\(courseSlug, lesson\.id, record, undefined, writeGen\(\)\)\) persisted\.current = record;/);
     assert.match(text, /readerMustDrop\(before, now, stored, persisted\.current\)/);
     assert.match(text, /detail\.source !== 'server'/);
     assert.match(text, /lastState\.current = lessonState\(lesson, merged\)/);
+  });
+
+  it('Phase 5: the reader follows the lesson\'s generation (reset events, other tabs\' writes of this lesson) and re-observes after a drop', () => {
+    const text = read('components/lesson/useLessonProgress.ts');
+    // A reset of this lesson restarts the reader (progressSync.ts takeIn sends reset: true).
+    assert.match(text, /if \(dropIfAccountSwitched\(\{ reset: detail\.reset === true \}\)\) return;/);
+    // Another tab wrote this lesson: a write that took the reader's stamp off is written over (G22).
+    assert.match(text, /else if \(event\.key === key\) dropIfAccountSwitched\(\{ rewriteForeign: true \}\);/);
+    assert.match(text, /const change = readerGenChange\(loadedGen\.current, raw, persisted\.current\);/);
+    assert.match(text, /if \(change === 'foreign' && rewriteForeign\) \{\s*dirty\.current = true;/);
+    // A lesson never started over (known(null)): another tab's unstamped write is merged in and
+    // written back stamped, wherever the check runs (also right before the reader's own write).
+    assert.match(text, /if \(change === 'merge' && raw !== mergedRaw\.current\) \{\s*(\/\/[^\n]*\s*)*mergedRaw\.current = raw;/);
+    assert.match(text, /const merged = \{ \.\.\.mergeProgress\(stored, prev\) \};\s*lastState\.current = lessonState\(lesson, merged\);\s*dirty\.current = true;\s*return merged;/);
+    assert.match(text, /setServerMerges\(\(n\) => n \+ 1\);\s*return true;\s*\}\s*if \(change === 'foreign' && rewriteForeign\)/);
+    // A drop replaces the record: the seen observer reads the new one (G16 keys the sections with drops).
+    assert.match(text, /\}, \[articleRef, container, lesson, update, drops\]\);/);
+    assert.match(text, /setDrops\(\(n\) => n \+ 1\);/);
+    assert.match(text, /loadedGen\.current = readerStartGen\(raw\);/);
   });
 });

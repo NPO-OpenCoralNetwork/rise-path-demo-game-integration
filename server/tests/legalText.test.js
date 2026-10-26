@@ -260,6 +260,50 @@ describe('the committed public texts (content/legal/*.ja.md)', () => {
     assert.doesNotMatch(inventory, /コース生成などのジョブ/u);
   });
 
+  it('the privacy policy and the inventory say what Phase 5 keeps: XP and learning days survive a reset or a delete (O2) and go with the account', () => {
+    const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
+    assert.match(privacy, /XP（経験値）の記録（どのレッスンやステージで、いつ、いくつ）と、学んだ日（日本時間の日付だけ）を当法人のサーバーに保存し/u);
+    assert.match(privacy, /「このレッスンを最初からやり直す」で、1 つのレッスンの記録だけを、すべての端末から消すこともできます。/u);
+    assert.match(privacy, /XP の記録と学んだ日の記録は、進み具合を消したりやり直したりしても残り、アカウントを削除するまで保存します。/u);
+    // The logout question is promised only where the code asks (logoutGuard.ts): a "sign in again"
+    // button (reason 'reauth') and an expired session never ask; their records stay all the same.
+    // It counts lesson records only (design §4.7): legacy Blender progress is cleared without one.
+    assert.match(privacy, /ご自分でログアウトするときに、まだサーバーへ送れていないレッスンの進み具合があれば画面でお知らせし、ログアウトするかを選んでいただきます（そのあいだは、まだログアウトしていません。前からある Blender のコースの進み具合は、おたずねせずに消します）。/u);
+    assert.doesNotMatch(privacy, /まだサーバーへ送れていない進み具合があれば画面でお知らせ/u, 'the question covers lesson records only (design §4.7); Blender progress is cleared without one');
+    assert.match(privacy, /もう一度ログインするためのボタン（「ログインし直す」など）を押したときや、ログインが切れたときは、おたずねしませんが、送れていないレッスンの進み具合は上のとおり端末に残します。/u);
+    assert.doesNotMatch(privacy, /。ログアウトのときに、まだサーバーへ送れていない進み具合があれば/u, 'not every logout asks');
+    assert.doesNotMatch(privacy, /連続して学んだ日数などの表示に使います/u, 'the streak no longer comes from the history');
+    const inventory = read('doc/legal/ai-data-inventory.ja.md');
+    assert.match(inventory, /^\| XP・バッジ・学んだ日（Phase 5） \|/mu);
+    assert.match(inventory, /\*\*AI アプリからは読めません\*\*/u);
+    assert.match(inventory, /本人がログアウトするときに、まだサーバーへ送れていないレッスンの記録があれば/u);
+    assert.match(inventory, /古い形の Blender の進み具合は、送れていなくても聞かずに消します/u);
+    // XP is kept per milestone: a lesson only started still earns 'done' once finished after a reset.
+    assert.doesNotMatch(inventory, /同じレッスンやステージでもう一度はもらえません/u);
+    assert.match(inventory, /同じレッスンの同じ段階（始めた・終えた）や同じステージでは、もう一度はもらえません/u);
+    assert.match(inventory, /ログインが切れたとき、Nexloom だけのログインでは聞きません。/u);
+    // The three Phase 5 tables are all named (vmStackConfig.test.js pins that none is granted to the MCP role).
+    for (const table of ['lesson_progress_lesson_resets', 'xp_awards', 'learning_days']) assert.ok(inventory.includes(`\`${table}\``), table);
+  });
+
+  it('privacy 2 の 3: the one-time learning-day backfill names the feature and both of its sources, after the feature is introduced', () => {
+    const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
+    const item = privacy.split('\n').find((line) => line.startsWith('3. **学習の記録**'));
+    assert.ok(item, 'the list item');
+    assert.doesNotMatch(item, /（この機能を始める前の記録は/u, 'no 「この機能」 without an antecedent');
+    assert.ok(item.indexOf('学んだ日（日本時間の日付だけ）') < item.indexOf('学んだ日の記録を作る'), 'learning days are introduced before the backfill');
+    assert.match(item, /XP と学んだ日の記録を始める前の、レッスンや Blender のステージを始めた・終えた記録と、レッスンの進み具合を最後に変えた日は、学んだ日の記録を作るのに一度だけ使いました。/u);
+  });
+
+  it('the inventory says minors\' XP and learning days are stored too (note 8 and the XP row)', () => {
+    const inventory = read('doc/legal/ai-data-inventory.ja.md');
+    const row = inventory.split('\n').find((line) => line.startsWith('| XP・バッジ・学んだ日（Phase 5） |'));
+    assert.match(row, /18 歳未満の人のものも保存します/u);
+    const note8 = inventory.split('\n').find((line) => line.startsWith('8. **18 歳未満の人のレッスンの進み具合も'));
+    assert.match(note8, /XP の記録と学んだ日（Phase 5。[^）]*）も、18 歳未満の人のものを保存します/u);
+    assert.match(note8, /進み具合と XP・学んだ日の保存に保護者の同意が要るかは【要確認】/u);
+  });
+
   it('the privacy policy names the processing records the code really writes (jobs: material indexing only)', () => {
     // POST /rag/index is the only jobs insert (type 'ingest'); the worker runs 'ingest' only.
     assert.match(read('server/jobWorker.js'), /'ingest'/);

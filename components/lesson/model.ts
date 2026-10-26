@@ -53,8 +53,9 @@ export type LessonState = LessonStateName;
 export type LessonEventType = 'lesson_start' | 'lesson_complete';
 
 /**
- * Learning events (dashboard streak and XP, profile history) for a state change the learner
- * caused: the first activity starts the lesson, and reaching a done state completes it.
+ * Learning events (the profile's learning history; Phase 5: history only, XP and the streak come
+ * from the server's records) for a state change the learner caused: the first activity starts the
+ * lesson, and reaching a done state completes it.
  */
 export function lessonStateEvents(before: LessonState, after: LessonState): LessonEventType[] {
   const events: LessonEventType[] = [];

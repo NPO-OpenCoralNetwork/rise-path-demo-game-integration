@@ -10,9 +10,12 @@ import { deleteLessonProgress, useProgressSyncState } from '../../lesson/progres
  * §6). Signed in with sync: the server's records go first (every course, every device, quiz
  * answers included), and only then this device's; a failure changes nothing. Otherwise (guests,
  * no API): this device only. A confirm dialog, not "type DELETE": children use this page.
- * The learning history (/user/events: lessons started and finished) and what AI apps saved
- * through the learner-state tools stay. The streak can get shorter: it also counts the days of
- * the deleted records (components/ui/ProgressCluster.tsx), so days when the learner only read go.
+ * What stays depends on the scope. Signed in: the learning history (/user/events: lessons started
+ * and finished), the XP ledger, badges and learning days (owner decision O2: XP already earned is
+ * kept and that item cannot earn again; the streak counts the server's learning days, which a
+ * delete never removes: tools/core/achievements.js), which lessons were started over and when,
+ * and what AI apps saved through the learner-state tools. On this device only (guests, no API):
+ * the learning history; nothing else of this list exists for them.
  * The button stays enabled while deleting (the open dialog makes it inert), so the dialog can
  * return focus to it however it closes.
  */
@@ -23,7 +26,8 @@ const copy = {
     body: 'Deletes what the lessons saved for you in every course: what you read, your quiz answers, checklists, self-ratings and where to continue.',
     scopeAccount: 'It is deleted on every device where you are signed in. This cannot be undone.',
     scopeDevice: 'It is deleted on this device. This cannot be undone.',
-    kept: 'Not deleted: your learning history (lessons you started and finished) and records that AI apps saved with the learner-state tools. Your streak can get shorter, because days when you only read lessons no longer count.',
+    keptAccount: 'Not deleted: your learning history (lessons you started and finished), the record of the XP you earned (which lessons and stages you started or finished, and when), your badges, the days you learned (your streak), which lessons you started over and when, and records that AI apps saved with the learner-state tools.',
+    keptDevice: 'Not deleted: your learning history (lessons you started and finished).',
     button: 'Delete lesson progress',
     dialogTitle: 'Delete all your lesson progress?',
     dialogAccount: 'Every course, on every device, quiz answers included. This cannot be undone.',
@@ -40,7 +44,8 @@ const copy = {
     body: 'すべてのコースについて、レッスンに記録された内容を消します。読んだところ、確認問題の答え、チェックリスト、自己評価、続きの位置です。',
     scopeAccount: 'ログインしているすべての端末から消えます。元に戻すことはできません。',
     scopeDevice: 'この端末から消えます。元に戻すことはできません。',
-    kept: '学習の履歴（レッスンを始めた・終えた記録）と、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。連続記録は、レッスンを読んだだけの日が数えられなくなるため、短くなることがあります。',
+    keptAccount: '学習の履歴（レッスンを始めた・終えた記録）、XP の記録（どのレッスンやステージを始めた・終えたか、いつか）とバッジ、学んだ日の記録（連続記録）、やり直したレッスンとその日時、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。',
+    keptDevice: '学習の履歴（レッスンを始めた・終えた記録）は消えません。',
     button: '学習の進み具合を消す',
     dialogTitle: '学習の進み具合をすべて消しますか？',
     dialogAccount: 'すべてのコース、すべての端末が対象で、確認問題の答えも消えます。元に戻すことはできません。',
@@ -96,7 +101,7 @@ const LessonProgressDeleteSection: React.FC = () => {
       <div id={bodyId} className="mt-2 space-y-2 text-small text-fg-2">
         <p>{t.body}</p>
         <p>{signedIn ? t.scopeAccount : t.scopeDevice}</p>
-        <p>{t.kept}</p>
+        <p>{signedIn ? t.keptAccount : t.keptDevice}</p>
       </div>
       <Button
         ref={buttonRef}

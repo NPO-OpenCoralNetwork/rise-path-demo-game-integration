@@ -36,6 +36,7 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 - `--find-email` と `--orphans` には `SUPABASE_SERVICE_ROLE_KEY` が要ります（anon のキーではユーザーを調べられません）。
 - 続いている有料プランがあると止まります（終了コード 2）。先に Stripe のダッシュボードで解約してから、もう一度実行します。
 - `ACCOUNT_DELETION_ENABLED` の値にかかわらず動きます（この設定が切りかえるのは、ご本人の画面からの削除だけです）。
+- デプロイで migration を当てているあいだ（`deploy-stack.sh` の実行中）は、`--yes` を実行しません。重なると、どちらかがデッドロック（40P01）で何も変えずに止まります。デプロイ中に終了コード 3 で止まったときは、デプロイが終わってから、もう一度実行します。
 - 終了コード: 0 = 消した（または、もう消えていた）、2 = 断った（続いている有料プランなど。理由が出ます）、3 = いまは使えない（DB、Supabase、Stripe、Memanto のどれか。Stripe や Memanto につながらないとき（`payment_provider_unavailable`、`memory_service_unavailable`）もここです。しばらくしてから、もう一度実行します）、1 = 使い方や設定のまちがい。
 - 表示された JSON に `"memoryDeleted":true` があるとき（終了コード 2 か 3）は、AI の記憶だけが消えて、ほかのデータは残っています。同じ `--yes` をもう一度実行します（5 章の `partial` の行）。
 - 削除の記録の `requested_by` は `staff` になります（ご本人の削除は `self`、定期の確認は `orphan`）。

@@ -547,7 +547,7 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
                 refusal={insightRefusal}
                 variant="result"
                 language={noticeLanguage}
-                onSignIn={() => { void logout(); }}
+                onSignIn={() => { void logout({ reason: 'reauth' }); }}
               />
             )}
           </div>

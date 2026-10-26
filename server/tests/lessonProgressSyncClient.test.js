@@ -9,6 +9,8 @@
 // - "Don't add" clears the other person's learning events and loads this learner's own again.
 // - Phase 4: the legacy progress push waits for this page load's GET (whenAccountKnown) and is
 //   skipped when it failed; forgetProgressAccount (account deleted) uploads nothing.
+// - Phase 5: the one-lesson reset is a POST to /lesson-reset through the session check (G3);
+//   another tab's pending markers and online/offline feed the save view.
 // The client imports Vite modules (import.meta.env, import.meta.glob in content/index.ts), so it is
 // bundled with esbuild (a Vite dependency, as in agentChatError.test.js) with the bundled course
 // outline, Supabase and React stubbed, and run against a fake window, document, storage and fetch.
@@ -342,6 +344,107 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     assert.equal(t.puts().length, 0);
     assert.deepEqual([...t.storage.map.keys()], []);
     assert.equal(await t.client.whenAccountKnown(), 'unknown');
+  });
+
+  it('Phase 5 (G3): the one-lesson reset is a POST to /lesson-reset with the session\'s token, never a DELETE', async () => {
+    const t = (current = await page({
+      routes: {
+        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true }, records: [] }),
+        'POST /user/lesson-progress/lesson-reset': (call) => json(200, {
+          ok: true, epoch: null, courseSlug: call.body.courseSlug, lessonId: call.body.lessonId,
+          lessonEpoch: '33333333-3333-4333-8333-333333333333', lessonResetAt: '2026-10-20T09:00:00.000Z',
+          record: { courseSlug: call.body.courseSlug, lessonId: call.body.lessonId, progress: { v: 1, seen: [], answers: {}, checks: {}, lastBlockId: null, updatedAt: '1970-01-01T00:00:00.000Z' }, pct: 0, state: 'not_started', updatedAt: '1970-01-01T00:00:00.000Z' },
+        }),
+      },
+    }));
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: true, achievements: true });
+    writeLocal(t, 'l1', record({ seen: ['b1'] }));
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: true });
+    const resets = t.calls.filter((c) => c.url.startsWith('/user/lesson-progress') && c.method !== 'GET' && c.method !== 'PUT');
+    assert.deepEqual(resets.map((c) => `${c.method} ${c.url}`), ['POST /user/lesson-progress/lesson-reset']);
+    assert.deepEqual(resets[0].body, { epoch: null, courseSlug: COURSE, lessonId: 'l1' });
+    assert.equal(resets[0].headers.Authorization, 'Bearer tok-session');
+    assert.equal(JSON.parse(t.storage.getItem(PROGRESS_KEY('l1'))).lessonGen.epoch, '33333333-3333-4333-8333-333333333333');
+    // Another learner's session: the session check refuses it before any request.
+    t.auth.session = { user: { id: U2 }, access_token: 'tok-u2' };
+    const before = t.calls.length;
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'failed' });
+    assert.equal(t.calls.length, before);
+  });
+
+  it('Phase 5: how the API layer reads a reset answer: a 200 without a uuid lessonEpoch is "unconfirmed" and changes nothing here; a malformed record is an emptied one', async () => {
+    let answer = { lessonEpoch: 'x' };
+    const t = (current = await page({
+      routes: {
+        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true }, records: [] }),
+        'POST /user/lesson-progress/lesson-reset': (call) => json(200, { ok: true, epoch: null, courseSlug: call.body.courseSlug, lessonId: call.body.lessonId, ...answer }),
+      },
+    }));
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    writeLocal(t, 'l1', record({ seen: ['b1'] }));
+    const before = t.storage.getItem(PROGRESS_KEY('l1'));
+    for (const bad of [{ lessonEpoch: 'x' }, {}, { lessonEpoch: null }, { lessonEpoch: 42 }]) {
+      answer = bad;
+      assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'unconfirmed' }, JSON.stringify(bad));
+      assert.equal(t.storage.getItem(PROGRESS_KEY('l1')), before, 'the local record is untouched');
+    }
+    answer = { lessonEpoch: '33333333-3333-4333-8333-333333333333', lessonResetAt: 'not a date', record: { courseSlug: COURSE, lessonId: 'l1', progress: 'garbage' } };
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: true });
+    const stored = JSON.parse(t.storage.getItem(PROGRESS_KEY('l1')));
+    assert.deepEqual(stored.seen, [], 'an emptied record');
+    assert.deepEqual(stored.lessonGen, { epoch: '33333333-3333-4333-8333-333333333333', resetAt: null });
+  });
+
+  it('Phase 5: capabilities other than true are false: the reset is "unsupported" and never sent', async () => {
+    const t = (current = await page({
+      routes: { 'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: 'yes', achievements: 1 }, records: [] }) },
+    }));
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: false, achievements: false });
+    writeLocal(t, 'l1', record({ seen: ['b1'] }));
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'unsupported' });
+    assert.equal(t.calls.filter((c) => c.method === 'POST').length, 0);
+  });
+
+  it('Phase 5: another tab\'s pending markers and the browser going offline reach the save view', async () => {
+    const t = (current = await page());
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    assert.equal(t.client.getProgressSaveView().state, 'saved');
+    // Another tab wrote a record of this learner and its marker (a storage event here).
+    t.storage.setItem(PROGRESS_KEY('l2'), JSON.stringify(record({ seen: ['x'] })));
+    t.storage.setItem('rp:progressSync:pending:course-a:l2', record().updatedAt);
+    const views = [];
+    const off = t.client.subscribeProgressSaveView(() => views.push(t.client.getProgressSaveView()));
+    window.dispatchEvent(Object.assign(new Event('storage'), { key: 'rp:progressSync:pending:course-a:l2' }));
+    assert.equal(t.client.getProgressSaveView().pending, 1);
+    assert.equal(t.client.getProgressSaveView().state, 'saving');
+    globalThis.navigator ??= {};
+    const onLine = Object.getOwnPropertyDescriptor(globalThis.navigator, 'onLine');
+    Object.defineProperty(globalThis.navigator, 'onLine', { value: false, configurable: true });
+    try {
+      window.dispatchEvent(new Event('offline'));
+      assert.equal(t.client.getProgressSaveView().state, 'offline');
+      assert.equal(t.client.getProgressSaveView().online, false);
+    } finally {
+      if (onLine) Object.defineProperty(globalThis.navigator, 'onLine', onLine);
+      else delete globalThis.navigator.onLine;
+    }
+    window.dispatchEvent(new Event('online'));
+    assert.equal(t.client.getProgressSaveView().online, true);
+    assert.ok(views.length >= 2);
+    off();
+    // prepareProgressSignOut uploads and counts; it never throws.
+    assert.deepEqual(await t.client.prepareProgressSignOut(), { unsaved: 0 });
+    assert.equal(t.puts().at(-1).body.records[0].lessonId, 'l2');
   });
 
   it('the legacy progress hydrate waits for the adoption choice; "Add" runs it after the choice', async () => {
