@@ -9,13 +9,14 @@
  * - unsupported: the sync's GET says the server has no reviews (capabilities.review not true), or
  *   the route answered 404 without error_type (an older server): latched for the page load.
  * - It fetches when a consumer mounts and the data is absent, out of date or older than 30 s;
- *   after a server-sourced lesson record (2 s trailing, at least 15 s apart: another tab's reset can
- *   lower today's count); after each grade (the same debounce, and the held list is out of date at
- *   once, so the dashboard card or a second /review visit mounted right after reads instead of
- *   showing the cards just graded); at once on REVIEW_STALE_EVENT (a one-lesson reset or a
- *   delete-all succeeded), when a grade answer names another Japan-time day than the list, and
- *   when a session's list is through; when the learner or the capabilities change; on
- *   「読み込み直す」. A lesson save the server took only marks the data out of date (expire): the
+ *   after a server-sourced lesson record that is not the answer to this tab's own save (`echo`)
+ *   (2 s trailing, at least 15 s apart: another tab's reset can lower today's count); after each
+ *   grade (the same debounce, and the held list is out of date at once, so the dashboard card or
+ *   a second /review visit mounted right after reads instead of showing the cards just graded);
+ *   at once on REVIEW_STALE_EVENT (a one-lesson reset or a delete-all succeeded), when a grade
+ *   answer names another Japan-time day than the list, and when a session's list is through; when
+ *   the learner or the capabilities change; on 「読み込み直す」. A lesson save the server took
+ *   (with the record it answered, `echo`) only marks the data out of date (expire): the
  *   sidebar consumer is mounted on lesson pages too, a save cannot add a card due today (a card
  *   enters due the next Japan-time day at the earliest), and a read per save would double a
  *   reader's requests against the per-IP limit a classroom shares; the next consumer that mounts
@@ -58,7 +59,9 @@ export type ReviewStore = AchievementsStore<ReviewQueue>;
 export function listenForReviewChanges(s: ReviewStore, target: Pick<Window, 'addEventListener'>): void {
   target.addEventListener(PROGRESS_EVENT, (event) => {
     const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
-    if (detail?.source === 'server') s.serverProgress();
+    // The server's answer to this tab's own save (echo, e.g. a lesson's first save here stamping
+    // its generation) is a save too: no request (the in-app check saw one GET per such save).
+    if (detail?.source === 'server' && !detail.echo) s.serverProgress();
   });
   // A save only marks the list out of date (see the header): no request from the lesson page.
   target.addEventListener(PROGRESS_SAVED_EVENT, () => s.expire());

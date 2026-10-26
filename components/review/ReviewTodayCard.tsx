@@ -39,7 +39,8 @@ export function ReviewTodayCardView({ language, snapshot, onReload }: {
     }
     case 'done': {
       const carried = data && data.carriedOver > 0 ? t.carried(data.carriedOver) : next;
-      return <EmptyState {...common} title={c.doneTitle} description={carried} />;
+      // break-keep: the line breaks after 「、」, never leaving 「す。」 alone (in-app check).
+      return <EmptyState {...common} title={c.doneTitle} description={carried ? <span className="break-keep">{carried}</span> : undefined} />;
     }
     case 'none_today':
       return <EmptyState {...common} title={c.noneTodayTitle} description={next} />;

@@ -43,9 +43,10 @@ import {
  * today (a skipped card used no slot of the cap), 「復習する」 reads the list again and goes on; if
  * that read fails, the page says so and offers it again (never the held list's counts). When the
  * list is through, the store reads again at once (the sidebar and the dashboard count).
- * After each grade focus goes to the next card, or to the done heading; after an end that removed
- * the card, to the status line or the page title (only when focus was lost or on this page). The
- * page scrolls inside <main id="main-content">. No timer, no warm-up.
+ * On arrival, focus that was lost goes to the page title. After each grade focus goes to the next
+ * card, or to the done heading; after an end that removed the card, to the status line or the page
+ * title (only when focus was lost or on this page). The page scrolls inside
+ * <main id="main-content">. No timer, no warm-up.
  */
 
 /** Where focus goes after the page changed what it shows. */
@@ -56,6 +57,23 @@ function focusIsOnPage(page: HTMLElement | null): boolean {
   if (typeof document === 'undefined') return false;
   const active = document.activeElement;
   return !active || active === document.body || (page !== null && page.contains(active));
+}
+
+/**
+ * On arrival: focus that fell to <body> (the dashboard's 「復習する」 link left the page with the
+ * in-app navigation, or a fresh load) goes to the title, so the next Tab reaches the card instead
+ * of starting again at the skip link and the sidebar. Focus still on an element (the sidebar's
+ * 「復習」) stays. Exported for tests.
+ */
+export function focusTitleIfLost(
+  title: Pick<HTMLElement, 'focus'> | null,
+  doc: Pick<Document, 'activeElement' | 'body'> | null = typeof document === 'undefined' ? null : document,
+): boolean {
+  if (!title || !doc) return false;
+  const active = doc.activeElement;
+  if (active && active !== doc.body) return false;
+  title.focus({ preventScroll: true });
+  return true;
 }
 
 /** The page outside a session (and the done view), for a store state. Exported for tests. */
@@ -124,7 +142,7 @@ export function ReviewStateView({ language, state, summary, offline, onReload, o
             <PartyPopper size={18} />
           </span>
           <h2 id="rp-review-done" ref={doneRef} tabIndex={-1} className="text-h3 text-fg focus:outline-none">{t.doneTitle}</h2>
-          {carried || nextLine ? <p className="text-body text-fg-2">{carried || nextLine}</p> : null}
+          {carried || nextLine ? <p className="break-keep text-body text-fg-2">{carried || nextLine}</p> : null}
           <ButtonLink to="/" variant="secondary">{t.toDashboard}</ButtonLink>
         </section>
       );
@@ -158,6 +176,10 @@ export default function ReviewView() {
   useEffect(() => {
     setTheme('default');
   }, [setTheme]);
+
+  useEffect(() => {
+    focusTitleIfLost(titleRef.current);
+  }, []);
 
   // The list comes from a read this visit started (or one under 30 s old), not an older one.
   useEffect(() => {
@@ -348,7 +370,7 @@ export default function ReviewView() {
 
   return (
     <div ref={pageRef} className="mx-auto flex max-w-2xl flex-col gap-6 py-6 sm:py-8">
-      <PageHeader eyebrow={t.eyebrow} title={t.title} description={t.description} titleRef={titleRef} />
+      <PageHeader eyebrow={t.eyebrow} title={t.title} description={<span className="break-keep">{t.description}</span>} titleRef={titleRef} />
       <div ref={statusRef} role="status" tabIndex={-1} className="focus:outline-none">
         {endNote ? <p className="rounded-control border border-line bg-sunken px-3 py-2 text-small text-fg-2">{endNote === 'signedOut' ? t.signedOut : t.switched}</p> : null}
       </div>

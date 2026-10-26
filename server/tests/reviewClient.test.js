@@ -394,6 +394,26 @@ describe('reviewClient: the review store (the Phase 5 store with capabilityKey "
     assert.equal(env.loads, 3);
   });
 
+  it('a lesson\'s first save on this device (the server\'s answer, echo, then saved): no review request; a server-sourced record without echo still reads (in-app check 1)', async () => {
+    const { s, env } = store();
+    const fire = events(s);
+    s.consumerMounted(); // the sidebar on the lesson page
+    await s.settled();
+    assert.equal(env.loads, 1);
+    // What the sync core sends when the PUT answer stamps the lesson's generation (born → known(null)).
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l', source: 'server', echo: true });
+    fire('rp:progress-saved');
+    await env.advance(60_000);
+    assert.equal(env.loads, 1, 'no review GET for this tab\'s own save');
+    assert.equal(s.getSnapshot().at, null, 'out of date: the next consumer reads');
+    s.consumerMounted(); // the dashboard card
+    await s.settled();
+    assert.equal(env.loads, 2);
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l', source: 'server' });
+    await env.advance(15_000);
+    assert.equal(env.loads, 3, 'a hydrate, a refresh or a lesson_reset refusal still reads');
+  });
+
   it('a save while a read is in flight: its answer is kept out of date, so the next consumer reads again', async () => {
     let release = null;
     const { s, env } = store({ load: (e) => new Promise((resolve) => { release = () => resolve(mod.parseReviewQueue(QUEUE(e.learner.toUpperCase()))); }) });

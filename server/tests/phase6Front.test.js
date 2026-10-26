@@ -155,7 +155,7 @@ before(async () => {
   ui = await fresh(await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { ReviewCardView, lineText } from './components/review/ReviewCardView';",
-    "export { ReviewStateView, default as ReviewView } from './components/review/ReviewView';",
+    "export { ReviewStateView, focusTitleIfLost, default as ReviewView } from './components/review/ReviewView';",
     "export { ReviewTodayCardView } from './components/review/ReviewTodayCard';",
     "export { reviewCopy } from './components/review/reviewCopy';",
     "export { startSession, sessionReducer } from './components/review/reviewModel';",
@@ -382,6 +382,14 @@ describe('ReviewTodayCardView: the dashboard card (design §5.5), server numbers
     assert.ok(textOf(card(SNAP('ready', QUEUE({ remainingToday: 0, doneToday: 0, carriedOver: 0, dueTotal: 0, inQueue: 0, nextDueOn: null })), 'en')).includes('a lesson that has review cards'));
   });
 
+  it('done: the carried-over (or next-day) line breaks only between phrases (break-keep), never leaving 「す。」 alone (in-app check 3)', () => {
+    for (const carriedOver of [2, 0]) {
+      const els = elementsOf(card(SNAP('ready', QUEUE({ remainingToday: 0, doneToday: 10, carriedOver }))));
+      const line = els.find((el) => el.type === 'span' && /残りの|次の復習は/.test(textOfElement(el)));
+      assert.ok(line && classesOf(line).includes('break-keep'), `carriedOver ${carriedOver}`);
+    }
+  });
+
   it('loading, no_account, unavailable and unsupported show no number (never a made-up zero); unavailable can reload', () => {
     for (const status of ['idle', 'loading', 'no_account', 'unavailable', 'unsupported']) {
       const tokens = card(SNAP(status));
@@ -418,6 +426,29 @@ describe('ReviewStateView and the /review page outside a session (design §5.3)'
     assert.ok(!text.includes('次の復習は'), 'carried cards come tomorrow: no later date beside them');
     assert.ok(textOf(state({ state: 'done', summary: { carriedOver: 0, nextDueOn: '2026-10-29', remainingToday: 0 } })).includes('次の復習は 10月29日（木）です。'));
     assert.equal(els.find((el) => el.type === 'Link').props.to, '/');
+    const line = els.find((el) => el.type === 'p' && textOfElement(el).startsWith('残りの'));
+    assert.ok(classesOf(line).includes('break-keep'), 'breaks after 「、」, not before 「す。」 (in-app check 3)');
+  });
+
+  it('arrival: focus that fell to <body> (the dashboard link left the page) goes to the title; focus on an element stays; the page calls it once on mount (in-app check 2)', () => {
+    const body = { id: 'body' };
+    const calls = [];
+    const title = { focus: (options) => calls.push(options) };
+    assert.equal(ui.focusTitleIfLost(title, { activeElement: body, body }), true);
+    assert.deepEqual(calls, [{ preventScroll: true }]);
+    assert.equal(ui.focusTitleIfLost(title, { activeElement: null, body }), true, 'no active element: lost too');
+    assert.equal(ui.focusTitleIfLost(title, { activeElement: { id: 'sidebar-link' }, body }), false, 'the sidebar 「復習」 keeps focus');
+    assert.equal(calls.length, 2);
+    assert.equal(ui.focusTitleIfLost(null, { activeElement: body, body }), false);
+    const view = readFile('components/review/ReviewView.tsx');
+    assert.match(view, /useEffect\(\(\) => \{\s*focusTitleIfLost\(titleRef\.current\);\s*\}, \[\]\);/);
+    assert.match(view, /<PageHeader .*titleRef=\{titleRef\} \/>/);
+  });
+
+  it('the page description breaks only between phrases (break-keep): no 「です。」 alone at 390 px', () => {
+    const els = elementsOf(pageWith({ __review: SNAP('no_account') }));
+    const span = els.find((el) => el.type === 'span' && textOfElement(el) === ui.reviewCopy.jp.description);
+    assert.ok(span && classesOf(span).includes('break-keep'));
   });
 
   it('no_account, unsupported, unavailable (online: reload; offline: wait for the connection), empty, none_today, loading', () => {

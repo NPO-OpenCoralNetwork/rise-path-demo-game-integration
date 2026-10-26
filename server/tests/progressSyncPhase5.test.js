@@ -1177,3 +1177,53 @@ describe('Phase 5 resetLesson (server first, local only on success)', () => {
     assert.equal(t.sync.capabilities(), null);
   });
 });
+
+describe('Phase 6: the server\'s answer to this tab\'s own save is announced as an echo (in-app check 1)', () => {
+  it('the first save of a lesson here (born → known(null)): one server event with echo, then saved; the review count reads nothing for it', async () => {
+    const t = p5();
+    await on(t);
+    t.events.progress.length = 0;
+    write(t, 'l1', stamped(record({ seen: ['a'], updatedAt: iso(1) }), { bornAt: iso(1) }));
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs + SYNC_TIMING.flushDelayMs);
+    assert.equal(t.api.puts().length, 1);
+    assert.deepEqual(genOf(t.storage, 'l1'), { kind: 'known', epoch: null, resetAt: null }, 'the stamp moved, so the record was written');
+    assert.deepEqual(t.events.progress, [{ courseSlug: COURSE, lessonId: 'l1', source: 'server', echo: true }]);
+    assert.equal(t.events.saved, 1);
+  });
+
+  it('a PUT answer that names a generation this tab did not know (started over elsewhere) is not an echo', async () => {
+    const t = p5();
+    await on(t);
+    t.events.progress.length = 0;
+    write(t, 'l1', stamped(record({ seen: ['a'], updatedAt: iso(1) }), { bornAt: iso(1) }));
+    t.api.script('put', { respond: (body) => {
+      const sent = body.records[0];
+      return { epoch: null, rejected: [], records: [{ courseSlug: COURSE, lessonId: 'l1', progress: sent.progress, pct: 10, state: 'in_progress', updatedAt: sent.progress.updatedAt, lessonEpoch: X1, lessonResetAt: iso(-30) }] };
+    } });
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs + SYNC_TIMING.flushDelayMs);
+    assert.equal(t.api.puts().length, 1);
+    assert.deepEqual(genOf(t.storage, 'l1'), { kind: 'known', epoch: X1, resetAt: iso(-30) });
+    assert.deepEqual(t.events.progress, [{ courseSlug: COURSE, lessonId: 'l1', source: 'server' }]);
+  });
+
+  it('a lesson_reset refusal (another device started the lesson over) is not an echo; the save of the stamped record afterwards is', async () => {
+    const t = p5();
+    await on(t);
+    t.events.progress.length = 0;
+    write(t, 'l1', stamped(record({ seen: ['new'], updatedAt: iso(2) }), { bornAt: iso(2) }));
+    const { gen } = t.api.resetOnServer(COURSE, 'l1', START + 60_000);
+    await t.clock.advance(SYNC_TIMING.flushDelayMs);
+    assert.deepEqual(genOf(t.storage, 'l1'), { kind: 'known', epoch: gen.epoch, resetAt: gen.at });
+    assert.deepEqual(t.events.progress, [{ courseSlug: COURSE, lessonId: 'l1', source: 'server' }], 'the refusal: the review count reads');
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs);
+    assert.equal(t.api.puts().length, 2);
+    assert.deepEqual(t.events.progress.slice(1), [{ courseSlug: COURSE, lessonId: 'l1', source: 'server', echo: true }], 'the stamped record saved: an echo');
+  });
+
+  it('the hydrate GET\'s records are never echoes', async () => {
+    const t = p5({ rows: [serverRow('l1', record({ seen: ['a'], updatedAt: iso(-5) }))] });
+    await on(t);
+    assert.ok(t.events.progress.some((d) => d.lessonId === 'l1'));
+    assert.ok(t.events.progress.every((d) => d.echo === undefined));
+  });
+});
