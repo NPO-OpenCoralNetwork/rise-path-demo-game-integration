@@ -319,6 +319,8 @@ describe('MCP server (stdio, production): rag-search resolves the learner first'
         for (const id of ['course-list', 'course-lesson-get', 'course-quiz-check', 'course-progress-get', 'course-progress-update']) {
             assert.ok(tools.some((t) => t.name === id), `${id} is a learner tool (so it takes rp_turn too)`);
         }
+        // Phase 6: the review tools are learner-remote only (the remote gate makes them adults only).
+        assert.deepEqual(tools.map((t) => t.name).filter((name) => name.startsWith('course-review-')), [], 'no review tool on stdio');
         for (const tool of tools) {
             assert.equal(tool.inputSchema.properties.rp_turn?.type, 'string', tool.name);
             assert.ok(!(tool.inputSchema.required || []).includes('rp_turn'), tool.name);

@@ -710,6 +710,24 @@ describe('failures', () => {
         assert.equal(byId(pool.reviewRows(ALICE))['card-frontend'].reps, 0, 'the UPDATE rolled back with the failed log row');
     });
 
+    it('before migration 020 the entry fails on lesson_progress.progress_changed_at (42703: PostgreSQL resolves that column before it sees review_cards is missing): table_not_found like a missing table, logged, rolled back, never the driver\'s text', async () => {
+        use({ reviewCards: [priorRow(VIBE, CH1, 'card-frontend', { daysAgo: 2 })] });
+        pool.fail({ code: '42703', message: 'column p.progress_changed_at does not exist (db.internal)', when: (text) => text === SQL.enterReviewCards });
+        const read = await quiet(() => queue());
+        assert.deepEqual(read.result, { error: 'Review tables or columns are missing during getReviewQueue. Run db:migrate.', error_type: 'table_not_found' });
+        assert.ok(read.lines.some((line) => /getReviewQueue/.test(line) && /42703/.test(line)), read.lines.join('\n'));
+        assert.deepEqual(pool.progressStatements().slice(-2), [SQL.enterReviewCards, 'rollback'], 'rolled back, never committed');
+        assert.equal(pool.inTransaction(), false);
+        // The same for a review column the grade reads (a half-applied schema): never 'unknown'.
+        pool.fail({ code: '42703', message: 'column "lapses" does not exist (db.internal)', when: (text) => text === SQL.lockReviewCard });
+        const graded = await quiet(() => grade());
+        assert.equal(graded.result.error_type, 'table_not_found');
+        assert.equal(pool.progressStatements().at(-1), 'rollback');
+        assert.doesNotMatch(JSON.stringify([read.result, graded.result]), /progress_changed_at|lapses|db\.internal/);
+        assert.equal(byId(pool.reviewRows(ALICE))['card-frontend'].reps, 0);
+        assert.equal(pool.inTransaction(), false);
+    });
+
     it('a duplicate log row (only by hand) is a defensive not_due, rolled back', async () => {
         use({
             reviewCards: [priorRow(VIBE, CH1, 'card-frontend', { daysAgo: 2 })],

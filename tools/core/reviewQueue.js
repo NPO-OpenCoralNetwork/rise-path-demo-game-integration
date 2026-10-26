@@ -28,6 +28,12 @@
  *   deterministic fuzz), written with an UPDATE that repeats the due and once-a-day rules, and one
  *   review_log row appended (source 'web' or 'mcp'). reveal: true (the MCP tool's "show the answer")
  *   answers the card's back after the same checks and records nothing.
+ * - reviewDueForAgent, reviewGradeForAgent (the remote MCP tools course-review-due and
+ *   course-review-grade, learner-remote only): the same queue and grade for an AI app the learner
+ *   allowed, in snake case, each card's text resolved to one locale. The due list has fronts only
+ *   (no back, no memory, no learning day, no history) and REVIEW_PROTOCOL; a back is returned only
+ *   by a reveal or a recorded rating of a card due today. source 'mcp'; no learning day (Phase 5
+ *   R8), no XP.
  *
  * Clock: PostgreSQL decides every day and time (now() in Japan time, the learning_days boundary;
  * clock_timestamp() for entered_at and, in migration 020's trigger, progress_changed_at). JavaScript gets whole days and booleans and computes only
@@ -38,13 +44,17 @@
  * The one-lesson reset and delete-all (tools/core/lessonProgress.js) delete the rows last, under
  * the same learner lock; account deletion cascades (the log's only foreign key is its card row).
  *
- * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
+ * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text. A missing
+ * column (42703, e.g. lesson_progress.progress_changed_at before migration 020) is table_not_found,
+ * like a missing table (reviewTransaction).
  */
 import { canonicalUserId } from './accountDeletions.js';
 import { STREAK_TIME_ZONE, TODAY_SQL } from './achievements.js';
-import { isSafeSlug, listPublishedLessons } from './courseCatalog.js';
+import { getPublishedLesson, isSafeSlug, listPublishedLessons } from './courseCatalog.js';
 import { inTransaction } from './dbTransaction.js';
 import { LEARNER_LOCK_SQL } from './lessonProgress.js';
+import { learnerLocale } from '../../shared/lesson/learnerView.js';
+import { resolveText } from '../../shared/lesson/text.js';
 import { lessonReviewCards } from '../../shared/review/cards.js';
 import { GRADE_OF, scheduler, seededUnit } from '../../shared/review/fsrs.js';
 import { LESSON_PRIORS, REVIEW_DAILY_LIMIT, pickToday } from '../../shared/review/queue.js';
@@ -189,6 +199,27 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`;
 
 /** @param {string} message @returns {CoreError} */
 const invalid = (message) => ({ error: message, error_type: 'validation' });
+
+/**
+ * inTransaction for the review statements. Before migration 020 the entry fails with 42703
+ * (undefined_column: lesson_progress.progress_changed_at), not 42P01: PostgreSQL resolves the CTE's
+ * columns before it finds review_cards missing. A missing review column means what a missing review
+ * table means (020 not applied): table_not_found, so the route answers 503 and the MCP tools
+ * review_unavailable, as for 42P01. The driver's text stays in the server log.
+ * @param {string} operation
+ * @param {(db: Queryable) => Promise<{ commit: boolean, value: any }>} work
+ * @returns {Promise<any>}
+ */
+const reviewTransaction = (operation, work) => inTransaction(operation, async (db) => {
+    try {
+        return await work(db);
+    } catch (error) {
+        const err = /** @type {any} */ (error);
+        if (err?.code !== '42703') throw error;
+        console.error(`[db] ${operation}: 42703 a column is missing (migration 020 not applied? run db:migrate):`, err?.message || err);
+        return { commit: false, value: { error: `Review tables or columns are missing during ${operation}. Run db:migrate.`, error_type: 'table_not_found' } };
+    }
+});
 
 /**
  * The queue key of a card.
@@ -345,7 +376,7 @@ export async function getReviewQueue({ userId: rawUserId }) {
     if (!userId) return invalid('A signed-in learner is required.');
     const catalog = reviewCatalog();
     /** @type {{ today: string, rows: ReviewRow[] } | CoreError} */
-    const read = await inTransaction('getReviewQueue', async (db) => {
+    const read = await reviewTransaction('getReviewQueue', async (db) => {
         await db.query(LEARNER_LOCK_SQL, [userId]);
         await enterReviewCards(db, userId, catalog);
         const today = String((await db.query(TODAY_SQL)).rows[0]?.today ?? '');
@@ -403,7 +434,7 @@ export async function gradeReviewCard({ userId: rawUserId, courseSlug, lessonId,
     const text = { front: card.front, back: card.back, lessonTitle: card.lessonTitle, lessonLocale: card.lessonLocale };
     const key = [userId, courseSlug, lessonId, cardId];
 
-    return inTransaction('gradeReviewCard', async (db) => {
+    return reviewTransaction('gradeReviewCard', async (db) => {
         await db.query(LEARNER_LOCK_SQL, [userId]);
         /** @param {Record<string, unknown>} refusal */
         const refuse = async (refusal) => ({ commit: false, value: { ...refusal, learnerId: userId, summary: await readSummary(db, userId, catalog) } });
@@ -456,4 +487,146 @@ export async function gradeReviewCard({ userId: rawUserId, courseSlug, lessonId,
             },
         };
     });
+}
+
+// ─── AI apps (the remote MCP tools course-review-due and course-review-grade) ──────────────────
+
+/**
+ * How an AI app runs a review: returned by course-review-due (the socratic-tutor prompt and the
+ * tutor protocol are unchanged). The tools' descriptions say the same in short.
+ */
+export const REVIEW_PROTOCOL = [
+    'You are running a short Rise Path review with the learner (lesson flashcards that come back when they are about to forget them).',
+    '1. Show one card\'s front at a time, in the order given. Do not show or hint at the answer.',
+    '2. Wait for the learner to answer from memory, in their own words. Never answer for them.',
+    '3. Then call course-review-grade with reveal: true and show the answer.',
+    '4. Ask which fits: "もう一度 / Again" (they did not remember it) or "覚えた / Got it" (they remembered it). Send only their choice as rating; never choose for them.',
+    '5. Never record a card the learner did not try. Each result is permanent; a card can be recorded once a day, and a card that is not due is refused (not_due).',
+    '6. Do not read card answers from course-lesson-get before the learner has answered.',
+    '7. At most 10 cards a day. Stop when the list is done or the learner wants to stop; the rest come back on later days.',
+    '8. Reply in the learner\'s language.',
+].join('\n');
+
+/** Core error types that mean the review tables cannot be reached here (no database, 020 not applied, the role SQL not re-run). */
+const AGENT_UNAVAILABLE = new Set(['db_connection', 'table_not_found', 'permission_denied']);
+
+/** The agent's answer to a database failure: fixed text, never the driver's. @param {CoreError} error @param {string} failed */
+const agentFailure = (error, failed) => (AGENT_UNAVAILABLE.has(error.error_type)
+    ? { error: 'Reviews are not available on this server right now. Please try again later.', error_type: 'review_unavailable' }
+    : { error: failed, error_type: 'review_failed' });
+
+/**
+ * A card's text for an AI app in one locale: the requested one when the card's lesson has it
+ * (learnerLocale, as course-lesson-get), else the lesson's source locale. A list can mix locales
+ * (a lesson without an English translation stays Japanese), so each card says which one it is in.
+ * @param {{ courseSlug: string, lessonId: string, lessonLocale: Locale }} card @param {unknown} locale
+ */
+function agentText({ courseSlug, lessonId, lessonLocale }, locale) {
+    const entry = getPublishedLesson(courseSlug, lessonId);
+    /** @type {Locale} */
+    const used = entry ? learnerLocale(entry.lesson, locale) : lessonLocale;
+    /** @param {LText} text */
+    const text = (text) => resolveText(text, used, lessonLocale).value;
+    return { used, text };
+}
+
+/**
+ * course-review-due: today's cards for an AI app, the ones the learner is closest to forgetting
+ * first (at most REVIEW_DAILY_LIMIT graded a day), question side only. Runs getReviewQueue, so it
+ * also enters the cards the learner's lesson records imply (their learning day comes from the
+ * records, not from this call). Never a back, the memory, the learning day or the history.
+ * @param {{ userId: unknown, locale?: unknown }} params
+ */
+export async function reviewDueForAgent({ userId, locale }) {
+    const queue = await getReviewQueue({ userId });
+    if ('error_type' in queue) {
+        return queue.error_type === 'validation' ? queue : agentFailure(queue, 'The review cards could not be read.');
+    }
+    return {
+        today: queue.today,
+        time_zone: queue.timeZone,
+        daily_limit: queue.dailyLimit,
+        done_today: queue.doneToday,
+        remaining_today: queue.remainingToday,
+        carried_over: queue.carriedOver,
+        next_due_on: queue.nextDueOn,
+        cards: queue.cards.map((item) => {
+            const { used, text } = agentText(item, locale);
+            return {
+                course_slug: item.courseSlug,
+                lesson_id: item.lessonId,
+                lesson_title: text(item.lessonTitle),
+                card_id: item.cardId,
+                front: text(item.front),
+                locale: used,
+            };
+        }),
+        review_protocol: REVIEW_PROTOCOL,
+    };
+}
+
+/**
+ * course-review-grade: for one of today's cards, reveal: true answers the back and records
+ * nothing; rating ('again' = 「もう一度」, 'good' = 「覚えた」, the learner's own choice) records one
+ * review (source 'mcp': no learning day, no XP) and answers the back and the next review day.
+ * Exactly one of them. Refusals: validation, not_found, not_in_queue, not_due (due_on and
+ * reviewed_today only: never what was recorded today, nor the back), review_limit,
+ * review_unavailable, review_failed.
+ * @param {{ userId: unknown, courseSlug: unknown, lessonId: unknown, cardId: unknown, rating?: unknown, reveal?: unknown, locale?: unknown }} params
+ */
+export async function reviewGradeForAgent({ userId, courseSlug, lessonId, cardId, rating, reveal, locale }) {
+    if (!canonicalUserId(userId)) return invalid('A signed-in learner is required.');
+    const hasRating = rating !== undefined && rating !== null;
+    if (hasRating === (reveal === true) || (hasRating && rating !== 'again' && rating !== 'good') || (reveal !== undefined && typeof reveal !== 'boolean')) {
+        return invalid('Send rating ("again" or "good", the learner\'s own choice) or reveal: true, exactly one of them.');
+    }
+    const result = /** @type {Record<string, any>} */ (await gradeReviewCard({
+        userId, courseSlug, lessonId, cardId, source: 'mcp', ...(hasRating ? { rating } : { reveal: true }),
+    }));
+    switch (result.error_type) {
+        case undefined:
+            break;
+        case 'validation':
+            return invalid('course_slug, lesson_id and card_id must name a card from course-review-due.');
+        case 'not_found':
+            return { error: 'This card is not in a published lesson.', error_type: 'not_found' };
+        case 'not_in_queue':
+            return { error: 'This card is not in the learner\'s reviews. course-review-due lists today\'s cards.', error_type: 'not_in_queue' };
+        case 'not_due':
+            return {
+                error: result.reviewedToday === true
+                    ? `This card was already recorded today (next review: ${result.dueOn}).`
+                    : `This card is not due today (next review: ${result.dueOn}).`,
+                error_type: 'not_due',
+                due_on: result.dueOn,
+                reviewed_today: result.reviewedToday === true,
+            };
+        case 'review_limit':
+            return {
+                error: `The learner has reviewed ${REVIEW_DAILY_LIMIT} cards today. The rest come back on later days.`,
+                error_type: 'review_limit',
+                done_today: result.doneToday,
+                daily_limit: result.dailyLimit,
+            };
+        default:
+            return agentFailure(/** @type {CoreError} */ (result), 'The review could not be recorded.');
+    }
+    const { used, text } = agentText({ courseSlug: String(courseSlug), lessonId: String(lessonId), lessonLocale: result.lessonLocale }, locale);
+    const ids = { course_slug: courseSlug, lesson_id: lessonId, card_id: cardId };
+    if (!hasRating) {
+        return { ...ids, front: text(result.front), back: text(result.back), locale: used, recorded: false };
+    }
+    return {
+        ...ids,
+        rating,
+        recorded: true,
+        front: text(result.front),
+        back: text(result.back),
+        next_review_day: result.graded.dueOn,
+        next_review_in_days: result.graded.intervalDays,
+        done_today: result.summary.doneToday,
+        remaining_today: result.summary.remainingToday,
+        daily_limit: result.summary.dailyLimit,
+        locale: used,
+    };
 }

@@ -13,11 +13,15 @@
  *
  * Same refusals and exit codes as verify-account-deletion.mjs (whose parseArgs and exitCode it
  * uses): exit 2 unless the database has no table in public or auth, the role risepath_mcp_remote
- * does not exist in the cluster, and the user is a superuser; 1 when a check failed. The database
- * keeps the test rows: drop it (or the whole cluster) afterwards.
+ * does not exist in the cluster, and the user is a superuser; 1 when a check failed; 3 when a check
+ * could not run here (P4 without psql) unless --allow-skip. P4 creates risepath_mcp_remote with
+ * deploy/risepath-vm/sql/mcp_remote_role.sql (through psql, a random password) and drops it again.
+ * The database keeps the test rows: drop it (or the whole cluster) afterwards.
  *
- * Checks (Phase 6 design §7.3; P4, the remote MCP role, comes with the role SQL in stage 4):
- *   P1  000–019, then 020 against an account deletion: the deletion inside its DELETE and 020 only
+ * Checks (Phase 6 design §7.3):
+ *   P1  000–019: the review queue, the web grade and both MCP review tools answer "not set up"
+ *       (table_not_found / review_unavailable; the entry's missing progress_changed_at is 42703),
+ *       then 020 against an account deletion: the deletion inside its DELETE and 020 only
  *       wait for each other in both orders (020 creates its tables before it alters lesson_progress);
  *       control: the other order (the ALTER first) deadlocks (40P01). Then 000–020 apply twice. FK
  *       shape: review_cards.user_id → auth.users CASCADE, review_log's card → review_cards CASCADE,
@@ -36,6 +40,15 @@
  *       before a REST save and wrote after it (an MCP writer: one row lock, no learner lock) finishes
  *       the lesson after a read entered the save's mark: the rest still get priors (the write's time
  *       is later than the mark's)
+ *   P4  as risepath_mcp_remote with the shipped role SQL: the column grants are exactly what the
+ *       review tools need. course-review-due (reviewDueForAgent, with the entry), a card added
+ *       later, course-review-grade reveal and rating (reviewGradeForAgent), a second rating
+ *       (not_due) work; refused (42501): DELETE, SELECT * and SELECT entered_at / prior_rating on
+ *       review_cards, INSERT or UPDATE of entered_at, any read of review_log, INSERT of review_day,
+ *       learning_days, the lesson generations, the XP ledger; the role's UPDATE of
+ *       lesson_progress.progress_changed_at is ignored (the trigger); an MCP review writes no
+ *       learning day. Without the review grants both tools answer review_unavailable; re-running
+ *       the role SQL brings them back
  *   P5  two grades of one card at once (web and MCP, both orders): one recorded, one not_due, one
  *       log row; two cards at 9 done: one review_limit; a grade waits for a REST save holding the
  *       learner lock
@@ -62,9 +75,11 @@
  *   P12 Japan-time days: due, reviewed_today, days_since and a grade's due_day from SQL equal the
  *       expected values for rows seeded n days back
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { exitCode, parseArgs } from './verify-account-deletion.mjs';
@@ -91,6 +106,8 @@ import {
     getReviewQueue,
     gradeReviewCard,
     reviewCatalog,
+    reviewDueForAgent,
+    reviewGradeForAgent,
 } from '../../tools/core/reviewQueue.js';
 import { LESSON_PRIORS } from '../../shared/review/queue.js';
 
@@ -98,6 +115,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
 const FILE = '020_review_queue.sql';
 const ROLE = 'risepath_mcp_remote';
+const ROLE_SQL = path.join(ROOT, 'deploy', 'risepath-vm', 'sql', 'mcp_remote_role.sql');
 const TABLES = ['review_cards', 'review_log'];
 const COURSE = 'vibe-coding';
 const LESSON = 'vibe-ch1';
@@ -156,6 +174,13 @@ const results = [];
 function check(id, ok, label) {
     results.push({ id, ok });
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${id.padEnd(4)} ${label}`);
+}
+/** @type {string[]} */
+const skipped = [];
+/** @param {string} id @param {string} label */
+function skip(id, label) {
+    skipped.push(id);
+    console.log(`skip ${id.padEnd(4)} ${label}`);
 }
 
 /** @param {pg.Pool | pg.PoolClient} db @param {string} sql @param {unknown[]} [params] */
@@ -334,6 +359,33 @@ async function backdate(pool, user, lesson, at, extra = '') {
         throw error;
     } finally {
         client.release();
+    }
+}
+
+/**
+ * P1 (before 020 is applied; preId has a finished lesson on record): the review code answers "not
+ * set up" (table_not_found: the route's 503, the MCP tools' review_unavailable), never 'unknown'.
+ * The entry names lesson_progress.progress_changed_at, and PostgreSQL reports that missing column
+ * (42703) before the missing review_cards; the grade's first review statement gets 42P01.
+ * @param {pg.Pool} pool @param {string} preId
+ */
+async function p1Before020(pool, preId) {
+    const inst = instrument(pool);
+    try {
+        const card = [...reviewCatalog().values()].find((c) => c.courseSlug === COURSE && c.lessonId === LESSON);
+        const ids = { courseSlug: COURSE, lessonId: LESSON, cardId: card?.cardId };
+        const answers = await quietly(async () => [
+            await getReviewQueue({ userId: preId }),
+            await gradeReviewCard({ userId: preId, ...ids, rating: 'good', source: 'web' }),
+            await reviewDueForAgent({ userId: preId }),
+            await reviewGradeForAgent({ userId: preId, ...ids, reveal: true }),
+        ]);
+        const types = answers.map((a) => /** @type {any} */ (a).error_type).join(',');
+        const codes = inst.state.errors.join(',');
+        check('P1', types === 'table_not_found,table_not_found,review_unavailable,review_unavailable' && codes === '42703,42P01,42703,42P01',
+            `before 020, a finished lesson on record: queue, web grade, course-review-due, course-review-grade answer ${types} (SQLSTATEs ${codes}: the entry's missing progress_changed_at, then the grade's missing review_cards)`);
+    } finally {
+        resetPoolForTests();
     }
 }
 
@@ -692,6 +744,154 @@ async function p3(pool) {
             && rest.every((r) => r.prior_rating === 3 && r.learned_at?.getTime() === finishedAt.getTime()),
             `a write that began (${began?.toISOString()}) before a save's mark (learned ${marked?.learned_at?.toISOString()}) and finished the lesson after it: progress_changed_at ${finishedAt?.toISOString()} (its write time); the other ${rest.length} cards: priors ${rest.map((r) => r.prior_rating).join(',')}`);
     }
+}
+
+/**
+ * Runs the shipped role SQL through psql (a random password). @param {string} url
+ * @returns {{ status: number | null, stderr: string, version: string } | null} null without psql
+ */
+function runRoleSql(url) {
+    const psql = spawnSync('psql', ['--version'], { encoding: 'utf8' });
+    if (psql.status !== 0) return null;
+    const password = crypto.randomBytes(16).toString('hex');
+    const run = spawnSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', `mcp_password=${password}`, '-d', url, '-f', ROLE_SQL], { encoding: 'utf8' });
+    return { status: run.status, stderr: run.stderr, version: psql.stdout.trim() };
+}
+
+/**
+ * P4: the review tools as risepath_mcp_remote with the shipped role SQL.
+ * @param {pg.Pool} pool @param {string} url @returns {Promise<boolean>} whether the role was created
+ */
+async function p4(pool, url) {
+    const run = runRoleSql(url);
+    if (!run) {
+        skip('P4', 'psql is not on PATH: the role SQL cannot run here');
+        return false;
+    }
+    check('P4', run.status === 0, `deploy/risepath-vm/sql/mcp_remote_role.sql through ${run.version}: exit ${run.status}${run.status ? ` ${run.stderr.trim().split('\n').slice(-2).join(' ')}` : ''}`);
+    if (run.status !== 0) return true;
+
+    // What the catalog says the role may and may not do (as the superuser).
+    /** @type {[string, string, string, boolean][]} table, column ('' = any column), privilege, granted */
+    const want = [
+        ['review_cards', 'learned_at', 'SELECT', true], ['review_cards', 'due_day', 'UPDATE', true], ['review_cards', 'prior_rating', 'INSERT', true],
+        ['review_cards', 'entered_at', 'SELECT', false], ['review_cards', 'entered_at', 'INSERT', false], ['review_cards', 'entered_at', 'UPDATE', false],
+        ['review_cards', 'prior_rating', 'SELECT', false], ['review_cards', 'prior_rating', 'UPDATE', false], ['review_cards', 'learned_at', 'UPDATE', false],
+        ['review_log', 'source', 'INSERT', true], ['review_log', '', 'SELECT', false], ['review_log', '', 'UPDATE', false],
+        ['review_log', 'review_day', 'INSERT', false], ['review_log', 'reviewed_at', 'INSERT', false],
+        ['learning_days', '', 'SELECT', false], ['learning_days', '', 'INSERT', false], ['xp_awards', '', 'SELECT', false], ['lesson_progress_lesson_resets', '', 'SELECT', false],
+    ];
+    const wrong = [];
+    for (const [table, column, privilege, granted] of want) {
+        const got = column
+            ? (await pool.query('SELECT has_column_privilege($1, $2, $3, $4) AS p', [ROLE, table, column, privilege])).rows[0].p
+            : (await pool.query('SELECT has_any_column_privilege($1, $2, $3) AS p', [ROLE, table, privilege])).rows[0].p;
+        if (got !== granted) wrong.push(`${privilege} ${table}${column ? `.${column}` : ''} ${got}`);
+    }
+    for (const table of TABLES) {
+        for (const privilege of ['DELETE', 'TRUNCATE']) {
+            if ((await pool.query('SELECT has_table_privilege($1, $2, $3) AS p', [ROLE, table, privilege])).rows[0].p) wrong.push(`${privilege} ${table}`);
+        }
+    }
+    check('P4', wrong.length === 0, `the catalog: ${want.length} column privileges as listed, no DELETE or TRUNCATE on either table${wrong.length ? `; wrong: ${wrong.join(', ')}` : ''}`);
+
+    // A learner whose vibe-ch1 the app saved 3 days ago (no review row yet).
+    instrument(pool);
+    const id = await stub(pool, 'p4');
+    await save(id, LESSON, finished());
+    const learned = new Date(Date.now() - 3 * DAY_MS).toISOString();
+    await backdate(pool, id, LESSON, learned);
+    const daysBefore = await count(pool, 'SELECT count(*) AS n FROM learning_days WHERE user_id = $1', [id]);
+    const rolePool = new pg.Pool({ connectionString: url, max: 2, options: `-c role=${ROLE}` });
+    try {
+        const whoami = (await rolePool.query('SELECT current_user AS u')).rows[0].u;
+        const inst = instrument(rolePool);
+        const due = /** @type {any} */ (await reviewDueForAgent({ userId: id }));
+        const rows = await cardsOf(pool, id);
+        const day = await jstDayOf(pool, learned);
+        const backs = cardIds(COURSE, LESSON).map((card) => /** @type {any} */ (reviewCatalog().get(`${COURSE}/${LESSON}/${card}`)).back.jp);
+        const text = JSON.stringify(due);
+        check('P4', whoami === ROLE && !due.error_type && due.cards?.length === 5 && rows.length === 5
+            && rows.every((r) => r.prior_rating === 3 && r.learned_at?.getTime() === new Date(learned).getTime())
+            && backs.every((back) => !text.includes(back)) && inst.state.errors.length === 0,
+            `as ${whoami}: course-review-due entered ${rows.length} cards (learned ${day}, Good priors) and listed ${due.cards?.length} fronts, no back (${due.error_type ?? 'ok'}; errors ${inst.state.errors.join(',') || 'none'})`);
+        const dueDays = (await pool.query("SELECT DISTINCT to_char(due_day, 'YYYY-MM-DD') AS d FROM review_cards WHERE user_id = $1", [id])).rows.map((r) => r.d).join();
+        check('P4', dueDays === addDays(day, 2), `the cards are due the learning day + 2 (${dueDays}; learned ${day})`);
+
+        // A card added to the lesson later, entered as the role (the studied rule reads learned_at).
+        const catalog = reviewCatalog();
+        const base = /** @type {import('../../tools/core/reviewQueue.js').CatalogCard} */ (catalog.get(`${COURSE}/${LESSON}/card-frontend`));
+        const extended = new Map(catalog);
+        extended.set(`${COURSE}/${LESSON}/card-added`, { ...base, cardId: 'card-added', checkKey: 'card:cards/card-added', order: catalog.size });
+        const c = await rolePool.connect();
+        let entered = -1;
+        try {
+            await c.query('BEGIN');
+            await c.query(LEARNER_LOCK_SQL, [id]);
+            entered = await enterReviewCards(c, id, extended);
+            await c.query('COMMIT');
+        } finally {
+            c.release();
+        }
+        const added = (await pool.query("SELECT learned_at, stability, to_char(due_day, 'YYYY-MM-DD') AS due FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [id])).rows[0];
+        check('P4', entered === 1 && added?.learned_at === null && added.stability === null && added.due === addDays(await todayOf(pool), 1),
+            `as ${ROLE}: a card added later entered with no memory, due ${added?.due} (tomorrow)`);
+        await pool.query("DELETE FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [id]);
+
+        const args = { userId: id, courseSlug: COURSE, lessonId: LESSON, cardId: 'card-frontend' };
+        const backJp = /** @type {{ jp: string }} */ (base.back).jp;
+        const reveal = /** @type {any} */ (await reviewGradeForAgent({ ...args, reveal: true }));
+        const logAfterReveal = await count(pool, 'SELECT count(*) AS n FROM review_log WHERE user_id = $1', [id]);
+        const rated = /** @type {any} */ (await reviewGradeForAgent({ ...args, rating: 'good' }));
+        const second = /** @type {any} */ (await reviewGradeForAgent({ ...args, rating: 'again' }));
+        const log = (await pool.query("SELECT source, rating, elapsed_days, to_char(review_day, 'YYYY-MM-DD') AS d FROM review_log WHERE user_id = $1", [id])).rows;
+        const today = await todayOf(pool);
+        check('P4', reveal.recorded === false && reveal.back === backJp && logAfterReveal === 0
+            && rated.recorded === true && rated.back === backJp && rated.next_review_day === addDays(today, rated.next_review_in_days)
+            && second.error_type === 'not_due' && second.reviewed_today === true && second.due_on === rated.next_review_day
+            && log.length === 1 && log[0].source === 'mcp' && log[0].rating === 3 && log[0].elapsed_days === 3 && log[0].d === today && inst.state.errors.length === 0,
+            `as ${ROLE}: reveal (recorded ${reveal.recorded}, ${logAfterReveal} log rows), rating good (next ${rated.next_review_day}, in ${rated.next_review_in_days} days), a second rating ${second.error_type} (reviewed_today ${second.reviewed_today}); log ${log.map((l) => `${l.source}:${l.rating}:${l.elapsed_days}`).join(',')}`);
+        const daysAfter = await count(pool, 'SELECT count(*) AS n FROM learning_days WHERE user_id = $1', [id]);
+        check('P4', daysAfter === daysBefore, `an MCP review wrote no learning day (${daysBefore} → ${daysAfter})`);
+
+        // Refused to the role (42501).
+        const refused = [
+            ['DELETE FROM review_cards WHERE user_id = $1', [id]],
+            ['SELECT * FROM review_cards WHERE user_id = $1', [id]],
+            ['SELECT entered_at FROM review_cards WHERE user_id = $1', [id]],
+            ['SELECT prior_rating FROM review_cards WHERE user_id = $1', [id]],
+            ["INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, due_day, entered_at) VALUES ($1, 'vibe-coding', 'vibe-ch1', 'card-x', current_date + 1, now())", [id]],
+            ['UPDATE review_cards SET entered_at = now() WHERE user_id = $1', [id]],
+            ['SELECT * FROM review_log', []],
+            ['SELECT count(*) FROM review_log WHERE user_id = $1', [id]],
+            ["INSERT INTO review_log (user_id, course_slug, lesson_id, card_id, rating, interval_days, stability, difficulty, source, review_day) VALUES ($1, 'vibe-coding', 'vibe-ch1', 'card-api', 3, 2, 2.3, 2.1, 'mcp', '2000-01-01')", [id]],
+            ['INSERT INTO learning_days (user_id, day) VALUES ($1, current_date)', [id]],
+            ['SELECT * FROM lesson_progress_lesson_resets', []],
+            ['SELECT * FROM xp_awards', []],
+        ];
+        const codes = [];
+        for (const [sql, params] of refused) codes.push(await codeOf(rolePool.query(/** @type {string} */ (sql), /** @type {unknown[]} */ (params))));
+        check('P4', codes.every((code) => code === '42501'), `refused to the role: ${refused.length} statements → ${[...new Set(codes)].join(', ')}`);
+        const changedBefore = (await pool.query('SELECT progress_changed_at AS t FROM lesson_progress WHERE user_id = $1', [id])).rows[0].t;
+        const upd = await codeOf(rolePool.query("UPDATE lesson_progress SET progress_changed_at = '2000-01-01' WHERE user_id = $1", [id]));
+        const changedAfter = (await pool.query('SELECT progress_changed_at AS t FROM lesson_progress WHERE user_id = $1', [id])).rows[0].t;
+        check('P4', upd === 'none' && changedAfter.getTime() === changedBefore.getTime(),
+            `the role's UPDATE of progress_changed_at (${upd}) is ignored: ${changedAfter.toISOString()} kept`);
+
+        // Before the owner re-runs the role SQL (a migration's new table without its grant): both
+        // tools answer review_unavailable; re-running the role SQL brings them back.
+        await pool.query(`REVOKE ALL ON review_cards, review_log FROM ${ROLE}`);
+        const offDue = /** @type {any} */ (await quietly(() => reviewDueForAgent({ userId: id })));
+        const offGrade = /** @type {any} */ (await quietly(() => reviewGradeForAgent({ ...args, cardId: 'card-api', reveal: true })));
+        const rerun = runRoleSql(url);
+        const back = /** @type {any} */ (await reviewDueForAgent({ userId: id }));
+        check('P4', offDue.error_type === 'review_unavailable' && offGrade.error_type === 'review_unavailable' && rerun?.status === 0 && !back.error_type,
+            `without the review grants: due ${offDue.error_type}, grade ${offGrade.error_type}; after the role SQL again (exit ${rerun?.status}): ${back.error_type ?? 'ok'}`);
+    } finally {
+        await rolePool.end();
+        instrument(pool);
+    }
+    return true;
 }
 
 /** @param {pg.Pool} pool */
@@ -1194,11 +1394,12 @@ async function p12(pool) {
 export async function main(argv = process.argv.slice(2)) {
     const { url, allowSkip, help } = parseArgs(argv);
     if (help || !url) {
-        console.log('Usage: node scripts/db/verify-phase6.mjs --url postgres://<user>@<host>:<port>/<empty throwaway database>');
-        console.log('Exit: 0 all passed, 1 a check failed, 2 refused or usage.');
+        console.log('Usage: node scripts/db/verify-phase6.mjs --url postgres://<user>@<host>:<port>/<empty throwaway database> [--allow-skip]');
+        console.log('Exit: 0 all passed, 1 a check failed, 2 refused or usage, 3 a check was skipped (without --allow-skip).');
         return help ? 0 : 2;
     }
     const pool = new pg.Pool({ connectionString: url, max: 8, statement_timeout: 30_000 });
+    let roleRan = false;
     try {
         const { rows: [target] } = await pool.query(`SELECT current_database() AS db,
             (SELECT count(*) FROM pg_tables WHERE schemaname IN ('public', 'auth'))::int AS tables,
@@ -1221,6 +1422,7 @@ export async function main(argv = process.argv.slice(2)) {
             VALUES ($1, '${COURSE}', '${LESSON}', '{}', 'read', now(), now() - interval '2 days')`, [preId]);
         // 020 in the chain right after 019 (later migrations may follow it; the runs below apply them too).
         check('P1', files.includes(FILE) && /^019_/.test(before.at(-1) ?? ''), `applied ${before.length} migrations (${before[0]} … ${before.at(-1)}) before ${FILE}`);
+        await p1Before020(pool, preId);
         await p1Order(pool);
         for (const run of [1, 2]) {
             for (const file of files) await applyMigration(pool, file);
@@ -1229,6 +1431,8 @@ export async function main(argv = process.argv.slice(2)) {
         await p1(pool, preId);
         await p2(pool);
         await p3(pool);
+        roleRan = true;
+        await p4(pool, url);
         await p5(pool);
         await p6(pool);
         await p7(pool);
@@ -1241,11 +1445,19 @@ export async function main(argv = process.argv.slice(2)) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {
         resetPoolForTests();
+        if (roleRan) {
+            await pool.query(`DROP OWNED BY ${ROLE}`).catch(() => {});
+            await pool.query(`DROP ROLE IF EXISTS ${ROLE}`).catch(() => {});
+            const left = (await pool.query('SELECT count(*)::int AS n FROM pg_roles WHERE rolname = $1', [ROLE]).catch(() => ({ rows: [{ n: -1 }] }))).rows[0].n;
+            check('P4', left === 0, `the role ${ROLE} was dropped again (${left} left)`);
+        }
         await pool.end();
     }
     const failed = results.filter((r) => !r.ok);
-    console.log(`# ${results.length - failed.length} passed, ${failed.length} failed`);
-    return exitCode({ failed: failed.length, skipped: 0, allowSkip });
+    console.log(`# ${results.length - failed.length} passed, ${failed.length} failed${skipped.length ? `, ${skipped.length} skipped (${skipped.join(', ')})` : ''}`);
+    const code = exitCode({ failed: failed.length, skipped: skipped.length, allowSkip });
+    if (code === 3) console.log('# exit 3: a skipped check is not a pass (install psql, or --allow-skip to accept the gap)');
+    return code;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

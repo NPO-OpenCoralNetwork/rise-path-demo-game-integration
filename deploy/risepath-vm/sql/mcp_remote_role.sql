@@ -3,7 +3,7 @@
 -- the postgres image makes a superuser; the internet-facing mcp-public must not hold that.
 --
 -- Run on the VM after the migrations (015 creates mcp_oauth_grants, 016 lesson_progress, 018
--- account_deletions), from deploy/risepath-vm:
+-- account_deletions, 020 review_cards and review_log), from deploy/risepath-vm:
 --
 --   MCP_DB_PASSWORD="$(openssl rand -hex 24)"
 --   docker compose --env-file stack.env exec -T db \
@@ -44,7 +44,18 @@
 --                         NOTHING, then SELECT … FOR UPDATE and UPDATE). No DELETE: only the learner's
 --                         delete control in the app removes rows, together with lesson_progress_resets,
 --                         which this role cannot read or write (nor lesson_progress_lesson_resets: a
---                         lesson started over in the app reads like an untouched one here)
+--                         lesson started over in the app reads like an untouched one here).
+--                         progress_changed_at (Phase 6) is kept by a trigger; a value this role sends
+--                         is ignored
+--   review_cards          course-review-due and course-review-grade (tools/core/reviewQueue.js): enter
+--                         the cards the learner's lesson_progress rows imply (INSERT … SELECT … ON
+--                         CONFLICT DO NOTHING; it reads learned_at to tell a card added to a lesson
+--                         after the learner's last change in it), read the queue, grade one card
+--                         (SELECT … FOR UPDATE, UPDATE of the memory columns). Column grants: never
+--                         entered_at, never SELECT prior_rating, never DELETE (only the learner's
+--                         reset and delete controls and account deletion remove rows)
+--   review_log            course-review-grade appends one review (insert only, without review_day or
+--                         reviewed_at, which the database stamps; never read: the history stays app-only)
 --   learning_journal      journal-recent, journal-log, learner-adaptation-signals (tools/core/journal.js)
 --   curricula             ownership check for journal-log and journal-recent (read only): columns
 --                         id, user_id, title, never the generated course content
@@ -124,6 +135,9 @@ CREATE POLICY mcp_remote_update ON ai_daily_usage FOR UPDATE TO risepath_mcp_rem
 
 GRANT SELECT, INSERT, UPDATE ON user_progress TO risepath_mcp_remote;
 GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;
+GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;
+GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day), UPDATE (due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;
+GRANT INSERT (user_id, course_slug, lesson_id, card_id, rating, elapsed_days, interval_days, stability, difficulty, source) ON review_log TO risepath_mcp_remote;
 GRANT SELECT, INSERT ON learning_journal TO risepath_mcp_remote;
 GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;
 GRANT SELECT (id, user_id, status) ON materials TO risepath_mcp_remote;

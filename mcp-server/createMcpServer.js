@@ -18,6 +18,13 @@
  * answers, quiz answers are graded on the server with the reader's attempt rules, and progress is
  * the same lesson_progress record the web reader syncs (tools/core/courseLessons.js and
  * lessonProgress.js). They act for the scoped learner only and return compact JSON.
+ *
+ * The review tools (Phase 6, tools/core/reviewQueue.js; learner-remote only and registered on
+ * remote servers only, so adults only):
+ * course-review-due lists today's review cards, question side only, with the review protocol;
+ * course-review-grade shows a due card's answer (reveal: true, records nothing) or records the
+ * learner's own 「もう一度」/「覚えた」 and returns the answer. Same queue, daily cap and rules as
+ * the web review page; no learning day, no XP.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -60,6 +67,7 @@ import { adultDraftRefusal } from '../tools/core/mcpAiAccess.js';
 import { DOMAINS, DOMAIN_COURSE_SLUGS } from '../tools/core/domains.js';
 import { getCourseLesson, getCourseProgress, listCourses, tutorCourseNote } from '../tools/core/courseLessons.js';
 import { applyQuizCheck, markLessonProgress } from '../tools/core/lessonProgress.js';
+import { reviewDueForAgent, reviewGradeForAgent } from '../tools/core/reviewQueue.js';
 
 /** rag-search results per call on the remote endpoint (the stdio/SSE cap is MAX_SEARCH_RESULTS). */
 export const REMOTE_RAG_MAX_RESULTS = 5;
@@ -210,7 +218,7 @@ async function remoteGateOrThrow(extra) {
 
 const server = new McpServer({
     name: 'rise-path-learning',
-    version: '2.4.0',
+    version: '2.5.0',
     description: `Rise Path パーソナライズ学習プラットフォームのMCP Server (profile: ${profile})`,
 });
 
@@ -790,6 +798,55 @@ policyTool(
         }
     }
 );
+
+// --- reviews (Phase 6, tools/core/reviewQueue.js): lesson flashcards that come back when the
+// learner is about to forget them. learner-remote only, and registered on the remote endpoint only:
+// its gate makes them adults only. stdio or SSE started with --profile learner-remote (or
+// RISE_PATH_MCP_PROFILE) has no such gate, so it never gets them.
+if (isRemote) {
+    policyTool(
+        'course-review-due',
+        '今日の復習カードを、忘れかけている順に最大 10 枚返す（問いだけ。答えは含まない）。review_protocol に従い、1 枚ずつ問いを見せ、学習者が自分で答えるのを待ってから、course-review-grade の reveal: true で答えを見せ、「もう一度」か「覚えた」かを学習者に選んでもらう / Lists today\'s review cards, the ones the learner is closest to forgetting first, at most 10 a day (question side only, no answers). Follow review_protocol: show one front at a time, wait for the learner\'s own answer, then show the answer with course-review-grade (reveal: true) and ask the learner to choose Again or Got it.',
+        {
+            locale: courseLocale(),
+        },
+        async ({ locale }, extra) => {
+            const t = Date.now();
+            try {
+                const userId = await requireScopedUser(undefined, extra, { toolName: 'course-review-due', startTime: t });
+                if (typeof userId !== 'string') return userId;
+                return toolResult(await reviewDueForAgent({ userId, locale }), { toolName: 'course-review-due', startTime: t, compact: true });
+            } catch (err) {
+                return toolError(err, { toolName: 'course-review-due', startTime: t });
+            }
+        }
+    );
+
+    policyTool(
+        'course-review-grade',
+        '今日の復習カード 1 枚について、学習者が答えたあとに reveal: true で答えを見せる（何も記録しない）か、学習者が選んだ結果を rating で記録する（取り消せない）。rating は学習者が選んだボタンだけ: again =「もう一度」（思い出せなかった）、good =「覚えた」（思い出せた）。エージェントが選んだり、学習者が答える前に答えを見せたりしない。記録すると、答えと次の復習日を返す。今日の分でないカードは not_due、今日の 10 枚を終えたら review_limit / For one of today\'s review cards: after the learner answered, reveal: true shows the answer and records nothing; rating records the learner\'s own choice and cannot be undone. Send only the button the learner chose: again (もう一度: did not remember) or good (覚えた: remembered). Never choose for the learner or show the answer before they tried. Recording returns the answer and the next review day. A card not due today is refused (not_due); after today\'s 10 cards, review_limit.',
+        {
+            course_slug: courseSlugArg(),
+            lesson_id: courseLessonArg(),
+            card_id: courseItemId().describe('カードの id（course-review-due の cards[].card_id） / Card id from course-review-due'),
+            rating: z.enum(['again', 'good']).optional().describe('学習者が選んだボタン: again =「もう一度」、good =「覚えた」（reveal と一緒に送らない） / The button the learner chose: again (もう一度) or good (覚えた); not together with reveal'),
+            reveal: z.boolean().optional().describe('学習者が答えたあと、答えを見せるときだけ true（何も記録しない。rating と一緒に送らない） / true to show the answer after the learner answered (records nothing; not together with rating)'),
+            locale: courseLocale(),
+        },
+        async ({ course_slug, lesson_id, card_id, rating, reveal, locale }, extra) => {
+            const t = Date.now();
+            try {
+                const userId = await requireScopedUser(undefined, extra, { toolName: 'course-review-grade', startTime: t });
+                if (typeof userId !== 'string') return userId;
+                return toolResult(await reviewGradeForAgent({
+                    userId, courseSlug: course_slug, lessonId: lesson_id, cardId: card_id, rating, reveal, locale,
+                }), { toolName: 'course-review-grade', startTime: t, compact: true });
+            } catch (err) {
+                return toolError(err, { toolName: 'course-review-grade', startTime: t });
+            }
+        }
+    );
+}
 
 // --- daily-life (Phase 16-6a) ---
 policyTool(

@@ -13,13 +13,17 @@
  *   course-quiz-check is charged 'mcp' only: it writes, but the reader's attempt rules bound its
  *   writes (at most two graded submissions per question), and a learner answering a lesson
  *   should not run out of the write cap.
+ *   Reviews (Phase 6): course-review-due is charged 'mcp' only (its only write enters the cards
+ *   the learner's lesson records already fix); every course-review-grade call, a reveal included,
+ *   is charged 'mcp_write' too, so a 10-card review with reveals uses at most 20 of the 50 daily
+ *   'mcp_write' calls (server/middleware/dailyCaps.js).
  */
 import { reserveDailyCapFor } from '../server/middleware/dailyCaps.js';
 import { resolveMcpUserId } from '../tools/core/mcpUserScope.js';
 import { aiAccessRefusal, aiAccessSettingsUrl, remoteAccessEnv } from '../tools/core/mcpAiAccess.js';
 
 /** Remote tools that write learner data: charged to 'mcp_write' as well (not course-quiz-check: see above). */
-export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update', 'course-progress-update']);
+export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update', 'course-progress-update', 'course-review-grade']);
 
 /**
  * daily_limit_reached text by the refusal's scope: the learner's own cap, the cap shared by every

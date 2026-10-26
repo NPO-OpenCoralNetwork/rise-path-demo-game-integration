@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-23",
+  "version": "2026-10-26",
   "server": "rise-path-learning",
   "default_profile": "learner",
   "profiles": ["learner", "curriculum-builder", "coach", "admin", "learner-remote"],
@@ -324,6 +324,40 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-review-due",
+      "category": "progress_read",
+      "risk": "read",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": false,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner-remote"],
+      "annotations": {
+        "title": "今日の復習カード（問いだけ）",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "tool_id": "course-review-grade",
+      "category": "progress_write",
+      "risk": "write",
+      "data_class": "learner_data",
+      "requires_approval": false,
+      "audit": true,
+      "max_calls_per_session": null,
+      "exposure_profiles": ["learner-remote"],
+      "annotations": {
+        "title": "復習カードの結果を記録",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
         "openWorldHint": false
       }
     },

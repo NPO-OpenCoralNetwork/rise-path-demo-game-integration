@@ -422,7 +422,7 @@ describe('the review queue routes (/api/v2/user/review)', () => {
         assert.deepEqual(grades, []);
     });
 
-    it('503 review_unavailable without a database, when it is down, before migration 020 (42P01) or without a grant (42501); 500 review_failed otherwise; never the driver\'s text; no hook', async () => {
+    it('503 review_unavailable without a database, when it is down, before migration 020 (42P01, or 42703 on the entry\'s lesson_progress column) or without a grant (42501); 500 review_failed otherwise; never the driver\'s text; no hook', async () => {
         const UNAVAILABLE = { ok: false, error: 'Reviews are unavailable right now. Please try again later.', error_type: 'review_unavailable' };
         use({ reviewCards: [priorRow(VIBE, CH1, 'card-frontend')] });
         await withServer(async (base) => {
@@ -436,6 +436,9 @@ describe('the review queue routes (/api/v2/user/review)', () => {
                 answers.push([await call(base, { headers: as(ALICE) }), 503, UNAVAILABLE]);
                 pool.failConnect(null);
                 pool.fail({ code: '42P01', message: `relation "review_cards" does not exist ${secret}`, when: (text) => text === SQL.enterReviewCards });
+                answers.push([await call(base, { headers: as(ALICE) }), 503, UNAVAILABLE]);
+                // Before migration 020 PostgreSQL reports the entry's missing lesson_progress column first (42703).
+                pool.fail({ code: '42703', message: `column p.progress_changed_at does not exist ${secret}`, when: (text) => text === SQL.enterReviewCards });
                 answers.push([await call(base, { headers: as(ALICE) }), 503, UNAVAILABLE]);
                 pool.fail({ code: '42501', message: `permission denied for table review_cards ${secret}`, when: (text) => text === SQL.lockReviewCard });
                 answers.push([await post(base, gradeBody()), 503, UNAVAILABLE]);

@@ -95,6 +95,7 @@ const copy = {
     readItems: [
       'The lessons of Rise Path courses, without the quiz answers',
       'Your progress in each lesson (sections read, quiz results) and your level for each subject',
+      'Your review cards due today, their answers when the app asks, and when each card comes back (the app is told to show an answer only after you try)',
       'Your recent learning journal entries (what you learned, difficulty, mood, confidence)',
       'Learning signals worked out from your journal (where it goes well, where you get stuck)',
       'Search the study materials you uploaded yourself',
@@ -104,6 +105,7 @@ const copy = {
     writeItems: [
       'Check your quiz answers. Each check is saved as your own attempt',
       'Mark the lesson sections you worked through as read',
+      'Record how you did on a review card ("Again" or "Got it"). Each result is saved as your own and cannot be undone',
       'Add an entry to your learning journal',
       'Record a finished lesson and its score in your progress',
     ],
@@ -202,6 +204,7 @@ const copy = {
     readItems: [
       'Rise Path のコースのレッスン（クイズの答えは除く）',
       'レッスンごとの進み具合（読んだセクション、クイズの結果）と、科目ごとのレベル',
+      '今日の復習カードとその答え、次に出る日（答えは、あなたが答えたあとに見せるよう、アプリに伝えています）',
       '最近の学習ジャーナル（学んだこと、難しさ、気分、自信）',
       'ジャーナルから求めた学習のシグナル（うまくいっているところ、つまずきやすいところ）',
       '自分でアップロードした教材の検索',
@@ -211,6 +214,7 @@ const copy = {
     writeItems: [
       'クイズの答えを確かめる（確かめるたびに、あなた自身の解答として記録されます）',
       '取り組んだレッスンのセクションを、読み終えたと記録する',
+      '復習カードの結果（「もう一度」か「覚えた」）を記録する（記録するたびに、あなた自身の結果として残り、取り消せません）',
       '学習ジャーナルに記録を追加する',
       '終えたレッスンとスコアを進み具合に記録する',
     ],
