@@ -49,11 +49,16 @@
 --                         is ignored
 --   review_cards          course-review-due and course-review-grade (tools/core/reviewQueue.js): enter
 --                         the cards the learner's lesson_progress rows imply (INSERT … SELECT … ON
---                         CONFLICT DO NOTHING; it reads learned_at to tell a card added to a lesson
---                         after the learner's last change in it), read the queue, grade one card
---                         (SELECT … FOR UPDATE, UPDATE of the memory columns). Column grants: never
---                         entered_at, never SELECT prior_rating, never DELETE (only the learner's
---                         reset and delete controls and account deletion remove rows)
+--                         CONFLICT DO UPDATE: before a card's first review, a changed mark sets its
+--                         learned_at, prior_rating and memory again; it reads checked_at to tell a
+--                         card added to a lesson after the learner learned it, then moves
+--                         checked_at with an UPDATE), read the queue, grade one card (SELECT … FOR
+--                         UPDATE, UPDATE of the memory columns). Column grants: never entered_at,
+--                         never SELECT prior_rating or last_rating (the entry and the grade only
+--                         write them), never DELETE (only the learner's reset and delete controls
+--                         and account deletion remove rows). Re-run this file before or with the
+--                         code that sends the entry's DO UPDATE and checked_at: without these
+--                         grants both review tools answer review_unavailable (42501)
 --   review_log            course-review-grade appends one review (insert only, without review_day or
 --                         reviewed_at, which the database stamps; never read: the history stays app-only)
 --   learning_journal      journal-recent, journal-log, learner-adaptation-signals (tools/core/journal.js)
@@ -135,8 +140,8 @@ CREATE POLICY mcp_remote_update ON ai_daily_usage FOR UPDATE TO risepath_mcp_rem
 
 GRANT SELECT, INSERT, UPDATE ON user_progress TO risepath_mcp_remote;
 GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;
-GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;
-GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day), UPDATE (due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;
+GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, due_day, stability, difficulty, reps, lapses, last_review_day) ON review_cards TO risepath_mcp_remote;
+GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, prior_rating, stability, difficulty, due_day), UPDATE (learned_at, checked_at, prior_rating, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;
 GRANT INSERT (user_id, course_slug, lesson_id, card_id, rating, elapsed_days, interval_days, stability, difficulty, source) ON review_log TO risepath_mcp_remote;
 GRANT SELECT, INSERT ON learning_journal TO risepath_mcp_remote;
 GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;

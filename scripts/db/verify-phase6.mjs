@@ -36,15 +36,21 @@
  *       「覚えた」 mark in an unfinished lesson, a tombstone, an unknown card id; the 15:00Z boundary;
  *       a re-run adds nothing. The learning day: a GET write-back and an unchanged REST save before
  *       the first review read leave it. A card added later (an extended catalog): no memory, due
- *       tomorrow; marks first, then the finish: priors for the rest. A write whose transaction began
- *       before a REST save and wrote after it (an MCP writer: one row lock, no learner lock) finishes
- *       the lesson after a read entered the save's mark: the rest still get priors (the write's time
- *       is later than the mark's)
+ *       tomorrow, also after a later change a read saw (a new resume point; every card marked:
+ *       checked_at), after a revisit no read saw (an unmarked sibling), and with a prior once marked;
+ *       marks first, then the finish: priors for the rest. Until the first review, a 「もう一度」
+ *       after the entry gives the Again prior dated that change (ON CONFLICT DO UPDATE), a re-read
+ *       with no change writes nothing, a reviewed card keeps its memory. A write whose transaction
+ *       began before a REST save and wrote after it (an MCP writer: one row lock, no learner lock)
+ *       finishes the lesson after a read entered the save's mark: the rest still get priors (the
+ *       write's time is later than the mark's)
  *   P4  as risepath_mcp_remote with the shipped role SQL: the column grants are exactly what the
  *       review tools need. course-review-due (reviewDueForAgent, with the entry), a card added
- *       later, course-review-grade reveal and rating (reviewGradeForAgent), a second rating
- *       (not_due) work; refused (42501): DELETE, SELECT * and SELECT entered_at / prior_rating on
- *       review_cards, INSERT or UPDATE of entered_at, any read of review_log, INSERT of review_day,
+ *       later, a later 「もう一度」 mark (the entry's DO UPDATE and checked_at UPDATE as the role, never
+ *       reading prior_rating), course-review-grade reveal and rating (reviewGradeForAgent), a second
+ *       rating (not_due), a mark on a reviewed card (kept) work; refused (42501): DELETE, SELECT *
+ *       and SELECT entered_at / prior_rating / last_rating on review_cards (the entry and the grade
+ *       only write the last two), INSERT or UPDATE of entered_at, any read of review_log, INSERT of review_day,
  *       learning_days, the lesson generations, the XP ledger; the role's UPDATE of
  *       lesson_progress.progress_changed_at is ignored (the trigger); an MCP review writes no
  *       learning day. Without the review grants both tools answer review_unavailable; re-running
@@ -341,6 +347,41 @@ const seedReviewedToday = (pool, user, course, lesson, card) => pool.query(SEED_
 const cardIds = (course, lesson) => [...reviewCatalog().values()].filter((c) => c.courseSlug === course && c.lessonId === lesson).map((c) => c.cardId);
 /** @param {pg.Pool} pool @param {string} user */
 const cardsOf = async (pool, user) => (await pool.query('SELECT * FROM review_cards WHERE user_id = $1 ORDER BY course_slug, lesson_id, card_id', [user])).rows;
+/** @param {any[]} rows @returns {Record<string, any>} */
+const byCard = (rows) => Object.fromEntries(rows.map((r) => [r.card_id, r]));
+/** @param {pg.Pool} pool @param {string} user @param {string} [lesson] @returns {Promise<Date>} */
+const changedAtOf = async (pool, user, lesson = LESSON) => (await pool.query('SELECT progress_changed_at AS t FROM lesson_progress WHERE user_id = $1 AND lesson_id = $2', [user, lesson])).rows[0].t;
+/** The published catalog plus card-added in vibe-ch1 (a card the author added later). */
+function extendedCatalog() {
+    const catalog = reviewCatalog();
+    const base = /** @type {import('../../tools/core/reviewQueue.js').CatalogCard} */ (catalog.get(`${COURSE}/${LESSON}/card-frontend`));
+    const extended = new Map(catalog);
+    extended.set(`${COURSE}/${LESSON}/card-added`, { ...base, cardId: 'card-added', checkKey: 'card:cards/card-added', order: catalog.size });
+    return extended;
+}
+/**
+ * The entry with a catalog, in one transaction under the learner lock (as getReviewQueue runs it).
+ * @param {pg.Pool} pool @param {string} user @param {import('../../tools/core/reviewQueue.js').ReviewCatalog} catalog
+ */
+async function enterWith(pool, user, catalog) {
+    const c = await pool.connect();
+    try {
+        await c.query('BEGIN');
+        await c.query(LEARNER_LOCK_SQL, [user]);
+        const entered = await enterReviewCards(c, user, catalog);
+        await c.query('COMMIT');
+        return entered;
+    } catch (error) {
+        await c.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        c.release();
+    }
+}
+/** @param {pg.Pool} pool @param {string} user */
+const addedRow = async (pool, user) => (await pool.query("SELECT learned_at, prior_rating, stability, difficulty, to_char(due_day, 'YYYY-MM-DD') AS due FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [user])).rows[0];
+/** No memory, due the day after it entered. @param {any} row @param {string} today */
+const noMemory = (row, today) => row?.learned_at === null && row.prior_rating === null && row.stability === null && row.difficulty === null && row.due === addDays(today, 1);
 /**
  * Sets a lesson row's progress_changed_at past the trigger (as the in-app harness does); `extra` adds
  * SET items. updated_at stays the 016 trigger's now().
@@ -681,24 +722,20 @@ async function p3(pool) {
         const id = await stub(pool, 'p3d');
         await save(id, LESSON, finished());
         await getReviewQueue({ userId: id });
-        const catalog = reviewCatalog();
-        const base = /** @type {import('../../tools/core/reviewQueue.js').CatalogCard} */ (catalog.get(`${COURSE}/${LESSON}/card-frontend`));
-        const extended = new Map(catalog);
-        extended.set(`${COURSE}/${LESSON}/card-added`, { ...base, cardId: 'card-added', checkKey: 'card:cards/card-added', order: catalog.size });
-        const c = await pool.connect();
-        let entered = -1;
-        try {
-            await c.query('BEGIN');
-            await c.query(LEARNER_LOCK_SQL, [id]);
-            entered = await enterReviewCards(c, id, extended);
-            await c.query('COMMIT');
-        } finally {
-            c.release();
-        }
+        const entered = await enterWith(pool, id, extendedCatalog());
         const today = await todayOf(pool);
-        const added = (await pool.query("SELECT learned_at, prior_rating, stability, difficulty, to_char(due_day, 'YYYY-MM-DD') AS due FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [id])).rows[0];
-        check('P3', entered === 1 && added?.learned_at === null && added.prior_rating === null && added.stability === null && added.difficulty === null && added.due === addDays(today, 1),
+        const added = await addedRow(pool, id);
+        check('P3', entered === 1 && noMemory(added, today),
             `a card added after the learner's last change: ${entered} entered, no memory, due ${added?.due} (tomorrow)`);
+        // Then the learner marks it in the lesson: its first rating is the lesson, dated the mark.
+        await sleep(20);
+        await save(id, LESSON, finished({ checks: { 'card:cards/card-added': false }, updatedAt: new Date(Date.now() - 1000).toISOString() }));
+        await enterWith(pool, id, extendedCatalog());
+        const marked = await addedRow(pool, id);
+        const markedAt = await changedAtOf(pool, id);
+        check('P3', marked?.prior_rating === 1 && marked.learned_at?.getTime() === markedAt.getTime() && marked.stability === LESSON_PRIORS.again.stability
+            && marked.due === addDays(await jstDayOf(pool, markedAt), LESSON_PRIORS.again.intervalDays),
+            `card-added marked 「もう一度」 later: prior ${marked?.prior_rating}, learned at the mark, due ${marked?.due}`);
         const e = await stub(pool, 'p3e');
         await save(e, LESSON, record({ seen: ['hook-b1'], checks: { 'card:cards/card-api': true } }));
         await getReviewQueue({ userId: e });
@@ -710,6 +747,66 @@ async function p3(pool) {
         const rest = rows.filter((r) => r.card_id !== 'card-api');
         check('P3', first === 'card-api' && rows.length === 5 && rest.every((r) => r.prior_rating === 3 && r.learned_at.getTime() === finishedAt.getTime()),
             `marks first (${first}), then the finish: the other ${rest.length} cards get priors dated the finish`);
+    }
+    // fsrs-queue #1 / integrity #2: a card added after a later change of the lesson. With a read
+    // between (checked_at), with every card marked (only checked_at tells), and with no read
+    // between the revisit and the addition (an unmarked sibling tells).
+    {
+        const allMarked = Object.fromEntries(cardIds(COURSE, LESSON).map((card) => [`card:cards/${card}`, true]));
+        for (const [tag, label, first, later, readBetween] of /** @type {[string, string, object, object, boolean][]} */ ([
+            ['p3f', 'a new resume point a read saw', {}, { lastBlockId: ch1.index.readingBlockIds[1] }, true],
+            ['p3g', 'every card marked, then a new resume point a read saw', { checks: allMarked }, { checks: allMarked, lastBlockId: ch1.index.readingBlockIds[1] }, true],
+            ['p3h', 'a revisit no read saw', {}, { lastBlockId: ch1.index.readingBlockIds[1] }, false],
+        ])) {
+            const id = await stub(pool, tag);
+            await save(id, LESSON, finished({ ...first, updatedAt: new Date(Date.now() - 2000).toISOString() }));
+            await getReviewQueue({ userId: id });
+            const entered = byCard(await cardsOf(pool, id));
+            await sleep(20);
+            await save(id, LESSON, finished({ ...later, updatedAt: new Date(Date.now() - 1000).toISOString() }));
+            const changed = await changedAtOf(pool, id);
+            if (readBetween) await getReviewQueue({ userId: id });
+            const n = await enterWith(pool, id, extendedCatalog());
+            const rows = await cardsOf(pool, id);
+            const added = await addedRow(pool, id);
+            const kept = rows.filter((r) => r.card_id !== 'card-added').every((r) => r.learned_at?.getTime() === entered[r.card_id].learned_at.getTime() && r.prior_rating === 3);
+            const checked = rows.every((r) => r.checked_at?.getTime() === changed.getTime());
+            check('P3', n === 1 && noMemory(added, await todayOf(pool)) && kept && (!readBetween || checked),
+                `a card added after ${label}: no memory, due ${added?.due}; the others keep their learning time${readBetween ? `; checked_at moved to the change (${checked})` : ''}`);
+        }
+    }
+    // integrity #1: until the first review, a later change of a mark gives the card its first rating again.
+    {
+        const id = await stub(pool, 'p3r');
+        await save(id, LESSON, finished({ updatedAt: new Date(Date.now() - 2000).toISOString() }));
+        await getReviewQueue({ userId: id });
+        const entered = byCard(await cardsOf(pool, id));
+        await sleep(20);
+        await save(id, LESSON, finished({ checks: { 'card:cards/card-api': false }, updatedAt: new Date(Date.now() - 1000).toISOString() }));
+        const changed = await changedAtOf(pool, id);
+        await getReviewQueue({ userId: id });
+        const rows = byCard(await cardsOf(pool, id));
+        const api = rows['card-api'];
+        const { again } = LESSON_PRIORS;
+        const others = cardIds(COURSE, LESSON).filter((card) => card !== 'card-api');
+        const apiDue = String((await pool.query("SELECT to_char(due_day, 'YYYY-MM-DD') AS d FROM review_cards WHERE user_id = $1 AND card_id = 'card-api'", [id])).rows[0].d);
+        check('P3', api.prior_rating === 1 && api.stability === again.stability && api.difficulty === again.difficulty && api.learned_at.getTime() === changed.getTime()
+            && apiDue === addDays(await jstDayOf(pool, changed), again.intervalDays)
+            && others.every((card) => rows[card].prior_rating === 3 && rows[card].learned_at.getTime() === entered[card].learned_at.getTime()),
+            `a 「もう一度」 after the entry: card-api Again (S ${api.stability}), learned at the change; the others keep Good and their time`);
+        const held = JSON.stringify(await cardsOf(pool, id));
+        await getReviewQueue({ userId: id });
+        check('P3', JSON.stringify(await cardsOf(pool, id)) === held, 'a re-read with no change writes nothing (no memory wiped)');
+        // A reviewed card (reps 1) keeps the queue's memory when the learner marks it in the lesson.
+        await pool.query(`UPDATE review_cards SET learned_at = now() - interval '5 days', reps = 1, last_rating = 3, last_review_day = (now() AT TIME ZONE 'Asia/Tokyo')::date,
+                          stability = 10.9, difficulty = 2.1, due_day = (now() AT TIME ZONE 'Asia/Tokyo')::date + 10 WHERE user_id = $1 AND card_id = 'card-frontend'`, [id]);
+        const reviewed = JSON.stringify(byCard(await cardsOf(pool, id))['card-frontend']);
+        await sleep(20);
+        await save(id, LESSON, finished({ checks: { 'card:cards/card-api': false, 'card:cards/card-frontend': false }, updatedAt: new Date(Date.now() - 1000).toISOString() }));
+        await getReviewQueue({ userId: id });
+        const now = byCard(await cardsOf(pool, id))['card-frontend'];
+        check('P3', JSON.stringify({ ...now, checked_at: JSON.parse(reviewed).checked_at }) === reviewed,
+            'a 「もう一度」 on a reviewed card changes nothing but checked_at');
     }
     // A write whose transaction began before a REST save and wrote after it (an MCP writer locks only
     // the row and takes no learner lock): a review read between them entered the save's mark; the
@@ -776,7 +873,9 @@ async function p4(pool, url) {
     const want = [
         ['review_cards', 'learned_at', 'SELECT', true], ['review_cards', 'due_day', 'UPDATE', true], ['review_cards', 'prior_rating', 'INSERT', true],
         ['review_cards', 'entered_at', 'SELECT', false], ['review_cards', 'entered_at', 'INSERT', false], ['review_cards', 'entered_at', 'UPDATE', false],
-        ['review_cards', 'prior_rating', 'SELECT', false], ['review_cards', 'prior_rating', 'UPDATE', false], ['review_cards', 'learned_at', 'UPDATE', false],
+        ['review_cards', 'prior_rating', 'SELECT', false], ['review_cards', 'prior_rating', 'UPDATE', true], ['review_cards', 'learned_at', 'UPDATE', true],
+        ['review_cards', 'last_rating', 'SELECT', false], ['review_cards', 'last_rating', 'UPDATE', true],
+        ['review_cards', 'checked_at', 'SELECT', true], ['review_cards', 'checked_at', 'INSERT', true], ['review_cards', 'checked_at', 'UPDATE', true],
         ['review_log', 'source', 'INSERT', true], ['review_log', '', 'SELECT', false], ['review_log', '', 'UPDATE', false],
         ['review_log', 'review_day', 'INSERT', false], ['review_log', 'reviewed_at', 'INSERT', false],
         ['learning_days', '', 'SELECT', false], ['learning_days', '', 'INSERT', false], ['xp_awards', '', 'SELECT', false], ['lesson_progress_lesson_resets', '', 'SELECT', false],
@@ -818,25 +917,29 @@ async function p4(pool, url) {
         const dueDays = (await pool.query("SELECT DISTINCT to_char(due_day, 'YYYY-MM-DD') AS d FROM review_cards WHERE user_id = $1", [id])).rows.map((r) => r.d).join();
         check('P4', dueDays === addDays(day, 2), `the cards are due the learning day + 2 (${dueDays}; learned ${day})`);
 
-        // A card added to the lesson later, entered as the role (the studied rule reads learned_at).
-        const catalog = reviewCatalog();
-        const base = /** @type {import('../../tools/core/reviewQueue.js').CatalogCard} */ (catalog.get(`${COURSE}/${LESSON}/card-frontend`));
-        const extended = new Map(catalog);
-        extended.set(`${COURSE}/${LESSON}/card-added`, { ...base, cardId: 'card-added', checkKey: 'card:cards/card-added', order: catalog.size });
-        const c = await rolePool.connect();
-        let entered = -1;
-        try {
-            await c.query('BEGIN');
-            await c.query(LEARNER_LOCK_SQL, [id]);
-            entered = await enterReviewCards(c, id, extended);
-            await c.query('COMMIT');
-        } finally {
-            c.release();
-        }
-        const added = (await pool.query("SELECT learned_at, stability, to_char(due_day, 'YYYY-MM-DD') AS due FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [id])).rows[0];
-        check('P4', entered === 1 && added?.learned_at === null && added.stability === null && added.due === addDays(await todayOf(pool), 1),
+        // A card added to the lesson later, entered as the role (the studied rule reads checked_at
+        // and the siblings' marks).
+        const base = /** @type {import('../../tools/core/reviewQueue.js').CatalogCard} */ (reviewCatalog().get(`${COURSE}/${LESSON}/card-frontend`));
+        const entered = await enterWith(rolePool, id, extendedCatalog());
+        const added = await addedRow(pool, id);
+        check('P4', entered === 1 && noMemory(added, await todayOf(pool)),
             `as ${ROLE}: a card added later entered with no memory, due ${added?.due} (tomorrow)`);
         await pool.query("DELETE FROM review_cards WHERE user_id = $1 AND card_id = 'card-added'", [id]);
+
+        // integrity #1 as the role: a later 「もう一度」 (saved by the app) gives card-api the Again
+        // prior through the entry's ON CONFLICT DO UPDATE, which never reads prior_rating; a re-read
+        // with no change writes nothing.
+        instrument(pool);
+        await save(id, LESSON, finished({ checks: { 'card:cards/card-api': false }, updatedAt: new Date(Date.now() - 1000).toISOString() }));
+        const markedAt = await changedAtOf(pool, id);
+        const inst2 = instrument(rolePool);
+        const afterMark = /** @type {any} */ (await reviewDueForAgent({ userId: id }));
+        const api = byCard(await cardsOf(pool, id))['card-api'];
+        const heldRows = JSON.stringify(await cardsOf(pool, id));
+        await reviewDueForAgent({ userId: id });
+        check('P4', !afterMark.error_type && inst2.state.errors.length === 0 && api.prior_rating === 1 && api.stability === LESSON_PRIORS.again.stability
+            && api.learned_at.getTime() === markedAt.getTime() && JSON.stringify(await cardsOf(pool, id)) === heldRows,
+            `as ${ROLE}: a later 「もう一度」 gave card-api the Again prior (${api.prior_rating}, S ${api.stability}) dated the mark; a re-read wrote nothing (errors ${inst2.state.errors.join(',') || 'none'})`);
 
         const args = { userId: id, courseSlug: COURSE, lessonId: LESSON, cardId: 'card-frontend' };
         const backJp = /** @type {{ jp: string }} */ (base.back).jp;
@@ -849,10 +952,18 @@ async function p4(pool, url) {
         check('P4', reveal.recorded === false && reveal.back === backJp && logAfterReveal === 0
             && rated.recorded === true && rated.back === backJp && rated.next_review_day === addDays(today, rated.next_review_in_days)
             && second.error_type === 'not_due' && second.reviewed_today === true && second.due_on === rated.next_review_day
-            && log.length === 1 && log[0].source === 'mcp' && log[0].rating === 3 && log[0].elapsed_days === 3 && log[0].d === today && inst.state.errors.length === 0,
+            && log.length === 1 && log[0].source === 'mcp' && log[0].rating === 3 && log[0].elapsed_days === 3 && log[0].d === today && inst2.state.errors.length === 0,
             `as ${ROLE}: reveal (recorded ${reveal.recorded}, ${logAfterReveal} log rows), rating good (next ${rated.next_review_day}, in ${rated.next_review_in_days} days), a second rating ${second.error_type} (reviewed_today ${second.reviewed_today}); log ${log.map((l) => `${l.source}:${l.rating}:${l.elapsed_days}`).join(',')}`);
         const daysAfter = await count(pool, 'SELECT count(*) AS n FROM learning_days WHERE user_id = $1', [id]);
         check('P4', daysAfter === daysBefore, `an MCP review wrote no learning day (${daysBefore} → ${daysAfter})`);
+        // A mark on the card just reviewed changes nothing as the role (reps 1).
+        const gradedRow = JSON.stringify({ ...byCard(await cardsOf(pool, id))['card-frontend'], checked_at: null });
+        instrument(pool);
+        await save(id, LESSON, finished({ checks: { 'card:cards/card-api': false, 'card:cards/card-frontend': false }, updatedAt: new Date(Date.now() - 500).toISOString() }));
+        instrument(rolePool);
+        const afterReviewedMark = /** @type {any} */ (await reviewDueForAgent({ userId: id }));
+        check('P4', !afterReviewedMark.error_type && JSON.stringify({ ...byCard(await cardsOf(pool, id))['card-frontend'], checked_at: null }) === gradedRow,
+            `as ${ROLE}: a 「もう一度」 on a reviewed card kept its memory`);
 
         // Refused to the role (42501).
         const refused = [
@@ -860,6 +971,7 @@ async function p4(pool, url) {
             ['SELECT * FROM review_cards WHERE user_id = $1', [id]],
             ['SELECT entered_at FROM review_cards WHERE user_id = $1', [id]],
             ['SELECT prior_rating FROM review_cards WHERE user_id = $1', [id]],
+            ['SELECT last_rating FROM review_cards WHERE user_id = $1', [id]],
             ["INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, due_day, entered_at) VALUES ($1, 'vibe-coding', 'vibe-ch1', 'card-x', current_date + 1, now())", [id]],
             ['UPDATE review_cards SET entered_at = now() WHERE user_id = $1', [id]],
             ['SELECT * FROM review_log', []],

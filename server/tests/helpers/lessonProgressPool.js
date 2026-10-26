@@ -31,8 +31,10 @@
  * with the migration's CHECKs, the log's primary key (one review of a card per Japan-time day) and
  * its composite foreign key (23503; deleting a card deletes its log rows). The queue's statements
  * (tools/core/reviewQueue.js) are evaluated in JavaScript: the entry's CTE (the finished states, the
- * `?` and `->` jsonb operators, the `studied` rule against the statement's snapshot, ON CONFLICT DO
- * NOTHING), the rows with their Japan-time days, the grade's UPDATE with its WHERE guard. Any other
+ * `?` and `->` jsonb operators, the `studied` rule against the statement's snapshot: a mark, the rows'
+ * checked_at, the siblings' marks), its ON CONFLICT DO UPDATE (a changed mark before the first
+ * review sets the first rating again) and the checked_at UPDATE after it, the rows with their
+ * Japan-time days, the grade's UPDATE with its WHERE guard. Any other
  * statement naming review_cards or review_log throws (PHASE6_TABLES).
  * Not a test file (npm test runs *.test.js).
  */
@@ -87,17 +89,21 @@ export const SQL = Object.freeze({
       SELECT p.user_id, c.course_slug, c.lesson_id, c.card_id,
              COALESCE(p.progress_changed_at, p.updated_at) AS learned_at,
              CASE WHEN (p.progress -> 'checks' -> c.check_key) = 'false'::jsonb THEN 1 ELSE 3 END AS prior,
-             NOT EXISTS (SELECT 1 FROM review_cards x
-                          WHERE x.user_id = p.user_id AND x.course_slug = p.course_slug AND x.lesson_id = p.lesson_id
-                            AND x.learned_at >= COALESCE(p.progress_changed_at, p.updated_at)) AS studied
+             COALESCE((p.progress -> 'checks') ? c.check_key, false)
+             OR NOT EXISTS (SELECT 1 FROM review_cards x
+                             WHERE x.user_id = p.user_id AND x.course_slug = p.course_slug AND x.lesson_id = p.lesson_id
+                               AND (x.checked_at >= COALESCE(p.progress_changed_at, p.updated_at)
+                                    OR NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS s (course_slug, lesson_id, check_key, card_id)
+                                                    WHERE s.course_slug = x.course_slug AND s.lesson_id = x.lesson_id AND s.card_id = x.card_id
+                                                      AND (p.progress -> 'checks') ? s.check_key))) AS studied
         FROM lesson_progress p
         JOIN unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS c (course_slug, lesson_id, check_key, card_id)
           ON c.course_slug = p.course_slug AND c.lesson_id = p.lesson_id
        WHERE p.user_id = $1
          AND (p.state IN ('read', 'checked', 'mastered') OR (p.progress -> 'checks') ? c.check_key)
     )
-    INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day)
-    SELECT user_id, course_slug, lesson_id, card_id,
+    INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, checked_at, learned_at, prior_rating, stability, difficulty, due_day)
+    SELECT user_id, course_slug, lesson_id, card_id, learned_at,
            CASE WHEN studied THEN learned_at END,
            CASE WHEN studied THEN prior END,
            CASE WHEN NOT studied THEN NULL WHEN prior = 1 THEN $9::float8 ELSE $6::float8 END,
@@ -106,14 +112,25 @@ export const SQL = Object.freeze({
                 ELSE (learned_at AT TIME ZONE 'Asia/Tokyo')::date + CASE WHEN prior = 1 THEN $11::int ELSE $8::int END END
       FROM candidates
      ORDER BY course_slug, lesson_id, card_id
-    ON CONFLICT (user_id, course_slug, lesson_id, card_id) DO NOTHING`),
-    reviewRows: norm(`SELECT course_slug, lesson_id, card_id, stability, difficulty, reps, last_rating,
+    ON CONFLICT (user_id, course_slug, lesson_id, card_id) DO UPDATE
+       SET learned_at = EXCLUDED.learned_at,
+           prior_rating = CASE WHEN EXCLUDED.stability = $9::float8 THEN 1 ELSE 3 END,
+           stability = EXCLUDED.stability, difficulty = EXCLUDED.difficulty, due_day = EXCLUDED.due_day
+     WHERE review_cards.reps = 0
+       AND EXCLUDED.learned_at IS NOT NULL
+       AND EXCLUDED.stability IS DISTINCT FROM review_cards.stability`),
+    markReviewCardsChecked: norm(`UPDATE review_cards r
+       SET checked_at = COALESCE(p.progress_changed_at, p.updated_at)
+      FROM lesson_progress p
+     WHERE r.user_id = $1 AND p.user_id = r.user_id AND p.course_slug = r.course_slug AND p.lesson_id = r.lesson_id
+       AND (r.checked_at IS NULL OR r.checked_at < COALESCE(p.progress_changed_at, p.updated_at))`),
+    reviewRows: norm(`SELECT course_slug, lesson_id, card_id, stability, difficulty, reps,
            to_char(due_day, 'YYYY-MM-DD') AS due_on,
            (now() AT TIME ZONE 'Asia/Tokyo')::date - COALESCE(last_review_day, (learned_at AT TIME ZONE 'Asia/Tokyo')::date) AS days_since,
            due_day <= (now() AT TIME ZONE 'Asia/Tokyo')::date AS due,
            last_review_day IS NOT DISTINCT FROM (now() AT TIME ZONE 'Asia/Tokyo')::date AS reviewed_today
       FROM review_cards WHERE user_id = $1 ORDER BY course_slug, lesson_id, card_id`),
-    lockReviewCard: norm(`SELECT stability, difficulty, reps, lapses, last_rating,
+    lockReviewCard: norm(`SELECT stability, difficulty, reps, lapses,
            to_char(due_day, 'YYYY-MM-DD') AS due_on,
            (now() AT TIME ZONE 'Asia/Tokyo')::date - COALESCE(last_review_day, (learned_at AT TIME ZONE 'Asia/Tokyo')::date) AS days_since,
            due_day <= (now() AT TIME ZONE 'Asia/Tokyo')::date AS due,
@@ -278,10 +295,10 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
         /** review_cards (Phase 6), by 'user|course|lesson|card' */
         reviewCards: new Map(reviewCards.map((r) => {
             const row = {
-                entered_at: new Date('2026-10-01T00:00:00Z'), learned_at: null, prior_rating: null, stability: null, difficulty: null,
+                entered_at: new Date('2026-10-01T00:00:00Z'), learned_at: null, checked_at: null, prior_rating: null, stability: null, difficulty: null,
                 reps: 0, lapses: 0, last_rating: null, last_review_day: null, ...structuredClone(r),
             };
-            for (const field of ['entered_at', 'learned_at']) if (row[field] !== null) row[field] = new Date(row[field]);
+            for (const field of ['entered_at', 'learned_at', 'checked_at']) if (row[field] !== null) row[field] = new Date(row[field]);
             checkReviewCard(row);
             return [cardKey(row.user_id, row.course_slug, row.lesson_id, row.card_id), row];
         })),
@@ -340,7 +357,7 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
         const base = row.last_review_day ?? (row.learned_at === null ? null : jstDay(row.learned_at));
         return {
             course_slug: row.course_slug, lesson_id: row.lesson_id, card_id: row.card_id, stability: row.stability, difficulty: row.difficulty,
-            reps: row.reps, lapses: row.lapses, last_rating: row.last_rating, due_on: row.due_day,
+            reps: row.reps, lapses: row.lapses, due_on: row.due_day,
             days_since: base === null ? null : daysBetween(base, today),
             due: row.due_day <= today,
             reviewed_today: row.last_review_day === today,
@@ -606,38 +623,78 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
                 }
                 // The CTE reads the statement's snapshot: rows this statement inserts never count.
                 const before = [...state.reviewCards.values()];
+                /** `(p.progress -> 'checks') ? key`: an own key of the record's checks object. */
+                const marks = (row) => {
+                    const checks = row.progress?.checks;
+                    return checks !== null && typeof checks === 'object' && !Array.isArray(checks) ? checks : null;
+                };
+                const has = (checks, k) => checks !== null && k !== undefined && Object.prototype.hasOwnProperty.call(checks, k);
+                /** A row's check key in the catalog arrays (s.card_id = x.card_id …), or undefined: no longer in the lesson. */
+                const checkKeyOf = (x) => {
+                    for (let j = 0; j < courses.length; j += 1) {
+                        if (courses[j] === x.course_slug && lessons[j] === x.lesson_id && cardIds[j] === x.card_id) return checkKeys[j];
+                    }
+                    return undefined;
+                };
                 const candidates = [];
                 for (let i = 0; i < courses.length; i += 1) {
                     const row = state.rows.get(key(user, courses[i], lessons[i]));
                     if (!row) continue;
-                    const checks = row.progress?.checks;
-                    const isObject = checks !== null && typeof checks === 'object' && !Array.isArray(checks);
-                    const marked = isObject && Object.prototype.hasOwnProperty.call(checks, checkKeys[i]);
+                    const checks = marks(row);
+                    const marked = has(checks, checkKeys[i]);
                     if (!DONE_STATES.has(row.state) && !marked) continue;
                     const learnedAt = row.progress_changed_at ?? row.updated_at;
                     const prior = marked && checks[checkKeys[i]] === false ? 1 : 3;
-                    const studied = !before.some((x) => x.user_id === user && x.course_slug === courses[i] && x.lesson_id === lessons[i]
-                        && x.learned_at !== null && x.learned_at.getTime() >= learnedAt.getTime());
+                    // Marked, or no row of the lesson that the entry already checked at this change, nor
+                    // one of a card the learner did not mark (or one no longer in the lesson).
+                    const studied = marked || !before.some((x) => x.user_id === user && x.course_slug === courses[i] && x.lesson_id === lessons[i]
+                        && ((x.checked_at !== null && x.checked_at.getTime() >= learnedAt.getTime()) || !has(checks, checkKeyOf(x))));
                     candidates.push({ course_slug: courses[i], lesson_id: lessons[i], card_id: cardIds[i], learnedAt, prior, studied });
                 }
                 candidates.sort(byCardKey);
                 let n = 0;
                 for (const c of candidates) {
                     const k = cardKey(user, c.course_slug, c.lesson_id, c.card_id);
-                    if (state.reviewCards.has(k)) continue;
                     const again = c.prior === 1;
-                    const row = {
-                        user_id: user, course_slug: c.course_slug, lesson_id: c.lesson_id, card_id: c.card_id,
-                        entered_at: clockTimestamp(),
+                    const proposed = {
                         learned_at: c.studied ? new Date(c.learnedAt) : null,
                         prior_rating: c.studied ? c.prior : null,
                         stability: c.studied ? Number(again ? againS : goodS) : null,
                         difficulty: c.studied ? Number(again ? againD : goodD) : null,
                         due_day: c.studied ? addDays(jstDay(c.learnedAt), Number(again ? againI : goodI)) : addDays(jstDay(now()), 1),
+                    };
+                    const existing = state.reviewCards.get(k);
+                    if (existing) {
+                        // ON CONFLICT DO UPDATE … WHERE reps = 0 AND EXCLUDED.learned_at IS NOT NULL AND EXCLUDED.stability IS DISTINCT FROM stability
+                        if (existing.reps !== 0 || proposed.learned_at === null || proposed.stability === existing.stability) continue;
+                        const next = { ...existing, ...proposed, prior_rating: proposed.stability === Number(againS) ? 1 : 3 };
+                        checkReviewCard(next);
+                        state.reviewCards.set(k, next);
+                        n += 1;
+                        continue;
+                    }
+                    const row = {
+                        user_id: user, course_slug: c.course_slug, lesson_id: c.lesson_id, card_id: c.card_id,
+                        entered_at: clockTimestamp(),
+                        checked_at: new Date(c.learnedAt),
+                        ...proposed,
                         reps: 0, lapses: 0, last_rating: null, last_review_day: null,
                     };
                     checkReviewCard(row);
                     state.reviewCards.set(k, row);
+                    n += 1;
+                }
+                return { rowCount: n, rows: [] };
+            }
+            case SQL.markReviewCardsChecked: {
+                let n = 0;
+                for (const [k, r] of state.reviewCards) {
+                    if (r.user_id !== p1) continue;
+                    const p = state.rows.get(key(r.user_id, r.course_slug, r.lesson_id));
+                    if (!p) continue;
+                    const changed = p.progress_changed_at ?? p.updated_at;
+                    if (r.checked_at !== null && r.checked_at.getTime() >= changed.getTime()) continue;
+                    state.reviewCards.set(k, { ...r, checked_at: new Date(changed) });
                     n += 1;
                 }
                 return { rowCount: n, rows: [] };

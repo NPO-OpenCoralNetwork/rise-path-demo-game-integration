@@ -85,7 +85,13 @@ describe('the plan: Phase 6 chapter', () => {
         // and the 11th card (review_limit); nothing checks membership in pickToday's list.
         assert.doesNotMatch(chapter, /今日の分でない|今日の分だけ/u);
         assert.equal(chapter.split('期日の来ていないカードと、今日すでに記録したカードは `not_due`').length - 1, 2, '10.1 API and MCP');
-        assert.match(chapter, /`reveal: true`（何も記録せず、期日の来たカードだけ（1 日 10 枚まで）/u);
+        // A reveal records nothing and counts no cards: any due card not recorded today, until 10 are
+        // recorded today (reviewQueueCore.test.js 'reveal counts no cards'), each call one mcp_write.
+        assert.match(chapter, /`reveal: true`（何も記録せず、期日が来ていて今日まだ記録していないカードだけ。今日 10 枚を記録するまで使えます。見せた枚数は数えませんが、呼び出しは書き込みの上限（1 日 50 回）に数えます）/u);
+        assert.match(chapter, /答えを見るだけの呼び出しは、今日 10 枚を記録するまで枚数を数えません/u, '10.3 の 4');
+        assert.doesNotMatch(chapter, /期日の来たカードだけ（1 日 10 枚まで）/u);
+        // One word per meaning (docs #14): 「答え」 a card's back, 「応答」 a server reply, 「評価」 an FSRS rating.
+        assert.doesNotMatch(chapter, /最初の答え|答えには `learnerId`|ほかの学習者あての答え|答えを返したあとで|答えのあとに書きます|記録の答えで|進み具合の(次の)?答え/u);
         assert.match(chapter, /出す順（R2）は今日の一覧の決まりで、AI アプリは、一覧にない期日の来たカード/u);
         assert.doesNotMatch(read('doc/guides/byoa-setup.ja.md'), /今日の分でない/u);
         assert.doesNotMatch(read('doc/guides/usage_guide.md'), /今日の分でない/u);
@@ -100,6 +106,32 @@ describe('the plan: Phase 6 chapter', () => {
         // 10.1 画面: a sign-out or expiry swaps the whole app for the signed-out page (AuthContext setUser(null)).
         assert.match(chapter, /ログインが切れたときは、ページごとログインの前の画面に戻り、何も記録しません（Nexloom のログインが残っているときは、その復習をそこで止めて 1 行で知らせます）/u);
         assert.doesNotMatch(chapter, /ログインが切れたときは、その復習をそこで止めて/u);
+    });
+});
+
+describe('PLAN.ja.md: the review queue row (docs #15)', () => {
+    it('says the lesson flashcards part was built in Phase 6 (no present-tense "does not exist"), and what is still missing', () => {
+        const row = read('doc/brushup-2026/PLAN.ja.md').split('\n').find((l) => l.startsWith('| FSRS による復習キュー'));
+        assert.ok(row);
+        assert.doesNotMatch(row, /現状は存在しない/u);
+        assert.match(row, /Phase 6 で、レッスンの暗記カードの分を作りました（\[ai-access-plan\.ja\.md\]\(ai-access-plan\.ja\.md\) の 10 章）/u);
+        assert.match(row, /確認問題と AI チューターのカードは、まだ入りません/u);
+    });
+});
+
+describe('the BYOA guide: what the remote role cannot read (docs #13)', () => {
+    it('only the prior_rating copy and the last result are hidden; the in-lesson marks stay readable in lesson_progress', () => {
+        const guide = read('doc/guides/byoa-setup.ja.md');
+        const line = guide.split('\n').find((l) => l.includes('復習（`review_cards`、`review_log`、Phase 6）'));
+        assert.ok(line, 'Phase 6 role bullet');
+        assert.doesNotMatch(line, /レッスンで付けた印（`prior_rating`）は読めません/u);
+        assert.match(line, /最初の目安に使った印の写し（`prior_rating`）と、最後の結果（`last_rating`）は読めません/u);
+        assert.match(line, /レッスンで付けた印そのものは、`lesson_progress` の一部として読めます/u);
+        // The grants that make this true.
+        const role = read('deploy/risepath-vm/sql/mcp_remote_role.sql');
+        assert.match(role, /^GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;$/m);
+        const select = /^GRANT SELECT \(([^)]*)\) ON review_cards TO risepath_mcp_remote;$/m.exec(role)?.[1].split(', ') ?? [];
+        for (const column of ['entered_at', 'prior_rating', 'last_rating']) assert.ok(!select.includes(column), column);
     });
 });
 

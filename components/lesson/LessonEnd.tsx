@@ -29,8 +29,9 @@ import type { LText } from '../../shared/lesson/schema.js';
  *   the dialog has closed, also when it closed before the request ended; on failure focus
  *   returns to the button (or #main-content when the button has gone) and the line under it
  *   says why.
- * Phase 6: when the server has reviews, the dialog also says that the lesson's review cards leave
- * the review queue with their schedule and history (R4); nothing else here changes.
+ * Phase 6: when the server has reviews and the lesson has review cards (a flashcards block), the
+ * dialog also says that the lesson's review cards leave the review queue with their schedule and
+ * history (R4); nothing else here changes.
  */
 
 const copy = {
@@ -358,8 +359,8 @@ export function LessonEnd({ next, prev, backTo, resettable = false, onLessonRese
         body={(
           <>
             <p>{text.resetBody}</p>
-            {/* Phase 6 (R4): the lesson's review cards leave the review queue too (a server that has reviews). */}
-            {progressCapabilities()?.review === true ? <p className="mt-2">{text.resetReview}</p> : null}
+            {/* Phase 6 (R4): the lesson's review cards leave the review queue too (a server that has reviews, and a lesson with review cards). */}
+            {cards.length > 0 && progressCapabilities()?.review === true ? <p className="mt-2">{text.resetReview}</p> : null}
             <p className="mt-2">{text.resetKept}</p>
           </>
         )}

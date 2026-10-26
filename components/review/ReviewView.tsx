@@ -8,9 +8,9 @@ import { Button, ButtonLink } from '../ui/Button';
 import { plainText } from '../lesson/model';
 import { syncedLearnerId, useProgressSaveView, useProgressSyncState } from '../lesson/progressSyncClient';
 import type { ReviewQueue, ReviewRating, ReviewSummary } from '../../services/reviewApi';
-import { gradeAsSyncedLearner, reloadReviewQueue, reviewQueueSettled, useReviewQueue } from './reviewClient';
+import { gradeAsSyncedLearner, markReviewStale, reloadReviewQueue, reviewQueueSettled, useReviewQueue } from './reviewClient';
 import { reviewCopy } from './reviewCopy';
-import { cardText } from './reviewText';
+import { cardText, type CardText } from './reviewText';
 import { ReviewCardView, lineText } from './ReviewCardView';
 import {
   counterOf,
@@ -40,7 +40,9 @@ import {
  * on for this learner, the buttons are aria-disabled with a helper (the card still flips).
  * Another learner signing in, or a sign-out, ends the session with a line saying which; so does a
  * server without review routes after all. When the list ends while the server still has cards for
- * today (a skipped card used no slot of the cap), 「復習する」 reads the list again and goes on.
+ * today (a skipped card used no slot of the cap), 「復習する」 reads the list again and goes on; if
+ * that read fails, the page says so and offers it again (never the held list's counts). When the
+ * list is through, the store reads again at once (the sidebar and the dashboard count).
  * After each grade focus goes to the next card, or to the done heading; after an end that removed
  * the card, to the status line or the page title (only when focus was lost or on this page). The
  * page scrolls inside <main id="main-content">. No timer, no warm-up.
@@ -140,7 +142,7 @@ export default function ReviewView() {
   const [settled, setSettled] = useState(false);
   const [session, dispatch] = useReducer(sessionReducer, null);
   const [endNote, setEndNote] = useState<SwitchReason | null>(null);
-  const [live, setLive] = useState('');
+  const [live, setLive] = useState<CardText | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -219,7 +221,8 @@ export default function ReviewView() {
     if (!card || !session) return;
     const turning = !session.flipped;
     dispatch({ type: 'flip' });
-    setLive(turning ? t.answerLive(plainText(cardText(card.back, language, card.lessonLocale).value)) : '');
+    const answer = cardText(card.back, language, card.lessonLocale);
+    setLive(turning ? { value: plainText(answer.value), lang: answer.lang } : null);
   };
 
   const grade = async (rating: ReviewRating) => {
@@ -242,12 +245,14 @@ export default function ReviewView() {
       sending.current = false;
     }
     if (!mounted.current) return;
+    // The list is through, or the cap reached: the sidebar and the dashboard read the counts now.
+    const through = action.type === 'limit' || ((action.type === 'graded' || action.type === 'skipped') && session.index + 1 >= session.cards.length);
     if (action.type === 'graded' || action.type === 'skipped') {
       focusNext.current = session.index + 1 < session.cards.length ? 'face' : 'done';
-      setLive('');
+      setLive(null);
     } else if (action.type === 'limit') {
       focusNext.current = 'done';
-      setLive('');
+      setLive(null);
     } else if (action.type === 'switched') {
       const why: SwitchReason = syncedLearnerId() ? 'other' : 'signedOut';
       setEndNote((note) => note ?? why);
@@ -256,6 +261,7 @@ export default function ReviewView() {
       focusNext.current = 'title';
     }
     dispatch(action);
+    if (through) markReviewStale();
   };
 
   /** 「復習する」 after an end: read today's list again, then start from that read (never the list held now). */
@@ -263,7 +269,7 @@ export default function ReviewView() {
     staleList.current = data;
     focusNext.current = 'face';
     setEndNote(null);
-    setLive('');
+    setLive(null);
     setSettled(false);
     dispatch({ type: 'clear' });
     void reloadReviewQueue()
@@ -319,10 +325,15 @@ export default function ReviewView() {
     body = <ReviewStateView language={language} state="unsupported" summary={null} offline={offline} onReload={() => void reloadReviewQueue()} />;
   } else {
     // Before the first list: 'due' waits (loading) for the read this visit started. After
-    // another learner's session ended here, or when a fresh read for today's next cards failed:
-    // the store's state, with a way to (try to) start its list.
-    const canStart = data !== null && ((session?.end === 'switched') || (!session && settled && data === staleList.current));
-    body = (
+    // another learner's session ended here: the store's state, with a way to start its list.
+    // When the read for today's next cards settled without a newer list (a 5xx or a network
+    // failure: the store kept the list held at the press), say so (offline: once online) and offer
+    // that read again; never the held list's counts.
+    const restartFailed = !session && settled && data !== null && data === staleList.current;
+    const canStart = data !== null && session?.end === 'switched';
+    body = restartFailed ? (
+      <ReviewStateView language={language} state="unavailable" summary={null} offline={offline} onReload={restartToday} />
+    ) : (
       <ReviewStateView
         language={language}
         state={todayCardOf(snap)}

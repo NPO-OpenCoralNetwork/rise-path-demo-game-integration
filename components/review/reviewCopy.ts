@@ -13,7 +13,8 @@ type ReviewCopy = {
   front: string;
   back: string;
   from: string;
-  answerLive: (text: string) => string;
+  /** Read before the answer in the polite announcement after a flip. */
+  answerLabel: string;
   tryFirst: string;
   flipBack: string;
   ask: string;
@@ -70,7 +71,7 @@ const copy = {
     front: 'Question',
     back: 'Answer',
     from: 'From: ',
-    answerLive: (text) => `Answer: ${text}`,
+    answerLabel: 'Answer: ',
     tryFirst: 'Try to remember first, then tap the card to see the answer.',
     flipBack: 'Tap the card to see the question.',
     ask: 'Did you remember it?',
@@ -129,7 +130,7 @@ const copy = {
     front: '問い',
     back: '答え',
     from: 'レッスン: ',
-    answerLive: (text) => `答え：${text}`,
+    answerLabel: '答え：',
     tryFirst: 'まず思い出してから、カードを押して答えを見ましょう。',
     flipBack: 'カードをまた押すと、問いに戻ります。',
     ask: '思い出せましたか？',

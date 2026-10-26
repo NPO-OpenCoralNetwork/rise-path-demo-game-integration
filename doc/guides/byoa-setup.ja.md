@@ -111,11 +111,11 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
    - いくつかの表は、要る列だけを渡します。安全の記録（`ai_safety_events`）は報告の文章（`detail`）を読めません。教材（`materials`）は題名や保存場所を読めず、`id`、`user_id`、`status` だけです。年齢と同意の表は、判定に使う列だけです。`mcp_oauth_grants` は `revoked_at` を書けず、`client_name` を読めません。書けるのは行の追加（`user_id`、`client_id`）と、`first_seen_at`、`last_used_at` の更新だけです。
    - 1 日の上限の表（`ai_daily_usage`）は、行ごとの守り（RLS）を on にします。このロールが読み書きできるのは、種類が `mcp` と `mcp_write` の行だけです。表の持ち主の `risepath_app`（VM ではスーパーユーザー）は RLS を通らないので、API はこれまでどおり動きます。持ち主でもスーパーユーザーでもないロールを別に足すと、そのロールのポリシーを作るまで、この表の行が見えません。
    - レッスンの進み具合（`lesson_progress`、Phase 2）は、読む・行を足す・書き換えるだけです。行を消せません。「学習の進み具合を消す」の記録（`lesson_progress_resets`）は読み書きできません。記録を消せるのは、学習者がアプリの画面で行う操作だけです。
-   - 復習（`review_cards`、`review_log`、Phase 6）は、要る列だけです。`review_cards` は、カードを加える・読む・復習の結果を書き換えるだけで、行を消せません。カードが加わった時刻（`entered_at`）と、レッスンで付けた印（`prior_rating`）は読めません。`review_log` は 1 行足すだけで、読めません（復習の記録は、アプリの中だけで使います）。復習を消せるのは、学習者のレッスンのやり直し、「学習の進み具合を消す」と、アカウントの削除だけです。
+   - 復習（`review_cards`、`review_log`、Phase 6）は、要る列だけです。`review_cards` は、カードを加える・読む・復習の結果を書き換えるだけで、行を消せません。カードが加わった時刻（`entered_at`）と、最初の目安に使った印の写し（`prior_rating`）と、最後の結果（`last_rating`）は読めません（印の写しと最後の結果は、書き込むだけです。レッスンで付けた印そのものは、`lesson_progress` の一部として読めます。カードを復習に加えるとき、最初の目安を選ぶのに使います）。`review_log` は 1 行足すだけで、読めません（復習の記録は、アプリの中だけで使います）。復習を消せるのは、学習者のレッスンのやり直し、「学習の進み具合を消す」と、アカウントの削除だけです。
    - ライフジャーナル、AI メモリ、性格のプロフィールなどの表は読めません。
    - あとの migration でリモートのツールに表や列が増えたら、SQL に足して実行し直します。実行し直すと、SQL にない権限は外れます。
 
-   **Phase 6 の更新**: migration 020（`review_cards`、`review_log`）を当てたあとも、上と同じコマンドでロールの SQL を流し直します（パスワードは今の値）。流し直すまで、AI アプリの復習の 2 つのツール（`course-review-due`、`course-review-grade`）は `review_unavailable` を返します。ほかのツールは動きます。流し直したら、手順 10 の 1（MCP Inspector）でツールが 13 あることと、`course-review-due` がエラーにならないことを確かめます。
+   **Phase 6 の更新**: migration 020（`review_cards`、`review_log`）を当てたあと、この版の `mcp-public` を起動する前か同時に、上と同じコマンドでロールの SQL を流し直します（パスワードは今の値）。流し直すまで、AI アプリの復習の 2 つのツール（`course-review-due`、`course-review-grade`）は `review_unavailable` を返します。ほかのツールは動きます。流し直したら、手順 10 の 1（MCP Inspector）でツールが 13 あることと、`course-review-due` がエラーにならないことを確かめます。
 
    **Phase 4 の更新**: migration 018（`account_deletions` など）を当てたあとも、上と同じコマンドでロールの SQL を流し直します（パスワードは今の値）。018 は、ロールがあればその場で `account_deletions` を読む権限を渡しますが、流し直すと、これからもその権限が SQL のとおりに保たれます。`mcp-public` は、この表を読めないと AI アプリの呼び出しをすべて 503 で断ります（安全な側）。削除したアカウントの AI アプリは、削除の前のトークンでは断られるので、その方がまたログインしたあとに、つなぎ直す必要があります。
 

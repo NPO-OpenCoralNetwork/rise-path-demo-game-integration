@@ -3,8 +3,10 @@
 // (helpers/lessonProgressPool.js, exact SQL, migration 020's CHECKs and trigger column).
 // - R1: which cards enter (a finished lesson's current cards, a marked card), with the lesson as
 //   their first rating (Good, or Again after a 「もう一度」 mark), dated the record's last change;
-//   the learning day is not moved by reads or saves that change nothing (Critique 1); a card added
-//   to a lesson later enters with no memory and sorts last (Critique 4);
+//   until the first review a changed mark sets that first rating again; the learning day is not
+//   moved by reads or saves that change nothing (Critique 1); a card added to a lesson later enters
+//   with no memory and sorts last (Critique 4), also after later changes (a mark, a resume point, a
+//   revisit) and unless the learner marks it;
 // - R2: 10 graded cards a Japan-time day, most at risk first, the rest carried over;
 // - R3: grading ('again' / 'good'): once a day, due cards only, the FSRS-6 memory, the log row,
 //   no XP; reveal records nothing;
@@ -24,6 +26,7 @@ import {
     GRADE_REVIEW_CARD_SQL,
     INSERT_REVIEW_LOG_SQL,
     LOCK_REVIEW_CARD_SQL,
+    MARK_REVIEW_CARDS_CHECKED_SQL,
     REVIEW_ROWS_SQL,
     REVIEW_SOURCES,
     enterReviewCards,
@@ -126,6 +129,7 @@ afterEach(() => {
 describe('the module\'s statements are the fake\'s (exact SQL)', () => {
     it('entry, rows, lock, done today, grade, log, and the learner lock and today they share', () => {
         assert.equal(norm(ENTER_REVIEW_CARDS_SQL), SQL.enterReviewCards);
+        assert.equal(norm(MARK_REVIEW_CARDS_CHECKED_SQL), SQL.markReviewCardsChecked);
         assert.equal(norm(REVIEW_ROWS_SQL), SQL.reviewRows);
         assert.equal(norm(LOCK_REVIEW_CARD_SQL), SQL.lockReviewCard);
         assert.equal(norm(DONE_TODAY_SQL), SQL.doneToday);
@@ -148,6 +152,11 @@ describe('the module\'s statements are the fake\'s (exact SQL)', () => {
         }
         assert.doesNotMatch(INSERT_REVIEW_LOG_SQL, /review_day|reviewed_at/, 'the log\'s day and time are column defaults');
         assert.doesNotMatch(ENTER_REVIEW_CARDS_SQL, /entered_at/, 'entered_at is clock_timestamp() (the column default)');
+        // The remote MCP role has no SELECT on prior_rating or last_rating: no statement it runs reads them.
+        for (const sql of [ENTER_REVIEW_CARDS_SQL, MARK_REVIEW_CARDS_CHECKED_SQL, REVIEW_ROWS_SQL, LOCK_REVIEW_CARD_SQL, DONE_TODAY_SQL]) {
+            assert.doesNotMatch(sql, /EXCLUDED\.prior_rating|review_cards\.prior_rating|SELECT[^;]*\blast_rating\b/, sql.slice(0, 40));
+        }
+        assert.doesNotMatch(GRADE_REVIEW_CARD_SQL, /last_rating(?! = \$8)/, 'the grade only assigns last_rating');
     });
 });
 
@@ -216,6 +225,51 @@ describe('R1: which cards enter, with what first rating (getReviewQueue)', () =>
             assert.deepEqual([rows[id].prior_rating, rows[id].stability, rows[id].difficulty, rows[id].due_day], [prior, memory.stability, memory.difficulty, due], id);
         }
         assert.deepEqual([rows['card-goal'].lesson_id, rows['card-checks'].lesson_id], [CH2, CC4]);
+    });
+
+    it('until a card\'s first review, a later change of its mark gives it the first rating again, dated that change; an unchanged read, an unmarked card and a reviewed card keep theirs (integrity #1)', async () => {
+        const { good, again } = LESSON_PRIORS;
+        const memoryOf = (r) => [r.learned_at?.toISOString() ?? null, r.prior_rating, r.stability, r.difficulty, r.due_day, r.reps];
+        // Finished and read: every card Good, learned 10-20 03:00 (the usual order: the read follows the save that finished it).
+        await save(VIBE, CH1, finished({ updatedAt: '2026-10-20T02:59:00.000Z' }));
+        await queue();
+        const entered = byId(pool.reviewRows(ALICE));
+        // (a) Then 「もう一度」 on card-api in the lesson (the flashcards block comes after the 90 % point).
+        setNow('2026-10-20T03:05:00.000Z');
+        await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': false }, updatedAt: '2026-10-20T03:04:00.000Z' }));
+        const changed = pool.row(ALICE, VIBE, CH1).progress_changed_at;
+        assert.equal(changed.toISOString(), '2026-10-20T03:05:00.000Z');
+        await queue();
+        let rows = byId(pool.reviewRows(ALICE));
+        assert.deepEqual(memoryOf(rows['card-api']), [changed.toISOString(), 1, again.stability, again.difficulty, '2026-10-21', 0], 'Again, dated the mark, due + 1');
+        for (const id of CH1_IDS.filter((c) => c !== 'card-api')) {
+            assert.deepEqual(memoryOf(rows[id]), memoryOf(entered[id]), `${id} keeps its Good prior and date`);
+            assert.equal(rows[id].checked_at.toISOString(), changed.toISOString(), `${id}: the entry saw the change`);
+        }
+        // (b) A read with no change in between changes nothing (no memory wiped, nothing moved).
+        const held = pool.reviewRows(ALICE);
+        const reads = pool.queries.filter((q) => q.sql === SQL.enterReviewCards).length;
+        await queue();
+        assert.deepEqual(pool.reviewRows(ALICE), held);
+        assert.equal(pool.queries.filter((q) => q.sql === SQL.enterReviewCards).length, reads + 1);
+        // 「覚えた」 on it the next day: Good again, dated that change.
+        setNow('2026-10-21T03:00:00.000Z');
+        await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': true }, updatedAt: '2026-10-21T02:59:00.000Z' }));
+        await queue();
+        rows = byId(pool.reviewRows(ALICE));
+        assert.deepEqual(memoryOf(rows['card-api']), ['2026-10-21T03:00:00.000Z', 3, good.stability, good.difficulty, '2026-10-23', 0]);
+        // (c) After its first review, a mark on the card changes nothing.
+        setNow('2026-10-22T03:00:00.000Z');
+        assert.equal((await grade()).error_type, undefined);
+        const reviewed = byId(pool.reviewRows(ALICE))['card-frontend'];
+        setNow('2026-10-22T03:10:00.000Z');
+        await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': true, 'card:cards/card-frontend': false }, updatedAt: '2026-10-22T03:09:00.000Z' }));
+        await queue();
+        rows = byId(pool.reviewRows(ALICE));
+        assert.deepEqual(memoryOf(rows['card-frontend']), memoryOf(reviewed), 'reviewed: the queue\'s memory stands');
+        assert.equal(rows['card-frontend'].reps, 1);
+        assert.deepEqual(memoryOf(rows['card-api']), ['2026-10-21T03:00:00.000Z', 3, good.stability, good.difficulty, '2026-10-23', 0], 'the same mark again: kept');
+        assert.deepEqual(pool.logRows(ALICE).length, 1, 'a mark is never a review');
     });
 
     it('nothing enters from a reset tombstone, a not_started record, an unpublished lesson, a lesson without cards, or a mark on a card id or block the lesson does not have', async () => {
@@ -378,15 +432,92 @@ describe('content changes: a card added later, a removed card, an unpublished le
         assert.equal(pool.logRows(ALICE)[0].elapsed_days, null, 'no rating before it');
     });
 
-    it('a change to the lesson after the card was added gives it a prior from that day; marks first, then the finish: the rest get priors', async () => {
+    it('a card added after a later change of the lesson that a read already saw (a mark, a new resume point, every card marked): no memory, due the day after it entered, last, rated as new (fsrs-queue #1)', async () => {
+        const allMarked = Object.fromEntries(cardsOf(VIBE, CH1).map((c) => [c.checkKey, true]));
+        for (const [label, first, later] of [
+            ['a mark after the read', {}, { checks: { 'card:cards/card-api': true } }],
+            ['a new resume point only', {}, { lastBlockId: ch1.index.readingBlockIds[1] }],
+            ['every card marked, then a new resume point', { checks: allMarked }, { checks: allMarked, lastBlockId: ch1.index.readingBlockIds[1] }],
+        ]) {
+            useRepoContent();
+            use();
+            // Finished (the server says 'read'), and the review store's read after that save enters the cards.
+            setNow('2026-08-01T03:00:00.000Z');
+            await save(VIBE, CH1, finished({ ...first, updatedAt: '2026-08-01T02:59:00.000Z' }));
+            await queue();
+            // The learner goes on in the lesson (the flashcards block comes after the 90 % point); a read sees it.
+            setNow('2026-08-01T03:05:00.000Z');
+            await save(VIBE, CH1, finished({ ...later, updatedAt: '2026-08-01T03:04:00.000Z' }));
+            assert.equal(pool.row(ALICE, VIBE, CH1).progress_changed_at.toISOString(), '2026-08-01T03:05:00.000Z', `${label}: the record changed`);
+            await queue();
+            // Weeks later the author adds a card.
+            useContent((cards) => [...cards, added]);
+            setNow('2026-09-30T03:00:00.000Z');
+            await queue();
+            const row = byId(pool.reviewRows(ALICE))['card-added'];
+            assert.deepEqual([row.learned_at, row.prior_rating, row.stability, row.difficulty, row.due_day], [null, null, null, null, '2026-10-01'], label);
+            setNow('2026-10-01T03:00:00.000Z');
+            const q = await queue();
+            assert.equal(q.cards.at(-1).cardId, 'card-added', `${label}: never studied, so last`);
+            const graded = await grade({ cardId: 'card-added' });
+            const after = byId(pool.reviewRows(ALICE))['card-added'];
+            assert.deepEqual([after.stability, after.difficulty, graded.graded.intervalDays], [LESSON_PRIORS.good.stability, LESSON_PRIORS.good.difficulty, 2], `${label}: FSRS's new-card Good`);
+        }
+    });
+
+    it('a card added after a revisit of a finished lesson (a new resume point), with or without a read between: no memory; the other cards keep theirs (integrity #2)', async () => {
+        for (const readBetween of [true, false]) {
+            useRepoContent();
+            use();
+            setNow('2026-10-01T03:00:00.000Z');
+            await save(VIBE, CH1, finished({ updatedAt: '2026-10-01T02:59:00.000Z' }));
+            await queue();
+            const entered = pool.reviewRows(ALICE);
+            // Oct 10: the learner reopens the lesson to look something up; only the resume point changes.
+            setNow('2026-10-10T03:00:00.000Z');
+            await save(VIBE, CH1, finished({ lastBlockId: ch1.index.readingBlockIds[1], updatedAt: '2026-10-10T02:59:00.000Z' }));
+            assert.equal(pool.row(ALICE, VIBE, CH1).progress_changed_at.toISOString(), '2026-10-10T03:00:00.000Z');
+            if (readBetween) {
+                setNow('2026-10-15T03:00:00.000Z');
+                await queue();
+            }
+            // Oct 20: the author publishes a new card; the learner's next read is on Oct 25.
+            useContent((cards) => [...cards, added]);
+            setNow('2026-10-25T03:00:00.000Z');
+            await queue();
+            const rows = byId(pool.reviewRows(ALICE));
+            const row = rows['card-added'];
+            assert.deepEqual([row.learned_at, row.prior_rating, row.stability, row.difficulty, row.due_day], [null, null, null, null, '2026-10-26'], `read between: ${readBetween}`);
+            for (const before of entered) {
+                const now = rows[before.card_id];
+                assert.deepEqual([now.learned_at, now.prior_rating, now.stability, now.due_day], [before.learned_at, before.prior_rating, before.stability, before.due_day], before.card_id);
+            }
+            setNow('2026-10-26T03:00:00.000Z');
+            assert.equal((await queue()).cards.at(-1).cardId, 'card-added');
+        }
+    });
+
+    it('a change to the lesson after the card was added gives it a prior only when the learner marked it (dated that change, even after it entered with no memory); marks first, then the finish: the rest get priors', async () => {
         await save(VIBE, CH1, finished());
         await queue();
         useContent((cards) => [...cards, added]);
         setNow('2026-10-24T03:00:00.000Z');
         await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': true }, updatedAt: '2026-10-24T02:00:00.000Z' }));
         await queue();
-        const row = byId(pool.reviewRows(ALICE))['card-added'];
-        assert.deepEqual([row.learned_at.toISOString(), row.prior_rating, row.due_day], ['2026-10-24T03:00:00.000Z', 3, '2026-10-26']);
+        let row = byId(pool.reviewRows(ALICE))['card-added'];
+        assert.deepEqual([row.learned_at, row.prior_rating, row.stability, row.due_day], [null, null, null, '2026-10-25'], 'another card\'s mark: no memory');
+        setNow('2026-10-24T03:10:00.000Z');
+        await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': true, 'card:cards/card-added': true }, updatedAt: '2026-10-24T03:09:00.000Z' }));
+        await queue();
+        row = byId(pool.reviewRows(ALICE))['card-added'];
+        assert.deepEqual([row.learned_at.toISOString(), row.prior_rating, row.stability, row.difficulty, row.due_day], ['2026-10-24T03:10:00.000Z', 3, LESSON_PRIORS.good.stability, LESSON_PRIORS.good.difficulty, '2026-10-26']);
+        // A card added and marked before any read enters with that prior directly.
+        useContent((cards) => [...cards, added, { ...added, id: 'card-added-2' }]);
+        setNow('2026-10-24T03:20:00.000Z');
+        await save(VIBE, CH1, finished({ checks: { 'card:cards/card-api': true, 'card:cards/card-added': true, 'card:cards/card-added-2': false }, updatedAt: '2026-10-24T03:19:00.000Z' }));
+        await queue();
+        row = byId(pool.reviewRows(ALICE))['card-added-2'];
+        assert.deepEqual([row.learned_at.toISOString(), row.prior_rating, row.due_day], ['2026-10-24T03:20:00.000Z', 1, '2026-10-25']);
 
         useRepoContent();
         use();
@@ -632,6 +763,29 @@ describe('R3: grading (gradeReviewCard)', () => {
         assert.deepEqual([early.error_type, early.reviewedToday, 'back' in early, 'front' in early], ['not_due', false, false, false]);
     });
 
+    it('reveal counts no cards: any due card not recorded today can be revealed, again and again, until 10 cards are recorded today; then review_limit (docs #9: plan 10.2 の 8 の 1)', async () => {
+        const cc1 = new Set(cardsOf(CC, CC1).map((c) => c.cardId));
+        const twelve = [...cardsOf(CC, CC1), ...cardsOf(CC, CC2)].slice(0, 12);
+        const lessonOf = (c) => (cc1.has(c.cardId) ? CC1 : CC2);
+        assert.equal(twelve.length, 12);
+        use({ reviewCards: twelve.map((c) => priorRow(CC, lessonOf(c), c.cardId, { daysAgo: 3 })) });
+        const before = pool.reviewRows(ALICE);
+        const reveal = (c) => gradeReviewCard({ userId: ALICE, courseSlug: CC, lessonId: lessonOf(c), cardId: c.cardId, reveal: true, source: 'mcp' });
+        for (const round of [1, 2]) {
+            for (const c of twelve) {
+                const shown = await reveal(c);
+                assert.deepEqual([shown.error_type, shown.revealed?.cardId, shown.back], [undefined, c.cardId, c.back], `round ${round}: ${c.cardId}`);
+            }
+        }
+        assert.deepEqual([pool.reviewRows(ALICE), pool.logRows(ALICE)], [before, []], '24 reveals recorded nothing');
+        for (const c of twelve.slice(0, 10)) {
+            const done = await gradeReviewCard({ userId: ALICE, courseSlug: CC, lessonId: lessonOf(c), cardId: c.cardId, rating: 'good', source: 'mcp' });
+            assert.equal(done.error_type, undefined, c.cardId);
+        }
+        const late = await reveal(twelve[10]);
+        assert.deepEqual([late.error_type, late.doneToday, 'back' in late], ['review_limit', 10, false]);
+    });
+
     it('validation and not_found before any SQL; the source is recorded (mcp)', async () => {
         use({ reviewCards: [priorRow(VIBE, CH1, 'card-frontend', { daysAgo: 2 })] });
         for (const [args, type] of [
@@ -750,12 +904,13 @@ describe('failures', () => {
 });
 
 describe('the statement order of a review read: the learner lock before the entry', () => {
-    it('begin, learner lock, entry, today, rows, commit', async () => {
+    it('begin, learner lock, entry, checked mark, today, rows, commit', async () => {
         await save(VIBE, CH1, finished());
         pool.queries.length = 0;
         await queue();
-        assert.deepEqual(pool.progressStatements().filter((s) => s !== SQL.selectToday), ['begin', SQL.advisoryLock, SQL.enterReviewCards, SQL.reviewRows, 'commit']);
-        assert.deepEqual(pool.queries.map((q) => q.sql).filter((s) => s !== 'begin' && s !== 'commit'), [SQL.advisoryLock, SQL.enterReviewCards, SQL.selectToday, SQL.reviewRows]);
+        assert.deepEqual(pool.progressStatements().filter((s) => s !== SQL.selectToday), ['begin', SQL.advisoryLock, SQL.enterReviewCards, SQL.markReviewCardsChecked, SQL.reviewRows, 'commit']);
+        assert.deepEqual(pool.queries.map((q) => q.sql).filter((s) => s !== 'begin' && s !== 'commit'), [SQL.advisoryLock, SQL.enterReviewCards, SQL.markReviewCardsChecked, SQL.selectToday, SQL.reviewRows]);
+        assert.deepEqual(pool.queries.find((q) => q.sql === SQL.markReviewCardsChecked).params, [ALICE]);
     });
 });
 

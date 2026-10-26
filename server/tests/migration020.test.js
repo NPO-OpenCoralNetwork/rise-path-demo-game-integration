@@ -89,7 +89,7 @@ describe(`migration ${FILE}`, () => {
         for (const column of ['course_slug', 'lesson_id']) assert.ok(body.includes(`${column} text not null check (${column} ~ '^[a-z0-9][a-z0-9-]{0,79}$')`), column);
         assert.ok(body.includes(`card_id text not null check (card_id ~ '${CARD_ID.source}')`), 'CARD_ID (tools/core/reviewQueue.js) is the CHECK');
         assert.match(body, /entered_at timestamptz not null default clock_timestamp\(\)/, 'not now(): later than any reset that committed before the insert');
-        assert.match(body, /learned_at timestamptz null, prior_rating smallint null check \(prior_rating in \(1, 3\)\), due_day date not null,/);
+        assert.match(body, /learned_at timestamptz null, checked_at timestamptz null, prior_rating smallint null check \(prior_rating in \(1, 3\)\), due_day date not null,/);
         assert.ok(body.includes(`stability double precision null check (stability between ${S_MIN} and ${S_MAX})`));
         assert.ok(body.includes(`difficulty double precision null check (difficulty between ${D_MIN} and ${D_MAX})`));
         assert.match(body, /reps integer not null default 0 check \(reps >= 0\), lapses integer not null default 0,/);

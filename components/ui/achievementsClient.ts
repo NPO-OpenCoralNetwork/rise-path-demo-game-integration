@@ -78,6 +78,18 @@ export type AchievementsStore<T extends { learnerId: string } = Achievements> = 
   serverProgress(): void;
   /** Something the server counts changed (ACHIEVEMENTS_STALE_EVENT). */
   stale(): void;
+  /**
+   * The server's data changed and what is held is out of date (a review grade): the next consumer
+   * that mounts reads at once, and a read in flight (which may predate the change) runs once more.
+   * Mounted consumers keep their debounced read (serverProgress).
+   */
+  invalidate(): void;
+  /**
+   * What is held may be out of date, but nothing shown now needs it (a lesson save, for the review
+   * store): no request now; the next consumer that mounts reads. An answer in flight is kept
+   * marked out of date.
+   */
+  expire(): void;
   /** The sync's learner or state changed. */
   syncChanged(): void;
   /** The "try again" button. */
@@ -113,6 +125,8 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
   let capsSeen: 'unknown' | 'off' | 'on' = 'unknown';
   let debounce: unknown = null;
   let lastServerFetchAt = Number.NEGATIVE_INFINITY;
+  /** expire() ran while a request was in flight: its answer is stored as out of date. */
+  let expiredInFlight = false;
 
   const learner = () => {
     try {
@@ -155,6 +169,7 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
   async function request(): Promise<void> {
     const id = learner();
     if (!caps()) probed = true;
+    expiredInFlight = false;
     if (snap.learnerId !== id) set({ status: 'loading', learnerId: id, data: null, at: null });
     else if (!snap.data) set({ status: 'loading' });
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -167,7 +182,7 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
           return;
         }
         if (canonical(data.learnerId) !== current) continue; // another learner meanwhile: once more
-        set({ status: 'ready', learnerId: current, data, at: now() });
+        set({ status: 'ready', learnerId: current, data, at: expiredInFlight ? null : now() });
         return;
       } catch (err) {
         const failure = (err ?? {}) as { status?: unknown; errorType?: unknown };
@@ -262,6 +277,14 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
     stale() {
       if (consumers > 0) void fetchNow();
       else if (snap.at !== null) set({ at: null });
+    },
+    invalidate() {
+      if (inFlight) again = true;
+      if (snap.at !== null) set({ at: null });
+    },
+    expire() {
+      if (inFlight) expiredInFlight = true;
+      if (snap.at !== null) set({ at: null });
     },
     syncChanged() {
       const id = learner();

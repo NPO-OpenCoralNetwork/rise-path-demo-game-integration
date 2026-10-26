@@ -193,7 +193,7 @@ describe('MCP review tools over the remote endpoint', () => {
         const from = db.progress.queries.length;
         const { isError, body, text } = await call(client, 'course-review-due', {});
         assert.equal(isError, false, text);
-        assert.deepEqual(statementNames(from), ['begin', 'advisoryLock', 'enterReviewCards', 'selectToday', 'reviewRows', 'commit']);
+        assert.deepEqual(statementNames(from), ['begin', 'advisoryLock', 'enterReviewCards', 'markReviewCardsChecked', 'selectToday', 'reviewRows', 'commit']);
         assert.deepEqual(Object.keys(body), ['today', 'time_zone', 'daily_limit', 'done_today', 'remaining_today', 'carried_over', 'next_due_on', 'cards', 'review_protocol']);
         assert.deepEqual({ ...body, cards: body.cards.length, review_protocol: undefined }, {
             today: today(), time_zone: 'Asia/Tokyo', daily_limit: 10, done_today: 0, remaining_today: 10, carried_over: 2,

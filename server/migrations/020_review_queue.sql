@@ -21,11 +21,15 @@
 -- claim. The lesson counts as the card's first rating: learned_at is the lesson row's
 -- progress_changed_at, prior_rating 1 when the learner's latest mark on the card is 「もう一度」, else
 -- 3, stability and difficulty FSRS-6's first-rating memory for it, due_day the Japan-time day of
--- learned_at plus FSRS's interval (1 or 2 days). A card added to the lesson after the learner's last
--- change in it was never studied: learned_at, prior_rating and the memory are NULL, due_day the day
--- after it entered. reps, lapses, last_rating and last_review_day count reviews in the queue (0 and
--- NULL before the first). A card is reviewed at most once a day: after a review, due_day is 1 to 365
--- days later (CHECK), and the review's UPDATE only matches a card due today and not reviewed today.
+-- learned_at plus FSRS's interval (1 or 2 days); until the first review, a change of that mark sets
+-- them again, dated the change. A card the author added to the lesson after the learner learned it
+-- was never studied unless the learner marks it: learned_at, prior_rating and the memory are NULL,
+-- due_day the day after it entered. checked_at is the lesson row's progress_changed_at as of the
+-- last entry that saw it (it tells such a card from one learned at that change; NULL only for a row
+-- written outside the entry). reps, lapses, last_rating and last_review_day count reviews in the
+-- queue (0 and NULL before the first). A card is reviewed at most once a day: after a review,
+-- due_day is 1 to 365 days later (CHECK), and the review's UPDATE only matches a card due today and
+-- not reviewed today.
 -- entered_at is the insert time (clock_timestamp(), after the learner lock; the roll-forward repair
 -- compares it with reset times). Card text is never stored (it is read from the published lessons):
 -- a text edit keeps the memory; a card removed from its lesson, or a lesson no longer published, is
@@ -61,6 +65,7 @@ CREATE TABLE IF NOT EXISTS review_cards (
   card_id         text             NOT NULL CHECK (card_id ~ '^[a-z0-9][a-z0-9._-]{0,79}$'),
   entered_at      timestamptz      NOT NULL DEFAULT clock_timestamp(),
   learned_at      timestamptz      NULL,
+  checked_at      timestamptz      NULL,
   prior_rating    smallint         NULL CHECK (prior_rating IN (1, 3)),
   due_day         date             NOT NULL,
   stability       double precision NULL CHECK (stability BETWEEN 0.001 AND 36500),

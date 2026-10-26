@@ -8,14 +8,20 @@
  * - no_account: no synced learner (guests, Nexloom-only, signed out): no request.
  * - unsupported: the sync's GET says the server has no reviews (capabilities.review not true), or
  *   the route answered 404 without error_type (an older server): latched for the page load.
- * - It fetches when a consumer mounts and the data is absent or older than 30 s; after a lesson
- *   save the server took or a server-sourced lesson record (2 s trailing, at least 15 s apart: a
- *   save may finish a lesson or mark a card, and the next read enters it); after each grade (the
- *   same debounce); at once on REVIEW_STALE_EVENT (a one-lesson reset or a delete-all succeeded)
- *   and when a grade answer names another Japan-time day than the list; when the learner or the
- *   capabilities change; on 「読み込み直す」. Never on focus, no timer: the server decides the due
- *   days and the cap, so a list left open past midnight shows yesterday's counts until the next
- *   mount, save or grade.
+ * - It fetches when a consumer mounts and the data is absent, out of date or older than 30 s;
+ *   after a server-sourced lesson record (2 s trailing, at least 15 s apart: another tab's reset can
+ *   lower today's count); after each grade (the same debounce, and the held list is out of date at
+ *   once, so the dashboard card or a second /review visit mounted right after reads instead of
+ *   showing the cards just graded); at once on REVIEW_STALE_EVENT (a one-lesson reset or a
+ *   delete-all succeeded), when a grade answer names another Japan-time day than the list, and
+ *   when a session's list is through; when the learner or the capabilities change; on
+ *   「読み込み直す」. A lesson save the server took only marks the data out of date (expire): the
+ *   sidebar consumer is mounted on lesson pages too, a save cannot add a card due today (a card
+ *   enters due the next Japan-time day at the earliest), and a read per save would double a
+ *   reader's requests against the per-IP limit a classroom shares; the next consumer that mounts
+ *   (the dashboard card, /review) reads. Never on focus, no timer: the server decides the due days
+ *   and the cap, so a list left open past midnight shows yesterday's counts until the next mount
+ *   after a save, or the next grade.
  * - Grades go out only for the learner the page's session was started for, and only while the
  *   primary session is that learner's (gradeAsSyncedLearner): otherwise 401 session_changed with
  *   no request. A graded card's day is a learning day on the server (written after the answer),
@@ -54,7 +60,8 @@ export function listenForReviewChanges(s: ReviewStore, target: Pick<Window, 'add
     const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
     if (detail?.source === 'server') s.serverProgress();
   });
-  target.addEventListener(PROGRESS_SAVED_EVENT, () => s.serverProgress());
+  // A save only marks the list out of date (see the header): no request from the lesson page.
+  target.addEventListener(PROGRESS_SAVED_EVENT, () => s.expire());
   target.addEventListener(REVIEW_STALE_EVENT, () => s.stale());
   target.addEventListener(SYNC_ACCOUNT_EVENT, () => s.syncChanged());
 }
@@ -91,14 +98,19 @@ export function createGrader(deps: GradeDeps) {
 }
 
 /**
- * After a grade answered by the server (a 200, or a refusal that carried counts): the store
- * refetches with the save debounce, or at once when the answer is for another Japan-time day than
- * the store's list (the day turned while the page was open).
+ * After a grade answered by the server (a 200, or a refusal that carried counts): the held list is
+ * out of date at once (a consumer that mounts next reads; a read in flight runs once more), and the
+ * store refetches with the debounce for the consumers already mounted; at once when the answer is
+ * for another Japan-time day than the store's list (the day turned while the page was open).
  */
 export function noteGradeAnswer(s: ReviewStore, today: string | null | undefined): void {
   const data = s.getSnapshot().data;
-  if (today && data && data.today !== today) s.stale();
-  else s.serverProgress();
+  if (today && data && data.today !== today) {
+    s.stale();
+    return;
+  }
+  s.invalidate();
+  s.serverProgress();
 }
 
 // --- The page's store ---------------------------------------------------------------------------

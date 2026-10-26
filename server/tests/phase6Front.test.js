@@ -25,15 +25,21 @@ const ICONS = [
 const STUBS = {
   react: `
     let index = 0;
-    export const __resetHooks = () => { index = 0; };
+    let refIndex = 0;
+    export const __resetHooks = () => { index = 0; refIndex = 0; };
     export const useState = (initial) => {
       const i = index++;
       const o = globalThis.__state;
       const value = o && i in o ? o[i] : (typeof initial === 'function' ? initial() : initial);
-      return [value, () => {}];
+      return [value, (v) => { if (globalThis.__set) globalThis.__set[i] = v; }];
     };
     export const useReducer = (reducer, initial) => [globalThis.__session ?? initial, (a) => { (globalThis.__dispatched ??= []).push(a); }];
-    export const useRef = (value) => ({ current: value ?? null });
+    // By call order (ReviewView: 0 pageRef … 7 staleList); __refs presets a ref's current value.
+    export const useRef = (value) => {
+      const i = refIndex++;
+      const o = globalThis.__refs;
+      return { current: o && i in o ? o[i] : (value ?? null) };
+    };
     let ids = 0;
     export const useId = () => ':r' + (ids += 1) + ':';
     export const useEffect = () => {};
@@ -70,7 +76,11 @@ const STUBS = {
     export const useReviewQueue = () => globalThis.__review ?? INITIAL;
     export const reloadReviewQueue = async () => { globalThis.__reloads = (globalThis.__reloads ?? 0) + 1; };
     export const reviewQueueSettled = async () => {};
-    export const gradeAsSyncedLearner = async () => { throw new Error('not in these tests'); };
+    export const markReviewStale = () => { globalThis.__stale = (globalThis.__stale ?? 0) + 1; };
+    export const gradeAsSyncedLearner = async (...args) => {
+      if (globalThis.__grade) return globalThis.__grade(...args);
+      throw new Error('not in these tests');
+    };
   `,
 };
 
@@ -175,7 +185,7 @@ const cardProps = (patch = {}) => ({
   busy: null,
   block: null,
   line: null,
-  live: '',
+  live: null,
   onFlip: () => {},
   onGrade: () => {},
   ...patch,
@@ -235,10 +245,10 @@ describe('ReviewCardView: the flip card and the two buttons (design §5.3)', () 
   });
 
   it('the face: a button described by the hint line (try first → flip back), and a polite live region for the answer', () => {
-    let els = elementsOf(render(ui, ui.ReviewCardView, cardProps({ live: '' })));
+    let els = elementsOf(render(ui, ui.ReviewCardView, cardProps({ live: null })));
     const hint = els.find((el) => el.props.id === face(els).props['aria-describedby']);
     assert.equal(textOfElement(hint), 'まず思い出してから、カードを押して答えを見ましょう。');
-    els = elementsOf(render(ui, ui.ReviewCardView, cardProps({ flipped: true, revealed: true, live: '答え：x' })));
+    els = elementsOf(render(ui, ui.ReviewCardView, cardProps({ flipped: true, revealed: true, live: { value: 'x' } })));
     assert.equal(textOfElement(els.find((el) => el.props.id === face(els).props['aria-describedby'])), 'カードをまた押すと、問いに戻ります。');
     const live = els.find((el) => el.props['aria-live'] === 'polite' && classesOf(el).includes('sr-only'));
     assert.equal(textOfElement(live), '答え：x');
@@ -326,6 +336,20 @@ describe('ReviewCardView: the flip card and the two buttons (design §5.3)', () 
     const bi = elementsOf(render(ui, ui.ReviewCardView, cardProps({ language: 'en', card: BI_CARD })));
     const biTexts = bi.filter((el) => el.type === 'span' && el.props.children?.type === 'Markdown');
     assert.deepEqual(biTexts.map((el) => [el.props.lang, el.props.children.props.source]), [[undefined, 'Question text'], [undefined, 'Answer text']]);
+  });
+
+  it('EN UI: the flip\'s announcement keeps the answer\'s lang="ja" for a Japanese-only card (the region itself has none); an English answer has none (client #7)', () => {
+    const regionOf = (els) => els.find((el) => el.props['aria-live'] === 'polite' && classesOf(el).includes('sr-only'));
+    const els = elementsOf(render(ui, ui.ReviewCardView, cardProps({ language: 'en', flipped: true, revealed: true, live: { value: CC_CARD.back, lang: 'ja' } })));
+    const region = regionOf(els);
+    assert.equal(textOfElement(region), `Answer: ${CC_CARD.back}`);
+    assert.equal(region.props.lang, undefined, 'the label is read in the page language');
+    const spans = walk(region.props.children).filter((t) => 'el' in t && t.el.type === 'span').map((t) => t.el);
+    assert.deepEqual(spans.map((el) => [el.props.lang, textOfElement(el)]), [['ja', CC_CARD.back]]);
+    const bi = regionOf(elementsOf(render(ui, ui.ReviewCardView, cardProps({ language: 'en', card: BI_CARD, flipped: true, revealed: true, live: { value: 'Answer text' } }))));
+    assert.equal(textOfElement(bi), 'Answer: Answer text');
+    assert.ok(walk(bi.props.children).every((t) => !('el' in t) || t.el.props.lang === undefined), 'no lang for the UI language');
+    assert.equal(textOfElement(regionOf(elementsOf(render(ui, ui.ReviewCardView, cardProps())))), '', 'mounted and empty before a flip');
   });
 });
 
@@ -467,6 +491,69 @@ describe('ReviewStateView and the /review page outside a session (design §5.3)'
     delete globalThis.__reloads;
   });
 
+  it('the flip stores the answer with its language (EN UI, a Japanese-only card: lang "ja") for the live region (client #7)', () => {
+    const session = ui.startSession(QUEUE({ remainingToday: 1, cards: [CC_CARD] }));
+    // useState order in ReviewView: 0 settled, 1 the end note, 2 the live text.
+    for (const [language, lang] of [['en', 'ja'], ['jp', undefined]]) {
+      globalThis.__set = {};
+      const els = elementsOf(render(ui, ui.ReviewView, {}, { __view: { state: 'saved', reason: null, online: true }, __sync: { status: 'on', userId: U1 }, __review: SNAP('ready', QUEUE()), __session: session, __language: language }));
+      face(els).props.onClick();
+      assert.deepEqual(globalThis.__set[2], { value: CC_CARD.back, lang }, language);
+    }
+    delete globalThis.__set;
+    delete globalThis.__dispatched;
+  });
+
+  it('the last card graded (or the cap reached): the store reads again at once, so the sidebar and the dashboard match the done view; a card before the last does not (client #5)', async () => {
+    const two = [{ ...CC_CARD, cardId: 'card-0' }, { ...CC_CARD, cardId: 'card-1' }];
+    const summary = { today: '2026-10-27', dailyLimit: 10, doneToday: 10, remainingToday: 0, dueTotal: 0, carriedOver: 0, inQueue: 40, nextDueOn: '2026-10-29' };
+    const press = async (session, grade) => {
+      globalThis.__stale = 0;
+      globalThis.__grade = grade;
+      const els = elementsOf(render(ui, ui.ReviewView, {}, { __view: { state: 'saved', reason: null, online: true }, __sync: { status: 'on', userId: U1 }, __review: SNAP('ready', QUEUE()), __session: session }));
+      gradeButtons(els)[1].props.onClick();
+      for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve));
+      const stale = globalThis.__stale;
+      delete globalThis.__grade;
+      delete globalThis.__stale;
+      delete globalThis.__dispatched;
+      return stale;
+    };
+    const ok = async () => ({ learnerId: U1, graded: { courseSlug: 'claude-code', lessonId: 'cc-07-skills', cardId: 'card-1', rating: 'good', dueOn: '2026-10-29', intervalDays: 2 }, summary });
+    const flipped = (session) => ui.sessionReducer(session, { type: 'flip' });
+    const first = flipped(ui.startSession(QUEUE({ remainingToday: 2, cards: two })));
+    assert.equal(await press(first, ok), 0, 'not the last card: the debounced read only');
+    const last = flipped({ ...first, index: 1 });
+    assert.equal(await press(last, ok), 1, 'the last card: one read now');
+    const limit = async () => { throw Object.assign(new Error('limit'), { status: 409, errorType: 'review_limit', learnerId: U1, summary }); };
+    assert.equal(await press(first, limit), 1, 'the cap: one read now');
+  });
+
+  it('「復習する」 whose read failed (the store kept the list held at the press): says the read failed and offers it again, never the held list\'s counts; offline: once online; a newer list: the done view (client #8)', () => {
+    const held = QUEUE({ remainingToday: 10 });
+    // ReviewView refs by call order: 0 page, 1 title, 2 status, 3 face, 4 done, 5 card, 6 focusNext, 7 staleList.
+    const page = (globals) => render(ui, ui.ReviewView, {}, { __view: { state: 'saved', reason: null, online: true }, __sync: { status: 'on', userId: U1 }, __review: SNAP('ready', held), __state: { 0: true }, __refs: { 7: held }, ...globals });
+    globalThis.__dispatched = [];
+    globalThis.__reloads = 0;
+    const failed = page({});
+    const els = elementsOf(failed);
+    assert.ok(textOf(failed).includes('いまは復習を読み込めません。'), textOf(failed));
+    assert.ok(!els.some((el) => el.type === 'h2' && textOfElement(el) === '今日の復習 10 枚（約 3 分）'), 'not the held list\'s count');
+    assert.equal(els.some((el) => el.type === 'button' && textOfElement(el) === '復習する'), false);
+    const again = els.find((el) => el.type === 'button' && textOfElement(el) === '読み込み直す');
+    assert.ok(again);
+    again.props.onClick();
+    assert.deepEqual(globalThis.__dispatched, [{ type: 'clear' }]);
+    assert.equal(globalThis.__reloads, 1, 'the same fresh read as 「復習する」');
+    const offline = page({ __view: { state: 'offline', reason: null, online: false } });
+    assert.ok(textOf(offline).includes('インターネットにつながると、今日の復習を読み込めます。'));
+    assert.equal(elementsOf(offline).some((el) => el.type === 'button'), false);
+    const newer = page({ __review: SNAP('ready', QUEUE({ remainingToday: 0, doneToday: 10, carriedOver: 0 })) });
+    assert.ok(textOf(newer).includes('今日の復習は終わりです。おつかれさまでした。'));
+    delete globalThis.__dispatched;
+    delete globalThis.__reloads;
+  });
+
   it('a session that ended without a card: a sign-out says so (not "another account"); another account keeps its line; the always-mounted status line and the title can take focus', () => {
     // useState order in ReviewView: 0 settled, 1 the end note, 2 the live text.
     const signedOut = pageWith({ __session: ended('switched'), __review: SNAP('no_account'), __state: { 1: 'signedOut' } });
@@ -485,14 +572,16 @@ describe('ReviewStateView and the /review page outside a session (design §5.3)'
   });
 });
 
-describe('LessonEnd: the reset dialog says the lesson\'s review cards leave too (R4, design §5.6)', () => {
-  const LESSON = { id: 'cc-03-plan-first', objectives: [{ id: 'o1', text: 'Goal' }], sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }] }] };
-  const reader = { lesson: LESSON, courseSlug: 'claude-code', scrollToBlock() {}, progress: { progress: { v: 1, seen: ['b1'], answers: {}, checks: {}, ratings: {}, lastBlockId: null, updatedAt: '2026-10-25T00:00:00.000Z' }, pct: 50, getCheck: () => undefined, setRating() {}, resetLesson: async () => ({ ok: true }) } };
-  const dialogText = (caps, language = 'jp') => {
+describe('LessonEnd: the reset dialog says the lesson\'s review cards leave too (R4, design §5.6), only for a lesson that has them', () => {
+  const LESSON = { id: 'cc-03-plan-first', objectives: [{ id: 'o1', text: 'Goal' }], sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }, { id: 'fc', type: 'flashcards', cards: [{ id: 'card-a', front: 'F', back: 'B' }] }] }] };
+  // vibe-ch0 and vibe-ch3 to vibe-ch11: published, synced, and no flashcards block.
+  const NO_CARDS = { ...LESSON, id: 'vibe-ch3', sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }] }] };
+  const readerOf = (lesson) => ({ lesson, courseSlug: 'claude-code', scrollToBlock() {}, progress: { progress: { v: 1, seen: ['b1'], answers: {}, checks: {}, ratings: {}, lastBlockId: null, updatedAt: '2026-10-25T00:00:00.000Z' }, pct: 50, getCheck: () => undefined, setRating() {}, resetLesson: async () => ({ ok: true }) } });
+  const dialogText = (caps, language = 'jp', lesson = LESSON) => {
     const els = elementsOf(render(ui, ui.LessonEnd, { next: null, prev: null, backTo: '/c', resettable: true }, {
       __view: { state: 'saved', reason: null, userId: U1, pending: 0, failures: 0, busy: false, savedAt: null, online: true },
       __sync: { status: 'on', userId: U1 },
-      __reader: reader,
+      __reader: readerOf(lesson),
       __caps: caps,
       __language: language,
     }));
@@ -507,6 +596,14 @@ describe('LessonEnd: the reset dialog says the lesson\'s review cards leave too 
     assert.ok(dialogText({ lessonReset: true, achievements: true, review: true }, 'en').includes("This lesson's review cards also leave your review, with their schedule and history"));
     assert.ok(!dialogText({ lessonReset: true, achievements: true }).includes('復習カード'), 'Phase 5 API');
     assert.ok(!dialogText({ lessonReset: true, achievements: true, review: false }).includes('復習カード'));
+  });
+
+  it('a lesson without flashcards: no review sentence even on a server with reviews (client #6/#17)', () => {
+    const caps = { lessonReset: true, achievements: true, review: true };
+    const jp = dialogText(caps, 'jp', NO_CARDS);
+    assert.ok(!jp.includes('復習カード'), jp);
+    assert.ok(jp.includes('元に戻すことはできません。'), 'the reset body stays');
+    assert.ok(!dialogText(caps, 'en', NO_CARDS).includes('review cards'));
   });
 });
 

@@ -8,6 +8,7 @@
 //   and pickToday, day by day (design R-5).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { AGAIN, DEFAULT_PARAMETERS, GOOD, S_MAX, S_MIN, scheduler } from '../../shared/review/fsrs.js';
 import { LESSON_PRIORS, REVIEW_DAILY_LIMIT, SECONDS_PER_CARD, pickToday, reviewMinutes, riskOf } from '../../shared/review/queue.js';
 
@@ -165,13 +166,13 @@ describe('pickToday (R2)', () => {
 
 describe('B1: the release backlog (design R-5), pure, fuzz off, every answer 「覚えた」', () => {
   /**
-   * 92 cards; card i learned 1 + i mod 8 days before day 0 with a lesson prior (Again for the
+   * 92 cards (or count); card i learned 1 + i mod 8 days before day 0 with a lesson prior (Again for the
    * cards againOf picks), due that day + the prior's interval. Each day: pickToday with the cap
    * (nothing done yet that day), then every picked card graded Good at t = days since its last rating.
    * @param {(i: number) => boolean} againOf
    */
-  const simulate = (againOf) => {
-    const cards = Array.from({ length: 92 }, (_, i) => {
+  const simulate = (againOf, count = 92) => {
+    const cards = Array.from({ length: count }, (_, i) => {
       const learned = -(1 + (i % 8));
       const prior = againOf(i) ? LESSON_PRIORS.again : LESSON_PRIORS.good;
       return { i, memory: { stability: prior.stability, difficulty: prior.difficulty }, last: learned, dueDay: learned + prior.intervalDays, reviews: 0 };
@@ -220,6 +221,22 @@ describe('B1: the release backlog (design R-5), pure, fuzz off, every answer 「
     assert.equal(run.allSeenBy, 9);
     assert.equal(run.total, 208);
     assert.ok(run.perDay.every((n) => n <= REVIEW_DAILY_LIMIT));
+  });
+
+  it('the plan\'s backlog figures are these runs, counted from 1 (the first day after the release = 1 日目; docs #10)', () => {
+    const plan = readFileSync(new URL('../../doc/brushup-2026/ai-access-plan.ja.md', import.meta.url), 'utf8');
+    const chapter = plan.slice(plan.indexOf('## 10. Phase 6: '), plan.indexOf('## 11. やらないこと'));
+    const good = simulate(() => false);
+    const fifth = simulate((i) => i % 5 === 0);
+    const cc = simulate(() => false, 77);
+    const again = fifth.carried.map((n, d) => (n > 0 && d > fifth.carryEndsOn ? d : -1)).filter((d) => d >= 0);
+    assert.deepEqual([good.allSeenBy, fifth.carryEndsOn, again[0], again.at(-1), cc.allSeenBy], [9, 11, 27, 33, 7], 'zero-based simulation days');
+    assert.deepEqual(again, Array.from({ length: again.length }, (_, k) => again[0] + k), 'one second window');
+    assert.equal(chapter.split(`リリースのあと最初に開いた日を 1 日目として、1 日 10 枚で、${good.allSeenBy + 1} 日目までに一度ずつ出ます`).length - 1, 1, '10.1');
+    assert.match(chapter, new RegExp(`リリースのあと最初に開いた日を 1 日目として、1 日 10 枚で ${good.allSeenBy + 1} 日目までに一度ずつ出て、はじめの 60 日の復習は ${good.total} 回です`, 'u'));
+    assert.match(chapter, new RegExp(`5 枚に 1 枚をレッスンで「もう一度」にしていたときは ${fifth.carryEndsOn + 1} 日目まで、${fifth.total} 回です（そのときは、${again[0] + 1}〜${again.at(-1) + 1} 日目にも`, 'u'));
+    assert.match(chapter, new RegExp(`claude-code の 77 枚だけなら ${cc.allSeenBy + 1} 日目までです`, 'u'));
+    assert.doesNotMatch(chapter, /9 日目までに|11 日目まで|27〜33 日目|7 日目までです/u, 'no zero-based figures left');
   });
 
   it('the 「もう一度」 cards come first on day 0', () => {

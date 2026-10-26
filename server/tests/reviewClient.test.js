@@ -336,12 +336,17 @@ describe('reviewClient: the review store (the Phase 5 store with capabilityKey "
     assert.equal(s.getSnapshot().data.learnerId, U1);
   });
 
-  it('window events: REVIEW_STALE_EVENT fetches at once while mounted; a save fetches 2 s later; a local write does not', async () => {
-    const { s, env } = store();
+  /** The window events through a stand-in target. */
+  const events = (s) => {
     const handlers = new Map();
     const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
-    const fire = (type, detail) => (handlers.get(type) ?? []).forEach((fn) => fn({ type, detail }));
     mod.listenForReviewChanges(s, target);
+    return (type, detail) => (handlers.get(type) ?? []).forEach((fn) => fn({ type, detail }));
+  };
+
+  it('window events: REVIEW_STALE_EVENT fetches at once while mounted; a save only marks the list out of date; a server-sourced record fetches 2 s later; a local write does not', async () => {
+    const { s, env } = store();
+    const fire = events(s);
     assert.equal(mod.REVIEW_STALE_EVENT, 'rp:review-stale');
     const unmount = s.consumerMounted();
     await s.settled();
@@ -350,10 +355,14 @@ describe('reviewClient: the review store (the Phase 5 store with capabilityKey "
     await s.settled();
     assert.equal(env.loads, 2, 'a reset or a delete-all removed cards: at once');
     fire('rp:progress-saved');
+    await env.advance(60_000);
+    assert.equal(env.loads, 2, 'a save: no request (a card enters due tomorrow at the earliest)');
+    assert.equal(s.getSnapshot().at, null, 'out of date: the next consumer reads');
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l', source: 'server' });
     await env.advance(1_999);
     assert.equal(env.loads, 2, 'trailing');
-    await env.advance(13_001);
-    assert.equal(env.loads, 3, 'a save may have finished a lesson: the next read enters its cards');
+    await env.advance(15_000);
+    assert.equal(env.loads, 3, 'a server-sourced record (another tab\'s reset) can lower today\'s count');
     fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l' });
     await env.advance(60_000);
     assert.equal(env.loads, 3, 'a local write is not a save');
@@ -361,6 +370,79 @@ describe('reviewClient: the review store (the Phase 5 store with capabilityKey "
     fire(mod.REVIEW_STALE_EVENT);
     assert.equal(s.getSnapshot().at, null, 'without a consumer: marked stale, the next consumer fetches');
     assert.equal(env.loads, 3);
+  });
+
+  it('a lesson page (the sidebar mounted): 30 saves 20 s apart send no review request; the dashboard card or /review mounting reads once; a server-sourced record still reads (regressions #16)', async () => {
+    const { s, env } = store();
+    const fire = events(s);
+    s.consumerMounted(); // the sidebar, on every page
+    await s.settled();
+    assert.equal(env.loads, 1);
+    for (let i = 0; i < 30; i += 1) {
+      fire('rp:progress-saved');
+      await env.advance(20_000);
+    }
+    await env.advance(60_000);
+    assert.equal(env.loads, 1, 'no review GET per save: a classroom keeps its per-IP budget');
+    assert.equal(s.getSnapshot().at, null);
+    s.consumerMounted(); // the dashboard card or /review
+    await s.settled();
+    assert.equal(env.loads, 2, 'the next consumer reads the out-of-date list');
+    assert.notEqual(s.getSnapshot().at, null);
+    fire('rp:progress-change', { courseSlug: 'c', lessonId: 'l', source: 'server' });
+    await env.advance(15_000);
+    assert.equal(env.loads, 3);
+  });
+
+  it('a save while a read is in flight: its answer is kept out of date, so the next consumer reads again', async () => {
+    let release = null;
+    const { s, env } = store({ load: (e) => new Promise((resolve) => { release = () => resolve(mod.parseReviewQueue(QUEUE(e.learner.toUpperCase()))); }) });
+    const fire = events(s);
+    s.consumerMounted();
+    assert.equal(env.loads, 1);
+    fire('rp:progress-saved');
+    release();
+    await s.settled();
+    assert.equal(s.getSnapshot().status, 'ready');
+    assert.equal(s.getSnapshot().at, null, 'the answer may predate the save');
+    s.consumerMounted();
+    assert.equal(env.loads, 2);
+    release();
+    await s.settled();
+    assert.notEqual(s.getSnapshot().at, null, 'a read that began after the save is fresh');
+  });
+
+  it('after grades, a consumer that mounts reads at once (the dashboard after the done view, a second /review visit), not when the 15 s debounce ends (client #5)', async () => {
+    const { s, env } = store();
+    s.consumerMounted(); // the sidebar
+    const unmountPage = s.consumerMounted(); // /review
+    await s.settled();
+    for (let i = 0; i < 10; i += 1) {
+      await env.advance(4_000);
+      mod.noteGradeAnswer(s, '2026-10-27');
+    }
+    unmountPage();
+    await env.advance(1_000);
+    const before = env.loads;
+    assert.equal(s.getSnapshot().at, null, 'each grade made the held list out of date');
+    s.consumerMounted(); // the dashboard card, 1 s after the last grade
+    assert.equal(env.loads, before + 1, 'read at mount, not when the debounce ends');
+    await s.settled();
+    assert.notEqual(s.getSnapshot().at, null);
+  });
+
+  it('a grade answered while a read is in flight: one more read after it (that read may predate the grade)', async () => {
+    let release = null;
+    const { s, env } = store({ load: (e) => new Promise((resolve) => { release = () => resolve(mod.parseReviewQueue(QUEUE(e.learner.toUpperCase()))); }) });
+    s.consumerMounted();
+    assert.equal(env.loads, 1);
+    mod.noteGradeAnswer(s, '2026-10-27');
+    release();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(env.loads, 2, 'the read that may predate the grade runs once more');
+    release();
+    await s.settled();
+    assert.notEqual(s.getSnapshot().at, null);
   });
 
   it('a grade answer for another Japan-time day than the list marks the store stale (at once); the same day waits for the debounce', async () => {

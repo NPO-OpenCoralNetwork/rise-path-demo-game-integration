@@ -262,8 +262,8 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
     // Phase 6: the review tools (course-review-due, course-review-grade), design §2.3.
-    'GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;',
-    'GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day), UPDATE (due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;',
+    'GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, due_day, stability, difficulty, reps, lapses, last_review_day) ON review_cards TO risepath_mcp_remote;',
+    'GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, prior_rating, stability, difficulty, due_day), UPDATE (learned_at, checked_at, prior_rating, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;',
     'GRANT INSERT (user_id, course_slug, lesson_id, card_id, rating, elapsed_days, interval_days, stability, difficulty, source) ON review_log TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, status) ON materials TO risepath_mcp_remote;',
@@ -344,7 +344,7 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     assert.match(sql, /lesson_progress\s+the course-\* tools/, 'the header maps the grant to its tools');
   });
 
-  it('Phase 6: the review tables by column only; never DELETE, never the log\'s rows, the entry time or the lesson mark', () => {
+  it('Phase 6: the review tables by column only; never DELETE, never the log\'s rows, the entry time, the lesson mark or the last result', () => {
     const on = (table) => code.split('\n').filter((l) => /^\s*GRANT\b/.test(l) && new RegExp(` ON ${table} TO `).test(l));
     const cards = on('review_cards');
     const log = on('review_log');
@@ -360,10 +360,13 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     assert.deepEqual(columns(log, 'SELECT'), [], 'the review history is never read by an AI app');
     assert.deepEqual(columns(log, 'UPDATE'), []);
     for (const column of ['review_day', 'reviewed_at']) assert.ok(!columns(log, 'INSERT').includes(column), `${column}: the database stamps it`);
-    assert.ok(!columns(cards, 'SELECT').includes('prior_rating'), 'the lesson mark is never read back');
+    for (const c of ['prior_rating', 'last_rating']) assert.ok(!columns(cards, 'SELECT').includes(c), `${c} is written, never read back`);
     for (const privilege of ['SELECT', 'INSERT', 'UPDATE']) assert.ok(!columns(cards, privilege).includes('entered_at'), `entered_at ${privilege}`);
-    // SELECT … FOR UPDATE needs UPDATE on a column; the UPDATE writes only the memory columns.
-    assert.deepEqual(columns(cards, 'UPDATE').sort(), ['difficulty', 'due_day', 'lapses', 'last_rating', 'last_review_day', 'reps', 'stability']);
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE']) assert.ok(columns(cards, privilege).includes('checked_at'), `checked_at ${privilege}: the entry reads, sets and moves it`);
+    // SELECT … FOR UPDATE needs UPDATE on a column. The grade writes the memory columns; the entry's
+    // ON CONFLICT DO UPDATE sets a card's first rating again (learned_at, prior_rating, memory, due_day)
+    // and its next statement moves checked_at.
+    assert.deepEqual(columns(cards, 'UPDATE').sort(), ['checked_at', 'difficulty', 'due_day', 'lapses', 'last_rating', 'last_review_day', 'learned_at', 'prior_rating', 'reps', 'stability']);
     for (const table of ['learning_days', 'xp_awards', 'lesson_progress_lesson_resets']) {
       assert.ok(!new RegExp(`\\b${table}\\b`).test(code), `${table} still never granted`);
     }

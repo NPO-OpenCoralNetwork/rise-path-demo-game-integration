@@ -14,7 +14,7 @@ import type { GradeBlock, SessionLine } from './reviewModel';
  * with reduced motion no transition applies and the sides swap at once. The two buttons appear
  * from the first flip on (the answer before the self-rating); while grading is blocked they are
  * aria-disabled (still focusable) and described by the reason. A Japanese-only card or lesson
- * title in the English UI keeps lang="ja".
+ * title in the English UI keeps lang="ja", in the flip's announcement too.
  * The turning part is keyed by the card: the next card mounts unturned, so it never turns back
  * from the previous card's answer (which would show the next card's answer for a frame or two).
  * The face button, the counter and the live regions stay mounted, so focus moves and
@@ -33,8 +33,8 @@ export type ReviewCardViewProps = {
   /** Why grading is blocked now, or null. */
   block: GradeBlock;
   line: SessionLine;
-  /** The polite announcement after a flip (the answer), or ''. */
-  live: string;
+  /** The answer announced after a flip (with its lang, as the back side), or null. */
+  live: CardText | null;
   onFlip: () => void;
   onGrade: (rating: ReviewRating) => void;
   faceRef?: React.Ref<HTMLButtonElement>;
@@ -132,7 +132,9 @@ export function ReviewCardView({
         </span>
       </button>
       <p id={hintId} className="text-small text-fg-3">{flipped ? t.flipBack : t.tryFirst}</p>
-      <span className="sr-only" aria-live="polite">{live}</span>
+      <span className="sr-only" aria-live="polite">
+        {live ? <>{t.answerLabel}<span lang={live.lang}>{live.value}</span></> : null}
+      </span>
 
       {revealed ? (
         <div className="flex flex-col gap-2">

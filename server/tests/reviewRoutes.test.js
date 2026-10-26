@@ -216,11 +216,11 @@ describe('the review queue routes (/api/v2/user/review)', () => {
         });
     });
 
-    it('GET: one transaction, the learner lock before the entry (begin, lock, entry, today, rows, commit); no XP statement', async () => {
+    it('GET: one transaction, the learner lock before the entry (begin, lock, entry, checked mark, today, rows, commit); no XP statement', async () => {
         await withServer(async (base) => {
             assert.equal((await call(base, { headers: as(ALICE) })).status, 200);
         });
-        assert.deepEqual(statements(pool), ['begin', SQL.advisoryLock, SQL.enterReviewCards, SQL.selectToday, SQL.reviewRows, 'commit']);
+        assert.deepEqual(statements(pool), ['begin', SQL.advisoryLock, SQL.enterReviewCards, SQL.markReviewCardsChecked, SQL.selectToday, SQL.reviewRows, 'commit']);
     });
 
     it('POST /grade 200: records the review (source web) and answers { ok, learnerId, graded, summary } without the card text; the after-grade hook runs once, after the answer; no XP', async () => {

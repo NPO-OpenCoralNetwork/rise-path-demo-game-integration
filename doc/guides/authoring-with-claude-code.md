@@ -33,7 +33,11 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
   it open, and a lesson-wide must-fix needs a changed lesson-level field or a `fixedIn` whose
   blocks all changed. Rules: `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
-  only when the owner asks.
+  only when the owner asks. Publishing also adds the lesson's flashcards as
+  `<course>/<lesson>/<card id>` to `published` in `server/tests/fixtures/published-card-ids.json`
+  (kept sorted; `server/tests/reviewCardIds.test.js` checks it). A rework keeps a published lesson's
+  card ids: learners' review memory is keyed by them (text edits keep it; moving a key to `retired`
+  hides that memory).
 - Before publishing (moving to `lessons/`, or opening a PR to publish), every verification on the
   lesson's chain names a committed previous round (`<commit id>:<reports path>`, with a commit id
   as `reviewedRevision`), or that reviewer reviews in full: a snapshot copy exists only in the

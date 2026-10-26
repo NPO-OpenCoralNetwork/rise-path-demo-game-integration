@@ -16,8 +16,11 @@
  *   either button), enters once. Never from a client's or an AI app's claim: only the server's own
  *   lesson_progress rows. The lesson counts as the card's first rating (LESSON_PRIORS), dated the
  *   row's progress_changed_at: Good, or Again when the latest mark is 「もう一度」; due that Japan-time
- *   day plus FSRS's interval (2 or 1 days). A card added to the lesson after the learner's last
- *   change in it enters with no memory, due the day after it entered. It runs under the learner's
+ *   day plus FSRS's interval (2 or 1 days). Until the card's first review, a change of its latest
+ *   mark gives it that first rating again, dated the change. A card the author added to the lesson
+ *   after the learner learned it (the entry already saw the learner's current record of the lesson,
+ *   or a card of it entered without a mark, so with the finished lesson) enters with no memory, due
+ *   the day after it entered, unless the learner marks it. It runs under the learner's
  *   lesson-progress lock (LEARNER_LOCK_SQL, the lock the one-lesson reset and delete-all take first),
  *   so it never re-inserts the cards of a reset that committed meanwhile.
  * - getReviewQueue (GET /api/v2/user/review): one transaction: the lock, the entry, today, the
@@ -87,7 +90,6 @@ import { LESSON_PRIORS, REVIEW_DAILY_LIMIT, pickToday } from '../../shared/revie
  * @property {number | null} stability null: no memory yet
  * @property {number | null} difficulty
  * @property {number} reps
- * @property {number | null} last_rating
  * @property {string} due_on 'YYYY-MM-DD'
  * @property {number | null} days_since whole Japan-time days since the last rating (the lesson or a review)
  * @property {boolean} due
@@ -128,26 +130,41 @@ export const REVIEW_TIME_ZONE = STREAK_TIME_ZONE;
 /**
  * R1: every current card of a finished lesson, and every marked card, enters once. The lesson counts
  * as the first rating, dated the row's progress_changed_at (rows from before migration 020: their
- * updated_at); a card added to the lesson after the learner's last change in it (a card of that
- * lesson already entered with that same learning time) enters with no memory, due tomorrow. $2..$5
- * the catalog arrays (course, lesson, check key, card id); $6..$8 LESSON_PRIORS.good (stability,
- * difficulty, intervalDays); $9..$11 LESSON_PRIORS.again. The state list is LESSON_DONE_STATES.
+ * updated_at). `studied` (the lesson is the card's first rating): the learner marked the card, or no
+ * row of the lesson shows that the card came after the learning, which a row shows when
+ * - its checked_at already holds the record's change time: the entry saw this record before (a read
+ *   after each change), so a card first seen now was added to the lesson since; or
+ * - it is a card the learner did not mark (or one no longer in the lesson): it entered with the
+ *   finished lesson, so a card not there then was added since.
+ * A card not studied enters with no memory, due tomorrow (its first rating is a review). Until a
+ * card's first review (reps 0), a studied card whose latest mark changed gets its first rating
+ * again, dated that change (ON CONFLICT … DO UPDATE). prior_rating there comes from the new
+ * stability: reading EXCLUDED.prior_rating needs SELECT on it, which the remote MCP role never has.
+ * An unchanged card is left alone (the WHERE), and a card not studied never loses its memory.
+ * Inserted rows get checked_at; the others get it from MARK_REVIEW_CARDS_CHECKED_SQL right after.
+ * $2..$5 the catalog arrays (course, lesson, check key, card id); $6..$8 LESSON_PRIORS.good
+ * (stability, difficulty, intervalDays); $9..$11 LESSON_PRIORS.again. The state list is
+ * LESSON_DONE_STATES.
  */
 export const ENTER_REVIEW_CARDS_SQL = `WITH candidates AS (
   SELECT p.user_id, c.course_slug, c.lesson_id, c.card_id,
          COALESCE(p.progress_changed_at, p.updated_at) AS learned_at,
          CASE WHEN (p.progress -> 'checks' -> c.check_key) = 'false'::jsonb THEN 1 ELSE 3 END AS prior,
-         NOT EXISTS (SELECT 1 FROM review_cards x
-                      WHERE x.user_id = p.user_id AND x.course_slug = p.course_slug AND x.lesson_id = p.lesson_id
-                        AND x.learned_at >= COALESCE(p.progress_changed_at, p.updated_at)) AS studied
+         COALESCE((p.progress -> 'checks') ? c.check_key, false)
+         OR NOT EXISTS (SELECT 1 FROM review_cards x
+                         WHERE x.user_id = p.user_id AND x.course_slug = p.course_slug AND x.lesson_id = p.lesson_id
+                           AND (x.checked_at >= COALESCE(p.progress_changed_at, p.updated_at)
+                                OR NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS s (course_slug, lesson_id, check_key, card_id)
+                                                WHERE s.course_slug = x.course_slug AND s.lesson_id = x.lesson_id AND s.card_id = x.card_id
+                                                  AND (p.progress -> 'checks') ? s.check_key))) AS studied
     FROM lesson_progress p
     JOIN unnest($2::text[], $3::text[], $4::text[], $5::text[]) AS c (course_slug, lesson_id, check_key, card_id)
       ON c.course_slug = p.course_slug AND c.lesson_id = p.lesson_id
    WHERE p.user_id = $1
      AND (p.state IN ('read', 'checked', 'mastered') OR (p.progress -> 'checks') ? c.check_key)
 )
-INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day)
-SELECT user_id, course_slug, lesson_id, card_id,
+INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, checked_at, learned_at, prior_rating, stability, difficulty, due_day)
+SELECT user_id, course_slug, lesson_id, card_id, learned_at,
        CASE WHEN studied THEN learned_at END,
        CASE WHEN studied THEN prior END,
        CASE WHEN NOT studied THEN NULL WHEN prior = 1 THEN $9::float8 ELSE $6::float8 END,
@@ -156,10 +173,28 @@ SELECT user_id, course_slug, lesson_id, card_id,
             ELSE (learned_at AT TIME ZONE 'Asia/Tokyo')::date + CASE WHEN prior = 1 THEN $11::int ELSE $8::int END END
   FROM candidates
  ORDER BY course_slug, lesson_id, card_id
-ON CONFLICT (user_id, course_slug, lesson_id, card_id) DO NOTHING`;
+ON CONFLICT (user_id, course_slug, lesson_id, card_id) DO UPDATE
+   SET learned_at = EXCLUDED.learned_at,
+       prior_rating = CASE WHEN EXCLUDED.stability = $9::float8 THEN 1 ELSE 3 END,
+       stability = EXCLUDED.stability, difficulty = EXCLUDED.difficulty, due_day = EXCLUDED.due_day
+ WHERE review_cards.reps = 0
+   AND EXCLUDED.learned_at IS NOT NULL
+   AND EXCLUDED.stability IS DISTINCT FROM review_cards.stability`;
+
+/**
+ * Right after the entry, in its transaction: each of the learner's rows records the change time of
+ * its lesson's record that the entry has now seen (checked_at), so a card the author adds to the
+ * lesson later is not taken for one the learner studied at that change. It only moves forward, and
+ * leaves the rows of an unchanged record alone.
+ */
+export const MARK_REVIEW_CARDS_CHECKED_SQL = `UPDATE review_cards r
+   SET checked_at = COALESCE(p.progress_changed_at, p.updated_at)
+  FROM lesson_progress p
+ WHERE r.user_id = $1 AND p.user_id = r.user_id AND p.course_slug = r.course_slug AND p.lesson_id = r.lesson_id
+   AND (r.checked_at IS NULL OR r.checked_at < COALESCE(p.progress_changed_at, p.updated_at))`;
 
 /** Every card of the learner with the day facts the queue needs (Japan time, database clock). */
-export const REVIEW_ROWS_SQL = `SELECT course_slug, lesson_id, card_id, stability, difficulty, reps, last_rating,
+export const REVIEW_ROWS_SQL = `SELECT course_slug, lesson_id, card_id, stability, difficulty, reps,
        to_char(due_day, 'YYYY-MM-DD') AS due_on,
        (now() AT TIME ZONE 'Asia/Tokyo')::date
          - COALESCE(last_review_day, (learned_at AT TIME ZONE 'Asia/Tokyo')::date) AS days_since,
@@ -170,7 +205,7 @@ export const REVIEW_ROWS_SQL = `SELECT course_slug, lesson_id, card_id, stabilit
  ORDER BY course_slug, lesson_id, card_id`;
 
 /** The card to grade or reveal, locked. */
-export const LOCK_REVIEW_CARD_SQL = `SELECT stability, difficulty, reps, lapses, last_rating,
+export const LOCK_REVIEW_CARD_SQL = `SELECT stability, difficulty, reps, lapses,
        to_char(due_day, 'YYYY-MM-DD') AS due_on,
        (now() AT TIME ZONE 'Asia/Tokyo')::date
          - COALESCE(last_review_day, (learned_at AT TIME ZONE 'Asia/Tokyo')::date) AS days_since,
@@ -286,11 +321,12 @@ export function reviewCatalog() {
 
 /**
  * R1, inside the caller's transaction and after LEARNER_LOCK_SQL: enters the cards the learner's
- * lesson_progress rows imply (ENTER_REVIEW_CARDS_SQL). Idempotent. Throws on a database error.
+ * lesson_progress rows imply (ENTER_REVIEW_CARDS_SQL), then marks what it saw
+ * (MARK_REVIEW_CARDS_CHECKED_SQL). Idempotent. Throws on a database error.
  * @param {Queryable} db
  * @param {string} userId canonical
  * @param {ReviewCatalog} catalog
- * @returns {Promise<number>} the number of cards that entered
+ * @returns {Promise<number>} the number of cards that entered or got their first rating again
  */
 export async function enterReviewCards(db, userId, catalog) {
     const cards = [...catalog.values()];
@@ -304,6 +340,7 @@ export async function enterReviewCards(db, userId, catalog) {
         good.stability, good.difficulty, good.intervalDays,
         again.stability, again.difficulty, again.intervalDays,
     ]);
+    await db.query(MARK_REVIEW_CARDS_CHECKED_SQL, [userId]);
     return rowCount ?? 0;
 }
 
