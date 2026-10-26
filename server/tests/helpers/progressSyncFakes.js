@@ -104,8 +104,8 @@ export function fakeApi({ epoch = null, rows = [], clock, phase5 = false } = {})
     /** Phase 5: lesson generations, `${course}:${lesson}` → { epoch, at } (never removed by a delete). */
     resets: new Map(),
     phase5,
-    /** Phase 5 GET capabilities (undefined: an older server). */
-    capabilities: phase5 ? { lessonReset: true, achievements: true } : undefined,
+    /** Phase 5 GET capabilities (undefined: an older server; review: Phase 6). */
+    capabilities: phase5 ? { lessonReset: true, achievements: true, review: true } : undefined,
     /** true: every request fails like a dropped network (status 0), after scripted steps. */
     offline: false,
   };

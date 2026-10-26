@@ -107,6 +107,7 @@ import {
   TermsRoute,
   PrivacyRoute,
   LegalConsentView,
+  ReviewView,
 } from './components/routes/lazyRoutes';
 import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
@@ -199,6 +200,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/profile/diagnosis')) return ViewState.PROFILE_DIAGNOSIS;
     if (path.startsWith('/profile/history')) return ViewState.PROFILE_HISTORY;
     if (path.startsWith('/profile/badges')) return ViewState.PROFILE_BADGES;
+    if (normalizePath(path) === '/review') return ViewState.REVIEW;
     if (path.startsWith('/profile/mirror')) return ViewState.PROFILE_MIRROR;
     if (path.startsWith('/profile/generated')) return ViewState.PROFILE_GENERATED;
     if (path.startsWith('/profile/edit')) return ViewState.PROFILE_EDIT;
@@ -396,6 +398,8 @@ const AppContent: React.FC = () => {
               <Route path="/profile/diagnosis" element={<ProfileDiagnosisView onNavigate={handleNavigate} />} />
               <Route path="/profile/history" element={<ProfileHistoryView onNavigate={handleNavigate} />} />
               <Route path="/profile/badges" element={<ProfileBadgesView />} />
+              {/* Phase 6: today's review cards (signed-in learners; the page explains sign-in to guests). */}
+              <Route path="/review" element={<ReviewView />} />
               <Route path="/profile/generated" element={<ProfileGeneratedView onNavigate={handleNavigate} />} />
               <Route path="/profile/edit" element={<ProfileEditView onNavigate={handleNavigate} />} />
               <Route path="/profile/mirror" element={<LearningMirrorView />} />

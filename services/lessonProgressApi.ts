@@ -40,8 +40,8 @@ export type LessonProgressPutBody = {
   records: { courseSlug: string; lessonId: string; progress: unknown; lessonEpoch?: string | null }[];
 };
 
-/** What the server offers (GET capabilities, Phase 5); undefined from an older server. */
-export type LessonProgressCapabilities = { lessonReset: boolean; achievements: boolean };
+/** What the server offers (GET capabilities, Phase 5; review: Phase 6); undefined from an older server. */
+export type LessonProgressCapabilities = { lessonReset: boolean; achievements: boolean; review: boolean };
 
 export class LessonProgressApiError extends Error {
   status: number;
@@ -75,7 +75,7 @@ function recordsOf(value: unknown): LessonProgressRecordOut[] {
 
 function capabilitiesOf(value: unknown): LessonProgressCapabilities | undefined {
   if (!isRecord(value)) return undefined;
-  return { lessonReset: value.lessonReset === true, achievements: value.achievements === true };
+  return { lessonReset: value.lessonReset === true, achievements: value.achievements === true, review: value.review === true };
 }
 
 async function send(init: RequestInit, subPath = ''): Promise<Record<string, unknown>> {

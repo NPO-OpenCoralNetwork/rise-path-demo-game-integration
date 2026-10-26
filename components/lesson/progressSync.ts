@@ -187,13 +187,13 @@ export type RejectedRecord = {
 };
 /** lessonEpoch: the generation the record's content builds on (null: unknown, born here, or never started over). */
 export type PutBody = { epoch: SyncEpoch; records: { courseSlug: string; lessonId: string; progress: LessonProgress; lessonEpoch: string | null }[] };
-/** What the server offers (GET capabilities, Phase 5); an older server sends none. */
-export type SyncCapabilities = { lessonReset: boolean; achievements: boolean };
+/** What the server offers (GET capabilities, Phase 5; review: Phase 6); an older server sends none. */
+export type SyncCapabilities = { lessonReset: boolean; achievements: boolean; review: boolean };
 
 /** services/lessonProgressApi.ts. Failures throw an ApiFailure-shaped error. */
 export type ProgressApi = {
   /** restarted: the account was deleted and opened again since its last reset (server GET, Phase 4). */
-  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean; capabilities?: { lessonReset?: boolean; achievements?: boolean } }>;
+  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean; capabilities?: { lessonReset?: boolean; achievements?: boolean; review?: boolean } }>;
   put(body: PutBody, options: { keepalive: boolean }): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; rejected: RejectedRecord[] }>;
   del(): Promise<{ deleted: number; epoch: string }>;
   /** POST …/lesson-reset (Phase 5). record: the lesson's emptied record (null when the answer had none). */
@@ -1173,9 +1173,10 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       // answer may predate a delete, and must not bring deleted records or the old epoch back.
       if (read(SYNC_ACCOUNT_KEY) === before || pass >= SYNC_TIMING.getPasses) break;
     }
-    // What this server offers (Phase 5): only the reset control, XP and the 503 rule depend on it.
+    // What this server offers (Phase 5): only the reset control, XP, reviews (Phase 6) and the 503
+    // rule depend on it.
     const offered = result.capabilities;
-    caps = { lessonReset: offered?.lessonReset === true, achievements: offered?.achievements === true };
+    caps = { lessonReset: offered?.lessonReset === true, achievements: offered?.achievements === true, review: offered?.review === true };
     getFailure = null;
     const account = readAccount();
     if (!account || account.userId !== userId || account.loggedOut) {

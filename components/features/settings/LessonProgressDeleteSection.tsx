@@ -16,6 +16,8 @@ import { deleteLessonProgress, useProgressSyncState } from '../../lesson/progres
  * delete never removes: tools/core/achievements.js), which lessons were started over and when,
  * and what AI apps saved through the learner-state tools. On this device only (guests, no API):
  * the learning history; nothing else of this list exists for them.
+ * Phase 6: the account's delete also removes every review card with its schedule and history
+ * (review_cards, review_log); the copy says so in both lines about the account's scope.
  * The button stays enabled while deleting (the open dialog makes it inert), so the dialog can
  * return focus to it however it closes.
  */
@@ -24,13 +26,13 @@ const copy = {
   en: {
     title: 'Delete lesson progress',
     body: 'Deletes what the lessons saved for you in every course: what you read, your quiz answers, checklists, self-ratings and where to continue.',
-    scopeAccount: 'It is deleted on every device where you are signed in. This cannot be undone.',
+    scopeAccount: 'It is deleted on every device where you are signed in, together with your review schedule and history. This cannot be undone.',
     scopeDevice: 'It is deleted on this device. This cannot be undone.',
     keptAccount: 'Not deleted: your learning history (lessons you started and finished), the record of the XP you earned (which lessons and stages you started or finished, and when), your badges, the days you learned (your streak), which lessons you started over and when, and records that AI apps saved with the learner-state tools.',
     keptDevice: 'Not deleted: your learning history (lessons you started and finished).',
     button: 'Delete lesson progress',
     dialogTitle: 'Delete all your lesson progress?',
-    dialogAccount: 'Every course, on every device, quiz answers included. This cannot be undone.',
+    dialogAccount: 'Every course, on every device, quiz answers and review history included. This cannot be undone.',
     dialogDevice: 'Every course on this device, quiz answers included. This cannot be undone.',
     confirm: 'Delete',
     busy: 'Deleting…',
@@ -42,13 +44,13 @@ const copy = {
   jp: {
     title: '学習の進み具合を消す',
     body: 'すべてのコースについて、レッスンに記録された内容を消します。読んだところ、確認問題の答え、チェックリスト、自己評価、続きの位置です。',
-    scopeAccount: 'ログインしているすべての端末から消えます。元に戻すことはできません。',
+    scopeAccount: 'ログインしているすべての端末から消えます。復習カードの予定と記録も消えます。元に戻すことはできません。',
     scopeDevice: 'この端末から消えます。元に戻すことはできません。',
     keptAccount: '学習の履歴（レッスンを始めた・終えた記録）、XP の記録（どのレッスンやステージを始めた・終えたか、いつか）とバッジ、学んだ日の記録（連続記録）、やり直したレッスンとその日時、AI アプリが学習状況ツール（learner-state）で保存した記録は消えません。',
     keptDevice: '学習の履歴（レッスンを始めた・終えた記録）は消えません。',
     button: '学習の進み具合を消す',
     dialogTitle: '学習の進み具合をすべて消しますか？',
-    dialogAccount: 'すべてのコース、すべての端末が対象で、確認問題の答えも消えます。元に戻すことはできません。',
+    dialogAccount: 'すべてのコース、すべての端末が対象で、確認問題の答えと復習の記録も消えます。元に戻すことはできません。',
     dialogDevice: 'この端末のすべてのコースが対象で、確認問題の答えも消えます。元に戻すことはできません。',
     confirm: '消す',
     busy: '消しています…',

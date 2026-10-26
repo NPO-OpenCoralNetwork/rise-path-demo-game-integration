@@ -625,7 +625,7 @@ describe('Phase 5 logout: prepareSignOut and signOut', () => {
 });
 
 const serverRow = (lessonId, progress, extra = {}) => ({ courseSlug: COURSE, lessonId, progress, pct: 40, state: 'in_progress', updatedAt: progress.updatedAt, ...extra });
-const CAPS = { lessonReset: true, achievements: true };
+const CAPS = { lessonReset: true, achievements: true, review: true };
 
 describe('Phase 5 generations: what a device keeps after a lesson was started over', () => {
   it('G10: an unstamped record written after the reset (an old bundle) is refused and dropped for the server\'s', async () => {
@@ -862,7 +862,7 @@ describe('Phase 5 generations: what a device keeps after a lesson was started ov
     const t = setup({ storage });
     t.sync.signIn(U1);
     await t.clock.advance(1_000);
-    assert.deepEqual(t.sync.capabilities(), { lessonReset: false, achievements: false });
+    assert.deepEqual(t.sync.capabilities(), { lessonReset: false, achievements: false, review: false });
     // The VM is upgraded while the page is open; another device had started l2 over.
     t.api.server.phase5 = true;
     t.api.server.capabilities = CAPS;
@@ -872,7 +872,7 @@ describe('Phase 5 generations: what a device keeps after a lesson was started ov
     assert.equal(t.api.puts().length, 2);
     assert.equal(t.api.puts()[1].body.records[0].lessonEpoch, gen.epoch);
     assert.deepEqual(t.api.server.rows.get(`${COURSE}:l2`).progress.seen, ['n1']);
-    assert.deepEqual(t.sync.capabilities(), { lessonReset: false, achievements: false }, 'no GET since');
+    assert.deepEqual(t.sync.capabilities(), { lessonReset: false, achievements: false, review: false }, 'no GET since');
   });
 
   it('G24: a GET without lessonEpoch (an older server) keeps local stamps and drops nothing', async () => {

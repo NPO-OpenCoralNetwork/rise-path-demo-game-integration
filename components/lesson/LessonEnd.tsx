@@ -29,6 +29,8 @@ import type { LText } from '../../shared/lesson/schema.js';
  *   the dialog has closed, also when it closed before the request ended; on failure focus
  *   returns to the button (or #main-content when the button has gone) and the line under it
  *   says why.
+ * Phase 6: when the server has reviews, the dialog also says that the lesson's review cards leave
+ * the review queue with their schedule and history (R4); nothing else here changes.
  */
 
 const copy = {
@@ -53,6 +55,7 @@ const copy = {
     reset: 'Start this lesson over',
     resetTitle: 'Start this lesson over?',
     resetBody: 'This deletes what you read in this lesson, your quiz answers, checks, self-ratings and where to continue. It is deleted on every device where you are signed in, and cannot be undone.',
+    resetReview: "This lesson's review cards also leave your review, with their schedule and history (finish the lesson again to add them back fresh).",
     resetKept: 'Your XP, badges, learning days and history stay. XP you already earned for this lesson is not given again. What AI apps already received is not deleted.',
     resetConfirm: 'Start over',
     resetBusy: 'Deleting…',
@@ -94,6 +97,7 @@ const copy = {
     reset: 'このレッスンを最初からやり直す',
     resetTitle: 'このレッスンを最初からやり直しますか？',
     resetBody: 'このレッスンで読んだところ、確認問題の答え、チェック、自己評価、続きの位置を消します。ログインしているすべての端末から消え、元に戻すことはできません。',
+    resetReview: 'このレッスンの復習カードも、復習の予定と記録ごと外れます（もう一度終えると、はじめから加わります）。',
     resetKept: 'もらった XP とバッジ、学んだ日、学習の履歴は残ります。すでにもらった XP は、このレッスンでもう一度もらうことはありません。AI アプリにすでに渡した内容は消えません。',
     resetConfirm: 'やり直す',
     resetBusy: '消しています…',
@@ -354,6 +358,8 @@ export function LessonEnd({ next, prev, backTo, resettable = false, onLessonRese
         body={(
           <>
             <p>{text.resetBody}</p>
+            {/* Phase 6 (R4): the lesson's review cards leave the review queue too (a server that has reviews). */}
+            {progressCapabilities()?.review === true ? <p className="mt-2">{text.resetReview}</p> : null}
             <p className="mt-2">{text.resetKept}</p>
           </>
         )}

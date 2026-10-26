@@ -28,6 +28,9 @@
  *   the server offers); syncedLearnerId and runAsSyncedLearner (XP, legacy progress: only the
  *   learner the sync runs for); PROGRESS_SAVED_EVENT when the server took records (the XP store
  *   refetches: the save's hook may have awarded XP).
+ * - Phase 6: the review capability (progressCapabilities().review), and REVIEW_STALE_EVENT after a
+ *   one-lesson reset (done, unconfirmed or reloaded) or a delete-all of the account's records
+ *   succeeded (the server removed review cards; components/review/reviewClient.ts reads again).
  */
 import { useSyncExternalStore } from 'react';
 import { getCourse, getLessonEntry } from '../../content';
@@ -42,6 +45,7 @@ import {
   putLessonProgressRecords,
   resetLessonProgressRecord,
 } from '../../services/lessonProgressApi';
+import { REVIEW_STALE_EVENT } from '../../services/reviewApi';
 import { PROGRESS_EVENT, type ProgressEventDetail } from './progressStore.ts';
 import {
   PROGRESS_SAVED_EVENT,
@@ -268,9 +272,14 @@ export function chooseProgressAdoption(add: boolean): void {
   if (applied) void whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId(), adoptUnowned: add })).then(() => dispatch(SYNC_ACCOUNT_EVENT));
 }
 
-/** The Privacy page's delete: the account's records on the server (then here), or this device's. */
-export function deleteLessonProgress(): Promise<DeleteResult> {
-  return progressSync().deleteAll();
+/**
+ * The Privacy page's delete: the account's records on the server (then here), or this device's.
+ * Phase 6: the server's delete also removed every review card; the review store reads again.
+ */
+export async function deleteLessonProgress(): Promise<DeleteResult> {
+  const result = await progressSync().deleteAll();
+  if (result.ok && result.scope === 'account') dispatch(REVIEW_STALE_EVENT);
+  return result;
 }
 
 const OFF: SyncState = { status: 'off', userId: null };
@@ -346,10 +355,18 @@ export async function prepareProgressSignOut(): Promise<{ unsaved: number }> {
   }
 }
 
-/** LessonEnd's 「このレッスンを最初からやり直す」: the server first, then this browser. Never throws. */
+/**
+ * LessonEnd's 「このレッスンを最初からやり直す」: the server first, then this browser. Never throws.
+ * Phase 6 (R4): the server's reset also removed the lesson's review cards; the review store reads
+ * again after a done reset, and also when the server may have reset (unconfirmed: the connection
+ * dropped after sending) or deleted everything meanwhile (reloaded). An extra read is harmless.
+ */
 export async function resetLessonProgress(courseSlug: string, lessonId: string): Promise<LessonResetResult> {
   try {
-    return await progressSync().resetLesson(courseSlug, lessonId);
+    const result = await progressSync().resetLesson(courseSlug, lessonId);
+    const mayHaveReset = result.ok || ('reason' in result && (result.reason === 'unconfirmed' || result.reason === 'reloaded'));
+    if (mayHaveReset) dispatch(REVIEW_STALE_EVENT);
+    return result;
   } catch (err) {
     console.warn('[progressSync] lesson reset failed:', err);
     return { ok: false, reason: 'failed' };

@@ -22,12 +22,14 @@ import {
   Trophy,
   BookOpen,
   Blocks,
+  RotateCw,
   type LucideIcon,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, type SelectedLanguage } from '../../context/LanguageContext';
 import { VIEW_PATHS, pathToNavKey, isLessonPath, type NavKey } from '../../navigation/viewPaths';
 import { features } from '../../config/features';
+import { useReviewQueue } from '../review/reviewClient';
 import BrandMark from './BrandMark';
 
 interface LayoutProps {
@@ -46,6 +48,8 @@ type NavItem = {
   view: ViewState;
   label: string;
   icon: LucideIcon;
+  /** Phase 6: a count after the label (the review cards left today); null or absent: none. */
+  count?: number | null;
 };
 
 type NavGroup = {
@@ -229,6 +233,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
       expandSidebar: 'Expand sidebar',
       dashboard: 'Dashboard',
       learningHub: 'Learning Content',
+      review: 'Review',
+      reviewDue: (n: number) => `${n} due today`,
       aiDiagnosis: 'AI Learning Diagnosis',
       lifeJournal: 'Life Journal',
       courseGenerator: 'AI Course Generator',
@@ -261,6 +267,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
       expandSidebar: 'サイドバーを広げる',
       dashboard: 'ダッシュボード',
       learningHub: '学習コンテンツ',
+      review: '復習',
+      reviewDue: (n: number) => `今日 ${n} 枚`,
       aiDiagnosis: 'AI学習診断',
       lifeJournal: 'ライフジャーナル',
       courseGenerator: 'AIカリキュラム生成',
@@ -288,9 +296,18 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
 
   const t = copy[language];
 
+  // Phase 6: the review entry and today's count from the server (components/review/reviewClient.ts).
+  // No entry while the server has no reviews (an older API); no count unless the server said so
+  // (never a made-up zero for guests, errors or while loading).
+  const review = useReviewQueue();
+  const reviewCount = review.status === 'ready' && review.data && review.data.remainingToday > 0 ? review.data.remainingToday : null;
+
   const navEntries: (NavItem | NavGroup)[] = [
     { key: 'dashboard', view: ViewState.DASHBOARD, label: t.dashboard, icon: LayoutDashboard },
     { key: 'learning', view: ViewState.LEARNING_HUB, label: t.learningHub, icon: Layers },
+    ...(review.status === 'unsupported' ? [] : [
+      { key: 'review' as const, view: ViewState.REVIEW, label: t.review, icon: RotateCw, count: reviewCount },
+    ]),
     { key: 'generator', view: ViewState.COURSE_GENERATOR, label: t.courseGenerator, icon: MapIcon },
     { key: 'diagnosis', view: ViewState.AI_DIAGNOSIS, label: t.aiDiagnosis, icon: Brain },
     { key: 'journal', view: ViewState.LIFE_JOURNAL, label: t.lifeJournal, icon: BookOpen },
@@ -370,19 +387,29 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
 
   const renderItem = (item: NavItem, nested = false) => {
     const isActive = activeKey === item.key;
+    const count = typeof item.count === 'number' && item.count > 0 ? item.count : null;
+    const countText = count !== null && item.key === 'review' ? t.reviewDue(count) : null;
     return (
       <li key={item.key}>
         <a
           href={VIEW_PATHS[item.view]}
           onClick={(event) => handleNavClick(event, item.view)}
           aria-current={isActive ? 'page' : undefined}
-          title={collapsed ? item.label : undefined}
-          className={`${rowClass} ${nested ? 'pl-11 text-sm' : 'text-body'} ${isActive ? styles.sidebarActive : styles.sidebarHover}`}
+          title={collapsed ? (countText ? `${item.label} (${countText})` : item.label) : undefined}
+          className={`${rowClass} ${nested ? 'pl-11 text-sm' : 'text-body'} ${isActive ? styles.sidebarActive : styles.sidebarHover} ${collapsed && countText ? 'relative' : ''}`}
         >
           {!nested && (
             <item.icon size={20} aria-hidden="true" className={`shrink-0 ${isActive ? '' : styles.text}`} />
           )}
           <span className={collapsed ? 'sr-only' : 'truncate'}>{item.label}</span>
+          {countText ? (
+            collapsed ? (
+              <span aria-hidden="true" className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary" />
+            ) : (
+              <span aria-hidden="true" className="ml-auto rounded-full bg-primary-soft px-2 text-caption text-primary-text tabular-nums">{count}</span>
+            )
+          ) : null}
+          {countText ? <span className="sr-only">{language === 'jp' ? `（${countText}）` : ` (${countText})`}</span> : null}
         </a>
       </li>
     );

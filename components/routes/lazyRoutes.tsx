@@ -22,6 +22,11 @@ export const DevBlocksRoute = lazy(
   () => (import.meta.env.DEV ? import('./DevBlocksRoute') : Promise.resolve({ default: () => null }))
 );
 
+/** /review: today's review cards (Phase 6). */
+export const ReviewView = lazy(
+  () => import('../review/ReviewView')
+);
+
 export const CoursePathViewWrapper = lazy(
   () => import('../wrappers/CoursePathViewWrapper')
 );

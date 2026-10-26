@@ -11,7 +11,7 @@
  */
 import { apiFetch } from './apiClient';
 
-/** Fired on window when something the server counts changed outside the lesson sync (a Blender stage). */
+/** Fired on window when something the server counts changed outside the lesson sync (a Blender stage, a review grade's learning day). */
 export const ACHIEVEMENTS_STALE_EVENT = 'rp:achievements-stale';
 
 export type BadgeId = 'first_lesson' | 'five_lessons' | 'fifteen_lessons' | 'first_course' | 'three_courses' | 'streak_3' | 'streak_7';

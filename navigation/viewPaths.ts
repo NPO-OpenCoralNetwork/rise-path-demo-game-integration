@@ -14,6 +14,8 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.COURSES]: '/courses',
   [ViewState.COURSE_DETAILS]: '/courses',
   [ViewState.LIBRARY]: '/library',
+  // Phase 6: today's review cards (the sidebar's 「復習」).
+  [ViewState.REVIEW]: '/review',
 
   [ViewState.AI_DIAGNOSIS]: '/assessment',
   [ViewState.LIFE_JOURNAL]: '/life-journal',
@@ -140,6 +142,7 @@ export const VIEW_PATHS: Record<ViewState, string> = {
 export type NavKey =
   | 'dashboard'
   | 'learning'
+  | 'review'
   | 'generator'
   | 'diagnosis'
   | 'journal'
@@ -202,6 +205,7 @@ export function pathToNavKey(pathname: string): NavKey | null {
   if (startsWithSegment(path, '/life-journal')) return 'journal';
   if (startsWithSegment(path, '/profile/history')) return 'history';
   if (startsWithSegment(path, '/profile/badges')) return 'badges';
+  if (startsWithSegment(path, '/review')) return 'review';
   if (startsWithSegment(path, '/profile/generated')) return 'generated';
   if (startsWithSegment(path, '/generated-course') || startsWithSegment(path, '/generated-lesson')) return 'generated';
   if (startsWithSegment(path, '/profile')) return 'passport';
