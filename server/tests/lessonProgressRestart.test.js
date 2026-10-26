@@ -29,8 +29,8 @@ const auth = (t) => ({ Authorization: `Bearer ${t}` });
 const record = (overrides = {}) => ({ v: 1, seen: ['hook-b1'], answers: {}, checks: {}, lastBlockId: null, updatedAt: '2026-10-20T00:00:00.000Z', ...overrides });
 
 const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'TRUST_PROXY'];
-/** GET's capabilities (Phase 5: the one-lesson reset, stage 1; XP and badges, stage 2). */
-const CAPABILITIES = { lessonReset: true, achievements: true };
+/** GET's capabilities (Phase 5: the one-lesson reset, stage 1; XP and badges, stage 2; Phase 6: the review queue). */
+const CAPABILITIES = { lessonReset: true, achievements: true, review: true };
 
 async function call(url, { method = 'GET', headers = {}, body } = {}) {
     const init = { method, headers: { ...headers } };

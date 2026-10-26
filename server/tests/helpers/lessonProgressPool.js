@@ -12,7 +12,8 @@
  * Phase 5 (migration 019): the account stub's KEY SHARE lock, the per-lesson generations
  * (lesson_progress_lesson_resets: kept by deleteAll and deleteOne, as in Postgres where no FK ties
  * them to lesson_progress), the XP ledger (xp_awards, with the amount CHECK), learning days (Japan
- * time of the transaction's now()) and the legacy user_progress rows the Blender reconcile reads.
+ * time of the transaction's now(); Phase 6's web review day is the day it is given, $2::date) and
+ * the legacy user_progress rows the Blender reconcile reads.
  * Any other statement naming xp_awards, learning_days or user_progress throws, like one naming
  * lesson_progress. `clock` (default: the real clock) gives each transaction its now() (a statement
  * outside a transaction gets the clock at that statement). Stage 2: the achievements read (ledger,
@@ -70,6 +71,8 @@ export const SQL = Object.freeze({
     deleteLessonsKeepingXp: "with gone as ( delete from lesson_progress where user_id = $1 returning user_id, course_slug, lesson_id, state ), awarded as ( insert into xp_awards (user_id, source, item_key, milestone, xp) select p.user_id, 'lesson', p.course_slug || '/' || p.lesson_id, m.milestone, m.xp from gone p join (values ('start', 10), ('done', 40)) as m (milestone, xp) on m.milestone = 'start' or p.state in ('read', 'checked', 'mastered') where p.state <> 'not_started' order by 3, 4 on conflict (user_id, source, item_key, milestone) do nothing ) select count(*)::int as deleted from gone",
     xpReconcileStages: "insert into xp_awards (user_id, source, item_key, milestone, xp) select distinct u.user_id, 'blender_stage', 'blender/' || s.stage, 'done', 80 from user_progress u cross join lateral unnest(u.completed_stages) as s (stage) where u.course_id = 'blender' and s.stage in ('1', '2', '3', '4') and u.user_id = $1 order by 3 on conflict (user_id, source, item_key, milestone) do nothing returning item_key",
     learningDay: "insert into learning_days (user_id, day) values ($1, (now() at time zone 'asia/tokyo')::date) on conflict (user_id, day) do nothing",
+    // Phase 6: a web review's learning day, the day the review's own transaction recorded ($2).
+    reviewLearningDay: 'insert into learning_days (user_id, day) values ($1, $2::date) on conflict (user_id, day) do nothing',
     xpAwards: 'select source, item_key, milestone, xp from xp_awards where user_id = $1 order by source, item_key, milestone',
     selectDays: "select to_char(day, 'yyyy-mm-dd') as day from learning_days where user_id = $1 order by day",
     selectToday: "select to_char((now() at time zone 'asia/tokyo')::date, 'yyyy-mm-dd') as today",
@@ -553,6 +556,13 @@ export function createLessonProgressPool({ rows = [], resets = {}, tombstones = 
             }
             case SQL.learningDay: {
                 const k = `${p1}|${jstDay(now())}`;
+                if (state.days.has(k)) return { rowCount: 0, rows: [] };
+                state.days.add(k);
+                return { rowCount: 1, rows: [] };
+            }
+            case SQL.reviewLearningDay: {
+                if (typeof p2 !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(p2)) throw Object.assign(new Error('invalid input syntax for type date'), { code: '22007' });
+                const k = `${p1}|${p2}`;
                 if (state.days.has(k)) return { rowCount: 0, rows: [] };
                 state.days.add(k);
                 return { rowCount: 1, rows: [] };

@@ -33,7 +33,7 @@ import {
     summaryOf,
 } from '../../tools/core/reviewQueue.js';
 import { LEARNER_LOCK_SQL, deleteAllLessonProgress, getLessonProgress, markLessonProgress, resetLessonProgress, saveLessonProgress } from '../../tools/core/lessonProgress.js';
-import { LEARNING_DAY_SQL, LESSON_XP_SELECT, TODAY_SQL, getAchievements, noteReviewDay } from '../../tools/core/achievements.js';
+import { LESSON_XP_SELECT, REVIEW_LEARNING_DAY_SQL, TODAY_SQL, getAchievements, noteReviewDay } from '../../tools/core/achievements.js';
 import { clearCatalogCacheForTests, getPublishedLesson, listPublishedLessons } from '../../tools/core/courseCatalog.js';
 import { getCourseProgress } from '../../tools/core/courseLessons.js';
 import { LESSON_DONE_STATES } from '../../shared/lesson/progress.js';
@@ -778,20 +778,26 @@ describe('one learner lock per learner: every writer under it takes the canonica
 });
 
 describe('noteReviewDay (a web review\'s learning day, after the answer)', () => {
-    it('today (Japan time, database clock) in its own transaction; never XP', async () => {
-        setNow('2026-10-25T15:30:00.000Z');
-        assert.equal(await noteReviewDay({ userId: ALICE.toUpperCase() }), true);
-        assert.deepEqual(pool.progressStatements(), ['begin', SQL.learningDay, 'commit']);
-        assert.equal(norm(LEARNING_DAY_SQL), SQL.learningDay);
-        assert.deepEqual(pool.daysOf(ALICE), ['2026-10-26']);
+    it('the review\'s own day (the day its transaction recorded) in its own transaction, even after 00:00 JST; never XP', async () => {
+        setNow('2026-10-25T15:30:00.000Z'); // 00:30 JST on the 26th: the hook runs after midnight
+        assert.equal(await noteReviewDay({ userId: ALICE.toUpperCase(), day: '2026-10-25' }), true);
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.reviewLearningDay, 'commit']);
+        assert.equal(norm(REVIEW_LEARNING_DAY_SQL), SQL.reviewLearningDay);
+        assert.deepEqual(pool.queries.find((q) => q.sql === SQL.reviewLearningDay).params, [ALICE, '2026-10-25']);
+        assert.deepEqual(pool.daysOf(ALICE), ['2026-10-25'], 'the review\'s day, not the hook\'s today');
+        assert.equal(await noteReviewDay({ userId: ALICE, day: '2026-10-25' }), true, 'twice: one day');
+        assert.deepEqual(pool.daysOf(ALICE), ['2026-10-25']);
         assert.deepEqual(pool.awardsOf(ALICE), []);
     });
 
-    it('not a learner: false with no SQL; a failure (a deleted account, 23503) only logs and returns false', async () => {
-        assert.equal(await noteReviewDay({ userId: 'nope' }), false);
+    it('not a learner or not a YYYY-MM-DD day: false with no SQL; a failure (a deleted account, 23503) only logs and returns false', async () => {
+        assert.equal(await noteReviewDay({ userId: 'nope', day: '2026-10-25' }), false);
+        for (const day of [undefined, null, '', '2026-02-30', '2026-10-25T00:00:00Z', '20261025', 20261025, ['2026-10-25']]) {
+            assert.equal(await noteReviewDay(/** @type {any} */ ({ userId: ALICE, day })), false, String(day));
+        }
         assert.equal(pool.queries.length, 0);
-        pool.fail({ code: '23503', message: 'violates foreign key constraint (db.internal)', when: (text) => text === SQL.learningDay });
-        const { result, lines } = await quiet(() => noteReviewDay({ userId: ALICE }));
+        pool.fail({ code: '23503', message: 'violates foreign key constraint (db.internal)', when: (text) => text === SQL.reviewLearningDay });
+        const { result, lines } = await quiet(() => noteReviewDay({ userId: ALICE, day: '2026-10-25' }));
         assert.equal(result, false);
         assert.ok(lines.some((l) => l.includes('note after review')));
         assert.deepEqual(pool.daysOf(ALICE), []);

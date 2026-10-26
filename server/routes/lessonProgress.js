@@ -7,14 +7,15 @@
  * and a per-user limit on writes. Not gated by AI access: progress is not an AI feature, so
  * minors keep it.
  *
- * GET    /  → { ok, epoch, capabilities: { lessonReset: true, achievements: true },
+ * GET    /  → { ok, epoch, capabilities: { lessonReset: true, achievements: true, review: true },
  *               records: [{ courseSlug, lessonId, progress, pct, state, updatedAt, lessonEpoch, lessonResetAt }] }
  *             epoch: the learner's reset epoch (null until the first DELETE). pct and state are
  *             the server's, against the published lesson. restarted: true (only then present, before
  *             capabilities) when the epoch was written by re-opening a deleted account (Phase 4): a
  *             device that knew another epoch clears its learning events too. capabilities (Phase 5):
- *             what this server offers (an older one sends none): the one-lesson reset below, and
- *             GET /api/v2/user/achievements (server/routes/achievements.js). lessonEpoch /
+ *             what this server offers (an older one sends none): the one-lesson reset below,
+ *             GET /api/v2/user/achievements (server/routes/achievements.js) and (Phase 6) the review
+ *             queue, /api/v2/user/review (server/routes/review.js). lessonEpoch /
  *             lessonResetAt: the lesson's generation and when it was last started over (null, null: never).
  * PUT    /  body { epoch: string | null, records: [{ courseSlug, lessonId, progress, lessonEpoch? }] } (1–25)
  *          → { ok, epoch, records, rejected: [{ courseSlug, lessonId, error_type, lessonEpoch?, lessonResetAt?, record? }] }
@@ -38,12 +39,15 @@
  *             Starts one published lesson over: its record becomes empty on the server and on every
  *             device at their next load or save, and the lesson gets a new generation. The account
  *             epoch is checked like PUT's (409 progress_reset with epoch) and never moved. XP already
- *             earned, learning days and learning events stay. 400 unknown_lesson for a lesson that
- *             is not published. A new path, not DELETE /?course=: an older server's DELETE / ignores
- *             the query and deletes every course; this path answers 404 there.
+ *             earned, learning days and learning events stay. Phase 6 (R4): the lesson's review cards
+ *             and their reviews are deleted too; finishing the lesson again enters its cards fresh.
+ *             400 unknown_lesson for a lesson that is not published. A new path, not
+ *             DELETE /?course=: an older server's DELETE / ignores the query and deletes every
+ *             course; this path answers 404 there.
  * DELETE /  → { ok, deleted, epoch }: every lesson record of the learner (all courses, quiz answers
- *             included) and a new epoch. The streak and learning events (/user/events), XP already
- *             earned, the lessons' generations and the legacy user_progress rows stay.
+ *             included), every review card and review (Phase 6, R4), and a new epoch. The streak and
+ *             learning events (/user/events), XP already earned, the lessons' generations and the
+ *             legacy user_progress rows stay.
  *
  * Every refusal from this router is { ok: false, error, error_type } (409 progress_reset adds epoch).
  * 503 { error_type: 'lesson_progress_unavailable' } without a database (or when it is down);
@@ -120,7 +124,7 @@ export function lessonProgressBodyErrors(err, req, res, next) {
 }
 
 /** What this server offers the reader (GET capabilities; an older server sends none). */
-export const LESSON_PROGRESS_CAPABILITIES = Object.freeze({ lessonReset: true, achievements: true });
+export const LESSON_PROGRESS_CAPABILITIES = Object.freeze({ lessonReset: true, achievements: true, review: true });
 
 /** @param {unknown} value */
 const isUuidOrNull = (value) => value === null || isUuid(value);

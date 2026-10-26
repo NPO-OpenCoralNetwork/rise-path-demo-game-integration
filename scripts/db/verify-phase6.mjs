@@ -48,8 +48,10 @@
  *   P8  account deletion (server/services/accountDeletion.js lock, lockStub, deleteStub) against a
  *       grade holding its card row and against an entry, both orders: no 40P01, both tables empty
  *       after; control: a log table with a second FK to auth.users deadlocks (40P01)
- *   P9  noteReviewDay writes today (Japan time); after the account is deleted it returns false
- *       (23503) and never throws; an MCP grade writes no learning day
+ *   P9  noteReviewDay writes the day it is given (the grade's summary.today, the log row's
+ *       review_day): today, and yesterday as given (a grade just before 00:00 JST whose hook runs
+ *       after it); after the account is deleted it returns false (23503) and never throws; an MCP
+ *       grade writes no learning day
  *   P10 the Phase 5 api on the 020 schema (its reset and delete-all without the review deletes):
  *       delete-all; delete-all then a REST save; delete-all then an MCP course-quiz-check; a reset; a
  *       reset then the lesson finished again: each leaves review rows. The roll-forward listings
@@ -1019,17 +1021,26 @@ async function p9(pool) {
     await seedPrior(pool, id, COURSE, LESSON, 'card-frontend');
     const graded = /** @type {any} */ (await gradeReviewCard({ userId: id, courseSlug: COURSE, lessonId: LESSON, cardId: 'card-frontend', rating: 'good', source: 'mcp' }));
     const afterMcp = await count(pool, 'SELECT count(*) AS n FROM learning_days WHERE user_id = $1', [id]);
-    const noted = await noteReviewDay({ userId: id.toUpperCase() });
     const today = await todayOf(pool);
-    const days = (await pool.query("SELECT string_agg(to_char(day, 'YYYY-MM-DD'), ',') AS s FROM learning_days WHERE user_id = $1", [id])).rows[0].s;
-    check('P9', !graded.error_type && afterMcp === 0 && noted === true && days === today,
-        `an MCP grade wrote no learning day (${afterMcp}); noteReviewDay wrote today in Japan (${days}; server today ${today})`);
+    const reviewDay = String((await pool.query("SELECT string_agg(to_char(review_day, 'YYYY-MM-DD'), ',') AS s FROM review_log WHERE user_id = $1", [id])).rows[0].s);
+    const gradeDay = graded.summary?.today;
+    const noted = await noteReviewDay({ userId: id.toUpperCase(), day: gradeDay });
+    const daysOf = async () => (await pool.query("SELECT string_agg(to_char(day, 'YYYY-MM-DD'), ',' ORDER BY day) AS s FROM learning_days WHERE user_id = $1", [id])).rows[0].s;
+    const days = await daysOf();
+    check('P9', !graded.error_type && afterMcp === 0 && gradeDay === reviewDay && reviewDay === today && noted === true && days === today,
+        `an MCP grade wrote no learning day (${afterMcp}); noteReviewDay with the grade's day (summary.today ${gradeDay} = review_day ${reviewDay}) wrote it (${days}; server today ${today})`);
+    const yesterday = String((await pool.query("SELECT to_char((now() AT TIME ZONE 'Asia/Tokyo')::date - 1, 'YYYY-MM-DD') AS d")).rows[0].d);
+    const notedYesterday = await noteReviewDay({ userId: id, day: yesterday });
+    const bad = await noteReviewDay({ userId: id, day: '2026-02-30' });
+    const days2 = await daysOf();
+    check('P9', notedYesterday === true && bad === false && days2 === `${yesterday},${today}`,
+        `the day as given, not the hook's today: yesterday ${notedYesterday} (a grade just before 00:00 JST, its hook after), not a day ${bad}; learning days ${days2}`);
     await pool.query('DELETE FROM auth.users WHERE id = $1', [id]);
     const before = inst.state.errors.length;
     let threw = false;
     let late = null;
     try {
-        late = await quietly(() => noteReviewDay({ userId: id }));
+        late = await quietly(() => noteReviewDay({ userId: id, day: today }));
     } catch {
         threw = true;
     }
