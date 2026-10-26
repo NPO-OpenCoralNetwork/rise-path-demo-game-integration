@@ -824,7 +824,7 @@ if (isRemote) {
 
     policyTool(
         'course-review-grade',
-        '今日の復習カード 1 枚について、学習者が答えたあとに reveal: true で答えを見せる（何も記録しない）か、学習者が選んだ結果を rating で記録する（取り消せない）。rating は学習者が選んだボタンだけ: again =「もう一度」（思い出せなかった）、good =「覚えた」（思い出せた）。エージェントが選んだり、学習者が答える前に答えを見せたりしない。記録すると、答えと次の復習日を返す。今日の分でないカードは not_due、今日の 10 枚を終えたら review_limit / For one of today\'s review cards: after the learner answered, reveal: true shows the answer and records nothing; rating records the learner\'s own choice and cannot be undone. Send only the button the learner chose: again (もう一度: did not remember) or good (覚えた: remembered). Never choose for the learner or show the answer before they tried. Recording returns the answer and the next review day. A card not due today is refused (not_due); after today\'s 10 cards, review_limit.',
+        '今日の復習カード 1 枚について、学習者が答えたあとに reveal: true で答えを見せる（何も記録しない）か、学習者が選んだ結果を rating で記録する（取り消せない）。rating は学習者が選んだボタンだけ: again =「もう一度」（思い出せなかった）、good =「覚えた」（思い出せた）。エージェントが選んだり、学習者が答える前に答えを見せたりしない。記録すると、答えと次の復習日を返す。期日の来ていないカードと今日すでに記録したカードは not_due、今日の 10 枚を終えたら review_limit / For one of today\'s review cards: after the learner answered, reveal: true shows the answer and records nothing; rating records the learner\'s own choice and cannot be undone. Send only the button the learner chose: again (もう一度: did not remember) or good (覚えた: remembered). Never choose for the learner or show the answer before they tried. Recording returns the answer and the next review day. A card not due yet, or already recorded today, is refused (not_due); after today\'s 10 cards, review_limit.',
         {
             course_slug: courseSlugArg(),
             lesson_id: courseLessonArg(),

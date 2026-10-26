@@ -180,7 +180,9 @@ describe('MCP review tools over the remote endpoint', () => {
         assert.match(grade.description, /rating records the learner's own choice and cannot be undone/);
         assert.match(grade.description, /Never choose for the learner or show the answer before they tried/);
         assert.match(grade.description, /again \(もう一度: did not remember\) or good \(覚えた: remembered\)/);
-        assert.match(grade.description, /not_due/);
+        // not_due is a card due later or already recorded today, not a due card outside today's list.
+        assert.match(grade.description, /期日の来ていないカードと今日すでに記録したカードは not_due/);
+        assert.match(grade.description, /A card not due yet, or already recorded today, is refused \(not_due\)/);
         assert.match(grade.description, /review_limit/);
     });
 

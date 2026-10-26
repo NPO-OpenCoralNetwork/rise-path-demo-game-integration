@@ -410,10 +410,11 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'rate_limited' });
     assert.equal(stale, 5, 'refused: nothing was reset');
     resetRoute = () => json(409, { ok: false, error: 'Progress was reset', error_type: 'progress_reset', epoch: '55555555-5555-4555-8555-555555555555' });
+    const getsBefore = t.gets().length;
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'reloaded' });
     assert.equal(stale, 6, 'everything was deleted on another device meanwhile: so were the review cards');
-    await until(() => t.client.progressCapabilities() !== null);
-    await wait(30);
+    // The 409 loads again: wait for that GET to finish (sync on), not a fixed delay (slow under a full run).
+    await until(() => t.gets().length > getsBefore && t.client.getProgressSaveView().state === 'saved');
     writeLocal(t, 'l1', record({ seen: ['b1'] }));
     resetRoute = null;
     answer = { lessonEpoch: '33333333-3333-4333-8333-333333333333', lessonResetAt: 'not a date', record: { courseSlug: COURSE, lessonId: 'l1', progress: 'garbage' } };

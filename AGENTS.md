@@ -11,11 +11,10 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
   (needs the dev server) · `npm run lessons:mcp-smoke`
 - MCP: `npm run mcp` (stdio; profile via `--profile` or `RISE_PATH_MCP_PROFILE`) — see `.mcp.json`
 - CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests (`lint:arch` included),
-  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references
-  `--check`, change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for
-  `check-assets.mjs`: credits in `assets/credits.json` for assets over 1 MiB), and `build:prod`
-  with dummy keys that must not appear in the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES`
-  unset). Run them before opening a PR.
+  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references `--check`,
+  change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for `check-assets.mjs`: credits
+  in `assets/credits.json` for assets over 1 MiB), and `build:prod` with dummy keys that must not appear in
+  the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES` unset). Run them before opening a PR.
 
 ## Where things live
 - Learning material (教材): `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json`
@@ -38,6 +37,9 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
   `lesson_progress_lesson_resets`, kept until the account is deleted, and in each local record's `lessonGen`;
   never move `lesson_progress_resets` for one lesson); XP, badges and streak `GET /api/v2/user/achievements`
   (`tools/core/achievements.js`, tables `xp_awards`, `learning_days`, migration 019, none granted to the MCP role).
+- Phase 6: flashcard reviews: FSRS-6 `shared/review/fsrs.js`, queue `tools/core/reviewQueue.js` (`review_cards`, `review_log`,
+  migration 020), `/api/v2/user/review`, page `/review`. Cards enter only from server lesson records; lesson resets and
+  delete-all delete them; no XP; MCP reviews write no learning day. Card ids: `server/tests/fixtures/published-card-ids.json`.
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
@@ -49,10 +51,9 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No fabricated facts, URLs, images or commands. Cite non-obvious claims (`sources` + `cite`).
 - Done = `lessons:validate` 0 errors, `lessons:lint --strict` clean, rubric pass
   (`content/schema/rubric.v1.json`: every criterion ≥ 3, mean ≥ 3.3), screenshots checked.
-  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration`
-  or `migration+…`, no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory.
-  Drafts are always strict; a rework records a new author and becomes strict (`--include-migrated`
-  gates them all).
+  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration` or `migration+…`,
+  no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory. Drafts are always strict; a rework
+  records a new author and becomes strict (`--include-migrated` gates them all).
 - Write new lessons to `drafts/`. Moving one to `lessons/` + `course.json` is publishing: owner only.
 
 ## Code conventions
