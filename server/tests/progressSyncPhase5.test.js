@@ -472,19 +472,52 @@ describe('Phase 5 recovery: networkChanged and retryNow', () => {
     assert.equal(t.sync.getView().state, 'saved');
   });
 
+  it('retryNow says whether a request is on its way: a press just after the third failure waits for the 20 s spacing; a press after a quick failure is not throttled (the spacing holds); nothing to retry → false', async () => {
+    const t = p5();
+    await on(t);
+    for (let i = 0; i < 5; i += 1) t.api.script('put', fail(503));
+    write(t, 'l1', record({ seen: ['b1'], updatedAt: iso(1) }));
+    while (t.api.puts().length < 3) await t.clock.advance(100);
+    assert.deepEqual([t.sync.getView().state, t.sync.getView().reason], ['stopped', 'server']);
+    // The notice's button at once: scheduled, not sent (the in-app case: about 18 s of waiting).
+    let lastPut = t.api.puts().at(-1).at;
+    assert.equal(t.sync.retryNow(), true, 'a PUT is on its way');
+    await t.clock.advance(lastPut + SYNC_TIMING.minPutIntervalMs - 1 - t.clock.now());
+    assert.equal(t.api.puts().length, 3, 'not before lastPut + 20 s');
+    await t.clock.advance(1);
+    assert.equal(t.api.puts().length, 4);
+    assert.equal(t.sync.getView().failures, 4);
+    // The spacing has passed: a press sends at once; it fails at once; a press 1 s later still
+    // schedules one (no 10 s throttle on uploads), again only at lastPut + 20 s.
+    await t.clock.advance(SYNC_TIMING.minPutIntervalMs);
+    assert.equal(t.sync.retryNow(), true);
+    await t.clock.advance(0);
+    assert.equal(t.api.puts().length, 5, 'at once');
+    lastPut = t.api.puts().at(-1).at;
+    await t.clock.advance(1_000);
+    assert.equal(t.sync.retryNow(), true, 'not throttled');
+    await t.clock.advance(lastPut + SYNC_TIMING.minPutIntervalMs - 1 - t.clock.now());
+    assert.equal(t.api.puts().length, 5);
+    await t.clock.advance(1);
+    assert.equal(t.api.puts().length, 6);
+    assert.equal(t.sync.getView().state, 'saved');
+    assert.equal(t.sync.retryNow(), false, 'saved: nothing to retry');
+    assert.equal(t.api.calls.length, t.api.gets().length + 6);
+  });
+
   it('retryNow: one GET at once for a failed load, at most once per 10 s; a server stop gets one GET too', async () => {
     const t = await offlinePage(0);
     t.api.script('get', fail(0, 'network'));
-    t.sync.retryNow();
+    assert.equal(t.sync.retryNow(), true);
     await settle();
     assert.equal(t.api.gets().length, 5, 'no jitter');
-    t.sync.retryNow();
+    assert.equal(t.sync.retryNow(), false);
     await t.clock.advance(9_000);
-    t.sync.retryNow();
+    assert.equal(t.sync.retryNow(), false);
     await settle();
     assert.equal(t.api.gets().length, 5, 'throttled');
     await t.clock.advance(1_000);
-    t.sync.retryNow();
+    assert.equal(t.sync.retryNow(), true);
     await settle();
     assert.equal(t.api.gets().length, 6);
 

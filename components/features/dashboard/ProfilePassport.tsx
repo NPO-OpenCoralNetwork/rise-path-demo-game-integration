@@ -188,8 +188,10 @@ const ProfilePassport: React.FC<ProfilePassportProps> = ({ onNavigate }) => {
                     }}
                 >
 
-                    {/* FRONT: The ID Card */}
+                    {/* FRONT: The ID Card (a light card in every theme: light tokens scoped to the face,
+                        so its text stays dark on the white gradient in dark mode) */}
                     <div
+                        data-theme="light"
                         className={`absolute inset-0 ${isFlipped ? 'pointer-events-none' : ''}`}
                         style={{ backfaceVisibility: 'hidden' }}
                     >

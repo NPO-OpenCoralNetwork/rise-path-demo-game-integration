@@ -322,12 +322,16 @@ export function useProgressSaveView(): SaveView {
   return useSyncExternalStore(subscribeProgressSaveView, getProgressSaveView, () => LOCAL_VIEW);
 }
 
-/** The notice's 「もう一度保存する」: one GET or one PUT now (at most once per 10 s). Never throws. */
-export function retryProgressSync(): void {
+/**
+ * The notice's 「もう一度保存する」: one GET now (at most once per 10 s), or one PUT as soon as the
+ * 20 s PUT spacing allows. True when a request started or is scheduled. Never throws.
+ */
+export function retryProgressSync(): boolean {
   try {
-    instance?.retryNow();
+    return instance?.retryNow() ?? false;
   } catch (err) {
     console.warn('[progressSync] retry failed:', err);
+    return false;
   }
 }
 

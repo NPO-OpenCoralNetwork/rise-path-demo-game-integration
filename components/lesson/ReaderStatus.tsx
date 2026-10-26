@@ -13,6 +13,9 @@ import type { SaveView, StopReason } from './progressSync.ts';
  * Messages, one at a time (LessonReader picks them; each clears itself after 8 s):
  *   - stall: saving moved to "on this device" or "stopped" while something is unsaved;
  *   - reset: the lesson was started over (LessonEnd).
+ * The reset message takes its own room under the bar (data-flow, reader.css): LessonReader has
+ * scrolled to the top and focused the title, which an overlay would cover; a stall message floats
+ * over the text, so it never moves what the learner reads.
  * "Close" empties it and moves focus to the page's main area (the button is gone). When the card
  * goes by itself (8 s, or saving works again) after its button had focus and focus fell to the
  * page body, the main area takes it too (as SaveStoppedNotice does).
@@ -93,7 +96,7 @@ export function ReaderStatusView({ language, message, onDismiss, onButtonFocus }
   }
   // The same element in every state: only its content changes.
   return (
-    <div className="rp-status" role="status" aria-live="polite">
+    <div className="rp-status" role="status" aria-live="polite" data-flow={message?.kind === 'reset' ? 'true' : undefined}>
       {content}
     </div>
   );

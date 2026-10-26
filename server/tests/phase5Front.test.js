@@ -669,7 +669,7 @@ describe('achievementsApi: the answer and its refusals', () => {
 const UI_ICONS = [
   'ArrowLeft', 'ArrowRight', 'Award', 'Bell', 'BookOpenCheck', 'CircleCheck', 'Cloud', 'CloudAlert', 'CloudCheck',
   'CloudOff', 'CloudUpload', 'Flag', 'Flame', 'GraduationCap', 'Layers', 'ListChecks', 'LockKeyhole', 'LogIn', 'LogOut',
-  'Medal', 'PartyPopper', 'RotateCcw', 'RotateCw', 'Settings', 'ShieldCheck', 'Trophy',
+  'Medal', 'MonitorSmartphone', 'PartyPopper', 'RotateCcw', 'RotateCw', 'Settings', 'ShieldCheck', 'Trophy',
 ];
 const UI_STUBS = {
   react: `
@@ -717,7 +717,7 @@ const UI_STUBS = {
     export const useProgressSyncState = () => globalThis.__sync ?? { status: 'on', userId: 'u1' };
     export const progressCapabilities = () => (globalThis.__caps === undefined ? { lessonReset: true, achievements: true } : globalThis.__caps);
     export const isSyncableLesson = () => globalThis.__syncable ?? true;
-    export const retryProgressSync = () => { globalThis.__retries = (globalThis.__retries ?? 0) + 1; };
+    export const retryProgressSync = () => { globalThis.__retries = (globalThis.__retries ?? 0) + 1; return globalThis.__retryResult ?? true; };
   `,
   guard: `
     export const answerUnsavedLearning = (v) => { (globalThis.__answers ??= []).push(v); };
@@ -851,7 +851,7 @@ describe('SaveChip: where the record is (design §4.2)', () => {
     [{ state: 'stopped', reason: 'auth' }, 'CloudAlert', '保存が止まっています', 'ログインの確認ができないため、保存が止まっています。この端末には残っていて、ログインし直すと保存します。'],
     [{ state: 'stopped', reason: 'account' }, 'CloudAlert', '保存が止まっています', 'ほかのタブでログアウトしたか、別のアカウントでログインしたため、このタブでは保存していません。この端末には残っています。'],
     [{ state: 'stopped', reason: 'storage' }, 'CloudAlert', '保存が止まっています', 'この端末の保存領域がいっぱいか使えないため、アカウントへの保存が止まっています。'],
-    [{ state: 'local' }, 'CloudOff', 'この端末だけ', '学習の記録は、この端末だけに保存されます。'],
+    [{ state: 'local' }, 'MonitorSmartphone', 'この端末だけ', '学習の記録は、この端末だけに保存されます。'],
   ];
 
   it('each state and reason: icon, short label (visual), long text (title and screen readers); not interactive, no live region', () => {
@@ -870,6 +870,8 @@ describe('SaveChip: where the record is (design §4.2)', () => {
     }
     const en = elementsOf(renderUi(ui, ui.SaveChipView, { view: VIEW({ state: 'offline' }), language: 'en' }));
     assert.equal(textOfElement(byClass(en, 'rp-save-label')[0]), 'On this device for now');
+    // Below 640 px only the icon shows (in-app check): every state has its own.
+    assert.equal(new Set(Object.values(ui.SAVE_ICONS)).size, Object.keys(ui.SAVE_ICONS).length);
   });
 
   it('colour repeats the state with tokens only: danger only while stopped; the label shows from 640 px', () => {
@@ -986,6 +988,19 @@ describe('ReaderStatus: the reader\'s status line (finding 11)', () => {
     assert.doesNotMatch(reader, /useProgressSaveView\(/);
   });
 
+  it('the reset message takes its own room under the bar (the title LessonReader focuses is never under it); a stall message floats', () => {
+    const regionOf = (message) => elementsOf(renderUi(ui, ui.ReaderStatusView, { language: 'jp', message, onDismiss() {} }))[0];
+    assert.equal(regionOf({ kind: 'reset', id: 1 }).props['data-flow'], 'true');
+    for (const message of [null, { kind: 'stall', state: 'offline', reason: null, id: 2 }, { kind: 'stall', state: 'stopped', reason: 'server', id: 3 }]) {
+      assert.equal(regionOf(message).props['data-flow'], undefined, JSON.stringify(message));
+    }
+    const css = readFile('components/lesson/reader.css');
+    assert.match(css, /\.rp-status \{\s*position: absolute;/);
+    assert.match(css, /\.rp-status\[data-flow\] \{\s*position: static;/);
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /showStatus\(\{ kind: 'reset', id: messageCount\.current \}\);\s*scrollToTop\(\);\s*document\.getElementById\(lessonTitleId\(lesson\.id\)\)\?\.focus/);
+  });
+
   it('the card wraps at any width (no nowrap, no ellipsis) and does not move under reduced motion', () => {
     const css = readFile('components/lesson/reader.css');
     const block = css.slice(css.indexOf('.rp-status {'), css.indexOf('.rp-status-card .rp-notice-x'));
@@ -1048,9 +1063,9 @@ describe('SaveStoppedNotice: the app notice while saving has stopped (design §4
   });
 
   it('an automatic retry (busy, nothing pressed) changes no text in the live region; the learner\'s press says 「保存しています…」 until its request ends', () => {
-    const view = (busy) => VIEW({ state: 'stopped', reason: 'network', pending: 2, busy });
-    const mount = (busy, state) => {
-      const tokens = renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view(busy), __refs: {}, ...(state ? { __state: state } : {}) });
+    const view = (busy, failures = 3) => VIEW({ state: 'stopped', reason: 'network', pending: 2, busy, failures });
+    const mount = (busy, state, failures) => {
+      const tokens = renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view(busy, failures), __refs: {}, ...(state ? { __state: state } : {}) });
       return { els: elementsOf(tokens), text: textOf(tokens), effects: globalThis.__effects };
     };
     const runEffects = (effects) => {
@@ -1064,18 +1079,73 @@ describe('SaveStoppedNotice: the app notice while saving has stopped (design §4
     assert.equal(textOfElement(autoButton), 'もう一度保存する');
     assert.doesNotMatch(auto.text, /保存しています…/);
     assert.equal(autoButton.props['aria-disabled'], true);
-    // The learner presses: pressed, and the retry runs.
+    // The learner presses: pressed (with the failure count), and the retry runs.
     globalThis.__retries = 0;
     const idle = mount(false);
     idle.els.find((el) => el.type === 'button').props.onClick();
-    assert.deepEqual(globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v), [true]);
+    assert.deepEqual(globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v), [{ failures: 3, started: false }]);
     assert.equal(globalThis.__retries, 1);
     // Its request runs: the label says so; it stays pressed.
-    const running = mount(true, { 0: true });
+    const running = mount(true, { 0: { failures: 3, started: false } });
     assert.match(textOfElement(running.els.find((el) => el.type === 'button')), /保存しています…/);
-    assert.deepEqual(runEffects(running.effects), []);
+    assert.deepEqual(runEffects(running.effects), [{ failures: 3, started: true }]);
+    assert.deepEqual(runEffects(mount(true, { 0: { failures: 3, started: true } }).effects), []);
     // The request ended (busy false): no longer pressed, the next automatic retry says nothing.
-    assert.deepEqual(runEffects(mount(false, { 0: true }).effects), [false]);
+    assert.deepEqual(runEffects(mount(false, { 0: { failures: 3, started: true } }).effects), [null]);
+  });
+
+  it('the common case (in-app check): the upload stopped after 3 failures and the PUT waits up to 20 s for its spacing; the press says 「保存しています…」 at once and until that request ends', () => {
+    const view = (busy, failures = 3) => VIEW({ state: 'stopped', reason: 'server', pending: 1, busy, failures });
+    const mount = (busy, state, failures) => {
+      const tokens = renderUi(ui, ui.SaveStoppedNotice, {}, { __view: view(busy, failures), __refs: {}, ...(state ? { __state: state } : {}) });
+      const els = elementsOf(tokens);
+      return { els, button: els.find((el) => el.type === 'button'), effects: globalThis.__effects };
+    };
+    const runEffects = (effects) => {
+      globalThis.__sets = [];
+      for (const effect of effects) effect();
+      return globalThis.__sets.filter(([i]) => i === 0).map(([, v]) => v);
+    };
+    const waiting = { 0: { failures: 3, started: false } };
+    // Pressed, nothing sent yet (busy false): the label and aria-disabled change at once, and stay.
+    const wait = mount(false, waiting);
+    assert.equal(textOfElement(wait.button), '保存しています…');
+    assert.equal(wait.button.props['aria-disabled'], true, 'focus stays on it');
+    assert.deepEqual(runEffects(wait.effects), [], 'still waiting for the 20 s spacing');
+    globalThis.__retries = 0;
+    wait.button.props.onClick();
+    assert.equal(globalThis.__retries, 0, 'a second press while it waits sends nothing');
+    // The PUT runs, then fails again: back to 「もう一度保存する」.
+    assert.deepEqual(runEffects(mount(true, waiting).effects), [{ failures: 3, started: true }]);
+    assert.deepEqual(runEffects(mount(false, { 0: { failures: 3, started: true } }, 4).effects), [null]);
+    // A failure no render saw running (one more failure): it ended too.
+    assert.deepEqual(runEffects(mount(false, waiting, 4).effects), [null]);
+    // Saved (or loading, or another reason): the notice or its button went: no longer pressed.
+    for (const patch of [{ state: 'saved', pending: 0 }, { state: 'loading', pending: 1 }, { state: 'stopped', reason: 'auth', pending: 1 }]) {
+      renderUi(ui, ui.SaveStoppedNotice, {}, { __view: VIEW({ failures: 3, ...patch }), __refs: {}, __state: waiting });
+      assert.deepEqual(runEffects(globalThis.__effects), [null], JSON.stringify(patch));
+    }
+    // A press that asked for nothing (a GET at most every 10 s): the label stays.
+    globalThis.__retries = 0;
+    globalThis.__retryResult = false;
+    try {
+      const idle = mount(false);
+      idle.button.props.onClick();
+      assert.equal(globalThis.__retries, 1);
+      assert.deepEqual(globalThis.__sets.filter(([i]) => i === 0), []);
+      assert.equal(textOfElement(idle.button), 'もう一度保存する');
+    } finally {
+      delete globalThis.__retryResult;
+    }
+  });
+
+  it('at 390 px the button wraps under the text (the text grows from a 16rem basis, never a zero one)', () => {
+    const els = render(VIEW({ state: 'stopped', reason: 'network', pending: 1 }));
+    const text = els.find((el) => el.type === 'p');
+    const classes = text.props.className.split(/\s+/);
+    assert.ok(classes.includes('grow') && classes.includes('basis-64'), text.props.className);
+    assert.ok(!classes.includes('flex-1'), 'flex-1 sets a zero basis: the row never wraps');
+    assert.match(els[1].props.className, /\bflex-wrap\b/);
   });
 
   it('English counts have a singular', () => {
@@ -1519,6 +1589,11 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     const passport = (snapshot, language) => elementsOf(passportTokens(snapshot, language));
     const ready = textOf(passportTokens(SNAP('ready', DATA({ streak: { current: 4, best: 5, activeToday: true, today: '2026-10-25', timeZone: 'Asia/Tokyo' } }))));
     assert.match(ready, /レベル3XP230/);
+    // The front is a light card in every theme (its gradient is white): light tokens scoped to it,
+    // or the name, level and XP turn near-white on white in dark mode (in-app check).
+    const faces = passport(SNAP('ready', DATA())).filter((el) => el.props?.['data-theme']);
+    assert.deepEqual(faces.map((el) => el.props['data-theme']), ['light', 'dark']);
+    assert.match(textOfElement(faces[0]), /Aki.*レベル3XP230/);
     assert.match(ready, /連続日数4日合計XP230/);
     const expected = {
       idle: '読み込んでいます', loading: '読み込んでいます', unavailable: '読み込めませんでした',
@@ -1585,6 +1660,16 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     assert.equal(ui.badgeProgressText('en', { id: 'five_lessons', earned: false, current: 2, goal: 5 }), '2 / 5 · 3 to go');
   });
 
+  it('badges: an unearned badge\'s track shows on its card in both themes (the line token, not sunken: dark sunken is the card\'s colour)', () => {
+    const els = elementsOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('ready', DATA()), onRetry() {} }));
+    const tracks = els.filter((el) => el.props?.role === 'progressbar');
+    assert.ok(tracks.length > 0);
+    for (const track of tracks) {
+      assert.match(track.props.className, /\bbg-line\b/);
+      assert.doesNotMatch(track.props.className, /\bbg-sunken\b/);
+    }
+  });
+
   it('badges: loading is a status line; unavailable offers "try again"; unsupported and no_account say so with no button', () => {
     const bodyTokens = (status) => renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP(status), onRetry: () => { globalThis.__retried = (globalThis.__retried ?? 0) + 1; } });
     const body = (status) => elementsOf(bodyTokens(status));
@@ -1616,7 +1701,13 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     assert.equal(textOfElement(idleStatus), '', 'always mounted; silent before a retry');
     assert.equal(retry.props['aria-disabled'], undefined);
     const failed = elementsOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('unavailable'), retry: 'failed', onRetry() {} }));
-    assert.equal(textOfElement(failed.find((el) => el.props?.role === 'status')), 'まだバッジを表示できません。しばらくしてから、もう一度お試しください。');
+    const failedStatus = failed.find((el) => el.props?.role === 'status');
+    assert.equal(textOfElement(failedStatus), 'まだバッジを表示できません。しばらくしてから、もう一度お試しください。');
+    // Seen too (in-app check: the panel otherwise looks the same as before the retry); "loading"
+    // is the button's own label, so its status line stays for screen readers.
+    assert.doesNotMatch(failedStatus.props.className, /\bsr-only\b/);
+    assert.match(busy.find((el) => el.props?.role === 'status').props.className, /^sr-only$/);
+    assert.match(idleStatus.props.className, /^sr-only$/);
     // Not the learner's retry (a background load): the plain loading line.
     const background = elementsOf(renderUi(ui, ui.ProfileBadgesBody, { language: 'jp', snapshot: SNAP('loading'), retry: null, onRetry() {} }));
     assert.equal(background[0].type, 'p');
@@ -1670,6 +1761,21 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     const badges = readFile('components/features/dashboard/profile/ProfileBadgesView.tsx');
     assert.doesNotMatch(badges, /初ビルド|First Build|AI探究者|AI Explorer|学習の守護者|マスター|レジェンド|Legendary|記念|Milestone Trophy/);
     assert.match(badges, /setTheme\('default'\)/);
+  });
+});
+
+describe('in-app check (static)', () => {
+  it('the disabled reset control is dimmed (not only a lighter grey); the "resumed" pill wraps below 768 px instead of cutting its text', () => {
+    const css = readFile('components/lesson/reader.css');
+    assert.match(css, /\.rp-reset-btn\[aria-disabled="true"\] \{[^}]*opacity: 0\.6;/);
+    const narrow = css.slice(css.indexOf('@media (max-width: 767px) {'));
+    assert.match(narrow, /^@media \(max-width: 767px\) \{[\s\S]*?\.rp-notice \{\s*width: max-content;\s*white-space: normal;/);
+    assert.match(narrow, /\.rp-notice \.rp-link-btn \{\s*white-space: nowrap;/);
+  });
+
+  it('the English menu names the student ID page as its heading does', () => {
+    assert.match(readFile('components/common/Layout.tsx'), /profileOverview: 'Student ID',/);
+    assert.match(readFile('components/features/dashboard/ProfilePassport.tsx'), /studentId: 'Student ID',/);
   });
 });
 

@@ -34,7 +34,8 @@ import type { Badge, BadgeId } from '../../../../services/achievementsApi';
  * States: loading (a status line), unavailable (try again), unsupported (an older server) and
  * no_account (no Rise Path account signed in) say so without numbers.
  * Try again keeps its button mounted while it loads (aria-disabled, focus stays on it); a status
- * line says it is loading and, when it fails again, that badges still can't be shown; on success
+ * line says it is loading (screen readers only: the button says so) and, when it fails again,
+ * visibly, that badges still can't be shown; on success
  * focus goes to the next-badge heading. Headings: h1, the next badge (h2), all badges (h2) over
  * each badge's name (h3).
  */
@@ -151,7 +152,7 @@ function ProgressBar({ badge, label }: { badge: Badge; label: string }) {
       aria-valuemin={0}
       aria-valuemax={badge.goal}
       aria-valuenow={badge.current}
-      className="block h-1.5 w-full overflow-hidden rounded-full bg-sunken"
+      className="block h-1.5 w-full overflow-hidden rounded-full bg-line"
     >
       <span className="block h-full rounded-full bg-sun" style={{ width: `${pct(badge)}%` }} />
     </span>
@@ -221,7 +222,11 @@ export function ProfileBadgesBody({ language, snapshot, onRetry, retry = null }:
               >
                 {busy ? t.loading : t.retry}
               </Button>
-              <p role="status" className="sr-only">{busy ? t.loading : retry === 'failed' ? t.retryFailed : ''}</p>
+              {/* "Still can't be shown" is shown too (the panel looks the same as before the retry);
+                  "loading" is already the button's label. */}
+              <p role="status" className={!busy && retry === 'failed' ? 'basis-full text-small text-fg-2' : 'sr-only'}>
+                {busy ? t.loading : retry === 'failed' ? t.retryFailed : ''}
+              </p>
             </>
           )}
         />
@@ -245,7 +250,7 @@ export function ProfileBadgesBody({ language, snapshot, onRetry, retry = null }:
               <LockKeyhole size={22} />
             </span>
             <div className="min-w-0 flex-1 space-y-2">
-              <h2 id="rp-next-badge" tabIndex={-1} className="text-h3 text-fg">{t.next(upcomingCopy.name)}</h2>
+              <h2 id="rp-next-badge" tabIndex={-1} className="w-fit rounded-control text-h3 text-fg">{t.next(upcomingCopy.name)}</h2>
               <p className="text-small text-fg-2">{upcomingCopy.rule}</p>
               <ProgressBar badge={upcoming} label={upcomingCopy.name} />
               <p className="tabular text-small text-fg-2">{badgeProgressText(language, upcoming)}</p>
@@ -256,7 +261,7 @@ export function ProfileBadgesBody({ language, snapshot, onRetry, retry = null }:
             <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-control bg-sun-soft text-sun-text">
               <Trophy size={22} />
             </span>
-            <h2 id="rp-next-badge" tabIndex={-1} className="text-h3 text-fg">{t.allEarned}</h2>
+            <h2 id="rp-next-badge" tabIndex={-1} className="w-fit rounded-control text-h3 text-fg">{t.allEarned}</h2>
           </div>
         )}
       </section>

@@ -11,10 +11,12 @@ import type { SaveView } from './progressSync.ts';
  * every page: only when the save view is 'stopped' and this learner has lesson records the server
  * does not have yet. It says how many, why (the reason's long text), when the server last
  * confirmed them, and offers one action:
- *   - network / server: 「もう一度保存する」 (retryProgressSync: one GET or PUT now, at most every
- *     10 s); aria-disabled while a request runs, so focus stays on it; 「保存しています…」 only for
- *     a request the learner started (the core's own retries on its backoff change no text in the
- *     live region, so nothing is read again while the learner reads);
+ *   - network / server: 「もう一度保存する」 (retryProgressSync: one GET now, or one PUT as soon as
+ *     the core's 20 s PUT spacing allows, up to 20 s after the press); 「保存しています…」 and
+ *     aria-disabled (focus stays on it) from the press until the request it asked for ends, also
+ *     while that PUT waits for its spacing; the core's own retries on its backoff only set
+ *     aria-disabled while they run and change no text in the live region (nothing is read again
+ *     while the learner reads);
  *   - auth: 「ログインし直す」 (logout with reason 'reauth': no question first; the records stay on
  *     this device and are saved at the same learner's next sign-in);
  *   - account (another tab's logout or learner), storage: no button (nothing here can fix it).
@@ -59,7 +61,7 @@ export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, butto
   buttonRef?: React.Ref<HTMLButtonElement>;
   /** The button got focus (the notice moves focus to main if it goes away from under it). */
   onButtonFocus?: () => void;
-  /** A request the learner started with the button runs (its label says so). */
+  /** The learner's press asked for a request that has not ended yet (its label says so). */
   retrying?: boolean;
 }) {
   const t = copy[language];
@@ -71,7 +73,8 @@ export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, butto
     content = (
       <div className={barClasses}>
         <CloudAlert size={18} aria-hidden="true" className="shrink-0 text-danger" />
-        <p className="min-w-0 flex-1">
+        {/* grow from a 16rem basis: at 390 px the button wraps under the text instead of squeezing it. */}
+        <p className="min-w-0 grow basis-64">
           {t.count(view.pending)}
           {language === 'jp' ? '' : ' '}
           {saveLongText(language, 'stopped', reason)}
@@ -82,9 +85,9 @@ export function SaveStoppedNoticeView({ language, view, onRetry, onSignIn, butto
             ref={buttonRef}
             type="button"
             className={buttonClasses}
-            aria-disabled={view.busy || undefined}
+            aria-disabled={view.busy || retrying || undefined}
             onClick={() => {
-              if (!view.busy) onRetry();
+              if (!view.busy && !retrying) onRetry();
             }}
             onFocus={onButtonFocus}
           >
@@ -115,15 +118,23 @@ const SaveStoppedNotice: React.FC = () => {
   const { logout } = useAuth();
   const view = useProgressSaveView();
   const shown = view.state === 'stopped' && view.pending > 0;
+  const retryShown = shown && (view.reason === 'network' || view.reason === 'server');
   const hadFocus = useRef(false);
-  /** The learner pressed 「もう一度保存する」 and its request has not ended yet. */
-  const [pressed, setPressed] = useState(false);
+  /**
+   * The learner pressed 「もう一度保存する」 and the request it asked for has not ended: the failure
+   * count at the press, and whether that request has started. A GET starts at once (the notice then
+   * goes: loading); a PUT keeps the core's 20 s spacing, so it may start up to 20 s after the press.
+   */
+  const [pressed, setPressed] = useState<{ failures: number; started: boolean } | null>(null);
 
-  // The press starts a request at once (busy in the same render); it ends when busy does, also when
-  // the press started none (at most one every 10 s) or the notice went away.
+  // It ended when the notice went away or lost its button (saved, loading, another reason), when
+  // its request was seen running and stopped, or when the upload failed again (one more failure,
+  // also if no render saw it running).
   useEffect(() => {
-    if (pressed && !(shown && view.busy)) setPressed(false);
-  }, [pressed, shown, view.busy]);
+    if (!pressed) return;
+    if (!retryShown || (!view.busy && (pressed.started || view.failures !== pressed.failures))) setPressed(null);
+    else if (view.busy && !pressed.started) setPressed({ failures: pressed.failures, started: true });
+  }, [pressed, retryShown, view.busy, view.failures]);
 
   // The notice went away (saved, or the learner left) after its button had focus, and focus fell
   // to the page body (a removed element takes focus with it): the page's main area takes it.
@@ -138,10 +149,10 @@ const SaveStoppedNotice: React.FC = () => {
     <SaveStoppedNoticeView
       language={language}
       view={view}
-      retrying={pressed && view.busy}
+      retrying={pressed !== null}
       onRetry={() => {
-        setPressed(true);
-        retryProgressSync();
+        // Nothing asked for (a GET at most every 10 s): the label stays.
+        if (retryProgressSync()) setPressed({ failures: view.failures, started: false });
       }}
       onSignIn={() => {
         hadFocus.current = false;

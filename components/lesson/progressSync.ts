@@ -346,8 +346,13 @@ export type ProgressSync = {
    * still holds). 'stopped' is left alone.
    */
   networkChanged(online: boolean): void;
-  /** The notice's "try saving again" (at most once per 10 s): as networkChanged, and a server stop retries one GET. */
-  retryNow(): void;
+  /**
+   * The notice's "try saving again": as networkChanged (a failing upload goes at once, the 20 s PUT
+   * spacing still holds, so it may start up to 20 s later), and a server stop retries one GET (at
+   * most one GET per 10 s). True when a request started or is scheduled: the notice says
+   * 「保存しています…」 until it ends.
+   */
+  retryNow(): boolean;
   /** Another tab changed pending markers: recount. */
   storageChanged(): void;
   /**
@@ -1734,22 +1739,36 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     return { ok: true };
   }
 
-  /** Back online (or the notice's button): one GET for a failed load, an early PUT for failing uploads. */
-  function retryAfterOutage(fromButton: boolean): void {
+  /**
+   * Back online (or the notice's button): one GET for a failed load, an early PUT for failing
+   * uploads. True when a request started (GET) or is scheduled (PUT).
+   */
+  function retryAfterOutage(fromButton: boolean): boolean {
     const userId = state.userId;
-    if (!userId) return;
+    if (!userId) return false;
     const account = readAccount();
     const mine = account?.userId === userId && !account.loggedOut;
     if (state.status === 'offline' || (fromButton && state.status === 'stopped' && stopReason === 'server')) {
       // A 401 or another learner's session is not a network problem: session events restart them.
-      if (!mine) return;
+      if (!mine) return false;
+      if (fromButton) {
+        // A GET has no spacing of its own: the button sends at most one per 10 s.
+        const t = now();
+        if (t - lastRetryNowAt < 10_000) return false;
+        lastRetryNowAt = t;
+      }
       stopActivity();
       epoch = undefined;
       startHydrate(userId, 'retry');
-    } else if (state.status === 'on' && failures > 0) {
+      return true;
+    }
+    if (state.status === 'on' && failures > 0) {
+      // The PUT keeps its 20 s spacing (no throttle needed: pressing again only reschedules it).
       retryAt = 0;
       scheduleFlush({ soon: true });
+      return flushTimer !== null;
     }
+    return false;
   }
 
   function networkChanged(next: boolean): void {
@@ -1767,11 +1786,8 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     }, 1_000 + random() * 4_000);
   }
 
-  function retryNow(): void {
-    const t = now();
-    if (t - lastRetryNowAt < 10_000) return;
-    lastRetryNowAt = t;
-    retryAfterOutage(true);
+  function retryNow(): boolean {
+    return retryAfterOutage(true);
   }
 
   function storageChanged(): void {

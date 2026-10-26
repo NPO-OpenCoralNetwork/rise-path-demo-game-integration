@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, CloudAlert, CloudCheck, CloudOff, CloudUpload, type LucideIcon } from 'lucide-react';
+import { Cloud, CloudAlert, CloudCheck, CloudOff, CloudUpload, MonitorSmartphone, type LucideIcon } from 'lucide-react';
 import { useLanguage, type Language } from '../../context/LanguageContext';
 import { useProgressSaveView } from './progressSyncClient';
 import type { SaveState, SaveView, StopReason } from './progressSync.ts';
@@ -58,13 +58,14 @@ const copy = {
 /** The chip's texts (the status line and the app notice use the long ones). */
 export const SAVE_COPY = copy;
 
+/** 'local' (kept here by design) has its own device icon: at 390 px, without the label, it must not look like 'offline'. */
 export const SAVE_ICONS: Record<SaveState, LucideIcon> = {
   saved: CloudCheck,
   saving: CloudUpload,
   loading: Cloud,
   offline: CloudOff,
   stopped: CloudAlert,
-  local: CloudOff,
+  local: MonitorSmartphone,
 };
 
 /** The short label of a save state. */

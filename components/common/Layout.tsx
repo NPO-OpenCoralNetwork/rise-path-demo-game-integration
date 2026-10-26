@@ -243,7 +243,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
       blocksGallery: 'Blocks Gallery',
       aiCharacters: 'AI Characters',
       account: 'Account',
-      profileOverview: 'Student Card',
+      profileOverview: 'Student ID',
       profileHistory: 'History',
       profileBadges: 'Badges',
       profileGenerated: 'Generated',

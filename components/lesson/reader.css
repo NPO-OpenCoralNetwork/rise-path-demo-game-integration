@@ -364,6 +364,13 @@
     pointer-events: none;
   }
 
+  /* The reset message (LessonReader scrolled to the top and focused the title): in the bar's flow,
+     so the bar grows and the title stays below it instead of under an overlay. */
+  .rp-status[data-flow] {
+    position: static;
+    padding: 10px 16px;
+  }
+
   .rp-status-card {
     pointer-events: auto;
     max-width: 36rem;
@@ -2074,10 +2081,12 @@
     color: var(--rp-fg-2);
   }
 
+  /* Dimmed like the app's other aria-disabled buttons (an inactive control needs no contrast). */
   .rp-reset-btn[aria-disabled="true"] {
     color: var(--rp-fg-3);
     cursor: not-allowed;
     text-decoration: none;
+    opacity: 0.6;
   }
 
   .rp-prose .rp-end-reset-help {
@@ -2710,6 +2719,17 @@
 
     .rp-crumb-current {
       font-size: 14px;
+    }
+
+    /* The "resumed" pill: its text wraps instead of being cut; its buttons keep one line. */
+    .rp-notice {
+      width: max-content;
+      white-space: normal;
+      border-radius: var(--radius-card, 14px);
+    }
+
+    .rp-notice .rp-link-btn {
+      white-space: nowrap;
     }
 
     .rp-grid {
