@@ -10,11 +10,16 @@
 //   changed just before it (G5); reset rows survive it (G18);
 // - the MCP course tools read a restarted lesson like an untouched one and never name the Phase 5
 //   tables (G9).
+// Phase 6 stage 2 (R4, design §3.5): the reset deletes that lesson's review cards (their log by
+// cascade) and only those; finishing it again enters them fresh; delete-all deletes every review
+// card and log row; XP, generations and learning days stay.
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 import {
     ACCOUNT_STUB_SHARE_SQL,
+    DELETE_ALL_REVIEW_CARDS_SQL,
+    DELETE_LESSON_REVIEW_CARDS_SQL,
     LEARNER_LOCK_SQL,
     LESSON_EPOCHS_SQL,
     RESET_LESSON_EPOCH_SQL,
@@ -32,7 +37,9 @@ import { lessonPct, lessonState, parseProgress } from '../../shared/lesson/progr
 import { mergeProgress, sanitizeProgress } from '../../shared/lesson/progressMerge.js';
 import { getCourseProgress } from '../../tools/core/courseLessons.js';
 import { getPublishedLesson } from '../../tools/core/courseCatalog.js';
-import { createLessonProgressPool, norm, PHASE5_TABLES, SQL } from './helpers/lessonProgressPool.js';
+import { getReviewQueue } from '../../tools/core/reviewQueue.js';
+import { LESSON_PRIORS } from '../../shared/review/queue.js';
+import { createLessonProgressPool, jstDay, norm, PHASE5_TABLES, SQL } from './helpers/lessonProgressPool.js';
 
 const ALICE = 'aaaaaaaa-1111-4000-8000-000000000001';
 const BOB = 'aaaaaaaa-1111-4000-8000-000000000002';
@@ -100,6 +107,8 @@ describe('the module\'s Phase 5 statements are the fake\'s (exact SQL)', () => {
         assert.equal(norm(BLENDER_XP_SQL), SQL.xpReconcileStages);
         assert.equal(norm(LEARNING_DAY_SQL), SQL.learningDay);
         assert.equal(norm(DELETE_LESSONS_KEEPING_XP_SQL), SQL.deleteLessonsKeepingXp);
+        assert.equal(norm(DELETE_LESSON_REVIEW_CARDS_SQL), SQL.deleteLessonReviewCards);
+        assert.equal(norm(DELETE_ALL_REVIEW_CARDS_SQL), SQL.deleteAllReviewCards);
     });
 });
 
@@ -110,7 +119,7 @@ describe('resetLessonProgress (POST /lesson-reset)', () => {
         assert.equal(result.error_type, undefined, JSON.stringify(result));
         assert.deepEqual(pool.progressStatements(), [
             'begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.selectEpoch, SQL.insertPlaceholder, SQL.lockRow,
-            SQL.xpLock, SQL.xpReconcileLessons, SQL.updateRow, SQL.upsertLessonEpoch, 'commit',
+            SQL.xpLock, SQL.xpReconcileLessons, SQL.updateRow, SQL.upsertLessonEpoch, SQL.deleteLessonReviewCards, 'commit',
         ]);
         const stub = pool.queries.find((q) => q.sql === SQL.stubKeyShare);
         assert.deepEqual(stub.params, [ALICE]);
@@ -347,7 +356,7 @@ describe('deleteAllLessonProgress keeps what was earned and the generations (G5,
         const deleted = await deleteAllLessonProgress({ userId: ALICE });
         assert.equal(deleted.deleted, 1);
         assert.equal(pool.xpOf(ALICE), 50);
-        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.upsertEpoch, 'commit']);
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.deleteAllReviewCards, SQL.upsertEpoch, 'commit']);
     });
 
     it('G5: an AI app\'s write that commits just before the delete reaches the row is deleted with its awards', async () => {
@@ -405,5 +414,93 @@ describe('the MCP course tools after a reset (G9)', () => {
         assert.equal(after.updated_at, NOW.toISOString(), 'a real change has a time again');
         const named = pool.queries.filter((q) => PHASE5_TABLES.test(q.sql) || /lesson_progress_resets|'xp:'|for key share/.test(q.sql));
         assert.deepEqual(named, [], 'the remote role has no grant on them');
+    });
+});
+
+describe('Phase 6 R4: a restart and delete-all take the review state with them (migration 020)', () => {
+    /** A Good prior learned on the 20th and reviewed on the 22nd (reps 1), and its log row. */
+    const reviewed = (user, course, lesson, card) => ({
+        card: {
+            user_id: user, course_slug: course, lesson_id: lesson, card_id: card, learned_at: '2026-10-20T03:00:00.000Z', prior_rating: 3,
+            stability: 10.96, difficulty: 2.11, reps: 1, last_rating: 3, last_review_day: '2026-10-22', due_day: '2026-11-02',
+        },
+        log: { user_id: user, course_slug: course, lesson_id: lesson, card_id: card, review_day: '2026-10-22', rating: 3, elapsed_days: 2, interval_days: 11, stability: 10.96, difficulty: 2.11, source: 'web' },
+    });
+    const seeded = () => {
+        const items = [
+            reviewed(ALICE, VIBE, CH1, 'card-frontend'), reviewed(ALICE, VIBE, CH1, 'card-api'),
+            reviewed(ALICE, CC, CC4, 'card-checks'), reviewed(BOB, VIBE, CH1, 'card-frontend'),
+        ];
+        return {
+            rows: [ch1Row('read', record({ seen: [...ch1.index.readingBlockIds] })), { ...ch1Row('read', record({ seen: [...ch1.index.readingBlockIds] })), user_id: BOB }],
+            awards: [{ user_id: ALICE, source: 'lesson', item_key: `${VIBE}/${CH1}`, milestone: 'start', xp: 10 }, { user_id: ALICE, source: 'lesson', item_key: `${VIBE}/${CH1}`, milestone: 'done', xp: 40 }],
+            days: [{ user_id: ALICE, day: '2026-10-22' }],
+            reviewCards: items.map((i) => i.card),
+            reviewLog: items.map((i) => i.log),
+        };
+    };
+    const keys = (user) => pool.reviewRows(user).map((r) => `${r.lesson_id}/${r.card_id}`);
+
+    it('the reset deletes that lesson\'s cards and their log rows only (other lessons, other learners, XP and days untouched), last in its transaction', async () => {
+        use(seeded());
+        const result = await reset();
+        assert.equal(result.error_type, undefined, JSON.stringify(result));
+        assert.deepEqual(pool.progressStatements().slice(-3), [SQL.upsertLessonEpoch, SQL.deleteLessonReviewCards, 'commit']);
+        assert.deepEqual(pool.queries.find((q) => q.sql === SQL.deleteLessonReviewCards).params, [ALICE, VIBE, CH1]);
+        assert.deepEqual(keys(ALICE), [`${CC4}/card-checks`]);
+        assert.deepEqual(pool.logRows(ALICE).map((l) => l.card_id), ['card-checks'], 'the log went by cascade');
+        assert.deepEqual([keys(BOB), pool.logRows(BOB).length], [[`${CH1}/card-frontend`], 1]);
+        assert.equal(pool.xpOf(ALICE), 50, 'XP stays (O2)');
+        assert.deepEqual(pool.daysOf(ALICE), ['2026-10-22']);
+    });
+
+    it('a failure of the review delete rolls the whole reset back', async () => {
+        use(seeded());
+        pool.fail({ code: '40001', message: 'could not serialize (db.internal)', when: (text) => text === SQL.deleteLessonReviewCards });
+        const failed = await quiet(() => reset());
+        assert.equal(failed.error_type, 'unknown');
+        assert.deepEqual(keys(ALICE), [`${CC4}/card-checks`, `${CH1}/card-api`, `${CH1}/card-frontend`]);
+        assert.deepEqual(pool.row(ALICE, VIBE, CH1).progress.seen, [...ch1.index.readingBlockIds], 'the record too');
+        assert.equal(pool.logRows(ALICE).length, 3);
+    });
+
+    it('finishing the lesson again adds its cards fresh: a new Good prior dated the new finish, no reviews', async () => {
+        use(seeded());
+        const gen = await reset();
+        assert.deepEqual(await getReviewQueue({ userId: ALICE }).then((q) => [q.inQueue, keys(ALICE).length]), [1, 1], 'the tombstone enters nothing');
+        await save([{ courseSlug: VIBE, lessonId: CH1, lessonEpoch: gen.lessonEpoch, progress: record({ seen: [...ch1.index.readingBlockIds], updatedAt: NOW.toISOString() }) }]);
+        const finishedAt = pool.row(ALICE, VIBE, CH1).progress_changed_at;
+        const q = await getReviewQueue({ userId: ALICE });
+        assert.equal(q.inQueue, 6);
+        const fresh = pool.reviewRows(ALICE).filter((r) => r.lesson_id === CH1);
+        assert.equal(fresh.length, 5);
+        for (const row of fresh) {
+            assert.deepEqual([row.reps, row.lapses, row.last_review_day, row.prior_rating, row.stability, row.learned_at.toISOString()],
+                [0, 0, null, 3, LESSON_PRIORS.good.stability, finishedAt.toISOString()], row.card_id);
+            assert.equal(row.due_day, new Date(Date.parse(`${jstDay(finishedAt)}T00:00:00Z`) + 2 * 86400000).toISOString().slice(0, 10));
+        }
+        assert.deepEqual(pool.logRows(ALICE).map((l) => l.card_id), ['card-checks'], 'the old reviews are gone for good');
+    });
+
+    it('delete-all deletes every review card and log row of the learner, right after the lesson rows; generations, XP and learning days stay', async () => {
+        use({ ...seeded(), lessonResets: [{ user_id: ALICE, course_slug: CC, lesson_id: CC4, lesson_epoch: OTHER_GEN }] });
+        const deleted = await deleteAllLessonProgress({ userId: ALICE });
+        assert.equal(deleted.deleted, 1, 'the lesson rows only');
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.deleteAllReviewCards, SQL.upsertEpoch, 'commit']);
+        assert.deepEqual([keys(ALICE), pool.logRows(ALICE)], [[], []]);
+        assert.deepEqual([keys(BOB).length, pool.logRows(BOB).length], [1, 1]);
+        assert.equal(pool.lessonResetOf(ALICE, CC, CC4).lesson_epoch, OTHER_GEN);
+        assert.equal(pool.xpOf(ALICE), 50);
+        assert.deepEqual(pool.daysOf(ALICE), ['2026-10-22']);
+    });
+
+    it('a failure after the review delete rolls delete-all back as a whole', async () => {
+        use(seeded());
+        pool.fail({ code: '40001', message: 'could not serialize (db.internal)', when: (text) => text === SQL.upsertEpoch });
+        const failed = await quiet(() => deleteAllLessonProgress({ userId: ALICE }));
+        assert.equal(failed.error_type, 'unknown');
+        assert.equal(keys(ALICE).length, 3);
+        assert.equal(pool.logRows(ALICE).length, 3);
+        assert.ok(pool.row(ALICE, VIBE, CH1));
     });
 });

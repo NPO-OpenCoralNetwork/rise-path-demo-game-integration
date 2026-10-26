@@ -51,7 +51,8 @@ const seedFor = (id = A, extra = {}) => ({
         { usage_day: shiftDay(TODAY, -3), kind: 'llm', subject: 'ip:198.51.100.7', count: 1 },
     ],
     // Phase 5 (migration 019): lesson resets, the XP ledger and learning days cascade with the stub.
-    owned: { lesson_progress: [id, B], curricula: [id, B], learning_events: [id], lesson_progress_lesson_resets: [id], xp_awards: [id, B], learning_days: [id, B] },
+    // Phase 6 (migration 020): review cards cascade with the stub, their log rows with the cards.
+    owned: { lesson_progress: [id, B], curricula: [id, B], learning_events: [id], lesson_progress_lesson_resets: [id], xp_awards: [id, B], learning_days: [id, B], review_cards: [id, B], review_log: [id, B] },
     clock,
     ...extra,
 });
@@ -172,7 +173,7 @@ describe('deleteAccountData: the order of the pipeline', () => {
         assert.equal((await run(pool)).status, 'deleted');
         const s = pool.state;
         assert.deepEqual([...s.stubs], [B]);
-        assert.deepEqual(s.owned, { lesson_progress: [B], curricula: [B], learning_events: [], lesson_progress_lesson_resets: [], xp_awards: [B], learning_days: [B] });
+        assert.deepEqual(s.owned, { lesson_progress: [B], curricula: [B], learning_events: [], lesson_progress_lesson_resets: [], xp_awards: [B], learning_days: [B], review_cards: [B], review_log: [B] });
         assert.deepEqual(s.materials.map((m) => m.user_id), [B]);
         assert.deepEqual(s.consents.map((c) => c.user_id), [B]);
         assert.deepEqual([...s.consentProofs.values()].map((p) => [p.user_id, p.policy_version, p.account_deleted_at.toISOString()]), [[A, 'guardian-ai-2026-10', NOW.toISOString()]]);

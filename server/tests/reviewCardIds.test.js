@@ -10,16 +10,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { clearCatalogCacheForTests, listPublishedLessons } from '../../tools/core/courseCatalog.js';
 import { lessonReviewCards } from '../../shared/review/cards.js';
+import { CARD_ID } from '../../tools/core/reviewQueue.js';
 import { ROOT } from './helpers/publishedLessons.js';
 
 const FIXTURE = 'server/tests/fixtures/published-card-ids.json';
 /**
  * <course slug>/<lesson id>/<card id>: the course slug and lesson id as the lesson_progress CHECKs
- * (migration 016, SAFE_SLUG), then a card id as the lesson schema's ID_PATTERN; each part at most 80
- * characters, the same as migration 020's CHECKs. A card id outside this would be refused by the
- * database when the card enters a learner's queue.
+ * (migration 016, SAFE_SLUG), then a card id as CARD_ID (tools/core/reviewQueue.js: the lesson
+ * schema's ID_PATTERN, at most 80 characters), which server/tests/migration020.test.js pins to
+ * migration 020's card_id CHECK. The review catalog leaves out (and logs) a card id outside it, so a
+ * published card that fails here never reaches a learner's queue.
  */
-const CARD_KEY = /^[a-z0-9][a-z0-9-]{0,79}\/[a-z0-9][a-z0-9-]{0,79}\/[a-z0-9][a-z0-9._-]{0,79}$/;
+const SLUG_PART = '[a-z0-9][a-z0-9-]{0,79}';
+const CARD_KEY = new RegExp(`^${SLUG_PART}/${SLUG_PART}/${CARD_ID.source.replace(/^\^|\$$/g, '')}$`);
 
 /**
  * What changed between the current card keys and the fixture, as failure messages.
@@ -67,6 +70,15 @@ describe('cardIdChanges (the guard itself)', () => {
 
   it('a card of an unpublished lesson reads as removed', () => {
     assert.deepEqual(cardIdChanges(['c/l/a'], fixture).length, 1);
+  });
+});
+
+describe('the key pattern', () => {
+  it('is built from CARD_ID: course/lesson/card, each part at most 80 characters', () => {
+    assert.equal(CARD_KEY.source, String.raw`^[a-z0-9][a-z0-9-]{0,79}\/[a-z0-9][a-z0-9-]{0,79}\/[a-z0-9][a-z0-9._-]{0,79}$`);
+    assert.match(`c/l/${'a'.repeat(80)}`, CARD_KEY);
+    assert.doesNotMatch(`c/l/${'a'.repeat(81)}`, CARD_KEY);
+    assert.doesNotMatch('c/l/Card', CARD_KEY);
   });
 });
 

@@ -28,8 +28,11 @@
  * - noteLearning: after a REST lesson-progress save that taught something (server/routes/
  *   lessonProgress.js, after the answer was sent): the lesson awards and today as a learning day;
  * - noteBlenderProgress: after the legacy PUT /api/v2/user/progress/blender (server/routes/user.js,
- *   after the answer): the stage awards, and today when a stage was newly awarded.
- * The two hooks never throw and only log a failure: the save they follow is already answered.
+ *   after the answer): the stage awards, and today when a stage was newly awarded;
+ * - noteReviewDay (Phase 6): after a review graded on the web page (POST /api/v2/user/review/grade,
+ *   after the answer): today as a learning day, never XP. A review recorded by an AI app (MCP)
+ *   writes no learning day (the remote role has no grant on learning_days).
+ * The hooks never throw and only log a failure: the save or review they follow is already answered.
  * Learning days come only from these server records (Japan time, server clock), never from events.
  *
  * Locking: XP_LOCK_SQL is a per-learner transaction lock (keyed by the canonical uuid text, so the
@@ -424,5 +427,21 @@ export async function noteBlenderProgress({ userId: rawUserId }) {
     if (!userId) return false;
     return noteAfterSave('note after Blender progress', async (db) => {
         await reconcileBlenderXp(db, userId);
+    });
+}
+
+/**
+ * After a REST review (Phase 6): today (Japan time, server clock) as a learning day. Runs after the
+ * review was answered, in its own transaction; never throws; never XP. MCP reviews do not call it
+ * (the remote role has no grant on learning_days, Phase 5 R8). After an account deletion it fails
+ * its foreign key (23503) and only logs.
+ * @param {{ userId: string }} params
+ * @returns {Promise<boolean>}
+ */
+export async function noteReviewDay({ userId: rawUserId }) {
+    const userId = canonicalUserId(rawUserId);
+    if (!userId) return false;
+    return noteAfterSave('note after review', async (db) => {
+        await db.query(LEARNING_DAY_SQL, [userId]);
     });
 }

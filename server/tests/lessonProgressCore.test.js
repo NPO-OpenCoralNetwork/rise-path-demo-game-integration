@@ -415,7 +415,7 @@ describe('deleteAllLessonProgress and getLessonProgress', () => {
         assert.equal(first.deleted, 2);
         assert.match(first.epoch, /^[0-9a-f-]{36}$/);
         assert.deepEqual(pool.rows().map((r) => r.user_id), [BOB]);
-        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.upsertEpoch, 'commit']);
+        assert.deepEqual(pool.progressStatements(), ['begin', SQL.advisoryLock, SQL.stubKeyShare, SQL.xpLock, SQL.deleteLessonsKeepingXp, SQL.deleteAllReviewCards, SQL.upsertEpoch, 'commit']);
         const second = await deleteAllLessonProgress({ userId: ALICE });
         assert.equal(second.deleted, 0);
         assert.notEqual(second.epoch, first.epoch);

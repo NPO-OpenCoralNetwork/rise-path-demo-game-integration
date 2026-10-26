@@ -20,6 +20,8 @@
  * billing rows (tax), legal_document_versions (append-only, not personal), live accounts'
  * consents, learning events and profiles, live accounts' XP ledger, learning days and lesson reset
  * rows (Phase 5, migration 019: kept while the account exists, deleted with it by the cascade),
+ * live accounts' review cards and review log (Phase 6, migration 020: kept while the account
+ * exists, removed by the one-lesson reset and delete-all, deleted with the account by the cascade),
  * generated images and the TTS cache.
  *
  * Env (api only; none is a secret): RETENTION_ENABLED (false/0/off/no turn it all off; unset,

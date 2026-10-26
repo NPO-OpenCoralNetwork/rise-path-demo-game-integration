@@ -70,7 +70,7 @@ const FIRST_ID = '00000000-0000-0000-0000-000000000000';
 export const DRY_RUN_TABLES = Object.freeze([
     'user_profiles', 'user_age', 'account_consents', 'curricula', 'curriculum_progress', 'materials', 'jobs',
     'learning_journal', 'learning_events', 'user_progress', 'lesson_progress', 'lesson_progress_resets',
-    'lesson_progress_lesson_resets', 'xp_awards', 'learning_days',
+    'lesson_progress_lesson_resets', 'xp_awards', 'learning_days', 'review_cards', 'review_log',
     'notifications', 'learner_profiles', 'daily_reflections', 'lifestyle_logs', 'analysis_snapshots',
     'ai_sessions', 'agent_chat_consent', 'agent_session_binding', 'learner_memory_meta', 'learning_portal_admins',
     'mcp_oauth_grants', 'mcp_sessions', 'billing_customers', 'billing_subscriptions', 'legal_acceptances',
