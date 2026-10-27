@@ -109,6 +109,20 @@ function steps(job) {
     });
 }
 
+/**
+ * The subcommands `scripts/ci/stack.sh <fn>` runs, in order: the `cmd_*` lines (one per line, two-space
+ * indent) of `cmd_<fn>() { … }`, with _ as - and the argument kept (`cmd_deploy 1` → `deploy 1`).
+ * @param {string} fn
+ */
+function stackOrder(fn) {
+    const body = /^cmd_([a-z_]+)\(\) \{[^\n]*\n([\s\S]*?)^\}$/gm;
+    for (const m of fs.readFileSync(path.join(ROOT, 'scripts/ci/stack.sh'), 'utf8').matchAll(body)) {
+        if (m[1] !== fn) continue;
+        return [...m[2].matchAll(/^ {2}cmd_([a-z_]+)( [^\n;|&]+)?$/gm)].map((c) => `${c[1].replaceAll('_', '-')}${c[2] ?? ''}`);
+    }
+    return [];
+}
+
 describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
     it('keyPaths numbers steps, keeps block-scalar lines under their key and skips comments', () => {
         const sample = 'on:\n  push:\n    branches: [main]\n# c\njobs:\n  a:\n    steps:\n      - uses: x\n        with:\n          k: v\n      - run: |\n          echo b: c\n';
@@ -142,8 +156,9 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
     });
 
     it('each job present is one the branch rule lists, by these names (P5); db on ubuntu-24.04 (psql 16), the stack jobs on ubuntu-26.04 (the VM\'s Docker and Compose majors)', () => {
-        // Stage 1 of Phase 7 adds db; the stack and e2e jobs come with their own stages.
+        // Phase 7 adds db (stage 1) and stack (stage 2); the e2e job comes with its own stage.
         assert.ok(jobIds.includes('db'), 'the Database checks job');
+        assert.ok(jobIds.includes('stack'), 'the Server stack deploy job');
         for (const id of jobIds) {
             const want = JOBS[/** @type {keyof typeof JOBS} */ (id)];
             assert.ok(want, `job ${id} is not one of ${Object.keys(JOBS).join(', ')}: the branch rule would not list it`);
@@ -191,6 +206,10 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
         assert.ok(uses.length > 0);
         for (const u of uses) assert.ok(ACTIONS.includes(u), `${u} is not allowed (P4: no buildx, cache or third-party action)`);
         for (const id of jobIds) {
+            const checkouts = steps(id).filter((step) => step.uses === 'actions/checkout@v4');
+            assert.equal(checkouts.length, 1, `${id}: one checkout`);
+            // No token left in .git/config: the stack job builds images with the whole checkout as the context.
+            for (const step of checkouts) assert.equal(step.with['persist-credentials'], 'false', `${id}: checkout with persist-credentials: false`);
             for (const step of steps(id)) {
                 if (step.uses === 'actions/upload-artifact@v4') {
                     assert.equal(step.if, 'failure()', `${id}: ${step.name} uploads only when the job failed (P4)`);
@@ -207,6 +226,56 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
         assert.match(checks[0].env.RISEPATH_CI_OUT ?? '', /^\$\{\{ runner\.temp \}\}\/\S+$/, 'db-checks.sh writes under runner.temp');
         assert.deepEqual(db.filter((s) => s.uses === 'actions/upload-artifact@v4').map((s) => s.with.path), [checks[0].env.RISEPATH_CI_OUT],
             'jobs.db keeps exactly the folder db-checks.sh writes (its RISEPATH_CI_OUT)');
+        const stack = steps('stack');
+        const logs = stack.filter((s) => /^bash scripts\/ci\/stack\.sh logs /.test(s.run ?? ''));
+        assert.deepEqual(logs.map((s) => s.run), ['bash scripts/ci/stack.sh logs "$RUNNER_TEMP/stack-artifacts"'], 'jobs.stack collects the logs once, under the runner\'s temp folder');
+        assert.deepEqual(stack.filter((s) => s.uses === 'actions/upload-artifact@v4').map((s) => s.with.path), ['${{ runner.temp }}/stack-artifacts'],
+            'jobs.stack keeps exactly the folder its logs step writes ($RUNNER_TEMP is runner.temp)');
+        assert.ok(stack.findIndex((s) => s.uses === 'actions/upload-artifact@v4') > stack.indexOf(logs[0]), 'the upload comes after the logs step');
+    });
+
+    it('the stack job runs scripts/ci/stack.sh subcommands only, in the order of npm run ci:stack, and always removes the stack last', () => {
+        const list = steps('stack');
+        assert.deepEqual(list.slice(0, 2).map((s) => s.uses), ['actions/checkout@v4', 'actions/setup-node@v4'], 'checkout and setup first');
+        const subcommand = (/** @type {{ run?: string }} */ s) => /^bash scripts\/ci\/stack\.sh ([a-z-]+(?: \S+)?)$/.exec(s.run ?? '')?.[1];
+        for (const step of list.slice(2)) {
+            if (step.uses) {
+                assert.equal(step.uses, 'actions/upload-artifact@v4', step.name);
+                continue;
+            }
+            if (step.name === 'Disk use') {
+                assert.equal(step.run, 'df -h / && docker system df');
+                assert.equal(step.if, 'always()');
+                continue;
+            }
+            assert.ok(subcommand(step), `${step.name}: every other step is one stack.sh subcommand (${step.run})`);
+        }
+        const order = stackOrder('rehearsal');
+        assert.deepEqual(order, ['preflight', 'install-env', 'pull', 'deploy 1', 'mcp-db', 'health']);
+        assert.deepEqual(list.filter((s) => !s.if && s.run).map(subcommand), order, 'the steps without if: are `npm run ci:stack`, in its order');
+        for (const step of list.filter((s) => /^logs\b/.test(subcommand(s) ?? ''))) assert.equal(step.if, 'failure()', step.name);
+        const last = list.at(-1);
+        assert.equal(subcommand(last ?? {}), 'down', 'the last step removes the stack');
+        assert.equal(last?.if, 'always()', 'also after a failed or timed-out step, and after a cancel');
+        assert.equal(list.filter((s) => subcommand(s) === 'down').length, 1);
+        for (const line of entries.filter((e) => e.path.join('/').startsWith('jobs/stack/steps/') && e.path.includes('run'))) {
+            assert.doesNotMatch(line.value, /deploy-stack\.sh|docker compose/, `${WORKFLOW}:${line.line}: compose and the deploy run only through stack.sh`);
+        }
+    });
+
+    it('the deploy step runs the real deploy-stack.sh with the pull opt-out (P3), in the risepath-ci project', () => {
+        assert.deepEqual(steps('stack').filter((s) => /\bdeploy\b/.test(s.run ?? '')).map((s) => s.run), ['bash scripts/ci/stack.sh deploy 1']);
+        assert.equal(valueOf('jobs/stack/env/COMPOSE_PROJECT_NAME'), 'risepath-ci');
+        const stack = fs.readFileSync(path.join(ROOT, 'scripts/ci/stack.sh'), 'utf8');
+        const body = /^cmd_deploy\(\) \{[^\n]*\n([\s\S]*?)^\}$/m.exec(stack)?.[1];
+        assert.equal(body?.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n'), [
+            "  ours \"${STACK}/stack.env\" || fail 'deploy/risepath-vm/stack.env is not the CI template: run install-env first'",
+            '  refuse_foreign_env',
+            '  mkdir -p "${LOG_DIR}"',
+            '  RISEPATH_DEPLOY_SKIP_PULL=1 bash "${STACK}/scripts/deploy-stack.sh" 2>&1 | tee "${LOG_DIR}/deploy-$1.log"',
+            '',
+        ].join('\n'), 'only the installed template and no foreign env file reach deploy-stack.sh, with the opt-out');
+        assert.doesNotMatch(text, /RISEPATH_DEPLOY_SKIP_PULL/, 'only stack.sh sets the opt-out; the workflow never does');
     });
 
     it('concurrency per event and ref; only pull requests cancel a running run; bash -eo pipefail by default; no continue-on-error', () => {

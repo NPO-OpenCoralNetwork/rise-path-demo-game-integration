@@ -3,10 +3,15 @@
 # pull request until the ruleset changes too (server/tests/e2eWorkflow.test.js pins them).
 # - Database checks: the VM's pinned pgvector image with production's terse error log; every migration
 #   twice, the three verify scripts and the role SQL (scripts/ci/db-checks.sh). ubuntu-24.04: psql 16.
+# - Server stack deploy: the real deploy-stack.sh with dummy values (deploy/risepath-vm/ci/), its health
+#   and smoke, then the admin MCP's database and /api/v2/health from the host. ubuntu-26.04: Docker 29
+#   and Compose 5, the majors the VM installs.
+# After checkout and setup, every step of the stack job but "Disk use" and the upload is one
+# scripts/ci/stack.sh subcommand, in the order of its `rehearsal` (npm run ci:stack); the test keeps them equal.
 # Every step has its own timeout, and each job's is at least the sum of its steps' plus 2 min (job set-up
 # and post steps): a hang fails its step before the job times out, so the failure() steps still keep the
 # logs (a job timeout cancels the job, and a cancelled job skips them).
-# No secrets: pull requests from forks run every job. Locally: npm run ci:db.
+# No secrets: pull requests from forks run every job. Locally: npm run ci:db | ci:stack.
 name: End-to-end checks
 
 on:
@@ -15,7 +20,8 @@ on:
     branches: [main]
   schedule:
     # 18:17 UTC = 03:17 JST: far from 00:00 JST (15:00 UTC), when learning days change. Catches drift
-    # in what no commit pins (the runner image with its psql and Docker, Node 22, npm) on quiet days.
+    # in what no commit pins (the runner image with its psql and Docker, Node 22, npm, node:22-slim) on
+    # quiet days.
     - cron: '17 18 * * *'
   workflow_dispatch:
 
@@ -74,3 +80,69 @@ jobs:
           path: ${{ runner.temp }}/db-checks
           retention-days: 7
           if-no-files-found: ignore
+
+  stack:
+    name: Server stack deploy
+    runs-on: ubuntu-26.04
+    timeout-minutes: 61
+    env:
+      COMPOSE_PROJECT_NAME: risepath-ci
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        timeout-minutes: 5
+        with:
+          node-version: 22
+
+      - name: Preflight (no foreign env files, free ports and disk; Docker versions)
+        timeout-minutes: 2
+        run: bash scripts/ci/stack.sh preflight
+
+      - name: CI settings (dummy values from deploy/risepath-vm/ci/)
+        timeout-minutes: 1
+        run: bash scripts/ci/stack.sh install-env
+
+      - name: Pull the base images
+        timeout-minutes: 10
+        run: bash scripts/ci/stack.sh pull
+
+      - name: First deploy with the real deploy-stack.sh (empty database)
+        timeout-minutes: 15
+        run: bash scripts/ci/stack.sh deploy 1
+
+      - name: Admin MCP reaches the database
+        timeout-minutes: 2
+        run: bash scripts/ci/stack.sh mcp-db
+
+      - name: Health from the host
+        timeout-minutes: 2
+        run: bash scripts/ci/stack.sh health
+
+      - name: Disk use
+        if: always()
+        timeout-minutes: 2
+        run: df -h / && docker system df
+
+      - name: Collect the logs (redacted)
+        if: failure()
+        timeout-minutes: 5
+        run: bash scripts/ci/stack.sh logs "$RUNNER_TEMP/stack-artifacts"
+
+      - name: Keep the logs
+        if: failure()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-logs-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stack-artifacts
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Remove the stack
+        if: always()
+        timeout-minutes: 5
+        run: bash scripts/ci/stack.sh down

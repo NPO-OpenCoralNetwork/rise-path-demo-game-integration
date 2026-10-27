@@ -1,17 +1,22 @@
 // @ts-check
 // The Phase 7 CI scripts (doc/brushup-2026/ai-access-plan.ja.md): scripts/ci/db-checks.sh, the job
-// "Database checks" of .github/workflows/e2e.yml and `npm run ci:db`, and the 00:00 JST guard
-// (scripts/ci/jst-midnight-guard.mjs). The checks themselves need Docker and PostgreSQL 16 (the job
-// runs them); here the script's text is pinned, and the parts that must stop before any psql or docker
-// call, or that pick the image, run against recording stubs. No test waits on a real network call.
+// "Database checks" of .github/workflows/e2e.yml and `npm run ci:db`; scripts/ci/stack.sh, its env
+// template deploy/risepath-vm/ci/stack.ci.env and scripts/ci/redact-log.mjs, the job "Server stack
+// deploy" and `npm run ci:stack`; and the 00:00 JST guard (scripts/ci/jst-midnight-guard.mjs). The
+// checks themselves need Docker and PostgreSQL 16 (the jobs run them); here the scripts' text is
+// pinned, and the parts that must stop before any psql or docker call, or that pick the image, run
+// against recording stubs. No test waits on a real network call.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { JST_OFFSET_S, secondsToJstMidnight, waitPastJstMidnight } from '../../scripts/ci/jst-midnight-guard.mjs';
+import { SECRET_KEY, redact, secretValues } from '../../scripts/ci/redact-log.mjs';
+import { isPlaceholder } from '../../scripts/ci/scan-secrets.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** @param {string} file */
@@ -397,9 +402,609 @@ describe('scripts/ci/jst-midnight-guard.mjs (00:00 JST, Japan time with no dayli
     });
 });
 
+const STACK_SH = 'scripts/ci/stack.sh';
+const stackScript = read(STACK_SH);
+/** stack.sh without its comment lines, so a word in a comment never satisfies a check. */
+const stackCode = stackScript.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+/** The same without the text of echo and fail messages: only what the script runs. */
+const stackCommands = stackCode.split('\n').map((line) => line.replace(/\b(echo|fail) ["'][\s\S]*$/, '$1')).join('\n');
+const TEMPLATE = 'deploy/risepath-vm/ci/stack.ci.env';
+const template = read(TEMPLATE);
+const PG_IMAGE = (read('deploy/risepath-vm/docker-compose.yml').match(IMAGE_RE) ?? [])[0] ?? '';
+const PG_DIGEST = PG_IMAGE.slice(PG_IMAGE.indexOf('@') + 1);
+const STACK_PORTS = [5432, 3006, 3100];
+const MARKER = '# risepath-ci-env:';
+/** A production-ready /api/v2/health body, as the api answers it on the CI stack. */
+const HEALTH = { ok: true, node_env: 'production', checks: { database: true, supabase_auth: true, production_data_mode: true, strict_auth_mode: true }, database: { migrations: { pending: 0, ok: true } } };
+/** A log line with the template's secret values in it (the deploy stub and `compose logs` print it). */
+const LEAKY = 'DATABASE_URL_PHASE1=postgresql://risepath_app:ci-dummy-db-password@db:5432/risepath token=ci-dummy-bridge-token';
+
+/** True when something on this machine listens on 127.0.0.1:<port>. @param {number} port */
+function busy(port) {
+    return spawnSync('bash', ['-c', `(exec 3<> "/dev/tcp/127.0.0.1/${port}") 2> /dev/null`]).status === 0;
+}
+const BUSY = STACK_PORTS.filter(busy);
+const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use on this machine (${BUSY.join(', ')}): preflight would refuse it first`;
+
+/**
+ * @typedef {{ env?: Record<string, string>, failPull?: (image: string) => boolean, inspectFails?: boolean,
+ *   mcpExit?: number, health?: unknown, curlExit?: number, deployExit?: number, dfKb?: number, cwd?: string,
+ *   hide?: string[], redactFails?: boolean, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
+ */
+/**
+ * Runs scripts/ci/stack.sh <args> in a temporary copy of the tree: stack.sh, redact-log.mjs and
+ * deploy/risepath-vm/{ci/stack.ci.env, docker-compose.yml, Dockerfile}, with a recording
+ * deploy/risepath-vm/scripts/deploy-stack.sh stub that prints LEAKY and exits `deployExit`. Recording
+ * docker, curl and sleep stubs come first on PATH (with `dfKb`, df too), the real node after them.
+ * docker answers version/info, fails `pull` for images `failPull` names and `image inspect` with
+ * `inspectFails`, exits `mcpExit` for the exec into mcp, and prints LEAKY for `compose logs`; each
+ * line logs the COMPOSE_PROJECT_NAME it saw. curl prints `health` (as JSON unless a string) or exits `curlExit`.
+ * With `redactFails`, node exits 7 for redact-log.mjs (and runs the real node otherwise). `hide` lists
+ * commands to take off PATH: the rest of PATH is then a folder of links to every other command on it.
+ * @param {string[]} args @param {StackOptions} [options]
+ */
+function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, setup, inspect } = {}) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-'));
+    try {
+        const tree = path.join(dir, 'repo');
+        for (const file of [STACK_SH, 'scripts/ci/redact-log.mjs', TEMPLATE, 'deploy/risepath-vm/docker-compose.yml', 'deploy/risepath-vm/Dockerfile']) {
+            fs.mkdirSync(path.dirname(path.join(tree, file)), { recursive: true });
+            fs.copyFileSync(path.join(ROOT, file), path.join(tree, file));
+        }
+        fs.mkdirSync(path.join(tree, 'deploy/risepath-vm/scripts'));
+        fs.writeFileSync(path.join(tree, 'deploy/risepath-vm/scripts/deploy-stack.sh'), [
+            'echo "deploy-stack.sh RISEPATH_DEPLOY_SKIP_PULL=${RISEPATH_DEPLOY_SKIP_PULL-<unset>} COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME-<unset>}" >> "$STUB_LOG"',
+            `echo '==> deploy ${LEAKY}'`,
+            `exit ${deployExit}`,
+        ].join('\n'));
+        const bin = path.join(dir, 'bin');
+        fs.mkdirSync(bin);
+        const log = path.join(dir, 'calls.log');
+        const failing = path.join(dir, 'fail-pull.txt');
+        const healthFile = path.join(dir, 'health.json');
+        const write = (/** @type {string} */ name, /** @type {string} */ body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+        write('docker', [
+            'echo "docker [${COMPOSE_PROJECT_NAME-<unset>}] $*" >> "$STUB_LOG"',
+            'case "$1" in',
+            '  version) echo "Docker 29.0.0" ;;',
+            '  info) echo "Storage driver: overlayfs" ;;',
+            '  pull) if grep -qxF -- "${@: -1}" "$STUB_FAIL_PULL"; then exit 1; fi ;;',
+            `  image) exit ${inspectFails ? 1 : 0} ;;`,
+            '  compose)',
+            '    if [[ "$2" == version ]]; then echo "Docker Compose version v5.0.0"; exit 0; fi',
+            `    if [[ " $* " == *" exec -T mcp "* ]]; then exit ${mcpExit}; fi`,
+            `    if [[ " $* " == *" logs "* ]]; then echo 'risepath-ci-api-1  | - Environment: production'; echo 'risepath-ci-api-1  | ${LEAKY}'; echo 'risepath-ci-api-1  | Authorization: Bearer abc.def-ghi'; fi`,
+            '    ;;',
+            'esac',
+            'exit 0',
+        ].join('\n'));
+        write('curl', ['echo "curl $*" >> "$STUB_LOG"', curlExit === undefined ? 'cat "$STUB_HEALTH"' : `exit ${curlExit}`].join('\n'));
+        write('sleep', 'echo "sleep $*" >> "$STUB_LOG"');
+        if (dfKb !== undefined) write('df', ['echo "Filesystem 1024-blocks Used Available Capacity Mounted on"', `echo "/dev/stub 999999999 1 ${dfKb} 1% /"`].join('\n'));
+        if (redactFails) write('node', ['if [[ "$1" == *redact-log.mjs ]]; then echo "node: stub: redact failed" >&2; exit 7; fi', `exec ${JSON.stringify(process.execPath)} "$@"`].join('\n'));
+        let rest = process.env.PATH ?? '';
+        if (hide) {
+            rest = path.join(dir, 'path');
+            fs.mkdirSync(rest);
+            for (const from of (process.env.PATH ?? '').split(path.delimiter)) {
+                /** @type {string[]} */
+                let names;
+                try { names = fs.readdirSync(from); } catch { continue; }
+                for (const name of names) {
+                    if (hide.includes(name) || fs.existsSync(path.join(rest, name))) continue;
+                    try { fs.accessSync(path.join(from, name), fs.constants.X_OK); } catch { continue; }
+                    fs.symlinkSync(path.join(from, name), path.join(rest, name));
+                }
+            }
+        }
+        const pulls = [`node:22-slim`, 'mirror.gcr.io/library/node:22-slim', PG_IMAGE, `mirror.gcr.io/pgvector/pgvector@${PG_DIGEST}`].filter((image) => failPull(image));
+        fs.writeFileSync(failing, pulls.map((image) => `${image}\n`).join(''));
+        fs.writeFileSync(healthFile, typeof health === 'string' ? health : JSON.stringify(health));
+        fs.writeFileSync(log, '');
+        setup?.(tree);
+        const result = spawnSync('bash', [path.join(tree, STACK_SH), ...args], {
+            cwd: cwd ?? dir,
+            encoding: 'utf8',
+            timeout: 60_000,
+            env: { PATH: `${bin}${path.delimiter}${rest}`, HOME: dir, STUB_LOG: log, STUB_FAIL_PULL: failing, STUB_HEALTH: healthFile, ...env },
+        });
+        inspect?.(tree);
+        const calls = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).map((line) => line.split(tree).join('<tree>'));
+        return { status: result.status, out: `${result.stdout}${result.stderr}`.split(tree).join('<tree>'), calls };
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+/** The timeout-minutes of the step of e2e.yml's stack job that runs `stack.sh <sub>`. @param {string} sub */
+function stackStepTimeout(sub) {
+    const job = read('.github/workflows/e2e.yml').split(/^  stack:$/m)[1]?.split(/^  [a-z0-9_-]+:$/m)[0] ?? '';
+    const step = job.split(/^      - /m).find((s) => new RegExp(`\\brun: bash scripts/ci/stack\\.sh ${sub}\\s*$`, 'm').test(s)) ?? '';
+    return Number(/^\s+timeout-minutes: (\d+)$/m.exec(step)?.[1]);
+}
+
+describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
+    const STACK_ENV = 'deploy/risepath-vm/stack.env';
+    const COMPOSE = 'docker [risepath-ci] compose -p risepath-ci --env-file ';
+
+    it('install-env writes stack.env from the template with its marker, mode 0600, and may run again', () => {
+        /** @type {{ text?: string, mode?: number }} */
+        const seen = {};
+        const { status, out } = runStack(['install-env'], {
+            setup: (tree) => fs.chmodSync(path.join(tree, TEMPLATE), 0o644),
+            inspect: (tree) => {
+                seen.text = fs.readFileSync(path.join(tree, STACK_ENV), 'utf8');
+                seen.mode = fs.statSync(path.join(tree, STACK_ENV)).mode & 0o777;
+            },
+        });
+        assert.equal(status, 0, out);
+        assert.equal(seen.text, template);
+        assert.ok(template.startsWith(MARKER), 'the marker is the first line');
+        assert.equal(seen.mode, 0o600);
+        assert.match(out, /deploy\/risepath-vm\/stack\.env <- ci\/stack\.ci\.env/);
+        const again = runStack(['install-env'], { setup: (tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV)) });
+        assert.equal(again.status, 0, `its own file is replaced: ${again.out}`);
+    });
+
+    it('install-env refuses a file it did not write (exit 1, bytes unchanged)', () => {
+        const mine = 'POSTGRES_PASSWORD=a-developer-s-own-value\n';
+        /** @type {string[]} */
+        const after = [];
+        const { status, out } = runStack(['install-env'], {
+            setup: (tree) => fs.writeFileSync(path.join(tree, STACK_ENV), mine),
+            inspect: (tree) => after.push(fs.readFileSync(path.join(tree, STACK_ENV), 'utf8')),
+        });
+        assert.equal(status, 1, out);
+        assert.match(out, /❌ deploy\/risepath-vm\/stack\.env exists and was not written by scripts\/ci\/stack\.sh: move it away \(it is never overwritten\)/);
+        assert.deepEqual(after, [mine]);
+    });
+
+    it('preflight refuses a foreign stack.env, mcp-public.env, billing.env or tunnel.env next to the compose file, before any docker call', () => {
+        for (const file of ['stack.env', 'mcp-public.env', 'billing.env', 'tunnel.env']) {
+            const { status, out, calls } = runStack(['preflight'], { setup: (tree) => fs.writeFileSync(path.join(tree, 'deploy/risepath-vm', file), 'X=1\n') });
+            assert.equal(status, 1, `${file}: ${out}`);
+            assert.match(out, new RegExp(`❌ deploy/risepath-vm/${file.replace('.', '\\.')} exists: the CI stack would load it \\(env_file\\)`), file);
+            assert.deepEqual(calls, [], `${file}: no docker call`);
+        }
+        const ours = runStack(['preflight'], { dfKb: 10 * 1048576, setup: (tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV)) });
+        assert.ok(ours.calls.some((line) => line.includes(' version ')), `the file it installed is not foreign: ${ours.out}`);
+    });
+
+    it('preflight and pull refuse a PATH without timeout (coreutils; stock macOS), with the remedy, before any docker call', () => {
+        for (const sub of ['preflight', 'pull']) {
+            const { status, out, calls } = runStack([sub], { dfKb: 10 * 1048576, hide: ['timeout'] });
+            assert.equal(status, 1, `${sub}: ${out}`);
+            assert.match(out, /❌ timeout is not on PATH \(coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH\)/, sub);
+            assert.deepEqual(calls, [], `${sub}: no docker call`);
+        }
+        const linked = runStack(['preflight'], { dfKb: 10 * 1048576, hide: [] });
+        assert.ok(linked.calls.some((line) => line.includes(' version ')), `the linked PATH runs the script: ${linked.out}`);
+    });
+
+    it('preflight prints the Docker, Compose and storage-driver versions (compare them with the VM\'s)', () => {
+        const { calls, out } = runStack(['preflight'], { dfKb: 10 * 1048576 });
+        assert.deepEqual(calls.slice(0, 3), [
+            'docker [risepath-ci] version --format Docker {{.Server.Version}}',
+            'docker [risepath-ci] compose version',
+            'docker [risepath-ci] info --format Storage driver: {{.Driver}}',
+        ]);
+        assert.match(out, /Docker 29\.0\.0\nDocker Compose version v5\.0\.0\nStorage driver: overlayfs\n/);
+    });
+
+    it('preflight refuses less than 5 GB free on the repo\'s disk', { skip: SKIP_IF_PORTS_BUSY }, () => {
+        const low = runStack(['preflight'], { dfKb: 5 * 1048576 - 1 });
+        assert.equal(low.status, 1, low.out);
+        assert.match(low.out, /Free disk: 4 GB\n❌ only 4 GB free; the CI stack needs 5 GB/);
+        const enough = runStack(['preflight'], { dfKb: 5 * 1048576 });
+        assert.equal(enough.status, 0, enough.out);
+        assert.match(enough.out, /Free disk: 5 GB\n?$/);
+    });
+
+    it('preflight refuses a port the stack publishes when something listens on it', { skip: SKIP_IF_PORTS_BUSY }, async () => {
+        for (const port of STACK_PORTS) {
+            const server = net.createServer();
+            await new Promise((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', () => resolve(undefined)));
+            try {
+                const { status, out } = runStack(['preflight'], { dfKb: 10 * 1048576 });
+                assert.equal(status, 1, `${port}: ${out}`);
+                assert.match(out, new RegExp(`❌ port ${port} is in use \\(the CI stack needs it\\)`));
+            } finally {
+                await new Promise((resolve) => server.close(() => resolve(undefined)));
+            }
+        }
+    });
+
+    it('every compose call names the project risepath-ci; another COMPOSE_PROJECT_NAME is refused (exit 2)', () => {
+        const down = runStack(['down']);
+        assert.equal(down.status, 0, down.out);
+        const compose = down.calls.filter((line) => / compose /.test(line));
+        assert.ok(compose.length > 0);
+        for (const line of compose) assert.ok(line.startsWith(COMPOSE), line);
+        assert.equal(runStack(['down'], { env: { COMPOSE_PROJECT_NAME: 'risepath-ci' } }).status, 0);
+        for (const name of ['risepath', 'other']) {
+            const refused = runStack(['down'], { env: { COMPOSE_PROJECT_NAME: name } });
+            assert.equal(refused.status, 2, refused.out);
+            assert.match(refused.out, new RegExp(`❌ COMPOSE_PROJECT_NAME=${name}: this script drives the risepath-ci project only`));
+            assert.deepEqual(refused.calls, [], `${name}: no call`);
+        }
+        assert.deepEqual(stackCode.match(/docker compose [^\n]*/g), ['docker compose -p "${PROJECT}" --env-file "$(envfile)" -f "${STACK}/docker-compose.yml" "$@"; }', 'docker compose version'],
+            'one compose wrapper; preflight\'s version line names no project');
+    });
+
+    it('deploy <n> runs the tree\'s deploy-stack.sh with RISEPATH_DEPLOY_SKIP_PULL=1, writes deploy-<n>.log and fails when it fails', () => {
+        /** @type {string[]} */
+        const logs = [];
+        const installed = (/** @type {string} */ tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
+        const ok = runStack(['deploy', '1'], { setup: installed, inspect: (tree) => logs.push(fs.readFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'), 'utf8')) });
+        assert.equal(ok.status, 0, ok.out);
+        assert.deepEqual(ok.calls, ['deploy-stack.sh RISEPATH_DEPLOY_SKIP_PULL=1 COMPOSE_PROJECT_NAME=risepath-ci']);
+        assert.equal(logs[0], `==> deploy ${LEAKY}\n`, 'the raw log (redacted only by `logs`)');
+        assert.match(ok.out, /==> deploy /, 'and the job log');
+
+        const failed = runStack(['deploy', '2'], { deployExit: 3, setup: installed, inspect: (tree) => logs.push(fs.readFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-2.log'), 'utf8')) });
+        assert.notEqual(failed.status, 0, 'pipefail: tee does not hide a failed deploy');
+        assert.match(stackScript, /^set -euo pipefail$/m);
+        assert.equal(logs[1], `==> deploy ${LEAKY}\n`, 'the log of a failed deploy is kept for the logs step');
+
+        const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-logdir-'));
+        try {
+            assert.equal(runStack(['deploy', '1'], { setup: installed, env: { RISEPATH_CI_LOG_DIR: elsewhere } }).status, 0);
+            assert.deepEqual(fs.readdirSync(elsewhere), ['deploy-1.log'], 'RISEPATH_CI_LOG_DIR moves the raw logs');
+        } finally {
+            fs.rmSync(elsewhere, { recursive: true, force: true });
+        }
+        assert.match(stackCode, /^ {2}RISEPATH_DEPLOY_SKIP_PULL=1 bash "\$\{STACK\}\/scripts\/deploy-stack\.sh" 2>&1 \| tee "\$\{LOG_DIR\}\/deploy-\$1\.log"$/m);
+    });
+
+    it('deploy runs only with the template that install-env wrote: a developer\'s or the VM\'s stack.env, or a foreign env file beside it, never reaches deploy-stack.sh', () => {
+        const own = 'POSTGRES_PASSWORD=a-developer-s-own-value\n';
+        for (const [what, setup, message] of /** @type {[string, (tree: string) => void, RegExp][]} */ ([
+            ['no stack.env', () => {}, /❌ deploy\/risepath-vm\/stack\.env is not the CI template: run install-env first/],
+            ['a foreign stack.env', (tree) => fs.writeFileSync(path.join(tree, STACK_ENV), own), /❌ deploy\/risepath-vm\/stack\.env is not the CI template: run install-env first/],
+            ...['mcp-public.env', 'billing.env', 'tunnel.env'].map((file) => /** @type {[string, (tree: string) => void, RegExp]} */ ([`the template and a foreign ${file}`, (tree) => {
+                fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
+                fs.writeFileSync(path.join(tree, 'deploy/risepath-vm', file), own);
+            }, new RegExp(`❌ deploy/risepath-vm/${file.replace('.', '\\.')} exists: the CI stack would load it \\(env_file\\)`)])),
+        ])) {
+            /** @type {boolean[]} */
+            const logged = [];
+            const { status, out, calls } = runStack(['deploy', '1'], { setup, inspect: (tree) => logged.push(fs.existsSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'))) });
+            assert.equal(status, 1, `${what}: ${out}`);
+            assert.match(out, message, what);
+            assert.deepEqual(calls, [], `${what}: no deploy-stack.sh or docker call`);
+            assert.deepEqual(logged, [false], `${what}: no deploy log`);
+        }
+    });
+
+    it('down removes the risepath-ci project with its volume, then only the env file it installed', () => {
+        /** @type {boolean[]} */
+        const left = [];
+        const own = runStack(['down'], {
+            setup: (tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV)),
+            inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))),
+        });
+        assert.equal(own.status, 0, own.out);
+        assert.deepEqual(own.calls, [`${COMPOSE}<tree>/deploy/risepath-vm/stack.env -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`]);
+        const foreign = runStack(['down'], {
+            setup: (tree) => fs.writeFileSync(path.join(tree, STACK_ENV), 'X=1\n'),
+            inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))),
+        });
+        assert.equal(foreign.status, 0, foreign.out);
+        assert.deepEqual(foreign.calls, [`${COMPOSE}<tree>/${TEMPLATE} -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`], 'a foreign stack.env is never read');
+        assert.deepEqual(left, [false, true], 'its own stack.env removed; a foreign one kept');
+        assert.doesNotMatch(stackCommands, /prune|docker volume rm|docker system|docker rmi|docker image rm/, 'removes nothing but the project');
+    });
+
+    it('pull: both base images from Docker Hub; when it refuses, the same reference from mirror.gcr.io re-tagged to the compose/Dockerfile reference, which must then resolve', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
+        const pulls = (/** @type {string[]} */ calls) => calls.filter((line) => /^docker \[risepath-ci\] (pull|tag|image) /.test(line)).map((line) => line.replace('docker [risepath-ci] ', ''));
+        const hub = runStack(['pull']);
+        assert.equal(hub.status, 0, hub.out);
+        assert.deepEqual(pulls(hub.calls), ['pull -q node:22-slim', `pull -q ${PG_IMAGE}`]);
+        assert.doesNotMatch(hub.out, /::warning/);
+
+        const mirror = runStack(['pull'], { failPull: (image) => !image.startsWith('mirror.gcr.io/') });
+        assert.equal(mirror.status, 0, mirror.out);
+        assert.deepEqual(pulls(mirror.calls), [
+            'pull -q node:22-slim', 'pull -q mirror.gcr.io/library/node:22-slim', 'tag mirror.gcr.io/library/node:22-slim node:22-slim', 'image inspect node:22-slim',
+            `pull -q ${PG_IMAGE}`, `pull -q mirror.gcr.io/pgvector/pgvector@${PG_DIGEST}`, `tag mirror.gcr.io/pgvector/pgvector@${PG_DIGEST} pgvector/pgvector:0.8.7-pg16`, `image inspect ${PG_IMAGE}`,
+        ]);
+        assert.match(mirror.out, /::warning ::docker pull node:22-slim: Docker Hub failed; using mirror\.gcr\.io\/library\/node:22-slim \(a pinned digest is the same image\)/);
+        assert.match(mirror.out, /::warning ::docker pull pgvector\/pgvector:0\.8\.7-pg16: Docker Hub failed; using mirror\.gcr\.io\/pgvector\/pgvector \(a pinned digest is the same image\)/);
+
+        // The classic image store cannot re-tag to a digest reference: the inspect fails, and so does the job.
+        const classic = runStack(['pull'], { failPull: (image) => !image.startsWith('mirror.gcr.io/'), inspectFails: true });
+        assert.equal(classic.status, 1, classic.out);
+        assert.equal(pulls(classic.calls).filter((line) => line === 'image inspect node:22-slim').length, 3, 'three attempts');
+        assert.deepEqual(classic.calls.filter((line) => line.startsWith('sleep ')), ['sleep 10', 'sleep 20']);
+        assert.match(classic.out.trimEnd().split('\n').at(-1) ?? '', /^❌ docker pull node:22-slim failed on Docker Hub and mirror\.gcr\.io \(attempt 3 of 3, 420 s at most for all pulls\); re-run the job later$/);
+        assert.ok(!classic.calls.some((line) => line.includes('pgvector')), 'stops at the first image');
+    });
+
+    it('pull is bounded: one deadline for every pull and pause, inside the workflow step\'s limit', () => {
+        const each = Number(/^PULL_EACH_S=(\d+)$/m.exec(stackCode)?.[1]);
+        const budget = Number(/^PULL_BUDGET_S=(\d+)$/m.exec(stackCode)?.[1]);
+        assert.ok(each > 0 && each < budget, `each pull ${each} s, all of them ${budget} s`);
+        assert.match(stackCode, /^ {2}local image attempt mirror pause pull_end=\$\(\(SECONDS \+ PULL_BUDGET_S\)\)$/m);
+        assert.match(stackCode, /^ {4}local left=\$\(\(pull_end - SECONDS\)\)\n {4}if \[\[ "\$\{left\}" -le 0 \]\]; then return 1; fi\n {4}timeout "\$\(\(left < PULL_EACH_S \? left : PULL_EACH_S\)\)" docker pull -q "\$1" > \/dev\/null$/m);
+        assert.equal(stackCommands.match(/docker pull/g)?.length, 1, 'every pull goes through pull()');
+        assert.match(stackCode, /if \[\[ "\$\{attempt\}" -eq 3 \|\| \$\(\(pull_end - SECONDS\)\) -le "\$\{pause\}" \]\]; then\n\s+fail "[^\n]*re-run the job later"\n/, 'no pause past the deadline');
+        const step = stackStepTimeout('pull');
+        assert.ok(Number.isInteger(step), 'the stack job\'s pull step has timeout-minutes');
+        // Each pull is cut at what is left, so all of them end by the budget; tag and inspect take seconds.
+        assert.ok(budget + 60 <= 60 * step, `${budget} s of pulls, plus 60 s, must fit in the step's ${step} min`);
+    });
+
+    it('mcp-db asks the admin MCP inside its container whether its database answered', () => {
+        const ok = runStack(['mcp-db']);
+        assert.equal(ok.status, 0, ok.out);
+        assert.equal(ok.calls.length, 1);
+        assert.ok(ok.calls[0].startsWith(`${COMPOSE}<tree>/${TEMPLATE} -f <tree>/deploy/risepath-vm/docker-compose.yml exec -T mcp node -e `), ok.calls[0]);
+        const down = runStack(['mcp-db'], { mcpExit: 1 });
+        assert.equal(down.status, 1, down.out);
+        assert.match(down.out, /❌ mcp \/health: the database is not connected/);
+
+        // The snippet itself (mcp's /health is 200 whatever the database says): only db=connected passes.
+        const snippet = /compose exec -T mcp node -e "([^"]+)"/.exec(stackCode)?.[1] ?? '';
+        assert.match(snippet, /fetch\('http:\/\/127\.0\.0\.1:3100\/health', \{ signal: AbortSignal\.timeout\(20000\) \}\)/, 'bounded: a local run has no step timeout');
+        /** @param {string} fake */
+        const exitOf = (fake) => spawnSync(process.execPath, ['-e', `globalThis.fetch = ${fake};\n${snippet}`], { encoding: 'utf8', timeout: 20_000 }).status;
+        assert.equal(exitOf("async () => ({ json: async () => ({ status: 'ok', db: 'connected' }) })"), 0);
+        assert.equal(exitOf("async (url, init) => ({ json: async () => ({ db: init?.signal instanceof AbortSignal ? 'connected' : 'no signal' }) })"), 0, 'the request carries the time limit');
+        for (const db of ['disconnected', 'timeout', 'not_configured']) {
+            assert.equal(exitOf(`async () => ({ json: async () => ({ status: 'degraded', db: '${db}' }) })`), 1, db);
+        }
+        assert.equal(exitOf("async () => { throw new Error('ECONNREFUSED'); }"), 1, 'no answer');
+        assert.equal(exitOf("async () => ({ json: async () => { throw new SyntaxError('not json'); } })"), 1, 'not JSON');
+    });
+
+    it('health reads /api/v2/health from the host and passes only a production-ready snapshot with no pending migration', () => {
+        const ok = runStack(['health']);
+        assert.equal(ok.status, 0, ok.out);
+        // No --fail: a 503 body (ok false, which check) reaches the check and the job log.
+        // --max-time: a local npm run ci:stack has no step timeout, and an api that never answers must not hang it.
+        assert.deepEqual(ok.calls, ['curl -sS --max-time 20 http://127.0.0.1:3006/api/v2/health']);
+        for (const [what, body] of /** @type {[string, unknown][]} */ ([
+            ['ok false', { ...HEALTH, ok: false }],
+            ['not production', { ...HEALTH, node_env: 'development' }],
+            ['strict auth off', { ...HEALTH, checks: { ...HEALTH.checks, strict_auth_mode: false } }],
+            ['demo data', { ...HEALTH, checks: { ...HEALTH.checks, production_data_mode: false } }],
+            ['a pending migration', { ...HEALTH, database: { migrations: { pending: 1, ok: false } } }],
+            ['no migration status', { ...HEALTH, database: { status: 'error' } }],
+        ])) {
+            const bad = runStack(['health'], { health: body });
+            assert.equal(bad.status, 1, `${what}: ${bad.out}`);
+            assert.match(bad.out, /^health: \{"ok":/m, what);
+            assert.match(bad.out, /❌ \/api\/v2\/health from the host is not production-ready/, what);
+        }
+        const unreachable = runStack(['health'], { curlExit: 7 });
+        assert.equal(unreachable.status, 1, unreachable.out);
+        assert.match(unreachable.out, /^health: not JSON: ""$/m);
+        assert.match(unreachable.out, /❌ \/api\/v2\/health from the host is not production-ready/);
+        const html = runStack(['health'], { health: '<html>' });
+        assert.equal(html.status, 1, html.out);
+        assert.match(html.out, /^health: not JSON: "<html>"$/m);
+    });
+
+    it('logs writes the compose state and the redacted compose and deploy logs into the folder given (relative to the caller), keeping the raw log', () => {
+        const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-caller-'));
+        try {
+            /** @type {Record<string, string>} */
+            const files = {};
+            /** @type {string[]} */
+            const raw = [];
+            const { status, out, calls } = runStack(['logs', 'kept/logs'], {
+                cwd: outer,
+                setup: (tree) => {
+                    fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
+                    fs.mkdirSync(path.join(tree, '.artifacts/ci/stack/raw'), { recursive: true });
+                    fs.writeFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'), `==> deploy ${LEAKY}\n`);
+                },
+                inspect: (tree) => raw.push(fs.readFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'), 'utf8')),
+            });
+            for (const name of fs.readdirSync(path.join(outer, 'kept/logs')).sort()) files[name] = fs.readFileSync(path.join(outer, 'kept/logs', name), 'utf8');
+            assert.equal(status, 0, out);
+            assert.deepEqual(Object.keys(files), ['compose-ps.txt', 'compose.log', 'deploy-1.log']);
+            assert.deepEqual(calls.map((line) => line.replace(/ --env-file \S+ -f \S+/, '')), ['docker [risepath-ci] compose -p risepath-ci ps -a', 'docker [risepath-ci] compose -p risepath-ci logs --no-color --timestamps']);
+            for (const [name, text] of Object.entries(files)) {
+                for (const secret of ['ci-dummy-db-password', 'ci-dummy-bridge-token', 'abc.def-ghi']) assert.ok(!text.includes(secret), `${name} holds ${secret}`);
+            }
+            assert.match(files['compose.log'], /risepath-ci-api-1 {2}\| - Environment: production/);
+            assert.match(files['compose.log'], /DATABASE_URL_PHASE1=<value> token=<value>/);
+            assert.match(files['compose.log'], /Bearer <token>/);
+            assert.equal(files['deploy-1.log'], '==> deploy DATABASE_URL_PHASE1=<value> token=<value>\n');
+            assert.deepEqual(raw, [`==> deploy ${LEAKY}\n`], 'the workspace copy stays raw; only the folder given is uploaded');
+            assert.match(out, /Environment: production/, 'the tail of compose.log goes to the job log');
+        } finally {
+            fs.rmSync(outer, { recursive: true, force: true });
+        }
+    });
+
+    it('logs also masks the secret values of env files it did not write (a developer\'s stack.env, billing.env)', () => {
+        /** @type {string[]} */
+        const kept = [];
+        const { status, out } = runStack(['logs', 'kept'], {
+            setup: (tree) => {
+                fs.writeFileSync(path.join(tree, STACK_ENV), 'POSTGRES_PASSWORD=a-developer-s-own-value\n');
+                fs.writeFileSync(path.join(tree, 'deploy/risepath-vm/billing.env'), 'STRIPE_WEBHOOK_SECRET=a-developer-s-billing-value\n');
+                fs.mkdirSync(path.join(tree, '.artifacts/ci/stack/raw'), { recursive: true });
+                fs.writeFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'), `${LEAKY} a-developer-s-own-value a-developer-s-billing-value\n`);
+            },
+            inspect: (tree) => kept.push(fs.readFileSync(path.join(path.dirname(tree), 'kept/deploy-1.log'), 'utf8')),
+        });
+        assert.equal(status, 0, out);
+        assert.deepEqual(kept, ['DATABASE_URL_PHASE1=<value> token=<value> <value> <value>\n']);
+    });
+
+    it('rehearsal runs the job\'s subcommands in order, and always removes the stack: with the logs when a step fails', { skip: SKIP_IF_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+        /** @type {{ env: boolean, logs: string[] }[]} */
+        const seen = [];
+        const look = (/** @type {string} */ tree) => {
+            const logs = path.join(tree, '.artifacts/ci/stack/logs');
+            seen.push({ env: fs.existsSync(path.join(tree, STACK_ENV)), logs: fs.existsSync(logs) ? fs.readdirSync(logs).sort() : [] });
+        };
+        const steps = (/** @type {string[]} */ calls) => calls.map((line) => {
+            if (line.startsWith('deploy-stack.sh ')) return 'deploy';
+            if (line.startsWith('curl ')) return 'health';
+            if (/ exec -T mcp /.test(line)) return 'mcp-db';
+            if (/ down -v /.test(line)) return 'down';
+            if (/ (logs|ps -a)( |$)/.test(line)) return 'logs';
+            if (/^docker \[risepath-ci\] (version|info|compose version)/.test(line)) return 'preflight';
+            if (/^docker \[risepath-ci\] pull /.test(line)) return 'pull';
+            return line;
+        }).filter((step, i, all) => step !== all[i - 1]);
+
+        const pass = runStack(['rehearsal'], { dfKb: 10 * 1048576, inspect: look });
+        assert.equal(pass.status, 0, pass.out);
+        assert.deepEqual(steps(pass.calls), ['preflight', 'pull', 'deploy', 'mcp-db', 'health', 'down']);
+        assert.match(pass.out, /# Server stack deploy: all passed\n/);
+
+        const failed = runStack(['rehearsal'], { dfKb: 10 * 1048576, mcpExit: 1, inspect: look });
+        assert.equal(failed.status, 1, failed.out);
+        assert.deepEqual(steps(failed.calls), ['preflight', 'pull', 'deploy', 'mcp-db', 'logs', 'down']);
+        assert.doesNotMatch(failed.out, /all passed/);
+
+        // A re-run after an earlier failed one: none of that run's logs is kept as this run's.
+        const refused = runStack(['rehearsal'], {
+            dfKb: 1048576,
+            inspect: look,
+            setup: (tree) => {
+                for (const dir of ['.artifacts/ci/stack/raw', '.artifacts/ci/stack/logs']) fs.mkdirSync(path.join(tree, dir), { recursive: true });
+                fs.writeFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-1.log'), 'an earlier run\n');
+                fs.writeFileSync(path.join(tree, '.artifacts/ci/stack/logs/deploy-1.log'), 'an earlier run\n');
+            },
+        });
+        assert.equal(refused.status, 1, refused.out);
+        assert.deepEqual(steps(refused.calls), ['preflight', 'logs', 'down'], 'a refused preflight still tears down');
+
+        assert.deepEqual(seen, [
+            { env: false, logs: [] },
+            { env: false, logs: ['compose-ps.txt', 'compose.log', 'deploy-1.log'] },
+            { env: false, logs: ['compose-ps.txt', 'compose.log'] },
+        ], 'stack.env removed every time; logs only after a failure');
+    });
+
+    it('rehearsal still removes the stack, and keeps the failed step\'s exit code, when collecting the logs fails', { skip: SKIP_IF_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+        /** @type {boolean[]} */
+        const left = [];
+        const { status, out, calls } = runStack(['rehearsal'], { dfKb: 10 * 1048576, deployExit: 3, redactFails: true, inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))) });
+        assert.match(out, /node: stub: redact failed/, 'the redaction of deploy-1.log failed inside the EXIT trap');
+        assert.equal(status, 3, `the deploy's exit code, not the redaction's: ${out}`);
+        assert.ok(calls.at(-1)?.includes(' down -v --remove-orphans '), `down runs last: ${calls.at(-1)}`);
+        assert.deepEqual(left, [false], 'the installed stack.env is removed');
+    });
+
+    it('the usage names every subcommand; an unknown one exits 2', () => {
+        const { status, out, calls } = runStack(['nope']);
+        assert.equal(status, 2);
+        assert.match(out, /^Usage: bash scripts\/ci\/stack\.sh preflight\|install-env\|pull\|deploy <n>\|mcp-db\|health\|logs <dir>\|down\|rehearsal$/m);
+        assert.deepEqual(calls, []);
+        const cases = [...stackCode.matchAll(/^ {2}([a-z-]+)\) cmd_/gm)].map((m) => m[1]);
+        assert.deepEqual(cases, ['preflight', 'install-env', 'pull', 'deploy', 'mcp-db', 'health', 'logs', 'down', 'rehearsal']);
+        for (const sub of cases) assert.match(stackScript, new RegExp(`^#   ${sub}\\b`, 'm'), `the header documents ${sub}`);
+    });
+});
+
+describe('deploy/risepath-vm/ci (dummy values only)', () => {
+    /** @type {Map<string, string>} */
+    const values = new Map();
+    for (const line of template.split('\n')) {
+        const m = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line);
+        if (m) values.set(m[1], m[2]);
+    }
+
+    it('stack.ci.env: marker first, the exact key set, production switches, deletion on, AI off, gate off, no billing, project risepath-ci', () => {
+        assert.ok(template.split('\n')[0].startsWith(`${MARKER} CI only.`));
+        for (const line of template.split('\n')) assert.match(line, /^(#.*|[A-Z][A-Z0-9_]*=.*|)$/, `a comment or KEY=value: ${line}`);
+        // Every KEY=value line, exactly and in order (the header says so): a changed value is a reviewed change here.
+        assert.deepEqual(template.split('\n').filter((line) => /^[A-Z]/.test(line)), [
+            'COMPOSE_PROJECT_NAME=risepath-ci',
+            'COMPOSE_PROFILES=',
+            'POSTGRES_USER=risepath_app',
+            'POSTGRES_PASSWORD=ci-dummy-db-password',
+            'POSTGRES_DB=risepath',
+            'DATABASE_URL_PHASE1=postgresql://risepath_app:ci-dummy-db-password@db:5432/risepath',
+            'NODE_ENV=production',
+            'VITE_DEMO_MODE=false',
+            'SUPABASE_URL=http://auth-stand-in:54390',
+            'SUPABASE_SERVICE_ROLE_KEY=ci-dummy-service-role-key',
+            'RISE_PATH_BRIDGE_TOKEN=ci-dummy-bridge-token',
+            'ANTHROPIC_API_KEY=',
+            'GEMINI_API_KEY=',
+            'ORIGIN_SECRET=',
+            'LLM_ALLOWED_ORIGINS=',
+            'MEMANTO_ENABLED=false',
+            'MEMANTO_SECRET_KEY=',
+            'ACCOUNT_DELETION_ENABLED=true',
+        ]);
+        assert.match(template, /^# server\/tests\/ciScripts\.test\.js pins every KEY=value line exactly/m, 'the header claims no more than this test checks');
+        // Why those values: the reasons below stay true when a value changes on purpose.
+        assert.equal(values.get('DATABASE_URL_PHASE1'), `postgresql://${values.get('POSTGRES_USER')}:${values.get('POSTGRES_PASSWORD')}@db:5432/${values.get('POSTGRES_DB')}`, 'the db service with the template\'s own role');
+        assert.match(values.get('SUPABASE_URL') ?? '', /^http:\/\/[a-z-]+:\d+$/, 'a name on the stack\'s network, nothing outside it');
+        // AI off (no LLM_PROVIDER, mock or task route; LLM_ALLOWED_ORIGINS is the empty origin list), no billing, no edge.
+        assert.doesNotMatch(template, /^(LLM_(?!ALLOWED_ORIGINS=$)|STRIPE_|BILLING_|OPENROUTER_|GEMINI_ALLOWED|TRUST_PROXY|HERMES_|TUNNEL_)/m);
+        for (const [key, value] of values) {
+            if (SECRET_KEY.test(key) && value) assert.ok(isPlaceholder(value), `${key}: scan-secrets must see a dummy`);
+            if (value) assert.doesNotMatch(value, /change-me|your-project/i, `${key}: deploy-stack.sh would refuse a template value`);
+        }
+    });
+
+    it('the template is not git-ignored, and holds the only CI env file there', () => {
+        assert.deepEqual(fs.readdirSync(path.join(ROOT, 'deploy/risepath-vm/ci')), ['stack.ci.env']);
+        const check = spawnSync('git', ['check-ignore', '-q', TEMPLATE], { cwd: ROOT });
+        if (check.error || check.status === 128) return; // not a git checkout
+        assert.equal(check.status, 1, `${TEMPLATE} must not be git-ignored (deploy/risepath-vm/.gitignore lists stack.env at any depth)`);
+    });
+});
+
+describe('scripts/ci/redact-log.mjs', () => {
+    it('redact masks the values of secret-named keys, JWTs, Bearer tokens and URL passwords, and keeps names a reader needs', () => {
+        const secrets = secretValues(path.join(ROOT, TEMPLATE));
+        assert.deepEqual(secrets.sort(), ['ci-dummy-bridge-token', 'ci-dummy-db-password', 'ci-dummy-service-role-key',
+            'postgresql://risepath_app:ci-dummy-db-password@db:5432/risepath', '', '', '', ''].sort(), 'the secret-named keys of the template, empty ones included');
+        const text = [
+            'risepath-ci-api-1  | DATABASE_URL_PHASE1=postgresql://risepath_app:ci-dummy-db-password@db:5432/risepath',
+            'risepath-ci-db-1   | FATAL: password authentication failed for user "risepath_app" database "risepath"',
+            'risepath-ci-api-1  | - Environment: production',
+            'bridge ci-dummy-bridge-token, service ci-dummy-service-role-key',
+            'Authorization: Bearer sb-access.token_value',
+            'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl',
+            'other postgres://someone:hunter22@elsewhere:5432/db',
+        ].join('\n');
+        const out = redact(text, secrets);
+        for (const secret of ['ci-dummy', 'hunter22', 'sb-access', 'eyJ']) assert.ok(!out.includes(secret), `${secret} masked:\n${out}`);
+        assert.match(out, /DATABASE_URL_PHASE1=<value>\n/);
+        assert.match(out, /bridge <value>, service <value>/);
+        assert.match(out, /Bearer <token>/);
+        assert.match(out, /jwt <jwt>/);
+        assert.match(out, /postgres:\/\/someone:<password>@elsewhere/);
+        for (const kept of ['risepath-ci-api-1', 'risepath-ci-db-1', '- Environment: production', 'database "risepath"', 'user "risepath_app"']) {
+            assert.ok(out.includes(kept), `${kept} stays readable`);
+        }
+        assert.equal(redact('NODE_ENV=production risepath', ['risepath', 'abc']), 'NODE_ENV=production <value>', 'values of 4+ characters only');
+    });
+
+    it('the command line redacts stdin with the env files given, also through a symlinked checkout; importing it runs nothing', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-redact-'));
+        try {
+            fs.symlinkSync(ROOT, path.join(dir, 'link'));
+            for (const script of [path.join(ROOT, 'scripts/ci/redact-log.mjs'), path.join(dir, 'link/scripts/ci/redact-log.mjs')]) {
+                const run = spawnSync(process.execPath, [script, '--env', path.join(ROOT, TEMPLATE)], { input: `x ci-dummy-db-password y\nBearer abc\n`, encoding: 'utf8', timeout: 20_000 });
+                assert.equal(run.status, 0, run.stderr);
+                assert.equal(run.stdout, 'x <value> y\nBearer <token>\n', script);
+            }
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+        const imported = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./scripts/ci/redact-log.mjs'); console.log('ok')"], { cwd: ROOT, input: 'stdin', encoding: 'utf8', timeout: 20_000 });
+        assert.equal(imported.status, 0, imported.stderr);
+        assert.equal(imported.stdout, 'ok\n');
+    });
+});
+
 describe('package.json (Phase 7 local runner)', () => {
-    it('ci:db runs scripts/ci/db-checks.sh', () => {
+    it('ci:db runs scripts/ci/db-checks.sh, ci:stack the whole Server stack deploy job', () => {
         const pkg = JSON.parse(read('package.json'));
         assert.equal(pkg.scripts['ci:db'], 'bash scripts/ci/db-checks.sh');
+        assert.equal(pkg.scripts['ci:stack'], 'bash scripts/ci/stack.sh rehearsal');
     });
 });
