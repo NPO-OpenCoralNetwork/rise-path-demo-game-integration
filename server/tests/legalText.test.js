@@ -304,6 +304,78 @@ describe('the committed public texts (content/legal/*.ja.md)', () => {
     assert.match(note8, /進み具合と XP・学んだ日の保存に保護者の同意が要るかは【要確認】/u);
   });
 
+  it('privacy and the inventory say what Phase 6 keeps for reviews, and the published version names no AI app (design §6, Critique 6)', () => {
+    const privacy = read(LEGAL_DOCUMENTS.privacy.generated);
+    const item = privacy.split('\n').find((line) => line.startsWith('3. **学習の記録**'));
+    assert.ok(item, 'privacy 2 の 3');
+    assert.match(item, /ログインしている方には、レッスンを終えると、そのレッスンの復習カードを復習に加えます（終える前でも、レッスンの中で「覚えた」か「もう一度」の印を付けたカードは加えます）。/u);
+    assert.match(item, /レッスンで学んだ日時（レッスンの記録が変わった日時）、そのレッスンの記録を最後に確かめたときの、記録が変わった日時（あとからレッスンに加わったカードを見分けるのに使います）、復習に加えた日時、次に出す日、覚えている度合いの目安/u);
+    assert.match(item, /本サービスの画面から記録したかどうか/u);
+    assert.match(item, /本サービスの画面で復習した日は、学んだ日にもなります。/u, 'web reviews are learning days (MCP reviews are not)');
+    // Unfenced lines are in today's version, which has no AI-app part (include.byoa false): the
+    // source of a review is named by the screen, and AI apps only inside the byoa fence.
+    assert.doesNotMatch(item, /AI アプリ|MCP|カードの/u);
+    assert.doesNotMatch(privacy, /AI アプリから記録/u);
+    assert.match(privacy, /復習の予定と記録は、アカウントを削除するまで保存します。ただし、1 つのレッスンをやり直すとそのレッスンの分を、「学習の進み具合を消す」を使うとすべてを消します。/u, '§8 (R4)');
+    assert.match(privacy, /生活の記録や、レッスンの進み具合と復習の予定と記録の削除（1 つのレッスンだけのやり直しもふくむ）/u, '9 の 4');
+    const on = publicLegalText(read(LEGAL_DOCUMENTS.privacy.source), ON, { document: 'privacy', source: LEGAL_DOCUMENTS.privacy.source });
+    const section44 = on.slice(on.indexOf('### 4.4'), on.indexOf('### 4.5'));
+    assert.match(section44, /今日の復習カードの問いと答え、カードが次に出る日、今日復習した数と残りの数（答えは、あなたが答えたあとに見せるよう、AI アプリに伝えています。アプリが求めれば渡ります）/u, '4.4 の 2 reads: worded by what the server does (Critique 5)');
+    assert.match(section44, /復習カードの結果の記録（「もう一度」か「覚えた」か。記録するたびに、あなた自身の結果として残り、取り消せません。AI アプリから記録したことも残ります）/u, '4.4 の 2 writes');
+    // The lawyer question is kept where the owner reads it (stripped from the page).
+    assert.match(read(LEGAL_DOCUMENTS.privacy.source), /（作成メモ: Phase 6 で、レッスンの復習カードを、忘れかけたころにもう一度出すようにしました（2 の 3）。【要確認: 弁護士。/u);
+    assert.match(read('doc/legal/README.md'), /^- \[ \] Phase 6: [^\n]*3 の 1[^\n]*3 の 2[^\n]*/mu);
+    // The README's update line and the inventory's status say Phase 6 too (docs #12).
+    const legalReadme = read('doc/legal/README.md');
+    assert.match(legalReadme, /^> 更新日: [^\n]*Phase 6: レッスンの復習カード/mu, 'README update line names Phase 6');
+    assert.match(legalReadme, /\[ai-data-inventory\.ja\.md\][^\n]*Phase 0〜6 のあとの状態[^\n]*Phase 6 は/mu, 'README inventory status covers Phase 6');
+    assert.ok(legalReadme.includes(`\`${LEGAL_DOCUMENTS.privacy.version}\``), 'the Phase 6 lawyer item names the current privacy draft');
+
+    // When review_cards or review_log gains a column, say in privacy 2 の 3 and the inventory row what it keeps.
+    const sql = read('server/migrations/020_review_queue.sql');
+    const columns = (table) => {
+      const body = sql.slice(sql.indexOf(`CREATE TABLE IF NOT EXISTS ${table} (`));
+      return [...body.slice(0, body.indexOf('\n);')).matchAll(/^ {2}([a-z_]+) +[a-z]/gm)].map((m) => m[1]);
+    };
+    assert.deepEqual(columns('review_cards'), ['user_id', 'course_slug', 'lesson_id', 'card_id', 'entered_at', 'learned_at', 'checked_at', 'prior_rating', 'due_day', 'stability', 'difficulty', 'reps', 'lapses', 'last_rating', 'last_review_day']);
+    assert.deepEqual(columns('review_log'), ['user_id', 'course_slug', 'lesson_id', 'card_id', 'review_day', 'reviewed_at', 'rating', 'elapsed_days', 'interval_days', 'stability', 'difficulty', 'source']);
+    assert.match(sql, /ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS progress_changed_at timestamptz NULL;/);
+
+    const inventory = read('doc/legal/ai-data-inventory.ja.md');
+    for (const name of ['review_cards', 'review_log', 'progress_changed_at']) assert.ok(inventory.includes(`\`${name}\``), name);
+    const row = inventory.split('\n').find((line) => line.startsWith('| 復習（Phase 6） |'));
+    assert.ok(row, 'the inventory row');
+    assert.match(row, /\*\*復習の記録、覚えている度合いの目安、学んだ日時は渡しません\*\*/u);
+    assert.match(row, /`review_log` は読めません/u);
+    assert.match(row, /18 歳未満の人のものも保存します/u);
+    assert.match(row, /1 日 10 枚まで/u);
+    // ... which the role SQL makes true for the remote MCP role: no SELECT on review_log, every
+    // review_cards column but the entry time, the lesson mark the first memory came from and the last
+    // result (entered_at, prior_rating, last_rating: the last two are only written), no DELETE on
+    // either table; the in-lesson marks stay readable in lesson_progress, as the row says
+    // (vmStackConfig.test.js pins the lines).
+    assert.match(row, /リモートの MCP のロールは、ツールが返す内容（今日のカードの一覧と、記録したあとの次に出る日）を計算するために、`review_cards` の列のうち、復習に加えた日時、最初の目安に使った印、最後の結果（`entered_at`・`prior_rating`・`last_rating`。印と結果は書き込むだけです）のほかをすべて読みます/u);
+    assert.match(row, /記録を最後に確かめた日時/u, 'checked_at, in the list of what the role reads');
+    assert.doesNotMatch(row, /答えを計算する/u, '「答え」 is a card\'s back in this row');
+    assert.match(row, /レッスンでのカードの印は、`lesson_progress` のほかの列と同じく読めます/u);
+    assert.match(row, /どちらの表の行も消せません/u);
+    const role = read('deploy/risepath-vm/sql/mcp_remote_role.sql');
+    assert.doesNotMatch(role, /^GRANT[^;]*\bSELECT\b[^;]*\bON review_log\b/m);
+    assert.doesNotMatch(role, /^GRANT[^;]*\bDELETE\b[^;]*\bON (review_cards|review_log)\b/m);
+    const reviewSelect = role.match(/^GRANT SELECT \(([^)]*)\) ON review_cards TO risepath_mcp_remote;$/m);
+    assert.ok(reviewSelect, 'column SELECT grant on review_cards');
+    assert.deepEqual(reviewSelect[1].split(', '), columns('review_cards').filter((c) => !['entered_at', 'prior_rating', 'last_rating'].includes(c)),
+        'the role reads every review_cards column but entered_at, prior_rating and last_rating, as the inventory row says');
+    assert.match(role, /^GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;$/m, 'the in-lesson marks: the whole lesson_progress row');
+    const xp = inventory.split('\n').find((line) => line.startsWith('| XP・バッジ・学んだ日（Phase 5） |'));
+    assert.match(xp, /本サービスの画面で復習カードの結果を記録した日も、学んだ日になります（Phase 6。AI アプリからの記録ではなりません）/u);
+    const mcp = inventory.split('\n').find((line) => line.startsWith('| MCP（自分の AI をつなぐ。'));
+    assert.match(mcp, /答えはアプリが求めると渡ります（学習者が答えたあとに見せるよう、アプリに伝えています）/u);
+    assert.match(mcp, /答えを見るだけの呼び出しも、書き込みの 50 回に数えます/u);
+    const progressRow = inventory.split('\n').find((line) => line.startsWith('| レッスンの進み具合（Phase 2） |'));
+    assert.match(progressRow, /やり直しと「学習の進み具合を消す」で、復習の予定と記録（下の「復習（Phase 6）」の行。やり直しはそのレッスンの分だけ）も消えます。/u);
+  });
+
   it('the privacy policy names the processing records the code really writes (jobs: material indexing only)', () => {
     // POST /rag/index is the only jobs insert (type 'ingest'); the worker runs 'ingest' only.
     assert.match(read('server/jobWorker.js'), /'ingest'/);

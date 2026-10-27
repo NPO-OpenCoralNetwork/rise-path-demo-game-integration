@@ -373,6 +373,22 @@ describe('wiring', () => {
     assert.match(apps, /Rise Path のレッスンと、学習の進み具合やジャーナルを読めます。クイズの答えを確かめたり（確かめるたびに、あなた自身の解答として記録されます）、レッスンを読み終えたと記録したり/);
   });
 
+  it('Phase 6: both pages name the review tools by what the server does (the app is told when to show an answer; results are permanent)', () => {
+    const consent = read('components/features/oauth/OAuthConsentView.tsx');
+    const items = (key) => [...consent.matchAll(new RegExp(`${key}: \\[([\\s\\S]*?)\\],`, 'g'))].map((m) => m[1]);
+    const [readEn, readJp] = items('readItems');
+    const [writeEn, writeJp] = items('writeItems');
+    assert.match(readEn, /'Your review cards due today, their answers when the app asks, and when each card comes back \(the app is told to show an answer only after you try\)'/);
+    assert.match(readJp, /'今日の復習カードとその答え、次に出る日（答えは、あなたが答えたあとに見せるよう、アプリに伝えています）'/);
+    assert.match(writeEn, /'Record how you did on a review card \("Again" or "Got it"\)\. Each result is saved as your own and cannot be undone'/);
+    assert.match(writeJp, /'復習カードの結果（「もう一度」か「覚えた」）を記録する（記録するたびに、あなた自身の結果として残り、取り消せません）'/);
+    // Worded by what the server does: it cannot enforce the order, so no page promises it.
+    assert.doesNotMatch(consent, /never (shows|sees) (the|an) answer before|答える前には(見せません|渡しません)/);
+    const apps = read('components/features/settings/ConnectedAppsView.tsx');
+    assert.match(apps, /mark lessons read, run your daily review cards, add journal entries and record finished lessons\./);
+    assert.match(apps, /レッスンを読み終えたと記録したり、今日の復習カードを進めたり、ジャーナルに記録を追加したり/);
+  });
+
   it('disconnecting goes through the tested sequence and sends the app name', () => {
     const api = read('services/connectedAppsApi.ts');
     assert.match(api, /return revokeConnectedAppWith\(target, \{/);

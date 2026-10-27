@@ -29,6 +29,7 @@ const NO_AGE = 'c3c3c3c3-0000-4000-8000-0000000000c3';
 const CLIENT = 'c1c1c1c1-0000-4000-8000-000000000001';
 const REMOTE_TOOLS = [
     'course-lesson-get', 'course-list', 'course-progress-get', 'course-progress-update', 'course-quiz-check',
+    'course-review-due', 'course-review-grade',
     'journal-log', 'journal-recent', 'learner-adaptation-signals', 'learner-state-get', 'learner-state-update', 'rag-search',
 ];
 

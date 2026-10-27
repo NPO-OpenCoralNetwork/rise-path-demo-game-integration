@@ -261,6 +261,10 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
+    // Phase 6: the review tools (course-review-due, course-review-grade), design §2.3.
+    'GRANT SELECT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, due_day, stability, difficulty, reps, lapses, last_review_day) ON review_cards TO risepath_mcp_remote;',
+    'GRANT INSERT (user_id, course_slug, lesson_id, card_id, learned_at, checked_at, prior_rating, stability, difficulty, due_day), UPDATE (learned_at, checked_at, prior_rating, due_day, stability, difficulty, reps, lapses, last_rating, last_review_day) ON review_cards TO risepath_mcp_remote;',
+    'GRANT INSERT (user_id, course_slug, lesson_id, card_id, rating, elapsed_days, interval_days, stability, difficulty, source) ON review_log TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, title) ON curricula TO risepath_mcp_remote;',
     'GRANT SELECT (id, user_id, status) ON materials TO risepath_mcp_remote;',
     'GRANT SELECT (material_id, chunk_index, content, embedding, embedding_model, created_at) ON material_chunks TO risepath_mcp_remote;',
@@ -338,6 +342,38 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     assert.match(code, /^GRANT SELECT, INSERT, UPDATE ON lesson_progress TO risepath_mcp_remote;$/m);
     assert.ok(!/lesson_progress_resets/.test(code), 'the delete control\'s epochs stay app-only');
     assert.match(sql, /lesson_progress\s+the course-\* tools/, 'the header maps the grant to its tools');
+  });
+
+  it('Phase 6: the review tables by column only; never DELETE, never the log\'s rows, the entry time, the lesson mark or the last result', () => {
+    const on = (table) => code.split('\n').filter((l) => /^\s*GRANT\b/.test(l) && new RegExp(` ON ${table} TO `).test(l));
+    const cards = on('review_cards');
+    const log = on('review_log');
+    assert.equal(cards.length, 2);
+    assert.equal(log.length, 1);
+    for (const line of [...cards, ...log]) {
+      assert.match(line, /^GRANT (SELECT|INSERT|UPDATE) \(/, `column grants only: ${line}`);
+      assert.doesNotMatch(line, /\b(DELETE|TRUNCATE|ALL)\b/, line);
+    }
+    /** Columns a privilege names on a table (every grant line of that table). */
+    const columns = (lines, privilege) => lines.flatMap((l) => [...l.matchAll(new RegExp(`\\b${privilege} \\(([^)]*)\\)`, 'g'))])
+      .flatMap((m) => m[1].split(',').map((c) => c.trim()));
+    assert.deepEqual(columns(log, 'SELECT'), [], 'the review history is never read by an AI app');
+    assert.deepEqual(columns(log, 'UPDATE'), []);
+    for (const column of ['review_day', 'reviewed_at']) assert.ok(!columns(log, 'INSERT').includes(column), `${column}: the database stamps it`);
+    for (const c of ['prior_rating', 'last_rating']) assert.ok(!columns(cards, 'SELECT').includes(c), `${c} is written, never read back`);
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE']) assert.ok(!columns(cards, privilege).includes('entered_at'), `entered_at ${privilege}`);
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE']) assert.ok(columns(cards, privilege).includes('checked_at'), `checked_at ${privilege}: the entry reads, sets and moves it`);
+    // SELECT … FOR UPDATE needs UPDATE on a column. The grade writes the memory columns; the entry's
+    // ON CONFLICT DO UPDATE sets a card's first rating again (learned_at, prior_rating, memory, due_day)
+    // and its next statement moves checked_at.
+    assert.deepEqual(columns(cards, 'UPDATE').sort(), ['checked_at', 'difficulty', 'due_day', 'lapses', 'last_rating', 'last_review_day', 'learned_at', 'prior_rating', 'reps', 'stability']);
+    for (const table of ['learning_days', 'xp_awards', 'lesson_progress_lesson_resets']) {
+      assert.ok(!new RegExp(`\\b${table}\\b`).test(code), `${table} still never granted`);
+    }
+    assert.match(sql, /review_cards\s+course-review-due and course-review-grade/, 'the header maps review_cards to its tools');
+    assert.match(sql, /review_log\s+course-review-grade appends one review/, 'the header maps review_log to its tool');
+    assert.match(sql, /progress_changed_at \(Phase 6\) is kept by a trigger; a value this role sends\s+--\s+is ignored/);
+    assert.match(sql, /020 review_cards and review_log\)/, 'run after migration 020');
   });
 
   it('starts from a clean slate on every run (revokes before it grants)', () => {

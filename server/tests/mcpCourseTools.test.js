@@ -11,6 +11,8 @@
 // - minors and learners without an age are refused; course-progress-update is charged mcp_write,
 //   course-quiz-check is not; sections with open check questions are skipped;
 // - the local learner profile (in process): the same tools with rp_turn, the learner from the turn.
+// Phase 6: the review tools' registry entries, charging, adults-only refusal and their absence from
+// every stdio profile; their behaviour is server/tests/mcpReviewTools.test.js.
 import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -38,6 +40,8 @@ const MINOR = 'b1b1b1b1-0000-4000-8000-0000000000b1';
 const NO_AGE = 'c3c3c3c3-0000-4000-8000-0000000000c3';
 const CLIENT = 'c1c1c1c1-0000-4000-8000-000000000001';
 const COURSE_TOOLS = ['course-list', 'course-lesson-get', 'course-quiz-check', 'course-progress-get', 'course-progress-update'];
+/** Phase 6: the review tools, learner-remote only (server/tests/mcpReviewTools.test.js). */
+const REVIEW_TOOLS = ['course-review-due', 'course-review-grade'];
 const VIBE = 'vibe-coding';
 const CH1 = 'vibe-ch1';
 
@@ -409,6 +413,9 @@ describe('MCP course tools over the remote endpoint', () => {
                 ['course-quiz-check', ch1Args({ question_id: 'q4', choices: ['1'] })],
                 ['course-progress-get', {}],
                 ['course-progress-update', ch1Args({ read_section_ids: ['1-3'] })],
+                ['course-review-due', {}],
+                ['course-review-grade', ch1Args({ card_id: 'card-frontend', reveal: true })],
+                ['course-review-grade', ch1Args({ card_id: 'card-frontend', rating: 'good' })],
             ]) {
                 const result = await call(client, name, args);
                 assert.equal(result.isError, true, name);
@@ -442,6 +449,12 @@ describe('MCP course tools over the remote endpoint', () => {
         const policy = createRemotePolicy({ env: {}, reserveCap: async ({ kind }) => { kinds.push(kind); return { handle: { refund: async () => {} } }; } });
         for (const tool of COURSE_TOOLS) await policy.charge(ADULT, tool);
         assert.deepEqual(kinds, ['mcp', 'mcp', 'mcp', 'mcp', 'mcp', 'mcp_write']);
+        // Phase 6: the due list is charged mcp only; every grade call (a reveal too) mcp_write as well.
+        kinds.length = 0;
+        for (const tool of REVIEW_TOOLS) await policy.charge(ADULT, tool);
+        assert.deepEqual(kinds, ['mcp', 'mcp', 'mcp_write']);
+        assert.ok(REMOTE_WRITE_TOOLS.includes('course-review-grade'));
+        assert.ok(!REMOTE_WRITE_TOOLS.includes('course-review-due'));
     });
 });
 
@@ -457,6 +470,10 @@ describe('tool-registry.json course entries (design §3)', () => {
         'course-progress-get': ['progress_read', 'read', 'learner_data', false, null, ['learner', 'coach', 'admin', 'learner-remote'], RO],
         'course-progress-update': ['progress_write', 'write', 'learner_data', true, 50, ['learner', 'admin', 'learner-remote'],
             { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }],
+        // Phase 6 (design §4.3): learner-remote only, the one profile with the adults-only gate.
+        'course-review-due': ['progress_read', 'read', 'learner_data', false, null, ['learner-remote'], RO],
+        'course-review-grade': ['progress_write', 'write', 'learner_data', true, null, ['learner-remote'],
+            { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }],
     };
 
     for (const [id, [category, risk, dataClass, audit, maxCalls, profiles, hints]] of Object.entries(EXPECTED)) {
@@ -475,9 +492,15 @@ describe('tool-registry.json course entries (design §3)', () => {
     }
 
     it('no course tool is named lesson-* (those are the authoring tools); the stdio limit is on progress-update only', () => {
-        assert.ok(COURSE_TOOLS.every((id) => !id.startsWith('lesson-')));
+        assert.ok([...COURSE_TOOLS, ...REVIEW_TOOLS].every((id) => !id.startsWith('lesson-')));
         assert.equal(hasCallLimit('course-progress-update'), true);
         assert.equal(hasCallLimit('course-quiz-check'), false);
+        for (const id of REVIEW_TOOLS) assert.equal(hasCallLimit(id), false, id);
+    });
+
+    it('the review tools are exposed to learner-remote only: no stdio or SSE profile (none has the adults-only gate) lists them', () => {
+        for (const id of REVIEW_TOOLS) assert.deepEqual(entry(id).exposure_profiles, ['learner-remote'], id);
+        assert.equal(registry.version, '2026-10-26');
     });
 });
 
@@ -524,6 +547,29 @@ describe('MCP course tools on the local learner profile (in process, rp_turn)', 
         assert.deepEqual(COURSE_TOOLS.filter((id) => coachTools.includes(id)), ['course-list', 'course-lesson-get', 'course-progress-get']);
         const builder = await open('curriculum-builder');
         assert.deepEqual((await builder.listTools()).tools.map((t) => t.name).filter((n) => n.startsWith('course-')), []);
+        // Phase 6: the review tools are for the remote endpoint (adults only) alone.
+        const admin = await open('admin');
+        for (const [profile, client] of [['learner', learner], ['coach', coach], ['admin', admin], ['curriculum-builder', builder]]) {
+            const names = (await client.listTools()).tools.map((t) => t.name);
+            assert.deepEqual(names.filter((n) => n.startsWith('course-review-')), [], profile);
+        }
+    });
+
+    it('stdio or SSE started with the learner-remote profile (no remote policy, so no adults-only gate) never registers the review tools', async () => {
+        const client = await open('learner-remote');
+        const names = (await client.listTools()).tools.map((t) => t.name);
+        assert.ok(COURSE_TOOLS.every((id) => names.includes(id)), 'the profile itself is served');
+        assert.deepEqual(names.filter((n) => n.startsWith('course-review-')), []);
+        const turn = await registerAgentTurn(ADULT);
+        for (const name of REVIEW_TOOLS) {
+            const answer = await client.callTool({ name, arguments: { rp_turn: turn } }).then(
+                (result) => ({ isError: result.isError === true, text: result.content?.[0]?.text ?? '' }),
+                (error) => ({ isError: true, text: String(error?.message ?? error) }),
+            );
+            assert.equal(answer.isError, true, name);
+            assert.match(answer.text, /not found/i, name);
+        }
+        assert.deepEqual(progress.queries.filter((q) => /review_cards|review_log/.test(q.sql)), [], 'no review statement');
     });
 
     it('the learner comes from rp_turn; an unknown turn token records nothing, while reading still works', async () => {

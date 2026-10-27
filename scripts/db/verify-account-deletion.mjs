@@ -27,7 +27,8 @@
  *       a session from before a second deletion cannot re-open (the UPDATE re-checks it)
  *   R5  as risepath_mcp_remote: the trigger needs the 018 grant; the verifier's query
  *   R6  a seeded learner deleted in one transaction: what goes, what stays, what is marked
- *       (with migration 019's lesson resets, XP awards and learning days: all go)
+ *       (with migration 019's lesson resets, XP awards and learning days, and migration 020's review
+ *       cards and review log: all go)
  *   R7  version archive rows never change; a version id must match its document
  *   R8  the lock key is canonical: an upper-case id locks what the trigger locks
  *   R9  the deletion service (server/services/accountDeletion.js) on a seeded learner: a terms
@@ -420,6 +421,10 @@ async function r6(pool) {
         ["INSERT INTO lesson_progress_lesson_resets (user_id, course_slug, lesson_id) VALUES ($1, 'c', 'l')", [A]],
         ["INSERT INTO xp_awards (user_id, source, item_key, milestone, xp) VALUES ($1, 'lesson', 'c/l', 'start', 10)", [A]],
         [`INSERT INTO learning_days (user_id, day) VALUES ($1, ${today})`, [A]],
+        // Phase 6 (migration 020): a review card (a lesson prior, reviewed once) and its review.
+        [`INSERT INTO review_cards (user_id, course_slug, lesson_id, card_id, learned_at, prior_rating, stability, difficulty, due_day, reps, last_rating, last_review_day)
+          VALUES ($1, 'c', 'l', 'card-a', now() - interval '3 days', 3, 10.9, 2.1, ${today} + 11, 1, 3, ${today})`, [A]],
+        ["INSERT INTO review_log (user_id, course_slug, lesson_id, card_id, rating, elapsed_days, interval_days, stability, difficulty, source) VALUES ($1, 'c', 'l', 'card-a', 3, 3, 11, 10.9, 2.1, 'web')", [A]],
         ["INSERT INTO ai_safety_events (user_id, surface, kind) VALUES ($1, 'tutor', 'input_blocked')", [A]],
         ["INSERT INTO billing_customers (stripe_customer_id, user_id, livemode) VALUES ($1, $2, false)", [`cus_${A}`, A]],
         [`INSERT INTO ai_daily_usage (usage_day, kind, subject, count) VALUES (${today}, 'llm', $1, 3), (${today} - 3, 'llm', $1, 2), (${today}, 'llm', $2, 1)`, [A, `ip:198.51.100.${counter % 250}`]],
@@ -481,6 +486,8 @@ async function r6(pool) {
         lessonResets: await n('SELECT count(*) AS n FROM lesson_progress_lesson_resets WHERE user_id = $1'),
         xpAwards: await n('SELECT count(*) AS n FROM xp_awards WHERE user_id = $1'),
         learningDays: await n('SELECT count(*) AS n FROM learning_days WHERE user_id = $1'),
+        reviewCards: await n('SELECT count(*) AS n FROM review_cards WHERE user_id = $1'),
+        reviewLog: await n('SELECT count(*) AS n FROM review_log WHERE user_id = $1'),
         safetyKept: await n("SELECT count(*) AS n FROM ai_safety_events WHERE user_id IS NULL AND surface = 'tutor' AND created_at > now() - interval '1 hour'", []),
         billingKept: await n('SELECT count(*) AS n FROM billing_customers WHERE stripe_customer_id = $1 AND user_id IS NULL', [`cus_${A}`]),
         usageA: (await pool.query(`SELECT usage_day = ${today} AS today FROM ai_daily_usage WHERE subject = $1`, [A])).rows.map((r) => r.today).join(),
@@ -494,14 +501,14 @@ async function r6(pool) {
     };
     const want = {
         stub: 0, curriculaA: 0, versionInB: 'NULL', approvalAuthor: 'NULL', jobsA: 0, jobsB: 1, mcp: 0, materials: 0, journal: 0, resets: 0,
-        lessonProgress: 0, lessonResets: 0, xpAwards: 0, learningDays: 0,
+        lessonProgress: 0, lessonResets: 0, xpAwards: 0, learningDays: 0, reviewCards: 0, reviewLog: 0,
         safetyKept: 1, billingKept: 1, usageA: 'true', ipKept: 1, acceptanceMarked: 1, acceptanceLive: 0, consents: 0, consentProofs: 1,
         provision: 'used', tombstone: 'staff/null',
     };
     const wrong = Object.keys(want).filter((k) => got[k] !== want[k]);
     check('R6', wrong.length === 0 && paths.length === 1,
         wrong.length ? `after the deletion, unexpected: ${wrong.map((k) => `${k}=${got[k]} (want ${want[k]})`).join(', ')}`
-            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards and learning days too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance marked, stub 0');
+            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance marked, stub 0');
     const again = (await pool.query(ACCEPT, [A, terms, privacy])).rowCount;
     check('R6', again === 1, `after the deletion the same versions can be accepted again (a new account): inserted ${again}`);
 }

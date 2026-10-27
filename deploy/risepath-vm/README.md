@@ -117,12 +117,12 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–019 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–020 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–019 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–020 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 ### 3. Mac `.env.local`
 
@@ -375,6 +375,51 @@ docker compose --env-file stack.env exec -T api node scripts/delete-account-data
 - 019 を当てるあいだは、アカウントの削除をしません。スタッフの削除（`--yes`）は待ちます。画面からの削除を使えるようにしているとき（`ACCOUNT_DELETION_ENABLED=true`）は、人の少ない時間にデプロイします。重なると、Postgres がデッドロック（40P01）でどちらかを止めます。止まったほうは何も変えずに戻ります（019 は 1 つのトランザクションです）。migrate が 40P01 で止まったら `./scripts/deploy-stack.sh` をもう一度実行し、削除が終了コード 3 で止まったら、デプロイのあとにもう一度実行します。
 - 画面（Vercel）と VM の順番は、計画の 9.2 の 1 です。
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase5.mjs` は、019 と、やり直し・XP の数え直し・削除との重なりを本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 019 の行）。VM の DB には決して向けないでください。
+
+## 復習（Phase 6）
+
+レッスンの復習カードが、忘れかけたころにもう一度出る仕組みです（1 日 10 枚まで）。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 10 章です。
+
+**この版の最初のデプロイ**
+
+- migration 020 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
+- `byoa` を使っているときは、020 を当てたあとに `sql/mcp_remote_role.sql` を流し直します（[`doc/guides/byoa-setup.ja.md`](../../doc/guides/byoa-setup.ja.md) の手順 7。パスワードは今の値）。流すまで、AI アプリの復習の 2 つのツール（`course-review-due`、`course-review-grade`）は使えません（`review_unavailable`）。ほかのツールは動きます。
+- 020 は終わるまで `auth.users` をロックするので、ログインした呼び出しは 020 が終わるまで待ちます。人の少ない時間に当てます。アカウントの削除が重なってもデッドロック（40P01）にはなりません。削除は 020 を待ち、10 秒を超えると `account_busy` で終わるので、あとでもう一度実行します。
+- 画面（Vercel）と VM は、どちらを先にしても壊れません（新しい画面は、古い API では復習を出しません。計画の 10.2 の 1）。
+
+**前の版に戻したあと、この版に戻すとき**
+
+前の版（Phase 5）のイメージで動いているあいだは、レッスンのやり直しと「学習の進み具合を消す」が、復習のカードを消しません。この版に戻すときは、この版の `api`・`mcp`・`mcp-public` を起動する前に、次の 2 つの確認と 2 つの削除を流します。先に起動すると、学習者が残ったカードを復習でき、あとの削除がその記録も消してしまいます。前の版のサービスを止めてから流し、そのあとで `./scripts/deploy-stack.sh` を実行します。
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env stop api mcp mcp-public   # byoa を使っていないときは mcp-public を外す
+docker compose --env-file stack.env exec db psql -U risepath_app -d risepath
+```
+
+psql で、まず 2 つの確認を流します。どちらも 0 行なら、削除は要りません。
+
+```sql
+-- 1. 「学習の進み具合を消す」（またはアカウントの使い直し）より前に加わったカード
+SELECT c.user_id, count(*) AS cards FROM review_cards c
+  JOIN lesson_progress_resets r USING (user_id)
+ WHERE c.entered_at < r.reset_at GROUP BY 1;
+-- 2. そのレッスンのやり直しより前に加わったカード
+SELECT c.user_id, c.course_slug, c.lesson_id, count(*) AS cards FROM review_cards c
+  JOIN lesson_progress_lesson_resets r USING (user_id, course_slug, lesson_id)
+ WHERE c.entered_at < r.reset_at GROUP BY 1, 2, 3;
+```
+
+行があれば、次の 2 つの削除を流します。復習の記録（`review_log`）は、カードと一緒に消えます。この版のやり直しと「学習の進み具合を消す」が消したあとに加わったカードは、どちらにも当てはまりません。
+
+```sql
+DELETE FROM review_cards c USING lesson_progress_resets r
+ WHERE r.user_id = c.user_id AND c.entered_at < r.reset_at;
+DELETE FROM review_cards c USING lesson_progress_lesson_resets r
+ WHERE r.user_id = c.user_id AND r.course_slug = c.course_slug AND r.lesson_id = c.lesson_id AND c.entered_at < r.reset_at;
+```
+
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase6.mjs` は、020 と、カードが加わる決まり・復習の記録・やり直しと削除・リモート MCP のロールの列ごとの権限・上の確認と削除（P10）を、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 020 の行）。VM の DB には決して向けないでください。
 
 ## セキュリティ
 

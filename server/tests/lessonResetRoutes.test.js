@@ -135,7 +135,7 @@ describe('POST /api/v2/user/lesson-progress/lesson-reset', () => {
             assert.deepEqual(pool.awardsOf(ALICE), [`lesson ${VIBE}/${CH1} start 10`], 'what was earned stays earned');
 
             const get = await call(base, { headers: as('alice') });
-            assert.deepEqual(get.json.capabilities, { lessonReset: true, achievements: true });
+            assert.deepEqual(get.json.capabilities, { lessonReset: true, achievements: true, review: true });
             assert.deepEqual(get.json.records.map((r) => [r.lessonId, r.state, r.lessonEpoch, r.lessonResetAt]), [[CH1, 'not_started', res.json.lessonEpoch, res.json.lessonResetAt]]);
         });
     });

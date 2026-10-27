@@ -11,8 +11,9 @@
  *                     MAX_CHUNKS_PER_MATERIAL chunks: server/ragService.js)
  *   mcp               each tools/call on the remote MCP endpoint (mcp-server/remote.js)
  *   mcp_write         each write tool call there (journal-log, learner-state-update,
- *                     course-progress-update: mcp-server/remotePolicy.js REMOTE_WRITE_TOOLS), on top
- *                     of mcp. course-quiz-check counts as mcp only (its attempt rules bound its writes)
+ *                     course-progress-update, course-review-grade: mcp-server/remotePolicy.js
+ *                     REMOTE_WRITE_TOOLS), on top of mcp. course-quiz-check counts as mcp only (its
+ *                     attempt rules bound its writes)
  * Limits come from AI_CAP_USER_<KIND>, AI_CAP_IP_<KIND> (default: 3 × the user cap) and
  * AI_CAP_GLOBAL_<KIND> (defaults in DEFAULT_LIMITS), read on every reservation. The mcp kinds have
  * no per-address cap (ip: null; AI_CAP_IP_MCP* is ignored): connected agents such as Claude.ai and

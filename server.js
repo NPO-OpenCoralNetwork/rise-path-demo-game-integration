@@ -29,6 +29,7 @@ import {
 import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
 import { LEGAL_BODY_LIMIT, createLegalRouter } from './server/routes/legal.js';
 import { ACHIEVEMENTS_READS_PER_MINUTE, createAchievementsRouter } from './server/routes/achievements.js';
+import { REVIEW_BODY_LIMIT, REVIEW_REQUESTS_PER_MINUTE, createReviewRouter } from './server/routes/review.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
@@ -86,13 +87,17 @@ import { getPool } from './server/db.js';
  * Builds the Express app: middleware, rate limits and every route, in mount order. No listen,
  * no job worker and no env loading, so tests (server/tests/llmRoute.test.js) run the real stack.
  * @param {{ serveStatic?: boolean, originGate?: Parameters<typeof createOriginGate>[0],
- *   lessonProgress?: { afterSave?: (params: { userId: string }) => unknown } }} [options]
+ *   lessonProgress?: { afterSave?: (params: { userId: string }) => unknown },
+ *   review?: { afterGrade?: (params: { userId: string, day: string }) => unknown } }} [options]
  *   serveStatic: dist/ + public/ (off in tests); originGate: options for the origin gate
  *   (server/middleware/originGate.js; tests pass exemptLoopback: false); lessonProgress.afterSave:
  *   the hook after a lesson-progress save that taught something (default: XP and the learning day,
- *   tools/core/achievements.js noteLearning; route tests pass a no-op or a recorder)
+ *   tools/core/achievements.js noteLearning; route tests pass a no-op or a recorder);
+ *   review.afterGrade: the hook after a review graded on the web (Phase 6; default: the grade's
+ *   Japan-time day as a learning day, tools/core/achievements.js noteReviewDay; route tests pass a
+ *   recorder)
  */
-export async function createApp({ serveStatic = true, originGate = {}, lessonProgress: { afterSave } = {} } = {}) {
+export async function createApp({ serveStatic = true, originGate = {}, lessonProgress: { afterSave } = {}, review: { afterGrade } = {} } = {}) {
     const app = express();
     app.disable('x-powered-by');
 
@@ -139,6 +144,8 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
     // A learning-history event (Phase 5: history only) is a type and two short texts: 8 kb, refused before the 50 MB parser.
     app.use('/api/v2/user/events', express.json({ limit: LEARNING_EVENTS_BODY_LIMIT }), smallBodyErrors(LEARNING_EVENTS_BODY_LIMIT));
+    // The review queue (Phase 6) takes three ids and a rating: 2 kb, refused before the 50 MB parser.
+    app.use('/api/v2/user/review', express.json({ limit: REVIEW_BODY_LIMIT }), smallBodyErrors(REVIEW_BODY_LIMIT));
     // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
@@ -203,6 +210,18 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
         standardHeaders: true,
         legacyHeaders: false,
         keyGenerator: (req) => `achievements:${req.userId}`,
+        message: { error: 'Too many requests. Please try again in a minute.', error_type: 'rate_limited' },
+        validate: { keyGeneratorIpFallback: false },
+    });
+
+    // The review queue (Phase 6): reads (each enters the learner's due cards) and grades together,
+    // per learner, after requireAuth and requireSignedIn. Not relaxed in dev.
+    const reviewLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: REVIEW_REQUESTS_PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => `review:${req.userId}`,
         message: { error: 'Too many requests. Please try again in a minute.', error_type: 'rate_limited' },
         validate: { keyGeneratorIpFallback: false },
     });
@@ -276,6 +295,16 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
         requireSignedIn('Sign in with a Rise Path account to see your XP.'),
         achievementsLimiter,
         createAchievementsRouter(),
+    );
+    // The review queue (Phase 6, server/routes/review.js): a real learner's session only (the queue is an
+    // account record); each read enters the cards the learner's lesson records imply. AI apps use the
+    // MCP course-review-* tools (requireAuth refuses their token here).
+    app.use(
+        '/api/v2/user/review',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to use reviews.'),
+        reviewLimiter,
+        createReviewRouter({ afterGrade }),
     );
     // The learning history (Phase 5: history only, no XP and no learning day; server/routes/user.js):
     // its own router so its per-learner limit lives with this app, after the 8 kb parser above.

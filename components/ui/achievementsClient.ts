@@ -12,6 +12,7 @@
  *   answered 404 without error_type (an older server: latched for this page load, which also
  *   spares its AI limiter). While the sync's GET has not succeeded yet, one background probe per
  *   page load; the "try again" button may probe again (an older VM's 404 is latched before that).
+ *   A capability that turns off while the page is open (a rollback) clears what was shown.
  * - When it fetches: a consumer mounts and there is no data for this learner or it is older than
  *   30 s; a server-sourced lesson record arrives, or the server took this tab's lesson records
  *   (PROGRESS_SAVED_EVENT: an ordinary save changes nothing here, yet its hook may award XP),
@@ -23,6 +24,10 @@
  * - Errors (401, network, 5xx, a malformed answer): 'unavailable' when there is nothing to show;
  *   data of the same learner is kept and shown (status stays 'ready').
  * - The learner changes (SYNC_ACCOUNT_EVENT, the sync's state): cleared only on a real change.
+ *
+ * Phase 6: the same store serves the review queue (components/review/reviewClient.ts): the data
+ * type is a parameter (any answer that names its learnerId) and capabilityKey picks which
+ * capability of the sync's GET gates the requests ('achievements' by default, or 'review').
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { ACHIEVEMENTS_STALE_EVENT, getAchievements, type Achievements } from '../../services/achievementsApi';
@@ -36,11 +41,11 @@ import {
 } from '../lesson/progressSyncClient';
 
 export type AchievementsStatus = 'idle' | 'loading' | 'ready' | 'unavailable' | 'unsupported' | 'no_account';
-export type AchievementsSnapshot = Readonly<{
+export type AchievementsSnapshot<T extends { learnerId: string } = Achievements> = Readonly<{
   status: AchievementsStatus;
   /** The learner `data` belongs to (lower case), or null. */
   learnerId: string | null;
-  data: Achievements | null;
+  data: T | null;
   /** When `data` was received (store clock); null without data or after it was marked stale. */
   at: number | null;
 }>;
@@ -49,17 +54,23 @@ export const ACHIEVEMENTS_FRESH_MS = 30_000;
 export const ACHIEVEMENTS_DEBOUNCE_MS = 2_000;
 export const ACHIEVEMENTS_MIN_INTERVAL_MS = 15_000;
 
-export type AchievementsDeps = {
-  load: () => Promise<Achievements>;
+/** The capability of the sync's GET that gates a store's requests (Phase 6 adds 'review'). */
+export type StoreCapabilityKey = 'achievements' | 'review';
+
+export type AchievementsDeps<T extends { learnerId: string } = Achievements> = {
+  load: () => Promise<T>;
   learnerId: () => string | null;
-  capabilities: () => Pick<SyncCapabilities, 'achievements'> | null;
+  /** What the sync's GET said the server offers; only `capabilityKey` is read. */
+  capabilities: () => Partial<Pick<SyncCapabilities, StoreCapabilityKey>> | null;
+  /** Which capability gates the requests (default 'achievements'). */
+  capabilityKey?: StoreCapabilityKey;
   now?: () => number;
   setTimeout?: (fn: () => void, ms: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
 };
 
-export type AchievementsStore = {
-  getSnapshot(): AchievementsSnapshot;
+export type AchievementsStore<T extends { learnerId: string } = Achievements> = {
+  getSnapshot(): AchievementsSnapshot<T>;
   subscribe(listener: () => void): () => void;
   /** A consumer mounted (fetches when needed); the returned function unmounts it. */
   consumerMounted(): () => void;
@@ -67,6 +78,18 @@ export type AchievementsStore = {
   serverProgress(): void;
   /** Something the server counts changed (ACHIEVEMENTS_STALE_EVENT). */
   stale(): void;
+  /**
+   * The server's data changed and what is held is out of date (a review grade): the next consumer
+   * that mounts reads at once, and a read in flight (which may predate the change) runs once more.
+   * Mounted consumers keep their debounced read (serverProgress).
+   */
+  invalidate(): void;
+  /**
+   * What is held may be out of date, but nothing shown now needs it (a lesson save, for the review
+   * store): no request now; the next consumer that mounts reads. An answer in flight is kept
+   * marked out of date.
+   */
+  expire(): void;
   /** The sync's learner or state changed. */
   syncChanged(): void;
   /** The "try again" button. */
@@ -75,15 +98,17 @@ export type AchievementsStore = {
   settled(): Promise<void>;
 };
 
-const INITIAL: AchievementsSnapshot = Object.freeze({ status: 'idle', learnerId: null, data: null, at: null });
+/** Holds no data, so it is a snapshot of any store. */
+const INITIAL = Object.freeze({ status: 'idle', learnerId: null, data: null, at: null }) as AchievementsSnapshot<never>;
 
 const canonical = (id: string | null) => (id ? id.toLowerCase() : null);
 
-export function createAchievementsStore(deps: AchievementsDeps): AchievementsStore {
+export function createAchievementsStore<T extends { learnerId: string } = Achievements>(deps: AchievementsDeps<T>): AchievementsStore<T> {
   const now = deps.now ?? (() => Date.now());
+  const capabilityKey: StoreCapabilityKey = deps.capabilityKey ?? 'achievements';
   const setTimer = deps.setTimeout ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
   const clearTimer = deps.clearTimeout ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>));
-  let snap: AchievementsSnapshot = INITIAL;
+  let snap: AchievementsSnapshot<T> = INITIAL;
   const listeners = new Set<() => void>();
   let consumers = 0;
   let inFlight: Promise<void> | null = null;
@@ -96,10 +121,12 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
   let probed = false;
   /** The route answered 200 on this page. */
   let routeSeen = false;
-  /** What the sync's capabilities said at the last syncChanged: unknown, achievements off, or on. */
+  /** What the sync's capabilities said at the last syncChanged: unknown, the capability off, or on. */
   let capsSeen: 'unknown' | 'off' | 'on' = 'unknown';
   let debounce: unknown = null;
   let lastServerFetchAt = Number.NEGATIVE_INFINITY;
+  /** expire() ran while a request was in flight: its answer is stored as out of date. */
+  let expiredInFlight = false;
 
   const learner = () => {
     try {
@@ -116,7 +143,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
     }
   };
 
-  function set(patch: Partial<AchievementsSnapshot>): void {
+  function set(patch: Partial<AchievementsSnapshot<T>>): void {
     const next = { ...snap, ...patch };
     if (next.status === snap.status && next.learnerId === snap.learnerId && next.data === snap.data && next.at === snap.at) return;
     snap = Object.freeze(next);
@@ -134,7 +161,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
     if (!learner()) return 'no_account';
     if (latched) return 'unsupported';
     const offered = caps();
-    if (offered && offered.achievements !== true) return 'unsupported';
+    if (offered && offered[capabilityKey] !== true) return 'unsupported';
     if (!offered && probed && !routeSeen) return 'wait'; // one probe per page load until the sync knows
     return 'go';
   }
@@ -142,6 +169,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
   async function request(): Promise<void> {
     const id = learner();
     if (!caps()) probed = true;
+    expiredInFlight = false;
     if (snap.learnerId !== id) set({ status: 'loading', learnerId: id, data: null, at: null });
     else if (!snap.data) set({ status: 'loading' });
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -154,7 +182,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
           return;
         }
         if (canonical(data.learnerId) !== current) continue; // another learner meanwhile: once more
-        set({ status: 'ready', learnerId: current, data, at: now() });
+        set({ status: 'ready', learnerId: current, data, at: expiredInFlight ? null : now() });
         return;
       } catch (err) {
         const failure = (err ?? {}) as { status?: unknown; errorType?: unknown };
@@ -250,13 +278,28 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
       if (consumers > 0) void fetchNow();
       else if (snap.at !== null) set({ at: null });
     },
+    invalidate() {
+      if (inFlight) again = true;
+      if (snap.at !== null) set({ at: null });
+    },
+    expire() {
+      if (inFlight) expiredInFlight = true;
+      if (snap.at !== null) set({ at: null });
+    },
     syncChanged() {
       const id = learner();
       const offered = caps();
-      const seen = offered === null ? 'unknown' : offered.achievements === true ? 'on' : 'off';
-      // The capabilities became known, or the server now offers achievements (an upgraded VM).
+      const seen = offered === null ? 'unknown' : offered[capabilityKey] === true ? 'on' : 'off';
+      // The capabilities became known, or the server now offers the capability (an upgraded VM).
       const capsArrived = (seen !== 'unknown' && capsSeen === 'unknown') || (seen === 'on' && capsSeen === 'off');
+      // The server stopped offering it (a rollback to an older image while this page is open).
+      const capsWithdrawn = seen === 'off' && capsSeen === 'on';
       capsSeen = seen;
+      if (capsWithdrawn && id) {
+        clearDebounce();
+        set({ status: 'unsupported', learnerId: id, data: null, at: null });
+        return;
+      }
       if (snap.learnerId !== id && (snap.data || snap.status !== 'idle')) {
         // Another learner (or none): what was shown goes.
         clearDebounce();
@@ -280,7 +323,7 @@ export function createAchievementsStore(deps: AchievementsDeps): AchievementsSto
 // --- The page's store ---------------------------------------------------------------------------
 
 /** The window events the page's store follows (exported for tests). */
-export function listenForAchievementChanges(s: AchievementsStore, target: Pick<Window, 'addEventListener'>): void {
+export function listenForAchievementChanges(s: AchievementsStore<Achievements>, target: Pick<Window, 'addEventListener'>): void {
   target.addEventListener(PROGRESS_EVENT, (event) => {
     const detail = (event as CustomEvent<ProgressEventDetail | undefined>).detail;
     if (detail?.source === 'server') s.serverProgress();
@@ -290,9 +333,9 @@ export function listenForAchievementChanges(s: AchievementsStore, target: Pick<W
   target.addEventListener(SYNC_ACCOUNT_EVENT, () => s.syncChanged());
 }
 
-let store: AchievementsStore | null = null;
+let store: AchievementsStore<Achievements> | null = null;
 
-function pageStore(): AchievementsStore {
+function pageStore(): AchievementsStore<Achievements> {
   if (store) return store;
   const created = createAchievementsStore({
     load: () => runAsSyncedLearner(getAchievements),
@@ -309,10 +352,10 @@ function pageStore(): AchievementsStore {
 
 const subscribe = (listener: () => void) => pageStore().subscribe(listener);
 const snapshot = () => pageStore().getSnapshot();
-const serverSnapshot = () => INITIAL;
+const serverSnapshot = (): AchievementsSnapshot<Achievements> => INITIAL;
 
 /** The learner's XP, streak and badges from the server, and how far loading got. */
-export function useAchievements(): AchievementsSnapshot {
+export function useAchievements(): AchievementsSnapshot<Achievements> {
   const value = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   useEffect(() => pageStore().consumerMounted(), []);
   return value;

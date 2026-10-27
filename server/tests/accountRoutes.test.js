@@ -89,7 +89,7 @@ describe('/api/v2/user/account on the server.js stack', () => {
         process.env.ACCOUNT_DELETION_ENABLED = 'true';
         pool = createDeletionPool({
             stubs: [A, B],
-            owned: { lesson_progress: [A, B], lesson_progress_lesson_resets: [A], xp_awards: [A, B], learning_days: [A] },
+            owned: { lesson_progress: [A, B], lesson_progress_lesson_resets: [A], xp_awards: [A, B], learning_days: [A], review_cards: [A, B], review_log: [A] },
             materials: [],
             subscriptions: [],
         });
@@ -196,6 +196,7 @@ describe('/api/v2/user/account on the server.js stack', () => {
         assert.equal(pool.state.tombstones.size, 0);
         assert.deepEqual(pool.state.owned.lesson_progress, [A, B]);
         assert.deepEqual([pool.state.owned.lesson_progress_lesson_resets, pool.state.owned.xp_awards, pool.state.owned.learning_days], [[A], [A, B], [A]]);
+        assert.deepEqual([pool.state.owned.review_cards, pool.state.owned.review_log], [[A, B], [A]]);
     });
 
     it(`the ${ACCOUNT_DELETIONS_PER_MINUTE + 1}th POST in a minute is 429 rate_limited (per learner); ACCOUNT_DELETION_ENABLED=false → 503 deletion_disabled`, async () => {
@@ -237,6 +238,7 @@ describe('/api/v2/user/account on the server.js stack', () => {
             assert.equal(pool.state.tombstones.get(A).requested_by, 'self');
             assert.deepEqual(pool.state.owned.lesson_progress, [B]);
             assert.deepEqual([pool.state.owned.lesson_progress_lesson_resets, pool.state.owned.xp_awards, pool.state.owned.learning_days], [[], [B], []], 'resets, XP and learning days go with the account');
+            assert.deepEqual([pool.state.owned.review_cards, pool.state.owned.review_log], [[B], []], 'review cards and their log go with the account');
 
             const later = token(A, { amr: [{ method: 'password', timestamp: nowS() + 31 }] });
             const fresh = await call(base, DELETION, { headers: auth(later) });
@@ -245,6 +247,7 @@ describe('/api/v2/user/account on the server.js stack', () => {
             assert.ok(pool.state.tombstones.get(A).reopened_at instanceof Date);
             assert.deepEqual(pool.state.owned.lesson_progress, [B], 'nothing of the old account came back');
             assert.deepEqual(pool.state.owned.xp_awards, [B], 'a re-opened account starts at 0 XP');
+            assert.deepEqual(pool.state.owned.review_cards, [B], 'and with no review cards');
         });
     });
 

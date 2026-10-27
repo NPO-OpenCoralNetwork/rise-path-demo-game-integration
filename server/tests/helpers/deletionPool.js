@@ -7,7 +7,9 @@
  *   - account_deletions (no FK) and the auth.users trigger of migration 018 (no stub for a deleted
  *     id until it is re-opened), the re-open statements of tools/core/accountDeletions.js;
  *   - DELETE FROM auth.users cascades the learner's own rows (materials, consents, grants and
- *     every table in `owned`), sets billing rows' user_id NULL, and leaves the no-FK tables
+ *     every table in `owned`; a table that cascades through another, like review_log through
+ *     review_cards (migration 020), is listed in `owned` with the same result), sets billing rows'
+ *     user_id NULL, and leaves the no-FK tables
  *     (legal_acceptances, the proof tables, ai_daily_usage, account_deletions);
  *   - transactions: BEGIN snapshots, ROLLBACK restores; clock_timestamp() comes from `clock`.
  * Any other statement that names one of these tables throws, so a changed query fails loudly.

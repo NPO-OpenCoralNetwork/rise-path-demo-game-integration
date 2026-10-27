@@ -28,8 +28,12 @@
  * - noteLearning: after a REST lesson-progress save that taught something (server/routes/
  *   lessonProgress.js, after the answer was sent): the lesson awards and today as a learning day;
  * - noteBlenderProgress: after the legacy PUT /api/v2/user/progress/blender (server/routes/user.js,
- *   after the answer): the stage awards, and today when a stage was newly awarded.
- * The two hooks never throw and only log a failure: the save they follow is already answered.
+ *   after the answer): the stage awards, and today when a stage was newly awarded;
+ * - noteReviewDay (Phase 6): after a review graded on the web page (POST /api/v2/user/review/grade,
+ *   after the answer): the review's own Japan-time day (the day its transaction recorded) as a
+ *   learning day, never XP. A review recorded by an AI app (MCP) writes no learning day (the remote
+ *   role has no grant on learning_days).
+ * The hooks never throw and only log a failure: the save or review they follow is already answered.
  * Learning days come only from these server records (Japan time, server clock), never from events.
  *
  * Locking: XP_LOCK_SQL is a per-learner transaction lock (keyed by the canonical uuid text, so the
@@ -145,6 +149,15 @@ RETURNING item_key`;
 
 /** Today (Japan time, server clock) as a day the learner learned. */
 export const LEARNING_DAY_SQL = `INSERT INTO learning_days (user_id, day) VALUES ($1, (now() AT TIME ZONE 'Asia/Tokyo')::date)
+ON CONFLICT (user_id, day) DO NOTHING`;
+
+/**
+ * A web review's day as a day the learner learned (Phase 6, noteReviewDay). $2 is the Japan-time day
+ * the review's own transaction recorded (review_log.review_day, the grade's summary.today), never a
+ * client's value: this runs after the answer, in its own transaction, so its now() can already be
+ * the next day for a review that committed just before 00:00 JST.
+ */
+export const REVIEW_LEARNING_DAY_SQL = `INSERT INTO learning_days (user_id, day) VALUES ($1, $2::date)
 ON CONFLICT (user_id, day) DO NOTHING`;
 
 /**
@@ -424,5 +437,24 @@ export async function noteBlenderProgress({ userId: rawUserId }) {
     if (!userId) return false;
     return noteAfterSave('note after Blender progress', async (db) => {
         await reconcileBlenderXp(db, userId);
+    });
+}
+
+/**
+ * After a REST review (Phase 6): the review's day as a learning day (REVIEW_LEARNING_DAY_SQL). Runs
+ * after the review was answered, in its own transaction; never throws; never XP. `day` is the
+ * Japan-time day the review's transaction recorded (the grade's summary.today), not this
+ * transaction's today: a review that commits at 23:59:59 JST counts on its own day even when this
+ * runs after midnight. Not a learner or not a YYYY-MM-DD day: false, no statement. MCP reviews do
+ * not call it (the remote role has no grant on learning_days, Phase 5 R8). After an account
+ * deletion it fails its foreign key (23503) and only logs.
+ * @param {{ userId: string, day: string }} params
+ * @returns {Promise<boolean>}
+ */
+export async function noteReviewDay({ userId: rawUserId, day }) {
+    const userId = canonicalUserId(rawUserId);
+    if (!userId || dayNumber(day) === null) return false;
+    return noteAfterSave('note after review', async (db) => {
+        await db.query(REVIEW_LEARNING_DAY_SQL, [userId, day]);
     });
 }

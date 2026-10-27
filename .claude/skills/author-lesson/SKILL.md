@@ -209,8 +209,12 @@ Reply with a short summary and the report path. Do not commit or open a PR unles
 ## 10. Publish — only when the owner asks
 
 Move the file from `drafts/` to `lessons/`, add it to a module in `course.json` (id, title,
-estMinutes, `next` links of the neighbours), then `npm run lessons:validate` (whole content) and
-`npm run lessons:catalog`. Never set `provenance.reviewedBy` yourself.
+estMinutes, `next` links of the neighbours), add each of its flashcards as
+`<course>/<lesson>/<card id>` to `published` in `server/tests/fixtures/published-card-ids.json`
+(kept sorted; `server/tests/reviewCardIds.test.js` checks it), then `npm run lessons:validate`
+(whole content) and `npm run lessons:catalog`. Never rename or remove a published lesson's card ids
+in a rework: learners' review memory is keyed by them (text edits keep it); moving a key to
+`retired` hides that memory. Never set `provenance.reviewedBy` yourself.
 
 A snapshot copy exists only in the checkout that made it. Before publishing (or opening a PR to
 publish), every verification on the lesson's chain must name a committed previous round

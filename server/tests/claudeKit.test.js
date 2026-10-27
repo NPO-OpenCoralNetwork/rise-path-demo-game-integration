@@ -311,6 +311,23 @@ describe('rules and instruction files', () => {
     assert.match(body, /drafts/);
   });
 
+  it('the publish steps name the published card ids fixture (a newly published lesson\'s cards; card ids kept in a rework)', () => {
+    const section = (text, heading) => {
+      const start = text.indexOf(heading);
+      assert.ok(start >= 0, heading);
+      const end = text.indexOf('\n## ', start + heading.length);
+      return text.slice(start, end < 0 ? undefined : end);
+    };
+    const slices = {
+      'doc/guides/authoring-with-claude-code.ja.md §6': section(read('doc/guides/authoring-with-claude-code.ja.md'), '## 6. 公開する'),
+      'author-lesson SKILL.md §10': section(read('.claude/skills/author-lesson/SKILL.md'), '## 10. Publish'),
+      'doc/guides/authoring-with-claude-code.md': read('doc/guides/authoring-with-claude-code.md'),
+      '.claude/rules/content.md': read('.claude/rules/content.md'),
+    };
+    for (const [where, text] of Object.entries(slices)) assert.ok(text.includes('server/tests/fixtures/published-card-ids.json'), where);
+    assert.ok(fs.existsSync(path.join(ROOT, 'server/tests/fixtures/published-card-ids.json')));
+  });
+
   it('AGENTS.md ≤ 80 lines; CLAUDE.md ≤ 40 lines and imports @AGENTS.md', () => {
     const agents = read('AGENTS.md');
     const claude = read('CLAUDE.md');

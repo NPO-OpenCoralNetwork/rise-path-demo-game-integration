@@ -82,7 +82,7 @@ const copy = {
         'For learners under 18, messages and AI answers are checked before they are shown. Unsuitable content is stopped. If the check cannot run, the answer is not shown.',
         'When a message shows distress, the screen shows places where children can talk to someone.',
         'If many messages are stopped in one day, AI pauses until midnight (Japan time).',
-        'On a shared device, signing out removes the AI answers kept in that browser (saved review cards, assessment results and drafts).',
+        'On a shared device, signing out removes the AI answers kept in that browser (cards you made from the tutor\'s answers, assessment results and drafts).',
       ] as Para[],
       revokeTitle: 'Withdrawing consent',
       revoke:
@@ -176,7 +176,7 @@ const copy = {
         '18歳未満の方の入力と AI の答えは、表示する前に確かめます。ふさわしくない内容は止めます。確かめられないときは、答えを表示しません。',
         'つらい気持ちが書かれたときは、相談できる窓口を表示します。',
         '止められる入力が1日に何度も続いたときは、日本時間の夜0時まで AI をお休みにします。',
-        '共有の端末では、ログアウトすると、そのブラウザに残る AI の答え（保存した復習カード、診断の結果、下書きなど）を消します。',
+        '共有の端末では、ログアウトすると、そのブラウザに残る AI の答え（AI 先生の答えから作ったカード、診断の結果、下書きなど）を消します。',
       ] as Para[],
       revokeTitle: '同意のやめ方',
       revoke:

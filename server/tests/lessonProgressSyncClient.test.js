@@ -346,10 +346,10 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     assert.equal(await t.client.whenAccountKnown(), 'unknown');
   });
 
-  it('Phase 5 (G3): the one-lesson reset is a POST to /lesson-reset with the session\'s token, never a DELETE', async () => {
+  it('Phase 5 (G3): the one-lesson reset is a POST to /lesson-reset with the session\'s token, never a DELETE; Phase 6: a done reset marks the reviews stale', async () => {
     const t = (current = await page({
       routes: {
-        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true }, records: [] }),
+        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true, review: true }, records: [] }),
         'POST /user/lesson-progress/lesson-reset': (call) => json(200, {
           ok: true, epoch: null, courseSlug: call.body.courseSlug, lessonId: call.body.lessonId,
           lessonEpoch: '33333333-3333-4333-8333-333333333333', lessonResetAt: '2026-10-20T09:00:00.000Z',
@@ -360,9 +360,12 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     t.client.signInProgressSync(U1, 'tok-1');
     await until(() => t.gets().length === 1);
     await wait(20);
-    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: true, achievements: true });
+    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: true, achievements: true, review: true });
+    let stale = 0;
+    globalThis.window.addEventListener('rp:review-stale', () => { stale += 1; });
     writeLocal(t, 'l1', record({ seen: ['b1'] }));
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: true });
+    assert.equal(stale, 1, 'Phase 6 (R4): the server removed the lesson\'s review cards: the review store reads again');
     const resets = t.calls.filter((c) => c.url.startsWith('/user/lesson-progress') && c.method !== 'GET' && c.method !== 'PUT');
     assert.deepEqual(resets.map((c) => `${c.method} ${c.url}`), ['POST /user/lesson-progress/lesson-reset']);
     assert.deepEqual(resets[0].body, { epoch: null, courseSlug: COURSE, lessonId: 'l1' });
@@ -373,19 +376,23 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
     const before = t.calls.length;
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'failed' });
     assert.equal(t.calls.length, before);
+    assert.equal(stale, 1, 'a reset that did not happen marks nothing');
   });
 
-  it('Phase 5: how the API layer reads a reset answer: a 200 without a uuid lessonEpoch is "unconfirmed" and changes nothing here; a malformed record is an emptied one', async () => {
+  it('Phase 5: how the API layer reads a reset answer: a 200 without a uuid lessonEpoch is "unconfirmed" and changes nothing here; a malformed record is an emptied one; Phase 6: a reset that may have happened marks the reviews stale', async () => {
     let answer = { lessonEpoch: 'x' };
+    let resetRoute = null;
     const t = (current = await page({
       routes: {
-        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true }, records: [] }),
-        'POST /user/lesson-progress/lesson-reset': (call) => json(200, { ok: true, epoch: null, courseSlug: call.body.courseSlug, lessonId: call.body.lessonId, ...answer }),
+        'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: true, achievements: true, review: true }, records: [] }),
+        'POST /user/lesson-progress/lesson-reset': (call) => (resetRoute ? resetRoute(call) : json(200, { ok: true, epoch: null, courseSlug: call.body.courseSlug, lessonId: call.body.lessonId, ...answer })),
       },
     }));
     t.client.signInProgressSync(U1, 'tok-1');
     await until(() => t.gets().length === 1);
     await wait(20);
+    let stale = 0;
+    globalThis.window.addEventListener('rp:review-stale', () => { stale += 1; });
     writeLocal(t, 'l1', record({ seen: ['b1'] }));
     const before = t.storage.getItem(PROGRESS_KEY('l1'));
     for (const bad of [{ lessonEpoch: 'x' }, {}, { lessonEpoch: null }, { lessonEpoch: 42 }]) {
@@ -393,21 +400,63 @@ describe('progress sync in the browser (progressSyncClient.ts)', () => {
       assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'unconfirmed' }, JSON.stringify(bad));
       assert.equal(t.storage.getItem(PROGRESS_KEY('l1')), before, 'the local record is untouched');
     }
+    assert.equal(stale, 4, 'Phase 6: the server did start the lesson over (a 2xx it could not read): its review cards are gone, the review store reads again');
+    resetRoute = () => {
+      throw new TypeError('Failed to fetch');
+    };
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'unconfirmed' });
+    assert.equal(stale, 5, 'the connection dropped after sending: the server may have reset');
+    resetRoute = () => json(429, { error: 'Too many', error_type: 'rate_limited' });
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'rate_limited' });
+    assert.equal(stale, 5, 'refused: nothing was reset');
+    resetRoute = () => json(409, { ok: false, error: 'Progress was reset', error_type: 'progress_reset', epoch: '55555555-5555-4555-8555-555555555555' });
+    const getsBefore = t.gets().length;
+    assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'reloaded' });
+    assert.equal(stale, 6, 'everything was deleted on another device meanwhile: so were the review cards');
+    // The 409 loads again: wait for that GET to finish (sync on), not a fixed delay (slow under a full run).
+    await until(() => t.gets().length > getsBefore && t.client.getProgressSaveView().state === 'saved');
+    writeLocal(t, 'l1', record({ seen: ['b1'] }));
+    resetRoute = null;
     answer = { lessonEpoch: '33333333-3333-4333-8333-333333333333', lessonResetAt: 'not a date', record: { courseSlug: COURSE, lessonId: 'l1', progress: 'garbage' } };
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: true });
+    assert.equal(stale, 7);
     const stored = JSON.parse(t.storage.getItem(PROGRESS_KEY('l1')));
     assert.deepEqual(stored.seen, [], 'an emptied record');
     assert.deepEqual(stored.lessonGen, { epoch: '33333333-3333-4333-8333-333333333333', resetAt: null });
   });
 
-  it('Phase 5: capabilities other than true are false: the reset is "unsupported" and never sent', async () => {
+  it('Phase 6: a delete-all of the account\'s records marks the reviews stale; a failed one or this device\'s does not', async () => {
+    let fail = true;
     const t = (current = await page({
-      routes: { 'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: 'yes', achievements: 1 }, records: [] }) },
+      routes: {
+        'DELETE /user/lesson-progress': () => (fail ? json(503, { ok: false, error_type: 'db_connection' }) : json(200, { ok: true, deleted: 1, epoch: '44444444-4444-4444-8444-444444444444' })),
+      },
     }));
     t.client.signInProgressSync(U1, 'tok-1');
     await until(() => t.gets().length === 1);
     await wait(20);
-    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: false, achievements: false });
+    let stale = 0;
+    globalThis.window.addEventListener('rp:review-stale', () => { stale += 1; });
+    assert.deepEqual(await t.client.deleteLessonProgress(), { ok: false });
+    assert.equal(stale, 0, 'nothing was deleted');
+    fail = false;
+    assert.deepEqual(await t.client.deleteLessonProgress(), { ok: true, scope: 'account' });
+    assert.equal(stale, 1, 'the server removed every review card: the review store reads again');
+    const guest = (current = await page({ session: null }));
+    let guestStale = 0;
+    globalThis.window.addEventListener('rp:review-stale', () => { guestStale += 1; });
+    assert.deepEqual(await guest.client.deleteLessonProgress(), { ok: true, scope: 'device' });
+    assert.equal(guestStale, 0, 'this device only: no server review state');
+  });
+
+  it('Phase 5: capabilities other than true are false: the reset is "unsupported" and never sent', async () => {
+    const t = (current = await page({
+      routes: { 'GET /user/lesson-progress': () => json(200, { ok: true, epoch: null, capabilities: { lessonReset: 'yes', achievements: 1, review: 'true' }, records: [] }) },
+    }));
+    t.client.signInProgressSync(U1, 'tok-1');
+    await until(() => t.gets().length === 1);
+    await wait(20);
+    assert.deepEqual(t.client.progressCapabilities(), { lessonReset: false, achievements: false, review: false });
     writeLocal(t, 'l1', record({ seen: ['b1'] }));
     assert.deepEqual(await t.client.resetLessonProgress(COURSE, 'l1'), { ok: false, reason: 'unsupported' });
     assert.equal(t.calls.filter((c) => c.method === 'POST').length, 0);

@@ -46,8 +46,14 @@ export const LAST_LESSON_KEY = 'rp:lastLesson';
  */
 export const PROGRESS_EVENT = 'rp:progress-change';
 
-/** reset: the sync core stored this lesson's record after the learner started it over (Phase 5). */
-export type ProgressEventDetail = { courseSlug: string; lessonId: string; source?: 'server'; reset?: true };
+/**
+ * reset: the sync core stored this lesson's record after the learner started it over (Phase 5).
+ * echo: the record is the server's answer to this tab's own save (a PUT it took, with no lesson
+ * generation this tab did not know): no reset or delete-all came with it (those come back refused,
+ * as a new epoch or as a new generation), so stores that only follow other tabs' and devices'
+ * changes (the review count) skip it (Phase 6).
+ */
+export type ProgressEventDetail = { courseSlug: string; lessonId: string; source?: 'server'; reset?: true; echo?: true };
 
 /**
  * A stored record's generation stamp (Phase 5, one-lesson reset). known: the content builds on

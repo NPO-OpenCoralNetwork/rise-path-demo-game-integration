@@ -187,13 +187,13 @@ export type RejectedRecord = {
 };
 /** lessonEpoch: the generation the record's content builds on (null: unknown, born here, or never started over). */
 export type PutBody = { epoch: SyncEpoch; records: { courseSlug: string; lessonId: string; progress: LessonProgress; lessonEpoch: string | null }[] };
-/** What the server offers (GET capabilities, Phase 5); an older server sends none. */
-export type SyncCapabilities = { lessonReset: boolean; achievements: boolean };
+/** What the server offers (GET capabilities, Phase 5; review: Phase 6); an older server sends none. */
+export type SyncCapabilities = { lessonReset: boolean; achievements: boolean; review: boolean };
 
 /** services/lessonProgressApi.ts. Failures throw an ApiFailure-shaped error. */
 export type ProgressApi = {
   /** restarted: the account was deleted and opened again since its last reset (server GET, Phase 4). */
-  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean; capabilities?: { lessonReset?: boolean; achievements?: boolean } }>;
+  get(): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; restarted?: boolean; capabilities?: { lessonReset?: boolean; achievements?: boolean; review?: boolean } }>;
   put(body: PutBody, options: { keepalive: boolean }): Promise<{ epoch: SyncEpoch; records: ServerRecord[]; rejected: RejectedRecord[] }>;
   del(): Promise<{ deleted: number; epoch: string }>;
   /** POST …/lesson-reset (Phase 5). record: the lesson's emptied record (null when the answer had none). */
@@ -206,8 +206,13 @@ export type SyncTimers = {
   setTimeout(fn: () => void, ms: number): unknown;
   clearTimeout(handle: unknown): void;
 };
-/** reset: the lesson was started over (its emptied record was stored): open readers restart. */
-export type ServerProgressDetail = { courseSlug: string; lessonId: string; source: 'server'; reset?: true };
+/**
+ * reset: the lesson was started over (its emptied record was stored): open readers restart.
+ * echo: the server's answer to this tab's own PUT (a record it took, with no generation this tab
+ * did not know), e.g. the first save of a lesson here stamping known(null): nothing another tab or
+ * device reset or deleted (Phase 6: the review count does not read again for it).
+ */
+export type ServerProgressDetail = { courseSlug: string; lessonId: string; source: 'server'; reset?: true; echo?: true };
 export type SyncEvents = {
   /** A server-sourced write of one lesson record (dispatch PROGRESS_EVENT with source 'server'). */
   progress?(detail: ServerProgressDetail): void;
@@ -963,9 +968,11 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
    * gen (Phase 5): the server named the lesson's generation: the written record is stamped
    * known(gen), i.e. from now on it is that generation's content. Without gen the stored stamp
    * stays as it is. Returns true when it wrote a known non-null epoch the stored record did not
-   * carry (a generation this tab learned: the caller bumps the lesson mark).
+   * carry (a generation this tab learned: the caller bumps the lesson mark). echo: a record of
+   * this tab's own PUT that the server took; the event says so (ServerProgressDetail) unless the
+   * record brought a generation this tab learned (the lesson was started over elsewhere).
    */
-  function takeIn(ref: LessonRef, server: LessonProgress, summary: ProgressSummary | null, gen?: ServerGen, options: { reset?: boolean } = {}): boolean {
+  function takeIn(ref: LessonRef, server: LessonProgress, summary: ProgressSummary | null, gen?: ServerGen, options: { reset?: boolean; echo?: boolean } = {}): boolean {
     const key = progressKey(ref.courseSlug, ref.lessonId);
     const raw = read(key);
     const local = parseProgress(raw);
@@ -976,12 +983,20 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
     if (keep) next = withSummary(next, keep);
     if (raw !== null && sameStored(local, next) && sameLessonGen(storedGen, nextGen) && !options.reset) return false;
     if (!write(key, JSON.stringify(stampedRecord(next, nextGen)))) return false;
+    const learnedGen = nextGen.kind === 'known' && nextGen.epoch !== null && !(storedGen.kind === 'known' && storedGen.epoch === nextGen.epoch);
     try {
-      events.progress?.({ courseSlug: ref.courseSlug, lessonId: ref.lessonId, source: 'server', ...(options.reset ? { reset: true as const } : {}) });
+      events.progress?.({
+        courseSlug: ref.courseSlug,
+        lessonId: ref.lessonId,
+        source: 'server',
+        ...(options.reset ? { reset: true as const } : {}),
+        // A generation this tab did not know yet is a reset made elsewhere: not an echo.
+        ...(options.echo && !learnedGen ? { echo: true as const } : {}),
+      });
     } catch {
       // ignore
     }
-    return nextGen.kind === 'known' && nextGen.epoch !== null && !(storedGen.kind === 'known' && storedGen.epoch === nextGen.epoch);
+    return learnedGen;
   }
 
   // --- Lifecycle ---
@@ -1173,9 +1188,10 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
       // answer may predate a delete, and must not bring deleted records or the old epoch back.
       if (read(SYNC_ACCOUNT_KEY) === before || pass >= SYNC_TIMING.getPasses) break;
     }
-    // What this server offers (Phase 5): only the reset control, XP and the 503 rule depend on it.
+    // What this server offers (Phase 5): only the reset control, XP, reviews (Phase 6) and the 503
+    // rule depend on it.
     const offered = result.capabilities;
-    caps = { lessonReset: offered?.lessonReset === true, achievements: offered?.achievements === true };
+    caps = { lessonReset: offered?.lessonReset === true, achievements: offered?.achievements === true, review: offered?.review === true };
     getFailure = null;
     const account = readAccount();
     if (!account || account.userId !== userId || account.loggedOut) {
@@ -1326,7 +1342,7 @@ export function createProgressSync(options: ProgressSyncOptions): ProgressSync {
         const gen = serverGenOf(record);
         const now = localGen(item);
         const stamp = gen && (sameLessonGen(now, item.sentGen) || keepsLocal(now, gen)) ? gen : undefined;
-        learned = takeIn(item, server, summaryOf(record), stamp) || learned;
+        learned = takeIn(item, server, summaryOf(record), stamp, { echo: true }) || learned;
         if (getMarker(item) === item.sentAt && covers(server, item.progress)) removeMarker(item);
         continue;
       }

@@ -19,6 +19,11 @@
  *   lessons and devices are unaffected. A saved record must name the lesson's current generation
  *   (lessonEpoch; none or null for a lesson never started over), else that record is refused
  *   'lesson_reset', so a device holding the old record cannot merge it back.
+ * - Phase 6 (R4, migration 020): the reset also deletes the lesson's review cards
+ *   (DELETE_LESSON_REVIEW_CARDS_SQL; their reviews go by cascade), and the delete deletes all of
+ *   them (DELETE_ALL_REVIEW_CARDS_SQL), in the same transaction. Finishing the lesson again enters
+ *   its cards fresh (tools/core/reviewQueue.js). lesson_progress.progress_changed_at (migration 020)
+ *   is kept by a trigger: no statement here writes it.
  * - applyQuizCheck (MCP course-quiz-check): grades on the server with the reader's attempt rules
  *   (shared/lesson/grading.js). A wrong answer is a normal result, never an error_type.
  * - markLessonProgress (MCP course-progress-update): marks sections read, only once their check
@@ -49,6 +54,7 @@
  */
 import { getPool } from '../../server/db.js';
 import { isUuid } from '../../server/utils/ids.js';
+import { canonicalUserId } from './accountDeletions.js';
 import { classifyDbError } from './dbErrors.js';
 import { inTransaction, noDatabase } from './dbTransaction.js';
 import { deleteLessonsKeepingXp, reconcileLessonXp } from './achievements.js';
@@ -97,7 +103,11 @@ export const SAVE_BATCH_MAX = 25;
 export const RESTARTED_SQL = `SELECT EXISTS (SELECT 1 FROM account_deletions d WHERE d.user_id = $1::uuid
    AND d.reopened_at = (SELECT r.reset_at FROM lesson_progress_resets r WHERE r.user_id = d.user_id)) AS restarted`;
 
-/** Orders a learner's REST saves, resets and delete against each other (transaction advisory lock). */
+/**
+ * Orders a learner's REST saves, resets and delete against each other, and the review queue's entry
+ * and grade (tools/core/reviewQueue.js), as a transaction advisory lock. hashtext hashes the text as
+ * given, so every caller passes the canonical (lower-case) id (canonicalUserId): one key per learner.
+ */
 export const LEARNER_LOCK_SQL = "SELECT pg_advisory_xact_lock(hashtext('lesson_progress:' || $1))";
 
 /**
@@ -130,6 +140,12 @@ export const ROWS_WITH_LESSON_EPOCHS_SQL = `SELECT p.course_slug, p.lesson_id, p
     ON r.user_id = p.user_id AND r.course_slug = p.course_slug AND r.lesson_id = p.lesson_id
  WHERE p.user_id = $1
  ORDER BY p.course_slug, p.lesson_id`;
+
+/** Phase 6 (R4): starting one lesson over takes its cards out of the review queue; their log goes by cascade. */
+export const DELETE_LESSON_REVIEW_CARDS_SQL = 'DELETE FROM review_cards WHERE user_id = $1 AND course_slug = $2 AND lesson_id = $3';
+
+/** Phase 6 (R4): deleting all lesson progress clears every review card and review. */
+export const DELETE_ALL_REVIEW_CARDS_SQL = 'DELETE FROM review_cards WHERE user_id = $1';
 
 /** Stored in a placeholder row until the same transaction writes the real record. */
 const PLACEHOLDER = JSON.stringify(emptyProgress());
@@ -238,7 +254,7 @@ async function writeRow(db, userId, entry, progress) {
     return { pct, state };
 }
 
-/** @param {Queryable} db @param {string} userId */
+/** @param {Queryable} db @param {string} userId canonical (LEARNER_LOCK_SQL hashes the text as given) */
 const lockUser = (db, userId) => db.query(LEARNER_LOCK_SQL, [userId]);
 
 /**
@@ -380,8 +396,10 @@ const echoId = (value) => (typeof value === 'string' ? value.slice(0, 120) : nul
  * @param {{ userId: string, epoch: string | null, records: { courseSlug?: unknown, lessonId?: unknown, progress?: unknown, lessonEpoch?: unknown }[], now?: Date | number }} params
  * @returns {Promise<{ epoch: string | null, records: StoredRecord[], rejected: RejectedRecord[], learned: boolean } | (CoreError & { epoch?: string | null })>}
  */
-export async function saveLessonProgress({ userId, epoch, records, now }) {
-    if (!isUuid(userId)) return invalid('A signed-in learner is required.');
+export async function saveLessonProgress({ userId: rawUserId, epoch, records, now }) {
+    // One spelling per learner: the learner lock's key is the lower-case id (LEARNER_LOCK_SQL).
+    const userId = canonicalUserId(rawUserId);
+    if (!userId) return invalid('A signed-in learner is required.');
     if (epoch !== null && typeof epoch !== 'string') return invalid('epoch must be a string or null.');
     if (!Array.isArray(records) || records.length < 1 || records.length > SAVE_BATCH_MAX) {
         return invalid(`records must hold 1 to ${SAVE_BATCH_MAX} records.`);
@@ -484,15 +502,18 @@ export async function saveLessonProgress({ userId, epoch, records, now }) {
  * transaction under the learner's lock. What the record earned so far is reconciled into the XP
  * ledger first (O2). The account epoch is checked like a save's (409 progress_reset when the
  * learner deleted everything elsewhere) and never moved: other lessons and devices are untouched,
- * and the Phase 4 restarted signal stays.
+ * and the Phase 4 restarted signal stays. The lesson's review cards (and their reviews, by cascade)
+ * are deleted in the same transaction (Phase 6, R4); finishing the lesson again enters them fresh.
  *
- * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the lesson's row, then the XP lock.
+ * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the lesson's row, the XP lock, then the
+ * lesson's review cards.
  *
  * @param {{ userId: string, epoch: string | null, courseSlug: unknown, lessonId: unknown }} params
  * @returns {Promise<{ epoch: string | null, courseSlug: string, lessonId: string, lessonEpoch: string, lessonResetAt: string | null, record: StoredRecord } | (CoreError & { epoch?: string | null })>}
  */
-export async function resetLessonProgress({ userId, epoch, courseSlug, lessonId }) {
-    if (!isUuid(userId)) return invalid('A signed-in learner is required.');
+export async function resetLessonProgress({ userId: rawUserId, epoch, courseSlug, lessonId }) {
+    const userId = canonicalUserId(rawUserId);
+    if (!userId) return invalid('A signed-in learner is required.');
     if (epoch !== null && !isUuid(epoch)) return invalid('epoch must be null or the epoch the last GET returned.');
     const entry = getPublishedLesson(courseSlug, lessonId);
     if (!entry) return { error: 'Only a published lesson can be started over.', error_type: 'unknown_lesson' };
@@ -514,6 +535,7 @@ export async function resetLessonProgress({ userId, epoch, courseSlug, lessonId 
         const { rows } = await db.query(RESET_LESSON_EPOCH_SQL, [userId, entry.courseSlug, entry.lesson.id]);
         const lessonEpoch = String(rows[0].lesson_epoch);
         const lessonResetAt = isoOf(rows[0].reset_at);
+        await db.query(DELETE_LESSON_REVIEW_CARDS_SQL, [userId, entry.courseSlug, entry.lesson.id]);
         /** @type {StoredRecord} */
         const record = { courseSlug: entry.courseSlug, lessonId: entry.lesson.id, progress: empty, pct, state, updatedAt: empty.updatedAt, lessonEpoch, lessonResetAt };
         return { commit: true, value: { epoch: current, courseSlug: entry.courseSlug, lessonId: entry.lesson.id, lessonEpoch, lessonResetAt, record } };
@@ -525,9 +547,11 @@ export async function resetLessonProgress({ userId, epoch, courseSlug, lessonId 
  * transaction under the learner's advisory lock (so no save of the old epoch commits after it).
  * The XP the deleted records earned is awarded by the DELETE statement itself and stays (O2), also
  * for a row an AI app changes while the delete waits for it; the lessons' generations
- * (lesson_progress_lesson_resets), the XP ledger and the learning days are kept.
+ * (lesson_progress_lesson_resets), the XP ledger and the learning days are kept. Every review card
+ * and review is deleted in the same transaction (Phase 6, R4).
  *
- * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the XP lock, then the rows (the DELETE).
+ * Lock order: LEARNER_LOCK_SQL, ACCOUNT_STUB_SHARE_SQL, the XP lock, the rows (the DELETE), then the
+ * review cards.
  * The reset takes its row before the XP lock, but both hold the learner lock first, so they never
  * run at the same time; the reconciles take the XP lock and lock no lesson_progress row, and the
  * MCP writers lock one row and never take the XP lock: no cycle.
@@ -535,12 +559,14 @@ export async function resetLessonProgress({ userId, epoch, courseSlug, lessonId 
  * @param {{ userId: string }} params
  * @returns {Promise<{ deleted: number, epoch: string } | CoreError>}
  */
-export async function deleteAllLessonProgress({ userId }) {
-    if (!isUuid(userId)) return invalid('A signed-in learner is required.');
+export async function deleteAllLessonProgress({ userId: rawUserId }) {
+    const userId = canonicalUserId(rawUserId);
+    if (!userId) return invalid('A signed-in learner is required.');
     return inTransaction('deleteAllLessonProgress', async (db) => {
         await lockUser(db, userId);
         await db.query(ACCOUNT_STUB_SHARE_SQL, [userId]);
         const deleted = await deleteLessonsKeepingXp(db, userId);
+        await db.query(DELETE_ALL_REVIEW_CARDS_SQL, [userId]);
         const { rows } = await db.query(
             `INSERT INTO lesson_progress_resets (user_id) VALUES ($1)
              ON CONFLICT (user_id) DO UPDATE SET epoch = gen_random_uuid(), reset_at = now()
