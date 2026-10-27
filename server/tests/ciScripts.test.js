@@ -2,7 +2,8 @@
 // The Phase 7 CI scripts (doc/brushup-2026/ai-access-plan.ja.md): scripts/ci/db-checks.sh, the job
 // "Database checks" of .github/workflows/e2e.yml and `npm run ci:db`; scripts/ci/stack.sh, its env
 // template deploy/risepath-vm/ci/stack.ci.env and scripts/ci/redact-log.mjs, the job "Server stack
-// deploy" and `npm run ci:stack`; and the 00:00 JST guard (scripts/ci/jst-midnight-guard.mjs). The
+// deploy" and `npm run ci:stack`, with its `auth` subcommand (the e2e auth stand-in's container); and the
+// 00:00 JST guard (scripts/ci/jst-midnight-guard.mjs). The
 // checks themselves need Docker and PostgreSQL 16 (the jobs run them); here the scripts' text is
 // pinned, and the parts that must stop before any psql or docker call, or that pick the image, run
 // against recording stubs. No test waits on a real network call.
@@ -17,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { JST_OFFSET_S, secondsToJstMidnight, waitPastJstMidnight } from '../../scripts/ci/jst-midnight-guard.mjs';
 import { SECRET_KEY, redact, secretValues } from '../../scripts/ci/redact-log.mjs';
 import { isPlaceholder } from '../../scripts/ci/scan-secrets.mjs';
+import { DEFAULT_PORT as STANDIN_DEFAULT_PORT } from '../../e2e/support/auth-stand-in.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** @param {string} file */
@@ -413,6 +415,9 @@ const template = read(TEMPLATE);
 const PG_IMAGE = (read('deploy/risepath-vm/docker-compose.yml').match(IMAGE_RE) ?? [])[0] ?? '';
 const PG_DIGEST = PG_IMAGE.slice(PG_IMAGE.indexOf('@') + 1);
 const STACK_PORTS = [5432, 3006, 3100];
+const STANDIN = 'e2e/support/auth-stand-in.mjs';
+/** The stand-in's container (scripts/ci/stack.sh AUTH_NAME). */
+const AUTH_NAME = 'risepath-ci-auth';
 const MARKER = '# risepath-ci-env:';
 /** A production-ready /api/v2/health body, as the api answers it on the CI stack. */
 const HEALTH = { ok: true, node_env: 'production', checks: { database: true, supabase_auth: true, production_data_mode: true, strict_auth_mode: true }, database: { migrations: { pending: 0, ok: true } } };
@@ -428,26 +433,27 @@ const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use o
 
 /**
  * @typedef {{ env?: Record<string, string>, failPull?: (image: string) => boolean, inspectFails?: boolean,
- *   mcpExit?: number, health?: unknown, curlExit?: number, deployExit?: number, dfKb?: number, cwd?: string,
+ *   mcpExit?: number, apiExit?: number, standIn?: boolean, health?: unknown, curlExit?: number, deployExit?: number, dfKb?: number, cwd?: string,
  *   hide?: string[], redactFails?: boolean, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
  */
 /**
- * Runs scripts/ci/stack.sh <args> in a temporary copy of the tree: stack.sh, redact-log.mjs and
- * deploy/risepath-vm/{ci/stack.ci.env, docker-compose.yml, Dockerfile}, with a recording
+ * Runs scripts/ci/stack.sh <args> in a temporary copy of the tree: stack.sh, redact-log.mjs,
+ * e2e/support/auth-stand-in.mjs and deploy/risepath-vm/{ci/stack.ci.env, docker-compose.yml, Dockerfile}, with a recording
  * deploy/risepath-vm/scripts/deploy-stack.sh stub that prints LEAKY and exits `deployExit`. Recording
  * docker, curl and sleep stubs come first on PATH (with `dfKb`, df too), the real node after them.
  * docker answers version/info, fails `pull` for images `failPull` names and `image inspect` with
- * `inspectFails`, exits `mcpExit` for the exec into mcp, and prints LEAKY for `compose logs`; each
- * line logs the COMPOSE_PROJECT_NAME it saw. curl prints `health` (as JSON unless a string) or exits `curlExit`.
+ * `inspectFails`, exits `mcpExit` for the exec into mcp and `apiExit` for the exec into api, and prints LEAKY
+ * for `compose logs`; `container inspect` finds the stand-in's container and `logs` prints its lines only
+ * with `standIn`; each line logs the COMPOSE_PROJECT_NAME it saw. curl prints `health` (as JSON unless a string) or exits `curlExit`.
  * With `redactFails`, node exits 7 for redact-log.mjs (and runs the real node otherwise). `hide` lists
  * commands to take off PATH: the rest of PATH is then a folder of links to every other command on it.
  * @param {string[]} args @param {StackOptions} [options]
  */
-function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, setup, inspect } = {}) {
+function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, apiExit = 0, standIn = false, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, setup, inspect } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-'));
     try {
         const tree = path.join(dir, 'repo');
-        for (const file of [STACK_SH, 'scripts/ci/redact-log.mjs', TEMPLATE, 'deploy/risepath-vm/docker-compose.yml', 'deploy/risepath-vm/Dockerfile']) {
+        for (const file of [STACK_SH, 'scripts/ci/redact-log.mjs', STANDIN, TEMPLATE, 'deploy/risepath-vm/docker-compose.yml', 'deploy/risepath-vm/Dockerfile']) {
             fs.mkdirSync(path.dirname(path.join(tree, file)), { recursive: true });
             fs.copyFileSync(path.join(ROOT, file), path.join(tree, file));
         }
@@ -470,9 +476,12 @@ function runStack(args, { env = {}, failPull = () => false, inspectFails = false
             '  info) echo "Storage driver: overlayfs" ;;',
             '  pull) if grep -qxF -- "${@: -1}" "$STUB_FAIL_PULL"; then exit 1; fi ;;',
             `  image) exit ${inspectFails ? 1 : 0} ;;`,
+            `  container) exit ${standIn ? 0 : 1} ;;`,
+            `  logs) ${standIn ? `echo '2026-10-27T15:00:00Z auth stand-in listening on http://0.0.0.0:54390'; echo '2026-10-27T15:00:01Z POST /auth/v1/token?grant_type=password 200 Bearer abc.def-ghi'` : 'echo "Error: No such container" >&2; exit 1'} ;;`,
             '  compose)',
             '    if [[ "$2" == version ]]; then echo "Docker Compose version v5.0.0"; exit 0; fi',
             `    if [[ " $* " == *" exec -T mcp "* ]]; then exit ${mcpExit}; fi`,
+            `    if [[ " $* " == *" exec -T api "* ]]; then exit ${apiExit}; fi`,
             `    if [[ " $* " == *" logs "* ]]; then echo 'risepath-ci-api-1  | - Environment: production'; echo 'risepath-ci-api-1  | ${LEAKY}'; echo 'risepath-ci-api-1  | Authorization: Bearer abc.def-ghi'; fi`,
             '    ;;',
             'esac',
@@ -676,7 +685,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         }
     });
 
-    it('down removes the risepath-ci project with its volume, then only the env file it installed', () => {
+    it('down removes the stand-in first (it is on the project\'s network), then the risepath-ci project with its volume, then only the env file it installed', () => {
         /** @type {boolean[]} */
         const left = [];
         const own = runStack(['down'], {
@@ -684,15 +693,17 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))),
         });
         assert.equal(own.status, 0, own.out);
-        assert.deepEqual(own.calls, [`${COMPOSE}<tree>/deploy/risepath-vm/stack.env -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`]);
+        assert.deepEqual(own.calls, [`docker [risepath-ci] rm -f ${AUTH_NAME}`, `${COMPOSE}<tree>/deploy/risepath-vm/stack.env -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`]);
         const foreign = runStack(['down'], {
             setup: (tree) => fs.writeFileSync(path.join(tree, STACK_ENV), 'X=1\n'),
             inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))),
         });
         assert.equal(foreign.status, 0, foreign.out);
-        assert.deepEqual(foreign.calls, [`${COMPOSE}<tree>/${TEMPLATE} -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`], 'a foreign stack.env is never read');
+        assert.deepEqual(foreign.calls, [`docker [risepath-ci] rm -f ${AUTH_NAME}`, `${COMPOSE}<tree>/${TEMPLATE} -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`], 'a foreign stack.env is never read');
         assert.deepEqual(left, [false, true], 'its own stack.env removed; a foreign one kept');
         assert.doesNotMatch(stackCommands, /prune|docker volume rm|docker system|docker rmi|docker image rm/, 'removes nothing but the project');
+        assert.deepEqual(stackCode.match(/docker rm [^\n#]*/g)?.map((line) => line.trim()), Array(2).fill('docker rm -f "${AUTH_NAME}" > /dev/null 2>&1 || true'), 'the only container it removes by name is its own stand-in (auth, down)');
+        assert.match(stackCode, /^AUTH_NAME="\$\{PROJECT\}-auth"$/m);
     });
 
     it('pull: both base images from Docker Hub; when it refuses, the same reference from mirror.gcr.io re-tagged to the compose/Dockerfile reference, which must then resolve', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
@@ -785,6 +796,67 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.match(html.out, /^health: not JSON: "<html>"$/m);
     });
 
+    it('auth publishes the stand-in on 127.0.0.1 only, under the alias the template\'s SUPABASE_URL names, with the switch, and checks the api can reach it', () => {
+        const installed = (/** @type {string} */ tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
+        const { status, out, calls } = runStack(['auth'], { setup: installed });
+        assert.equal(status, 0, out);
+        const port = new URL(template.match(/^SUPABASE_URL=(.*)$/m)?.[1] ?? '').port;
+        assert.equal(port, String(STANDIN_DEFAULT_PORT), 'one port: the template\'s SUPABASE_URL and the stand-in\'s default');
+        const health = `curl -fsS --max-time 5 http://127.0.0.1:${port}/auth/v1/health`;
+        assert.deepEqual(calls, [
+            `docker [risepath-ci] rm -f ${AUTH_NAME}`,
+            `docker [risepath-ci] run -d --name ${AUTH_NAME} --network risepath-ci_default --network-alias auth-stand-in`
+                + ` -p 127.0.0.1:${port}:${port} --read-only --cap-drop ALL --security-opt no-new-privileges --user node`
+                + ` -e RISEPATH_E2E_AUTH_STANDIN=1 -e E2E_AUTH_HOST=0.0.0.0 -e E2E_AUTH_PORT=${port} -e E2E_AUTH_PUBLIC_URL=http://127.0.0.1:${port}`
+                + ` --mount type=bind,src=<tree>/${STANDIN},dst=/stand-in/auth-stand-in.mjs,readonly node:22-slim node /stand-in/auth-stand-in.mjs`,
+            health,
+            health,
+            `${COMPOSE}<tree>/${STACK_ENV} -f <tree>/deploy/risepath-vm/docker-compose.yml exec -T api node -e fetch('http://auth-stand-in:${port}/auth/v1/health', { signal: AbortSignal.timeout(20000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))`,
+        ]);
+        assert.match(out, new RegExp(`==> auth stand-in: http://127\\.0\\.0\\.1:${port} \\(browser\\), http://auth-stand-in:${port} \\(api\\)`));
+        assert.doesNotMatch(stackCode, new RegExp(`${port}|auth-stand-in:|node:22-slim`), 'stack.sh names no port, alias or image: the template and the Dockerfile do');
+
+        // Another name and port in the template move every part with them; the api's base image too.
+        const moved = runStack(['auth'], {
+            setup: (tree) => {
+                fs.writeFileSync(path.join(tree, TEMPLATE), template.replace(/^SUPABASE_URL=.*$/m, 'SUPABASE_URL=http://other-auth:54391'));
+                fs.writeFileSync(path.join(tree, 'deploy/risepath-vm/Dockerfile'), read('deploy/risepath-vm/Dockerfile').replace(/^FROM node:22-slim AS api$/m, 'FROM node:24-slim AS api'));
+            },
+        });
+        assert.equal(moved.status, 0, moved.out);
+        const run = moved.calls.find((line) => line.includes(' run -d ')) ?? '';
+        for (const part of ['--network-alias other-auth ', '-p 127.0.0.1:54391:54391 ', 'E2E_AUTH_PORT=54391 ', ' node:24-slim node ']) assert.ok(run.includes(part), `${part}: ${run}`);
+        assert.ok(moved.calls.some((line) => line.includes("exec -T api node -e fetch('http://other-auth:54391/auth/v1/health'")), moved.calls.join('\n'));
+    });
+
+    it('auth refuses a SUPABASE_URL it cannot publish, a missing stand-in file or Dockerfile api stage, before any docker call', () => {
+        for (const [what, setup, message] of /** @type {[string, (tree: string) => void, RegExp][]} */ ([
+            ['an https URL', (tree) => fs.writeFileSync(path.join(tree, TEMPLATE), template.replace(/^SUPABASE_URL=.*$/m, 'SUPABASE_URL=https://abc.supabase.co')), /❌ SUPABASE_URL of deploy\/risepath-vm\/ci\/stack\.ci\.env is not http:\/\/<name>:<port>/],
+            ['a URL with a path', (tree) => fs.writeFileSync(path.join(tree, TEMPLATE), template.replace(/^SUPABASE_URL=.*$/m, 'SUPABASE_URL=http://auth-stand-in:54390/x')), /is not http:\/\/<name>:<port>/],
+            ['a quote in the name', (tree) => fs.writeFileSync(path.join(tree, TEMPLATE), template.replace(/^SUPABASE_URL=.*$/m, "SUPABASE_URL=http://a'b:54390")), /is not http:\/\/<name>:<port>/],
+            ['no stand-in file', (tree) => fs.rmSync(path.join(tree, STANDIN)), /❌ e2e\/support\/auth-stand-in\.mjs is missing/],
+            ['no api stage', (tree) => fs.writeFileSync(path.join(tree, 'deploy/risepath-vm/Dockerfile'), 'FROM node:22-slim\n'), /❌ deploy\/risepath-vm\/Dockerfile has no "FROM <image> AS api" line/],
+        ])) {
+            const { status, out, calls } = runStack(['auth'], { setup });
+            assert.equal(status, 1, `${what}: ${out}`);
+            assert.match(out, message, what);
+            assert.deepEqual(calls, [], `${what}: no docker call`);
+        }
+    });
+
+    it('auth fails with the stand-in\'s own log when it never answers, and names the network when the api cannot reach it', () => {
+        const silent = runStack(['auth'], { curlExit: 7, standIn: true });
+        assert.equal(silent.status, 1, silent.out);
+        assert.match(silent.out, /❌ the auth stand-in does not answer on http:\/\/127\.0\.0\.1:54390/);
+        assert.match(silent.out, /auth stand-in listening on/, 'its log is printed');
+        assert.equal(silent.calls.filter((line) => line.startsWith('sleep ')).length, 30, 'a 30-second readiness poll, not a test wait');
+        assert.equal(silent.calls.filter((line) => line.startsWith('curl ')).length, 31);
+        assert.ok(!silent.calls.some((line) => / exec -T api /.test(line)), 'the api check never runs');
+        const unreachable = runStack(['auth'], { apiExit: 1 });
+        assert.equal(unreachable.status, 1, unreachable.out);
+        assert.match(unreachable.out, /❌ the api container cannot reach http:\/\/auth-stand-in:54390 \(network risepath-ci_default\)/);
+    });
+
     it('logs writes the compose state and the redacted compose and deploy logs into the folder given (relative to the caller), keeping the raw log', () => {
         const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-caller-'));
         try {
@@ -804,7 +876,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             for (const name of fs.readdirSync(path.join(outer, 'kept/logs')).sort()) files[name] = fs.readFileSync(path.join(outer, 'kept/logs', name), 'utf8');
             assert.equal(status, 0, out);
             assert.deepEqual(Object.keys(files), ['compose-ps.txt', 'compose.log', 'deploy-1.log']);
-            assert.deepEqual(calls.map((line) => line.replace(/ --env-file \S+ -f \S+/, '')), ['docker [risepath-ci] compose -p risepath-ci ps -a', 'docker [risepath-ci] compose -p risepath-ci logs --no-color --timestamps']);
+            assert.deepEqual(calls.map((line) => line.replace(/ --env-file \S+ -f \S+/, '')), ['docker [risepath-ci] compose -p risepath-ci ps -a', 'docker [risepath-ci] compose -p risepath-ci logs --no-color --timestamps', `docker [risepath-ci] container inspect ${AUTH_NAME}`], 'no stand-in log where auth never ran (Server stack deploy)');
             for (const [name, text] of Object.entries(files)) {
                 for (const secret of ['ci-dummy-db-password', 'ci-dummy-bridge-token', 'abc.def-ghi']) assert.ok(!text.includes(secret), `${name} holds ${secret}`);
             }
@@ -817,6 +889,23 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         } finally {
             fs.rmSync(outer, { recursive: true, force: true });
         }
+    });
+
+    it('logs adds the stand-in\'s log, redacted, where auth started it', () => {
+        /** @type {Record<string, string>} */
+        const files = {};
+        const { status, out, calls } = runStack(['logs', 'kept'], {
+            standIn: true,
+            inspect: (tree) => {
+                const dir = path.join(path.dirname(tree), 'kept');
+                for (const name of fs.readdirSync(dir)) files[name] = fs.readFileSync(path.join(dir, name), 'utf8');
+            },
+        });
+        assert.equal(status, 0, out);
+        assert.deepEqual(Object.keys(files).sort(), ['auth-stand-in.log', 'compose-ps.txt', 'compose.log']);
+        assert.ok(calls.includes(`docker [risepath-ci] logs --timestamps ${AUTH_NAME}`), calls.join('\n'));
+        assert.match(files['auth-stand-in.log'], /^2026-10-27T15:00:01Z POST \/auth\/v1\/token\?grant_type=password 200 Bearer <token>$/m);
+        assert.ok(!files['auth-stand-in.log'].includes('abc.def-ghi'));
     });
 
     it('logs also masks the secret values of env files it did not write (a developer\'s stack.env, billing.env)', () => {
@@ -846,8 +935,8 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             if (line.startsWith('deploy-stack.sh ')) return 'deploy';
             if (line.startsWith('curl ')) return 'health';
             if (/ exec -T mcp /.test(line)) return 'mcp-db';
-            if (/ down -v /.test(line)) return 'down';
-            if (/ (logs|ps -a)( |$)/.test(line)) return 'logs';
+            if (/ down -v /.test(line) || line === `docker [risepath-ci] rm -f ${AUTH_NAME}`) return 'down';
+            if (/ (logs|ps -a)( |$)/.test(line) || line === `docker [risepath-ci] container inspect ${AUTH_NAME}`) return 'logs';
             if (/^docker \[risepath-ci\] (version|info|compose version)/.test(line)) return 'preflight';
             if (/^docker \[risepath-ci\] pull /.test(line)) return 'pull';
             return line;
@@ -896,10 +985,10 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
     it('the usage names every subcommand; an unknown one exits 2', () => {
         const { status, out, calls } = runStack(['nope']);
         assert.equal(status, 2);
-        assert.match(out, /^Usage: bash scripts\/ci\/stack\.sh preflight\|install-env\|pull\|deploy <n>\|mcp-db\|health\|logs <dir>\|down\|rehearsal$/m);
+        assert.match(out, /^Usage: bash scripts\/ci\/stack\.sh preflight\|install-env\|pull\|deploy <n>\|mcp-db\|health\|auth\|logs <dir>\|down\|rehearsal$/m);
         assert.deepEqual(calls, []);
         const cases = [...stackCode.matchAll(/^ {2}([a-z-]+)\) cmd_/gm)].map((m) => m[1]);
-        assert.deepEqual(cases, ['preflight', 'install-env', 'pull', 'deploy', 'mcp-db', 'health', 'logs', 'down', 'rehearsal']);
+        assert.deepEqual(cases, ['preflight', 'install-env', 'pull', 'deploy', 'mcp-db', 'health', 'auth', 'logs', 'down', 'rehearsal']);
         for (const sub of cases) assert.match(stackScript, new RegExp(`^#   ${sub}\\b`, 'm'), `the header documents ${sub}`);
     });
 });

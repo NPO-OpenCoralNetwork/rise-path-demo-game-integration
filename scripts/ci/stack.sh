@@ -16,8 +16,11 @@
 #                     with RISEPATH_DEPLOY_SKIP_PULL=1; log deploy-<n>.log
 #   mcp-db            the admin MCP's /health says its database is connected
 #   health            /api/v2/health from the host: production-ready, no pending migration
-#   logs <dir>        compose and deploy logs, redacted with the template and every env file present
-#   down              the risepath-ci project and its volume, the installed env file
+#   auth              the auth stand-in (e2e/support/auth-stand-in.mjs) in a container on the stack's
+#                     network, under the host name and port of the template's SUPABASE_URL; published on
+#                     127.0.0.1 only; checks that the api container reaches it
+#   logs <dir>        compose, deploy and stand-in logs, redacted with the template and every env file present
+#   down              the stand-in, the risepath-ci project and its volume, the installed env file
 #   rehearsal         the whole job locally (npm run ci:stack): logs on failure, always down
 set -euo pipefail
 
@@ -27,6 +30,7 @@ STACK="${ROOT}/deploy/risepath-vm"
 PROJECT=risepath-ci
 MARKER='# risepath-ci-env:'
 TEMPLATE="${STACK}/ci/stack.ci.env"
+AUTH_NAME="${PROJECT}-auth"
 LOG_DIR="${RISEPATH_CI_LOG_DIR:-${ROOT}/.artifacts/ci/stack/raw}"
 # Each pull may take PULL_EACH_S, and all of them with the pauses PULL_BUDGET_S (an uncached pull takes
 # seconds), so a hanging registry ends with this script's message, inside the step's 10 minutes.
@@ -45,6 +49,7 @@ fail() {
   exit 1
 }
 ours() { [[ -f "$1" ]] && head -n 1 "$1" | grep -q "^${MARKER}"; }
+value_of() { sed -n "s/^$1=//p" "$2" | tail -n 1; }   # <name> <env file>
 envfile() { if ours "${STACK}/stack.env"; then echo "${STACK}/stack.env"; else echo "${TEMPLATE}"; fi; }
 compose() { docker compose -p "${PROJECT}" --env-file "$(envfile)" -f "${STACK}/docker-compose.yml" "$@"; }
 # The files docker-compose.yml loads (env_file) or deploy-stack.sh sources when they exist.
@@ -150,6 +155,44 @@ cmd_health() { # from the host, through the published port (no origin gate in CI
     });" || fail '/api/v2/health from the host is not production-ready'
 }
 
+# The stand-in's host name on the stack's network and its port: the template's SUPABASE_URL (one source).
+auth_target() {
+  local url
+  url="$(value_of SUPABASE_URL "${TEMPLATE}")"
+  [[ "${url}" =~ ^http://([a-z][a-z0-9-]*):([0-9]+)$ ]] || fail 'SUPABASE_URL of deploy/risepath-vm/ci/stack.ci.env is not http://<name>:<port>'
+  AUTH_ALIAS="${BASH_REMATCH[1]}"
+  AUTH_PORT="${BASH_REMATCH[2]}"
+}
+
+cmd_auth() { # the api reaches it as the template's SUPABASE_URL; the browser as http://127.0.0.1:<port>
+  local _ image file="${ROOT}/e2e/support/auth-stand-in.mjs"
+  auth_target
+  local alias="${AUTH_ALIAS}" port="${AUTH_PORT}"
+  [[ -f "${file}" ]] || fail 'e2e/support/auth-stand-in.mjs is missing'
+  # The api's own base image (pull fetched it, with the mirror fallback): no other download.
+  image="$(sed -nE 's/^FROM ([^ ]+) AS api$/\1/p' "${STACK}/Dockerfile")"
+  [[ -n "${image}" ]] || fail 'deploy/risepath-vm/Dockerfile has no "FROM <image> AS api" line'
+  docker rm -f "${AUTH_NAME}" > /dev/null 2>&1 || true
+  # --mount (not -v): a missing source is an error, never an empty folder created on the host.
+  docker run -d --name "${AUTH_NAME}" --network "${PROJECT}_default" --network-alias "${alias}" \
+    -p "127.0.0.1:${port}:${port}" --read-only --cap-drop ALL --security-opt no-new-privileges --user node \
+    -e RISEPATH_E2E_AUTH_STANDIN=1 -e E2E_AUTH_HOST=0.0.0.0 -e E2E_AUTH_PORT="${port}" \
+    -e E2E_AUTH_PUBLIC_URL="http://127.0.0.1:${port}" \
+    --mount "type=bind,src=${file},dst=/stand-in/auth-stand-in.mjs,readonly" \
+    "${image}" node /stand-in/auth-stand-in.mjs > /dev/null
+  for _ in $(seq 1 30); do   # a readiness poll, not a test wait
+    if curl -fsS --max-time 5 "http://127.0.0.1:${port}/auth/v1/health" > /dev/null 2>&1; then break; fi
+    sleep 1
+  done
+  if ! curl -fsS --max-time 5 "http://127.0.0.1:${port}/auth/v1/health" > /dev/null; then
+    docker logs "${AUTH_NAME}" 2>&1 | tail -n 20 || true
+    fail "the auth stand-in does not answer on http://127.0.0.1:${port}"
+  fi
+  compose exec -T api node -e "fetch('http://${alias}:${port}/auth/v1/health', { signal: AbortSignal.timeout(20000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))" \
+    || fail "the api container cannot reach http://${alias}:${port} (network ${PROJECT}_default)"
+  echo "==> auth stand-in: http://127.0.0.1:${port} (browser), http://${alias}:${port} (api)"
+}
+
 cmd_logs() { # <dir>
   local dir="${1:?logs <dir>}" f
   local envs=(--env "${TEMPLATE}")
@@ -158,6 +201,9 @@ cmd_logs() { # <dir>
   mkdir -p "${dir}"
   compose ps -a > "${dir}/compose-ps.txt" 2>&1 || true
   compose logs --no-color --timestamps 2>&1 | node "${ROOT}/scripts/ci/redact-log.mjs" "${envs[@]}" > "${dir}/compose.log" || true
+  if docker container inspect "${AUTH_NAME}" > /dev/null 2>&1; then   # only where auth started it
+    docker logs --timestamps "${AUTH_NAME}" 2>&1 | node "${ROOT}/scripts/ci/redact-log.mjs" "${envs[@]}" > "${dir}/auth-stand-in.log" || true
+  fi
   for f in "${LOG_DIR}"/deploy-*.log; do
     if [[ -f "${f}" ]]; then node "${ROOT}/scripts/ci/redact-log.mjs" "${envs[@]}" < "${f}" > "${dir}/$(basename "${f}")"; fi
   done
@@ -165,6 +211,7 @@ cmd_logs() { # <dir>
 }
 
 cmd_down() {
+  docker rm -f "${AUTH_NAME}" > /dev/null 2>&1 || true   # first: it is attached to the project's network
   compose down -v --remove-orphans --timeout 10 || true
   if ours "${STACK}/stack.env"; then rm -f "${STACK}/stack.env"; fi
 }
@@ -190,8 +237,9 @@ case "${1:-}" in
   deploy) cmd_deploy "${2:?deploy <n>}" ;;
   mcp-db) cmd_mcp_db ;;
   health) cmd_health ;;
+  auth) cmd_auth ;;
   logs) cmd_logs "${2:-}" ;;
   down) cmd_down ;;
   rehearsal) cmd_rehearsal ;;
-  *) echo "Usage: bash scripts/ci/stack.sh preflight|install-env|pull|deploy <n>|mcp-db|health|logs <dir>|down|rehearsal"; exit 2 ;;
+  *) echo "Usage: bash scripts/ci/stack.sh preflight|install-env|pull|deploy <n>|mcp-db|health|auth|logs <dir>|down|rehearsal"; exit 2 ;;
 esac
