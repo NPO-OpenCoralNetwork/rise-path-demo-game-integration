@@ -2,10 +2,11 @@
 // @ts-check
 /**
  * Proves migration 020 (Phase 6: the review queue) and the server code that uses it on a real,
- * THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). CI has no Postgres, so npm
- * test pins the SQL text (server/tests/migration020.test.js) and runs the code on in-memory fakes
+ * THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). npm test pins the SQL text
+ * without a database (server/tests/migration020.test.js) and runs the code on in-memory fakes
  * (server/tests/reviewQueueCore.test.js); this script runs the shipped migration, SQL constants and
- * tools/core functions on Postgres. It is the Phase 6 stage gate and the 確かめ方 of
+ * tools/core functions on Postgres, and CI runs it on the VM's image (job "Database checks",
+ * scripts/ci/db-checks.sh). It is the Phase 6 stage gate and the 確かめ方 of
  * server/migrations/README.md.
  *
  *   createdb -h 127.0.0.1 -p 55621 -U postgres verify_p6

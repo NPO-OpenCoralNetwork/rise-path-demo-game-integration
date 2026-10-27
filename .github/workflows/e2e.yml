@@ -1,0 +1,76 @@
+# End-to-end checks (Phase 7, doc/brushup-2026/ai-access-plan.ja.md; owner decisions P1-P5). Each
+# job name is a required check on main. The ruleset lists them by name, so renaming one blocks every
+# pull request until the ruleset changes too (server/tests/e2eWorkflow.test.js pins them).
+# - Database checks: the VM's pinned pgvector image with production's terse error log; every migration
+#   twice, the three verify scripts and the role SQL (scripts/ci/db-checks.sh). ubuntu-24.04: psql 16.
+# Every step has its own timeout, and each job's is at least the sum of its steps' plus 2 min (job set-up
+# and post steps): a hang fails its step before the job times out, so the failure() steps still keep the
+# logs (a job timeout cancels the job, and a cancelled job skips them).
+# No secrets: pull requests from forks run every job. Locally: npm run ci:db.
+name: End-to-end checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 18:17 UTC = 03:17 JST: far from 00:00 JST (15:00 UTC), when learning days change. Catches drift
+    # in what no commit pins (the runner image with its psql and Docker, Node 22, npm) on quiet days.
+    - cron: '17 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # A new push to a pull request cancels its older run. A running push or nightly run is never
+  # cancelled; GitHub keeps one pending run per group, so a newer push to main replaces a pending one.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    # bash -eo pipefail: a failing command before `| tee` fails its step.
+    shell: bash
+
+env:
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+
+jobs:
+  db:
+    name: Database checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        # 5 min, 20 × the slowest measured run (15 s): a slow npm cache restore still passes.
+        timeout-minutes: 5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci --ignore-scripts
+
+      - name: Migrations, verify scripts and role SQL on the VM's PostgreSQL image
+        timeout-minutes: 20
+        env:
+          RISEPATH_CI_OUT: ${{ runner.temp }}/db-checks
+        run: bash scripts/ci/db-checks.sh
+
+      - name: Keep the outputs and the PostgreSQL log
+        if: failure()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-checks-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/db-checks
+          retention-days: 7
+          if-no-files-found: ignore

@@ -2,10 +2,11 @@
 // @ts-check
 /**
  * Proves migration 019 (Phase 5: one-lesson reset, XP ledger, learning days) and the server code
- * that uses it on a real, THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). CI
- * has no Postgres, so npm test pins the SQL text (server/tests/migration019.test.js) and runs the
- * code on in-memory fakes; this script runs the shipped SQL constants and tools/core functions on
- * Postgres. It is the Phase 5 stage gate and the 確かめ方 of server/migrations/README.md.
+ * that uses it on a real, THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). npm
+ * test pins the SQL text without a database (server/tests/migration019.test.js) and runs the code on
+ * in-memory fakes; this script runs the shipped SQL constants and tools/core functions on Postgres,
+ * and CI runs it on the VM's image (job "Database checks", scripts/ci/db-checks.sh). It is the Phase 5
+ * stage gate and the 確かめ方 of server/migrations/README.md.
  *
  *   createdb -h 127.0.0.1 -p 55461 -U postgres verify_p5
  *   node scripts/db/verify-phase5.mjs --url postgres://postgres@127.0.0.1:55461/verify_p5

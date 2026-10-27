@@ -31,6 +31,7 @@
     "test": "node --experimental-strip-types --test server/tests/*.test.js",
     "typecheck": "tsc --noEmit",
     "lint:arch": "node --test server/tests/architectureBoundaries.test.js",
+    "ci:db": "bash scripts/ci/db-checks.sh",
     "audit:prod": "npm audit --omit=dev",
     "lessons:validate": "node scripts/lessons/validate.mjs",
     "lessons:lint": "node scripts/lessons/lint.mjs",

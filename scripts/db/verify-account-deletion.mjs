@@ -2,9 +2,10 @@
 // @ts-check
 /**
  * Proves migration 018 (account deletion, proof of consent) and the deleted-account checks on a
- * real, THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). CI has no Postgres,
- * so npm test pins the SQL text (server/tests/migration018.test.js, accountState.test.js); this
- * script runs it. It is the stage gate of Phase 4 and the 確かめ方 of server/migrations/README.md.
+ * real, THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). npm test pins the SQL
+ * text without a database (server/tests/migration018.test.js, accountState.test.js); CI runs this
+ * script on the VM's image (job "Database checks", scripts/ci/db-checks.sh). It is the stage gate of
+ * Phase 4 and the 確かめ方 of server/migrations/README.md.
  *
  *   createdb -h 127.0.0.1 -p 55441 -U postgres verify
  *   node scripts/db/verify-account-deletion.mjs --url postgres://postgres@127.0.0.1:55441/verify
@@ -1073,6 +1074,23 @@ async function readServerLog(pool, logFile, offset = 0) {
     return { text: String(read.text ?? ''), size, source: 'pg_current_logfile()' };
 }
 
+/**
+ * The server log from `offset`, read again every 100 ms until every marker has its STATEMENT line
+ * (terse keeps STATEMENT) or `ms` passed; then the last read, and the checks report what is missing.
+ * The tests pass their own `sleep` and `now` (server/tests/verifyAccountDeletion.test.js).
+ * @param {pg.Pool} pool @param {string} logFile @param {number} offset @param {string[]} markers @param {number} ms
+ * @param {{ sleep?: (ms: number) => Promise<unknown>, now?: () => number }} [clock]
+ */
+export async function readLogUntil(pool, logFile, offset, markers, ms, { sleep: wait = sleep, now = Date.now } = {}) {
+    const end = now() + ms;
+    for (;;) {
+        const log = await readServerLog(pool, logFile, offset);
+        const lines = (log?.text ?? '').split('\n');
+        if (markers.every((marker) => lines.some((line) => line.includes('STATEMENT:') && line.includes(marker))) || now() >= end) return log;
+        await wait(100);
+    }
+}
+
 /** @param {pg.Pool} pool @param {string} logFile */
 async function r11(pool, logFile) {
     const start = await readServerLog(pool, logFile);
@@ -1088,7 +1106,9 @@ async function r11(pool, logFile) {
     try {
         for (const verbosity of cases) {
             ids[verbosity] = uid(`r11${verbosity[0]}`);
-            await client.query(`SET log_error_verbosity = ${verbosity}`);
+            // Quoted: a bare `default` is SET's DEFAULT keyword (the server's own setting, terse on the
+            // VM and in CI: docker-compose.yml db.command), not the value default.
+            await client.query(`SET log_error_verbosity = '${verbosity}'`);
             // A foreign key refusal with a bound parameter, as the api's statements are sent.
             await client.query(`/* r11-${verbosity}-${nonce} */ INSERT INTO jobs (user_id, type) VALUES ($1::uuid, 'ingest')`, [ids[verbosity]])
                 .then(() => { throw new Error('the insert was not refused'); }, (error) => {
@@ -1099,8 +1119,9 @@ async function r11(pool, logFile) {
     } finally {
         client.release();
     }
-    await sleep(300); // the server writes its log asynchronously
-    const log = await readServerLog(pool, logFile, start.size);
+    // The logging collector writes asynchronously: read again until both statements are in (≤ 5 s),
+    // instead of a fixed wait that a busy runner can outlast.
+    const log = await readLogUntil(pool, logFile, start.size, cases.map((verbosity) => `r11-${verbosity}-${nonce}`), 5_000);
     const entries = (log?.text ?? '').split('\n');
     /** The ERROR … STATEMENT lines of one case. @param {string} verbosity */
     const block = (verbosity) => {
