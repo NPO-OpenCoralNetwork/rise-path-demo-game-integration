@@ -34,6 +34,7 @@ import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
 import { describeError, redactUrl } from './server/utils/redactUrl.js';
+import { isDbUnavailable } from './tools/core/dbErrors.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -56,6 +57,9 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/** Retry-After of a 503 for a database that cannot be reached (the last error handler). */
+const DB_RETRY_AFTER_SECONDS = 10;
 
 // --- Environment ---
 const loadEnvFile = async (filename) => {
@@ -384,11 +388,14 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
     // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
     // sent: Express's own handler sends the stack (database text included) outside production. The
-    // line has its name, code and message only: a pg error's detail holds values (Phase 4).
+    // line has its name, code and message only: a pg error's detail holds values (Phase 4). A
+    // database that cannot be reached is a 503 with Retry-After, so clients try again later.
     app.use((err, req, res, next) => {
         if (res.headersSent) return next(err);
         const code = err?.status ?? err?.statusCode;
-        const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
+        const unavailable = isDbUnavailable(err);
+        if (unavailable) res.set('Retry-After', String(DB_RETRY_AFTER_SECONDS));
+        const status = unavailable ? 503 : Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
         if (status >= 500) console.error(`[Server] ${req.method} ${redactUrl(req.originalUrl)} failed: ${describeError(err)}`);
         res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
     });

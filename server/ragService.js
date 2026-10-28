@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import { createRequire } from 'module';
 import { getPool } from './db.js';
+import { describeError } from './utils/redactUrl.js';
 // Embeddings are shared with the MCP rag-search tool so ingest and query always use one model.
 import {
     EMBEDDING_DIM,
@@ -151,14 +152,16 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             await client.query('COMMIT');
             console.log(`Ingested material ${materialId}: ${chunks.length} chunks${vectors ? '' : ' (embeddings off: keyword search only)'}`);
         } catch (e) {
-            await client.query('ROLLBACK');
+            // A lost connection makes ROLLBACK fail too; keep the original error.
+            await client.query('ROLLBACK').catch(() => {});
             throw e;
         } finally {
             client.release();
         }
         return { chunks: chunks.length, embedded: vectors ? vectors.length : 0 };
     } catch (e) {
-        console.error("Ingestion failed:", e);
+        // Name, code and message only: a pg error's detail holds values (Phase 4).
+        console.error(`Ingestion failed: ${describeError(e)}`);
         if (e && typeof e === 'object' && !('ingestStage' in e)) e.ingestStage = stage;
         throw e;
     }
@@ -232,40 +235,5 @@ export const retrieveContext = async (query, limit = 3, userId) => {
     } catch (e) {
         console.error("   [RAG] Retrieval failed:", e);
         return [];
-    }
-};
-
-export const getFullMaterialText = async (materialId) => {
-    const pool = getPool();
-    if (!pool) return "";
-    
-    try {
-        const result = await pool.query(
-            `SELECT content FROM material_chunks 
-             WHERE material_id = $1 
-             ORDER BY chunk_index ASC`,
-            [materialId]
-        );
-        return result.rows.map(row => row.content).join("\n");
-    } catch (e) {
-        console.error("Full text retrieval failed:", e);
-        return "";
-    }
-};
-
-export const getMaterialDetails = async (materialId) => {
-    const pool = getPool();
-    if (!pool) return null;
-    
-    try {
-        const result = await pool.query(
-            `SELECT storage_path, type FROM materials WHERE id = $1`,
-            [materialId]
-        );
-        if (result.rows.length === 0) return null;
-        return result.rows[0];
-    } catch (e) {
-        console.error("Material details retrieval failed:", e);
-        return null;
     }
 };
