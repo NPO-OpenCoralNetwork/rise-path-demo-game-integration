@@ -6,7 +6,8 @@
  * - The shell did not match the page: the light Web track pages had the dark shell, the dark Vibe
  *   prologue and Sonic Lab pages had the light one, and the lower-case ViewState values
  *   ('programming_vibe', 'programming_ai') never matched the dark checks.
- * - Signing in from a shared link landed on the dashboard instead of the shared page.
+ * - Signing in from a shared link landed on the dashboard instead of the shared page (a waiting AI-app
+ *   connection request still comes first).
  * - Reading or writing the language in localStorage threw where storage is blocked.
  */
 import { describe, it } from 'node:test';
@@ -16,8 +17,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveMermaidSource } from '../../components/features/ai/mermaidSource.ts';
 import { shellThemeForView } from '../../components/common/shellTheme.ts';
-import { trackViewForPath, withoutTrailingSlash, startsWithSegment } from '../../navigation/pathViews.ts';
-import { authReturnTarget, isInAppPath } from '../../navigation/authReturn.ts';
+import { trackViewForPath, normalizePath, startsWithSegment } from '../../navigation/pathViews.ts';
+import { authReturnTarget, isInAppPath, postSignInPath } from '../../navigation/authReturn.ts';
 import { readStoredLanguage, writeStoredLanguage, LANGUAGE_STORAGE_KEY } from '../../context/languageStorage.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -37,15 +38,12 @@ const themeOf = (view) => {
 };
 
 describe('resolveMermaidSource', () => {
-    it('uses chart, or code when chart is missing or empty', () => {
+    it('uses chart', () => {
         assert.equal(resolveMermaidSource({ chart: 'graph TD;A-->B' }), 'graph TD;A-->B');
-        assert.equal(resolveMermaidSource({ code: 'graph TD;A-->B' }), 'graph TD;A-->B');
-        assert.equal(resolveMermaidSource({ chart: '   ', code: 'graph LR;X-->Y' }), 'graph LR;X-->Y');
-        assert.equal(resolveMermaidSource({ chart: 'graph TD;A', code: 'graph LR;B' }), 'graph TD;A');
     });
 
-    it('returns null when there is nothing to draw', () => {
-        for (const block of [null, undefined, {}, { chart: '' }, { chart: 42 }, { code: ['x'] }]) {
+    it('returns null when there is nothing to draw (no guess from other fields)', () => {
+        for (const block of [null, undefined, {}, { chart: '' }, { chart: '   ' }, { chart: 42 }, { code: 'graph TD;A-->B' }]) {
             assert.equal(resolveMermaidSource(block), null, JSON.stringify(block));
         }
     });
@@ -112,46 +110,94 @@ describe('trackViewForPath: the shell matches each page', () => {
         assert.equal(themeOf(trackViewForPath('/vibe/prologuex')), 'default');
         assert.equal(startsWithSegment('/vibe/prologue/x', '/vibe/prologue'), true);
         assert.equal(startsWithSegment('/vibe/prologuex', '/vibe/prologue'), false);
-        assert.match(read('navigation/viewPaths.ts'), /import \{ startsWithSegment, withoutTrailingSlash \} from '\.\/pathViews'/);
+        // viewPaths.ts imports the ViewState enum, which node cannot strip, so its use is checked in the source.
+        const viewPaths = read('navigation/viewPaths.ts');
+        assert.match(viewPaths, /import \{ normalizePath, startsWithSegment \} from '\.\/pathViews'/);
+        assert.match(viewPaths, /export function pathToNavKey\(pathname: string\)[^{]*\{\s*const path = normalizePath\(pathname\);/);
     });
 
     it('treats a trailing slash like React Router does', () => {
-        assert.equal(withoutTrailingSlash('/vibe/'), '/vibe');
-        assert.equal(withoutTrailingSlash('/programming/web//'), '/programming/web');
-        assert.equal(withoutTrailingSlash('/'), '/');
-        assert.equal(withoutTrailingSlash('//'), '/');
-        assert.equal(themeOf(trackViewForPath(withoutTrailingSlash('/vibe/'))), 'default');
-        assert.equal(themeOf(trackViewForPath(withoutTrailingSlash('/programming/html-css/part2/'))), 'vibe');
+        assert.equal(normalizePath('/vibe/'), '/vibe');
+        assert.equal(normalizePath('/programming/web//'), '/programming/web');
+        assert.equal(normalizePath('/'), '/');
+        assert.equal(normalizePath('//'), '/');
+        assert.equal(themeOf(trackViewForPath(normalizePath('/vibe/'))), 'default');
+        assert.equal(themeOf(trackViewForPath(normalizePath('/programming/html-css/part2/'))), 'vibe');
     });
 
-    it('App derives the view through these helpers, with no second copy of the track rules', () => {
+    it('App derives the view through these helpers, with no second copy of the track rules or of normalizePath', () => {
         const app = read('App.tsx');
-        assert.match(app, /const path = withoutTrailingSlash\(location\.pathname\)/);
-        assert.match(app, /trackViewForPath\(path\)/);
+        assert.match(app, /trackViewForPath\(normalizePath\(path\)\)/);
         assert.doesNotMatch(app, /path(?:\.startsWith\(| === )'\/(?:programming|vibe)/);
+        assert.doesNotMatch(app, /const normalizePath =/);
     });
 });
 
 describe('authReturnTarget', () => {
-    it('returns to the page the visitor was on when no target is given', () => {
+    it('returns to the page the visitor was on, with its query and hash, when no target is given', () => {
         assert.equal(authReturnTarget(undefined, { pathname: '/learn/vibe-coding/vibe-ch3', search: '?s=2' }), '/learn/vibe-coding/vibe-ch3?s=2');
+        assert.equal(authReturnTarget(undefined, { pathname: '/learn/vibe-coding/vibe-ch3', search: '', hash: '#s-intro' }), '/learn/vibe-coding/vibe-ch3#s-intro');
     });
 
     it('prefers an explicit target', () => {
         assert.equal(authReturnTarget('/learn/vibe-coding/vibe-ch1', { pathname: '/library' }), '/learn/vibe-coding/vibe-ch1');
+        assert.equal(authReturnTarget('/learn/vibe-coding/vibe-ch1', { pathname: '/library' }, true), '/learn/vibe-coding/vibe-ch1');
+    });
+
+    it('leaves the return to a waiting AI-app connection request (postSignInTarget) instead of the current page', () => {
+        assert.equal(authReturnTarget(undefined, { pathname: '/learn/vibe-coding/vibe-ch3' }, true), null);
+        assert.equal(authReturnTarget(undefined, { pathname: '/learn/vibe-coding/vibe-ch3' }, false), '/learn/vibe-coding/vibe-ch3');
     });
 
     it('never stores the root (with or without a query) or a path that leaves the app', () => {
         assert.equal(authReturnTarget(undefined, { pathname: '/' }), null);
         assert.equal(authReturnTarget(undefined, { pathname: '/', search: '?ref=x' }), null);
+        assert.equal(authReturnTarget(undefined, { pathname: '/', hash: '#top' }), null);
         for (const target of ['/?ref=x', '/#top', '//evil.example', '/\\evil.example', 'https://evil.example', '']) {
             assert.equal(authReturnTarget(target, { pathname: '/library' }), null, target);
         }
         assert.equal(isInAppPath('/ok'), true);
     });
 
-    it('App.openAuth uses it', () => {
-        assert.match(read('App.tsx'), /authReturnTarget\(returnTo, location\)/);
+    it('never stores a sign-in plumbing page or a hash that can carry tokens, as the implicit target', () => {
+        for (const pathname of ['/auth/callback', '/auth/callback/', '/auth/confirm-pending', '/auth']) {
+            assert.equal(authReturnTarget(undefined, { pathname, search: '?email=a%40b.example', hash: '#access_token=x' }), null, pathname);
+        }
+        assert.equal(
+            authReturnTarget(undefined, { pathname: '/learn/claude-code/cc-05', search: '?s=1', hash: '#access_token=x&refresh_token=y' }),
+            '/learn/claude-code/cc-05?s=1',
+        );
+        // /oauth/consent passes its own path explicitly (OAuthConsentView), so an explicit target is kept.
+        assert.equal(authReturnTarget('/oauth/consent?authorization_id=abc', { pathname: '/oauth/consent' }), '/oauth/consent?authorization_id=abc');
+    });
+
+    it('App.openAuth uses it, and App keeps no second copy of the path check', () => {
+        const app = read('App.tsx');
+        assert.match(app, /consentWaiting = pendingConsentReturnPath\(readLocalStorage\(\)\)\s*!==\s*null/);
+        assert.match(app, /authReturnTarget\(\s*returnTo,\s*location,\s*consentWaiting\s*\)/);
+        assert.match(app, /from '\.\/navigation\/authReturn'/);
+        assert.doesNotMatch(app, /const isInAppPath =/);
+    });
+});
+
+describe('postSignInPath: where sign-in lands', () => {
+    const CONSENT = '/oauth/consent?authorization_id=abc';
+
+    it('the saved in-app path first, then a waiting AI-app connection request, then the dashboard', () => {
+        assert.equal(postSignInPath('/learn/claude-code/cc-05#s-1', CONSENT), '/learn/claude-code/cc-05#s-1');
+        assert.equal(postSignInPath(null, CONSENT), CONSENT);
+        assert.equal(postSignInPath(null, null), '/');
+    });
+
+    it('ignores a saved path that leaves the app', () => {
+        for (const saved of ['//evil.example', '/\\evil.example', 'https://evil.example', '']) {
+            assert.equal(postSignInPath(saved, null), '/', saved);
+            assert.equal(postSignInPath(saved, CONSENT), CONSENT, saved);
+        }
+    });
+
+    it("App's postSignInTarget uses it with the consent request", () => {
+        assert.match(read('App.tsx'), /return postSignInPath\(\s*saved,\s*pendingConsentReturnPath\(readLocalStorage\(\)\)\s*\)/);
     });
 });
 

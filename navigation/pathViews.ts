@@ -2,8 +2,8 @@
 // background. Only a type import (erased at run time), so node:test can check it.
 import type { ViewState } from '../types';
 
-/** "/vibe/" and "/vibe" are the same route to React Router, so the view checks see one form. */
-export const withoutTrailingSlash = (pathname: string): string =>
+/** "/vibe/" and "/vibe" are the same route to React Router: one form for the checks ("//" is "/"). */
+export const normalizePath = (pathname: string): string =>
     pathname.length > 1 ? pathname.replace(/\/+$/, '') || '/' : pathname;
 
 /** The prefix itself or a path under it: "/vibe/prologue/x", but not "/vibe/prologuex". */
@@ -19,7 +19,7 @@ const LIGHT_PROGRAMMING_PAGES = new Set(['/programming', '/programming/web', '/p
  *   redirect, to the lesson reader or back to the course page).
  * - Dark shell: the other Programming pages (AI and Python tracks, the course path, HTML/CSS part 2,
  *   the inspector) and the Vibe prologue.
- * @param path a pathname without a trailing slash (see withoutTrailingSlash)
+ * @param path a pathname without a trailing slash (see normalizePath)
  */
 export const trackViewForPath = (path: string): `${ViewState}` | null => {
     if (LIGHT_PROGRAMMING_PAGES.has(path)) return 'programming_web';

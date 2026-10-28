@@ -1882,7 +1882,7 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
         }
 
         case 'mermaid': {
-            // `chart`, or `code` in drafts saved over MCP; a block with neither is not drawn.
+            // A block without `chart` (drafts saved over MCP are not checked) is not drawn.
             const source = resolveMermaidSource(block);
             return source ? <MermaidBlock chart={source} caption={block.caption} language={language} /> : null;
         }

@@ -1,5 +1,5 @@
 import { ViewState } from '../types';
-import { startsWithSegment, withoutTrailingSlash } from './pathViews';
+import { normalizePath, startsWithSegment } from './pathViews';
 
 /**
  * ViewState → URL. Every ViewState must have an entry (Record enforces it), so
@@ -195,7 +195,7 @@ const DEMO_KEYS: Record<string, NavKey> = {
 
 /** Which sidebar entry the URL belongs to, or null when none should be highlighted. */
 export function pathToNavKey(pathname: string): NavKey | null {
-  const path = withoutTrailingSlash(pathname);
+  const path = normalizePath(pathname);
 
   if (path === '/' || path === '') return 'dashboard';
   if (startsWithSegment(path, '/course-generator')) return 'generator';

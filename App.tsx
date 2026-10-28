@@ -8,8 +8,8 @@ import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
 import UnsavedLogoutDialog from './components/lesson/UnsavedLogoutDialog';
 import SaveStoppedNotice from './components/lesson/SaveStoppedNotice';
 import { VIEW_PATHS } from './navigation/viewPaths';
-import { trackViewForPath, withoutTrailingSlash } from './navigation/pathViews';
-import { isInAppPath, authReturnTarget } from './navigation/authReturn';
+import { normalizePath, trackViewForPath } from './navigation/pathViews';
+import { authReturnTarget, postSignInPath } from './navigation/authReturn';
 import { features } from './config/features';
 import { syncLegalGate, useLegalGate } from './components/legal/legalGateClient';
 import LegalNoticeBar from './components/legal/LegalNoticeBar';
@@ -117,7 +117,6 @@ import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthCo
 const RETURN_TO_KEY = 'rp:returnTo';
 /** Pages open when signed out; they render outside the Layout then. */
 const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/terms', '/privacy', '/account/deleted']);
-const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 /**
  * Pages that stay open while the signed-in learner has not accepted a terms version that requires
  * acceptance (Phase 4, design §4.3, finding 17): reading the texts and every public page, deleting
@@ -152,14 +151,14 @@ const readLocalStorage = (): Storage | null => {
  * the dashboard. `consume` clears the saved path.
  */
 const postSignInTarget = (consume: boolean): string => {
+  let saved: string | null = null;
   try {
-    const saved = sessionStorage.getItem(RETURN_TO_KEY);
+    saved = sessionStorage.getItem(RETURN_TO_KEY);
     if (consume) sessionStorage.removeItem(RETURN_TO_KEY);
-    if (saved && isInAppPath(saved)) return saved;
   } catch {
     // Storage blocked: fall through.
   }
-  return pendingConsentReturnPath(readLocalStorage()) ?? '/';
+  return postSignInPath(saved, pendingConsentReturnPath(readLocalStorage()));
 };
 
 /** Signed in on /auth/callback or /auth/confirm-pending (the session arrived first): forward once. */
@@ -190,7 +189,7 @@ const AppContent: React.FC = () => {
   // Derive current view from location for Layout highlight
   // This is a simple mapping for the Layout's navigation prop
   const getCurrentViewState = (): ViewState => {
-    const path = withoutTrailingSlash(location.pathname);
+    const path = location.pathname;
     if (path === '/') return ViewState.DASHBOARD;
     if (path === '/learning-hub') return ViewState.LEARNING_HUB;
     if (path.startsWith('/courses')) return ViewState.COURSES;
@@ -232,8 +231,8 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/course-generator')) return ViewState.COURSE_GENERATOR;
     if (path.startsWith('/characters') || path.startsWith('/character')) return ViewState.AI_CHARACTERS;
     if (path.startsWith('/blender')) return ViewState.BLENDER;
-    // /programming and /vibe: light or dark shell to match each page.
-    const trackView = trackViewForPath(path);
+    // /programming and /vibe: light or dark shell to match each page ("/vibe/" is "/vibe").
+    const trackView = trackViewForPath(normalizePath(path));
     if (trackView) return trackView as ViewState;
     if (path.startsWith('/art')) return ViewState.ART_MUSEUM;
     if (path.startsWith('/sonic')) return ViewState.SONIC_LAB;
@@ -287,10 +286,12 @@ const AppContent: React.FC = () => {
   };
 
   // In-app path to open after sign-in: the landing's "read chapter 1" CTA when guest access is
-  // off, or else the page the visitor opened (a shared lesson link shows the landing at that URL).
+  // off; else, unless an AI app's connection request is waiting (postSignInTarget returns to it),
+  // the page the visitor opened (a shared lesson link shows the landing at that URL).
   // sessionStorage, so it survives the OAuth redirect through /auth/callback.
   const openAuth = (mode: AuthMode, returnTo?: string) => {
-    const target = authReturnTarget(returnTo, location);
+    const consentWaiting = pendingConsentReturnPath(readLocalStorage()) !== null;
+    const target = authReturnTarget(returnTo, location, consentWaiting);
     try {
       if (target) sessionStorage.setItem(RETURN_TO_KEY, target);
       else sessionStorage.removeItem(RETURN_TO_KEY);
