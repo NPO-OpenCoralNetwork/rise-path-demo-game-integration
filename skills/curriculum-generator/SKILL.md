@@ -21,7 +21,7 @@ version: 1.0.0
    - 詳細は `references/big5_mapping.md` 参照
 
 ### Step 2: 既存コンテンツ検索
-1. `rag-search` ツールでRise Pathの既存教材を検索する
+1. `rag-search` ツールで学習者本人がアップロードした教材を検索する（Rise Path のコース教材は対象外）
 2. 関連する既存レッスンがあればユーザーに提案する
 3. 既存コンテンツがない場合、新規生成に進む
 
@@ -35,7 +35,7 @@ version: 1.0.0
    - `analogy`: 理解を助けるアナロジー
 
 ### Step 4: コンテンツ生成
-1. `rag-search` で関連する既存コンテンツを検索する
+1. `rag-search` で学習者本人の教材から関連箇所を検索する
 2. `get-generation-kit` でテンプレートとスキーマを取得する
 3. LLM自身がカリキュラムJSONを生成する
 4. `validate-intake` で要件をバリデーションする

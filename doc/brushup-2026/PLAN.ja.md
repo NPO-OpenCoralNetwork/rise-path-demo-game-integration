@@ -147,7 +147,7 @@
 | コードのハイライト、コピー、`prompt` ブロック | Vibe Coding の主役である「AIへの指示文」をきちんと見せるため | P1 |
 | 段落アンカー付きの AI先生（ソクラテス式） | 教材の文脈を知ったチューターが最も効果的だから | P1〜P2 |
 | 正直な進捗（既読・回答済み・習熟）と再開機能 | 偽の進捗を廃止するため | P1 |
-| FSRS による復習キュー（「今日の復習 n 枚」） | 分散学習の仕組み。現状は存在しない | P2 |
+| FSRS による復習キュー（「今日の復習 n 枚」） | 分散学習の仕組み。計画を作った当時は存在しませんでした。Phase 6 で、レッスンの暗記カードの分を作りました（[ai-access-plan.ja.md](ai-access-plan.ja.md) の 10 章）。確認問題と AI チューターのカードは、まだ入りません | P2 |
 | ブロックから自動で作るスライドとナレーション（Kokoro） | PDF に依存したスライドが全滅しているため | P2 |
 | 練習モード（間違えた問題だけ解き直す） | 確認テストの集約 | P2 |
 | Claude Code 用の制作キット（skill、subagent、hook、プレビュー） | 差別化の核 | P0〜P1 |
@@ -1091,7 +1091,7 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
     - 表紙は World のグラデーションと記号で生成する。画像を使う場合は `onError` で生成表紙に切り替える。`alt=""`。
     - 2 行で省略するタイトル、メタ情報（レッスン数・所要時間）、進捗バー。
   - `EmptyState.tsx`
-  - `ProgressCluster.tsx`（連続日数と Lv / XP は `gamificationService` の実データ。ゼロ状態の文言付き。`.tabular`）
+  - `ProgressCluster.tsx`（連続日数と Lv / XP は実データ。ゼロ状態の文言付き。`.tabular`。作った当時はブラウザの `gamificationService` から計算していました。Phase 5 からは、サーバーの記録から数えた値（`useAchievements`。[ai-access-plan.ja.md](ai-access-plan.ja.md) の 9 章）を出します）
 - **変更するファイル:**
   - `components/features/dashboard/MissionControlDashboard.tsx`
     - 見出しは `PageHeader`（ゴシックの H1「おかえりなさい、{name} さん」。字間を広げた小見出しは使わない）。

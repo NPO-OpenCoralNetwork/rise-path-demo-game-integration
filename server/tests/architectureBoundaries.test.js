@@ -5,6 +5,9 @@
  *   tools/core/**, server/services/** ↛ server/routes/**, mcp-server/**
  *   components/**                     ↛ server/**
  * tools/core → server/services is allowed (the MCP tools reuse the server's domain services).
+ * And one fence (Phase 7): nothing outside e2e/, server/tests/ and playwright.config.ts imports e2e/,
+ * so the end-to-end suite and its Supabase Auth stand-in (e2e/support/auth-stand-in.mjs) never reach
+ * production code.
  *
  * Every import form counts: static import, `export … from`, dynamic import() with a string and
  * require(). Specifiers are found with TypeScript's preProcessFile (already a dev dependency),
@@ -104,6 +107,32 @@ export function violationsIn(file, text) {
   return out;
 }
 
+/**
+ * Root folders the e2e fence does not walk: e2e/ itself, tooling output and git. data/ is walked: its
+ * .ts files (data/curricula/**, data/tts, data/glossary) are front-end code that Vite bundles.
+ */
+const E2E_FENCE_SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.artifacts', 'e2e']);
+/** Root files that may import e2e/ (the Playwright config reads e2e/support/env.ts). */
+const E2E_FENCE_SKIP_FILES = new Set(['playwright.config.ts']);
+
+/**
+ * Imports of e2e/ in one file's text, as `<file>:<line> imports "<specifier>"`.
+ * @param {string} file repo-relative path
+ * @param {string} text
+ */
+export function e2eImportsIn(file, text) {
+  return importsOf(text).filter(({ specifier }) => {
+    const target = resolveSpecifier(file, specifier);
+    return target !== null && under(target, 'e2e');
+  }).map(({ specifier, line }) => `${file}:${line} imports "${specifier}"`);
+}
+
+/** Every source file the e2e fence checks: the repo outside the skipped folders and server/tests/. */
+const fenceFiles = () => fs.readdirSync(ROOT, { withFileTypes: true }).flatMap((entry) => {
+  if (entry.isDirectory()) return E2E_FENCE_SKIP_DIRS.has(entry.name) ? [] : sourceFiles(entry.name);
+  return entry.isFile() && SOURCE_EXT.test(entry.name) && !entry.name.endsWith('.d.ts') && !E2E_FENCE_SKIP_FILES.has(entry.name) ? [entry.name] : [];
+}).filter((file) => !under(file, 'server/tests'));
+
 const scanned = RULES.map((r) => r.from).flatMap(sourceFiles);
 const violations = [...new Set(scanned)].flatMap((file) => violationsIn(file, fs.readFileSync(path.join(ROOT, file), 'utf8')));
 const keyOf = (v) => `${v.file} -> ${v.target}`;
@@ -119,6 +148,17 @@ describe('architecture boundaries (lint:arch)', () => {
     const unexpected = violations.filter((v) => !Object.hasOwn(ALLOWED, keyOf(v)))
       .map((v) => `${v.file}:${v.line} imports "${v.specifier}" (${v.rule})`);
     assert.deepEqual(unexpected, [], 'Move the shared logic down a layer (e.g. into shared/ or tools/core/) instead of importing upward.');
+  });
+
+  it('nothing outside e2e/, server/tests/ and playwright.config.ts imports e2e/ (the auth stand-in stays out of production code)', () => {
+    const files = fenceFiles();
+    for (const must of ['server.js', 'vite.config.ts']) assert.ok(files.includes(must), `the fence scans ${must}`);
+    for (const dir of ['server/routes', 'server/middleware', 'tools/core', 'mcp-server', 'services', 'components', 'scripts', 'data/curricula']) {
+      assert.ok(files.some((f) => under(f, dir)), `the fence scans ${dir}/`);
+    }
+    assert.ok(!files.some((f) => under(f, 'server/tests') || under(f, 'e2e')), 'server/tests/ and e2e/ may import e2e/');
+    const found = files.flatMap((file) => e2eImportsIn(file, fs.readFileSync(path.join(ROOT, file), 'utf8')));
+    assert.deepEqual(found, [], 'e2e/ is test code only: production code must never import it (move shared logic out of e2e/ instead).');
   });
 
   it('every allowlisted violation still exists and has a TODO', () => {
@@ -153,5 +193,25 @@ describe('architecture boundary detection', () => {
     assert.deepEqual(violationsIn('server/routes/x.js', "import s from '../../mcp-server/index.js';"), []);
     // "server-utils" is not under "server/".
     assert.deepEqual(violationsIn('shared/x.js', "import s from '../server-utils/a.js';"), []);
+  });
+
+  it('e2eImportsIn finds relative, @/, dynamic and require imports of e2e/, and ignores e2e2/, comments and packages', () => {
+    const text = [
+      "import { startAuthStandIn } from '../../e2e/support/auth-stand-in.mjs';",
+      "export { E2E } from '@/e2e/support/env.ts';",
+      "const m = await import('../e2e');", // from server/routes/ that is server/e2e, not e2e/
+      "const r = require('../../e2e/fixtures.ts');",
+      "import x from '../../e2e2/support/x.js';",
+      "// import y from '../../e2e/support/comment.js';",
+      "import z from 'e2e/support/package-name';",
+      "import w from '../e2e-tools/w.js';",
+    ].join('\n');
+    assert.deepEqual(e2eImportsIn('server/routes/health.js', text), [
+      'server/routes/health.js:1 imports "../../e2e/support/auth-stand-in.mjs"',
+      'server/routes/health.js:2 imports "@/e2e/support/env.ts"',
+      'server/routes/health.js:4 imports "../../e2e/fixtures.ts"',
+    ]);
+    assert.deepEqual(e2eImportsIn('server/x.js', "const m = await import('../e2e');"), ['server/x.js:1 imports "../e2e"'], 'the folder itself');
+    assert.deepEqual(e2eImportsIn('playwright.config.ts', "import { E2E } from './e2e/support/env.ts';"), ['playwright.config.ts:1 imports "./e2e/support/env.ts"'], 'the helper reports; the walk skips the allowed importers');
   });
 });

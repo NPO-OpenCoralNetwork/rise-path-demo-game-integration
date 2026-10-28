@@ -5,6 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 RUN pip install --no-cache-dir "memanto==0.2.3" "moorcheh-client"
 RUN useradd -m --shell /bin/false --uid 1001 memanto
+# The data volume mounts here. A new empty named volume takes this owner, so uid 1001 can write it.
+RUN install -d -o memanto -g memanto ~memanto/.memanto
 USER memanto
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \

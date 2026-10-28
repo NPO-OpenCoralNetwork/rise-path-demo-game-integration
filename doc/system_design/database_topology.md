@@ -103,7 +103,7 @@ npm run env:check -- --db
 | ai-note-meet（`nexloom-gce`） | **別 VM・別 Hermes** — Rise Path から参照しない |
 | 開発者個人 Hermes（`default` プロファイル） | Rise Path 本番では使わない |
 | Rise Path | 専用 `rise-path` プロファイル + MCP `rise_path` allowlist |
-| 学習者（エンドユーザー） | 1 台の Hermes が `rp:user:{uuid}` でデータスコープ（VM 増設不要） |
+| 学習者（エンドユーザー） | 1 台の Hermes がチャット 1 ターンごとの `rp_turn`（Express が発行、`agent_session_binding`）でデータスコープ（VM 増設不要、[`hermes/README.md`](../../hermes/README.md)） |
 
 ## オブジェクトストレージ（GCS）
 

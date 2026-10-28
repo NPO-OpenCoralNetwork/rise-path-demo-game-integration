@@ -10,6 +10,7 @@ import {
 import { ViewState } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useTheme } from '../../../context/ThemeContext';
+import { features } from '../../../config/features';
 import {
   getLifeJournalAnalysis,
   type LifeJournalAnalysisResult,
@@ -277,14 +278,17 @@ const LifeJournalInsightsView: React.FC<LifeJournalInsightsViewProps> = ({ onNav
       )}
 
       <div className="flex flex-wrap gap-4 pt-2">
-        <button
-          type="button"
-          onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-        >
-          <Sparkles size={16} />
-          {t.askCoach}
-        </button>
+        {/* The shared Hermes chat: shown only when features.agentChat is on. */}
+        {features.agentChat && (
+          <button
+            type="button"
+            onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            <Sparkles size={16} />
+            {t.askCoach}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onNavigate(ViewState.LIFE_JOURNAL_MONTHLY)}

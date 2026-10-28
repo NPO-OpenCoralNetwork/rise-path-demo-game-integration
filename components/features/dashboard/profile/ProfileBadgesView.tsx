@@ -1,175 +1,316 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Trophy,
-  Sparkles,
+  Award,
+  BookOpenCheck,
+  CircleCheck,
+  CloudOff,
   Flame,
-  Shield,
+  GraduationCap,
+  LockKeyhole,
   Medal,
-  Crown,
-  Gem,
-  LockKeyhole
+  RotateCw,
+  Trophy,
+  type LucideIcon,
 } from 'lucide-react';
-import { useLanguage } from '../../../../context/LanguageContext';
+import { useLanguage, type Language } from '../../../../context/LanguageContext';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getLearningEvents, getAllProgress } from '../../../../services/progressService';
+import { getCourse } from '../../../../content';
+import { resolveText } from '../../../../shared/lesson/text.js';
+import PageHeader from '../../../ui/PageHeader';
+import EmptyState from '../../../ui/EmptyState';
+import { Button } from '../../../ui/Button';
+import { trackCopy } from '../../../ui/tracks';
+import { reloadAchievements, useAchievements, type AchievementsSnapshot } from '../../../ui/achievementsClient';
+import type { Badge, BadgeId } from '../../../../services/achievementsApi';
+
+/**
+ * Badges (Phase 5, design §3.5, §3.7): counted by the server from the learning records saved to
+ * the account (useAchievements), never from this browser. Seven badges: lessons or Blender stages
+ * finished (1, 5, 15), one course and three courses finished (the lessons published now), and
+ * learning 3 or 7 days in a row (Japan time). A badge once earned stays (a reset or delete keeps
+ * it). Words of an award appear only on earned badges (G20); an unearned badge shows its
+ * progress (streak badges: the current streak, not the best, finding 8). The "next badge" card
+ * shows the unearned badge nearest to done.
+ * States: loading (a status line), unavailable (try again), unsupported (an older server) and
+ * no_account (no Rise Path account signed in) say so without numbers.
+ * Try again keeps its button mounted while it loads (aria-disabled, focus stays on it); a status
+ * line says it is loading (screen readers only: the button says so) and, when it fails again,
+ * visibly, that badges still can't be shown; on success
+ * focus goes to the next-badge heading. Headings: h1, the next badge (h2), all badges (h2) over
+ * each badge's name (h3).
+ */
+/** The try-again button's request: running, or it failed again (the status line says so). */
+export type BadgesRetry = 'busy' | 'failed' | null;
+
+const copy = {
+  en: {
+    title: 'Badges',
+    subtitle: 'Counted from the learning records saved to your account.',
+    longest: (n: number) => (n === 1 ? 'Longest streak: 1 day' : `Longest streak: ${n} days`),
+    next: (name: string) => `Next badge: ${name}`,
+    allEarned: 'You have every badge',
+    earned: 'Earned',
+    toGo: (current: number, goal: number) => `${current} / ${goal} · ${goal - current} to go`,
+    streakToGo: (c: number, r: number) => `${c} ${c === 1 ? 'day' : 'days'} in a row now; ${r} more ${r === 1 ? 'day' : 'days'} in a row to earn it`,
+    course: (name: string) => `${name}: `,
+    loading: 'Loading…',
+    unavailableTitle: "Badges can't be shown right now.",
+    unavailableBody: 'Please try again later.',
+    retry: 'Try again',
+    retryFailed: "Badges still can't be shown. Please try again later.",
+    unsupported: 'Badges will be available soon.',
+    noAccount: 'XP and badges are recorded when you sign in with a Rise Path account.',
+    listLabel: 'All badges',
+    badges: {
+      first_lesson: { name: 'First lesson done', rule: 'Finish one lesson or stage' },
+      five_lessons: { name: 'Five lessons done', rule: 'Finish five lessons or stages' },
+      fifteen_lessons: { name: 'Fifteen lessons done', rule: 'Finish fifteen lessons or stages' },
+      first_course: { name: 'Course complete', rule: 'Finish every lesson now published in one course' },
+      three_courses: { name: 'Three courses complete', rule: 'Finish every lesson of three courses' },
+      streak_3: { name: '3-day streak', rule: 'Learn three days in a row (Japan time)' },
+      streak_7: { name: '7-day streak', rule: 'Learn seven days in a row (Japan time)' },
+    } as Record<BadgeId, { name: string; rule: string }>,
+  },
+  jp: {
+    title: 'バッジ',
+    subtitle: 'アカウントに保存された学習の記録から数えています。',
+    longest: (n: number) => `いちばん長い連続: ${n} 日`,
+    next: (name: string) => `次のバッジ: ${name}`,
+    allEarned: 'すべてのバッジを獲得しました',
+    earned: '獲得済み',
+    toGo: (current: number, goal: number) => `${current} / ${goal}・あと ${goal - current}`,
+    streakToGo: (c: number, r: number) => `いまの連続 ${c} 日。あと ${r} 日つづけると獲得`,
+    course: (name: string) => `${name}：`,
+    loading: '読み込んでいます…',
+    unavailableTitle: 'いまはバッジを表示できません。',
+    unavailableBody: 'しばらくしてから、もう一度お試しください。',
+    retry: 'もう一度読み込む',
+    retryFailed: 'まだバッジを表示できません。しばらくしてから、もう一度お試しください。',
+    unsupported: 'バッジは、まもなく使えるようになります。',
+    noAccount: 'XP とバッジは、Rise Path のアカウントでログインすると記録されます。',
+    listLabel: 'すべてのバッジ',
+    badges: {
+      first_lesson: { name: 'はじめてのレッスン完了', rule: 'レッスンかステージを 1 つ終える' },
+      five_lessons: { name: '5 つのレッスン完了', rule: 'レッスンかステージを 5 つ終える' },
+      fifteen_lessons: { name: '15 個のレッスン完了', rule: 'レッスンかステージを 15 個終える' },
+      first_course: { name: 'コース修了', rule: '1 つのコースの、いま公開されているレッスンをすべて終える' },
+      three_courses: { name: '3 コース修了', rule: '3 つのコースのレッスンをすべて終える' },
+      streak_3: { name: '3 日つづけて学習', rule: '3 日つづけて学ぶ（日本時間）' },
+      streak_7: { name: '7 日つづけて学習', rule: '7 日つづけて学ぶ（日本時間）' },
+    } as Record<BadgeId, { name: string; rule: string }>,
+  },
+} as const;
+
+const ICONS: Record<BadgeId, LucideIcon> = {
+  first_lesson: BookOpenCheck,
+  five_lessons: Medal,
+  fifteen_lessons: Trophy,
+  first_course: GraduationCap,
+  three_courses: Award,
+  streak_3: Flame,
+  streak_7: Flame,
+};
+
+const STREAK_BADGES: ReadonlySet<BadgeId> = new Set<BadgeId>(['streak_3', 'streak_7']);
+/** Course slugs with a track name (components/ui/tracks.ts). */
+const TRACK_OF: Record<string, 'vibe' | 'claude-code' | 'blender'> = { 'vibe-coding': 'vibe', 'claude-code': 'claude-code', blender: 'blender' };
+
+/** A course's name in the UI language (the badge's `course`). */
+export function courseName(slug: string, language: Language): string {
+  const track = TRACK_OF[slug];
+  const course = getCourse(slug);
+  if (track) return trackCopy(track, language, course).title;
+  if (course) return resolveText(course.title, language, course.locale ?? 'jp').value;
+  return slug;
+}
+
+/** The progress line of an unearned badge. */
+export function badgeProgressText(language: Language, badge: Badge): string {
+  const t = copy[language];
+  if (STREAK_BADGES.has(badge.id)) return t.streakToGo(badge.current, badge.goal - badge.current);
+  const prefix = badge.id === 'first_course' && badge.course ? t.course(courseName(badge.course, language)) : '';
+  return `${prefix}${t.toGo(badge.current, badge.goal)}`;
+}
+
+/** The unearned badge nearest to done (the first of equals), or null when all are earned. */
+export function nextBadge(badges: readonly Badge[]): Badge | null {
+  let best: Badge | null = null;
+  for (const badge of badges) {
+    if (badge.earned) continue;
+    if (!best || badge.current * best.goal > best.current * badge.goal) best = badge;
+  }
+  return best;
+}
+
+const pct = (badge: Badge) => (badge.goal > 0 ? Math.max(0, Math.min(100, Math.round((badge.current / badge.goal) * 100))) : 0);
+
+function ProgressBar({ badge, label }: { badge: Badge; label: string }) {
+  return (
+    <span
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={badge.goal}
+      aria-valuenow={badge.current}
+      className="block h-1.5 w-full overflow-hidden rounded-full bg-line"
+    >
+      <span className="block h-full rounded-full bg-sun" style={{ width: `${pct(badge)}%` }} />
+    </span>
+  );
+}
+
+function BadgeItem({ badge, language }: { badge: Badge; language: Language }) {
+  const t = copy[language];
+  const { name, rule } = t.badges[badge.id];
+  const Icon = ICONS[badge.id];
+  return (
+    <li className="flex items-start gap-3 rounded-card border border-line bg-surface p-4 shadow-1" data-earned={badge.earned || undefined}>
+      <span
+        aria-hidden="true"
+        className={`grid size-10 shrink-0 place-items-center rounded-control ${badge.earned ? 'bg-sun-soft text-sun-text' : 'bg-sunken text-fg-3'}`}
+      >
+        {badge.earned ? <Icon size={20} /> : <LockKeyhole size={18} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-body font-bold text-fg">{name}</h3>
+        <p className="mt-0.5 text-small text-fg-2">{rule}</p>
+        {badge.earned ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-small font-semibold text-fg">
+            <CircleCheck size={16} aria-hidden="true" className="text-success" />
+            {t.earned}
+          </p>
+        ) : (
+          <div className="mt-2 space-y-1">
+            <ProgressBar badge={badge} label={name} />
+            <p className="tabular text-small text-fg-2">{badgeProgressText(language, badge)}</p>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** The page body for a snapshot (exported for server/tests/phase5Front.test.js). */
+export function ProfileBadgesBody({ language, snapshot, onRetry, retry = null }: {
+  language: Language;
+  snapshot: AchievementsSnapshot;
+  onRetry: () => void;
+  retry?: BadgesRetry;
+}) {
+  const t = copy[language];
+  const data = snapshot.status === 'ready' ? snapshot.data : null;
+  if (!data) {
+    // While the learner's own retry loads, the same panel stays (the focused button is not unmounted).
+    const busy = retry === 'busy' && snapshot.status === 'loading';
+    if (snapshot.status === 'unavailable' || busy) {
+      return (
+        <EmptyState
+          headingLevel={2}
+          icon={<CloudOff size={20} />}
+          title={t.unavailableTitle}
+          description={t.unavailableBody}
+          action={(
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<RotateCw size={14} aria-hidden="true" />}
+                aria-disabled={busy || undefined}
+                onClick={() => {
+                  if (!busy) onRetry();
+                }}
+              >
+                {busy ? t.loading : t.retry}
+              </Button>
+              {/* "Still can't be shown" is shown too (the panel looks the same as before the retry);
+                  "loading" is already the button's label. */}
+              <p role="status" className={!busy && retry === 'failed' ? 'basis-full text-small text-fg-2' : 'sr-only'}>
+                {busy ? t.loading : retry === 'failed' ? t.retryFailed : ''}
+              </p>
+            </>
+          )}
+        />
+      );
+    }
+    if (snapshot.status === 'unsupported') return <EmptyState headingLevel={2} icon={<Award size={20} />} title={t.unsupported} />;
+    if (snapshot.status === 'no_account') return <EmptyState headingLevel={2} icon={<Award size={20} />} title={t.noAccount} />;
+    return <p role="status" className="text-body text-fg-2">{t.loading}</p>;
+  }
+
+  const upcoming = nextBadge(data.badges);
+  const upcomingCopy = upcoming ? t.badges[upcoming.id] : null;
+  return (
+    <div className="space-y-6">
+      <p className="tabular text-body text-fg-2">{t.longest(data.streak.best)}</p>
+
+      <section className="rounded-card border border-line bg-surface p-5 shadow-1" aria-labelledby="rp-next-badge">
+        {upcoming && upcomingCopy ? (
+          <div className="flex items-start gap-4">
+            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-control bg-sunken text-fg-3">
+              <LockKeyhole size={22} />
+            </span>
+            <div className="min-w-0 flex-1 space-y-2">
+              <h2 id="rp-next-badge" tabIndex={-1} className="w-fit rounded-control text-h3 text-fg">{t.next(upcomingCopy.name)}</h2>
+              <p className="text-small text-fg-2">{upcomingCopy.rule}</p>
+              <ProgressBar badge={upcoming} label={upcomingCopy.name} />
+              <p className="tabular text-small text-fg-2">{badgeProgressText(language, upcoming)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-control bg-sun-soft text-sun-text">
+              <Trophy size={22} />
+            </span>
+            <h2 id="rp-next-badge" tabIndex={-1} className="w-fit rounded-control text-h3 text-fg">{t.allEarned}</h2>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="rp-all-badges" className="space-y-3">
+        <h2 id="rp-all-badges" className="text-h3 text-fg">{t.listLabel}</h2>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {data.badges.map((badge) => <BadgeItem key={badge.id} badge={badge} language={language} />)}
+        </ul>
+      </section>
+    </div>
+  );
+}
 
 const ProfileBadgesView: React.FC = () => {
   const { language } = useLanguage();
   const { setTheme } = useTheme();
+  const snapshot = useAchievements();
+  const [retry, setRetry] = useState<BadgesRetry>(null);
 
   useEffect(() => {
     setTheme('default');
   }, [setTheme]);
 
-  // Compute earned badges from real data
-  const earned = useMemo(() => {
-    const events = getLearningEvents();
-    const progress = getAllProgress();
-    const hasCompletedLesson = events.some(e => e.type === 'lesson_complete' || e.type === 'stage_complete');
-    const hasGeneratedCourse = events.some(e => e.type === 'course_generated');
-    const hasDiagnosis = events.some(e => e.type === 'diagnosis_complete');
-    const completedCourses = Object.values(progress).filter(p => p.completedStages.length >= 3).length;
-    return { hasCompletedLesson, hasGeneratedCourse, hasDiagnosis, completedCourses };
-  }, []);
-
-  const copy = {
-    en: {
-      title: 'Badges & Trophies',
-      subtitle: 'Celebrate your milestones and next targets.',
-      featuredTitle: 'Milestone Trophy',
-      featuredBody: 'Awarded for your first AI curriculum build.',
-      featuredTag: 'Legendary Reward'
-    },
-    jp: {
-      title: 'バッジ & トロフィー',
-      subtitle: '到達点と次の目標を見える化。',
-      featuredTitle: 'マイルストーントロフィー',
-      featuredBody: '初めてAIカリキュラムを生成した記念。',
-      featuredTag: 'レジェンド報酬'
+  // The learner's retry ended: failed again (the status line says so), or the badges are here
+  // (focus to the next-badge heading, where the button was).
+  useEffect(() => {
+    if (retry !== 'busy' || snapshot.status === 'loading') return;
+    if (snapshot.status === 'unavailable') {
+      setRetry('failed');
+      return;
     }
-  } as const;
+    setRetry(null);
+    if (snapshot.status === 'ready' && typeof document !== 'undefined') document.getElementById('rp-next-badge')?.focus({ preventScroll: true });
+  }, [retry, snapshot.status]);
 
   const t = copy[language];
-
-  const badges = [
-    {
-      label: language === 'jp' ? 'レッスン完了' : 'First Lesson',
-      icon: Flame,
-      earned: earned.hasCompletedLesson,
-      accent: 'from-orange-400 via-amber-400 to-yellow-300',
-      glow: 'shadow-[0_18px_30px_rgba(251,146,60,0.35)]'
-    },
-    {
-      label: language === 'jp' ? '初ビルド' : 'First Build',
-      icon: Sparkles,
-      earned: earned.hasGeneratedCourse,
-      accent: 'from-sky-400 via-cyan-400 to-indigo-400',
-      glow: 'shadow-[0_18px_30px_rgba(56,189,248,0.35)]'
-    },
-    {
-      label: language === 'jp' ? 'AI探究者' : 'AI Explorer',
-      icon: Gem,
-      earned: earned.hasDiagnosis,
-      accent: 'from-fuchsia-400 via-pink-400 to-rose-400',
-      glow: 'shadow-[0_18px_30px_rgba(236,72,153,0.35)]'
-    },
-    {
-      label: language === 'jp' ? '学習の守護者' : 'Learning Guardian',
-      icon: Shield,
-      earned: earned.completedCourses >= 1,
-      accent: 'from-emerald-400 via-teal-400 to-cyan-400',
-      glow: 'shadow-[0_18px_30px_rgba(45,212,191,0.2)]'
-    },
-    {
-      label: language === 'jp' ? 'マスター' : 'Mastery',
-      icon: Medal,
-      earned: earned.completedCourses >= 3,
-      accent: 'from-slate-400 via-slate-300 to-slate-200',
-      glow: 'shadow-[0_18px_30px_rgba(148,163,184,0.2)]'
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-50/50 px-6 pt-12 pb-20">
-      <div className="max-w-5xl mx-auto space-y-10">
-        <header className="space-y-3">
-          <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
-          <p className="text-slate-500">{t.subtitle}</p>
-        </header>
-
-        <div className="grid lg:grid-cols-[1fr,1fr] gap-6">
-          <div className={`rounded-[2.5rem] text-white p-8 shadow-2xl relative overflow-hidden ${earned.hasGeneratedCourse ? 'bg-slate-900' : 'bg-slate-600'}`}>
-            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/30 rounded-full blur-2xl" />
-            <div className="absolute bottom-0 left-8 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl" />
-            <div className="flex items-start gap-5 mb-6">
-              <div className="relative w-20 h-20">
-                <div className="absolute inset-0 rounded-[28px] bg-gradient-to-br from-amber-400 via-yellow-300 to-orange-500 shadow-[0_25px_50px_rgba(251,191,36,0.35)]" />
-                <div className="absolute inset-[3px] rounded-[24px] bg-gradient-to-b from-white/40 to-white/5 border border-white/40" />
-                <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-emerald-300/60 blur-md" />
-                <div className="relative z-10 w-full h-full flex items-center justify-center text-amber-950">
-                  <Trophy className="w-9 h-9" />
-                </div>
-                <div className="absolute -bottom-2 -left-2 w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center border border-white/20">
-                  <Crown className="w-4 h-4 text-amber-300" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.3em] text-indigo-100">
-                  {t.featuredTag}
-                </div>
-                <div className="text-xs font-bold uppercase tracking-[0.3em] text-indigo-200">{t.featuredTitle}</div>
-              </div>
-            </div>
-            <div className="text-2xl font-semibold leading-tight">{t.featuredBody}</div>
-          </div>
-
-          <div className="rounded-[2.5rem] bg-white border border-slate-100 p-8 shadow-xl">
-            <div className="grid grid-cols-2 gap-4">
-              {badges.map((badge) => {
-                const Icon = badge.icon;
-                return (
-                <div
-                  key={badge.label}
-                  className={`rounded-3xl border p-4 flex flex-col items-center text-center gap-3 shadow-sm ${
-                    badge.earned
-                      ? 'border-white/80 bg-white text-slate-800 shadow-indigo-100/60'
-                      : 'border-slate-200 bg-slate-50 text-slate-400'
-                  }`}
-                >
-                  <div className="relative">
-                    <div
-                      className={`absolute inset-0 rounded-[20px] bg-gradient-to-br ${
-                        badge.earned ? badge.accent : 'from-slate-200 via-slate-100 to-white'
-                      } ${badge.earned ? badge.glow : ''}`}
-                    />
-                    <div
-                      className={`absolute inset-[2px] rounded-[18px] ${
-                        badge.earned
-                          ? 'bg-slate-950/20 border border-white/50'
-                          : 'bg-white/70 border border-slate-200'
-                      }`}
-                    />
-                    <div className="relative z-10 w-14 h-14 flex items-center justify-center">
-                      <Icon
-                        className={`w-7 h-7 ${
-                          badge.earned ? 'text-white drop-shadow-[0_6px_12px_rgba(15,23,42,0.25)]' : 'text-slate-400'
-                        }`}
-                      />
-                    </div>
-                    {!badge.earned && (
-                      <div className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md">
-                        <LockKeyhole className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-bold tracking-wide">{badge.label}</span>
-                </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-8 py-8 md:py-12">
+      <PageHeader title={t.title} description={t.subtitle} />
+      <ProfileBadgesBody
+        language={language}
+        snapshot={snapshot}
+        retry={retry}
+        onRetry={() => {
+          setRetry('busy');
+          void reloadAchievements();
+        }}
+      />
     </div>
   );
 };

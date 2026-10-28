@@ -22,7 +22,9 @@ paths:
   `provenance.author` and keeps `migratedFrom`, so the lesson becomes strict.
   `--include-migrated` makes every lesson strict.
 - Ids: lowercase kebab-case, unique in the lesson, stable. Never renumber existing ids — progress,
-  reviews and citations point at them. The lesson id equals the file name.
+  reviews and citations point at them. The lesson id equals the file name. Flashcard ids of a
+  published lesson key learners' review memory (`server/tests/fixtures/published-card-ids.json`);
+  keep them in a rework, and add a newly published lesson's cards to that file.
 - Text: a plain string is in `lesson.locale`; `{jp, en, fr}` objects when the lesson declares several
   `locales` (keys are `jp`, not `ja`). Inline markdown only: **bold**, `code`, [link text](https://…),
   [[glossary term]]. No raw HTML, no headings inside `md`, no italics in Japanese.

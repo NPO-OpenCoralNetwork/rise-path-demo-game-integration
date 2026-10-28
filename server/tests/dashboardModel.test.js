@@ -1,16 +1,12 @@
-// Dashboard data (WP-09): streak days, the "続きから" target and the track card totals.
+// Dashboard data (WP-09): the "続きから" target and the track card totals.
 // Pure modules only; the lesson and course JSON are the real Vibe Coding files.
+// Phase 5: the streak is the server's (tools/core/achievements.js streakOf, tested in
+// achievements.test.js); components/ui/activity.ts and its device-local streak are gone.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  activeDaysFrom,
-  dayOfTimestamp,
-  localDateKey,
-  streakFromDays,
-} from '../../components/ui/activity.ts';
 import {
   DEFAULT_START,
   courseTotals,
@@ -24,42 +20,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
 const course = readJson('content/courses/vibe-coding/course.json');
 const ch1 = readJson('content/courses/vibe-coding/lessons/vibe-ch1.lesson.json');
-
-const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h);
-
-describe('activity: streak days', () => {
-  it('uses local calendar days', () => {
-    assert.equal(localDateKey(at(2026, 1, 5)), '2026-01-05');
-    assert.equal(dayOfTimestamp(at(2026, 10, 18, 8).toISOString()), '2026-10-18');
-  });
-
-  it('ignores bad and epoch timestamps', () => {
-    assert.equal(dayOfTimestamp('nope'), null);
-    assert.equal(dayOfTimestamp(new Date(0).toISOString()), null);
-    assert.equal(dayOfTimestamp(undefined), null);
-    assert.equal(activeDaysFrom(['x', null, new Date(0).toISOString()]).size, 0);
-  });
-
-  it('counts consecutive days ending today', () => {
-    const days = ['2026-10-16', '2026-10-17', '2026-10-18'];
-    assert.deepEqual(streakFromDays(days, at(2026, 10, 18)), { days: 3, activeToday: true });
-  });
-
-  it('keeps yesterday\'s streak alive until today ends', () => {
-    assert.deepEqual(streakFromDays(['2026-10-16', '2026-10-17'], at(2026, 10, 18)), { days: 2, activeToday: false });
-  });
-
-  it('drops a streak after a missed day, and handles month boundaries', () => {
-    assert.deepEqual(streakFromDays(['2026-10-15'], at(2026, 10, 18)), { days: 0, activeToday: false });
-    assert.deepEqual(streakFromDays(['2026-09-30', '2026-10-01'], at(2026, 10, 1)), { days: 2, activeToday: true });
-    assert.deepEqual(streakFromDays([], at(2026, 10, 1)), { days: 0, activeToday: false });
-  });
-
-  it('merges several timestamps on the same day', () => {
-    const days = activeDaysFrom([at(2026, 10, 18, 9).toISOString(), at(2026, 10, 18, 21).toISOString()]);
-    assert.equal(days.size, 1);
-  });
-});
 
 describe('lessonResume: 続きから target', () => {
   const exists = (slug, id) => slug === 'vibe-coding' && /^vibe-ch\d+$/.test(id);

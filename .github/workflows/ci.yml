@@ -142,6 +142,12 @@ jobs:
           HERMES_API_KEY: ci-leak-sentinel-HERMES_API_KEY
           RISE_PATH_BRIDGE_TOKEN: ci-leak-sentinel-RISE_PATH_BRIDGE_TOKEN
           DATABASE_URL_PHASE1: ci-leak-sentinel-DATABASE_URL_PHASE1
+          ORIGIN_SECRET: ci-leak-sentinel-ORIGIN_SECRET
+          TUNNEL_TOKEN: ci-leak-sentinel-TUNNEL_TOKEN
+          STRIPE_SECRET_KEY: ci-leak-sentinel-STRIPE_SECRET_KEY
+          VITE_STRIPE_SECRET_KEY: ci-leak-sentinel-VITE_STRIPE_SECRET_KEY
+          STRIPE_WEBHOOK_SECRET: ci-leak-sentinel-STRIPE_WEBHOOK_SECRET
+          BILLING_TEST_USER_IDS: ci-leak-sentinel-BILLING_TEST_USER_IDS
         run: npm run build:prod -- --outDir "$RUNNER_TEMP/dist" --emptyOutDir
 
       - name: Fail if a sentinel key reached the bundle
@@ -153,3 +159,14 @@ jobs:
             exit 1
           fi
           echo "No sentinel key in $(find "$dist" -type f | wc -l) built files."
+
+      # Phase 4: this build runs with VITE_FEATURE_LEGAL_PAGES unset, so the generated legal text
+      # (content/legal/*.ja.md, first line "risepath-legal-text") and the drafts' markers must not
+      # be in it. 【要記入 is not checked: it ships through services/billingRules.ts on purpose.
+      - name: Fail if draft legal text reached the bundle
+        run: |
+          if grep -rlF -e 'risepath-legal-text' -e '【要確認' -e '公開前に専門家' -e '（作成メモ:' -e '（根拠:' "$RUNNER_TEMP/dist"; then
+            echo "::error title=Legal text in the bundle::content/legal text must load only through the conditional imports in components/routes/lazyRoutes.tsx (VITE_FEATURE_LEGAL_PAGES unset)."
+            exit 1
+          fi
+          echo "No legal text in the bundle."

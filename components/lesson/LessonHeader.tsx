@@ -9,8 +9,13 @@ import type { LessonEntry } from '../../content';
 
 /**
  * Lesson title block in the reading flow (left-aligned, never centred): eyebrow with the
- * chapter and module, title, subtitle, meta row and the objectives card.
+ * chapter and module, title, subtitle, meta row and the objectives card. The title is a focus
+ * target (tabIndex -1, id lessonTitleId): after the lesson is started over, the reader moves focus
+ * there (Phase 5).
  */
+
+/** The id of the lesson's h1. */
+export const lessonTitleId = (lessonId: string) => `${lessonId}-title`;
 
 const copy = {
   en: {
@@ -53,7 +58,7 @@ export function LessonHeader({ lesson, entry }: LessonHeaderProps) {
   return (
     <header className="rp-header">
       {eyebrow && <p className="rp-eyebrow" lang={title.lang}>{eyebrow}</p>}
-      <h1 className="rp-title" lang={title.lang}>{mainTitle}</h1>
+      <h1 id={lessonTitleId(lesson.id)} className="rp-title" tabIndex={-1} lang={title.lang}>{mainTitle}</h1>
       {lesson.subtitle && <Txt value={lesson.subtitle} as="p" className="rp-subtitle" />}
       <ul className="rp-meta">
         <li>

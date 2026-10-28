@@ -14,9 +14,10 @@ import {
 
 const router = express.Router();
 
+/** A fixed 500: the error (database or Memanto text) is logged, never sent. */
 const respondServerError = (res, label, error) => {
     console.error(`[Learner Memory API] ${label}:`, error);
-    res.status(500).json({ error: label, detail: error?.message });
+    res.status(500).json({ error: label });
 };
 
 const sendBridgeResult = (res, result) => {
@@ -31,7 +32,8 @@ const sendBridgeResult = (res, result) => {
     return res.json(result);
 };
 
-router.use(requireBridgeOrAuth);
+// Scoped to its own paths: this router is mounted on all of /api/v2 (server.js).
+router.use('/learner-memory', requireBridgeOrAuth);
 
 // GET /api/v2/learner-memory/privacy
 router.get('/learner-memory/privacy', async (req, res) => {

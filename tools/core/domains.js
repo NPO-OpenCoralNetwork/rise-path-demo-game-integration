@@ -51,6 +51,15 @@ export const DOMAINS = DOMAIN_DEFS.map(({ courseSlug, ...domain }) => {
     return { ...domain, maxStages: count ?? domain.maxStages };
 });
 
+/**
+ * Domain id → its course slug, for the domains taught by a published course (content://domains
+ * lists it so agents use the course-* tools for those lessons, not learner-state-*).
+ * @type {Readonly<Record<string, string>>}
+ */
+export const DOMAIN_COURSE_SLUGS = Object.freeze(Object.fromEntries(
+    DOMAIN_DEFS.filter((d) => d.courseSlug).map((d) => [d.id, d.courseSlug])
+));
+
 /** Lookup map: domain id → max stages */
 export const DOMAIN_MAX_STAGES = Object.fromEntries(
     DOMAINS.map(d => [d.id, d.maxStages])

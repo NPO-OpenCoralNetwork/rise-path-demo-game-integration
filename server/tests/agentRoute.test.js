@@ -1,9 +1,9 @@
-import { describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
-import agentRoutes from '../routes/agent.js';
+import agentRoutes, { isAgentChatEnabled, startSseHeartbeat } from '../routes/agent.js';
 
 const optedInPool = {
     query: async () => ({
@@ -41,7 +41,63 @@ const withServer = async (handler) => {
     }
 };
 
+describe('POST /api/v2/agent/chat is off unless VITE_FEATURE_AGENT_CHAT is exactly "true"', () => {
+    it('isAgentChatEnabled reads the same switch as the front end', () => {
+        assert.equal(isAgentChatEnabled({}), false);
+        assert.equal(isAgentChatEnabled({ VITE_FEATURE_AGENT_CHAT: 'true' }), true);
+        for (const value of ['', 'TRUE', '1', 'yes', ' true', 'false']) {
+            assert.equal(isAgentChatEnabled({ VITE_FEATURE_AGENT_CHAT: value }), false, JSON.stringify(value));
+        }
+    });
+
+    it('answers 404 agent_chat_off before validation or Hermes, even with Hermes configured', async () => {
+        const saved = ['VITE_FEATURE_AGENT_CHAT', 'HERMES_API_KEY', 'NODE_ENV', 'RISE_PATH_BRIDGE_TOKEN', 'DATABASE_URL_PHASE1']
+            .map((key) => [key, process.env[key]]);
+        delete process.env.VITE_FEATURE_AGENT_CHAT;
+        delete process.env.RISE_PATH_BRIDGE_TOKEN;
+        delete process.env.DATABASE_URL_PHASE1;
+        process.env.HERMES_API_KEY = 'configured-hermes-key';
+        process.env.NODE_ENV = 'development';
+        const realFetch = globalThis.fetch;
+        const outbound = [];
+        try {
+            await withServer(async (baseUrl) => {
+                globalThis.fetch = async (...args) => {
+                    outbound.push(String(args[0]));
+                    return realFetch(...args);
+                };
+                for (const body of [{ skill: 'life-habit-analyst', message: '傾向は？' }, { skill: 'nope' }]) {
+                    const response = await realFetch(`${baseUrl}/api/v2/agent/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    });
+                    assert.equal(response.status, 404);
+                    assert.equal((await response.json()).error_type, 'agent_chat_off');
+                }
+                assert.deepEqual(outbound, [], 'Hermes was not called');
+            });
+        } finally {
+            globalThis.fetch = realFetch;
+            for (const [key, value] of saved) {
+                if (value === undefined) delete process.env[key];
+                else process.env[key] = value;
+            }
+        }
+    });
+});
+
 describe('POST /api/v2/agent/chat diary excerpt gate', () => {
+    let prevAgentChat;
+    before(() => {
+        prevAgentChat = process.env.VITE_FEATURE_AGENT_CHAT;
+        process.env.VITE_FEATURE_AGENT_CHAT = 'true'; // the shared chat is on for these tests
+    });
+    after(() => {
+        if (prevAgentChat === undefined) delete process.env.VITE_FEATURE_AGENT_CHAT;
+        else process.env.VITE_FEATURE_AGENT_CHAT = prevAgentChat;
+    });
+
     it('returns 403 diary_excerpts_not_allowed when excerpts requested without opt-in', async () => {
         const prevDb = process.env.DATABASE_URL_PHASE1;
         const prevNodeEnv = process.env.NODE_ENV;
@@ -168,6 +224,38 @@ describe('POST /api/v2/agent/chat diary excerpt gate', () => {
             else process.env.RISE_PATH_BRIDGE_TOKEN = prevBridge;
             if (prevHermesKey === undefined) delete process.env.HERMES_API_KEY;
             else process.env.HERMES_API_KEY = prevHermesKey;
+        }
+    });
+});
+
+describe('startSseHeartbeat', () => {
+    it('pings only while idle and between events, and stops on stop()', () => {
+        mock.timers.enable({ apis: ['setInterval'] });
+        const writes = [];
+        const res = { writableEnded: false, write: (text) => { writes.push(text); return true; } };
+        const pings = () => writes.filter((text) => text === ': ping\n\n').length;
+        try {
+            const heartbeat = startSseHeartbeat(res, { intervalMs: 1000 });
+            mock.timers.tick(1000);
+            assert.equal(pings(), 1, 'an idle tick before the first chunk pings');
+
+            heartbeat.write('data: {"a":');
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            assert.equal(pings(), 1, 'no ping inside an unfinished event');
+
+            heartbeat.write('1}\n\n');
+            mock.timers.tick(1000);
+            mock.timers.tick(1000);
+            assert.equal(pings(), 2, 'a ping follows the closing blank line within two ticks');
+            assert.deepEqual(writes.slice(1, 3), ['data: {"a":', '1}\n\n'], 'chunks are forwarded unchanged');
+
+            heartbeat.stop();
+            mock.timers.tick(5000);
+            assert.equal(pings(), 2, 'no ping after stop()');
+        } finally {
+            mock.timers.reset();
         }
     });
 });

@@ -51,6 +51,17 @@ describe('authFormValidation', () => {
         assert.equal(result, null);
     });
 
+    it('requireLegalAcceptance (Phase 4, VITE_FEATURE_LEGAL_PAGES): the box must be ticked; the default asks nothing', () => {
+        const valid = { email: 'user@example.com', password: 'password123', passwordConfirm: 'password123' };
+        assert.deepEqual(validateSignupForm(valid, { requireLegalAcceptance: true }), {
+            field: 'legal',
+            message: 'Agree to the terms of use to create an account.',
+        });
+        assert.equal(validateSignupForm({ ...valid, acceptedLegal: true }, { requireLegalAcceptance: true }), null);
+        assert.equal(validateSignupForm({ ...valid, acceptedLegal: false }, { requireLegalAcceptance: false }), null);
+        assert.equal(validateSignupForm({ ...valid, acceptedLegal: false }), null);
+    });
+
     it('maps already registered errors', () => {
         assert.equal(
             mapSignupErrorMessage('User already registered'),

@@ -44,6 +44,12 @@ const FAKE = {
   github: 'gh' + 'p_' + chars(36, 6),
   githubPat: 'github' + '_pat_' + chars(22, 7) + '_' + chars(59, 8),
   slack: 'xo' + 'xb-' + '123456789012-' + '9876543210987-' + chars(24, 9),
+  stripeTest: ['sk', 'test', ''].join('_') + chars(99, 15),
+  stripeLive: ['sk', 'live', ''].join('_') + chars(99, 16),
+  stripeRestricted: ['rk', 'live', ''].join('_') + chars(99, 17),
+  stripeRestrictedTest: ['rk', 'test', ''].join('_') + chars(60, 18),
+  stripeWebhook: ['wh', 'sec_'].join('') + chars(32, 19),
+  stripePublishable: ['pk', 'live', ''].join('_') + chars(99, 20),
   serviceJwt: [b64url({ alg: 'HS256', typ: 'JWT' }), b64url({ iss: 'supabase', ref: 'demo', role: 'service_role' }), chars(43, 10)].join('.'),
   anonJwt: [b64url({ alg: 'HS256', typ: 'JWT' }), b64url({ iss: 'supabase', ref: 'demo', role: 'anon' }), chars(43, 11)].join('.'),
   pemBody: chars(64, 12),
@@ -87,6 +93,26 @@ describe('scan-secrets rules', () => {
     assert.deepEqual(rulesOf(`token ${FAKE.github}`), ['github-token']);
     assert.deepEqual(rulesOf(`token ${FAKE.githubPat}`), ['github-token']);
     assert.deepEqual(rulesOf(`SLACK_TOKEN=${FAKE.slack}`), ['slack-token']);
+  });
+
+  it('detects Stripe secret, restricted and webhook keys (test and live), not publishable keys or short fixtures', () => {
+    for (const key of [FAKE.stripeTest, FAKE.stripeLive, FAKE.stripeRestricted, FAKE.stripeRestrictedTest]) {
+      assert.deepEqual(rulesOf(`STRIPE_SECRET_KEY=${key}`), ['stripe-secret-key'], key.slice(0, 8));
+      assert.deepEqual(rulesOf(`"${key}"`), ['stripe-secret-key'], key.slice(0, 8));
+    }
+    assert.deepEqual(rulesOf(`STRIPE_WEBHOOK_SECRET=${FAKE.stripeWebhook}`), ['stripe-webhook-secret']);
+    assert.deepEqual(rulesOf(`STRIPE_WEBHOOK_SECRET=${FAKE.stripeWebhook},${FAKE.stripeWebhook}`), ['stripe-webhook-secret', 'stripe-webhook-secret']);
+    assert.deepEqual(rulesOf(`VITE_STRIPE_PUBLISHABLE_KEY=${FAKE.stripePublishable}`), []);
+    // Test fixtures stay short or obviously fake; prose names the prefixes.
+    const fixtures = [
+      `const key = '${['sk', 'test', 'fake1'].join('_')}';`,
+      `secrets: ['${['wh', 'sec_'].join('')}test_secret_a']`,
+      `STRIPE_SECRET_KEY=${['sk', 'test', ''].join('_')}${'X'.repeat(40)}`,
+      `a live key starts with ${['sk', 'live', ''].join('_')} or ${['rk', 'live', ''].join('_')}, a webhook secret with ${['wh', 'sec_'].join('')}`,
+    ].join('\n');
+    assert.deepEqual(scanText(fixtures), []);
+    const [finding] = scanText(`k=${FAKE.stripeLive}`);
+    assert.ok(finding.masked.startsWith(['sk', 'live', ''].join('_')) && !finding.masked.includes(FAKE.stripeLive.slice(8, 20)));
   });
 
   it('detects a PEM private key block, also inside a JSON string, but not the header in prose', () => {
@@ -137,7 +163,7 @@ describe('scan-secrets rules', () => {
 
   it('every rule id is covered by these tests', () => {
     assert.deepEqual([...RULE_IDS].sort(), ['absolute-personal-path', 'anthropic-api-key', 'github-token', 'google-api-key',
-      'openai-api-key', 'private-key', 'service-role-jwt', 'slack-token']);
+      'openai-api-key', 'private-key', 'service-role-jwt', 'slack-token', 'stripe-secret-key', 'stripe-webhook-secret']);
   });
 });
 

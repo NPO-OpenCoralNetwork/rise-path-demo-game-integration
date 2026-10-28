@@ -73,6 +73,23 @@ export const PersonalityInsight = z.object({
   hiddenTalent: TitledPoint,
 });
 
+// --- safety.screen (server/safety/moderation.js) ------------------------------
+
+/** Categories the child-safety screen reports; 'none' first (the safe value). */
+export const SAFETY_CATEGORIES = /** @type {const} */ ([
+  'none', 'self_harm', 'sexual', 'violence', 'bullying', 'personal_info', 'dangerous', 'hate', 'other',
+]);
+
+/**
+ * The screen's verdict. Every enum lists its safe value first, so a schema-filling stand-in
+ * (the mock without a fixture takes enum[0]) can only ever allow, never block by accident.
+ */
+export const SafetyScreen = z.object({
+  verdict: z.enum(['allow', 'block']).describe('block when the text breaks a rule for a children\'s learning service'),
+  category: z.enum(SAFETY_CATEGORIES).describe('the main rule broken; none when allowed'),
+  support: z.enum(['no', 'yes']).describe('yes when the writer seems to be in distress, at risk of harm or being hurt'),
+});
+
 // --- tutor.chat (PLAN §9.1 AskTutorDetail) -----------------------------------
 
 export const TUTOR_EXCERPT_MAX = 1500;

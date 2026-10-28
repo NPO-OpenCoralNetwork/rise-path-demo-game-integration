@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Redeploy Rise Path stack on risepath-vm (pull, build, migrate, up, smoke)
+# Redeploy Rise Path stack on risepath-vm (pull, check stack.env, build, migrate, up, wait, smoke)
 # Usage (on VM): ./deploy-stack.sh
 set -euo pipefail
 
@@ -8,6 +8,13 @@ STACK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${STACK_DIR}/../.." && pwd)"
 
 cd "${STACK_DIR}"
+
+# CI only (.github/workflows/e2e.yml through scripts/ci/stack.sh deploy; owner decision P3): the job
+# deploys the commit it checked out, often a detached HEAD where `git pull` fails. Only exactly 1 skips
+# the pull (and so the re-run after it). Read from the caller's environment before stack.env is
+# sourced and kept read-only, so stack.env can never turn the pull off. Unset on the VM: every deploy
+# pulls and re-runs a moved script, as before.
+readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"
 
 if [[ ! -f stack.env ]]; then
   echo "Missing stack.env — copy stack.env.example and fill secrets"
@@ -19,7 +26,9 @@ set -a
 source stack.env
 set +a
 
-if [[ -d "${REPO_ROOT}/.git" ]]; then
+if [[ "${RISEPATH_CALLER_SKIP_PULL}" == "1" ]]; then
+  echo "==> git pull skipped (RISEPATH_DEPLOY_SKIP_PULL=1): deploying the checked-out commit"
+elif [[ -d "${REPO_ROOT}/.git" ]]; then
   echo "==> git pull"
   HEAD_BEFORE="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   git -C "${REPO_ROOT}" pull --ff-only
@@ -31,24 +40,26 @@ if [[ -d "${REPO_ROOT}/.git" ]]; then
   fi
 fi
 
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
-  echo "==> init Hermes profile (full stack)"
-  "${SCRIPT_DIR}/init-hermes-profile.sh"
-fi
-
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-full}"
+if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY,,}" != *change-me* ]]; then
+  HERMES_KEYED=1
 else
-  echo "⚠️  OPENROUTER_API_KEY unset — skipping hermes profile (set in stack.env to enable)"
-  COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
+  HERMES_KEYED=0
 fi
+# Hermes (profile full) starts only when COMPOSE_PROFILES lists it: the shared agent is not offered
+# to learners, so an OpenRouter key alone no longer turns it on (stack.env.example: tts).
+COMPOSE_PROFILES="${COMPOSE_PROFILES:-}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
 MEMANTO_STACK=0
 if [[ -n "${MEMANTO_SECRET_KEY:-}" && "${MEMANTO_SECRET_KEY}" != "change-me-memanto-secret" ]]; then
+  # The boot unit (systemd/risepath-stack.service) reads stack.env only: with false there, a reboot
+  # recreates api and mcp with learner memory off.
+  if [[ "${MEMANTO_ENABLED:-}" != "true" ]]; then
+    echo "❌ MEMANTO_SECRET_KEY is set: set MEMANTO_ENABLED=true in stack.env (the boot unit reads it)"
+    exit 1
+  fi
   COMPOSE_FILES+=(-f docker-compose.memanto.yml)
   MEMANTO_STACK=1
-  export MEMANTO_ENABLED=true
   if [[ ",${COMPOSE_PROFILES}," != *",memory,"* ]]; then
     COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}memory"
   fi
@@ -59,20 +70,178 @@ else
 fi
 export COMPOSE_PROFILES
 
-compose() {
-  docker compose --env-file stack.env "${COMPOSE_FILES[@]}" "$@"
-}
+# The env-file guards below read assignment lines the way Docker Compose does: it also reads
+# `export NAME=…`, `NAME: value`, spaces around '=' and quoted values, and a bare `NAME` copies the
+# value from the deploy environment, so every pattern allows them: ENV_KEY starts an assignment
+# line, ENV_EQ is the '=' or ':' and an opening quote. Set here, outside any profile's block.
+ENV_KEY='^[[:space:]]*(export[[:space:]]+)?'
+ENV_EQ="[[:space:]]*[=:][[:space:]]*[\"']?"
 
-if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
-  echo "==> Memanto data volume permissions (uid 1001)"
-  MEMANTO_VOL="$(compose volume ls -q 2>/dev/null | grep risepath_memanto_data | head -1 || true)"
-  if [[ -n "${MEMANTO_VOL}" ]]; then
-    MEMANTO_MP="$(docker volume inspect "${MEMANTO_VOL}" --format '{{.Mountpoint}}' 2>/dev/null || true)"
-    if [[ -n "${MEMANTO_MP}" && -d "${MEMANTO_MP}" ]]; then
-      sudo chown -R 1001:1001 "${MEMANTO_MP}" 2>/dev/null || true
+# Profile tunnel publishes the api as https://api.<domain> (Cloudflare Tunnel). Refuse it until the
+# origin gate and the tunnel token are in place. Prints variable names only, never their values.
+if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* ]]; then
+  TUNNEL_MISSING=()
+  if [[ ! -f tunnel.env ]] || ! grep -Eq '^TUNNEL_TOKEN=.+' tunnel.env; then
+    TUNNEL_MISSING+=("TUNNEL_TOKEN (tunnel.env, from tunnel.env.example)")
+  fi
+  ORIGIN_SECRET_VALUE="${ORIGIN_SECRET:-}"
+  if [[ ${#ORIGIN_SECRET_VALUE} -lt 32 || "${ORIGIN_SECRET_VALUE}" == '$'* || "${ORIGIN_SECRET_VALUE,,}" == *change-me* ]]; then
+    TUNNEL_MISSING+=("ORIGIN_SECRET (stack.env: openssl rand -hex 32, same value as in Vercel)")
+  fi
+  unset ORIGIN_SECRET_VALUE
+  if [[ -z "${LLM_ALLOWED_ORIGINS:-}" ]]; then
+    TUNNEL_MISSING+=("LLM_ALLOWED_ORIGINS (stack.env: https://app.<domain>)")
+  fi
+  if [[ -n "${RISE_PATH_PUBLIC_URL:-}" ]]; then
+    TUNNEL_MISSING+=("RISE_PATH_PUBLIC_URL (stack.env: must be unset)")
+  fi
+  if [[ ${#TUNNEL_MISSING[@]} -gt 0 ]]; then
+    echo "❌ COMPOSE_PROFILES includes tunnel, but these are missing or invalid:"
+    printf '   %s\n' "${TUNNEL_MISSING[@]}"
+    echo "   Fix them (see stack.env.example), or remove tunnel from COMPOSE_PROFILES."
+    exit 1
+  fi
+  if [[ "${TRUST_PROXY:-}" != "1" ]]; then
+    echo "⚠️  TRUST_PROXY is not 1 — with the tunnel, cloudflared is one proxy hop (stack.env)"
+  fi
+  echo "==> Public edge: tunnel profile enabled (origin gate on)"
+fi
+
+# Profile byoa starts mcp-public, the internet-facing remote MCP (https://mcp.<domain> through the
+# tunnel; doc/guides/byoa-setup.ja.md). Refuse it without the tunnel or without its own
+# mcp-public.env, and refuse an env file that holds stack.env secrets or the superuser DB role.
+# Reads variable names and the DB user only; prints names, never values.
+if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
+  BYOA_PROBLEMS=()
+  if [[ ",${COMPOSE_PROFILES// /}," != *",tunnel,"* ]]; then
+    BYOA_PROBLEMS+=("COMPOSE_PROFILES must list tunnel too (mcp-public has no host port)")
+  fi
+  if [[ ! -f mcp-public.env ]]; then
+    BYOA_PROBLEMS+=("mcp-public.env (cp mcp-public.env.example mcp-public.env && chmod 600 mcp-public.env)")
+  else
+    # ENV_KEY and ENV_EQ: see above (Compose's dotenv variants).
+    for name in DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_ANON_KEY MCP_PUBLIC_RESOURCE_URL; do
+      if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" mcp-public.env || grep -Eiq "${ENV_KEY}${name}${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
+        BYOA_PROBLEMS+=("${name} (mcp-public.env: missing or a template value)")
+      fi
+    done
+    # Optional, but a template value would put a placeholder link into every adults-only refusal.
+    if grep -Eiq "${ENV_KEY}APP_PUBLIC_URL${ENV_EQ}.*(change-me|your-project|your-domain)" mcp-public.env; then
+      BYOA_PROBLEMS+=("APP_PUBLIC_URL (mcp-public.env: a template value; set the app origin or leave it empty)")
+    fi
+    for name in RISE_PATH_BRIDGE_TOKEN SUPABASE_SERVICE_ROLE_KEY ANTHROPIC_API_KEY GEMINI_ OPENROUTER_API_KEY HERMES_ MEMANTO_ ORIGIN_SECRET RISE_PATH_ACTIVE_SESSION_KEY TUNNEL_TOKEN POSTGRES_PASSWORD; do
+      if grep -Eq "${ENV_KEY}${name}[A-Z0-9_]*[[:space:]]*([=:]|$)" mcp-public.env; then
+        BYOA_PROBLEMS+=("${name}* (mcp-public.env: must not be there; it belongs to stack.env only)")
+      fi
+    done
+    if grep -Eq "${ENV_KEY}DATABASE_URL_PHASE1${ENV_EQ}[A-Za-z]+://risepath_app[:@]" mcp-public.env; then
+      BYOA_PROBLEMS+=("DATABASE_URL_PHASE1 (mcp-public.env: use risepath_mcp_remote from sql/mcp_remote_role.sql, not risepath_app)")
+    fi
+  fi
+  if [[ ${#BYOA_PROBLEMS[@]} -gt 0 ]]; then
+    echo "❌ COMPOSE_PROFILES includes byoa, but these are missing or invalid:"
+    printf '   %s\n' "${BYOA_PROBLEMS[@]}"
+    echo "   Fix them (see mcp-public.env.example and doc/guides/byoa-setup.ja.md), or remove byoa from COMPOSE_PROFILES."
+    exit 1
+  fi
+  echo "==> Public remote MCP: byoa profile enabled (mcp-public.env, least-privilege DB role)"
+fi
+
+# The paid plan (Phase 3) reads billing.env, which only the api service loads (billing.env.example).
+# STRIPE_* and BILLING_* belong there only: in stack.env they would reach the mcp container too, and
+# mcp-public must never hold them. With BILLING_ENABLED=true the keys must be set, and a live key
+# (sk_live_/rk_live_) needs BILLING_LIVE=true: test mode only until the legal and tax checks.
+# Runs whatever COMPOSE_PROFILES lists. Reads names and key prefixes only; prints names, never values.
+BILLING_PROBLEMS=()
+for file in stack.env mcp-public.env; do
+  if [[ -f "${file}" ]] && grep -Eq "${ENV_KEY}(STRIPE|BILLING)_[A-Z0-9_]*[[:space:]]*([=:]|$)" "${file}"; then
+    BILLING_PROBLEMS+=("STRIPE_* / BILLING_* (${file}: must not be there; they belong to billing.env only)")
+  fi
+done
+BILLING_MODE=off
+if [[ -f billing.env ]]; then
+  BILLING_LIVE_KEY=0
+  if grep -Eq "${ENV_KEY}[A-Z0-9_]+${ENV_EQ}(sk|rk|pk)_live_" billing.env; then
+    BILLING_LIVE_KEY=1
+    if ! grep -Eq "${ENV_KEY}BILLING_LIVE${ENV_EQ}true[\"']?[[:space:]]*$" billing.env; then
+      BILLING_PROBLEMS+=("BILLING_LIVE (billing.env: a live Stripe key needs BILLING_LIVE=true; sell in test mode only until the legal and tax checks)")
+    fi
+  fi
+  if grep -Eq "${ENV_KEY}BILLING_ENABLED${ENV_EQ}true[\"']?[[:space:]]*$" billing.env; then
+    BILLING_REQUIRED=(STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_ID BILLING_RETURN_ORIGIN)
+    if [[ "${BILLING_LIVE_KEY}" -eq 1 ]]; then
+      BILLING_REQUIRED+=(BILLING_TOS_URL)
+      BILLING_MODE=live
+    else
+      BILLING_REQUIRED+=(BILLING_TEST_USER_IDS)
+      BILLING_MODE=test
+    fi
+    for name in "${BILLING_REQUIRED[@]}"; do
+      if ! grep -Eq "${ENV_KEY}${name}${ENV_EQ}[^\"'[:space:]]" billing.env; then
+        BILLING_PROBLEMS+=("${name} (billing.env: missing; BILLING_ENABLED=true needs it)")
+      fi
+    done
+    if ! grep -Eq "${ENV_KEY}STRIPE_SECRET_KEY${ENV_EQ}(sk|rk)_(test|live)_[A-Za-z0-9]" billing.env; then
+      BILLING_PROBLEMS+=("STRIPE_SECRET_KEY (billing.env: not a secret or restricted key, sk_… or rk_…)")
+    fi
+    if ! grep -Eq "${ENV_KEY}STRIPE_WEBHOOK_SECRET${ENV_EQ}whsec_" billing.env; then
+      BILLING_PROBLEMS+=("STRIPE_WEBHOOK_SECRET (billing.env: not a webhook signing secret, whsec_…)")
     fi
   fi
 fi
+if [[ ${#BILLING_PROBLEMS[@]} -gt 0 ]]; then
+  echo "❌ Billing settings are missing or in the wrong place:"
+  printf '   %s\n' "${BILLING_PROBLEMS[@]}"
+  echo "   Fix them (see billing.env.example). BILLING_ENABLED= (empty) keeps sales off."
+  exit 1
+fi
+echo "==> Billing sales: ${BILLING_MODE} (BILLING_ENABLED in billing.env, read by the api only)"
+
+# Template values deploy green and then break sign-in (Supabase), keep a known DB password and
+# bridge token, or give Hermes a key it refuses (under 16 characters). Refuse them before anything
+# is built. Prints variable names only, never their values.
+PLACEHOLDERS=()
+for name in POSTGRES_PASSWORD DATABASE_URL_PHASE1 SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RISE_PATH_BRIDGE_TOKEN; do
+  value="${!name:-}"
+  if [[ -z "${value}" || "${value,,}" == *change-me* || "${value,,}" == *your-project* ]]; then
+    PLACEHOLDERS+=("${name}")
+  fi
+done
+# Profile full starts hermes (published on API_SERVER_PORT) even without an OpenRouter key, so it
+# needs that key and its own API key. Profile tts alone runs kokoro-tts without Hermes.
+HERMES_PROFILE=0
+if [[ ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then
+  HERMES_PROFILE=1
+fi
+if [[ "${HERMES_PROFILE}" -eq 1 && "${HERMES_KEYED}" -eq 0 ]]; then
+  PLACEHOLDERS+=("OPENROUTER_API_KEY (COMPOSE_PROFILES lists full, which starts Hermes: set the key, or use COMPOSE_PROFILES=tts for TTS without Hermes)")
+fi
+if [[ "${HERMES_PROFILE}" -eq 1 ]]; then
+  value="${HERMES_API_KEY:-}"
+  if [[ ${#value} -lt 16 || "${value,,}" == *change-me* ]]; then
+    PLACEHOLDERS+=("HERMES_API_KEY (at least 16 characters: openssl rand -hex 32)")
+  fi
+fi
+unset value
+if [[ ${#PLACEHOLDERS[@]} -gt 0 ]]; then
+  echo "❌ stack.env still has empty or template values:"
+  printf '   %s\n' "${PLACEHOLDERS[@]}"
+  echo "   Fill them (see stack.env.example). POSTGRES_PASSWORD is fixed at the db volume's first"
+  echo "   start: set it now (openssl rand -hex 24) and use the same value in DATABASE_URL_PHASE1."
+  exit 1
+fi
+
+# The guard above makes full imply a real OpenRouter key; without full, Hermes does not start.
+if [[ "${HERMES_PROFILE}" -eq 1 ]]; then
+  echo "==> init Hermes profile (full stack)"
+  "${SCRIPT_DIR}/init-hermes-profile.sh"
+else
+  echo "==> COMPOSE_PROFILES has no full: Hermes is not started (no init, no smoke)"
+fi
+
+compose() {
+  docker compose --env-file stack.env "${COMPOSE_FILES[@]}" "$@"
+}
 
 echo "==> docker compose build (profiles=${COMPOSE_PROFILES:-default})"
 compose build
@@ -91,6 +260,13 @@ compose run --rm --no-deps -T api npm run db:migrate
 echo "==> api up (recreate, wait until healthy)"
 compose up -d --no-deps --force-recreate --wait api
 
+# `up` leaves containers of services whose profile is not active alone, so a stack that ran Hermes
+# before (with the full profile) would keep it running after the switch to tts. Remove it.
+if [[ "${HERMES_PROFILE}" -eq 0 && -n "$(compose --profile full ps -aq hermes 2>/dev/null)" ]]; then
+  echo "==> COMPOSE_PROFILES has no full: removing the Hermes container left from an earlier deploy"
+  compose --profile full rm -sf hermes
+fi
+
 echo "==> docker compose up (profiles=${COMPOSE_PROFILES:-default})"
 compose up -d
 
@@ -99,28 +275,40 @@ if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   "${SCRIPT_DIR}/init-memanto-ollama.sh" || echo "⚠️  Ollama pull failed — retry: deploy/risepath-vm/scripts/init-memanto-ollama.sh"
 fi
 
-echo "==> stack smoke"
+# `up -d` returns once the containers start, and the smoke checks each service once (hermes has a
+# 90 s start_period). Wait for exactly the services the smoke requires, under the same conditions:
+# naming a service on `up` starts it even when no active profile runs it.
 SMOKE_FLAGS=(--require-mcp)
+WAIT=(mcp)
 if [[ "${MEMANTO_STACK}" -eq 1 ]]; then
   SMOKE_FLAGS+=(--require-memanto)
+  WAIT+=(memanto)
 fi
 if [[ "${COMPOSE_PROFILES:-}" == *tts* || "${COMPOSE_PROFILES:-}" == *full* ]]; then
   SMOKE_FLAGS+=(--require-kokoro)
+  WAIT+=(kokoro-tts)
 fi
-if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY}" != "change-me" ]]; then
+if [[ "${HERMES_KEYED}" -eq 1 && ",${COMPOSE_PROFILES// /}," == *",full,"* ]]; then
   SMOKE_FLAGS+=(--require-hermes)
+  WAIT+=(hermes)
 fi
+# mcp-public exits at start on a config readRemoteConfig refuses (trailing slash, http, a bad
+# origin or port), and restart: unless-stopped hides that. Its /health healthcheck fails the deploy.
+if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
+  WAIT+=(mcp-public)
+fi
+echo "==> wait until healthy: ${WAIT[*]}"
+compose up -d --wait "${WAIT[@]}"
 
-if command -v node >/dev/null 2>&1; then
-  node "${REPO_ROOT}/scripts/smoke-vm-stack.mjs" --target host "${SMOKE_FLAGS[@]}"
-else
-  compose exec -T api env \
-    PORT="${PORT:-3006}" \
-    MCP_SSE_PORT="${MCP_SSE_PORT:-3100}" \
-    API_SERVER_PORT="${API_SERVER_PORT:-8642}" \
-    MEMANTO_API_PORT="${MEMANTO_API_PORT:-8100}" \
-    node scripts/smoke-vm-stack.mjs --target container "${SMOKE_FLAGS[@]}"
-fi
+echo "==> stack smoke"
+# Always from inside the api container: there 127.0.0.1 is loopback, which the origin gate exempts.
+# From the host, the published port does not arrive as loopback (403 once ORIGIN_SECRET is set).
+compose exec -T api env \
+  PORT="${PORT:-3006}" \
+  MCP_SSE_PORT="${MCP_SSE_PORT:-3100}" \
+  API_SERVER_PORT="${API_SERVER_PORT:-8642}" \
+  MEMANTO_API_PORT="${MEMANTO_API_PORT:-8100}" \
+  node scripts/smoke-vm-stack.mjs --target container "${SMOKE_FLAGS[@]}"
 
 echo "==> Done"
 compose ps

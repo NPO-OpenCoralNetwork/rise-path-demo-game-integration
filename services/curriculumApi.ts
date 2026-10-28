@@ -3,8 +3,8 @@ import { isVibeCodingCurriculum, mapVibeCodingToGeneratedCourse } from './vibeCo
 import { getCourseProgress } from './progressService';
 import { AIDJ_DEMO_DATA } from './aidjDemoData';
 import { apiFetch } from './apiClient';
+import { dailyLimitFields } from './aiDailyLimit';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '/api/v2';
 const USE_DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'; // Set VITE_DEMO_MODE=false for production
 
 type CurriculumListResponse = {
@@ -756,7 +756,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Paleolithic cave wall painting of bison and horses, torchlight, ochre pigment, prehistoric style',
-                  src: 'https://image.pollinations.ai/prompt/Paleolithic%20cave%20wall%20painting%20of%20bison%20and%20horses%2C%20torchlight%2C%20ochre%20pigment%2C%20prehistoric%20style?nologo=true',
                   alt: 'Paleolithic cave wall painting of bison and horses',
                   caption: { en: 'Reimagined Lascaux wall under torchlight', jp: '松明の光で浮かぶラスコー壁画の再現イメージ' }
                 },
@@ -791,7 +790,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Deep cave interior lit by torchlight, ritual gathering, silhouettes and smoke',
-                  src: 'https://image.pollinations.ai/prompt/Deep%20cave%20interior%20lit%20by%20torchlight%2C%20ritual%20gathering%2C%20silhouettes%20and%20smoke?nologo=true',
                   alt: 'Deep cave interior lit by torchlight with ritual silhouettes',
                   caption: { en: 'Ritual spaces deep inside the cave', jp: '洞窟奥部にある儀礼空間のイメージ' }
                 },
@@ -837,7 +835,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Prehistoric artist grinding ochre pigment with stone tools, dark cave environment',
-                  src: 'https://image.pollinations.ai/prompt/Prehistoric%20artist%20grinding%20ochre%20pigment%20with%20stone%20tools%2C%20dark%20cave%20environment?nologo=true',
                   alt: 'Prehistoric artist grinding ochre pigment with stone tools',
                   caption: { en: 'Grinding ochre to prepare pigment', jp: '顔料を作るための黄土のすり潰し' }
                 },
@@ -878,7 +875,6 @@ const ART_DEMO_DATA: any = {
                 {
                   type: 'image',
                   prompt: 'Ancient cave hand stencils on rock wall, red ochre, torchlight, high contrast',
-                  src: 'https://image.pollinations.ai/prompt/Ancient%20cave%20hand%20stencils%20on%20rock%20wall%2C%20red%20ochre%2C%20torchlight%2C%20high%20contrast?nologo=true',
                   alt: 'Ancient cave hand stencils on rock wall',
                   caption: { en: 'Hand stencils as a shared signature', jp: '共同体の“署名”としての手形' }
                 },
@@ -2683,7 +2679,7 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
   // Real DB fetch (skipped in demo mode)
   let curricula: any[] = [];
   try {
-    const response = await fetch(`${API_BASE}/curricula`);
+    const response = await apiFetch('/curricula');
     if (response.ok) {
       const payload: CurriculumListResponse = await response.json();
       curricula = payload.curricula || [];
@@ -2727,7 +2723,7 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
     return normalizeGeneratedCourse(PYTHON_DEMO_DATA);
   }
 
-  const response = await fetch(`${API_BASE}/curricula/${id}`);
+  const response = await apiFetch(`/curricula/${id}`);
   if (!response.ok) {
     throw new Error('Failed to load curriculum.');
   }
@@ -2740,9 +2736,22 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
 // --- V2 AI Chat & Decision ---
 
 // /ai/generate and /ai/drafts require auth in strict mode, so they go through apiFetch (Bearer
-// token). Errors carry the HTTP status so CourseGeneratorView can tell 401 from 503/504.
-const aiHttpError = (message: string, status: number): Error =>
-  Object.assign(new Error(message), { status });
+// token). Errors carry the HTTP status so CourseGeneratorView can tell 401 from 503/504, and
+// error_type, kind, scope and reset_at from the body (with Retry-After) so a daily cap (error_type
+// 'daily_limit_reached', services/aiDailyLimit.ts) is recognised. The minor safeguards (Phase 0.5)
+// add the access gate's error_type (403 age_required, guardian_consent_required, ai_paused_safety,
+// adults_only) and the safety screen's (422 content_blocked with category and support, 503
+// safety_check_unavailable); the body rides along as `body` for services/safetyApi.ts aiRefusalOf.
+const aiHttpError = (message: string, status: number, body?: unknown, retryAfter?: string | null): Error => {
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  return Object.assign(new Error(message), {
+    status,
+    ...dailyLimitFields(body, retryAfter),
+    ...(typeof record.category === 'string' ? { category: record.category } : {}),
+    ...(typeof record.support === 'boolean' ? { support: record.support } : {}),
+    ...(body && typeof body === 'object' ? { body } : {}),
+  });
+};
 
 export const sendAiChat = async (message: string, sessionId?: string, attachments: any[] = []) => {
   if (USE_DEMO_MODE) {
@@ -2791,14 +2800,16 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || '日次生成上限に達しました', response.status);
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
-      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
+      // A 503 may carry an error_type (safety_check_unavailable, ai_access_unavailable).
+      const err = await response.json().catch(() => ({}));
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status, err);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || 'Chat failed.', response.status);
+      throw aiHttpError(err.error || 'Chat failed.', response.status, err);
     }
     return await response.json();
   } catch (e: any) {
@@ -2903,14 +2914,16 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
 
     if (response.status === 429) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || '日次生成上限に達しました', response.status);
+      throw aiHttpError(err.error || '日次生成上限に達しました', response.status, err, response.headers.get('retry-after'));
     }
     if (response.status === 503 || response.status === 504) {
-      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status);
+      // A 503 may carry an error_type (safety_check_unavailable, ai_access_unavailable).
+      const err = await response.json().catch(() => ({}));
+      throw aiHttpError('AI が一時的に利用できません。しばらくしてから再試行してください。', response.status, err);
     }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw aiHttpError(err.error || 'Decision failed.', response.status);
+      throw aiHttpError(err.error || 'Decision failed.', response.status, err);
     }
     return await response.json();
   } catch (e: any) {
@@ -2937,21 +2950,35 @@ export const fetchAiDrafts = async (): Promise<{drafts: {id: string, title: stri
 export const uploadFile = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+  const response = await apiFetch('/upload', { method: 'POST', body: formData });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || 'Upload failed.');
+    throw Object.assign(new Error(err.error || 'Upload failed.'), { status: response.status, ...dailyLimitFields(err, response.headers.get('retry-after')) });
   }
   return await response.json();
+};
+
+/** /image error_type when the deployment does not generate images (GEMINI_ALLOWED is not "true"). */
+export const IMAGE_GENERATION_UNAVAILABLE = 'image_generation_unavailable';
+
+/**
+ * True when an error from generateImagePreview means this deployment does not make images, so
+ * asking again will not help: only the server's error_type 'image_generation_unavailable' (at any
+ * status). Other 503s (a provider rate limit, the daily caps' outage share) are short outages,
+ * not "images are never made here".
+ */
+export const isImageGenerationUnavailable = (err: unknown): boolean => {
+  if (err === null || typeof err !== 'object') return false;
+  const { errorType } = err as { errorType?: unknown };
+  return errorType === IMAGE_GENERATION_UNAVAILABLE;
 };
 
 export const generateImagePreview = async (
   prompt: string,
   options?: { aspectRatio?: string; imageSize?: string }
 ) => {
-  const response = await fetch(`${API_BASE}/image`, {
+  const response = await apiFetch('/image', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt,
       aspect_ratio: options?.aspectRatio,
@@ -2960,7 +2987,7 @@ export const generateImagePreview = async (
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || 'Image generation failed.');
+    throw Object.assign(new Error(err.error || 'Image generation failed.'), { status: response.status, ...dailyLimitFields(err, response.headers.get('retry-after')) });
   }
   const data = await response.json();
   if (data?.url) {

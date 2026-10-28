@@ -30,7 +30,7 @@ export const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 /** Course slugs and lesson ids that become file names. Stricter than the schema's id pattern (no "." or "_"). */
 export const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
-const MAX_SLUG_LENGTH = 80;
+export const MAX_SLUG_LENGTH = 80;
 const MAX_LESSON_BYTES = 512 * 1024;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

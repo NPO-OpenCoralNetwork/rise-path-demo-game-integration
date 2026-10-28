@@ -15,6 +15,8 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.COURSES]: '/courses',
   [ViewState.COURSE_DETAILS]: '/courses',
   [ViewState.LIBRARY]: '/library',
+  // Phase 6: today's review cards (the sidebar's 「復習」).
+  [ViewState.REVIEW]: '/review',
 
   [ViewState.AI_DIAGNOSIS]: '/assessment',
   [ViewState.LIFE_JOURNAL]: '/life-journal',
@@ -32,8 +34,6 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.PROFILE_MIRROR]: '/profile/mirror',
   [ViewState.PROFILE_EDIT]: '/profile/edit',
   [ViewState.NOTIFICATIONS]: '/notifications',
-  [ViewState.SUBSCRIPTION]: '/subscription',
-  [ViewState.BALANCE]: '/subscription',
 
   [ViewState.SETTINGS]: '/settings',
   [ViewState.SETTINGS_VOICE]: '/settings/voice',
@@ -41,6 +41,23 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.SETTINGS_API_KEY]: '/settings/api-key',
   [ViewState.SETTINGS_PRIVACY]: '/settings/privacy',
   [ViewState.SETTINGS_AI_MEMORY]: '/settings/ai-memory',
+  [ViewState.SETTINGS_AI_ACCESS]: '/settings/ai-access',
+  [ViewState.SETTINGS_ADMIN_SAFETY]: '/settings/admin/safety',
+  // Phase 1: the learner's own AI apps connected to the remote MCP endpoint (OAuth).
+  [ViewState.SETTINGS_CONNECTED_APPS]: '/settings/connected-apps',
+  // Public guide; open when signed out too (App.tsx renders it outside the Layout then).
+  [ViewState.AI_SAFETY]: '/ai-safety',
+  // Phase 3: the supporter plan (VITE_FEATURE_BILLING; the old /subscription redirects here) and
+  // the public 特定商取引法に基づく表記 (open when signed out, like /ai-safety).
+  [ViewState.SETTINGS_PLAN]: '/settings/plan',
+  [ViewState.SETTINGS_PLAN_CONFIRM]: '/settings/plan/confirm',
+  [ViewState.LEGAL_COMMERCE]: '/legal/commerce',
+  // Phase 4: deleting one's own account, and the public page after it (open when signed out).
+  [ViewState.SETTINGS_DELETE_ACCOUNT]: '/settings/delete-account',
+  [ViewState.ACCOUNT_DELETED]: '/account/deleted',
+  // Phase 4: the public legal texts ("being prepared" until VITE_FEATURE_LEGAL_PAGES=true).
+  [ViewState.LEGAL_TERMS]: '/terms',
+  [ViewState.LEGAL_PRIVACY]: '/privacy',
 
   // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',
@@ -126,6 +143,7 @@ export const VIEW_PATHS: Record<ViewState, string> = {
 export type NavKey =
   | 'dashboard'
   | 'learning'
+  | 'review'
   | 'generator'
   | 'diagnosis'
   | 'journal'
@@ -185,6 +203,7 @@ export function pathToNavKey(pathname: string): NavKey | null {
   if (startsWithSegment(path, '/life-journal')) return 'journal';
   if (startsWithSegment(path, '/profile/history')) return 'history';
   if (startsWithSegment(path, '/profile/badges')) return 'badges';
+  if (startsWithSegment(path, '/review')) return 'review';
   if (startsWithSegment(path, '/profile/generated')) return 'generated';
   if (startsWithSegment(path, '/generated-course') || startsWithSegment(path, '/generated-lesson')) return 'generated';
   if (startsWithSegment(path, '/profile')) return 'passport';

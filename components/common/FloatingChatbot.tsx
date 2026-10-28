@@ -13,6 +13,7 @@ import {
 } from '../../services/agentApi';
 import { onTutorRequest, type TutorChatContext } from '../../services/tutorBridge';
 import { isLessonPath } from '../../navigation/viewPaths';
+import { features } from '../../config/features';
 
 const markdownComponents = {
     h1: ({ ...props }: React.HTMLAttributes<HTMLHeadingElement>) => <h1 className="text-base font-bold text-fg my-2" {...props} />,
@@ -76,8 +77,11 @@ export const FloatingChatbot: React.FC = () => {
             habitChatLink: 'Sleep, focus & habits',
             habitChatHint: 'Open Habit & Learning Chat for journal-based patterns.',
             errorMessage: 'Something went wrong. Please try again.',
-            hermesUnavailable: 'AI coach is unavailable. Check Hermes and HERMES_API_KEY.',
+            // Learners see plain words; operators find the cause in the server log ([Agent Proxy]).
+            hermesUnavailable: "The AI coach isn't available right now. Please try again in a little while.",
             rateLimited: 'Too many requests. Please wait a minute.',
+            dailyLimit: "Today's limit for the AI coach has been reached. You can chat again after midnight Japan time.",
+            featurePaused: 'The AI coach is paused for now.',
             demoUnavailable: 'AI coach requires the API server (not available in demo mode).',
             loginRequired: 'Please sign in to use the AI coach.',
             thinking: 'Thinking…',
@@ -94,8 +98,10 @@ export const FloatingChatbot: React.FC = () => {
             habitChatLink: '睡眠・集中・習慣の相談',
             habitChatHint: 'ジャーナルに基づく傾向は「生活習慣×学習チャット」で詳しく聞けます。',
             errorMessage: 'エラーが発生しました。もう一度お試しください。',
-            hermesUnavailable: 'AI コーチを利用できません。Hermes と HERMES_API_KEY を確認してください。',
+            hermesUnavailable: 'AI コーチは今使えません。しばらくしてからもう一度お試しください。',
             rateLimited: 'リクエストが多すぎます。1分ほどお待ちください。',
+            dailyLimit: '今日のAIコーチの利用は上限に達しました。日本時間の0時を過ぎたら、また話しかけてください。',
+            featurePaused: 'AIコーチは、今は停止しています。',
             demoUnavailable: 'AI コーチには API サーバーが必要です（デモモードでは利用できません）。',
             loginRequired: 'AI コーチを利用するにはログインが必要です。',
             thinking: '考えています…',
@@ -107,6 +113,8 @@ export const FloatingChatbot: React.FC = () => {
         genericError: t.errorMessage,
         hermesUnavailable: t.hermesUnavailable,
         rateLimited: t.rateLimited,
+        dailyLimit: t.dailyLimit,
+        featurePaused: t.featurePaused,
         demoUnavailable: t.demoUnavailable,
         loginRequired: t.loginRequired,
     }), [t]);
@@ -296,14 +304,20 @@ export const FloatingChatbot: React.FC = () => {
                             <Brain size={24} aria-hidden="true" />
                         </div>
                         <p className="text-sm">{t.welcome}</p>
-                        <button
-                            type="button"
-                            onClick={() => navigate('/life-journal/chat')}
-                            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5"
-                        >
-                            {t.habitChatLink}
-                        </button>
-                        <p className="text-xs text-fg-3 max-w-60">{t.habitChatHint}</p>
+                        {/* App.tsx mounts this panel only when features.agentChat is on; the link to the
+                            other shared chat follows the same flag. */}
+                        {features.agentChat && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/life-journal/chat')}
+                                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5"
+                                >
+                                    {t.habitChatLink}
+                                </button>
+                                <p className="text-xs text-fg-3 max-w-60">{t.habitChatHint}</p>
+                            </>
+                        )}
                     </div>
                 )}
 

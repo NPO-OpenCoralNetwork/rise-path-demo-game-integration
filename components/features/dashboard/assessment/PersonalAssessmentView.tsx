@@ -5,7 +5,11 @@ import PersonalityAssessment from './PersonalityAssessment';
 import IntroSequence from './IntroSequence';
 import { analyzePersonality, toLlmLocale } from '../../../../services/llmApi';
 import { useTheme } from '../../../../context/ThemeContext';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, CalendarClock, Info } from 'lucide-react';
+import { dailyLimitScope } from '../../../../services/aiDailyLimit';
+import { aiRefusalOf, type AiRefusal } from '../../../../services/safetyApi';
+import { AiNotice, AiRefusalNotice } from '../../../ui/AiNotice';
+import { useAuth } from '../../../../context/AuthContext';
 import { notifyAssessmentProfileChanged } from '../../../../constants/assessment';
 import { STORAGE_KEY } from './assessmentConstants';
 import { useLanguage } from '../../../../context/LanguageContext';
@@ -28,6 +32,56 @@ enum Step {
 
 // Keep the analysis screen up long enough to read, even when the answer comes back instantly.
 const MIN_ANALYZING_MS = 1200;
+
+/**
+ * Shown on the results whenever the AI did not write them, so the built-in explanation is never
+ * passed off as an AI analysis: a daily cap (429 daily_limit_reached, services/aiDailyLimit.ts),
+ * a refusal by the AI access gate or the safety screen (Phase 0.5; its card follows), or any
+ * other failure.
+ */
+type InsightFallback = 'daily_limit' | 'paused' | 'refused' | 'unavailable';
+const insightLimitCopy = {
+  en: {
+    daily_limit: "Today's limit for AI analysis has been reached, so this shows the standard explanation. Retake the assessment after midnight Japan time to get the AI analysis.",
+    paused: 'AI analysis is paused for now, so this shows the standard explanation.',
+    refused: 'The AI analysis could not be used, so this shows the standard explanation.',
+    unavailable: 'The AI analysis is not available right now, so this shows the standard explanation.',
+  },
+  jp: {
+    daily_limit: '今日のAI分析は上限に達したため、標準の解説を表示しています。AI分析を受けるには、日本時間の0時を過ぎてから診断を受け直してください。',
+    paused: 'AI分析は今は停止しているため、標準の解説を表示しています。',
+    refused: 'AIの分析は使えなかったため、標準の解説を表示しています。',
+    unavailable: '今はAIの分析を使えないため、標準の解説を表示しています。',
+  },
+  fr: {
+    daily_limit: "La limite d'analyses IA du jour est atteinte : voici l'explication standard. Refaites le test après minuit, heure du Japon, pour obtenir l'analyse IA.",
+    paused: "L'analyse IA est suspendue pour le moment : voici l'explication standard.",
+    refused: "L'analyse IA n'a pas pu être utilisée : voici l'explication standard.",
+    unavailable: "L'analyse IA n'est pas disponible pour le moment : voici l'explication standard.",
+  },
+} as const satisfies Record<'en' | 'jp' | 'fr', Record<InsightFallback, string>>;
+
+/** The AI insight as plain text, for a report on it (services/safetyApi.ts reportAiAnswer). */
+const insightReportText = (advice: AIAdvice | undefined): string => {
+  if (!advice) return '';
+  const lines: string[] = [];
+  const items = (list?: Array<{ title?: string; description?: string }>) =>
+    (list ?? []).forEach((item) => lines.push([item.title, item.description].filter(Boolean).join(': ')));
+  items(advice.strengths);
+  items(advice.growthTips);
+  const strategy = advice.learningStrategy;
+  if (strategy) {
+    lines.push([strategy.title, strategy.approach].filter(Boolean).join(': '));
+    (strategy.steps ?? []).forEach((step) => lines.push(step.action));
+  }
+  if (advice.careerCompatibility) lines.push(advice.careerCompatibility);
+  const relation = advice.relationshipAnalysis;
+  if (relation) lines.push(...[relation.style, relation.idealPartner, relation.advice].filter(Boolean) as string[]);
+  const business = advice.businessPartnership;
+  if (business) lines.push(...[business.role, business.bestSync, business.warning].filter(Boolean) as string[]);
+  if (advice.hiddenTalent) lines.push([advice.hiddenTalent.title, advice.hiddenTalent.description].filter(Boolean).join(': '));
+  return lines.filter((line) => line.trim()).join('\n');
+};
 
 const DEMO_AI_ADVICE_BY_LANG: Record<'en' | 'jp' | 'fr', AIAdvice> = {
   en: {
@@ -271,6 +325,13 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
   const { setProfile: setGlobalProfile } = useTheme();
   const { language } = useLanguage();
   const [assessmentLanguage, setAssessmentLanguage] = useState<'en' | 'jp' | 'fr'>(language === 'jp' ? 'jp' : 'en');
+  // The last analysis did not come from the AI and shows the built-in text: why.
+  const [insightLimit, setInsightLimit] = useState<InsightFallback | null>(null);
+  // The access gate or the safety screen refused it (Phase 0.5): the card that says what to do.
+  const [insightRefusal, setInsightRefusal] = useState<AiRefusal | null>(null);
+  // The results on screen were written by the AI (they get the AI notice and a report button).
+  const [insightFromAi, setInsightFromAi] = useState(false);
+  const { logout } = useAuth();
 
   const t = {
     en: {
@@ -342,16 +403,30 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
     // Server-side analysis (/api/v2/llm). If the AI is unavailable, the built-in profile text
     // for the chosen language keeps the results screen useful.
     let advice: AIAdvice & { personalityType?: string };
+    let fromAi = false;
+    setInsightLimit(null);
+    setInsightRefusal(null);
+    setInsightFromAi(false);
     try {
       const [insight] = await Promise.all([
         analyzePersonality(finalScores, { locale: toLlmLocale(assessmentLanguage) }),
         new Promise(resolve => setTimeout(resolve, MIN_ANALYZING_MS)),
       ]);
       advice = insight;
+      fromAi = true;
     } catch (error) {
       console.warn('Personality analysis unavailable, using built-in profile text:', error);
       advice = DEMO_AI_ADVICE_BY_LANG[assessmentLanguage] || DEMO_AI_ADVICE_BY_LANG.jp;
+      // Never silent: the results say the text is the standard one, and why.
+      const scope = dailyLimitScope(error);
+      const refusal = aiRefusalOf(error);
+      if (scope) setInsightLimit(scope === 'off' ? 'paused' : 'daily_limit');
+      else if (refusal) {
+        setInsightLimit('refused');
+        setInsightRefusal(refusal);
+      } else setInsightLimit('unavailable');
     }
+    setInsightFromAi(fromAi);
 
     try {
       // personalityType is a lookup key for the result visuals, not the AI's free-text label.
@@ -365,7 +440,13 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
         aiAdvice
       };
 
-      persistAssessmentProfile(newProfile);
+      // Stored aiAdvice is AI-written only (IntroSequence and the profile screen label it as AI);
+      // the built-in text stays on this screen.
+      if (fromAi) persistAssessmentProfile(newProfile);
+      else {
+        const { aiAdvice: _builtIn, ...withoutAdvice } = newProfile;
+        persistAssessmentProfile(withoutAdvice);
+      }
       setProfile(newProfile);
       addLearningEvent({
         type: 'diagnosis_complete',
@@ -450,8 +531,37 @@ const PersonalAssessmentView: React.FC<PersonalAssessmentViewProps> = ({ onNavig
 
   if (step === Step.RESULTS && profile) {
     const result = mapProfileToDiagnosisResult(profile, assessmentLanguage);
+    const noticeLanguage = assessmentLanguage === 'jp' ? 'jp' : 'en';
     return (
       <div className="bg-white text-slate-900">
+        {insightLimit && (
+          <div className="mx-auto max-w-3xl space-y-3 px-4 pt-4">
+            <p role="status" className="flex items-start gap-2 rounded-control border border-line bg-sunken px-4 py-3 text-small text-fg-2">
+              {insightLimit === 'daily_limit' || insightLimit === 'paused'
+                ? <CalendarClock size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+                : <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />}
+              <span>{insightLimitCopy[assessmentLanguage][insightLimit]}</span>
+            </p>
+            {insightRefusal && (
+              <AiRefusalNotice
+                refusal={insightRefusal}
+                variant="result"
+                language={noticeLanguage}
+                onSignIn={() => { void logout({ reason: 'reauth' }); }}
+              />
+            )}
+          </div>
+        )}
+        {insightFromAi && profile.aiAdvice && (
+          <div className="mx-auto max-w-3xl px-4 pt-4">
+            <AiNotice
+              surface="assessment_insight"
+              answer={insightReportText(profile.aiAdvice)}
+              language={noticeLanguage}
+              className="rounded-control border border-line bg-surface px-4 py-3"
+            />
+          </div>
+        )}
         <ResultScreen result={result} onRetake={handleRestart} />
       </div>
     );

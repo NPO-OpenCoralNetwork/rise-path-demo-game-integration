@@ -384,7 +384,7 @@ export async function recallForLearner({
             agent_id: agentId,
             count: 0,
             memories: [],
-            semantic_memory_status: 'degraded',
+            semantic_memory_status: 'not_configured',
         };
     }
 
@@ -465,7 +465,7 @@ export async function listRecentMemories({ pool, userId, limit = 50, type }) {
             agent_id: agentId,
             count: 0,
             memories: [],
-            semantic_memory_status: 'degraded',
+            semantic_memory_status: 'not_configured',
         };
     }
 
@@ -866,7 +866,8 @@ export async function syncHabitInsightMemories({
 
     const listed = await listRecentMemories({ pool, userId, limit: 100 });
     if (listed.error_type) return listed;
-    if (listed.semantic_memory_status === 'degraded') {
+    if (listed.semantic_memory_status === 'degraded'
+        || listed.semantic_memory_status === 'not_configured') {
         return { error: 'Semantic memory service unavailable', error_type: 'service_unavailable' };
     }
 

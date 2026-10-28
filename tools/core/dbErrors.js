@@ -25,5 +25,15 @@ export function classifyDbError(err, operation) {
     if (err.code === '22P02') {
         return { error: `Invalid UUID format during ${operation}`, error_type: 'validation' };
     }
-    return { error: `${operation} failed: ${err.message}`, error_type: 'unknown' };
+    // insufficient_privilege: the role has no grant on a table, typically mcp-public's
+    // risepath_mcp_remote after a migration added the table and before the owner re-ran
+    // deploy/risepath-vm/sql/mcp_remote_role.sql. The log says so; the caller gets no table name.
+    if (err.code === '42501') {
+        console.error(`[db] ${operation}: permission denied (re-run the role SQL after the migration):`, err?.message || err);
+        return { error: 'server setup incomplete', error_type: 'permission_denied' };
+    }
+    // The driver's own text (column names, SQL fragments, values) stays in the server log: these
+    // results reach the LLM and can be quoted to a learner.
+    console.error(`[db] ${operation} failed:`, err?.code || '', err?.message || err);
+    return { error: `${operation} failed`, error_type: 'unknown' };
 }

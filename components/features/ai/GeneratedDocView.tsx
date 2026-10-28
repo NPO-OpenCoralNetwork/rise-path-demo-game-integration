@@ -14,14 +14,17 @@ import { DocChapter, DocSection, LocalizedDocBlock, LocalizedText, QuizData } fr
 import { GeneratedLesson, CurriculumPersonalization } from '../../../services/curriculumAdapter';
 import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
-import { generateImagePreview } from '../../../services/curriculumApi';
+import { generateImagePreview, isImageGenerationUnavailable } from '../../../services/curriculumApi';
 import { resolveMermaidSource } from './mermaidSource';
+import { dailyLimitResetAt, dailyLimitScope, nextJstMidnight } from '../../../services/aiDailyLimit';
+import { aiAccessErrorKind } from '../../../services/aiAccessRules';
 import {
     checkTtsAvailable,
     getDisplayName,
     loadTtsPreferences,
 } from '../../../services/ttsPreferencesService';
 import VoiceQuickSwitchSheet from '../settings/VoiceQuickSwitchSheet';
+import { AiNotice } from '../../ui/AiNotice';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -308,6 +311,20 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
             });
         return () => { active = false; };
     }, [language, location.key]);
+
+    // The lesson as plain text, for a report on it (the AI notice under the title).
+    const lessonReportText = useMemo(() => {
+        const lines: string[] = [getText(lesson.title, language), getText(lesson.subtitle, language)];
+        for (const section of lesson.sections ?? []) {
+            lines.push(getText(section.title, language));
+            for (const block of section.content ?? []) {
+                if (block.type === 'text' || block.type === 'callout') lines.push(getText(block.text, language));
+                else if (block.type === 'list') block.items.forEach((item) => lines.push(getText(item, language)));
+                else if (block.type === 'code') lines.push(block.code);
+            }
+        }
+        return lines.filter((line) => line && line.trim()).join('\n');
+    }, [lesson, language]);
 
     const t = {
         en: {
@@ -750,6 +767,14 @@ const GeneratedDocView: React.FC<GeneratedDocViewProps> = ({
                                 {getText(lesson.subtitle, language)}
                             </p>
                             {personalization && <PersonalizationBar p={personalization} lang={language} />}
+                            {/* This lesson was written by AI: disclosure and report. */}
+                            <AiNotice
+                                surface="generated_lesson"
+                                answer={lessonReportText}
+                                language={language}
+                                context={{ ...(courseId ? { courseId } : {}), ...(lesson.id ? { lessonId: String(lesson.id) } : {}) }}
+                                className="mt-6 rounded-control border border-line bg-sunken px-3 py-2 text-left"
+                            />
                         </header>
 
                         <div className="space-y-16">
@@ -1359,25 +1384,64 @@ const getMermaidThemeForType = (type: MermaidDiagramType) => {
 
 type ImageDocBlock = Extract<LocalizedDocBlock, { type: 'image' }>;
 const imagePreviewCache = new Map<string, string>();
+// Set when /image answers 429 daily_limit_reached (server/middleware/dailyCaps.js): until then,
+// image blocks skip the request (each would get the same 429). Today's cap holds until reset_at
+// (00:00 JST); a feature turned off ('paused') holds until the page reloads. A block that mounts
+// after the time has passed asks again; one already on screen keeps its note (no unattended calls).
+let imageLimit: { until: number; paused: boolean } | null = null;
+const imageLimitNow = (): 'daily' | 'paused' | null =>
+    imageLimit && Date.now() < imageLimit.until ? (imageLimit.paused ? 'paused' : 'daily') : null;
+type ImageNote = 'daily' | 'paused' | 'unavailable' | 'failed';
 
 const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({ block, language }) => {
+    const copy = {
+        en: {
+            // Blocks on screen do not ask again by themselves: the page has to be opened again.
+            daily: "Today's limit for image previews has been reached. Open this page again after midnight Japan time to see them.",
+            paused: 'Image previews are paused for now.',
+            unavailable: 'Images are not generated here, so this is a description of the picture.',
+            failed: "This image couldn't be shown. Here is what it would show.",
+            imageLabel: 'Image description',
+        },
+        jp: {
+            daily: '今日の画像生成は上限に達しました。日本時間の0時を過ぎてから、このページを開き直すと表示されます。',
+            paused: '画像の生成は、今は停止しています。',
+            unavailable: 'ここでは画像を作らないため、絵の内容を文章でお伝えします。',
+            failed: '画像を表示できませんでした。絵の内容を文章でお伝えします。',
+            imageLabel: '画像の説明',
+        },
+    } as const;
+    const t = copy[language];
     const cached = block.prompt ? imagePreviewCache.get(block.prompt) : null;
     const [src, setSrc] = useState<string | null>(
         block.prompt ? cached || null : block.src || block.fallbackSrc || null
     );
     const [isLoading, setIsLoading] = useState(false);
+    // A daily cap, an unavailable image service or a failed call stopped this image: with no
+    // fallback image, a static note and the image description replace the skeleton.
+    const [limited, setLimited] = useState<ImageNote | null>(null);
     const analysisRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!block.prompt) {
+            setLimited(null);
             setSrc(block.src || block.fallbackSrc || null);
             return;
         }
         if (imagePreviewCache.has(block.prompt)) {
+            setLimited(null);
             setSrc(imagePreviewCache.get(block.prompt) || null);
             setIsLoading(false);
             return;
         }
+        const holding: ImageNote | null = imageLimitNow();
+        if (holding) {
+            setLimited(holding);
+            setSrc(block.src || block.fallbackSrc || null);
+            setIsLoading(false);
+            return;
+        }
+        setLimited(null);
         let cancelled = false;
         setSrc(null);
         setIsLoading(true);
@@ -1387,8 +1451,23 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
                 imagePreviewCache.set(block.prompt || '', url);
                 setSrc(url);
             })
-            .catch(() => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
+                const scope = dailyLimitScope(err);
+                if (scope) {
+                    const paused = scope === 'off';
+                    imageLimit = { paused, until: paused ? Infinity : dailyLimitResetAt(err) ?? nextJstMidnight(Date.now()) };
+                    setLimited(paused ? 'paused' : 'daily');
+                } else if (isImageGenerationUnavailable(err) || aiAccessErrorKind(err)) {
+                    // 503 image_generation_unavailable: this deployment does not generate images.
+                    // Each block still asks once, since the server answers images it already
+                    // cached (free, before this check); this block does not ask again. An access
+                    // refusal (403 adults_only for a learner under 18, age_required, …) reads the same.
+                    setLimited('unavailable');
+                } else {
+                    // Any other failure: this block does not ask again by itself.
+                    setLimited('failed');
+                }
                 setSrc(block.src || block.fallbackSrc || null);
             })
             .finally(() => {
@@ -1445,7 +1524,31 @@ const ImageBlock: React.FC<{ block: ImageDocBlock; language: 'en' | 'jp' }> = ({
     if (!src) {
         return (
             <div className={`my-8 ${block.layout === 'full' ? '-mx-4 sm:-mx-6 md:-mx-12' : ''}`}>
-                <div className="w-full h-64 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-50 animate-pulse" />
+                {limited === 'unavailable' || limited === 'failed' ? (
+                    // No image here: what it would show (caption, else alt text, else the prompt) is
+                    // the content, with a short note under it. Static, no role="alert", as below.
+                    <figure className="w-full min-h-32 rounded-card border border-line bg-sunken flex flex-col items-center justify-center gap-2 px-6 py-6 text-center">
+                        <Image size={20} aria-hidden="true" className="text-fg-3" />
+                        {(getText(block.caption, language) || block.alt || block.prompt) && (
+                            <p className="text-sm text-fg-2 max-w-prose">
+                                <span className="sr-only">{t.imageLabel}: </span>
+                                {getText(block.caption, language) || block.alt || block.prompt}
+                            </p>
+                        )}
+                        <figcaption className="text-xs text-fg-3">{t[limited]}</figcaption>
+                    </figure>
+                ) : limited ? (
+                    // Static, no role="alert": several image blocks could otherwise announce at once.
+                    // What the image would show (caption, else alt text) stays readable under the note.
+                    <div className="w-full min-h-32 rounded-xl border border-line bg-sunken flex flex-col items-center justify-center gap-1 px-6 py-6 text-center">
+                        <p className="text-sm text-fg-2">{t[limited]}</p>
+                        {(getText(block.caption, language) || block.alt) && (
+                            <p className="text-xs text-fg-3">{getText(block.caption, language) || block.alt}</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-full h-64 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-50 animate-pulse" />
+                )}
             </div>
         );
     }

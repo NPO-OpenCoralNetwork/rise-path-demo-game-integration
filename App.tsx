@@ -1,13 +1,18 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import { ViewState, GeneratedCourse, Course } from './types';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
+import UnsavedLogoutDialog from './components/lesson/UnsavedLogoutDialog';
+import SaveStoppedNotice from './components/lesson/SaveStoppedNotice';
 import { VIEW_PATHS } from './navigation/viewPaths';
 import { trackViewForPath, withoutTrailingSlash } from './navigation/pathViews';
-import { RETURN_TO_KEY, isInAppPath, authReturnTarget } from './navigation/authReturn';
+import { isInAppPath, authReturnTarget } from './navigation/authReturn';
 import { features } from './config/features';
+import { syncLegalGate, useLegalGate } from './components/legal/legalGateClient';
+import LegalNoticeBar from './components/legal/LegalNoticeBar';
 
 // Common Components
 import Layout from './components/common/Layout';
@@ -32,7 +37,6 @@ import ProfileGeneratedView from './components/features/dashboard/profile/Profil
 import ProfileEditView from './components/features/dashboard/profile/ProfileEditView';
 import LearningMirrorView from './components/features/dashboard/profile/LearningMirrorView';
 import NotificationsView from './components/features/dashboard/NotificationsView';
-import SubscriptionView from './components/features/dashboard/SubscriptionView';
 import SettingsView from './components/features/settings/SettingsView';
 import SettingsVoiceView from './components/features/settings/SettingsVoiceView';
 import SettingsDialogueVoiceView from './components/features/settings/SettingsDialogueVoiceView';
@@ -92,13 +96,92 @@ import {
   SonicSynthView,
   PSchoolView,
   AidjCurriculumView,
+  AiAccessSetupView,
+  AiSafetyGuideView,
+  AdminSafetyView,
+  OAuthConsentView,
+  ConnectedAppsView,
+  PlanView,
+  PlanConfirmView,
+  CommerceDisclosureView,
+  DeleteAccountView,
+  AccountDeletedView,
+  TermsRoute,
+  PrivacyRoute,
+  LegalConsentView,
+  ReviewView,
 } from './components/routes/lazyRoutes';
+import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
+
+/** sessionStorage key for the page to open after sign-in. */
+const RETURN_TO_KEY = 'rp:returnTo';
+/** Pages open when signed out; they render outside the Layout then. */
+const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/terms', '/privacy', '/account/deleted']);
+const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
+/**
+ * Pages that stay open while the signed-in learner has not accepted a terms version that requires
+ * acceptance (Phase 4, design §4.3, finding 17): reading the texts and every public page, deleting
+ * the account, withdrawing the guardian's AI consent, disconnecting AI apps, the privacy deletes,
+ * AI memory and cancelling a plan (the portal; checkout is /settings/plan/confirm) never depend on
+ * accepting new text. Everything else, P-School and /oauth/consent included, shows the
+ * re-consent page (LegalConsentView) instead.
+ */
+const LEGAL_GATE_EXEMPT = new Set([
+  ...PUBLIC_PATHS,
+  '/settings/delete-account',
+  '/settings/ai-access',
+  '/settings/connected-apps',
+  '/settings/privacy',
+  '/settings/ai-memory',
+  '/settings/plan',
+]);
+/** Pages that finish a sign-in: when the session is already there, they forward like handleLoginSuccess. */
+const POST_SIGN_IN_PATHS = new Set(['/auth/callback', '/auth/confirm-pending']);
+
+const readLocalStorage = (): Storage | null => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Where to go after sign-in: the saved in-app path, else a pending agent connection request
+ * (/oauth/consent, kept in localStorage so email confirmation in another tab comes back), else
+ * the dashboard. `consume` clears the saved path.
+ */
+const postSignInTarget = (consume: boolean): string => {
+  try {
+    const saved = sessionStorage.getItem(RETURN_TO_KEY);
+    if (consume) sessionStorage.removeItem(RETURN_TO_KEY);
+    if (saved && isInAppPath(saved)) return saved;
+  } catch {
+    // Storage blocked: fall through.
+  }
+  return pendingConsentReturnPath(readLocalStorage()) ?? '/';
+};
+
+/** Signed in on /auth/callback or /auth/confirm-pending (the session arrived first): forward once. */
+const PostSignInRedirect: React.FC = () => {
+  const [target] = useState(() => postSignInTarget(false));
+  useEffect(() => {
+    postSignInTarget(true);
+  }, []);
+  return <Navigate to={target} replace />;
+};
 
 const AppContent: React.FC = () => {
   const { language, setLanguage } = useLanguage();
-  const { isLoggedIn, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoggedIn, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Phase 4: whether the terms are accepted (components/legal/legalGateClient.ts; off unless
+  // VITE_FEATURE_LEGAL_PAGES=true). Only `needed` blocks, and only outside LEGAL_GATE_EXEMPT.
+  const legal = useLegalGate(features.legalPages);
+  useEffect(() => {
+    syncLegalGate(features.legalPages, user ? { id: user.id, email: user.email, isGuest: user.isGuest } : null);
+  }, [user?.id, user?.email, user?.isGuest]);
 
   // UI state
   const [isLoginPageVisible, setIsLoginPageVisible] = useState(false);
@@ -117,10 +200,22 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/profile/diagnosis')) return ViewState.PROFILE_DIAGNOSIS;
     if (path.startsWith('/profile/history')) return ViewState.PROFILE_HISTORY;
     if (path.startsWith('/profile/badges')) return ViewState.PROFILE_BADGES;
+    if (normalizePath(path) === '/review') return ViewState.REVIEW;
     if (path.startsWith('/profile/mirror')) return ViewState.PROFILE_MIRROR;
     if (path.startsWith('/profile/generated')) return ViewState.PROFILE_GENERATED;
     if (path.startsWith('/profile/edit')) return ViewState.PROFILE_EDIT;
     if (path.startsWith('/profile')) return ViewState.PROFILE;
+    if (path.startsWith('/settings/admin/safety')) return ViewState.SETTINGS_ADMIN_SAFETY;
+    if (path.startsWith('/settings/ai-access')) return ViewState.SETTINGS_AI_ACCESS;
+    if (path.startsWith('/settings/connected-apps')) return ViewState.SETTINGS_CONNECTED_APPS;
+    if (path.startsWith('/settings/plan/confirm')) return ViewState.SETTINGS_PLAN_CONFIRM;
+    if (path.startsWith('/settings/plan')) return ViewState.SETTINGS_PLAN;
+    if (path.startsWith('/ai-safety')) return ViewState.AI_SAFETY;
+    if (path.startsWith('/legal/commerce')) return ViewState.LEGAL_COMMERCE;
+    if (normalizePath(path) === '/terms') return ViewState.LEGAL_TERMS;
+    if (normalizePath(path) === '/privacy') return ViewState.LEGAL_PRIVACY;
+    if (path === '/account/deleted') return ViewState.ACCOUNT_DELETED;
+    if (path.startsWith('/settings/delete-account')) return ViewState.SETTINGS_DELETE_ACCOUNT;
     if (path.startsWith('/settings/voice/dialogue')) return ViewState.SETTINGS_DIALOGUE_VOICE;
     if (path.startsWith('/settings/ai-memory')) return ViewState.SETTINGS_AI_MEMORY;
     if (path.startsWith('/settings/privacy')) return ViewState.SETTINGS_PRIVACY;
@@ -128,7 +223,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/settings/voice')) return ViewState.SETTINGS_VOICE;
     if (path.startsWith('/settings')) return ViewState.SETTINGS;
     if (path.startsWith('/notifications')) return ViewState.NOTIFICATIONS;
-    if (path.startsWith('/subscription')) return ViewState.SUBSCRIPTION;
+    if (path.startsWith('/subscription')) return ViewState.SETTINGS;
     if (path.startsWith('/life-journal/chat')) return ViewState.LIFE_JOURNAL_CHAT;
     if (path.startsWith('/life-journal/insights')) return ViewState.LIFE_JOURNAL_INSIGHTS;
     if (path.startsWith('/life-journal/monthly')) return ViewState.LIFE_JOURNAL_MONTHLY;
@@ -161,10 +256,11 @@ const AppContent: React.FC = () => {
     navigate('/');
   };
 
+  // Phase 5 (O4): false = the learner chose to stay signed in (unsaved lesson records): stay here.
   const handleLogout = () => {
     logout()
-      .catch((error) => console.warn('Logout failed:', error))
-      .finally(() => navigate('/', { replace: true }));
+      .then((done) => { if (done !== false) navigate('/', { replace: true }); })
+      .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
   };
 
   const handleCourseSelect = async (course: Course) => {
@@ -207,15 +303,7 @@ const AppContent: React.FC = () => {
 
   const handleLoginSuccess = () => {
     setIsLoginPageVisible(false);
-    let target = '/';
-    try {
-      const saved = sessionStorage.getItem(RETURN_TO_KEY);
-      sessionStorage.removeItem(RETURN_TO_KEY);
-      if (saved && isInAppPath(saved)) target = saved;
-    } catch {
-      // Storage blocked: default to the dashboard.
-    }
-    navigate(target, { replace: true });
+    navigate(postSignInTarget(true), { replace: true });
   };
 
   const handleBackToLogin = () => {
@@ -224,13 +312,31 @@ const AppContent: React.FC = () => {
     navigate('/', { replace: true });
   };
 
+  const publicPath = PUBLIC_PATHS.has(normalizePath(location.pathname));
+  // Agent connection consent (Phase 1): outside the Layout, signed in or out, no chat widget.
+  const consentPath = normalizePath(location.pathname) === OAUTH_CONSENT_PATH;
+
   return (
     <>
       {authLoading ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white/50 text-sm font-mono">
           Loading…
         </div>
-      ) : (!isLoggedIn && location.pathname !== '/aidj') ? (
+      ) : isLoggedIn && legal.status === 'needed' && !LEGAL_GATE_EXEMPT.has(normalizePath(location.pathname)) ? (
+        <Suspense fallback={<RouteLoading />}>
+          <LegalConsentView />
+        </Suspense>
+      ) : consentPath ? (
+        !isLoggedIn && isLoginPageVisible ? (
+          <LoginView initialMode={authMode} onLoginSuccess={handleLoginSuccess} />
+        ) : (
+          <Suspense fallback={<RouteLoading />}>
+            <OAuthConsentView onSignIn={openAuth} />
+          </Suspense>
+        )
+      ) : isLoggedIn && POST_SIGN_IN_PATHS.has(normalizePath(location.pathname)) ? (
+        <PostSignInRedirect />
+      ) : (!isLoggedIn && !publicPath) ? (
         location.pathname === '/auth/callback' ? (
           <AuthCallbackView onSuccess={handleLoginSuccess} />
         ) : location.pathname === '/auth/confirm-pending' ? (
@@ -242,14 +348,25 @@ const AppContent: React.FC = () => {
         )
       ) : (
         <>
-          {location.pathname === '/aidj' ? (
+          {normalizePath(location.pathname) === '/aidj' || (!isLoggedIn && publicPath) ? (
             <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/aidj" element={<AidjCurriculumView />} />
+                {/* Public guide for children and guardians (signed out: its own header, no Layout). */}
+                <Route path="/ai-safety" element={<AiSafetyGuideView />} />
+                {/* Phase 3: 特定商取引法に基づく表記 (public; Stripe's commerce disclosure link). */}
+                <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+                {/* Phase 4: 利用規約 and プライバシーポリシー (LegalPagesOff unless VITE_FEATURE_LEGAL_PAGES=true). */}
+                <Route path="/terms" element={<TermsRoute />} />
+                <Route path="/privacy" element={<PrivacyRoute />} />
+                {/* Phase 4: after an account deletion (this device is signed out by then). */}
+                <Route path="/account/deleted" element={<AccountDeletedView />} />
               </Routes>
             </Suspense>
           ) : (
-            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout}>
+            // Phase 4: notice = a changed text (dismissible), or "please agree" on an exempt page.
+            // Phase 5: and, while saving has stopped with lesson records unsaved, SaveStoppedNotice.
+            <Layout currentView={getCurrentViewState()} onNavigate={handleNavigate} onLogout={handleLogout} notice={<>{features.legalPages ? <LegalNoticeBar /> : null}<SaveStoppedNotice /></>}>
               <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/" element={<Dashboard onNavigate={handleNavigate} />} />
@@ -270,7 +387,13 @@ const AppContent: React.FC = () => {
 
               {/* Assessment & Profile */}
               <Route path="/assessment" element={<PersonalAssessmentView onNavigate={handleNavigate} />} />
-              <Route path="/life-journal/chat" element={<LifeJournalChatView onNavigate={handleNavigate} />} />
+              {/* The shared Hermes chat is off unless VITE_FEATURE_AGENT_CHAT=true (config/features.ts). */}
+              <Route
+                path="/life-journal/chat"
+                element={features.agentChat
+                  ? <LifeJournalChatView onNavigate={handleNavigate} />
+                  : <Navigate to="/life-journal" replace />}
+              />
               <Route path="/life-journal/insights" element={<LifeJournalInsightsView onNavigate={handleNavigate} />} />
               <Route path="/life-journal/monthly" element={<LifeJournalMonthlyView onNavigate={handleNavigate} />} />
               <Route path="/life-journal" element={<LifeJournalView onNavigate={handleNavigate} />} />
@@ -278,6 +401,8 @@ const AppContent: React.FC = () => {
               <Route path="/profile/diagnosis" element={<ProfileDiagnosisView onNavigate={handleNavigate} />} />
               <Route path="/profile/history" element={<ProfileHistoryView onNavigate={handleNavigate} />} />
               <Route path="/profile/badges" element={<ProfileBadgesView />} />
+              {/* Phase 6: today's review cards (signed-in learners; the page explains sign-in to guests). */}
+              <Route path="/review" element={<ReviewView />} />
               <Route path="/profile/generated" element={<ProfileGeneratedView onNavigate={handleNavigate} />} />
               <Route path="/profile/edit" element={<ProfileEditView onNavigate={handleNavigate} />} />
               <Route path="/profile/mirror" element={<LearningMirrorView />} />
@@ -286,9 +411,26 @@ const AppContent: React.FC = () => {
               <Route path="/settings/api-key" element={<SettingsApiKeyView onNavigate={handleNavigate} />} />
               <Route path="/settings/ai-memory" element={<SettingsAiMemoryView onNavigate={handleNavigate} />} />
               <Route path="/settings/privacy" element={<SettingsPrivacyView onNavigate={handleNavigate} />} />
+              {/* Phase 0.5 minor safeguards: birth month, guardian consent, admin safety page. */}
+              <Route path="/settings/ai-access" element={<AiAccessSetupView />} />
+              <Route path="/settings/admin/safety" element={<AdminSafetyView />} />
+              {/* Phase 1: AI apps the learner connected to the remote MCP endpoint. */}
+              <Route path="/settings/connected-apps" element={<ConnectedAppsView />} />
+              {/* Phase 3: the supporter plan and its final confirmation screen, only with
+                  VITE_FEATURE_BILLING=true (config/features.ts); otherwise Settings. */}
+              <Route path="/settings/plan" element={features.billing ? <PlanView /> : <Navigate to="/settings" replace />} />
+              <Route path="/settings/plan/confirm" element={features.billing ? <PlanConfirmView /> : <Navigate to="/settings" replace />} />
+              <Route path="/ai-safety" element={<AiSafetyGuideView />} />
+              <Route path="/legal/commerce" element={<CommerceDisclosureView />} />
+              <Route path="/terms" element={<TermsRoute />} />
+              <Route path="/privacy" element={<PrivacyRoute />} />
+              {/* Phase 4: delete one's own Rise Path account; the page after it (signed in again). */}
+              <Route path="/settings/delete-account" element={<DeleteAccountView />} />
+              <Route path="/account/deleted" element={<AccountDeletedView />} />
               <Route path="/settings" element={<SettingsView onNavigate={handleNavigate} />} />
               <Route path="/notifications" element={<NotificationsView onNavigate={handleNavigate} />} />
-              <Route path="/subscription" element={<SubscriptionView onNavigate={handleNavigate} />} />
+              {/* The old mock plans page is gone: its URL goes to the plan page, or Settings while billing is off. */}
+              <Route path="/subscription" element={<Navigate to={features.billing ? '/settings/plan' : '/settings'} replace />} />
               <Route path="/library" element={<Library />} />
               <Route path="/characters" element={<AICharacterIntroView onNavigate={handleNavigate} onSelectCharacter={(id) => navigate(`/character/${id}`)} />} />
               <Route path="/character/:characterId" element={<AICharacterDetailViewWrapper onNavigate={handleNavigate} />} />
@@ -366,7 +508,9 @@ const AppContent: React.FC = () => {
             </Suspense>
           </Layout>
           )}
-          <FloatingChatbot />
+          {/* Shared Hermes coach: mounted only when features.agentChat is on. The in-lesson tutor
+              (components/lesson/TutorPanel) is separate and always available on /learn and /preview. */}
+          {features.agentChat && <FloatingChatbot />}
         </>
       )}
     </>
@@ -447,6 +591,10 @@ const App: React.FC = () => (
       <AuthProvider>
         <ThemeProvider>
           <AppContent />
+          {/* Lesson progress nobody owns on this device: ask before adding it to the account. */}
+          <ProgressAdoptDialog />
+          {/* Phase 5 (O4): lesson records still unsaved at logout: ask before logging out. */}
+          <UnsavedLogoutDialog />
         </ThemeProvider>
       </AuthProvider>
     </LanguageProvider>

@@ -3,7 +3,18 @@ import { collectRuntimeHealth } from '../services/runtimeHealth.js';
 
 const router = express.Router();
 
-router.get('/health', async (_req, res) => {
+router.get('/health', async (req, res) => {
+    // Through the public edge (originGate.js): only ok/status, and no Hermes or Kokoro probes.
+    // Loopback and gate-off callers (compose healthcheck, container smoke) keep the full snapshot.
+    if (req.originGate === 'edge') {
+        try {
+            const { ok } = await collectRuntimeHealth({ includeOptional: false });
+            res.status(ok ? 200 : 503).json({ ok, status: ok ? 'ok' : 'degraded' });
+        } catch {
+            res.status(500).json({ ok: false, error: 'health_check_failed' });
+        }
+        return;
+    }
     try {
         const snapshot = await collectRuntimeHealth();
         const status = snapshot.ok ? 200 : 503;
@@ -13,11 +24,8 @@ router.get('/health', async (_req, res) => {
             ...snapshot,
         });
     } catch (err) {
-        res.status(500).json({
-            ok: false,
-            error: 'health_check_failed',
-            message: err.message,
-        });
+        console.error('[Health] snapshot failed:', err?.message);
+        res.status(500).json({ ok: false, error: 'health_check_failed' });
     }
 });
 

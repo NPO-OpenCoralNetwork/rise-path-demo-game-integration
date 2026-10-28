@@ -1,7 +1,8 @@
 # Rise Path 専用 VM デプロイ（`risepath-vm`）
 
-> 更新日: 2026-10-21  
-> ステータス: **GCP `risepath-vm` 稼働中**（db/api/mcp + Memanto overlay、50GB ディスク）/ Hermes・kokoro は `--profile full` で起動  
+> 更新日: 2026-10-22  
+> ステータス: 2026-10-21 に、オーナーが GCP の **`risepath-vm` を削除した**。作り直す手順は §4.5（全体の順番と公開エッジは [`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。新しい VM の DB は空から始まる。構成は db（pgvector 入り）/api/mcp（Memanto overlay は任意。`e2-standard-2` が要る）、50GB ディスク / kokoro は `COMPOSE_PROFILES=tts`（既定）で起動  
+> AI の方針（2026-10-22、Phase 0。[`doc/brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md)）: アプリの中の AI（チューター・文章フィードバック・コース生成）は Claude の安いモデルで動かす。**共有の Hermes エージェントは学習者に提供しない**（`COMPOSE_PROFILES` に `full` を入れず、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しない。Hermes は自分で運用するときや開発のときだけ）。**Gemini は使わない**（`GEMINI_ALLOWED` を設定しない。Gemini の API 規約は 18 歳未満の人が使うサービスでの利用を禁じている）  
 > 目的: **ai-note-meet / nexloom-gce の既存スタックを変更せず**、Rise Path を DB〜Hermes まで一式で再現・運用する。
 
 ---
@@ -25,14 +26,15 @@
 
 - **VM / Hermes インスタンス** = Rise Path **プロダクト 1 つ分**（マルチテナント）
 - **学習者ごとに VM や Hermes は作らない**
-- ユーザー枠は Supabase JWT → `rp:user:{uuid}` → MCP / DB の `user_id` スコープで分離
+- ユーザー枠は Supabase JWT → Express がチャット 1 ターンごとに発行する `rp_turn`（`agent_session_binding` の `rp:turn:<token>`）→ MCP / DB の `user_id` スコープで分離（[`hermes/README.md`](../../hermes/README.md)「MCP の学習者スコープ」）
 
 ### 1.3 VM 外に置くもの
 
 | コンポーネント | 配置 | 理由 |
 |----------------|------|------|
 | **Supabase Auth** | SaaS | 認証のみ。データ DB は VM |
-| **フロント（Vite ビルド）** | Vercel 等（推奨） | 静的配信。API は VM 向け |
+| **フロント（Vite ビルド）** | Vercel（`https://app.<domain>`） | 静的配信。`/api/*` などは `vercel.json` の routes が VM へ転送する |
+| **公開エッジ** | Cloudflare（DNS + Tunnel） | API は Cloudflare Tunnel 経由の `https://api.<domain>` だけで公開する。インターネット向けの受信ポートは開けない |
 | **GCS** | GCP | 大きいファイル（計画） |
 
 ---
@@ -41,9 +43,15 @@
 
 ```text
 [Browser]
-   │ Supabase Auth (JWT)
+   │ Supabase Auth (JWT)。API は同一オリジンの /api/v2 だけを呼ぶ
    ▼
-[Vercel 等]  静的フロント ──HTTPS──► [risepath-vm / Tailscale]
+[Vercel app.<domain>]  静的フロント + vercel.json routes
+   │ /api/*・/audio/cache/*・/generated/img_* を転送し、x-origin-secret を付ける
+   ▼
+[Cloudflare api.<domain>]
+   │ Cloudflare Tunnel（VM から外向きに張る接続。インターネット向けの受信ポートは要らない）
+   ▼
+[risepath-vm]  cloudflared（profile tunnel、edge ネットワーク）──► api:3006
                                          │
                     ┌────────────────────┴────────────────────┐
                     │  docker compose (Rise Path stack)         │
@@ -55,20 +63,27 @@
                     │       └──────────┴────────┴────────┘    │
                     └───────────────────────────────────────────┘
 
+[Mac / Tailscale]  risepath-vm の 5432（db）・3100（mcp）・8642（hermes）・8880（kokoro）は今までどおり。
+                   3006（api）は ORIGIN_SECRET の設定後、x-origin-secret が要る
+
 [nexloom-gce]  … 変更しない（ai-note-meet, auto-grants, gemini5 Hermes 等）
 ```
+
+`api` の最初のミドルウェアは origin gate（`server/middleware/originGate.js`）。`stack.env` に `ORIGIN_SECRET` があると、`api` コンテナ内の loopback 以外から来て正しい `x-origin-secret` を持たないリクエストに 403 を返す。通ったリクエストは edge 扱いで、Bridge Token は使えず、edge のパスにしか届かない。`ORIGIN_SECRET` が空なら gate は動かない。
 
 ### 2.1 Compose サービス（目標）
 
 | サービス | イメージ / ビルド | ポート | 責務 |
 |----------|-------------------|--------|------|
-| `db` | `postgres:16-alpine` | 5432（内部） | `risepath` データ、DB ロール **`risepath_app`** |
-| `api` | リポジトリ `Dockerfile` | 3006 | Express `server.js` |
+| `db` | `pgvector/pgvector:0.8.7-pg16`（Postgres 16 + pgvector。タグ + digest 固定） | 5432（内部） | `risepath` データ、DB ロール **`risepath_app`** |
+| `api` | リポジトリ `Dockerfile` | 3006 | Express `server.js`（フロントは含まない。Vercel が配信する） |
 | `mcp` | 同上 | 3100 | MCP SSE（本番は stdio 非推奨） |
-| `hermes` | Hermes 公式 or カスタム | 8642 | `rise-path` プロファイル、API Server |
-| `proxy` | caddy / traefik（任意） | 443 | TLS 終端 |
+| `hermes` | Hermes 公式 or カスタム（profile `full`。既定では起動しない） | 8642 | `rise-path` プロファイル、API Server。学習者には提供しない（自分で運用するときや開発のときだけ） |
+| `cloudflared` | `cloudflare/cloudflared`（タグ + digest 固定、profile `tunnel`） | なし | `api.<domain>` → `http://api:3006`。TLS は Cloudflare で終端。`tunnel.env` だけを読む |
 
 Postgres ロールは **`risepath_app`** に統一（`deploy/risepath-vm/stack.env.example` の `POSTGRES_USER`、Mac `.env.local`、レガシー bootstrap SQL と一致）。
+
+`db` は pgvector 入りのイメージ。新しい空の `pgdata` ボリュームでは migration 000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になる。RAG のベクトル検索が使える（ただし埋め込みには Gemini が要る。`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探す）。これは空のボリュームから始めたときだけで、pgvector の無いイメージで作ったボリュームはイメージを替えても `FLOAT8[]` のまま（RAG はキーワード検索。[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 migration は **新しい `api` イメージを起動する前に** 流す（`deploy-stack.sh` はこの順。§4.2。Memanto overlay を使うときは §7.2 の `-f` も付ける）:
 
@@ -79,7 +94,9 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate
 docker compose --env-file stack.env up -d
 ```
 
-`/api/v2/health` は未適用の migration が 1 つでもあると 503 を返し、`api` の healthcheck はこれを見る。`mcp` は `api` の healthy を、`hermes` は `mcp` を待つ。新しい migration を含むイメージを先に起動すると、`up` が unhealthy で止まり、`mcp` と `hermes` が更新されない。
+migration（018 をふくむ）は、`api` と `mcp` を起動する前に流す（上の順のとおり）。
+
+`/api/v2/health` は未適用の migration が 1 つでもあると 503 を返し、`api` の healthcheck はこれを見る。`mcp` は `api` の healthy を、`hermes`（有効にしたときだけ）は `mcp` を待つ。新しい migration を含むイメージを先に起動すると、`up` が unhealthy で止まり、`mcp` と `hermes` が更新されない。
 
 前の失敗で unhealthy な `api` が残っていると、設定もイメージも同じなので `up -d` はそれを作り直さず、`mcp` の依存待ちですぐ止まる。そのときは migrate のあと `docker compose --env-file stack.env up -d --no-deps --force-recreate --wait api` を挟んでから `up -d` する（`deploy-stack.sh` は毎回挟む）。
 
@@ -87,17 +104,20 @@ docker compose --env-file stack.env up -d
 
 | パス | 内容 |
 |------|------|
-| `deploy/risepath-vm/docker-compose.yml` | VM スタック（**db + api + mcp**） |
-| `deploy/risepath-vm/scripts/provision-gce.sh` | GCP VM + 09:00–23:00 JST スケジュール |
+| `deploy/risepath-vm/docker-compose.yml` | VM スタック（**db + api + mcp** + `kokoro-tts`（profile `tts`）・`hermes`（profile `full`。既定では起動しない）。`cloudflared` は profile `tunnel`） |
+| `deploy/risepath-vm/scripts/provision-gce.sh` | GCP VM（24 時間稼働。`NIGHT_STOP=1` のときだけ 09:00–23:00 JST スケジュール） |
 | `deploy/risepath-vm/stack.env.example` | 変数名テンプレ（秘密なし） |
-| `deploy/risepath-vm/hermes/config.yaml` | 本番 Hermes プロファイル（SSE MCP + allowlist） |
-| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ（build → migrate → up → `smoke:vm`） |
+| `deploy/risepath-vm/tunnel.env.example` | Cloudflare Tunnel の `TUNNEL_TOKEN` テンプレ（`tunnel.env` は Git 管理外） |
+| `deploy/risepath-vm/hermes/config.yaml` | Hermes を有効にしたときのプロファイル（SSE MCP + allowlist） |
+| `deploy/risepath-vm/scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env` と tunnel のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
 | `docker-compose.yml`（ルート） | **ローカル開発用**（`db` + **`app`** のみ。本番 Compose はサービス名 `api`） |
 | `hermes/config.example.yaml` | Hermes `rise-path` プロファイルテンプレ |
 
 ---
 
 ## 3. Hermes の分離
+
+**この節は、Hermes を有効にしたとき（`COMPOSE_PROFILES` に `full`）だけの話。** 共有の Hermes は学習者に提供しない（既定は `tts`、Vercel の `VITE_FEATURE_AGENT_CHAT` は未設定）。Hermes を使う学習者は、Phase 1 ができてから、自分の Hermes を MCP でつなぐ（[`hermes/README.md`](../../hermes/README.md)）。
 
 ### 3.1 使わないもの
 
@@ -116,8 +136,10 @@ Express（`api` サービス）の環境変数:
 
 ```env
 HERMES_API_URL=http://hermes:8642
-HERMES_API_KEY=<API_SERVER_KEY と同値>
+HERMES_API_KEY=<openssl rand -hex 32。16 文字以上>
 ```
+
+Hermes 側の `API_SERVER_KEY` は、Compose と `init-hermes-profile.sh` が `HERMES_API_KEY` から写す。`stack.env` に別の値を置かない。
 
 ### 3.3 本番 MCP トランスポート
 
@@ -126,7 +148,7 @@ HERMES_API_KEY=<API_SERVER_KEY と同値>
 | Mac ローカル開発 | stdio（Hermes が子プロセス起動） | `hermes -p rise-path gateway` |
 | `risepath-vm` 本番 | **SSE**（`mcp` サービス） | `url: http://mcp:3100/sse` + Bearer |
 
-**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証し、Express 経由のユーザーチャットでは Express が先に `registerAgentSession(rp:user:{uuid})` する。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向け。
+**Hermes → MCP（Compose 内）:** Hermes の `config.yaml` で SSE URL を使い、`Authorization: Bearer ${RISE_PATH_BRIDGE_TOKEN}` を付与（`stack.env` の `RISE_PATH_BRIDGE_TOKEN` と同値）。MCP は Bridge Token を検証する。Express 経由のユーザーチャットでは、Express がターンごとに `registerAgentTurn(userId)` でランダムなトークンを発行して `agent_session_binding` に書き込み（失敗したら Hermes を呼ばずに 503）、Hermes には `instructions` で渡す（ヘッダー `X-Hermes-Session-Key` は学習者ごとに固定の `rp:user:{uuid}` で、Hermes 自身の状態の単位。MCP はこれを無視する）。Hermes は各ツール呼び出しの引数 `rp_turn` にそれを付け、MCP はその学習者として実行する。クライアントが送る `X-Hermes-Session-Key: rp:user:{uuid}` は無視される。`rp_turn` のない Bridge Token の呼び出しは strict auth（本番、`RISEPATH_STRICT_AUTH=true`、`VITE_DEMO_MODE=false`）では `session_binding_required`（直近 15 分にチャット中の学習者が 1 人だけならその学習者、という暫定フォールバックは strict auth でない開発環境だけ）。エンドユーザー JWT を MCP に直接渡す経路は外部クライアント（ChatGPT 等）向けで、その JWT の学習者として動く。
 
 stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) §3.2）。
 
@@ -134,77 +156,91 @@ stdio は本番では **非推奨**（[`architecture_v3_hermes_agent.md`](../arc
 
 ## 4. セットアップ手順（目標）
 
-### 4.1 VM プロビジョニング（開発期: 夜間停止）
+### 4.1 VM プロビジョニング（24 時間稼働）
 
-**推奨スペック:** `e2-medium`（2 vCPU / 4 GB）+ 30 GB `pd-balanced` + Ubuntu 24.04 + `asia-northeast1`
+**推奨スペック:** `e2-medium`（2 vCPU / 4 GB）+ 50 GB `pd-balanced` + Ubuntu 24.04 + `asia-northeast1`（`provision-gce.sh` の既定）
 
-**開発期スケジュール:** 毎日 **09:00 起動 / 23:00 停止**（Asia/Tokyo）→ 月額 **約 ¥3,000–3,500**
+**マシンタイプ:**
+
+- 基本のスタック（Memanto なし）は `e2-medium` でよい。`api` イメージはもうフロントをビルドしない（Vercel がビルドする）。`bootstrap-vm.sh` が 4 GB の swap ファイルを作る。
+- Memanto を使うなら `e2-standard-2`（2 vCPU / 8 GB）。Ollama・moorcheh・memanto が増え、4 GB では余裕がない。
+- メモリの見込み（基本のスタックで 2.3–3.2 GB ほど、Ollama で 0.9–1.4 GB ほど増える）は推定で、VM での実測ではない。
+
+**稼働:** 公開 API が VM に載るので、既定は 24 時間稼働。開発期の夜間停止（09:00 起動 / 23:00 停止、Asia/Tokyo）は既定ではなくなった。戻すときだけ `NIGHT_STOP=1 ./provision-gce.sh`。
+
+**月額（推定。未確認）:** 24 時間稼働の `asia-northeast1` で、`e2-medium` は約 $0.043/時（約 $31/月）、`e2-standard-2` は約 $0.086/時（約 $63/月）。50 GB のディスクは別。どれも第三者のサイト（[gcloud-compute.com](https://gcloud-compute.com/e2-medium.html)）の値で、Google の料金ページでは確かめていない。予算アラートを決める前に、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめる。
 
 ```bash
 export GCP_PROJECT=your-project-id
 cd deploy/risepath-vm/scripts
-./provision-gce.sh
+./provision-gce.sh                                   # 既定: e2-medium
+# Memanto を使うとき: MACHINE_TYPE=e2-standard-2 ./provision-gce.sh
 ```
 
 手動の場合:
 
 1. GCP で VM 作成（`risepath-vm`）
-2. インスタンススケジュールをアタッチ（上記スクリプト参照）
-3. Tailscale に参加（`--hostname=risepath-vm`）
-4. `scripts/bootstrap-vm.sh` で Docker + compose + systemd
-5. ファイアウォール: **5432/3006/3100 を 0.0.0.0/0 に開放しない**（Tailscale 経由のみ）
+2. インスタンススケジュールは付けない（夜間停止が要るときだけ `NIGHT_STOP=1` でスクリプトを使う）
+3. Tailscale に参加（`--hostname=risepath-vm`。旧 `risepath-vm` が管理画面に残っていれば先に Remove する。残っていると新しい VM は `risepath-vm-1` になる）
+4. `scripts/bootstrap-vm.sh` で Docker + compose + 4 GB の swap + 初回デプロイ + systemd（起動ユニットは初回デプロイが通ってから登録する）
+5. ファイアウォール: アプリ用の受信ルールは作らない。**5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。Cloudflare Tunnel 用に外向きの TCP/UDP 7844 を許可したままにする
 
 #### Mac から接続
 
-`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` を VM 内で公開。Tailscale の `100.x` 経由で `risepath-vm:5432` 等に接続する。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
+`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` / `8642` / `8880` を VM 内で公開する（ポートの公開は変えていない）。Tailscale の `100.x` 経由で `risepath-vm:5432` 等に接続する。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
 
-**Hermes（開発期）:** VM には載せず **Mac ローカル**で `hermes -p rise-path gateway`。DB/MCP は VM 向け。
+`stack.env` に `ORIGIN_SECRET` を設定したあとは、api（3006）だけ `x-origin-secret` ヘッダーが要る。付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届かない。db・mcp・kokoro（Hermes を有効にしたときは hermes も）は今までどおり。
+
+MCP（3100）は Tailscale の中だけで使う。ngrok などのトンネルやファイアウォールの開放でインターネットに出さず、`RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供する。
+
+**Hermes（有効にしたときだけ）:** VM の `hermes` サービス（profile `full`）を使う。Mac からは `HERMES_API_URL=http://risepath-vm:8642`（§4.3）。VM なしで試すときだけ、Mac で `hermes -p rise-path gateway` を動かす。既定の `tts` では `hermes` は起動しない。
 
 ### 4.2 初回デプロイ・再デプロイ
 
+新しい VM の初回は [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで行う（`bootstrap-vm.sh` を 2 回。1 回目のあとに SSH し直す。`stack.env` に入れる値の表もそこにある）。手作業でやるときの要点:
+
 ```bash
+sudo install -d -o "$(id -un)" -g "$(id -gn)" /opt/risepath   # /opt は root 所有
 git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git /opt/risepath
 cd /opt/risepath/deploy/risepath-vm
 cp stack.env.example stack.env   # 実値を入れる。deploy/risepath-vm/.gitignore で除外済み
 chmod 600 stack.env
-./scripts/deploy-stack.sh        # pull → build → db 起動 → db:migrate → api 作り直し → up -d → smoke
-docker compose --env-file stack.env exec api npm run env:check -- --db
+./scripts/deploy-stack.sh        # pull → stack.env の検査 → build → db 起動 → db:migrate → api 作り直し → up -d → healthy を待つ → smoke
+docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status   # 未適用が 0 件なら正しい
 ```
 
-既存の `/opt/risepath` の取得元確認と clone し直しの手順: [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md)
+- `POSTGRES_PASSWORD` は DB の最初の起動で固定される。あとで `stack.env` を変えても DB 側は変わらないので、最初の `deploy-stack.sh` の前に決める（`openssl rand -hex 24`。`DATABASE_URL_PHASE1` にも同じ値）。
+- `deploy-stack.sh` は、DB・Supabase・Bridge Token の値が空かテンプレの値のままだと、変数名だけを表示して build の前に止まる。既定の `COMPOSE_PROFILES=tts` は `hermes` を起動せず、kokoro は動く。`full` を入れたとき（Hermes を有効にしたときだけ）は、`OPENROUTER_API_KEY` と 16 文字以上の `HERMES_API_KEY` も確かめる。`OPENROUTER_API_KEY` を入れただけでは Hermes は起動しない。
+- `ANTHROPIC_API_KEY` を入れる（チューター・文章フィードバック・コース生成）。`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま。Gemini が無いあいだ、教材の検索はキーワード検索で動き、AI の画像生成は止まる。
+- `bootstrap-vm.sh` は、VM 起動時の systemd ユニットを、初回デプロイが通ってから登録する。テンプレの値のまま再起動しても、db は起動しない。
+- 再デプロイは `./scripts/deploy-stack.sh` だけ。毎回 pull し、HEAD が進めば pull したあとの自分自身を 1 回だけ実行し直す。CI は同じ `deploy-stack.sh` を `RISEPATH_DEPLOY_SKIP_PULL=1` で流す（取り出したコミットのまま。VM では使わない）。
 
-#### 既存の VM で、この版のスクリプトを初めて使うデプロイ
-
-`deploy-stack.sh` は pull で HEAD が進むと、pull したあとの自分自身を 1 回だけ実行し直す（`RISEPATH_DEPLOY_REEXEC`）。ただし VM にあるのが古い版なら、pull するのも古いスクリプトで、bash は読み込んだ古い本体（`up -d --build` のあとに migrate）を最後まで続ける。新しい `api` が未適用の migration で unhealthy になり、`up` が止まって migrate は流れない。
-
-- **最初の 1 回だけは、先に pull してからスクリプトを実行する。** VM の `deploy-stack.sh` に `RISEPATH_DEPLOY_REEXEC` の行が無ければ古い版。
-
-  ```bash
-  git -C /opt/risepath pull --ff-only
-  cd /opt/risepath/deploy/risepath-vm
-  ./scripts/deploy-stack.sh
-  ```
-
-- **古い順序で走って失敗したら**、pull 済みの新しい `./scripts/deploy-stack.sh` をもう一度実行する。migrate のあと `api` を作り直して healthy を待つので、前回の unhealthy な `api` が残っていても止まらない。
-- `scripts/deploy-from-mac.sh` は先に ssh で pull するので、この手順は要らない。
-
-**main へのマージだけではデプロイされない。** レッスンと `/claude-code` などの画面はビルド時に `api` イメージ（`dist/`）へ、MCP の `lesson-get` が読む `content/` は `mcp` イメージへ焼き込まれる。学習者に届くのは `deploy-stack.sh` で両方を再ビルドしたあと（Vercel のフロントは [`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。
+**main へのマージで、フロントとレッスンは Vercel の Production デプロイ（Git 連携）で届く**（[`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。VM は `deploy-stack.sh` を流すまで変わらない。`deploy-stack.sh` が作り直すのは `api` と `mcp` のイメージで、MCP の `lesson-get` が読む `content/` は `mcp` イメージに焼き込まれる。新しい migration（例: Learning Hub のカードの seed）も `deploy-stack.sh` で入る。
 
 #### migration の確認（適用前）
 
 - `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
-- `db:migrate` は未適用をまとめて順に流す。2026-06-24 の記録は 000–008 まで。009〜012 が一度に入ることがある。
-- 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（小さいテーブルならすぐ終わる）。
+- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が `server/migrations/` のすべて（2026-10-26 時点で 000–020）を一度に流す。そのあとの `db:migrate:status` は、すべて適用済み（未適用 0 件）になる。
+- **018（Phase 4、アカウントの削除）**: ログインした呼び出しのたびに `account_deletions` を読むので、この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る。`deploy-stack.sh` は migrate のあとに作り直すので、この順になる。手で動かすとき（§4.4）や手元の開発の DB（`npm run db:migrate`）でも、先に流す。未適用のままだと、ログインした呼び出しはアプリで 503 `auth_unavailable`、SSE の MCP で 401、リモート MCP で 503 になる（安全な側）。`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。
+- **019（Phase 5、レッスンのやり直しと XP）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（`deploy-stack.sh` は migrate のあとに作り直すので、この順になる）。`sql/mcp_remote_role.sql` は流し直さなくてよい。019 を当てるあいだは、アカウントの削除をしない（スタッフの `--yes`。画面からの削除を使えるようにしているなら、人の少ない時間に）。重なると、デッドロック（40P01）でどちらかが何も変えずに戻るので、もう一度実行する。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「保存の様子・レッスンのやり直し・XP」。
+- **020（Phase 6、復習）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（`deploy-stack.sh` は migrate のあとに作り直すので、この順になる）。019 と違い、`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（流すまで、AI アプリの復習のツールは使えない。[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。020 は終わるまで `auth.users` をロックするので、ログインした呼び出しは 020 が終わるまで待つ（`lesson_progress` を使う開いたままのトランザクションがあると、020 はそれも待つ）。人の少ない時間に当てる。アカウントの削除が重なってもデッドロックにはならないが、削除は 020 を待ち、10 秒を超えると `account_busy` で終わるので、削除をやり直す。**前の版のイメージに戻したあと、この版に戻すとき**は、この版の `api`・`mcp`・`mcp-public` を起動する前に、データベースの所有者で確認と削除の SQL（[`scripts/db/verify-phase6.mjs`](../../scripts/db/verify-phase6.mjs) の `ROLL_FORWARD`）を流す（前の版のサービスを止めてから）。前の版のレッスンのやり直しと「学習の進み具合を消す」は、復習のカードを消さないため。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「復習（Phase 6）」。
+- **Phase 4 の最初のデプロイ**では、すべてのサービスにログの上限（`x-logging`）が付くので、動いているコンテナがすべて一度作り直される。`db` は「db up」のときに数秒止まり（そのあいだ古い `api` は 503）、そのあと `api`、最後の `up -d` で cloudflared（トンネルが少し止まる）、kokoro（モデルを読み直す）、`mcp`、`mcp-public`、`hermes` と Memanto（有効なら）。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「アカウントの削除・保存期間・ログ」。
+- 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（新しい DB では空なので、すぐ終わる）。
 
 ### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
 
 ```env
 DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
-HERMES_API_URL=http://risepath-vm:8642
-HERMES_API_KEY=***
+# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
+RETENTION_ENABLED=false
+# Hermes を有効にしたときだけ
+# HERMES_API_URL=http://risepath-vm:8642
+# HERMES_API_KEY=***
 ```
 
-フロントは引き続き `npm run dev`（:3007）で、API は Tailscale 経由で VM またはローカル proxy。
+VM を作り直したら、パスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）を新しい `stack.env` の値に替える（旧 VM の値のままだと DB 接続が認証エラーになる）。Mac の `~/.ssh/known_hosts` に残った旧 VM の鍵は `ssh-keygen -R risepath-vm` で消す（残っていると `scripts/setup-vm-ssh.sh`・`scripts/deploy-from-mac.sh` の ssh が止まる）。
+
+フロントは引き続き `npm run dev`（:3007）で、API はローカル（:3006）。VM の API を Tailscale 経由で使えるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけ（§4.1「Mac から接続」）。
 
 ### 4.4 ローカル Docker のみ（VM なしで試す場合）
 
@@ -220,19 +256,50 @@ docker compose --env-file stack.env up -d
 
 ルートの `docker-compose.yml` は簡易版（`db` + **`app`**）。migration は `docker compose exec app npm run db:migrate`。フルスタックは `deploy/risepath-vm/`（サービス名 `api`）が正本。
 
+### 4.5 VM を作り直す（2026-10-21 に削除済み）
+
+2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。新しい VM を作り、DB は空から始まる（Supabase のアカウントは残る。進捗・ジャーナルなど旧 VM の DB にあったデータは無い）。全体の順番と Cloudflare・Vercel・Supabase の作業は [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の「[新しい VM の順番](../../deploy/vercel/README.md#新しい-vm-の順番)」。VM 側の要点:
+
+**最初のデプロイの前に**: デプロイする main のコミットで、GitHub Actions の「End-to-end checks」の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）と毎晩の実行が緑であることを確かめる（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の「End-to-end checks」で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。緑なら、空の DB への 000–020、`deploy-stack.sh` の流れ（検査・build・migration・api の作り直し・スモーク）、DB ロールの SQL、ブラウザでの学習の流れは、ダミーの値で確かめてある。確かめていないもの: 本物の Supabase（ログインと Site URL）、公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1` での origin gate）、`mcp-public`、2 回目のデプロイと起動のユニット、`ANTHROPIC_API_KEY`、`POSTGRES_PASSWORD` を最初に決めること、Tailscale、Cloudflare Tunnel（cloudflared とトークン）、kokoro-tts・Hermes・Memanto、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばす）。VM の Docker の版と `stack.env` は、下の 3 で、`bootstrap-vm.sh` の 2 回目の前に見る。`RISEPATH_DEPLOY_SKIP_PULL` は VM では使わない。
+
+1. 前の VM の残りを片付ける。夜間停止のスケジュールが残っていれば消す（どの VM にも付いていなければ消せる）。Tailscale の管理画面（Machines）で旧 `risepath-vm` を Remove する。Mac では `ssh-keygen -R risepath-vm`。
+
+   ```bash
+   export GCP_PROJECT=your-project-id
+   gcloud compute resource-policies describe risepath-dev-schedule --project="$GCP_PROJECT" --region=asia-northeast1   # 無ければ not found
+   gcloud compute resource-policies delete risepath-dev-schedule --project="$GCP_PROJECT" --region=asia-northeast1
+   ```
+
+2. `provision-gce.sh` で作る（§4.1。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`）。
+3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → **2 回目の前に**、VM の `docker version` と `docker compose version` を `Server stack deploy` の「Preflight」の行とくらべ（メジャーがちがえば、デプロイの前にエージェントと相談する。計画の 11.3 の 2）、`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）を見る → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration をすべて（000–020）まとめて流す。
+4. Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（§4.3）。`ORIGIN_SECRET` を入れる前に、Mac から `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。
+5. 初回サインインのあと、自分の `user_profiles.role` を `admin` にする（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「[管理者にする](../../deploy/risepath-vm/README.md#5-管理者にする初回サインインのあと)」）。
+
+新しく clone した VM の `deploy-stack.sh` は最新版なので、pull を先にする必要はない。
+
+公開エッジを有効にするときは、その前に `tunnel.env`（`TUNNEL_TOKEN`）と `stack.env` の `ORIGIN_SECRET`・`TRUST_PROXY=1`・`LLM_ALLOWED_ORIGINS=https://app.<domain>`・`COMPOSE_PROFILES=tts,tunnel`（Hermes を有効にするときだけ `full,tunnel`）を入れる（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「Cloudflare Tunnel」）。`tunnel` プロファイルで値が足りないと、`deploy-stack.sh` は足りない変数名だけを表示して止まる。
+
 ---
 
 ## 5. `nexloom-gce` からの移行
 
-既に `nexloom-gce` / `risepath` にデータがある場合:
+既に `nexloom-gce` / `risepath` にデータがある場合だけ。**空の DB で始めるなら、この節は要らない。**
+
+復元は、新しい VM の初回の `db:migrate` より前に、空の DB へ流す。`deploy-stack.sh`（`bootstrap-vm.sh` の 2 回目）は migrate でテーブルと seed の行を作るので、そのあとに復元すると、既存のテーブルや行とぶつかる。
 
 ```bash
 # 旧（暫定）
 pg_dump -h nexloom-gce -U risepath_app -d risepath -Fc -f risepath.dump
 
-# 新 VM（Compose 起動後）
+# 新 VM: SSH し直して stack.env を埋めたあと、bootstrap-vm.sh の 2 回目より前に、db だけ起動する（VM 上。POSTGRES_PASSWORD はここで固定される）
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env up -d --wait db
+
+# Mac から（Tailscale 経由）。終わったら bootstrap-vm.sh の 2 回目で、残りの migration が流れる
 pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
 ```
+
+旧 DB に pgvector が無ければ、復元した `material_chunks.embedding` は `FLOAT8[]` のままで、RAG はキーワード検索で動く。
 
 切替手順:
 
@@ -247,12 +314,20 @@ pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
 ## 6. セキュリティチェックリスト
 
 - [ ] `stack.env` / `.env.local` が Git に無い
-- [ ] Hermes `tools.include` が Rise Path allowlist のみ
-- [ ] `daily-life-range` / `daily-life-log` を Hermes 本番 allowlist に含めない
-- [ ] `HERMES_API_KEY` は Express のみ（ブラウザに露出しない）
+- [ ] `stack.env` にテンプレの値（`change-me` など）が残っていない。`POSTGRES_PASSWORD`・`HERMES_API_KEY`・`RISE_PATH_BRIDGE_TOKEN` は `openssl rand -hex …` で作った値
+- [ ] `COMPOSE_PROFILES` に `full` が無い（共有の Hermes は学習者に提供しない）。Vercel に `VITE_FEATURE_AGENT_CHAT` が無い
+- [ ] `GEMINI_ALLOWED` を設定していない（Gemini の API 規約の 18 歳未満の条項）
+- [ ] MCP（3100）をインターネットに公開していない（ngrok なども使わない）。`RISE_PATH_BRIDGE_TOKEN` を外部サービスに入れていない
+- [ ] Hermes を有効にしたときだけ: `tools.include` が Rise Path allowlist のみ
+- [ ] Hermes を有効にしたときだけ: `daily-life-range` / `daily-life-log` を Hermes 本番 allowlist に含めない
+- [ ] Hermes を有効にしたときだけ: `HERMES_API_KEY` は Express のみ（ブラウザに露出しない）
 - [ ] MCP SSE は本番で Bridge Token または Supabase JWT 必須（`NODE_ENV=production` で匿名不可）
-- [ ] `RISE_PATH_BRIDGE_TOKEN` を `mcp` と Hermes `config.yaml` で同値に揃える
+- [ ] Hermes を有効にしたときだけ: `RISE_PATH_BRIDGE_TOKEN` を `mcp` と Hermes `config.yaml` で同値に揃える
 - [ ] Tailscale ACL で `risepath-vm` へのアクセスを限定
+- [ ] `ORIGIN_SECRET` は `stack.env` と Vercel Production env の 2 か所だけ（`VITE_` 変数にしない）
+- [ ] `tunnel.env` は `chmod 600` で Git に無い。`TUNNEL_TOKEN` を読むのは `cloudflared` だけ
+- [ ] `curl -s -o /dev/null -w '%{http_code}\n' https://api.<domain>/api/v2/health` が `403`
+- [ ] GCP ファイアウォールにアプリ用の受信ルールが無い（公開は Cloudflare Tunnel の外向き接続だけ）
 
 ---
 
@@ -262,28 +337,31 @@ pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
 
 ### 7.1 有効化
 
-`stack.env` に実 secret を設定:
+マシンタイプは `e2-standard-2`（8 GB）以上にする（§4.1）。作成済みの VM は止めてから変える: `gcloud compute instances stop risepath-vm --zone=asia-northeast1-b`、`gcloud compute instances set-machine-type risepath-vm --zone=asia-northeast1-b --machine-type=e2-standard-2`、`gcloud compute instances start risepath-vm --zone=asia-northeast1-b`（`provision-gce.sh` は既存の VM を変えない）。`stack.env` に実 secret を設定:
 
 ```env
 MEMANTO_SECRET_KEY=<openssl rand -hex 32>
 MEMANTO_ENABLED=true
-COMPOSE_PROFILES=full,memory
+COMPOSE_PROFILES=tts,memory
+# Hermes を有効にするときだけ full,memory
 ```
+
+`MEMANTO_ENABLED=true` は `stack.env` に必ず書く。VM 起動時の systemd ユニットはこの値を読む。秘密を入れて `false` のままだと、`deploy-stack.sh` が止まる。
 
 ### 7.2 起動
 
 ```bash
 cd /opt/risepath/deploy/risepath-vm
 ./scripts/deploy-stack.sh
-# または手動（§2.1 と同じ順。migrate は新しい api の起動前）:
+# または手動（§2.1 と同じ順。migrate は新しい api の起動前。Hermes を有効にしたときは --profile tts を --profile full に）:
 docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
-  --env-file stack.env --profile full --profile memory build
+  --env-file stack.env --profile tts --profile memory build
 docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
-  --env-file stack.env --profile full --profile memory up -d --wait db
+  --env-file stack.env --profile tts --profile memory up -d --wait db
 docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
-  --env-file stack.env --profile full --profile memory run --rm --no-deps api npm run db:migrate
+  --env-file stack.env --profile tts --profile memory run --rm --no-deps api npm run db:migrate
 docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
-  --env-file stack.env --profile full --profile memory up -d
+  --env-file stack.env --profile tts --profile memory up -d
 ./scripts/init-memanto-ollama.sh   # nomic-embed-text を pull
 ```
 
@@ -298,12 +376,13 @@ docker compose -f docker-compose.yml -f docker-compose.memanto.yml \
 ### 7.3 スモーク
 
 ```bash
-# VM host (loopback + published ports)
-node scripts/smoke-vm-stack.mjs --target host --require-mcp --require-memanto
-
-# From api container (Compose service DNS — deploy-stack.sh uses this when host has no node)
-docker compose exec api node scripts/smoke-vm-stack.mjs --target container --require-mcp --require-memanto
+cd /opt/risepath/deploy/risepath-vm
+# api コンテナ内から（loopback なので origin gate を通る。deploy-stack.sh も同じ）
+docker compose --env-file stack.env -f docker-compose.yml -f docker-compose.memanto.yml \
+  exec -T api node scripts/smoke-vm-stack.mjs --target container --require-mcp --require-memanto
 ```
+
+VM のホストには Node が無いので、`--target host` は使わない。Mac からは §4.5 の `npm run smoke:vm -- --base …`（`ORIGIN_SECRET` を入れる前だけ）。
 
 ---
 
@@ -312,15 +391,17 @@ docker compose exec api node scripts/smoke-vm-stack.mjs --target container --req
 | 項目 | 状態 |
 |------|------|
 | アーキテクチャ方針（本ドキュメント） | ✅ 確定 |
-| migration 000–012 + `db:migrate` | 🔄 リポジトリは 012 まで。VM は 000–008 適用の記録（2026-06-24）。`npm run db:migrate:status` で確認してから適用。010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る（§4.2） |
+| migration 000–020 + `db:migrate` | ✅ リポジトリは 020 まで（2026-10-26）。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–020 を流す（§4.2） |
 | Express agent proxy + Life Journal API | ✅ 完了 |
-| `deploy/risepath-vm/docker-compose.yml` | ✅ db + api + mcp + kokoro-tts + hermes（healthcheck 付き） |
+| `deploy/risepath-vm/docker-compose.yml` | ✅ db（pgvector）+ api + mcp + kokoro-tts + hermes（healthcheck 付き。hermes は profile `full` で、既定では起動しない） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |
-| GCP スケジュール + provision スクリプト | ✅ `scripts/provision-gce.sh` |
+| provision スクリプト | ✅ `scripts/provision-gce.sh`（24 時間稼働が既定。夜間停止は `NIGHT_STOP=1`） |
+| 公開エッジ（Vercel routes + Cloudflare Tunnel + origin gate） | 🔄 リポジトリ側は実装済み。SSE のバッファ、Authorization の転送、ボディ上限は初回デプロイで確認（[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の確認チェックリスト） |
 | `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線（migrate は新しい api の起動前） |
+| CI での予行（`.github/workflows/e2e.yml`、Phase 7） | 🔄 リポジトリ側は実装済み（GitHub での最初の実行と、必須のチェックにするのはこれから。[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11.2）。プルリクエストのたびに、ダミーの値で `deploy-stack.sh` とブラウザの学習の流れ（`Server stack deploy`・`Learner end-to-end`）、VM と同じ DB のイメージで migration と DB ロールの SQL（`Database checks`）。最初のデプロイの前に緑を確かめる（§4.5） |
 | Hermes 本番 `config.yaml`（SSE） | ✅ `deploy/risepath-vm/hermes/config.yaml` |
-| Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可 |
-| `risepath-vm` GCP 実機プロビジョニング | 🔄 DB 接続済み（Tailscale）。フル stack は `deploy-stack.sh` で更新 |
+| Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可。2026-10-22 から学習者には提供しない（既定 `tts`） |
+| `risepath-vm` GCP 実機プロビジョニング | ⏸ 2026-10-21 に削除（オーナー）。作り直しは §4.5（`provision-gce.sh` → `bootstrap-vm.sh`）。DB は空から始まる。DB 接続は Tailscale、フル stack は `deploy-stack.sh` で更新 |
 
 ---
 

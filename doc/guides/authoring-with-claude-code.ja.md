@@ -287,15 +287,20 @@ npm run lessons:preview -- vibe-coding vibe-ch1
 
 1. `drafts/<lesson>.lesson.json` を `lessons/` に移す
 2. `course.json` のモジュールに追加し、前後のレッスンの `next` をつなぐ
-3. `npm run lessons:validate` と `npm run lessons:catalog` で確認する
-4. 修正確認レビューが、前回の回をコミット済みの `<コミット ID>:…/reports/…` で指しているか
+3. レッスンの復習カード（`flashcards` のカード）を、`server/tests/fixtures/published-card-ids.json`
+   の `published` に `<コース>/<レッスン>/<カード ID>` で加える（並べ替えたままにする）。
+   公開済みのレッスンを直すときは、カード ID を変えない（学習者の復習の記録がこの ID に
+   ひもづくため。文は直してかまいません。ID を消したり `retired` に移したりすると、その記録が
+   隠れます）。`node --test server/tests/reviewCardIds.test.js` で確かめる
+4. `npm run lessons:validate` と `npm run lessons:catalog` で確認する
+5. 修正確認レビューが、前回の回をコミット済みの `<コミット ID>:…/reports/…` で指しているか
    確かめる（`reviewedRevision` もコミット ID）。さかのぼった各回も同じです。スナップショットの
    写しは、作ったチェックアウトにしかないため、ほかのクローンではゲートが通りません。そうでない
    レビュアーには、全体レビューをやり直してもらいます。公開済みのレッスンは
    `server/tests/reviewChainsDurable.test.js` が確かめます。
-5. `provenance.reviewedBy` に、確認した人の名前を書く
-6. PR にして、レポートとスクリーンショットを添える
-7. マージのあと、フロントエンドを再ビルドして再デプロイする。レッスンはビルド時にバンドルへ
+6. `provenance.reviewedBy` に、確認した人の名前を書く
+7. PR にして、レポートとスクリーンショットを添える
+8. マージのあと、フロントエンドを再ビルドして再デプロイする。レッスンはビルド時にバンドルへ
    入るため、マージしただけでは学習者に届きません（VM は
    [risepath_vm_deployment.md](risepath_vm_deployment.md) の §4.2、Vercel は
    [deploy/vercel/README.md](../../deploy/vercel/README.md)）。新しいコースは、Learning Hub の
@@ -400,21 +405,14 @@ Cursor も `AGENTS.md` をルールとして読みます。MCP は `.cursor/mcp.
 `rise-path-learning` を `curriculum-builder` プロファイルで起動します。リポジトリのルートで
 `gemini` を起動し、`/mcp` でツールが見えることを確かめてください。
 
-### ChatGPT
+### ChatGPT・Claude.ai などのリモート接続
 
-ChatGPT が接続できるのは、インターネットに公開された**リモート**の MCP サーバーだけです。
+インターネット上のリモート MCP（`https://mcp.<domain>/mcp`、プロファイル `learner-remote`）は、**学習者が自分の記録を使うための入口で、教材づくりには使えません。** 18 歳以上の学習者がサインイン（OAuth）してつなぎ、使えるのは本人の進み具合・学習ジャーナル・アップロードした教材の検索などだけです。`lesson-*` のツール、`rp://schema/lesson/v1`、`author-lesson` のプロンプト、カリキュラムのツールはありません（`mcp-server/tool-registry.json`）。つなぎ方は [usage_guide.md](./usage_guide.md) の「自分の AI をつなぐ（リモート MCP）」、公開の手順は [byoa-setup.ja.md](./byoa-setup.ja.md) です。
 
-1. MCP サーバーを SSE で起動します: `npm run mcp:sse`（ポート 3100、エンドポイント `/sse`）。
-   `RISE_PATH_MCP_PROFILE=curriculum-builder` と、下書きを DB に保存する `RP_LESSON_STORE=db` を
-   設定してください（本番の SSE サーバーは、ファイルへの下書き保存を拒否します）。
-2. HTTPS の公開 URL（リバースプロキシやトンネル）を用意し、認証に `RISE_PATH_BRIDGE_TOKEN`
-   （Bearer トークン）か Supabase の JWT を使います。
-3. ChatGPT の設定でカスタムコネクタ（MCP）として `https://<公開ホスト>/sse` を追加します。
-   画面の名前や手順は変わりやすいので、OpenAI のヘルプで最新の手順を確認してください。
-4. ChatGPT で作った下書きは DB に入ります。リポジトリに取り込むときは、PR にしてから
-   `lessons:validate` と `/review-lesson` を通します（DB からファイルへの取り込みコマンドは今後追加予定）。
+教材を書くときは、これまでどおり上の Claude Code・Claude Desktop・Codex・Cursor のように、自分のパソコンから stdio で `curriculum-builder` プロファイルにつなぎます。次も守ってください。
 
-Streamable HTTP（`/mcp`）と OAuth 2.1 への移行は P2 の予定です（計画 §7.4）。
+- `RISE_PATH_BRIDGE_TOKEN`（ブリッジトークン）を、ChatGPT などの外部サービスに入れません。Hermes と管理者用の MCP サーバーのあいだだけで使う共有の合言葉なので、持っている人は誰でも同じ権限で動けてしまいます。
+- 管理者用の MCP サーバーのポート（SSE の 3100）を、ngrok などのトンネルやファイアウォールの開放でインターネットに公開しません。
 
 ### ほかのモデルに頼むときの注意
 

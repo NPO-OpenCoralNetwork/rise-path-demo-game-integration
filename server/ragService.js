@@ -7,6 +7,7 @@ import {
     EMBEDDING_MODEL,
     embeddingCoverage,
     embedTexts,
+    isEmbeddingConfigured,
     keywordSearchChunks,
     legacyChunkScope,
     mergeByRelevance,
@@ -53,16 +54,56 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
     return chunks.filter(c => c.length > 0);
 };
 
+/**
+ * Most chunks embedded for one material (about 160,000 characters at 1,000 per chunk with 200
+ * overlap). One 'embeddings' unit of the daily caps (server/middleware/dailyCaps.js) is one
+ * material, so this bounds what a unit costs for /upload, /rag/index and the job worker alike.
+ * The rest of a longer file is not indexed.
+ */
+export const MAX_CHUNKS_PER_MATERIAL = 200;
+
+/**
+ * Read, chunk, embed and store one material, and mark it 'ready'. With embeddings off (Gemini not
+ * allowed, or no key: tools/core/ragSearch.js isEmbeddingConfigured) the chunks are stored without
+ * a vector or model (embedding_model NULL), keyword search finds them, and
+ * scripts/rag/reembed.mjs can embed them later. With embeddings off, a material that already has
+ * chunks with a vector (embedded while Gemini was allowed) is left as it is: re-indexing it would
+ * replace those vectors with NULL ones. A failure carries `ingestStage`: 'extract' (the file could
+ * not be read or split: nothing was embedded), 'embed' or 'store'.
+ * @returns {Promise<{ chunks: number, embedded: number, kept?: 'embeddings_off' }>} chunks stored,
+ *   and how many have a vector (`kept` when the stored chunks were left as they are)
+ */
 export const ingestMaterial = async (materialId, filePath, mimeType, userId) => {
     const pool = getPool();
     if (!pool) throw new Error("DB not configured");
     
+    let stage = 'store';
     try {
+        if (!isEmbeddingConfigured()) {
+            const stored = await pool.query(
+                'SELECT count(*)::int AS embedded FROM material_chunks WHERE material_id = $1 AND embedding IS NOT NULL',
+                [materialId]
+            );
+            const embedded = Number(stored.rows?.[0]?.embedded) || 0;
+            if (embedded > 0) {
+                console.warn(`[RAG] Material ${materialId}: embeddings are off; keeping its ${embedded} embedded chunks (not re-indexed).`);
+                return { chunks: embedded, embedded, kept: 'embeddings_off' };
+            }
+        }
+
+        stage = 'extract';
         const text = await extractText(filePath, mimeType);
-        const chunks = await chunkText(text);
+        const allChunks = await chunkText(text);
+        const chunks = allChunks.slice(0, MAX_CHUNKS_PER_MATERIAL);
+        if (allChunks.length > chunks.length) {
+            console.warn(`[RAG] Material ${materialId}: ${allChunks.length} chunks; indexing the first ${MAX_CHUNKS_PER_MATERIAL} (MAX_CHUNKS_PER_MATERIAL).`);
+        }
         // Embed (batched) before opening the transaction so no DB connection is held during API calls.
-        const vectors = await embedTexts(chunks);
+        stage = 'embed';
+        const embedding = isEmbeddingConfigured();
+        const vectors = embedding ? await embedTexts(chunks) : null;
         
+        stage = 'store';
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
@@ -76,6 +117,17 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
 
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
+
+                if (!vectors) {
+                    // Embeddings off: text only. The NULL model marks the row for reembed.mjs.
+                    await client.query(
+                        `INSERT INTO material_chunks 
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
+                        VALUES ($1, $2, $3, NULL, $4, NULL, NULL)`,
+                        [materialId, i, chunk, chunk.length]
+                    );
+                    continue;
+                }
                 const vector = vectors[i];
                 
                 if (hasVector) {
@@ -97,15 +149,17 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             
             await client.query('UPDATE materials SET status = $1, updated_at = NOW() WHERE id = $2', ['ready', materialId]);
             await client.query('COMMIT');
-            console.log(`Ingested material ${materialId}: ${chunks.length} chunks`);
+            console.log(`Ingested material ${materialId}: ${chunks.length} chunks${vectors ? '' : ' (embeddings off: keyword search only)'}`);
         } catch (e) {
             await client.query('ROLLBACK');
             throw e;
         } finally {
             client.release();
         }
+        return { chunks: chunks.length, embedded: vectors ? vectors.length : 0 };
     } catch (e) {
         console.error("Ingestion failed:", e);
+        if (e && typeof e === 'object' && !('ingestStage' in e)) e.ingestStage = stage;
         throw e;
     }
 };
@@ -126,6 +180,13 @@ export const retrieveContext = async (query, limit = 3, userId) => {
         let result;
         // Always scoped to the caller's own materials (an undefined userId matches nothing).
         const scope = { conditions: ['m.user_id = $1'], params: [userId] };
+        if (!isEmbeddingConfigured()) {
+            // Embeddings off (Gemini not allowed, or no key): the query cannot be embedded, so
+            // every chunk of this user's is matched by keyword.
+            const rows = await keywordSearchChunks(pool, { query, scope, limit });
+            console.log(`   [RAG] Found ${rows.length} relevant chunks (keyword search: embeddings off).`);
+            return rows.map(row => row.content);
+        }
         const coverage = hasVector ? await embeddingCoverage(pool, scope) : null;
         if (coverage) warnLegacyEmbeddingsOnce(coverage.legacy);
 

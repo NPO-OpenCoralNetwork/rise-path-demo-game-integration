@@ -1,11 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ArrowRight, Fingerprint, Lock, Mail, ShieldCheck, Terminal, User, UserCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { allowGuestLogin } from '../../services/authPolicy';
-import { mapSignupErrorMessage, validateSignupForm } from '../../services/authFormValidation.ts';
+import { mapSignupErrorMessage, validateSignupForm, type SignupFormError } from '../../services/authFormValidation.ts';
+import { forgetSignupAcceptance } from '../../services/legalConsentApi';
+import { features } from '../../config/features';
+import { LegalNewTabLink } from '../legal/LegalLinks';
+import LeftRecordsNotice from '../lesson/LeftRecordsNotice';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -29,6 +33,14 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const [displayName, setDisplayName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorField, setErrorField] = useState<SignupFormError['field'] | null>(null);
+    // Phase 4: unticked until the person ticks it (never pre-checked).
+    const [acceptedLegal, setAcceptedLegal] = useState(false);
+    const legalRef = useRef<HTMLInputElement | null>(null);
+    const legalId = useId();
+    const purposeId = useId();
+    const minorsId = useId();
+    const errorId = useId();
     const [notice, setNotice] = useState<string | null>(null);
     const [useNexloom, setUseNexloom] = useState(false);
     const hasSupabase = isSupabaseConfigured();
@@ -62,6 +74,20 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             error: 'Authentication failed. Please check your credentials.',
             errorAlreadyRegistered: 'This email is already registered. Please sign in.',
             placeholder: 'identity@risepath.system',
+            aiSafety: 'AI safety: for children and guardians',
+            // Phase 4 (only with VITE_FEATURE_LEGAL_PAGES=true): the purpose notice and the checkbox.
+            purpose: 'We use the information you register for the purposes in section 3 of the Privacy Policy (in Japanese).',
+            purposeLink: 'Read the purposes',
+            legalBefore: 'I agree to the ',
+            legalTerms: 'Terms of Use',
+            legalMiddle: ' and have read the ',
+            legalPrivacy: 'Privacy Policy',
+            legalAfter: '. (Both are in Japanese; the Japanese text is official.)',
+            legalMinors: 'If you are under 18, get your parent’s or guardian’s consent before you sign up.',
+            legalRequired: 'To create an account, please agree to the Terms of Use.',
+            newTab: '(opens in a new tab)',
+            footerTerms: 'Terms of Use',
+            footerPrivacy: 'Privacy Policy',
         },
         jp: {
             title: 'システム認証',
@@ -89,6 +115,19 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             error: '認証に失敗しました。情報を確認してください。',
             errorAlreadyRegistered: 'このメールアドレスは既に登録されています。ログインしてください。',
             placeholder: 'identity@risepath.system',
+            aiSafety: 'AI の安全について（子どもと保護者の方へ）',
+            purpose: 'ご登録の情報は、プライバシーポリシーの「3. 利用目的」に書いた目的で使います。',
+            purposeLink: '利用目的を読む',
+            legalBefore: '',
+            legalTerms: '利用規約',
+            legalMiddle: 'に同意し、',
+            legalPrivacy: 'プライバシーポリシー',
+            legalAfter: 'を読みました。',
+            legalMinors: '18 歳未満の方は、保護者の方の同意を得てから登録してください。',
+            legalRequired: '登録するには、利用規約への同意が必要です。',
+            newTab: '（新しいタブで開きます）',
+            footerTerms: '利用規約',
+            footerPrivacy: 'プライバシーポリシー',
         },
     } as const;
 
@@ -98,6 +137,8 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const switchMode = (next: AuthMode) => {
         setMode(next);
         setError(null);
+        setErrorField(null);
+        setAcceptedLegal(false);
         setNotice(null);
         setUseNexloom(false);
     };
@@ -124,28 +165,38 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setErrorField(null);
         setNotice(null);
 
-        const validationError = validateSignupForm({
-            email,
-            password,
-            passwordConfirm,
-            displayName,
-        });
+        const validationError = validateSignupForm(
+            { email, password, passwordConfirm, displayName, acceptedLegal },
+            { requireLegalAcceptance: features.legalPages },
+        );
         if (validationError) {
-            setError(validationError.message);
+            setErrorField(validationError.field);
+            if (validationError.field === 'legal') {
+                setError(t.legalRequired);
+                legalRef.current?.focus();
+            } else {
+                setError(validationError.message);
+            }
             return;
         }
 
         setIsLoading(true);
         try {
-            const result = await signUp(email, password, { displayName: displayName.trim() || undefined });
+            const result = await signUp(email, password, {
+                displayName: displayName.trim() || undefined,
+                legalAccepted: features.legalPages && acceptedLegal,
+            });
             if (result.status === 'session_ready') {
                 onLoginSuccess();
                 return;
             }
             navigate(`/auth/confirm-pending?email=${encodeURIComponent(result.email)}`, { replace: true });
         } catch (err: unknown) {
+            // No account was made: the sign-up marker must not answer for a later sign-in.
+            forgetSignupAcceptance();
             const message = err instanceof Error ? err.message : t.error;
             if (mapSignupErrorMessage(message) === 'already_registered') {
                 setError(t.errorAlreadyRegistered);
@@ -180,212 +231,280 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
+        // The box scrolls and the inner wrapper centres: the sign-up form with the legal block is
+        // taller than a 1366x768 laptop or a phone screen, and a centred fixed box cannot scroll.
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-black">
+            <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 
-            <div className="relative w-full max-w-md p-1 px-6">
-                <div className="absolute inset-0 bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
+            <div className="relative flex min-h-full items-center justify-center py-8">
+                <div className="relative w-full max-w-md p-1 px-6">
+                    <div className="absolute inset-0 bg-rose-500/20 blur-[100px] rounded-full pointer-events-none" />
 
-                <div className="relative bg-[#0a0a0a] border border-white/10 rounded-[2rem] p-8 shadow-2xl backdrop-blur-xl overflow-hidden">
-                    <div className="text-center mb-8">
-                        <div className="inline-flex p-4 rounded-2xl bg-white/5 border border-white/10 mb-6 animate-pulse">
-                            <Fingerprint className="w-10 h-10 text-rose-500" />
+                    <div className="relative bg-[#0a0a0a] border border-white/10 rounded-[2rem] p-8 shadow-2xl backdrop-blur-xl overflow-hidden">
+                        <div className="text-center mb-8">
+                            <div className="inline-flex p-4 rounded-2xl bg-white/5 border border-white/10 mb-6 animate-pulse">
+                                <Fingerprint className="w-10 h-10 text-rose-500" />
+                            </div>
+                            <h1 className="text-2xl font-bold tracking-tight text-white mb-2 uppercase font-mono">{t.title}</h1>
+                            <p className="text-white/40 text-sm">{isSignup ? t.signupSubtitle : t.subtitle}</p>
                         </div>
-                        <h1 className="text-2xl font-bold tracking-tight text-white mb-2 uppercase font-mono">{t.title}</h1>
-                        <p className="text-white/40 text-sm">{isSignup ? t.signupSubtitle : t.subtitle}</p>
-                    </div>
 
-                    <div className="flex rounded-full bg-white/5 border border-white/10 p-1 mb-8">
-                        <button
-                            type="button"
-                            onClick={() => switchMode('login')}
-                            className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                                !isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
-                            }`}
-                        >
-                            {t.tabLogin}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => switchMode('signup')}
-                            className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                                isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
-                            }`}
-                        >
-                            {t.tabSignup}
-                        </button>
-                    </div>
+                        {/* Phase 5: lesson records a learner left on this device unsaved (who saves them, who deletes them). */}
+                        <LeftRecordsNotice />
 
-                    {!isSignup && (
-                        <>
+                        <div className="flex rounded-full bg-white/5 border border-white/10 p-1 mb-8">
                             <button
                                 type="button"
-                                onClick={handleNexloomLogin}
-                                disabled={isLoading}
-                                className="w-full group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-1 transition-all hover:border-rose-500/30 hover:bg-white/[0.05] disabled:opacity-50"
+                                onClick={() => switchMode('login')}
+                                className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                                    !isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
+                                }`}
                             >
-                                <div className="flex items-center gap-4 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-4 text-left">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f43f5e_0%,#fb7185_45%,#fda4af_100%)] text-sm font-black tracking-[0.24em] text-black shadow-[0_12px_32px_rgba(244,63,94,0.22)]">
-                                        N
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-white/35">
-                                            {t.nexloomBadge}
-                                        </div>
-                                        <div className="mt-1 text-sm font-semibold text-white">
-                                            {t.nexloomCta}
-                                        </div>
-                                        <div className="mt-1 text-[11px] text-white/35">
-                                            {t.nexloomDesc}
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-1 group-hover:text-rose-300" />
-                                </div>
+                                {t.tabLogin}
                             </button>
-
-                            <div className="flex items-center gap-4 my-8 text-white/10">
-                                <div className="h-[1px] flex-1 bg-current" />
-                                <span className="text-[10px] font-mono uppercase tracking-widest">OR</span>
-                                <div className="h-[1px] flex-1 bg-current" />
-                            </div>
-                        </>
-                    )}
-
-                    <form onSubmit={isSignup ? handleSignup : handleLogin} className="space-y-5">
-                        <div>
-                            <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
-                                {t.emailLabel}
-                            </label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                                <input
-                                    ref={emailInputRef}
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder={t.placeholder}
-                                    autoComplete="email"
-                                    className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
-                                />
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => switchMode('signup')}
+                                className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                                    isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
+                                }`}
+                            >
+                                {t.tabSignup}
+                            </button>
                         </div>
 
-                        {(hasSupabase || isSignup) && (
+                        {!isSignup && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleNexloomLogin}
+                                    disabled={isLoading}
+                                    className="w-full group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-1 transition-all hover:border-rose-500/30 hover:bg-white/[0.05] disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-4 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-4 text-left">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f43f5e_0%,#fb7185_45%,#fda4af_100%)] text-sm font-black tracking-[0.24em] text-black shadow-[0_12px_32px_rgba(244,63,94,0.22)]">
+                                            N
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-white/35">
+                                                {t.nexloomBadge}
+                                            </div>
+                                            <div className="mt-1 text-sm font-semibold text-white">
+                                                {t.nexloomCta}
+                                            </div>
+                                            <div className="mt-1 text-[11px] text-white/35">
+                                                {t.nexloomDesc}
+                                            </div>
+                                        </div>
+                                        <ArrowRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-1 group-hover:text-rose-300" />
+                                    </div>
+                                </button>
+
+                                <div className="flex items-center gap-4 my-8 text-white/10">
+                                    <div className="h-[1px] flex-1 bg-current" />
+                                    <span className="text-[10px] font-mono uppercase tracking-widest">OR</span>
+                                    <div className="h-[1px] flex-1 bg-current" />
+                                </div>
+                            </>
+                        )}
+
+                        <form onSubmit={isSignup ? handleSignup : handleLogin} className="space-y-5">
                             <div>
                                 <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
-                                    {t.passwordLabel}
+                                    {t.emailLabel}
                                 </label>
                                 <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                                     <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        autoComplete={isSignup ? 'new-password' : 'current-password'}
+                                        ref={emailInputRef}
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder={t.placeholder}
+                                        autoComplete="email"
                                         className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
                                     />
                                 </div>
                             </div>
-                        )}
 
-                        {isSignup && (
-                            <>
+                            {(hasSupabase || isSignup) && (
                                 <div>
                                     <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
-                                        {t.passwordConfirmLabel}
+                                        {t.passwordLabel}
                                     </label>
                                     <div className="relative">
                                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                                         <input
                                             type="password"
-                                            value={passwordConfirm}
-                                            onChange={(e) => setPasswordConfirm(e.target.value)}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
                                             placeholder="••••••••"
-                                            autoComplete="new-password"
+                                            autoComplete={isSignup ? 'new-password' : 'current-password'}
                                             className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
                                         />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
-                                        {t.displayNameLabel}
-                                    </label>
-                                    <div className="relative">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                                        <input
-                                            type="text"
-                                            value={displayName}
-                                            onChange={(e) => setDisplayName(e.target.value)}
-                                            placeholder={t.displayNamePlaceholder}
-                                            autoComplete="name"
-                                            className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
-                                        />
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                            )}
 
-                        {error && (
-                            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
-                                [ERROR]: {error}
-                            </div>
-                        )}
-
-                        {notice && (
-                            <div className="p-4 rounded-xl border border-amber-400/20 bg-amber-500/10 text-[11px] font-mono text-amber-100">
-                                [NOTICE]: {notice}
-                            </div>
-                        )}
-
-                        <button
-                            disabled={isLoading}
-                            className="w-full group bg-white text-black py-4 rounded-full font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50 shadow-xl shadow-white/5"
-                        >
-                            {isLoading ? (
-                                <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
-                            ) : (
+                            {isSignup && (
                                 <>
-                                    {isSignup ? t.signupCta : t.loginCta}
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    <div>
+                                        <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
+                                            {t.passwordConfirmLabel}
+                                        </label>
+                                        <div className="relative">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                                            <input
+                                                type="password"
+                                                value={passwordConfirm}
+                                                onChange={(e) => setPasswordConfirm(e.target.value)}
+                                                placeholder="••••••••"
+                                                autoComplete="new-password"
+                                                className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2 ml-4">
+                                            {t.displayNameLabel}
+                                        </label>
+                                        <div className="relative">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                                            <input
+                                                type="text"
+                                                value={displayName}
+                                                onChange={(e) => setDisplayName(e.target.value)}
+                                                placeholder={t.displayNamePlaceholder}
+                                                autoComplete="name"
+                                                className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-12 pr-6 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all placeholder:text-white/10"
+                                            />
+                                        </div>
+                                    </div>
                                 </>
                             )}
-                        </button>
 
-                        <p className="text-center text-[11px] text-white/40 font-mono">
-                            {isSignup ? t.hasAccount : t.needAccount}{' '}
+                            {/* Phase 4 (APPI Art. 21(2), terms 第1条): the purposes before the button, and an unticked checkbox. */}
+                            {isSignup && features.legalPages && (
+                                <div className="space-y-3 rounded-card border border-white/10 bg-white/5 p-4">
+                                    <p id={purposeId} className="text-sm text-white/80">
+                                        {t.purpose}{' '}
+                                        <LegalNewTabLink to="/privacy#section-3" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                            {t.purposeLink}
+                                        </LegalNewTabLink>
+                                    </p>
+                                    <div className="flex items-start gap-3">
+                                        <input
+                                            id={legalId}
+                                            ref={legalRef}
+                                            type="checkbox"
+                                            checked={acceptedLegal}
+                                            onChange={(e) => {
+                                                setAcceptedLegal(e.target.checked);
+                                                if (e.target.checked && errorField === 'legal') {
+                                                    setError(null);
+                                                    setErrorField(null);
+                                                }
+                                            }}
+                                            aria-invalid={errorField === 'legal' ? true : undefined}
+                                            aria-describedby={`${purposeId} ${minorsId}${errorField === 'legal' ? ` ${errorId}` : ''}`}
+                                            className="mt-1 size-5 shrink-0 accent-rose-500"
+                                        />
+                                        <label htmlFor={legalId} className="text-sm text-white/80">
+                                            {t.legalBefore}
+                                            <LegalNewTabLink to="/terms" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                                {t.legalTerms}
+                                            </LegalNewTabLink>
+                                            {t.legalMiddle}
+                                            <LegalNewTabLink to="/privacy" newTab={t.newTab} className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                                {t.legalPrivacy}
+                                            </LegalNewTabLink>
+                                            {t.legalAfter}
+                                        </label>
+                                    </div>
+                                    <p id={minorsId} className="text-sm text-white/80">
+                                        {t.legalMinors}
+                                    </p>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div id={errorId} role="alert" className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono">
+                                    [ERROR]: {error}
+                                </div>
+                            )}
+
+                            {notice && (
+                                <div className="p-4 rounded-xl border border-amber-400/20 bg-amber-500/10 text-[11px] font-mono text-amber-100">
+                                    [NOTICE]: {notice}
+                                </div>
+                            )}
+
                             <button
-                                type="button"
-                                onClick={() => switchMode(isSignup ? 'login' : 'signup')}
-                                className="text-rose-300 hover:text-rose-200 underline underline-offset-2"
+                                disabled={isLoading}
+                                className="w-full group bg-white text-black py-4 rounded-full font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50 shadow-xl shadow-white/5"
                             >
-                                {isSignup ? t.switchLogin : t.switchSignup}
+                                {isLoading ? (
+                                    <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        {isSignup ? t.signupCta : t.loginCta}
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
                             </button>
-                        </p>
-                    </form>
 
-                    {!isSignup && guestEnabled && (
-                        <button
-                            onClick={handleGuestLogin}
-                            disabled={isLoading}
-                            className="w-full mt-6 group bg-white/5 border border-white/10 text-white p-6 rounded-[1.5rem] text-left hover:bg-white/10 transition-all flex items-center gap-4"
-                        >
-                            <div className="w-12 h-12 rounded-xl bg-black border border-white/10 flex items-center justify-center text-white/60 group-hover:text-rose-400 transition-colors">
-                                <UserCircle className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-sm font-bold uppercase tracking-wider">{t.guestCta}</h3>
-                                <p className="text-[10px] text-white/30 font-mono">{t.guestDesc}</p>
-                            </div>
-                            <Terminal className="w-4 h-4 text-white/20" />
-                        </button>
-                    )}
-                </div>
+                            <p className="text-center text-[11px] text-white/40 font-mono">
+                                {isSignup ? t.hasAccount : t.needAccount}{' '}
+                                <button
+                                    type="button"
+                                    onClick={() => switchMode(isSignup ? 'login' : 'signup')}
+                                    className="text-rose-300 hover:text-rose-200 underline underline-offset-2"
+                                >
+                                    {isSignup ? t.switchLogin : t.switchSignup}
+                                </button>
+                            </p>
+                        </form>
 
-                <div className="mt-8 text-center">
-                    <div className="inline-flex items-center gap-2 text-[10px] font-mono text-white/20 uppercase tracking-[0.3em]">
-                        <ShieldCheck className="w-3 h-3 text-emerald-500/50" />
-                        Secure Neural Channel: Active
+                        {!isSignup && guestEnabled && (
+                            <button
+                                onClick={handleGuestLogin}
+                                disabled={isLoading}
+                                className="w-full mt-6 group bg-white/5 border border-white/10 text-white p-6 rounded-[1.5rem] text-left hover:bg-white/10 transition-all flex items-center gap-4"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-black border border-white/10 flex items-center justify-center text-white/60 group-hover:text-rose-400 transition-colors">
+                                    <UserCircle className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-sm font-bold uppercase tracking-wider">{t.guestCta}</h3>
+                                    <p className="text-[10px] text-white/30 font-mono">{t.guestDesc}</p>
+                                </div>
+                                <Terminal className="w-4 h-4 text-white/20" />
+                            </button>
+                        )}
+                    </div>
+
+                    <p className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-sm">
+                        <Link to="/ai-safety" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                            {t.aiSafety}
+                        </Link>
+                        {/* Phase 4: only once the texts are published (VITE_FEATURE_LEGAL_PAGES=true). */}
+                        {features.legalPages && (
+                            <>
+                                <Link to="/terms" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                    {t.footerTerms}
+                                </Link>
+                                <Link to="/privacy" className="text-rose-300 underline underline-offset-4 hover:text-rose-200">
+                                    {t.footerPrivacy}
+                                </Link>
+                            </>
+                        )}
+                    </p>
+
+                    <div className="mt-8 text-center">
+                        <div className="inline-flex items-center gap-2 text-[10px] font-mono text-white/20 uppercase tracking-[0.3em]">
+                            <ShieldCheck className="w-3 h-3 text-emerald-500/50" />
+                            Secure Neural Channel: Active
+                        </div>
                     </div>
                 </div>
             </div>

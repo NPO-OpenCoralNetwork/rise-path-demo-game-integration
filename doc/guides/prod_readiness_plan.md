@@ -60,11 +60,15 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # PostgreSQL（risepath-vm 推奨 — Supabase Postgres は使わない）
 DATABASE_URL_PHASE1=postgresql://risepath_app:password@risepath-vm:5432/risepath?sslmode=disable
 
-# Hermes Agent (v3 LLM — optional until gateway runs)
-HERMES_API_URL=http://risepath-vm:8642
-HERMES_API_KEY=change-me-local-dev
+# AI tutor, writing feedback and course generation (Claude; server only)
+ANTHROPIC_API_KEY=
 
-# Legacy Gemini (FloatingChatbot, /ai/generate — optional)
+# Hermes Agent: not offered to learners (VITE_FEATURE_AGENT_CHAT unset). Development only:
+# HERMES_API_URL=http://risepath-vm:8642
+# HERMES_API_KEY=change-me-local-dev
+
+# Gemini: only with GEMINI_ALLOWED=true, and only where people under 18 cannot reach (off by default)
+# GEMINI_ALLOWED=true
 # GEMINI_API_KEY=
 
 # Production data mode

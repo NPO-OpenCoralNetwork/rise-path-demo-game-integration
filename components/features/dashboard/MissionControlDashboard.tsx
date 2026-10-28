@@ -1,15 +1,17 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Bot, Box, Braces, Check, Palette, RotateCw, Sparkles, Terminal } from 'lucide-react';
+import { ArrowRight, Bot, Box, Braces, Check, Palette, Sparkles, Terminal } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { getCourse, getLessonEntry, loadLesson } from '../../../content';
 import { getLastLesson, readLessonSummary, readProgress } from '../../lesson/progressStore';
+import { useProgressVersion } from '../../lesson/useProgressVersion';
 import { minutesLeft, resolveLText, type ContentLocale } from '../../lesson/model';
 import type { Course, Lesson } from '../../../shared/lesson/schema.js';
 import PageHeader from '../../ui/PageHeader';
 import ProgressCluster from '../../ui/ProgressCluster';
+import ReviewTodayCard from '../../review/ReviewTodayCard';
 import EmptyState from '../../ui/EmptyState';
 import CourseCard, { WORLD_COVER_STYLE } from '../../ui/CourseCard';
 import { ButtonLink } from '../../ui/Button';
@@ -52,8 +54,6 @@ const copy = {
     outlineLabel: 'Chapter outline',
     sectionDone: 'done',
     sectionCurrent: 'you are here',
-    reviewTitle: '0 reviews due today',
-    reviewBody: 'Questions you missed and terms you turn into cards will show up here.',
     tutorTitle: 'Your AI tutor lives in the lesson',
     tutorBody: 'Ask about any paragraph with ✦. It starts with a hint and thinks it through with you instead of handing over the answer.',
     tracks: 'Tracks',
@@ -93,8 +93,6 @@ const copy = {
     outlineLabel: 'この章の構成',
     sectionDone: '読了',
     sectionCurrent: '前回ここまで',
-    reviewTitle: '今日の復習 0枚',
-    reviewBody: '確認問題で間違えた所と、カードにした用語がここに並びます。',
     tutorTitle: 'AI先生は教材の中に',
     tutorBody: '段落の ✦ から質問できます。すぐ答えは言わず、ヒントから一緒に考えます。',
     tracks: 'トラック',
@@ -159,7 +157,7 @@ const MissionControlDashboard: React.FC<DashboardProps> = () => {
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
         <ContinueCard />
         <div className="flex flex-col gap-5">
-          <EmptyState tone="sun" icon={<RotateCw size={18} />} title={t.reviewTitle} description={t.reviewBody} headingLevel={2} />
+          <ReviewTodayCard />
           <EmptyState tone="primary" icon={<Sparkles size={18} />} title={t.tutorTitle} description={t.tutorBody} headingLevel={2} />
         </div>
       </div>
@@ -220,7 +218,9 @@ const ContinueCard: React.FC = () => {
   const t = copy[language];
   const locale: ContentLocale = language;
 
-  const target = useMemo(() => pickResumeTarget(getLastLesson(), lessonExists), []);
+  // Re-read when progress changes (synced progress arriving after the page opened, another tab).
+  const progressVersion = useProgressVersion();
+  const target = useMemo(() => pickResumeTarget(getLastLesson(), lessonExists), [progressVersion]);
   const course = getCourse(target.courseSlug) as Course;
   const entry = getLessonEntry(course, target.lessonId);
   const lessonKey = `${target.courseSlug}/${target.lessonId}`;
@@ -424,12 +424,17 @@ const TrackSection: React.FC = () => {
   const t = copy[language];
 
   // Progress is saved under the course folder name (the slug getCourse takes), not course.id.
+  // progressVersion: re-read when progress changes (synced progress, another tab).
+  const progressVersion = useProgressVersion();
   const vibeCourse = useMemo(() => getCourse(VIBE_COURSE_SLUG) ?? null, []);
-  const vibe = useMemo(() => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null), [vibeCourse]);
+  const vibe = useMemo(
+    () => (vibeCourse ? courseTotals(vibeCourse, readLessonSummary, VIBE_COURSE_SLUG) : null),
+    [vibeCourse, progressVersion],
+  );
   const claudeCodeCourse = useMemo(() => getCourse(CLAUDE_CODE_COURSE_SLUG) ?? null, []);
   const claudeCode = useMemo(
     () => (claudeCodeCourse ? courseTotals(claudeCodeCourse, readLessonSummary, CLAUDE_CODE_COURSE_SLUG) : null),
-    [claudeCodeCourse],
+    [claudeCodeCourse, progressVersion],
   );
   const tracks = {
     vibe: trackCopy('vibe', language, vibeCourse),

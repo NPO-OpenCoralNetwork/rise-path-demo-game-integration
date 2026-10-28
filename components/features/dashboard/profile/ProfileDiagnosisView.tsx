@@ -4,10 +4,12 @@ import { AssessmentProfile, ViewState } from '../../../../types';
 import { ASSESSMENT_PROFILE_CHANGED_EVENT } from '../../../../constants/assessment';
 import { useLanguage } from '../../../../context/LanguageContext';
 import { useTheme } from '../../../../context/ThemeContext';
+import { features } from '../../../../config/features';
 import {
   AssessmentProfileSource,
   loadAssessmentProfile,
 } from '../../../../services/learnerProfileService';
+import { AiNotice } from '../../../ui/AiNotice';
 
 interface ProfileDiagnosisViewProps {
   onNavigate: (view: ViewState) => void;
@@ -65,9 +67,12 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
       openHabitChat: 'Explore habits & learning',
       lifeJournalPromoTitle: 'See how habits affect your learning',
       lifeJournalPromoBody: 'Log daily mood, sleep, and exercise — then ask the AI coach what patterns it finds.',
+      // Shown when the shared AI coach is off (features.agentChat).
+      lifeJournalPromoBodyNoChat: 'Log daily mood, sleep, and exercise, then see the patterns in your monthly view and insights.',
       loading: 'Loading diagnosis…',
       demoSourceNote: 'Demo data — analysis accuracy may be limited.',
       dbSourceNote: 'Synced from your saved learner profile.',
+      noStrengths: 'No AI analysis of your strengths yet.',
     },
     jp: {
       title: 'AI診断',
@@ -85,9 +90,11 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
       openHabitChat: '生活習慣と学習の関係を見る',
       lifeJournalPromoTitle: '生活習慣と学習の関係を見る',
       lifeJournalPromoBody: '日々の気分・睡眠・運動を記録し、AI コーチに傾向を質問できます。',
+      lifeJournalPromoBodyNoChat: '日々の気分・睡眠・運動を記録すると、月ごとのまとめとインサイトで傾向を見られます。',
       loading: '診断結果を読み込み中…',
       demoSourceNote: 'デモデータ — 分析精度が限定的です。',
       dbSourceNote: '保存済みの学習プロフィールと同期しています。',
+      noStrengths: 'AIによる強みの分析は、まだありません。',
     }
   } as const;
 
@@ -213,11 +220,25 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
                 </div>
               ))}
               {(!profile.aiAdvice?.strengths || profile.aiAdvice.strengths.length === 0) && (
-                <div className="text-sm text-slate-500">Analyzing strengths…</div>
+                <div className="text-sm text-slate-500">{t.noStrengths}</div>
               )}
             </div>
           </div>
         </div>
+
+        {/* The strengths, learning style and motivation above come from the stored AI insight
+            (PersonalAssessmentView stores aiAdvice only when the AI wrote it). */}
+        {profile.aiAdvice && (
+          <AiNotice
+            surface="assessment_insight"
+            answer={[
+              ...(profile.aiAdvice.strengths ?? []).map((item) => `${item.title}: ${item.description}`),
+              profile.learningStyle,
+              profile.motivation,
+            ].filter(Boolean).join('\n')}
+            className="rounded-control border border-line bg-surface px-4 py-3"
+          />
+        )}
 
         <section className="rounded-[2.5rem] bg-white border border-slate-100 p-8 shadow-xl">
           <div className="flex items-center justify-between mb-6">
@@ -247,23 +268,32 @@ const ProfileDiagnosisView: React.FC<ProfileDiagnosisViewProps> = ({ onNavigate 
         <section className="rounded-[2rem] border border-indigo-100 bg-indigo-50/60 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="text-sm font-bold text-indigo-900">{t.lifeJournalPromoTitle}</div>
-            <p className="text-xs text-indigo-700/80 mt-1">{t.lifeJournalPromoBody}</p>
+            <p className="text-xs text-indigo-700/80 mt-1">
+              {features.agentChat ? t.lifeJournalPromoBody : t.lifeJournalPromoBodyNoChat}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
-            >
-              {t.openHabitChat}
-              <ArrowRight size={16} />
-            </button>
+            {/* The shared Hermes chat: shown only when features.agentChat is on. Without it, the
+                Life Journal button becomes the main action. */}
+            {features.agentChat && (
+              <button
+                type="button"
+                onClick={() => onNavigate(ViewState.LIFE_JOURNAL_CHAT)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+              >
+                {t.openHabitChat}
+                <ArrowRight size={16} />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onNavigate(ViewState.LIFE_JOURNAL)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 text-sm font-semibold hover:bg-white"
+              className={features.agentChat
+                ? 'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 text-sm font-semibold hover:bg-white'
+                : 'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700'}
             >
               {t.openLifeJournal}
+              {!features.agentChat && <ArrowRight size={16} aria-hidden="true" />}
             </button>
           </div>
         </section>

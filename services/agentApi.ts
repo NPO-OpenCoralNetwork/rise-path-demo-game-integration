@@ -1,4 +1,5 @@
 import { apiFetch, isApiAvailable } from './apiClient';
+import { dailyLimitFields } from './aiDailyLimit';
 import type { TutorChatContext } from './tutorBridge';
 
 export type AgentUiLanguage = 'en' | 'jp';
@@ -15,20 +16,33 @@ export interface AgentChatContext extends TutorChatContext {
   ui_language?: AgentUiLanguage;
 }
 
+/**
+ * Learner-facing copy for a failed agent chat. None of it names Hermes or a setting such as
+ * HERMES_API_KEY: learners get plain words, operators find the cause in the server log.
+ */
 export interface AgentChatErrorCopy {
   genericError: string;
+  /** The coach cannot be reached or is not set up (hermes_* error types). */
   hermesUnavailable: string;
   rateLimited: string;
   loginRequired: string;
   demoUnavailable?: string;
   diaryExcerptsNotAllowed?: string;
+  /** 429 daily_limit_reached: today's agent_chat cap (server/middleware/dailyCaps.js), reset at 00:00 JST. */
+  dailyLimit?: string;
+  /** 429 daily_limit_reached with scope 'off': the feature is turned off (no reset time). */
+  featurePaused?: string;
 }
 
+/** The text to show for a failed agent chat. Always the app's own copy, never the server's text. */
 export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): string {
   if (err instanceof AgentApiError) {
-    if (err.errorType === 'hermes_not_configured' || err.errorType === 'hermes_unreachable') {
+    // Hermes could not be used (a fixed error_type: the server never forwards Hermes's own text).
+    if (err.errorType === 'hermes_not_configured' || err.errorType === 'hermes_unreachable' || err.errorType === 'hermes_api_error') {
       return copy.hermesUnavailable;
     }
+    // The connection to Hermes broke after the request was sent: a plain "try again".
+    if (err.errorType === 'hermes_interrupted') return copy.genericError;
     if (err.errorType === 'api_disabled' && copy.demoUnavailable) {
       return copy.demoUnavailable;
     }
@@ -36,10 +50,17 @@ export function mapAgentChatError(err: unknown, copy: AgentChatErrorCopy): strin
     if (err.status === 403 && err.errorType === 'diary_excerpts_not_allowed' && copy.diaryExcerptsNotAllowed) {
       return copy.diaryExcerptsNotAllowed;
     }
+    if (err.errorType === 'daily_limit_reached') {
+      if (err.scope === 'off' && copy.featurePaused) return copy.featurePaused;
+      if (copy.dailyLimit) return copy.dailyLimit;
+    }
     if (err.status === 429) return copy.rateLimited;
-    if (err.detail) return `${err.message}: ${err.detail}`;
-    if (err.message) return err.message;
+    // 503 ai_unavailable (the daily caps' outage share) or agent_session_unavailable (the turn's
+    // learner binding could not be written): the server's English text is not shown.
+    if (err.errorType === 'ai_unavailable' || err.errorType === 'agent_session_unavailable') return copy.genericError;
   }
+  // Any other failure: the server's English text can name internals (e.g. "Hermes API is not
+  // configured (set HERMES_API_KEY)"), so it stays out of the UI.
   return copy.genericError;
 }
 
@@ -68,21 +89,38 @@ export class AgentApiError extends Error {
   status: number;
   errorType?: string;
   detail?: string;
+  /** Daily caps (services/aiDailyLimit.ts): the capped feature, whose limit, and when it lifts. */
+  kind?: string;
+  scope?: string;
+  resetAt?: string;
 
-  constructor(message: string, status: number, errorType?: string, detail?: string) {
+  constructor(
+    message: string,
+    status: number,
+    errorType?: string,
+    detail?: string,
+    limit: { kind?: string; scope?: string; resetAt?: string } = {},
+  ) {
     super(message);
     this.name = 'AgentApiError';
     this.status = status;
     this.errorType = errorType;
     this.detail = detail;
+    this.kind = limit.kind;
+    this.scope = limit.scope;
+    this.resetAt = limit.resetAt;
   }
 }
 
-/** Retry on network errors and 5xx except 503; do not retry 4xx (including 403 diary gate). */
+/**
+ * Retry on network errors and 5xx except 503; do not retry 4xx (including 403 diary gate), nor a
+ * Hermes error (502 hermes_api_error): Hermes answered, and the same call would fail again.
+ */
 export function shouldRetryAgentChatWithoutStream(err: unknown): boolean {
   if (!(err instanceof AgentApiError)) return true;
   if (err.status >= 400 && err.status < 500) return false;
   if (err.status === 503) return false;
+  if (err.errorType === 'hermes_api_error') return false;
   return true;
 }
 
@@ -94,6 +132,7 @@ const parseAgentError = async (res: Response): Promise<AgentApiError> => {
       res.status,
       data?.error_type,
       data?.detail,
+      dailyLimitFields(data, res.headers.get('retry-after')),
     );
   } catch {
     return new AgentApiError(`Agent request failed (${res.status})`, res.status);

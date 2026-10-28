@@ -10,15 +10,26 @@
  * failure (5xx, timeout, rate limit, bad key) moves on to the next configured provider.
  * Without any key the gateway uses the mock provider outside production, and throws
  * `no_provider` (HTTP 503) in production.
+ *
+ * The Gemini key counts only when GEMINI_ALLOWED is exactly "true" (models.config.js
+ * isGeminiAllowed: the Gemini API terms exclude services that people under 18 use). A key set
+ * without it is ignored, reported as unconfigured, and logged once as a warning.
+ *
+ * Minors (Phase 0.5): a request with `audience: 'minor'` gets the MINOR_SAFETY system part
+ * (prompts/shared.js) appended after its own parts, uncached, so every task a minor reaches
+ * carries the child-safety rules from this one place. The route decides the audience
+ * (server/middleware/aiAccessGate.js sets res.locals.aiAudience); a request body never does.
  */
 import { LlmError, isLlmError, modelMayHaveRun } from './errors.js';
 import {
   PROVIDER_FALLBACK_ORDER,
   TASKS,
+  isGeminiAllowed,
   modelForTier,
   resolveTaskRoute,
 } from './models.config.js';
 import { generateStructured } from './structured.js';
+import { MINOR_SAFETY } from './prompts/shared.js';
 import { createAnthropicProvider } from './providers/anthropic.js';
 import { createGeminiProvider } from './providers/gemini.js';
 import { createMockProvider } from './providers/mock.js';
@@ -39,6 +50,7 @@ import { createMockProvider } from './providers/mock.js';
  * @property {AbortSignal} [signal]
  * @property {{ provider?: ProviderId, model?: string, effort?: Effort, maxTokens?: number }} [override]
  * @property {unknown} [input]                     structured input the prompt was built from (mock + logs)
+ * @property {'adult'|'minor'} [audience]          'minor' appends MINOR_SAFETY (set by routes, never by a body)
  */
 
 /**
@@ -63,6 +75,47 @@ import { createMockProvider } from './providers/mock.js';
 
 const cleanKey = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
 
+/** A Gemini key from the server environment (never a VITE_* variable), allowed or not. */
+const rawGeminiKey = (env) => cleanKey(env.GEMINI_API_KEY) || cleanKey(env.GOOGLE_API_KEY);
+
+/** The warning logged when a Gemini key is set but GEMINI_ALLOWED is not "true". */
+export const GEMINI_KEY_IGNORED_WARNING = '[LLM] GEMINI_API_KEY (or GOOGLE_API_KEY) is set but GEMINI_ALLOWED is not "true", '
+  + 'so Gemini is off: no Gemini chat, embeddings or image generation. The Gemini API terms do not allow services that '
+  + 'people under 18 use. Set GEMINI_ALLOWED=true only on a deployment that people under 18 cannot reach; otherwise '
+  + 'remove the key.';
+
+/**
+ * Whether a Gemini key is set that GEMINI_ALLOWED keeps off (for the startup warning).
+ * @param {Record<string, string | undefined>} [env]
+ */
+export const geminiKeyIgnored = (env = process.env) => Boolean(rawGeminiKey(env)) && !isGeminiAllowed(env);
+
+/**
+ * Log GEMINI_KEY_IGNORED_WARNING when it applies. Returns whether it was logged.
+ * @param {Record<string, string | undefined>} [env]
+ * @param {{ warn: Function }} [logger]
+ */
+export function warnIfGeminiKeyIgnored(env = process.env, logger = console) {
+  if (!geminiKeyIgnored(env)) return false;
+  logger.warn(GEMINI_KEY_IGNORED_WARNING);
+  return true;
+}
+
+/**
+ * The request as sent to a provider: for a minor, MINOR_SAFETY goes last, as its own uncached
+ * part (the cached prefix before it stays the same for adults and minors).
+ * @param {LlmRequest} req
+ * @returns {LlmRequest}
+ */
+export function withAudienceRules(req) {
+  if (req?.audience !== 'minor') return req;
+  /** @type {SystemPart[]} */
+  const parts = typeof req.system === 'string'
+    ? [{ text: req.system, cache: true }]
+    : Array.isArray(req.system) ? req.system : [];
+  return { ...req, system: [...parts, { text: MINOR_SAFETY }] };
+}
+
 /** @type {LlmUsage} */
 const NO_USAGE = Object.freeze({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
 
@@ -84,8 +137,10 @@ export function createGateway(options = {}) {
   const logger = options.logger ?? console;
   const keys = {
     anthropic: cleanKey(env.ANTHROPIC_API_KEY),
-    gemini: cleanKey(env.GEMINI_API_KEY) || cleanKey(env.GOOGLE_API_KEY),
+    gemini: isGeminiAllowed(env) ? rawGeminiKey(env) : '',
   };
+  // The process-wide gateway is built once, so this is one warning per process.
+  warnIfGeminiKeyIgnored(env, logger);
   const timeoutMs = Number.parseInt(env.LLM_TIMEOUT_MS || '', 10) || 120_000;
   const mockDelayMs = Number.parseInt(env.LLM_MOCK_DELAY_MS ?? '', 10);
 
@@ -166,6 +221,7 @@ export function createGateway(options = {}) {
       result?.truncated ? 'truncated=1' : '',
       error ? `error=${error.code}` : '',
       req.userId ? `user=${String(req.userId).slice(0, 8)}` : '',
+      req.audience === 'minor' ? 'audience=minor' : '',
     ];
     (error ? logger.warn : logger.info).call(logger, parts.filter(Boolean).join(' '));
   }
@@ -189,11 +245,12 @@ export function createGateway(options = {}) {
   return {
     /**
      * Non-streaming call. With `req.schema`, `result.data` is the zod-validated object.
-     * @param {LlmRequest} req
+     * @param {LlmRequest} request
      * @returns {Promise<LlmResult>}
      */
-    async generate(req) {
-      assertRequest(req);
+    async generate(request) {
+      assertRequest(request);
+      const req = withAudienceRules(request);
       let lastError = null;
       // Whether any attempt (or a structured first turn) already ran a model: the final error
       // then carries modelRan, so a guest's quota is not given back for a billed call.
@@ -235,11 +292,12 @@ export function createGateway(options = {}) {
      * they arrive as one final `error` event. Falls over to the next provider only before
      * any text has been sent. A reply cut off by the output limit after text was sent ends
      * with `done` (`truncated: true`) carrying that text, not with an error.
-     * @param {LlmRequest} req
+     * @param {LlmRequest} request
      * @returns {AsyncGenerator<LlmEvent>}
      */
-    async *stream(req) {
+    async *stream(request) {
       let routes;
+      const req = withAudienceRules(request);
       try {
         assertRequest(req);
         routes = plan(req.task, req.override);
@@ -301,6 +359,34 @@ export function createGateway(options = {}) {
     },
 
     /**
+     * Whether a call for `task` would reach a provider: a configured one, or the mock fallback
+     * outside production. False when it would fail with `no_provider` (or the task is unknown).
+     * @param {string} task
+     */
+    canServe(task) {
+      try {
+        return plan(task).length > 0;
+      } catch {
+        return false;
+      }
+    },
+
+    /**
+     * The provider a call for `task` would try first ('mock' when only the mock fallback can
+     * serve it), or null when none can. The safety screen uses it to refuse the mock in
+     * production before calling.
+     * @param {string} task
+     * @returns {ProviderId | null}
+     */
+    firstProvider(task) {
+      try {
+        return plan(task)[0]?.provider ?? null;
+      } catch {
+        return null;
+      }
+    },
+
+    /**
      * Configuration snapshot for /llm/status. Contains no secrets.
      */
     status() {
@@ -329,7 +415,7 @@ export function createGateway(options = {}) {
         forced_provider: forced,
         providers: {
           anthropic: { configured: Boolean(keys.anthropic) },
-          gemini: { configured: Boolean(keys.gemini) },
+          gemini: { configured: Boolean(keys.gemini), allowed: isGeminiAllowed(env) },
           mock: { available: allowMockFallback(env) || forced === 'mock', forced: forced === 'mock' },
         },
         tasks,

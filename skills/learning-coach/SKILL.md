@@ -12,7 +12,7 @@ version: 1.0.0
 ## セッション開始時（Phase 19）
 
 1. ユーザーの質問・つまずき内容を要約し、`mcp_rise_path_learner_memory_recall` を呼ぶ（query = 要約）。
-   - `semantic_memory_status` が `disabled` のときは記憶なしとして扱う（エラーにしない）
+   - `semantic_memory_status` が `disabled` または `not_configured`（このサーバーでは AI 個人記憶を提供していない）のときは記憶なしとして扱う（エラーにしない）
 2. `mcp_rise_path_learner_personal_context` を呼ぶ（期間未指定で直近30日）。
    - 学習スタイル・生活習慣の傾向を把握してから対話を始める
 
@@ -41,7 +41,7 @@ version: 1.0.0
 3. 発展: 関連する次のステップや応用を提案する
 
 ### パターン C: 概念理解の質問
-1. `rag-search` で関連する教材を検索
+1. `rag-search` で学習者本人がアップロードした教材から関連箇所を検索
 2. アナロジーを使って説明する
 3. 具体例を示す
 4. 理解を確認する質問を投げかける
@@ -58,7 +58,7 @@ version: 1.0.0
 - `learner-personal-context`: セッション開始時の統合コンテキスト（優先）
 - `learner-memory-recall`: 質問に関連する過去の傾向・好みの検索
 - `learner-memory-remember`: ユーザーが「覚えておいて」と明示したときは `provenance: explicit_statement` + `source: hermes-explicit`。会話キャプチャは `personal-memory-curator` 手順（`provenance: inferred`, `source: hermes-skill`、capture ON 時のみ）。自動連打禁止
-- `rag-search`: 関連教材の根拠として使用 (トップ2-3件)
+- `rag-search`: 学習者本人がアップロードした教材を根拠として使用 (トップ2-3件。ヒットがなければ使わない)
 - `learner-state`: 過去の学習履歴を参照してコンテキスト化
 - `journal`: セッション後の振り返り記録
 

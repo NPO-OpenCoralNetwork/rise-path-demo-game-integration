@@ -10,6 +10,21 @@ import { deriveDisplayName, normalizeAuthEmail } from '../services/authFormValid
 import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
+import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
+import { forgetDeletedAccountOnDevice, signOutThisBrowser } from '../services/accountDeviceData';
+import { ACCOUNT_DELETED_EVENT, ACCOUNT_DELETED_PATH, accountDeletedUrl, markDeletionInFlight, type DeletedBy } from '../services/accountDeletionState';
+import { forgetSignupAcceptance, rememberSignupAcceptance, signUpMadeNoAccount } from '../services/legalConsentApi';
+import { features } from '../config/features';
+import {
+    forgetProgressAccount,
+    progressChoicePending,
+    signInProgressSync,
+    signOutProgressSync,
+    stopProgressSync,
+    syncedLearnerId,
+    whenAccountKnown,
+} from '../components/lesson/progressSyncClient';
+import { confirmUnsavedLearning, endUnsavedLearningQuestion } from '../components/lesson/logoutGuard';
 
 export type SignUpResult =
     | { status: 'session_ready' }
@@ -17,6 +32,8 @@ export type SignUpResult =
 
 export type SignUpOptions = {
     displayName?: string;
+    /** Phase 4: the sign-up form's terms checkbox was ticked (only with VITE_FEATURE_LEGAL_PAGES=true). */
+    legalAccepted?: boolean;
 };
 
 export interface AuthUser {
@@ -34,8 +51,15 @@ interface AuthContextType {
     login: (email: string, password: string, options?: { useNexloomAuth?: boolean }) => Promise<void>;
     loginAsGuest: () => void;
     signUp: (email: string, password: string, options?: SignUpOptions) => Promise<SignUpResult>;
-    logout: () => Promise<void>;
+    /**
+     * Phase 5 (O4): resolves false when the learner chose to stay signed in (lesson records still
+     * unsaved: 「ログアウトしない」), true once logged out. reason 'reauth' (a "sign in again" button)
+     * never asks.
+     */
+    logout: (options?: { reason?: 'reauth' }) => Promise<boolean>;
     updateProfile: (updates: Partial<Pick<AuthUser, 'name' | 'avatar'>>) => void;
+    /** Phase 4: this account's Rise Path data is gone (here: by 'self'; elsewhere: 'other'). Never resolves into the app again. */
+    endDeletedAccountSession: (outcome: { by: DeletedBy; at?: string | null }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -48,13 +72,33 @@ const GUEST_USER: AuthUser = {
     isGuest: true,
 };
 
-// Hydrate user data from backend after login
+// Hydrate user data from backend after login. While the lesson progress adoption choice is open,
+// the device's legacy progress may be someone else's: hydrateFromApi would upload it into this
+// account, so it waits for the choice (chooseProgressAdoption runs it). It also waits for this page
+// load's lesson-progress GET (Phase 4, design §5.10): on a re-opened account that GET's epoch rule
+// clears the deleted account's legacy progress first; when the GET failed, nothing local is pushed.
+// Phase 5: only the synced learner's own legacy entries are kept and pushed, through their own session.
 const hydrateUserData = async () => {
     try {
-        await Promise.all([hydrateFromApi(), hydrateNotifications()]);
+        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId() })), hydrateNotifications()]);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
     }
+};
+
+/**
+ * What a deleted account leaves on this page and in this browser (design §5.11 steps 2–3): lesson
+ * progress (forgotten, no upload), the account's local keys and AI data (P-School and device
+ * preferences stay), the profile cache, the api identity. endDeletedAccountSession runs it before
+ * the sign-outs and again after them: meanwhile a token refresh inside signOut (TOKEN_REFRESHED →
+ * handleSession) writes rp_auth_user back and restarts the progress sync, and a lesson page may
+ * still write its records. Idempotent.
+ */
+const forgetDeletedAccountHere = () => {
+    forgetProgressAccount();
+    forgetDeletedAccountOnDevice();
+    clearUserProfileCache();
+    setAuthProvider(() => null);
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -90,8 +134,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        const handleSession = (session: any) => {
+        // `client`: which Supabase project the session belongs to. Only the primary one is the
+        // identity apiFetch sends, so only it syncs lesson progress (Nexloom-only sessions do not).
+        const handleSession = (session: any, client: 'primary' | 'nexloom') => {
             if (session?.user) {
+                // Lesson progress owner rule (Phase 2, ai-access-plan §6): synchronous, before this
+                // learner is shown, so another learner's progress on a shared device never appears
+                // under their name. Repeated events (INITIAL_SESSION, TOKEN_REFRESHED, SIGNED_IN on
+                // refocus) do not hydrate again unless the last try failed; they keep the access
+                // token current for the page-hide upload.
+                if (client === 'primary' && session.access_token) signInProgressSync(session.user.id, session.access_token);
                 const u: AuthUser = {
                     id: session.user.id,
                     email: session.user.email || '',
@@ -109,13 +161,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get initial sessions
         if (supabase) {
             supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user) handleSession(session);
+                if (session?.user) handleSession(session, 'primary');
                 if (!nexloomSupabase) setIsLoading(false);
             });
         }
         if (nexloomSupabase) {
             nexloomSupabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user) handleSession(session);
+                if (session?.user) handleSession(session, 'nexloom');
                 setIsLoading(false);
             });
         } else if (supabase) {
@@ -129,8 +181,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (supabase) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
                 if (session?.user) {
-                    handleSession(session);
+                    handleSession(session, 'primary');
                 } else if (!_event.startsWith('SIGNED_IN') && !session) {
+                    // The primary session ended (here or in another tab): stop syncing. Logout
+                    // already cleared this learner's lesson data; an expiry keeps it for their
+                    // next sign-in (what someone else writes meanwhile is asked about first).
+                    stopProgressSync();
+                    // A logout question still open is no longer true: the learner is signed out.
+                    endUnsavedLearningQuestion();
                     if (nexloomSupabase) {
                         nexloomSupabase.auth.getSession().then(({ data: { session: ns } }) => {
                             if (!ns) setUser(null);
@@ -146,7 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (nexloomSupabase) {
             const { data: { subscription } } = nexloomSupabase.auth.onAuthStateChange((_event, session) => {
                 if (session?.user) {
-                    handleSession(session);
+                    handleSession(session, 'nexloom');
                 } else if (!_event.startsWith('SIGNED_IN') && !session) {
                     if (supabase) {
                         supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -203,6 +261,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const supabase = getSupabaseClient();
 
         if (supabase) {
+            // Phase 4 (design §4.2): the first session of this email on this device records the acceptance.
+            if (features.legalPages && options?.legalAccepted === true) await rememberSignupAcceptance(normalizedEmail);
             const { data, error } = await supabase.auth.signUp({
                 email: normalizedEmail,
                 password,
@@ -217,7 +277,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (error) throw new Error(error.message);
 
             if (data.session) {
-                await hydrateUserData();
+                // Not awaited: the legacy hydrate waits for this page load's lesson-progress GET and
+                // its bounded retries (whenAccountKnown), which must not hold the sign-up screen.
+                // handleSession (SIGNED_IN) has started the same hydrate already.
+                void hydrateUserData();
                 try {
                     await apiPut('/user/profile', { display_name: displayName });
                     clearUserProfileCache();
@@ -227,6 +290,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return { status: 'session_ready' };
             }
 
+            // An address that is already registered gets the same answer as a new one (Supabase hides
+            // which addresses exist), but no account was made: the marker must not answer for the
+            // owner's later sign-in on this device.
+            if (signUpMadeNoAccount(data.user)) forgetSignupAcceptance();
             return { status: 'email_confirmation_required', email: normalizedEmail };
         }
 
@@ -268,7 +335,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }, []);
 
-    const logout = useCallback(async () => {
+    /**
+     * Phase 4 (design §5.11): the account's Rise Path data was deleted, here (by 'self', with the
+     * deletion time when known) or on another device or by staff ('other'). Not the logout below: its
+     * progress upload would only get 401, and its sign-out is global (Nexloom's sessions too).
+     * 1. hold the "deleted elsewhere" signal for good; 2–3. forget lesson progress (no upload) and
+     * clear what the account left in this browser; 4. sign this browser out of both clients, scope
+     * 'local' only, at most 5 s, and remove a stored session auth-js kept; 2–3 again, for what
+     * was written meanwhile; 5. a full load of the deleted page, the outcome in its URL (not in
+     * storage).
+     */
+    const endDeletedAccountSession = useCallback(async ({ by, at = null }: { by: DeletedBy; at?: string | null }) => {
+        markDeletionInFlight();
+        forgetDeletedAccountHere();
+        await signOutThisBrowser([getSupabaseClient(), getNexloomSupabaseClient()]);
+        forgetDeletedAccountHere();
+        // Already on the deleted page (a sign-in there within the 30 s margin, or a session that
+        // outlived the sign-out, answered 401 again): stay, so the page never reloads itself in a loop.
+        const path = window.location.pathname.replace(/\/+$/, '');
+        if (path.endsWith(ACCOUNT_DELETED_PATH)) return;
+        window.location.replace(accountDeletedUrl(import.meta.env.BASE_URL || '/', by, at));
+    }, []);
+
+    // The server answered 401 account_deleted to a request of this tab (services/apiClient.ts),
+    // outside a deletion made here: the account was deleted on another device or by staff.
+    useEffect(() => {
+        const onDeleted = () => {
+            void endDeletedAccountSession({ by: 'other' });
+        };
+        window.addEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
+        return () => window.removeEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
+    }, [endDeletedAccountSession]);
+
+    const logout = useCallback(async (options?: { reason?: 'reauth' }): Promise<boolean> => {
+        // Phase 5 (owner O4): upload first (≤ 3 s); a learner whose lesson records are still unsaved
+        // chooses. Nothing is cleared before this line, so "stay signed in" keeps everything.
+        if (!(await confirmUnsavedLearning(options))) return false;
+        // First, so a failed remote sign-out still leaves no AI answers on a shared device.
+        clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true });
+        // Lesson progress (Phase 2): upload what is still pending (at most 3 s, while the token is
+        // valid; a stalled sync loads and uploads once more), then clear this learner's lesson
+        // records, rp:lastLesson, learning events and legacy course progress. Records still
+        // pending stay for this learner's next sign-in; another learner's clears them.
+        await signOutProgressSync();
         const supabase = getSupabaseClient();
         const nexloomSupabase = getNexloomSupabaseClient();
         await Promise.all([
@@ -279,7 +388,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('rp_auth_user');
         clearUserProfileCache();
         setAuthProvider(() => null);
-    }, []);
+        return true;
+    }, [user?.isGuest]);
 
     return (
         <AuthContext.Provider value={{
@@ -291,6 +401,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signUp,
             logout,
             updateProfile,
+            endDeletedAccountSession,
         }}>
             {children}
         </AuthContext.Provider>

@@ -2,7 +2,8 @@
  * Hermes Agent proxy — Phase 16-6d
  * Forwards authenticated Web UI chat to Hermes API Server (OpenAI-compatible).
  */
-import { setAgentChatConsent, registerAgentSession } from '../../tools/core/agentSessionStore.js';
+import { setAgentChatConsent } from '../../tools/core/agentSessionStore.js';
+import { registerAgentTurn, buildTurnInstruction, TURN_KEY_PREFIX } from '../../tools/core/mcpUserScope.js';
 import { DATA_NOT_INSTRUCTIONS, fence, stripTags } from '../llm/prompts/shared.js';
 
 export const ALLOWED_SKILLS = new Set([
@@ -41,12 +42,31 @@ export function getHermesConfig() {
     return { baseUrl, apiKey, model, configured: Boolean(apiKey) };
 }
 
-export function buildConversationKey(userId, skill) {
-    return `rp:user:${userId}:${skill}`;
+/**
+ * The account generation as a key suffix (Phase 4, tools/core/accountDeletions.js): '' for an
+ * account that was never deleted (null: today's keys and stored conversations stay as they are),
+ * ':g<epoch seconds of the re-open>' for an account re-opened after a deletion, so its Hermes
+ * conversation (stored with store: true) never continues the deleted account's. Anything that is
+ * not a positive whole number counts as null.
+ * @param {unknown} generation
+ */
+const generationSuffix = (generation) => (Number.isSafeInteger(generation) && /** @type {number} */ (generation) > 0 ? `:g${generation}` : '');
+
+/** @param {string} userId @param {string} skill @param {number | null} [generation] req.accountGeneration */
+export function buildConversationKey(userId, skill, generation = null) {
+    return `rp:user:${userId}:${skill}${generationSuffix(generation)}`;
 }
 
-export function buildSessionKey(userId) {
-    return `rp:user:${userId}`;
+/**
+ * The X-Hermes-Session-Key Express sends Hermes: stable per learner, because Hermes scopes its own
+ * per-channel state by it (a key that changes every turn would start a new scope each time). Hermes
+ * does not forward it to the MCP server, and the MCP server ignores rp:user keys from clients; the
+ * learner for tool calls comes only from the turn token in `instructions`. A re-opened account
+ * (generation set) gets its own scope, as buildConversationKey.
+ * @param {string} userId @param {number | null} [generation] req.accountGeneration
+ */
+export function buildSessionKey(userId, generation = null) {
+    return `rp:user:${userId}${generationSuffix(generation)}`;
 }
 
 // Lesson context from openTutor() (PLAN §9.1 AskTutorDetail). Every field is learner-controlled,
@@ -292,12 +312,77 @@ async function readHermesError(response) {
     }
 }
 
+/**
+ * Error codes a fetch can fail with before the request reached Hermes: refused, no DNS answer,
+ * no route, connect timeout, bad URL. After any of these Hermes did no work.
+ */
+const HERMES_CONNECT_CODES = new Set([
+    'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'ERR_INVALID_URL',
+]);
+
+/** Codes on a fetch rejection: its own, its cause's, and an AggregateError's inner errors. */
+function fetchErrorCodes(err) {
+    const codes = [];
+    for (const item of [err, err?.cause]) {
+        if (!item) continue;
+        if (typeof item.code === 'string') codes.push(item.code);
+        if (Array.isArray(item.errors)) {
+            for (const inner of item.errors) if (typeof inner?.code === 'string') codes.push(inner.code);
+        }
+    }
+    return codes;
+}
+
+/**
+ * A rejected fetch to Hermes as a route result. 'hermes_unreachable' only when the connection
+ * never opened (HERMES_CONNECT_CODES), so the route can give the daily agent_chat unit back.
+ * Anything else ('hermes_interrupted': the headers timeout, a reset or closed socket after the
+ * request was sent) may have run the agent, so it stays charged.
+ */
+export function hermesFetchFailure(err) {
+    const codes = fetchErrorCodes(err);
+    const neverConnected = codes.length > 0 && codes.every((code) => HERMES_CONNECT_CODES.has(code));
+    return neverConnected
+        ? { ok: false, status: 503, error: 'Hermes API unreachable', error_type: 'hermes_unreachable', detail: err?.message }
+        : { ok: false, status: 503, error: 'Hermes API connection was interrupted', error_type: 'hermes_interrupted', detail: err?.message };
+}
+
+/**
+ * Everything a Hermes call needs for one chat turn, before Hermes is contacted. Mints the turn
+ * token (registerAgentTurn) that tells the MCP server which learner this turn's tool calls act for:
+ * Hermes gets it in `instructions` (the rp_turn argument of each tool call). When the binding cannot be written, the turn does not start: the
+ * MCP server could not resolve the learner, so Hermes is never called ('agent_session_unavailable',
+ * which the route refunds). Then the learner's diary consent for this turn is recorded.
+ * @returns {Promise<{ ok: true, conversation: string, input: string, instructions: string, sessionKey: string }
+ *   | { ok: false, status: number, error: string, error_type: string }>}
+ */
+async function beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation = null }) {
+    const turn = await registerAgentTurn(userId);
+    if (!turn) {
+        return {
+            ok: false,
+            status: 503,
+            error: 'Agent session could not be started',
+            error_type: 'agent_session_unavailable',
+        };
+    }
+    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    return {
+        ok: true,
+        conversation: buildConversationKey(userId, skill, generation),
+        input: buildHermesInput({ skill, message, context }),
+        instructions: [buildSkillInstructions(skill), buildTurnInstruction(turn)].join('\n'),
+        sessionKey: buildSessionKey(userId, generation),
+    };
+}
+
 export async function callHermesResponses({
     userId,
     skill,
     message,
     context,
     includeDiaryExcerpts,
+    generation = null,
     fetchImpl = fetch,
 }) {
     const { baseUrl, apiKey, model, configured } = getHermesConfig();
@@ -310,11 +395,9 @@ export async function callHermesResponses({
         };
     }
 
-    const conversation = buildConversationKey(userId, skill);
-    const sessionKey = buildSessionKey(userId);
-    const input = buildHermesInput({ skill, message, context });
-    await registerAgentSession(sessionKey, userId);
-    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation });
+    if (!turn.ok) return turn;
+    const { conversation, input, instructions, sessionKey } = turn;
 
     let response;
     try {
@@ -328,19 +411,13 @@ export async function callHermesResponses({
             body: JSON.stringify({
                 model,
                 input,
-                instructions: buildSkillInstructions(skill),
+                instructions,
                 conversation,
                 store: true,
             }),
         });
     } catch (err) {
-        return {
-            ok: false,
-            status: 503,
-            error: 'Hermes API unreachable',
-            error_type: 'hermes_unreachable',
-            detail: err.message,
-        };
+        return hermesFetchFailure(err);
     }
 
     if (!response.ok) {
@@ -377,6 +454,7 @@ export async function streamHermesChatCompletions({
     message,
     context,
     includeDiaryExcerpts,
+    generation = null,
     fetchImpl = fetch,
 }) {
     const { baseUrl, apiKey, model, configured } = getHermesConfig();
@@ -389,11 +467,9 @@ export async function streamHermesChatCompletions({
         };
     }
 
-    const conversation = buildConversationKey(userId, skill);
-    const sessionKey = buildSessionKey(userId);
-    const input = buildHermesInput({ skill, message, context });
-    await registerAgentSession(sessionKey, userId);
-    await setAgentChatConsent(userId, { includeDiaryExcerpts });
+    const turn = await beginHermesTurn({ userId, skill, message, context, includeDiaryExcerpts, generation });
+    if (!turn.ok) return turn;
+    const { conversation, input, instructions, sessionKey } = turn;
 
     let response;
     try {
@@ -407,20 +483,14 @@ export async function streamHermesChatCompletions({
             body: JSON.stringify({
                 model,
                 input,
-                instructions: buildSkillInstructions(skill),
+                instructions,
                 conversation,
                 store: true,
                 stream: true,
             }),
         });
     } catch (err) {
-        return {
-            ok: false,
-            status: 503,
-            error: 'Hermes API unreachable',
-            error_type: 'hermes_unreachable',
-            detail: err.message,
-        };
+        return hermesFetchFailure(err);
     }
 
     if (!response.ok) {
