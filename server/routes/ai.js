@@ -244,7 +244,8 @@ export async function saveDraftVersion(pool, { curriculumId, userId, curriculum,
     await client.query('COMMIT');
     return saved.curriculumVersionId;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // A lost connection makes ROLLBACK fail too; keep the original error.
+    await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();
