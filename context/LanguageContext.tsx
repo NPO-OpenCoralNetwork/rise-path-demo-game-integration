@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, ReactNode } from 'react';
+import { readStoredLanguage, writeStoredLanguage } from './languageStorage';
 
 export type Language = 'en' | 'jp';
 export type SelectedLanguage = 'en' | 'jp' | 'fr';
@@ -12,15 +13,10 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const LANGUAGE_STORAGE_KEY = 'risepath:language';
+const getStorage = () => (typeof window === 'undefined' ? undefined : window.localStorage);
 
-const getInitialLanguage = (): SelectedLanguage => {
-  if (typeof window === 'undefined') return 'en';
-  const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  if (stored === 'jp') return 'jp';
-  if (stored === 'fr') return 'fr';
-  return 'en';
-};
+// Storage can be blocked (private modes, blocked site data): the helpers never throw.
+const getInitialLanguage = (): SelectedLanguage => readStoredLanguage(getStorage);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedLanguage, setSelectedLanguage] = useState<SelectedLanguage>(getInitialLanguage);
@@ -28,9 +24,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const setLanguage = (next: SelectedLanguage) => {
     setSelectedLanguage(next);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
-    }
+    writeStoredLanguage(getStorage, next);
   };
 
   const toggleLanguage = () =>
