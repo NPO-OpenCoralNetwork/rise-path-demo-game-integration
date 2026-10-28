@@ -195,7 +195,11 @@ export default function FlashcardsBlock({ block }: BlockProps<'flashcards'>) {
             data-known={status === true || undefined}
             onClick={flip}
           >
-            <span className="rp-card-inner">
+            {/* Keyed by the card, the same fix as ReviewCardView.tsx on the review page: another card
+                mounts a new span, unturned and without a transition, so it never turns back over the
+                previous card's flip while already holding this card's answer. The button stays mounted
+                (focus); the same card keeps its span, so its own flip animates. */}
+            <span key={card.id} className="rp-card-inner">
               <span className="rp-card-side rp-card-front" aria-hidden={flipped || undefined}>
                 <span className="eyebrow text-fg-3">{text.front}</span>
                 <span className="rp-card-text"><MdText value={card.front} inline /></span>

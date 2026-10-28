@@ -81,6 +81,15 @@
     border-bottom: 1px solid var(--rp-border);
   }
 
+  /* Phase 8 (S4): opaque in dark. At 90 % the light text scrolling under the bar showed through as
+     ghost glyphs behind the title and buttons; light and sepia keep the frosted bar.
+     [data-theme="dark"] is on .rp-reader (and on <html> while it is mounted). */
+  [data-theme="dark"] .rp-bar {
+    background: var(--rp-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
   .rp-bar-inner {
     height: var(--rp-bar-h);
     display: flex;
