@@ -121,8 +121,6 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
   let probed = false;
   /** The route answered 200 on this page. */
   let routeSeen = false;
-  /** What the sync's capabilities said at the last syncChanged: unknown, the capability off, or on. */
-  let capsSeen: 'unknown' | 'off' | 'on' = 'unknown';
   let debounce: unknown = null;
   let lastServerFetchAt = Number.NEGATIVE_INFINITY;
   /** expire() ran while a request was in flight: its answer is stored as out of date. */
@@ -142,6 +140,17 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
       return null;
     }
   };
+  /** What the sync's capabilities say now: unknown, the capability off, or on. */
+  const capsNow = (): 'unknown' | 'off' | 'on' => {
+    const offered = caps();
+    return !offered ? 'unknown' : offered[capabilityKey] === true ? 'on' : 'off';
+  };
+  /**
+   * What they said at the last syncChanged, or when the store was made: a store first made after
+   * the sync knew them (LessonEnd's XP item on a lesson page) must not read the next save-view
+   * change as "the capabilities arrived" (Phase 8: one more request, sent with the upload).
+   */
+  let capsSeen = capsNow();
 
   function set(patch: Partial<AchievementsSnapshot<T>>): void {
     const next = { ...snap, ...patch };
@@ -288,8 +297,7 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
     },
     syncChanged() {
       const id = learner();
-      const offered = caps();
-      const seen = offered === null ? 'unknown' : offered[capabilityKey] === true ? 'on' : 'off';
+      const seen = capsNow();
       // The capabilities became known, or the server now offers the capability (an upgraded VM).
       const capsArrived = (seen !== 'unknown' && capsSeen === 'unknown') || (seen === 'on' && capsSeen === 'off');
       // The server stopped offering it (a rollback to an older image while this page is open).

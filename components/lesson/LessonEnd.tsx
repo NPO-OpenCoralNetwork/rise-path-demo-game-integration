@@ -1,11 +1,12 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Flag, Layers, ListChecks, PartyPopper, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { ConfirmDialog } from '../safety/ConfirmDialog';
+import { useAchievements, type AchievementsSnapshot } from '../ui/achievementsClient';
 import { useReader } from './ReaderContext';
 import { MdText } from './Md';
-import { allBlocks, isAnswered, isQuiz } from './model';
+import { LESSON_DONE_STATES, allBlocks, isAnswered, isQuiz } from './model';
 import type { SelfRating } from './progressStore';
 import { hasActivity, type LessonResetResult, type SaveView, type SyncState } from './progressSync.ts';
 import { isSyncableLesson, progressCapabilities, useProgressSaveView, useProgressSyncState } from './progressSyncClient';
@@ -32,6 +33,15 @@ import type { LText } from '../../shared/lesson/schema.js';
  * Phase 6: when the server has reviews and the lesson has review cards (a flashcards block), the
  * dialog also says that the lesson's review cards leave the review queue with their schedule and
  * history (R4); nothing else here changes.
+ * Phase 8 (S2): the XP of this lesson's done award, from the server's ledger
+ * (GET /api/v2/user/achievements lessonXp; the browser computes no XP). Asked for only when the
+ * lesson is done in the local record, it syncs, a learner is synced and the server offers
+ * achievements (LessonXpItem mounts the store's consumer only then). 「このレッスンを終えて +40 XP」
+ * only when this page first saw a current answer without the award and then one with it;
+ * otherwise 「このレッスンを終えたときにもらった XP：40」 (a revisit, another device, a redo after a
+ * reset: XP is given once ever, O2). Nothing without the figure (an older server, not loaded,
+ * refused). No icon, like the progress item and ProgressCluster's XP: the sparkle means the AI tutor
+ * in the reader.
  */
 
 const copy = {
@@ -44,6 +54,8 @@ const copy = {
     saved: 'Saved. Come back to the parts marked "not sure yet" later.',
     savedDevice: 'Saved on this device. Come back to the parts marked "not sure yet" later.',
     progress: (pct: number) => `${pct}% done`,
+    xpNew: (n: number) => `+${n} XP for finishing this lesson`,
+    xpTotal: (n: number) => `XP for finishing this lesson: ${n}`,
     checks: (n: number, m: number) => `Checks answered: ${n}/${m}`,
     cards: (n: number, m: number) => `Review cards known: ${n}/${m}`,
     goToCards: 'Go to the review cards',
@@ -86,6 +98,8 @@ const copy = {
     saved: '記録しました。「まだ不安」の目標は、あとで読み返しましょう。',
     savedDevice: 'この端末に記録しました。「まだ不安」の目標は、あとで読み返しましょう。',
     progress: (pct: number) => `${pct}% 完了`,
+    xpNew: (n: number) => `このレッスンを終えて +${n} XP`,
+    xpTotal: (n: number) => `このレッスンを終えたときにもらった XP：${n}`,
     checks: (n: number, m: number) => `確認問題 ${n}/${m} 回答`,
     cards: (n: number, m: number) => `復習カード 覚えた ${n}/${m}`,
     goToCards: '復習カードへ移動',
@@ -164,6 +178,54 @@ export function resetControlOf({ resettable, sync, view, offered, active }: {
   return ready ? 'enabled' : 'disabled';
 }
 
+/** What the XP line reads of the achievements store (Phase 8, S2). */
+type XpSnap = Pick<AchievementsSnapshot, 'status' | 'data' | 'at'>;
+
+const ownKey = (map: Readonly<Record<string, number>>, key: string) => Object.prototype.hasOwnProperty.call(map, key);
+
+/** The server's lessonXp in a current answer (at !== null), or undefined (not loaded, refused, stale, an older server). */
+const currentLessonXp = (snap: XpSnap) => (snap.status === 'ready' && snap.at !== null ? snap.data?.lessonXp : undefined);
+
+/** A current answer from a server that sends lessonXp, without this lesson's award. Pure (tests). */
+export function lacksLessonXp(snap: XpSnap, lessonKey: string): boolean {
+  const map = currentLessonXp(snap);
+  return map !== undefined && !ownKey(map, lessonKey);
+}
+
+export type LessonXpLine = { kind: 'new' | 'total'; xp: number } | null;
+
+/**
+ * The XP line: only from a current answer (after a stale mark the old one is not shown) and only
+ * the server's figure (the browser adds or subtracts nothing). 'new' (+N) only when this page saw
+ * a current answer without the award first (it was written while the page was open); otherwise
+ * the ledger fact, true on every visit and after a reset. Pure (tests).
+ */
+export function lessonXpLineOf(snap: XpSnap, lessonKey: string, sawWithout: boolean): LessonXpLine {
+  const map = currentLessonXp(snap);
+  if (!map || !ownKey(map, lessonKey)) return null;
+  return { kind: sawWithout ? 'new' : 'total', xp: map[lessonKey] };
+}
+
+/**
+ * The XP item of the stats list. Mounted only when LessonEnd may ask (design D7), so ordinary
+ * lesson pages send no achievements request. Not a live region: it may appear seconds later and
+ * nothing is read aloud while the learner rates.
+ */
+function LessonXpItem({ lessonKey }: { lessonKey: string }) {
+  const { language } = useLanguage();
+  const snap = useAchievements();
+  const [sawWithout, setSawWithout] = useState(false);
+  useEffect(() => {
+    if (!sawWithout && lacksLessonXp(snap, lessonKey)) setSawWithout(true);
+  }, [snap, lessonKey, sawWithout]);
+  const line = lessonXpLineOf(snap, lessonKey, sawWithout);
+  if (!line) return null;
+  const text = copy[language];
+  return (
+    <li className="rp-end-xp tabular">{line.kind === 'new' ? text.xpNew(line.xp) : text.xpTotal(line.xp)}</li>
+  );
+}
+
 export type LessonLinkInfo = { title: string; href: string; minutes?: number; lang?: string };
 
 type LessonEndProps = {
@@ -229,6 +291,9 @@ export function LessonEnd({ next, prev, backTo, resettable = false, onLessonRese
     setSavedWhere(savedWhereOf(view, syncs));
     progress.setRating(objectiveId, rating);
   };
+
+  // Phase 8 (S2): the server's XP for this lesson, asked for only when it can be there (D7).
+  const showXp = syncs && sync.userId !== null && progressCapabilities()?.achievements === true && LESSON_DONE_STATES.has(progress.state);
 
   const control = resetControlOf({
     resettable,
@@ -315,6 +380,7 @@ export function LessonEnd({ next, prev, backTo, resettable = false, onLessonRese
         </p>
         <ul className="rp-end-stats">
           <li className="tabular">{text.progress(progress.pct)}</li>
+          {showXp ? <LessonXpItem lessonKey={`${courseSlug}/${lesson.id}`} /> : null}
           {questions.length > 0 && (
             <li className="tabular"><ListChecks size={14} aria-hidden="true" />{text.checks(answered, questions.length)}</li>
           )}

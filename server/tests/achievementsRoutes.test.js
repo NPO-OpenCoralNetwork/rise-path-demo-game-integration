@@ -115,7 +115,7 @@ describe('GET /api/v2/user/achievements', () => {
             const res = await call(base, { headers: as(ALICE.toUpperCase()) });
             assert.equal(res.status, 200, res.text);
             assert.equal(res.headers.get('cache-control'), 'no-store');
-            assert.deepEqual(Object.keys(res.json), ['ok', 'learnerId', 'xp', 'counts', 'streak', 'badges']);
+            assert.deepEqual(Object.keys(res.json), ['ok', 'learnerId', 'xp', 'counts', 'streak', 'badges', 'lessonXp']);
             assert.equal(res.json.ok, true);
             assert.equal(res.json.learnerId, ALICE, 'the caller, in lower case');
             assert.deepEqual(res.json.xp, { total: 140, level: 2, intoLevel: 40, levelSize: 100, toNextLevel: 60 }, 'read 50 + started 10 + stage 1 80; stage 9 nothing');
@@ -128,9 +128,12 @@ describe('GET /api/v2/user/achievements', () => {
             ]);
             assert.deepEqual(res.json.badges.find((b) => b.id === 'five_lessons'), { id: 'five_lessons', earned: false, current: 2, goal: 5 });
             assert.deepEqual(pool.awardsOf(BOB), [], 'another learner\'s rows are never reconciled by Alice\'s read');
+            // Phase 8 (S2): the done award of each finished lesson, for the lesson end; a started one is absent.
+            assert.deepEqual(res.json.lessonXp, { 'vibe-coding/vibe-ch1': 40 });
 
             const bob = await call(base, { headers: as(BOB) });
             assert.deepEqual([bob.json.learnerId, bob.json.xp.total, bob.json.streak.best], [BOB, 50, 1]);
+            assert.deepEqual(bob.json.lessonXp, { 'vibe-coding/vibe-ch1': 40 });
         });
     });
 

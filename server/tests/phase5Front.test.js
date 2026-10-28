@@ -15,6 +15,9 @@
 // reset control, its helper by reason, a dialog closed before the request ends, focus fallback),
 // LessonReader's keyed sections (G16), LeftRecordsNotice, ProgressCluster, ProfilePassport and
 // the badges page (G20, G33), the logout callers (G12, G28) and the copy and token rules.
+// Phase 8 (S2): achievementsApi's lessonXp (absent on an older server, a malformed field dropped
+// alone) and LessonEnd's XP line (the server's figure only; 「+N」 only after this page saw an
+// answer without the award; no request unless the lesson is done, synced and offered).
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -504,6 +507,26 @@ describe('achievementsClient: the XP store', () => {
     assert.equal(env.loads, 1, 'once');
   });
 
+  it('Phase 8: a store made after the capabilities are known (the lesson end\'s XP item) does not read the next save-view change as their arrival', async () => {
+    const { s, env } = store();
+    s.consumerMounted();
+    await s.settled();
+    assert.equal(env.loads, 1);
+    s.syncChanged(); // the save view changes when the upload starts
+    await s.settled();
+    assert.equal(env.loads, 1, 'no second request, sent with the lesson-progress upload');
+    assert.equal(s.getSnapshot().status, 'ready');
+    // A rollback is still seen on the first change, without a request.
+    const rolled = store();
+    rolled.s.consumerMounted();
+    await rolled.s.settled();
+    rolled.env.caps = { lessonReset: true, achievements: false };
+    rolled.s.syncChanged();
+    await rolled.s.settled();
+    assert.deepEqual(rolled.s.getSnapshot(), { status: 'unsupported', learnerId: U1, data: null, at: null });
+    assert.equal(rolled.env.loads, 1);
+  });
+
   it('errors keep the same learner\'s data on screen; with nothing to show they are "unavailable"', async () => {
     let fail = false;
     const { s } = store({ load: () => {
@@ -658,6 +681,34 @@ describe('achievementsApi: the answer and its refusals', () => {
     const capped = mod.parseAchievements({ ...ACHIEVEMENTS(), badges: [{ id: 'five_lessons', earned: true, current: 9, goal: 5 }] });
     assert.equal(capped.badges[0].current, 5);
   });
+
+  it('Phase 8: lessonXp absent (an older server) stays absent; {} is kept; good entries kept, bad ones dropped; a malformed field drops only lessonXp', () => {
+    const older = mod.parseAchievements(ACHIEVEMENTS());
+    assert.equal('lessonXp' in older, false, 'an older server: no field, so the lesson end shows nothing');
+    assert.deepEqual(mod.parseAchievements({ ...ACHIEVEMENTS(), lessonXp: {} }).lessonXp, {});
+    const mixed = mod.parseAchievements({
+      ...ACHIEVEMENTS(),
+      lessonXp: {
+        'vibe-coding/vibe-ch1': 40, 'claude-code/cc-01-first-session': 40,
+        'Vibe-Coding/x': 40, 'vibe-coding': 40, 'a/b/c': 40, 'vibe-coding/zero': 0, 'vibe-coding/half': 1.5,
+        'vibe-coding/text': '40', 'vibe-coding/minus': -40, 'vibe-coding/huge': 2 ** 53,
+      },
+    });
+    assert.deepEqual(mixed.lessonXp, { 'vibe-coding/vibe-ch1': 40, 'claude-code/cc-01-first-session': 40 });
+    assert.ok(Object.isFrozen(mixed.lessonXp));
+    for (const bad of [[{ 'vibe-coding/vibe-ch1': 40 }], 'vibe-coding/vibe-ch1', 40, null, true]) {
+      const parsed = mod.parseAchievements({ ...ACHIEVEMENTS(), lessonXp: bad });
+      assert.ok(parsed, `the answer stays usable: ${JSON.stringify(bad)}`);
+      assert.equal('lessonXp' in parsed, false, JSON.stringify(bad));
+      assert.equal(parsed.xp.total, 230);
+      assert.equal(parsed.badges.length, 2);
+    }
+    // A JSON key "__proto__" is an own key of the parsed body: dropped, and nothing is inherited.
+    const proto = mod.parseAchievements(JSON.parse(`{"ok":true,"learnerId":"${U1}","xp":{"total":0,"level":1,"intoLevel":0,"levelSize":100,"toNextLevel":100},"counts":{"lessonsStarted":0,"lessonsDone":0,"stagesDone":0},"streak":{"current":0,"best":0,"activeToday":false,"today":"2026-10-25","timeZone":"Asia/Tokyo"},"badges":[],"lessonXp":{"__proto__":{"polluted":1},"vibe-coding/vibe-ch1":40}}`));
+    assert.deepEqual(Object.keys(proto.lessonXp), ['vibe-coding/vibe-ch1']);
+    assert.equal(Object.getPrototypeOf(proto.lessonXp), Object.prototype);
+    assert.equal(proto.lessonXp.polluted, undefined);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -728,7 +779,7 @@ const UI_STUBS = {
     export const restoreLogoutFocus = (t) => { (globalThis.__restored ??= []).push(t); return t; };
   `,
   achievements: `
-    export const useAchievements = () => globalThis.__ach;
+    export const useAchievements = () => { globalThis.__achCalls = (globalThis.__achCalls ?? 0) + 1; return globalThis.__ach; };
     export const reloadAchievements = async () => { globalThis.__reloads = (globalThis.__reloads ?? 0) + 1; };
   `,
   content: "export const getCourse = (slug) => (slug === 'vibe-coding' ? { id: 'vibe-coding', locale: 'jp', title: 'バイブコーディング入門：AIと作る' } : undefined);",
@@ -832,7 +883,7 @@ before(async () => {
     "export { SaveStoppedNoticeView, default as SaveStoppedNotice } from './components/lesson/SaveStoppedNotice';",
     "export { LeftRecordsNoticeView, default as LeftRecordsNotice } from './components/lesson/LeftRecordsNotice';",
     "export { UnsavedLogoutDialogView } from './components/lesson/UnsavedLogoutDialog';",
-    "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf } from './components/lesson/LessonEnd';",
+    "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf, lacksLessonXp, lessonXpLineOf } from './components/lesson/LessonEnd';",
     "export { ProgressClusterView } from './components/ui/ProgressCluster';",
     "export { ProfileBadgesBody, nextBadge, badgeProgressText, default as ProfileBadgesView } from './components/features/dashboard/profile/ProfileBadgesView';",
     "export { default as ProfilePassport, notReadyText } from './components/features/dashboard/ProfilePassport';",
@@ -1761,6 +1812,141 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     const badges = readFile('components/features/dashboard/profile/ProfileBadgesView.tsx');
     assert.doesNotMatch(badges, /初ビルド|First Build|AI探究者|AI Explorer|学習の守護者|マスター|レジェンド|Legendary|記念|Milestone Trophy/);
     assert.match(badges, /setTheme\('default'\)/);
+  });
+});
+
+describe('Phase 8 (S2): the lesson end shows the server\'s XP for the lesson', () => {
+  const KEY = 'vibe-coding/vibe-ch1';
+  const LESSON = { id: 'vibe-ch1', objectives: [{ id: 'o1', text: 'Goal one' }], sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }] }] };
+  const reader = (state = 'read', lesson = LESSON) => ({
+    lesson,
+    courseSlug: 'vibe-coding',
+    scrollToBlock() {},
+    progress: {
+      progress: { v: 1, seen: ['b1'], answers: {}, checks: {}, ratings: {}, lastBlockId: null, updatedAt: '2026-10-25T00:00:00.000Z' },
+      pct: 100,
+      state,
+      getCheck: () => undefined,
+      setRating() {},
+      resetLesson: async () => ({ ok: true }),
+    },
+  });
+  const WITH = (xp = 40) => SNAP('ready', DATA({ lessonXp: { [KEY]: xp, 'vibe-coding/vibe-ch2': 40 } }));
+  const WITHOUT = () => SNAP('ready', DATA({ lessonXp: { 'vibe-coding/vibe-ch2': 40 } }));
+  const OLDER = () => SNAP('ready', DATA());
+  const render = (globals = {}) => {
+    globalThis.__achCalls = 0;
+    const els = elementsOf(renderUi(ui, ui.LessonEnd, { next: null, prev: null, backTo: '/c', resettable: true }, {
+      __view: VIEW(),
+      __sync: { status: 'on', userId: U1 },
+      __reader: reader(),
+      __ach: WITH(),
+      ...globals,
+    }));
+    return { els, item: byClass(els, 'rp-end-xp')[0] ?? null, calls: globalThis.__achCalls };
+  };
+  /** The useState index of LessonXpItem's sawWithout: the setter its effect calls on an answer without the award. */
+  const sawWithoutIndex = () => {
+    render({ __ach: WITHOUT() });
+    for (const effect of globalThis.__effects) effect();
+    const set = globalThis.__sets.filter(([, value]) => value === true);
+    assert.equal(set.length, 1, JSON.stringify(globalThis.__sets));
+    return set[0][0];
+  };
+
+  it('lacksLessonXp: true only for a current answer from a server that sends lessonXp, without this lesson', () => {
+    assert.equal(ui.lacksLessonXp(WITHOUT(), KEY), true);
+    assert.equal(ui.lacksLessonXp(WITH(), KEY), false);
+    assert.equal(ui.lacksLessonXp(OLDER(), KEY), false, 'an older server: never "without"');
+    assert.equal(ui.lacksLessonXp({ ...WITHOUT(), at: null }, KEY), false, 'a stale answer');
+    for (const status of NOT_READY) assert.equal(ui.lacksLessonXp(SNAP(status), KEY), false, status);
+    assert.equal(ui.lacksLessonXp({ status: 'unavailable', data: WITHOUT().data, at: 1 }, KEY), false);
+  });
+
+  it('lessonXpLineOf: the server\'s figure, total or new by what the page saw; nothing without a current figure', () => {
+    assert.deepEqual(ui.lessonXpLineOf(WITH(), KEY, false), { kind: 'total', xp: 40 });
+    assert.deepEqual(ui.lessonXpLineOf(WITH(), KEY, true), { kind: 'new', xp: 40 });
+    assert.deepEqual(ui.lessonXpLineOf(WITH(80), KEY, true), { kind: 'new', xp: 80 }, 'the server\'s number as it is');
+    assert.equal(ui.lessonXpLineOf(WITHOUT(), KEY, true), null);
+    assert.equal(ui.lessonXpLineOf(OLDER(), KEY, true), null, 'an older server');
+    assert.equal(ui.lessonXpLineOf({ ...WITH(), at: null }, KEY, false), null, 'stale');
+    for (const status of NOT_READY) assert.equal(ui.lessonXpLineOf(SNAP(status), KEY, true), null, status);
+    assert.equal(ui.lessonXpLineOf({ status: 'unavailable', data: WITH().data, at: 1 }, KEY, false), null);
+    // Object.prototype keys are not lessons.
+    assert.equal(ui.lessonXpLineOf(WITHOUT(), 'constructor', false), null);
+    assert.equal(ui.lacksLessonXp(WITHOUT(), 'constructor'), true);
+  });
+
+  it('a done lesson with the award in the ledger: the ledger fact, with no 「+」 (a revisit, another device, a redo); EN too', () => {
+    const { item, calls } = render();
+    assert.ok(item, 'the XP item');
+    assert.equal(textOfElement(item), 'このレッスンを終えたときにもらった XP：40');
+    assert.equal(item.type, 'li');
+    assert.ok(byClass([item], 'tabular').length === 1);
+    // Text only, like the progress item and ProgressCluster's XP: no icon (Sparkles is the AI tutor's glyph in the reader).
+    assert.deepEqual(walk(item.props.children).filter((t) => 'el' in t).map((t) => t.el.type), []);
+    assert.equal(item.props.role, undefined, 'not a live region');
+    assert.equal(item.props['aria-live'], undefined);
+    assert.equal(calls, 1);
+    assert.equal(textOfElement(render({ __language: 'en' }).item), 'XP for finishing this lesson: 40');
+    // Running the effect with the award already there never turns 「+」 on.
+    render();
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value === true), false);
+  });
+
+  it('「+40 XP」 only after this page saw a current answer without the award (the effect records it), then one with it', () => {
+    const index = sawWithoutIndex();
+    const { item } = render({ __state: { [index]: true } });
+    assert.equal(textOfElement(item), 'このレッスンを終えて +40 XP');
+    assert.equal(textOfElement(render({ __state: { [index]: true }, __language: 'en' }).item), '+40 XP for finishing this lesson');
+    assert.equal(render({ __ach: WITHOUT() }).item, null, 'while the award is not there: nothing yet');
+    // A stale answer without the award does not count as "seen without".
+    render({ __ach: { ...WITHOUT(), at: null } });
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value === true), false);
+  });
+
+  it('nothing on an older API (no lessonXp), or without a current answer: the browser never makes the line up from the local record', () => {
+    assert.equal(render({ __ach: OLDER() }).item, null, 'an older server');
+    assert.equal(render({ __ach: { ...WITH(), at: null } }).item, null, 'stale');
+    for (const status of NOT_READY) assert.equal(render({ __ach: SNAP(status) }).item, null, status);
+    assert.equal(render({ __ach: { status: 'unavailable', learnerId: U1, data: WITH().data, at: 1 } }).item, null);
+  });
+
+  it('D7: no achievements consumer unless the lesson is done, syncs, a learner is synced and the server offers achievements', () => {
+    assert.equal(render().calls, 1);
+    for (const state of ['read', 'checked', 'mastered']) assert.equal(render({ __reader: reader(state) }).calls, 1, state);
+    for (const [why, globals] of [
+      ['in_progress', { __reader: reader('in_progress') }],
+      ['not_started', { __reader: reader('not_started') }],
+      ['not syncable', { __syncable: false }],
+      ['capability off', { __caps: { lessonReset: true, achievements: false } }],
+      ['an older server (no capability)', { __caps: { lessonReset: true } }],
+      ['capabilities unknown', { __caps: null }],
+      ['no synced learner', { __sync: { status: 'off', userId: null } }],
+    ]) {
+      const { item, calls } = render(globals);
+      assert.equal(calls, 0, why);
+      assert.equal(item, null, why);
+    }
+  });
+
+  it('the stats list: the XP item right after the progress item, before the cards; copy in both languages', () => {
+    const withCards = { ...LESSON, sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }, { id: 'fc', type: 'flashcards', cards: [{ id: 'c1', front: 'F', back: 'B' }] }] }] };
+    const { els } = render({ __reader: reader('read', withCards) });
+    const stats = byClass(els, 'rp-end-stats')[0];
+    const items = walk(stats.props.children).filter((t) => 'el' in t && t.el.type === 'li').map((t) => t.el);
+    assert.deepEqual(items.map((li) => textOfElement(li)), ['100% 完了', 'このレッスンを終えたときにもらった XP：40', '復習カード 覚えた 0/1 · 復習カードへ移動']);
+    const source = readFile('components/lesson/LessonEnd.tsx');
+    assert.match(source, /xpNew: \(n: number\) => `\+\$\{n\} XP for finishing this lesson`,/);
+    assert.match(source, /xpTotal: \(n: number\) => `XP for finishing this lesson: \$\{n\}`,/);
+    assert.match(source, /xpNew: \(n: number\) => `このレッスンを終えて \+\$\{n\} XP`,/);
+    assert.match(source, /xpTotal: \(n: number\) => `このレッスンを終えたときにもらった XP：\$\{n\}`,/);
+    // Not 「終えてもらった」: that reads as the favour form 〜てもらう ("had someone finish it").
+    assert.doesNotMatch(source, /終えてもらった/);
+    // The lesson end has no AI control: the reader's AI glyph stays out of it.
+    assert.doesNotMatch(source, /\bSparkles\b/);
   });
 });
 

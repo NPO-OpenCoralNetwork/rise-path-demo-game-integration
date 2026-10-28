@@ -12,6 +12,8 @@
 // - levelOf (O1: floor(total / 100) + 1), streakOf (today or yesterday keeps the run; JST days),
 //   summarizeAchievements (the seven badges, earned exactly at their goal; G33: an unearned streak
 //   badge shows the current run, never the best);
+// - Phase 8 (S2): lessonXpOf and getAchievements' lessonXp (each lesson's done award from the
+//   ledger rows the read already holds; no new statement; kept after a reset and a delete-all, O2);
 // - noteLearning (lesson XP + today) and noteBlenderProgress (stage XP + today when new) only log a
 //   failure, never throw.
 import { describe, it, beforeEach, afterEach } from 'node:test';
@@ -21,7 +23,7 @@ import { inTransaction } from '../../tools/core/dbTransaction.js';
 import {
     BADGES, BLENDER_STAGES, DAYS_SQL, DELETE_LESSONS_KEEPING_XP_SQL, LESSON_XP_SELECT, LESSON_XP_SQL, BLENDER_XP_SQL, TODAY_SQL,
     XP_AWARDS_SQL, XP_LOCK_SQL, XP_PER_LEVEL,
-    badgeCourses, deleteLessonsKeepingXp, getAchievements, levelOf, noteBlenderProgress, noteLearning, reconcileBlenderXp,
+    badgeCourses, deleteLessonsKeepingXp, getAchievements, lessonXpOf, levelOf, noteBlenderProgress, noteLearning, reconcileBlenderXp,
     reconcileLessonXp, streakOf, summarizeAchievements,
 } from '../../tools/core/achievements.js';
 import { deleteAllLessonProgress, resetLessonProgress } from '../../tools/core/lessonProgress.js';
@@ -386,6 +388,60 @@ describe('getAchievements (one transaction: reconcile, then read)', () => {
         assert.deepEqual(value, { error: 'Table not found during getAchievements. Run db:migrate.', error_type: 'table_not_found' });
         assert.deepEqual(pool.awardsOf(ALICE), []);
         assert.equal(pool.inTransaction(), false);
+    });
+});
+
+describe('Phase 8 (S2): lessonXp, each lesson\'s done award for the lesson end', () => {
+    it('lessonXpOf: lesson done awards only (no start, no Blender stage), keyed by course/lesson, the ledger\'s figure; xp 0 dropped', () => {
+        assert.deepEqual(lessonXpOf([
+            award('lesson', 'vibe-coding/vibe-ch1', 'start'),
+            award('lesson', 'vibe-coding/vibe-ch2', 'start'), award('lesson', 'vibe-coding/vibe-ch2', 'done'),
+            { source: 'lesson', item_key: 'claude-code/cc-01', milestone: 'done', xp: '40' },
+            award('blender_stage', 'blender/1', 'done'),
+            { source: 'lesson', item_key: 'vibe-coding/zero', milestone: 'done', xp: 0 },
+            { source: 'diagnosis', item_key: 'vibe-coding/vibe-ch3', milestone: 'done', xp: 40 },
+        ]), { 'vibe-coding/vibe-ch2': 40, 'claude-code/cc-01': 40 });
+        assert.deepEqual(lessonXpOf([]), {});
+        assert.equal(Object.getPrototypeOf(lessonXpOf([])), Object.prototype, 'a plain object for JSON');
+    });
+
+    const seed = () => use({
+        rows: [
+            row('vibe-ch1', 'in_progress'), row('vibe-ch2', 'read'), row('vibe-ch3', 'checked'), row('vibe-ch4', 'mastered'),
+            row('vibe-ch5', 'not_started'), row('vibe-ch6', 'mastered', BOB),
+        ],
+        userProgress: [{ user_id: ALICE, course_id: 'blender', completed_stages: ['1', '2'] }],
+    });
+
+    it('getAchievements: a read, checked or mastered lesson has its 40; started, not started, Blender stages and another learner\'s lessons are absent; no new statement', async () => {
+        seed();
+        const result = await getAchievements({ userId: ALICE });
+        assert.equal('error_type' in result, false, JSON.stringify(result));
+        assert.deepEqual(Object.keys(result), ['learnerId', 'xp', 'counts', 'streak', 'badges', 'lessonXp']);
+        assert.deepEqual(result.lessonXp, { 'vibe-coding/vibe-ch2': 40, 'vibe-coding/vibe-ch3': 40, 'vibe-coding/vibe-ch4': 40 });
+        assert.equal(result.xp.total, 3 * 50 + 10 + 2 * 80, 'the total is the summary\'s, unchanged');
+        assert.deepEqual(pool.queries.filter((q) => q.via === 'client').map((q) => q.sql), [
+            'begin', SQL.xpLock, SQL.xpReconcileLessons, SQL.xpLock, SQL.xpReconcileStages, SQL.learningDay,
+            SQL.xpAwards, SQL.selectDays, SQL.selectToday, 'commit',
+        ], 'the same statements as before Phase 8');
+    });
+
+    it('the figure stays after a one-lesson reset and after a redo (XP is given once ever, O2), and after delete-all', async () => {
+        seed();
+        assert.equal((await getAchievements({ userId: ALICE })).lessonXp['vibe-coding/vibe-ch2'], 40);
+        const reset = await resetLessonProgress({ userId: ALICE, epoch: null, courseSlug: 'vibe-coding', lessonId: 'vibe-ch2' });
+        assert.equal('error_type' in reset, false, JSON.stringify(reset));
+        assert.equal(pool.row(ALICE, 'vibe-coding', 'vibe-ch2').state, 'not_started');
+        assert.equal((await getAchievements({ userId: ALICE })).lessonXp['vibe-coding/vibe-ch2'], 40, 'after the reset');
+        pool.row(ALICE, 'vibe-coding', 'vibe-ch2').state = 'read';
+        const redo = await getAchievements({ userId: ALICE });
+        assert.equal(redo.lessonXp['vibe-coding/vibe-ch2'], 40, 'a redo: still 40, never 80');
+        assert.equal(pool.awardsOf(ALICE).filter((a) => a.startsWith('lesson vibe-coding/vibe-ch2 done')).length, 1);
+        const deleted = await deleteAllLessonProgress({ userId: ALICE });
+        assert.equal('error_type' in deleted, false, JSON.stringify(deleted));
+        assert.deepEqual((await getAchievements({ userId: ALICE })).lessonXp, { 'vibe-coding/vibe-ch2': 40, 'vibe-coding/vibe-ch3': 40, 'vibe-coding/vibe-ch4': 40 });
+        // Each learner reads only their own ledger.
+        assert.deepEqual((await getAchievements({ userId: BOB })).lessonXp, { 'vibe-coding/vibe-ch6': 40 });
     });
 });
 

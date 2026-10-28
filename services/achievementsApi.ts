@@ -33,6 +33,12 @@ export type Achievements = {
   counts: { lessonsStarted: number; lessonsDone: number; stagesDone: number };
   streak: { current: number; best: number; activeToday: boolean; today: string; timeZone: string };
   badges: Badge[];
+  /**
+   * Phase 8: the XP of each lesson's done award in the server's ledger, keyed by
+   * '<course>/<lesson>' (LessonEnd's line). Absent: an older server that does not send it (the
+   * line is not shown). `{}`: a newer server, no lesson done yet.
+   */
+  lessonXp?: Readonly<Record<string, number>>;
 };
 
 export class AchievementsApiError extends Error {
@@ -80,7 +86,26 @@ function badgeOf(value: unknown): Badge | null {
   };
 }
 
-/** The documented 200 body, or null. Unknown badges are left out (a newer server). */
+/** A lesson key as the server's ledger writes it (xp_awards.item_key for source 'lesson'). */
+const LESSON_KEY = /^[a-z0-9][a-z0-9-]{0,79}\/[a-z0-9][a-z0-9-]{0,79}$/;
+
+/**
+ * The lessonXp field: undefined unless a plain object; entries with a lesson key and a positive
+ * whole XP are kept, others dropped. The browser takes the server's figures as they are.
+ */
+export function lessonXpOf(value: unknown): Readonly<Record<string, number>> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [key, xp] of Object.entries(value)) {
+    if (LESSON_KEY.test(key) && typeof xp === 'number' && Number.isSafeInteger(xp) && xp > 0) out[key] = xp;
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * The documented 200 body, or null. Unknown badges are left out (a newer server). A malformed
+ * lessonXp is dropped on its own (Phase 8): the rest of the answer stays usable.
+ */
 export function parseAchievements(body: unknown): Achievements | null {
   if (!isRecord(body) || typeof body.learnerId !== 'string' || !body.learnerId) return null;
   const xp = numbers(body.xp, ['total', 'level', 'intoLevel', 'levelSize', 'toNextLevel'] as const);
@@ -91,12 +116,14 @@ export function parseAchievements(body: unknown): Achievements | null {
   if (typeof streak.activeToday !== 'boolean' || typeof streak.today !== 'string' || typeof streak.timeZone !== 'string') return null;
   if (!Array.isArray(body.badges)) return null;
   const badges = body.badges.map(badgeOf).filter((badge): badge is Badge => badge !== null);
+  const lessonXp = lessonXpOf(body.lessonXp);
   return {
     learnerId: body.learnerId.toLowerCase(),
     xp,
     counts,
     streak: { ...streakCounts, activeToday: streak.activeToday, today: streak.today, timeZone: streak.timeZone },
     badges,
+    ...(lessonXp ? { lessonXp } : {}),
   };
 }
 
