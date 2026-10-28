@@ -12,10 +12,11 @@
 # Time limits: each verify script 180 s (they take about 20 s), the 00:00 JST guard 185 s, the pulls
 # 240 s in all, the first boot 120 s. The workflow step allows 20 min: all of them together plus a minute
 # for the rest (server/tests/ciScripts.test.js), so a hang ends with this script's message.
-# Needs Docker, psql 16+ and node_modules (npm ci). Dummy values only. Removes only the container it
-# created (RISEPATH_CI_KEEP=1 keeps it). Outputs: $RISEPATH_CI_OUT (default .artifacts/ci/db).
-# Without Docker: --existing-url <superuser URL of an empty cluster on this machine, no database name>
-# started with -c log_error_verbosity=terse -c logging_collector=on; one loopback host, no ?params.
+# Needs Docker, psql 16+, timeout (coreutils) and node_modules (npm ci). Dummy values only. Removes only
+# the container it created (RISEPATH_CI_KEEP=1 keeps it). Outputs: $RISEPATH_CI_OUT (default .artifacts/ci/db).
+# Without Docker: --existing-url postgresql://user[:password]@host:port (exactly these two arguments): the
+# superuser of an empty cluster on this machine, no database name, the user named, started with
+# -c log_error_verbosity=terse -c logging_collector=on; one loopback host, no ?params.
 # The workflow never passes it. Pulls fall back to mirror.gcr.io (same digest) when Docker Hub refuses.
 set -euo pipefail
 
@@ -33,10 +34,19 @@ ROLE_PASSWORD=ci-dummy-mcp-remote-password-0001   # 33 characters; the role SQL 
 VERIFY_TIMEOUT_S=180
 WANT_VECTOR="$(sed -E 's#^[^:]+:([0-9.]+)-pg[0-9]+@.*$#\1#' <<< "${IMAGE}")"
 EXISTING=''
-if [[ "${1:-}" == --existing-url ]]; then EXISTING="${2:?--existing-url <postgres://user[:password]@host:port>}"; fi
+# Nothing or exactly `--existing-url <url>`: anything else (the `=` form too) is refused before any call,
+# never read as "no option" (Docker mode).
+USAGE='usage: db-checks.sh [--existing-url postgresql://user[:password]@host:port]'
+case "$#:${1:-}" in
+  0:) ;;
+  2:--existing-url) if [[ -z "$2" ]]; then echo "❌ ${USAGE}"; exit 2; fi; EXISTING="$2" ;;
+  *) echo "❌ ${USAGE}"; exit 2 ;;
+esac
 # libpq connects to PGHOSTADDR, or a service file's hostaddr, instead of the URL's host: clear them (both modes).
 unset PGHOSTADDR PGSERVICE PGSERVICEFILE
 if [[ -n "${EXISTING}" ]]; then   # it creates and drops databases and roles: a throwaway local cluster only
+  # The role checks connect as risepath_mcp_remote to the URL's host:port (after its '@').
+  if [[ ! "${EXISTING}" =~ ^postgres(ql)?://[^@/]+@ ]]; then echo "❌ --existing-url needs the user: postgresql://user[:password]@host:port"; exit 2; fi
   host="$(sed -E 's#^postgres(ql)?://([^@/]*@)?(\[[^]/]*\]|[^:/?]*).*$#\3#' <<< "${EXISTING}")"
   # libpq tries each host of 'h1:p1,h2:p2' in turn, and ?host= names another one: refuse both.
   if [[ "${EXISTING}" == *[,?]* ]]; then echo "❌ --existing-url takes no ?parameters or extra hosts (write a ',' or '?' in the password as %2C or %3F)"; exit 2; fi
@@ -68,11 +78,14 @@ trap cleanup EXIT
 
 command -v psql > /dev/null || { echo "❌ psql is not on PATH (install the PostgreSQL 16 client)"; exit 2; }
 psql --version | grep -Eq '\(PostgreSQL\) (1[6-9]|[2-9][0-9])\.' || { echo "❌ psql 16 or newer expected: $(psql --version)"; exit 2; }
+# Every pull, the first boot and each verify script run under timeout; stock macOS has none.
+command -v timeout > /dev/null || { echo "❌ timeout is not on PATH (coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH)"; exit 2; }
 
 if [[ -n "${EXISTING}" ]]; then
   SU="${EXISTING%/}"
   echo "::warning ::--existing-url: not the VM's image; the pgvector version and the wrong-password check are not asserted"
 else
+  command -v docker > /dev/null || { echo "❌ docker is not on PATH (without Docker: --existing-url, see the header of this script)"; exit 2; }
   if docker container inspect "${NAME}" > /dev/null 2>&1; then
     echo "❌ A container named ${NAME} exists. Remove it, or set RISEPATH_CI_DB_NAME."
     exit 2

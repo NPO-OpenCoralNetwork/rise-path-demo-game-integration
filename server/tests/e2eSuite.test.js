@@ -173,6 +173,28 @@ describe('the learner end-to-end suite (Phase 7, P1 C)', () => {
         assert.match(globalSetup, /new pg\.Pool\(\{ connectionString: E2E\.databaseUrl/);
     });
 
+    it('the specs take UI words from e2e/support/ui.mjs or the app\'s own copy, never inline', () => {
+        // A copy change then fails where the runbook (plan §11.5) and ui.mjs's header send the fixer.
+        assert.match(specCode, /R\.next\(formatDueDay\(queue\.nextDueOn, 'jp'\)\)/, 'the next-review line is the review page\'s own copy and date');
+        assert.match(spec, /^import \{ formatDueDay \} from '\.\.\/components\/review\/reviewModel\.ts';$/m);
+        const inline = /\b(getByText|getByRole|getByLabel|getByPlaceholder|toContainText|toHaveText|hasText)\b[^\n]*?(['"`]|\/)[^'"`\n]*[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
+        for (const file of e2eFiles().filter((f) => /\.(ts|mjs|js)$/.test(f) && f !== 'e2e/support/ui.mjs' && f !== 'e2e/support/auth-stand-in.mjs')) {
+            assert.doesNotMatch(codeOf(read(file)), inline, `${file}: a UI string inline (put it in e2e/support/ui.mjs or import the app's copy)`);
+        }
+    });
+
+    it('account deletion: a session that never signed out (another device) gets account_deleted; this browser\'s signed-out one is refused before the account check', () => {
+        const start = specCode.indexOf("test('account deletion asks for the password again");
+        assert.ok(start > 0);
+        const flow = specCode.slice(start);
+        const other = flow.indexOf('fetch(`${E2E.authUrl}/auth/v1/token?grant_type=password`');
+        const deleteClick = flow.indexOf("page.goto('/settings/delete-account')");
+        assert.ok(other > 0 && other < deleteClick, 'the other device signs in before the deletion, straight at the stand-in');
+        assert.match(flow, /headers: \{ authorization: `Bearer \$\{otherToken\}` \} \}\);\n\s+expect\(other\.status\)\.toBe\(401\);\n\s+expect\(\(await other\.json\(\)\)\.error_type\)\.toBe\('account_deleted'\);/);
+        assert.match(flow, /headers: \{ authorization: `Bearer \$\{oldToken\}` \} \}\);\n\s+expect\(old\.status\)\.toBe\(401\);\n\s+expect\(\(await old\.json\(\)\)\.error_type\)\.toBeUndefined\(\);/,
+            'the stand-in ends a signed-out session as GoTrue does (server/tests/e2eAuthStandIn.test.js)');
+    });
+
     it('the time nudge lives in e2e/support/sql.ts, and the spec runs the control first', () => {
         const sql = read('e2e/support/sql.ts');
         assert.match(sql, /^export const NUDGE_DUE_TODAY_SQL = `UPDATE review_cards$/m);

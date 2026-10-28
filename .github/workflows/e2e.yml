@@ -8,9 +8,9 @@
 #   and Compose 5, the majors the VM installs.
 # - Learner end-to-end: the same stack, the auth stand-in (e2e/support/auth-stand-in.mjs), a production
 #   build in vite preview and Playwright (e2e/learner.spec.ts). ubuntu-26.04, as Server stack deploy.
-# After checkout and setup, every step of the stack jobs but "Disk use" (Server stack deploy), npm ci
-# (Learner end-to-end) and the uploads is one scripts/ci/stack.sh subcommand, in the order of its
-# `rehearsal` and `e2e` (npm run ci:stack, npm run e2e:local); the test keeps them equal.
+# After checkout and setup, every step of the stack jobs but "Disk use" (Server stack deploy, Learner
+# end-to-end), npm ci (Learner end-to-end) and the uploads is one scripts/ci/stack.sh subcommand, in
+# the order of its `rehearsal` and `e2e` (npm run ci:stack, npm run e2e:local); the test keeps them equal.
 # Every step has its own timeout, and each job's is at least the sum of its steps' plus 2 min (job set-up
 # and post steps): a hang fails its step before the job times out, so the failure() steps still keep the
 # logs (a job timeout cancels the job, and a cancelled job skips them).
@@ -153,7 +153,7 @@ jobs:
   e2e:
     name: Learner end-to-end
     runs-on: ubuntu-26.04
-    timeout-minutes: 103
+    timeout-minutes: 105
     env:
       COMPOSE_PROJECT_NAME: risepath-ci
     steps:
@@ -203,6 +203,11 @@ jobs:
       - name: Learner flows (Playwright)
         timeout-minutes: 22
         run: bash scripts/ci/stack.sh test
+
+      - name: Disk use
+        if: always()
+        timeout-minutes: 2
+        run: df -h / && docker system df
 
       - name: Collect the logs (redacted)
         if: failure()

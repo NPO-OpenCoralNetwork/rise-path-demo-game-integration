@@ -11,6 +11,7 @@ import { UI } from './support/ui.mjs';
 import { NUDGE_DUE_TODAY_SQL, SHORTCUT_DUE_TODAY_SQL } from './support/sql.ts';
 import { accessToken, decodeJwt, lessonSettled, markFirstCard, openLesson, signIn, storedSession, waitServerCheck } from './support/flows.ts';
 import { reviewCopy } from '../components/review/reviewCopy.ts';
+import { formatDueDay } from '../components/review/reviewModel.ts';
 
 const COURSE = 'vibe-coding';
 /** vibe-ch1 (published, module m1): its block `cards` holds 5 cards, card-frontend first. */
@@ -43,7 +44,7 @@ test('review: a marked card is saved, waits for its day, then 「覚えた」 re
   expect(queue).toMatchObject({ inQueue: 1, remainingToday: 0, cards: [] });
   expect(queue.nextDueOn > today, `next review ${queue.nextDueOn} is after today ${today}`).toBe(true);
   await expect(page.getByText(R.noneToday, { exact: true })).toBeVisible();
-  await expect(page.getByText(/^次の復習は .+です。$/)).toBeVisible();
+  await expect(page.getByText(R.next(formatDueDay(queue.nextDueOn, 'jp')), { exact: true })).toBeVisible();
   expect(await db.q('SELECT card_id, reps, prior_rating, due_day::text AS due_day FROM review_cards WHERE user_id = $1', [learner.id]))
     .toEqual([{ card_id: FIRST_CARD, reps: 0, prior_rating: 3, due_day: queue.nextDueOn }]);
 
@@ -197,6 +198,13 @@ test('account deletion asks for the password again (fresh amr) and ends the old 
   await markFirstCard(page);
   await waitServerCheck(db, learner, COURSE, CARDS_LESSON, FIRST_CARD_KEY);
   const oldToken = await accessToken(page);
+  // Another device of the same learner: signed in before the deletion and never signed out (straight to
+  // the stand-in, so none of the api's per-IP budget).
+  const otherDevice = await fetch(`${E2E.authUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: learner.email, password: learner.password }),
+  });
+  expect(otherDevice.status).toBe(200);
+  const otherToken: string = (await otherDevice.json()).access_token;
 
   const preflight = page.waitForResponse(apiCall('GET', '/api/v2/user/account/deletion'));
   await page.goto('/settings/delete-account');
@@ -241,8 +249,14 @@ test('account deletion asks for the password again (fresh amr) and ends the old 
   expect(await db.q('SELECT requested_by FROM account_deletions WHERE user_id = $1', [learner.id])).toEqual([{ requested_by: 'self' }]);
   expect(await db.q('SELECT (SELECT count(*)::int FROM lesson_progress WHERE user_id = $1) AS lessons, (SELECT count(*)::int FROM review_cards WHERE user_id = $1) AS cards', [learner.id]))
     .toEqual([{ lessons: 0, cards: 0 }]);
-  // The session from before the deletion is refused (its sign-in is older than the deletion).
+  // The other device's session, still signed in, is refused by the account check: its sign-in is older
+  // than the deletion.
+  const other = await fetch(`${E2E.apiUrl}/api/v2/user/achievements`, { headers: { authorization: `Bearer ${otherToken}` } });
+  expect(other.status).toBe(401);
+  expect((await other.json()).error_type).toBe('account_deleted');
+  // This browser signed its own session out before /account/deleted: Supabase Auth refuses that token
+  // first (session_not_found), so the api answers 401 without the account check.
   const old = await fetch(`${E2E.apiUrl}/api/v2/user/achievements`, { headers: { authorization: `Bearer ${oldToken}` } });
   expect(old.status).toBe(401);
-  expect((await old.json()).error_type).toBe('account_deleted');
+  expect((await old.json()).error_type).toBeUndefined();
 });

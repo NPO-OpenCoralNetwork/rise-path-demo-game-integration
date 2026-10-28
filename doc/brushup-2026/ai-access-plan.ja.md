@@ -920,21 +920,21 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
   | チェックの名前 | 確かめること | 手元で | 時間（見込み。GitHub ではまだ測っていません） |
   |---|---|---|---|
   | `Database checks` | VM と同じ DB のイメージを、本番と同じ `log_error_verbosity=terse` で起動します。確かめのスクリプト 3 つ（`verify-account-deletion.mjs`・`verify-phase5.mjs`・`verify-phase6.mjs`）を、それぞれ空の DB で、飛ばしを許さずに動かします。別の DB に `scripts/db-migrate.mjs` で migration を 2 回流し（2 回目は何も流しません）、`vector(768)` の列と、DB ロールの SQL（パスワードがないときと短いときは断ること、2 回流せること、ロールで読めない表）を確かめます | `npm run ci:db` | 約 3 分 |
-  | `Server stack deploy` | 本物の `deploy-stack.sh` で、ダミーの値のスタック（db・api・mcp）を Docker で作ります（ビルド → db → migration → api → ヘルスチェック → スモーク）。そのあと、この端末から `/api/v2/health` を読み、本番の設定で動いていて、まだ流していない migration がないことと、`mcp` が DB につながっていることを確かめます。最後にディスクの使い方を出します（「Disk use」） | `npm run ci:stack` | 約 6 分 |
-  | `Learner end-to-end` | 同じ手順でスタックを作り、本番と同じビルドの画面（`build:prod` を `vite preview` で出します）とログインの代わりをつなぎ、ブラウザ（Playwright）で下の 5 つの流れを動かします | `npm run e2e:local` | 約 10〜12 分 |
+  | `Server stack deploy` | 本物の `deploy-stack.sh` で、ダミーの値のスタック（db・api・mcp）を Docker で作ります（ビルド → db → migration → api → ヘルスチェック → スモーク）。そのあと、実行環境（手元ではこのマシン）から `/api/v2/health` を読み、本番の設定で動いていて、まだ流していない migration がないことと、`mcp` が DB につながっていることを確かめます。最後にディスクの使い方を出します（「Disk use」） | `npm run ci:stack` | 約 6 分 |
+  | `Learner end-to-end` | 同じ手順でスタックを作り、本番と同じビルドの画面（`build:prod` を `vite preview` で出します）とログインの代わりをつなぎ、ブラウザ（Playwright）で下の 5 つの流れを動かします。最後にディスクの使い方を出します（「Disk use」） | `npm run e2e:local` | 約 10〜12 分 |
 
-  `Database checks` は ubuntu-24.04（psql 16 があるため）で、ほかの 2 つは ubuntu-26.04（VM と同じ Docker 29 と Compose 5 のため）で動きます。どの手順にも時間の上限があり、止まったまま動かない手順は、そこで失敗になります。仕事ごとの上限（42 分・61 分・103 分）は、手順の上限の合計より長くしてあるので、そのときもログは残ります。
+  `Database checks` は ubuntu-24.04（psql 16 があるため）で、ほかの 2 つは ubuntu-26.04（VM と同じ Docker 29 と Compose 5 のため）で動きます。どの手順にも時間の上限があり、止まったまま動かない手順は、そこで失敗になります。仕事ごとの上限（42 分・61 分・105 分）は、手順の上限の合計より長くしてあるので、そのときもログは残ります。
 
 - **ブラウザで動かす 5 つの流れ**（`e2e/learner.spec.ts`。毎回、新しい学習者です）
   1. ログイン → レッスン（`vibe-coding/vibe-ch1`）の暗記カードで「覚えた」→ 保存の表示が「保存済み」→ 復習のページは「今日の復習はありません。」→ DB でカードを 2 日前に学んだことにして、期日を今日にする → 「覚えた」→ 今日の残りが 1 枚から 0 枚になり、サーバーに復習の記録が残ります。DB を変えるのは、この 1 か所だけです（`e2e/support/sql.ts`）。その前に、学んだ日を変えずに期日だけを今日にすると DB が断ること（23514）も確かめます。
   2. レッスン（`vibe-coding/vibe-ch0`）を最後まで読む → サーバーに XP 50 と「はじめてのレッスン完了」のバッジが付きます。
   3. レッスンを少し読み、カードに印を付けて復習に入れる → 「このレッスンを最初からやり直す」→ そのレッスンのカードが外れ、XP（10）は残ります。
   4. インターネットにつながらない状態でカードに印を付ける → ログアウトを押すと「まだ保存できていない学習があります」→「ログアウトしない」→ つながると保存され、そのあとはそのままログアウトできます。
-  5. アカウントの削除（`ACCOUNT_DELETION_ENABLED=true` は CI のスタックだけです）。パスワードを入れ直して削除すると、その場でパスワードを確かめた新しいトークン（`amr`）で削除が通り、削除の前のトークンは断られます（`account_deleted`）。
+  5. アカウントの削除（`ACCOUNT_DELETION_ENABLED=true` は CI のスタックだけです）。パスワードを入れ直して削除すると、その場でパスワードを確かめた新しいトークン（`amr`）で削除が通ります。削除の前にほかの端末でログインしたままのセッションは、断られます（`account_deleted`）。このブラウザのセッションは、削除のあとでログアウトするので、ログインの代わりが断ります（本物の Supabase と同じです）。
 
   5 つの流れは、1 つずつ順に動かします（同時には動かしません）。決まった時間だけ待つことはせず、サーバーと DB の記録が変わるまで待ちます。API の上限（1 つの接続元から 1 分に 200 回）に当たったとき（429）、学習者の API が 5xx を返したとき、ログインの代わりが知らない呼び出し（404）を受けたときは、失敗にします。日本時間の 0 時の 8 分前からは、0 時を過ぎるまで待ってから始めます（`Database checks` は 3 分前から）。日付は、すべてサーバーと DB から読みます。どの流れも AI を呼ばないので、AI を使う前の年齢の記録は要りません（年齢の確かめが止めるのは、AI の呼び出しだけです）。
 
-- **ログインの代わり**（`e2e/support/auth-stand-in.mjs`）。`e2e-…@example.org` のメールと、決まったダミーのパスワードでログインできます。ログインのたびに、パスワードを確かめた時刻（`amr`）を入れたトークンを出します。署名の鍵は起動のたびに作り、どこにも保存しません。`RISEPATH_E2E_AUTH_STANDIN=1` がないと起動せず、`NODE_ENV=production` のときと Vercel の上でも起動しません。本番で動くイメージ（VM の `api` と `mcp`）には入りません（Dockerfile は決まったフォルダーだけをコピーします）。本番のコードからは読み込めません（`npm run lint:arch` で固定しています）。CI では、スタックと同じ Docker のネットワークに、コンテナとして置きます。ブラウザからは、この端末の中（127.0.0.1）からだけ届きます。
+- **ログインの代わり**（`e2e/support/auth-stand-in.mjs`）。`e2e-…@example.org` のメールと、決まったダミーのパスワードでログインできます。ログインのたびに、パスワードを確かめた時刻（`amr`）を入れたトークンを出します。ログアウトしたセッションのトークンは、本物の Supabase と同じように断ります（`session_not_found`）。署名の鍵は起動のたびに作り、どこにも保存しません。`RISEPATH_E2E_AUTH_STANDIN=1` がないと起動せず、`NODE_ENV=production` のときと Vercel の上でも起動しません。本番で動くイメージ（VM の `api` と `mcp`）には入りません（Dockerfile は決まったフォルダーだけをコピーします）。本番のコードからは読み込めません（`npm run lint:arch` で固定しています）。CI では、スタックと同じ Docker のネットワークに、コンテナとして置きます。ブラウザからは、このマシンの中（127.0.0.1）からだけ届きます。
 - **CI の値**: `deploy/risepath-vm/ci/stack.ci.env` のダミーの値です。AI はオフ（鍵なし）、有料プランはオフ、規約のページの切り替えもオフ、origin gate（Vercel から来たリクエストだけに答えるしくみ）もオフです。Compose のプロジェクト名は `risepath-ci` です。
 - **`deploy-stack.sh` の切り替え**: 環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` があるときだけ「git pull」を飛ばし、取り出してあるコミットをデプロイします（P3）。`stack.env` に書いても効きません。VM では設定しないので、何も変わりません。pull でスクリプトが新しくなったときにやり直す動きも、テストで固定しています。
 - **直したもの**: `verify-account-deletion.mjs` の R11 は、本番と同じ `log_error_verbosity=terse` の DB では失敗していました（49 件のうち 1 件）。`SET log_error_verbosity = default` の `default` が、値ではなく「サーバーの設定に戻す」という意味になっていたためです。値を引用符で囲み、ログを決まった時間だけ待つのをやめて、2 つの記録がそろうまで読み直すようにしました。テストで固定しています。
@@ -951,7 +951,8 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
   - `deploy/risepath-vm/` に自分の `stack.env`・`billing.env`・`tunnel.env`・`mcp-public.env` があると、止まります（上書きしません）。そのときは、別の作業ツリー（`git worktree add`）で流します。`risepath` のスタックには触れません。
   - ブラウザは、一度だけ `npx playwright install chromium` で入れます。
   - 終わると、スタック、DB のボリューム、CI の `stack.env`、画面のビルド（`.artifacts/e2e/dist`）を消します。失敗したときのログと、スクリーンショットとトレースは、`.artifacts/ci/stack/logs` と `.artifacts/e2e/` に残ります。
-  - Docker が動かないマシンでは、`ci:stack` と `e2e:local` は流せません。プルリクエストの実行で確かめます。`ci:db` は、この端末の使い捨ての PostgreSQL 16（pgvector 入り）に向けて流せます（`bash scripts/ci/db-checks.sh --existing-url postgresql://postgres@127.0.0.1:<ポート>`。空で、`-c log_error_verbosity=terse -c logging_collector=on` で起動したクラスタだけです）。
+  - 作ったイメージ（`risepath-ci-api`・`risepath-ci-mcp`）とビルドのキャッシュは、次の実行を速くするために残ります（約 4 GB）。空きが 5 GB を切って止まったときは、`docker image rm risepath-ci-api risepath-ci-mcp` のあと `docker builder prune` で空けます（`docker builder prune` は、ほかのビルドのキャッシュも消します）。
+  - Docker が動かないマシンでは、`ci:stack` と `e2e:local` は流せません。プルリクエストの実行で確かめます。`ci:db` は、このマシンの使い捨ての PostgreSQL 16（pgvector 入り）に向けて流せます（`bash scripts/ci/db-checks.sh --existing-url postgresql://postgres@127.0.0.1:<ポート>`。URL にはユーザー名が要ります。空で、`-c log_error_verbosity=terse -c logging_collector=on` で起動したクラスタだけです）。
   - **ブラウザの流れだけを何度も直すとき**は、スタックを 1 回作ってから、`npm run e2e` を何度でも流します。終わったら `down` で片付けます。`down` は、スタック、DB のボリューム、CI の `stack.env`、ログインの代わり、画面のビルドを消します。また始めるときは、下の手順を `bash scripts/ci/stack.sh preflight e2e` から全部流し直します。
 
     ```bash
@@ -965,17 +966,17 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
     bash scripts/ci/stack.sh down     # 最後に
     ```
 
-  - **イメージを作らずに流すとき**（Docker のないマシンでも流せます）: PostgreSQL 16 と pgvector を 127.0.0.1:5432 で、`stack.ci.env` のユーザー・パスワード・DB で動かします（そのユーザーが `vector` の拡張を作れること。Docker があれば、`db-checks.sh` と同じ pgvector のイメージを `-p 127.0.0.1:5432:5432` で起動するのが早いです）。そのあと、3 つの端末で次を流します。ログインの代わりは、本番の設定（`NODE_ENV=production`）を読み込んだ端末では起動しないので、端末を分けます。api（`node server.js`）は、`stack.ci.env` にない値を、この作業ツリーの `.env.local` から読み込みます。自分の `.env.local`（有料プラン、Stripe のテスト、Hermes、OpenRouter などの値）があると、CI とちがう設定で動きます。`.env.local` のない作業ツリー（`git worktree add`）で流すか、流すあいだだけ `.env.local` をよそに移します。この流れは、ブラウザの流れを確かめるだけです。Docker の組み立ては、プルリクエストの実行で確かめます。
+  - **イメージを作らずに流すとき**（Docker のないマシンでも流せます）: PostgreSQL 16 と pgvector を 127.0.0.1:5432 で、`stack.ci.env` のユーザー・パスワード・DB で動かします（そのユーザーが `vector` の拡張を作れること。Docker があれば、`db-checks.sh` と同じ pgvector のイメージを `-p 127.0.0.1:5432:5432` で起動するのが早いです）。そのあと、3 つのターミナル（のウィンドウ）で次を流します。ログインの代わりは、本番の設定（`NODE_ENV=production`）を読み込んだターミナルでは起動しないので、ターミナルを分けます。api（`node server.js`）は、`stack.ci.env` にない値を、この作業ツリーの `.env.local` から読み込みます。自分の `.env.local`（有料プラン、Stripe のテスト、Hermes、OpenRouter などの値）があると、CI とちがう設定で動きます。`.env.local` のない作業ツリー（`git worktree add`）で流すか、流すあいだだけ `.env.local` をよそに移します。この流れは、ブラウザの流れを確かめるだけです。Docker の組み立ては、プルリクエストの実行で確かめます。
 
     ```bash
-    # 端末 1: ログインの代わり（127.0.0.1:54390）
+    # ターミナル 1: ログインの代わり（127.0.0.1:54390）
     RISEPATH_E2E_AUTH_STANDIN=1 node e2e/support/auth-stand-in.mjs
-    # 端末 2: CI の値で api を動かします（DB とログインの代わりは、この端末のもの）
+    # ターミナル 2: CI の値で api を動かします（DB とログインの代わりは、このマシンのもの）
     set -a; source <(grep -E '^[A-Z][A-Z0-9_]*=' deploy/risepath-vm/ci/stack.ci.env | grep -v '^COMPOSE_'); set +a
     export DATABASE_URL_PHASE1="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
     export SUPABASE_URL=http://127.0.0.1:54390 PORT=3006
     npm run db:migrate && node server.js
-    # 端末 3: 画面のビルドとブラウザの流れ
+    # ターミナル 3: 画面のビルドとブラウザの流れ
     bash scripts/ci/stack.sh build-front && npm run e2e
     ```
 
@@ -983,7 +984,7 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
 
 ### 11.2 オーナーの作業
 
-1. **3 つを必須のチェックにします**（P5）。**このプルリクエストを main にマージしたあとに**設定します。マージの前に設定すると、ほかのプルリクエストがすべて止まります（main に `e2e.yml` がないので、3 つのチェックが来ないためです）。マージのあとは、main への push で 3 つが一度動くので、候補に出ます。
+1. **3 つを必須のチェックにします**（P5）。**このプルリクエストを main にマージしたあとに**設定します。マージの前に設定すると、main に向けたほかのプルリクエストが止まります（main に `e2e.yml` がないので、3 つのチェックが来ないためです）。マージのあとは、main への push で 3 つが一度動くので、候補に出ます。
    1. GitHub のリポジトリで **Settings → Rules → Rulesets → New ruleset → New branch ruleset** を開きます。
    2. **Ruleset name** に `main: required checks` と入れ、**Enforcement status** を `Active` にします。
    3. **Target branches → Add target → Include default branch** を選びます（`main`）。
@@ -995,11 +996,11 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
       今ある CI の 2 つ（`Typecheck, tests and lessons` と `Build and key-leak scan`）も、一緒に足すことをおすすめします。
    5. **Require branches to be up to date before merging** には、今は印を付けません。付けると、main が進むたびに、開いているプルリクエストを main に合わせて動かし直すことになります（1 回 10 分ほど）。main への push と毎晩の実行で、マージのあとの状態も確かめます。
    6. **Create** で保存します。このルールは、main への直接の push にも効きます（チェックが通っていないコミットは push できなくなります）。急ぎで直接 push する必要があるときのために、**Bypass list** に自分（Repository admin）を入れるかどうかを決めます。
-   7. **ほかの開いているプルリクエスト**（2026-10-28 には 10 件: #39〜#41、#43〜#45、#48〜#51）は、main を取り込むか push し直すまで、3 つのチェックが出ず、マージできません（「Expected — Waiting for status to be reported」）。プルリクエストの画面の **Update branch** を押すと、main を取り込んで、3 つが動きます。main と競合しているプルリクエストでは、競合を解くまで、チェックは動きません。
+   7. **ほかの開いているプルリクエスト**（2026-10-28 には 10 件）。main に向けた 5 件（#39〜#41、#45、#50）は、main を取り込むか push し直すまで、3 つのチェックが出ず、マージできません（「Expected — Waiting for status to be reported」）。プルリクエストの画面の **Update branch** を押すと、main を取り込んで、3 つが動きます。main と競合しているプルリクエストでは、競合を解くまで、チェックは動きません。ほかのブランチに重ねた 5 件（#43、#44、#48、#49、#51）は、このルールの外です。もとのプルリクエストがマージされ、そのブランチが消えると、GitHub が向け先を main に変えます（消さないときは、プルリクエストの画面の **Edit** で向け先を `main` にします）。そのあとで **Update branch** を押します。
    8. 試しのプルリクエストで、3 つが「Required」と出ることを確かめます。
    9. チェックの名前は、`e2e.yml` の `name:` と同じでなければなりません（ルールに足した `ci.yml` の 2 つは、`ci.yml` の `name:` と同じ）。名前を変えると、ルールが待つチェックが来なくなり、どのプルリクエストもマージできなくなります（「Expected — Waiting for status to be reported」）。名前は `server/tests/e2eWorkflow.test.js` で固定しています。変えるときは、ルールも同じ日に直します。
-2. **最初の数回の結果を見ます**。各チェックの時間と、`Server stack deploy` の「Disk use」のディスクの空きを見て、11.1 の見込みの時間を、測った値に直します（エージェントに頼めます）。
-3. **作り直した VM の最初のデプロイの前に**（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 0）、デプロイする main のコミットで 3 つのチェックが緑であること、毎晩の実行も緑であることを確かめます。毎晩の実行を待たないときは、Actions の画面の左で `End-to-end checks` を選び、**Run workflow** を開いて、ブランチを `main` のまま **Run workflow** を押します（毎晩の実行と同じ 3 つが動きます）。CI が確かめないもの（11.3 の 1）は、VM で確かめます。次のことも見ます。
+2. **最初の数回の結果を見ます**。各チェックの時間と、`Server stack deploy` と `Learner end-to-end` の「Disk use」のディスクの空き（少ないのは `Learner end-to-end` です）を見て、11.1 の見込みの時間を、測った値に直します（エージェントに頼めます）。
+3. **作り直した VM の最初のデプロイの前に**（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 0）、デプロイする main のコミットで 3 つのチェックが緑であること、毎晩の実行も緑であることを確かめます。毎晩の実行を待たないときは、Actions の画面の左で `End-to-end checks` を選び、**Run workflow** を開いて、ブランチを `main` のまま **Run workflow** を押します（毎晩の実行と同じ 3 つが動きます）。CI が確かめないもの（11.3 の 1）は、VM で確かめます。VM で、`bootstrap-vm.sh` の 1 回目のあと（Docker が入り、`stack.env` を埋めたあと）、2 回目の前に、次のことも見ます。
    - `stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）。
    - VM の `docker version` と `docker compose version` を、`Server stack deploy` の「Preflight」の行（Docker・Compose・Storage driver）とくらべます。メジャー（29 と 5）がちがうときは、デプロイの前にエージェントと相談します（11.3 の 2）。
 4. **VM では `RISEPATH_DEPLOY_SKIP_PULL` を設定しません。** `deploy/risepath-vm/ci/` のファイルも、VM の設定には使いません。
@@ -1045,8 +1046,8 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
 | `Learner end-to-end` が、ログインの代わりの 404 で赤 | supabase-js が新しい呼び出しを使い始めました（11.3 の 3）。ログインの代わり（`e2e/support/auth-stand-in.mjs`）にその呼び出しを足し、`server/tests/e2eAuthStandIn.test.js` にもテストを足します |
 | 画面の言葉を変えたら `Learner end-to-end` が赤 | テストが探す言葉は `e2e/support/ui.mjs` と `components/review/reviewCopy.ts` にあります。同じコミットで直します |
 | チェックの名前を変えたい | 11.2 の 1 の 9。`e2e.yml`、ルール、この章と手順書（`doc/guides/risepath_vm_deployment.md` §4.5、`deploy/risepath-vm/README.md`、`deploy/vercel/README.md` の手順 0）、`AGENTS.md` を同じ日に直します。`server/tests/e2eWorkflow.test.js` が、名前のずれを知らせます |
-| 開いているプルリクエストが「Expected — Waiting for status to be reported」のまま | 11.2 の 1 の 7。**Update branch** で main を取り込みます。競合があれば、先に解きます。初めての人のフォークからのプルリクエストは、GitHub の標準の設定で、メンテナーが承認するまで動きません。変更（とくに `.github/` と `scripts/`）を見てから、プルリクエストの画面の **Approve workflows to run** を押すと、3 つが動きます |
-| 「Preflight」で赤（`only … GB free`、ポートが使われている） | GitHub の実行環境が変わったことがあります。その行と「Disk use」の行を見て、エージェントに調べてもらいます。5 GB の下限は下げません |
+| 開いているプルリクエストが「Expected — Waiting for status to be reported」のまま | main に向けたプルリクエストなら、11.2 の 1 の 7 のとおり **Update branch** で main を取り込みます。ほかのブランチに向けたプルリクエストは、向け先が main になってから同じようにします。競合があれば、先に解きます。初めての人のフォークからのプルリクエストは、GitHub の標準の設定で、メンテナーが承認するまで動きません。変更（とくに `.github/` と `scripts/`）を見てから、プルリクエストの画面の **Approve workflows to run** を押すと、3 つが動きます |
+| 「Preflight」で赤（`only … GB free`、ポートが使われている） | GitHub の実行環境が変わったことがあります。その行と、同じ仕事の「Disk use」の行を見て、エージェントに調べてもらいます。5 GB の下限は下げません。手元で止まったときは、前の実行のイメージとキャッシュが残っていることがあります（11.1 の「手元で流す」） |
 | 日本時間の 0 時の近くで、チェックが数分待った（`00:00 JST` の知らせ） | 正しい動きです。途中で日付が変わると、日付の確かめがずれるので、0 時を過ぎてから始めます |
 
 ## 12. やらないこと

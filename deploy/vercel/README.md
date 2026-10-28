@@ -63,7 +63,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 秘密の値（トンネルトークン、`ORIGIN_SECRET`）はチャット・issue・git に貼らない。`<domain>` は自分のドメインに読み替える。
 
-0. この変更の PR を `main` にマージしてから VM を作る。クイックスタートの clone も、手順 13 の Vercel の Production Branch も `main` を使う。マージ前の `main` を clone すると、swap、`stack.env` の検査、Hermes のファイルの持ち主の修正が入らない。マージした `main` のコミットで、GitHub Actions の `Database checks`・`Server stack deploy`・`Learner end-to-end` と毎晩の実行が緑であることを確かめてから、VM を作ります（[ai-access-plan.ja.md](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の `End-to-end checks` で **Run workflow**（`main`）を押して動かせます（計画の 11.2 の 3）。
+0. この変更の PR を `main` にマージしてから VM を作る。クイックスタートの clone も、手順 13 の Vercel の Production Branch も `main` を使う。マージ前の `main` を clone すると、swap、`stack.env` の検査、Hermes のファイルの持ち主の修正が入らない。マージした `main` のコミットで、GitHub Actions の `Database checks`・`Server stack deploy`・`Learner end-to-end` と毎晩の実行が緑であることを確かめてから、VM を作る（[ai-access-plan.ja.md](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の `End-to-end checks` で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。
 
 ### 新しい VM の順番
 

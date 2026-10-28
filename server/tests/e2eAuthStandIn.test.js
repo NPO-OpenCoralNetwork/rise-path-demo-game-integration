@@ -362,6 +362,63 @@ describe('e2e/support/auth-stand-in.mjs: the Supabase Auth contract of the learn
         });
     });
 
+    it('a signed-out session\'s access token is refused as GoTrue does (403 session_not_found), before its exp; other sessions keep working', async () => {
+        await withStandIn({}, async ({ url }) => {
+            const email = 'e2e-revoked@example.org';
+            const session = async () => /** @type {{ access_token: string, refresh_token: string }} */ ((await signIn(url, email)).json);
+            const user = (/** @type {{ access_token: string }} */ s) => call(url, '/auth/v1/user', { token: s.access_token });
+            const gone = async (/** @type {{ access_token: string }} */ s, /** @type {string} */ what) => {
+                const res = await user(s);
+                assert.equal(res.status, 403, what);
+                assert.equal(res.json?.error_code, 'session_not_found', what);
+            };
+
+            const [a, b] = [await session(), await session()];
+            assert.equal((await call(url, '/auth/v1/logout?scope=local', { method: 'POST', token: a.access_token })).status, 204);
+            await gone(a, 'local: the signed-out session');
+            assert.equal((await user(b)).status, 200, 'local: the learner\'s other session (another device) stays');
+            const refresh = await call(url, '/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: a.refresh_token } });
+            assert.equal(refresh.status, 400);
+            assert.equal(refresh.json?.error_code, 'refresh_token_not_found');
+            assert.equal((await apiClient(url).auth.getUser(a.access_token)).data.user, null, 'the api gets no user, so it answers 401 before any account check');
+            const grants = await call(url, '/auth/v1/user/oauth/grants', { token: a.access_token });
+            assert.equal(grants.status, 403, 'the grants too');
+            assert.equal(grants.json?.error_code, 'session_not_found');
+            const again = await call(url, '/auth/v1/logout?scope=local', { method: 'POST', token: a.access_token });
+            assert.equal(again.status, 403, 'a second logout of the same session');
+
+            const [d, e] = [await session(), await session()];
+            assert.equal((await call(url, '/auth/v1/logout?scope=others', { method: 'POST', token: d.access_token })).status, 204);
+            await gone(e, 'others: every other session');
+            await gone(b, 'others: also the session from before');
+            assert.equal((await user(d)).status, 200, 'others: this one stays');
+
+            const [f, g] = [await session(), await session()];
+            assert.equal((await call(url, '/auth/v1/logout', { method: 'POST', token: f.access_token })).status, 204);
+            await gone(f, 'global: this one');
+            await gone(g, 'global: every other one');
+            await gone(d, 'global: the one others kept');
+            const someoneElse = await signIn(url, 'e2e-revoked-other@example.org');
+            assert.equal((await user(someoneElse.json)).status, 200, 'another learner keeps theirs');
+
+            // The browser's sign-out of a session that already ended elsewhere, as against GoTrue: supabase-js
+            // 2.89 reads session_not_found as AuthSessionMissingError and keeps its stored session, so the
+            // app removes it itself (services/accountDeviceData.ts signOutThisBrowser).
+            const browser = browserClient(url);
+            const { data } = await browser.client.auth.signInWithPassword({ email, password: STANDIN_PASSWORD });
+            assert.ok(data.session);
+            assert.equal((await call(url, '/auth/v1/logout', { method: 'POST', token: (await session()).access_token })).status, 204);
+            const out = await browser.client.auth.signOut({ scope: 'local' });
+            assert.equal(out.error?.name, 'AuthSessionMissingError');
+            assert.equal(browser.memory.size, 1, 'supabase-js keeps the stored session after session_not_found');
+            // A live session signs out cleanly (the app's own sign-outs: logout, the deletion's re-auth client).
+            const live = browserClient(url);
+            await live.client.auth.signInWithPassword({ email, password: STANDIN_PASSWORD });
+            assert.equal((await live.client.auth.signOut({ scope: 'local' })).error, null);
+            assert.equal(live.memory.size, 0);
+        });
+    });
+
     it('CORS echoes the origin and allows the supabase-js headers; an endpoint it does not model is 404 not_implemented', async () => {
         await withStandIn({}, async ({ url }) => {
             const origin = 'http://127.0.0.1:4173';

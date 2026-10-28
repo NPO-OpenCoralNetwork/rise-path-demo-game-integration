@@ -115,6 +115,8 @@ exit
 ```bash
 gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋める
+# 作り直した VM の最初のデプロイなら、ここで 2 つ見ます（計画の 11.2 の 3）: docker version と docker compose version を
+# CI の Server stack deploy の「Preflight」の行とくらべ、stack.env の SUPABASE_URL が https://<project>.supabase.co であることを見ます。
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
 # 2 回目: build → db 起動 → migration 000–020 → api → up → healthy を待つ → smoke → systemd 登録

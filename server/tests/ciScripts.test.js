@@ -33,8 +33,31 @@ const IMAGE_RE = /pgvector\/pgvector:[^@\s]+@sha256:[0-9a-f]{64}/g;
 const IMAGE = (script.match(IMAGE_RE) ?? [])[0] ?? '';
 const DIGEST = IMAGE.slice(IMAGE.indexOf('@') + 1);
 
-/** `timeout` (coreutils) runs the docker-mode stub runs; a Mac without coreutils skips them. */
+/**
+ * `timeout` (coreutils) runs db-checks.sh's docker-mode stub runs (runStubbed); a Mac without coreutils
+ * skips them. runStack puts a pass-through `timeout` of its own on PATH, so the stack.sh runs never
+ * depend on the host's coreutils.
+ */
 const HAS_TIMEOUT = spawnSync('timeout', ['5', 'true']).status === 0;
+
+/**
+ * A folder of links to every executable on this PATH but the names in `hide` (the first of each name,
+ * as PATH finds it): a PATH without those commands. @param {string} dir @param {string[]} hide
+ */
+function linkedPath(dir, hide) {
+    fs.mkdirSync(dir);
+    for (const from of (process.env.PATH ?? '').split(path.delimiter)) {
+        /** @type {string[]} */
+        let names;
+        try { names = fs.readdirSync(from); } catch { continue; }
+        for (const name of names) {
+            if (hide.includes(name) || fs.existsSync(path.join(dir, name))) continue;
+            try { fs.accessSync(path.join(from, name), fs.constants.X_OK); } catch { continue; }
+            fs.symlinkSync(path.join(from, name), path.join(dir, name));
+        }
+    }
+    return dir;
+}
 
 /**
  * Runs db-checks.sh with recording stubs for docker, psql and node first on PATH. docker fails
@@ -45,19 +68,23 @@ const HAS_TIMEOUT = spawnSync('timeout', ['5', 'true']).status === 0;
  * `psqlAnswer` (default nothing) otherwise. Without `nodeFails`, node exits 1, so the script stops at
  * the 00:00 JST guard (set -e), after the image, the server checks and the PG* variables were used;
  * with it, node exits 1 only for the scripts listed, and the script runs to its end. `sleep` only
- * records its argument. `outFiles` lists what the script left in its outputs folder.
+ * records its argument. `outFiles` lists what the script left in its outputs folder. `hide` lists
+ * commands to take off PATH (a stub of that name too): the rest of PATH is then a folder of links to
+ * every other command on it. `timeoutStub` adds a pass-through `timeout` (it never kills).
  * @param {string[]} args
  * @param {{ env?: Record<string, string>, failPull?: (image: string) => boolean, psqlAnswer?: string, nodeFails?: string[],
- *   psqlVersion?: string, roles?: string, databases?: string, dockerFails?: string[], containerExists?: boolean }} [options]
+ *   psqlVersion?: string, roles?: string, databases?: string, dockerFails?: string[], containerExists?: boolean, hide?: string[], timeoutStub?: boolean }} [options]
  */
-function runStubbed(args, { env = {}, failPull = () => false, psqlAnswer, nodeFails, psqlVersion = '16.15', roles = '0', databases, dockerFails = [], containerExists = false } = {}) {
+function runStubbed(args, { env = {}, failPull = () => false, psqlAnswer, nodeFails, psqlVersion = '16.15', roles = '0', databases, dockerFails = [], containerExists = false, hide, timeoutStub = false } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-db-checks-'));
     try {
         const bin = path.join(dir, 'bin');
         fs.mkdirSync(bin);
         const log = path.join(dir, 'calls.log');
         const failing = path.join(dir, 'fail-pull.txt');
-        const write = (/** @type {string} */ name, /** @type {string} */ body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+        const write = (/** @type {string} */ name, /** @type {string} */ body) => {
+            if (!hide?.includes(name)) fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+        };
         write('docker', [
             'echo "docker $*" >> "$STUB_LOG"',
             `if [[ "$1 $2" == "container inspect" ]]; then exit ${containerExists ? 0 : 1}; fi`,
@@ -78,15 +105,18 @@ function runStubbed(args, { env = {}, failPull = () => false, psqlAnswer, nodeFa
             nodeFails === undefined ? 'exit 1' : `case "$1" in ${nodeFails.length ? nodeFails.join('|') : "''"}) exit 1 ;; esac\nexit 0`,
         ].join('\n'));
         write('sleep', 'echo "sleep $*" >> "$STUB_LOG"');
+        if (timeoutStub) write('timeout', 'shift; exec "$@"');
         const pulls = [IMAGE, `mirror.gcr.io/pgvector/pgvector@${DIGEST}`].filter((image) => failPull(image));
         fs.writeFileSync(failing, pulls.map((image) => `${image}\n`).join(''));
         fs.writeFileSync(log, '');
+        let rest = process.env.PATH ?? '';
+        if (hide) rest = linkedPath(path.join(dir, 'path'), hide);
         const result = spawnSync('bash', [path.join(ROOT, DB_CHECKS), ...args], {
             cwd: ROOT,
             encoding: 'utf8',
             timeout: 60_000,
             env: {
-                PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+                PATH: `${bin}${path.delimiter}${rest}`,
                 HOME: dir,
                 STUB_LOG: log,
                 STUB_FAIL_PULL: failing,
@@ -272,6 +302,47 @@ describe('scripts/ci/db-checks.sh', () => {
             assert.match(out, /❌ --existing-url (must point at 127\.0\.0\.1, localhost or \[::1\]|takes no \?parameters or extra hosts)/, url);
             assert.deepEqual(calls, [], `${url}: no psql, docker or node call`);
         }
+        // Without user@, the role checks would connect to 'postgresql://…@postgresql://host:port/risepath'.
+        for (const url of ['postgresql://127.0.0.1:5432', 'postgres://localhost:5432', 'postgresql://@127.0.0.1:5432']) {
+            const { status, out, calls } = runStubbed(['--existing-url', url]);
+            assert.equal(status, 2, `${url}: ${out}`);
+            assert.match(out, /❌ --existing-url needs the user: postgresql:\/\/user\[:password\]@host:port/, url);
+            assert.deepEqual(calls, [], `${url}: no psql, docker or node call`);
+        }
+    });
+
+    it('takes nothing or exactly --existing-url <url>: the = form, a missing or empty URL, an extra or unknown argument exit 2 before any call (never Docker mode)', () => {
+        for (const args of [
+            ['--existing-url=postgresql://postgres@127.0.0.1:5432'],
+            ['--existing-url'],
+            ['--existing-url', ''],
+            ['--foo'],
+            ['--existing-url', 'postgresql://postgres@127.0.0.1:5432', 'extra'],
+            ['postgresql://postgres@127.0.0.1:5432'],
+        ]) {
+            const { status, out, calls } = runStubbed(args);
+            assert.equal(status, 2, `${JSON.stringify(args)}: ${out}`);
+            assert.match(out, /❌ usage: db-checks\.sh \[--existing-url postgresql:\/\/user\[:password\]@host:port\]/, JSON.stringify(args));
+            assert.deepEqual(calls, [], `${JSON.stringify(args)}: no psql, docker or node call`);
+        }
+    });
+
+    it('refuses a PATH without timeout (both modes) or without docker (Docker mode) with the remedy, before any docker or node call or pause', () => {
+        const VERSION_ONLY = ['psql PGHOSTADDR=<unset> PGSERVICE=<unset> PGSERVICEFILE=<unset> --version'];
+        for (const args of [[], ['--existing-url', 'postgresql://postgres@127.0.0.1:5999']]) {
+            const { status, out, calls } = runStubbed(args, { hide: ['timeout'] });
+            assert.equal(status, 2, `${args.join(' ') || 'docker mode'}: ${out}`);
+            assert.match(out, /❌ timeout is not on PATH \(coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH\)/);
+            assert.deepEqual(calls, VERSION_ONLY, 'no docker, node or sleep: the registries are not blamed');
+        }
+        const noDocker = runStubbed([], { hide: ['docker'], timeoutStub: true });
+        assert.equal(noDocker.status, 2, noDocker.out);
+        assert.match(noDocker.out, /❌ docker is not on PATH \(without Docker: --existing-url, see the header of this script\)/);
+        assert.deepEqual(noDocker.calls, VERSION_ONLY);
+        if (HAS_TIMEOUT) {
+            const linked = runStubbed([], { hide: [] });
+            assert.ok(linked.calls.some((line) => line.startsWith('docker container inspect ')), `the linked PATH runs the script: ${linked.out}`);
+        }
     });
 
     it('db-checks clears PGHOSTADDR, PGSERVICE and PGSERVICEFILE before the first psql, in both modes', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
@@ -434,7 +505,7 @@ const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use o
 /**
  * @typedef {{ env?: Record<string, string>, failPull?: (image: string) => boolean, inspectFails?: boolean,
  *   mcpExit?: number, apiExit?: number, standIn?: boolean, health?: unknown, curlExit?: number, deployExit?: number, dfKb?: number, cwd?: string,
- *   hide?: string[], redactFails?: boolean, stubs?: Record<string, string>, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
+ *   hide?: string[], noTimeoutStub?: boolean, redactFails?: boolean, stubs?: Record<string, string>, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
  */
 /**
  * Runs scripts/ci/stack.sh <args> in a temporary copy of the tree: stack.sh, redact-log.mjs,
@@ -447,10 +518,12 @@ const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use o
  * with `standIn`; each line logs the COMPOSE_PROJECT_NAME it saw. curl prints `health` (as JSON unless a string) or exits `curlExit`.
  * With `redactFails`, node exits 7 for redact-log.mjs (and runs the real node otherwise). `hide` lists
  * commands to take off PATH: the rest of PATH is then a folder of links to every other command on it.
+ * A pass-through `timeout` stub (it runs the command, never kills it: every stub returns at once) is on
+ * PATH unless `noTimeoutStub`, so a host without coreutils (stock macOS) runs these tests too.
  * `stubs` adds more bash stubs to the stub folder (name → body), e.g. npm and npx for the e2e steps.
  * @param {string[]} args @param {StackOptions} [options]
  */
-function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, apiExit = 0, standIn = false, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, stubs = {}, setup, inspect } = {}) {
+function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, apiExit = 0, standIn = false, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, noTimeoutStub = false, redactFails = false, stubs = {}, setup, inspect } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-'));
     try {
         const tree = path.join(dir, 'repo');
@@ -492,22 +565,12 @@ function runStack(args, { env = {}, failPull = () => false, inspectFails = false
         write('sleep', 'echo "sleep $*" >> "$STUB_LOG"');
         if (dfKb !== undefined) write('df', ['echo "Filesystem 1024-blocks Used Available Capacity Mounted on"', `echo "/dev/stub 999999999 1 ${dfKb} 1% /"`].join('\n'));
         if (redactFails) write('node', ['if [[ "$1" == *redact-log.mjs ]]; then echo "node: stub: redact failed" >&2; exit 7; fi', `exec ${JSON.stringify(process.execPath)} "$@"`].join('\n'));
+        // preflight, pull and browser only need `timeout` to exist and pass the command through (every stub
+        // returns at once), so these runs never depend on the host's coreutils (stock macOS has none).
+        if (!noTimeoutStub) write('timeout', 'shift; exec "$@"');
         for (const [name, body] of Object.entries(stubs)) write(name, body);
         let rest = process.env.PATH ?? '';
-        if (hide) {
-            rest = path.join(dir, 'path');
-            fs.mkdirSync(rest);
-            for (const from of (process.env.PATH ?? '').split(path.delimiter)) {
-                /** @type {string[]} */
-                let names;
-                try { names = fs.readdirSync(from); } catch { continue; }
-                for (const name of names) {
-                    if (hide.includes(name) || fs.existsSync(path.join(rest, name))) continue;
-                    try { fs.accessSync(path.join(from, name), fs.constants.X_OK); } catch { continue; }
-                    fs.symlinkSync(path.join(from, name), path.join(rest, name));
-                }
-            }
-        }
+        if (hide) rest = linkedPath(path.join(dir, 'path'), hide);
         const pulls = [`node:22-slim`, 'mirror.gcr.io/library/node:22-slim', PG_IMAGE, `mirror.gcr.io/pgvector/pgvector@${PG_DIGEST}`].filter((image) => failPull(image));
         fs.writeFileSync(failing, pulls.map((image) => `${image}\n`).join(''));
         fs.writeFileSync(healthFile, typeof health === 'string' ? health : JSON.stringify(health));
@@ -583,13 +646,16 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
 
     it('preflight and pull refuse a PATH without timeout (coreutils; stock macOS), with the remedy, before any docker call', () => {
         for (const sub of ['preflight', 'pull']) {
-            const { status, out, calls } = runStack([sub], { dfKb: 10 * 1048576, hide: ['timeout'] });
+            const { status, out, calls } = runStack([sub], { dfKb: 10 * 1048576, hide: ['timeout'], noTimeoutStub: true });
             assert.equal(status, 1, `${sub}: ${out}`);
             assert.match(out, /❌ timeout is not on PATH \(coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH\)/, sub);
             assert.deepEqual(calls, [], `${sub}: no docker call`);
         }
         const linked = runStack(['preflight'], { dfKb: 10 * 1048576, hide: [] });
         assert.ok(linked.calls.some((line) => line.includes(' version ')), `the linked PATH runs the script: ${linked.out}`);
+        // A Mac without coreutils: the host's timeout is gone, the stub's pass-through stays.
+        const mac = runStack(['preflight'], { dfKb: 10 * 1048576, hide: ['timeout'] });
+        assert.ok(mac.calls.some((line) => line.includes(' version ')), `the stub PATH never depends on the host's coreutils: ${mac.out}`);
     });
 
     it('preflight prints the Docker, Compose and storage-driver versions (compare them with the VM\'s)', () => {
@@ -609,6 +675,26 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         const enough = runStack(['preflight'], { dfKb: 5 * 1048576 });
         assert.equal(enough.status, 0, enough.out);
         assert.match(enough.out, /Free disk: 5 GB\n?$/);
+    });
+
+    it('preflight names the previous local run\'s images and build cache on a local refusal only', { skip: SKIP_IF_PORTS_BUSY }, () => {
+        // down removes the project only (pinned above): the images and the build cache stay for a faster
+        // rebuild, and on one disk they can push the next local run under the 5 GB floor.
+        const hint = /docker image rm risepath-ci-api risepath-ci-mcp, then docker builder prune/;
+        const local = runStack(['preflight'], { dfKb: 4 * 1048576 });
+        assert.equal(local.status, 1, local.out);
+        assert.match(local.out, /❌ only 4 GB free; the CI stack needs 5 GB \(images, build cache, database\); a previous local run kept its images and build cache: /);
+        assert.match(local.out, hint);
+        assert.ok(local.calls.includes('docker [risepath-ci] image inspect risepath-ci-api'), local.calls.join('\n'));
+        const ci = runStack(['preflight'], { dfKb: 4 * 1048576, env: { CI: 'true' } });
+        assert.equal(ci.status, 1, ci.out);
+        assert.doesNotMatch(ci.out, hint, 'a CI runner starts empty');
+        const none = runStack(['preflight'], { dfKb: 4 * 1048576, inspectFails: true });
+        assert.equal(none.status, 1, none.out);
+        assert.doesNotMatch(none.out, hint, 'no image of an earlier run');
+        const enough = runStack(['preflight'], { dfKb: 5 * 1048576 });
+        assert.equal(enough.status, 0, enough.out);
+        assert.ok(!enough.calls.some((c) => / image inspect /.test(c)), 'no image lookup when the disk check passes');
     });
 
     it('preflight refuses a port the stack publishes when something listens on it', { skip: SKIP_IF_PORTS_BUSY }, async () => {
@@ -723,7 +809,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.match(stackCode, /^AUTH_NAME="\$\{PROJECT\}-auth"$/m);
     });
 
-    it('pull: both base images from Docker Hub; when it refuses, the same reference from mirror.gcr.io re-tagged to the compose/Dockerfile reference, which must then resolve', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
+    it('pull: both base images from Docker Hub; when it refuses, the same reference from mirror.gcr.io re-tagged to the compose/Dockerfile reference, which must then resolve', () => {
         const pulls = (/** @type {string[]} */ calls) => calls.filter((line) => /^docker \[risepath-ci\] (pull|tag|image) /.test(line)).map((line) => line.replace('docker [risepath-ci] ', ''));
         const hub = runStack(['pull']);
         assert.equal(hub.status, 0, hub.out);
@@ -941,7 +1027,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.deepEqual(kept, ['DATABASE_URL_PHASE1=<value> token=<value> <value> <value>\n']);
     });
 
-    it('rehearsal runs the job\'s subcommands in order, and always removes the stack: with the logs when a step fails', { skip: SKIP_IF_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+    it('rehearsal runs the job\'s subcommands in order, and always removes the stack: with the logs when a step fails', { skip: SKIP_IF_PORTS_BUSY }, () => {
         /** @type {{ env: boolean, logs: string[] }[]} */
         const seen = [];
         const look = (/** @type {string} */ tree) => {
@@ -954,7 +1040,8 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             if (/ exec -T mcp /.test(line)) return 'mcp-db';
             if (/ down -v /.test(line) || line === `docker [risepath-ci] rm -f ${AUTH_NAME}`) return 'down';
             if (/ (logs|ps -a)( |$)/.test(line) || line === `docker [risepath-ci] container inspect ${AUTH_NAME}`) return 'logs';
-            if (/^docker \[risepath-ci\] (version|info|compose version)/.test(line)) return 'preflight';
+            // image inspect: a refused preflight looks for an earlier local run's images (the disk hint).
+            if (/^docker \[risepath-ci\] (version|info|compose version|image inspect risepath-ci-api$)/.test(line)) return 'preflight';
             if (/^docker \[risepath-ci\] pull /.test(line)) return 'pull';
             return line;
         }).filter((step, i, all) => step !== all[i - 1]);
@@ -989,7 +1076,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         ], 'stack.env removed every time; logs only after a failure');
     });
 
-    it('rehearsal still removes the stack, and keeps the failed step\'s exit code, when collecting the logs fails', { skip: SKIP_IF_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+    it('rehearsal still removes the stack, and keeps the failed step\'s exit code, when collecting the logs fails', { skip: SKIP_IF_PORTS_BUSY }, () => {
         /** @type {boolean[]} */
         const left = [];
         const { status, out, calls } = runStack(['rehearsal'], { dfKb: 10 * 1048576, deployExit: 3, redactFails: true, inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))) });
@@ -1050,7 +1137,32 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.equal(failed.status, 3, `a failed build fails the step: ${failed.out}`);
     });
 
-    it('browser installs the headless shell with its system packages on CI only, three bounded attempts inside the workflow step', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
+    it('build-front blanks the VITE_ keys of every line form Vite\'s dotenv reads: export, indented, `NAME: value`, lower-case', () => {
+        // Each key the stub sees, or <unset>: Vite's loadEnv would read every one of these lines.
+        const npm = NPM.replace('foo=${VITE_FOO-<unset>}', 'foo=${VITE_FOO-<unset>} bar=${VITE_BAR-<unset>} base=${VITE_APP_BASE_PATH-<unset>} lower=${VITE_lower-<unset>}');
+        const { status, out, calls } = runStack(['build-front'], {
+            stubs: { npm },
+            setup: (tree) => fs.writeFileSync(path.join(tree, '.env.local'), [
+                'export VITE_FOO=a-local-value',
+                '  VITE_FEATURE_LEGAL_PAGES=true',
+                'VITE_BAR: x',
+                '\texport\tVITE_APP_BASE_PATH=/app/',
+                'VITE_lower=y',
+                '# VITE_COMMENTED=1',
+                'VITE_SUPABASE_URL=https://real.example.org',
+                '',
+            ].join('\n')),
+        });
+        assert.equal(status, 0, out);
+        assert.equal(calls.length, 1, calls.join('\n'));
+        for (const part of [' foo= ', ' bar= ', ' base= ', ' lower= ', ' legal= ', ` url=http://127.0.0.1:${STANDIN_DEFAULT_PORT} `]) {
+            assert.ok(calls[0].includes(part), `${part.trim()}: ${calls[0]}`);
+        }
+        assert.match(out, /blanking 5 VITE_\* keys found in local \.env files/, 'not the comment, not the stand-in\'s own two keys');
+        assert.doesNotMatch(stackCode, /grep -ho '\^VITE_\[A-Z0-9_\]\*'/, 'plain VITE_X= lines are not the only form Vite reads');
+    });
+
+    it('browser installs the headless shell with its system packages on CI only, three bounded attempts inside the workflow step', () => {
         const local = runStack(['browser'], { stubs: { npx: NPX } });
         assert.equal(local.status, 0, local.out);
         assert.match(local.out, /Local run: Playwright uses PLAYWRIGHT_CHROMIUM_PATH/);
@@ -1077,7 +1189,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.equal(red.status, 1, red.out);
     });
 
-    it('e2e runs the Learner end-to-end job\'s subcommands in order, and always removes the stack: with the logs in .artifacts/e2e/logs when a step fails', { skip: SKIP_IF_E2E_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+    it('e2e runs the Learner end-to-end job\'s subcommands in order, and always removes the stack: with the logs in .artifacts/e2e/logs when a step fails', { skip: SKIP_IF_E2E_PORTS_BUSY }, () => {
         /** @type {{ env: boolean, dist: boolean, logs: string[] }[]} */
         const seen = [];
         const look = (/** @type {string} */ tree) => {
@@ -1091,7 +1203,8 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             if (line.startsWith('curl ') || / exec -T api /.test(line) || line.includes(` run -d --name ${AUTH_NAME} `)) return 'auth';
             if (/ down -v /.test(line)) return 'down';
             if (/ (logs|ps -a)( |$)/.test(line) || line === `docker [risepath-ci] container inspect ${AUTH_NAME}`) return 'logs';
-            if (/^docker \[risepath-ci\] (version|info|compose version)/.test(line)) return 'preflight';
+            // image inspect: a refused preflight looks for an earlier local run's images (the disk hint).
+            if (/^docker \[risepath-ci\] (version|info|compose version|image inspect risepath-ci-api$)/.test(line)) return 'preflight';
             if (/^docker \[risepath-ci\] pull /.test(line)) return 'pull';
             return line;
         }).filter((step, i, all) => step !== all[i - 1]);

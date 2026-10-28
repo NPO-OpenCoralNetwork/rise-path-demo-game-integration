@@ -21,6 +21,11 @@
  * password sign-in time in amr, which a refresh keeps (as Supabase does; account deletion needs a
  * password sign-in of the last 120 s, server/routes/account.js).
  *
+ * Sessions end as in Supabase Auth (GoTrue): a logout ends its scope's sessions (local: this one,
+ * others: the learner's other ones, global: all of them), and from then on an access token of an ended
+ * session is refused with 403 session_not_found (GET /user, the grants, logout), before its exp; its
+ * refresh tokens are gone. The api answers such a token 401 without reading its account.
+ *
  * Each request logs one line: METHOD /auth/v1/<path>[?grant_type=<grant>] <status>. Never a body,
  * header, token, email or password.
  *
@@ -98,6 +103,8 @@ export async function startAuthStandIn({ host = '127.0.0.1', port = DEFAULT_PORT
   const key = crypto.randomBytes(32);
   /** Refresh tokens, each usable once. @type {Map<string, Session>} */
   const refreshTokens = new Map();
+  /** The sessions not signed out yet: session_id → sub (a refresh keeps its session). @type {Map<string, string>} */
+  const liveSessions = new Map();
   /** When each learner first signed in to this instance (their created_at). @type {Map<string, string>} */
   const created = new Map();
   /** @type {string} */
@@ -189,6 +196,8 @@ export async function startAuthStandIn({ host = '127.0.0.1', port = DEFAULT_PORT
     };
     /** @param {number} status @param {string} errorCode @param {string} msg */
     const fail = (status, errorCode, msg) => send(status, { code: status, error_code: errorCode, msg });
+    /** GoTrue's answer to a valid token whose session was signed out. */
+    const sessionGone = () => fail(403, 'session_not_found', 'Session from session_id claim in JWT does not exist');
 
     if (req.method === 'OPTIONS') return send(204);
     let raw = '';
@@ -211,33 +220,42 @@ export async function startAuthStandIn({ host = '127.0.0.1', port = DEFAULT_PORT
       if (!LEARNER_EMAIL.test(email) || body.password !== STANDIN_PASSWORD) return fail(400, 'invalid_credentials', 'Invalid login credentials');
       const sub = userIdFor(email);
       if (!created.has(sub)) created.set(sub, iso());
-      return send(200, sessionJson({ sub, email, amrAt: nowS(), sessionId: crypto.randomUUID() }));
+      const sessionId = crypto.randomUUID();
+      liveSessions.set(sessionId, sub);
+      return send(200, sessionJson({ sub, email, amrAt: nowS(), sessionId }));
     }
     if (path === '/auth/v1/token' && req.method === 'POST' && grant === 'refresh_token') {
       const token = typeof body.refresh_token === 'string' ? body.refresh_token : '';
       const session = refreshTokens.get(token);
-      if (!session) return fail(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
+      if (!session || !liveSessions.has(session.sessionId)) return fail(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
       refreshTokens.delete(token);
       return send(200, sessionJson(session)); // the same sign-in time (amr) and session_id
     }
     if (path === '/auth/v1/user' && req.method === 'GET') {
       const claims = verify(bearer);
-      return claims ? send(200, userOf(claims.sub, String(claims.email ?? ''))) : fail(401, 'bad_jwt', 'invalid JWT: unable to parse or verify signature');
+      if (!claims) return fail(401, 'bad_jwt', 'invalid JWT: unable to parse or verify signature');
+      if (!liveSessions.has(claims.session_id)) return sessionGone();
+      return send(200, userOf(claims.sub, String(claims.email ?? '')));
     }
     if (path === '/auth/v1/logout' && req.method === 'POST') {
-      // supabase-js ignores 401, 403 and 404 here, so an unknown token is not an error either.
+      // supabase-js ignores 401, 403 and 404 here, so an unknown token is not an error either. An ended
+      // session is 403 session_not_found, as in GoTrue (supabase-js returns it as AuthSessionMissingError).
       const claims = verify(bearer);
+      if (claims && !liveSessions.has(claims.session_id)) return sessionGone();
       const scope = url.searchParams.get('scope') ?? 'global';
       if (claims) {
-        for (const [token, session] of refreshTokens) {
-          const own = session.sessionId === claims.session_id;
-          if (session.sub === claims.sub && (scope === 'global' || (scope === 'local' && own) || (scope === 'others' && !own))) refreshTokens.delete(token);
+        for (const [sessionId, sub] of liveSessions) {
+          const own = sessionId === claims.session_id;
+          if (sub === claims.sub && (scope === 'global' || (scope === 'local' && own) || (scope === 'others' && !own))) liveSessions.delete(sessionId);
         }
+        for (const [token, session] of refreshTokens) if (!liveSessions.has(session.sessionId)) refreshTokens.delete(token);
       }
       return send(204);
     }
     if (path === '/auth/v1/user/oauth/grants' && (req.method === 'GET' || req.method === 'DELETE')) {
-      if (!verify(bearer)) return fail(401, 'bad_jwt', 'invalid JWT: unable to parse or verify signature');
+      const claims = verify(bearer);
+      if (!claims) return fail(401, 'bad_jwt', 'invalid JWT: unable to parse or verify signature');
+      if (!liveSessions.has(claims.session_id)) return sessionGone();
       return req.method === 'DELETE' ? send(204) : send(200, []);
     }
     return fail(404, 'not_implemented', 'The e2e auth stand-in does not model this endpoint.');

@@ -25,7 +25,8 @@
 #   test              the learner flows (npx playwright test, playwright.config.ts)
 #   logs <dir>        compose, deploy and stand-in logs, redacted with the template and every env file present
 #   down              the stand-in, the risepath-ci project and its volume, the installed env file, the
-#                     front build (.artifacts/e2e/dist); the logs and test results stay
+#                     front build (.artifacts/e2e/dist); the logs and test results stay, and so do the
+#                     images risepath-ci-api and -mcp and the build cache (about 4 GB: a faster next run)
 #   rehearsal | e2e   a whole job locally (npm run ci:stack | npm run e2e:local): logs on failure, always down
 set -euo pipefail
 
@@ -97,7 +98,14 @@ cmd_preflight() { # [e2e]
   done
   free_gb="$(df -Pk "${ROOT}" | awk 'NR==2 {print int($4/1048576)}')"
   echo "Free disk: ${free_gb} GB"
-  if [[ "${free_gb}" -lt 5 ]]; then fail "only ${free_gb} GB free; the CI stack needs 5 GB (images, build cache, database)"; fi
+  if [[ "${free_gb}" -lt 5 ]]; then
+    # A previous local run keeps its images and build cache (about 4 GB) for a faster rebuild; down
+    # removes the project only. CI runners start empty, so only a local refusal names them.
+    if [[ -z "${CI:-}" ]] && docker image inspect "${PROJECT}-api" > /dev/null 2>&1; then
+      fail "only ${free_gb} GB free; the CI stack needs 5 GB (images, build cache, database); a previous local run kept its images and build cache: docker image rm ${PROJECT}-api ${PROJECT}-mcp, then docker builder prune (it also clears other builds' cache)"
+    fi
+    fail "only ${free_gb} GB free; the CI stack needs 5 GB (images, build cache, database)"
+  fi
 }
 
 cmd_install_env() { install_file "${TEMPLATE}" "${STACK}/stack.env"; echo "deploy/risepath-vm/stack.env <- ci/stack.ci.env"; }
@@ -210,9 +218,12 @@ cmd_build_front() { # the deployed build mode for the stand-in; no key, VITE_FEA
     local key blank=()
     # A developer's .env files must not reach this bundle: Vite lets the process env win over them, so
     # their VITE_* keys are set empty here; the caller's VITE_FEATURE_LEGAL_PAGES is removed (ci.yml's rule).
+    # The keys are read in every line form Vite's dotenv reads (vite.config.ts loadEnv): indented,
+    # `export NAME=…`, `NAME: value` and lower-case letters, as deploy-stack.sh's ENV_KEY does for Compose.
     while read -r key; do
       if [[ -n "${key}" && "${key}" != VITE_SUPABASE_URL && "${key}" != VITE_SUPABASE_ANON_KEY ]]; then blank+=("${key}="); fi
-    done < <(grep -ho '^VITE_[A-Z0-9_]*' .env .env.local .env.production .env.production.local 2> /dev/null | sort -u)
+    done < <(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?(VITE_[A-Za-z0-9_.-]*)([[:space:]]*=|:[[:space:]]).*/\2/p' \
+      .env .env.local .env.production .env.production.local 2> /dev/null | sort -u)
     if [[ ${#blank[@]} -gt 0 ]]; then echo "blanking ${#blank[@]} VITE_* keys found in local .env files"; fi
     env -u VITE_FEATURE_LEGAL_PAGES ${blank[@]+"${blank[@]}"} NODE_OPTIONS=--max-old-space-size=4096 \
       VITE_SUPABASE_URL="http://127.0.0.1:${AUTH_PORT}" VITE_SUPABASE_ANON_KEY=ci-dummy-anon-key \

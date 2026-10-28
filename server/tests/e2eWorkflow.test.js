@@ -281,9 +281,12 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
                 }
                 assert.ok(subcommand(step), `${step.name}: every other step is one stack.sh subcommand (${step.run})`);
             }
-            assert.deepEqual(other, job === 'stack' ? ['Disk use'] : ['npm ci --ignore-scripts'], `${job}: the steps that are not stack.sh`);
+            // Disk use in both stack jobs: Learner end-to-end holds the most (node_modules, the front build,
+            // Chromium), so its peak is the headroom the owner reads (plan §11.2) and a full-disk failure's figures.
+            assert.deepEqual(other, job === 'stack' ? ['Disk use'] : ['npm ci --ignore-scripts', 'Disk use'], `${job}: the steps that are not stack.sh`);
             const header = text.slice(0, text.indexOf('\nname: ')).split('\n').map((line) => line.replace(/^# ?/, '')).join(' ');
-            assert.ok(header.includes(`${job === 'stack' ? '"Disk use"' : 'npm ci'} (${JOBS[job].name})`), `${WORKFLOW} header: names the ${JOBS[job].name} step that is not stack.sh`);
+            assert.ok(header.includes('"Disk use" (Server stack deploy, Learner end-to-end)') && header.includes('npm ci (Learner end-to-end)'),
+                `${WORKFLOW} header: names the ${JOBS[job].name} steps that are not stack.sh`);
             assert.deepEqual(stackOrder(fn), order, `stack.sh ${fn}: its subcommands, one per line`);
             assert.deepEqual(list.filter((s) => !s.if && s.run && s.run !== 'npm ci --ignore-scripts').map(subcommand), order, `the steps without if: are \`${script}\`, in its order`);
             for (const step of list.filter((s) => /^logs\b/.test(subcommand(s) ?? ''))) assert.equal(step.if, 'failure()', step.name);
@@ -391,6 +394,45 @@ describe('e2e.yml: the runbooks name its checks (P5)', () => {
             assert.ok(name, `ci.yml has the job ${id} with a name`);
             assert.ok(plan.includes(`\`${name}\``), `plan §11.2 names ci.yml's check \`${name}\` (job ${id}) exactly`);
         }
+    });
+
+    /** @param {string} rel */
+    const readDoc = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+
+    it('the VM checks of a first deploy sit between bootstrap-vm.sh run 1 and run 2, when Docker and stack.env exist and nothing is deployed yet', () => {
+        const g = section(readDoc('doc/guides/risepath_vm_deployment.md'), '### 4.5 ');
+        const lines = g.split('\n');
+        const first = lines.findIndex((line) => line.startsWith('1. '));
+        assert.ok(first > 0, 'VM guide §4.5 has numbered steps');
+        assert.ok(!lines.slice(0, first).join('\n').includes('`docker version`'), 'VM guide §4.5: not above step 1, where no VM exists yet');
+        const step3 = lines.find((line) => line.startsWith('3. ')) ?? '';
+        for (const must of ['`stack.env` を埋める', '`docker version`', '`docker compose version`', '`SUPABASE_URL`', '`bootstrap-vm.sh`（2 回目）']) {
+            assert.ok(step3.includes(must), `VM guide §4.5 step 3 names ${must}`);
+        }
+        const at = (/** @type {string} */ t) => step3.indexOf(t);
+        assert.ok(at('`stack.env` を埋める') < at('`docker version`') && at('`docker version`') < at('`bootstrap-vm.sh`（2 回目）'),
+            'VM guide §4.5 step 3: after stack.env is filled in, before the second run deploys');
+        assert.ok(section(readDoc('doc/brushup-2026/ai-access-plan.ja.md'), '### 11.2 ').includes('2 回目の前に'), 'plan §11.2 item 3 says when');
+        assert.match(readDoc('deploy/risepath-vm/README.md'), /^# 作り直した VM の最初のデプロイなら、ここで 2 つ見ます（計画の 11\.2 の 3）/m, 'the quickstart\'s second run says it too');
+    });
+
+    it('the deploy runbooks written in plain form stay plain form (the VM guide, the Vercel runbook)', () => {
+        for (const file of ['doc/guides/risepath_vm_deployment.md', 'deploy/vercel/README.md']) {
+            let fenced = false;
+            for (const [i, line] of readDoc(file).split('\n').entries()) {
+                if (/^\s*```/.test(line)) fenced = !fenced;
+                if (fenced || /^\s*```/.test(line)) continue;
+                const plain = line.replace(/「[^」]*」/g, '「」').replace(/`[^`]*`/g, '``');
+                assert.doesNotMatch(plain, /(ます|ません|です|ました|でした)(?=[。（）]|$)/u, `${file}:${i + 1}: this runbook is plain form`);
+            }
+        }
+    });
+
+    it('plan §11.1 says ターミナル for a shell window and このマシン for the host; 端末 only for a learner\'s other device', () => {
+        const s111 = section(readDoc('doc/brushup-2026/ai-access-plan.ja.md'), '### 11.1 ');
+        for (const m of s111.matchAll(/(.{0,3})端末/gu)) assert.ok(m[1].endsWith('ほかの'), `§11.1: 端末 means a learner's device here, not a shell or a host: …${m[0]}`);
+        assert.match(s111, /# ターミナル 1: ログインの代わり/u);
+        assert.match(s111, /ターミナルを分けます/u);
     });
 
     it('section() ends at the next heading of the same or a higher level and skips fenced code', () => {
