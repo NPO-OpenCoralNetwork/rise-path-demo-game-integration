@@ -17,7 +17,7 @@ Our visual roadmap and tasks are tracked using the following:
 ## 🛠️ How to Contribute
 
 ### 1. Reporting Bugs
-If you find a bug, please open a [GitHub Issue](issues) with:
+If you find a bug, please open a [GitHub Issue](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/issues) with:
 - Steps to reproduce
 - Expected vs. actual behavior
 - Your environment (Browser, OS, Node.js version)

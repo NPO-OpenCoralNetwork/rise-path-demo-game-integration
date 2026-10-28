@@ -63,4 +63,6 @@ test_mcp_client.js
 exports/
 backups/
 *.dump
-*.sql.gz
+*.sql.*
+# a plain pg_dump at the root (migrations and other SQL live in subfolders)
+/*.sql

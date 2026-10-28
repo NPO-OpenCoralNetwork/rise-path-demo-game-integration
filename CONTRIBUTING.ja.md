@@ -17,7 +17,7 @@ Rise Path プロジェクトに関心を持っていただき、ありがとう�
 ## 🛠️ コントリビュートの方法
 
 ### 1. バグの報告
-バグを発見した場合は、[GitHub Issues](issues) から報告してください。その際、以下の情報を含めていただけると修正がスムーズになります：
+バグを発見した場合は、[GitHub Issues](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/issues) から報告してください。その際、以下の情報を含めていただけると修正がスムーズになります：
 - 再現手順
 - 期待する挙動と実際の挙動
 - 実行環境（ブラウザ、OS、Node.jsバージョン）

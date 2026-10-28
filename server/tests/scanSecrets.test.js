@@ -104,9 +104,17 @@ describe('scan-secrets rules', () => {
 
   it('flags a Cloudflare Tunnel token, not a JWT or other base64 JSON', () => {
     assert.deepEqual(rulesOf(`token: "${FAKE.tunnel}"`), ['cloudflare-tunnel-token']);
-    assert.deepEqual(rulesOf(`TUNNEL_TOKEN=${FAKE.tunnel.replace(/\+/g, '-').replace(/\//g, '_')}`), ['cloudflare-tunnel-token'], 'base64url');
+    const unpadded = FAKE.tunnel.replace(/=+$/, '');
+    assert.notEqual(unpadded, FAKE.tunnel, 'the fake ends with padding');
+    assert.deepEqual(rulesOf(`TUNNEL_TOKEN=${unpadded}`), ['cloudflare-tunnel-token'], 'base64url, no padding');
     assert.deepEqual(rulesOf(`VITE_SUPABASE_ANON_KEY=${FAKE.anonJwt}`), []);
     assert.deepEqual(rulesOf(`data=${Buffer.from(JSON.stringify({ b: chars(32, 26), s: chars(44, 27) })).toString('base64')}`), []);
+  });
+
+  it('flags the three newer key types written as a compose or shell default (${NAME:-…})', () => {
+    assert.deepEqual(rulesOf(`OPENROUTER_API_KEY: \${OPENROUTER_API_KEY:-${FAKE.openrouter}}`), ['openrouter-api-key']);
+    assert.deepEqual(rulesOf(`FIGMA_TOKEN=\${FIGMA_TOKEN-${FAKE.figma}}`), ['figma-token']);
+    assert.deepEqual(rulesOf(`TUNNEL_TOKEN: \${TUNNEL_TOKEN:-${FAKE.tunnel}}`), ['cloudflare-tunnel-token']);
   });
 
   it('detects Stripe secret, restricted and webhook keys (test and live), not publishable keys or short fixtures', () => {

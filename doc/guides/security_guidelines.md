@@ -82,7 +82,7 @@ GitHub のリポジトリの **Settings** を開き、左のメニューの「**
 
 > [!IMPORTANT]
 > **Push Protection が有効な場合**:
-> 誤ってAPIキーを含んだコミットをプッシュしようとすると、ターミナル上にエラーメッセージが表示され、プッシュがブロックされます。開発者はローカルで履歴を修正（`git commit --amend` 等）するまでプッシュできません。
+> 誤ってAPIキーを含んだコミットをプッシュしようとすると、ターミナル上にエラーメッセージが表示され、プッシュがブロックされます。開発者は、鍵を消して履歴を直し（`git commit --amend` 等）、プッシュし直します。理由を選んでブロックを迂回することもできますが、迂回するとアラートが残ります。本物の鍵では迂回しません。迂回のアラートが本物の鍵なら、管理者は下の「万が一…」の手順で無効にします。
 
 ---
 
@@ -107,6 +107,8 @@ AIアシスタントにコーディングを指示する際、プロンプトの
 - Google（`AIza`）、Anthropic（`sk-ant-`）、OpenAI（`sk-proj-` など）、OpenRouter（`sk-or-v1-`）、GitHub（`ghp_` など）、Slack（`xoxb-` など）、Figma（`figd_`）、Stripe（`sk_live_` など）、Cloudflare Tunnel のトークン、秘密鍵（PEM）、Supabase の `service_role` の JWT
 
 全部のファイルを手元で確かめるときは、`node scripts/ci/scan-secrets.mjs --all` を流します。同じ CI の `Build and key-leak scan` は、本番のビルドにサーバーの鍵が入っていないことを確かめます。
+
+CI は、GitHub に push したあとに動きます。このリポジトリは公開なので、CI が見つけた値が本物の鍵なら、もう公開されています（ブランチと、プルリクエストの参照 `refs/pull/…`）。値を消すコミットや amend の前に、下の「万が一…」の 1（無効化）から始めます。push の前に `node scripts/ci/scan-secrets.mjs --diff origin/main` を流すと、コミット前の変更と、まだ追跡していないファイルも同じように確かめられます。
 
 ---
 

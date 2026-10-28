@@ -9,7 +9,8 @@ Please do not report a security problem in a public issue, discussion or pull re
 Report it privately on GitHub: open the **Security and quality** tab of this repository, go to
 **Advisories** and choose **Report a vulnerability**
 ([direct link](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/security/advisories/new)).
-Only the maintainers can see the report.
+Only the maintainers can see the report. If you do not see **Report a vulnerability**, open an
+issue that only asks for a security contact, without any details.
 
 Please include:
 
@@ -24,8 +25,9 @@ Only the latest `main` is maintained. There are no release branches.
 
 ## Scope
 
-- In scope: the code in this repository: the web app, the API (`server.js`, `server/`), the MCP
-  server (`mcp-server/`) and the deploy scripts (`deploy/`).
+- In scope: all code in this repository, for example the web app, the API (`server.js`,
+  `server/`), the MCP server (`mcp-server/`), the code both of them use (`tools/`) and the deploy
+  and staff scripts (`deploy/`, `scripts/`).
 - Out of scope: problems in third-party services (Supabase, Vercel, Cloudflare, Stripe, model
   providers). Report those to the service.
 
@@ -51,7 +53,8 @@ Only the latest `main` is maintained. There are no release branches.
 GitHub で、非公開で報告してください。このリポジトリの **Security and quality** タブの
 **Advisories** で、**Report a vulnerability** を選びます
 （[直接のリンク](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/security/advisories/new)）。
-報告は、メンテナーだけが見られます。
+報告は、メンテナーだけが見られます。**Report a vulnerability** が見つからないときは、内容を書かずに、
+連絡先を求める Issue だけを作ってください。
 
 次のことを書いてください。
 
@@ -66,8 +69,9 @@ GitHub で、非公開で報告してください。このリポジトリの **S
 
 ### 対象の範囲
 
-- 対象: このリポジトリのコード（Web アプリ、API の `server.js` と `server/`、MCP サーバーの
-  `mcp-server/`、デプロイのスクリプトの `deploy/`）
+- 対象: このリポジトリのすべてのコード（たとえば Web アプリ、API の `server.js` と `server/`、
+  MCP サーバーの `mcp-server/`、その 2 つが使う `tools/`、デプロイと運用のスクリプトの `deploy/` と
+  `scripts/`）
 - 対象外: 外部のサービス（Supabase、Vercel、Cloudflare、Stripe、AI のモデルの提供元）の問題。
   それぞれのサービスに報告してください。
 

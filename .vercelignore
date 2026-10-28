@@ -14,3 +14,11 @@ public/uploads
 *.env
 .artifacts/
 .shots/
+# Same as .gitignore: secrets carried between hosts, data exports and database dumps. git status
+# does not show them, so a "clean" checkout can still hold one (SECURITY.md).
+*.env.gpg
+exports/
+backups/
+*.dump
+*.sql.*
+/*.sql
