@@ -213,7 +213,7 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 - `deploy-stack.sh` は、DB・Supabase・Bridge Token の値が空かテンプレの値のままだと、変数名だけを表示して build の前に止まる。既定の `COMPOSE_PROFILES=tts` は `hermes` を起動せず、kokoro は動く。`full` を入れたとき（Hermes を有効にしたときだけ）は、`OPENROUTER_API_KEY` と 16 文字以上の `HERMES_API_KEY` も確かめる。`OPENROUTER_API_KEY` を入れただけでは Hermes は起動しない。
 - `ANTHROPIC_API_KEY` を入れる（チューター・文章フィードバック・コース生成）。`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま。Gemini が無いあいだ、教材の検索はキーワード検索で動き、AI の画像生成は止まる。
 - `bootstrap-vm.sh` は、VM 起動時の systemd ユニットを、初回デプロイが通ってから登録する。テンプレの値のまま再起動しても、db は起動しない。
-- 再デプロイは `./scripts/deploy-stack.sh` だけ。毎回 pull し、HEAD が進めば pull したあとの自分自身を 1 回だけ実行し直す。
+- 再デプロイは `./scripts/deploy-stack.sh` だけ。毎回 pull し、HEAD が進めば pull したあとの自分自身を 1 回だけ実行し直す。CI は同じ `deploy-stack.sh` を `RISEPATH_DEPLOY_SKIP_PULL=1` で流します（取り出したコミットのまま。VM では使いません）。
 
 **main へのマージで、フロントとレッスンは Vercel の Production デプロイ（Git 連携）で届く**（[`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。VM は `deploy-stack.sh` を流すまで変わらない。`deploy-stack.sh` が作り直すのは `api` と `mcp` のイメージで、MCP の `lesson-get` が読む `content/` は `mcp` イメージに焼き込まれる。新しい migration（例: Learning Hub のカードの seed）も `deploy-stack.sh` で入る。
 
@@ -259,6 +259,8 @@ docker compose --env-file stack.env up -d
 ### 4.5 VM を作り直す（2026-10-21 に削除済み）
 
 2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。新しい VM を作り、DB は空から始まる（Supabase のアカウントは残る。進捗・ジャーナルなど旧 VM の DB にあったデータは無い）。全体の順番と Cloudflare・Vercel・Supabase の作業は [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の「[新しい VM の順番](../../deploy/vercel/README.md#新しい-vm-の順番)」。VM 側の要点:
+
+**最初のデプロイの前に**: デプロイする main のコミットで、GitHub Actions の「End-to-end checks」の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）と毎晩の実行が緑であることを確かめます（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の「End-to-end checks」で **Run workflow**（`main`）を押して動かせます（計画の 11.2 の 3）。緑なら、空の DB への 000–020、`deploy-stack.sh` の流れ（検査・build・migration・api の作り直し・スモーク）、DB ロールの SQL、ブラウザでの学習の流れは、ダミーの値で確かめてあります。確かめていないもの: 本物の Supabase（ログインと Site URL）、公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1` での origin gate）、`mcp-public`、2 回目のデプロイと起動のユニット、`ANTHROPIC_API_KEY`、`POSTGRES_PASSWORD` を最初に決めること、Tailscale、Cloudflare Tunnel（cloudflared とトークン）、kokoro-tts・Hermes・Memanto、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばします）。`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）も見ます。VM の `docker version` と `docker compose version` を、`Server stack deploy` の「Preflight」の行とくらべます。`RISEPATH_DEPLOY_SKIP_PULL` は VM では使いません。
 
 1. 前の VM の残りを片付ける。夜間停止のスケジュールが残っていれば消す（どの VM にも付いていなければ消せる）。Tailscale の管理画面（Machines）で旧 `risepath-vm` を Remove する。Mac では `ssh-keygen -R risepath-vm`。
 
@@ -396,6 +398,7 @@ VM のホストには Node が無いので、`--target host` は使わない。M
 | provision スクリプト | ✅ `scripts/provision-gce.sh`（24 時間稼働が既定。夜間停止は `NIGHT_STOP=1`） |
 | 公開エッジ（Vercel routes + Cloudflare Tunnel + origin gate） | 🔄 リポジトリ側は実装済み。SSE のバッファ、Authorization の転送、ボディ上限は初回デプロイで確認（[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の確認チェックリスト） |
 | `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線（migrate は新しい api の起動前） |
+| CI での予行（`.github/workflows/e2e.yml`、Phase 7） | 🔄 リポジトリ側は実装済み（GitHub での最初の実行と、必須のチェックにするのはこれから。[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11.2）。プルリクエストのたびに、ダミーの値で `deploy-stack.sh` とブラウザの学習の流れ（`Server stack deploy`・`Learner end-to-end`）、VM と同じ DB のイメージで migration と DB ロールの SQL（`Database checks`）。最初のデプロイの前に緑を確かめる（§4.5） |
 | Hermes 本番 `config.yaml`（SSE） | ✅ `deploy/risepath-vm/hermes/config.yaml` |
 | Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可。2026-10-22 から学習者には提供しない（既定 `tts`） |
 | `risepath-vm` GCP 実機プロビジョニング | ⏸ 2026-10-21 に削除（オーナー）。作り直しは §4.5（`provision-gce.sh` → `bootstrap-vm.sh`）。DB は空から始まる。DB 接続は Tailscale、フル stack は `deploy-stack.sh` で更新 |

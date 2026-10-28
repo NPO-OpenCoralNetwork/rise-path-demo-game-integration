@@ -1,10 +1,13 @@
 // @ts-check
 // .github/workflows/e2e.yml (Phase 7, doc/brushup-2026/ai-access-plan.ja.md; owner decisions
 // P1-P5): text checks with node:fs only (no YAML dependency, as vmStackConfig.test.js). The job names
-// are the required checks of main's branch rule, so they are pinned. GitHub rejects the whole file
-// when an expression uses a context its key does not allow (a job-level env cannot read runner.*), and
-// then no job of any trigger starts: the narrow rule below pins that class. A job timeout ends as a
-// cancel, which skips the failure() steps, so every step has its own timeout and the job's covers them all.
+// are the required checks of main's branch rule, so they are pinned, here and in every runbook that
+// names them (plan §11.2, the VM guide §4.5, the VM README, deploy/vercel/README.md, AGENTS.md);
+// §11.2's ruleset list exactly, and ci.yml's two checks it also recommends for the ruleset.
+// GitHub rejects the whole file when an expression uses a context its key does not allow (a job-level
+// env cannot read runner.*), and then no job of any trigger starts: the narrow rule below pins that
+// class. A job timeout ends as a cancel, which skips the failure() steps, so every step has its own
+// timeout and the job's covers them all.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -325,5 +328,75 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
         assert.doesNotMatch(text, /claude-(opus|sonnet|haiku)/);
         assert.doesNotMatch(text, /\/home\/|\/tmp\/|\/Users\//);
         assert.doesNotMatch(text, /--existing-url/, 'CI runs the VM\'s image, never a cluster of its own');
+    });
+});
+
+/**
+ * The text of a Markdown section: from the line that starts with `heading` to the next heading of the
+ * same or a higher level, skipping fenced code (a `# comment` in a bash block is not a heading).
+ * @param {string} text @param {string} heading e.g. '### 11.2 '
+ */
+function section(text, heading) {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => line.startsWith(heading));
+    assert.ok(start >= 0, `no heading "${heading}"`);
+    const level = /^#+/.exec(heading)?.[0].length ?? 0;
+    let fenced = false;
+    let end = lines.length;
+    for (let i = start + 1; i < lines.length; i += 1) {
+        if (/^\s*```/.test(lines[i])) fenced = !fenced;
+        const m = fenced ? null : /^(#+) /.exec(lines[i]);
+        if (m && m[1].length <= level) {
+            end = i;
+            break;
+        }
+    }
+    return lines.slice(start, end).join('\n');
+}
+
+describe('e2e.yml: the runbooks name its checks (P5)', () => {
+    it('every runbook the owner follows names the three checks exactly as e2e.yml does', () => {
+        const names = jobIds.map((id) => valueOf(`jobs/${id}/name`) ?? '');
+        assert.equal(names.length, 3, 'three jobs');
+        /** @param {string} rel */
+        const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+        const plan = section(read('doc/brushup-2026/ai-access-plan.ja.md'), '### 11.2 ');
+        // The ruleset steps: what to tick, whose checks, and only after this change is on main.
+        for (const must of ['Require status checks to pass', 'GitHub Actions', 'マージしたあと']) assert.ok(plan.includes(must), `plan §11.2 says ${must}`);
+        const vercel = read('deploy/vercel/README.md').split('\n').find((line) => line.startsWith('0. '));
+        assert.ok(vercel, 'deploy/vercel/README.md step 0');
+        const agents = read('AGENTS.md').split('\n').find((line) => line.startsWith('- `e2e.yml`'));
+        assert.ok(agents, 'AGENTS.md names e2e.yml');
+        const runbooks = {
+            'doc/brushup-2026/ai-access-plan.ja.md §11.2': plan,
+            'doc/guides/risepath_vm_deployment.md §4.5': section(read('doc/guides/risepath_vm_deployment.md'), '### 4.5 '),
+            'deploy/risepath-vm/README.md「CI での予行（Phase 7）」': section(read('deploy/risepath-vm/README.md'), '## CI での予行（Phase 7）'),
+            'deploy/vercel/README.md step 0': vercel,
+            AGENTS: agents,
+        };
+        for (const [where, body] of Object.entries(runbooks)) {
+            for (const name of names) assert.ok(body.includes(`\`${name}\``), `${where} names the check \`${name}\` (the job name in ${WORKFLOW}): rename both, and the branch rule, on the same day`);
+            // A checklist that waits for the nightly run also says how to start it now (workflow_dispatch).
+            if (body.includes('毎晩の実行')) assert.ok(body.includes('**Run workflow**'), `${where} says how to start the nightly run by hand (**Run workflow**)`);
+        }
+        assert.match(text, /^ {2}workflow_dispatch:$/m, `${WORKFLOW} can be started by hand (the runbooks' **Run workflow**)`);
+        // The list the owner copies into the ruleset: one bullet per check, nothing else, in the workflow's order.
+        // includes() above also matches the other mentions of a name in §11.2 ("Disk use", "Preflight").
+        const bullets = plan.split('\n').map((line) => /^[ \t]+- `([^`]+)`$/.exec(line)?.[1]).filter(Boolean);
+        assert.deepEqual(bullets, names, 'plan §11.2: the ruleset list is one bullet per check, named as in e2e.yml');
+        // §11.2 also recommends ci.yml's two checks for the same ruleset: a rename there strands it the same way.
+        const ci = keyPaths(read('.github/workflows/ci.yml'));
+        for (const id of ['checks', 'build']) {
+            const name = ci.find((e) => e.path.join('/') === `jobs/${id}/name`)?.value.replace(/^'(.*)'$/, '$1');
+            assert.ok(name, `ci.yml has the job ${id} with a name`);
+            assert.ok(plan.includes(`\`${name}\``), `plan §11.2 names ci.yml's check \`${name}\` (job ${id}) exactly`);
+        }
+    });
+
+    it('section() ends at the next heading of the same or a higher level and skips fenced code', () => {
+        const md = ['## A', 'a', '### A.1', 'x', '```bash', '# not a heading', '```', 'y', '### A.2', 'z', '## B'].join('\n');
+        assert.equal(section(md, '### A.1'), ['### A.1', 'x', '```bash', '# not a heading', '```', 'y'].join('\n'));
+        assert.equal(section(md, '## A').split('\n').length, 10);
+        assert.throws(() => section(md, '### C'), /no heading/);
     });
 });

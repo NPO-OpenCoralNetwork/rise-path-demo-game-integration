@@ -421,6 +421,17 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase6.mjs` は、020 と、カードが加わる決まり・復習の記録・やり直しと削除・リモート MCP のロールの列ごとの権限・上の確認と削除（P10）を、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 020 の行）。VM の DB には決して向けないでください。
 
+## CI での予行（Phase 7）
+
+GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プルリクエストのたびに、このディレクトリの `deploy-stack.sh` をダミーの値で動かします（チェック `Server stack deploy` と `Learner end-to-end`）。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章です。
+
+- `ci/stack.ci.env` は、CI だけのダミーの値です。VM では使いません。`scripts/ci/stack.sh` が 1 回の実行のあいだだけ `stack.env` にコピーし、終わると消します。1 行目に `# risepath-ci-env:` の印があり、印のない `stack.env`（自分で作ったもの）があると、書き換えずに止まります。`billing.env`・`tunnel.env`・`mcp-public.env` があるときも止まります。
+- Compose のプロジェクト名は `risepath-ci` なので、`risepath` のスタックには触れません。
+- `deploy-stack.sh` は、環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` のときだけ git pull を飛ばします。**VM では設定しません。** `stack.env` に書いても効きません。
+- CI が確かめること: 空の DB への migration 000–020、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
+- 作り直した VM の最初のデプロイの前に、main の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）が緑であることを確かめます。
+- 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
+
 ## セキュリティ
 
 - GCP VPC ファイアウォールで **5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。アプリ用の受信ルールは要りません（公開は Cloudflare Tunnel の外向き接続）

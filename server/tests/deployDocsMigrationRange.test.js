@@ -1,6 +1,7 @@
-// The VM runbooks (deploy/risepath-vm/README.md, doc/guides/risepath_vm_deployment.md) name the
-// migration range a fresh VM applies ("000–NNN") and the steps of each release's first deploy. A new
-// migration without a runbook update fails here (Phase 5 final review, findings 11 and 17). The
+// The VM runbooks (deploy/risepath-vm/README.md, doc/guides/risepath_vm_deployment.md and the new-VM
+// order of deploy/vercel/README.md) name the migration range a fresh VM applies ("000–NNN") and the
+// steps of each release's first deploy. A new migration without a runbook update fails here (Phase 5
+// final review, findings 11 and 17; deploy/vercel/README.md since Phase 7). The
 // plan's Phase 5 deploy order and its R12 agree on which order narrows R12 (finding 14).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import { LESSON_PRIORS } from '../../shared/review/queue.js';
 const read = (rel) => fs.readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 const migrations = fs.readdirSync(new URL('../migrations/', import.meta.url)).filter((name) => /^\d{3}_.+\.sql$/.test(name)).sort();
 const latest = migrations.at(-1).slice(0, 3);
-const RUNBOOKS = ['deploy/risepath-vm/README.md', 'doc/guides/risepath_vm_deployment.md'];
+const RUNBOOKS = ['deploy/risepath-vm/README.md', 'doc/guides/risepath_vm_deployment.md', 'deploy/vercel/README.md'];
 
 describe('the VM runbooks follow server/migrations', () => {
     it(`every "000–NNN" range names the latest migration (${latest})`, () => {
@@ -66,13 +67,14 @@ describe('the VM runbooks follow server/migrations', () => {
 });
 
 describe('the plan: Phase 6 chapter', () => {
-    it('§10 is Phase 6, inserted before やらないこと (11) and まだ分からないこと (12); its owner steps start with the deploy order of 020', () => {
+    it('§10 is Phase 6 and §11 Phase 7, before やらないこと (12) and まだ分からないこと (13); its owner steps start with the deploy order of 020', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
         const headings = plan.split('\n').filter((line) => /^## \d+\. /.test(line)).map((line) => line.replace(/^## /, '').slice(0, 12));
-        assert.deepEqual(headings.slice(-4).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.']);
+        assert.deepEqual(headings.slice(-5).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.']);
         assert.match(plan, /^## 10\. Phase 6: /m);
-        assert.match(plan, /^## 11\. やらないこと$/m);
-        assert.match(plan, /^## 12\. まだ分からないこと$/m);
+        assert.match(plan, /^## 11\. Phase 7: /m);
+        assert.match(plan, /^## 12\. やらないこと$/m);
+        assert.match(plan, /^## 13\. まだ分からないこと$/m);
         const order = plan.split('\n').find((line) => line.startsWith('1. **デプロイの順番**: migration 020 を'));
         assert.ok(order, '10.2 item 1');
         assert.match(order, /`api`・`mcp`・`mcp-public` を起動する前に/);
@@ -80,7 +82,9 @@ describe('the plan: Phase 6 chapter', () => {
 
     it('§10 says what the code does: not_due, reveal and grading cover due cards (not only today\'s list), the FSRS figures the app reaches, the signed-out screen', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
-        const chapter = plan.slice(plan.indexOf('## 10. Phase 6: '), plan.indexOf('## 11. やらないこと'));
+        const end = plan.indexOf('## 11. Phase 7: ');
+        assert.ok(end > plan.indexOf('## 10. Phase 6: '), 'the chapter ends where Phase 7 starts');
+        const chapter = plan.slice(plan.indexOf('## 10. Phase 6: '), end);
         // tools/core/reviewQueue.js gradeReviewCard refuses a card due later or recorded today (not_due)
         // and the 11th card (review_limit); nothing checks membership in pickToday's list.
         assert.doesNotMatch(chapter, /今日の分でない|今日の分だけ/u);
