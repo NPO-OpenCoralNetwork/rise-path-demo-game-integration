@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# The VM stack in CI (Phase 7; .github/workflows/e2e.yml job "Server stack deploy";
-# doc/brushup-2026/ai-access-plan.ja.md). Always the compose project risepath-ci, never the VM's or a
-# developer's risepath. Installs the dummy env file deploy/risepath-vm/ci/stack.ci.env for one run and
-# removes only files it installed (first line: the marker). Prints names, never values.
-# Each workflow step runs one subcommand, in the order of `rehearsal` (Server stack deploy);
-# server/tests/e2eWorkflow.test.js keeps the orders equal.
+# The VM stack in CI (Phase 7; .github/workflows/e2e.yml jobs "Server stack deploy" and "Learner
+# end-to-end"; doc/brushup-2026/ai-access-plan.ja.md). Always the compose project risepath-ci, never the
+# VM's or a developer's risepath. Installs the dummy env file deploy/risepath-vm/ci/stack.ci.env for one
+# run and removes only files it installed (first line: the marker). Prints names, never values.
+# Each workflow step runs one subcommand, in the order of `rehearsal` (Server stack deploy) and `e2e`
+# (Learner end-to-end); server/tests/e2eWorkflow.test.js keeps the orders equal.
 # Run it only on a trusted network: while it runs, the stack publishes 5432 (the database superuser,
 # with the template's known password), 3006 and 3100 on all interfaces (on Linux, past ufw).
-#   preflight         refuse foreign env files next to the compose file, busy ports, < 5 GB free disk, no
-#                     `timeout` (coreutils); print the Docker, Compose and storage-driver versions (compare
-#                     them with the VM's)
+#   preflight [e2e]   refuse foreign env files next to the compose file, busy ports (with e2e also the
+#                     preview's 4173 and the stand-in's), < 5 GB free disk, no `timeout` (coreutils);
+#                     print the Docker, Compose and storage-driver versions (compare them with the VM's)
 #   install-env       ci/stack.ci.env -> stack.env
 #   pull              the base images (Dockerfile FROM, the db image), 3 attempts each, 420 s in all
 #   deploy <n>        only with the installed template and no foreign env file: the real deploy-stack.sh
@@ -19,9 +19,14 @@
 #   auth              the auth stand-in (e2e/support/auth-stand-in.mjs) in a container on the stack's
 #                     network, under the host name and port of the template's SUPABASE_URL; published on
 #                     127.0.0.1 only; checks that the api container reaches it
+#   build-front       the production build (build:prod) for the stand-in into .artifacts/e2e/dist: no key,
+#                     VITE_FEATURE_LEGAL_PAGES unset, VITE_* keys of local .env files blanked
+#   browser           Chromium for Playwright (on CI only: the headless shell and its system packages)
+#   test              the learner flows (npx playwright test, playwright.config.ts)
 #   logs <dir>        compose, deploy and stand-in logs, redacted with the template and every env file present
-#   down              the stand-in, the risepath-ci project and its volume, the installed env file
-#   rehearsal         the whole job locally (npm run ci:stack): logs on failure, always down
+#   down              the stand-in, the risepath-ci project and its volume, the installed env file, the
+#                     front build (.artifacts/e2e/dist); the logs and test results stay
+#   rehearsal | e2e   a whole job locally (npm run ci:stack | npm run e2e:local): logs on failure, always down
 set -euo pipefail
 
 CALLER_PWD="${PWD}"
@@ -62,7 +67,7 @@ refuse_foreign_env() {
     fi
   done
 }
-need_timeout() { # cmd_pull bounds every download with it; stock macOS has none
+need_timeout() { # cmd_pull and cmd_browser bound every download with it; stock macOS has none
   command -v timeout > /dev/null || fail 'timeout is not on PATH (coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH)'
 }
 
@@ -74,14 +79,19 @@ install_file() { # <template> <target>: never replaces a file this script did no
   chmod 600 "$2"
 }
 
-cmd_preflight() {
+cmd_preflight() { # [e2e]
   local port free_gb ports=(5432 3006 3100)
+  if [[ -n "${1:-}" && "$1" != e2e ]]; then fail "preflight takes nothing or e2e, not '$1'"; fi
   refuse_foreign_env
   need_timeout
   # The VM installs the current docker-ce and compose plugin (scripts/install-docker.sh): compare.
   docker version --format 'Docker {{.Server.Version}}'
   docker compose version
   docker info --format 'Storage driver: {{.Driver}}'
+  if [[ "${1:-}" == e2e ]]; then   # vite preview (playwright.config.ts) and the stand-in (stack.sh auth)
+    auth_target
+    ports+=(4173 "${AUTH_PORT}")
+  fi
   for port in "${ports[@]}"; do
     if (exec 3<> "/dev/tcp/127.0.0.1/${port}") 2> /dev/null; then fail "port ${port} is in use (the CI stack needs it)"; fi
   done
@@ -193,6 +203,46 @@ cmd_auth() { # the api reaches it as the template's SUPABASE_URL; the browser as
   echo "==> auth stand-in: http://127.0.0.1:${port} (browser), http://${alias}:${port} (api)"
 }
 
+cmd_build_front() { # the deployed build mode for the stand-in; no key, VITE_FEATURE_LEGAL_PAGES never set
+  auth_target
+  (
+    cd "${ROOT}"
+    local key blank=()
+    # A developer's .env files must not reach this bundle: Vite lets the process env win over them, so
+    # their VITE_* keys are set empty here; the caller's VITE_FEATURE_LEGAL_PAGES is removed (ci.yml's rule).
+    while read -r key; do
+      if [[ -n "${key}" && "${key}" != VITE_SUPABASE_URL && "${key}" != VITE_SUPABASE_ANON_KEY ]]; then blank+=("${key}="); fi
+    done < <(grep -ho '^VITE_[A-Z0-9_]*' .env .env.local .env.production .env.production.local 2> /dev/null | sort -u)
+    if [[ ${#blank[@]} -gt 0 ]]; then echo "blanking ${#blank[@]} VITE_* keys found in local .env files"; fi
+    env -u VITE_FEATURE_LEGAL_PAGES ${blank[@]+"${blank[@]}"} NODE_OPTIONS=--max-old-space-size=4096 \
+      VITE_SUPABASE_URL="http://127.0.0.1:${AUTH_PORT}" VITE_SUPABASE_ANON_KEY=ci-dummy-anon-key \
+      npm run build:prod -- --outDir .artifacts/e2e/dist --emptyOutDir
+    grep -rqF "127.0.0.1:${AUTH_PORT}" .artifacts/e2e/dist/assets || fail "the build does not point at the auth stand-in (127.0.0.1:${AUTH_PORT})"
+  )
+}
+
+# Each playwright install may take BROWSER_EACH_S; three of them with the pauses (15 s, 30 s) stay inside
+# the workflow step's 10 minutes, so a hanging mirror ends with this script's message.
+BROWSER_EACH_S=180
+
+cmd_browser() { # an idempotent download, retried with a warning; never a test
+  local attempt
+  if [[ -z "${CI:-}" ]]; then
+    echo 'Local run: Playwright uses PLAYWRIGHT_CHROMIUM_PATH, the preinstalled build, or its own browsers (npx playwright install chromium)'
+    return 0
+  fi
+  need_timeout
+  for attempt in 1 2 3; do
+    if (cd "${ROOT}" && timeout "${BROWSER_EACH_S}" npx playwright install --with-deps --only-shell chromium); then return 0; fi
+    if [[ "${attempt}" -eq 3 ]]; then break; fi
+    echo "::warning ::playwright install failed (attempt ${attempt}); trying again in $((attempt * 15)) s"
+    sleep $((attempt * 15))
+  done
+  fail 'playwright install failed 3 times; re-run the job later'
+}
+
+cmd_test() { (cd "${ROOT}" && npx playwright test); }
+
 cmd_logs() { # <dir>
   local dir="${1:?logs <dir>}" f
   local envs=(--env "${TEMPLATE}")
@@ -214,6 +264,9 @@ cmd_down() {
   docker rm -f "${AUTH_NAME}" > /dev/null 2>&1 || true   # first: it is attached to the project's network
   compose down -v --remove-orphans --timeout 10 || true
   if ours "${STACK}/stack.env"; then rm -f "${STACK}/stack.env"; fi
+  # build-front's 0.4 GB: the compose build context is the repo root and .dockerignore does not exclude
+  # .artifacts, so a later local deploy would send it to Docker again (no image copies it: explicit COPY lists).
+  rm -rf "${ROOT}/.artifacts/e2e/dist"
 }
 
 # One subcommand per line, in the workflow's step order (server/tests/e2eWorkflow.test.js compares them).
@@ -230,16 +283,34 @@ cmd_rehearsal() {
   echo '# Server stack deploy: all passed'
 }
 
+cmd_e2e() {
+  rm -f "${LOG_DIR}"/deploy-*.log "${ROOT}"/.artifacts/e2e/logs/*   # a re-run keeps only its own logs
+  trap 'code=$?; set +e; if [[ ${code} -ne 0 ]]; then cmd_logs "${ROOT}/.artifacts/e2e/logs"; fi; cmd_down; exit ${code}' EXIT
+  cmd_preflight e2e
+  cmd_install_env
+  cmd_pull
+  cmd_deploy 1
+  cmd_auth
+  cmd_build_front
+  cmd_browser
+  cmd_test
+  echo '# Learner end-to-end: all passed'
+}
+
 case "${1:-}" in
-  preflight) cmd_preflight ;;
+  preflight) cmd_preflight "${2:-}" ;;
   install-env) cmd_install_env ;;
   pull) cmd_pull ;;
   deploy) cmd_deploy "${2:?deploy <n>}" ;;
   mcp-db) cmd_mcp_db ;;
   health) cmd_health ;;
   auth) cmd_auth ;;
+  build-front) cmd_build_front ;;
+  browser) cmd_browser ;;
+  test) cmd_test ;;
   logs) cmd_logs "${2:-}" ;;
   down) cmd_down ;;
   rehearsal) cmd_rehearsal ;;
-  *) echo "Usage: bash scripts/ci/stack.sh preflight|install-env|pull|deploy <n>|mcp-db|health|auth|logs <dir>|down|rehearsal"; exit 2 ;;
+  e2e) cmd_e2e ;;
+  *) echo "Usage: bash scripts/ci/stack.sh preflight [e2e]|install-env|pull|deploy <n>|mcp-db|health|auth|build-front|browser|test|logs <dir>|down|rehearsal|e2e"; exit 2 ;;
 esac

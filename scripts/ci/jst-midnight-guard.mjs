@@ -7,7 +7,7 @@
  * A run with less than `budget` seconds left before 00:00 JST waits until 00:00:05 JST: one computed,
  * logged wait, never a retry.
  *   node scripts/ci/jst-midnight-guard.mjs --url <postgres url> --budget <seconds, 1-900>
- * Used by scripts/ci/db-checks.sh (180 s).
+ * Used by scripts/ci/db-checks.sh (180 s) and e2e/global-setup.ts (480 s).
  */
 import { fileURLToPath } from 'node:url';
 

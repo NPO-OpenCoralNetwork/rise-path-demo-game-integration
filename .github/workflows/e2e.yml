@@ -6,12 +6,15 @@
 # - Server stack deploy: the real deploy-stack.sh with dummy values (deploy/risepath-vm/ci/), its health
 #   and smoke, then the admin MCP's database and /api/v2/health from the host. ubuntu-26.04: Docker 29
 #   and Compose 5, the majors the VM installs.
-# After checkout and setup, every step of the stack job but "Disk use" and the upload is one
-# scripts/ci/stack.sh subcommand, in the order of its `rehearsal` (npm run ci:stack); the test keeps them equal.
+# - Learner end-to-end: the same stack, the auth stand-in (e2e/support/auth-stand-in.mjs), a production
+#   build in vite preview and Playwright (e2e/learner.spec.ts). ubuntu-26.04, as Server stack deploy.
+# After checkout and setup, every step of the stack jobs but "Disk use" (Server stack deploy), npm ci
+# (Learner end-to-end) and the uploads is one scripts/ci/stack.sh subcommand, in the order of its
+# `rehearsal` and `e2e` (npm run ci:stack, npm run e2e:local); the test keeps them equal.
 # Every step has its own timeout, and each job's is at least the sum of its steps' plus 2 min (job set-up
 # and post steps): a hang fails its step before the job times out, so the failure() steps still keep the
 # logs (a job timeout cancels the job, and a cancelled job skips them).
-# No secrets: pull requests from forks run every job. Locally: npm run ci:db | ci:stack.
+# No secrets: pull requests from forks run every job. Locally: npm run ci:db | ci:stack | e2e:local.
 name: End-to-end checks
 
 on:
@@ -20,8 +23,8 @@ on:
     branches: [main]
   schedule:
     # 18:17 UTC = 03:17 JST: far from 00:00 JST (15:00 UTC), when learning days change. Catches drift
-    # in what no commit pins (the runner image with its psql and Docker, Node 22, npm, node:22-slim) on
-    # quiet days.
+    # in what no commit pins (the runner image with its psql and Docker, Node 22, npm, node:22-slim,
+    # Playwright's Chromium) on quiet days.
     - cron: '17 18 * * *'
   workflow_dispatch:
 
@@ -139,6 +142,82 @@ jobs:
         with:
           name: stack-logs-${{ github.run_attempt }}
           path: ${{ runner.temp }}/stack-artifacts
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Remove the stack
+        if: always()
+        timeout-minutes: 5
+        run: bash scripts/ci/stack.sh down
+
+  e2e:
+    name: Learner end-to-end
+    runs-on: ubuntu-26.04
+    timeout-minutes: 103
+    env:
+      COMPOSE_PROJECT_NAME: risepath-ci
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        timeout-minutes: 5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci --ignore-scripts
+
+      - name: Preflight (no foreign env files, free ports and disk; Docker versions)
+        timeout-minutes: 2
+        run: bash scripts/ci/stack.sh preflight e2e
+
+      - name: CI settings (dummy values from deploy/risepath-vm/ci/)
+        timeout-minutes: 1
+        run: bash scripts/ci/stack.sh install-env
+
+      - name: Pull the base images
+        timeout-minutes: 10
+        run: bash scripts/ci/stack.sh pull
+
+      - name: Deploy with the real deploy-stack.sh
+        timeout-minutes: 15
+        run: bash scripts/ci/stack.sh deploy 1
+
+      - name: Start the auth stand-in on the stack's network
+        timeout-minutes: 3
+        run: bash scripts/ci/stack.sh auth
+
+      - name: Production build of the front for the stand-in
+        timeout-minutes: 8
+        run: bash scripts/ci/stack.sh build-front
+
+      - name: Chromium for Playwright
+        timeout-minutes: 10
+        run: bash scripts/ci/stack.sh browser
+
+      - name: Learner flows (Playwright)
+        timeout-minutes: 22
+        run: bash scripts/ci/stack.sh test
+
+      - name: Collect the logs (redacted)
+        if: failure()
+        timeout-minutes: 5
+        run: bash scripts/ci/stack.sh logs .artifacts/e2e/logs
+
+      - name: Keep screenshots, traces and logs
+        if: failure()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: learner-e2e-${{ github.run_attempt }}
+          path: |
+            .artifacts/e2e/
+            !.artifacts/e2e/dist/
           retention-days: 7
           if-no-files-found: ignore
 

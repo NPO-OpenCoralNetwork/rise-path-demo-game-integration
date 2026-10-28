@@ -1,9 +1,9 @@
 // @ts-check
 // The Phase 7 CI scripts (doc/brushup-2026/ai-access-plan.ja.md): scripts/ci/db-checks.sh, the job
 // "Database checks" of .github/workflows/e2e.yml and `npm run ci:db`; scripts/ci/stack.sh, its env
-// template deploy/risepath-vm/ci/stack.ci.env and scripts/ci/redact-log.mjs, the job "Server stack
-// deploy" and `npm run ci:stack`, with its `auth` subcommand (the e2e auth stand-in's container); and the
-// 00:00 JST guard (scripts/ci/jst-midnight-guard.mjs). The
+// template deploy/risepath-vm/ci/stack.ci.env and scripts/ci/redact-log.mjs, the jobs "Server stack
+// deploy" and "Learner end-to-end" and `npm run ci:stack` | `npm run e2e:local`, with the e2e auth
+// stand-in's container; and the 00:00 JST guard (scripts/ci/jst-midnight-guard.mjs). The
 // checks themselves need Docker and PostgreSQL 16 (the jobs run them); here the scripts' text is
 // pinned, and the parts that must stop before any psql or docker call, or that pick the image, run
 // against recording stubs. No test waits on a real network call.
@@ -434,7 +434,7 @@ const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use o
 /**
  * @typedef {{ env?: Record<string, string>, failPull?: (image: string) => boolean, inspectFails?: boolean,
  *   mcpExit?: number, apiExit?: number, standIn?: boolean, health?: unknown, curlExit?: number, deployExit?: number, dfKb?: number, cwd?: string,
- *   hide?: string[], redactFails?: boolean, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
+ *   hide?: string[], redactFails?: boolean, stubs?: Record<string, string>, setup?: (tree: string) => void, inspect?: (tree: string) => void }} StackOptions
  */
 /**
  * Runs scripts/ci/stack.sh <args> in a temporary copy of the tree: stack.sh, redact-log.mjs,
@@ -447,9 +447,10 @@ const SKIP_IF_PORTS_BUSY = BUSY.length === 0 ? false : `a stack port is in use o
  * with `standIn`; each line logs the COMPOSE_PROJECT_NAME it saw. curl prints `health` (as JSON unless a string) or exits `curlExit`.
  * With `redactFails`, node exits 7 for redact-log.mjs (and runs the real node otherwise). `hide` lists
  * commands to take off PATH: the rest of PATH is then a folder of links to every other command on it.
+ * `stubs` adds more bash stubs to the stub folder (name → body), e.g. npm and npx for the e2e steps.
  * @param {string[]} args @param {StackOptions} [options]
  */
-function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, apiExit = 0, standIn = false, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, setup, inspect } = {}) {
+function runStack(args, { env = {}, failPull = () => false, inspectFails = false, mcpExit = 0, apiExit = 0, standIn = false, health = HEALTH, curlExit, deployExit = 0, dfKb, cwd, hide, redactFails = false, stubs = {}, setup, inspect } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-'));
     try {
         const tree = path.join(dir, 'repo');
@@ -491,6 +492,7 @@ function runStack(args, { env = {}, failPull = () => false, inspectFails = false
         write('sleep', 'echo "sleep $*" >> "$STUB_LOG"');
         if (dfKb !== undefined) write('df', ['echo "Filesystem 1024-blocks Used Available Capacity Mounted on"', `echo "/dev/stub 999999999 1 ${dfKb} 1% /"`].join('\n'));
         if (redactFails) write('node', ['if [[ "$1" == *redact-log.mjs ]]; then echo "node: stub: redact failed" >&2; exit 7; fi', `exec ${JSON.stringify(process.execPath)} "$@"`].join('\n'));
+        for (const [name, body] of Object.entries(stubs)) write(name, body);
         let rest = process.env.PATH ?? '';
         if (hide) {
             rest = path.join(dir, 'path');
@@ -525,9 +527,9 @@ function runStack(args, { env = {}, failPull = () => false, inspectFails = false
     }
 }
 
-/** The timeout-minutes of the step of e2e.yml's stack job that runs `stack.sh <sub>`. @param {string} sub */
-function stackStepTimeout(sub) {
-    const job = read('.github/workflows/e2e.yml').split(/^  stack:$/m)[1]?.split(/^  [a-z0-9_-]+:$/m)[0] ?? '';
+/** The timeout-minutes of the step of an e2e.yml job (default stack) that runs `stack.sh <sub>`. @param {string} sub @param {string} [id] */
+function stackStepTimeout(sub, id = 'stack') {
+    const job = read('.github/workflows/e2e.yml').split(new RegExp(`^  ${id}:$`, 'm'))[1]?.split(/^  [a-z0-9_-]+:$/m)[0] ?? '';
     const step = job.split(/^      - /m).find((s) => new RegExp(`\\brun: bash scripts/ci/stack\\.sh ${sub}\\s*$`, 'm').test(s)) ?? '';
     return Number(/^\s+timeout-minutes: (\d+)$/m.exec(step)?.[1]);
 }
@@ -685,14 +687,29 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         }
     });
 
-    it('down removes the stand-in first (it is on the project\'s network), then the risepath-ci project with its volume, then only the env file it installed', () => {
+    it('down removes the stand-in first (it is on the project\'s network), then the risepath-ci project with its volume, then only the env file it installed, then the front build', () => {
         /** @type {boolean[]} */
         const left = [];
+        /** @type {string[][]} */
+        const artifacts = [];
         const own = runStack(['down'], {
-            setup: (tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV)),
-            inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))),
+            setup: (tree) => {
+                fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
+                for (const file of ['dist/index.html', 'dist/assets/index-x.js', 'test-results/trace.zip', 'logs/compose.log']) {
+                    fs.mkdirSync(path.dirname(path.join(tree, '.artifacts/e2e', file)), { recursive: true });
+                    fs.writeFileSync(path.join(tree, '.artifacts/e2e', file), 'x\n');
+                }
+            },
+            inspect: (tree) => {
+                left.push(fs.existsSync(path.join(tree, STACK_ENV)));
+                const dir = path.join(tree, '.artifacts/e2e');
+                artifacts.push(fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []);
+            },
         });
         assert.equal(own.status, 0, own.out);
+        // The compose build context is the repo root and .dockerignore does not exclude .artifacts: a
+        // build left behind would go to Docker with every later local deploy.
+        assert.deepEqual(artifacts, [['logs', 'test-results']], 'the front build removed; the logs and test results kept for reading');
         assert.deepEqual(own.calls, [`docker [risepath-ci] rm -f ${AUTH_NAME}`, `${COMPOSE}<tree>/deploy/risepath-vm/stack.env -f <tree>/deploy/risepath-vm/docker-compose.yml down -v --remove-orphans --timeout 10`]);
         const foreign = runStack(['down'], {
             setup: (tree) => fs.writeFileSync(path.join(tree, STACK_ENV), 'X=1\n'),
@@ -982,14 +999,146 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.deepEqual(left, [false], 'the installed stack.env is removed');
     });
 
+    /** npm stub: records the build and what it saw, then writes a bundle that names VITE_SUPABASE_URL (unless STUB_BUILD_EMPTY=1). */
+    const NPM = [
+        'echo "npm $* [pwd=$PWD] url=${VITE_SUPABASE_URL-<unset>} anon=${VITE_SUPABASE_ANON_KEY-<unset>} legal=${VITE_FEATURE_LEGAL_PAGES-<unset>} foo=${VITE_FOO-<unset>} options=${NODE_OPTIONS-<unset>}" >> "$STUB_LOG"',
+        'mkdir -p .artifacts/e2e/dist/assets',
+        'if [[ "${STUB_BUILD_EMPTY:-}" == 1 ]]; then echo "const u = 1;" > .artifacts/e2e/dist/assets/index-x.js; else echo "const u = \"${VITE_SUPABASE_URL}\";" > .artifacts/e2e/dist/assets/index-x.js; fi',
+    ].join('\n');
+    /** npx stub: records the call and its folder, exits STUB_NPX_EXIT. */
+    const NPX = 'echo "npx $* [pwd=$PWD]" >> "$STUB_LOG"\nexit "${STUB_NPX_EXIT:-0}"';
+    const E2E_PORTS = [...STACK_PORTS, 4173, STANDIN_DEFAULT_PORT];
+    const E2E_BUSY = E2E_PORTS.filter(busy);
+    const SKIP_IF_E2E_PORTS_BUSY = E2E_BUSY.length === 0 ? false : `a port of the e2e stack is in use on this machine (${E2E_BUSY.join(', ')}): preflight e2e would refuse it first`;
+
+    it('preflight e2e also refuses the preview\'s port 4173 and the stand-in\'s (the template\'s SUPABASE_URL); preflight takes nothing else', { skip: SKIP_IF_E2E_PORTS_BUSY }, async () => {
+        for (const port of [4173, STANDIN_DEFAULT_PORT]) {
+            const server = net.createServer();
+            await new Promise((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', () => resolve(undefined)));
+            try {
+                const e2e = runStack(['preflight', 'e2e'], { dfKb: 10 * 1048576 });
+                assert.equal(e2e.status, 1, `${port}: ${e2e.out}`);
+                assert.match(e2e.out, new RegExp(`❌ port ${port} is in use \\(the CI stack needs it\\)`));
+                const stack = runStack(['preflight'], { dfKb: 10 * 1048576 });
+                assert.equal(stack.status, 0, `Server stack deploy needs no ${port}: ${stack.out}`);
+            } finally {
+                await new Promise((resolve) => server.close(() => resolve(undefined)));
+            }
+        }
+        const free = runStack(['preflight', 'e2e'], { dfKb: 10 * 1048576 });
+        assert.equal(free.status, 0, free.out);
+        const other = runStack(['preflight', 'nope']);
+        assert.equal(other.status, 1, other.out);
+        assert.match(other.out, /❌ preflight takes nothing or e2e, not 'nope'/);
+        assert.deepEqual(other.calls, [], 'no docker call');
+    });
+
+    it('build-front builds build:prod into .artifacts/e2e/dist for the stand-in: its URL, a dummy anon key, no legal-pages flag, local .env VITE_ keys blanked', () => {
+        const { status, out, calls } = runStack(['build-front'], {
+            stubs: { npm: NPM },
+            env: { VITE_FEATURE_LEGAL_PAGES: 'true' },
+            setup: (tree) => fs.writeFileSync(path.join(tree, '.env.local'), 'VITE_FOO=a-local-value\nVITE_SUPABASE_URL=https://real.example.org\nOTHER=1\n'),
+        });
+        assert.equal(status, 0, out);
+        assert.deepEqual(calls, [`npm run build:prod -- --outDir .artifacts/e2e/dist --emptyOutDir [pwd=<tree>] url=http://127.0.0.1:${STANDIN_DEFAULT_PORT} anon=ci-dummy-anon-key legal=<unset> foo= options=--max-old-space-size=4096`]);
+        assert.match(out, /blanking 1 VITE_\* keys found in local \.env files/);
+        assert.match(stackCode, /npm run build:prod -- --outDir \.artifacts\/e2e\/dist --emptyOutDir/, 'the deployed build mode (VITE_DEMO_MODE=false)');
+        const empty = runStack(['build-front'], { stubs: { npm: NPM }, env: { STUB_BUILD_EMPTY: '1' } });
+        assert.equal(empty.status, 1, empty.out);
+        assert.match(empty.out, new RegExp(`❌ the build does not point at the auth stand-in \\(127\\.0\\.0\\.1:${STANDIN_DEFAULT_PORT}\\)`));
+        const failed = runStack(['build-front'], { stubs: { npm: 'exit 3' } });
+        assert.equal(failed.status, 3, `a failed build fails the step: ${failed.out}`);
+    });
+
+    it('browser installs the headless shell with its system packages on CI only, three bounded attempts inside the workflow step', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
+        const local = runStack(['browser'], { stubs: { npx: NPX } });
+        assert.equal(local.status, 0, local.out);
+        assert.match(local.out, /Local run: Playwright uses PLAYWRIGHT_CHROMIUM_PATH/);
+        assert.deepEqual(local.calls, [], 'nothing is installed on a developer\'s machine');
+        const ci = runStack(['browser'], { stubs: { npx: NPX }, env: { CI: 'true' } });
+        assert.equal(ci.status, 0, ci.out);
+        assert.deepEqual(ci.calls, ['npx playwright install --with-deps --only-shell chromium [pwd=<tree>]']);
+        const broken = runStack(['browser'], { stubs: { npx: NPX }, env: { CI: 'true', STUB_NPX_EXIT: '1' } });
+        assert.equal(broken.status, 1, broken.out);
+        assert.deepEqual(broken.calls.map((line) => line.split(' [')[0]), ['npx playwright install --with-deps --only-shell chromium', 'sleep 15', 'npx playwright install --with-deps --only-shell chromium', 'sleep 30', 'npx playwright install --with-deps --only-shell chromium']);
+        assert.match(broken.out, /❌ playwright install failed 3 times; re-run the job later$/m);
+        const each = Number(/^BROWSER_EACH_S=(\d+)$/m.exec(stackCode)?.[1]);
+        assert.match(stackCode, /timeout "\$\{BROWSER_EACH_S\}" npx playwright install --with-deps --only-shell chromium/);
+        const step = stackStepTimeout('browser', 'e2e');
+        assert.ok(Number.isInteger(step), 'the e2e job\'s browser step has timeout-minutes');
+        assert.ok(3 * each + 15 + 30 <= 60 * step, `3 × ${each} s and the pauses must fit in the step's ${step} min`);
+    });
+
+    it('test runs npx playwright test at the repo root, whatever folder it is called from, and fails with it', () => {
+        const pass = runStack(['test'], { stubs: { npx: NPX } });
+        assert.equal(pass.status, 0, pass.out);
+        assert.deepEqual(pass.calls, ['npx playwright test [pwd=<tree>]']);
+        const red = runStack(['test'], { stubs: { npx: NPX }, env: { STUB_NPX_EXIT: '1' } });
+        assert.equal(red.status, 1, red.out);
+    });
+
+    it('e2e runs the Learner end-to-end job\'s subcommands in order, and always removes the stack: with the logs in .artifacts/e2e/logs when a step fails', { skip: SKIP_IF_E2E_PORTS_BUSY || (HAS_TIMEOUT ? false : 'needs timeout (coreutils)') }, () => {
+        /** @type {{ env: boolean, dist: boolean, logs: string[] }[]} */
+        const seen = [];
+        const look = (/** @type {string} */ tree) => {
+            const logs = path.join(tree, '.artifacts/e2e/logs');
+            seen.push({ env: fs.existsSync(path.join(tree, STACK_ENV)), dist: fs.existsSync(path.join(tree, '.artifacts/e2e/dist')), logs: fs.existsSync(logs) ? fs.readdirSync(logs).sort() : [] });
+        };
+        const steps = (/** @type {string[]} */ calls) => calls.filter((line) => line !== `docker [risepath-ci] rm -f ${AUTH_NAME}`).map((line) => {
+            if (line.startsWith('deploy-stack.sh ')) return 'deploy';
+            if (line.startsWith('npm run build:prod ')) return 'build-front';
+            if (line.startsWith('npx playwright test ')) return 'test';
+            if (line.startsWith('curl ') || / exec -T api /.test(line) || line.includes(` run -d --name ${AUTH_NAME} `)) return 'auth';
+            if (/ down -v /.test(line)) return 'down';
+            if (/ (logs|ps -a)( |$)/.test(line) || line === `docker [risepath-ci] container inspect ${AUTH_NAME}`) return 'logs';
+            if (/^docker \[risepath-ci\] (version|info|compose version)/.test(line)) return 'preflight';
+            if (/^docker \[risepath-ci\] pull /.test(line)) return 'pull';
+            return line;
+        }).filter((step, i, all) => step !== all[i - 1]);
+        const stubs = { npm: NPM, npx: NPX };
+
+        const pass = runStack(['e2e'], { dfKb: 10 * 1048576, stubs, inspect: look });
+        assert.equal(pass.status, 0, pass.out);
+        assert.deepEqual(steps(pass.calls), ['preflight', 'pull', 'deploy', 'auth', 'build-front', 'test', 'down']);
+        assert.equal(pass.calls.filter((line) => line === `docker [risepath-ci] rm -f ${AUTH_NAME}`).length, 2, 'auth starts a fresh stand-in; down removes it');
+        assert.match(pass.out, /Local run: Playwright uses/, 'browser installs nothing locally');
+        assert.match(pass.out, /# Learner end-to-end: all passed\n/);
+
+        const red = runStack(['e2e'], {
+            dfKb: 10 * 1048576,
+            stubs,
+            standIn: true,
+            env: { STUB_NPX_EXIT: '1' },
+            inspect: look,
+            setup: (tree) => {
+                fs.mkdirSync(path.join(tree, '.artifacts/e2e/logs'), { recursive: true });
+                fs.writeFileSync(path.join(tree, '.artifacts/e2e/logs/compose.log'), 'an earlier run\n');
+                fs.writeFileSync(path.join(tree, '.artifacts/e2e/logs/old.log'), 'an earlier run\n');
+            },
+        });
+        assert.equal(red.status, 1, red.out);
+        assert.deepEqual(steps(red.calls), ['preflight', 'pull', 'deploy', 'auth', 'build-front', 'test', 'logs', 'down']);
+        assert.doesNotMatch(red.out, /all passed/);
+
+        const refused = runStack(['e2e'], { dfKb: 1048576, stubs, inspect: look });
+        assert.equal(refused.status, 1, refused.out);
+        assert.deepEqual(steps(refused.calls), ['preflight', 'logs', 'down'], 'a refused preflight still tears down');
+
+        assert.deepEqual(seen, [
+            { env: false, dist: false, logs: [] },
+            { env: false, dist: false, logs: ['auth-stand-in.log', 'compose-ps.txt', 'compose.log', 'deploy-1.log'] },
+            { env: false, dist: false, logs: ['compose-ps.txt', 'compose.log'] },
+        ], 'stack.env and the front build removed every time; logs only after a failure, and only this run\'s');
+    });
+
     it('the usage names every subcommand; an unknown one exits 2', () => {
         const { status, out, calls } = runStack(['nope']);
         assert.equal(status, 2);
-        assert.match(out, /^Usage: bash scripts\/ci\/stack\.sh preflight\|install-env\|pull\|deploy <n>\|mcp-db\|health\|auth\|logs <dir>\|down\|rehearsal$/m);
+        assert.match(out, /^Usage: bash scripts\/ci\/stack\.sh preflight \[e2e\]\|install-env\|pull\|deploy <n>\|mcp-db\|health\|auth\|build-front\|browser\|test\|logs <dir>\|down\|rehearsal\|e2e$/m);
         assert.deepEqual(calls, []);
-        const cases = [...stackCode.matchAll(/^ {2}([a-z-]+)\) cmd_/gm)].map((m) => m[1]);
-        assert.deepEqual(cases, ['preflight', 'install-env', 'pull', 'deploy', 'mcp-db', 'health', 'auth', 'logs', 'down', 'rehearsal']);
-        for (const sub of cases) assert.match(stackScript, new RegExp(`^#   ${sub}\\b`, 'm'), `the header documents ${sub}`);
+        const cases = [...stackCode.matchAll(/^ {2}([a-z0-9-]+)\) cmd_/gm)].map((m) => m[1]);
+        assert.deepEqual(cases, ['preflight', 'install-env', 'pull', 'deploy', 'mcp-db', 'health', 'auth', 'build-front', 'browser', 'test', 'logs', 'down', 'rehearsal', 'e2e']);
+        for (const sub of cases) assert.match(stackScript, new RegExp(`^#   (\\S+ \\| )?${sub}\\b`, 'm'), `the header documents ${sub}`);
     });
 });
 
@@ -1091,9 +1240,18 @@ describe('scripts/ci/redact-log.mjs', () => {
 });
 
 describe('package.json (Phase 7 local runner)', () => {
-    it('ci:db runs scripts/ci/db-checks.sh, ci:stack the whole Server stack deploy job', () => {
+    it('ci:db, ci:stack, e2e and e2e:local are exact; the runner is the installed playwright package (no @playwright/test)', (t) => {
         const pkg = JSON.parse(read('package.json'));
         assert.equal(pkg.scripts['ci:db'], 'bash scripts/ci/db-checks.sh');
         assert.equal(pkg.scripts['ci:stack'], 'bash scripts/ci/stack.sh rehearsal');
+        assert.equal(pkg.scripts.e2e, 'playwright test');
+        assert.equal(pkg.scripts['e2e:local'], 'bash scripts/ci/stack.sh e2e');
+        for (const field of ['dependencies', 'devDependencies']) {
+            assert.equal(pkg[field]?.['@playwright/test'], undefined, `${field}: no @playwright/test (the runner is playwright/test, owner rule: no new dependency)`);
+        }
+        assert.ok(pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright, 'playwright is the installed package');
+        const installed = path.join(ROOT, 'node_modules/playwright/package.json');
+        if (!fs.existsSync(installed)) return t.skip('node_modules is not installed');
+        assert.ok(JSON.parse(fs.readFileSync(installed, 'utf8')).exports?.['./test'], 'node_modules/playwright exports ./test');
     });
 });

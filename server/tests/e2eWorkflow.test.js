@@ -115,10 +115,10 @@ function steps(job) {
  * @param {string} fn
  */
 function stackOrder(fn) {
-    const body = /^cmd_([a-z_]+)\(\) \{[^\n]*\n([\s\S]*?)^\}$/gm;
+    const body = /^cmd_([a-z0-9_]+)\(\) \{[^\n]*\n([\s\S]*?)^\}$/gm;
     for (const m of fs.readFileSync(path.join(ROOT, 'scripts/ci/stack.sh'), 'utf8').matchAll(body)) {
         if (m[1] !== fn) continue;
-        return [...m[2].matchAll(/^ {2}cmd_([a-z_]+)( [^\n;|&]+)?$/gm)].map((c) => `${c[1].replaceAll('_', '-')}${c[2] ?? ''}`);
+        return [...m[2].matchAll(/^ {2}cmd_([a-z0-9_]+)( [^\n;|&]+)?$/gm)].map((c) => `${c[1].replaceAll('_', '-')}${c[2] ?? ''}`);
     }
     return [];
 }
@@ -155,10 +155,8 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
         assert.doesNotMatch(text, /:\s*write\b/);
     });
 
-    it('each job present is one the branch rule lists, by these names (P5); db on ubuntu-24.04 (psql 16), the stack jobs on ubuntu-26.04 (the VM\'s Docker and Compose majors)', () => {
-        // Phase 7 adds db (stage 1) and stack (stage 2); the e2e job comes with its own stage.
-        assert.ok(jobIds.includes('db'), 'the Database checks job');
-        assert.ok(jobIds.includes('stack'), 'the Server stack deploy job');
+    it('has exactly the three jobs the branch rule lists, by these names (P5); db on ubuntu-24.04 (psql 16), the stack jobs on ubuntu-26.04 (the VM\'s Docker and Compose majors)', () => {
+        assert.deepEqual(jobIds, Object.keys(JOBS), 'the jobs db, stack and e2e, no other');
         for (const id of jobIds) {
             const want = JOBS[/** @type {keyof typeof JOBS} */ (id)];
             assert.ok(want, `job ${id} is not one of ${Object.keys(JOBS).join(', ')}: the branch rule would not list it`);
@@ -232,40 +230,76 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
         assert.deepEqual(stack.filter((s) => s.uses === 'actions/upload-artifact@v4').map((s) => s.with.path), ['${{ runner.temp }}/stack-artifacts'],
             'jobs.stack keeps exactly the folder its logs step writes ($RUNNER_TEMP is runner.temp)');
         assert.ok(stack.findIndex((s) => s.uses === 'actions/upload-artifact@v4') > stack.indexOf(logs[0]), 'the upload comes after the logs step');
+        // Learner end-to-end: the logs, Playwright's test-results (outputDir) and report, never the 0.4 GB build.
+        const e2e = steps('e2e');
+        const e2eLogs = e2e.filter((s) => /^bash scripts\/ci\/stack\.sh logs /.test(s.run ?? ''));
+        assert.deepEqual(e2eLogs.map((s) => s.run), ['bash scripts/ci/stack.sh logs .artifacts/e2e/logs'], 'jobs.e2e collects the logs once, beside the Playwright results');
+        const uploads = e2e.filter((s) => s.uses === 'actions/upload-artifact@v4');
+        assert.equal(uploads.length, 1, 'jobs.e2e uploads once');
+        const base = `jobs/e2e/steps/${uploads[0].id}/with/path`;
+        assert.equal(valueOf(base), '|', 'a list of paths');
+        assert.deepEqual(entries.filter((e) => e.path.join('/') === base).slice(1).map((e) => e.value), ['.artifacts/e2e/', '!.artifacts/e2e/dist/'],
+            'jobs.e2e keeps .artifacts/e2e/ (logs, test-results, report) without the build');
+        assert.ok(e2e.indexOf(uploads[0]) > e2e.indexOf(e2eLogs[0]), 'the upload comes after the logs step');
+        const config = fs.readFileSync(path.join(ROOT, 'playwright.config.ts'), 'utf8');
+        assert.match(config, /outputDir: '\.artifacts\/e2e\/test-results'/, 'Playwright writes its failures under the uploaded folder');
+        assert.match(config, /outputFolder: '\.artifacts\/e2e\/report'/, 'and its report');
+        assert.match(fs.readFileSync(path.join(ROOT, 'e2e/support/env.ts'), 'utf8'), /^ {2}distDir: '\.artifacts\/e2e\/dist',$/m, 'the preview serves the build the upload leaves out');
     });
 
-    it('the stack job runs scripts/ci/stack.sh subcommands only, in the order of npm run ci:stack, and always removes the stack last', () => {
-        const list = steps('stack');
-        assert.deepEqual(list.slice(0, 2).map((s) => s.uses), ['actions/checkout@v4', 'actions/setup-node@v4'], 'checkout and setup first');
-        const subcommand = (/** @type {{ run?: string }} */ s) => /^bash scripts\/ci\/stack\.sh ([a-z-]+(?: \S+)?)$/.exec(s.run ?? '')?.[1];
-        for (const step of list.slice(2)) {
-            if (step.uses) {
-                assert.equal(step.uses, 'actions/upload-artifact@v4', step.name);
-                continue;
-            }
-            if (step.name === 'Disk use') {
-                assert.equal(step.run, 'df -h / && docker system df');
-                assert.equal(step.if, 'always()');
-                continue;
-            }
-            assert.ok(subcommand(step), `${step.name}: every other step is one stack.sh subcommand (${step.run})`);
-        }
-        const order = stackOrder('rehearsal');
-        assert.deepEqual(order, ['preflight', 'install-env', 'pull', 'deploy 1', 'mcp-db', 'health']);
-        assert.deepEqual(list.filter((s) => !s.if && s.run).map(subcommand), order, 'the steps without if: are `npm run ci:stack`, in its order');
-        for (const step of list.filter((s) => /^logs\b/.test(subcommand(s) ?? ''))) assert.equal(step.if, 'failure()', step.name);
-        const last = list.at(-1);
-        assert.equal(subcommand(last ?? {}), 'down', 'the last step removes the stack');
-        assert.equal(last?.if, 'always()', 'also after a failed or timed-out step, and after a cancel');
-        assert.equal(list.filter((s) => subcommand(s) === 'down').length, 1);
-        for (const line of entries.filter((e) => e.path.join('/').startsWith('jobs/stack/steps/') && e.path.includes('run'))) {
-            assert.doesNotMatch(line.value, /deploy-stack\.sh|docker compose/, `${WORKFLOW}:${line.line}: compose and the deploy run only through stack.sh`);
-        }
-    });
+    /** The subcommand of a step that runs `bash scripts/ci/stack.sh <sub>`. @param {{ run?: string }} s */
+    const subcommand = (s) => /^bash scripts\/ci\/stack\.sh ([a-z-]+(?: \S+)?)$/.exec(s.run ?? '')?.[1];
 
-    it('the deploy step runs the real deploy-stack.sh with the pull opt-out (P3), in the risepath-ci project', () => {
-        assert.deepEqual(steps('stack').filter((s) => /\bdeploy\b/.test(s.run ?? '')).map((s) => s.run), ['bash scripts/ci/stack.sh deploy 1']);
-        assert.equal(valueOf('jobs/stack/env/COMPOSE_PROJECT_NAME'), 'risepath-ci');
+    for (const [job, fn, script, order] of /** @type {const} */ ([
+        ['stack', 'rehearsal', 'npm run ci:stack', ['preflight', 'install-env', 'pull', 'deploy 1', 'mcp-db', 'health']],
+        ['e2e', 'e2e', 'npm run e2e:local', ['preflight e2e', 'install-env', 'pull', 'deploy 1', 'auth', 'build-front', 'browser', 'test']],
+    ])) {
+        it(`the ${job} job runs scripts/ci/stack.sh subcommands only, in the order of ${script}, and always removes the stack last`, () => {
+            const list = steps(job);
+            assert.deepEqual(list.slice(0, 2).map((s) => s.uses), ['actions/checkout@v4', 'actions/setup-node@v4'], 'checkout and setup first');
+            /** The steps that are neither stack.sh nor an upload: npm ci (the e2e job needs node_modules) and Disk use. */
+            const other = [];
+            for (const step of list.slice(2)) {
+                if (step.uses) {
+                    assert.equal(step.uses, 'actions/upload-artifact@v4', step.name);
+                    continue;
+                }
+                if (step.name === 'Disk use') {
+                    assert.equal(step.run, 'df -h / && docker system df');
+                    assert.equal(step.if, 'always()');
+                    other.push(step.name);
+                    continue;
+                }
+                if (step.run === 'npm ci --ignore-scripts') {
+                    assert.equal(step.if, undefined);
+                    assert.equal(list.indexOf(step), 2, 'npm ci right after setup, before the first stack.sh step');
+                    other.push(step.run);
+                    continue;
+                }
+                assert.ok(subcommand(step), `${step.name}: every other step is one stack.sh subcommand (${step.run})`);
+            }
+            assert.deepEqual(other, job === 'stack' ? ['Disk use'] : ['npm ci --ignore-scripts'], `${job}: the steps that are not stack.sh`);
+            const header = text.slice(0, text.indexOf('\nname: ')).split('\n').map((line) => line.replace(/^# ?/, '')).join(' ');
+            assert.ok(header.includes(`${job === 'stack' ? '"Disk use"' : 'npm ci'} (${JOBS[job].name})`), `${WORKFLOW} header: names the ${JOBS[job].name} step that is not stack.sh`);
+            assert.deepEqual(stackOrder(fn), order, `stack.sh ${fn}: its subcommands, one per line`);
+            assert.deepEqual(list.filter((s) => !s.if && s.run && s.run !== 'npm ci --ignore-scripts').map(subcommand), order, `the steps without if: are \`${script}\`, in its order`);
+            for (const step of list.filter((s) => /^logs\b/.test(subcommand(s) ?? ''))) assert.equal(step.if, 'failure()', step.name);
+            const last = list.at(-1);
+            assert.equal(subcommand(last ?? {}), 'down', 'the last step removes the stack');
+            assert.equal(last?.if, 'always()', 'also after a failed or timed-out step, and after a cancel');
+            assert.equal(list.filter((s) => subcommand(s) === 'down').length, 1);
+            for (const line of entries.filter((e) => e.path.join('/').startsWith(`jobs/${job}/steps/`) && e.path.includes('run'))) {
+                assert.doesNotMatch(line.value, /deploy-stack\.sh|docker compose|playwright/, `${WORKFLOW}:${line.line}: compose, the deploy and Playwright run only through stack.sh`);
+            }
+        });
+    }
+
+    it('the deploy steps run the real deploy-stack.sh with the pull opt-out (P3), in the risepath-ci project', () => {
+        for (const job of ['stack', 'e2e']) {
+            assert.deepEqual(steps(job).filter((s) => /\bdeploy\b/.test(s.run ?? '')).map((s) => s.run), ['bash scripts/ci/stack.sh deploy 1'], `${job}: one deploy`);
+            assert.equal(valueOf(`jobs/${job}/env/COMPOSE_PROJECT_NAME`), 'risepath-ci', job);
+        }
+        assert.equal(valueOf('jobs/db/env/COMPOSE_PROJECT_NAME'), undefined, 'the db job runs no compose');
         const stack = fs.readFileSync(path.join(ROOT, 'scripts/ci/stack.sh'), 'utf8');
         const body = /^cmd_deploy\(\) \{[^\n]*\n([\s\S]*?)^\}$/m.exec(stack)?.[1];
         assert.equal(body?.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n'), [

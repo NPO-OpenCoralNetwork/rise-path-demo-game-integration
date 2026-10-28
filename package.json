@@ -33,6 +33,8 @@
     "lint:arch": "node --test server/tests/architectureBoundaries.test.js",
     "ci:db": "bash scripts/ci/db-checks.sh",
     "ci:stack": "bash scripts/ci/stack.sh rehearsal",
+    "e2e": "playwright test",
+    "e2e:local": "bash scripts/ci/stack.sh e2e",
     "audit:prod": "npm audit --omit=dev",
     "lessons:validate": "node scripts/lessons/validate.mjs",
     "lessons:lint": "node scripts/lessons/lint.mjs",
