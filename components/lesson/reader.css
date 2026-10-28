@@ -423,6 +423,29 @@
     margin: -4px -4px -4px 0;
   }
 
+  /* Phase 8 (S1): a part failed to load offline (OfflineReloadNotice). In the bar's flow, so the
+     sticky bar grows: the card is always in view and never covers the text or the floating status
+     card below it. The live region is always there and has no size while empty. */
+  .rp-chunk-status {
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+  }
+
+  .rp-chunk-status:not(:empty) {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .rp-status-card[data-kind="chunk"] .rp-status-icon {
+    color: var(--rp-info);
+  }
+
+  .rp-status-card[data-kind="chunk"] .rp-link-btn:not(.rp-notice-x) {
+    flex: none;
+    white-space: nowrap;
+  }
+
   /* Progress ring */
   .rp-ring {
     position: relative;
@@ -472,10 +495,11 @@
     display: none;
   }
 
+  /* --rp-bar-extra: the height OfflineReloadNotice adds to the sticky bar while it shows (Phase 8, S1). */
   .rp-col-sticky {
     position: sticky;
-    top: calc(var(--rp-bar-total) + 28px);
-    max-height: calc(100dvh - var(--rp-bar-total) - 48px);
+    top: calc(var(--rp-bar-total) + var(--rp-bar-extra, 0px) + 28px);
+    max-height: calc(100dvh - var(--rp-bar-total) - var(--rp-bar-extra, 0px) - 48px);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -773,9 +797,11 @@
   }
 
   /* The reader scrolls inside <main>: keep focused controls clear of the sticky LessonBar (and
-     of the phone bottom bar below), WCAG 2.4.11. Programmatic jumps use their own offset. */
+     of the phone bottom bar below), WCAG 2.4.11, also while the offline notice makes the bar taller
+     (--rp-bar-extra, set on <main> by OfflineReloadNotice). Programmatic jumps use their own offset
+     plus the same extra (useScrollContainer.ts). */
   #main-content:has(.rp-reader) {
-    scroll-padding-top: 72px;
+    scroll-padding-top: calc(72px + var(--rp-bar-extra, 0px));
   }
 
   .rp-block + .rp-block {

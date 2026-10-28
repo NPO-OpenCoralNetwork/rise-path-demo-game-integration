@@ -10,6 +10,10 @@
 //   tech and its two DELETE inputs are named by their headings and described by their paragraphs;
 //   read as a TSX syntax tree.
 // - S4: the reader's top bar (components/lesson/reader.css) is opaque in dark only.
+// - S1 (§1.3 6–7): the reader bar's OfflineReloadNotice per controller state (rendered), its hooks,
+//   the root ErrorBoundary's waiting screens (rendered as a class against a fake controller), and
+//   the wiring of index.tsx, LearnRoute, LessonReader and reader.css (read as source). The
+//   controller itself is tested in chunkReload.test.js.
 // The legal pages' wider token pin is in legalPagesFront.test.js.
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,26 +39,51 @@ const STUBS = {
   react: `
     let index = 0;
     export const __resetHooks = () => { index = 0; };
-    // By call order (FlashcardsBlock: 0 order, 1 pos, 2 flipped, 3 finished, 4 live).
+    // By call order (FlashcardsBlock: 0 order, 1 pos, 2 flipped, 3 finished, 4 live). With
+    // globalThis.__hookStore the state lives there across renders and every set is logged in
+    // __setLog as [index, value] (OfflineReloadNotice); otherwise sets do nothing.
     export const useState = (initial) => {
       const i = index++;
+      const init = () => (typeof initial === 'function' ? initial() : initial);
+      const store = globalThis.__hookStore;
+      if (store) {
+        if (!(i in store)) store[i] = init();
+        return [store[i], (v) => {
+          store[i] = typeof v === 'function' ? v(store[i]) : v;
+          (globalThis.__setLog ??= []).push([i, store[i]]);
+        }];
+      }
       const o = globalThis.__state;
-      const value = o && i in o ? o[i] : (typeof initial === 'function' ? initial() : initial);
+      const value = o && i in o ? o[i] : init();
       return [value, () => {}];
     };
     export const useRef = (value) => ({ current: value ?? null });
     export const useMemo = (fn) => fn();
     export const useCallback = (fn) => fn;
-    export const useEffect = () => {};
+    // __effects collects effects when a test asks for them (useRequireReload).
+    export const useEffect = (fn) => { if (globalThis.__effects) globalThis.__effects.push(fn); };
+    export const useSyncExternalStore = (subscribe, get) => get();
+    export class Component {
+      constructor(props) { this.props = props; }
+      forceUpdate() { globalThis.__forceUpdates = (globalThis.__forceUpdates ?? 0) + 1; }
+      setState() {}
+    }
+    export const createRef = () => ({ current: null });
     export const Fragment = 'Fragment';
-    export default { useState, useRef, useMemo, useCallback, useEffect, Fragment };
+    export default { useState, useRef, useMemo, useCallback, useEffect, useSyncExternalStore, Component, createRef, Fragment };
   `,
   'react/jsx-runtime': "export const jsx = (type, props, key) => ({ type, props, key }); export const jsxs = jsx; export const Fragment = 'Fragment';",
-  'lucide-react': ['Check', 'ChevronLeft', 'ChevronRight', 'RotateCcw', 'ThumbsUp'].map((name) => `export const ${name} = '${name}';`).join('\n'),
+  'lucide-react': ['Check', 'ChevronLeft', 'ChevronRight', 'CloudOff', 'RotateCcw', 'RotateCw', 'ThumbsUp'].map((name) => `export const ${name} = '${name}';`).join('\n'),
   language: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp' });",
   reader: 'export const useReader = () => globalThis.__reader;',
   md: "export const MdText = 'MdText';",
   model: "export const plainText = (value) => String(value ?? '');",
+  button: "export const Button = 'Button'; export const buttonClasses = () => 'btn';",
+  // The real module, with the page's controller replaced by the test's fake.
+  chunkReload: `
+    export * from ${JSON.stringify(path.join(ROOT, 'components/common/chunkReload.ts'))};
+    export const pageOfflineReload = () => globalThis.__controller ?? null;
+  `,
 };
 
 /** @param {string} entry */
@@ -79,7 +108,9 @@ async function bundleUi(entry) {
         stub(/\/ReaderContext$/, 'reader');
         stub(/\/Md$/, 'md');
         stub(/^\.\.\/model$/, 'model');
-        b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: STUBS[args.path], loader: 'js' }));
+        stub(/\/ui\/Button$/, 'button');
+        stub(/^\.\/chunkReload$/, 'chunkReload');
+        b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: STUBS[args.path], loader: 'js', resolveDir: ROOT }));
       },
     }],
     logLevel: 'silent',
@@ -122,6 +153,9 @@ before(async () => {
   const code = await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { default as FlashcardsBlock } from './components/lesson/blocks/FlashcardsBlock';",
+    "export { default as OfflineReloadNotice, OfflineReloadNoticeView, useOfflineReloadState, useRequireReload } from './components/common/OfflineReloadNotice';",
+    "export { BAR_EXTRA_PROPERTY, barExtra, scrollElementIntoContainer } from './components/lesson/useScrollContainer';",
+    "export { default as ErrorBoundary } from './components/common/ErrorBoundary';",
   ].join('\n'));
   ui = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 });
@@ -342,5 +376,612 @@ describe('S4: the reader top bar is opaque in dark (reader.css)', () => {
     assert.match(light[0].decls['backdrop-filter'], /blur\(10px\)/);
     // Deferred on purpose (Phase 8 scope guard SG-2): a later change to it is deliberate.
     assert.equal(rules.filter((r) => r.selectors.some((s) => /\[data-theme="dark"\].*\.rp-bottombar\b/.test(s))).length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// S1: offline right after opening a lesson
+// ---------------------------------------------------------------------------------------------
+
+/** The wording of design p8 §1.2, exactly (a change is deliberate). */
+const S1_COPY = {
+  jp: {
+    offline: 'インターネットにつながっていないため、ページの一部を読み込めませんでした。つながったら、ここから読み込み直せます。学習の記録は、この端末に残っています。',
+    checking: 'インターネットにつながりました。Rise Path につながるか確かめています…',
+    unreachable: 'Rise Path がまだ答えません。答えたら、ここから読み込み直せます。',
+    back: 'つながりました。読み込み直すと、読み込めなかった部分も表示されます。',
+    reload: '読み込み直す',
+    close: '閉じる',
+    titles: { offline: 'インターネットにつながっていません', checking: 'つながるか確かめています', unreachable: 'Rise Path につながりません' },
+    bodies: {
+      offline: 'このページを読み込めませんでした。Rise Path につながると、自動で読み込み直します。学習の記録は、この端末に残っています。',
+      checking: 'インターネットにつながりました。Rise Path につながるか確かめています…',
+      unreachable: 'インターネットにはつながっていますが、Rise Path が答えません。答えると、自動で読み込み直します。学習の記録は、この端末に残っています。',
+    },
+    reloadPage: '再読み込み',
+  },
+  en: {
+    offline: "You're offline, so part of this page couldn't load. Once you're back online, you can reload it from here. Your learning records stay on this device.",
+    checking: "You're back online. Checking that Rise Path answers…",
+    unreachable: "Rise Path isn't answering yet. Once it does, you can reload from here.",
+    back: "You're back online. Reload to show the parts that didn't load.",
+    reload: 'Reload',
+    close: 'Close',
+    titles: { offline: "You're offline", checking: 'Checking the connection', unreachable: "Rise Path isn't answering" },
+    bodies: {
+      offline: "This page couldn't load. It reloads by itself once Rise Path answers again. Your learning records stay on this device.",
+      checking: "You're back online. Checking that Rise Path answers…",
+      unreachable: "You're online, but Rise Path isn't answering yet. The page reloads by itself once it does. Your learning records stay on this device.",
+    },
+    reloadPage: 'Reload page',
+  },
+};
+const WAITS = /** @type {const} */ (['offline', 'checking', 'unreachable', 'back']);
+
+/** Text content of a rendered tree. @param {any} node @returns {string} */
+const textOf = (node) => {
+  if (node == null || node === false || node === true) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  return textOf(node.props?.children);
+};
+
+describe('S1: the reader bar notice (OfflineReloadNoticeView)', () => {
+  /** @param {any} props */
+  const render = (props) => expand(ui.OfflineReloadNoticeView({ language: 'jp', dismissed: false, onReload() {}, onDismiss() {}, ...props }));
+
+  it('none, and a closed notice: one empty role="status" region (always mounted, so what appears is announced)', () => {
+    for (const props of [{ wait: 'none' }, { wait: 'offline', dismissed: true }, { wait: 'back', dismissed: true }]) {
+      const root = render(props);
+      assert.equal(root.type, 'div');
+      assert.equal(root.props.role, 'status');
+      assert.ok(classesOf(root).includes('rp-chunk-status'));
+      assert.equal(root.props.children, null, JSON.stringify(props));
+    }
+  });
+
+  for (const language of /** @type {const} */ (['jp', 'en'])) {
+    it(`each state's text in ${language}; 「${S1_COPY[language].reload}」 only when back; 閉じる everywhere; icons hidden`, () => {
+      for (const wait of WAITS) {
+        /** @type {string[]} */
+        const calls = [];
+        const root = render({ language, wait, onReload: () => calls.push('reload'), onDismiss: () => calls.push('dismiss') });
+        assert.equal(root.props.role, 'status');
+        const els = elements(root);
+        const card = els.find((el) => el.type === 'p');
+        assert.ok(card, wait);
+        assert.equal(card.props['data-kind'], 'chunk');
+        assert.equal(card.props['data-state'], wait);
+        const text = els.find((el) => el.type === 'span' && classesOf(el).includes('rp-status-text'));
+        assert.equal(textOf(text), S1_COPY[language][wait], `${language} ${wait}`);
+        const icons = els.filter((el) => el.type === 'CloudOff' || el.type === 'RotateCw');
+        assert.deepEqual(icons.map((el) => el.type), [wait === 'back' ? 'RotateCw' : 'CloudOff']);
+        for (const icon of icons) assert.equal(icon.props['aria-hidden'], 'true');
+        const buttons = els.filter((el) => el.type === 'button');
+        for (const button of buttons) assert.equal(button.props.type, 'button');
+        const close = buttons.find((el) => el.props['aria-label'] === S1_COPY[language].close);
+        assert.ok(close, `${wait}: close`);
+        const reload = buttons.find((el) => textOf(el) === S1_COPY[language].reload);
+        assert.equal(Boolean(reload), wait === 'back', `${wait}: reload only once the app answered`);
+        assert.equal(buttons.length, wait === 'back' ? 2 : 1);
+        reload?.props.onClick();
+        close.props.onClick();
+        assert.deepEqual(calls, wait === 'back' ? ['reload', 'dismiss'] : ['dismiss']);
+        for (const el of els) assert.doesNotMatch(classesOf(el).join(' '), TOKEN_RULE);
+      }
+    });
+  }
+});
+
+describe('S1: the hooks LearnRoute and the notice use', () => {
+  /** @param {string} state */
+  const fakeController = (state) => {
+    const log = /** @type {string[]} */ ([]);
+    return {
+      log,
+      state: () => state,
+      subscribe: () => () => {},
+      requireReload: () => { log.push('require'); return () => log.push('release'); },
+      reloadNow: () => log.push('reloadNow'),
+    };
+  };
+  const withGlobals = (/** @type {Record<string, unknown>} */ g, /** @type {() => void} */ fn) => {
+    Object.assign(globalThis, g);
+    try { fn(); } finally { for (const key of Object.keys(g)) delete (/** @type {any} */ (globalThis))[key]; }
+  };
+
+  it('useOfflineReloadState reads the page controller; none without one', () => {
+    withGlobals({ __controller: fakeController('unreachable') }, () => assert.equal(ui.useOfflineReloadState(), 'unreachable'));
+    assert.equal(ui.useOfflineReloadState(), 'none');
+  });
+
+  it('useRequireReload(true) holds requireReload until cleanup; useRequireReload(false) asks for nothing', () => {
+    const controller = fakeController('offline');
+    /** @type {Array<() => unknown>} */
+    const effects = [];
+    withGlobals({ __controller: controller, __effects: effects }, () => {
+      ui.useRequireReload(true);
+      ui.useRequireReload(false);
+      assert.equal(effects.length, 2);
+      const cleanup = effects[0]();
+      assert.equal(typeof cleanup, 'function');
+      assert.deepEqual(controller.log, ['require']);
+      /** @type {any} */ (cleanup)();
+      assert.deepEqual(controller.log, ['require', 'release']);
+      assert.equal(effects[1](), undefined);
+      assert.deepEqual(controller.log, ['require', 'release']);
+    });
+  });
+});
+
+describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus, the bar\'s extra height)', () => {
+  /**
+   * The notice on a page: a controller whose state the test sets, React state kept across renders
+   * (the stub's __hookStore), a fake #main-content and window. `render(wait)` re-renders while a
+   * render sets state, as React does.
+   * @param {(p: any) => void} fn
+   */
+  const onPage = (fn) => {
+    /** @type {any[]} */
+    const log = [];
+    const controller = {
+      wait: 'none',
+      state: () => controller.wait,
+      subscribe: () => () => {},
+      requireReload: () => () => {},
+      reloadNow: () => log.push('reloadNow'),
+    };
+    /** @type {Array<() => unknown>} */
+    const effects = [];
+    const main = { focus: (/** @type {unknown} */ o) => log.push(['focus', o]) };
+    Object.assign(globalThis, {
+      __controller: controller,
+      __hookStore: {},
+      __setLog: [],
+      __effects: effects,
+      document: { getElementById: (/** @type {string} */ id) => (id === 'main-content' ? main : null) },
+      window: { location: { reload: () => log.push('location.reload') } },
+    });
+    /** @param {string} wait @param {'jp' | 'en'} [language] */
+    const render = (wait, language = 'jp') => {
+      controller.wait = wait;
+      /** @type {any} */ (globalThis).__language = language;
+      for (let pass = 0; pass < 3; pass += 1) {
+        const sets = /** @type {any} */ (globalThis).__setLog.length;
+        ui.__resetHooks();
+        effects.length = 0;
+        const tree = expand(ui.OfflineReloadNotice());
+        if (/** @type {any} */ (globalThis).__setLog.length === sets) return tree;
+      }
+      throw new Error('a render keeps setting state');
+    };
+    /** @param {any} tree */
+    const card = (tree) => elements(tree).find((el) => el.type === 'p');
+    /** @param {any} tree @param {string} label */
+    const button = (tree, label) => elements(tree).find((el) => el.type === 'button' && (textOf(el) === label || el.props['aria-label'] === label));
+    try {
+      fn({ log, controller, effects, render, card, button });
+    } finally {
+      for (const key of ['__controller', '__hookStore', '__setLog', '__effects', '__language', 'document', 'window']) {
+        delete (/** @type {any} */ (globalThis))[key];
+      }
+    }
+  };
+  const jp = S1_COPY.jp;
+
+  it('closing hides the card for the rest of that state only; the next change shows it again, every time', () => {
+    // Review round 1, finding 2: back → close → offline → back showed no card the second time.
+    onPage(({ render, card, button }) => {
+      let tree = render('back');
+      assert.ok(button(tree, jp.reload));
+      button(tree, jp.close).props.onClick();
+      assert.equal(render('back').props.children, null, 'closed for the rest of this back');
+      assert.equal(render('back').props.children, null);
+      tree = render('offline');
+      assert.equal(card(tree)?.props['data-state'], 'offline', 'a new state: shown again');
+      tree = render('checking');
+      assert.equal(card(tree)?.props['data-state'], 'checking');
+      tree = render('back');
+      assert.equal(card(tree)?.props['data-state'], 'back', 'back again after another outage: shown');
+      assert.ok(button(tree, jp.reload), '「読み込み直す」 is there when the learner needs it');
+      // The same for offline → checking → offline.
+      button(render('offline'), jp.close).props.onClick();
+      assert.equal(render('offline').props.children, null);
+      assert.ok(card(render('checking')));
+      assert.equal(card(render('offline'))?.props['data-state'], 'offline');
+    });
+  });
+
+  it('a notice closed while offline comes back in back with 「読み込み直す」 (a degraded page never reloads by itself)', () => {
+    onPage(({ render, card, button }) => {
+      button(render('offline'), jp.close).props.onClick();
+      assert.equal(render('offline').props.children, null, 'closed while offline: hidden while offline');
+      const tree = render('back');
+      assert.equal(card(tree)?.props['data-state'], 'back');
+      assert.ok(button(tree, jp.reload));
+    });
+  });
+
+  it('閉じる moves focus to #main-content without scrolling; 「読み込み直す」 goes through the controller\'s reloadNow', () => {
+    for (const language of /** @type {const} */ (['jp', 'en'])) {
+      onPage(({ log, render, button }) => {
+        const tree = render('back', language);
+        button(tree, S1_COPY[language].reload).props.onClick();
+        assert.deepEqual(log, ['reloadNow'], 'once per page and never offline: not location.reload()');
+        button(tree, S1_COPY[language].close).props.onClick();
+        assert.deepEqual(log, ['reloadNow', ['focus', { preventScroll: true }]], language);
+      });
+    }
+  });
+
+  it('the bar\'s extra height: published on #main-content while the card shows, removed while empty and on unmount', () => {
+    // Review round 1, finding 3: the notice grows the sticky bar; the offsets follow it.
+    onPage(({ effects, render }) => {
+      const tree = render('offline');
+      assert.equal(effects.length, 1, 'one effect: the height');
+      /** @type {Record<string, string>} */
+      const props = {};
+      const style = {
+        setProperty: (/** @type {string} */ k, /** @type {string} */ v) => { props[k] = v; },
+        removeProperty: (/** @type {string} */ k) => { delete props[k]; },
+      };
+      let height = 89.2;
+      /** @type {string[]} */
+      const asked = [];
+      const host = {
+        closest: (/** @type {string} */ sel) => { asked.push(sel); return sel === '#main-content' ? { style } : null; },
+        getBoundingClientRect: () => ({ height }),
+      };
+      /** @type {any} */
+      let observer = null;
+      const saved = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+      globalThis.ResizeObserver = /** @type {any} */ (class {
+        /** @param {() => void} cb */
+        constructor(cb) { this.cb = cb; this.observed = /** @type {unknown[]} */ ([]); this.disconnected = false; observer = this; }
+        /** @param {unknown} el */
+        observe(el) { this.observed.push(el); }
+        disconnect() { this.disconnected = true; }
+      });
+      try {
+        tree.props.ref.current = host;
+        const cleanup = /** @type {() => void} */ (effects[0]());
+        assert.deepEqual(asked, ['#main-content']);
+        assert.deepEqual(observer.observed, [host]);
+        assert.deepEqual(props, { '--rp-bar-extra': '90px' });
+        assert.equal(ui.BAR_EXTRA_PROPERTY, '--rp-bar-extra');
+        height = 0; // closed: the region is empty
+        observer.cb();
+        assert.deepEqual(props, {});
+        height = 120;
+        observer.cb();
+        assert.deepEqual(props, { '--rp-bar-extra': '120px' });
+        cleanup();
+        assert.equal(observer.disconnected, true);
+        assert.deepEqual(props, {}, 'unmounted: nothing left on <main>');
+        // Outside <main> it falls back to the reader root; with neither, nothing happens.
+        const reader = { style, closest: undefined };
+        const lone = { closest: (/** @type {string} */ sel) => (sel === '.rp-reader' ? reader : null), getBoundingClientRect: () => ({ height: 40 }) };
+        tree.props.ref.current = lone;
+        const cleanup2 = /** @type {() => void} */ (effects[0]());
+        assert.deepEqual(props, { '--rp-bar-extra': '40px' });
+        cleanup2();
+        tree.props.ref.current = { closest: () => null, getBoundingClientRect: () => ({ height: 40 }) };
+        assert.equal(effects[0](), undefined);
+        assert.deepEqual(props, {});
+      } finally {
+        if (saved) Object.defineProperty(globalThis, 'ResizeObserver', saved);
+        else delete (/** @type {any} */ (globalThis)).ResizeObserver;
+      }
+    });
+  });
+
+  it('the reader\'s jumps add the extra height read from the container\'s own inline style (useScrollContainer)', () => {
+    /** @param {string} value */
+    const containerWith = (value) => {
+      /** @type {any[]} */
+      const calls = [];
+      return {
+        calls,
+        scrollTop: 100,
+        style: { getPropertyValue: (/** @type {string} */ k) => (k === '--rp-bar-extra' ? value : '') },
+        getBoundingClientRect: () => ({ top: 0 }),
+        scrollTo: (/** @type {unknown} */ o) => calls.push(o),
+      };
+    };
+    for (const [value, extra] of /** @type {const} */ ([['90px', 90], ['', 0], ['junk', 0], ['-4px', 0]])) {
+      assert.equal(ui.barExtra(containerWith(value)), extra, value);
+    }
+    Object.assign(globalThis, { document: { documentElement: {} } });
+    try {
+      const target = { getBoundingClientRect: () => ({ top: 500 }) };
+      const grown = containerWith('90px');
+      ui.scrollElementIntoContainer(grown, target, { smooth: false });
+      assert.deepEqual(grown.calls, [{ top: 500 + 100 - 72 - 90, behavior: 'auto' }], 'below the grown bar');
+      const plain = containerWith('');
+      ui.scrollElementIntoContainer(plain, target, { smooth: false });
+      assert.deepEqual(plain.calls, [{ top: 500 + 100 - 72, behavior: 'auto' }], 'today\'s offset without the notice');
+    } finally {
+      // @ts-ignore test globals
+      delete globalThis.document;
+    }
+  });
+});
+
+describe('S1: the root ErrorBoundary while the page waits for the connection', () => {
+  const CHUNK = new TypeError('Failed to fetch dynamically imported module: https://app.example/assets/BadgesView-abc123.js');
+  /** @param {string} wait */
+  const controllerIn = (wait) => {
+    const log = /** @type {string[]} */ ([]);
+    /** @type {Array<() => void>} */
+    const listeners = [];
+    return {
+      log,
+      listeners,
+      state: () => wait,
+      subscribe: (/** @type {() => void} */ l) => { listeners.push(l); return () => log.push('unsubscribe'); },
+      requireReload: () => { log.push('require'); return () => log.push('release'); },
+      reloadNow: () => log.push('reloadNow'),
+    };
+  };
+  /**
+   * @param {{ wait: string, language?: 'jp' | 'en', error?: unknown }} o
+   */
+  const renderBoundary = ({ wait, language = 'jp', error = CHUNK }) => {
+    const controller = controllerIn(wait);
+    Object.assign(globalThis, {
+      __controller: controller,
+      document: { documentElement: { lang: language === 'jp' ? 'ja' : 'en' }, querySelector: () => null },
+    });
+    try {
+      const eb = new ui.ErrorBoundary({});
+      eb.state = { hasError: true, error };
+      const tree = expand(eb.render());
+      return { tree, els: elements(tree), controller, eb };
+    } finally {
+      // @ts-ignore test globals
+      delete globalThis.__controller;
+      // @ts-ignore test globals
+      delete globalThis.document;
+    }
+  };
+
+  for (const language of /** @type {const} */ (['jp', 'en'])) {
+    it(`offline and checking (and back): the controller's words, no button at all (${language})`, () => {
+      for (const [wait, shown] of [['offline', 'offline'], ['checking', 'checking'], ['back', 'checking']]) {
+        const { els } = renderBoundary({ wait, language });
+        const h1 = els.find((el) => el.type === 'h1');
+        assert.equal(textOf(h1), S1_COPY[language].titles[/** @type {'offline'} */ (shown)], wait);
+        const body = els.find((el) => el.type === 'p');
+        assert.equal(body.props.role, 'status', 'a later state is announced');
+        assert.equal(textOf(body), S1_COPY[language].bodies[/** @type {'offline'} */ (shown)]);
+        assert.equal(els.filter((el) => el.type === 'Button' || el.type === 'button' || el.type === 'a').length, 0, `${wait}: no reload, no home link`);
+      }
+    });
+
+    it(`unreachable: 「${S1_COPY[language].reloadPage}」 wired to the controller's reloadNow, no home link (${language})`, () => {
+      const { els, controller } = renderBoundary({ wait: 'unreachable', language });
+      assert.equal(textOf(els.find((el) => el.type === 'h1')), S1_COPY[language].titles.unreachable);
+      assert.equal(textOf(els.find((el) => el.type === 'p')), S1_COPY[language].bodies.unreachable);
+      const buttons = els.filter((el) => el.type === 'Button');
+      assert.equal(buttons.length, 1);
+      assert.equal(textOf(buttons[0]), S1_COPY[language].reloadPage);
+      assert.equal(els.filter((el) => el.type === 'a').length, 0);
+      Object.assign(globalThis, { __controller: controller });
+      try { buttons[0].props.onClick(); } finally { /** @type {any} */ (globalThis).__controller = undefined; }
+      assert.deepEqual(controller.log, ['reloadNow']);
+    });
+  }
+
+  it('nothing waits: today\'s screens ("a new version", or a plain error) with reload and home', () => {
+    const stale = renderBoundary({ wait: 'none' });
+    assert.equal(textOf(stale.els.find((el) => el.type === 'h1')), '新しいバージョンがあります');
+    assert.equal(stale.els.find((el) => el.type === 'p').props.role, undefined);
+    assert.equal(stale.els.filter((el) => el.type === 'Button').length, 1);
+    assert.equal(stale.els.filter((el) => el.type === 'a').length, 1);
+    const bug = renderBoundary({ wait: 'offline', error: new TypeError("Cannot read properties of undefined (reading 'x')") });
+    assert.equal(textOf(bug.els.find((el) => el.type === 'h1')), '問題が発生しました', 'a bug is not an offline screen');
+    assert.equal(bug.els.filter((el) => el.type === 'Button').length, 1);
+  });
+
+  it('a chunk error while waiting holds requireReload until unmount; none when nothing waits or for a bug; follows the controller', () => {
+    for (const [wait, error, held] of [['offline', CHUNK, true], ['unreachable', CHUNK, true], ['none', CHUNK, false], ['offline', new Error('bug'), false]]) {
+      const controller = controllerIn(/** @type {string} */ (wait));
+      Object.assign(globalThis, { __controller: controller, __forceUpdates: 0 });
+      try {
+        const eb = new ui.ErrorBoundary({});
+        eb.componentDidMount();
+        assert.equal(controller.listeners.length, 1, 'subscribed');
+        controller.listeners[0]();
+        assert.equal(/** @type {any} */ (globalThis).__forceUpdates, 0, 'no re-render without an error');
+        eb.state = { hasError: true, error };
+        eb.componentDidUpdate({}, { hasError: false, error: null });
+        controller.listeners[0]();
+        assert.equal(/** @type {any} */ (globalThis).__forceUpdates, 1, 'the waiting screen follows the controller');
+        eb.componentDidUpdate({}, { hasError: true, error }); // a later update asks again for nothing
+        eb.componentWillUnmount();
+        assert.deepEqual(controller.log, held ? ['require', 'release', 'unsubscribe'] : ['unsubscribe'], `${wait} ${String(error)}`);
+      } finally {
+        // @ts-ignore test globals
+        delete globalThis.__controller;
+        // @ts-ignore test globals
+        delete globalThis.__forceUpdates;
+      }
+    }
+  });
+
+  /**
+   * A controller whose state the test moves; `notifyOnRequire` makes requireReload behave as in
+   * 'back' (it checks again and notifies the subscribers synchronously, back → checking).
+   * @param {{ wait: string, notifyOnRequire?: boolean }} o
+   */
+  const movingController = (o) => {
+    const log = /** @type {string[]} */ ([]);
+    /** @type {Array<() => void>} */
+    const listeners = [];
+    const c = {
+      log,
+      listeners,
+      wait: o.wait,
+      state: () => c.wait,
+      subscribe: (/** @type {() => void} */ l) => { listeners.push(l); return () => log.push('unsubscribe'); },
+      requireReload: () => {
+        log.push('require');
+        if (o.notifyOnRequire && c.wait === 'back') {
+          c.wait = 'checking';
+          for (const l of [...listeners]) l();
+        }
+        return () => log.push('release');
+      },
+      reloadNow: () => log.push('reloadNow'),
+      /** @param {string} next */
+      move(next) { c.wait = next; for (const l of [...listeners]) l(); },
+    };
+    return c;
+  };
+  /** @param {any} controller @param {() => void} fn */
+  const withController = (controller, fn) => {
+    Object.assign(globalThis, { __controller: controller, __forceUpdates: 0 });
+    try { fn(); } finally {
+      // @ts-ignore test globals
+      delete globalThis.__controller;
+      // @ts-ignore test globals
+      delete globalThis.__forceUpdates;
+    }
+  };
+
+  it('a chunk error shown while nothing waited takes the hold once the page starts waiting (another import failed offline)', () => {
+    // Review round 1, finding 1: the screen then says it reloads by itself, so it must hold
+    // requireReload; without it the controller ends in 'back' and the screen says "checking" for good.
+    const controller = movingController({ wait: 'none' });
+    withController(controller, () => {
+      const eb = new ui.ErrorBoundary({});
+      eb.componentDidMount();
+      eb.state = { hasError: true, error: CHUNK };
+      eb.componentDidUpdate({}, { hasError: false, error: null });
+      assert.deepEqual(controller.log, [], 'nothing waits yet: today\'s screen, no hold');
+      controller.move('offline');
+      assert.deepEqual(controller.log, ['require'], 'the page waits now: hold');
+      assert.equal(/** @type {any} */ (globalThis).__forceUpdates, 1);
+      controller.move('checking');
+      controller.move('unreachable');
+      assert.deepEqual(controller.log, ['require'], 'one hold however often the state changes');
+      eb.componentWillUnmount();
+      assert.deepEqual(controller.log, ['require', 'release', 'unsubscribe']);
+    });
+  });
+
+  it('a bug never takes the hold, also when the page starts waiting later', () => {
+    const controller = movingController({ wait: 'none' });
+    withController(controller, () => {
+      const eb = new ui.ErrorBoundary({});
+      eb.componentDidMount();
+      eb.state = { hasError: true, error: new Error('bug') };
+      eb.componentDidUpdate({}, { hasError: false, error: null });
+      controller.move('offline');
+      eb.componentWillUnmount();
+      assert.deepEqual(controller.log, ['unsubscribe']);
+    });
+  });
+
+  it('in back, requireReload notifies synchronously (back → checking): still exactly one hold, released once', () => {
+    for (const late of [false, true]) {
+      const controller = movingController({ wait: late ? 'none' : 'back', notifyOnRequire: true });
+      withController(controller, () => {
+        const eb = new ui.ErrorBoundary({});
+        eb.componentDidMount();
+        eb.state = { hasError: true, error: CHUNK };
+        eb.componentDidUpdate({}, { hasError: false, error: null });
+        if (late) controller.move('back'); // a degraded page answered; then this screen came up earlier
+        assert.deepEqual(controller.log, ['require'], `late=${late}`);
+        assert.equal(controller.wait, 'checking');
+        eb.componentWillUnmount();
+        eb.componentWillUnmount();
+        assert.deepEqual(controller.log, ['require', 'release', 'unsubscribe'], `late=${late}`);
+      });
+    }
+  });
+});
+
+describe('S1: wiring (index.tsx, LearnRoute, LessonReader, reader.css, copy)', () => {
+  it('index.tsx hands every vite:preloadError to handlePreloadError with the online state and the controller\'s wait', () => {
+    const index = readFile('index.tsx');
+    assert.match(index, /const offlineReload = pageOfflineReload\(\);\nwindow\.addEventListener\('vite:preloadError', \(event\) => \{\n {2}handlePreloadError\(event, \{/);
+    assert.match(index, /\n {4}online: navigatorOnline\(\),\n/);
+    assert.match(index, /\n {4}waiting: \(offlineReload\?\.state\(\) \?\? 'none'\) !== 'none',\n/);
+    assert.match(index, /\n {4}awaitOnline: \(\) => offlineReload\?\.chunkFailed\(\),\n/);
+    assert.match(index, /reload: \(\) => \{\n {6}markChunkReloadStarted\(\);\n {6}window\.location\.reload\(\);\n {4}\},/);
+    assert.doesNotMatch(index, /preventDefault\(\)/, 'only handlePreloadError decides preventDefault');
+    assert.doesNotMatch(index, /claimReloadForPreloadError|claimChunkReload/, 'no claim of its own');
+  });
+
+  it('LearnRoute: the offline problem has no re-import retry; 「再読み込み」 (reloadNow) only when unreachable; it holds requireReload', () => {
+    const route = readFile('components/routes/LearnRoute.tsx');
+    assert.match(route, /const wait = useOfflineReloadState\(\);\n {2}const offlineError = state\.status === 'error' && wait !== 'none';\n {2}useRequireReload\(offlineError\);/);
+    const start = route.indexOf("if (state.status === 'error' && wait !== 'none') {");
+    const end = route.indexOf("if (state.status === 'error') {");
+    assert.ok(start > 0 && end > start, 'the offline branch comes before the online one');
+    const offline = route.slice(start, end);
+    assert.doesNotMatch(offline, /setAttempt/, 're-importing a failed module URL fails again');
+    assert.match(offline, /title=\{offlinePageTitle\(language, wait\)\}/);
+    assert.match(offline, /body=\{offlinePageBody\(language, wait\)\}/);
+    assert.match(offline, /\n {8}live\n/);
+    assert.match(offline, /\{\.\.\.\(wait === 'unreachable'\n {10}\? \{ onRetry: \(\) => pageOfflineReload\(\)\?\.reloadNow\(\), retryLabel: offlineReloadCopy\[language\]\.reloadPage \}\n {10}: \{\}\)\}/);
+    assert.equal((offline.match(/onRetry/g) ?? []).length, 1);
+    // The online branch keeps its retry.
+    assert.match(route.slice(end), /^if \(state\.status === 'error'\) \{\n {4}return \(\n {6}<Problem\n[^]*?onRetry=\{\(\) => setAttempt\(\(n\) => n \+ 1\)\}/);
+    assert.match(route, /<p role=\{live \? 'status' : undefined\} className="mt-2 text-body text-fg-2">\{body\}<\/p>/);
+  });
+
+  it('LessonReader renders the notice first in the bar\'s notice slot; App.tsx has no notice of its own (scope guard SG-1)', () => {
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /^import OfflineReloadNotice from '\.\.\/common\/OfflineReloadNotice';$/m);
+    assert.match(reader, /notice=\{\(\n {12}<>\n {14}\{\/\*[^\n]*\*\/\}\n {14}<OfflineReloadNotice \/>\n {14}\{resumed && !statusMessage \? \(/);
+    assert.equal((reader.match(/<OfflineReloadNotice \/>/g) ?? []).length, 1);
+    assert.doesNotMatch(readFile('App.tsx'), /OfflineReloadNotice/);
+  });
+
+  it('reader.css: the notice sits in the bar\'s flow, has no size while empty, and uses tokens only (outside the Phase 5 slice)', () => {
+    const css = readFile('components/lesson/reader.css');
+    const rules = cssRules(css);
+    /** @param {string} selector */
+    const one = (selector) => {
+      const found = rules.filter((r) => r.selectors.includes(selector));
+      assert.equal(found.length, 1, selector);
+      return found[0].decls;
+    };
+    const host = one('.rp-chunk-status');
+    assert.equal(host.display, 'flex');
+    assert.equal(host.padding, '0 16px');
+    assert.equal(host.position, undefined, 'in flow: the sticky bar grows, nothing is covered');
+    assert.deepEqual(one('.rp-chunk-status:not(:empty)'), { 'padding-top': '10px', 'padding-bottom': '10px' });
+    assert.equal(one('.rp-status-card[data-kind="chunk"] .rp-status-icon').color, 'var(--rp-info)');
+    // The grown bar (--rp-bar-extra, OfflineReloadNotice): focus scrolling and the sticky columns follow it.
+    const paddings = rules.filter((r) => r.selectors.includes('#main-content:has(.rp-reader)') && 'scroll-padding-top' in r.decls);
+    assert.deepEqual(paddings.map((r) => r.decls['scroll-padding-top']), ['calc(72px + var(--rp-bar-extra, 0px))']);
+    const sticky = one('.rp-col-sticky');
+    assert.equal(sticky.top, 'calc(var(--rp-bar-total) + var(--rp-bar-extra, 0px) + 28px)');
+    assert.equal(sticky['max-height'], 'calc(100dvh - var(--rp-bar-total) - var(--rp-bar-extra, 0px) - 48px)');
+    const block = css.slice(css.indexOf('.rp-chunk-status {'), css.indexOf('/* Progress ring */'));
+    assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, 'colours from tokens');
+    assert.ok(css.indexOf('.rp-chunk-status {') > css.indexOf('.rp-status-card .rp-notice-x'), 'after the slice phase5Front.test.js reads');
+  });
+
+  it('copy: en and jp with the same keys, no 「簡単です」「誰でも」; new and changed TSX on tokens only', () => {
+    const copySource = readFile('components/common/offlineReloadCopy.ts');
+    const keys = (/** @type {string} */ lang) => {
+      const start = copySource.indexOf(`  ${lang}: {`);
+      const body = copySource.slice(start, copySource.indexOf('\n  },', start));
+      return [...body.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]);
+    };
+    assert.deepEqual(keys('jp'), keys('en'));
+    assert.equal(keys('en').length, 12);
+    assert.doesNotMatch(copySource, /簡単です|誰でも/);
+    assert.doesNotMatch(copySource, /from 'react'/, 'React-free: the boundary renders outside the providers');
+    for (const file of ['components/common/OfflineReloadNotice.tsx', 'components/common/ErrorBoundary.tsx', 'components/routes/LearnRoute.tsx']) {
+      const text = readFile(file);
+      assert.doesNotMatch(text, TOKEN_RULE, file);
+      assert.doesNotMatch(text, PALETTE_RULE, file);
+      assert.doesNotMatch(text, /簡単です|誰でも/, file);
+    }
   });
 });

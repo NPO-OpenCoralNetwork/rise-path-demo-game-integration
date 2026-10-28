@@ -2,13 +2,16 @@ import React, { Component, ErrorInfo, ReactNode, createRef } from "react";
 import { Button, buttonClasses } from "../ui/Button";
 import {
     LANGUAGE_STORAGE_KEY,
+    boundaryKind,
     boundaryLanguage,
     buildId,
     chunkReloadStarted,
     chunkReloadTried,
     isChunkLoadError,
+    pageOfflineReload,
     sessionStorageOrNull,
 } from "./chunkReload";
+import { offlinePageBody, offlinePageTitle } from "./offlineReloadCopy";
 
 interface Props {
     children?: ReactNode;
@@ -21,6 +24,11 @@ interface State {
 
 // Renders outside LanguageProvider and ThemeProvider (App.tsx), so no hooks: the language comes
 // from storage and the colours from the token defaults.
+// Phase 8 (S1): a route chunk that failed offline (or while the page waits for the connection)
+// shows the offline controller's state instead of "a new version": offline and checking have no
+// button (a reload or the home link would land on the browser's offline page or race the probe);
+// unreachable (the browser is online, the app is silent) offers 「再読み込み」. This screen has
+// nothing usable on it, so it holds requireReload(): the page reloads by itself once the app answers.
 const copy = {
     en: {
         staleTitle: "A new version is available",
@@ -57,6 +65,8 @@ class ErrorBoundary extends Component<Props, State> {
     };
 
     private headingRef = createRef<HTMLHeadingElement>();
+    private unsubscribe: (() => void) | null = null;
+    private releaseReload: (() => void) | null = null;
 
     public static getDerivedStateFromError(error: Error): State {
         return { hasError: true, error };
@@ -66,9 +76,42 @@ class ErrorBoundary extends Component<Props, State> {
         console.error("Uncaught error:", error, errorInfo);
     }
 
+    public componentDidMount() {
+        // The waiting screen follows the controller (offline → checking → unreachable). The page may
+        // start waiting after this screen came up (a chunk failed online first, then another one
+        // failed offline): hold requireReload from then on, or the screen would promise a reload
+        // that never comes.
+        this.unsubscribe =
+            pageOfflineReload()?.subscribe(() => {
+                if (!this.state.hasError) return;
+                this.holdReloadWhileWaiting();
+                this.forceUpdate();
+            }) ?? null;
+    }
+
     public componentDidUpdate(_prevProps: Props, prevState: State) {
+        if (!this.state.hasError || prevState.hasError) return;
         // The app it replaced may have held focus; start screen readers and keyboards here.
-        if (this.state.hasError && !prevState.hasError) this.headingRef.current?.focus();
+        this.headingRef.current?.focus();
+        this.holdReloadWhileWaiting();
+    }
+
+    /** A failed chunk while the page waits: nothing usable here, so reload by itself once the app answers. */
+    private holdReloadWhileWaiting() {
+        const controller = pageOfflineReload();
+        if (!controller || this.releaseReload || !isChunkLoadError(this.state.error) || controller.state() === "none") return;
+        // Taken before the call: in 'back', requireReload checks again and notifies the subscription
+        // above synchronously, which must not take a second hold.
+        const hold = { release: () => {} };
+        this.releaseReload = () => hold.release();
+        hold.release = controller.requireReload();
+    }
+
+    public componentWillUnmount() {
+        this.releaseReload?.();
+        this.releaseReload = null;
+        this.unsubscribe?.();
+        this.unsubscribe = null;
     }
 
     public render() {
@@ -76,11 +119,15 @@ class ErrorBoundary extends Component<Props, State> {
             const { error } = this.state;
             const language = boundaryLanguage(savedLanguage(), document.documentElement.lang);
             const t = copy[language];
-            // "New version" only while a reload can still help: one is running, or a chunk failed and
-            // none was tried for this build yet. After that it is a plain error (blocked or missing file).
-            const stale =
-                chunkReloadStarted() ||
-                (isChunkLoadError(error) && !chunkReloadTried(sessionStorageOrNull(), buildId(document)));
+            const kind = boundaryKind(error, {
+                wait: pageOfflineReload()?.state() ?? "none",
+                reloadStarted: chunkReloadStarted(),
+                reloadTried: chunkReloadTried(sessionStorageOrNull(), buildId(document)),
+            });
+            const waiting = kind === "offline" || kind === "checking" || kind === "unreachable";
+            const stale = kind === "stale";
+            const title = waiting ? offlinePageTitle(language, kind) : stale ? t.staleTitle : t.errorTitle;
+            const body = waiting ? offlinePageBody(language, kind) : stale ? t.staleBody : t.errorBody;
             return (
                 <main
                     lang={language === "jp" ? "ja" : "en"}
@@ -88,15 +135,22 @@ class ErrorBoundary extends Component<Props, State> {
                 >
                     <div className="w-full max-w-form rounded-card border border-line bg-surface p-6 shadow-1">
                         <h1 ref={this.headingRef} tabIndex={-1} className="text-h2 text-fg focus:outline-none">
-                            {stale ? t.staleTitle : t.errorTitle}
+                            {title}
                         </h1>
-                        <p className="mt-2 text-body text-fg-2">{stale ? t.staleBody : t.errorBody}</p>
-                        <div className="mt-5 flex flex-wrap gap-2">
-                            <Button onClick={() => window.location.reload()}>{t.reload}</Button>
-                            <a href={import.meta.env.BASE_URL} className={buttonClasses({ variant: "secondary" })}>
-                                {t.home}
-                            </a>
-                        </div>
+                        {/* While waiting, a later state (checking, unreachable) is announced; the heading has focus. */}
+                        <p role={waiting ? "status" : undefined} className="mt-2 text-body text-fg-2">{body}</p>
+                        {kind === "unreachable" ? (
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <Button onClick={() => pageOfflineReload()?.reloadNow()}>{t.reload}</Button>
+                            </div>
+                        ) : waiting ? null : (
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <Button onClick={() => window.location.reload()}>{t.reload}</Button>
+                                <a href={import.meta.env.BASE_URL} className={buttonClasses({ variant: "secondary" })}>
+                                    {t.home}
+                                </a>
+                            </div>
+                        )}
                         {import.meta.env.DEV && error ? (
                             <details className="mt-5 rounded-control border border-line bg-sunken p-3">
                                 <summary className="cursor-pointer text-small font-semibold text-fg-2">{t.details}</summary>

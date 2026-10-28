@@ -38,6 +38,7 @@ import { ReaderSheet } from './ReaderSheet';
 import { TutorPanel, type TutorLayout } from './TutorPanel';
 import { lessonLearnerState, useTutorStream, type LiveLearnerFn } from './useTutorStream';
 import ReaderSettings, { useReaderSettings } from './ReaderSettings';
+import OfflineReloadNotice from '../common/OfflineReloadNotice';
 import './reader.css';
 
 /**
@@ -664,6 +665,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           showSaveState={syncable}
           notice={(
             <>
+              {/* Phase 8 (S1): a part failed to load offline; in the bar's flow, so always in view. */}
+              <OfflineReloadNotice />
               {resumed && !statusMessage ? (
                 <div className="rp-notice" role="status">
                   <span>{text.resumed}</span>
