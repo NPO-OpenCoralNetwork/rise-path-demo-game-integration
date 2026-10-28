@@ -312,7 +312,9 @@ describe('e2e.yml: triggers, permissions and jobs (Phase 7, P2 and P5)', () => {
             "  ours \"${STACK}/stack.env\" || fail 'deploy/risepath-vm/stack.env is not the CI template: run install-env first'",
             '  refuse_foreign_env',
             '  mkdir -p "${LOG_DIR}"',
-            '  RISEPATH_DEPLOY_SKIP_PULL=1 bash "${STACK}/scripts/deploy-stack.sh" 2>&1 | tee "${LOG_DIR}/deploy-$1.log"',
+            '  local status=0',
+            '  RISEPATH_DEPLOY_SKIP_PULL=1 bash "${STACK}/scripts/deploy-stack.sh" 2>&1 | tee "${LOG_DIR}/deploy-$1.log" || status=$?',
+            '  if [[ "${status}" -ne 0 ]]; then fail "deploy-stack.sh exited ${status}: its last lines above say why (deploy-$1.log)"; fi',
             '',
         ].join('\n'), 'only the installed template and no foreign env file reach deploy-stack.sh, with the opt-out');
         assert.doesNotMatch(text, /RISEPATH_DEPLOY_SKIP_PULL/, 'only stack.sh sets the opt-out; the workflow never does');

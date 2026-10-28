@@ -27,8 +27,8 @@ const DB_CHECKS = 'scripts/ci/db-checks.sh';
 const script = read(DB_CHECKS);
 /** The script without its comment lines, so a word in a comment never satisfies a check. */
 const code = script.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
-/** The same without the text of echo messages: only what the script runs. */
-const commands = code.split('\n').map((line) => line.replace(/\becho "[\s\S]*$/, 'echo')).join('\n');
+/** The same without the text of echo and die messages: only what the script runs. */
+const commands = code.split('\n').map((line) => line.replace(/\b(echo|die \d) "[\s\S]*$/, '$1')).join('\n');
 const IMAGE_RE = /pgvector\/pgvector:[^@\s]+@sha256:[0-9a-f]{64}/g;
 const IMAGE = (script.match(IMAGE_RE) ?? [])[0] ?? '';
 const DIGEST = IMAGE.slice(IMAGE.indexOf('@') + 1);
@@ -195,7 +195,7 @@ describe('scripts/ci/db-checks.sh', () => {
         assert.match(code, /^ {4}local left=\$\(\(pull_end - SECONDS\)\)\n {4}if \[\[ "\$\{left\}" -le 0 \]\]; then return 1; fi\n {4}timeout "\$\(\(left < PULL_EACH_S \? left : PULL_EACH_S\)\)" docker pull -q "\$1" > \/dev\/null$/m);
         assert.equal(commands.match(/docker pull/g)?.length, 1, 'every pull goes through pull()');
         assert.deepEqual(code.match(/^ {4}if pull "\$\{(IMAGE|MIRROR)\}"; then/gm), ['    if pull "${IMAGE}"; then', '    if pull "${MIRROR}"; then']);
-        assert.match(code, /if \[\[ "\$\{attempt\}" -eq 3 \|\| \$\(\(pull_end - SECONDS\)\) -le "\$\{pause\}" \]\]; then\n[^\n]*re-run the job later"\n\s+exit 1$/m, 'no pause past the deadline');
+        assert.match(code, /if \[\[ "\$\{attempt\}" -eq 3 \|\| \$\(\(pull_end - SECONDS\)\) -le "\$\{pause\}" \]\]; then\n\s+die 1 "[^\n]*re-run the job later"$/m, 'no pause past the deadline');
         const step = dbStepTimeout();
         assert.ok(Number.isInteger(step), 'the Database checks step that runs db-checks.sh has timeout-minutes');
         // The guard waits at most budget + 5 s. The step outlasts every bound plus a minute for the rest
@@ -324,6 +324,28 @@ describe('scripts/ci/db-checks.sh', () => {
             assert.equal(status, 2, `${JSON.stringify(args)}: ${out}`);
             assert.match(out, /❌ usage: db-checks\.sh \[--existing-url postgresql:\/\/user\[:password\]@host:port\]/, JSON.stringify(args));
             assert.deepEqual(calls, [], `${JSON.stringify(args)}: no psql, docker or node call`);
+        }
+    });
+
+    it('every early stop goes through die(): the ❌ line, and on GitHub Actions an ::error annotation, so the check\'s summary names the cause', () => {
+        const parts = code.split(/^die\(\) \{[^\n]*\n[\s\S]*?^\}$/m);
+        assert.equal(parts.length, 2, 'one die()');
+        assert.doesNotMatch(parts.join(''), /❌/, 'no ❌ line of its own outside die(): its stop would show only "Process completed with exit code 1"');
+        assert.match(code, /^die\(\) \{[^\n]*\n {2}echo "❌ \$2"\n {2}if \[\[ -n "\$\{GITHUB_ACTIONS:-\}" \]\]; then echo "::error title=Database checks::\$2"; fi\n {2}exit "\$1"\n\}$/m);
+        const USAGE = 'usage: db-checks\\.sh \\[--existing-url postgresql://user\\[:password\\]@host:port\\]';
+        const usage = runStubbed(['--foo'], { env: { GITHUB_ACTIONS: 'true' } });
+        assert.equal(usage.status, 2, usage.out);
+        assert.match(usage.out, new RegExp(`^❌ ${USAGE}\\n::error title=Database checks::${USAGE}$`, 'm'));
+        const local = runStubbed(['--foo']);
+        assert.equal(local.status, 2, local.out);
+        assert.doesNotMatch(local.out, /::error/, 'the annotation only on GitHub Actions');
+        if (HAS_TIMEOUT) {
+            const start = runStubbed([], { dockerFails: ['start'], env: { GITHUB_ACTIONS: 'true' } });
+            assert.equal(start.status, 1, start.out);
+            assert.match(start.out, /^::error title=Database checks::docker start risepath-ci-db failed \(is 127\.0\.0\.1:55432 in use\? set RISEPATH_CI_DB_PORT\)$/m);
+            const pulls = runStubbed([], { failPull: () => true, env: { GITHUB_ACTIONS: 'true' } });
+            assert.equal(pulls.status, 1, pulls.out);
+            assert.match(pulls.out.trimEnd().split('\n').at(-1) ?? '', /^::error title=Database checks::docker pull pgvector\/pgvector:0\.8\.7-pg16 failed on Docker Hub and mirror\.gcr\.io /);
         }
     });
 
@@ -728,7 +750,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
             'one compose wrapper; preflight\'s version line names no project');
     });
 
-    it('deploy <n> runs the tree\'s deploy-stack.sh with RISEPATH_DEPLOY_SKIP_PULL=1, writes deploy-<n>.log and fails when it fails', () => {
+    it('deploy <n> runs the tree\'s deploy-stack.sh with RISEPATH_DEPLOY_SKIP_PULL=1, writes deploy-<n>.log and fails when it fails, with an annotation', () => {
         /** @type {string[]} */
         const logs = [];
         const installed = (/** @type {string} */ tree) => fs.copyFileSync(path.join(tree, TEMPLATE), path.join(tree, STACK_ENV));
@@ -739,9 +761,17 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         assert.match(ok.out, /==> deploy /, 'and the job log');
 
         const failed = runStack(['deploy', '2'], { deployExit: 3, setup: installed, inspect: (tree) => logs.push(fs.readFileSync(path.join(tree, '.artifacts/ci/stack/raw/deploy-2.log'), 'utf8')) });
-        assert.notEqual(failed.status, 0, 'pipefail: tee does not hide a failed deploy');
+        assert.equal(failed.status, 1, `pipefail: tee does not hide a failed deploy: ${failed.out}`);
         assert.match(stackScript, /^set -euo pipefail$/m);
         assert.equal(logs[1], `==> deploy ${LEAKY}\n`, 'the log of a failed deploy is kept for the logs step');
+        // deploy-stack.sh prints no annotation: without this one the check's summary shows only the exit code.
+        const DEPLOY_FAILED = 'deploy-stack\\.sh exited 3: its last lines above say why \\(deploy-2\\.log\\)';
+        assert.match(failed.out, new RegExp(`^❌ ${DEPLOY_FAILED}$`, 'm'));
+        assert.doesNotMatch(failed.out, /::error/, 'the annotation only on GitHub Actions');
+        const annotated = runStack(['deploy', '2'], { deployExit: 3, setup: installed, env: { GITHUB_ACTIONS: 'true' } });
+        assert.equal(annotated.status, 1, annotated.out);
+        assert.match(annotated.out, new RegExp(`^❌ ${DEPLOY_FAILED}\\n::error title=Stack::${DEPLOY_FAILED}$`, 'm'));
+        assert.doesNotMatch(runStack(['deploy', '1'], { setup: installed, env: { GITHUB_ACTIONS: 'true' } }).out, /::error/, 'a passing deploy has none');
 
         const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-stack-logdir-'));
         try {
@@ -750,7 +780,7 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         } finally {
             fs.rmSync(elsewhere, { recursive: true, force: true });
         }
-        assert.match(stackCode, /^ {2}RISEPATH_DEPLOY_SKIP_PULL=1 bash "\$\{STACK\}\/scripts\/deploy-stack\.sh" 2>&1 \| tee "\$\{LOG_DIR\}\/deploy-\$1\.log"$/m);
+        assert.match(stackCode, /^ {2}RISEPATH_DEPLOY_SKIP_PULL=1 bash "\$\{STACK\}\/scripts\/deploy-stack\.sh" 2>&1 \| tee "\$\{LOG_DIR\}\/deploy-\$1\.log" \|\| status=\$\?$/m);
     });
 
     it('deploy runs only with the template that install-env wrote: a developer\'s or the VM\'s stack.env, or a foreign env file beside it, never reaches deploy-stack.sh', () => {
@@ -1081,7 +1111,8 @@ describe('scripts/ci/stack.sh (temporary copy of the tree, stubs)', () => {
         const left = [];
         const { status, out, calls } = runStack(['rehearsal'], { dfKb: 10 * 1048576, deployExit: 3, redactFails: true, inspect: (tree) => left.push(fs.existsSync(path.join(tree, STACK_ENV))) });
         assert.match(out, /node: stub: redact failed/, 'the redaction of deploy-1.log failed inside the EXIT trap');
-        assert.equal(status, 3, `the deploy's exit code, not the redaction's: ${out}`);
+        assert.match(out, /❌ deploy-stack\.sh exited 3: /, 'the deploy failed with 3');
+        assert.equal(status, 1, `the deploy step's exit code (its fail), not the redaction's (7): ${out}`);
         assert.ok(calls.at(-1)?.includes(' down -v --remove-orphans '), `down runs last: ${calls.at(-1)}`);
         assert.deepEqual(left, [false], 'the installed stack.env is removed');
     });

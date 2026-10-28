@@ -23,6 +23,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT}"
 
+# Every early stop: the message, and on GitHub Actions an annotation, so the check's summary on the pull
+# request names the cause (not only "Process completed with exit code 1"). bad() below does the same.
+die() { # <exit code> <message>
+  echo "❌ $2"
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then echo "::error title=Database checks::$2"; fi
+  exit "$1"
+}
+
 # The VM's db image, tag and digest (deploy/risepath-vm/docker-compose.yml, service db).
 # server/tests/ciScripts.test.js keeps the two equal: bump them together.
 IMAGE=pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
@@ -39,18 +47,18 @@ EXISTING=''
 USAGE='usage: db-checks.sh [--existing-url postgresql://user[:password]@host:port]'
 case "$#:${1:-}" in
   0:) ;;
-  2:--existing-url) if [[ -z "$2" ]]; then echo "❌ ${USAGE}"; exit 2; fi; EXISTING="$2" ;;
-  *) echo "❌ ${USAGE}"; exit 2 ;;
+  2:--existing-url) if [[ -z "$2" ]]; then die 2 "${USAGE}"; fi; EXISTING="$2" ;;
+  *) die 2 "${USAGE}" ;;
 esac
 # libpq connects to PGHOSTADDR, or a service file's hostaddr, instead of the URL's host: clear them (both modes).
 unset PGHOSTADDR PGSERVICE PGSERVICEFILE
 if [[ -n "${EXISTING}" ]]; then   # it creates and drops databases and roles: a throwaway local cluster only
   # The role checks connect as risepath_mcp_remote to the URL's host:port (after its '@').
-  if [[ ! "${EXISTING}" =~ ^postgres(ql)?://[^@/]+@ ]]; then echo "❌ --existing-url needs the user: postgresql://user[:password]@host:port"; exit 2; fi
+  if [[ ! "${EXISTING}" =~ ^postgres(ql)?://[^@/]+@ ]]; then die 2 "--existing-url needs the user: postgresql://user[:password]@host:port"; fi
   host="$(sed -E 's#^postgres(ql)?://([^@/]*@)?(\[[^]/]*\]|[^:/?]*).*$#\3#' <<< "${EXISTING}")"
   # libpq tries each host of 'h1:p1,h2:p2' in turn, and ?host= names another one: refuse both.
-  if [[ "${EXISTING}" == *[,?]* ]]; then echo "❌ --existing-url takes no ?parameters or extra hosts (write a ',' or '?' in the password as %2C or %3F)"; exit 2; fi
-  case "${host}" in 127.0.0.1|localhost|'[::1]') ;; *) echo "❌ --existing-url must point at 127.0.0.1, localhost or [::1], not '${host}'"; exit 2 ;; esac
+  if [[ "${EXISTING}" == *[,?]* ]]; then die 2 "--existing-url takes no ?parameters or extra hosts (write a ',' or '?' in the password as %2C or %3F)"; fi
+  case "${host}" in 127.0.0.1|localhost|'[::1]') ;; *) die 2 "--existing-url must point at 127.0.0.1, localhost or [::1], not '${host}'" ;; esac
 fi
 mkdir -p "${OUT}"
 
@@ -76,19 +84,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-command -v psql > /dev/null || { echo "❌ psql is not on PATH (install the PostgreSQL 16 client)"; exit 2; }
-psql --version | grep -Eq '\(PostgreSQL\) (1[6-9]|[2-9][0-9])\.' || { echo "❌ psql 16 or newer expected: $(psql --version)"; exit 2; }
+command -v psql > /dev/null || die 2 "psql is not on PATH (install the PostgreSQL 16 client)"
+psql --version | grep -Eq '\(PostgreSQL\) (1[6-9]|[2-9][0-9])\.' || die 2 "psql 16 or newer expected: $(psql --version)"
 # Every pull, the first boot and each verify script run under timeout; stock macOS has none.
-command -v timeout > /dev/null || { echo "❌ timeout is not on PATH (coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH)"; exit 2; }
+command -v timeout > /dev/null || die 2 "timeout is not on PATH (coreutils; on a Mac: brew install coreutils, then put its gnubin folder on PATH)"
 
 if [[ -n "${EXISTING}" ]]; then
   SU="${EXISTING%/}"
   echo "::warning ::--existing-url: not the VM's image; the pgvector version and the wrong-password check are not asserted"
 else
-  command -v docker > /dev/null || { echo "❌ docker is not on PATH (without Docker: --existing-url, see the header of this script)"; exit 2; }
+  command -v docker > /dev/null || die 2 "docker is not on PATH (without Docker: --existing-url, see the header of this script)"
   if docker container inspect "${NAME}" > /dev/null 2>&1; then
-    echo "❌ A container named ${NAME} exists. Remove it, or set RISEPATH_CI_DB_NAME."
-    exit 2
+    die 2 "A container named ${NAME} exists. Remove it, or set RISEPATH_CI_DB_NAME."
   fi
   # Docker Hub refuses anonymous pulls past its limit (429) on a shared runner IP. The same digest on
   # mirror.gcr.io (Google's copy of Docker Hub, no login, so fork PRs work) is the same image: Docker
@@ -114,8 +121,7 @@ else
     fi
     pause=$((attempt * 10))
     if [[ "${attempt}" -eq 3 || $((pull_end - SECONDS)) -le "${pause}" ]]; then
-      echo "❌ docker pull ${IMAGE%%@*} failed on Docker Hub and mirror.gcr.io (attempt ${attempt} of 3, ${PULL_BUDGET_S} s at most); re-run the job later"
-      exit 1
+      die 1 "docker pull ${IMAGE%%@*} failed on Docker Hub and mirror.gcr.io (attempt ${attempt} of 3, ${PULL_BUDGET_S} s at most); re-run the job later"
     fi
     echo "::warning ::docker pull failed (attempt ${attempt}); trying again in ${pause} s"
     sleep "${pause}"
@@ -126,13 +132,12 @@ else
   docker create --name "${NAME}" -e POSTGRES_PASSWORD="${SU_PASSWORD}" -p "127.0.0.1:${PORT}:5432" \
     "${RUN_IMAGE}" -c log_error_verbosity=terse -c logging_collector=on > /dev/null
   STARTED=1
-  docker start "${NAME}" > /dev/null || { echo "❌ docker start ${NAME} failed (is 127.0.0.1:${PORT} in use? set RISEPATH_CI_DB_PORT)"; exit 1; }
+  docker start "${NAME}" > /dev/null || die 1 "docker start ${NAME} failed (is 127.0.0.1:${PORT} in use? set RISEPATH_CI_DB_PORT)"
   SU="postgresql://postgres:${SU_PASSWORD}@127.0.0.1:${PORT}"
   # First boot runs a socket-only init server, then the real one: wait for a query over TCP (≤ 120 s).
   if ! timeout 120 bash -c "until psql '${SU}/postgres' -X -q -At -c 'SELECT 1' > /dev/null 2>&1; do sleep 1; done"; then
     docker logs "${NAME}" 2>&1 | tail -n 50
-    echo "❌ PostgreSQL did not accept connections within 120 s"
-    exit 1
+    die 1 "PostgreSQL did not accept connections within 120 s"
   fi
 fi
 HOSTPORT="${SU##*@}"
@@ -146,8 +151,7 @@ expect_eq "logging_collector (R11 reads the server log)" "$(sql postgres 'SHOW l
 # The role SQL sets the role's password, connection limit and timeouts for the whole cluster: an
 # existing role (--existing-url on a cluster in use) is refused before anything changes or waits.
 if [[ "$(sql postgres "SELECT count(*) FROM pg_roles WHERE rolname = 'risepath_mcp_remote'")" != 0 ]]; then
-  echo "❌ the role risepath_mcp_remote exists: use an empty cluster (the role SQL would change its password)"
-  exit 2
+  die 2 "the role risepath_mcp_remote exists: use an empty cluster (the role SQL would change its password)"
 fi
 
 # The verify scripts compare Japan-time days (verify-phase5.mjs P8's today, verify-phase6.mjs todayOf()).
@@ -155,8 +159,7 @@ node scripts/ci/jst-midnight-guard.mjs --url "${SU}/postgres" --budget 180
 
 for db in verify_del verify_p5 verify_p6 risepath; do
   if [[ "$(sql postgres "SELECT count(*) FROM pg_database WHERE datname = '${db}'")" != 0 ]]; then
-    echo "❌ database ${db} exists: use an empty cluster"
-    exit 2
+    die 2 "database ${db} exists: use an empty cluster"
   fi
   sql postgres "CREATE DATABASE ${db}" > /dev/null
 done

@@ -154,7 +154,10 @@ cmd_deploy() { # <n>: the real script; the opt-out skips only its git pull (owne
   ours "${STACK}/stack.env" || fail 'deploy/risepath-vm/stack.env is not the CI template: run install-env first'
   refuse_foreign_env
   mkdir -p "${LOG_DIR}"
-  RISEPATH_DEPLOY_SKIP_PULL=1 bash "${STACK}/scripts/deploy-stack.sh" 2>&1 | tee "${LOG_DIR}/deploy-$1.log"
+  local status=0
+  RISEPATH_DEPLOY_SKIP_PULL=1 bash "${STACK}/scripts/deploy-stack.sh" 2>&1 | tee "${LOG_DIR}/deploy-$1.log" || status=$?
+  # deploy-stack.sh prints its own ❌ or Compose's error, but no annotation: name the failure for the check.
+  if [[ "${status}" -ne 0 ]]; then fail "deploy-stack.sh exited ${status}: its last lines above say why (deploy-$1.log)"; fi
 }
 
 cmd_mcp_db() { # mcp's /health answers 200 either way; its body says whether the database answered
