@@ -1,6 +1,6 @@
-// Migration 019 (Phase 5: one-lesson reset, XP ledger, learning days), pinned on its SQL text: CI
-// has no Postgres. The behaviour on a real PostgreSQL 16 is proved by scripts/db/verify-phase5.mjs
-// (the stage gate and the README's 確かめ方).
+// Migration 019 (Phase 5: one-lesson reset, XP ledger, learning days), pinned on its SQL text (npm
+// test has no database). The behaviour on PostgreSQL 16 is proved by scripts/db/verify-phase5.mjs,
+// which CI's Database checks job runs (scripts/ci/db-checks.sh).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

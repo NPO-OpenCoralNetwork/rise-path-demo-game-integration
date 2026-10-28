@@ -1022,3 +1022,173 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
     assert.deepEqual(entries.map((e) => [e.path, e.rule]), [[rel, 'absolute-personal-path']], 'one entry, this file and this rule only');
   });
 });
+
+// Phase 7 (owner decision P3; doc/brushup-2026/ai-access-plan.ja.md): "Server stack deploy" runs the
+// real deploy-stack.sh on the commit it checked out (often a detached HEAD, where `git pull` fails),
+// through scripts/ci/stack.sh deploy with RISEPATH_DEPLOY_SKIP_PULL=1. Only that step is skipped, and
+// only for exactly 1 from the caller's environment; on the VM the variable is unset and every deploy
+// pulls and re-runs a moved script, as before. CI never runs the pull or the re-run, so these tests are
+// their only check: the whole script runs from a temporary copy with recording git and docker stubs.
+describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', () => {
+  const script = read(path.join(STACK, 'scripts/deploy-stack.sh'));
+  // deploy-stack.sh uses ${var,,} (bash 4); stock macOS bash 3.2 stops with "bad substitution".
+  const bash4 = spawnSync('bash', ['-c', 'x=A; : "${x,,}"']).status === 0;
+  const skip = bash4 ? false : 'needs bash ≥ 4 (deploy-stack.sh uses ${var,,}); on a Mac: brew install bash';
+  const COMPOSE = 'compose --env-file stack.env -f docker-compose.yml ';
+  const VM_SEQUENCE = [
+    'build',
+    'up -d --wait db',
+    'run --rm --no-deps -T api npm run db:migrate',
+    'up -d --no-deps --force-recreate --wait api',
+    '--profile full ps -aq hermes',
+    'up -d',
+    'up -d --wait mcp',
+    'exec -T api env PORT=3006 MCP_SSE_PORT=3100 API_SERVER_PORT=8642 MEMANTO_API_PORT=8100 node scripts/smoke-vm-stack.mjs --target container --require-mcp',
+    'ps',
+  ];
+
+  /**
+   * Runs a copy of deploy-stack.sh in <tmp>/repo (with a .git directory, so it would pull) and
+   * stack.env = ci/stack.ci.env unless `stackEnv` is given. git and docker are recording stubs: git
+   * `rev-parse HEAD` prints one sha, or with `moving` sha A on its first call and sha B afterwards (the
+   * pull moved HEAD); `pull` exits 1 like a detached checkout with `pullFails`. docker prints nothing
+   * and logs the compose project and profiles it was given.
+   */
+  const runDeploy = ({ skipPull, stackEnv, moving = false, pullFails = false } = {}) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-stack-'));
+    try {
+      const stackDir = path.join(dir, 'repo/deploy/risepath-vm');
+      fs.mkdirSync(path.join(stackDir, 'scripts'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'repo/.git'));
+      fs.copyFileSync(path.join(STACK, 'scripts/deploy-stack.sh'), path.join(stackDir, 'scripts/deploy-stack.sh'));
+      fs.writeFileSync(path.join(stackDir, 'stack.env'), stackEnv ?? read(path.join(STACK, 'ci/stack.ci.env')));
+      const bin = path.join(dir, 'bin');
+      fs.mkdirSync(bin);
+      const log = path.join(dir, 'calls.log');
+      fs.writeFileSync(log, '');
+      const stub = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+      stub('git', [
+        'echo "git $*" >> "$STUB_LOG"',
+        'if [[ "$1" == -C ]]; then shift 2; fi',
+        'case "$1" in',
+        '  rev-parse)',
+        '    n=$(cat "$STUB_COUNT" 2> /dev/null || echo 0); echo $((n + 1)) > "$STUB_COUNT"',
+        '    if [[ "$STUB_MOVING" == 1 && "$n" -gt 0 ]]; then echo bbbbbbbb; else echo aaaaaaaa; fi ;;',
+        '  pull) if [[ "$STUB_PULL_FAILS" == 1 ]]; then echo "You are not currently on a branch." >&2; exit 1; fi ;;',
+        'esac',
+      ].join('\n'));
+      stub('docker', 'echo "docker [${COMPOSE_PROJECT_NAME-<unset>}|${COMPOSE_PROFILES-<unset>}] $*" >> "$STUB_LOG"');
+      const env = {
+        PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        HOME: dir,
+        STUB_LOG: log,
+        STUB_COUNT: path.join(dir, 'count'),
+        STUB_MOVING: moving ? '1' : '0',
+        STUB_PULL_FAILS: pullFails ? '1' : '0',
+        ...(skipPull === undefined ? {} : { RISEPATH_DEPLOY_SKIP_PULL: skipPull }),
+      };
+      const result = spawnSync('bash', [path.join(stackDir, 'scripts/deploy-stack.sh')], { env, encoding: 'utf8', timeout: 30_000 });
+      const calls = lines(read(log));
+      const docker = calls.filter((line) => line.startsWith('docker '));
+      return {
+        status: result.status,
+        out: `${result.stdout}${result.stderr}`,
+        calls,
+        git: calls.filter((line) => line.startsWith('git ')),
+        docker,
+        compose: docker.map((line) => line.replace(/^docker \[[^\]]*\] /, '')).map((line) => (line.startsWith(COMPOSE) ? line.slice(COMPOSE.length) : `(not compose) ${line}`)),
+      };
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('reads RISEPATH_DEPLOY_SKIP_PULL once, before stack.env is sourced, into a read-only variable', () => {
+    const readAt = script.search(/^readonly RISEPATH_CALLER_SKIP_PULL="\$\{RISEPATH_DEPLOY_SKIP_PULL:-\}"$/m);
+    assert.ok(readAt > 0, 'readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"');
+    assert.ok(readAt < script.search(/^source stack\.env$/m), 'before stack.env is sourced');
+    const code = script.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+    assert.equal(code.match(/RISEPATH_DEPLOY_SKIP_PULL/g)?.length, 2, 'read once, and named in the message');
+    assert.match(code, /^ {2}echo "==> git pull skipped \(RISEPATH_DEPLOY_SKIP_PULL=1\): deploying the checked-out commit"$/m);
+    assert.equal(code.match(/RISEPATH_CALLER_SKIP_PULL/g)?.length, 2, 'set once, read once');
+    assert.match(code, /^if \[\[ "\$\{RISEPATH_CALLER_SKIP_PULL\}" == "1" \]\]; then\n {2}echo "==> git pull skipped[^\n]*\nelif \[\[ -d "\$\{REPO_ROOT\}\/\.git" \]\]; then\n {2}echo "==> git pull"\n/m,
+      'a branch in front of the old pull block, which is unchanged');
+  });
+
+  it('unset (the VM): git pull --ff-only runs before any docker call; a detached checkout stops the deploy there', { skip }, () => {
+    const vm = runDeploy();
+    assert.equal(vm.status, 0, vm.out);
+    assert.deepEqual(vm.git.filter((line) => line.endsWith(' pull --ff-only')).length, 1);
+    const pullAt = vm.calls.findIndex((line) => line.endsWith(' pull --ff-only'));
+    assert.ok(pullAt >= 0 && pullAt < vm.calls.findIndex((line) => line.startsWith('docker ')), 'the pull comes first');
+    assert.deepEqual(vm.compose, VM_SEQUENCE);
+    assert.match(vm.out, /==> git pull\n/);
+    assert.doesNotMatch(vm.out, /git pull skipped/);
+
+    const detached = runDeploy({ pullFails: true });
+    assert.equal(detached.status, 1, detached.out);
+    assert.match(detached.out, /You are not currently on a branch/);
+    assert.deepEqual(detached.docker, [], 'nothing built or started');
+  });
+
+  it('unset (the VM), HEAD moved by the pull: one re-run of the pulled script, which pulls again and deploys once', { skip }, () => {
+    const moved = runDeploy({ moving: true });
+    assert.equal(moved.status, 0, moved.out);
+    assert.equal(moved.out.match(/==> HEAD moved — re-running the pulled deploy-stack\.sh/g)?.length, 1, 'one re-run');
+    assert.equal(moved.git.filter((line) => line.endsWith(' pull --ff-only')).length, 2, 'the re-run pulls again (HEAD no longer moves)');
+    assert.equal(moved.git.length, 6, moved.git.join('\n'));
+    assert.deepEqual(moved.compose, VM_SEQUENCE, 'built and deployed once, by the re-run');
+  });
+
+  it('RISEPATH_DEPLOY_SKIP_PULL=1 skips only the pull: no git call, then the same compose sequence', { skip }, () => {
+    for (const moving of [false, true]) {
+      const ci = runDeploy({ skipPull: '1', moving });
+      assert.equal(ci.status, 0, ci.out);
+      assert.deepEqual(ci.git, [], 'no git call: no pull, no re-run');
+      assert.deepEqual(ci.compose, VM_SEQUENCE);
+      assert.match(ci.out, /==> git pull skipped \(RISEPATH_DEPLOY_SKIP_PULL=1\): deploying the checked-out commit\n/);
+      assert.doesNotMatch(ci.out, /==> git pull\n|HEAD moved/);
+    }
+  });
+
+  it('only exactly 1 skips: true, yes, 0, 01, " 1" and an empty value still pull', { skip }, () => {
+    for (const value of ['true', 'yes', '0', '01', ' 1', '']) {
+      const run = runDeploy({ skipPull: value });
+      assert.equal(run.status, 0, `${JSON.stringify(value)}: ${run.out}`);
+      assert.equal(run.git.filter((line) => line.endsWith(' pull --ff-only')).length, 1, JSON.stringify(value));
+      assert.doesNotMatch(run.out, /git pull skipped/, JSON.stringify(value));
+    }
+  });
+
+  it('stack.env cannot turn the pull off, and a stack.env that assigns the read-only name stops before any docker call', { skip }, () => {
+    const template = read(path.join(STACK, 'ci/stack.ci.env'));
+    const viaEnv = runDeploy({ stackEnv: `${template}RISEPATH_DEPLOY_SKIP_PULL=1\n` });
+    assert.equal(viaEnv.status, 0, viaEnv.out);
+    assert.equal(viaEnv.git.filter((line) => line.endsWith(' pull --ff-only')).length, 1, 'stack.env is read after the variable');
+
+    for (const line of ['RISEPATH_CALLER_SKIP_PULL=1', 'export RISEPATH_CALLER_SKIP_PULL=1']) {
+      const internal = runDeploy({ stackEnv: `${template}${line}\n` });
+      assert.notEqual(internal.status, 0, `${line}: ${internal.out}`);
+      assert.match(internal.out, /RISEPATH_CALLER_SKIP_PULL: readonly variable/, line);
+      assert.deepEqual(internal.docker, [], `${line}: nothing built or started`);
+      assert.deepEqual(internal.git, [], `${line}: stopped at source stack.env`);
+    }
+  });
+
+  it('the CI env template passes every guard, deploys the risepath-ci project and starts no profile', { skip }, () => {
+    const ci = runDeploy({ skipPull: '1' });
+    assert.equal(ci.status, 0, ci.out);
+    assert.match(ci.out, /==> Billing sales: off /);
+    assert.match(ci.out, /==> COMPOSE_PROFILES has no full: Hermes is not started/);
+    assert.match(ci.out, /MEMANTO_SECRET_KEY unset — skipping Memanto overlay/);
+    assert.doesNotMatch(ci.out, /❌|Public edge|byoa profile enabled|Memanto overlay enabled/);
+    assert.ok(ci.docker.length > 0);
+    for (const line of ci.docker) assert.match(line, /^docker \[risepath-ci\|\] compose /, 'project risepath-ci from stack.env, no profile');
+    assert.ok(!ci.compose.some((line) => line.includes('memanto')), 'one compose file');
+
+    const placeholder = runDeploy({ skipPull: '1', stackEnv: read(path.join(STACK, 'ci/stack.ci.env')).replace('ci-dummy-bridge-token', 'change-me') });
+    assert.equal(placeholder.status, 1, 'the placeholder guard still runs with the opt-out');
+    assert.match(placeholder.out, /RISE_PATH_BRIDGE_TOKEN/);
+    assert.deepEqual(placeholder.docker, []);
+  });
+});

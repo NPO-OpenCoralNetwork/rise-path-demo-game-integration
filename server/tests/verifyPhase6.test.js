@@ -1,8 +1,8 @@
 // scripts/db/verify-phase6.mjs without a database: its options and exit codes (shared with
 // verify-account-deletion.mjs), and that the checks it runs are the shipped code. The checks
-// themselves need a throwaway PostgreSQL 16 (the Phase 6 stage gates run them). A check that could
-// not run here (P4 without psql) is not a pass: exit 3 unless --allow-skip. Same pins as
-// verifyPhase5.test.js for verify-phase5.mjs.
+// themselves need a throwaway PostgreSQL 16 (CI's Database checks job runs them:
+// scripts/ci/db-checks.sh). A check that could not run here (P4 without psql) is not a pass: exit 3
+// unless --allow-skip. Same pins as verifyPhase5.test.js for verify-phase5.mjs.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

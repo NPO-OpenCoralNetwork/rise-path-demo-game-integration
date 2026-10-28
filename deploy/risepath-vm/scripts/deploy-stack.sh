@@ -9,6 +9,13 @@ REPO_ROOT="$(cd "${STACK_DIR}/../.." && pwd)"
 
 cd "${STACK_DIR}"
 
+# CI only (.github/workflows/e2e.yml through scripts/ci/stack.sh deploy; owner decision P3): the job
+# deploys the commit it checked out, often a detached HEAD where `git pull` fails. Only exactly 1 skips
+# the pull (and so the re-run after it). Read from the caller's environment before stack.env is
+# sourced and kept read-only, so stack.env can never turn the pull off. Unset on the VM: every deploy
+# pulls and re-runs a moved script, as before.
+readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"
+
 if [[ ! -f stack.env ]]; then
   echo "Missing stack.env — copy stack.env.example and fill secrets"
   exit 1
@@ -19,7 +26,9 @@ set -a
 source stack.env
 set +a
 
-if [[ -d "${REPO_ROOT}/.git" ]]; then
+if [[ "${RISEPATH_CALLER_SKIP_PULL}" == "1" ]]; then
+  echo "==> git pull skipped (RISEPATH_DEPLOY_SKIP_PULL=1): deploying the checked-out commit"
+elif [[ -d "${REPO_ROOT}/.git" ]]; then
   echo "==> git pull"
   HEAD_BEFORE="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   git -C "${REPO_ROOT}" pull --ff-only

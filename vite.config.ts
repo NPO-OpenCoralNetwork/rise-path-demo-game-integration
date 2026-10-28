@@ -27,7 +27,8 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         proxy: {
           '/api': {
-            // Dev only: API_PROXY_TARGET points a second dev server at another API instance.
+            // Dev, and vite preview in the end-to-end checks (preview inherits server.proxy; playwright.config.ts).
+            // API_PROXY_TARGET points a second dev server, or that preview, at another API instance.
             target: process.env.API_PROXY_TARGET || 'http://localhost:3006',
             changeOrigin: true,
             secure: false,

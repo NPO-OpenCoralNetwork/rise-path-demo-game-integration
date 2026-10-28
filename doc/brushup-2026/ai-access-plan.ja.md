@@ -1,8 +1,8 @@
 # 学習者が AI を使う方法の方針（決定記録）
 
 - 日付: 2026-10-22
-- 決めた人: オーナー（Phase 0 を承認。Phase 3 は 2026-10-23 に「作るが止めておく。テストモードだけ」と決定。Phase 4 の D1〜D5 は 8 章。Phase 5 の O1〜O4 は 9 章。Phase 6 の R1〜R4 は 10 章）
-- 状態: Phase 0 は実施済み。Phase 0.5（未成年のための安全対策）は実施中（オーナーが「おすすめの既定で進める」と承認）。Phase 1（大人が自分の AI をつなぐ）はコードと手順書を作りました（2026-10-23。公開はオーナーの設定と確認のあと）。Phase 2（レッスンの進み具合をサーバーに保存し、AI と学ぶツールを足す）もコードを作りました（2026-10-23。使い始めるのは、オーナーが VM を更新して確かめたあと。6 章）。Phase 3（有料のサポータープラン）もコードを作りました（2026-10-23）。止めたままで、使えるのは Stripe のテストモードで、オーナーが決めたテストの方だけです。本物の請求は、法律と税の確認とオーナーの OK のあとです（7 章）。Phase 4（規約のページ、登録の同意、アカウントの削除、保存期間）もコードを作りました（2026-10-24）。規約のページと同意は `VITE_FEATURE_LEGAL_PAGES` で止めていて、一般の登録は、弁護士の確認のあとにそれを on にするまで受け付けません（8 章）。Phase 5（保存の様子の表示、1 つのレッスンのやり直し、XP とバッジをサーバーに）もコードを作りました（2026-10-25。使い始めるのは、オーナーが migration 019 を当てて VM を更新したあと。9 章）。Phase 6（レッスンの復習カードが、忘れかけたころにもう一度出る）もコードを作りました（2026-10-26。使い始めるのは、オーナーが migration 020 を当てて VM を更新したあと。10 章）。
+- 決めた人: オーナー（Phase 0 を承認。Phase 3 は 2026-10-23 に「作るが止めておく。テストモードだけ」と決定。Phase 4 の D1〜D5 は 8 章。Phase 5 の O1〜O4 は 9 章。Phase 6 の R1〜R4 は 10 章。Phase 7 の P1〜P5 は 11 章）
+- 状態: Phase 0 は実施済み。Phase 0.5（未成年のための安全対策）は実施中（オーナーが「おすすめの既定で進める」と承認）。Phase 1（大人が自分の AI をつなぐ）はコードと手順書を作りました（2026-10-23。公開はオーナーの設定と確認のあと）。Phase 2（レッスンの進み具合をサーバーに保存し、AI と学ぶツールを足す）もコードを作りました（2026-10-23。使い始めるのは、オーナーが VM を更新して確かめたあと。6 章）。Phase 3（有料のサポータープラン）もコードを作りました（2026-10-23）。止めたままで、使えるのは Stripe のテストモードで、オーナーが決めたテストの方だけです。本物の請求は、法律と税の確認とオーナーの OK のあとです（7 章）。Phase 4（規約のページ、登録の同意、アカウントの削除、保存期間）もコードを作りました（2026-10-24）。規約のページと同意は `VITE_FEATURE_LEGAL_PAGES` で止めていて、一般の登録は、弁護士の確認のあとにそれを on にするまで受け付けません（8 章）。Phase 5（保存の様子の表示、1 つのレッスンのやり直し、XP とバッジをサーバーに）もコードを作りました（2026-10-25。使い始めるのは、オーナーが migration 019 を当てて VM を更新したあと。9 章）。Phase 6（レッスンの復習カードが、忘れかけたころにもう一度出る）もコードを作りました（2026-10-26。使い始めるのは、オーナーが migration 020 を当てて VM を更新したあと。10 章）。Phase 7（公開の前の、CI の 3 つのチェック）もコードを作りました（2026-10-28。必須にするのは、このプルリクエストをマージしたあとに、オーナーがブランチのルールを設定してから。11 章）。
 - 関連: [../legal/README.md](../legal/README.md)（プライバシーポリシーと利用規約の下書き）、[../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)（データの送り先の一覧）、[../guides/safety-operations.ja.md](../guides/safety-operations.ja.md)（安全の運用ガイド）
 
 この文書の工数（何日かかるか）は、どれも**見積もり**です。作って測ったものではありません。費用は**試算**で、前提を変えると変わります。
@@ -723,7 +723,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 - 効力が生じる日より前に、新しい規約を見せるページ。
 - 外国への提供の手続きを登録のときの同意で行う場合の、施行規則 第 17 条の項目とその版（作っていません）。
 - 保護者がアカウントを登録する年齢の線と、保護者の同意の記録。
-- マイグレーションを本物の PostgreSQL で確かめる CI の仕事（`scripts/db/verify-account-deletion.mjs` を `pgvector/pgvector:0.8.7-pg16` で動かす）を足すか（CI が変わるので、オーナーが決めます）。今は、手元の使い捨ての DB で確かめています。
+- マイグレーションを本物の PostgreSQL で確かめる CI の仕事は、Phase 7 で入れました（11 章の `Database checks`）。
 - Memanto への呼び出しの時間の上限、削除したアカウントの続いている契約の知らせの種類（今はログの警告だけ）。
 
 ### 8.5 困ったときの手順（ランブック）
@@ -802,7 +802,7 @@ Phase 2 で、レッスンの進み具合をサーバーに保存するように
 - MCP の `learner-state-get` は、まだ `streak: 0` を返します（`tools/core/learnerState.js`）。この欄をなくすか、`learning_days` から計算するか（MCP のロールへの権限、同意の文、プライバシーポリシー 4.4 の変更が要ります）。
 - レッスンの終わりに「+40 XP」のように、もらった XP を見せること。
 - 古い `PUT /api/v2/user/progress/:courseId` の形の確かめ（ID の形、ステージの数、手順の大きさ）。XP は、ステージ 1〜4 だけを数え、持ち主の決まりもあるので、今も上限があります。
-- マイグレーションを本物の PostgreSQL で確かめる CI の仕事（8.4 と同じ。`scripts/db/verify-phase5.mjs` も）。
+- マイグレーションを本物の PostgreSQL で確かめる CI の仕事は、Phase 7 で入れました（11 章の `Database checks`）。
 - Nexloom だけでログインした人のための、端末だけのやり直し（今はボタンを出しません）。
 - 端末の時計のずれを、サーバーの時刻（応答の `Date`）から直すこと（R5 を狭めます）。
 - 先生が学習者の進み具合を見る画面（6.4）。
@@ -893,10 +893,164 @@ Phase 6 では、レッスンの暗記カード（復習カード）が、忘れ
 - アプリの外の知らせ（メールやプッシュ）、5 つの項目のナビゲーション、`learner-state-get` の復習の欄、claude-code のカードの英訳。
 - 範囲を絞るときに見送ったもの: レッスンの終わりの復習の 1 行とリンク、スマートフォンのメニューのボタンの枚数、終わりの画面の「覚えた」と「もう一度」の数、日本時間の 0 時の読み直し、AI チューターのプロンプトで復習のツールを名指しすること、AI チューターのカードの「この端末だけ」の 1 行、英語の画面の「このカードは日本語です」。
 - レッスンの中のカード（`components/lesson/blocks/FlashcardsBlock.tsx`）は、動きを減らしていない画面で次のカードに進むとき、前のカードの答えが 1〜2 フレームだけ見えます。復習のページは、カードごとに裏返る部分を作り直して防ぎました。同じ 1 行の直しが使えますが、Phase 6 ではこのファイルを変えていません。
-- マイグレーションを本物の PostgreSQL で確かめる CI の仕事（`scripts/db/verify-phase6.mjs` も。9.4 と同じ）。
+- マイグレーションを本物の PostgreSQL で確かめる CI の仕事は、Phase 7 で入れました（11 章の `Database checks`）。
 - 工数（見積もり・未検証）: 実際にかかった日数は測っていません【要確認】。オーナーの更新と確認は、半日ほどの見込みです。
 
-## 11. やらないこと
+## 11. Phase 7: 公開の前に、通しで確かめる（CI の 3 つのチェック）
+
+Phase 1〜6 のコードは、まだ本番で動いたことがありません（2026-10-21 に VM を削除したためです）。作り直した VM では、最初の `deploy-stack.sh` が、空の DB に migration 000–020 をまとめて流します。Phase 7 では、それと同じことを GitHub Actions で、プルリクエストのたびに確かめるようにしました（2026-10-28 の作業ツリー）。オーナーの決定は次の 5 つです。
+
+- **P1**: 新しい確かめを 3 つ足します。(A) VM と同じ pgvector の PostgreSQL 16（`docker-compose.yml` と同じダイジェスト）に migration を 2 回流し、確かめのスクリプト 3 つと DB ロールの SQL を動かします。(B) 本物の `deploy-stack.sh` で、秘密を含まないダミーの値のスタックを Docker で作り、ヘルスチェックとスモークを通します。(C) ブラウザで、ログイン → レッスン → 復習の流れを、そのスタックに対して最後まで動かします。
+- **P2**: (B) と (C) は、すべてのプルリクエスト、main への push、毎晩、手動で動かします。(A) も、すべてのプルリクエストと push で動かします。
+- **P3**: `deploy-stack.sh` に、CI の変数があるときだけ「最新のコードを取る」手順（git pull）を飛ばす、小さな切り替えを足します。VM では変数を設定しないので、何も変わりません。テストで固定します。
+- **P4**: 失敗したときのスクリーンショットとログを残すために、GitHub の `actions/upload-artifact` を使います。ほかの Action は足しません。
+- **P5**: この 3 つは、マージの前に必ず通るもの（必須のチェック）にします。ブランチのルールは、オーナーが GitHub で設定します（11.2 の 1）。
+
+この章では、次の言葉を使います。
+
+- **チェック**: プルリクエストの画面に出る、CI の 1 つの仕事の結果です（緑か赤）。
+- **必須のチェック**: 緑にならないとマージできないチェックです。ブランチのルールで決めます。
+- **ログインの代わり**: Supabase のログインと同じ形の答えを返す、テスト専用の小さなプログラムです（`e2e/support/auth-stand-in.mjs`）。本物の Supabase には、つなぎません。
+- **ダミーの値**: 形だけの値です（`ci-dummy-…`）。秘密ではなく、本番では使いません。
+
+### 11.1 作ったもの
+
+- **CI の仕事** `.github/workflows/e2e.yml`（名前は `End-to-end checks`）。どれも秘密を使わないので、フォークからのプルリクエストでも動きます（初めての人のものは、承認のあとです。11.5）。
+
+  | チェックの名前 | 確かめること | 手元で | 時間（2026-10-28、GitHub での最初の実行で測った値） |
+  |---|---|---|---|
+  | `Database checks` | VM と同じ DB のイメージを、本番と同じ `log_error_verbosity=terse` で起動します。確かめのスクリプト 3 つ（`verify-account-deletion.mjs`・`verify-phase5.mjs`・`verify-phase6.mjs`）を、それぞれ空の DB で、飛ばしを許さずに動かします。別の DB に `scripts/db-migrate.mjs` で migration を 2 回流し（2 回目は何も流しません）、`vector(768)` の列と、DB ロールの SQL（パスワードがないときと短いときは断ること、2 回流せること、ロールで読めない表）を確かめます | `npm run ci:db` | 約 2 分（1 分 42 秒） |
+  | `Server stack deploy` | 本物の `deploy-stack.sh` で、ダミーの値のスタック（db・api・mcp）を Docker で作ります（ビルド → db → migration → api → ヘルスチェック → スモーク）。そのあと、実行環境（手元ではこのマシン）から `/api/v2/health` を読み、本番の設定で動いていて、まだ流していない migration がないことと、`mcp` が DB につながっていることを確かめます。最後にディスクの使い方を出します（「Disk use」） | `npm run ci:stack` | 約 2 分（2 分 2 秒） |
+  | `Learner end-to-end` | 同じ手順でスタックを作り、本番と同じビルドの画面（`build:prod` を `vite preview` で出します）とログインの代わりをつなぎ、ブラウザ（Playwright）で下の 5 つの流れを動かします。最後にディスクの使い方を出します（「Disk use」） | `npm run e2e:local` | 約 4 分（4 分 14 秒。ブラウザの 5 つの流れは 1.1 分） |
+
+  `Database checks` は ubuntu-24.04（psql 16 があるため）で、ほかの 2 つは ubuntu-26.04（VM と同じ Docker 29 と Compose 5 のため）で動きます。どの手順にも時間の上限があり、止まったまま動かない手順は、そこで失敗になります。仕事ごとの上限（42 分・61 分・105 分）は、手順の上限の合計より長くしてあるので、そのときもログは残ります。
+
+- **ブラウザで動かす 5 つの流れ**（`e2e/learner.spec.ts`。毎回、新しい学習者です）
+  1. ログイン → レッスン（`vibe-coding/vibe-ch1`）の暗記カードで「覚えた」→ 保存の表示が「保存済み」→ 復習のページは「今日の復習はありません。」→ DB でカードを 2 日前に学んだことにして、期日を今日にする → 「覚えた」→ 今日の残りが 1 枚から 0 枚になり、サーバーに復習の記録が残ります。DB を変えるのは、この 1 か所だけです（`e2e/support/sql.ts`）。その前に、学んだ日を変えずに期日だけを今日にすると DB が断ること（23514）も確かめます。
+  2. レッスン（`vibe-coding/vibe-ch0`）を最後まで読む → サーバーに XP 50 と「はじめてのレッスン完了」のバッジが付きます。
+  3. レッスンを少し読み、カードに印を付けて復習に入れる → 「このレッスンを最初からやり直す」→ そのレッスンのカードが外れ、XP（10）は残ります。
+  4. インターネットにつながらない状態でカードに印を付ける → ログアウトを押すと「まだ保存できていない学習があります」→「ログアウトしない」→ つながると保存され、そのあとはそのままログアウトできます。
+  5. アカウントの削除（`ACCOUNT_DELETION_ENABLED=true` は CI のスタックだけです）。パスワードを入れ直して削除すると、その場でパスワードを確かめた新しいトークン（`amr`）で削除が通ります。削除の前にほかの端末でログインしたままのセッションは、断られます（`account_deleted`）。このブラウザのセッションは、削除のあとでログアウトするので、ログインの代わりが断ります（本物の Supabase と同じです）。
+
+  5 つの流れは、1 つずつ順に動かします（同時には動かしません）。決まった時間だけ待つことはせず、サーバーと DB の記録が変わるまで待ちます。API の上限（1 つの接続元から 1 分に 200 回）に当たったとき（429）、学習者の API が 5xx を返したとき、ログインの代わりが知らない呼び出し（404）を受けたときは、失敗にします。日本時間の 0 時の 8 分前からは、0 時を過ぎるまで待ってから始めます（`Database checks` は 3 分前から）。日付は、すべてサーバーと DB から読みます。どの流れも AI を呼ばないので、AI を使う前の年齢の記録は要りません（年齢の確かめが止めるのは、AI の呼び出しだけです）。
+
+- **ログインの代わり**（`e2e/support/auth-stand-in.mjs`）。`e2e-…@example.org` のメールと、決まったダミーのパスワードでログインできます。ログインのたびに、パスワードを確かめた時刻（`amr`）を入れたトークンを出します。ログアウトしたセッションのトークンは、本物の Supabase と同じように断ります（`session_not_found`）。署名の鍵は起動のたびに作り、どこにも保存しません。`RISEPATH_E2E_AUTH_STANDIN=1` がないと起動せず、`NODE_ENV=production` のときと Vercel の上でも起動しません。本番で動くイメージ（VM の `api` と `mcp`）には入りません（Dockerfile は決まったフォルダーだけをコピーします）。本番のコードからは読み込めません（`npm run lint:arch` で固定しています）。CI では、スタックと同じ Docker のネットワークに、コンテナとして置きます。ブラウザからは、このマシンの中（127.0.0.1）からだけ届きます。
+- **CI の値**: `deploy/risepath-vm/ci/stack.ci.env` のダミーの値です。AI はオフ（鍵なし）、有料プランはオフ、規約のページの切り替えもオフ、origin gate（Vercel から来たリクエストだけに答えるしくみ）もオフです。Compose のプロジェクト名は `risepath-ci` です。
+- **`deploy-stack.sh` の切り替え**: 環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` があるときだけ「git pull」を飛ばし、取り出してあるコミットをデプロイします（P3）。`stack.env` に書いても効きません。VM では設定しないので、何も変わりません。pull でスクリプトが新しくなったときにやり直す動きも、テストで固定しています。
+- **直したもの**: `verify-account-deletion.mjs` の R11 は、本番と同じ `log_error_verbosity=terse` の DB では失敗していました（49 件のうち 1 件）。`SET log_error_verbosity = default` の `default` が、値ではなく「サーバーの設定に戻す」という意味になっていたためです。値を引用符で囲み、ログを決まった時間だけ待つのをやめて、2 つの記録がそろうまで読み直すようにしました。テストで固定しています。
+- **手元で流す**
+
+  ```bash
+  npm run ci:db        # Database checks
+  npm run ci:stack     # Server stack deploy（最後に片付けます）
+  npm run e2e:local    # Learner end-to-end（最後に片付けます）
+  ```
+
+  - 要るもの: Docker（Compose v2.24 以上）、`npm ci` を済ませた Node 22、psql 16 以上（`ci:db`）、空きディスク 5 GB 以上（`ci:stack` と `e2e:local`。足りないと止まります）。Mac では、Homebrew の bash 4 以上（`deploy-stack.sh` が使うため）と、`timeout` のコマンド（Homebrew の coreutils。その gnubin のフォルダーを PATH に足します）も要ります。bash 3.2 では、`npm test` の `deploy-stack.sh` のテストは、理由を出して飛ばします。
+  - ポートの 5432・3006・3100 を使います（`e2e:local` は 4173 と 54390 も、`ci:db` は 55432 だけ）。動いているあいだは、5432（DB の管理者。パスワードは、このリポジトリに書いてあるダミーです）、3006、3100 を、すべてのネットワークに開きます。信頼できるネットワークでだけ流します。
+  - `deploy/risepath-vm/` に自分の `stack.env`・`billing.env`・`tunnel.env`・`mcp-public.env` があると、止まります（上書きしません）。そのときは、別の作業ツリー（`git worktree add`）で流します。`risepath` のスタックには触れません。
+  - ブラウザは、一度だけ `npx playwright install chromium` で入れます。
+  - 終わると、スタック、DB のボリューム、CI の `stack.env`、画面のビルド（`.artifacts/e2e/dist`）を消します。失敗したときのログと、スクリーンショットとトレースは、`.artifacts/ci/stack/logs` と `.artifacts/e2e/` に残ります。
+  - 作ったイメージ（`risepath-ci-api`・`risepath-ci-mcp`）とビルドのキャッシュは、次の実行を速くするために残ります（約 4 GB）。空きが 5 GB を切って止まったときは、`docker image rm risepath-ci-api risepath-ci-mcp` のあと `docker builder prune` で空けます（`docker builder prune` は、ほかのビルドのキャッシュも消します）。
+  - Docker が動かないマシンでは、`ci:stack` と `e2e:local` は流せません。プルリクエストの実行で確かめます。`ci:db` は、このマシンの使い捨ての PostgreSQL 16（pgvector 入り）に向けて流せます（`bash scripts/ci/db-checks.sh --existing-url postgresql://postgres@127.0.0.1:<ポート>`。URL にはユーザー名が要ります。空で、`-c log_error_verbosity=terse -c logging_collector=on` で起動したクラスタだけです）。
+  - **ブラウザの流れだけを何度も直すとき**は、スタックを 1 回作ってから、`npm run e2e` を何度でも流します。終わったら `down` で片付けます。`down` は、スタック、DB のボリューム、CI の `stack.env`、ログインの代わり、画面のビルドを消します。また始めるときは、下の手順を `bash scripts/ci/stack.sh preflight e2e` から全部流し直します。
+
+    ```bash
+    bash scripts/ci/stack.sh preflight e2e
+    bash scripts/ci/stack.sh install-env
+    bash scripts/ci/stack.sh pull
+    bash scripts/ci/stack.sh deploy 1
+    bash scripts/ci/stack.sh auth
+    bash scripts/ci/stack.sh build-front
+    npm run e2e                       # 何度でも
+    bash scripts/ci/stack.sh down     # 最後に
+    ```
+
+  - **イメージを作らずに流すとき**（Docker のないマシンでも流せます）: PostgreSQL 16 と pgvector を 127.0.0.1:5432 で、`stack.ci.env` のユーザー・パスワード・DB で動かします（そのユーザーが `vector` の拡張を作れること。Docker があれば、`db-checks.sh` と同じ pgvector のイメージを `-p 127.0.0.1:5432:5432` で起動するのが早いです）。そのあと、3 つのターミナル（のウィンドウ）で次を流します。ログインの代わりは、本番の設定（`NODE_ENV=production`）を読み込んだターミナルでは起動しないので、ターミナルを分けます。api（`node server.js`）は、`stack.ci.env` にない値を、この作業ツリーの `.env.local` から読み込みます。自分の `.env.local`（有料プラン、Stripe のテスト、Hermes、OpenRouter などの値）があると、CI とちがう設定で動きます。`.env.local` のない作業ツリー（`git worktree add`）で流すか、流すあいだだけ `.env.local` をよそに移します。この流れは、ブラウザの流れを確かめるだけです。Docker の組み立ては、プルリクエストの実行で確かめます。
+
+    ```bash
+    # ターミナル 1: ログインの代わり（127.0.0.1:54390）
+    RISEPATH_E2E_AUTH_STANDIN=1 node e2e/support/auth-stand-in.mjs
+    # ターミナル 2: CI の値で api を動かします（DB とログインの代わりは、このマシンのもの）
+    set -a; source <(grep -E '^[A-Z][A-Z0-9_]*=' deploy/risepath-vm/ci/stack.ci.env | grep -v '^COMPOSE_'); set +a
+    export DATABASE_URL_PHASE1="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+    export SUPABASE_URL=http://127.0.0.1:54390 PORT=3006
+    npm run db:migrate && node server.js
+    # ターミナル 3: 画面のビルドとブラウザの流れ
+    bash scripts/ci/stack.sh build-front && npm run e2e
+    ```
+
+- **失敗したとき**: Actions の画面で赤いチェックを開き、最初の ❌ の行を見ます。Artifacts（7 日残ります）に、スクリーンショット、トレース（`npx playwright show-trace <trace.zip>` で開きます）、値を伏せたログがあります。よくある原因と、することは 11.5 です。
+
+### 11.2 オーナーの作業
+
+1. **3 つを必須のチェックにします**（P5）。**このプルリクエストを main にマージしたあとに**設定します。マージの前に設定すると、main に向けたほかのプルリクエストが止まります（main に `e2e.yml` がないので、3 つのチェックが来ないためです）。マージのあとは、main への push で 3 つが一度動くので、候補に出ます。
+   1. GitHub のリポジトリで **Settings → Rules → Rulesets → New ruleset → New branch ruleset** を開きます。
+   2. **Ruleset name** に `main: required checks` と入れ、**Enforcement status** を `Active` にします。
+   3. **Target branches → Add target → Include default branch** を選びます（`main`）。
+   4. **Require status checks to pass** に印を付けます。**Add checks** で、次の 3 つを名前のとおりに足します。提供元は、どれも **GitHub Actions** を選びます。
+      - `Database checks`
+      - `Server stack deploy`
+      - `Learner end-to-end`
+
+      今ある CI の 2 つ（`Typecheck, tests and lessons` と `Build and key-leak scan`）も、一緒に足すことをおすすめします。
+   5. **Require branches to be up to date before merging** には、今は印を付けません。付けると、main が進むたびに、開いているプルリクエストを main に合わせて動かし直すことになります（1 回 10 分ほど）。main への push と毎晩の実行で、マージのあとの状態も確かめます。
+   6. **Create** で保存します。このルールは、main への直接の push にも効きます（チェックが通っていないコミットは push できなくなります）。急ぎで直接 push する必要があるときのために、**Bypass list** に自分（Repository admin）を入れるかどうかを決めます。
+   7. **ほかの開いているプルリクエスト**（2026-10-28 には 10 件）。main に向けた 5 件（#39〜#41、#45、#50）は、main を取り込むか push し直すまで、3 つのチェックが出ず、マージできません（「Expected — Waiting for status to be reported」）。プルリクエストの画面の **Update branch** を押すと、main を取り込んで、3 つが動きます。main と競合しているプルリクエストでは、競合を解くまで、チェックは動きません。ほかのブランチに重ねた 5 件（#43、#44、#48、#49、#51）は、このルールの外です。もとのプルリクエストがマージされ、そのブランチが消えると、GitHub が向け先を main に変えます（消さないときは、プルリクエストの画面の **Edit** で向け先を `main` にします）。そのあとで **Update branch** を押します。
+   8. 試しのプルリクエストで、3 つが「Required」と出ることを確かめます。
+   9. チェックの名前は、`e2e.yml` の `name:` と同じでなければなりません（ルールに足した `ci.yml` の 2 つは、`ci.yml` の `name:` と同じ）。名前を変えると、ルールが待つチェックが来なくなり、どのプルリクエストもマージできなくなります（「Expected — Waiting for status to be reported」）。名前は `server/tests/e2eWorkflow.test.js` で固定しています。変えるときは、ルールも同じ日に直します。
+2. **最初の数回の結果を見ます**。各チェックの時間と、`Server stack deploy` と `Learner end-to-end` の「Disk use」のディスクの空き（少ないのは `Learner end-to-end` です）を見て、11.1 の見込みの時間を、測った値に直します（エージェントに頼めます）。
+3. **作り直した VM の最初のデプロイの前に**（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 0）、デプロイする main のコミットで 3 つのチェックが緑であること、毎晩の実行も緑であることを確かめます。毎晩の実行を待たないときは、Actions の画面の左で `End-to-end checks` を選び、**Run workflow** を開いて、ブランチを `main` のまま **Run workflow** を押します（毎晩の実行と同じ 3 つが動きます）。CI が確かめないもの（11.3 の 1）は、VM で確かめます。VM で、`bootstrap-vm.sh` の 1 回目のあと（Docker が入り、`stack.env` を埋めたあと）、2 回目の前に、次のことも見ます。
+   - `stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）。
+   - VM の `docker version` と `docker compose version` を、`Server stack deploy` の「Preflight」の行（Docker・Compose・Storage driver）とくらべます。メジャー（29 と 5）がちがうときは、デプロイの前にエージェントと相談します（11.3 の 2）。
+4. **VM では `RISEPATH_DEPLOY_SKIP_PULL` を設定しません。** `deploy/risepath-vm/ci/` のファイルも、VM の設定には使いません。
+5. **毎晩の実行が赤のとき**: GitHub は、`e2e.yml` の `schedule` を最後に変えた人に、メールで知らせます。赤のままにせず、原因を直します（エージェントに調べてもらえます。11.5）。公開のリポジトリに 60 日動きがないと、GitHub は毎晩の実行を止めます（Actions の画面から再開できます）。
+
+### 11.3 受け入れているリスク
+
+1. **CI が確かめないもの**: 本物の Supabase（ログインの設定、「Require current password when updating」、メールの確認、OAuth、Site URL）、Cloudflare Tunnel（cloudflared とトンネルのトークン）、kokoro-tts、Hermes、Memanto、本物の AI の答え（CI では AI はオフです）、VM の作成（`provision-gce.sh`、`bootstrap-vm.sh`、Tailscale、swap）、`POSTGRES_PASSWORD` が DB の最初の起動で決まること、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばします。テストで固定しています）。これらは、作り直した VM で確かめます（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と、[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の確認のチェックリスト）。origin gate（`ORIGIN_SECRET` と `TRUST_PROXY=1`）、`mcp-public`、2 回目のデプロイ、VM の起動のユニットも、CI では確かめません（11.4）。
+2. **Docker の版**: VM は `install-docker.sh` で、そのときの最新の docker-ce と Compose を入れます（2026-10-27 には 29.9.2 と 5.6.1）。CI の ubuntu-26.04 は 29.4.2 と 5.1.3 です。メジャーは同じですが、細かい版はちがいます。11.2 の 3 でくらべます。VM の版を固定するかは、オーナーが決めます（11.4）。
+3. **ログインの代わりは、Supabase そのものではありません。** supabase-js が新しい呼び出しを使い始めると、`Learner end-to-end` が赤になります（知らない呼び出しは 404 になり、テストが止まります）。そのときは、ログインの代わりに足します。トークンの更新（refresh）は、ブラウザのテストでは起きません（トークンは 1 時間有効で、1 つの流れは 3 分以内です）。更新のときに `amr` が残ることは、node のテストだけで確かめています。
+4. **本番の値がまちがっていても、デプロイは緑になります**（形の正しい Supabase の URL、AI の鍵がないなど）。CI はダミーの値なので、これは見つけられません。
+5. **固定していない部品**: api と mcp のイメージのもと（`node:22-slim`）、GitHub の Ubuntu のイメージ、Playwright が入れる Chromium、npm の中身は、日によって変わります。毎晩の実行で気づけるようにしました。VM も同じ `node:22-slim` を使います。
+6. **たまに失敗するテスト**: 失敗しても、自動ではやり直しません（ダウンロードだけは 3 回まで試します）。スクリーンショット、トレース、ログを見て、原因を直します。テストを止めるときは、オーナーに確かめます。待ち時間を当てにする確かめはせず、サーバーと DB の状態が変わるまで待ちます。
+7. **DB の確かめの待ち時間**: いくつかの確かめは、2 秒のロックの待ちを数えます。とても遅い CI では、まれに失敗するおそれがあります。それぞれの行に、待った時間（`waited … ms`）を出します。毎晩の実行で見て、くり返すときは、待つ時間の定数をレビューして広げます（11.5）。
+8. **API の上限までの余り**: 5 つの流れで、1 分あまりのあいだに `/api` を 160 回ほど呼びます。上限は 1 分に 200 回です。手元の実行では、残りがいちばん少ないときで 29 回でした。流れを足すと、上限に当たるおそれがあります。そのときは、流れを分けるか、ページを読み込む回数を減らします（429 になると、テストがそう伝えます）。
+9. **リポジトリを非公開にしたとき**: 今は公開リポジトリなので、標準の Ubuntu の実行環境は無料です。非公開にすると、1 回の push で約 11 分（2026-10-28 に測った値。3 つのチェックと、今ある CI の 2 つの合計）使い、無料の枠（月 2,000〜3,000 分）をすぐに使い切ります。実行環境も 2 vCPU・8 GB に小さくなります。そのときは、重い 2 つを main と毎晩だけにするかを決めます。
+10. **Docker Hub のダウンロードの上限**: ログインせずにダウンロードすると、Docker Hub は、同じ IP からの回数が多いときに断ります（429）。そのときは、同じイメージを Google の写し（`mirror.gcr.io`）から取り、警告を出して続けます。pgvector はダイジェストで固定しているので、中身は同じです。`node:22-slim` は、数時間古いことがあります。それでも取れないときは、チェックが赤になります（「re-run the job later」と出ます）。少し待ってから、Actions の画面の **Re-run failed jobs** で動かし直します。
+
+### 11.4 残っていること
+
+- 時間とディスクは、2026-10-28 の最初の GitHub での実行で測りました（11.1 の表）。`Learner end-to-end` の「Disk use」は、空きが 80 GB でした（5 GB の下限より十分に多い）。実行環境が変わったときは、また見ます。
+- `deploy-stack.sh` で、本番の `SUPABASE_URL` が `https://` でないときに止めること（P3 の外なので、オーナーが決めます）。
+- VM の `install-docker.sh` で、docker-ce と Compose の版を固定するか（VM が変わるので、オーナーが決めます）。
+- メールの確認がある新規登録、AI を使う前の年齢の記録、AI アプリ（リモート MCP）の復習のツールを、ブラウザや CI で確かめること。
+- kokoro-tts のイメージのビルドを、週に 1 回の CI で確かめること。
+- `deploy/supabase/custom_access_token_hook.sql` を CI の DB で流すこと。
+- Docker のビルドのキャッシュ（新しい Action が要るため、今は入れていません）と、`node:22-slim` のダイジェストの固定（Dockerfile の変更で、VM も変わります）。
+- `actions/checkout` などを次のメジャー版に上げること（`ci.yml` と一緒に）。
+- `Server stack deploy` に足せる確かめ（今回は入れていません）: 公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1`）での 3 回目のデプロイと、外からの 403、`mcp-public`（`byoa`）の起動とその DB の権限、2 回目のデプロイ、VM の起動のユニットと同じ止め方と起こし方。
+- `.dockerignore` に `e2e` と `.artifacts` を足すこと（今もイメージには入りません。念のための変更です）と、使っていない `scripts/e2e-smoke.mjs` を消すこと。
+- ブラウザの流れを作るときに見つけた、アプリの動き（Phase 7 では変えていません）:
+  - レッスンを開いてすぐにインターネットが切れると、まだ届いていない図やコードの部品を読めず、ページを読み直して、ブラウザの「インターネットにつながっていません」の画面になります（`index.tsx` が、部品を読めなかったときに 1 回読み直すためです。学習の記録は端末に残ります）。読み直す前に、つながっているかを確かめれば防げます。
+  - レッスンを開いてすぐは、進み具合の読み込み、図やコードの部品、文字の形が届くたびに、画面が少し動きます。押してから離すまでのあいだに動くと、ボタンが押されないことがまれにあります（テストは、画面が落ち着いてから押します）。
+
+### 11.5 困ったときの手順（ランブック）
+
+| こんなとき | すること |
+|---|---|
+| チェックが赤 | Actions の画面で、その仕事の最初の ❌ の手順を開きます。その手順が流した `scripts/ci/stack.sh` の段（`deploy 1`、`auth` など）が分かります。Artifacts のログ（値は伏せてあります）と、ブラウザの失敗はスクリーンショットとトレースを見ます。手元で同じ段を流せます（11.1 の「手元で流す」） |
+| `Database checks` で、ロックの待ちの確かめが 1 つだけ赤（`waited … ms` が 1000 より小さい） | 遅い CI のゆらぎのことがあります。一度だけ **Re-run failed jobs** で動かし直します。また赤なら、3 つの確かめのスクリプトの待つ時間（`HOLD_MS` など）を広げる変更をレビューし、`npm run ci:db` で確かめます。動かし直しで緑になっても、毎晩の実行で続けて見ます |
+| checkout、setup-node、`npm ci`、イメージやブラウザのダウンロードで赤 | GitHub やダウンロード先の一時的な問題のことがあります。少し待ってから、一度だけ動かし直します。くり返すときは、エージェントに調べてもらいます |
+| `Learner end-to-end` が 429（rate limited）で赤 | 流れが API の上限に近づいています（11.3 の 8）。流れを分けるか、ページを読み込む回数を減らします。上限を上げたり、テストを止めたりはしません |
+| `Learner end-to-end` が、ログインの代わりの 404 で赤 | supabase-js が新しい呼び出しを使い始めました（11.3 の 3）。ログインの代わり（`e2e/support/auth-stand-in.mjs`）にその呼び出しを足し、`server/tests/e2eAuthStandIn.test.js` にもテストを足します |
+| 画面の言葉を変えたら `Learner end-to-end` が赤 | テストが探す言葉は `e2e/support/ui.mjs` と `components/review/reviewCopy.ts` にあります。同じコミットで直します |
+| チェックの名前を変えたい | 11.2 の 1 の 9。`e2e.yml`、ルール、この章と手順書（`doc/guides/risepath_vm_deployment.md` §4.5、`deploy/risepath-vm/README.md`、`deploy/vercel/README.md` の手順 0）、`AGENTS.md` を同じ日に直します。`server/tests/e2eWorkflow.test.js` が、名前のずれを知らせます |
+| 開いているプルリクエストが「Expected — Waiting for status to be reported」のまま | main に向けたプルリクエストなら、11.2 の 1 の 7 のとおり **Update branch** で main を取り込みます。ほかのブランチに向けたプルリクエストは、向け先が main になってから同じようにします。競合があれば、先に解きます。初めての人のフォークからのプルリクエストは、GitHub の標準の設定で、メンテナーが承認するまで動きません。変更（とくに `.github/` と `scripts/`）を見てから、プルリクエストの画面の **Approve workflows to run** を押すと、3 つが動きます |
+| 「Preflight」で赤（`only … GB free`、ポートが使われている） | GitHub の実行環境が変わったことがあります。その行と、同じ仕事の「Disk use」の行を見て、エージェントに調べてもらいます。5 GB の下限は下げません。手元で止まったときは、前の実行のイメージとキャッシュが残っていることがあります（11.1 の「手元で流す」） |
+| 日本時間の 0 時の近くで、チェックが数分待った（`00:00 JST` の知らせ） | 正しい動きです。途中で日付が変わると、日付の確かめがずれるので、0 時を過ぎてから始めます |
+
+## 12. やらないこと
 
 - 学習者の Claude や ChatGPT のログイン情報（パスワード、セッション、API キー）を集めたり預かったりすること。
 - AI のモデルそのものを、そのまま売ること（転売）。
@@ -905,7 +1059,7 @@ Phase 6 では、レッスンの暗記カード（復習カード）が、忘れ
 - 共有のブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡すこと。
 - 18 歳未満の方に、有料プランを売ること。保護者が代わりに払う形も、作っていません（7 章）。
 
-## 12. まだ分からないこと
+## 13. まだ分からないこと
 
 - Haiku のチューターと作文フィードバックの質が十分か（試して確かめます）。
 - Anthropic の利用ポリシーのページの「Effective Nov 12, 2026」が、これから有効になる版かどうか。2026-10-22 の調べでは、ページは 2026-11-12 から有効の版を最新として出し、2025-09-15 の版は「新しい版に置き換えられた」として保管されています（<https://www.anthropic.com/legal/aup>、<https://www.anthropic.com/legal/archive/22742366-2ef0-4c7a-a833-6523f10d3944>）。前もって公開された版で、2026-11-12 までは 2025-09-15 の版が効いている、と読めますが、推測です【要確認】。

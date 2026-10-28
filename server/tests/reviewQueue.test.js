@@ -225,7 +225,9 @@ describe('B1: the release backlog (design R-5), pure, fuzz off, every answer 「
 
   it('the plan\'s backlog figures are these runs, counted from 1 (the first day after the release = 1 日目; docs #10)', () => {
     const plan = readFileSync(new URL('../../doc/brushup-2026/ai-access-plan.ja.md', import.meta.url), 'utf8');
-    const chapter = plan.slice(plan.indexOf('## 10. Phase 6: '), plan.indexOf('## 11. やらないこと'));
+    const end = plan.indexOf('## 11. Phase 7: ');
+    assert.ok(end > plan.indexOf('## 10. Phase 6: '), 'the Phase 6 chapter ends where Phase 7 starts');
+    const chapter = plan.slice(plan.indexOf('## 10. Phase 6: '), end);
     const good = simulate(() => false);
     const fifth = simulate((i) => i % 5 === 0);
     const cc = simulate(() => false, 77);
