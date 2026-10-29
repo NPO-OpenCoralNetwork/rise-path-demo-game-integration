@@ -6,8 +6,9 @@
  * body_too_large, 400 invalid_body, before the 2 MB parser). The rest lives in this router, so
  * server.js changes by one parser line and one mount line:
  *   1. the switch: unless TRAINING_ENABLED is exactly "true" (the BILLING_ENABLED rule,
- *      server/services/billingConfig.js), every request answers 404 training_off, before auth (no
- *      Supabase call, no account read, no stub write, no limiter). Read on every request;
+ *      server/services/billingConfig.js), every request that passes the parser above answers 404
+ *      training_off, before auth (no Supabase call, no account read, no stub write, no limiter).
+ *      Read on every request;
  *   2. requireAuth + requireSignedIn (the dev fallback, the bridge user and an anonymous user 401
  *      sign_in_required; an agent's OAuth token 401 oauth_client_token: AI apps never reach it);
  *   3. a per-learner limit on every route together (TRAINING_REQUESTS_PER_MINUTE, 429
@@ -16,8 +17,8 @@
  *
  * GET /me → 200 { ok, learnerId, cohorts: [{ cohortId, name, role }] } (live memberships only).
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
- * 503 training_unavailable (no database, down, migration 021 not applied, a missing grant), 500
- * training_failed. 401, 404 training_off and 429 come from the middleware, in their own shape.
+ * 503 training_unavailable (no database, down, migration 021 not applied, a missing grant; with
+ * Retry-After: 60, as server/routes/legal.js), 500 training_failed. 401, 404 training_off and 429 come from the middleware, in their own shape.
  * Logic and SQL: tools/core/training.js. Tables: server/migrations/021_training_cohorts.sql.
  */
 import express from 'express';
@@ -70,6 +71,7 @@ export function createTrainingRouter({ env = process.env } = {}) {
         const result = await getTrainingMe({ userId: userIdOf(req) });
         if ('error_type' in result) {
             if (UNAVAILABLE.has(result.error_type)) {
+                res.set('Retry-After', '60');
                 return res.status(503).json({ ok: false, error: 'Training is unavailable right now. Please try again later.', error_type: 'training_unavailable' });
             }
             return res.status(500).json({ ok: false, error: 'Training could not be read.', error_type: 'training_failed' });

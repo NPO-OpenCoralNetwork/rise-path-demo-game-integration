@@ -209,6 +209,7 @@ describe('/api/v2/training on the server.js stack', () => {
             setPoolForTests(null);
             const none = await call(`${base}${ME}`, { headers: as(ALICE) });
             assert.deepEqual([none.status, none.json], [503, { ok: false, error: 'Training is unavailable right now. Please try again later.', error_type: 'training_unavailable' }]);
+            assert.equal(none.headers.get('retry-after'), '60', 'as server/routes/legal.js');
             setPoolForTests(pool);
             await quiet(async () => {
                 const secret = '(host db.internal:5432, password=hunter2)';
@@ -216,6 +217,7 @@ describe('/api/v2/training on the server.js stack', () => {
                     pool.fail(/training_memberships/, Object.assign(new Error(`relation "training_memberships" ${code} ${secret}`), { code }));
                     const res = await call(`${base}${ME}`, { headers: as(ALICE) });
                     assert.deepEqual([res.status, res.json.error_type], [status, type], code);
+                    assert.equal(res.headers.get('retry-after'), status === 503 ? '60' : null, code);
                     assert.doesNotMatch(res.text, /relation|training_memberships|db\.internal|hunter2|getTrainingMe|ECONNREFUSED/);
                 }
             });

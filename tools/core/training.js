@@ -14,7 +14,7 @@
  * scripts/training-admin.mjs. Failures return { error, error_type } (tools/core/dbErrors.js), never
  * the driver's text.
  */
-import { getPool } from '../../server/db.js';
+import { getPool, PHASE1_USER_ID } from '../../server/db.js';
 import { accountLockKey, canonicalUserId } from './accountDeletions.js';
 import { classifyDbError } from './dbErrors.js';
 import { noDatabase } from './dbTransaction.js';
@@ -64,9 +64,9 @@ const isoTime = (value) => {
     return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 };
 
-/** A calendar date as YYYY-MM-DD that exists (2026-02-30 does not). @param {unknown} value */
+/** A calendar date as YYYY-MM-DD that exists (2026-02-30 does not; nor does year 0000 in PostgreSQL). @param {unknown} value */
 export const isCalendarDate = (value) => {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false;
     const date = new Date(`${value}T00:00:00Z`);
     return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
@@ -134,6 +134,8 @@ export async function createCohort({ slug, name, startsOn = null, endsOn = null,
 export async function addMember({ cohortSlug, userId: rawUserId, role, pool = getPool() }) {
     const userId = canonicalUserId(rawUserId);
     if (!userId) return { error: 'An account id (a UUID) is required.', error_type: 'validation' };
+    // The shared dev and bridge user has a stub wherever the dev fallback ran: never a member.
+    if (userId === canonicalUserId(PHASE1_USER_ID)) return { error: 'The shared dev and bridge user (PHASE1_USER_ID) is never a member.', error_type: 'validation' };
     if (!TRAINING_ROLES.includes(role)) return { error: `The role is one of ${TRAINING_ROLES.join(', ')}.`, error_type: 'validation' };
     if (!COHORT_SLUG.test(String(cohortSlug))) return { error: 'Unknown cohort slug.', error_type: 'validation' };
     if (!pool?.connect) return noDatabase();

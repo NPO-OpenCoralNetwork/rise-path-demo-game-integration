@@ -12,7 +12,8 @@ import { apiFetch } from './apiClient';
 
 /** The roles of a membership (tools/core/training.js TRAINING_ROLES, migration 021's CHECK). */
 export type TrainingRole = 'learner' | 'instructor' | 'examiner' | 'staff';
-export type TrainingCohort = { cohortId: string; name: string; role: TrainingRole };
+/** role null: a role this page does not know yet (a newer server); the cohort is still listed. */
+export type TrainingCohort = { cohortId: string; name: string; role: TrainingRole | null };
 export type TrainingMe = {
   /** The learner the server answered for (lower case). */
   learnerId: string;
@@ -37,13 +38,13 @@ const ROLES: readonly string[] = ['learner', 'instructor', 'examiner', 'staff'];
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** The documented 200 body, or null. A cohort with a role this page does not know is left out (a newer server). */
+/** The documented 200 body, or null. A cohort with a role this page does not know keeps role null. */
 export function parseTrainingMe(body: unknown): TrainingMe | null {
   if (!isRecord(body) || typeof body.learnerId !== 'string' || !body.learnerId || !Array.isArray(body.cohorts)) return null;
   const cohorts: TrainingCohort[] = [];
   for (const item of body.cohorts) {
     if (!isRecord(item) || typeof item.cohortId !== 'string' || !item.cohortId || typeof item.name !== 'string' || typeof item.role !== 'string') return null;
-    if (ROLES.includes(item.role)) cohorts.push({ cohortId: item.cohortId, name: item.name, role: item.role as TrainingRole });
+    cohorts.push({ cohortId: item.cohortId, name: item.name, role: ROLES.includes(item.role) ? (item.role as TrainingRole) : null });
   }
   return { learnerId: body.learnerId.toLowerCase(), cohorts };
 }

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { EXIT, parseArgs, run } from '../../scripts/training-admin.mjs';
 import { PHASE1_USER_ID } from '../db.js';
 import { accountLockKey } from '../../tools/core/accountDeletions.js';
-import { TRAINING_ROLES, TRAINING_SQL, isCalendarDate } from '../../tools/core/training.js';
+import { TRAINING_ROLES, TRAINING_SQL, addMember, isCalendarDate } from '../../tools/core/training.js';
 
 const A = 'aaaaaaaa-2121-4000-8000-0000000000a1';
 const B = 'aaaaaaaa-2121-4000-8000-0000000000b2';
@@ -111,7 +111,8 @@ describe('scripts/training-admin.mjs: the switch and the arguments', () => {
             ['--name', 'X', '--list', 'a'], ['--cohort', 'a', '--list', 'a'], ['--bogus'], ['--add', 'not-a-uuid', '--cohort', 'a', '--role', 'learner'],
             ['--add', PHASE1_USER_ID, '--cohort', 'web-2026-11', '--role', 'learner'], ['--add', A, '--cohort', 'web-2026-11', '--role', 'admin'],
             ['--create-cohort', 'Bad Slug', '--name', 'X'], ['--create-cohort', 'ok', '--name', 'X', '--starts-on', '2026-02-30'],
-            ['--create-cohort', 'ok', '--name', 'X', '--starts-on', '2026-12-01', '--ends-on', '2026-11-01'], ['--create-cohort', 'ok', '--name', '  ']]) {
+            ['--create-cohort', 'ok', '--name', 'X', '--starts-on', '2026-12-01', '--ends-on', '2026-11-01'], ['--create-cohort', 'ok', '--name', '  '],
+            ['--create-cohort', 'ok', '--name', 'X', '--starts-on', '0000-01-01']]) {
             const { code, pool } = await runWith(argv);
             assert.equal(code, EXIT.usage, argv.join(' '));
             assert.deepEqual(pool.state.queries, [], argv.join(' '));
@@ -121,6 +122,8 @@ describe('scripts/training-admin.mjs: the switch and the arguments', () => {
         assert.deepEqual([...TRAINING_ROLES], ['learner', 'instructor', 'examiner', 'staff']);
         assert.equal(isCalendarDate('2026-02-28'), true);
         assert.equal(isCalendarDate('2026-02-29'), false);
+        assert.equal(isCalendarDate('0000-01-01'), false, 'PostgreSQL has no year 0 (22008 would read as an outage)');
+        assert.equal(isCalendarDate('0001-01-01'), true);
     });
 });
 
@@ -213,6 +216,13 @@ describe('scripts/training-admin.mjs: adding a member', () => {
 });
 
 describe('tools/core/training.js: the staff statements', () => {
+    it('addMember refuses the shared dev and bridge user itself, before any statement (not only the script)', async () => {
+        const pool = fakePool({ stubs: [PHASE1_USER_ID] });
+        const result = await addMember({ cohortSlug: 'web-2026-11', userId: PHASE1_USER_ID.toUpperCase(), role: 'learner', pool: /** @type {any} */ (pool) });
+        assert.equal(result.error_type, 'validation');
+        assert.deepEqual(pool.state.queries, []);
+    });
+
     it('the lock is the shared account lock; the INSERT needs the stub, uses the live-only conflict target and the default added_at', () => {
         assert.equal(TRAINING_SQL.lock, `SELECT pg_advisory_xact_lock_shared(${accountLockKey(1)})`);
         assert.match(TRAINING_SQL.addMember, /WHERE EXISTS \(SELECT 1 FROM auth\.users WHERE id = \$1::uuid\)/);

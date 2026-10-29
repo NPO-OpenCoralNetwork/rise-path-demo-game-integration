@@ -56,7 +56,8 @@
  *       written east of UTC; added, already, another role, no account; a deletion holding the
  *       account lock makes an add wait, mark the member and refuse the add (control: the INSERT
  *       without the lock leaves a live row for a deleted account); the staff list keeps the marked
- *       row, the learner's own read does not
+ *       row, the learner's own read does not; an add started first makes the deletion service
+ *       wait, then the service marks the new row with the tombstone's time
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -1128,6 +1129,47 @@ async function r12(pool) {
     const mine = (meI.cohorts ?? []).map((/** @type {any} */ c) => `${c.cohortId === made.cohort.id}:${c.name}:${c.role}`).join();
     check('R12', shown.join() === 'L:learner:marked,I:instructor:live' && meL.cohorts?.length === 0 && mine === 'true:R12 cohort:instructor',
         `the staff list keeps the marked row (${shown.join(', ')}); the learner's own read: deleted ${meL.cohorts?.length}, instructor ${mine}`);
+
+    // An add started first (its transaction holds the shared lock with the row inserted, HOLD_MS):
+    // the deletion service waits for its COMMIT, then marks the row with the tombstone's deleted_at.
+    const F = uid('r12f');
+    await pool.query(STUB_INSERT, [F]);
+    const uploadRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rp-verify-'));
+    const c3 = await pool.connect();
+    let added = 0;
+    /** @type {any} */ let deleted = null;
+    let serviceWaited = 0;
+    try {
+        await c3.query('BEGIN');
+        await c3.query(TRAINING_SQL.lock, [F]);
+        added = (await c3.query(TRAINING_SQL.addMember, [F, made.cohort.id, 'learner'])).rowCount ?? 0;
+        const holding = c3.query('SELECT pg_sleep($1)', [HOLD_MS / 1000]).then(() => c3.query('COMMIT'));
+        await sleep(LEAD_MS);
+        const t0 = Date.now();
+        deleted = await deleteAccountData({
+            pool,
+            userId: F,
+            requestedBy: 'staff',
+            authTime: null,
+            billing: { config: null, stripe: null },
+            logger: { log: () => {}, warn: () => {} },
+            uploadRoot,
+            memory: { enabled: () => false, purge: async () => ({ ok: true }) },
+            invalidateCaches: () => {},
+        });
+        serviceWaited = Date.now() - t0;
+        await holding;
+    } catch (error) {
+        await c3.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        c3.release();
+        await fs.rm(uploadRoot, { recursive: true, force: true }).catch(() => {});
+    }
+    const markedF = await n('SELECT count(*) AS n FROM training_memberships m JOIN account_deletions d USING (user_id) WHERE m.user_id = $1::uuid AND m.account_deleted_at = d.deleted_at', [F]);
+    const liveF = await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1::uuid AND account_deleted_at IS NULL', [F]);
+    check('R12', added === 1 && deleted?.status === 'deleted' && serviceWaited >= BLOCKED_MS && markedF === 1 && liveF === 0,
+        `an add started first: the deletion service (${deleted?.status ?? deleted?.reason}) waited ${serviceWaited} ms for it, then marked its row with the tombstone time (${markedF}), live rows ${liveF}`);
 
     // Control: the add's INSERT without the lock, run while a deletion is between its mark and its
     // COMMIT, sees the stub and leaves a live row for a deleted account (so the lock is needed).

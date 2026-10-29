@@ -425,6 +425,35 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase6.mjs` は、020 と、カードが加わる決まり・復習の記録・やり直しと削除・リモート MCP のロールの列ごとの権限・上の確認と削除（P10）を、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 020 の行）。VM の DB には決して向けないでください。
 
+## 職業訓練（骨組み）
+
+職業訓練の期と割り当て、`/api/v2/training` の入口です。学校のデプロイだけで使い、公開版の Rise Path では使いません。決定と理由は [`doc/brushup-2026/training-plan.ja.md`](../../doc/brushup-2026/training-plan.ja.md) です。
+
+**この版の最初のデプロイ**
+
+- migration 021 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。021 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が 021 の表に印を付けるため）。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
+- 021 は新しい表を 2 つ作るだけです。`auth.users` はロックせず、ログインした呼び出しもアカウントの削除も待ちません。`sql/mcp_remote_role.sql` は流し直さなくてかまいません（どちらの表も、リモート MCP のロールに渡しません）。
+- 公開版では `TRAINING_ENABLED` を設定しません。表は空のままで、`/api/v2/training` は 404 を返し、職員のスクリプトも動きません。
+
+**設定（`stack.env`。秘密の値ではありません。`api` だけが読みます）**
+
+| 変数 | 既定 | 中身 |
+|---|---|---|
+| `TRAINING_ENABLED` | 未設定（止まっている） | ちょうど `true` のときだけ、`/api/v2/training` が答え、職員のスクリプトが動きます。ほかの値（`TRUE`・`1`・`yes` など）では止まったままです。呼び出しのたびに読みます。学校のデプロイだけで設定します |
+
+**職員のスクリプト**（`api` コンテナの中で。`TRAINING_ENABLED=true` のときだけ動きます）
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --create-cohort 2026-11-web --name "2026年11月 Web" --starts-on 2026-11-01 --ends-on 2027-01-31
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --add <account uuid> --cohort 2026-11-web --role learner
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --list 2026-11-web
+```
+
+割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（期がない、ほかの役割で割り当てずみ、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
+
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 の行）。VM の DB には決して向けないでください。
+
 ## CI での予行（Phase 7）
 
 GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プルリクエストのたびに、このディレクトリの `deploy-stack.sh` をダミーの値で動かします（チェック `Server stack deploy` と `Learner end-to-end`）。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章です。
