@@ -29,7 +29,7 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Plan and research: `doc/brushup-2026/`. Authoring guide: `doc/guides/authoring-with-claude-code.ja.md`.
 - Legal texts: edit the drafts `doc/legal/*.draft.ja.md`, then `node scripts/legal/build-legal-text.mjs`
   (writes `content/legal/`, prints the version and hash for `shared/legal/versions.js`); `/terms` and
-  `/privacy` publish only with `VITE_FEATURE_LEGAL_PAGES=true` (the build refuses drafts). `doc/legal/README.md`.
+  `/privacy` publish only with `VITE_FEATURE_LEGAL_PAGES=true` (the build refuses drafts). `doc/legal/README.md`. Server switch `LEGAL_TERMS_REQUIRED=true` (off by default; turn on after that flag, ignored in production while texts are drafts) refuses signed-in learners' API and remote MCP calls with `terms_required` until they accept: every route is gated except those listed in `TERMS_EXEMPT` (`server/middleware/termsGate.js`); exempt a new route there only when the UI exempts its page or the app shell calls it there.
 - Account data: learner data deletion goes through `server/services/accountDeletion.js` (staff:
   `scripts/delete-account-data.mjs`); account ids go through `canonicalUserId` and the `rp:account:`
   lock key is built from `<id>::uuid::text` (`tools/core/accountDeletions.js`). Retention: `server/services/retention.js`.

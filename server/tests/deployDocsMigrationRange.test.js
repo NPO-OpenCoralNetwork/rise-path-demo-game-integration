@@ -67,14 +67,15 @@ describe('the VM runbooks follow server/migrations', () => {
 });
 
 describe('the plan: Phase 6 chapter', () => {
-    it('§10 is Phase 6 and §11 Phase 7, before やらないこと (12) and まだ分からないこと (13); its owner steps start with the deploy order of 020', () => {
+    it('§10 is Phase 6, §11 Phase 7 and §12 Phase 8, before やらないこと (13) and まだ分からないこと (14); its owner steps start with the deploy order of 020', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
         const headings = plan.split('\n').filter((line) => /^## \d+\. /.test(line)).map((line) => line.replace(/^## /, '').slice(0, 12));
-        assert.deepEqual(headings.slice(-5).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.']);
+        assert.deepEqual(headings.slice(-6).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.']);
         assert.match(plan, /^## 10\. Phase 6: /m);
         assert.match(plan, /^## 11\. Phase 7: /m);
-        assert.match(plan, /^## 12\. やらないこと$/m);
-        assert.match(plan, /^## 13\. まだ分からないこと$/m);
+        assert.match(plan, /^## 12\. Phase 8: /m);
+        assert.match(plan, /^## 13\. やらないこと$/m);
+        assert.match(plan, /^## 14\. まだ分からないこと$/m);
         const order = plan.split('\n').find((line) => line.startsWith('1. **デプロイの順番**: migration 020 を'));
         assert.ok(order, '10.2 item 1');
         assert.match(order, /`api`・`mcp`・`mcp-public` を起動する前に/);
@@ -110,6 +111,77 @@ describe('the plan: Phase 6 chapter', () => {
         // 10.1 画面: a sign-out or expiry swaps the whole app for the signed-out page (AuthContext setUser(null)).
         assert.match(chapter, /ログインが切れたときは、ページごとログインの前の画面に戻り、何も記録しません（Nexloom のログインが残っているときは、その復習をそこで止めて 1 行で知らせます）/u);
         assert.doesNotMatch(chapter, /ログインが切れたときは、その復習をそこで止めて/u);
+    });
+});
+
+describe('the plan: Phase 8 chapter', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const start = plan.indexOf('## 12. Phase 8: ');
+    const end = plan.indexOf('## 13. やらないこと');
+    const chapter = plan.slice(start, end);
+
+    it('§12 holds 12.1–12.4 in order and ends where やらないこと starts', () => {
+        assert.ok(start > plan.indexOf('## 11. Phase 7: ') && end > start, 'Phase 8 after Phase 7, before やらないこと');
+        const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
+        assert.deepEqual(subsections, ['12.1', '12.2', '12.3', '12.4']);
+    });
+
+    it('the earlier chapters no longer list what Phase 8 fixed as open (§8.3/§8.4, §9.4, §10.3/§10.4, §11.4)', () => {
+        const before = plan.slice(0, start);
+        assert.doesNotMatch(before, /同意のない方を API とリモート MCP でも止めるか/u, '§8.4');
+        assert.doesNotMatch(before, /API とリモートの MCP は、同意のない方を止めません/u, '§8.3');
+        assert.doesNotMatch(before, /まだ `streak: 0` を返します/u, '§9.4');
+        assert.doesNotMatch(before, /レッスンの終わりに「\+40 XP」のように、もらった XP を見せること/u, '§9.4');
+        assert.doesNotMatch(before, /メニューのボタンに枚数を出す案は|スマートフォンのメニューのボタンの枚数、/u, '§10.3 の 17, §10.4');
+        assert.doesNotMatch(before, /前のカードの答えが 1〜2 フレームだけ見えます/u, '§10.4');
+        assert.doesNotMatch(before, /`index\.tsx` が、部品を読めなかったときに 1 回読み直すためです/u, '§11.4');
+    });
+
+    it('AGENTS.md and the chapter name the terms switch and its exempt list where the code keeps them', () => {
+        assert.match(read('tools/core/legalAcceptance.js'), /^export const TERMS_SWITCH = 'LEGAL_TERMS_REQUIRED';$/m);
+        assert.match(read('server/middleware/termsGate.js'), /^export const TERMS_EXEMPT = /m);
+        const lines = read('AGENTS.md').split('\n');
+        const at = lines.findIndex((line) => line.startsWith('- Legal texts: '));
+        assert.ok(at >= 0, 'the Legal texts bullet');
+        const next = lines.findIndex((line, i) => i > at && !line.startsWith('  '));
+        const bullet = lines.slice(at, next).join('\n');
+        for (const must of ['`LEGAL_TERMS_REQUIRED=true`', 'off by default', 'ignored in production while texts are drafts', '`terms_required`', '`TERMS_EXEMPT`', '`server/middleware/termsGate.js`']) {
+            assert.ok(bullet.includes(must), `AGENTS.md Legal texts bullet: ${must}`);
+        }
+        for (const must of ['`LEGAL_TERMS_REQUIRED`', '`terms_required`', '`TERMS_EXEMPT`', '`server/middleware/termsGate.js`', '**はじめは止まっています。**']) {
+            assert.ok(chapter.includes(must), `§12: ${must}`);
+        }
+    });
+
+    it('AGENTS.md states the exemption rule with both conditions termsGate.js gives (the UI page, the app shell)', () => {
+        const rule = /Exempt a route only when (.+?)\.$/m.exec(read('server/middleware/termsGate.js'))?.[1];
+        assert.equal(rule, 'the UI exempts its page or the app shell calls it there');
+        assert.ok(read('AGENTS.md').includes(`exempt a new route there only when ${rule}`), 'AGENTS.md Legal texts bullet: the full rule');
+    });
+
+    it('§12 points to 10.3 の 17 only for what item 17 says (Phase 6 deferred the menu count, and why)', () => {
+        const item17 = plan.slice(0, start).split('\n').find((line) => line.startsWith('17. 390 px の画面では'));
+        assert.ok(item17, '10.3 item 17');
+        assert.match(item17, /すべての画面の上の部分が変わるので Phase 6 では見送り、Phase 8 で出すようにしました（12 章）/u);
+        assert.match(chapter, /Phase 6 で見送ったものです。10\.3 の 17/u, '12.1 S3');
+        assert.match(chapter, /すべての画面の上の部分が、枚数の分だけ変わります（10\.3 の 17）/u, '12.3 item 4');
+    });
+
+    it('S1 never gives the browser\'s own error page the app screen\'s title, and 12.2 item 3 says when 「読み込み直す」 shows', () => {
+        const title = /offlineTitle: '([^']+)'/.exec(read('components/common/offlineReloadCopy.ts').split('jp: {')[1])?.[1];
+        assert.equal(title, 'インターネットにつながっていません');
+        assert.doesNotMatch(chapter, /ブラウザの「(インターネットに)?つながっていません」/u);
+        assert.ok(chapter.includes(`Rise Path の中で「${title}」の画面`), 'S1 names the app screen as Rise Path\'s');
+        assert.match(chapter, /Rise Path の外の、ブラウザ自身のエラーの画面/u);
+        const check = chapter.split('\n').find((line) => line.startsWith('3. **確かめます**: '));
+        assert.ok(check, '12.2 item 3');
+        assert.match(check, /図とコードのあるレッスン（たとえば Claude Code の「第1回｜最初のタスクを任せる」）/u);
+        assert.match(check, /図やコードを読めなかったときだけ、上のバーにお知らせが出て、つなぐと「読み込み直す」が出ること/u);
+        const lesson = JSON.parse(read('content/courses/claude-code/lessons/cc-01-first-session.lesson.json'));
+        assert.equal(lesson.title, '第1回｜最初のタスクを任せる');
+        const types = JSON.stringify(lesson);
+        assert.match(types, /"type":"diagram"/);
+        assert.match(types, /"type":"code"/);
     });
 });
 
