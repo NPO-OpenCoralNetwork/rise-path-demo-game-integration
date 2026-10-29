@@ -85,7 +85,15 @@ class ErrorBoundary extends Component<Props, State> {
             pageOfflineReload()?.subscribe(() => {
                 if (!this.state.hasError) return;
                 this.holdReloadWhileWaiting();
-                this.forceUpdate();
+                // A new state can take away the control that has focus (「再読み込み」 goes when
+                // 'unreachable' turns offline or checking). A removed element takes focus with it, to
+                // the page body: the heading takes it again (as the first time).
+                const before = typeof document !== "undefined" ? document.activeElement : null;
+                this.forceUpdate(() => {
+                    if (!before || before === document.body || before.isConnected) return;
+                    const active = document.activeElement;
+                    if (!active || active === document.body) this.headingRef.current?.focus();
+                });
             }) ?? null;
     }
 

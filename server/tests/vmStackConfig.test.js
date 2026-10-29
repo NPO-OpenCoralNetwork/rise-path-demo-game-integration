@@ -1248,4 +1248,29 @@ describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
     assert.match(row, /文面の公開 → Vercel の `VITE_FEATURE_LEGAL_PAGES=true` と同意の画面の確かめ → `byoa` なら `sql\/mcp_remote_role\.sql` を流し直す → `stack\.env` と `mcp-public\.env` に `true` → `deploy-stack\.sh`/);
     assert.match(row, /同意をお願いする新しい版を出すときは、先に両方で止め、同意の画面が出てから入れ直します/);
   });
+
+  it('stack.env.example names the values that turn the switch on and keep it off, as the api reads them (self-review, finding 3)', async () => {
+    const { termsEnforcement, termsSwitchLine } = await import('../../tools/core/legalAcceptance.js');
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Terms check (Phase 8'), stack.indexOf('# LEGAL_TERMS_REQUIRED=true'));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    const said = text.match(/Off by default: true \(or ([^)]+)\) turns it on; unset, empty or false \(or ([^)]+)\) keeps it off; any other value keeps it off and the api logs a warning\./);
+    assert.ok(said, 'the comment names the values');
+    // 1, on and yes turn it on (an owner who wrote them to keep it off would refuse learners).
+    for (const value of ['true', ...said[1].split(', ')]) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: true, reason: 'on' }, value);
+    }
+    for (const value of [undefined, '', 'false', ...said[2].split(', ')]) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: false, reason: 'off' }, String(value));
+      assert.equal(termsSwitchLine(env), null, `${String(value)}: off, no line`);
+    }
+    for (const value of ['ture', 'enabled']) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: false, reason: 'unrecognised' }, value);
+      assert.match(String(termsSwitchLine(env)), /unrecognised value/, value);
+    }
+    assert.deepEqual([said[1], said[2]], ['1, on, yes', '0, off, no'], 'every value the parser knows (server/utils/envSwitch.js)');
+  });
 });

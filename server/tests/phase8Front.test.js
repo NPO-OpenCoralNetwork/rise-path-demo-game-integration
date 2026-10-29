@@ -38,10 +38,12 @@ const PALETTE_RULE = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|divide|ou
 const STUBS = {
   react: `
     let index = 0;
-    export const __resetHooks = () => { index = 0; };
+    let refIndex = 0;
+    export const __resetHooks = () => { index = 0; refIndex = 0; };
     // By call order (FlashcardsBlock: 0 order, 1 pos, 2 flipped, 3 finished, 4 live). With
-    // globalThis.__hookStore the state lives there across renders and every set is logged in
-    // __setLog as [index, value] (OfflineReloadNotice); otherwise sets do nothing.
+    // globalThis.__hookStore the state lives there across renders and every set that changes it
+    // (Object.is, as React bails out) is logged in __setLog as [index, value] (OfflineReloadNotice,
+    // useLessonProgress); otherwise sets do nothing.
     export const useState = (initial) => {
       const i = index++;
       const init = () => (typeof initial === 'function' ? initial() : initial);
@@ -49,7 +51,9 @@ const STUBS = {
       if (store) {
         if (!(i in store)) store[i] = init();
         return [store[i], (v) => {
-          store[i] = typeof v === 'function' ? v(store[i]) : v;
+          const next = typeof v === 'function' ? v(store[i]) : v;
+          if (Object.is(next, store[i])) return;
+          store[i] = next;
           (globalThis.__setLog ??= []).push([i, store[i]]);
         }];
       }
@@ -57,7 +61,14 @@ const STUBS = {
       const value = o && i in o ? o[i] : init();
       return [value, () => {}];
     };
-    export const useRef = (value) => ({ current: value ?? null });
+    // With globalThis.__hookStore a ref lives there across renders too (by its own call order).
+    export const useRef = (value) => {
+      const store = globalThis.__hookStore;
+      if (!store) return { current: value ?? null };
+      const key = 'ref' + refIndex++;
+      if (!(key in store)) store[key] = { current: value ?? null };
+      return store[key];
+    };
     export const useMemo = (fn) => fn();
     export const useCallback = (fn) => fn;
     // __effects collects effects when a test asks for them (useRequireReload).
@@ -65,7 +76,13 @@ const STUBS = {
     export const useSyncExternalStore = (subscribe, get) => get();
     export class Component {
       constructor(props) { this.props = props; }
-      forceUpdate() { globalThis.__forceUpdates = (globalThis.__forceUpdates ?? 0) + 1; }
+      // The callback runs after the update is on the page: __onCommit plays what the update did
+      // to the page (a removed button) first.
+      forceUpdate(callback) {
+        globalThis.__forceUpdates = (globalThis.__forceUpdates ?? 0) + 1;
+        globalThis.__onCommit?.();
+        callback?.();
+      }
       setState() {}
     }
     export const createRef = () => ({ current: null });
@@ -79,6 +96,8 @@ const STUBS = {
   md: "export const MdText = 'MdText';",
   model: "export const plainText = (value) => String(value ?? '');",
   button: "export const Button = 'Button'; export const buttonClasses = () => 'btn';",
+  progressService: 'export const addLearningEvent = () => {};',
+  progressSyncClient: 'export const resetLessonProgress = async () => ({ ok: true });',
   // The real module, with the page's controller replaced by the test's fake.
   chunkReload: `
     export * from ${JSON.stringify(path.join(ROOT, 'components/common/chunkReload.ts'))};
@@ -110,6 +129,8 @@ async function bundleUi(entry) {
         stub(/^\.\.\/model$/, 'model');
         stub(/\/ui\/Button$/, 'button');
         stub(/^\.\/chunkReload$/, 'chunkReload');
+        stub(/services\/progressService$/, 'progressService');
+        stub(/^\.\/progressSyncClient$/, 'progressSyncClient');
         b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: STUBS[args.path], loader: 'js', resolveDir: ROOT }));
       },
     }],
@@ -153,8 +174,9 @@ before(async () => {
   const code = await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { default as FlashcardsBlock } from './components/lesson/blocks/FlashcardsBlock';",
-    "export { default as OfflineReloadNotice, OfflineReloadNoticeView, useOfflineReloadState, useReaderOfflineWait, useRequireReload } from './components/common/OfflineReloadNotice';",
+    "export { default as OfflineReloadNotice, OfflineReloadNoticeView, useFocusAfterRemoval, useOfflineReloadState, useReaderOfflineWait, useRequireReload } from './components/common/OfflineReloadNotice';",
     "export { BAR_EXTRA_PROPERTY, barExtra, scrollElementIntoContainer } from './components/lesson/useScrollContainer';",
+    "export { useLessonProgress } from './components/lesson/useLessonProgress';",
     "export { default as ErrorBoundary } from './components/common/ErrorBoundary';",
   ].join('\n'));
   ui = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
@@ -490,6 +512,52 @@ describe('S1: the hooks LearnRoute and the notice use', () => {
     try { fn(); } finally { for (const key of Object.keys(g)) delete (/** @type {any} */ (globalThis))[key]; }
   };
 
+  it('useFocusAfterRemoval: when the control goes after it had focus and focus fell to the body, recover runs once (self-review, finding 1)', () => {
+    /** @type {Array<() => unknown>} */
+    const effects = [];
+    const body = {};
+    const doc = { body, activeElement: /** @type {any} */ (body) };
+    /** @type {string[]} */
+    const calls = [];
+    const recover = () => calls.push('recover');
+    withGlobals({ __hookStore: {}, __effects: effects, document: doc }, () => {
+      /** @param {boolean} shown */
+      const run = (shown) => {
+        ui.__resetHooks();
+        effects.length = 0;
+        const onFocus = ui.useFocusAfterRemoval(shown, recover);
+        for (const effect of [...effects]) effect();
+        return onFocus;
+      };
+      run(true);
+      run(false);
+      assert.deepEqual(calls, [], 'it never had focus');
+      run(true)();
+      run(true);
+      assert.deepEqual(calls, [], 'still shown');
+      run(false);
+      assert.deepEqual(calls, ['recover'], 'gone under focus');
+      run(false);
+      assert.deepEqual(calls, ['recover'], 'once');
+      run(true)();
+      doc.activeElement = { tag: 'a' };
+      run(false);
+      assert.deepEqual(calls, ['recover'], 'focus had moved on: left there');
+      run(true)();
+      doc.activeElement = null;
+      run(false);
+      assert.deepEqual(calls, ['recover', 'recover'], 'no active element counts as the body');
+    });
+  });
+
+  it('LearnRoute\'s problem screen: 「再読み込み」 reports its focus; the heading (tabIndex -1) takes focus when the button goes (self-review, finding 1)', () => {
+    const route = readFile('components/routes/LearnRoute.tsx');
+    const problem = route.slice(route.indexOf('function Problem('), route.indexOf('/** Dev preview'));
+    assert.match(problem, /const titleRef = useRef<HTMLHeadingElement>\(null\);\n {2}const focusTitle = useCallback\(\(\) => titleRef\.current\?\.focus\(\), \[\]\);\n {2}const onRetryFocus = useFocusAfterRemoval\(Boolean\(onRetry\), focusTitle\);/);
+    assert.match(problem, /<h1 ref=\{titleRef\} tabIndex=\{-1\} className="mt-3 text-h2 text-fg focus:outline-none">\{title\}<\/h1>/);
+    assert.match(problem, /\{onRetry && \(\n {12}<button\n {14}type="button"\n {14}onClick=\{onRetry\}\n {14}onFocus=\{onRetryFocus\}/);
+  });
+
   it('useOfflineReloadState reads the page controller; none without one', () => {
     withGlobals({ __controller: fakeController('unreachable') }, () => assert.equal(ui.useOfflineReloadState(), 'unreachable'));
     assert.equal(ui.useOfflineReloadState(), 'none');
@@ -680,11 +748,49 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
     }
   });
 
+  it('「読み込み直す」 taken away under focus (back → offline): #main-content takes focus once; never when focus is elsewhere or the button never had it (self-review, finding 1)', () => {
+    onPage(({ log, render, button, effects }) => {
+      const body = { tag: 'body' };
+      const doc = /** @type {any} */ (globalThis).document;
+      Object.assign(doc, { body, activeElement: null });
+      const runEffects = () => { for (const effect of [...effects]) effect(); };
+      // Keyboard focus on 「読み込み直す」, then the connection drops again.
+      let tree = render('back');
+      const reload = button(tree, jp.reload);
+      assert.equal(typeof reload.props.onFocus, 'function', 'the button reports its focus');
+      reload.props.onFocus();
+      doc.activeElement = reload;
+      runEffects();
+      assert.deepEqual(log, [], 'still shown: nothing to do');
+      doc.activeElement = body; // a removed element takes focus with it
+      tree = render('offline');
+      assert.equal(button(tree, jp.reload), undefined, 'gone in offline');
+      runEffects();
+      assert.deepEqual(log, [['focus', { preventScroll: true }]], 'the page\'s main area takes focus');
+      runEffects();
+      render('checking');
+      runEffects();
+      assert.equal(log.length, 1, 'once');
+      // Back again: the button had focus, but the learner moved on before it went.
+      button(render('back'), jp.reload).props.onFocus();
+      doc.activeElement = { tag: 'a' };
+      render('offline');
+      runEffects();
+      assert.equal(log.length, 1, 'focus is elsewhere: left where it is');
+      doc.activeElement = body;
+      render('back');
+      runEffects();
+      render('offline');
+      runEffects();
+      assert.equal(log.length, 1, 'the button never had focus this time: nothing moves');
+    });
+  });
+
   it('the bar\'s extra height: published on #main-content while the card shows, removed while empty and on unmount', () => {
     // Review round 1, finding 3: the notice grows the sticky bar; the offsets follow it.
     onPage(({ effects, render }) => {
       const tree = render('offline');
-      assert.equal(effects.length, 1, 'one effect: the height');
+      assert.equal(effects.length, 2, 'two effects: the height (first), focus after 「読み込み直す」 went');
       /** @type {Record<string, string>} */
       const props = {};
       const style = {
@@ -770,6 +876,140 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
       // @ts-ignore test globals
       delete globalThis.document;
     }
+  });
+});
+
+describe('S1: the reader\'s reading lines and "seen" follow the grown bar (useLessonProgress, self-review, finding 2)', () => {
+  const LESSON = JSON.parse(readFile('content/courses/vibe-coding/lessons/vibe-ch1.lesson.json'));
+
+  /**
+   * useLessonProgress on a fake page: a scroll container 784 px tall at the top of the viewport
+   * whose inline style holds the notice's height, blocks b1–b3 (bottoms at 150, 400 and 900 px),
+   * React state kept across renders (the stub's __hookStore) and every effect run after each render.
+   * @param {(p: any) => void} fn
+   */
+  const onReader = (fn) => {
+    /** @type {Array<() => unknown>} */
+    const effects = [];
+    /** @type {Array<() => unknown>} */
+    let cleanups = [];
+    const style = { extra: '', getPropertyValue: (/** @type {string} */ k) => (k === '--rp-bar-extra' ? style.extra : '') };
+    const container = {
+      style,
+      scrollTop: 400,
+      clientHeight: 784,
+      scrollHeight: 4000,
+      getBoundingClientRect: () => ({ top: 0 }),
+      addEventListener() {},
+      removeEventListener() {},
+    };
+    const block = (/** @type {string} */ id, /** @type {number} */ bottom) => ({ dataset: { rpBlock: id }, getBoundingClientRect: () => ({ bottom }) });
+    const blocks = [block('b1', 150), block('b2', 400), block('b3', 900)];
+    const article = { querySelectorAll: () => blocks };
+    /** @type {any[]} */
+    const observers = [];
+    /** @type {any[]} */
+    const mutationObservers = [];
+    const globals = {
+      __hookStore: {},
+      __setLog: [],
+      __effects: effects,
+      document: { documentElement: {} },
+      window: {
+        localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        addEventListener() {},
+        removeEventListener() {},
+        dispatchEvent() {},
+        setTimeout: () => 0,
+        clearTimeout() {},
+        requestAnimationFrame: () => 0,
+        cancelAnimationFrame() {},
+      },
+      IntersectionObserver: class {
+        /** @param {unknown} cb @param {any} options */
+        constructor(cb, options) { this.options = options; this.disconnected = false; observers.push(this); }
+        observe() {}
+        unobserve() {}
+        disconnect() { this.disconnected = true; }
+      },
+      MutationObserver: class {
+        /** @param {() => void} cb */
+        constructor(cb) { this.cb = cb; this.disconnected = false; mutationObservers.push(this); }
+        /** @param {unknown} target @param {unknown} options */
+        observe(target, options) { this.target = target; this.options = options; }
+        disconnect() { this.disconnected = true; }
+      },
+    };
+    /** @type {Record<string, PropertyDescriptor | undefined>} */
+    const saved = {};
+    for (const key of Object.keys(globals)) saved[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.assign(globalThis, globals);
+    const options = { courseSlug: 'vibe-coding', lesson: LESSON, title: 't', articleRef: { current: article }, container, trackPosition: false, recordLastLesson: false };
+    /** Renders until no state is set, running the effects (after the last render's cleanups) each time. */
+    const render = () => {
+      for (let pass = 0; pass < 6; pass += 1) {
+        const sets = /** @type {any} */ (globalThis).__setLog.length;
+        ui.__resetHooks();
+        effects.length = 0;
+        const api = ui.useLessonProgress(options);
+        for (const cleanup of cleanups) cleanup();
+        cleanups = [];
+        for (const effect of [...effects]) {
+          const cleanup = effect();
+          if (typeof cleanup === 'function') cleanups.push(/** @type {() => unknown} */ (cleanup));
+        }
+        if (/** @type {any} */ (globalThis).__setLog.length === sets) return api;
+      }
+      throw new Error('a render keeps setting state');
+    };
+    const liveObserver = () => observers.filter((o) => !o.disconnected).at(-1);
+    try {
+      fn({ style, container, render, liveObserver, mutationObservers });
+    } finally {
+      for (const cleanup of cleanups) cleanup();
+      for (const [key, descriptor] of Object.entries(saved)) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete (/** @type {any} */ (globalThis))[key];
+      }
+    }
+  };
+
+  it('without the notice: the bar is 59 px (seen root, resume line at 83 px, reading line at 59 + 235 px)', () => {
+    onReader(({ render, liveObserver }) => {
+      const api = render();
+      assert.equal(liveObserver().options.rootMargin, '-59px 0px 0px 0px');
+      assert.equal(api.topBlockId, 'b1', 'b1 ends at 150 px, below the bar: the resume point');
+      assert.equal(api.activeBlockId, 'b2', 'the reading line (294 px) is in b2');
+    });
+  });
+
+  it('with the notice (126 px): a block under the grown bar is neither the resume point nor in view for "seen"', () => {
+    onReader(({ style, render, liveObserver }) => {
+      style.extra = '126px';
+      const api = render();
+      assert.equal(liveObserver().options.rootMargin, '-185px 0px 0px 0px', 'the seen root starts below the grown bar');
+      assert.equal(api.topBlockId, 'b2', 'b1 (bottom 150) is hidden under the bar (bottom 185): resume at b2');
+      assert.equal(api.activeBlockId, 'b3', 'the reading line moves down with the bar (420 px)');
+    });
+  });
+
+  it('the notice shows and goes while the reader is open: its height is read again (a MutationObserver on the container\'s style)', () => {
+    onReader(({ style, container, render, liveObserver, mutationObservers }) => {
+      let api = render();
+      const watcher = mutationObservers.filter((o) => !o.disconnected).at(-1);
+      assert.equal(watcher.target, container);
+      assert.deepEqual(watcher.options, { attributes: true, attributeFilter: ['style'] });
+      style.extra = '126px';
+      watcher.cb();
+      api = render();
+      assert.equal(liveObserver().options.rootMargin, '-185px 0px 0px 0px', 'a new observer for the new bar (its timers start over)');
+      assert.equal(api.topBlockId, 'b2');
+      style.extra = '';
+      mutationObservers.filter((o) => !o.disconnected).at(-1).cb();
+      api = render();
+      assert.equal(liveObserver().options.rootMargin, '-59px 0px 0px 0px');
+      assert.equal(api.topBlockId, 'b1');
+    });
   });
 });
 
@@ -965,6 +1205,46 @@ describe('S1: the root ErrorBoundary while the page waits for the connection', (
         assert.deepEqual(controller.log, ['require', 'release', 'unsubscribe'], `late=${late}`);
       });
     }
+  });
+
+  it('「再読み込み」 taken away under focus (unreachable → offline): the heading takes focus again; never when focus was elsewhere (self-review, finding 1)', () => {
+    const controller = movingController({ wait: 'unreachable' });
+    withController(controller, () => {
+      const focused = /** @type {string[]} */ ([]);
+      const body = { isConnected: true };
+      const doc = { body, activeElement: /** @type {any} */ (body), documentElement: { lang: 'ja' } };
+      Object.assign(globalThis, { document: doc });
+      try {
+        const eb = new ui.ErrorBoundary({});
+        eb.headingRef.current = { focus: () => focused.push('heading') };
+        eb.componentDidMount();
+        eb.state = { hasError: true, error: CHUNK };
+        eb.componentDidUpdate({}, { hasError: false, error: null });
+        assert.deepEqual(focused, ['heading'], 'the first time, as before');
+        // Keyboard focus on 「再読み込み」, then the connection drops: the update removes the button.
+        const reloadButton = { isConnected: true };
+        doc.activeElement = reloadButton;
+        /** @type {any} */ (globalThis).__onCommit = () => {
+          reloadButton.isConnected = false;
+          doc.activeElement = body;
+        };
+        controller.move('offline');
+        assert.deepEqual(focused, ['heading', 'heading'], 'focus fell to the body: the heading takes it');
+        // Focus already on the body (or still on an element on the page): left where it is.
+        /** @type {any} */ (globalThis).__onCommit = undefined;
+        controller.move('checking');
+        const still = { isConnected: true };
+        doc.activeElement = still;
+        controller.move('unreachable');
+        assert.deepEqual(focused, ['heading', 'heading']);
+        eb.componentWillUnmount();
+      } finally {
+        // @ts-ignore test globals
+        delete globalThis.document;
+        // @ts-ignore test globals
+        delete globalThis.__onCommit;
+      }
+    });
   });
 });
 

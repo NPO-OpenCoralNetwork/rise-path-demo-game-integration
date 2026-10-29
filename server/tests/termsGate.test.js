@@ -505,6 +505,9 @@ const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABAS
     'KOKORO_TTS_URL', 'MEMANTO_ENABLED'];
 
 /**
+ * One request to the stack. A request that gets no answer (a network error, or no answer within
+ * 10 s: a middleware that never calls next) throws, so a check that a call was not refused for the
+ * terms always means the stack answered (self-review, finding 5).
  * @param {string} base @param {string} method @param {string} path
  * @param {{ headers?: Record<string, string>, body?: unknown }} [options]
  */
@@ -515,15 +518,17 @@ async function call(base, method, path, { headers = {}, body } = {}) {
         init.headers = { ...headers, 'content-type': 'application/json' };
         init.body = JSON.stringify(body);
     }
+    /** @type {Response} */
+    let response;
     try {
-        const response = await fetch(`${base}${path}`, init);
-        const text = await response.text();
-        let json = null;
-        try { json = JSON.parse(text); } catch { /* not JSON */ }
-        return { status: response.status, json, headers: response.headers };
+        response = await fetch(`${base}${path}`, init);
     } catch (error) {
-        return { status: 0, json: null, error, headers: new Headers() };
+        throw new Error(`${method} ${path}: no answer from the stack`, { cause: error });
     }
+    const text = await response.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* not JSON */ }
+    return { status: response.status, json, headers: response.headers };
 }
 
 /** @param {(base: string) => Promise<void>} handler */

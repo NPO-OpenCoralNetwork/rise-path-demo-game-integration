@@ -39,6 +39,23 @@ export function barExtra(container: HTMLElement): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+/**
+ * `barExtra(container)`, kept current: read again whenever the container's inline style changes
+ * (the notice shows, grows or goes). useLessonProgress measures its lines below the grown bar.
+ */
+export function useBarExtraOf(container: HTMLElement | null): number {
+  const [extra, setExtra] = useState(() => (container ? barExtra(container) : 0));
+  useEffect(() => {
+    const read = () => setExtra(container ? barExtra(container) : 0);
+    read();
+    if (!container || typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(read);
+    observer.observe(container, { attributes: true, attributeFilter: ['style'] });
+    return () => observer.disconnect();
+  }, [container]);
+  return extra;
+}
+
 /** Scrolls `container` so `target` sits `offset` px (plus the notice's `barExtra`) below its top edge. */
 export function scrollElementIntoContainer(
   container: HTMLElement,

@@ -24,7 +24,9 @@ import { offlinePartText, offlineReloadCopy } from './offlineReloadCopy';
  * region is always mounted and empty otherwise, so what appears in it is announced (as ReaderStatus
  * and SaveStoppedNotice do). While the card shows, the bar is taller by its height: the notice
  * publishes it as --rp-bar-extra (reader.css, useScrollContainer.ts) so focused controls, the
- * reader's jumps and the sticky columns stay clear of the grown bar.
+ * reader's jumps and the sticky columns stay clear of the grown bar. When the connection drops
+ * again while 「読み込み直す」 has focus, the button goes (back → offline) and the page's main area
+ * takes focus (useFocusAfterRemoval).
  */
 
 const subscribe = (listener: () => void) => pageOfflineReload()?.subscribe(listener) ?? (() => {});
@@ -69,6 +71,25 @@ function focusMain(): void {
 }
 
 /**
+ * A control that a change of the page's offline state can remove while it has focus (the notice's
+ * 「読み込み直す」, LearnRoute's 「再読み込み」). Returns the control's onFocus. When `shown` turns
+ * false after it had focus and focus fell to the page body (a removed element takes focus with it),
+ * `recover` moves it, as ReaderStatus and SaveStoppedNotice do. Pass a stable `recover`.
+ */
+export function useFocusAfterRemoval(shown: boolean, recover: () => void): () => void {
+  const hadFocus = useRef(false);
+  useEffect(() => {
+    if (shown || !hadFocus.current) return;
+    hadFocus.current = false;
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!active || active === document.body) recover();
+  }, [shown, recover]);
+  return () => {
+    hadFocus.current = true;
+  };
+}
+
+/**
  * Publishes the notice's height as --rp-bar-extra on `#main-content` (the reader's scroll container;
  * else the reader root), inherited by the sticky columns; removed while the region is empty and on unmount.
  */
@@ -93,12 +114,13 @@ function useBarExtra(ref: React.RefObject<HTMLDivElement | null>): void {
   }, [ref]);
 }
 
-export function OfflineReloadNoticeView({ language, wait, dismissed, onReload, onDismiss, hostRef }: {
+export function OfflineReloadNoticeView({ language, wait, dismissed, onReload, onDismiss, onReloadFocus, hostRef }: {
   language: Language;
   wait: ChunkWait;
   dismissed: boolean;
   onReload: () => void;
   onDismiss: () => void;
+  onReloadFocus?: () => void;
   hostRef?: React.Ref<HTMLDivElement>;
 }) {
   const t = offlineReloadCopy[language];
@@ -110,7 +132,7 @@ export function OfflineReloadNoticeView({ language, wait, dismissed, onReload, o
         <Icon size={16} aria-hidden="true" className="rp-status-icon" />
         <span className="rp-status-text">{offlinePartText(language, wait)}</span>
         {wait === 'back' ? (
-          <button type="button" className="rp-link-btn" onClick={onReload}>
+          <button type="button" className="rp-link-btn" onClick={onReload} onFocus={onReloadFocus}>
             {t.reload}
           </button>
         ) : null}
@@ -137,15 +159,19 @@ export default function OfflineReloadNotice() {
   // back → offline → back the card comes back even if it was closed in the first back.
   const [stretch, setStretch] = useState<{ wait: ChunkWait; closed: boolean }>(() => ({ wait, closed: false }));
   if (stretch.wait !== wait) setStretch({ wait, closed: false });
+  const dismissed = stretch.wait === wait && stretch.closed;
   const hostRef = useRef<HTMLDivElement | null>(null);
   useBarExtra(hostRef);
+  // 「読み込み直す」 shows only in back: offline again (or closed) takes it away.
+  const onReloadFocus = useFocusAfterRemoval(wait === 'back' && !dismissed, focusMain);
   return (
     <OfflineReloadNoticeView
       language={language}
       wait={wait}
-      dismissed={stretch.wait === wait && stretch.closed}
+      dismissed={dismissed}
       hostRef={hostRef}
       onReload={() => pageOfflineReload()?.reloadNow()}
+      onReloadFocus={onReloadFocus}
       onDismiss={() => {
         setStretch({ wait, closed: true });
         focusMain();

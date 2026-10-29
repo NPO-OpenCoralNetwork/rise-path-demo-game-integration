@@ -223,6 +223,9 @@ describe('Phase 8 in-app check: chapter 12 says what the fixes changed', () => {
         assert.ok(read('components/common/offlineReloadCopy.ts').includes("'インターネットにつながっていないため、ページの一部を読み込めませんでした。"), 'the notice text the chapter quotes');
         assert.ok(read('components/lesson/SaveChip.tsx').includes("long: 'いまはサーバーにつながらないため、この端末に記録しています。つながると、アカウントに保存します。',"), 'the card text the chapter quotes');
         assert.match(read('components/lesson/ReaderStatus.tsx'), /if \(message\?\.kind === 'stall' && message\.state === 'offline' && offlineWait === 'offline'\) return null;/);
+        // Self-review, findings 1 and 2: what follows the grown bar, and where focus goes.
+        assert.match(s1, /横の目次の位置、見出しに移ったときの位置、読んだブロックの数え方、続きから開く位置も、それに合わせます（高くなったバーの下に隠れたブロックは、読んだことにしません）/u);
+        assert.match(s1, /「読み込み直す」にフォーカスがあるときにまた切れて、ボタンがなくなったときは、フォーカスをページの本文に移します（ページやレッスンを読めなかったときの画面の「再読み込み」も同じで、そのときは見出しに移します）/u);
     });
 
     it('S5: the sign-in reads run once more after the acceptance (finding 1); 12.3 item 5 counts the refused reads', () => {
@@ -231,8 +234,16 @@ describe('Phase 8 in-app check: chapter 12 says what the fixes changed', () => {
         assert.match(s5, /断られていた XP と復習の枚数、ログインのときに読む前の形式のコースの進み・学習の記録・お知らせを、画面が 1 回だけ読み直します（切り替えを止めているときは、何も読み直しません）/u);
         const item5 = chapter.slice(chapter.indexOf('### 12.3')).split('\n').find((l) => l.startsWith('5. '));
         assert.ok(item5, '12.3 item 5');
-        assert.match(item5, /同意のページが出るまでと出ているあいだに、画面が読みに行くもののうち 7 つほどは断られます（ログインするたびに 1 回です。教室の 1 分 200 回の分を使います）/u);
-        assert.match(read('context/AuthContext.tsx'), /const hydration = createTermsRetry\(hydrateUserDataOnce\);/);
+        assert.match(item5, /ログインしたときは、同意のページが出るまでと出ているあいだに、画面が読みに行くもののうち 7 つほどが断られます。/u);
+        // Self-review, finding 4: not once per sign-in. supabase-js sends SIGNED_IN on every return to
+        // the tab and TOKEN_REFRESHED on each refresh; handleSession hydrates again on each, and the
+        // three sign-in reads are refused again while the consent page shows.
+        assert.match(item5, /同意のページが出ているあいだは、そのあとも、タブに戻るたびと、ログインの自動の更新のたびに、前の形式のコースの進み・学習の記録・お知らせの 3 つがまた断られます。どれも教室の 1 分 200 回の分を使います。/u);
+        assert.doesNotMatch(item5, /ログインするたびに 1 回/u);
+        const authContext = read('context/AuthContext.tsx');
+        assert.match(authContext, /const hydration = createTermsRetry\(hydrateUserDataOnce\);/);
+        const handleSession = authContext.slice(authContext.indexOf('const handleSession = '), authContext.indexOf('// Get initial sessions'));
+        assert.match(handleSession, /\n {16}hydrateUserData\(\);\n/, 'every primary session event with a user hydrates again');
     });
 });
 
