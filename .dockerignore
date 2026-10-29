@@ -14,4 +14,7 @@ public/data/audio
 deploy/risepath-vm/hermes-data
 # VM stack secrets (stack.env, tunnel.env): no build step reads them
 deploy/risepath-vm/*.env
+# Learners' uploaded files (server/uploads.js): never baked into an image
+uploads
+public/uploads
 .grok

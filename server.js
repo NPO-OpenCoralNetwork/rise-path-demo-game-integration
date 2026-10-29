@@ -35,6 +35,7 @@ import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
 import { describeError, redactUrl } from './server/utils/redactUrl.js';
 import { isDbUnavailable } from './tools/core/dbErrors.js';
+import { blockLegacyUploads } from './server/uploads.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -364,6 +365,9 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
 
     if (serveStatic) {
         // --- Static File Serving (Production) ---
+        // Uploads are private (server/uploads.js): files older versions left in public/uploads (and
+        // copied into dist/ by a build made next to them) answer 404, before either static server.
+        app.use(blockLegacyUploads());
         // In production, serve the built frontend from dist/
         const distPath = path.join(__dirname, 'dist');
         try {
@@ -381,7 +385,7 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
             console.log('[Static] No dist/ found — frontend served separately (dev mode)');
         }
 
-        // Also serve public/ for uploaded/generated assets
+        // Also serve public/ for generated assets (not uploads: see above)
         app.use(express.static(path.join(__dirname, 'public')));
     }
 

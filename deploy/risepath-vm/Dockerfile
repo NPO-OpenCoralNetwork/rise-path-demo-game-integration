@@ -18,6 +18,9 @@ COPY content/ ./content/
 COPY scripts/ ./scripts/
 COPY public/ ./public/
 COPY data/ ./data/
+# Uploaded materials (server/uploads.js): the uploads volume is mounted here and starts with this
+# directory's mode, so only the server's user can list it.
+RUN mkdir -m 700 /app/uploads
 
 ENV NODE_ENV=production
 ENV PORT=3006

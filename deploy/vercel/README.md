@@ -247,6 +247,6 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 - Git 連携: `main` への push で本番がビルドされる（CI にデプロイジョブはない）。レッスンはビルド時にバンドルされるので、学習者に届くのは再ビルドのあと。
 - CLI: `npm run vercel:link`（初回のプロジェクト紐付け）、`npm run vercel:deploy`（本番。`--archive=tgz` で巨大リポジトリの CLI OOM とファイル数上限を避ける）。`vercel:deploy` はローカルの作業ツリーをそのままアップロードするので、`main` のクリーンなチェックアウトで実行する。
-- `.vercelignore` は `node_modules`、Blender マニュアル HTML（約 1.2 GB）、`*.env`・`.env*`、`.artifacts/`・`.shots/`、`public/uploads`、`/data/curricula/p_school` などを除外する。`public/p_school` は載る。
+- `.vercelignore` は `node_modules`、Blender マニュアル HTML（約 1.2 GB）、`*.env`・`.env*`、`.artifacts/`・`.shots/`、`public/uploads`・`/uploads`（アップロードされた教材）、`/data/curricula/p_school` などを除外する。`public/p_school` は載る。
 - データの書き出しと DB のダンプ（`exports/`・`backups/`・`*.dump`・`*.sql.*`・ルートの `*.sql`）と、ホストの間で持ち運ぶ暗号化した秘密（`*.env.gpg`）も、`.gitignore` と同じく除外する。`.gitignore` にあるファイルは `git status` に出ないので、「クリーン」に見えるチェックアウトにも残っていることがある。
 - API（VM）はフロントと別にデプロイする。新しい API を前提にしたフロントは、先に VM で `deploy-stack.sh` を流してから出す。

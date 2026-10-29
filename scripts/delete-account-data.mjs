@@ -6,7 +6,7 @@
  * (server/services/accountDeletion.js deleteAccountData): the shared Supabase login (Nexloom,
  * P-School) is not touched; deleting it is a separate dashboard step, after this one.
  *
- * Run it in the running api container (uploaded files live in its layer; DATABASE_URL_PHASE1,
+ * Run it in the running api container (uploaded files are in its uploads volume; DATABASE_URL_PHASE1,
  * SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and the billing env are already there):
  *
  *   docker compose --env-file stack.env exec -T api node scripts/delete-account-data.mjs --find-email someone@example.com

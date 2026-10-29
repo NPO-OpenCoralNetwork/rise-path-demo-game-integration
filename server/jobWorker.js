@@ -1,14 +1,9 @@
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { getPool } from './db.js';
 import { ingestMaterial } from './ragService.js';
+import { uploadLocationOf, uploadRoot } from './uploads.js';
 import { describeError } from './utils/redactUrl.js';
 import { isDbUnavailable } from '../tools/core/dbErrors.js';
-
-// ESM dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..'); // Assuming server/jobWorker.js
 
 const POLLING_INTERVAL_MS = 2000;
 const MAX_POLLING_INTERVAL_MS = 60_000;
@@ -196,7 +191,9 @@ export class JobWorker {
                 if (matRes.rowCount === 0) throw jobError("Material not found", 'material_not_found');
                 
                 const material = matRes.rows[0];
-                const filePath = path.resolve(PROJECT_ROOT, material.storage_path);
+                // Only a path the upload route writes (server/uploads.js), resolved like it stores it.
+                if (!uploadLocationOf(material.storage_path)) throw jobError('Not an upload path', 'file_missing');
+                const filePath = path.resolve(uploadRoot(), material.storage_path);
                 const mimeType = material.type === 'pdf' ? 'application/pdf' : 'text/plain';
 
                 await ingestMaterial(material_id, filePath, mimeType, job.user_id);
