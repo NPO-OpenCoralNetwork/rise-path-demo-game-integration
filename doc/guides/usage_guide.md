@@ -121,7 +121,7 @@ AI に自然言語で話しかけるだけで：
     "rise-path-learning": {
       "command": "/opt/homebrew/bin/node",
       "args": [
-        "/path/to/rise-path-demo-game-Integration-/mcp-server/index.js"
+        "/path/to/rise-path-demo-game-integration/mcp-server/index.js"
       ],
       "env": {
         "DATABASE_URL_PHASE1": "postgresql://...",
@@ -391,8 +391,8 @@ get-generation-kit     validate-intake     save-curriculum-draft
 ### 1. クローン & インストール
 
 ```bash
-git clone https://github.com/t012093/rise-path-demo-game-Integration-.git
-cd rise-path-demo-game-Integration-
+git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git
+cd rise-path-demo-game-integration
 npm install
 ```
 
