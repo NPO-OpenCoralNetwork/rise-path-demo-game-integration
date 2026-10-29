@@ -2,7 +2,9 @@
  * Per-call policy of the remote MCP endpoint (mcp-server/remote.js, createMcpServer's `remote`):
  *
  * - gate(extra): the user of the verified access token (tools/core/mcpUserScope.js step 0) when
- *   their AI access is 'ready' and 'adult' (tools/core/mcpAiAccess.js, production rules always),
+ *   they accepted the current terms (only with LEGAL_TERMS_REQUIRED on, Phase 8: else a tool error
+ *   terms_required or legal_unavailable linking to <APP_PUBLIC_URL>/, tools/core/legalAcceptance.js;
+ *   checked first) and their AI access is 'ready' and 'adult' (tools/core/mcpAiAccess.js, production rules always),
  *   else a tool error: age_required | adults_only | ai_paused_safety | ai_access_unavailable, in
  *   English and Japanese, linking to <APP_PUBLIC_URL>/settings/ai-access. Runs on every tools/call,
  *   resources/read and prompts/get, not only at consent: Supabase approves a known client again
@@ -21,6 +23,7 @@
 import { reserveDailyCapFor } from '../server/middleware/dailyCaps.js';
 import { resolveMcpUserId } from '../tools/core/mcpUserScope.js';
 import { aiAccessRefusal, aiAccessSettingsUrl, remoteAccessEnv } from '../tools/core/mcpAiAccess.js';
+import { createRemoteTermsCheck } from '../tools/core/legalAcceptance.js';
 
 /** Remote tools that write learner data: charged to 'mcp_write' as well (not course-quiz-check: see above). */
 export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update', 'course-progress-update', 'course-review-grade']);
@@ -82,9 +85,11 @@ function capToolError({ status, body }) {
  * @param {{
  *   env?: Record<string, string | undefined>,
  *   reserveCap?: typeof reserveDailyCapFor,
- * }} [options]  reserveCap: dailyCaps reserveFor (tests pass their own createDailyCaps)
+ *   terms?: { refusal: (userId: string) => Promise<Record<string, unknown> | null> },
+ * }} [options]  reserveCap: dailyCaps reserveFor (tests pass their own createDailyCaps);
+ *   terms: the terms check (default: tools/core/legalAcceptance.js createRemoteTermsCheck over env)
  */
-export function createRemotePolicy({ env = process.env, reserveCap = reserveDailyCapFor } = {}) {
+export function createRemotePolicy({ env = process.env, reserveCap = reserveDailyCapFor, terms = createRemoteTermsCheck({ env }) } = {}) {
     const accessEnv = remoteAccessEnv(env);
     const settingsUrl = aiAccessSettingsUrl(env);
     const writes = new Set(REMOTE_WRITE_TOOLS);
@@ -94,6 +99,10 @@ export function createRemotePolicy({ env = process.env, reserveCap = reserveDail
         async gate(extra) {
             const scope = await resolveMcpUserId({ extra, remote: true });
             if ('error' in scope) return { refusal: scope };
+            // Terms first (Phase 8): a learner who has not accepted is sent to the app's consent
+            // page, not to /settings/ai-access, whose age and consent writes need the terms too.
+            const termsRefusal = await terms.refusal(scope.userId);
+            if (termsRefusal) return { refusal: termsRefusal };
             const refusal = await aiAccessRefusal(scope.userId, { env: accessEnv, settingsUrl });
             return refusal ? { refusal } : { userId: scope.userId };
         },

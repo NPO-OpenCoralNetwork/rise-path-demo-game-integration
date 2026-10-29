@@ -40,6 +40,7 @@ import { extractBearerToken } from '../middleware/auth.js';
 import { DELETION_APP_NAMES_MAX, deleteAccountData as defaultDeleteAccountData, readDeletionState as defaultReadDeletionState, REAUTH_MAX_AGE_S } from '../services/accountDeletion.js';
 import { cleanClientName } from './connectedApps.js';
 import { isUuid } from '../utils/ids.js';
+import { readEnvSwitch } from '../utils/envSwitch.js';
 import { canonicalUserId } from '../../tools/core/accountDeletions.js';
 import { decodeTokenClaims, passwordAuthTime, sessionAuthTime } from '../../tools/core/oauthToken.js';
 
@@ -51,26 +52,18 @@ export const ACCOUNT_DELETIONS_PER_MINUTE = 5;
 export const REAUTH_FUTURE_SKEW_S = 60;
 export const CONFIRM_WORD = 'delete-my-account';
 
-/** The only ACCOUNT_DELETION_ENABLED values that turn deletion on (trimmed, any case). */
-const SWITCH_ON = new Set(['true', '1', 'on', 'yes']);
-/** Values that leave it off on purpose, as unset and empty do (any other value leaves it off too, with a warning). */
-const SWITCH_OFF = new Set(['', 'false', '0', 'off', 'no']);
-
 /**
- * Whether deleting from Settings is on. It is off until the owner sets the switch: without the
+ * Whether deleting from Settings is on (the parser of server/utils/envSwitch.js: only true/1/on/yes,
+ * trimmed and in any case, turn it on; anything else leaves it off, an unrecognised value with
+ * recognised: false). It is off until the owner sets the switch: without the
  * Supabase setting "Require current password when updating", anyone holding a signed-in session
  * can set a new password through /auth/v1/user and pass the password re-entry, and the production
  * `amr` check comes first too (ai-access-plan §8.2 items 2 and 3). The switch is also the BYOA
  * precondition (design §10.1), so a misspelt value ("ture", "enabled") leaves deletion off.
  * The staff script (scripts/delete-account-data.mjs) does not read it.
- * @param {string | undefined} raw
- * @returns {{ on: boolean, recognised: boolean }}
+ * @type {(raw: string | undefined) => { on: boolean, recognised: boolean }}
  */
-export function readDeletionSwitch(raw) {
-    const value = String(raw ?? '').trim().toLowerCase();
-    if (SWITCH_ON.has(value)) return { on: true, recognised: true };
-    return { on: false, recognised: SWITCH_OFF.has(value) };
-}
+export const readDeletionSwitch = readEnvSwitch;
 
 /** Fixed answers by the service's reason. @type {Record<string, { status: number, error: string }>} */
 const REASONS = Object.freeze({

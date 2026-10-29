@@ -224,6 +224,10 @@ expect_eq "never granted" "$(psql "${REMOTE}" -X -At -c "SELECT string_agg(t || 
   "learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false xp_awards=false"
 expect_eq "reads lesson_progress" "$(psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM lesson_progress')" 0
 if psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM xp_awards' > /dev/null 2>&1; then bad "the role read xp_awards"; else ok "the role cannot read xp_awards"; fi
+# Phase 8: the terms check (LEGAL_TERMS_REQUIRED) reads the newest acceptance with the statement of
+# tools/core/legalAcceptance.js LATEST_ACCEPTANCE_SQL (its columns only, never id).
+expect_eq "reads the newest acceptance (terms check, Phase 8)" "$(psql "${REMOTE}" -X -At -c "SELECT count(*) FROM (SELECT terms_version, privacy_version, accepted_at FROM legal_acceptances WHERE user_id = '00000000-0000-4000-8000-000000000000'::uuid AND account_deleted_at IS NULL ORDER BY accepted_at DESC LIMIT 1) a")" 0
+if psql "${REMOTE}" -X -At -c 'SELECT id FROM legal_acceptances LIMIT 1' > /dev/null 2>&1; then bad "the role read legal_acceptances.id"; else ok "the role cannot read legal_acceptances.id"; fi
 
 if [[ "${FAILED}" -ne 0 ]]; then
   echo "# Database checks: FAILED (outputs in ${OUT})"

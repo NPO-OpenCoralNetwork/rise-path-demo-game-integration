@@ -36,10 +36,15 @@
  * After a successful "Agree and continue" the consent page is replaced by the app: the gate keeps a
  * one-shot hint (takeFocusAfterAccept) so the notice bar, which mounts in the Layout's main, moves
  * focus there instead of leaving it on the document body.
+ *
+ * Phase 8: each acceptance this page recorded (that button, or the sign-up marker) is announced
+ * once with LEGAL_ACCEPTED_EVENT (./legalEvents.ts): with the server's terms check on, the XP and
+ * review reads that raced it may have been refused (terms_required), and those stores read again.
  */
 import { useSyncExternalStore } from 'react';
 import { currentLegalVersions } from '../../shared/legal/versions.js';
 import { getSupabaseClient } from '../../services/supabaseClient';
+import { LEGAL_ACCEPTED_EVENT } from './legalEvents';
 import {
   forgetSignupAcceptance,
   getLegalStatus,
@@ -94,6 +99,11 @@ export type LegalGateDeps = {
   clearTimer: (timer: Timer) => void;
   warn: (message: string) => void;
   retryMs?: number;
+  /**
+   * Called once per acceptance this page recorded (accept(), the sign-up marker), never for a
+   * status read that answers "accepted". The page's gate sends LEGAL_ACCEPTED_EVENT (Phase 8).
+   */
+  announceAccepted?: () => void;
 };
 
 export const OFF_STATE: LegalGateState = Object.freeze({ status: 'off', notice: [], lastAccepted: null }) as LegalGateState;
@@ -140,6 +150,13 @@ export function createLegalGate(deps: LegalGateDeps) {
   const set = (next: LegalGateState) => {
     state = next;
     for (const listener of listeners) listener();
+  };
+  const announce = () => {
+    try {
+      deps.announceAccepted?.();
+    } catch {
+      // Only a hint for the stores (they read again on their next mount anyway).
+    }
   };
   const cancelRetry = () => {
     if (retry !== null) deps.clearTimer(retry);
@@ -205,7 +222,8 @@ export function createLegalGate(deps: LegalGateDeps) {
         if (stale()) return;
         if (posted.kind === 'accepted') {
           deps.forgetMarker(storage);
-          return set({ status: 'accepted', notice: [], lastAccepted: null });
+          set({ status: 'accepted', notice: [], lastAccepted: null });
+          return announce();
         }
         if (posted.kind === 'failed') return unavailable('the sign-up acceptance could not be recorded yet');
         deps.forgetMarker(storage);
@@ -252,6 +270,7 @@ export function createLegalGate(deps: LegalGateDeps) {
         deps.forgetMarker(deps.storage());
         focusAfterAccept = true;
         set({ status: 'accepted', notice: [], lastAccepted: null });
+        announce();
         return 'accepted';
       }
       // The server has newer versions than this page; only a reload shows them (the page offers it).
@@ -314,6 +333,9 @@ export function legalGate(enabled: boolean): LegalGate {
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (timer) => clearTimeout(timer),
     warn: (message) => console.warn(message),
+    announceAccepted: () => {
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(LEGAL_ACCEPTED_EVENT));
+    },
   });
   if (enabled && typeof window !== 'undefined') {
     window.addEventListener('focus', () => instance?.retryIfUnavailable());

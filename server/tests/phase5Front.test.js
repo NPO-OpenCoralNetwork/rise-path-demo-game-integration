@@ -290,7 +290,7 @@ describe('achievementsClient: the XP store', () => {
   let mod = null;
   before(async () => {
     const code = await bundle(
-      "export * from './components/ui/achievementsClient'; export { AchievementsApiError, parseAchievements } from './services/achievementsApi';",
+      "export * from './components/ui/achievementsClient'; export { AchievementsApiError, parseAchievements } from './services/achievementsApi'; export { LEGAL_ACCEPTED_EVENT } from './components/legal/legalEvents';",
       [[/\/progressSyncClient$/, 'syncForAchievements'], [/^react$/, 'react'], [/supabaseClient$/, 'supabase']],
     );
     mod = await fresh(code);
@@ -597,6 +597,161 @@ describe('achievementsClient: the XP store', () => {
     s.consumerMounted();
     await s.settled();
     assert.equal(env.loads, 4, 'fetched within 30 s of the last');
+  });
+
+  it('Phase 8: LEGAL_ACCEPTED_EVENT reads again only when the last read was refused with terms_required (SG-5: nothing changes while the server check is off)', async () => {
+    assert.equal(mod.LEGAL_ACCEPTED_EVENT, 'rp:legal-accepted');
+    /** A store whose reads answer `outcomes` in turn ('ok', or a refusal to throw), then 'ok'. */
+    const scripted = (outcomes) => {
+      const queue = [...outcomes];
+      const made = store({ load: () => {
+        const next = queue.length > 0 ? queue.shift() : 'ok';
+        if (next !== 'ok') throw next;
+        return mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()));
+      } });
+      const handlers = new Map();
+      const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
+      mod.listenForAchievementChanges(made.s, target);
+      return { ...made, fire: (type) => (handlers.get(type) ?? []).forEach((fn) => fn({ type })) };
+    };
+    const TERMS = new mod.AchievementsApiError('Accept the current terms of use to continue.', 403, 'terms_required');
+
+    // Refused while the sign-up acceptance was still on its way: held 'unavailable' with a consumer mounted.
+    const refused = scripted([TERMS]);
+    refused.s.consumerMounted();
+    await refused.s.settled();
+    assert.deepEqual([refused.s.getSnapshot().status, refused.env.loads], ['unavailable', 1]);
+    refused.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await refused.s.settled();
+    assert.deepEqual([refused.s.getSnapshot().status, refused.env.loads], ['ready', 2], 'one read, and the cluster comes back without a reload');
+    refused.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await refused.env.advance(60_000);
+    assert.equal(refused.env.loads, 2, 'a second announcement reads nothing');
+
+    // Without a consumer: only marked out of date (data shown before, a later read refused).
+    const kept = scripted(['ok', TERMS]);
+    const unmount = kept.s.consumerMounted();
+    await kept.s.settled();
+    kept.s.stale();
+    await kept.s.settled();
+    assert.deepEqual([kept.s.getSnapshot().status, kept.env.loads], ['ready', 2], 'refused, the earlier data is kept');
+    unmount();
+    kept.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await kept.s.settled();
+    assert.equal(kept.env.loads, 2, 'no request without a consumer');
+    assert.equal(kept.s.getSnapshot().at, null, 'marked out of date');
+    kept.s.consumerMounted();
+    await kept.s.settled();
+    assert.equal(kept.env.loads, 3, 'the next consumer reads at once (within 30 s of the last)');
+
+    // SG-5: a ready store, or one refused for another reason, reads nothing on the event.
+    for (const [label, outcomes] of [
+      ['ready', []],
+      ['503', [{ status: 503 }]],
+      ['network', [{ status: 0 }]],
+      ['another 403', [new mod.AchievementsApiError('x', 403, 'ai_access_required')]],
+      ['401', [new mod.AchievementsApiError('x', 401, 'sign_in_required')]],
+    ]) {
+      const other = scripted(outcomes);
+      other.s.consumerMounted();
+      await other.s.settled();
+      other.fire(mod.LEGAL_ACCEPTED_EVENT);
+      await other.env.advance(60_000);
+      assert.equal(other.env.loads, 1, label);
+    }
+
+    // A later successful read clears the mark: an announcement after it reads nothing.
+    const cleared = scripted([TERMS]);
+    cleared.s.consumerMounted();
+    await cleared.s.settled();
+    await cleared.s.reload();
+    assert.equal(cleared.s.getSnapshot().status, 'ready');
+    cleared.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await cleared.env.advance(60_000);
+    assert.equal(cleared.env.loads, 2);
+  });
+
+  it('Phase 8: LEGAL_ACCEPTED_EVENT while a read is on its way that then answers terms_required: exactly one more read (its check ran before the acceptance was stored)', async () => {
+    const TERMS = new mod.AchievementsApiError('Accept the current terms of use to continue.', 403, 'terms_required');
+    /** A store whose first read is held until settle(outcome); later reads answer `rest` in turn, then 'ok'. */
+    const held = (rest = []) => {
+      let settle = null;
+      const queue = [...rest];
+      const made = store({ load: (env) => {
+        if (env.loads > 1) {
+          const next = queue.length > 0 ? queue.shift() : 'ok';
+          if (next !== 'ok') throw next;
+          return mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()));
+        }
+        return new Promise((resolve, reject) => {
+          settle = (outcome) => (outcome === 'ok' ? resolve(mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()))) : reject(outcome));
+        });
+      } });
+      const handlers = new Map();
+      const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
+      mod.listenForAchievementChanges(made.s, target);
+      return { ...made, settle: (outcome) => settle(outcome), fire: (type) => (handlers.get(type) ?? []).forEach((fn) => fn({ type })) };
+    };
+
+    // The race: the event comes while the read is held, then the read is refused for the terms.
+    const raced = held();
+    raced.s.consumerMounted();
+    assert.equal(raced.env.loads, 1);
+    raced.fire(mod.LEGAL_ACCEPTED_EVENT);
+    assert.equal(raced.env.loads, 1, 'nothing more while the read is on its way');
+    raced.settle(TERMS);
+    await raced.s.settled();
+    assert.deepEqual([raced.s.getSnapshot().status, raced.env.loads], ['ready', 2], 'one more read: the cluster comes back without a reload');
+    await raced.env.advance(60_000);
+    assert.equal(raced.env.loads, 2, 'exactly one');
+
+    // Without a consumer when the refusal comes back: marked out of date, read by the next consumer.
+    const gone = held();
+    const unmount = gone.s.consumerMounted();
+    gone.fire(mod.LEGAL_ACCEPTED_EVENT);
+    unmount();
+    gone.settle(TERMS);
+    await gone.s.settled();
+    await gone.env.advance(60_000);
+    assert.equal(gone.env.loads, 1, 'no request without a consumer');
+    gone.s.consumerMounted();
+    await gone.s.settled();
+    assert.deepEqual([gone.s.getSnapshot().status, gone.env.loads], ['ready', 2]);
+
+    // SG-5: the same event during a read that succeeds or is refused for another reason reads nothing more.
+    for (const [label, outcome] of [
+      ['ok', 'ok'],
+      ['503', { status: 503 }],
+      ['another 403', new mod.AchievementsApiError('x', 403, 'ai_access_required')],
+    ]) {
+      const other = held();
+      other.s.consumerMounted();
+      other.fire(mod.LEGAL_ACCEPTED_EVENT);
+      other.settle(outcome);
+      await other.s.settled();
+      await other.env.advance(60_000);
+      assert.equal(other.env.loads, 1, label);
+    }
+
+    // A refusal for the terms with no announcement on its way reads nothing more (as before).
+    const quiet = held();
+    quiet.s.consumerMounted();
+    quiet.settle(TERMS);
+    await quiet.s.settled();
+    await quiet.env.advance(60_000);
+    assert.deepEqual([quiet.s.getSnapshot().status, quiet.env.loads], ['unavailable', 1]);
+
+    // The mark belongs to that read: an event during an earlier read that succeeded does not carry
+    // over to a later read refused for the terms.
+    const later = held([TERMS]);
+    later.s.consumerMounted();
+    later.fire(mod.LEGAL_ACCEPTED_EVENT);
+    later.settle('ok');
+    await later.s.settled();
+    later.s.stale();
+    await later.s.settled();
+    await later.env.advance(60_000);
+    assert.deepEqual([later.s.getSnapshot().status, later.env.loads], ['ready', 2], 'refused, the earlier data kept, no third read');
   });
 
   it('ACHIEVEMENTS_STALE_EVENT (a Blender stage): fetched at once with a consumer; a request asked for meanwhile runs once after', async () => {

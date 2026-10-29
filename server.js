@@ -49,6 +49,7 @@ import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
 import { requireSignedIn } from './server/middleware/signedIn.js';
 import { smallBodyErrors } from './server/middleware/smallBody.js';
 import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
+import { legalStartupWarnings } from './server/middleware/termsGate.js';
 import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
@@ -231,6 +232,9 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     // that calls a model needs sign-in (guests only with LLM_GUEST_AI=true), a recorded age and, under
     // 18, a guardian's consent. It runs after auth and before the daily caps, so a refused call is
     // never charged, and sets res.locals.aiAudience for the safety checks.
+    // Terms check (Phase 8, server/middleware/termsGate.js; off unless LEGAL_TERMS_REQUIRED): it runs
+    // inside requireAuth, optionalAuth and requireBridgeOrAuth, so every route below that a learner's
+    // session reaches is gated, except its TERMS_EXEMPT list. A new learner route: decide there.
     app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
     // The supporter plan (Phase 3): Stripe's webhook (signed, no JWT) and the billing routes (public
     // GET /plan; requireAuth inside for the rest). Before the requireAuth catch-all below.
@@ -402,6 +406,8 @@ async function main() {
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
     for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
+    // The terms check (Phase 8, LEGAL_TERMS_REQUIRED): one line only when the switch is set.
+    for (const warning of legalStartupWarnings(process.env)) console.warn(warning);
     // One line, names only; an owner alert when subscribers exist but billing cannot serve them.
     const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
     console.log(billingStartupLine(billingConfig));

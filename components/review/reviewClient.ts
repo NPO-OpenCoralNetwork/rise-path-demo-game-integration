@@ -15,7 +15,9 @@
  *   a second /review visit mounted right after reads instead of showing the cards just graded);
  *   at once on REVIEW_STALE_EVENT (a one-lesson reset or a delete-all succeeded), when a grade
  *   answer names another Japan-time day than the list, and when a session's list is through; when
- *   the learner or the capabilities change; on 「読み込み直す」. A lesson save the server took
+ *   the learner or the capabilities change; on 「読み込み直す」; after this page recorded an
+ *   acceptance of the terms (LEGAL_ACCEPTED_EVENT), only when the last read was refused with
+ *   terms_required (Phase 8). A lesson save the server took
  *   (with the record it answered, `echo`) only marks the data out of date (expire): the
  *   sidebar consumer is mounted on lesson pages too, a save cannot add a card due today (a card
  *   enters due the next Japan-time day at the earliest), and a read per save would double a
@@ -43,6 +45,7 @@ import {
 } from '../../services/reviewApi';
 import { ACHIEVEMENTS_STALE_EVENT } from '../../services/achievementsApi';
 import { createAchievementsStore, type AchievementsSnapshot, type AchievementsStore } from '../ui/achievementsClient';
+import { LEGAL_ACCEPTED_EVENT } from '../legal/legalEvents';
 import { PROGRESS_EVENT, type ProgressEventDetail } from '../lesson/progressStore.ts';
 import { PROGRESS_SAVED_EVENT, SYNC_ACCOUNT_EVENT } from '../lesson/progressSync.ts';
 import {
@@ -67,6 +70,8 @@ export function listenForReviewChanges(s: ReviewStore, target: Pick<Window, 'add
   target.addEventListener(PROGRESS_SAVED_EVENT, () => s.expire());
   target.addEventListener(REVIEW_STALE_EVENT, () => s.stale());
   target.addEventListener(SYNC_ACCOUNT_EVENT, () => s.syncChanged());
+  // Phase 8: reads again only when its last read was refused with terms_required (the store decides).
+  target.addEventListener(LEGAL_ACCEPTED_EVENT, () => s.termsAccepted());
 }
 
 export type GradeDeps = {

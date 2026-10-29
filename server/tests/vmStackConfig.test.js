@@ -259,6 +259,8 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;',
+    // Phase 8: the terms check (LEGAL_TERMS_REQUIRED, tools/core/legalAcceptance.js), never id.
+    'GRANT SELECT (user_id, terms_version, privacy_version, accepted_at, account_deleted_at) ON legal_acceptances TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
     // Phase 6: the review tools (course-review-due, course-review-grade), design §2.3.
@@ -1190,5 +1192,53 @@ describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', ()
     assert.equal(placeholder.status, 1, 'the placeholder guard still runs with the opt-out');
     assert.match(placeholder.out, /RISE_PATH_BRIDGE_TOKEN/);
     assert.deepEqual(placeholder.docker, []);
+  });
+});
+
+// Phase 8 (S5; design §5.7): the terms check's server switch reaches the api (empty default: off)
+// and mcp-public only through its own file (commented: off); the examples say how it pairs with the
+// Vercel flag VITE_FEATURE_LEGAL_PAGES, which the server cannot see.
+describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
+  const stripComments = (text) => text.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n');
+  const composeFiles = {
+    'docker-compose.yml': stripComments(read(path.join(STACK, 'docker-compose.yml'))),
+    'docker-compose.memanto.yml': stripComments(read(path.join(STACK, 'docker-compose.memanto.yml'))),
+  };
+
+  it('reaches the api with an empty default, and no other service has it in its environment', () => {
+    assert.match(services.api || '', /^ {6}LEGAL_TERMS_REQUIRED: \$\{LEGAL_TERMS_REQUIRED:-\}\s*$/m);
+    for (const [file, text] of Object.entries(composeFiles)) {
+      for (const [name, block] of Object.entries(serviceBlocks(text))) {
+        if (file === 'docker-compose.yml' && name === 'api') continue;
+        assert.ok(!block.includes('LEGAL_TERMS_REQUIRED'), `${file}: ${name}`);
+      }
+    }
+    assert.ok(!read(path.join(STACK, 'ci/stack.ci.env')).includes('LEGAL_TERMS_REQUIRED'), 'the E2E stack keeps it off');
+  });
+
+  it('mcp-public.env.example and stack.env.example name it only commented out (off), with the line that turns it on', () => {
+    for (const file of ['mcp-public.env.example', 'stack.env.example']) {
+      const text = read(path.join(STACK, file));
+      assert.ok(!lines(text).some((line) => line.startsWith('LEGAL_TERMS_REQUIRED')), `${file}: not set`);
+      assert.deepEqual(lines(text).filter((line) => /^#?\s*LEGAL_TERMS_REQUIRED=/.test(line)), ['# LEGAL_TERMS_REQUIRED=true'], file);
+    }
+    assert.deepEqual(lines(read(path.join(ROOT, '.env.example'))).filter((line) => /^#?\s*LEGAL_TERMS_REQUIRED=/.test(line)), ['# LEGAL_TERMS_REQUIRED=true']);
+  });
+
+  it('stack.env.example gives the order with VITE_FEATURE_LEGAL_PAGES and the role SQL, and says what happens out of order', () => {
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Terms check (Phase 8'), stack.indexOf('# LEGAL_TERMS_REQUIRED=true'));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    assert.match(text, /\(1\) released texts \(the api ignores the switch while they are drafts, and logs it\); \(2\) VITE_FEATURE_LEGAL_PAGES=true on Vercel, redeploy, check the consent page; \(3\) with byoa, run sql\/mcp_remote_role\.sql again; \(4\) the switch on here and in mcp-public\.env, then deploy-stack\.sh\./);
+    assert.match(text, /Turn off in reverse \(this switch first\)\./);
+    assert.match(text, /On here with the Vercel flag off, learners are refused with no page to accept on\./);
+    assert.match(text, /A new version that needs acceptance: turn it off in both files before deploying the texts, on again once the consent page shows/);
+    assert.match(text, /server\/middleware\/termsGate\.js TERMS_EXEMPT/);
+    const readme = read(path.join(STACK, 'README.md'));
+    const row = readme.split('\n').find((line) => line.startsWith('| `LEGAL_TERMS_REQUIRED` |'));
+    assert.ok(row, 'the README env table has the row');
+    assert.match(row, /`mcp-public` は同じ名前を `mcp-public\.env` から読みます/);
+    assert.match(row, /文面の公開 → Vercel の `VITE_FEATURE_LEGAL_PAGES=true` と同意の画面の確かめ → `byoa` なら `sql\/mcp_remote_role\.sql` を流し直す → `stack\.env` と `mcp-public\.env` に `true` → `deploy-stack\.sh`/);
+    assert.match(row, /同意をお願いする新しい版を出すときは、先に両方で止め、同意の画面が出てから入れ直します/);
   });
 });

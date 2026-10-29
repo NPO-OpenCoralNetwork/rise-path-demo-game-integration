@@ -12,14 +12,17 @@ import {
 } from './auth.js';
 import { allowDevAuthFallback } from './authPolicy.js';
 import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
+import { termsGateStep } from './termsGate.js';
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 
-async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, accountGeneration = null }) {
+async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, accountGeneration = null, isAnonymous }) {
     req.userId = userId;
     req.authMethod = authMethod;
     req.bridgeAuthenticated = bridgeAuthenticated;
     req.accountGeneration = accountGeneration;
+    // As requireAuth, for a Supabase session only (Phase 8: the terms check never gates an anonymous user).
+    if (isAnonymous !== undefined) req.isAnonymous = isAnonymous;
     await syncAuthUserStub(userId);
 }
 
@@ -33,6 +36,7 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, 
  *      auth_unavailable when that check cannot run (server/middleware/auth.js; never the dev
  *      fallback). The bridge and dev paths are PHASE1_USER_ID, which is never deleted.
  *   4. (dev only) → PHASE1_USER_ID fallback
+ * Only 3 meets the terms check (server/middleware/termsGate.js, off unless LEGAL_TERMS_REQUIRED).
  *
  * A bridge caller (1, 2) is the shared PHASE1 user: it reads and writes only rows PHASE1_USER_ID
  * owns, so a signed-in learner's curriculum or learner profile id answers 404. x-nexloom-user-id
@@ -97,8 +101,10 @@ export const requireBridgeOrAuth = async (req, res, next) => {
                     authMethod: 'supabase-jwt',
                     bridgeAuthenticated: false,
                     accountGeneration: account.generation,
+                    isAnonymous: user.is_anonymous === true,
                 });
-                return next();
+                // Phase 8: the terms check (off unless LEGAL_TERMS_REQUIRED; ./termsGate.js).
+                return termsGateStep(req, res, next);
             }
         }
     }

@@ -13,7 +13,7 @@ const BRIDGE_TOKEN = 'test-bridge-token-for-api-mounts';
 const SECRET = 'test-origin-secret-for-api-mounts-0123456789';
 const quietLogger = { warn: () => {} };
 
-const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'AI_ACCESS_DEV_AUDIENCE', 'LLM_GUEST_AI', 'VITE_FEATURE_AGENT_CHAT'];
+const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'HERMES_API_KEY', 'AI_ACCESS_DEV_AUDIENCE', 'LLM_GUEST_AI', 'VITE_FEATURE_AGENT_CHAT', 'LEGAL_TERMS_REQUIRED'];
 
 const withApp = async (originGate, handler) => {
     const app = await createApp({ serveStatic: false, originGate });

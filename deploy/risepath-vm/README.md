@@ -351,6 +351,7 @@ docker compose --env-file stack.env logs api | grep '\[Billing\]'
 | `RETENTION_PROCESSING_DAYS` | 365 | 処理の記録と AI アプリからの呼び出しの記録を残す日数（30〜3650） |
 | `RETENTION_DELETION_PROOF_YEARS` | 5 | 削除したアカウントの同意の記録・保護者の同意の証拠・削除の記録を残す年数（1〜10） |
 | `RETENTION_AI_APP_RECORD_YEARS` | 3 | 削除したアカウントの、使っていた AI アプリの記録を残す年数（1〜10） |
+| `LEGAL_TERMS_REQUIRED` | 未設定（同意は画面だけで求める） | `true` で、今の利用規約に同意していない学習者の API の呼び出しを `403 terms_required` で断ります（Phase 8。断らない操作は `server/middleware/termsGate.js` の `TERMS_EXEMPT`）。文面が案のあいだは `true` でも効かず、起動時のログに出します。`mcp-public` は同じ名前を `mcp-public.env` から読みます（AI アプリからの呼び出しも断ります）。入れる順番：文面の公開 → Vercel の `VITE_FEATURE_LEGAL_PAGES=true` と同意の画面の確かめ → `byoa` なら `sql/mcp_remote_role.sql` を流し直す → `stack.env` と `mcp-public.env` に `true` → `deploy-stack.sh`。止めるときは逆の順番です（この切り替えから）。画面のフラグが止まったまま `true` にすると、同意する画面がないまま断られます。同意をお願いする新しい版を出すときは、先に両方で止め、同意の画面が出てから入れ直します（[`doc/legal/README.md`](../../doc/legal/README.md) の「改定するとき」） |
 
 保存期間の処理は、`api` の起動時と 1 時間ごとに動きます（2 つの `api` が同時に動いても、1 つだけが消します）。値がまちがっていると、その規則だけを止め、起動時のログに出します（`[Retention] …`）。
 

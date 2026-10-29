@@ -24,6 +24,8 @@
  *   with import.meta.env.DEV = true unless LEGAL_DRAFT_PREVIEW_BUILD=true. Public sign-up opens only
  *   with this flag on. The legal text loads only through the conditional imports in
  *   components/routes/lazyRoutes.tsx, so with the flag off Rollup drops it from the bundle.
+ *   The server cannot see this flag: its own switch LEGAL_TERMS_REQUIRED (API and remote MCP; off by
+ *   default) is turned on after this flag and off before it (doc/legal/README.md).
  *
  * Read single flags only (`features.legalPages`). Never spread `features`, pass it whole, call
  * Object.keys/values/entries on it or index it with `features[…]`: Rollup folds a flag only while
