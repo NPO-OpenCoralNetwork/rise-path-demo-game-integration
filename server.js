@@ -326,6 +326,9 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     app.post('/api/v2/agent/chat', aiAccessGate({ adultsOnly: true })); // adults only (see /image); before its daily cap (agent.js)
     app.use('/api/v2', agentRoutes);
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
+    // TTS: in strict mode the requireAuth just above already answered a guest with 401, the health
+    // probe too, so the app shows voice as unavailable to guests (synthesize refuses them as well).
+    // optionalAuth reuses that check of the session (auth.js: one check per request).
     app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
     app.use('/api/v2', optionalAuth, aiLimiter, ttsRoutes);  // Issue #3: Kokoro TTS (+ user prefs when authed)
 

@@ -162,7 +162,7 @@ MCP ツール `request-tts` および `POST /api/generate-audio` は、このサ
 
 | 経路 | ユーザー解決 | preference 適用 |
 |------|-------------|----------------|
-| `POST /api/v2/tts/synthesize` | `optionalAuth` → `req.userId`（無効 JWT は匿名） | 認証時のみ |
+| `POST /api/v2/tts/synthesize` | コンテンツのルートの `requireAuth` → `optionalAuth` → `req.userId`。無効な JWT は 401。トークンがなければ、厳格モードでは 401、開発モードでは匿名（2026-10-29 訂正） | 認証時のみ |
 | MCP `request-tts` | SSE セッション / `RISE_PATH_ACTIVE_SESSION_KEY` | `voice_id` 省略時は **セッション必須**（fail-closed） |
 
 **優先順位:** 明示引数（`voice_id`, `speed` 等）> 保存済み `preferences.tts` > 環境変数デフォルト（`jf_alpha` / `af_bella`）。

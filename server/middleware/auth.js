@@ -23,6 +23,10 @@
  *       the dev fallbacks too, as in bridgeAuth.js).
  *       This release reads account_deletions on every signed-in request: apply migration 018
  *       (npm run db:migrate) before starting the api, also on a local dev database.
+ *     - the guards of one request (several can run: server.js mounts requireAuth twice on /image,
+ *       /upload and /rag, and optionalAuth after requireAuth on the TTS routes) check the session
+ *       once: getUser, the account state and the stub write are shared (oncePerRequest below).
+ *       Each guard still decides on its own; nothing is kept across requests.
  *
  * @module server/middleware/auth
  */
@@ -132,12 +136,42 @@ export const AUTH_UNAVAILABLE = Object.freeze({
  * @param {string} token
  * @param {string} userId
  */
-export const readSessionAccountState = (token, userId) => readAccountState(
+const readSessionAccountState = (token, userId) => readAccountState(
     getPool(),
     userId,
     sessionAuthTime(decodeTokenClaims(token)),
     { mayReopen: true },
 );
+
+// ─── One check per request ──────────────────────────────────
+
+const CHECKS = Symbol('rise-path.authChecks');
+
+/**
+ * What run() answers, once per request and key: the first guard that asks runs it, later guards of
+ * the same request get the same promise. A guard handles a shared rejection as if it had made the
+ * call itself (syncAuthUserStub never rejects).
+ * @template T
+ * @param {object} req
+ * @param {string} key
+ * @param {() => Promise<T>} run
+ * @returns {Promise<T>}
+ */
+const oncePerRequest = (req, key, run) => {
+    const checks = req[CHECKS] ?? (req[CHECKS] = new Map());
+    if (!checks.has(key)) checks.set(key, run());
+    return checks.get(key);
+};
+
+/** supabase.auth.getUser(token), once per request. */
+export const getUserOnce = (req, supabase, token) => oncePerRequest(req, `user:${token}`, () => supabase.auth.getUser(token));
+
+/** readSessionAccountState (which may re-open the account), once per request. */
+export const readSessionAccountStateOnce = (req, token, userId) =>
+    oncePerRequest(req, `account:${userId}:${token}`, () => readSessionAccountState(token, userId));
+
+/** syncAuthUserStub, once per request and user. */
+export const syncAuthUserStubOnce = (req, userId) => oncePerRequest(req, `stub:${userId}`, () => syncAuthUserStub(userId));
 
 // ─── Middleware ──────────────────────────────────────────────
 
@@ -155,7 +189,7 @@ export const requireAuth = async (req, res, next) => {
             req.userId = PHASE1_USER_ID;
             req.authMethod = 'dev-fallback';
             req.accountGeneration = null;
-            await syncAuthUserStub(req.userId);
+            await syncAuthUserStubOnce(req, req.userId);
             return next();
         }
         return res.status(401).json({
@@ -177,7 +211,7 @@ export const requireAuth = async (req, res, next) => {
             req.authMethod = 'no-supabase-fallback';
             req.accountGeneration = null;
             console.warn('[Auth] Token provided but Supabase not configured. Using dev fallback.');
-            await syncAuthUserStub(req.userId);
+            await syncAuthUserStubOnce(req, req.userId);
             return next();
         }
         return res.status(503).json({
@@ -186,7 +220,7 @@ export const requireAuth = async (req, res, next) => {
     }
 
     try {
-        const { data, error } = await supabase.auth.getUser(token);
+        const { data, error } = await getUserOnce(req, supabase, token);
         if (error || !data?.user) {
             // The auth provider's own text stays in the server log.
             if (error) console.warn('[Auth] token rejected:', error?.message || error);
@@ -196,7 +230,7 @@ export const requireAuth = async (req, res, next) => {
         // try: a database error is 503 auth_unavailable, not the generic 500 below.
         let account;
         try {
-            account = await readSessionAccountState(token, data.user.id);
+            account = await readSessionAccountStateOnce(req, token, data.user.id);
         } catch (err) {
             console.warn('[Auth] account state check failed:', err?.message || err);
             return res.status(503).json(AUTH_UNAVAILABLE);
@@ -208,7 +242,7 @@ export const requireAuth = async (req, res, next) => {
         // An anonymous Supabase user (if the project ever enables anonymous sign-in) cannot sign
         // back in after losing the session: routes that keep records for a person (billing) refuse it.
         req.isAnonymous = data.user.is_anonymous === true;
-        await syncAuthUserStub(req.userId);
+        await syncAuthUserStubOnce(req, req.userId);
         next();
     } catch (err) {
         console.error('[Auth] JWT validation error:', err.message);
@@ -241,7 +275,7 @@ export const optionalAuth = async (req, res, next) => {
             req.userId = PHASE1_USER_ID;
             req.authMethod = 'no-supabase-fallback';
             req.accountGeneration = null;
-            await syncAuthUserStub(req.userId);
+            await syncAuthUserStubOnce(req, req.userId);
             return next();
         }
         req.userId = null;
@@ -250,7 +284,7 @@ export const optionalAuth = async (req, res, next) => {
     }
 
     try {
-        const { data, error } = await supabase.auth.getUser(token);
+        const { data, error } = await getUserOnce(req, supabase, token);
         if (error || !data?.user) {
             req.userId = null;
             req.authMethod = 'anonymous';
@@ -261,7 +295,7 @@ export const optionalAuth = async (req, res, next) => {
         // again), never 401 sign_in_required or the guest path to a signed-in learner.
         let account;
         try {
-            account = await readSessionAccountState(token, data.user.id);
+            account = await readSessionAccountStateOnce(req, token, data.user.id);
         } catch (err) {
             console.warn('[Auth] optionalAuth account state check failed:', err?.message || err);
             account = null;
@@ -275,7 +309,7 @@ export const optionalAuth = async (req, res, next) => {
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';
         req.accountGeneration = account.generation;
-        await syncAuthUserStub(req.userId);
+        await syncAuthUserStubOnce(req, req.userId);
         return next();
     } catch (err) {
         console.warn('[Auth] optionalAuth JWT validation failed:', err.message);
