@@ -439,7 +439,7 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 
 | 変数 | 既定 | 中身 |
 |---|---|---|
-| `TRAINING_ENABLED` | 未設定（止まっている） | ちょうど `true` のときだけ、`/api/v2/training` が答え、職員のスクリプトが動きます。ほかの値（`TRUE`・`1`・`yes` など）では止まったままです。呼び出しのたびに読みます。学校のデプロイだけで設定します |
+| `TRAINING_ENABLED` | 未設定（止まっている） | ちょうど `true` のときだけ、`/api/v2/training` が答え、職員のスクリプトが動きます。ほかの値（`TRUE`・`1`・`yes` など）では止まったままです。値は `api` のコンテナを作るときに入るので、変えたら `./scripts/deploy-stack.sh` を実行し直します（`exec` で動かす職員のスクリプトも、そのコンテナの値を見ます）。学校のデプロイだけで設定します |
 
 **職員のスクリプト**（`api` コンテナの中で。`TRAINING_ENABLED=true` のときだけ動きます）
 
@@ -450,7 +450,7 @@ docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs 
 docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --list 2026-11-web
 ```
 
-割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（期がない、ほかの役割で割り当てずみ、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
+割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（`TRAINING_ENABLED` が `true` でない、期がない、ほかの役割で割り当てずみ、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 の行）。VM の DB には決して向けないでください。
 
