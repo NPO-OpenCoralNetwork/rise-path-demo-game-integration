@@ -710,6 +710,12 @@ describe('Phase 8 (S3): today\'s review count on the phone menu button', () => {
     assert.equal(textOfElement(badge), '3');
     for (const cls of ['bg-primary', 'text-on-primary', 'rounded-full', 'text-caption', 'tabular-nums', 'absolute']) assert.ok(classesOf(badge).includes(cls), cls);
     assert.doesNotMatch(badge.props.className, TOKEN_RULE);
+    // In-app check, finding 3: at top-1 right-1 the 16 px badge covered the right end of the icon's
+    // top line (lucide's Menu, "M4 5h16", 24 px in the 44 px button: that line's stroke spans y 14–16 px).
+    // Its top is now 4 px above the button (its right edge 2 px past it): its bottom (12 px) stays
+    // 2 px above the line for any number of digits (measured at 390 px with 1, 12 and 123).
+    for (const cls of ['-top-1', '-right-0.5', 'leading-4', 'min-w-4']) assert.ok(classesOf(badge).includes(cls), cls);
+    for (const cls of ['top-1', 'right-1', 'top-0', 'right-0']) assert.ok(!classesOf(badge).includes(cls), `not ${cls}`);
     assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 3 })), { language: 'en' })).props['aria-label'], 'Open menu (3 reviews due today)');
     assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 1 })), { language: 'en' })).props['aria-label'], 'Open menu (1 review due today)');
     assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 1 })))).props['aria-label'], 'メニューを開く（今日の復習 1 枚）');

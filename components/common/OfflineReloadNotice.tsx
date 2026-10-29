@@ -43,6 +43,20 @@ export function useOfflineFailures(): number {
   return useSyncExternalStore(subscribe, failuresSnapshot, serverFailures);
 }
 
+/**
+ * The page's offline state as this reader shows it: 'none' until a part failed to load while the
+ * reader is mounted (the controller's `failures()` grew since mount), then the controller's state.
+ * The notice reads it, and LessonReader, which leaves out its own "kept on this device" card while
+ * this one says 'offline' (ReaderStatus.tsx shownReaderStatus).
+ */
+export function useReaderOfflineWait(): ChunkWait {
+  const pageWait = useOfflineReloadState();
+  const failures = useOfflineFailures();
+  // The count when this reader mounted: only a failure after it counts.
+  const [mountedAt] = useState(failures);
+  return failures > mountedAt ? pageWait : 'none';
+}
+
 /** While `active`, this screen has nothing usable on it: the page reloads by itself once the app answers. */
 export function useRequireReload(active: boolean): void {
   useEffect(() => (active ? pageOfflineReload()?.requireReload() : undefined), [active]);
@@ -116,11 +130,8 @@ export function OfflineReloadNoticeView({ language, wait, dismissed, onReload, o
 
 export default function OfflineReloadNotice() {
   const { language } = useLanguage();
-  const pageWait = useOfflineReloadState();
-  const failures = useOfflineFailures();
-  // The count when this reader mounted: the card shows only after a part failed here.
-  const [mountedAt] = useState(failures);
-  const wait: ChunkWait = failures > mountedAt ? pageWait : 'none';
+  // The card shows only after a part failed here.
+  const wait = useReaderOfflineWait();
   // One stretch of one state: `closed` belongs to the state it was set in. When the state changes,
   // a new stretch starts open (during render, so the card never misses a frame), so after
   // back → offline → back the card comes back even if it was closed in the first back.

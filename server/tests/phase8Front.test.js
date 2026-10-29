@@ -153,7 +153,7 @@ before(async () => {
   const code = await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { default as FlashcardsBlock } from './components/lesson/blocks/FlashcardsBlock';",
-    "export { default as OfflineReloadNotice, OfflineReloadNoticeView, useOfflineReloadState, useRequireReload } from './components/common/OfflineReloadNotice';",
+    "export { default as OfflineReloadNotice, OfflineReloadNoticeView, useOfflineReloadState, useReaderOfflineWait, useRequireReload } from './components/common/OfflineReloadNotice';",
     "export { BAR_EXTRA_PROPERTY, barExtra, scrollElementIntoContainer } from './components/lesson/useScrollContainer';",
     "export { default as ErrorBoundary } from './components/common/ErrorBoundary';",
   ].join('\n'));
@@ -626,6 +626,24 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
     }, { failedSinceMount: false });
   });
 
+  it('useReaderOfflineWait (the notice and LessonReader read it): none until a part fails after mount, then the page\'s state; a new reader starts at none', () => {
+    onPage(({ controller, fail, remount }) => {
+      /** @param {string} wait */
+      const read = (wait) => {
+        controller.wait = wait;
+        ui.__resetHooks();
+        return ui.useReaderOfflineWait();
+      };
+      assert.equal(read('offline'), 'none', 'the page is offline, nothing failed here');
+      fail();
+      for (const wait of ['offline', 'checking', 'unreachable', 'back', 'none']) assert.equal(read(wait), wait);
+      remount();
+      assert.equal(read('offline'), 'none', 'a new reader: only its own failures count');
+      fail();
+      assert.equal(read('offline'), 'offline');
+    }, { failedSinceMount: false });
+  });
+
   it('a part that fails after mount shows the card for the page\'s state; 「読み込み直す」 in back (final review, finding 1)', () => {
     onPage(({ render, card, button, fail }) => {
       assert.equal(render('offline').props.children, null);
@@ -982,7 +1000,7 @@ describe('S1: wiring (index.tsx, LearnRoute, LessonReader, reader.css, copy)', (
 
   it('LessonReader renders the notice first in the bar\'s notice slot; App.tsx has no notice of its own (scope guard SG-1)', () => {
     const reader = readFile('components/lesson/LessonReader.tsx');
-    assert.match(reader, /^import OfflineReloadNotice from '\.\.\/common\/OfflineReloadNotice';$/m);
+    assert.match(reader, /^import OfflineReloadNotice, \{ useReaderOfflineWait \} from '\.\.\/common\/OfflineReloadNotice';$/m);
     assert.match(reader, /notice=\{\(\n {12}<>\n {14}\{\/\*[^\n]*\*\/\}\n {14}<OfflineReloadNotice \/>\n {14}\{resumed && !statusMessage \? \(/);
     assert.equal((reader.match(/<OfflineReloadNotice \/>/g) ?? []).length, 1);
     assert.doesNotMatch(readFile('App.tsx'), /OfflineReloadNotice/);

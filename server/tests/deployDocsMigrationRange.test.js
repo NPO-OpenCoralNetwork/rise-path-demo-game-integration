@@ -211,6 +211,31 @@ describe('the plan: Phase 8 chapter', () => {
     });
 });
 
+describe('Phase 8 in-app check: chapter 12 says what the fixes changed', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const chapter = plan.slice(plan.indexOf('## 12. Phase 8: '), plan.indexOf('## 13. やらないこと'));
+    const line = (prefix) => chapter.split('\n').find((l) => l.startsWith(prefix));
+
+    it('S1: no "kept on this device" card while the bar notice shows (finding 2), as ReaderStatus.tsx does', () => {
+        const s1 = line('- **S1 ');
+        assert.ok(s1, '12.1 S1');
+        assert.match(s1, /お知らせが「インターネットにつながっていないため、…」のあいだは（閉じたあとも）、記録をこの端末に残すときのカード（「いまはサーバーにつながらないため、この端末に記録しています。…」）を出しません/u);
+        assert.ok(read('components/common/offlineReloadCopy.ts').includes("'インターネットにつながっていないため、ページの一部を読み込めませんでした。"), 'the notice text the chapter quotes');
+        assert.ok(read('components/lesson/SaveChip.tsx').includes("long: 'いまはサーバーにつながらないため、この端末に記録しています。つながると、アカウントに保存します。',"), 'the card text the chapter quotes');
+        assert.match(read('components/lesson/ReaderStatus.tsx'), /if \(message\?\.kind === 'stall' && message\.state === 'offline' && offlineWait === 'offline'\) return null;/);
+    });
+
+    it('S5: the sign-in reads run once more after the acceptance (finding 1); 12.3 item 5 counts the refused reads', () => {
+        const s5 = line('- **S5 ');
+        assert.ok(s5, '12.1 S5');
+        assert.match(s5, /断られていた XP と復習の枚数、ログインのときに読む前の形式のコースの進み・学習の記録・お知らせを、画面が 1 回だけ読み直します（切り替えを止めているときは、何も読み直しません）/u);
+        const item5 = chapter.slice(chapter.indexOf('### 12.3')).split('\n').find((l) => l.startsWith('5. '));
+        assert.ok(item5, '12.3 item 5');
+        assert.match(item5, /同意のページが出るまでと出ているあいだに、画面が読みに行くもののうち 7 つほどは断られます（ログインするたびに 1 回です。教室の 1 分 200 回の分を使います）/u);
+        assert.match(read('context/AuthContext.tsx'), /const hydration = createTermsRetry\(hydrateUserDataOnce\);/);
+    });
+});
+
 describe('BYOA guide step 7 names the remote role\'s grants (final review, finding 6)', () => {
     const guide = read('doc/guides/byoa-setup.ja.md');
     const from = guide.indexOf('### 7. VM:');

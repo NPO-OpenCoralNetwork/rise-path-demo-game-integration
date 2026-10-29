@@ -1042,7 +1042,7 @@ before(async () => {
   ui = await fresh(await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { SaveChipView, saveLongText, saveLabel, SAVE_ICONS } from './components/lesson/SaveChip';",
-    "export { ReaderStatus, ReaderStatusView, readerStatusText, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
+    "export { ReaderStatus, ReaderStatusView, readerStatusText, shownReaderStatus, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
     "export { SaveStoppedNoticeView, default as SaveStoppedNotice } from './components/lesson/SaveStoppedNotice';",
     "export { LeftRecordsNoticeView, default as LeftRecordsNotice } from './components/lesson/LeftRecordsNotice';",
     "export { UnsavedLogoutDialogView } from './components/lesson/UnsavedLogoutDialog';",
@@ -1223,8 +1223,29 @@ describe('ReaderStatus: the reader\'s status line (finding 11)', () => {
     // .rp-reader * animations are cut to 1 ms under prefers-reduced-motion (the card is inside the reader).
     assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.rp-reader \*,/);
     const reader = readFile('components/lesson/LessonReader.tsx');
-    assert.match(reader, /<ReaderStatus message=\{statusMessage\} onDismiss=\{\(\) => setStatusMessage\(null\)\} \/>/);
+    assert.match(reader, /<ReaderStatus message=\{shownStatus\} onDismiss=\{\(\) => setStatusMessage\(null\)\} \/>/);
     assert.match(reader, /\{resumed && !statusMessage \? \(/, 'a message hides the "resumed" pill');
+  });
+
+  it('Phase 8 in-app check (S1): no "kept on this device" card while the bar\'s offline notice says the records stay here; every other message shows', () => {
+    // At 390 the two cards took about 45% of the first screen and the floating one covered the
+    // lesson title (in-app check, finding 2). The bar notice's offline text ends with 「学習の記録は、この端末に残っています。」.
+    const offline = { kind: 'stall', state: 'offline', reason: null, id: 1 };
+    assert.equal(ui.shownReaderStatus(offline, 'offline'), null);
+    for (const wait of ['none', 'checking', 'unreachable', 'back']) assert.equal(ui.shownReaderStatus(offline, wait), offline, wait);
+    for (const reason of ['network', 'server', 'auth', 'account', 'storage']) {
+      const stopped = { kind: 'stall', state: 'stopped', reason, id: 2 };
+      assert.equal(ui.shownReaderStatus(stopped, 'offline'), stopped, `stopped:${reason} still shows`);
+    }
+    const reset = { kind: 'reset', id: 3 };
+    assert.equal(ui.shownReaderStatus(reset, 'offline'), reset);
+    assert.equal(ui.shownReaderStatus(null, 'offline'), null);
+    // LessonReader passes the filtered message, from the same per-reader state the notice shows.
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /const offlineWait = useReaderOfflineWait\(\);\s*const shownStatus = shownReaderStatus\(statusMessage, offlineWait\);/);
+    assert.match(reader, /^import OfflineReloadNotice, \{ useReaderOfflineWait \} from '\.\.\/common\/OfflineReloadNotice';$/m);
+    assert.match(readFile('components/common/OfflineReloadNotice.tsx'), /export default function OfflineReloadNotice\(\) \{\s*const \{ language \} = useLanguage\(\);\s*\/\/[^\n]*\n\s*const wait = useReaderOfflineWait\(\);/);
+    assert.match(readFile('components/common/offlineReloadCopy.ts'), /partOffline:\s*'[^']*学習の記録は、この端末に残っています。',/);
   });
 });
 
