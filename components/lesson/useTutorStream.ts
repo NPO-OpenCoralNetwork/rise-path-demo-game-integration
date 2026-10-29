@@ -8,6 +8,8 @@ import type {
   TutorRequest as BridgeTutorRequest,
 } from '../../services/tutorBridge';
 import { answerKey, type AnswerRecord } from './progressStore.ts';
+import { dailyLimitResetAt, dailyLimitScope } from '../../services/aiDailyLimit.ts';
+import { aiAccessErrorKind, type AiAccessErrorKind } from '../../services/aiAccessRules.ts';
 
 /**
  * State for the inline AI tutor (WP-11, PLAN §5.7).
@@ -35,7 +37,44 @@ export type TutorErrorKind =
   | 'refused'
   | 'rejected'
   | 'interrupted'
-  | 'failed';
+  | 'daily_limit'
+  | 'daily_limit_guest'
+  | 'paused'
+  | 'failed'
+  // The AI access gate (server/middleware/aiAccessGate.js; services/aiAccessApi.ts
+  // AiAccessErrorKind): the panel shows components/safety/AiAccessRequired for these.
+  | 'sign_in_required'
+  | 'age_required'
+  | 'guardian_consent_required'
+  | 'ai_paused_safety'
+  | 'adults_only'
+  // The safety screen for minors (server/safety/moderation.js): the question or the answer was
+  // blocked (422 content_blocked, with `support` for distress), or the check could not run (503).
+  | 'content_blocked'
+  | 'safety_unavailable';
+
+/**
+ * Error kinds from the AI access gate (services/aiAccessRules.ts AiAccessErrorKind; that module
+ * is pure, so this file stays importable from node tests).
+ */
+export type TutorAccessKind = Extract<TutorErrorKind, AiAccessErrorKind>;
+export const isTutorAccessKind = (kind: TutorErrorKind | undefined): kind is TutorAccessKind =>
+  Boolean(kind && aiAccessErrorKind({ errorType: kind }));
+
+/** Errors a retry cannot fix: the panel offers no "Try again" for them. */
+export const tutorErrorIsFinal = (kind: TutorErrorKind | undefined): boolean => isTutorAccessKind(kind) || kind === 'content_blocked';
+
+/**
+ * The server's daily caps (server/middleware/dailyCaps.js, 429 daily_limit_reached):
+ * 'daily_limit' today's limit (lifts at 00:00 JST), 'daily_limit_guest' the guest budget (signing
+ * in lifts it), 'paused' the tutor is turned off (no reset time). While one holds, the hook
+ * refuses new questions locally instead of adding an error turn per try.
+ */
+export type TutorLimitKind = Extract<TutorErrorKind, 'daily_limit' | 'daily_limit_guest' | 'paused'>;
+export type TutorLimit = { kind: TutorLimitKind; until: number | null };
+
+const LIMIT_KINDS: ReadonlySet<TutorErrorKind> = new Set<TutorErrorKind>(['daily_limit', 'daily_limit_guest', 'paused']);
+export const isTutorLimitKind = (kind: TutorErrorKind | undefined): kind is TutorLimitKind => Boolean(kind && LIMIT_KINDS.has(kind));
 
 export type TutorTurn = {
   id: string;
@@ -51,6 +90,8 @@ export type TutorTurn = {
   typed?: boolean;
   /** The answer hit the length limit: `text` is what arrived, shown as a normal answer. */
   truncated?: boolean;
+  /** error 'content_blocked': the server asks for support lines (distress or self-harm). */
+  support?: boolean;
 };
 
 export type TutorThread = {
@@ -223,11 +264,32 @@ export function buildTutorRequest(thread: TutorThread, message: string, locale: 
   };
 }
 
+/** errorType (or error_type) on the error, else on its parsed `body`. */
+function errorTypeOf(error: unknown): string {
+  const pick = (value: unknown): unknown => {
+    if (!value || typeof value !== 'object') return undefined;
+    const record = value as Record<string, unknown>;
+    return record.errorType ?? record.error_type;
+  };
+  const direct = pick(error);
+  const found = typeof direct === 'string' ? direct : pick((error as { body?: unknown } | null)?.body);
+  return typeof found === 'string' ? found : '';
+}
+
 /** Maps an LlmApiError (status / errorType), a fetch TypeError or anything else to a UI message key. */
 export function classifyTutorError(error: unknown): TutorErrorKind {
-  const err = (error ?? {}) as { status?: unknown; errorType?: unknown; name?: unknown };
-  const type = typeof err.errorType === 'string' ? err.errorType : '';
+  const limitScope = dailyLimitScope(error);
+  if (limitScope === 'guest') return 'daily_limit_guest';
+  if (limitScope === 'off') return 'paused';
+  if (limitScope) return 'daily_limit';
+  const err = (error ?? {}) as { status?: unknown; name?: unknown };
+  const type = errorTypeOf(error);
   const status = typeof err.status === 'number' ? err.status : 0;
+  // Access and safety refusals first: they come as 401/403/422/503 and need their own message.
+  const access = aiAccessErrorKind(error);
+  if (access) return access;
+  if (type === 'content_blocked') return 'content_blocked';
+  if (type === 'safety_check_unavailable') return 'safety_unavailable';
   if (type === 'rate_limited' || status === 429) return 'rate_limited';
   if (type === 'timeout' || status === 504) return 'timeout';
   if (type === 'refusal' || status === 422) return 'refused';
@@ -237,6 +299,28 @@ export function classifyTutorError(error: unknown): TutorErrorKind {
   if (err.name === 'TypeError') return 'network';
   return 'failed';
 }
+
+/** content_blocked with support: true (the server saw distress or self-harm): show support lines. */
+export function tutorErrorSupport(error: unknown): boolean {
+  if (errorTypeOf(error) !== 'content_blocked') return false;
+  const read = (value: unknown) => (value && typeof value === 'object' ? (value as { support?: unknown }).support : undefined);
+  const support = read(error) ?? read((error as { body?: unknown } | null)?.body);
+  return support === true;
+}
+
+/**
+ * The limit a failed question hit, or null: until the server's reset_at (else the next 00:00
+ * JST); a paused tutor has no end (the page must be reloaded after the owner turns it back on).
+ */
+export function tutorLimitFor(error: unknown, nowMs: number = Date.now()): TutorLimit | null {
+  const kind = classifyTutorError(error);
+  if (!isTutorLimitKind(kind)) return null;
+  return { kind, until: kind === 'paused' ? null : dailyLimitResetAt(error, nowMs) };
+}
+
+/** True while `limit` holds at `nowMs`. */
+export const tutorLimitActive = (limit: TutorLimit | null, nowMs: number = Date.now()): limit is TutorLimit =>
+  Boolean(limit && (limit.until === null || nowMs < limit.until));
 
 /**
  * The answer turn once its stream ended. A reply cut at the length limit (`done.truncated`)
@@ -383,6 +467,8 @@ export type TutorStreamApi = {
   stop: () => void;
   /** End the conversation on screen (it is kept for the block, and the stream stops). */
   dismiss: () => void;
+  /** A daily cap holds: new questions are refused locally until it lifts. */
+  limit: TutorLimit | null;
 };
 
 let turnSeq = 0;
@@ -408,6 +494,16 @@ export function useTutorStream({ locale, stream, learnerState }: {
   const nextTyped = useRef(false);
   const [thread, setThread] = useState<TutorThread | null>(null);
   const [busy, setBusy] = useState(false);
+  const [limit, setLimit] = useState<TutorLimit | null>(null);
+  const limitRef = useRef<TutorLimit | null>(null);
+  limitRef.current = limit;
+
+  // Lift a daily limit at its reset time (00:00 JST), so the panel works again without a reload.
+  useEffect(() => {
+    if (!limit || limit.until === null) return undefined;
+    const timer = setTimeout(() => setLimit(null), Math.min(Math.max(0, limit.until - Date.now()), 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [limit]);
 
   // Latest values for the stable callbacks below.
   const localeRef = useRef(locale);
@@ -429,6 +525,8 @@ export function useTutorStream({ locale, stream, learnerState }: {
     const stored = threads.current.get(key);
     const text = message.trim().slice(0, TUTOR_MESSAGE_MAX);
     if (!stored || !text) return;
+    // A daily cap holds: refuse here; the panel shows one notice instead of an error per try.
+    if (tutorLimitActive(limitRef.current)) return;
     // The learner may have retried or revealed the check since the last turn.
     const base = refreshThread(stored, liveRef.current);
     if (base !== stored) threads.current.set(key, base);
@@ -459,7 +557,22 @@ export function useTutorStream({ locale, stream, learnerState }: {
       if (own.signal.aborted) {
         update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, status: 'stopped' })));
       } else {
-        update(key, (t) => patchTurn(t, answerId, (turn) => ({ ...turn, status: 'error', error: classifyTutorError(error) })));
+        const kind = classifyTutorError(error);
+        // A blocked answer arrives after its text was screened, so no text is on screen for it
+        // (minors' answers are buffered); drop any partial text all the same.
+        const blocked = kind === 'content_blocked';
+        update(key, (t) => patchTurn(t, answerId, (turn) => ({
+          ...turn,
+          status: 'error',
+          error: kind,
+          ...(blocked ? { text: '' } : {}),
+          ...(tutorErrorSupport(error) ? { support: true } : {}),
+        })));
+        const hit = tutorLimitFor(error);
+        if (hit) {
+          limitRef.current = hit;
+          setLimit(hit);
+        }
       }
     } finally {
       if (controller.current === own) {
@@ -500,7 +613,7 @@ export function useTutorStream({ locale, stream, learnerState }: {
   const retry = useCallback(() => {
     const key = activeKey.current;
     const current = key ? threads.current.get(key) : null;
-    if (!key || !current) return;
+    if (!key || !current || tutorLimitActive(limitRef.current)) return;
     const last = current.turns[current.turns.length - 1];
     const question = current.turns[current.turns.length - 2];
     if (!last || !question || last.role !== 'assistant' || question.role !== 'user') return;
@@ -522,5 +635,5 @@ export function useTutorStream({ locale, stream, learnerState }: {
   // Stop streaming when the reader unmounts (another lesson, another route).
   useEffect(() => () => controller.current?.abort(), []);
 
-  return { thread, busy, ask, send, markNextTyped, retry, stop, dismiss };
+  return { thread, busy, ask, send, markNextTyped, retry, stop, dismiss, limit: tutorLimitActive(limit) ? limit : null };
 }

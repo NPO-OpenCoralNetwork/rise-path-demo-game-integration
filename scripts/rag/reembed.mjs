@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getPool } from '../../server/db.js';
 import { EMBEDDING_DIM, EMBEDDING_MODEL, embedTexts, isEmbeddingConfigured } from '../../tools/core/ragSearch.js';
+import { isGeminiAllowed } from '../../server/llm/models.config.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DEFAULT_BATCH_SIZE = 100;
@@ -187,7 +188,9 @@ async function main() {
     if (!pool) throw new Error('DATABASE_URL_PHASE1 is not set (environment or .env.local).');
     try {
         if (!options.dryRun && !isEmbeddingConfigured()) {
-            throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) is not set; it is needed to embed chunks.');
+            throw new Error(isGeminiAllowed(process.env)
+                ? 'GEMINI_API_KEY (or GOOGLE_API_KEY) is not set; it is needed to embed chunks.'
+                : 'Embeddings are off: they need GEMINI_ALLOWED=true (only for deployments that people under 18 cannot reach) and GEMINI_API_KEY.');
         }
         await reembedChunks({ pool, ...options });
     } finally {

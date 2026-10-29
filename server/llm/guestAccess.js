@@ -5,14 +5,19 @@
  * any third-party page could use its visitors' browsers as a free model proxy. So:
  * - CORS answers only the app's own origins (same host, LLM_ALLOWED_ORIGINS, and in development
  *   the Vite dev server), and a POST from any other browser origin is refused with 403.
- * - Anonymous POSTs share a daily budget per IP and in total (in memory, reset at 00:00 UTC):
- *   LLM_GUEST_DAILY_PER_IP (default 100) and LLM_GUEST_DAILY_TOTAL (default 2000).
+ * - Anonymous POSTs share a daily budget per IP and in total (in memory, reset at 00:00 JST):
+ *   LLM_GUEST_DAILY_PER_IP (default 100) and LLM_GUEST_DAILY_TOTAL (default 2000). An IPv6 guest
+ *   counts by its /56 (ipSubject in server/middleware/dailyCaps.js), so switching addresses inside
+ *   one connection's block does not give a fresh budget.
  *   The routes mount the budget after body validation (and the guest lesson check), so only
  *   requests that will reach a model are charged, and give a request back with
- *   refundGuestBudget when the call fails before any model ran.
- * Signed-in requests (req.userId) skip the budget; the per-minute AI limiter still applies.
+ *   refundGuestBudget when the call fails before any model ran. Over the budget: 429 with
+ *   error_type 'daily_limit_reached', scope 'guest' (server/middleware/dailyCaps.js sendDailyLimit).
+ * Signed-in requests (req.userId) skip the budget; the per-minute AI limiter and the per-user
+ * daily caps (server/middleware/dailyCaps.js) apply to them instead.
  */
 import { modelMayHaveRun } from './errors.js';
+import { ipSubject, jstDay, sendDailyLimit } from '../middleware/dailyCaps.js';
 
 const DEFAULT_PER_IP = 100;
 const DEFAULT_TOTAL = 2000;
@@ -31,6 +36,8 @@ const positiveInt = (value, fallback) => {
 };
 
 /**
+ * The app's own browser origins: server.js answers CORS for these only, on every route, and
+ * originGuard below refuses a POST to the LLM gateway from any other.
  * @param {{ env?: Record<string, string | undefined> }} [options]
  * @returns {(origin: string | undefined, req?: import('express').Request) => boolean}
  */
@@ -85,7 +92,7 @@ export function createGuestBudget({ env = process.env, perIp, total, now = () =>
   const byIp = new Map();
 
   const roll = () => {
-    const today = new Date(now()).toISOString().slice(0, 10);
+    const today = jstDay(now());
     if (today !== day) {
       day = today;
       used = 0;
@@ -96,14 +103,17 @@ export function createGuestBudget({ env = process.env, perIp, total, now = () =>
   return function guestBudget(req, res, next) {
     if (req.method !== 'POST' || req.userId) return next();
     roll();
-    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    // Public addresses as the daily caps count them (an IPv6 guest by its /56); internal ones
+    // (local dev, a proxy without TRUST_PROXY) as they are.
+    const raw = req.ip || req.socket?.remoteAddress || 'unknown';
+    const ip = ipSubject(raw) ?? raw;
     const mine = byIp.get(ip) ?? 0;
     if (mine >= limitPerIp || used >= limitTotal) {
-      const midnight = new Date(`${day}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000;
-      res.set('Retry-After', String(Math.max(60, Math.ceil((midnight - now()) / 1000))));
-      res.status(429).json({
-        error: 'The daily limit for guest AI questions has been reached. Sign in, or try again tomorrow.',
-        error_type: 'rate_limited',
+      sendDailyLimit(res, {
+        kind: 'llm',
+        scope: 'guest',
+        now: now(),
+        message: 'The daily limit for guest AI questions has been reached. Sign in, or try again after 00:00 Japan time (JST).',
       });
       return;
     }

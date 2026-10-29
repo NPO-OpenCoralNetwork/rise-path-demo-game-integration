@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import { realpathSync } from 'fs';
+import { STATUS_CODES } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg'; // For legacy pool if needed, or remove
@@ -15,19 +16,52 @@ import lifeJournalRoutes from './server/routes/lifeJournal.js';
 import learnerMemoryRoutes from './server/routes/learnerMemory.js';
 import agentRoutes from './server/routes/agent.js';
 import contentRoutes from './server/routes/content.js';
-import userRoutes from './server/routes/user.js';
+import userRoutes, { LEARNING_EVENTS_BODY_LIMIT, createLearningEventsRouter } from './server/routes/user.js';
 import healthRoutes from './server/routes/health.js';
+import aiAccessRoutes from './server/routes/aiAccess.js';
+import connectedAppsRoutes from './server/routes/connectedApps.js';
+import {
+    createLessonProgressRouter,
+    lessonProgressBodyErrors,
+    LESSON_PROGRESS_BODY_LIMIT,
+    LESSON_PROGRESS_WRITES_PER_MINUTE,
+} from './server/routes/lessonProgress.js';
+import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account.js';
+import { LEGAL_BODY_LIMIT, createLegalRouter } from './server/routes/legal.js';
+import { ACHIEVEMENTS_READS_PER_MINUTE, createAchievementsRouter } from './server/routes/achievements.js';
+import { REVIEW_BODY_LIMIT, REVIEW_REQUESTS_PER_MINUTE, createReviewRouter } from './server/routes/review.js';
+import safetyRoutes from './server/routes/safety.js';
+import { pruneSafetyEvents } from './server/safety/events.js';
+import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
+import { describeError, redactUrl } from './server/utils/redactUrl.js';
+import { isDbUnavailable } from './tools/core/dbErrors.js';
+import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
+import { dailyCap, setPlanResolver } from './server/middleware/dailyCaps.js';
+import { createBillingRouter } from './server/routes/billing.js';
+import { billingStartupLine, checkBillingServiceable, readBillingConfig } from './server/services/billingConfig.js';
+import { createSupporterCapResolver } from './server/services/billingEntitlement.js';
+import { BILLING_WEBHOOK_BODY_LIMIT, BILLING_WEBHOOK_PATH, createBillingWebhook } from './server/services/billingWebhook.js';
+import { createStripeClient } from './server/services/stripeClient.js';
 import { logStartupDiagnostics } from './server/services/runtimeHealth.js';
 import { requireAuth, optionalAuth, initSupabase } from './server/middleware/auth.js';
 import { requireBridgeOrAuth } from './server/middleware/bridgeAuth.js';
+import { requireSignedIn } from './server/middleware/signedIn.js';
+import { smallBodyErrors } from './server/middleware/smallBody.js';
+import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
+import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/** Retry-After of a 503 for a database that cannot be reached (the last error handler). */
+const DB_RETRY_AFTER_SECONDS = 10;
+/** The JSON body limit of every route without a smaller one of its own (createApp). */
+const JSON_BODY_LIMIT = '2mb';
 
 // --- Environment ---
 const loadEnvFile = async (filename) => {
@@ -58,11 +92,18 @@ import { getPool } from './server/db.js';
 /**
  * Builds the Express app: middleware, rate limits and every route, in mount order. No listen,
  * no job worker and no env loading, so tests (server/tests/llmRoute.test.js) run the real stack.
- * @param {{ serveStatic?: boolean, originGate?: Parameters<typeof createOriginGate>[0] }} [options]
+ * @param {{ serveStatic?: boolean, originGate?: Parameters<typeof createOriginGate>[0],
+ *   lessonProgress?: { afterSave?: (params: { userId: string }) => unknown },
+ *   review?: { afterGrade?: (params: { userId: string, day: string }) => unknown } }} [options]
  *   serveStatic: dist/ + public/ (off in tests); originGate: options for the origin gate
- *   (server/middleware/originGate.js; tests pass exemptLoopback: false)
+ *   (server/middleware/originGate.js; tests pass exemptLoopback: false); lessonProgress.afterSave:
+ *   the hook after a lesson-progress save that taught something (default: XP and the learning day,
+ *   tools/core/achievements.js noteLearning; route tests pass a no-op or a recorder);
+ *   review.afterGrade: the hook after a review graded on the web (Phase 6; default: the grade's
+ *   Japan-time day as a learning day, tools/core/achievements.js noteReviewDay; route tests pass a
+ *   recorder)
  */
-export async function createApp({ serveStatic = true, originGate = {} } = {}) {
+export async function createApp({ serveStatic = true, originGate = {}, lessonProgress: { afterSave } = {}, review: { afterGrade } = {} } = {}) {
     const app = express();
     app.disable('x-powered-by');
 
@@ -73,6 +114,13 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         const hops = Number.parseInt(trustProxy, 10);
         app.set('trust proxy', Number.isFinite(hops) ? hops : trustProxy === 'true');
     }
+
+    // Billing (Phase 3): read once per app. The supporter caps resolve through it on the shared
+    // daily caps (dailyCaps.js); mcp-public never sets a resolver. Off (no resolver, no plan field in
+    // 429 bodies) unless billing is serviceable (server/services/billingConfig.js).
+    const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    const stripe = billingConfig.serviceable ? createStripeClient({ secretKey: billingConfig.secretKey }) : null;
+    setPlanResolver(billingConfig.serviceable ? createSupporterCapResolver({ config: billingConfig }) : null);
 
     // --- Middleware ---
     // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
@@ -87,48 +135,49 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         next();
     });
 
-    // CORS: the whole API answers only the app's own origins (server/llm/guestAccess.js:
-    // LLM_ALLOWED_ORIGINS, the same host, and the dev server when not in production). A page on
-    // another site can then neither read the API's answers nor send it JSON or authenticated
-    // requests, which need a preflight. (CORS is not access control: a simple request still runs.)
-    const isAllowedLlmOrigin = createOriginPolicy();
-    // A refused preflight ends here instead of reaching auth (a 401 in the log) or a rate limit.
+    // CORS: the whole API answers only the app's own origins (server/llm/guestAccess.js
+    // createOriginPolicy: LLM_ALLOWED_ORIGINS, the same host, and local pages outside production).
+    // A page on another site can then neither read the API's answers nor send it JSON or an
+    // Authorization header, which need a preflight. (CORS is not access control: a simple request
+    // still runs. The LLM gateway also refuses a POST from another origin: originGuard below.)
+    const isAllowedOrigin = createOriginPolicy();
+    const apiCors = cors((req, callback) => callback(null, { origin: isAllowedOrigin(req.headers.origin, req) }));
     app.use((req, res, next) => {
-        const { origin } = req.headers;
-        if (req.method !== 'OPTIONS' || !origin || !req.headers['access-control-request-method']) return next();
-        if (isAllowedLlmOrigin(origin, req)) return next();
+        // The CORS headers depend on the Origin, also when there are none.
         res.vary('Origin');
-        return res.status(204).end();
+        // apiCors ends every OPTIONS it allows with 204; a refused one ends here, without CORS
+        // headers, before auth (a 401 in the log) and the rate limits.
+        if (req.method === 'OPTIONS' && !isAllowedOrigin(req.headers.origin, req)) return res.status(204).end();
+        return apiCors(req, res, next);
     });
-    app.use(cors((req, callback) => callback(null, { origin: isAllowedLlmOrigin(req.headers.origin, req) })));
-    // The largest real JSON body (a curriculum draft) is far below the limit. Uploads are
-    // multipart, which this parser does not read.
-    const JSON_BODY_LIMIT_MB = 2;
-    app.use(express.json({ limit: `${JSON_BODY_LIMIT_MB}mb` }));
-    // The parser's refusals as JSON instead of Express's HTML page (with a stack trace outside
-    // production). Only errors from express.json reach this handler.
-    app.use((err, req, res, next) => {
-        const status = err?.status ?? err?.statusCode;
-        if (!err?.type || !(status >= 400 && status < 500)) return next(err);
-        console.warn(`[Body] ${status} ${err.type}: ${req.method} ${req.originalUrl}`);
-        if (status === 413) {
-            return res.status(413).json({ error: `The request body is larger than ${JSON_BODY_LIMIT_MB} MB.`, error_type: 'payload_too_large' });
-        }
-        if (status === 415) {
-            return res.status(415).json({ error: 'The request body uses an unsupported charset or encoding.', error_type: 'unsupported_media_type' });
-        }
-        const error = err.type === 'entity.parse.failed' ? 'The request body is not valid JSON.' : 'The request body could not be read.';
-        return res.status(400).json({ error, error_type: 'validation' });
-    });
+    // Lesson progress has its own, smaller body limit. Registered first: the 2 MB parser below
+    // then sees the body as already read and skips it.
+    app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
+    // Account deletion (Phase 4) takes a confirm word and the AI apps' names: 16 kb, refused before the 2 MB parser.
+    app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
+    // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 2 MB parser too.
+    app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
+    // A learning-history event (Phase 5: history only) is a type and two short texts: 8 kb, refused before the 2 MB parser.
+    app.use('/api/v2/user/events', express.json({ limit: LEARNING_EVENTS_BODY_LIMIT }), smallBodyErrors(LEARNING_EVENTS_BODY_LIMIT));
+    // The review queue (Phase 6) takes three ids and a rating: 2 kb, refused before the 2 MB parser.
+    app.use('/api/v2/user/review', express.json({ limit: REVIEW_BODY_LIMIT }), smallBodyErrors(REVIEW_BODY_LIMIT));
+    // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 2 MB JSON
+    // parser below then skips the body); the handler is mounted with the billing routes, after the
+    // logger and the global limiter.
+    app.post(BILLING_WEBHOOK_PATH, express.raw({ type: 'application/json', limit: BILLING_WEBHOOK_BODY_LIMIT }));
+    // Every other JSON body: 2 MB (the last handler answers a refusal as JSON). The largest real
+    // one, a lesson, is under 80 kb; uploads are multipart, which no JSON parser reads.
+    app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
-    // path when a scoped middleware (e.g. /api/v2/agent auth) answers.
+    // path when a scoped middleware (e.g. /api/v2/agent auth) answers. redactUrl (Phase 4): no query
+    // string, ids cut to 8 characters, no dates, emails, file names or tokens (server/utils/redactUrl.js).
     app.use((req, res, next) => {
         const start = Date.now();
         res.on('finish', () => {
             const ms = Date.now() - start;
             const auth = req.authMethod || '-';
-            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms auth=${auth}`);
+            console.log(`[${new Date().toISOString()}] ${req.method} ${redactUrl(req.originalUrl)} ${res.statusCode} ${ms}ms auth=${auth}`);
         });
         next();
     });
@@ -152,32 +201,141 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         max: isDev ? 100 : 10,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: (req) => req.userId || req.ip,
+        // Guests by address, an IPv6 one by its /56 (one connection can switch inside it).
+        keyGenerator: (req) => req.userId || ipKeyGenerator(req.ip ?? ''),
         message: { error: 'AI rate limit exceeded. Max 10 requests/min.' },
         validate: { keyGeneratorIpFallback: false },
     });
 
+    // Lesson progress writes: per learner (after requireAuth), so a classroom behind one address
+    // shares only the global limit above. Not relaxed in dev: the client saves at most every 20 s.
+    const lessonProgressLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: LESSON_PROGRESS_WRITES_PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => `lesson-progress:${req.userId}`,
+        message: { error: 'Too many progress saves. Please try again in a minute.', error_type: 'rate_limited' },
+        validate: { keyGeneratorIpFallback: false },
+    });
+
+    // XP and badges (Phase 5): each read reconciles the learner's ledger, so per learner, after
+    // requireAuth and requireSignedIn. Not relaxed in dev.
+    const achievementsLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: ACHIEVEMENTS_READS_PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => `achievements:${req.userId}`,
+        message: { error: 'Too many requests. Please try again in a minute.', error_type: 'rate_limited' },
+        validate: { keyGeneratorIpFallback: false },
+    });
+
+    // The review queue (Phase 6): reads (each enters the learner's due cards) and grades together,
+    // per learner, after requireAuth and requireSignedIn. Not relaxed in dev.
+    const reviewLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: REVIEW_REQUESTS_PER_MINUTE,
+        standardHeaders: true,
+        legacyHeaders: false,
+        keyGenerator: (req) => `review:${req.userId}`,
+        message: { error: 'Too many requests. Please try again in a minute.', error_type: 'rate_limited' },
+        validate: { keyGeneratorIpFallback: false },
+    });
+
     // --- Mount V2 Routes ---
+    // AI access gate (Phase 0.5 minor safeguards, server/middleware/aiAccessGate.js): every POST
+    // that calls a model needs sign-in (guests only with LLM_GUEST_AI=true), a recorded age and, under
+    // 18, a guardian's consent. It runs after auth and before the daily caps, so a refused call is
+    // never charged, and sets res.locals.aiAudience for the safety checks.
     app.use('/api/v2', healthRoutes);                         // Phase 15-1: readiness probe (no auth)
+    // The supporter plan (Phase 3): Stripe's webhook (signed, no JWT) and the billing routes (public
+    // GET /plan; requireAuth inside for the rest). Before the requireAuth catch-all below.
+    app.post(BILLING_WEBHOOK_PATH, createBillingWebhook({ config: billingConfig, stripe }));
+    app.use('/api/v2/billing', createBillingRouter({ config: billingConfig, stripe }));
     // LLM gateway: mounted before the blanket /api/v2 auth below so guests are not 401'd in strict
     // mode; optionalAuth sets req.userId when a token is present; the AI limiter covers its POSTs.
+    // GET /status stays public and ungated; the POSTs run the gate inside guarded() (llm.js).
     app.use(
         '/api/v2/llm',
         optionalAuth,
-        originGuard(isAllowedLlmOrigin),
-        createLlmRouter({ limiter: aiLimiter, guestBudget: createGuestBudget() }),
+        originGuard(isAllowedOrigin),
+        createLlmRouter({
+            limiter: aiLimiter,
+            guestBudget: createGuestBudget(),
+            userCap: dailyCap('llm'),
+            aiAccess: aiAccessGate(),
+        }),
     );
     // Course generator (ai.js) requires auth. Scoped to its own paths: chatgptCurriculumRoutes also
     // serves /api/v2/ai/* (generation-kit, curriculum-drafts…) with bridge-token auth further down.
     app.use(['/api/v2/ai/generate', '/api/v2/ai/drafts'], requireAuth);
-    app.use('/api/v2/ai', aiLimiter, aiRoutes);              // AI rate limit (keyed by req.userId once authed)
+    app.use('/api/v2/ai', aiLimiter);                        // AI rate limit (keyed by req.userId once authed)
+    app.post('/api/v2/ai/generate', aiAccessGate());          // before its daily cap (inside ai.js)
+    app.use('/api/v2/ai', aiRoutes);
     // AI rate limit for image generation, uploads and RAG indexing (served by contentRoutes below).
     app.use(['/api/v2/image', '/api/v2/upload', '/api/v2/rag'], requireAuth, aiLimiter);
+    // Image generation and Hermes (/agent/chat) have no minor screening and no child-safety prompt
+    // part, so they are adults only (403 adults_only for a minor, even with a guardian consent).
+    app.post('/api/v2/image', aiAccessGate({ adultsOnly: true })); // before its daily cap (content.js)
+    // The learner's age and guardian consent (server/routes/aiAccess.js).
+    app.use('/api/v2/user/ai-access', requireAuth, aiAccessRoutes);
+    // Agents the learner connected to the remote MCP endpoint with OAuth (Phase 1). requireAuth
+    // refuses an agent's own OAuth token (401 oauth_client_token), so an agent cannot revoke or list.
+    app.use('/api/v2/user/connected-apps', requireAuth, connectedAppsRoutes);
+    // The lesson reader's progress, synced across the learner's devices (Phase 2). Not AI-gated:
+    // progress is not an AI feature. requireAuth refuses an agent's OAuth token (agents use the
+    // MCP course-* tools). Before the /api/v2/user mount, whose legacy /progress routes stay.
+    app.use('/api/v2/user/lesson-progress', requireAuth, createLessonProgressRouter({ writeLimiter: lessonProgressLimiter, afterSave }));
+    // Deleting one's own Rise Path account (Phase 4, server/routes/account.js): a real learner's
+    // session only, re-authenticated with the password; the shared Supabase login stays.
+    app.use(
+        '/api/v2/user/account',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to delete it.'),
+        createAccountRouter({ billing: { config: billingConfig, stripe } }),
+    );
+    // Accepting the terms of use (Phase 4, server/routes/legal.js): a real learner's session only;
+    // the acceptance is recorded under the shared account lock (never for an account deleted meanwhile).
+    app.use(
+        '/api/v2/user/legal',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to accept the terms.'),
+        createLegalRouter(),
+    );
+    // XP, level, streak and badges (Phase 5, server/routes/achievements.js), from the server's own
+    // records: a real learner's session only (the ledger is a permanent account record; dev guests
+    // would share one). GET only, no body. AI apps get nothing (requireAuth refuses their token).
+    app.use(
+        '/api/v2/user/achievements',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to see your XP.'),
+        achievementsLimiter,
+        createAchievementsRouter(),
+    );
+    // The review queue (Phase 6, server/routes/review.js): a real learner's session only (the queue is an
+    // account record); each read enters the cards the learner's lesson records imply. AI apps use the
+    // MCP course-review-* tools (requireAuth refuses their token here).
+    app.use(
+        '/api/v2/user/review',
+        requireAuth,
+        requireSignedIn('Sign in with a Rise Path account to use reviews.'),
+        reviewLimiter,
+        createReviewRouter({ afterGrade }),
+    );
+    // The learning history (Phase 5: history only, no XP and no learning day; server/routes/user.js):
+    // its own router so its per-learner limit lives with this app, after the 8 kb parser above.
+    app.use('/api/v2/user/events', requireAuth, createLearningEventsRouter());
     app.use('/api/v2/user', requireAuth, userRoutes);       // Phase 7: JWT auth
+    // Reports on AI answers (any signed-in user), and the admin side: safety reports, a learner's
+    // age and a guardian's paper consent. The admin role is read on the server (requireAdmin.js).
+    app.use('/api/v2/safety', requireAuth, safetyRoutes);
+    app.use('/api/v2/admin', requireAuth, requireAdmin, adminSafetyRoutes);
     app.use('/api/v2', chatgptCurriculumRoutes);             // uses own Bridge/JWT auth (§4.6)
     app.use('/api/v2', lifeJournalRoutes);                   // Phase 16: life journal (Bridge/JWT auth)
     app.use('/api/v2', learnerMemoryRoutes);                 // Phase 19: learner semantic memory (Bridge/JWT auth)
     app.use('/api/v2/agent', requireBridgeOrAuth, aiLimiter); // Phase 16-6d: auth before AI rate limit
+    app.post('/api/v2/agent/chat', aiAccessGate({ adultsOnly: true })); // adults only (see /image); before its daily cap (agent.js)
     app.use('/api/v2', agentRoutes);
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
     app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
@@ -240,6 +398,21 @@ export async function createApp({ serveStatic = true, originGate = {} } = {}) {
         app.use(express.static(path.join(__dirname, 'public')));
     }
 
+    // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
+    // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
+    // sent: Express's own handler sends the stack (database text included) outside production. The
+    // line has its name, code and message only: a pg error's detail holds values (Phase 4). A
+    // database that cannot be reached is a 503 with Retry-After, so clients try again later.
+    app.use((err, req, res, next) => {
+        if (res.headersSent) return next(err);
+        const code = err?.status ?? err?.statusCode;
+        const unavailable = isDbUnavailable(err);
+        if (unavailable) res.set('Retry-After', String(DB_RETRY_AFTER_SECONDS));
+        const status = unavailable ? 503 : Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
+        if (status >= 500) console.error(`[Server] ${req.method} ${redactUrl(req.originalUrl)} failed: ${describeError(err)}`);
+        res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
+    });
+
     return app;
 }
 
@@ -248,6 +421,11 @@ async function main() {
     await loadEnvFile('.env.local');
     await initSupabase(); // Initialize Supabase client for JWT validation (Phase 7)
     await logStartupDiagnostics();
+    for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
+    // One line, names only; an owner alert when subscribers exist but billing cannot serve them.
+    const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    console.log(billingStartupLine(billingConfig));
+    void checkBillingServiceable(billingConfig);
 
     // Checked before createApp so a weak value stops startup with a clear error; never logs values.
     const originSecrets = readOriginSecrets(process.env).length;
@@ -261,6 +439,20 @@ async function main() {
     const app = await createApp();
     const PORT = Number.parseInt(process.env.PORT, 10) || 3006;
     jobWorker.start();
+    // Safety-event retention (90-day report text, 365-day events) on a timer, not only when traffic
+    // records a new event; the admin queries also enforce it.
+    void pruneSafetyEvents(undefined, { force: true });
+    setInterval(() => void pruneSafetyEvents(undefined, { force: true }), 60 * 60 * 1000).unref();
+    // Retention (Phase 4, server/services/retention.js): old usage counts, processing records and
+    // the proofs of deleted accounts, hourly. An invalid setting turns its rule off (logged). Outside
+    // NODE_ENV=production it runs only with RETENTION_ENABLED=true (a laptop api on the VM database).
+    const retention = readRetentionConfig(process.env, { nodeEnv: process.env.NODE_ENV });
+    for (const problem of retention.problems) console.warn(`[Retention] ${problem}`);
+    console.log(retentionStartupLine(retention));
+    if (retention.enabled) {
+        void runRetention({ config: retention });
+        setInterval(() => void runRetention({ config: retention }), RETENTION_INTERVAL_MS).unref();
+    }
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);

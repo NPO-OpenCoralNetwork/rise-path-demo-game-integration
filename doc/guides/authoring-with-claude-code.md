@@ -33,7 +33,11 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
   it open, and a lesson-wide must-fix needs a changed lesson-level field or a `fixedIn` whose
   blocks all changed. Rules: `.claude/skills/review-lesson/SKILL.md`.
 - Agents write `drafts/` only. Moving a lesson to `lessons/` and `course.json` is publishing, done
-  only when the owner asks.
+  only when the owner asks. Publishing also adds the lesson's flashcards as
+  `<course>/<lesson>/<card id>` to `published` in `server/tests/fixtures/published-card-ids.json`
+  (kept sorted; `server/tests/reviewCardIds.test.js` checks it). A rework keeps a published lesson's
+  card ids: learners' review memory is keyed by them (text edits keep it; moving a key to `retired`
+  hides that memory).
 - Before publishing (moving to `lessons/`, or opening a PR to publish), every verification on the
   lesson's chain names a committed previous round (`<commit id>:<reports path>`, with a commit id
   as `reviewedRevision`), or that reviewer reviews in full: a snapshot copy exists only in the
@@ -126,7 +130,11 @@ the `curriculum-builder` and `admin` profiles.
 - **Cursor**: reads `AGENTS.md`; add the same server to `.cursor/mcp.json` or `~/.cursor/mcp.json`.
 - **Gemini CLI**: already configured in `.gemini/settings.json` (loads `AGENTS.md`, starts the
   server with the `curriculum-builder` profile). Run `gemini` at the repo root and check `/mcp`.
-- **ChatGPT**: needs a public HTTPS server. Run `npm run mcp:sse` (port 3100, `/sse`) with
-  `RISE_PATH_MCP_PROFILE=curriculum-builder` and `RP_LESSON_STORE=db`, authenticate with
-  `RISE_PATH_BRIDGE_TOKEN` or a Supabase JWT, and add the URL as a custom MCP connector. Bring the
-  drafts into a PR and run validation and review before publishing.
+- **ChatGPT, Claude.ai and other remote clients**: the public remote MCP endpoint
+  (`https://mcp.<domain>/mcp`, profile `learner-remote`, adults only, per-learner OAuth sign-in)
+  is for learners' own records and has **no authoring tools**: no `lesson-*` tools, no
+  `rp://schema/lesson/v1`, no `author-lesson` prompt, no curriculum tools. Author lessons over
+  local stdio with the `curriculum-builder` profile as above. Never put `RISE_PATH_BRIDGE_TOKEN`
+  into an outside service and never expose the admin MCP port (3100) to the internet (no ngrok
+  or other public tunnels, no open firewall ports). Learner setup: `doc/guides/usage_guide.md`;
+  owner setup: `doc/guides/byoa-setup.ja.md`.

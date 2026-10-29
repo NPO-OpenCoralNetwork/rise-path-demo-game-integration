@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, BookOpenText, CircleCheck, PenTool } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage, type SelectedLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { allowGuestLogin } from '../../services/authPolicy';
@@ -62,6 +62,9 @@ const copy = {
       },
     ],
     footerSignIn: 'Already have an account? Sign in',
+    footerSafety: 'AI safety (for children and guardians)',
+    footerTerms: 'Terms of Use',
+    footerPrivacy: 'Privacy Policy',
   },
   jp: {
     skip: '本文へ移動',
@@ -104,6 +107,9 @@ const copy = {
       },
     ],
     footerSignIn: 'アカウントをお持ちの方はログイン',
+    footerSafety: 'AI の安全について（子どもと保護者の方へ）',
+    footerTerms: '利用規約',
+    footerPrivacy: 'プライバシーポリシー',
   },
 } as const;
 
@@ -267,6 +273,20 @@ const ExperienceLandingView: React.FC<LandingViewProps> = ({ onAuthClick }) => {
 
       <footer className="mx-auto flex max-w-wide flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-6 text-small text-fg-3 sm:px-6 lg:px-10">
         <span>© 2026 Rise Path</span>
+        <Link to="/ai-safety" className="rounded-chip font-medium text-primary-text underline-offset-4 hover:underline">
+          {t.footerSafety}
+        </Link>
+        {/* Phase 4: only once the texts are published (VITE_FEATURE_LEGAL_PAGES=true). */}
+        {features.legalPages && (
+          <>
+            <Link to="/terms" className="rounded-chip font-medium text-primary-text underline-offset-4 hover:underline">
+              {t.footerTerms}
+            </Link>
+            <Link to="/privacy" className="rounded-chip font-medium text-primary-text underline-offset-4 hover:underline">
+              {t.footerPrivacy}
+            </Link>
+          </>
+        )}
         <button type="button" onClick={() => onAuthClick('login')} className="rounded-chip font-medium text-primary-text hover:underline underline-offset-4">
           {t.footerSignIn}
         </button>

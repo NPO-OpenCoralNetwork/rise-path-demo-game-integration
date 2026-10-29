@@ -297,13 +297,23 @@ export async function loadUserTtsPreferences(userId) {
         const pool = getPool?.();
         if (!pool) return null;
         const { getUserTtsPreferences } = await import('../../server/services/userPreferences.js');
-        return getUserTtsPreferences(pool, userId);
+        // Awaited here so a failed read lands in the catch below (default voice), not in the caller.
+        return await getUserTtsPreferences(pool, userId);
     } catch (err) {
         console.warn('[kokoroTts] loadUserTtsPreferences failed:', err.message);
         return null;
     }
 }
 
+/** What requestTts answers when the sidecar fails: no sidecar text, status or exception message. */
+export const TTS_UNAVAILABLE = Object.freeze({ error: 'Voice service is unavailable', error_type: 'tts_unavailable' });
+
+/**
+ * Synthesize for a learner (the MCP request-tts tool and POST /api/v2/tts/synthesize). Validation
+ * errors are returned as they are. Any other failure is logged here with the sidecar's own error
+ * and response body, and answered with TTS_UNAVAILABLE only: an MCP tool result reaches the LLM
+ * and can be quoted to the learner.
+ */
 export async function requestTts({
     userId,
     text,
@@ -325,5 +335,15 @@ export async function requestTts({
         lesson_id,
     }, ttsPrefs);
 
-    return synthesize(opts);
+    const result = await synthesize(opts);
+    if (result.error_type && result.error_type !== 'validation') {
+        console.error(
+            '[kokoroTts] synthesis unavailable:',
+            result.error_type,
+            result.error,
+            String(result.details ?? '').slice(0, 500),
+        );
+        return { ...TTS_UNAVAILABLE };
+    }
+    return result;
 }

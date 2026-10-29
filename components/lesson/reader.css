@@ -312,6 +312,108 @@
     color: var(--rp-fg-3);
   }
 
+  /* Phase 5: where the record is saved (SaveChip). Not interactive; the icon and the words carry
+     the meaning, the colour only repeats it. The label shows from 640 px (screen readers get the
+     long text at every width). */
+  .rp-save {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-save[data-state="saving"] {
+    color: var(--rp-fg-2);
+  }
+
+  .rp-save[data-state="offline"],
+  .rp-save[data-state="local"] {
+    color: var(--rp-info);
+  }
+
+  .rp-save[data-state="stopped"] {
+    color: var(--rp-danger);
+  }
+
+  .rp-save-label {
+    display: none;
+  }
+
+  @media (min-width: 640px) {
+    .rp-save-label {
+      display: inline;
+    }
+  }
+
+  /* Phase 5: the reader's status line under the bar (ReaderStatus). The live region is always
+     there and has no size while empty; the card wraps (no ellipsis). */
+  .rp-status {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  /* The reset message (LessonReader scrolled to the top and focused the title): in the bar's flow,
+     so the bar grows and the title stays below it instead of under an overlay. */
+  .rp-status[data-flow] {
+    position: static;
+    padding: 10px 16px;
+  }
+
+  .rp-status-card {
+    pointer-events: auto;
+    max-width: 36rem;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 0;
+    padding: 10px 12px 10px 14px;
+    border-radius: var(--radius-card, 14px);
+    background: var(--rp-raised);
+    border: 1px solid var(--rp-border);
+    box-shadow: var(--rp-shadow-2);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--rp-fg-2);
+    white-space: normal;
+    animation: rp-fade-down var(--rp-duration-slow) var(--rp-ease);
+  }
+
+  .rp-status-icon {
+    flex: none;
+    margin-top: 3px;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-status-card[data-state="offline"] .rp-status-icon {
+    color: var(--rp-info);
+  }
+
+  .rp-status-card[data-state="stopped"] .rp-status-icon {
+    color: var(--rp-danger);
+  }
+
+  .rp-status-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rp-status-card .rp-notice-x {
+    flex: none;
+    margin: -4px -4px -4px 0;
+  }
+
   /* Progress ring */
   .rp-ring {
     position: relative;
@@ -543,6 +645,17 @@
     font-weight: 700;
     letter-spacing: 0.01em;
     color: var(--rp-fg);
+  }
+
+  /* A focus target after the lesson is started over (tabIndex -1), like the section headings. */
+  .rp-title:focus {
+    outline: none;
+  }
+
+  .rp-title:focus-visible {
+    outline: 2px solid var(--rp-focus);
+    outline-offset: 4px;
+    border-radius: 4px;
   }
 
   .rp-subtitle {
@@ -1959,6 +2072,39 @@
     gap: 5px;
   }
 
+  /* Phase 5: 「このレッスンを最初からやり直す」, a secondary text button under the stats. */
+  .rp-end-reset {
+    margin-top: 12px;
+  }
+
+  .rp-reset-btn {
+    color: var(--rp-fg-2);
+  }
+
+  /* Dimmed like the app's other aria-disabled buttons (an inactive control needs no contrast). */
+  .rp-reset-btn[aria-disabled="true"] {
+    color: var(--rp-fg-3);
+    cursor: not-allowed;
+    text-decoration: none;
+    opacity: 0.6;
+  }
+
+  .rp-prose .rp-end-reset-help {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-prose .rp-end-reset-status {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-prose .rp-end-reset-status:empty {
+    margin: 0;
+  }
+
   .rp-next-card {
     display: flex;
     align-items: center;
@@ -2573,6 +2719,17 @@
 
     .rp-crumb-current {
       font-size: 14px;
+    }
+
+    /* The "resumed" pill: its text wraps instead of being cut; its buttons keep one line. */
+    .rp-notice {
+      width: max-content;
+      white-space: normal;
+      border-radius: var(--radius-card, 14px);
+    }
+
+    .rp-notice .rp-link-btn {
+      white-space: nowrap;
     }
 
     .rp-grid {

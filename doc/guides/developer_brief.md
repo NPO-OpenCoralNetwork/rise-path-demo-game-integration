@@ -1,13 +1,13 @@
 # Rise Path Developer Brief
 
 ## Project snapshot
-Rise Path is an immersive learning platform that blends curated curricula with AI generated, personality aware courses. This repo contains a React/Vite SPA and a Node/Express API that orchestrates multi agent Gemini workflows with structured JSON output and optional RAG grounding.
+Rise Path is an immersive learning platform that blends curated curricula with AI generated, personality aware courses. This repo contains a React/Vite SPA and a Node/Express API that runs course generation and the in-app AI through the server LLM gateway (`server/llm/`, Claude) with JSON output and optional RAG grounding.
 
 ## Architecture at a glance
 - Frontend: React 19 + Vite + TypeScript
 - Backend: Express (Node) + LangGraph workflow
 - Data: Postgres + pgvector (optional)
-- AI: Google Gemini via @google/genai
+- AI: Claude via the server gateway `server/llm/` (`/api/v2/llm/*`); Gemini only with `GEMINI_ALLOWED=true` (deployments that people under 18 cannot reach)
 - Assets: Static curricula in `data/`, specs in `doc/`
 - Optional: Kokoro-82M ONNX TTS sidecar (in progress; see `doc/ai-curriculum-spec/09_content_types_tts.md`)
 
@@ -46,12 +46,12 @@ Rise Path is an immersive learning platform that blends curated curricula with A
 - LangGraph: `server/graph/workflow.js`, `server/graph/nodes.js`
 
 ### Frontend services
-- `services/geminiService.ts`: client side AI generation and personality analysis
 - `services/curriculumApi.ts`: V2 API wrapper and upload helpers
 - `services/vibeCodingAdapter.ts`: template to UI mapping
 
 ### Backend services
-- `server/geminiBackendService.js`: requirements/roadmap/curriculum generators
+- `server/services/aiGenerator.js` + `server/services/aiPrompts.js`: requirements/roadmap/curriculum generators (gateway task `course.generate`)
+- `server/geminiBackendService.js`: image generation (off unless `GEMINI_ALLOWED=true`)
 - `server/ragService.js`: ingestion, embeddings, retrieval
 - `server/jobWorker.js`: job queue polling for ingest
 
@@ -60,12 +60,12 @@ Rise Path is an immersive learning platform that blends curated curricula with A
 ### Prereqs
 - Node 20+
 - Postgres (pgvector optional)
-- Gemini API key
+- Anthropic API key for the AI features (optional locally: without one, the gateway answers from a mock outside production)
 
 ### Environment
 Create `.env.local`:
 ```
-GEMINI_API_KEY=your_key
+ANTHROPIC_API_KEY=your_key
 DATABASE_URL_PHASE1=postgres://user:pass@localhost:5432/rise-path_db
 PHASE1_USER_ID=00000000-0000-0000-0000-000000000001
 ```
@@ -95,8 +95,8 @@ Backend: http://localhost:3006
 
 ### App API
 - Frontend calls V2 endpoints via `services/curriculumApi.ts` (base `/api/v2`).
-- Server side Gemini key: `GEMINI_API_KEY` (see `server/geminiBackendService.js`).
-- Client side Gemini key: `VITE_GEMINI_API_KEY` or local storage (see `services/geminiService.ts`).
+- Model keys live on the server only (`ANTHROPIC_API_KEY`; LLM gateway `server/llm/`, browser code uses `services/llmApi.ts`). No keys in browser code or `VITE_*` variables.
+- Gemini is used only when `GEMINI_ALLOWED` is exactly `true`, and only for deployments that people under 18 cannot reach (Gemini API terms). It is off by default.
 - If you add plan gating, enforce limits in the `/api/v2/*` routes.
 
 ### MCP (optional, tooling)

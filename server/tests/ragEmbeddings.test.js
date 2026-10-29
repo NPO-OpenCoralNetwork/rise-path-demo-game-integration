@@ -17,7 +17,10 @@ import {
     searchContent,
     setEmbeddingClientForTests,
 } from '../../tools/core/ragSearch.js';
-import { ingestMaterial, retrieveContext } from '../ragService.js';
+import { MAX_CHUNKS_PER_MATERIAL, ingestMaterial, retrieveContext } from '../ragService.js';
+
+/** searchContent searches one learner's materials; its id is a materials.user_id (uuid). */
+const LEARNER = 'a1a1a1a1-0000-4000-8000-000000000001';
 
 const vector = (seed = 0) => Array.from({ length: EMBEDDING_DIM }, (_, i) => (i + seed) / EMBEDDING_DIM);
 
@@ -60,13 +63,15 @@ const mockPool = ({ hasVector = true, rows = [], keywordRows = rows, coverage = 
 };
 
 const savedEnv = {};
-const ENV_KEYS = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'VITE_GEMINI_API_KEY'];
+const ENV_KEYS = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'VITE_GEMINI_API_KEY', 'GEMINI_ALLOWED'];
 
 beforeEach(() => {
     for (const key of ENV_KEYS) {
         savedEnv[key] = process.env[key];
         delete process.env[key];
     }
+    // Most tests here exercise embeddings on; 'embeddings off' below deletes it.
+    process.env.GEMINI_ALLOWED = 'true';
     resetEmbeddingClientForTests();
     resetLegacyEmbeddingWarningForTests();
 });
@@ -160,16 +165,17 @@ describe('tools/core/ragSearch searchContent', () => {
         const pool = mockPool({ rows: [{ content: 'Blender basics', chunk_index: 0, distance: 0.25, material_id: 'm1' }] });
         setPoolForTests(pool);
 
-        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: 'u1' });
+        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: LEARNER });
         assert.equal(result.search_type, 'vector');
         assert.equal(result.results[0].relevance_score, 0.75);
         assert.deepEqual(client.log[0].contents, ['blender modifiers']);
 
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.ok(search, 'vector query issued');
-        assert.match(search.sql, /c\.embedding_model = \$2/);
-        assert.equal(search.params[1], MODEL_IDS.gemini.embedding);
-        assert.equal(search.params[2], 'u1');
+        assert.match(search.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$3/);
+        assert.match(search.sql, /c\.embedding <=> \$2::vector/);
+        assert.equal(search.params[0], LEARNER);
+        assert.equal(search.params[2], MODEL_IDS.gemini.embedding);
         assert.equal(search.params[3], 2);
     });
 
@@ -177,7 +183,7 @@ describe('tools/core/ragSearch searchContent', () => {
         setEmbeddingClientForTests(null);
         const pool = mockPool({ rows: [] });
         setPoolForTests(pool);
-        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d' });
+        const result = await searchContent({ query: 'blender modifiers', domain: 'blender-3d', userId: LEARNER });
         assert.equal(result.search_type, 'keyword');
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)));
     });
@@ -214,6 +220,32 @@ describe('server/ragService ingest + retrieve', () => {
         }
         assert.match(pool.queries[0].sql, /^BEGIN$/);
         assert.ok(pool.queries.some((q) => q.sql === 'COMMIT'));
+    });
+
+    it('embeds at most MAX_CHUNKS_PER_MATERIAL chunks of a long file (one daily embeddings unit)', async () => {
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool();
+        setPoolForTests(pool);
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-ingest-'));
+        const file = path.join(dir, 'long.txt');
+        // ~800 new characters per chunk: 300,000 characters is well over the cap.
+        await fs.writeFile(file, 'Rise Path material. '.repeat(15000), 'utf8');
+        const warnings = [];
+        const { log, warn } = console;
+        console.log = () => {};
+        console.warn = (...args) => warnings.push(args.join(' '));
+        try {
+            await ingestMaterial('mat-long', file, 'text/plain', 'user-1');
+        } finally {
+            console.log = log;
+            console.warn = warn;
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+        const embedded = client.log.reduce((n, call) => n + call.contents.length, 0);
+        assert.equal(embedded, MAX_CHUNKS_PER_MATERIAL);
+        assert.equal(pool.queries.filter((q) => /INSERT INTO material_chunks/.test(q.sql)).length, MAX_CHUNKS_PER_MATERIAL);
+        assert.match(warnings.join('\n'), /mat-long: \d+ chunks; indexing the first 200/);
     });
 
     it('retrieveContext filters by embedding model under pgvector', async () => {
@@ -356,7 +388,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: result, warnings } = await captureWarnings(() =>
-            searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: 'u1' }));
+            searchContent({ query: 'blender modifiers', domain: 'blender-3d', maxResults: 2, userId: LEARNER }));
 
         assert.equal(result.search_type, 'keyword');
         assert.equal(result.fallback_reason, 'reembed_required');
@@ -366,15 +398,15 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
 
         const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
         assert.match(coverage.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$2/);
-        assert.deepEqual(coverage.params, ['u1', MODEL_IDS.gemini.embedding]);
+        assert.deepEqual(coverage.params, [LEARNER, MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
         assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.deepEqual(keyword.params, ['u1', '%blender%', '%modifiers%', 2]);
+        assert.deepEqual(keyword.params, [LEARNER, '%blender%', '%modifiers%', 2]);
         assert.equal(warnings.length, 1);
     });
 
-    it('searchContent over all users (MCP rag-search, no userId): another user\'s current chunk does not hide older chunks', async () => {
+    it('searchContent with mixed chunks in the learner scope: a current chunk does not hide older chunks', async () => {
         const client = fakeEmbeddingClient();
         setEmbeddingClientForTests(client);
         const pool = mockPool({
@@ -385,7 +417,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: result } = await captureWarnings(() =>
-            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3 }));
+            searchContent({ query: 'Blender modifier', domain: 'blender-3d', maxResults: 3, userId: LEARNER }));
 
         assert.equal(result.search_type, 'vector+keyword');
         assert.equal(result.reembed_required, true);
@@ -394,9 +426,132 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
             ['m-krita', 0.4, undefined],
         ]);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$1 OR c\.embedding_model > \$1\) AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.deepEqual(keyword.params, [MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.deepEqual(keyword.params, [LEARNER, MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
-        assert.deepEqual(search.params.slice(1), [MODEL_IDS.gemini.embedding, 3]);
+        assert.equal(search.params[0], LEARNER);
+        assert.deepEqual(search.params.slice(2), [MODEL_IDS.gemini.embedding, 3]);
+    });
+});
+
+/** Write `text` to a temp file, run `fn(file)` with console.log/warn silenced, then clean up. */
+const withTempFile = async (text, fn) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rag-off-'));
+    const file = path.join(dir, 'notes.txt');
+    await fs.writeFile(file, text, 'utf8');
+    const { log, warn } = console;
+    console.log = () => {};
+    console.warn = () => {};
+    try {
+        return await fn(file);
+    } finally {
+        console.log = log;
+        console.warn = warn;
+        await fs.rm(dir, { recursive: true, force: true });
+    }
+};
+
+describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
+    it('a Gemini key alone does not turn embeddings on; only GEMINI_ALLOWED=true does', async () => {
+        process.env.GEMINI_API_KEY = 'test-key-123';
+        for (const value of [undefined, '', 'false', 'TRUE', '1', 'yes', ' true']) {
+            if (value === undefined) delete process.env.GEMINI_ALLOWED;
+            else process.env.GEMINI_ALLOWED = value;
+            assert.equal(isEmbeddingConfigured(), false, `GEMINI_ALLOWED=${JSON.stringify(value)}`);
+        }
+        process.env.GEMINI_ALLOWED = 'true';
+        assert.equal(isEmbeddingConfigured(), true);
+    });
+
+    it('makes no Gemini client and no request when not allowed, even with a key or a test client', async () => {
+        delete process.env.GEMINI_ALLOWED;
+        process.env.GEMINI_API_KEY = 'test-key-123';
+        const originalFetch = globalThis.fetch;
+        let fetched = 0;
+        globalThis.fetch = async () => { fetched += 1; throw new Error('no network in this test'); };
+        try {
+            await assert.rejects(() => embedTexts(['hello']), /GEMINI_ALLOWED/);
+            const client = fakeEmbeddingClient();
+            setEmbeddingClientForTests(client);
+            assert.equal(isEmbeddingConfigured(), false);
+            await assert.rejects(() => embedTexts(['hello']), /GEMINI_ALLOWED/);
+            assert.equal(client.log.length, 0, 'the injected client is not used either');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+        assert.equal(fetched, 0);
+    });
+
+    it('ingestMaterial stores the chunks without vectors or model and marks the material ready', async () => {
+        delete process.env.GEMINI_ALLOWED;
+        process.env.GEMINI_API_KEY = 'test-key-123';
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool();
+        setPoolForTests(pool);
+
+        const result = await withTempFile('Rise Path material. '.repeat(120), (file) => ingestMaterial('mat-off', file, 'text/plain', 'user-1'));
+
+        assert.deepEqual(result, { chunks: 3, embedded: 0 });
+        assert.equal(client.log.length, 0, 'nothing was embedded');
+        const inserts = pool.queries.filter((q) => /INSERT INTO material_chunks/.test(q.sql));
+        assert.equal(inserts.length, 3);
+        for (const insert of inserts) {
+            assert.match(insert.sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, NULL, NULL\)/, 'NULL embedding, model and dimension');
+            assert.equal(insert.params.length, 4);
+        }
+        const ready = pool.queries.find((q) => /UPDATE materials SET status/.test(q.sql));
+        assert.deepEqual(ready.params, ['ready', 'mat-off']);
+        assert.ok(pool.queries.some((q) => q.sql === 'COMMIT'));
+    });
+
+    it('ingestMaterial with embeddings off keeps a material\'s stored vectors (no delete, no insert)', async () => {
+        delete process.env.GEMINI_ALLOWED;
+        process.env.GEMINI_API_KEY = 'test-key-123';
+        const pool = mockPool({ rows: [{ embedded: 4 }] });
+        setPoolForTests(pool);
+        const result = await withTempFile('Rise Path material. '.repeat(120), (file) => ingestMaterial('mat-embedded', file, 'text/plain', 'user-1'));
+        assert.deepEqual(result, { chunks: 4, embedded: 4, kept: 'embeddings_off' });
+        const probe = pool.queries.find((q) => /embedding IS NOT NULL/.test(q.sql));
+        assert.deepEqual(probe.params, ['mat-embedded']);
+        assert.ok(!pool.queries.some((q) => /DELETE FROM material_chunks|INSERT INTO material_chunks/.test(q.sql)), 'stored chunks untouched');
+    });
+
+    it('ingestMaterial with embeddings on reports how many chunks were embedded', async () => {
+        setEmbeddingClientForTests(fakeEmbeddingClient());
+        setPoolForTests(mockPool());
+        const result = await withTempFile('Rise Path material. '.repeat(120), (file) => ingestMaterial('mat-on', file, 'text/plain', 'user-1'));
+        assert.deepEqual(result, { chunks: 3, embedded: 3 });
+    });
+
+    it('retrieveContext matches the user\'s chunks by keyword, without embedding or coverage probes', async () => {
+        delete process.env.GEMINI_ALLOWED;
+        const client = fakeEmbeddingClient();
+        setEmbeddingClientForTests(client);
+        const pool = mockPool({ rows: [{ content: 'モディファイアは形状を非破壊で変えます。', chunk_index: 0, material_id: 'm1' }] });
+        setPoolForTests(pool);
+
+        const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('Blenderのモディファイアとは？', 3, 'user-1'));
+
+        assert.deepEqual(chunks, ['モディファイアは形状を非破壊で変えます。']);
+        assert.equal(client.log.length, 0);
+        assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)), 'no vector search');
+        assert.ok(!pool.queries.some((q) => /AS has_current/.test(q.sql)), 'no coverage probe');
+        assert.deepEqual(warnings, [], 'no "re-embedding is required" warning while embeddings are off');
+        const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
+    });
+
+    it('searchContent (MCP rag-search) uses keyword search over the learner scope', async () => {
+        delete process.env.GEMINI_ALLOWED;
+        process.env.GEMINI_API_KEY = 'test-key-123';
+        const pool = mockPool({ rows: [{ content: 'Blender modifiers stack', chunk_index: 1, material_id: 'm9' }] });
+        setPoolForTests(pool);
+        const result = await searchContent({ query: 'blender modifiers', maxResults: 2, userId: LEARNER });
+        assert.equal(result.search_type, 'keyword');
+        assert.equal(result.fallback_reason, undefined);
+        assert.equal(result.results[0].source, 'm9');
+        assert.ok(!pool.queries.some((q) => /<=>|AS has_current/.test(q.sql)));
     });
 });

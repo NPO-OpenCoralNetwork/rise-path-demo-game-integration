@@ -25,7 +25,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - `ORIGIN_SECRET` が空のときも、Cloudflare を通ってきたリクエストには 403 を返す。`COMPOSE_PROFILES` に `tunnel` があって `ORIGIN_SECRET` が空なら、API は起動しない（戻し方は VM README の「[Cloudflare Tunnel（公開エッジ）](../risepath-vm/README.md#cloudflare-tunnel公開エッジ)」にある、公開エッジを止める手順）。
 - 正しい `x-origin-secret` を持って通ったリクエストは edge 扱い。Bridge Token は使えず、Supabase JWT が要る。
 - Vercel 側に `ORIGIN_SECRET` が無いと、文字列 `$ORIGIN_SECRET` がそのまま送られ、API は 403 を返す（安全側に倒れる）。
-- Tailscale から VM の `:3006` を呼ぶ場合も、`ORIGIN_SECRET` を設定したあとは `x-origin-secret` が要り、edge 扱いになる。db・mcp・hermes・kokoro への Tailscale 接続は今までどおり（[`deploy/risepath-vm/README.md`](../risepath-vm/README.md)）。
+- Tailscale から VM の `:3006` を呼ぶ場合も、`ORIGIN_SECRET` を設定したあとは `x-origin-secret` が要り、edge 扱いになる。db・mcp・kokoro（Hermes を有効にしたときは hermes も）への Tailscale 接続は今までどおり（[`deploy/risepath-vm/README.md`](../risepath-vm/README.md)）。
 
 ## Vercel 環境変数（Production のみ）
 
@@ -41,6 +41,11 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 | `VITE_API_ENABLED` | `true` | |
 
 - `VITE_API_BASE_URL` は**設定しない**。未設定ならクライアントは同一オリジンの `/api/v2` を使う（`services/apiClient.ts`）。旧手順の Tailscale 値（`http://risepath-vm:3006/api/v2`）が残っていたら削除する。
+- `VITE_FEATURE_AGENT_CHAT` は**設定しない**。共有の Hermes エージェントとのチャット（画面に浮かぶ AI コーチと `/life-journal/chat`）は、この値がちょうど `true` のときだけ出る。共有の Hermes は学習者に提供しないので、既定のままにする（レッスンの中の AI チューターには関係しない）。
+- `VITE_FEATURE_BILLING`（有料のサポータープランの画面。Phase 3）は、オーナーがテストの方と本番の経路を確かめるとき（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 7.2 の 3）まで**設定しない**。ちょうど `true` のときだけ `/settings/plan` と申し込みの最終確認の画面を出し、入口は API が認めた学習者にだけ出る。変えたらデプロイし直す（ビルドのときに入るため）。Stripe の鍵は Vercel にも `VITE_` にも入れない（鍵は VM の `billing.env` だけ。ブラウザは使わない）。Stripe の Webhook は `https://app.<domain>/api/v2/billing/webhook` を通るので、Production に Deployment Protection やボットのチャレンジをかけない。
+- `VITE_FEATURE_LEGAL_PAGES`（利用規約・プライバシーポリシーのページと登録の同意。Phase 4）は、公開のときまで**設定しない**。設定しないあいだ、`/terms` と `/privacy` は「準備中」を出し、登録画面に同意はない。**そのあいだは一般の登録を受け付けない**（拠点とテスターだけ）。公開するときは、弁護士の確認のあと、[`doc/legal/README.md`](../../doc/legal/README.md) の「ページを公開する手順」のとおりに `true` にして Redeploy する。文が下書きのままだと、ビルドが止まり、足りないものの一覧が出る。
+- `VITE_SUPPORT_CONTACT`（Phase 4）: 学習者の問い合わせ先。フォームの `https://` の URL か、アドレス 1 つの `mailto:`。アカウントの削除のページ、削除のあとのページ、同意のページ、設定の「このサービスについて」に出る。設定しないと「ご利用の拠点のスタッフにお伝えください」と出る。公開の前に設定し、規約の【要記入: 連絡先】と同じ窓口にする。秘密の値ではない。
+- **マージすると、すぐに画面（フロント）がデプロイされる**（Git 連携、Production Branch は `main`）。API は VM で `deploy-stack.sh` を実行するまで古いまま。新しい画面は古い API でも止まらないように作っているが、**同じ日に `deploy-stack.sh` を実行する**（[`deploy/risepath-vm/README.md`](../risepath-vm/README.md)）。
 - `VITE_` で始まる値はバンドルに入り、誰でも読める。`API_ORIGIN` と `ORIGIN_SECRET` に `VITE_` を付けない。
 
 ### Preview
@@ -58,7 +63,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 秘密の値（トンネルトークン、`ORIGIN_SECRET`）はチャット・issue・git に貼らない。`<domain>` は自分のドメインに読み替える。
 
-0. この変更の PR を `main` にマージしてから VM を作る。クイックスタートの clone も、手順 13 の Vercel の Production Branch も `main` を使う。マージ前の `main` を clone すると、swap、`stack.env` の検査、Hermes のファイルの持ち主の修正が入らない。
+0. この変更の PR を `main` にマージしてから VM を作る。クイックスタートの clone も、手順 13 の Vercel の Production Branch も `main` を使う。マージ前の `main` を clone すると、swap、`stack.env` の検査、Hermes のファイルの持ち主の修正が入らない。マージした `main` のコミットで、GitHub Actions の `Database checks`・`Server stack deploy`・`Learner end-to-end` と毎晩の実行が緑であることを確かめてから、VM を作る（[ai-access-plan.ja.md](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の `End-to-end checks` で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。
 
 ### 新しい VM の順番
 
@@ -67,9 +72,9 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - **最初に**: 手順 4（Cloudflare にドメインを追加し、ネームサーバーを切り替える）。Free プランのゾーンは、28 日以内に Active にならないと消える。
 - **ゾーンを待つあいだに**:
   - 手順 1: GCP の予算アラートを作り、残っていれば `risepath-dev-schedule` を消す。Tailscale の管理画面で旧 `risepath-vm` を Remove し、Mac で `ssh-keygen -R risepath-vm` を実行する。
-  - 手順 2〜3: マシンタイプを決めて VM を作り、ファイアウォールを確かめる。VM README のクイックスタートで、スタックを `COMPOSE_PROFILES=full` で動かす（Hermes を使わないなら `tts`。`bootstrap-vm.sh` の 1 回目 → SSH し直す → `stack.env` を埋める → 2 回目）。Mac の `.env.local` を新しい値に替え、Tailscale 経由で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。流せるのは `ORIGIN_SECRET` を入れる前だけ。
+  - 手順 2〜3: マシンタイプを決めて VM を作り、ファイアウォールを確かめる。VM README のクイックスタートで、スタックを `COMPOSE_PROFILES=tts` で動かす（Hermes は起動しない。`bootstrap-vm.sh` の 1 回目 → SSH し直す → `stack.env` を埋める → 2 回目）。Mac の `.env.local` を新しい値に替え、Tailscale 経由で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。流せるのは `ORIGIN_SECRET` を入れる前だけ。
   - 手順 13 の import だけ: Vercel で GitHub リポジトリを import する。env はまだ入れない。
-- **ゾーンが Active になったら**: 手順 5〜6（トンネル）→ 手順 7〜12（`tunnel.env`、`ORIGIN_SECRET` などの値、`full,tunnel`、`deploy-stack.sh`、`403` の確認）→ 手順 13〜15（Vercel Production の env、Redeploy、`app.<domain>` の追加）→ 手順 16（Supabase。`app.<domain>` が開けるようになってから。そのあと初回サインインをして、自分を管理者にする）→ 手順 17（確認チェックリストと `npm run smoke:edge`）。
+- **ゾーンが Active になったら**: 手順 5〜6（トンネル）→ 手順 7〜12（`tunnel.env`、`ORIGIN_SECRET` などの値、`tts,tunnel`、`deploy-stack.sh`、`403` の確認）→ 手順 13〜15（Vercel Production の env、Redeploy、`app.<domain>` の追加）→ 手順 16（Supabase。`app.<domain>` が開けるようになってから。そのあと初回サインインをして、自分を管理者にする）→ 手順 17（確認チェックリストと `npm run smoke:edge`）。
 
 ### A. 新しい VM を用意する
 
@@ -91,9 +96,9 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 2. マシンタイプを決めて VM を作る。VM README の[クイックスタート](../risepath-vm/README.md#クイックスタート)に沿って進める（`provision-gce.sh` → Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh` の 1 回目 → SSH し直す → `stack.env` を埋める → 2 回目）。
    - Memanto なしは `e2-medium`（4 GB。既定）。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`（8 GB）。理由は VM README の「[マシンタイプ](../risepath-vm/README.md#マシンタイプ)」。
    - 月額は**推定**（未確認）: 24 時間稼働の `asia-northeast1` で `e2-medium` 約 $31、`e2-standard-2` 約 $63。ディスクは別。第三者のサイトの値なので、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめる。
-   - `stack.env` は VM README の表のとおりに埋める。`POSTGRES_PASSWORD` は DB の最初の起動で固定される。`COMPOSE_PROFILES` は表のとおり（`full`。Memanto を使うなら `full,memory`。Hermes を使わないなら `tts`）にし、手順 9〜10 の公開エッジの値はまだ入れない。`full` のときは `OPENROUTER_API_KEY` と 16 文字以上の `HERMES_API_KEY` が要り、無いと `deploy-stack.sh` が止まる。
-   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–012 がすべて入る。
-   - Mac の `.env.local` を新しいパスワードと `HERMES_API_KEY` に替える（VM README の「Mac `.env.local`」）。`ORIGIN_SECRET` を入れる前に、Mac のリポジトリ直下で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（[VM README](../risepath-vm/README.md#4-手動でスタック操作vm-上)）。
+   - `stack.env` は VM README の表のとおりに埋める。`POSTGRES_PASSWORD` は DB の最初の起動で固定される。`COMPOSE_PROFILES` は表のとおり（`tts`。Memanto を使うなら `tts,memory`）にし、手順 9〜10 の公開エッジの値はまだ入れない。`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま（Gemini の API 規約は 18 歳未満の人が使うサービスでの利用を禁じている）。`OPENROUTER_API_KEY` と `HERMES_API_KEY` は、Hermes を有効にする（`full` を入れる）ときだけ要る。
+   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–020 がすべて入る。
+   - Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（VM README の「Mac `.env.local`」）。`ORIGIN_SECRET` を入れる前に、Mac のリポジトリ直下で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（[VM README](../risepath-vm/README.md#4-手動でスタック操作vm-上)）。
 
 3. GCP ファイアウォールを確認する。ルールはタグに付くので、前の VM のルールが残っていれば新しい VM にも効く。
 
@@ -102,7 +107,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
      --format="table(name,direction,sourceRanges.list(),allowed[].map().firewall_rule().list(),denied[].map().firewall_rule().list(),targetTags.list())"
    ```
 
-   - 3006・5432・3100・8642・8880 を `0.0.0.0/0` へ開く INGRESS ルールが無いこと。
+   - 3006・5432・3100・8642・8880 を `0.0.0.0/0` へ開く INGRESS ルールが無いこと。MCP（3100）は、ngrok などのトンネルでもインターネットに出さない。
    - 7844 を止める EGRESS の deny ルールが無いこと（無ければ、外向きは既定で許可されている。Cloudflare Tunnel は外向きの TCP と UDP の 7844 を使う）。
 
 ### B. Cloudflare
@@ -114,7 +119,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
    - ゾーンが Active になるまで待つ（24〜48 時間かかることがある）
 5. Cloudflare Zero Trust で、ゾーンと同じアカウントに remotely-managed のトンネルを作る。
    - Published application: `api.<domain>` → Service URL `http://api:3006`
-   - ルートはこの 1 つだけにする。Service URL に IP アドレス、`host.docker.internal`、`tcp://` のサービスを使わない。`cloudflared` からは、ホストに公開されたほかのポート（db・mcp・hermes・kokoro）や GCE のメタデータサーバーにも届くため
+   - ルートはこの 1 つだけにする（例外: 大人が自分の AI をつなぐリモート MCP を有効にするときだけ、2 つ目の `mcp.<domain>` → `http://mcp-public:3200` を足す。手順は `doc/guides/byoa-setup.ja.md`）。Service URL に IP アドレス、`host.docker.internal`、`tcp://` のサービスを使わない。`cloudflared` からは、ホストに公開されたほかのポート（db・mcp・hermes・kokoro）や GCE のメタデータサーバーにも届くため
    - HTTP Host Header は空のまま
    - 画面のインストール用コマンドは実行しない（コンテナの `cloudflared` が接続する）。コマンドの中の `eyJ` で始まる文字列だけがトークン。手順 8 で VM の `tunnel.env` にだけ入れる
 6. セキュリティ設定。正規の通信はすべて Vercel の IP から来るので、`api.<domain>` に IP ベースの rate limit ルールを付けない。Bot Fight Mode は off のまま。切り替え後、Security Events で Vercel からのリクエストに challenge が出ていないか見る。任意で、`x-origin-secret` ヘッダーの無い `api.<domain>` へのリクエストを止める WAF カスタムルールを足す。
@@ -142,17 +147,18 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
     ORIGIN_SECRET=<手順 9 の値>
     TRUST_PROXY=1
     LLM_ALLOWED_ORIGINS=https://app.<domain>
-    COMPOSE_PROFILES=full,tunnel
-    # Hermes を使わないなら COMPOSE_PROFILES=tts,tunnel
+    COMPOSE_PROFILES=tts,tunnel
+    # Hermes を有効にするときだけ COMPOSE_PROFILES=full,tunnel
     # RISE_PATH_PUBLIC_URL は設定しない
     ```
 
     - `TRUST_PROXY=1`: `cloudflared` が 1 ホップ。`true` にしない
     - `LLM_ALLOWED_ORIGINS`: API に届く Host は `app.<domain>` にならない（`api.<domain>` の見込み）ので、アプリのオリジンを明示する
     - `RISE_PATH_PUBLIC_URL` があると、メディア URL が `https://api.<domain>` の絶対 URL になり 403 になる
-    - Memanto を使う場合は `COMPOSE_PROFILES=full,memory,tunnel` にする（書き忘れても `deploy-stack.sh` が `memory` を足す）。`MEMANTO_ENABLED=true` も `stack.env` に入れる（VM 起動時の systemd ユニットが読む。手順 2 で入れていればそのまま）
-    - `GEMINI_API_KEY` が入っているか確かめる。コース生成、画像生成、教材の索引づけが使う。無いと、確認チェックリストの画像生成が失敗する
-11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–012 が入ったので、13 件すべて適用済み（未適用 0 件）と出れば正しい。
+    - Memanto を使う場合は `COMPOSE_PROFILES=tts,memory,tunnel` にする（書き忘れても `deploy-stack.sh` が `memory` を足す）。`MEMANTO_ENABLED=true` も `stack.env` に入れる（VM 起動時の systemd ユニットが読む。手順 2 で入れていればそのまま）
+    - `ANTHROPIC_API_KEY` が入っているか確かめる。チューター、文章フィードバック、コース生成が使う
+    - `GEMINI_API_KEY` と `GEMINI_ALLOWED` が空か確かめる。Gemini を使わないので、教材の検索はキーワード検索で動き、AI の画像生成は止まる（`/api/v2/image` は 503）
+11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–020 が入ったので、すべて適用済み（未適用 0 件）と出れば正しい。
 
     ```bash
     docker compose --env-file stack.env build api
@@ -169,7 +175,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 ### D. Vercel
 
-13. Vercel Pro で GitHub リポジトリを import する（Git 連携。Production Branch は `main`）。ゾーンを待つあいだに import 済みなら、そのプロジェクトを使う。Production env に上の表の 6 つを入れる。`VITE_API_BASE_URL` があれば消す。Preview には `API_ORIGIN` と `ORIGIN_SECRET` を入れず、プレビューの Deployment Protection を有効にする。
+13. Vercel Pro で GitHub リポジトリを import する（Git 連携。Production Branch は `main`）。ゾーンを待つあいだに import 済みなら、そのプロジェクトを使う。Production env に上の表の 6 つを入れる。`VITE_API_BASE_URL` があれば消す。`VITE_FEATURE_AGENT_CHAT` は入れない（あれば消す）。`VITE_FEATURE_LEGAL_PAGES` は公開のときまで入れない。`VITE_SUPPORT_CONTACT` は、窓口が決まったら入れる。Preview には `API_ORIGIN` と `ORIGIN_SECRET` を入れず、プレビューの Deployment Protection を有効にする。
     - env を足したり消したりしたら（`VITE_API_BASE_URL` の削除も含む）、Deployments で最新の Production デプロイを Redeploy する。ビルドキャッシュは使わない。env の変更は次のデプロイから効き、`VITE_` の値はビルド時にバンドルへ入る。import 直後のデプロイは env なしでビルドされていることがある。
     - 手順 15 のビルド確認と、手順 17 の `npm run smoke:edge` は、この新しいデプロイに対して行う。
     - Settings → Environment Variables で、6 つが Production だけに付いていて、Preview のスコープに何も保存されていないことを確かめる（import 画面で入れた値も見る）。
@@ -190,7 +196,10 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 
 - GCP の予算アラート（手順 1）: 24 時間稼働の最初の 1 日分の費用が Billing のレポートに出たら、しきい値を見直す。手順 2 の月額は推定なので、実際の額で決め直す。
 - 稼働監視: `https://app.<domain>/api/v2/health` を外形監視する（edge には `{ ok, status }` だけを返す）。`ROUTER_EXTERNAL_TARGET_ERROR` や Cloudflare のエラーページは、`cloudflared` か VM が落ちている印。
-- Anthropic・Gemini・OpenRouter の各コンソールで、利用上限かアラートを設定する。公開直後はゲスト枠（`LLM_GUEST_DAILY_PER_IP`・`LLM_GUEST_DAILY_TOTAL`）を下げることも考える。
+- Anthropic のコンソールで、利用上限かアラートを設定する（Hermes を有効にしたなら OpenRouter も）。公開直後はサインイン済みの全ユーザー合計の日次上限（`AI_CAP_GLOBAL_*`。機能ごとの費用のブレーカー。日本時間 0 時にリセット。`deploy/risepath-vm/stack.env.example` を参照）を下げることも考える。全体の上限の 80% と 100% に達すると `[AI caps] global daily cap` のエラーログが出る。`AI_CAP_ALERT_WEBHOOK_URL` に Slack か Discord の Incoming Webhook を入れると、同じ内容が届く。
+- 未成年の安全対策（Phase 0.5）: ゲスト（ログインしていない人）は AI を使えない（`LLM_GUEST_AI` を設定しない既定。ゲスト枠 `LLM_GUEST_DAILY_*` はそのときだけ使う）。報告や止めた件数の通知は `SAFETY_ALERT_WEBHOOK_URL`（未設定なら `AI_CAP_ALERT_WEBHOOK_URL`）に届く。報告の確かめ方、紙の同意書の記録、虐待や命の危険が疑われるときの動き方は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md) を見る。
+- サインアップを公開するなら、Supabase の Email 認証の設定で「Confirm email」（メールアドレスの確認）が有効か確かめる。確認していないアカウントを量産して、有料の AI 機能の枠を増やせないようにするため（アプリには確認待ちの画面 `/auth/confirm-pending` がある）。
+- サインアップの公開前に、Supabase の Attack Protection で CAPTCHA（hCaptcha か Cloudflare Turnstile）も有効にする。ただし、アプリのサインアップとログインのフォームはまだ `captchaToken` を送らない。先に有効にするとログインできなくなるので、フォーム側の対応が入ってから有効にする。それまでは、Supabase の「Allow new users to sign up」を切ってサインアップを止めておくか、全体の上限（`AI_CAP_GLOBAL_*`）を低めにしておく。
 - `ORIGIN_SECRET` は定期的にローテーションする（上の 3 段階）。
 - `cloudflared` は `docker-compose.yml` でタグと digest を固定している。更新は両方を一緒に上げ、利用の少ない時間に行う。再起動で流れているストリームが切れる。
 
@@ -207,12 +216,25 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
   ```
 
 - [ ] Authorization ヘッダーが routes を通って API に届く（`SMOKE_BEARER` を付けた smoke、またはログイン後のプロフィール表示）
-- [ ] チューターの応答が少しずつ表示される。DevTools の Network で `text/event-stream` になり、本文が分割して届く（Vercel の routes と Cloudflare Free が SSE をバッファしないか）
+- [ ] 18 歳以上のテスト用アカウントで、チューターの応答が少しずつ表示される。DevTools の Network で `text/event-stream` になり、本文が分割して届く（Vercel の routes と Cloudflare Free が SSE をバッファしないか）
 - [ ] 4.5 MB を超えるファイルのアップロードが成功する（外部転送のボディ上限）
 - [ ] TTS の音声が再生できる（`/audio/cache/...` が routes を通る）
-- [ ] 画像生成の結果が表示される（`/generated/img_...`）
+- [ ] AI の画像生成は止まっている（`GEMINI_ALLOWED` を設定しない既定。`/api/v2/image` は 503 `image_generation_unavailable` を返す）。`GEMINI_ALLOWED=true` にした環境でだけ、生成した画像が表示されるか（`/generated/img_...`）を見る
+- [ ] 画面に浮かぶ AI コーチ（共有の Hermes）が出ない（`VITE_FEATURE_AGENT_CHAT` を設定しない既定）。レッスンの AI チューターは使える
 - [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す
+- [ ] 未成年の安全対策（Phase 0.5。手順は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md)）。テスト用のアカウントを 2 つ（18 歳以上と 18 歳未満）使う。本物の子どもの情報は使わない:
+  - [ ] VM で migration 014 が当たっている（`deploy-stack.sh` の `db:migrate`）。`docker compose --env-file stack.env exec db psql -U risepath_app -d risepath -c '\d user_age'` で表が出る
+  - [ ] ログインしていない状態で AI を呼ぶと 401 `sign_in_required` になる（`LLM_GUEST_AI` を設定しない既定）。`/api/v2/llm/status` は 200 のまま
+  - [ ] 生まれた年と月を登録していないアカウントで、チューターを使おうとすると「AI を使う前に、ひとつだけ設定してください」の案内が出て、「AI の利用設定へ」ボタンで `/settings/ai-access` に進める（API は 403 `age_required`）。AI を使わないレッスンは読める
+  - [ ] 18 歳未満のアカウントで年月を登録すると、保護者の同意の画面になる。同意する前は AI を使えない（403 `guardian_consent_required`）
+  - [ ] 保護者の同意のあと、18 歳未満のアカウントのチューターの答えは、確認が終わってから**まとめて**表示される（少しずつ流れてこない。これは正しい動き）
+  - [ ] 18 歳未満のアカウントで、ふつうの学習の質問には答えが出る。架空の携帯番号（例: `090-0000-0000`）を書いて送ると、AI に答えさせずに「答えられません」という案内が出る（API は 422 `content_blocked`、`category: personal_info`）。この 1 件は管理者の安全のページの集計に「入力を止めた」として出る
+  - [ ] AI の答えの近くに「AI が作った答えです」の表示と「報告する」ボタンがある。報告を 1 件送ると、管理者のアカウントの `/settings/admin/safety` の「報告」に出て、「確認済みにする」で消える。`SAFETY_ALERT_WEBHOOK_URL`（または `AI_CAP_ALERT_WEBHOOK_URL`）を入れているなら、学習者の文章をふくまない通知が届く
+  - [ ] 18 歳未満のアカウントの「AI の利用設定」で保護者の同意をやめると、すぐに AI が使えなくなる
+  - [ ] ログインしていない状態で `https://app.<domain>/ai-safety` が開け、相談窓口の電話番号が出る
 - [ ] P-School の画像が出る（例: `https://app.<domain>/p_school/assets/armory.jpg`）
+- [ ] Hermes を有効にしたときだけ: AI エージェントが自分の教材を検索できる。テスト用の学習者で小さな教材をアップロードし、取り込みが終わってから、エージェントにその内容を質問する。答えに教材の内容が出れば、Hermes がツール呼び出しに `rp_turn` を渡している。出ずに「使えない」と返るときは、`docker compose --env-file stack.env logs mcp | grep session_binding_required` で確かめ、公開せずに止めて報告する
+- [ ] Hermes を有効にしたときだけ: 別の学習者でサインインし、同じ質問をしても、前の学習者の教材が出ない
 
 ## 既知の制限
 
@@ -226,4 +248,5 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - Git 連携: `main` への push で本番がビルドされる（CI にデプロイジョブはない）。レッスンはビルド時にバンドルされるので、学習者に届くのは再ビルドのあと。
 - CLI: `npm run vercel:link`（初回のプロジェクト紐付け）、`npm run vercel:deploy`（本番。`--archive=tgz` で巨大リポジトリの CLI OOM とファイル数上限を避ける）。`vercel:deploy` はローカルの作業ツリーをそのままアップロードするので、`main` のクリーンなチェックアウトで実行する。
 - `.vercelignore` は `node_modules`、Blender マニュアル HTML（約 1.2 GB）、`*.env`・`.env*`、`.artifacts/`・`.shots/`、`public/uploads`、`/data/curricula/p_school` などを除外する。`public/p_school` は載る。
+- データの書き出しと DB のダンプ（`exports/`・`backups/`・`*.dump`・`*.sql.*`・ルートの `*.sql`）と、ホストの間で持ち運ぶ暗号化した秘密（`*.env.gpg`）も、`.gitignore` と同じく除外する。`.gitignore` にあるファイルは `git status` に出ないので、「クリーン」に見えるチェックアウトにも残っていることがある。
 - API（VM）はフロントと別にデプロイする。新しい API を前提にしたフロントは、先に VM で `deploy-stack.sh` を流してから出す。

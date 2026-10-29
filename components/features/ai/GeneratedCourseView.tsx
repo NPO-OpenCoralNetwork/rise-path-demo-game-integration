@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Clock, Award, BookOpen, Share2, RefreshCw, Sparkles, ArrowRight, Layers } from 'lucide-react';
 import { GeneratedCourse, LocalizedText } from '../../../types';
 import { useLanguage } from '../../../context/LanguageContext';
+import { AiNotice } from '../../ui/AiNotice';
 
 // Helper to extract text from LocalizedText or string
 const getText = (value: string | LocalizedText | undefined, lang: 'en' | 'jp'): string => {
@@ -183,9 +184,20 @@ const GeneratedCourseView: React.FC<GeneratedCourseViewProps> = ({ course, onBac
             {/* Path */}
             <div className={`max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 relative z-20 ${resumeCard && resumeCard.type !== 'fresh_start' ? '' : '-mt-16'}`}>
                 <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-slate-200">
-                    <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <BookOpen size={24} className="text-indigo-600" /> {t.pathTitle}
                     </h2>
+                    {/* The course (title, description, chapters) was written by AI. */}
+                    <AiNotice
+                        surface="course_generation"
+                        answer={[
+                            getText(course.title, language),
+                            getText(course.description, language),
+                            ...course.chapters.map((chapter) => getText(chapter.title, language)),
+                        ].filter(Boolean).join('\n')}
+                        context={{ courseId: course.id }}
+                        className="mb-8 rounded-control border border-line bg-sunken px-3 py-2"
+                    />
 
                     <div className="relative">
                         {/* Line */}

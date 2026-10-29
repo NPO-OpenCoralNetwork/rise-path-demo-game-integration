@@ -123,7 +123,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
                 throw new LlmError('max_tokens', 'Gemini reply hit the output limit', { provider: 'gemini', model: 'gemini-x', retryable: false });
             },
         });
-        const gateway = createGateway({ env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' }, providers: { gemini: factory }, logger: quietLogger });
+        const gateway = createGateway({ env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' }, providers: { gemini: factory }, logger: quietLogger });
         const events = await collect(gateway.stream({ task: 'tutor.chat', messages: userMessage }));
         assert.deepEqual(events.map((e) => e.type), ['text.delta', 'text.delta', 'done']);
         assert.equal(events.at(-1).result.text, 'Part one, part two');
@@ -140,7 +140,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
             return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
         };
         const part = (text, finishReason) => ({ candidates: [{ content: { role: 'model', parts: text ? [{ text }] : [] }, ...(finishReason ? { finishReason } : {}) }] });
-        const run = () => collect(createGateway({ env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' }, logger: quietLogger })
+        const run = () => collect(createGateway({ env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' }, logger: quietLogger })
             .stream({ task: 'tutor.chat', messages: userMessage }));
         try {
             chunks = [part('Part one, '), { ...part('last part', 'MAX_TOKENS'), usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 10, thoughtsTokenCount: 4000 } }];
@@ -180,7 +180,7 @@ describe('truncated replies (thinking counts against max_tokens)', () => {
 
 // ---------------------------------------------------------------------------------------------
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LLM_PROVIDER', 'LLM_MOCK_FALLBACK', 'LLM_MOCK_DELAY_MS', 'NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'LLM_ALLOWED_ORIGINS', 'LLM_GUEST_DAILY_PER_IP', 'LLM_GUEST_DAILY_TOTAL', 'TRUST_PROXY', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'LLM_GUEST_AI', 'AI_ACCESS_DEV_AUDIENCE'];
 
 const withServer = async (handler) => {
     const app = await createApp({ serveStatic: false });
@@ -211,6 +211,9 @@ describe('/api/v2/llm guest tutor and guest budget', () => {
         for (const key of ENV_KEYS) delete process.env[key];
         process.env.NODE_ENV = 'development';
         process.env.LLM_MOCK_DELAY_MS = '0';
+        // These cases exercise anonymous calls: guests may use AI only with LLM_GUEST_AI=true
+        // (server/middleware/aiAccessGate.js); signed-in callers without a pool count as adults.
+        process.env.LLM_GUEST_AI = 'true';
         resetGatewayForTests();
         resetPoolForTests();
         setPoolForTests(null);
@@ -273,7 +276,7 @@ describe('/api/v2/llm guest tutor and guest budget', () => {
             await valid.text();
             const next = await postJson(`${base}/llm/personality-insight`, { scores: SCORES });
             assert.equal(next.status, 429, 'the valid request was charged');
-            assert.equal((await next.json()).error_type, 'rate_limited');
+            assert.equal((await next.json()).error_type, 'daily_limit_reached');
         });
     });
 
@@ -318,11 +321,29 @@ describe('guest budget refunds', () => {
         assert.equal(run('a')[0], 429, 'a second refund for the same request does nothing');
     });
 
+    it('counts an IPv6 guest by its /56: addresses in one /64 or /56 share the budget, other /56s do not', () => {
+        const run = runner(createGuestBudget({ env: {}, perIp: 2, total: 50, now: () => Date.parse('2026-10-19T10:00:00Z') }));
+        assert.equal(run('2001:db8:1:2::5')[0], 200);
+        assert.equal(run('2001:db8:1:2:aaaa:bbbb:cccc:9')[0], 200, 'another address in the same /64');
+        assert.equal(run('2001:db8:1:2::77')[0], 429, 'a third address in that /64 shares the budget of 2');
+        assert.equal(run('2001:db8:1:80::1')[0], 429, 'another /64 inside the same /56 too');
+        assert.equal(run('2001:db8:1:100::1')[0], 200, 'the next /56 has its own budget');
+        assert.equal(run('2001:db8:2::1')[0], 200, 'another network');
+        const [, res] = run('2001:db8:2::2');
+        refundGuestBudget(res, new LlmError('no_provider', 'none'));
+        assert.equal(run('2001:db8:2:0:ffff::3')[0], 200, 'the refund goes back to the same /56');
+        assert.equal(run('::ffff:203.0.113.7')[0], 200);
+        assert.equal(run('203.0.113.7')[0], 200, 'IPv4-mapped and plain IPv4 are one address');
+        assert.equal(run('203.0.113.7')[0], 429);
+        assert.equal(run('127.0.0.1')[0], 200, 'internal addresses count as they are');
+        assert.equal(run('127.0.0.2')[0], 200);
+    });
+
     it("does not add yesterday's refund to today's budget", () => {
-        let now = Date.parse('2026-10-19T23:59:59Z');
+        let now = Date.parse('2026-10-20T14:59:59Z'); // 23:59:59 JST
         const run = runner(createGuestBudget({ env: {}, perIp: 5, total: 1, now: () => now }));
         const [, yesterday] = run('a');
-        now = Date.parse('2026-10-20T00:00:01Z');
+        now = Date.parse('2026-10-20T15:00:01Z'); // 00:00:01 JST, the next day
         assert.equal(run('b')[0], 200, 'new day');
         refundGuestBudget(yesterday, new LlmError('provider_unavailable', 'down'));
         assert.equal(run('c')[0], 429, 'the total budget for today is still used up');
@@ -335,7 +356,7 @@ describe('guest budget refunds', () => {
         // Structured call: the first turn returns invalid JSON (billed), the repair turn hits a 503.
         let calls = 0;
         const structured = createGateway({
-            env: { GEMINI_API_KEY: 'g', LLM_PROVIDER: 'gemini' },
+            env: { GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'gemini' },
             providers: {
                 gemini: fake('gemini', {
                     async generate() {
@@ -358,7 +379,7 @@ describe('guest budget refunds', () => {
 
         // Stream: Anthropic times out (the model ran), then Gemini is down.
         const fallback = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: {
                 anthropic: fake('anthropic', { async generate() {}, async *stream() { throw new LlmError('timeout', 'slow'); } }),
                 gemini: fake('gemini', { async generate() {}, async *stream() { throw new LlmError('provider_unavailable', 'down'); } }),
@@ -373,7 +394,7 @@ describe('guest budget refunds', () => {
 
         // Both providers down before any model ran: refunded.
         const down = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: {
                 anthropic: fake('anthropic', { async generate() {}, async *stream() { throw new LlmError('provider_unavailable', 'down'); } }),
                 gemini: fake('gemini', { async generate() {}, async *stream() { throw new LlmError('rate_limited', 'busy'); } }),

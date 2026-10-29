@@ -1,12 +1,29 @@
-# Rise Path dedicated VM stack (db + api + mcp + kokoro-tts + hermes; cloudflared with profile tunnel)
-# Hermes: nousresearch/hermes-agent — run scripts/init-hermes-profile.sh before first up.
+# Rise Path dedicated VM stack (db + api + mcp; kokoro-tts with profile tts; cloudflared with profile
+# tunnel; the public remote MCP mcp-public with profile byoa, which needs mcp-public.env and the
+# tunnel). Default COMPOSE_PROFILES=tts (stack.env.example). Hermes (profile full) is not offered to
+# learners; it stays for self-hosting and development (deploy-stack.sh runs
+# scripts/init-hermes-profile.sh before up when full is listed).
 #
 #   cp stack.env.example stack.env && chmod 600 stack.env
-#   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=full,tunnel
+#   cp tunnel.env.example tunnel.env && chmod 600 tunnel.env   # only for COMPOSE_PROFILES=tts,tunnel
+#   cp billing.env.example billing.env && chmod 600 billing.env # only for the paid plan (api only)
 #   ./scripts/deploy-stack.sh   # build -> up --wait db -> run --rm --no-deps api npm run db:migrate -> up -d
 #   (apply migrations before the new api starts: its healthcheck fails while one is pending)
 
 name: risepath
+
+# Docker's json-file logs of every service (Phase 4, owner decision D4): at most 5 files of 10 MB
+# per container (about 50 MB), the oldest dropped first. Anchors do not cross files, so
+# docker-compose.memanto.yml defines the same block. The api's request lines carry no query
+# string and only 8 characters of an id (server/utils/redactUrl.js). Adding or changing this block
+# changes every service's config, so the next deploy-stack.sh recreates every running container
+# once: db at "db up", the api next, and the rest at "docker compose up" (a short outage of the
+# tunnel and of text-to-speech; mcp, mcp-public, hermes and the memanto stack restart too).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   db:
@@ -15,6 +32,12 @@ services:
     # Changing the image does not convert a volume made by an earlier image. Bump tag and digest together.
     image: pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
     restart: unless-stopped
+    logging: *default-logging
+    # terse: an error line without DETAIL, HINT, QUERY or CONTEXT. By default Postgres logs a foreign
+    # key refusal with "DETAIL: Key (user_id)=(<full id>)", and account deletion makes such refusals
+    # normal; the STATEMENT line stays and holds $1, not the values. Changing this recreates db (a
+    # few seconds at deploy-stack.sh's "db up").
+    command: ["postgres", "-c", "log_error_verbosity=terse"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -37,8 +60,13 @@ services:
       dockerfile: deploy/risepath-vm/Dockerfile
       target: api
     restart: unless-stopped
+    logging: *default-logging
+    # billing.env (Phase 3, billing.env.example): the Stripe keys and billing switches reach the
+    # api only, never mcp or mcp-public. deploy-stack.sh refuses STRIPE_/BILLING_ names in stack.env.
     env_file:
       - path: stack.env
+        required: false
+      - path: billing.env
         required: false
     environment:
       DATABASE_URL_PHASE1: ${DATABASE_URL_PHASE1}
@@ -49,7 +77,27 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       HERMES_API_URL: ${HERMES_API_URL:-http://hermes:8642}
       HERMES_API_KEY: ${HERMES_API_KEY:-}
+      # Gemini only when GEMINI_ALLOWED is exactly "true" (off by default: under-18 clause in the
+      # Gemini API terms; stack.env.example).
+      GEMINI_ALLOWED: ${GEMINI_ALLOWED:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Minor safeguards (Phase 0.5; stack.env.example). Empty = the safe defaults: no guest AI,
+      # pause after 10 blocked inputs a day, alerts to AI_CAP_ALERT_WEBHOOK_URL. The dev audience is
+      # ignored in production (the api warns when it is set).
+      LLM_GUEST_AI: ${LLM_GUEST_AI:-}
+      SAFETY_BLOCKS_BEFORE_PAUSE: ${SAFETY_BLOCKS_BEFORE_PAUSE:-}
+      SAFETY_ALERT_WEBHOOK_URL: ${SAFETY_ALERT_WEBHOOK_URL:-}
+      AI_ACCESS_DEV_AUDIENCE: ${AI_ACCESS_DEV_AUDIENCE:-}
+      # Account deletion and retention (Phase 4; stack.env.example). Empty: deletion from Settings
+      # stays off (true turns it on, after ai-access-plan §8.2 items 2-3), and retention runs with the
+      # defaults (30 days of AI usage counts, 365 days of processing records, 5 years of deletion
+      # proofs, 3 years of AI-app records). An invalid retention value turns its rule off; the api logs it.
+      ACCOUNT_DELETION_ENABLED: ${ACCOUNT_DELETION_ENABLED:-}
+      RETENTION_ENABLED: ${RETENTION_ENABLED:-}
+      RETENTION_AI_USAGE_DAYS: ${RETENTION_AI_USAGE_DAYS:-}
+      RETENTION_PROCESSING_DAYS: ${RETENTION_PROCESSING_DAYS:-}
+      RETENTION_DELETION_PROOF_YEARS: ${RETENTION_DELETION_PROOF_YEARS:-}
+      RETENTION_AI_APP_RECORD_YEARS: ${RETENTION_AI_APP_RECORD_YEARS:-}
       KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
       KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}
       KOKORO_TTS_DEFAULT_VOICE_EN: ${KOKORO_TTS_DEFAULT_VOICE_EN:-af_bella}
@@ -91,6 +139,7 @@ services:
       context: ../kokoro-tts
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "8880:8880"
     healthcheck:
@@ -106,6 +155,7 @@ services:
       dockerfile: deploy/risepath-vm/Dockerfile
       target: mcp
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - path: stack.env
         required: false
@@ -148,9 +198,64 @@ services:
       api:
         condition: service_healthy
 
+  # Public remote MCP for adults who connect their own agent (Phase 1, compose profile `byoa`;
+  # doc/guides/byoa-setup.ja.md). Same image as mcp, started with --http: stateless Streamable HTTP
+  # on :3200, Supabase OAuth access tokens only, profile learner-remote. The tunnel publishes
+  # https://mcp.<domain> → http://mcp-public:3200; no host port. It reads mcp-public.env only
+  # (never stack.env): a least-privilege DATABASE_URL_PHASE1 (sql/mcp_remote_role.sql), the
+  # Supabase URL and anon key, and its own settings. No bridge token, no service-role key, no
+  # model or Memanto keys, and no ${...} values from stack.env. NODE_ENV and the profile are fixed
+  # here so the env file cannot change them.
+  mcp-public:
+    profiles:
+      - byoa
+    build:
+      context: ../..
+      dockerfile: deploy/risepath-vm/Dockerfile
+      target: mcp
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["node", "mcp-server/index.js", "--http"]
+    env_file:
+      - path: mcp-public.env
+        required: false
+    environment:
+      NODE_ENV: production
+      RISE_PATH_MCP_PROFILE: learner-remote
+      MCP_HTTP_PORT: "3200"
+    user: node
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3200/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
   hermes:
     image: nousresearch/hermes-agent:latest
     restart: unless-stopped
+    logging: *default-logging
     profiles:
       - full
     volumes:
@@ -192,6 +297,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
     restart: unless-stopped
+    logging: *default-logging
     profiles:
       - tunnel
     command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
@@ -211,7 +317,8 @@ services:
         condition: service_healthy
 
 networks:
-  # Plain bridge shared by api and cloudflared only; cloudflared keeps its outbound egress.
+  # Plain bridge shared by api, cloudflared and (profile byoa) mcp-public only; cloudflared keeps
+  # its outbound egress.
   edge: {}
 
 volumes:

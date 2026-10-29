@@ -23,6 +23,14 @@ export async function logEntry({ userId, curriculumId, moduleId, lessonId, learn
     }
 
     try {
+        // A reflection belongs to one of the caller's own curricula (as POST /curricula/:id/journal).
+        const owned = await pool.query(
+            'SELECT 1 FROM curricula WHERE id = CAST($1 AS uuid) AND user_id = CAST($2 AS uuid)',
+            [curriculumId, effectiveUserId]
+        );
+        if (!owned.rowCount) {
+            return { error: `Curriculum ${curriculumId} not found or not owned by user`, error_type: 'not_found' };
+        }
         const result = await pool.query(
             `INSERT INTO learning_journal
                 (user_id, curriculum_id, module_id, lesson_id, learned, difficulty, mood, confidence, time_spent_min)
@@ -69,7 +77,7 @@ export async function getRecent({ userId, limit = 10 }) {
                     j.mood, j.confidence, j.time_spent_min, j.created_at,
                     c.title as curriculum_title
              FROM learning_journal j
-             LEFT JOIN curricula c ON c.id = j.curriculum_id
+             LEFT JOIN curricula c ON c.id = j.curriculum_id AND c.user_id = j.user_id
              WHERE j.user_id = CAST($1 AS uuid)
              ORDER BY j.created_at DESC LIMIT $2`,
             [effectiveUserId, safeLimit]

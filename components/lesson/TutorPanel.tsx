@@ -1,17 +1,24 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, CircleAlert, CornerDownRight, Layers, Lightbulb, RotateCcw, Send, Sparkles, Square, X } from 'lucide-react';
+import { CalendarClock, Check, CircleAlert, CornerDownRight, Layers, Lightbulb, LogIn, RotateCcw, Send, Sparkles, Square, X } from 'lucide-react';
 import type { Block, Section } from '../../shared/lesson/schema.js';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useReader } from './ReaderContext';
 import { Markdown } from './Md';
 import { ReaderSheet } from './ReaderSheet';
 import { splitSectionTitle } from './model';
+import { AiNotice, AiRefusalNotice } from '../ui/AiNotice';
+import type { AiRefusal } from '../../services/safetyApi';
 import {
   CHECK_BLOCK_TYPES,
   draftTutorCard,
+  isTutorAccessKind,
+  isTutorLimitKind,
   plainAnswer,
   saveTutorCard,
+  tutorErrorIsFinal,
   type TutorErrorKind,
+  type TutorLimitKind,
   type TutorStreamApi,
   type TutorThread,
   type TutorTurn,
@@ -74,8 +81,19 @@ const copy = {
       refused: 'The tutor could not answer this. Try asking another way.',
       rejected: 'This question could not be sent. Try a shorter question.',
       interrupted: 'The answer stopped partway. Please try again.',
+      daily_limit: "Today's limit for AI tutor questions has been reached. It resets at midnight Japan time. The lesson and the glossary still work.",
+      daily_limit_guest: "Today's limit for guest questions to the AI tutor has been reached. Sign in to keep asking. The lesson and the glossary still work.",
+      paused: 'The AI tutor is paused for now. The lesson and the glossary still work.',
       failed: 'Something went wrong. Please try again.',
+      sign_in_required: 'Sign in to use the AI tutor. The lesson and the glossary still work.',
+      age_required: 'Before using the AI tutor, please enter the year and month you were born.',
+      guardian_consent_required: 'A parent or guardian needs to agree before you use the AI tutor.',
+      ai_paused_safety: 'The AI tutor is resting for today. The lesson and the glossary still work.',
+      adults_only: 'This feature is for people aged 18 or over.',
+      content_blocked: 'The AI tutor cannot answer this.',
+      safety_unavailable: 'The safety check is not working right now, so the AI tutor cannot answer. Please try again a little later.',
     } satisfies Record<TutorErrorKind, string>,
+    signIn: 'Sign in',
     card: {
       title: 'Make a flashcard',
       tip: 'Put it in your own words: that is what makes it stick.',
@@ -133,8 +151,19 @@ const copy = {
       refused: 'この質問には答えられませんでした。聞き方を変えてみてください。',
       rejected: '質問を送れませんでした。短くして、もう一度お試しください。',
       interrupted: '回答が途中で止まりました。もう一度お試しください。',
+      daily_limit: '今日のAI先生への質問は上限に達しました。日本時間の0時にリセットされます。本文と用語集はそのまま使えます。',
+      daily_limit_guest: 'ゲストのAI先生への質問は、今日の上限に達しました。ログインすると、続けて質問できます。本文と用語集はそのまま使えます。',
+      paused: 'AI先生は、今は停止しています。本文と用語集はそのまま使えます。',
       failed: 'うまくいきませんでした。もう一度お試しください。',
+      sign_in_required: 'AI先生を使うには、ログインが必要です。本文と用語集はそのまま使えます。',
+      age_required: 'AI先生を使う前に、生まれた年と月を設定してください。',
+      guardian_consent_required: 'AI先生を使うには、保護者の人の同意が必要です。',
+      ai_paused_safety: '今日は、AI先生をお休みしています。本文と用語集はそのまま使えます。',
+      adults_only: 'この機能は、18歳以上の人が使えます。',
+      content_blocked: 'この内容には、AI先生は答えられません。',
+      safety_unavailable: '安全のチェックが今は動いていないため、AI先生は答えられません。少し待ってから、もう一度お試しください。',
     } satisfies Record<TutorErrorKind, string>,
+    signIn: 'ログイン',
     card: {
       title: 'カードにする',
       tip: '自分の言葉に直すと、記憶に残りやすくなります。',
@@ -374,6 +403,13 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
 
   const turns = thread?.turns ?? [];
   const lastAnswer = [...turns].reverse().find((t) => t.role === 'assistant');
+  // A daily cap holds (useTutorStream refuses new questions): chips and Send are off, and one
+  // notice explains why, unless this thread's last answer already says it.
+  const limited = Boolean(tutor.limit);
+  const lastTurn = turns[turns.length - 1];
+  const limitNotice: TutorLimitKind | null = tutor.limit && !(lastTurn?.status === 'error' && isTutorLimitKind(lastTurn.error))
+    ? tutor.limit.kind
+    : null;
   const socratic = Boolean(thread) && (lastAnswer?.mode ?? thread?.mode) === 'socratic';
   const hasAnswer = turns.some((t) => t.role === 'assistant' && t.status === 'done' && t.text.trim());
 
@@ -467,7 +503,9 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
   };
 
   // Screen readers hear the finished answer once, not every streamed piece.
-  const announcement = !thread || !lastAnswer
+  const announcement = limitNotice
+    ? text.errors[limitNotice]
+    : !thread || !lastAnswer
     ? ''
     : lastAnswer.status === 'streaming'
       ? text.thinking
@@ -507,15 +545,27 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
           aria-busy={busy}
           data-rp-tutor-thread=""
         >
-          {turns.map((turn) => (
+          {turns.map((turn, index) => (
             <TurnView
               key={turn.id}
               turn={turn}
               text={text}
               sourceChip={turn.role === 'assistant' && turn.status === 'done' ? sourceChip(turn) : null}
-              onRetry={turn === turns[turns.length - 1] ? tutor.retry : undefined}
+              // No Retry while a daily cap holds: the hook would refuse it without a word.
+              onRetry={turn === turns[turns.length - 1] && !limited ? tutor.retry : undefined}
+              question={turn.role === 'assistant' && turns[index - 1]?.role === 'user' ? turns[index - 1].text : undefined}
+              reportContext={{
+                courseId: thread?.lesson?.courseId ?? course.id,
+                lessonId: thread?.lesson?.lessonId ?? lesson.id,
+                ...(thread?.anchor?.blockId ? { blockId: thread.anchor.blockId } : {}),
+              }}
             />
           ))}
+        </div>
+      )}
+      {limitNotice && (
+        <div className="mt-2 rounded-control border border-line bg-surface p-3 text-small text-fg-2" data-rp-tutor-limit="">
+          <LimitMessage kind={limitNotice} text={text} />
         </div>
       )}
       <p className="sr-only" role="status">{announcement}</p>
@@ -555,9 +605,9 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
                   type="button"
                   className="rp-suggestion rp-suggestion-sm aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                   // aria-disabled, not disabled: a disabled button would drop the keyboard focus.
-                  aria-disabled={busy || undefined}
+                  aria-disabled={busy || limited || undefined}
                   onClick={() => {
-                    if (!busy) ask(s.message);
+                    if (!busy && !limited) ask(s.message);
                   }}
                 >
                   {s.label}
@@ -589,7 +639,8 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
             className="rp-tutor-form"
             onSubmit={(event) => {
               event.preventDefault();
-              if (busy) return;
+              // While a daily cap holds, the typed question stays in the field for later.
+              if (busy || limited) return;
               ask(draft, true);
               setDraft('');
             }}
@@ -617,7 +668,7 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
                 key="send"
                 type="submit"
                 className="rp-btn rp-btn-primary rp-btn-sm"
-                aria-disabled={!draft.trim() || undefined}
+                aria-disabled={!draft.trim() || limited || undefined}
               >
                 <Send size={14} aria-hidden="true" />
                 {text.send}
@@ -630,12 +681,24 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
   );
 }
 
-function TurnView({ turn, text, sourceChip, onRetry }: {
+/** The refusal card for an access or safety error turn, or null for any other error. */
+function refusalFor(turn: TutorTurn): AiRefusal | null {
+  if (isTutorAccessKind(turn.error)) return { type: 'access', kind: turn.error };
+  if (turn.error === 'content_blocked') return { type: 'blocked', category: null, support: Boolean(turn.support) };
+  if (turn.error === 'safety_unavailable') return { type: 'check_unavailable' };
+  return null;
+}
+
+function TurnView({ turn, text, sourceChip, onRetry, question, reportContext }: {
   turn: TutorTurn;
   text: Copy;
   sourceChip: React.ReactNode;
   onRetry?: () => void;
+  /** The learner's question this answer belongs to (sent with a report). */
+  question?: string;
+  reportContext: { courseId?: string; lessonId?: string; blockId?: string };
 }) {
+  const { logout } = useAuth();
   if (turn.role === 'user') {
     return (
       <div className="rounded-control bg-sunken px-3 py-2 text-small text-fg" data-turn="user">
@@ -646,6 +709,10 @@ function TurnView({ turn, text, sourceChip, onRetry }: {
   }
 
   const showDemo = turn.demo && turn.status === 'done' && !/デモ|demo/i.test(turn.text);
+  const refusal = turn.status === 'error' ? refusalFor(turn) : null;
+  // Disclosure and report under every AI text left on screen once streaming ends: a done or
+  // stopped answer, and one that failed partway (content_blocked clears its text, so no notice).
+  const answered = turn.status !== 'streaming' && Boolean(turn.text.trim());
   return (
     <div className="text-body text-fg" data-turn="assistant">
       <span className="sr-only">{text.tutor}: </span>
@@ -668,13 +735,29 @@ function TurnView({ turn, text, sourceChip, onRetry }: {
         <p className="mt-1 text-caption text-fg-3">{text.truncated}</p>
       )}
 
-      {turn.status === 'error' && (
+      {turn.status === 'error' && refusal && (
+        <div className="mt-2" data-rp-tutor-refusal={turn.error}>
+          <AiRefusalNotice refusal={refusal} onSignIn={() => { void logout({ reason: 'reauth' }); }} />
+          {onRetry && !tutorErrorIsFinal(turn.error) && (
+            <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={onRetry}>
+              <RotateCcw size={14} aria-hidden="true" />
+              {text.retry}
+            </button>
+          )}
+        </div>
+      )}
+
+      {turn.status === 'error' && !refusal && (
         <div className="mt-2 rounded-control border border-line bg-surface p-3 text-small text-fg-2">
-          <p className="flex items-start gap-1.5">
-            <CircleAlert size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />
-            <span>{text.errors[turn.error ?? 'failed']}</span>
-          </p>
-          {onRetry && (
+          {isTutorLimitKind(turn.error) ? (
+            <LimitMessage kind={turn.error} text={text} />
+          ) : (
+            <p className="flex items-start gap-1.5">
+              <CircleAlert size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />
+              <span>{text.errors[turn.error ?? 'failed']}</span>
+            </p>
+          )}
+          {onRetry && !isTutorLimitKind(turn.error) && (
             <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={onRetry}>
               <RotateCcw size={14} aria-hidden="true" />
               {text.retry}
@@ -701,7 +784,40 @@ function TurnView({ turn, text, sourceChip, onRetry }: {
           {showDemo && <span className="text-caption text-fg-3">{text.demo}</span>}
         </div>
       )}
+
+      {answered && (
+        <AiNotice
+          surface="tutor"
+          answer={turn.text}
+          question={question}
+          context={reportContext}
+          className="mt-2 border-t border-line pt-2"
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * A daily cap (not a failure): a calendar icon in the body colour, no Retry. Guests get a sign-in
+ * button: signing in ends the guest session (as the course generator's sign-in does) and lifts
+ * the guest budget.
+ */
+function LimitMessage({ kind, text }: { kind: TutorLimitKind; text: Copy }) {
+  const { logout } = useAuth();
+  return (
+    <>
+      <p className="flex items-start gap-1.5">
+        <CalendarClock size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-fg-2" />
+        <span>{text.errors[kind]}</span>
+      </p>
+      {kind === 'daily_limit_guest' && (
+        <button type="button" className="rp-btn rp-btn-sm mt-2" onClick={() => { void logout({ reason: 'reauth' }); }}>
+          <LogIn size={14} aria-hidden="true" />
+          {text.signIn}
+        </button>
+      )}
+    </>
   );
 }
 

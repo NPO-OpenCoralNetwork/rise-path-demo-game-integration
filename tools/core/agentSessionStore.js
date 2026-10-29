@@ -92,4 +92,4 @@ export function clearAgentChatConsentForTests() {
     memory.clear();
 }
 
-export { registerAgentSession } from './mcpUserScope.js';
+export { registerAgentSession, registerAgentTurn, buildTurnInstruction } from './mcpUserScope.js';

@@ -18,7 +18,7 @@ Rise Path の日次ライフジャーナル（睡眠・運動・気分・学習�
 ## 手順
 
 1. ユーザーの質問から分析期間（`from` / `to`）を特定する。未指定なら直近30日。
-2. **`mcp_rise_path_learner_personal_context` を優先**して呼ぶ（`user_id` は SSE/JWT で自動解決される場合は省略可）。
+2. **`mcp_rise_path_learner_personal_context` を優先**して呼ぶ（`user_id` は不要。このターンの指示にある `rp_turn` を必ず渡す）。
    - ライフジャーナル集計（L3）+ 診断プロファイル（L1）+ セマンティック記憶（L2, opt-in 時）を統合取得
    - 日記抜粋はサーバー側の opt-in 同意がある場合のみ含まれる
    - フォールバック: `mcp_rise_path_daily_life_chat_context`（後方互換）

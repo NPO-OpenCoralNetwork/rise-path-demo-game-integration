@@ -188,7 +188,7 @@ depends_on:
 ```
 
 - `api` と `mcp` は同一 Compose ネットワーク上の `memanto` ホスト名で解決する
-- Memanto 未起動時: `MEMANTO_ENABLED=false` で degraded 運用（§4.4）。`depends_on` は本番 `full` プロファイルでは有効化
+- Memanto 未起動時: `MEMANTO_ENABLED=false` で AI 個人記憶を「未提供」として運用（§4.4）。`depends_on` は本番 `full` プロファイルでは有効化
 - `hermes` は引き続き `http://mcp:3100/sse` のみ（Memanto 直接接続なし）
 
 ### 4.3 リソース要件
@@ -201,7 +201,14 @@ depends_on:
 
 ### 4.4 障害時フォールバック
 
-Memanto オフライン時:
+Memanto 未設定時（`MEMANTO_ENABLED=false` または `MEMANTO_API_URL` なし）:
+
+- recall / 一覧は空配列 + `semantic_memory_status: not_configured`（エラーにしない）
+- `GET /learner-memory/privacy` は `available: false` を返し、`PUT` で OFF から ON にする操作（opt-in・会話からの自動記憶）は **409** `ai_memory_not_offered`。OFF にする操作と、同じ値の再送は可能
+- 設定画面（プライバシー）の「AI 個人記憶」カードは「このサーバーでは提供していません。」と表示し、ON にする操作・会話からの自動記憶・一覧リンクは出さない。以前 ON にした学習者には、OFF にするだけのトグルと全削除を残す
+- 「AI の記憶」ページは「このサーバーでは AI 個人記憶を提供していません。」だけを表示
+
+Memanto オフライン時（設定済みだが応答しない）:
 
 - `learner-personal-context` は L3（集計）+ L1 注入分のみ返す（`semantic_memory_status: degraded`）
 - `learner-memory-remember` は **503** + キューしない（サイレント欠落を避けるため UI に通知）
@@ -449,8 +456,8 @@ MCP 以外に Express ルートを追加。認証: `requireBridgeOrAuth`（JWT `
 | `POST` | `/api/v2/learner-memory` | 明示 remember（UI から） |
 | `DELETE` | `/api/v2/learner-memory/:memoryId` | 1 件削除 |
 | `DELETE` | `/api/v2/learner-memory` | 全削除（`confirm: "DELETE"`） |
-| `GET` | `/api/v2/learner-memory/privacy` | opt-in 設定取得 |
-| `PUT` | `/api/v2/learner-memory/privacy` | opt-in 設定更新 |
+| `GET` | `/api/v2/learner-memory/privacy` | opt-in 設定取得（`available`: このサーバーで提供しているか） |
+| `PUT` | `/api/v2/learner-memory/privacy` | opt-in 設定更新（未提供時の ON は 409 `ai_memory_not_offered`） |
 
 ### 8.2 プライバシー設定（`user_profiles.preferences` 拡張）
 

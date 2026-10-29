@@ -24,11 +24,8 @@ router.get('/health', async (req, res) => {
             ...snapshot,
         });
     } catch (err) {
-        res.status(500).json({
-            ok: false,
-            error: 'health_check_failed',
-            message: err.message,
-        });
+        console.error('[Health] snapshot failed:', err?.message);
+        res.status(500).json({ ok: false, error: 'health_check_failed' });
     }
 });
 

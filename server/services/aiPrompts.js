@@ -5,7 +5,17 @@
  *   requirements → roadmap → curriculum
  * 
  * Each prompt injects the learner profile from Kit + RAG context.
+ *
+ * Replies are read by aiGenerator.js parseJsonReply. Claude has no JSON mode for free-form
+ * output and no prefill, so every prompt ends with JSON_ONLY_RULE: exactly one JSON object, no
+ * code fences, no text before or after it.
  */
+
+/** The closing rule of every stage prompt. */
+export const JSON_ONLY_RULE = `## 返答のルール
+- 返答は上の形の JSON オブジェクト 1 つだけにしてください。
+- コードフェンス（\`\`\`）で囲まないでください。JSON の前後に説明や挨拶を書かないでください。
+- 文字列の中の改行は \\n、ダブルクォートは \\" と書き、正しい JSON にしてください。`;
 
 export function buildRequirementsPrompt(kit, ragContext = '') {
   const profile = kit?.personalization?.derived_learning_profile || {};
@@ -28,9 +38,8 @@ ${profile.motivation ? `- モチベーション: ${JSON.stringify(profile.motiva
 ${ragContext ? `\n## 参考資料 (RAG)\n${ragContext}` : ''}
 
 ## 出力形式
-以下の2つを含む JSON を返してください:
+次の 2 つのキーを持つ JSON オブジェクトを返してください:
 
-\`\`\`json
 {
   "message": "ユーザーへの提案メッセージ (Markdown形式、日本語)",
   "intake": {
@@ -42,9 +51,10 @@ ${ragContext ? `\n## 参考資料 (RAG)\n${ragContext}` : ''}
     "constraints": "制約事項"
   }
 }
-\`\`\`
 
-メッセージは要件を箇条書きで整理し、「この方向性で進めてよろしいでしょうか？」で締めてください。`;
+message では要件を箇条書きで整理し、「この方向性で進めてよろしいでしょうか？」で締めてください。
+
+${JSON_ONLY_RULE}`;
 }
 
 export function buildRoadmapPrompt(kit) {
@@ -65,9 +75,8 @@ ${profile.learning_style ? `- 学習スタイル: ${JSON.stringify(profile.learn
 - explanation_style: ${rules.explanation_style || 'balanced'}
 
 ## 出力形式
-以下の JSON を返してください:
+次の形の JSON オブジェクトを返してください:
 
-\`\`\`json
 {
   "message": "ロードマップの説明メッセージ (Markdown、Module構成を含む)",
   "modules": [
@@ -87,9 +96,10 @@ ${profile.learning_style ? `- 学習スタイル: ${JSON.stringify(profile.learn
     }
   ]
 }
-\`\`\`
 
-3〜5モジュール、各2〜4レッスンで構成してください。`;
+3〜5モジュール、各2〜4レッスンで構成してください。
+
+${JSON_ONLY_RULE}`;
 }
 
 export function buildCurriculumPrompt(kit) {
@@ -118,10 +128,10 @@ ${profile.learning_style ? `- 学習スタイル: ${JSON.stringify(profile.learn
 ${schema ? `## カリキュラムスキーマ\n${JSON.stringify(schema, null, 2).slice(0, 2000)}` : ''}
 
 ## 出力形式
-intake と modules を受け取り、レッスン詳細を埋めた完全な JSON を返してください。
+intake と modules を受け取り、レッスン詳細を埋めた完全なカリキュラムを、次の形の JSON オブジェクトで返してください。
 各レッスンには最低3セクション、各セクションには最低3ブロックを含めてください。
+code ブロックのコードは JSON 文字列として書いてください（コードフェンスは使いません）。
 
-\`\`\`json
 {
   "curriculum": {
     "id": "generated-uuid",
@@ -129,9 +139,9 @@ intake と modules を受け取り、レッスン詳細を埋めた完全な JSO
     "description": { "en": "...", "jp": "..." },
     "modules": [...],
     "ui_template_id": "doc_chapter",
-    "duration": "X hours",
-    "modelUsed": "<model id>"
+    "duration": "X hours"
   }
 }
-\`\`\``;
+
+${JSON_ONLY_RULE}`;
 }

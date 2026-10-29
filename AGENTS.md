@@ -7,14 +7,14 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 ## Commands
 - `npm run dev` (API + Vite) · `npm test` (node:test, `server/tests/`) · `npm run typecheck` (tsc, keep 0 errors)
 - Build check: `npx vite build --outDir <tmp dir>` (not `dist/` while others work in the tree)
-- Lessons: `npm run lessons:validate|lint|catalog|schema` · `npm run lessons:preview -- <course> <lesson>`
-  (needs the dev server) · `npm run lessons:mcp-smoke`
+- Lessons: `npm run lessons:validate|lint|catalog|schema` · `npm run lessons:preview -- <course> <lesson>` (needs the dev server) · `npm run lessons:mcp-smoke`
 - MCP: `npm run mcp` (stdio; profile via `--profile` or `RISE_PATH_MCP_PROFILE`) — see `.mcp.json`
 - CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests (`lint:arch` included),
-  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references
-  `--check`, change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for
-  `check-assets.mjs`: credits in `assets/credits.json` for assets over 1 MiB), and `build:prod`
-  with dummy keys that must not appear in the bundle. Run them before opening a PR.
+  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references `--check`,
+  change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for `check-assets.mjs`: credits
+  in `assets/credits.json` for assets over 1 MiB), and `build:prod` with dummy keys that must not appear in
+  the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES` unset). Run them before opening a PR.
+- `e2e.yml` (Docker; PRs, main, nightly): checks `Database checks`, `Server stack deploy`, `Learner end-to-end`, required on main once the owner sets the branch rule (ai-access-plan §11). Locally: `npm run ci:stack|e2e:local` need Docker; `npm run ci:db` also runs with `-- --existing-url <url>` on a throwaway local PG16+pgvector cluster (§11.1); otherwise the PR run is the proof.
 
 ## Where things live
 - Learning material (教材): `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json`
@@ -27,6 +27,19 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Design: tokens in `styles/tokens.css`, rules in `doc/design/design-system.md`, shared UI in
   `components/ui/`. Routes: `navigation/viewPaths.ts`; flags: `config/features.ts`.
 - Plan and research: `doc/brushup-2026/`. Authoring guide: `doc/guides/authoring-with-claude-code.ja.md`.
+- Legal texts: edit the drafts `doc/legal/*.draft.ja.md`, then `node scripts/legal/build-legal-text.mjs`
+  (writes `content/legal/`, prints the version and hash for `shared/legal/versions.js`); `/terms` and
+  `/privacy` publish only with `VITE_FEATURE_LEGAL_PAGES=true` (the build refuses drafts). `doc/legal/README.md`.
+- Account data: learner data deletion goes through `server/services/accountDeletion.js` (staff:
+  `scripts/delete-account-data.mjs`); account ids go through `canonicalUserId` and the `rp:account:`
+  lock key is built from `<id>::uuid::text` (`tools/core/accountDeletions.js`). Retention: `server/services/retention.js`.
+- Phase 5: one-lesson reset `POST /api/v2/user/lesson-progress/lesson-reset` (per-lesson generation in
+  `lesson_progress_lesson_resets`, kept until the account is deleted, and in each local record's `lessonGen`;
+  never move `lesson_progress_resets` for one lesson); XP, badges and streak `GET /api/v2/user/achievements`
+  (`tools/core/achievements.js`, tables `xp_awards`, `learning_days`, migration 019, none granted to the MCP role).
+- Phase 6: flashcard reviews: FSRS-6 `shared/review/fsrs.js`, queue `tools/core/reviewQueue.js` (`review_cards`, `review_log`,
+  migration 020), `/api/v2/user/review`, page `/review`. Cards enter only from server lesson records; lesson resets and
+  delete-all delete them; no XP; MCP reviews write no learning day. Card ids: `server/tests/fixtures/published-card-ids.json`.
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
@@ -38,10 +51,9 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No fabricated facts, URLs, images or commands. Cite non-obvious claims (`sources` + `cite`).
 - Done = `lessons:validate` 0 errors, `lessons:lint --strict` clean, rubric pass
   (`content/schema/rubric.v1.json`: every criterion ≥ 3, mean ≥ 3.3), screenshots checked.
-  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration`
-  or `migration+…`, no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory.
-  Drafts are always strict; a rework records a new author and becomes strict (`--include-migrated`
-  gates them all).
+  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration` or `migration+…`,
+  no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory. Drafts are always strict; a rework
+  records a new author and becomes strict (`--include-migrated` gates them all).
 - Write new lessons to `drafts/`. Moving one to `lessons/` + `course.json` is publishing: owner only.
 
 ## Code conventions
@@ -56,10 +68,13 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No API keys in browser code or `VITE_*` variables; model keys live on the server only.
 - Model IDs appear only in `server/llm/models.config.js`; never hard-code them elsewhere.
 - Don't publish to the database or mark lessons published from an authoring flow; drafts + PR.
-- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`) by hand.
+- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`,
+  `content/legal/*.ja.md`, `content/legal/archive/`) by hand.
 - Don't touch P-School (`components/features/PSchool`, `data/curricula/p_school`, `public/p_school`).
 - No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.
 - No `git push --force`, and no rewriting shared history.
+- Don't compute XP or badges in the browser, award XP or learning days from `POST /user/events`, or write
+  XP inside a lesson-progress save transaction (reconcile from server records instead).
 - Don't merge, cherry-pick or patch in anything from the private personal repository; rebuild a
   feature as new commits on `main`. What not to port and why: `doc/brushup-2026/integration/do-not-port.ja.md`.

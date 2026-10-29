@@ -255,6 +255,8 @@ response:
 - `ChatGPT` の bearer token は `Rise Path` にそのまま委譲しない
 - `Rise Path MCP facade -> Rise Path backend` は bridge token で認証する
 - `X-Nexloom-User-Id` と `X-Nexloom-Organization-Id` は監査用途で受けてよい
+- bridge token のリクエストは共有の `PHASE1_USER_ID` として動き、`PHASE1_USER_ID` が持つ行だけを読み書きする。サインインした学習者の `curriculum_id` や `learner_profile_id` を渡しても 404 になる（`server/middleware/bridgeAuth.js`）
+- `X-Nexloom-User-Id` は監査ログにだけ残り、Rise Path のユーザーを選ばない。学習者の代わりに動く連携は、その学習者の Supabase JWT を送る（または、意図して設計した署名付きのユーザー対応付けを用意する。未実装）
 - `save draft` と `publish` は audit log 対象にする
 
 ## 8. 既存 Gemini フローとの関係

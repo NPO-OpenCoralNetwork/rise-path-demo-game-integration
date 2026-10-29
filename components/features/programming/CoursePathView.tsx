@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Languages } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { getCourse, lessonEntries } from '../../../content';
 import { getLastLesson, readLessonSummary } from '../../lesson/progressStore';
+import { useProgressVersion } from '../../lesson/useProgressVersion';
 import { LESSON_DONE_STATES, resolveLText, splitLessonTitle, type ContentLocale } from '../../lesson/model';
 import { courseTotals, formatCourseMeta } from '../../ui/lessonResume';
 import { ButtonLink } from '../../ui/Button';
@@ -82,6 +83,8 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
   const course = getCourse(courseSlug);
   const fallback = (course?.locale as ContentLocale | undefined) ?? 'jp';
 
+  // Re-read when progress changes (synced progress arriving after the page opened, another tab).
+  const progressVersion = useProgressVersion();
   const data = useMemo(() => {
     if (!course) return null;
     const last = getLastLesson();
@@ -118,7 +121,7 @@ const CoursePathView: React.FC<CoursePathViewProps> = ({ courseSlug, badge, onBa
     const totals = courseTotals(course, readLessonSummary, courseSlug);
     const resumeHref = `/learn/${courseSlug}/${lastId ?? entries[0]?.ref.id ?? ''}`;
     return { modules, totals, resumeHref, resumed: Boolean(lastId) };
-  }, [course, courseSlug, locale, fallback]);
+  }, [course, courseSlug, locale, fallback, progressVersion]);
 
   const title = resolveLText(course?.title, locale, fallback);
   const subtitle = resolveLText(course?.subtitle, locale, fallback);

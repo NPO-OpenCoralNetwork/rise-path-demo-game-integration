@@ -44,9 +44,16 @@ const TTS_RECOMMENDED = [
   'KOKORO_TTS_DEFAULT_VOICE_EN',
 ];
 
+// In-app AI (tutor, writing feedback, /ai/generate) runs on Claude through server/llm/.
+const LLM_RECOMMENDED = [
+  'ANTHROPIC_API_KEY',
+];
+
+// Gemini is used only when GEMINI_ALLOWED is exactly "true" (a key alone does nothing): only for
+// deployments that people under 18 cannot reach (doc/brushup-2026/ai-access-plan.ja.md).
 const OPTIONAL = [
+  'GEMINI_ALLOWED',
   'GEMINI_API_KEY',
-  'VITE_GEMINI_API_KEY',
 ];
 
 const PLACEHOLDER_PATTERNS = [
@@ -370,7 +377,13 @@ async function main() {
     console.log(`${statusIcon(status)} ${key}: ${status}`);
   }
 
-  console.log('\n## Optional (legacy Gemini — FloatingChatbot, /ai/generate)');
+  console.log('\n## Recommended (in-app AI on Claude — tutor, writing feedback, /ai/generate)');
+  for (const key of LLM_RECOMMENDED) {
+    const status = classify(key, env[key]);
+    console.log(`${statusIcon(status)} ${key}: ${status}`);
+  }
+
+  console.log('\n## Optional (Gemini — used only with GEMINI_ALLOWED=true, for deployments people under 18 cannot reach)');
   for (const key of OPTIONAL) {
     const status = classify(key, env[key]);
     console.log(`${statusIcon(status)} ${key}: ${status}`);

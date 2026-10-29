@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { GLOSSARY_TERMS, GlossaryTerm } from '../../data/glossary/terms';
 import { Sparkles, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { features } from '../../config/features';
 
 // Utility to escape regex characters
 const escapeRegExp = (string: string) => {
@@ -13,8 +14,17 @@ interface GlossaryTextProps {
   text: string;
 }
 
+const copy = {
+  en: { askAi: 'Ask AI Tutor', close: 'Close definition' },
+  jp: { askAi: 'AI先生に詳しく聞く', close: '説明を閉じる' },
+} as const;
+
 const GlossaryText: React.FC<GlossaryTextProps> = ({ text }) => {
   const { language } = useLanguage();
+  const t = copy[language];
+  // "Ask AI" opens the shared Hermes coach (FloatingChatbot), which is mounted only when
+  // features.agentChat is on. Without it the popup keeps the definition and drops the action.
+  const canAskAi = features.agentChat;
   const [activeTerm, setActiveTerm] = useState<GlossaryTerm | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ x: number, y: number } | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -151,11 +161,13 @@ const GlossaryText: React.FC<GlossaryTextProps> = ({ text }) => {
             }}
             className="w-[280px] bg-white rounded-xl shadow-xl border border-indigo-100 p-4 animate-in fade-in zoom-in-95 duration-200"
         >
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTerm(null)}
-            className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+            aria-label={t.close}
+            className="absolute top-2 right-2 text-fg-3 hover:text-fg-2"
           >
-            <X size={14} />
+            <X size={14} aria-hidden="true" />
           </button>
           
           <div className="flex items-center gap-2 mb-2">
@@ -165,17 +177,20 @@ const GlossaryText: React.FC<GlossaryTextProps> = ({ text }) => {
             <h3 className="font-bold text-slate-800">{activeTerm.term}</h3>
           </div>
           
-          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+          <p className={`text-sm text-slate-600 leading-relaxed ${canAskAi ? 'mb-4' : ''}`}>
             {activeTerm.definitions[language]}
           </p>
-          
-          <button 
-            onClick={handleAskAI}
-            className="w-full bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all group"
-          >
-            <Sparkles size={14} className="text-indigo-300 group-hover:text-white" />
-            {language === 'jp' ? 'AI先生に詳しく聞く' : 'Ask AI Tutor'}
-          </button>
+
+          {canAskAi && (
+            <button
+              type="button"
+              onClick={handleAskAI}
+              className="w-full bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all group"
+            >
+              <Sparkles size={14} aria-hidden="true" className="text-indigo-300 group-hover:text-white" />
+              {t.askAi}
+            </button>
+          )}
         </div>,
         document.body
       )}

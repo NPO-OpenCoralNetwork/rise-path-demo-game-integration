@@ -8,6 +8,14 @@ export type AiMemoryPrivacyPrefs = {
   allow_conversation_capture: boolean;
 };
 
+/** The learner's prefs plus whether this server offers AI memory at all (Memanto configured). */
+export type AiMemoryPrivacyState = AiMemoryPrivacyPrefs & {
+  available: boolean;
+};
+
+/** Thrown by saveAiMemoryPrivacy; errorType is the API's error_type, e.g. 'ai_memory_not_offered'. */
+export type AiMemorySaveError = Error & { errorType?: string; status?: number };
+
 export type LearnerMemoryItem = {
   id?: string;
   type?: string;
@@ -44,20 +52,21 @@ function saveLocalPrivacy(prefs: AiMemoryPrivacyPrefs): void {
   window.localStorage.setItem(PRIVACY_STORAGE_KEY, JSON.stringify(prefs));
 }
 
-export async function loadAiMemoryPrivacy(): Promise<AiMemoryPrivacyPrefs> {
+export async function loadAiMemoryPrivacy(): Promise<AiMemoryPrivacyState> {
   if (!isApiAvailable()) {
-    return loadLocalPrivacy();
+    return { ...loadLocalPrivacy(), available: true };
   }
 
   try {
-    const res = await apiGet<{ ok: boolean; privacy?: AiMemoryPrivacyPrefs }>(
+    const res = await apiGet<{ ok: boolean; privacy?: AiMemoryPrivacyPrefs; available?: boolean }>(
       '/learner-memory/privacy',
     );
     const privacy = res.privacy ?? DEFAULT_PRIVACY;
     saveLocalPrivacy(privacy);
-    return privacy;
+    // An older API sends no `available`; treat that as offered so the UI stays as before.
+    return { ...privacy, available: res.available !== false };
   } catch {
-    return loadLocalPrivacy();
+    return { ...loadLocalPrivacy(), available: true };
   }
 }
 
@@ -84,9 +93,13 @@ export async function saveAiMemoryPrivacy(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(
+    // errorType lets the UI tell "not offered on this server" (409) apart from a passing failure.
+    const e = new Error(
       (err as { error?: string }).error || `Failed to save AI memory settings (${res.status})`,
-    );
+    ) as AiMemorySaveError;
+    e.errorType = (err as { error_type?: string }).error_type;
+    e.status = res.status;
+    throw e;
   }
 
   const body = await res.json() as { privacy?: AiMemoryPrivacyPrefs };

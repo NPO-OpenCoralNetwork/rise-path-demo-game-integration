@@ -4,7 +4,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { TutorRequest, resolveTutorMode } from '../llm/schemas.js';
 import { TUTOR_SYSTEM, TUTOR_TAGS, buildTutorPrompt, tutorData, tutorModeLine } from '../llm/prompts/tutor.js';
-import { fence } from '../llm/prompts/shared.js';
+import { MINOR_SAFETY, fence } from '../llm/prompts/shared.js';
+import { withAudienceRules } from '../llm/index.js';
 
 const lesson = {
     courseId: 'vibe-coding',
@@ -31,6 +32,14 @@ describe('tutor prompt: stable instructions', () => {
         assert.equal(prompt.system[0].cache, true);
         assert.equal(prompt.system[1].cache, undefined);
         assert.doesNotMatch(TUTOR_SYSTEM, /人間が理解すべき最低ライン/);
+    });
+
+    it("for a minor the gateway adds the child-safety part after the tutor's parts, leaving the cached prefix as is", () => {
+        const { prompt } = build({ message: 'なぜ？', lesson, locale: 'jp' });
+        const sent = withAudienceRules({ task: 'tutor.chat', audience: 'minor', ...prompt });
+        assert.deepEqual(sent.system.slice(0, prompt.system.length), prompt.system);
+        assert.deepEqual(sent.system.at(-1), { text: MINOR_SAFETY });
+        assert.doesNotMatch(TUTOR_SYSTEM, /under 18/, 'adults get the same tutor prompt as before');
     });
 
     it('asks for short, grounded answers and names the out-of-scope phrase in both languages', () => {

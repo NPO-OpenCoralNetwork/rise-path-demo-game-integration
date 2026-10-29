@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Wind, Swords, HeartHandshake, Lightbulb, Box, Infinity, Zap, Map, ChevronRight } from 'lucide-react';
 import { AssessmentProfile } from '../../../../types';
 import { useLanguage } from '../../../../context/LanguageContext';
+import { AiNotice } from '../../../ui/AiNotice';
 
 interface IntroSequenceProps {
   profile: AssessmentProfile;
@@ -157,6 +158,19 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ profile, onFinish, langua
           ></div>
         ))}
       </div>
+
+      {/* Slides 2 and 3 show the stored AI insight: say so (PersonalAssessmentView stores aiAdvice
+          only when the AI wrote it). */}
+      {profile.aiAdvice && currentSlide > 0 && (
+        <div className="absolute inset-x-4 top-6 z-20 mx-auto max-w-xl">
+          <AiNotice
+            surface="assessment_insight"
+            answer={`${slide.title}\n${slide.description}`}
+            language={resolvedLang === 'jp' ? 'jp' : 'en'}
+            className="rounded-control border border-line bg-surface px-4 py-2"
+          />
+        </div>
+      )}
 
       <button 
         onClick={() => {

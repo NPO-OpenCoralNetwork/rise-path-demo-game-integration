@@ -15,14 +15,21 @@ export type PageHeaderProps = {
   actions?: React.ReactNode;
   /** id for the h1, e.g. for aria-labelledby on the page. */
   titleId?: string;
+  /** Makes the h1 a focus target (tabIndex -1) for a page that moves focus to its title. */
+  titleRef?: React.Ref<HTMLHeadingElement>;
   className?: string;
 };
 
-const PageHeader: React.FC<PageHeaderProps> = ({ title, eyebrow, description, actions, titleId, className = '' }) => (
+const PageHeader: React.FC<PageHeaderProps> = ({ title, eyebrow, description, actions, titleId, titleRef, className = '' }) => (
   <header className={`flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6 ${className}`}>
     <div className="min-w-0">
       {eyebrow ? <p className="text-small font-medium text-fg-3">{eyebrow}</p> : null}
-      <h1 id={titleId} className="mt-0.5 break-words text-h1 text-fg">
+      <h1
+        id={titleId}
+        ref={titleRef}
+        tabIndex={titleRef ? -1 : undefined}
+        className={`mt-0.5 break-words text-h1 text-fg${titleRef ? ' focus:outline-none' : ''}`}
+      >
         {title}
       </h1>
       {description ? <p className="mt-1 max-w-measure text-body text-fg-2">{description}</p> : null}

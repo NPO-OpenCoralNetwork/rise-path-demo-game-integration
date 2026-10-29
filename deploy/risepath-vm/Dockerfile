@@ -25,7 +25,7 @@ EXPOSE 3006
 
 CMD ["node", "server.js"]
 
-# --- MCP: SSE server ---
+# --- MCP: SSE server (mcp) and the public remote endpoint (mcp-public: node mcp-server/index.js --http) ---
 FROM node:22-slim AS mcp
 
 WORKDIR /app

@@ -70,9 +70,13 @@ const sendJson = (res, payload) => {
 };
 
 describe('models.config task routing', () => {
-    it('uses Sonnet for tutor/general tasks, Opus for authoring and Haiku for classification', () => {
-        assert.equal(resolveTaskRoute('tutor.chat', {}).model, MODEL_IDS.anthropic.sonnet);
-        assert.equal(resolveTaskRoute('writing.feedback', {}).model, MODEL_IDS.anthropic.sonnet);
+    it('uses Haiku for learner-facing and classification tasks, Sonnet for general and Opus for authoring', () => {
+        assert.equal(resolveTaskRoute('tutor.chat', {}).model, MODEL_IDS.anthropic.haiku);
+        assert.equal(resolveTaskRoute('tutor.chat', {}).tier, 'cheap');
+        assert.equal(resolveTaskRoute('writing.feedback', {}).model, MODEL_IDS.anthropic.haiku);
+        assert.equal(resolveTaskRoute('writing.feedback', {}).tier, 'cheap');
+        assert.equal(resolveTaskRoute('assessment.insight', {}).model, MODEL_IDS.anthropic.sonnet);
+        assert.equal(resolveTaskRoute('lesson.translate', {}).model, MODEL_IDS.anthropic.sonnet);
         assert.equal(resolveTaskRoute('course.outline', {}).model, MODEL_IDS.anthropic.opus);
         assert.equal(resolveTaskRoute('lesson.author', {}).model, MODEL_IDS.anthropic.opus);
         assert.equal(resolveTaskRoute('text.classify', {}).model, MODEL_IDS.anthropic.haiku);
@@ -145,14 +149,15 @@ describe('createGateway provider selection', () => {
     });
 
     it('never exposes key material in status()', () => {
-        const gateway = createGateway({ env: { ANTHROPIC_API_KEY: 'sk-ant-SECRET-123', GEMINI_API_KEY: 'AIza-SECRET-456' }, logger: quietLogger });
+        const gateway = createGateway({ env: { ANTHROPIC_API_KEY: 'sk-ant-SECRET-123', GEMINI_API_KEY: 'AIza-SECRET-456', GEMINI_ALLOWED: 'true' }, logger: quietLogger });
         const status = gateway.status();
         const serialized = JSON.stringify(status);
         assert.ok(!serialized.includes('SECRET'));
         assert.equal(status.providers.anthropic.configured, true);
         assert.equal(status.providers.gemini.configured, true);
         assert.equal(status.mock, false);
-        assert.deepEqual(status.tasks['tutor.chat'].fallback, [`gemini:${MODEL_IDS.gemini.flash}`]);
+        assert.deepEqual(status.tasks['tutor.chat'].fallback, [`gemini:${MODEL_IDS.gemini.flashLite}`]);
+        assert.deepEqual(status.tasks['assessment.insight'].fallback, [`gemini:${MODEL_IDS.gemini.flash}`]);
     });
 
     it('falls over to the next configured provider on a retryable failure', async () => {
@@ -161,7 +166,7 @@ describe('createGateway provider selection', () => {
         });
         const gemini = fakeProvider('gemini', { generate: () => okResult('gemini', 'from gemini') });
         const gateway = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: { anthropic: anthropic.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -169,7 +174,7 @@ describe('createGateway provider selection', () => {
         assert.equal(result.provider, 'gemini');
         assert.equal(result.text, 'from gemini');
         assert.equal(anthropic.calls.length, 1);
-        assert.equal(gemini.calls[0].route.model, MODEL_IDS.gemini.flash);
+        assert.equal(gemini.calls[0].route.model, MODEL_IDS.gemini.flashLite, 'tutor.chat is on the cheap tier');
     });
 
     it('does not fall over on a refusal or a bad request', async () => {
@@ -178,7 +183,7 @@ describe('createGateway provider selection', () => {
         });
         const gemini = fakeProvider('gemini', { generate: () => okResult('gemini', 'x') });
         const gateway = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: { anthropic: anthropic.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -192,7 +197,7 @@ describe('createGateway provider selection', () => {
         });
         const gemini = fakeProvider('gemini', { generate: () => okResult('gemini', 'x') });
         const gateway = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', LLM_PROVIDER: 'anthropic' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true', LLM_PROVIDER: 'anthropic' },
             providers: { anthropic: anthropic.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -212,7 +217,7 @@ describe('createGateway provider selection', () => {
             },
         });
         const gateway = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: { anthropic: anthropic.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -228,7 +233,7 @@ describe('createGateway provider selection', () => {
             },
         });
         const gateway2 = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: { anthropic: midStream.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -279,7 +284,7 @@ describe('structured output', () => {
         const anthropic = fakeProvider('anthropic', { generate: () => okResult('anthropic', '{"score":"high"}') });
         const gemini = fakeProvider('gemini', { generate: () => okResult('gemini', '{"score":1,"note":"x","tags":["a"]}') });
         const gateway = createGateway({
-            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' },
+            env: { ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', GEMINI_ALLOWED: 'true' },
             providers: { anthropic: anthropic.factory, gemini: gemini.factory },
             logger: quietLogger,
         });
@@ -296,7 +301,8 @@ describe('Anthropic provider request shape (fake API server)', () => {
         await withFakeAnthropic(({ body, res }) => {
             sendJson(res, anthropicMessage(body, JSON.stringify({ clarityScore: 80, linkingScore: 70, toneScore: 75, feedback: 'Good.', refinedVersion: 'Better.' })));
         }, async (baseUrl, requests) => {
-            const gateway = createGateway({ env: env(baseUrl), logger: quietLogger });
+            // writing.feedback defaults to Haiku; an owner's switch back to Sonnet gets the fallbacks.
+            const gateway = createGateway({ env: env(baseUrl, { LLM_TASK_WRITING_FEEDBACK: `anthropic:${MODEL_IDS.anthropic.sonnet}` }), logger: quietLogger });
             const result = await gateway.generate({
                 task: 'writing.feedback',
                 schema: WritingFeedback,
@@ -333,6 +339,30 @@ describe('Anthropic provider request shape (fake API server)', () => {
             assert.equal(requests[0].body.model, MODEL_IDS.anthropic.haiku);
             assert.equal(requests[0].body.fallbacks, undefined);
             assert.ok(!String(requests[0].headers['anthropic-beta'] || '').includes('server-side-fallback'));
+        });
+    });
+
+    it('sends an opaque metadata.user_id for a signed-in user (never the id itself), none for guests', async () => {
+        await withFakeAnthropic(({ body, res }) => sendJson(res, anthropicMessage(body, 'ok')), async (baseUrl, requests) => {
+            const gateway = createGateway({ env: env(baseUrl), logger: quietLogger });
+            const userId = '11111111-1111-4111-8111-111111111111';
+            await gateway.generate({ task: 'text.classify', userId, messages: userMessage });
+            await gateway.generate({ task: 'text.classify', messages: userMessage });
+            assert.match(requests[0].body.metadata.user_id, /^[0-9a-f]{32}$/);
+            assert.ok(!JSON.stringify(requests[0].body).includes(userId));
+            assert.equal(requests[1].body.metadata, undefined);
+        });
+    });
+
+    it("a minor's request carries the child-safety part last, without cache_control", async () => {
+        await withFakeAnthropic(({ body, res }) => sendJson(res, anthropicMessage(body, 'ok')), async (baseUrl, requests) => {
+            const gateway = createGateway({ env: env(baseUrl), logger: quietLogger });
+            await gateway.generate({ task: 'tutor.chat', audience: 'minor', system: [{ text: 'Stable', cache: true }, { text: 'Per request' }], messages: userMessage });
+            const { system } = requests[0].body;
+            assert.equal(system.length, 3);
+            assert.deepEqual(system[0].cache_control, { type: 'ephemeral' });
+            assert.equal(system[2].cache_control, undefined);
+            assert.match(system[2].text, /under 18/);
         });
     });
 
@@ -378,7 +408,9 @@ describe('Anthropic provider request shape (fake API server)', () => {
             assert.equal(events.at(-1).type, 'done');
             assert.equal(events.at(-1).result.text, 'Hello');
             assert.equal(requests[0].body.stream, true);
-            assert.equal(requests[0].body.fallbacks, 'default');
+            assert.equal(requests[0].body.model, MODEL_IDS.anthropic.haiku, 'the tutor runs on the cheap tier');
+            assert.equal(requests[0].body.fallbacks, undefined, 'Haiku has no server-side fallback');
+            assert.equal(requests[0].body.output_config.effort, 'low');
         });
     });
 });

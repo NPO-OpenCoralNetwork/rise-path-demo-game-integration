@@ -4,6 +4,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.repl
 
 import { getSupabaseClient } from './supabaseClient';
 import { shouldSendLegacyUserIdHeader } from './authPolicy';
+import { reportAccountDeleted } from './accountDeletionState';
 
 // Legacy fallback for Guest users (no Supabase session)
 let _getUserId: (() => string | null) = () => null;
@@ -23,9 +24,10 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
         ...(options.headers as Record<string, string> || {}),
     };
 
-    // Primary: Supabase JWT as Bearer token
+    // Primary: Supabase JWT as Bearer token, unless the caller already set one (the page-hide
+    // progress upload: getSession waits for a lock, and fetch must start before the page is gone).
     const supabase = getSupabaseClient();
-    if (supabase) {
+    if (supabase && !headers['Authorization']) {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.access_token) {
@@ -44,8 +46,58 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
         }
     }
 
-    return fetch(`${API_BASE}${path}`, { ...options, headers });
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    // Phase 4 (design §5.11): this account was deleted (here or on another device). AuthContext
+    // hears the signal and ends the session on this device; callers get the response unchanged.
+    if (res.status === 401) await noteAccountDeleted(res);
+    return res;
 };
+
+/**
+ * Phase 5: the learner this tab's AuthContext shows (the auth provider's id), or null. Another
+ * tab can have switched the browser to another learner meanwhile (progressService.ts compares).
+ */
+export const currentAuthUserId = (): string | null => {
+    try {
+        return _getUserId() || null;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Phase 5: apiFetch only while the primary Supabase session is `expectedUserId`'s, with that
+ * session's token (read once, so the request cannot pick up another learner's session in
+ * between). Otherwise nothing is sent and null is returned: data recorded for one learner (legacy
+ * Blender progress, learning events) never reaches another learner's account.
+ */
+export const apiFetchAs = async (expectedUserId: string, path: string, options: RequestInit = {}): Promise<Response | null> => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !expectedUserId) return null;
+    let session: { access_token?: string; user?: { id?: string } } | null = null;
+    try {
+        ({ data: { session } } = await supabase.auth.getSession());
+    } catch {
+        return null;
+    }
+    if (!session?.access_token || session.user?.id !== expectedUserId) return null;
+    return apiFetch(path, {
+        ...options,
+        headers: { ...(options.headers as Record<string, string> || {}), Authorization: `Bearer ${session.access_token}` },
+    });
+};
+
+/** Reads a 401's error_type from a copy of the body; account_deleted → reportAccountDeleted(). */
+async function noteAccountDeleted(res: Response): Promise<void> {
+    try {
+        const body = await res.clone().json();
+        if (body && typeof body === 'object' && (body as { error_type?: unknown }).error_type === 'account_deleted') {
+            reportAccountDeleted();
+        }
+    } catch {
+        // Not JSON (a proxy page): not the server's answer.
+    }
+}
 
 export const apiGet = async <T = any>(path: string): Promise<T> => {
     const res = await apiFetch(path);

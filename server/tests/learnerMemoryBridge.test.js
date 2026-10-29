@@ -6,6 +6,7 @@ import {
     seedAssessmentMemories,
     rememberForLearner,
     recallForLearner,
+    listRecentMemories,
     ensureLearnerAgent,
     setMemantoFetchForTests,
     clearSessionCacheForTests,
@@ -288,6 +289,123 @@ describe('recallForLearner opt-in gate', () => {
         assert.equal(result.semantic_memory_status, 'disabled');
         assert.equal(result.count, 0);
         assert.equal(calls.length, 0);
+    });
+});
+
+describe('recall and list status when Memanto is not configured or failing', () => {
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+        clearSessionCacheForTests();
+    });
+
+    afterEach(() => {
+        setMemantoFetchForTests();
+        clearSessionCacheForTests();
+        process.env = { ...originalEnv };
+    });
+
+    function memantoOff() {
+        process.env.MEMANTO_API_URL = 'http://127.0.0.1:8100';
+        process.env.MEMANTO_ENABLED = 'false';
+    }
+
+    function memantoOnButFailing() {
+        process.env.MEMANTO_API_URL = 'http://127.0.0.1:8100';
+        process.env.MEMANTO_ENABLED = 'true';
+        const calls = [];
+        setMemantoFetchForTests(async (url, init = {}) => {
+            calls.push(String(url));
+            if (String(url).endsWith('/activate') && init.method === 'POST') {
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        session_token: 'test-session-token',
+                        expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+                    }),
+                };
+            }
+            return { ok: false, status: 500, json: async () => ({ detail: 'down' }) };
+        });
+        return calls;
+    }
+
+    it('recall returns not_configured without calling Memanto when MEMANTO_ENABLED=false', async () => {
+        memantoOff();
+        const { fetchFn, calls } = createMemantoFetchRecorder();
+        setMemantoFetchForTests(fetchFn);
+        const pool = createMockPool({ aiMemoryEnabled: true, metaExists: true });
+
+        const result = await recallForLearner({ pool, userId: USER_ID, query: 'learning style' });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.agent_id, AGENT_ID);
+        assert.equal(result.count, 0);
+        assert.deepEqual(result.memories, []);
+        assert.equal(result.semantic_memory_status, 'not_configured');
+        assert.equal(calls.length, 0);
+    });
+
+    it('recall returns not_configured when MEMANTO_API_URL is missing', async () => {
+        delete process.env.MEMANTO_API_URL;
+        delete process.env.MEMANTO_ENABLED;
+        const pool = createMockPool({ aiMemoryEnabled: true, metaExists: true });
+
+        const result = await recallForLearner({ pool, userId: USER_ID, query: 'learning style' });
+
+        assert.equal(result.semantic_memory_status, 'not_configured');
+    });
+
+    it('list returns not_configured without calling Memanto when MEMANTO_ENABLED=false', async () => {
+        memantoOff();
+        const { fetchFn, calls } = createMemantoFetchRecorder();
+        setMemantoFetchForTests(fetchFn);
+        const pool = createMockPool({ aiMemoryEnabled: true, metaExists: true });
+
+        const result = await listRecentMemories({ pool, userId: USER_ID });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.agent_id, AGENT_ID);
+        assert.equal(result.count, 0);
+        assert.deepEqual(result.memories, []);
+        assert.equal(result.semantic_memory_status, 'not_configured');
+        assert.equal(calls.length, 0);
+    });
+
+    it('keeps disabled ahead of not_configured when the learner has not opted in', async () => {
+        memantoOff();
+        const pool = createMockPool({ aiMemoryEnabled: false });
+
+        const recalled = await recallForLearner({ pool, userId: USER_ID, query: 'learning style' });
+        const listed = await listRecentMemories({ pool, userId: USER_ID });
+
+        assert.equal(recalled.semantic_memory_status, 'disabled');
+        assert.equal(listed.semantic_memory_status, 'disabled');
+    });
+
+    it('recall returns degraded when Memanto is enabled but failing', async () => {
+        const calls = memantoOnButFailing();
+        const pool = createMockPool({ aiMemoryEnabled: true, metaExists: true });
+
+        const result = await recallForLearner({ pool, userId: USER_ID, query: 'learning style' });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.count, 0);
+        assert.equal(result.semantic_memory_status, 'degraded');
+        assert.ok(calls.some((url) => url.endsWith('/recall')));
+    });
+
+    it('list returns degraded when Memanto is enabled but failing', async () => {
+        const calls = memantoOnButFailing();
+        const pool = createMockPool({ aiMemoryEnabled: true, metaExists: true });
+
+        const result = await listRecentMemories({ pool, userId: USER_ID });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.count, 0);
+        assert.equal(result.semantic_memory_status, 'degraded');
+        assert.ok(calls.some((url) => url.endsWith('/recall/recent')));
     });
 });
 

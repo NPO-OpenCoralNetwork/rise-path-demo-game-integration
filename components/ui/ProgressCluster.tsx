@@ -1,56 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Flame } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
-import { getLevel, getXpForNextLevel } from '../../services/gamificationService';
-import { getLearningEvents } from '../../services/progressService';
-import { parseProgress, PROGRESS_EVENT } from '../lesson/progressStore';
-import { activeDaysFrom, streakFromDays, type StreakInfo } from './activity';
+import { useAchievements, type AchievementsSnapshot } from './achievementsClient';
 
 /**
- * Streak and level chips for the page header. Real data only:
- * - Streak: days with a learning event (gamificationService's source) or with lesson-reader
- *   progress (`rp:progress:*`, saved only when a block was read or a check answered), counted in
- *   local days. The reader saves its
- *   progress there, so reading one lesson today starts a streak.
- * - Level and XP: gamificationService.
+ * Streak and level chips for the page header (Phase 5: from the server, useAchievements). The
+ * server counts XP from its own records (a lesson started 10, finished 40, a Blender stage 80,
+ * each once) and the streak from the days learning reached it (Japan time). Nothing is computed
+ * in the browser.
+ * Only with an answer for this learner ('ready'); while loading, signed out, on an older server
+ * or after an error it renders nothing (no made-up zero).
  * Zero states say what to do instead of showing an empty number.
  */
-
-const PROGRESS_PREFIX = 'rp:progress:';
-
-function readerTimestamps(): string[] {
-  const out: string[] = [];
-  try {
-    const storage = window.localStorage;
-    for (let i = 0; i < storage.length; i += 1) {
-      const key = storage.key(i);
-      if (!key || !key.startsWith(PROGRESS_PREFIX)) continue;
-      const progress = parseProgress(storage.getItem(key));
-      const touched = progress.seen.length > 0 || Object.keys(progress.answers).length > 0;
-      if (touched) out.push(progress.updatedAt);
-    }
-  } catch {
-    // Storage blocked: no reader activity to count.
-  }
-  // rp:lastLesson is not counted: it changes when a lesson is only opened, not read.
-  return out;
-}
-
-type Snapshot = { streak: StreakInfo; level: number; xp: { current: number; goal: number } };
-
-function readSnapshot(): Snapshot {
-  let eventTimes: string[] = [];
-  try {
-    eventTimes = getLearningEvents().map((event) => event.timestamp);
-  } catch {
-    eventTimes = [];
-  }
-  return {
-    streak: streakFromDays(activeDaysFrom([...eventTimes, ...readerTimestamps()])),
-    level: getLevel(),
-    xp: getXpForNextLevel(),
-  };
-}
 
 const copy = {
   en: {
@@ -75,51 +36,45 @@ export type ProgressClusterProps = { className?: string };
 
 const chip = 'inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-small text-fg-2 shadow-1';
 
-const ProgressCluster: React.FC<ProgressClusterProps> = ({ className = '' }) => {
-  const { language } = useLanguage();
+/** The chips for a snapshot (exported for server/tests/phase5Front.test.js). */
+export function ProgressClusterView({ snapshot, language, className = '' }: {
+  snapshot: AchievementsSnapshot;
+  language: 'en' | 'jp';
+  className?: string;
+}) {
   const t = copy[language];
-  const [data, setData] = useState<Snapshot>(readSnapshot);
-
-  useEffect(() => {
-    const refresh = () => setData(readSnapshot());
-    window.addEventListener(PROGRESS_EVENT, refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener(PROGRESS_EVENT, refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
-
-  const { streak, level, xp } = data;
-  const xpPct = xp.goal > 0 ? Math.max(0, Math.min(100, Math.round((xp.current / xp.goal) * 100))) : 0;
+  const data = snapshot.status === 'ready' ? snapshot.data : null;
+  if (!data) return null;
+  const { streak, xp } = data;
+  const xpPct = xp.levelSize > 0 ? Math.max(0, Math.min(100, Math.round((xp.intoLevel / xp.levelSize) * 100))) : 0;
 
   return (
     <ul aria-label={t.label} className={`flex flex-wrap items-center gap-2 ${className}`}>
       <li className={chip}>
-        <Flame size={16} aria-hidden="true" className={streak.days > 0 ? 'text-sun-text' : 'text-fg-3'} />
-        {streak.days === 0 ? (
+        <Flame size={16} aria-hidden="true" className={streak.current > 0 ? 'text-sun-text' : 'text-fg-3'} />
+        {streak.current === 0 ? (
           <span>{t.streakZero}</span>
         ) : (
           <span>
-            <span className="tabular font-semibold text-fg">{t.streak(streak.days)}</span>
+            <span className="tabular font-semibold text-fg">{t.streak(streak.current)}</span>
             {!streak.activeToday ? <span> — {t.keepGoing}</span> : null}
           </span>
         )}
       </li>
       <li className={chip}>
         <span>
-          {t.level} <span className="tabular font-semibold text-fg">{level}</span>
+          {t.level} <span className="tabular font-semibold text-fg">{xp.level}</span>
         </span>
         <span aria-hidden="true" className="text-fg-3">·</span>
         <span className="tabular">
-          {xp.current} / {xp.goal} XP
+          {xp.intoLevel} / {xp.levelSize} XP
         </span>
         <span
           role="progressbar"
           aria-label={t.xpBar}
           aria-valuemin={0}
-          aria-valuemax={xp.goal}
-          aria-valuenow={xp.current}
+          aria-valuemax={xp.levelSize}
+          aria-valuenow={xp.intoLevel}
           className="h-1 w-10 overflow-hidden rounded-full bg-sunken"
         >
           <span className="block h-full rounded-full bg-sun" style={{ width: `${xpPct}%` }} />
@@ -127,6 +82,12 @@ const ProgressCluster: React.FC<ProgressClusterProps> = ({ className = '' }) => 
       </li>
     </ul>
   );
+}
+
+const ProgressCluster: React.FC<ProgressClusterProps> = ({ className = '' }) => {
+  const { language } = useLanguage();
+  const snapshot = useAchievements();
+  return <ProgressClusterView snapshot={snapshot} language={language} className={className} />;
 };
 
 export default ProgressCluster;

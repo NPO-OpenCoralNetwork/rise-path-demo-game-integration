@@ -4,6 +4,8 @@
 > Status: 仕様策定
 > Depends on: Phase 6 (MCP Server), Phase 7/8 (認証・Rate Limit)
 
+> **2026-10-22 追記: この手順は使いません。** MCP サーバー（`/sse`、ポート 3100）をインターネットに公開しないでください（Cloudflare Tunnel でも ngrok でも同じです）。共有の `RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れないでください。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供します（[`doc/brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md)）。今の公開経路は API（`https://api.<domain>`）だけで、MCP は含みません（[`deploy/vercel/README.md`](../../deploy/vercel/README.md)）。自分のパソコンからの stdio 接続はこれまでどおり使えます。以下は当時の記録として残します。
+
 ---
 
 ## 1. 概要
@@ -309,7 +311,7 @@ cloudflared tunnel info rise-path-mcp
 
 ---
 
-## 8. 代替案: ngrok (テスト用)
+## 8. 代替案: ngrok (テスト用) — 使いません（冒頭の追記）
 
 ドメインがない場合や一時テスト:
 

@@ -1,6 +1,7 @@
 // Client for the server-side LLM gateway (/api/v2/llm). The browser never holds a model key
 // or a model SDK; every AI call goes through these helpers.
 import { apiFetch } from './apiClient';
+import { dailyLimitFields } from './aiDailyLimit';
 import type { AIAdvice, AnalysisResult, Big5Profile, LessonRubric } from '../types';
 
 export type LlmLocale = 'ja' | 'en' | 'fr';
@@ -15,19 +16,64 @@ export const toLlmLocale = (language: string | undefined): LlmLocale => {
 export class LlmApiError extends Error {
   status: number;
   errorType?: string;
+  /** Daily caps (services/aiDailyLimit.ts): the capped feature, whose limit, and when it lifts. */
+  kind?: string;
+  scope?: string;
+  resetAt?: string;
+  /** Safety screen (422 content_blocked): what kind of content, and whether to show support lines. */
+  category?: string;
+  support?: boolean;
+  /** The parsed error body, when there was one (services/aiAccessApi.ts aiAccessErrorKind reads it). */
+  body?: unknown;
 
-  constructor(message: string, status: number, errorType?: string) {
+  constructor(
+    message: string,
+    status: number,
+    errorType?: string,
+    limit: { kind?: string; scope?: string; resetAt?: string } = {},
+    extra: { category?: string; support?: boolean; body?: unknown } = {},
+  ) {
     super(message);
     this.name = 'LlmApiError';
     this.status = status;
     this.errorType = errorType;
+    this.kind = limit.kind;
+    this.scope = limit.scope;
+    this.resetAt = limit.resetAt;
+    this.category = extra.category;
+    this.support = extra.support;
+    this.body = extra.body;
   }
 }
+
+/** category / support of a content_blocked body (server/safety/moderation.js), plus the body. */
+const safetyFields = (data: unknown): { category?: string; support?: boolean; body?: unknown } => {
+  if (!data || typeof data !== 'object') return {};
+  const record = data as Record<string, unknown>;
+  return {
+    category: typeof record.category === 'string' ? record.category : undefined,
+    support: typeof record.support === 'boolean' ? record.support : undefined,
+    body: data,
+  };
+};
+
+/** HTTP status for an SSE `error` event, which arrives on a 200 stream. */
+const sseErrorStatus = (errorType: unknown): number => {
+  if (errorType === 'content_blocked') return 422;
+  if (errorType === 'safety_check_unavailable') return 503;
+  return 502;
+};
 
 const readError = async (res: Response): Promise<LlmApiError> => {
   try {
     const data = await res.json();
-    return new LlmApiError(data?.error || `LLM request failed (${res.status})`, res.status, data?.error_type);
+    return new LlmApiError(
+      data?.error || `LLM request failed (${res.status})`,
+      res.status,
+      data?.error_type,
+      dailyLimitFields(data, res.headers.get('retry-after')),
+      safetyFields(data),
+    );
   } catch {
     return new LlmApiError(`LLM request failed (${res.status})`, res.status);
   }
@@ -168,7 +214,11 @@ export async function streamTutor(
     const payload = JSON.parse(dataLine.slice(5).trim());
     if (payload.type === 'text.delta' && typeof payload.text === 'string') handlers.onDelta?.(payload.text);
     else if (payload.type === 'meta') handlers.onMeta?.(payload as TutorMeta);
-    else if (payload.type === 'error') throw new LlmApiError(payload.error || 'Tutor error', 502, payload.error_type);
+    else if (payload.type === 'error') {
+      // A blocked answer (minors' output screen) or a failed check comes as this event, with the
+      // same body as the JSON 422 / 503.
+      throw new LlmApiError(payload.error || 'Tutor error', sseErrorStatus(payload.error_type), payload.error_type, {}, safetyFields(payload));
+    }
     return payload.type === 'done' ? (payload as TutorDone) : null;
   };
 

@@ -186,6 +186,7 @@ describe('buildHermesInput lesson context', () => {
 describe('lesson context reaches Hermes', () => {
     const prevKey = process.env.HERMES_API_KEY;
     const prevUrl = process.env.HERMES_API_URL;
+    const prevAgentChat = process.env.VITE_FEATURE_AGENT_CHAT;
     const realFetch = globalThis.fetch;
 
     beforeEach(() => {
@@ -193,6 +194,7 @@ describe('lesson context reaches Hermes', () => {
         clearMcpUserScopeForTests();
         process.env.HERMES_API_KEY = 'test-key';
         process.env.HERMES_API_URL = 'http://hermes.test';
+        process.env.VITE_FEATURE_AGENT_CHAT = 'true'; // the shared chat is on (routes/agent.js)
     });
 
     afterEach(() => {
@@ -203,6 +205,8 @@ describe('lesson context reaches Hermes', () => {
         else process.env.HERMES_API_KEY = prevKey;
         if (prevUrl === undefined) delete process.env.HERMES_API_URL;
         else process.env.HERMES_API_URL = prevUrl;
+        if (prevAgentChat === undefined) delete process.env.VITE_FEATURE_AGENT_CHAT;
+        else process.env.VITE_FEATURE_AGENT_CHAT = prevAgentChat;
     });
 
     const hermesReply = {

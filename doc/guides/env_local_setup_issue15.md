@@ -107,7 +107,7 @@ npm run env:check -- --api
 
 **注意:** `.env.local` で同じキーを2回書くと **後の行が勝ちます**。テンプレの `YOUR_PROJECT_REF` 行が残っていると、正しい `SUPABASE_URL` が上書きされます。
 
-**LLM（v3）:** 標準は **Hermes**（`HERMES_API_URL` / `HERMES_API_KEY`）。Web UI チャット（`LifeJournalChatView`・`FloatingChatbot`）は Hermes プロキシ経由。`GEMINI_API_KEY` はレガシー（`/ai/generate` 等）用で **必須ではない**。
+**LLM:** アプリの中の AI（チューター・文章フィードバック・コース生成 `/ai/generate`）は `ANTHROPIC_API_KEY`（Claude）で動きます。共有の Hermes とのチャット（`LifeJournalChatView`・`FloatingChatbot`）は学習者には提供せず、`VITE_FEATURE_AGENT_CHAT=true` のときだけ出ます（開発で試すときは `HERMES_API_URL` / `HERMES_API_KEY` も設定）。Gemini は `GEMINI_ALLOWED=true` のときだけ使い、それは 18 歳未満の人が使えない環境に限ります。
 
 期待する進捗:
 

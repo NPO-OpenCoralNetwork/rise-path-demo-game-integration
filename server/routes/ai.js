@@ -8,7 +8,28 @@
  *
  * Auth: server.js mounts requireAuth on /ai/generate and /ai/drafts, so req.userId is the
  * authenticated user (or the dev fallback user outside strict mode).
- * TODO(P1): move generation onto server/llm (gateway + per-lesson structured calls, PLAN §6.3).
+ *
+ * Model: each stage is one LLM gateway call, task 'course.generate' (server/services/aiGenerator.js;
+ * the cheap Claude tier by default, server/llm/models.config.js).
+ *
+ * Cost: every /ai/generate call that can run a model stage takes one 'course_generation' unit of
+ * the daily caps (server/middleware/dailyCaps.js; one course is at least 3 calls). Approving the
+ * final 'curriculum' stage runs no model and is free. Before the unit is taken, the body is
+ * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID: 400 invalid_body)
+ * and a gateway that cannot serve the task (no provider, and no mock fallback in production)
+ * answers 503 ai_unavailable, so neither is charged. After it, the 400 and 404 answers that every
+ * stage sends before calling the model give it back. A gateway failure (LlmError,
+ * server/llm/errors.js) gives it back when no model ran (modelMayHaveRun: no provider, provider
+ * unreachable or overloaded, our key rejected, rate limited) and keeps it when a model may have
+ * produced output (timeouts, refusals, cut-off or invalid replies, a cancelled request). Any other
+ * error (the database, say) keeps it too. A refund never depends on the wording of an error message.
+ *
+ * Minors (Phase 0.5): server.js runs the AI access gate (server/middleware/aiAccessGate.js) before
+ * this route, so res.locals.aiAudience is 'adult' or 'minor'. For a minor every stage screens the
+ * learner's text before the model and the stage result before anything is saved
+ * (server/services/aiGenerator.js): a block answers 422 content_blocked { category, support }, a
+ * failed check 503 safety_check_unavailable. A block before the model ran gives the unit back; one
+ * after it (the result held back) keeps it.
  */
 import express from 'express';
 import { getPool } from '../db.js';
@@ -22,7 +43,12 @@ import {
   generateRequirements,
   generateRoadmap,
   generateCurriculum,
+  isCourseGenerationAvailable,
 } from '../services/aiGenerator.js';
+import { reserveDailyCap } from '../middleware/dailyCaps.js';
+import { isLlmError, modelMayHaveRun, toClientError } from '../llm/errors.js';
+import { isUuid } from '../utils/ids.js';
+import { isSafetyError, safetyErrorResponse } from '../safety/moderation.js';
 
 const router = express.Router();
 
@@ -218,52 +244,97 @@ export async function saveDraftVersion(pool, { curriculumId, userId, curriculum,
     await client.query('COMMIT');
     return saved.curriculumVersionId;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // A lost connection makes ROLLBACK fail too; keep the original error.
+    await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();
   }
 }
 
-// --- Daily generation limit ---
-const DAILY_LIMIT = parseInt(process.env.AI_DAILY_LIMIT || '5', 10);
+// --- POST /ai/generate ---
 
-async function checkDailyLimit(pool, userId) {
-  const result = await pool.query(
-    `SELECT COUNT(*)::int as cnt FROM curricula 
-     WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 day' 
-     AND status != 'error'`,
-    [userId]
-  );
-  return result.rows[0].cnt;
+/** Longest topic or revision feedback a learner can send (the composer limits it too). */
+export const MESSAGE_MAX_CHARS = 4000;
+
+/**
+ * Checks that need no database or model, run before the daily cap is charged. Returns the error
+ * text for a 400 invalid_body, or null.
+ * @param {Record<string, unknown>} body
+ */
+export function invalidGenerateBody(body) {
+  const { message, curriculum_id: curriculumId } = body;
+  if (message != null && typeof message !== 'string') return 'message must be a string';
+  if (typeof message === 'string' && message.length > MESSAGE_MAX_CHARS) {
+    return `message must be at most ${MESSAGE_MAX_CHARS} characters`;
+  }
+  if (curriculumId != null && curriculumId !== '' && !isUuid(curriculumId)) {
+    return 'curriculum_id must be a UUID';
+  }
+  return null;
 }
 
-// --- POST /ai/generate ---
+/**
+ * Whether the daily cap unit goes back for an error thrown while a stage ran: only for a gateway
+ * error raised before any model ran. Errors that are not LlmError (database, adapter) keep it.
+ * @param {unknown} error
+ */
+export const refundsCourseGeneration = (error) => isLlmError(error) && !modelMayHaveRun(error);
+
+/**
+ * The response for an error thrown while a stage ran: gateway errors by code
+ * (errors.js toClientError; 'no_provider' answers 503 ai_unavailable like the check before the
+ * cap), anything else 500. Never echoes a provider or database message.
+ * @param {unknown} error
+ * @returns {{ status: number, body: { error: string, error_type?: string } }}
+ */
+export function courseGenerationError(error) {
+  if (!isLlmError(error)) return { status: 500, body: { error: 'Internal server error' } };
+  if (error.code === 'no_provider') {
+    return { status: 503, body: { error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' } };
+  }
+  return toClientError(error);
+}
+
 router.post('/generate', async (req, res) => {
   // Set request timeout
   req.setTimeout(60000);
+  // The model call is not cancelled when the client goes away (the composer gives up after 60 s):
+  // the stage finishes and saves the draft, so a charged unit is not thrown away.
 
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not configured' });
 
-  const { message, session_id, curriculum_id, stage, decision, attachments } = req.body;
+  const body = asObject(req.body);
+  const { message, session_id, curriculum_id, stage, decision, attachments } = body;
 
   const userId = req.userId;
   if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
+  const invalid = invalidGenerateBody(body);
+  if (invalid) return res.status(400).json({ error: invalid, error_type: 'invalid_body' });
+
+  // Approving the saved curriculum runs no model: it needs no key and is never charged.
+  const runsModel = !(decision === 'approved' && stage === 'curriculum');
+  if (runsModel && !isCourseGenerationAvailable()) {
+    return res.status(503).json({ error: 'AI service is temporarily unavailable', error_type: 'ai_unavailable' });
+  }
+
+  /** @type {{ refund: () => Promise<void> } | null} */
+  let cap = null;
   try {
-    // --- Cost limit check ---
-    const dailyCount = await checkDailyLimit(pool, userId);
-    if (dailyCount >= DAILY_LIMIT) {
-      return res.status(429).json({
-        error: `日次生成上限（${DAILY_LIMIT}回）に達しました`,
-        daily_count: dailyCount,
-        limit: DAILY_LIMIT,
-      });
+    // --- Daily cap (429 daily_limit_reached when used up). Every 400 and 404 below is sent
+    // before the model runs, so those give the unit back, as does a gateway error raised before
+    // any model ran (below).
+    if (runsModel) {
+      cap = await reserveDailyCap(req, res, 'course_generation', { refundOnStatus: [400, 404] });
+      if (!cap) return;
     }
 
     // --- Get Kit (cached) ---
     const kit = await getCachedKit(userId, getKit);
+    // Who the stages are for (the access gate decided); minors' stages are screened.
+    const stageOptions = { audience: res.locals?.aiAudience === 'minor' ? 'minor' : 'adult', ip: req.ip ?? null };
 
     // --- Stage Router ---
 
@@ -271,7 +342,7 @@ router.post('/generate', async (req, res) => {
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
-      const result = await generateRequirements(message, userId, kit);
+      const result = await generateRequirements(message, userId, kit, stageOptions);
       const title = result.intake?.goal || message.slice(0, 100);
 
       let draftId = curriculum_id;
@@ -318,7 +389,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const intake = draft.rows[0].intake_json;
-      const result = await generateRoadmap(intake, userId, kit);
+      const result = await generateRoadmap(intake, userId, kit, stageOptions);
 
       // Update draft
       await pool.query(
@@ -349,7 +420,7 @@ router.post('/generate', async (req, res) => {
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
       const { intake_json: intake, modules_json: modules } = draft.rows[0];
-      const result = await generateCurriculum(intake, modules, userId, kit);
+      const result = await generateCurriculum(intake, modules, userId, kit, stageOptions);
 
       if (!result.curriculum) {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
@@ -398,7 +469,7 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
-        const result = await generateRequirements(message, userId, kit);
+        const result = await generateRequirements(message, userId, kit, stageOptions);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()
@@ -427,7 +498,7 @@ router.post('/generate', async (req, res) => {
         const intake = draft.rows[0].intake_json;
         // Append feedback to intake for re-generation
         const modifiedIntake = { ...intake, revision_feedback: message };
-        const result = await generateRoadmap(modifiedIntake, userId, kit);
+        const result = await generateRoadmap(modifiedIntake, userId, kit, stageOptions);
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET modules_json = $1, updated_at = NOW()
@@ -453,17 +524,26 @@ router.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request parameters' });
 
   } catch (err) {
-    console.error('[AI Generate] Error:', err);
-
-    // Gemini-specific errors
-    if (err.message?.includes('API key') || err.message?.includes('GEMINI')) {
-      return res.status(503).json({ error: 'AI service is temporarily unavailable' });
+    // A minor's stage held back by the safety screen (events are recorded by the screen). Before
+    // the model ran (input) nothing was generated, so the unit goes back, unless the classifier
+    // made the call: it cost money, and the charged unit bounds each user's classifier calls.
+    if (isSafetyError(err)) {
+      if (err.direction === 'input' && !err.classifierRan) void cap?.refund();
+      const { status, body: errorBody } = safetyErrorResponse(err);
+      if (res.headersSent) return;
+      return res.status(status).json(errorBody);
     }
-    if (err.message?.includes('timeout') || err.code === 'ECONNRESET') {
-      return res.status(504).json({ error: '生成がタイムアウトしました。再試行してください' });
-    }
+    // The gateway logs provider details; the client gets a fixed answer by code.
+    console.error('[AI Generate] Error:', isLlmError(err) ? `${err.code} (${err.provider ?? 'no provider'})` : err);
 
-    return res.status(500).json({ error: 'Internal server error' });
+    // Each request runs one stage, and each stage makes one gateway call. A gateway error raised
+    // before any model ran (no provider, provider unreachable or overloaded, our key rejected,
+    // rate limited) means nothing was generated, so the unit goes back. Decided by code.
+    if (refundsCourseGeneration(err)) void cap?.refund();
+
+    const { status, body: errorBody } = courseGenerationError(err);
+    if (res.headersSent) return;
+    return res.status(status).json(errorBody);
   }
 });
 
