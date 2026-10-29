@@ -30,6 +30,7 @@ import { ACCOUNT_BODY_LIMIT, createAccountRouter } from './server/routes/account
 import { LEGAL_BODY_LIMIT, createLegalRouter } from './server/routes/legal.js';
 import { ACHIEVEMENTS_READS_PER_MINUTE, createAchievementsRouter } from './server/routes/achievements.js';
 import { REVIEW_BODY_LIMIT, REVIEW_REQUESTS_PER_MINUTE, createReviewRouter } from './server/routes/review.js';
+import { TRAINING_BODY_LIMIT, createTrainingRouter } from './server/routes/training.js';
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
@@ -163,6 +164,8 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     app.use('/api/v2/user/events', express.json({ limit: LEARNING_EVENTS_BODY_LIMIT }), smallBodyErrors(LEARNING_EVENTS_BODY_LIMIT));
     // The review queue (Phase 6) takes three ids and a rating: 2 kb, refused before the 2 MB parser.
     app.use('/api/v2/user/review', express.json({ limit: REVIEW_BODY_LIMIT }), smallBodyErrors(REVIEW_BODY_LIMIT));
+    // Job training (training-plan §4.2): small bodies only, refused before the 2 MB parser.
+    app.use('/api/v2/training', express.json({ limit: TRAINING_BODY_LIMIT }), smallBodyErrors(TRAINING_BODY_LIMIT));
     // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 2 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
@@ -326,6 +329,10 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
         reviewLimiter,
         createReviewRouter({ afterGrade }),
     );
+    // Job training (training-plan D1, D5; server/routes/training.js): 404 unless TRAINING_ENABLED=true,
+    // then requireAuth, requireSignedIn and a per-learner limit inside the router. Before /api/v2/user
+    // and the /api/v2 catch-alls, whose AI limiter would count training calls.
+    app.use('/api/v2/training', createTrainingRouter());
     // The learning history (Phase 5: history only, no XP and no learning day; server/routes/user.js):
     // its own router so its per-learner limit lives with this app, after the 8 kb parser above.
     app.use('/api/v2/user/events', requireAuth, createLearningEventsRouter());

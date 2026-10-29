@@ -24,6 +24,11 @@
  *   with import.meta.env.DEV = true unless LEGAL_DRAFT_PREVIEW_BUILD=true. Public sign-up opens only
  *   with this flag on. The legal text loads only through the conditional imports in
  *   components/routes/lazyRoutes.tsx, so with the flag off Rollup drops it from the bundle.
+ * - training: the job-training section /training (doc/brushup-2026/training-plan.ja.md, D1). Off by
+ *   default; on only when VITE_FEATURE_TRAINING is exactly "true" (the school's build). The API
+ *   answers only where the server's TRAINING_ENABLED is "true" (server/routes/training.js). The
+ *   section loads only through the conditional import in components/routes/lazyRoutes.tsx; CI greps
+ *   the flag-off build for its marker.
  *
  * Read single flags only (`features.legalPages`). Never spread `features`, pass it whole, call
  * Object.keys/values/entries on it or index it with `features[…]`: Rollup folds a flag only while
@@ -69,6 +74,8 @@ export const features = {
   billing: import.meta.env.VITE_FEATURE_BILLING === 'true',
   // Legal pages, sign-up checkbox, re-consent page and notices: off by default (see the note above).
   legalPages: import.meta.env.VITE_FEATURE_LEGAL_PAGES === 'true',
+  // Job-training section: off by default (see the note above).
+  training: import.meta.env.VITE_FEATURE_TRAINING === 'true',
   labs: {
     sonic: labsEnabled,
     teacherBot: labsEnabled,

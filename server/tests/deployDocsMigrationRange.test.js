@@ -64,6 +64,24 @@ describe('the VM runbooks follow server/migrations', () => {
         const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **020（Phase 6、復習）**'));
         assert.match(guide, /\[`deploy\/risepath-vm\/README\.md`\]\(\.\.\/\.\.\/deploy\/risepath-vm\/README\.md\) の「復習（Phase 6）」/, 'the guide links the block');
     });
+
+    it('the VM README has a job-training block: 021 before the services (else every deletion is deletion_unavailable), no role re-run, TRAINING_ENABLED in its table, the staff script, the PostgreSQL proof', () => {
+        const readme = read('deploy/risepath-vm/README.md');
+        const start = readme.indexOf('## 職業訓練（骨組み）');
+        assert.ok(start > 0, 'the training section');
+        const section = readme.slice(start, readme.indexOf('\n## ', start + 1));
+        assert.match(section, /\*\*この版の最初のデプロイ\*\*/);
+        assert.match(section, /migration 021 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。021 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります/);
+        assert.match(section, /`sql\/mcp_remote_role\.sql` は流し直さなくてかまいません/);
+        assert.match(section, /^\| `TRAINING_ENABLED` \| 未設定（止まっている） \| ちょうど `true` のときだけ/m);
+        for (const mode of ['--create-cohort', '--add', '--list']) {
+            assert.match(section, new RegExp(`exec -T api node scripts/training-admin\\.mjs ${mode} `), mode);
+            assert.ok(read('scripts/training-admin.mjs').includes(`node scripts/training-admin.mjs ${mode} `), `${mode}: the script's own usage`);
+        }
+        assert.match(section, /`scripts\/db\/verify-account-deletion\.mjs` の R6 と R12/);
+        const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **021（職業訓練の期と割り当て）**'));
+        assert.match(guide, /\[`deploy\/risepath-vm\/README\.md`\]\(\.\.\/\.\.\/deploy\/risepath-vm\/README\.md\) の「職業訓練（骨組み）」/, 'the guide links the block');
+    });
 });
 
 describe('the plan: Phase 6 chapter', () => {

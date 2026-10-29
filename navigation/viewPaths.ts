@@ -58,6 +58,8 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   // Phase 4: the public legal texts ("being prepared" until VITE_FEATURE_LEGAL_PAGES=true).
   [ViewState.LEGAL_TERMS]: '/terms',
   [ViewState.LEGAL_PRIVACY]: '/privacy',
+  // Job training (VITE_FEATURE_TRAINING; App.tsx sends it to "/" while the flag is off).
+  [ViewState.TRAINING]: '/training',
 
   // A lesson needs its course and lesson ids (/learn/:course/:lesson); without them, the course list.
   [ViewState.LESSON]: '/courses',

@@ -10,7 +10,7 @@
  *     every table in `owned`; a table that cascades through another, like review_log through
  *     review_cards (migration 020), is listed in `owned` with the same result), sets billing rows'
  *     user_id NULL, and leaves the no-FK tables
- *     (legal_acceptances, the proof tables, ai_daily_usage, account_deletions);
+ *     (legal_acceptances, training_memberships, the proof tables, ai_daily_usage, account_deletions);
  *   - transactions: BEGIN snapshots, ROLLBACK restores; clock_timestamp() comes from `clock`.
  * Any other statement that names one of these tables throws, so a changed query fails loudly.
  * Every statement is recorded (normalised, with its parameters, `tx` when it ran on a client) and
@@ -41,6 +41,8 @@ export const SQL = Object.freeze({
         returning deleted_at`),
     // The proofs read deleted_at from the tombstone row (exact to the microsecond), never a parameter.
     markAcceptances: 'update legal_acceptances set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
+    // Job training (migration 021): memberships are kept and marked the same way.
+    markTrainingMemberships: 'update training_memberships set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
     copyConsents: norm(`insert into account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
         select id, user_id, kind, policy_version, method, given_at, revoked_at, (select deleted_at from account_deletions where user_id = $1::uuid) from account_consents where user_id = $1::uuid
         on conflict (consent_id) do nothing`),
@@ -60,7 +62,7 @@ export const SQL = Object.freeze({
     reopenEpoch: 'insert into lesson_progress_resets (user_id) values ($1::uuid) on conflict (user_id) do update set epoch = gen_random_uuid(), reset_at = now()',
 });
 const NAME_OF = new Map(Object.entries(SQL).map(([name, text]) => [text, name]));
-const KNOWN_TABLES = /account_deletions|auth\.users|billing_|materials|legal_acceptances|account_consent|mcp_oauth_grants|ai_app_provision_records|ai_daily_usage|learner_memory_meta|lesson_progress_resets/;
+const KNOWN_TABLES = /account_deletions|auth\.users|billing_|materials|legal_acceptances|account_consent|mcp_oauth_grants|ai_app_provision_records|ai_daily_usage|learner_memory_meta|lesson_progress_resets|training_/;
 const EMPTY = Object.freeze({ rowCount: 0, rows: Object.freeze([]) });
 const TERMINAL = new Set(['canceled', 'incomplete_expired']);
 
@@ -77,6 +79,7 @@ export const shiftDay = (day, delta) => new Date(Date.parse(`${day}T00:00:00Z`) 
  *   customers?: Array<{ stripe_customer_id: string, user_id: string | null, livemode: boolean }>,
  *   materials?: Array<{ user_id: string, storage_path: string | null }>,
  *   acceptances?: Array<{ user_id: string, terms_version: string, privacy_version: string, account_deleted_at?: Date | null }>,
+ *   memberships?: Array<{ user_id: string, cohort_id: string, role: string, account_deleted_at?: Date | null }>,
  *   consents?: Array<{ id: string, user_id: string, kind?: string, policy_version?: string, method?: string, given_at?: Date, revoked_at?: Date | null }>,
  *   grants?: Array<{ user_id: string, client_id: string, client_name?: string | null, first_seen_at?: Date | null, last_used_at?: Date | null, revoked_at?: Date | null }>,
  *   usage?: Array<{ usage_day: string, kind: string, subject: string, count: number }>,
@@ -102,6 +105,7 @@ export function createDeletionPool(seed = {}) {
         customers: (seed.customers ?? []).map((c) => ({ ...c })),
         materials: (seed.materials ?? []).map((m) => ({ ...m })),
         acceptances: (seed.acceptances ?? []).map((a) => ({ account_deleted_at: null, ...a })),
+        memberships: (seed.memberships ?? []).map((m) => ({ account_deleted_at: null, ...m })),
         consents: (seed.consents ?? []).map((c) => ({ kind: 'guardian_ai', policy_version: 'guardian-ai-2026-10', method: 'guardian_on_device', given_at: new Date('2026-10-01T00:00:00Z'), revoked_at: null, ...c })),
         /** @type {Map<string, any>} */
         consentProofs: new Map(),
@@ -219,6 +223,17 @@ export function createDeletionPool(seed = {}) {
                 for (const a of state.acceptances) {
                     if (a.user_id === id && a.account_deleted_at === null) {
                         a.account_deleted_at = at;
+                        n += 1;
+                    }
+                }
+                return { rowCount: n, rows: [] };
+            }
+            case SQL.markTrainingMemberships: {
+                const at = tombstoneTime(id);
+                let n = 0;
+                for (const m of state.memberships) {
+                    if (m.user_id === id && m.account_deleted_at === null) {
+                        m.account_deleted_at = at;
                         n += 1;
                     }
                 }
