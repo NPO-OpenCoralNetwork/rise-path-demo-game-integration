@@ -53,9 +53,9 @@ function frontFiles() {
   return files.filter((f) => SOURCE.test(f) && !f.endsWith('.d.ts') && !NOT_FRONT_ROOTS.test(f) && !NOT_FRONT_FILES.test(f) && fs.existsSync(path.join(ROOT, f)));
 }
 
-/** Import specifiers as repo-relative module paths: relative ones resolved, the "@/" alias (vite.config.ts, tsconfig) taken off, a source extension dropped. */
-function importsOf(file) {
-  const { importedFiles } = ts.preProcessFile(read(file), true, true);
+/** Import specifiers of `text` (the source of `file`) as repo-relative module paths: relative ones resolved, the "@/" alias (vite.config.ts, tsconfig) taken off, a source extension dropped. */
+function importsOfText(file, text) {
+  const { importedFiles } = ts.preProcessFile(text, true, true);
   return importedFiles.map(({ fileName }) => {
     let spec = fileName;
     if (spec.startsWith('.')) spec = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
@@ -63,6 +63,7 @@ function importsOf(file) {
     return spec.replace(SOURCE, '');
   });
 }
+const importsOf = (file) => importsOfText(file, read(file));
 
 const inSection = (spec) => spec === SECTION || spec.startsWith(`${SECTION}/`);
 
@@ -99,19 +100,18 @@ describe('keeping the training section out of a flag-off bundle', () => {
     );
   });
 
-  it('the import scan reads every form of an import: relative, "@/", with ".ts"', () => {
-    const forms = ['../../services/trainingApi.ts', '@/services/trainingApi', '@/components/features/training/TrainingView.tsx', '../features/training'];
-    const scanned = ts.preProcessFile(forms.map((f) => `import x from '${f}';`).join('\n'), true, true).importedFiles.map(({ fileName }) => fileName);
-    assert.deepEqual(scanned, forms);
-    const resolve = (file, spec) => {
-      let s = spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : spec.startsWith('@/') ? spec.slice(2) : spec;
-      s = s.replace(SOURCE, '');
-      return s;
-    };
-    assert.equal(resolve('components/common/Layout.tsx', forms[0]), 'services/trainingApi');
-    assert.equal(resolve('components/common/Layout.tsx', forms[1]), 'services/trainingApi');
-    assert.ok(inSection(resolve('App.tsx', forms[2])));
-    assert.ok(inSection(resolve('components/routes/lazyRoutes.tsx', forms[3])));
+  it('the import scan reads every form of an import: relative, "@/", with ".ts", a dynamic import, a re-export', () => {
+    const text = [
+      "import { getTrainingMe } from '../../services/trainingApi.ts';",
+      "import type { TrainingMe } from '@/services/trainingApi';",
+      "export { default } from '@/components/features/training/TrainingView.tsx';",
+      "const page = () => import('../features/training');",
+      "import { useAuth } from '../../context/AuthContext';",
+    ].join('\n');
+    const specs = importsOfText('components/common/Layout.tsx', text);
+    assert.deepEqual(specs.filter((spec) => spec === 'services/trainingApi').length, 2, specs.join(', '));
+    assert.deepEqual(specs.filter(inSection), ['components/features/training/TrainingView', 'components/features/training'], specs.join(', '));
+    assert.ok(specs.includes('context/AuthContext'), 'other imports resolve as well');
   });
 
   it('nothing outside the section imports it or its API client, except that one lazy import', () => {
@@ -463,7 +463,7 @@ describe('components/features/training/TrainingView.tsx', () => {
     }
   });
 
-  it('「もう一度読み込む」 reads again; focus that the button\'s leaving dropped goes to the title, focus elsewhere stays', async () => {
+  it('「もう一度読み込む」 reads again; once the new state shows (not while loading), focus that the button\'s leaving dropped goes to the title, focus elsewhere stays', async () => {
     for (const [active, wantFocus] of [[BODY, 1], [{ tag: 'a' }, 0]]) {
       respond(503, { error_type: 'training_unavailable' });
       const focused = [];
@@ -472,11 +472,21 @@ describe('components/features/training/TrainingView.tsx', () => {
       const failed = await render();
       assert.equal(respond.calls, 1);
       assert.deepEqual(focused, [], 'no focus move on arrival');
-      respond(200, ME([{ cohortId: 'c1', name: 'A', role: 'learner' }]));
+      let calls = 0;
+      let release;
+      globalThis.fetch = () => {
+        calls += 1;
+        return new Promise((resolve) => {
+          release = () => resolve(new Response(JSON.stringify(ME([{ cohortId: 'c1', name: 'A', role: 'learner' }])), { status: 200 }));
+        });
+      };
       globalThis.document.activeElement = active;
       button(failed, 'もう一度読み込む').props.onClick();
+      assert.equal(statusText(await render()), '読み込んでいます…');
+      assert.equal(calls, 1, 'one more request');
+      assert.deepEqual(focused, [], 'not while loading');
+      release();
       assert.equal(statusText(await render()), 'A|受講者');
-      assert.equal(respond.calls, 1, 'one more request');
       assert.deepEqual(focused, wantFocus ? [{ preventScroll: true }] : []);
       globalThis.document.activeElement = BODY;
     }
