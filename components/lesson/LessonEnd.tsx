@@ -36,7 +36,8 @@ import type { LText } from '../../shared/lesson/schema.js';
  * Phase 8 (S2): the XP of this lesson's done award, from the server's ledger
  * (GET /api/v2/user/achievements lessonXp; the browser computes no XP). Asked for only when the
  * lesson is done in the local record, it syncs, a learner is synced and the server offers
- * achievements (LessonXpItem mounts the store's consumer only then). 「このレッスンを終えて +40 XP」
+ * achievements (LessonXpItem mounts the store's consumer only then, and only until the answer holds
+ * the award: then it keeps the line and stops reading). 「このレッスンを終えて +40 XP」
  * only when this page first saw a current answer without the award and then one with it;
  * otherwise 「このレッスンを終えたときにもらった XP：40」 (a revisit, another device, a redo after a
  * reset: XP is given once ever, O2). Nothing without the figure (an older server, not loaded,
@@ -206,24 +207,46 @@ export function lessonXpLineOf(snap: XpSnap, lessonKey: string, sawWithout: bool
   return { kind: sawWithout ? 'new' : 'total', xp: map[lessonKey] };
 }
 
-/**
- * The XP item of the stats list. Mounted only when LessonEnd may ask (design D7), so ordinary
- * lesson pages send no achievements request. Not a live region: it may appear seconds later and
- * nothing is read aloud while the learner rates.
- */
-function LessonXpItem({ lessonKey }: { lessonKey: string }) {
+/** The XP line itself. Not a live region: it may appear seconds later and nothing is read aloud while the learner rates. */
+function LessonXpLineItem({ line }: { line: NonNullable<LessonXpLine> }) {
   const { language } = useLanguage();
+  const text = copy[language];
+  return (
+    <li className="rp-end-xp tabular">{line.kind === 'new' ? text.xpNew(line.xp) : text.xpTotal(line.xp)}</li>
+  );
+}
+
+/**
+ * Reads the store (an achievements consumer) until a current answer holds this lesson's award,
+ * shows the line from then on and hands it to LessonXpItem to keep.
+ */
+function LessonXpReader({ lessonKey, onLine }: { lessonKey: string; onLine: (line: NonNullable<LessonXpLine>) => void }) {
   const snap = useAchievements();
   const [sawWithout, setSawWithout] = useState(false);
   useEffect(() => {
     if (!sawWithout && lacksLessonXp(snap, lessonKey)) setSawWithout(true);
   }, [snap, lessonKey, sawWithout]);
   const line = lessonXpLineOf(snap, lessonKey, sawWithout);
-  if (!line) return null;
-  const text = copy[language];
-  return (
-    <li className="rp-end-xp tabular">{line.kind === 'new' ? text.xpNew(line.xp) : text.xpTotal(line.xp)}</li>
-  );
+  const kind = line?.kind;
+  const xp = line?.xp;
+  useEffect(() => {
+    if (kind !== undefined && xp !== undefined) onLine({ kind, xp });
+  }, [kind, xp, onLine]);
+  return line ? <LessonXpLineItem line={line} /> : null;
+}
+
+/**
+ * The XP item of the stats list. Mounted only when LessonEnd may ask (design D7), so ordinary
+ * lesson pages send no achievements request. Once the server's answer holds this lesson's award,
+ * the line is kept and the reader unmounts (final review, finding 5): the award is given once
+ * ever (O2), so a later read could add nothing, and while a consumer is mounted every upload of
+ * this page would read again (2 s after it, at most every 15 s; plan 10.3 の 16, the classroom's
+ * per-IP budget). A lesson that is being finished sends its two reads (before and after the
+ * upload, for 「+40 XP」); a revisit sends one when it opens.
+ */
+function LessonXpItem({ lessonKey }: { lessonKey: string }) {
+  const [kept, setKept] = useState<LessonXpLine>(null);
+  return kept ? <LessonXpLineItem line={kept} /> : <LessonXpReader lessonKey={lessonKey} onLine={setKept} />;
 }
 
 export type LessonLinkInfo = { title: string; href: string; minutes?: number; lang?: string };
@@ -380,7 +403,8 @@ export function LessonEnd({ next, prev, backTo, resettable = false, onLessonRese
         </p>
         <ul className="rp-end-stats">
           <li className="tabular">{text.progress(progress.pct)}</li>
-          {showXp ? <LessonXpItem lessonKey={`${courseSlug}/${lesson.id}`} /> : null}
+          {/* Keyed by the learner: a line kept for one learner never shows for another. */}
+          {showXp ? <LessonXpItem key={sync.userId ?? ''} lessonKey={`${courseSlug}/${lesson.id}`} /> : null}
           {questions.length > 0 && (
             <li className="tabular"><ListChecks size={14} aria-hidden="true" />{text.checks(answered, questions.length)}</li>
           )}

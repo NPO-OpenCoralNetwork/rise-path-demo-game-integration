@@ -518,15 +518,19 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
   /**
    * The notice on a page: a controller whose state the test sets, React state kept across renders
    * (the stub's __hookStore), a fake #main-content and window. `render(wait)` re-renders while a
-   * render sets state, as React does.
+   * render sets state, as React does. Unless `failedSinceMount` is false, the notice is first
+   * mounted while nothing failed and then a part fails (`fail()`), as on the lesson that degraded.
    * @param {(p: any) => void} fn
+   * @param {{ failedSinceMount?: boolean }} [o]
    */
-  const onPage = (fn) => {
+  const onPage = (fn, { failedSinceMount = true } = {}) => {
     /** @type {any[]} */
     const log = [];
     const controller = {
       wait: 'none',
+      count: 0,
       state: () => controller.wait,
+      failures: () => controller.count,
       subscribe: () => () => {},
       requireReload: () => () => {},
       reloadNow: () => log.push('reloadNow'),
@@ -559,8 +563,15 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
     const card = (tree) => elements(tree).find((el) => el.type === 'p');
     /** @param {any} tree @param {string} label */
     const button = (tree, label) => elements(tree).find((el) => el.type === 'button' && (textOf(el) === label || el.props['aria-label'] === label));
+    const fail = () => { controller.count += 1; };
+    /** A new reader (LessonReader is keyed per lesson): fresh React state, the same page controller. */
+    const remount = () => { /** @type {any} */ (globalThis).__hookStore = {}; };
     try {
-      fn({ log, controller, effects, render, card, button });
+      if (failedSinceMount) {
+        render('none');
+        fail();
+      }
+      fn({ log, controller, effects, render, card, button, fail, remount });
     } finally {
       for (const key of ['__controller', '__hookStore', '__setLog', '__effects', '__language', 'document', 'window']) {
         delete (/** @type {any} */ (globalThis))[key];
@@ -596,6 +607,43 @@ describe('S1: OfflineReloadNotice (closing per stretch of a state, reload, focus
     onPage(({ render, card, button }) => {
       button(render('offline'), jp.close).props.onClick();
       assert.equal(render('offline').props.children, null, 'closed while offline: hidden while offline');
+      const tree = render('back');
+      assert.equal(card(tree)?.props['data-state'], 'back');
+      assert.ok(button(tree, jp.reload));
+    });
+  });
+
+  it('a reader where nothing failed since it mounted shows nothing in any state (final review, finding 1: cc-01 after cc-02 failed)', () => {
+    // cc-02's lesson chunk failed offline (the page is 'offline'), the learner went Back to cc-01,
+    // which is fully loaded: its new reader must not say a part failed, nor offer a reload later.
+    onPage(({ render, card }) => {
+      for (const wait of ['offline', 'checking', 'unreachable', 'back']) {
+        const tree = render(wait);
+        assert.equal(tree.props.role, 'status', `${wait}: the region stays mounted`);
+        assert.equal(tree.props.children, null, `${wait}: empty`);
+        assert.equal(card(tree), undefined);
+      }
+    }, { failedSinceMount: false });
+  });
+
+  it('a part that fails after mount shows the card for the page\'s state; 「読み込み直す」 in back (final review, finding 1)', () => {
+    onPage(({ render, card, button, fail }) => {
+      assert.equal(render('offline').props.children, null);
+      fail(); // a diagram's chunk failed on this lesson
+      let tree = render('offline');
+      assert.equal(card(tree)?.props['data-state'], 'offline');
+      tree = render('back');
+      assert.equal(card(tree)?.props['data-state'], 'back');
+      assert.ok(button(tree, jp.reload));
+    }, { failedSinceMount: false });
+  });
+
+  it('a new reader in back starts empty; its own failure shows the card with 「読み込み直す」 (the lesson that degraded, design check g)', () => {
+    onPage(({ render, card, button, fail, remount }) => {
+      assert.ok(card(render('back')), 'the reader where the part failed');
+      remount(); // another lesson, or back to the same one
+      assert.equal(render('back').props.children, null, 'nothing failed here yet');
+      fail(); // its diagram imports again (mermaidRenderer drops a failed load) and fails again
       const tree = render('back');
       assert.equal(card(tree)?.props['data-state'], 'back');
       assert.ok(button(tree, jp.reload));
@@ -983,5 +1031,51 @@ describe('S1: wiring (index.tsx, LearnRoute, LessonReader, reader.css, copy)', (
       assert.doesNotMatch(text, PALETTE_RULE, file);
       assert.doesNotMatch(text, /簡単です|誰でも/, file);
     }
+  });
+});
+
+describe('S1: a failed diagram load is dropped, so the next diagram imports again (mermaidRenderer, final review, finding 1)', () => {
+  // Without this, a diagram mounted after a mermaid failure got the kept rejection, never imported
+  // again and never reached the page's offline controller: back on the lesson that degraded, the
+  // reader notice (which counts failures since it mounted) would stay empty.
+  /** @type {any} */
+  let renderer = null;
+  before(async () => {
+    const result = await build({
+      entryPoints: [path.join(ROOT, 'components/lesson/blocks/mermaidRenderer.ts')],
+      bundle: true,
+      write: false,
+      format: 'esm',
+      platform: 'neutral',
+      external: ['mermaid', 'dompurify'],
+      logLevel: 'silent',
+    });
+    renderer = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+  });
+
+  it('retryableLoad shares one load; a rejection is dropped and the next call loads again; a success is kept', async () => {
+    let calls = 0;
+    /** @type {Array<{ resolve: (v: unknown) => void, reject: (e: unknown) => void }>} */
+    const pending = [];
+    const load = renderer.retryableLoad(() => { calls += 1; return new Promise((resolve, reject) => pending.push({ resolve, reject })); });
+    const a = load();
+    assert.equal(load(), a, 'one load shared while it runs');
+    assert.equal(calls, 1);
+    pending[0].reject(new TypeError('Failed to fetch dynamically imported module'));
+    await assert.rejects(a, /dynamically imported module/);
+    const b = load();
+    assert.notEqual(b, a, 'a failed load is not kept');
+    assert.equal(calls, 2, 'imports again (and fails again until a reload, reaching the controller)');
+    pending[1].resolve('mermaid');
+    assert.equal(await b, 'mermaid');
+    assert.equal(load(), b, 'a loaded module is kept');
+    assert.equal(calls, 2);
+  });
+
+  it('mermaid and DOMPurify both load through it (no kept rejection: no `??= import(`)', () => {
+    const source = readFile('components/lesson/blocks/mermaidRenderer.ts');
+    assert.match(source, /^const loadMermaid = retryableLoad\(\(\) => import\('mermaid'\)\.then\(\(m\) => m\.default\)\);$/m);
+    assert.match(source, /^const loadPurify = retryableLoad\(\(\) => import\('dompurify'\)\.then\(\(m\) => m\.default\)\);$/m);
+    assert.doesNotMatch(source, /\?\?= import\(/);
   });
 });

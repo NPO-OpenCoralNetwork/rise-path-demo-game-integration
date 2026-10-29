@@ -215,10 +215,16 @@ export const PROBE_TIMEOUT_MS = 8_000;
  * usable on it (the root ErrorBoundary, LearnRoute's lesson-load error) holds `requireReload()`.
  * A page that degraded in place (a diagram, highlighted code) is never reloaded by itself: the
  * reader bar offers 「読み込み直す」, so the AI tutor thread and typed text are lost only on request.
+ * `failures()` counts every failed chunk handed to `chunkFailed()` on this page (in every state):
+ * the state is page-wide and outlives the lesson that degraded, so the reader bar shows its notice
+ * only after a failure while that reader is mounted (OfflineReloadNotice).
  */
 export function createOfflineReload(deps: {
   online: () => boolean;
-  /** Resolves once the app's own origin answered (any HTTP status); rejects on a network error or an abort. */
+  /**
+   * Resolves once the app's own origin answered (any status below 500); rejects on a network error,
+   * a 5xx (an edge or proxy error page is not the app) or an abort.
+   */
   probe: (signal: AbortSignal) => Promise<unknown>;
   reload: () => void;
   setTimer: (fn: () => void, ms: number) => unknown;
@@ -232,11 +238,10 @@ export function createOfflineReload(deps: {
   let abortProbe: (() => void) | null = null;
   let blockers = 0; // mounted screens with nothing usable on them (requireReload)
   let reloading = false;
+  let failures = 0; // chunks that failed on this page (chunkFailed), in every state
   const listeners = new Set<() => void>();
 
-  const set = (next: ChunkWait) => {
-    if (next === wait) return;
-    wait = next;
+  const notify = () => {
     for (const listener of [...listeners]) {
       try {
         listener();
@@ -244,6 +249,12 @@ export function createOfflineReload(deps: {
         /* a listener's failure must not stop the others */
       }
     }
+  };
+
+  const set = (next: ChunkWait) => {
+    if (next === wait) return;
+    wait = next;
+    notify();
   };
 
   /** Cancels the retry timer and the probe in flight; an answer that arrives later is ignored. */
@@ -297,8 +308,25 @@ export function createOfflineReload(deps: {
     void attempt();
   };
 
+  /** handlePreloadError's await-online, after the count. */
+  const onFailure = () => {
+    if (!deps.online()) {
+      stop();
+      set('offline');
+      return;
+    }
+    if (wait === 'none' || wait === 'offline') {
+      // The browser already says online again (event lag): check now. Not check(), which leaves
+      // 'none' alone (a plain online event with no failure).
+      set('checking');
+      void attempt();
+    }
+  };
+
   return {
     state: (): ChunkWait => wait,
+    /** Chunks that failed on this page so far (never after a reload started). Listeners hear each one. */
+    failures: (): number => failures,
     subscribe(listener: () => void): () => void {
       listeners.add(listener);
       return () => {
@@ -308,17 +336,10 @@ export function createOfflineReload(deps: {
     /** handlePreloadError's await-online: a chunk failed offline, or online while the page already waits. */
     chunkFailed(): void {
       if (reloading) return;
-      if (!deps.online()) {
-        stop();
-        set('offline');
-        return;
-      }
-      if (wait === 'none' || wait === 'offline') {
-        // The browser already says online again (event lag): check now. Not check(), which leaves
-        // 'none' alone (a plain online event with no failure).
-        set('checking');
-        void attempt();
-      }
+      failures += 1;
+      const before = wait;
+      onFailure();
+      if (wait === before) notify(); // only the count changed: the reader notice still has to hear it
     },
     /** window 'online'. */
     online: check,
@@ -350,8 +371,10 @@ let pageController: OfflineReload | null = null;
 
 /**
  * The page's controller, created on first use with the window's online/offline events; null outside
- * a browser. The probe is a same-origin HEAD of the page URL (the SPA answers it with any status);
- * a captive portal's TLS failure or cross-origin redirect rejects it.
+ * a browser. The probe is a same-origin HEAD of the page URL: the app's own origin answers it with
+ * a status below 500 (200 from Vercel and Vite, 404 from Express's GET-only SPA fallback). A captive
+ * portal's TLS failure or cross-origin redirect rejects it, and so does a 5xx: that is an edge or
+ * proxy error page (a Vercel 502–504, a restarting proxy), and a reload would land on it.
  */
 export function pageOfflineReload(): OfflineReload | null {
   if (pageController) return pageController;
@@ -359,7 +382,9 @@ export function pageOfflineReload(): OfflineReload | null {
   const controller = createOfflineReload({
     online: () => navigatorOnline(),
     probe: (signal) =>
-      fetch(window.location.href, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', signal }),
+      fetch(window.location.href, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', signal }).then((res) => {
+        if (res.status >= 500) throw new Error('unavailable'); // an edge or proxy error page is not the app
+      }),
     reload: () => window.location.reload(),
     setTimer: (fn, ms) => window.setTimeout(fn, ms),
     clearTimer: (handle) => window.clearTimeout(handle as number),

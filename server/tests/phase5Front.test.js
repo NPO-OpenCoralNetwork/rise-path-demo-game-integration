@@ -934,7 +934,15 @@ const UI_STUBS = {
     export const restoreLogoutFocus = (t) => { (globalThis.__restored ??= []).push(t); return t; };
   `,
   achievements: `
-    export const useAchievements = () => { globalThis.__achCalls = (globalThis.__achCalls ?? 0) + 1; return globalThis.__ach; };
+    // With globalThis.__achStore (a real store), the hook reads it and leaves its mount effect in
+    // __consumerEffects for the test to run as React would (once while mounted).
+    export const useAchievements = () => {
+      globalThis.__achCalls = (globalThis.__achCalls ?? 0) + 1;
+      const store = globalThis.__achStore;
+      if (!store) return globalThis.__ach;
+      (globalThis.__consumerEffects ??= []).push(() => store.consumerMounted());
+      return store.getSnapshot();
+    };
     export const reloadAchievements = async () => { globalThis.__reloads = (globalThis.__reloads ?? 0) + 1; };
   `,
   content: "export const getCourse = (slug) => (slug === 'vibe-coding' ? { id: 'vibe-coding', locale: 'jp', title: 'バイブコーディング入門：AIと作る' } : undefined);",
@@ -2085,6 +2093,122 @@ describe('Phase 8 (S2): the lesson end shows the server\'s XP for the lesson', (
       assert.equal(calls, 0, why);
       assert.equal(item, null, why);
     }
+  });
+
+  it('once a current answer holds the award, the line is kept and the item stops reading (no consumer; final review, finding 5)', () => {
+    render();
+    globalThis.__sets = [];
+    for (const effect of globalThis.__effects) effect();
+    const kept = globalThis.__sets.filter(([, value]) => value && typeof value === 'object' && 'kind' in value);
+    assert.deepEqual(kept.map(([, value]) => value), [{ kind: 'total', xp: 40 }], 'the reader hands its line over');
+    const keptIndex = kept[0][0];
+    for (const [line, text] of [[{ kind: 'total', xp: 40 }, 'このレッスンを終えたときにもらった XP：40'], [{ kind: 'new', xp: 40 }, 'このレッスンを終えて +40 XP']]) {
+      const { item, calls } = render({ __state: { [keptIndex]: line }, __ach: { ...WITHOUT(), at: null } });
+      assert.equal(textOfElement(item), text, 'the kept line, whatever the store holds now');
+      assert.equal(calls, 0, 'no useAchievements: no consumer, so an upload sends no read');
+    }
+    // No line yet: nothing is handed over, and the reader stays.
+    render({ __ach: WITHOUT() });
+    globalThis.__sets = [];
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value && typeof value === 'object' && 'kind' in value), false);
+    // Keyed by the learner: another learner's page never shows a line kept for the first.
+    const source = readFile('components/lesson/LessonEnd.tsx');
+    assert.match(source, /<LessonXpItem key=\{sync\.userId \?\? ''\} lessonKey=\{`\$\{courseSlug\}\/\$\{lesson\.id\}`\} \/>/);
+  });
+
+  describe('with a real achievements store: reads per page (final review, finding 5)', () => {
+    let mod = null;
+    before(async () => {
+      mod = await fresh(await bundle(
+        "export * from './components/ui/achievementsClient';",
+        [[/\/progressSyncClient$/, 'syncForAchievements'], [/^react$/, 'react'], [/supabaseClient$/, 'supabase']],
+      ));
+    });
+
+    /**
+     * LessonEnd on a page with a real store on a fake clock. commit() renders, mounts or unmounts
+     * the store's consumer as React would (useAchievements rendered or not), runs the effects and
+     * keeps what they set for the next render.
+     * @param {(n: number) => Record<string, number>} lessonXpOfLoad the ledger the n-th read answers
+     */
+    function page(lessonXpOfLoad) {
+      let t = 0;
+      const queue = [];
+      const env = { loads: 0 };
+      const s = mod.createAchievementsStore({
+        load: async () => {
+          env.loads += 1;
+          return { ...DATA({ lessonXp: lessonXpOfLoad(env.loads) }), learnerId: U1 };
+        },
+        learnerId: () => U1,
+        capabilities: () => ({ lessonReset: true, achievements: true }),
+        now: () => t,
+        setTimeout: (fn, ms) => { const h = { at: t + ms, fn }; queue.push(h); return h; },
+        clearTimeout: (h) => { const i = queue.indexOf(h); if (i >= 0) queue.splice(i, 1); },
+      });
+      let state = {};
+      let release = null;
+      const commit = () => {
+        globalThis.__consumerEffects = [];
+        const { item, calls } = render({ __achStore: s, __state: state });
+        if (calls > 0 && !release) release = globalThis.__consumerEffects[0]();
+        if (calls === 0 && release) { release(); release = null; }
+        globalThis.__sets = [];
+        for (const effect of globalThis.__effects) effect();
+        for (const [i, v] of globalThis.__sets) state = { ...state, [i]: v };
+        delete globalThis.__achStore;
+        return item;
+      };
+      const advance = async (ms) => {
+        const end = t + ms;
+        for (;;) {
+          await s.settled();
+          queue.sort((a, b) => a.at - b.at);
+          if (!queue[0] || queue[0].at > end) break;
+          const h = queue.shift();
+          t = h.at;
+          h.fn();
+        }
+        t = end;
+        await s.settled();
+      };
+      return { s, env, commit, advance };
+    }
+
+    it('a revisit of a finished lesson: one read when it opens, none for the uploads after it', async () => {
+      const { s, env, commit, advance } = page(() => ({ [KEY]: 40 }));
+      assert.equal(commit(), null, 'loading');
+      await advance(0);
+      assert.equal(env.loads, 1);
+      assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40');
+      assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40', 'kept: the reader has unmounted');
+      for (let i = 0; i < 3; i += 1) {
+        s.serverProgress(); // PROGRESS_SAVED_EVENT: an upload of this page (a scroll position, a card)
+        await advance(20_000);
+        assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40');
+      }
+      assert.equal(env.loads, 1, 'no read per upload (without the latch: 4)');
+    });
+
+    it('finishing the lesson: a read without the award, the upload, a read with it (「+40 XP」), then none', async () => {
+      const { s, env, commit, advance } = page((n) => (n === 1 ? {} : { [KEY]: 40 }));
+      commit();
+      await advance(0);
+      assert.equal(commit(), null, 'the award is not there yet');
+      commit(); // the effect recorded "seen without"
+      s.serverProgress(); // the upload with the done state
+      await advance(20_000);
+      assert.equal(env.loads, 2);
+      assert.equal(textOfElement(commit()), 'このレッスンを終えて +40 XP');
+      assert.equal(textOfElement(commit()), 'このレッスンを終えて +40 XP', 'kept');
+      for (let i = 0; i < 3; i += 1) {
+        s.serverProgress();
+        await advance(20_000);
+        commit();
+      }
+      assert.equal(env.loads, 2, 'the two reads design D7 counts, no more');
+    });
   });
 
   it('the stats list: the XP item right after the progress item, before the cards; copy in both languages', () => {

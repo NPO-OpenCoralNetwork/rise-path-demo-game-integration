@@ -32,12 +32,29 @@ const FONT_FAMILY = '"Inter", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", s
 type Mermaid = typeof import('mermaid')['default'];
 type Purify = typeof import('dompurify')['default'];
 
-let mermaidPromise: Promise<Mermaid> | null = null;
-let purifyPromise: Promise<Purify> | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 
-const loadMermaid = () => (mermaidPromise ??= import('mermaid').then((m) => m.default));
-const loadPurify = () => (purifyPromise ??= import('dompurify').then((m) => m.default));
+/**
+ * One load shared by every diagram; a failed one (offline, a chunk error) is dropped, so the next
+ * diagram imports again, as highlighter.ts does. That import fails again until a reload, and the
+ * failure reaches the page's offline controller (index.tsx), so the reader bar's notice shows on
+ * the lesson where a diagram fell back to its plain form (OfflineReloadNotice).
+ */
+export function retryableLoad<T>(load: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | null = null;
+  return () => {
+    if (pending) return pending;
+    const current = load();
+    pending = current;
+    current.catch(() => {
+      if (pending === current) pending = null;
+    });
+    return current;
+  };
+}
+
+const loadMermaid = retryableLoad(() => import('mermaid').then((m) => m.default));
+const loadPurify = retryableLoad(() => import('dompurify').then((m) => m.default));
 
 /** Reads the token colors that apply at `el` (reader theme, world accent). */
 export function readPalette(el: Element): DiagramPalette {

@@ -333,7 +333,7 @@ function harness(o = {}) {
       now = end;
       await flush();
     },
-    /** The last probe answers (any HTTP status). */
+    /** The last probe answers (the app: a status below 500). */
     async answer() { const p = probes.at(-1); assert.ok(p && !p.settled, 'a probe is running'); p.settled = true; p.resolve({ status: 200 }); await flush(); },
     /** The last probe fails (network error). */
     async fail() { const p = probes.at(-1); assert.ok(p && !p.settled, 'a probe is running'); p.settled = true; p.reject(new TypeError('Failed to fetch')); await flush(); },
@@ -610,6 +610,42 @@ describe('chunkReload: createOfflineReload (the offline controller)', () => {
     assert.deepEqual(h.changes, ['offline', 'checking']);
   });
 
+  it('failures() counts every chunkFailed in every state, never after a reload started; listeners hear each one once (final review, finding 1)', async () => {
+    // The reader notice shows only after a part failed while it is mounted (OfflineReloadNotice):
+    // it needs a count that grows in every state, also when the state stays the same.
+    const { h, c } = harness();
+    let heard = 0;
+    c.subscribe(() => { heard += 1; });
+    const step = (/** @type {string} */ state, /** @type {number} */ failures, /** @type {string} */ why) => {
+      const before = heard;
+      c.chunkFailed();
+      assert.equal(c.state(), state, why);
+      assert.equal(c.failures(), failures, why);
+      assert.equal(heard - before, 1, `${why}: listeners told once`);
+    };
+    assert.equal(c.failures(), 0);
+    step('offline', 1, 'none → offline');
+    step('offline', 2, 'offline, no change of state');
+    h.online = true;
+    c.online();
+    assert.equal(c.state(), 'checking');
+    step('checking', 3, 'checking');
+    await h.fail();
+    assert.equal(c.state(), 'unreachable');
+    step('unreachable', 4, 'unreachable');
+    await h.advance(RECONNECT_RETRY_MS);
+    await h.answer();
+    assert.equal(c.state(), 'back');
+    step('back', 5, 'back, while the browser says online');
+    c.reloadNow();
+    assert.equal(h.reloads, 1);
+    const before = heard;
+    c.chunkFailed();
+    assert.equal(c.failures(), 5, 'not after reloadNow()');
+    assert.equal(heard, before);
+    assert.equal(h.reloads, 1);
+  });
+
   it('there is no page controller outside a browser', () => {
     assert.equal(pageOfflineReload(), null);
   });
@@ -702,6 +738,106 @@ describe('chunkReload: pageOfflineReload (the browser wiring)', () => {
     }
     assert.equal(typeof window, 'undefined', 'restored');
     assert.equal(pageOfflineReload(), null, 'the other copy is untouched');
+  });
+});
+
+/**
+ * A fresh copy of the module (its own page controller) on a fake window, navigator and fetch whose
+ * answers the test gives; the shape of the wiring test above.
+ * @param {string} tag
+ * @param {(page: { c: any, mod: any, fire: (type: string) => void, fetches: Array<{ resolve: (v: unknown) => void }>, timers: Map<number, { fn: () => void, ms: number }>, setOnLine: (v: boolean) => void, reloads: () => number }) => Promise<void>} fn
+ */
+async function onFakePage(tag, fn) {
+  const saved = ['window', 'navigator', 'fetch'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+  /** @type {Map<string, Array<() => void>>} */
+  const listeners = new Map();
+  /** @type {Array<{ resolve: (v: unknown) => void }>} */
+  const fetches = [];
+  /** @type {Map<number, { fn: () => void, ms: number }>} */
+  const timers = new Map();
+  let nextId = 1;
+  let onLine = false;
+  let reloads = 0;
+  const fakeWindow = {
+    addEventListener: (/** @type {string} */ type, /** @type {() => void} */ f) => {
+      if (!listeners.has(type)) listeners.set(type, []);
+      /** @type {Array<() => void>} */ (listeners.get(type)).push(f);
+    },
+    location: { href: 'https://app.example/learn/claude-code/cc-01-first-session', reload: () => { reloads += 1; } },
+    setTimeout: (/** @type {() => void} */ f, /** @type {number} */ ms) => { const id = nextId++; timers.set(id, { fn: f, ms }); return id; },
+    clearTimeout: (/** @type {number} */ id) => { timers.delete(id); },
+  };
+  Object.defineProperty(globalThis, 'window', { value: fakeWindow, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'navigator', { value: { get onLine() { return onLine; } }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: (/** @type {unknown} */ _url, /** @type {any} */ init) => new Promise((resolve, reject) => {
+      fetches.push({ resolve });
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    }),
+  });
+  try {
+    const mod = await import(`../../components/common/chunkReload.ts?${tag}`);
+    await fn({
+      c: mod.pageOfflineReload(),
+      mod,
+      fire: (type) => { for (const f of listeners.get(type) ?? []) f(); },
+      fetches,
+      timers,
+      setOnLine: (v) => { onLine = v; },
+      reloads: () => reloads,
+    });
+  } finally {
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, /** @type {string} */ (key), /** @type {PropertyDescriptor} */ (descriptor));
+      else delete (/** @type {any} */ (globalThis))[/** @type {string} */ (key)];
+    }
+  }
+}
+
+describe('chunkReload: pageOfflineReload probe answers (final review, finding 2)', () => {
+  it('a 5xx is not the app (an edge or proxy error page): unreachable, no reload, a retry; the next 200 reloads', async () => {
+    await onFakePage('page-wiring-5xx', async ({ c, mod, fire, fetches, timers, setOnLine, reloads }) => {
+      c.chunkFailed(); // offline
+      c.requireReload(); // a screen with nothing usable on it
+      setOnLine(true);
+      fire('online');
+      assert.equal(fetches.length, 1);
+      fetches[0].resolve({ status: 503 });
+      await flush();
+      assert.equal(c.state(), 'unreachable', 'never back or a reload on a 503');
+      assert.equal(reloads(), 0, 'the tab never reloads onto the host error page');
+      assert.deepEqual([...timers.values()].map((t) => t.ms), [mod.RECONNECT_RETRY_MS], 'probes again later');
+      for (const status of [502, 504]) {
+        const [id, retry] = [...timers.entries()][0];
+        timers.delete(id);
+        retry.fn();
+        fetches.at(-1)?.resolve({ status });
+        await flush();
+        assert.equal(c.state(), 'unreachable', String(status));
+        assert.equal(reloads(), 0, String(status));
+      }
+      const [id, retry] = [...timers.entries()][0];
+      timers.delete(id);
+      retry.fn();
+      assert.equal(fetches.length, 4);
+      fetches[3].resolve({ status: 200 });
+      await flush();
+      assert.equal(reloads(), 1, 'the app answered: reload once');
+    });
+  });
+
+  it('a 4xx is the app answering (Express answers a HEAD of a page with 404): reloads where a screen asked for it', async () => {
+    await onFakePage('page-wiring-404', async ({ c, fire, fetches, setOnLine, reloads }) => {
+      c.chunkFailed();
+      c.requireReload();
+      setOnLine(true);
+      fire('online');
+      fetches[0].resolve({ status: 404 });
+      await flush();
+      assert.equal(reloads(), 1);
+    });
   });
 });
 

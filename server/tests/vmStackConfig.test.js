@@ -1234,6 +1234,13 @@ describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
     assert.match(text, /On here with the Vercel flag off, learners are refused with no page to accept on\./);
     assert.match(text, /A new version that needs acceptance: turn it off in both files before deploying the texts, on again once the consent page shows/);
     assert.match(text, /server\/middleware\/termsGate\.js TERMS_EXEMPT/);
+    // Final review, finding 3: the list names every kind of exempt route (termsGate.js), so an owner
+    // reading it before turning the switch on sees that a guardian can still withdraw AI consent.
+    assert.match(text, /withdrawing a guardian's AI consent/);
+    assert.match(text, /reporting an AI answer/);
+    const gate = read(path.join(ROOT, 'server/middleware/termsGate.js'));
+    assert.match(gate, /\{ method: 'POST', path: '\/api\/v2\/user\/ai-access\/guardian-consent\/revoke', why: 'consent withdrawal' \}/);
+    assert.match(gate, /\{ method: 'POST', path: '\/api\/v2\/safety\/reports', why: 'safety' \}/);
     const readme = read(path.join(STACK, 'README.md'));
     const row = readme.split('\n').find((line) => line.startsWith('| `LEGAL_TERMS_REQUIRED` |'));
     assert.ok(row, 'the README env table has the row');

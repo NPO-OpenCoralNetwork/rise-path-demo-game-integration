@@ -177,11 +177,68 @@ describe('the plan: Phase 8 chapter', () => {
         assert.ok(check, '12.2 item 3');
         assert.match(check, /図とコードのあるレッスン（たとえば Claude Code の「第1回｜最初のタスクを任せる」）/u);
         assert.match(check, /図やコードを読めなかったときだけ、上のバーにお知らせが出て、つなぐと「読み込み直す」が出ること/u);
+        // Final review, findings 1 and 2: the notice belongs to the lesson where a part failed, and a
+        // 5xx from the host is not the app answering (OfflineReloadNotice.tsx, chunkReload.ts).
+        const s1 = chapter.split('\n').find((line) => line.startsWith('- **S1 '));
+        assert.ok(s1, '12.1 S1');
+        assert.match(s1, /そのレッスンで読めなかったときだけです。全部読めたレッスンに移ると、出ません/u);
+        assert.match(s1, /ホストやプロキシのエラーの画面（500 番台）が返ったときも、答えたことにはしません/u);
+        assert.match(read('components/common/chunkReload.ts'), /if \(res\.status >= 500\) throw/);
         const lesson = JSON.parse(read('content/courses/claude-code/lessons/cc-01-first-session.lesson.json'));
         assert.equal(lesson.title, '第1回｜最初のタスクを任せる');
         const types = JSON.stringify(lesson);
         assert.match(types, /"type":"diagram"/);
         assert.match(types, /"type":"code"/);
+    });
+
+    it('S2 says when the XP is read: when a finished lesson opens, then per upload until it arrives, then never (final review, finding 5)', () => {
+        const s2 = chapter.split('\n').find((line) => line.startsWith('- **S2 '));
+        assert.ok(s2, '12.1 S2');
+        assert.doesNotMatch(s2, /終えたレッスンの終わりの画面だけ/u);
+        assert.match(s2, /終えたレッスンを開いたとき（終わりまで読まなくても）/u);
+        assert.match(s2, /記録をサーバーに送るたび（2 秒あと、15 秒に 1 回まで）/u);
+        assert.match(s2, /XP が届いたら、そのページではもう読みません（レッスンを終えるときは 2 回、開き直したときは 1 回です。10\.3 の 16 の、教室の 1 分 200 回のためです/u);
+        const item3 = chapter.slice(chapter.indexOf('### 12.3')).split('\n').find((line) => line.startsWith('3. XP の 1 行は'));
+        assert.ok(item3, '12.3 item 3');
+        assert.match(item3, /終えたレッスンを開くと、終わりまで読まなくても、XP を 1 回読みます（教室の 1 分 200 回の分を使います）/u);
+        // The code that makes "then never" true: the item keeps the line and unmounts its reader.
+        const end = read('components/lesson/LessonEnd.tsx');
+        assert.match(end, /return kept \? <LessonXpLineItem line=\{kept\} \/> : <LessonXpReader lessonKey=\{lessonKey\} onLine=\{setKept\} \/>;/);
+        // The figures the sentence names (achievementsClient.ts).
+        const client = read('components/ui/achievementsClient.ts');
+        assert.match(client, /^export const ACHIEVEMENTS_DEBOUNCE_MS = 2_000;$/m);
+        assert.match(client, /^export const ACHIEVEMENTS_MIN_INTERVAL_MS = 15_000;$/m);
+    });
+});
+
+describe('BYOA guide step 7 names the remote role\'s grants (final review, finding 6)', () => {
+    const guide = read('doc/guides/byoa-setup.ja.md');
+    const from = guide.indexOf('### 7. VM:');
+    const step7 = guide.slice(from, guide.indexOf('\n### ', from + 1));
+    // Covered in step 7 by a general phrase rather than by name: the auth stub, the age and consent
+    // tables (「年齢と同意の表」), and what the remote tools read or log for themselves.
+    const BY_PHRASE = new Set(['auth.users', 'user_profiles', 'user_age', 'account_consents', 'user_progress', 'learning_journal', 'curricula', 'material_chunks', 'mcp_tool_calls']);
+
+    it('every table granted to risepath_mcp_remote, except those covered by a phrase, is named in step 7', () => {
+        assert.ok(from > 0 && step7.length > 1000, 'step 7');
+        const role = read('deploy/risepath-vm/sql/mcp_remote_role.sql');
+        const tables = [...new Set([...role.matchAll(/^GRANT [^\n]* ON (\w+(?:\.\w+)?) TO risepath_mcp_remote;$/gm)].map((m) => m[1]))];
+        assert.ok(tables.includes('legal_acceptances') && tables.includes('review_cards'), tables.join(', '));
+        const missing = tables.filter((table) => !BY_PHRASE.has(table) && !step7.includes(`\`${table}\``));
+        assert.deepEqual(missing, [], 'a new grant needs its line in step 7 (or a reason to be covered by a phrase)');
+    });
+
+    it('the purpose sentence names the terms check, and a Phase 8 note says when to re-run the role SQL', () => {
+        assert.match(step7, /このロールに渡すのは、リモートのツール、年齢の確認、利用規約への同意の確かめ（Phase 8。`LEGAL_TERMS_REQUIRED=true` のときだけ使います）、1 日の上限、接続したアプリの記録に要る表と列だけです/u);
+        assert.match(step7, /利用規約への同意（`legal_acceptances`、Phase 8）は、いちばん新しい同意の版と時刻を確かめる列（`user_id`、`terms_version`、`privacy_version`、`accepted_at`、`account_deleted_at`）を読むだけです。`id` は読めず、行を書けません/u);
+        const note = step7.split('\n').find((line) => line.trim().startsWith('**Phase 8 の更新**'));
+        assert.ok(note, 'the Phase 8 note');
+        assert.ok(step7.indexOf(note) < step7.indexOf('**Phase 6 の更新**'), 'newest first, as the other notes');
+        for (const must of ['`LEGAL_TERMS_REQUIRED=true`', '`legal_unavailable`', '42501', '`deploy/risepath-vm/README.md`']) {
+            assert.ok(note.includes(must), `the Phase 8 note: ${must}`);
+        }
+        // The grant the sentence describes, column for column.
+        assert.match(read('deploy/risepath-vm/sql/mcp_remote_role.sql'), /^GRANT SELECT \(user_id, terms_version, privacy_version, accepted_at, account_deleted_at\) ON legal_acceptances TO risepath_mcp_remote;$/m);
     });
 });
 

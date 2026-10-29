@@ -7,7 +7,11 @@ import { offlinePartText, offlineReloadCopy } from './offlineReloadCopy';
 
 /**
  * Phase 8 (S1): the reader bar's notice after a part of the lesson failed to load offline (a
- * diagram, highlighted code: they show their plain form in place). It sits in the sticky bar's flow
+ * diagram, highlighted code: they show their plain form in place). Only a failure while this reader
+ * is mounted counts (the controller's `failures()` grew since mount): the page-wide state outlives
+ * the lesson that degraded, so a lesson opened afterwards (or the one whose lesson chunk failed,
+ * then left) shows nothing. Back on a lesson that degraded, its diagram or code loads again and
+ * fails again, which counts. It sits in the sticky bar's flow
  * (LessonReader's notice slot, `.rp-chunk-status`), so it is always in view and never covers the
  * text. It follows the page's offline controller (chunkReload.ts):
  *   - offline: part of the page couldn't load; records stay on this device;
@@ -26,10 +30,17 @@ import { offlinePartText, offlineReloadCopy } from './offlineReloadCopy';
 const subscribe = (listener: () => void) => pageOfflineReload()?.subscribe(listener) ?? (() => {});
 const snapshot = (): ChunkWait => pageOfflineReload()?.state() ?? 'none';
 const serverSnapshot = (): ChunkWait => 'none';
+const failuresSnapshot = (): number => pageOfflineReload()?.failures() ?? 0;
+const serverFailures = (): number => 0;
 
 /** The page's offline controller state ('none' outside a browser). */
 export function useOfflineReloadState(): ChunkWait {
   return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+}
+
+/** How many chunks failed on this page so far (0 outside a browser). */
+export function useOfflineFailures(): number {
+  return useSyncExternalStore(subscribe, failuresSnapshot, serverFailures);
 }
 
 /** While `active`, this screen has nothing usable on it: the page reloads by itself once the app answers. */
@@ -105,7 +116,11 @@ export function OfflineReloadNoticeView({ language, wait, dismissed, onReload, o
 
 export default function OfflineReloadNotice() {
   const { language } = useLanguage();
-  const wait = useOfflineReloadState();
+  const pageWait = useOfflineReloadState();
+  const failures = useOfflineFailures();
+  // The count when this reader mounted: the card shows only after a part failed here.
+  const [mountedAt] = useState(failures);
+  const wait: ChunkWait = failures > mountedAt ? pageWait : 'none';
   // One stretch of one state: `closed` belongs to the state it was set in. When the state changes,
   // a new stretch starts open (during render, so the card never misses a frame), so after
   // back → offline → back the card comes back even if it was closed in the first back.
