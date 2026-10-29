@@ -2,13 +2,16 @@
 // - GET /api/v2/curricula sends total_lessons, and leaves out lesson drafts (risepath.lesson/v1,
 //   previewed at /preview/) and generations still in progress (status draft_<stage>, listed by
 //   GET /api/v2/ai/drafts) unless they already have content.
-// - services/curriculumApi.ts: fetchGeneratedCourses throws a 401 with its status (the sign-in
-//   ended) instead of answering an empty list; fetchGeneratedCourseById keeps the status.
-// - services/generatedCourses.ts: the resume card sits at the top level of the resume answer, the
-//   dashboard keeps only a generated course's id (a UUID), and isSignInRequired.
-// - components/common/GeneratedCoursesSignInNotice.tsx: the sign-in ended; its button signs in
-//   again without asking (logout reason 'reauth'). The four views that load generated courses show
-//   it on a 401 (source checks).
+// - services/curriculumApi.ts: fetchGeneratedCourses throws a 401 with its status and body instead of
+//   answering an empty list; fetchGeneratedCourseById does the same for a 401 only (CourseGeneratorView
+//   reads other statuses as AI errors).
+// - services/generatedCourses.ts: the resume card the server builds sits at the top level of the
+//   resume answer (checked against server/services/resumeService.js and the route itself), the
+//   dashboard keeps only a generated course's id (a UUID), and isSignInRequired (not for a deleted
+//   account, which apiClient already handles).
+// - components/common/GeneratedCoursesSignInNotice.tsx: the sign-in could not be confirmed; its
+//   button signs in again without asking (logout reason 'reauth'). The four views that load generated
+//   courses show it on a 401 (source checks).
 // The front-end modules are bundled with esbuild (a Vite dependency) with their imports stubbed.
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { createApp } from '../../server.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
+import { buildResumeCard } from '../services/resumeService.js';
 import { LESSON_UI_TEMPLATE_ID } from '../../tools/core/lessons.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -25,6 +29,8 @@ const COURSE = 'aaaaaaaa-0000-4000-8000-000000000001';
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 // Loaded inside the tests, so the other tests still run where the module does not exist yet.
 const loadHelpers = () => import('../../services/generatedCourses.ts');
+/** What a JSON answer turns a value into. */
+const overJson = (value) => JSON.parse(JSON.stringify(value));
 
 async function bundle(contents, stubs, env = {}) {
   const plugin = {
@@ -61,20 +67,21 @@ const loadCurriculumApi = () => bundle(
 
 const answer = (status, body = {}) => async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-describe('GET /api/v2/curricula (the library list)', () => {
+/** createApp in development (the dev fallback learner, so no token is needed) on a stand-in pool. */
+function withDevApp(respond) {
   const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS'];
   const saved = {};
-  let queries;
+  const queries = [];
   beforeEach(() => {
     for (const key of ENV_KEYS) saved[key] = process.env[key];
     for (const key of ENV_KEYS) delete process.env[key];
-    process.env.NODE_ENV = 'development'; // the dev fallback learner, so no token is needed
-    queries = [];
+    process.env.NODE_ENV = 'development';
+    queries.length = 0;
     resetPoolForTests();
     setPoolForTests({
       query: async (text, params) => {
         queries.push({ text, params });
-        return /from curricula/i.test(text) ? { rowCount: 1, rows: [{ id: COURSE, title: 'Course', total_lessons: 7 }] } : { rowCount: 0, rows: [] };
+        return respond(text) ?? { rowCount: 0, rows: [] };
       },
       connect: async () => { throw new Error('no client in this test'); },
       on() {},
@@ -87,27 +94,52 @@ describe('GET /api/v2/curricula (the library list)', () => {
       else process.env[key] = saved[key];
     }
   });
-
-  it('sends total_lessons and leaves out lesson drafts and generations still in progress', async () => {
+  const get = async (urlPath) => {
     const app = await createApp({ serveStatic: false });
     const server = await new Promise((resolve) => {
       const s = app.listen(0, () => resolve(s));
     });
     try {
-      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v2/curricula`);
-      assert.equal(response.status, 200);
-      assert.equal((await response.json()).curricula[0].total_lessons, 7);
+      const response = await fetch(`http://127.0.0.1:${server.address().port}${urlPath}`);
+      return { status: response.status, body: await response.json() };
     } finally {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
-    const list = queries.find((q) => /from curricula/i.test(q.text));
+  };
+  return { queries, get };
+}
+
+describe('GET /api/v2/curricula (the library list)', () => {
+  const app = withDevApp((text) => (/from curricula/i.test(text) ? { rowCount: 1, rows: [{ id: COURSE, title: 'Course', total_lessons: 7 }] } : null));
+
+  it('sends total_lessons and leaves out lesson drafts and generations still in progress', async () => {
+    const { status, body } = await app.get('/api/v2/curricula');
+    assert.equal(status, 200);
+    assert.equal(body.curricula[0].total_lessons, 7);
+    const list = app.queries.find((q) => /from curricula/i.test(q.text));
     assert.ok(list, 'the list query ran');
     const select = list.text.slice(0, list.text.search(/\bfrom curricula\b/i));
     assert.match(select, /\btotal_lessons\b/, 'total_lessons is selected');
     assert.match(list.text, /ui_template_id is distinct from \$4/, 'lesson drafts are left out');
-    assert.equal(list.params[3], LESSON_UI_TEMPLATE_ID);
     assert.match(list.text, /not starts_with\(coalesce\(status, ''\), 'draft_'\) or current_version_id is not null/, 'generations in progress are left out until they have content');
+    assert.match(list.text, /limit \$2 offset \$3/);
+    assert.deepEqual(list.params.slice(1), [50, 0, LESSON_UI_TEMPLATE_ID]);
+  });
+});
+
+describe('GET /api/v2/curricula/:id/resume', () => {
+  const CONTENT = { modules: [{ id: 'm1', title: 'Module 1', lessons: [{ id: 'l1', title: 'Lesson 1' }, { id: 'l2', title: 'Lesson 2' }] }] };
+  const app = withDevApp((text) => (/from curricula/i.test(text) ? { rowCount: 1, rows: [{ content_json: CONTENT }] } : null));
+
+  it('answers the card at the top level, which parseResumeCard reads back', async () => {
+    const { parseResumeCard } = await loadHelpers();
+    const { status, body } = await app.get(`/api/v2/curricula/${COURSE}/resume`);
+    assert.equal(status, 200);
+    const card = overJson(buildResumeCard({ progress: [], curriculum: CONTENT }));
+    assert.equal(card.type, 'fresh_start');
+    assert.deepEqual(body, { ok: true, ...card });
+    assert.deepEqual(parseResumeCard(body), card);
   });
 });
 
@@ -116,10 +148,14 @@ describe('services/curriculumApi.ts', () => {
     delete globalThis.__apiFetch;
   });
 
-  it('fetchGeneratedCourses throws a 401 with its status; any other failure is an empty list', async () => {
+  it('fetchGeneratedCourses throws a 401 with its status and body; any other failure is an empty list', async () => {
     const api = await loadCurriculumApi();
-    globalThis.__apiFetch = answer(401, { error: 'Authentication required' });
-    await assert.rejects(api.fetchGeneratedCourses(), (error) => error.status === 401);
+    const { isSignInRequired } = await loadHelpers();
+    globalThis.__apiFetch = answer(401, { error: 'Invalid or expired token' });
+    await assert.rejects(api.fetchGeneratedCourses(), (error) => error.status === 401 && isSignInRequired(error));
+    // A deleted account: apiClient ends the session and leaves the app; no sign-in notice meanwhile.
+    globalThis.__apiFetch = answer(401, { error: 'Account deleted', error_type: 'account_deleted' });
+    await assert.rejects(api.fetchGeneratedCourses(), (error) => error.status === 401 && !isSignInRequired(error));
     for (const failure of [answer(500, { error: 'Failed to load curricula' }), answer(503), async () => { throw new TypeError('Failed to fetch'); }]) {
       globalThis.__apiFetch = failure;
       assert.deepEqual(await api.fetchGeneratedCourses(), []);
@@ -134,21 +170,35 @@ describe('services/curriculumApi.ts', () => {
     assert.equal(course.totalLessons, 7);
   });
 
-  it("fetchGeneratedCourseById keeps a failed answer's status", async () => {
+  it('fetchGeneratedCourseById: a 401 carries its status and body, any other failure is a plain error', async () => {
     const api = await loadCurriculumApi();
-    for (const status of [401, 404, 500]) {
+    globalThis.__apiFetch = answer(401, { error: 'Invalid or expired token' });
+    await assert.rejects(api.fetchGeneratedCourseById(COURSE), (error) => error.status === 401 && error.body?.error === 'Invalid or expired token');
+    // CourseGeneratorView (classifyAiError) would read a 503 here as "AI is unavailable".
+    for (const status of [404, 500, 503]) {
       globalThis.__apiFetch = answer(status, { error: 'x' });
-      await assert.rejects(api.fetchGeneratedCourseById(COURSE), (error) => error.status === status, String(status));
+      await assert.rejects(api.fetchGeneratedCourseById(COURSE), (error) => error.status === undefined, String(status));
     }
   });
 });
 
 describe('services/generatedCourses.ts', () => {
-  it('parseResumeCard reads the card at the top level of the resume answer', async () => {
+  it('parseResumeCard reads every card the server builds, in the route\'s shape', async () => {
     const { parseResumeCard } = await loadHelpers();
-    const card = { type: 'gentle_return', message: 'おかえりなさい', gap_days: 9 };
-    assert.deepEqual(parseResumeCard({ ok: true, ...card }), card);
-    for (const payload of [null, 'x', { ok: true }, { ok: false, ...card }, { resume_card: card }, { ok: true, type: 'other', message: 'm' }, { ok: true, type: 'continue' }]) {
+    const curriculum = { modules: [{ id: 'm1', lessons: [{ id: 'l1', title: 'One' }, { id: 'l2', title: 'Two' }] }] };
+    const last = '2026-10-01T09:00:00.000Z';
+    const progress = [{ module_id: 'm1', lesson_id: 'l1', status: 'done', updated_at: last }];
+    const daysLater = (days) => new Date(Date.parse(last) + days * 86_400_000);
+    const cards = [
+      buildResumeCard({ progress: [], curriculum }),
+      buildResumeCard({ progress, curriculum, now: daysLater(1) }),
+      buildResumeCard({ progress, curriculum, now: daysLater(4) }),
+      buildResumeCard({ progress, curriculum, now: daysLater(10) }),
+    ].map(overJson);
+    assert.deepEqual(cards.map((card) => card.type), ['fresh_start', 'continue', 'gentle_return', 'recovery']);
+    for (const card of cards) assert.deepEqual(parseResumeCard({ ok: true, ...card }), card, card.type);
+
+    for (const payload of [null, 'x', { ok: true }, { ok: false, ...cards[1] }, { resume_card: cards[1] }, { ok: true, type: 'other', message: 'm' }, { ok: true, type: 'continue' }]) {
       assert.equal(parseResumeCard(payload), null, JSON.stringify(payload));
     }
   });
@@ -162,10 +212,12 @@ describe('services/generatedCourses.ts', () => {
     }
   });
 
-  it('isSignInRequired is true for a 401 only', async () => {
+  it('isSignInRequired is true for a 401, except a deleted account', async () => {
     const { isSignInRequired } = await loadHelpers();
     assert.equal(isSignInRequired(Object.assign(new Error('x'), { status: 401 })), true);
-    for (const error of [null, undefined, new Error('x'), { status: 403 }, { status: '401' }]) {
+    assert.equal(isSignInRequired({ status: 401, body: { error: 'Invalid or expired token' } }), true);
+    assert.equal(isSignInRequired({ status: 401, body: { error_type: 'oauth_client_token' } }), true);
+    for (const error of [null, undefined, new Error('x'), { status: 403 }, { status: '401' }, { status: 401, body: { error_type: 'account_deleted' } }]) {
       assert.equal(isSignInRequired(error), false, JSON.stringify(error));
     }
   });
@@ -210,11 +262,11 @@ describe('components/common/GeneratedCoursesSignInNotice.tsx', () => {
     return out;
   };
 
-  it('says the sign-in ended and signs in again without a question', async () => {
+  it('says the sign-in could not be confirmed and signs in again without a question', async () => {
     const { default: Notice } = await loadNotice();
     const cases = [
-      ['jp', '生成したコースを読み込めませんでした', 'ログインが切れています', 'もう一度ログインする'],
-      ['en', 'Your generated courses could not be loaded', 'Your sign-in has ended', 'Sign in again'],
+      ['jp', '生成したコースを読み込めませんでした', 'ログインの確認ができませんでした。', 'ログインし直す'],
+      ['en', 'Your generated courses could not be loaded', 'Your sign-in could not be confirmed.', 'Sign in again'],
     ];
     for (const [language, title, body, action] of cases) {
       globalThis.__language = language;
@@ -223,7 +275,7 @@ describe('components/common/GeneratedCoursesSignInNotice.tsx', () => {
         const { text, elements } = collect(expand(Notice({})));
         assert.equal(elements[0].props.role, 'alert', language);
         assert.ok(text.includes(title), `${language}: ${text.join(' | ')}`);
-        assert.ok(text.some((line) => line.includes(body)), `${language}: ${text.join(' | ')}`);
+        assert.ok(text.some((line) => line.startsWith(body)), `${language}: ${text.join(' | ')}`);
         const button = elements.find((element) => element.type === 'Button');
         assert.ok(button, language);
         assert.deepEqual(collect(button.props.children).text, [action], language);
@@ -257,5 +309,13 @@ describe('the views that load generated courses', () => {
     assert.doesNotMatch(wrapper, /resume_card/);
     const dashboard = read('components/features/dashboard/MissionControlDashboard.tsx');
     assert.match(dashboard, /activeCurriculumId\(window\.localStorage\.getItem\('active_curriculum_id'\)\)/);
+  });
+
+  it('the course and lesson pages start over when the course changes in place', () => {
+    for (const file of ['components/wrappers/GeneratedCourseViewWrapper.tsx', 'components/wrappers/GeneratedLessonViewWrapper.tsx']) {
+      const effect = read(file).match(/useEffect\(\(\) => \{[\s\S]*?\}, \[courseId[^\]]*\]\);/)?.[0] ?? '';
+      assert.match(effect, /setSignInRequired\(false\);/, file);
+      assert.match(effect, /setLoading\(true\);/, file);
+    }
   });
 });

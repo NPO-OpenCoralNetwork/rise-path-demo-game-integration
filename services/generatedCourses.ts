@@ -6,11 +6,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const RESUME_CARD_TYPES = new Set(['fresh_start', 'continue', 'gentle_return', 'recovery']);
 
 /**
- * True for the error fetchGeneratedCourses and fetchGeneratedCourseById throw on a 401 (the
- * sign-in ended): the view asks to sign in again (GeneratedCoursesSignInNotice).
+ * True for the error fetchGeneratedCourses and fetchGeneratedCourseById throw on a 401 (the API
+ * could not confirm the sign-in): the view asks to sign in again (GeneratedCoursesSignInNotice).
+ * Not for a deleted account: apiClient has already started ending that session and leaving the app.
  */
-export const isSignInRequired = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 401;
+export const isSignInRequired = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  const { status, body } = error as { status?: unknown; body?: unknown };
+  const errorType = typeof body === 'object' && body !== null ? (body as { error_type?: unknown }).error_type : undefined;
+  return status === 401 && errorType !== 'account_deleted';
+};
 
 /**
  * The course the dashboard shows insights for: the id the course page stored, only when it names

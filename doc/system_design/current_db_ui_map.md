@@ -216,7 +216,8 @@ flowchart TB
 - `server/routes/content.js` tries a legacy fallback `SELECT content FROM curricula`,
   which depends on the `content` column added by the migration script.
 - `curricula.visibility` exists in SQL but is not read by API routes. `GET /api/v2/curricula` reads
-  `ui_template_id` to leave out lesson drafts (`risepath_lesson_v1`).
+  `ui_template_id` and `status` to leave out lesson drafts (`risepath_lesson_v1`) and generations still
+  in progress (`draft_<stage>` without a current version).
 - `curriculum_versions.content_mix`, `assessment_mix`, `ui_hints`, `created_by` are not referenced
   in runtime code.
 

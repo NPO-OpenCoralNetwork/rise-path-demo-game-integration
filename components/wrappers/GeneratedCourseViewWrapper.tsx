@@ -46,6 +46,13 @@ const GeneratedCourseViewWrapper: React.FC = () => {
       return;
     }
 
+    // Another course in the same page (history): nothing of the previous one stays.
+    setCourse(null);
+    setResumeCard(null);
+    setError(null);
+    setSignInRequired(false);
+    setLoading(true);
+
     // Track active curriculum for dashboard widget
     localStorage.setItem('active_curriculum_id', courseId);
 
