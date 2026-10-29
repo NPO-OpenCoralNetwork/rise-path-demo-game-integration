@@ -136,10 +136,11 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     });
 
     // CORS: the whole API answers only the app's own origins (server/llm/guestAccess.js
-    // createOriginPolicy: LLM_ALLOWED_ORIGINS, the same host, and local pages outside production).
-    // A page on another site can then neither read the API's answers nor send it JSON or an
-    // Authorization header, which need a preflight. (CORS is not access control: a simple request
-    // still runs. The LLM gateway also refuses a POST from another origin: originGuard below.)
+    // createOriginPolicy: LLM_ALLOWED_ORIGINS, the same host, and outside production localhost,
+    // 127.0.0.1 and port 3007 on any host). A page on another site can then neither read the
+    // API's answers nor send it JSON or an Authorization header, which need a preflight. (CORS is
+    // not access control: a simple request still runs. The LLM gateway also refuses a POST from
+    // another origin: originGuard below.)
     const isAllowedOrigin = createOriginPolicy();
     const apiCors = cors((req, callback) => callback(null, { origin: isAllowedOrigin(req.headers.origin, req) }));
     app.use((req, res, next) => {
@@ -166,7 +167,8 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     // logger and the global limiter.
     app.post(BILLING_WEBHOOK_PATH, express.raw({ type: 'application/json', limit: BILLING_WEBHOOK_BODY_LIMIT }));
     // Every other JSON body: 2 MB (the last handler answers a refusal as JSON). The largest real
-    // one, a lesson, is under 80 kb; uploads are multipart, which no JSON parser reads.
+    // one, a curriculum draft (titles and goals of at most 12 x 10 lessons), is far smaller;
+    // uploads are multipart, which no JSON parser reads.
     app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount

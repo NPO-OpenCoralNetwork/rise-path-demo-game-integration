@@ -106,6 +106,8 @@ describe('API CORS and JSON body limit (server.js)', () => {
             assert.equal(sameHost.headers.get('access-control-allow-origin'), base, 'the page and the API on one host');
             const devServer = await preflight(base, 'http://localhost:3007', '/api/v2/user/profile');
             assert.equal(devServer.headers.get('access-control-allow-origin'), null, 'no local pages in production');
+            const opaque = await preflight(base, 'null', '/api/v2/user/profile');
+            assert.equal(opaque.headers.get('access-control-allow-origin'), null, 'a sandboxed page or a file');
 
             // A simple request still runs (CORS is not access control), but another site cannot read the answer.
             for (const [origin, expected] of [[EVIL, null], [APP, APP], [undefined, null]]) {
@@ -138,6 +140,10 @@ describe('API CORS and JSON body limit (server.js)', () => {
             const refused = await preflight(base, EVIL, '/api/v2/user/profile', 'PUT');
             assert.equal(refused.status, 204, 'not the 401 of requireAuth');
             assert.equal(await refused.text(), '');
+            // An OPTIONS without an Origin (not a browser's) ends at CORS too, with no origin allowed.
+            const bare = await fetch(`${base}/api/v2/user/profile`, { method: 'OPTIONS' });
+            assert.equal(bare.status, 204, 'not the 401 of requireAuth');
+            assert.equal(bare.headers.get('access-control-allow-origin'), null);
         });
     });
 
