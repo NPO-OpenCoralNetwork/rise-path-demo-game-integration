@@ -103,6 +103,9 @@ services:
       # VITE_FEATURE_LEGAL_PAGES=true on Vercel; ignored while the texts are drafts. mcp-public reads
       # the same name from mcp-public.env.
       LEGAL_TERMS_REQUIRED: ${LEGAL_TERMS_REQUIRED:-}
+      # Job training (doc/brushup-2026/training-plan.ja.md D5; stack.env.example). Exactly "true" turns
+      # /api/v2/training on; empty (the default) answers 404 there. Only the school deployment sets it.
+      TRAINING_ENABLED: ${TRAINING_ENABLED:-}
       KOKORO_TTS_URL: ${KOKORO_TTS_URL:-http://kokoro-tts:8880}
       KOKORO_TTS_DEFAULT_VOICE_JA: ${KOKORO_TTS_DEFAULT_VOICE_JA:-jf_alpha}
       KOKORO_TTS_DEFAULT_VOICE_EN: ${KOKORO_TTS_DEFAULT_VOICE_EN:-af_bella}

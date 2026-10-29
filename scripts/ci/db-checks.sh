@@ -220,8 +220,8 @@ if [[ -z "${EXISTING}" ]]; then
 fi
 expect_eq "limits" "$(sql postgres "SELECT rolconnlimit || ' ' || (SELECT string_agg(c, ',' ORDER BY c) FROM unnest(rolconfig) AS c) FROM pg_roles WHERE rolname = 'risepath_mcp_remote'")" \
   "20 idle_in_transaction_session_timeout=30s,statement_timeout=10s"
-expect_eq "never granted" "$(psql "${REMOTE}" -X -At -c "SELECT string_agg(t || '=' || has_table_privilege(t, 'SELECT'), ' ' ORDER BY t) FROM unnest(ARRAY['learning_days', 'lesson_progress_lesson_resets', 'lesson_progress_resets', 'review_log', 'xp_awards']) AS t")" \
-  "learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false xp_awards=false"
+expect_eq "never granted" "$(psql "${REMOTE}" -X -At -c "SELECT string_agg(t || '=' || has_table_privilege(t, 'SELECT'), ' ' ORDER BY t) FROM unnest(ARRAY['learning_days', 'lesson_progress_lesson_resets', 'lesson_progress_resets', 'review_log', 'training_cohorts', 'training_memberships', 'xp_awards']) AS t")" \
+  "learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false"
 expect_eq "reads lesson_progress" "$(psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM lesson_progress')" 0
 if psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM xp_awards' > /dev/null 2>&1; then bad "the role read xp_awards"; else ok "the role cannot read xp_awards"; fi
 # Phase 8: the terms check (LEGAL_TERMS_REQUIRED) reads the newest acceptance with the statement of

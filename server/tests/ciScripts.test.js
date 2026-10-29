@@ -406,7 +406,7 @@ describe('scripts/ci/db-checks.sh', () => {
         assert.match(role, /^ALTER ROLE risepath_mcp_remote SET statement_timeout = '10s';$/m);
         assert.match(role, /^ALTER ROLE risepath_mcp_remote SET idle_in_transaction_session_timeout = '30s';$/m);
         assert.match(code, /^expect_eq "limits" "\$\(sql postgres "SELECT rolconnlimit \|\| ' ' \|\| \(SELECT string_agg\(c, ',' ORDER BY c\) FROM unnest\(rolconfig\) AS c\) FROM pg_roles WHERE rolname = 'risepath_mcp_remote'"\)" \\\n {2}"20 idle_in_transaction_session_timeout=30s,statement_timeout=10s"$/m);
-        const never = ['learning_days', 'lesson_progress_lesson_resets', 'lesson_progress_resets', 'review_log', 'xp_awards'];
+        const never = ['learning_days', 'lesson_progress_lesson_resets', 'lesson_progress_resets', 'review_log', 'training_cohorts', 'training_memberships', 'xp_awards'];
         for (const table of never) assert.doesNotMatch(role, new RegExp(`^GRANT SELECT[^;]* ON ${table} `, 'm'), `${table} is never readable`);
         assert.match(code, new RegExp(`^expect_eq "never granted" "\\$\\(psql "\\$\\{REMOTE\\}" -X -At -c "SELECT string_agg\\(t \\|\\| '=' \\|\\| has_table_privilege\\(t, 'SELECT'\\), ' ' ORDER BY t\\) FROM unnest\\(ARRAY\\[${never.map((t) => `'${t}'`).join(', ')}\\]\\) AS t"\\)" \\\\\n {2}"${never.map((t) => `${t}=false`).join(' ')}"$`, 'm'));
         assert.match(code, /^expect_eq "the role logs in with its password" "\$\(psql "\$\{REMOTE\}" -X -At -c 'SELECT current_user'\)" risepath_mcp_remote$/m);
@@ -437,7 +437,7 @@ describe('scripts/ci/db-checks.sh', () => {
         for (const line of [
             "FAIL the role logs in with its password: got '0', want 'risepath_mcp_remote'",
             "FAIL limits: got '0', want '20 idle_in_transaction_session_timeout=30s,statement_timeout=10s'",
-            "FAIL never granted: got '0', want 'learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false xp_awards=false'",
+            "FAIL never granted: got '0', want 'learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false'",
             'FAIL a wrong password logged in',
             'FAIL the role read xp_awards',
             'FAIL the role read legal_acceptances.id',

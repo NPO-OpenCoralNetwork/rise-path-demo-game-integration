@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_FEATURE_BILLING?: string;
   /** "true" publishes /terms and /privacy and the consent flow (config/features.ts → features.legalPages). Default off. */
   readonly VITE_FEATURE_LEGAL_PAGES?: string;
+  /** "true" ships the job-training section /training (config/features.ts → features.training). Default off. */
+  readonly VITE_FEATURE_TRAINING?: string;
   /** https URL or mailto: where deletion and other requests arrive (config/support.ts). Unset: "tell the staff". */
   readonly VITE_SUPPORT_CONTACT?: string;
 }

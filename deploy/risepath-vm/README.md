@@ -119,12 +119,12 @@ nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋�
 # CI の Server stack deploy の「Preflight」の行とくらべ、stack.env の SUPABASE_URL が https://<project>.supabase.co であることを見ます。
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–020 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–021 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–020 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–021 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
 
@@ -426,6 +426,35 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-phase6.mjs` は、020 と、カードが加わる決まり・復習の記録・やり直しと削除・リモート MCP のロールの列ごとの権限・上の確認と削除（P10）を、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 020 の行）。VM の DB には決して向けないでください。
 
+## 職業訓練（骨組み）
+
+職業訓練の期と割り当て、`/api/v2/training` の入口です。学校のデプロイだけで使い、公開版の Rise Path では使いません。決定と理由は [`doc/brushup-2026/training-plan.ja.md`](../../doc/brushup-2026/training-plan.ja.md) です。
+
+**この版の最初のデプロイ**
+
+- migration 021 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。021 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が 021 の表に印を付けるため）。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
+- 021 は新しい表を 2 つ作るだけです。`auth.users` はロックせず、ログインした呼び出しもアカウントの削除も待ちません。`sql/mcp_remote_role.sql` は流し直さなくてかまいません（どちらの表も、リモート MCP のロールに渡しません）。
+- 公開版では `TRAINING_ENABLED` を設定しません。表は空のままで、`/api/v2/training` は 404 を返し、職員のスクリプトも動きません。
+
+**設定（`stack.env`。秘密の値ではありません。`api` だけが読みます）**
+
+| 変数 | 既定 | 中身 |
+|---|---|---|
+| `TRAINING_ENABLED` | 未設定（止まっている） | ちょうど `true` のときだけ、`/api/v2/training` が答え、職員のスクリプトが動きます。ほかの値（`TRUE`・`1`・`yes` など）では止まったままです。値は `api` のコンテナを作るときに入るので、変えたら `./scripts/deploy-stack.sh` を実行し直します（`exec` で動かす職員のスクリプトも、そのコンテナの値を見ます）。学校のデプロイだけで設定します |
+
+**職員のスクリプト**（`api` コンテナの中で。`TRAINING_ENABLED=true` のときだけ動きます）
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --create-cohort 2026-11-web --name "2026年11月 Web" --starts-on 2026-11-01 --ends-on 2027-01-31
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --add <account uuid> --cohort 2026-11-web --role learner
+docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --list 2026-11-web
+```
+
+割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（`TRAINING_ENABLED` が `true` でない、期がない、ほかの役割で割り当てずみ、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
+
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 の行）。VM の DB には決して向けないでください。
+
 ## CI での予行（Phase 7）
 
 GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プルリクエストのたびに、このディレクトリの `deploy-stack.sh` をダミーの値で動かします（チェック `Server stack deploy` と `Learner end-to-end`）。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章です。
@@ -433,7 +462,7 @@ GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プ
 - `ci/stack.ci.env` は、CI だけのダミーの値です。VM では使いません。`scripts/ci/stack.sh` が 1 回の実行のあいだだけ `stack.env` にコピーし、終わると消します。1 行目に `# risepath-ci-env:` の印があり、印のない `stack.env`（自分で作ったもの）があると、書き換えずに止まります。`billing.env`・`tunnel.env`・`mcp-public.env` があるときも止まります。
 - Compose のプロジェクト名は `risepath-ci` なので、`risepath` のスタックには触れません。
 - `deploy-stack.sh` は、環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` のときだけ git pull を飛ばします。**VM では設定しません。** `stack.env` に書いても効きません。
-- CI が確かめること: 空の DB への migration 000–020、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
+- CI が確かめること: 空の DB への migration 000–021、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
 - 作り直した VM の最初のデプロイの前に、main の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）が緑であることを確かめます。
 - 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
 

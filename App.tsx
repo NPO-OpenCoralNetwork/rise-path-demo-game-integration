@@ -110,6 +110,7 @@ import {
   PrivacyRoute,
   LegalConsentView,
   ReviewView,
+  TrainingRoute,
 } from './components/routes/lazyRoutes';
 import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthConsentRules';
 
@@ -242,6 +243,7 @@ const AppContent: React.FC = () => {
     // Lesson reader (default theme; the shell switches to the rail via isLessonPath).
     if (path.startsWith('/learn/') || path.startsWith('/preview/')) return ViewState.LESSON;
     if (path === '/dev/blocks') return ViewState.DEV_BLOCKS;
+    if (path === '/training' || path.startsWith('/training/')) return ViewState.TRAINING;
     return ViewState.DASHBOARD;
   };
 
@@ -404,6 +406,9 @@ const AppContent: React.FC = () => {
               <Route path="/profile/badges" element={<ProfileBadgesView />} />
               {/* Phase 6: today's review cards (signed-in learners; the page explains sign-in to guests). */}
               <Route path="/review" element={<ReviewView />} />
+              {/* Job training (doc/brushup-2026/training-plan.ja.md 4.6): only with VITE_FEATURE_TRAINING=true
+                  (config/features.ts); otherwise the home page. */}
+              <Route path="/training/*" element={features.training ? <TrainingRoute /> : <Navigate to="/" replace />} />
               <Route path="/profile/generated" element={<ProfileGeneratedView onNavigate={handleNavigate} />} />
               <Route path="/profile/edit" element={<ProfileEditView onNavigate={handleNavigate} />} />
               <Route path="/profile/mirror" element={<LearningMirrorView />} />
