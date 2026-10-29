@@ -14,6 +14,7 @@ import { ViewState, DocChapter, LocalizedDocBlock, QuizData, LocalizedText } fro
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import GlossaryText from '../../common/GlossaryText';
+import { resolveMermaidSource } from '../ai/mermaidSource';
 import VibeQuizView from './VibeQuizView';
 
 // Configure PDF worker
@@ -927,8 +928,11 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: Lang }> = ({
          if (!block.headers || !block.rows) return null;
          return <TableBlock headers={block.headers} rows={block.rows} language={language} />;
 
-      case 'mermaid':
-         return <MermaidBlock chart={block.chart} caption={block.caption} language={language} />;
+      case 'mermaid': {
+         // Same guard as GeneratedDocView: a block without a source is not drawn.
+         const source = resolveMermaidSource(block);
+         return source ? <MermaidBlock chart={source} caption={block.caption} language={language} /> : null;
+      }
 
       default:
          return null;

@@ -8,6 +8,8 @@ import ProgressAdoptDialog from './components/lesson/ProgressAdoptDialog';
 import UnsavedLogoutDialog from './components/lesson/UnsavedLogoutDialog';
 import SaveStoppedNotice from './components/lesson/SaveStoppedNotice';
 import { VIEW_PATHS } from './navigation/viewPaths';
+import { normalizePath, trackViewForPath } from './navigation/pathViews';
+import { authReturnTarget, postSignInPath } from './navigation/authReturn';
 import { features } from './config/features';
 import { syncLegalGate, useLegalGate } from './components/legal/legalGateClient';
 import LegalNoticeBar from './components/legal/LegalNoticeBar';
@@ -113,11 +115,8 @@ import { OAUTH_CONSENT_PATH, pendingConsentReturnPath } from './services/oauthCo
 
 /** sessionStorage key for the page to open after sign-in. */
 const RETURN_TO_KEY = 'rp:returnTo';
-/** Same-origin app paths only ("/learn/…"), never "//host" or absolute URLs. */
-const isInAppPath = (path: string) => path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
 /** Pages open when signed out; they render outside the Layout then. */
 const PUBLIC_PATHS = new Set(['/aidj', '/ai-safety', '/legal/commerce', '/terms', '/privacy', '/account/deleted']);
-const normalizePath = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 /**
  * Pages that stay open while the signed-in learner has not accepted a terms version that requires
  * acceptance (Phase 4, design §4.3, finding 17): reading the texts and every public page, deleting
@@ -152,14 +151,14 @@ const readLocalStorage = (): Storage | null => {
  * the dashboard. `consume` clears the saved path.
  */
 const postSignInTarget = (consume: boolean): string => {
+  let saved: string | null = null;
   try {
-    const saved = sessionStorage.getItem(RETURN_TO_KEY);
+    saved = sessionStorage.getItem(RETURN_TO_KEY);
     if (consume) sessionStorage.removeItem(RETURN_TO_KEY);
-    if (saved && isInAppPath(saved)) return saved;
   } catch {
     // Storage blocked: fall through.
   }
-  return pendingConsentReturnPath(readLocalStorage()) ?? '/';
+  return postSignInPath(saved, pendingConsentReturnPath(readLocalStorage()));
 };
 
 /** Signed in on /auth/callback or /auth/confirm-pending (the session arrived first): forward once. */
@@ -232,10 +231,11 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/course-generator')) return ViewState.COURSE_GENERATOR;
     if (path.startsWith('/characters') || path.startsWith('/character')) return ViewState.AI_CHARACTERS;
     if (path.startsWith('/blender')) return ViewState.BLENDER;
-    if (path.startsWith('/programming')) return ViewState.PROGRAMMING;
+    // /programming and /vibe: light or dark shell to match each page ("/vibe/" is "/vibe").
+    const trackView = trackViewForPath(normalizePath(path));
+    if (trackView) return trackView as ViewState;
     if (path.startsWith('/art')) return ViewState.ART_MUSEUM;
     if (path.startsWith('/sonic')) return ViewState.SONIC_LAB;
-    if (path.startsWith('/vibe')) return ViewState.PROGRAMMING_VIBE;
     if (path.startsWith('/claude-code')) return ViewState.CLAUDE_CODE;
     if (path.startsWith('/unity')) return ViewState.UNITY_AI_GAME_DEV;
     if (path === '/library') return ViewState.LIBRARY;
@@ -285,11 +285,15 @@ const AppContent: React.FC = () => {
     navigate(`/generated-course/${course.id}`);
   };
 
-  // In-app path to open after sign-in (the landing's "read chapter 1" CTA when guest access
-  // is off). sessionStorage, so it survives the OAuth redirect through /auth/callback.
+  // In-app path to open after sign-in: the landing's "read chapter 1" CTA when guest access is
+  // off; else, unless an AI app's connection request is waiting (postSignInTarget returns to it),
+  // the page the visitor opened (a shared lesson link shows the landing at that URL).
+  // sessionStorage, so it survives the OAuth redirect through /auth/callback.
   const openAuth = (mode: AuthMode, returnTo?: string) => {
+    const consentWaiting = pendingConsentReturnPath(readLocalStorage()) !== null;
+    const target = authReturnTarget(returnTo, location, consentWaiting);
     try {
-      if (returnTo && isInAppPath(returnTo)) sessionStorage.setItem(RETURN_TO_KEY, returnTo);
+      if (target) sessionStorage.setItem(RETURN_TO_KEY, target);
       else sessionStorage.removeItem(RETURN_TO_KEY);
     } catch {
       // Storage blocked: sign-in still works and lands on the dashboard.

@@ -15,6 +15,7 @@ import { GeneratedLesson, CurriculumPersonalization } from '../../../services/cu
 import LessonReflectionModal from './LessonReflectionModal';
 import GlossaryText from '../../common/GlossaryText';
 import { generateImagePreview, isImageGenerationUnavailable } from '../../../services/curriculumApi';
+import { resolveMermaidSource } from './mermaidSource';
 import { dailyLimitResetAt, dailyLimitScope, nextJstMidnight } from '../../../services/aiDailyLimit';
 import { aiAccessErrorKind } from '../../../services/aiAccessRules';
 import {
@@ -1880,8 +1881,11 @@ const BlockRenderer: React.FC<{ block: LocalizedDocBlock; language: 'en' | 'jp' 
             );
         }
 
-        case 'mermaid':
-            return <MermaidBlock chart={block.chart} caption={block.caption} language={language} />;
+        case 'mermaid': {
+            // A block without `chart` (drafts saved over MCP are not checked) is not drawn.
+            const source = resolveMermaidSource(block);
+            return source ? <MermaidBlock chart={source} caption={block.caption} language={language} /> : null;
+        }
 
         case 'table':
             if (!block.headers || !block.rows) return null;
