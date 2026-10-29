@@ -170,3 +170,14 @@ jobs:
             exit 1
           fi
           echo "No legal text in the bundle."
+
+      # Job training (doc/brushup-2026/training-plan.ja.md 4.8): this build runs with
+      # VITE_FEATURE_TRAINING unset, so the training section (components/features/training/, whose
+      # page root carries the marker "risepath-training-ui") must not be in it.
+      - name: Fail if training code reached the bundle
+        run: |
+          if grep -rlF -e 'risepath-training-ui' "$RUNNER_TEMP/dist"; then
+            echo "::error title=Training code in the bundle::components/features/training/ must load only through the conditional import in components/routes/lazyRoutes.tsx (VITE_FEATURE_TRAINING unset)."
+            exit 1
+          fi
+          echo "No training code in the bundle."

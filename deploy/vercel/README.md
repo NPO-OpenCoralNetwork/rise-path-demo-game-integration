@@ -44,6 +44,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - `VITE_FEATURE_AGENT_CHAT` は**設定しない**。共有の Hermes エージェントとのチャット（画面に浮かぶ AI コーチと `/life-journal/chat`）は、この値がちょうど `true` のときだけ出る。共有の Hermes は学習者に提供しないので、既定のままにする（レッスンの中の AI チューターには関係しない）。
 - `VITE_FEATURE_BILLING`（有料のサポータープランの画面。Phase 3）は、オーナーがテストの方と本番の経路を確かめるとき（[`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 7.2 の 3）まで**設定しない**。ちょうど `true` のときだけ `/settings/plan` と申し込みの最終確認の画面を出し、入口は API が認めた学習者にだけ出る。変えたらデプロイし直す（ビルドのときに入るため）。Stripe の鍵は Vercel にも `VITE_` にも入れない（鍵は VM の `billing.env` だけ。ブラウザは使わない）。Stripe の Webhook は `https://app.<domain>/api/v2/billing/webhook` を通るので、Production に Deployment Protection やボットのチャレンジをかけない。
 - `VITE_FEATURE_LEGAL_PAGES`（利用規約・プライバシーポリシーのページと登録の同意。Phase 4）は、公開のときまで**設定しない**。設定しないあいだ、`/terms` と `/privacy` は「準備中」を出し、登録画面に同意はない。**そのあいだは一般の登録を受け付けない**（拠点とテスターだけ）。公開するときは、弁護士の確認のあと、[`doc/legal/README.md`](../../doc/legal/README.md) の「ページを公開する手順」のとおりに `true` にして Redeploy する。文が下書きのままだと、ビルドが止まり、足りないものの一覧が出る。
+- `VITE_FEATURE_TRAINING`（職業訓練の画面 `/training`）は、この公開のプロジェクトでは**設定しない**。訓練の画面は学校のビルドだけに入れる（[`doc/brushup-2026/training-plan.ja.md`](../../doc/brushup-2026/training-plan.ja.md)）。CI は、設定しないビルドに訓練の画面のコードが入っていないことを確かめる。
 - `VITE_SUPPORT_CONTACT`（Phase 4）: 学習者の問い合わせ先。フォームの `https://` の URL か、アドレス 1 つの `mailto:`。アカウントの削除のページ、削除のあとのページ、同意のページ、設定の「このサービスについて」に出る。設定しないと「ご利用の拠点のスタッフにお伝えください」と出る。公開の前に設定し、規約の【要記入: 連絡先】と同じ窓口にする。秘密の値ではない。
 - **マージすると、すぐに画面（フロント）がデプロイされる**（Git 連携、Production Branch は `main`）。API は VM で `deploy-stack.sh` を実行するまで古いまま。新しい画面は古い API でも止まらないように作っているが、**同じ日に `deploy-stack.sh` を実行する**（[`deploy/risepath-vm/README.md`](../risepath-vm/README.md)）。
 - `VITE_` で始まる値はバンドルに入り、誰でも読める。`API_ORIGIN` と `ORIGIN_SECRET` に `VITE_` を付けない。
@@ -97,7 +98,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
    - Memanto なしは `e2-medium`（4 GB。既定）。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`（8 GB）。理由は VM README の「[マシンタイプ](../risepath-vm/README.md#マシンタイプ)」。
    - 月額は**推定**（未確認）: 24 時間稼働の `asia-northeast1` で `e2-medium` 約 $31、`e2-standard-2` 約 $63。ディスクは別。第三者のサイトの値なので、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめる。
    - `stack.env` は VM README の表のとおりに埋める。`POSTGRES_PASSWORD` は DB の最初の起動で固定される。`COMPOSE_PROFILES` は表のとおり（`tts`。Memanto を使うなら `tts,memory`）にし、手順 9〜10 の公開エッジの値はまだ入れない。`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま（Gemini の API 規約は 18 歳未満の人が使うサービスでの利用を禁じている）。`OPENROUTER_API_KEY` と `HERMES_API_KEY` は、Hermes を有効にする（`full` を入れる）ときだけ要る。
-   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–020 がすべて入る。
+   - 2 回目の最後に `api` コンテナ内の smoke が通れば、スタックは動いている。DB には migration 000–021 がすべて入る。
    - Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（VM README の「Mac `.env.local`」）。`ORIGIN_SECRET` を入れる前に、Mac のリポジトリ直下で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（[VM README](../risepath-vm/README.md#4-手動でスタック操作vm-上)）。
 
 3. GCP ファイアウォールを確認する。ルールはタグに付くので、前の VM のルールが残っていれば新しい VM にも効く。
@@ -158,7 +159,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
     - Memanto を使う場合は `COMPOSE_PROFILES=tts,memory,tunnel` にする（書き忘れても `deploy-stack.sh` が `memory` を足す）。`MEMANTO_ENABLED=true` も `stack.env` に入れる（VM 起動時の systemd ユニットが読む。手順 2 で入れていればそのまま）
     - `ANTHROPIC_API_KEY` が入っているか確かめる。チューター、文章フィードバック、コース生成が使う
     - `GEMINI_API_KEY` と `GEMINI_ALLOWED` が空か確かめる。Gemini を使わないので、教材の検索はキーワード検索で動き、AI の画像生成は止まる（`/api/v2/image` は 503）
-11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–020 が入ったので、すべて適用済み（未適用 0 件）と出れば正しい。
+11. `./scripts/deploy-stack.sh` で公開エッジを有効にする。その前に、任意で migration の状態を確かめる（適用はしない。正本 §4.2 の「[migration の確認](../../doc/guides/risepath_vm_deployment.md#migration-の確認適用前)」）。新しい VM では手順 2 の初回デプロイで 000–021 が入ったので、すべて適用済み（未適用 0 件）と出れば正しい。
 
     ```bash
     docker compose --env-file stack.env build api

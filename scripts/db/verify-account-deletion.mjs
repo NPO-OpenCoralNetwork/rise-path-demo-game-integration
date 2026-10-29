@@ -29,7 +29,8 @@
  *   R5  as risepath_mcp_remote: the trigger needs the 018 grant; the verifier's query
  *   R6  a seeded learner deleted in one transaction: what goes, what stays, what is marked
  *       (with migration 019's lesson resets, XP awards and learning days, and migration 020's review
- *       cards and review log: all go)
+ *       cards and review log: all go; migration 021's training membership: kept, marked with the
+ *       tombstone's time by the service's own statement, B's stays live, and A can be added again)
  *   R7  version archive rows never change; a version id must match its document
  *   R8  the lock key is canonical: an upper-case id locks what the trigger locks
  *   R9  the deletion service (server/services/accountDeletion.js) on a seeded learner: a terms
@@ -51,6 +52,11 @@
  *       line carries the full id; with terse (docker-compose.yml's db command) it does not, and the
  *       STATEMENT line holds $1. The log is read from --log-file <path> when given, else from
  *       pg_current_logfile() (logging_collector on); without either, R11 is skipped (exit 3).
+ *   R12 job training (migration 021) through tools/core/training.js: a cohort's dates read back as
+ *       written east of UTC; added, already, another role, no account; a deletion holding the
+ *       account lock makes an add wait, mark the member and refuse the add (control: the INSERT
+ *       without the lock leaves a live row for a deleted account); the staff list keeps the marked
+ *       row, the learner's own read does not
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -62,6 +68,7 @@ import { RESTARTED_SQL } from '../../tools/core/lessonProgress.js';
 import { isGrantRevoked } from '../../mcp-server/oauthVerifier.js';
 import { deleteAccountData, SQL as DELETION_SQL } from '../../server/services/accountDeletion.js';
 import { BATCH_LIMIT, RETENTION_LOCK_SQL, readRetentionConfig, runRetention } from '../../server/services/retention.js';
+import { addMember, createCohort, getTrainingMe, listMembers, TRAINING_SQL } from '../../tools/core/training.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
@@ -400,7 +407,7 @@ async function r5(pool) {
 async function r6(pool) {
     const A = uid('r6a');
     const B = uid('r6b');
-    const [CA, CB, VA, VB, VBA, SA, G1, G2] = ['ca', 'cb', 'va', 'vb', 'vx', 'sa', 'g1', 'g2'].map(uid);
+    const [CA, CB, VA, VB, VBA, SA, G1, G2, TC] = ['ca', 'cb', 'va', 'vb', 'vx', 'sa', 'g1', 'g2', 'tc'].map(uid);
     const terms = 'terms-draft-2026-10-01';
     const privacy = 'privacy-draft-2026-10-01';
     const today = "(now() AT TIME ZONE 'Asia/Tokyo')::date";
@@ -434,6 +441,9 @@ async function r6(pool) {
         ["INSERT INTO mcp_oauth_grants (user_id, client_id, client_name, first_seen_at, last_used_at) VALUES ($1, $2, 'never used', NULL, NULL)", [A, G2]],
         ["INSERT INTO legal_document_versions (version, document, sha256) VALUES ($1, 'terms', repeat('a', 64)), ($2, 'privacy', repeat('b', 64)) ON CONFLICT DO NOTHING", [terms, privacy]],
         ['INSERT INTO legal_acceptances (user_id, terms_version, privacy_version) VALUES ($1, $2, $3)', [A, terms, privacy]],
+        // Job training (migration 021): a cohort with A and B in it.
+        ['INSERT INTO training_cohorts (id, slug, name) VALUES ($1, $2, $3)', [TC, `r6-${TC.slice(0, 8)}`, 'R6 cohort']],
+        ["INSERT INTO training_memberships (cohort_id, user_id, role) VALUES ($1, $2, 'learner'), ($1, $3, 'learner')", [TC, A, B]],
     ];
     for (const [sql, params] of seed) await pool.query(/** @type {string} */ (sql), /** @type {unknown[]} */ (params));
     const ACCEPT = `INSERT INTO legal_acceptances (user_id, terms_version, privacy_version) VALUES ($1::uuid, $2, $3)
@@ -454,6 +464,8 @@ async function r6(pool) {
         paths = (await client.query('SELECT storage_path FROM materials WHERE user_id = $1::uuid AND storage_path IS NOT NULL', [id])).rows;
         const deletedAt = (await client.query(DELETION.tombstone, [id, 'staff'])).rows[0].deleted_at;
         await client.query('UPDATE legal_acceptances SET account_deleted_at = $2 WHERE user_id = $1::uuid AND account_deleted_at IS NULL', [id, deletedAt]);
+        // The service's own statement (it reads the time from the tombstone row written above).
+        await client.query(DELETION_SQL.markTrainingMemberships, [id]);
         await client.query(`INSERT INTO account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
             SELECT id, user_id, kind, policy_version, method, given_at, revoked_at, $2 FROM account_consents WHERE user_id = $1::uuid
             ON CONFLICT (consent_id) DO NOTHING`, [id, deletedAt]);
@@ -495,6 +507,9 @@ async function r6(pool) {
         ipKept: await n('SELECT count(*) AS n FROM ai_daily_usage WHERE subject LIKE $1', [`ip:198.51.100.%`]),
         acceptanceMarked: await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NOT NULL'),
         acceptanceLive: await n('SELECT count(*) AS n FROM legal_acceptances WHERE user_id = $1 AND account_deleted_at IS NULL'),
+        trainingMarked: await n('SELECT count(*) AS n FROM training_memberships m JOIN account_deletions d ON d.user_id = m.user_id WHERE m.user_id = $1 AND m.account_deleted_at = d.deleted_at'),
+        trainingLive: await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1 AND account_deleted_at IS NULL'),
+        trainingB: await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1 AND account_deleted_at IS NULL', [B]),
         consents: await n('SELECT count(*) AS n FROM account_consents WHERE user_id = $1'),
         consentProofs: await n("SELECT count(*) AS n FROM account_consent_proofs WHERE user_id = $1 AND policy_version = 'guardian-ai-2026-10'"),
         provision: (await pool.query('SELECT client_id FROM ai_app_provision_records WHERE user_id = $1', [A])).rows.map((r) => (r.client_id === G1 ? 'used' : r.client_id)).join(),
@@ -503,15 +518,18 @@ async function r6(pool) {
     const want = {
         stub: 0, curriculaA: 0, versionInB: 'NULL', approvalAuthor: 'NULL', jobsA: 0, jobsB: 1, mcp: 0, materials: 0, journal: 0, resets: 0,
         lessonProgress: 0, lessonResets: 0, xpAwards: 0, learningDays: 0, reviewCards: 0, reviewLog: 0,
-        safetyKept: 1, billingKept: 1, usageA: 'true', ipKept: 1, acceptanceMarked: 1, acceptanceLive: 0, consents: 0, consentProofs: 1,
+        safetyKept: 1, billingKept: 1, usageA: 'true', ipKept: 1, acceptanceMarked: 1, acceptanceLive: 0, trainingMarked: 1, trainingLive: 0, trainingB: 1, consents: 0, consentProofs: 1,
         provision: 'used', tombstone: 'staff/null',
     };
     const wrong = Object.keys(want).filter((k) => got[k] !== want[k]);
     check('R6', wrong.length === 0 && paths.length === 1,
         wrong.length ? `after the deletion, unexpected: ${wrong.map((k) => `${k}=${got[k]} (want ${want[k]})`).join(', ')}`
-            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance marked, stub 0');
+            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance and training membership marked with the tombstone time (B\'s live), stub 0');
     const again = (await pool.query(ACCEPT, [A, terms, privacy])).rowCount;
     check('R6', again === 1, `after the deletion the same versions can be accepted again (a new account): inserted ${again}`);
+    const readded = (await pool.query(`INSERT INTO training_memberships (cohort_id, user_id, role) VALUES ($1, $2, 'learner')
+        ON CONFLICT (cohort_id, user_id) WHERE account_deleted_at IS NULL DO NOTHING`, [TC, A])).rowCount;
+    check('R6', readded === 1, `after the deletion A can be added to the same cohort again (a new account; the marked row stays): inserted ${readded}`);
 }
 
 /** @param {pg.Pool} pool */
@@ -1048,6 +1066,87 @@ async function r10(pool) {
     }
 }
 
+/** @param {pg.Pool} pool */
+async function r12(pool) {
+    const [L, I, NONE, X] = ['r12l', 'r12i', 'r12n', 'r12x'].map(uid);
+    await pool.query('INSERT INTO auth.users (id) VALUES ($1), ($2), ($3)', [L, I, X]);
+    const slug = `r12-${L.slice(4, 8)}`;
+    // pg reads a DATE as local midnight: east of UTC a Date of 2026-11-01 prints as 2026-10-31.
+    const tz = process.env.TZ;
+    process.env.TZ = 'Asia/Tokyo';
+    /** @type {any} */ let made;
+    /** @type {any} */ let again;
+    try {
+        made = await createCohort({ slug, name: 'R12 cohort', startsOn: '2026-11-01', endsOn: '2027-01-31', pool });
+        again = await createCohort({ slug, name: 'Other name', pool });
+    } finally {
+        if (tz === undefined) delete process.env.TZ;
+        else process.env.TZ = tz;
+    }
+    check('R12', made?.status === 'created' && again?.status === 'exists' && again.cohort.name === 'R12 cohort'
+        && `${made.cohort.startsOn}/${made.cohort.endsOn}` === '2026-11-01/2027-01-31',
+    `a cohort is created once, kept on a second create, its dates read back as written in Asia/Tokyo: ${made?.cohort?.startsOn}/${made?.cohort?.endsOn}`);
+
+    const add = (/** @type {string} */ id, role = 'learner') => addMember({ cohortSlug: slug, userId: id, role, pool });
+    const outcomes = [await add(L.toUpperCase()), await add(L), await add(L, 'staff'), await add(I, 'instructor'), await add(NONE)]
+        .map((r) => /** @type {any} */ (r).status ?? /** @type {any} */ (r).error_type);
+    const rows = await count(pool, 'SELECT count(*) AS n FROM training_memberships WHERE cohort_id = $1::uuid', [made.cohort.id]);
+    check('R12', outcomes.join() === 'added,already,role_differs,added,no_account' && rows === 2,
+        `add (upper-case id), again, another role, an instructor, an id with no stub: ${outcomes.join(', ')}; rows ${rows}`);
+
+    // The deletion's own statements (as the service runs them), held HOLD_MS; an add LEAD_MS later.
+    const c1 = await pool.connect();
+    /** @type {any} */ let raced;
+    let waited = 0;
+    try {
+        await c1.query('BEGIN');
+        await c1.query(DELETION.lock, [L]);
+        await c1.query(DELETION.tombstone, [L, 'self']);
+        await c1.query(DELETION_SQL.markTrainingMemberships, [L]);
+        await c1.query(DELETION.stub, [L]);
+        const hold = c1.query('SELECT pg_sleep($1)', [HOLD_MS / 1000]);
+        await sleep(LEAD_MS);
+        const t0 = Date.now();
+        const adding = add(L).then((result) => ({ result, ms: Date.now() - t0 }));
+        await hold;
+        await c1.query('COMMIT');
+        ({ result: raced, ms: waited } = await adding);
+    } finally {
+        c1.release();
+    }
+    const n = (/** @type {string} */ sql, /** @type {unknown[]} */ params = [L]) => count(pool, sql, params);
+    const live = await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1::uuid AND account_deleted_at IS NULL');
+    const marked = await n('SELECT count(*) AS n FROM training_memberships m JOIN account_deletions d USING (user_id) WHERE m.user_id = $1::uuid AND m.account_deleted_at = d.deleted_at');
+    check('R12', waited >= BLOCKED_MS && raced?.status === 'deleted_account' && live === 0 && marked === 1,
+        `deletion first: the add waited ${waited} ms and answered ${raced?.status ?? raced?.error_type}; the member is marked with the tombstone time (${marked}), live rows ${live}`);
+
+    const listed = /** @type {any} */ (await listMembers({ cohortSlug: slug, pool }));
+    const deletedAt = (await pool.query('SELECT deleted_at FROM account_deletions WHERE user_id = $1::uuid', [L])).rows[0]?.deleted_at;
+    const shown = (listed.members ?? []).map((/** @type {any} */ m) => `${m.userId === L ? 'L' : m.userId === I ? 'I' : '?'}:${m.role}:${m.accountDeletedAt === (deletedAt ? new Date(deletedAt).toISOString() : 'none') ? 'marked' : m.accountDeletedAt ?? 'live'}`);
+    const meL = /** @type {any} */ (await getTrainingMe({ userId: L, pool }));
+    const meI = /** @type {any} */ (await getTrainingMe({ userId: I, pool }));
+    const mine = (meI.cohorts ?? []).map((/** @type {any} */ c) => `${c.cohortId === made.cohort.id}:${c.name}:${c.role}`).join();
+    check('R12', shown.join() === 'L:learner:marked,I:instructor:live' && meL.cohorts?.length === 0 && mine === 'true:R12 cohort:instructor',
+        `the staff list keeps the marked row (${shown.join(', ')}); the learner's own read: deleted ${meL.cohorts?.length}, instructor ${mine}`);
+
+    // Control: the add's INSERT without the lock, run while a deletion is between its mark and its
+    // COMMIT, sees the stub and leaves a live row for a deleted account (so the lock is needed).
+    const c2 = await pool.connect();
+    try {
+        await c2.query('BEGIN');
+        await c2.query(DELETION.lock, [X]);
+        await c2.query(DELETION.tombstone, [X, 'self']);
+        await c2.query(DELETION_SQL.markTrainingMemberships, [X]);
+        await c2.query(DELETION.stub, [X]);
+        const inserted = (await pool.query(TRAINING_SQL.addMember, [X, made.cohort.id, 'learner'])).rowCount;
+        await c2.query('COMMIT');
+        const left = await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1::uuid AND account_deleted_at IS NULL', [X]);
+        check('R12', inserted === 1 && left === 1, `control, the INSERT without the lock: inserted ${inserted}, a live row for a deleted account ${left}`);
+    } finally {
+        c2.release();
+    }
+}
+
 /**
  * The server log as text from `offset` on: --log-file, else the server's own file when the logging
  * collector runs (pg_read_file, superuser). null when neither is available.
@@ -1178,6 +1277,7 @@ export async function main(argv = process.argv.slice(2)) {
         await r8(pool);
         await r9(pool);
         await r10(pool);
+        await r12(pool);
         await r11(pool, logFile);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));

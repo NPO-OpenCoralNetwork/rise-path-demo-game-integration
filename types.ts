@@ -206,6 +206,7 @@ export enum ViewState {
   SETTINGS_DELETE_ACCOUNT = 'SETTINGS_DELETE_ACCOUNT', // Phase 4: delete one's own Rise Path account
   LEGAL_TERMS = 'LEGAL_TERMS', // Phase 4: public 利用規約 (/terms, VITE_FEATURE_LEGAL_PAGES)
   LEGAL_PRIVACY = 'LEGAL_PRIVACY', // Phase 4: public プライバシーポリシー (/privacy, VITE_FEATURE_LEGAL_PAGES)
+  TRAINING = 'TRAINING', // Job training section (/training, VITE_FEATURE_TRAINING; training-plan.ja.md)
 }
 
 // Generated Content Types

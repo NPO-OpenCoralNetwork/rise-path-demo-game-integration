@@ -206,3 +206,9 @@ export const PrivacyRoute = lazy(
 export const LegalConsentView = lazy(
   () => (features.legalPages ? import('../legal/LegalConsentView') : Promise.resolve({ default: () => null }))
 );
+/** Job training (doc/brushup-2026/training-plan.ja.md 4.6): the section ships only with
+ *  VITE_FEATURE_TRAINING=true. Otherwise Rollup drops the import (CI step "Fail if training code
+ *  reached the bundle"). Keep `features.training` a plain property read here. */
+export const TrainingRoute = lazy(
+  () => (features.training ? import('../features/training/TrainingView') : Promise.resolve({ default: () => null }))
+);

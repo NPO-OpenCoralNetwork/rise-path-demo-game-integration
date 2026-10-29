@@ -220,10 +220,11 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 #### migration の確認（適用前）
 
 - `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
-- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が `server/migrations/` のすべて（2026-10-26 時点で 000–020）を一度に流す。そのあとの `db:migrate:status` は、すべて適用済み（未適用 0 件）になる。
+- `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が `server/migrations/` のすべて（2026-10-29 時点で 000–021）を一度に流す。そのあとの `db:migrate:status` は、すべて適用済み（未適用 0 件）になる。
 - **018（Phase 4、アカウントの削除）**: ログインした呼び出しのたびに `account_deletions` を読むので、この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る。`deploy-stack.sh` は migrate のあとに作り直すので、この順になる。手で動かすとき（§4.4）や手元の開発の DB（`npm run db:migrate`）でも、先に流す。未適用のままだと、ログインした呼び出しはアプリで 503 `auth_unavailable`、SSE の MCP で 401、リモート MCP で 503 になる（安全な側）。`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。
 - **019（Phase 5、レッスンのやり直しと XP）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（`deploy-stack.sh` は migrate のあとに作り直すので、この順になる）。`sql/mcp_remote_role.sql` は流し直さなくてよい。019 を当てるあいだは、アカウントの削除をしない（スタッフの `--yes`。画面からの削除を使えるようにしているなら、人の少ない時間に）。重なると、デッドロック（40P01）でどちらかが何も変えずに戻るので、もう一度実行する。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「保存の様子・レッスンのやり直し・XP」。
 - **020（Phase 6、復習）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（`deploy-stack.sh` は migrate のあとに作り直すので、この順になる）。019 と違い、`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（流すまで、AI アプリの復習のツールは使えない。[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。020 は終わるまで `auth.users` をロックするので、ログインした呼び出しは 020 が終わるまで待つ（`lesson_progress` を使う開いたままのトランザクションがあると、020 はそれも待つ）。人の少ない時間に当てる。アカウントの削除が重なってもデッドロックにはならないが、削除は 020 を待ち、10 秒を超えると `account_busy` で終わるので、削除をやり直す。**前の版のイメージに戻したあと、この版に戻すとき**は、この版の `api`・`mcp`・`mcp-public` を起動する前に、データベースの所有者で確認と削除の SQL（[`scripts/db/verify-phase6.mjs`](../../scripts/db/verify-phase6.mjs) の `ROLL_FORWARD`）を流す（前の版のサービスを止めてから）。前の版のレッスンのやり直しと「学習の進み具合を消す」は、復習のカードを消さないため。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「復習（Phase 6）」。
+- **021（職業訓練の期と割り当て）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（未適用のままだと、アカウントの削除が 42P01 で取り消され、`deletion_unavailable` になる）。新しい表を 2 つ作るだけなので `auth.users` はロックせず、ログインした呼び出しもアカウントの削除も待たない。`sql/mcp_remote_role.sql` は流し直さなくてよい（AI アプリのロールは新しい表を読めない）。訓練の API は `TRAINING_ENABLED=true` のデプロイ（学校）だけで答え、公開版では表は空のままになる（[`doc/brushup-2026/training-plan.ja.md`](../brushup-2026/training-plan.ja.md)）。
 - **Phase 4 の最初のデプロイ**では、すべてのサービスにログの上限（`x-logging`）が付くので、動いているコンテナがすべて一度作り直される。`db` は「db up」のときに数秒止まり（そのあいだ古い `api` は 503）、そのあと `api`、最後の `up -d` で cloudflared（トンネルが少し止まる）、kokoro（モデルを読み直す）、`mcp`、`mcp-public`、`hermes` と Memanto（有効なら）。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「アカウントの削除・保存期間・ログ」。
 - 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（新しい DB では空なので、すぐ終わる）。
 
@@ -260,7 +261,7 @@ docker compose --env-file stack.env up -d
 
 2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。新しい VM を作り、DB は空から始まる（Supabase のアカウントは残る。進捗・ジャーナルなど旧 VM の DB にあったデータは無い）。全体の順番と Cloudflare・Vercel・Supabase の作業は [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の「[新しい VM の順番](../../deploy/vercel/README.md#新しい-vm-の順番)」。VM 側の要点:
 
-**最初のデプロイの前に**: デプロイする main のコミットで、GitHub Actions の「End-to-end checks」の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）と毎晩の実行が緑であることを確かめる（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の「End-to-end checks」で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。緑なら、空の DB への 000–020、`deploy-stack.sh` の流れ（検査・build・migration・api の作り直し・スモーク）、DB ロールの SQL、ブラウザでの学習の流れは、ダミーの値で確かめてある。確かめていないもの: 本物の Supabase（ログインと Site URL）、公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1` での origin gate）、`mcp-public`、2 回目のデプロイと起動のユニット、`ANTHROPIC_API_KEY`、`POSTGRES_PASSWORD` を最初に決めること、Tailscale、Cloudflare Tunnel（cloudflared とトークン）、kokoro-tts・Hermes・Memanto、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばす）。VM の Docker の版と `stack.env` は、下の 3 で、`bootstrap-vm.sh` の 2 回目の前に見る。`RISEPATH_DEPLOY_SKIP_PULL` は VM では使わない。
+**最初のデプロイの前に**: デプロイする main のコミットで、GitHub Actions の「End-to-end checks」の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）と毎晩の実行が緑であることを確かめる（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の「End-to-end checks」で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。緑なら、空の DB への 000–021、`deploy-stack.sh` の流れ（検査・build・migration・api の作り直し・スモーク）、DB ロールの SQL、ブラウザでの学習の流れは、ダミーの値で確かめてある。確かめていないもの: 本物の Supabase（ログインと Site URL）、公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1` での origin gate）、`mcp-public`、2 回目のデプロイと起動のユニット、`ANTHROPIC_API_KEY`、`POSTGRES_PASSWORD` を最初に決めること、Tailscale、Cloudflare Tunnel（cloudflared とトークン）、kokoro-tts・Hermes・Memanto、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばす）。VM の Docker の版と `stack.env` は、下の 3 で、`bootstrap-vm.sh` の 2 回目の前に見る。`RISEPATH_DEPLOY_SKIP_PULL` は VM では使わない。
 
 1. 前の VM の残りを片付ける。夜間停止のスケジュールが残っていれば消す（どの VM にも付いていなければ消せる）。Tailscale の管理画面（Machines）で旧 `risepath-vm` を Remove する。Mac では `ssh-keygen -R risepath-vm`。
 
@@ -271,7 +272,7 @@ docker compose --env-file stack.env up -d
    ```
 
 2. `provision-gce.sh` で作る（§4.1。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`）。
-3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → **2 回目の前に**、VM の `docker version` と `docker compose version` を `Server stack deploy` の「Preflight」の行とくらべ（メジャーがちがえば、デプロイの前にエージェントと相談する。計画の 11.3 の 2）、`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）を見る → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration をすべて（000–020）まとめて流す。
+3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → **2 回目の前に**、VM の `docker version` と `docker compose version` を `Server stack deploy` の「Preflight」の行とくらべ（メジャーがちがえば、デプロイの前にエージェントと相談する。計画の 11.3 の 2）、`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）を見る → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration をすべて（000–021）まとめて流す。
 4. Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（§4.3）。`ORIGIN_SECRET` を入れる前に、Mac から `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。
 5. 初回サインインのあと、自分の `user_profiles.role` を `admin` にする（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「[管理者にする](../../deploy/risepath-vm/README.md#5-管理者にする初回サインインのあと)」）。
 
@@ -391,7 +392,7 @@ VM のホストには Node が無いので、`--target host` は使わない。M
 | 項目 | 状態 |
 |------|------|
 | アーキテクチャ方針（本ドキュメント） | ✅ 確定 |
-| migration 000–020 + `db:migrate` | ✅ リポジトリは 020 まで（2026-10-26）。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–020 を流す（§4.2） |
+| migration 000–021 + `db:migrate` | ✅ リポジトリは 021 まで（2026-10-29）。新しい VM（空の DB）では、初回の `deploy-stack.sh` が 000–021 を流す（§4.2） |
 | Express agent proxy + Life Journal API | ✅ 完了 |
 | `deploy/risepath-vm/docker-compose.yml` | ✅ db（pgvector）+ api + mcp + kokoro-tts + hermes（healthcheck 付き。hermes は profile `full` で、既定では起動しない） |
 | Phase 19 Memanto overlay | ✅ compose + deploy-stack + smoke（bridge は 19-1） |

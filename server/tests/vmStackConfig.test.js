@@ -1006,6 +1006,21 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
     }
   });
 
+  it('TRAINING_ENABLED (training-plan D5) reaches the api with an empty default and no other service; documented commented out', () => {
+    assert.match(services.api || '', /^ {6}TRAINING_ENABLED: \$\{TRAINING_ENABLED:-\}\s*$/m);
+    for (const [file, text] of Object.entries(files)) {
+      for (const [name, block] of Object.entries(serviceBlocks(text))) {
+        if (file === 'docker-compose.yml' && name === 'api') continue;
+        assert.ok(!block.includes('TRAINING_ENABLED'), `${file}: ${name} has TRAINING_ENABLED`);
+      }
+    }
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    assert.ok(!lines(stack).some((line) => line.startsWith('TRAINING_ENABLED=')), 'not set in stack.env.example (the public stack leaves it off)');
+    assert.deepEqual(lines(stack).filter((line) => line.startsWith('# TRAINING_ENABLED=')), ['# TRAINING_ENABLED=true']);
+    assert.ok(!read(path.join(STACK, 'mcp-public.env.example')).includes('TRAINING_ENABLED'));
+    assert.deepEqual(lines(read(path.join(ROOT, '.env.example'))).filter((line) => /^#? ?(TRAINING_ENABLED|VITE_FEATURE_TRAINING)=/.test(line)), ['# VITE_FEATURE_TRAINING=true', '# TRAINING_ENABLED=true']);
+  });
+
   // The log limits put docker-compose.memanto.yml into scan-secrets' --diff, which reports the
   // memanto volume's mount point inside its container. The allowlist works per file and rule, so
   // this keeps that exemption from hiding a real personal path added to the file later.
