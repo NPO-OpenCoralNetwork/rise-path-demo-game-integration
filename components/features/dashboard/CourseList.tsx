@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Course } from '../../../types';
 import { COURSES_DATA } from '../../../services/curriculumData';
 import { fetchGeneratedCourses } from '../../../services/curriculumApi';
+import { isSignInRequired } from '../../../services/generatedCourses';
 import { BookOpen, Briefcase, Clock, Filter, Search, X } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { WORLD_COVER_STYLE } from '../../ui/CourseCard';
+import GeneratedCoursesSignInNotice from '../../common/GeneratedCoursesSignInNotice';
 
 /** Course photo, or the generated cover (gradient + icon) when there is none or it fails to load. */
 const CourseThumb: React.FC<{ src?: string }> = ({ src }) => {
@@ -33,6 +35,7 @@ interface CourseListProps {
 const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
   const { language } = useLanguage();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [signInRequired, setSignInRequired] = useState(false);
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
@@ -279,6 +282,7 @@ const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
         if (!isMounted) return;
         console.error('Failed to load generated curricula:', error);
         setCourses([]); // Set empty array on failure
+        setSignInRequired(isSignInRequired(error));
       }
     };
 
@@ -331,6 +335,8 @@ const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
               {filteredCourses.length} {t.results}
             </span>
           </div>
+
+          {signInRequired && <GeneratedCoursesSignInNotice />}
 
           {showFilters && (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-5">

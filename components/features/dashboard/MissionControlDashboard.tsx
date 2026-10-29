@@ -5,6 +5,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { getCourse, getLessonEntry, loadLesson } from '../../../content';
+import { activeCurriculumId } from '../../../services/generatedCourses';
 import { getLastLesson, readLessonSummary, readProgress } from '../../lesson/progressStore';
 import { useProgressVersion } from '../../lesson/useProgressVersion';
 import { minutesLeft, resolveLText, type ContentLocale } from '../../lesson/model';
@@ -143,7 +144,7 @@ const MissionControlDashboard: React.FC<DashboardProps> = () => {
   const name = !user || user.isGuest ? t.guestName : user.name || t.guestName;
   const curriculumId = useMemo(() => {
     try {
-      return window.localStorage.getItem('active_curriculum_id') || undefined;
+      return activeCurriculumId(window.localStorage.getItem('active_curriculum_id'));
     } catch {
       return undefined;
     }

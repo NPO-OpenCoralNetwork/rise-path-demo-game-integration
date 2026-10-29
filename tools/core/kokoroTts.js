@@ -297,7 +297,8 @@ export async function loadUserTtsPreferences(userId) {
         const pool = getPool?.();
         if (!pool) return null;
         const { getUserTtsPreferences } = await import('../../server/services/userPreferences.js');
-        return getUserTtsPreferences(pool, userId);
+        // Awaited here so a failed read lands in the catch below (default voice), not in the caller.
+        return await getUserTtsPreferences(pool, userId);
     } catch (err) {
         console.warn('[kokoroTts] loadUserTtsPreferences failed:', err.message);
         return null;

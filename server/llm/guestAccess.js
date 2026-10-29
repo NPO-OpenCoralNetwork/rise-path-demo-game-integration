@@ -36,6 +36,8 @@ const positiveInt = (value, fallback) => {
 };
 
 /**
+ * The app's own browser origins: server.js answers CORS for these only, on every route, and
+ * originGuard below refuses a POST to the LLM gateway from any other.
  * @param {{ env?: Record<string, string | undefined> }} [options]
  * @returns {(origin: string | undefined, req?: import('express').Request) => boolean}
  */
@@ -58,7 +60,8 @@ export function createOriginPolicy({ env = process.env } = {}) {
     const forwarded = trustProxy ? String(req?.headers?.['x-forwarded-host'] ?? '').split(',')[0].trim() : '';
     const host = forwarded || String(req?.headers?.host ?? '');
     if (host && url.host === host) return true;
-    // Development: the Vite dev server (port 3007, proxied to this API) on any local address.
+    // Development: any page on localhost or 127.0.0.1, and the Vite dev server (port 3007, proxied
+    // to this API) on any host, so a phone on the LAN can open it.
     if (!production && (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.port === '3007')) return true;
     return false;
   };

@@ -16,6 +16,8 @@ import { setPoolForTests, resetPoolForTests } from '../db.js';
 import { resetDailyCapsForTests } from '../middleware/dailyCaps.js';
 import { setImageClientForTests } from '../geminiBackendService.js';
 import { resetEmbeddingClientForTests } from '../../tools/core/ragSearch.js';
+import { resetUploadRootForTests, setUploadRootForTests } from '../uploads.js';
+import os from 'node:os';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const LESSON = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] };
@@ -428,6 +430,21 @@ describe('daily caps on the API routes', () => {
     });
 
     describe('/upload and /rag/index', () => {
+        // Uploads go to <root>/uploads (server/uploads.js): a temporary root, removed afterwards.
+        let uploadRoot;
+        beforeEach(() => {
+            uploadRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-daily-caps-uploads-'));
+            setUploadRootForTests(uploadRoot);
+        });
+        afterEach(() => {
+            resetUploadRootForTests();
+            fs.rmSync(uploadRoot, { recursive: true, force: true });
+        });
+        const storedFiles = () => {
+            const dir = path.join(uploadRoot, 'uploads');
+            return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+        };
+
         it('refuses an upload before multer stores the file', async () => {
             process.env.AI_CAP_USER_EMBEDDINGS = '0';
             const name = `daily-cap-${Date.now()}.txt`;
@@ -438,9 +455,7 @@ describe('daily caps on the API routes', () => {
                 const json = await response.json();
                 assertDailyLimit({ status: response.status, json, text: JSON.stringify(json), headers: response.headers }, 'embeddings', 'off');
             });
-            const uploads = path.join(ROOT, 'public/uploads');
-            const stored = fs.existsSync(uploads) ? fs.readdirSync(uploads).filter((file) => file.endsWith(name)) : [];
-            assert.deepEqual(stored, [], 'nothing was written');
+            assert.deepEqual(storedFiles(), [], 'nothing was written');
         });
 
         it('keeps the unit when the stored file cannot be read, so the cap still bounds stored files', async () => {
@@ -451,24 +466,18 @@ describe('daily caps on the API routes', () => {
             const name = `daily-cap-unreadable-${Date.now()}.pdf`;
             const upload = (base) => {
                 const form = new FormData();
-                form.append('file', new Blob(['not a PDF'], { type: 'application/pdf' }), name);
+                // Starts like a PDF (the upload's signature check), but pdf-parse cannot read it.
+                form.append('file', new Blob(['%PDF-1.4 not really a PDF'], { type: 'application/pdf' }), name);
                 return fetch(`${base}/upload`, { method: 'POST', body: form });
             };
-            const uploads = path.join(ROOT, 'public/uploads');
-            try {
-                await withServer(async (base) => {
-                    const first = await upload(base);
-                    assert.equal(first.status, 200);
-                    assert.equal((await first.json()).status, 'uploaded', 'the text could not be read');
-                    const second = await upload(base);
-                    const json = await second.json();
-                    assertDailyLimit({ status: second.status, json, text: JSON.stringify(json), headers: second.headers }, 'embeddings', 'user');
-                });
-            } finally {
-                for (const file of fs.existsSync(uploads) ? fs.readdirSync(uploads) : []) {
-                    if (file.endsWith(name)) fs.unlinkSync(path.join(uploads, file));
-                }
-            }
+            await withServer(async (base) => {
+                const first = await upload(base);
+                assert.equal(first.status, 200);
+                assert.equal((await first.json()).status, 'uploaded', 'the text could not be read');
+                const second = await upload(base);
+                const json = await second.json();
+                assertDailyLimit({ status: second.status, json, text: JSON.stringify(json), headers: second.headers }, 'embeddings', 'user');
+            });
         });
 
         it('gives the unit back when the route ends with 503 (no database)', async () => {
@@ -496,7 +505,6 @@ describe('daily caps on the API routes', () => {
                 form.append('file', new Blob(['Rise Path keyword search material. '.repeat(40)], { type: 'text/plain' }), name);
                 return fetch(`${base}/upload`, { method: 'POST', body: form });
             };
-            const uploads = path.join(ROOT, 'public/uploads');
             const { log } = console;
             console.log = () => {};
             try {
@@ -510,9 +518,6 @@ describe('daily caps on the API routes', () => {
                 });
             } finally {
                 console.log = log;
-                for (const file of fs.existsSync(uploads) ? fs.readdirSync(uploads) : []) {
-                    if (file.endsWith(name)) fs.unlinkSync(path.join(uploads, file));
-                }
             }
             const chunks = pool.queries.filter((q) => q.sql.startsWith('insert into material_chunks'));
             assert.ok(chunks.length > 0);
@@ -550,6 +555,8 @@ describe('daily caps on the API routes', () => {
 
         it('refuses a file over 10 MB with 413 and gives the unit back; one file per request', async () => {
             process.env.AI_CAP_USER_EMBEDDINGS = '1';
+            // A database to keep the row: without one the route answers 503 before reading the file.
+            setPoolForTests(countingPool(() => undefined));
             const name = `daily-cap-large-${Date.now()}.txt`;
             const big = new Uint8Array(10 * 1024 * 1024 + 1);
             await withServer(async (base) => {
@@ -568,9 +575,7 @@ describe('daily caps on the API routes', () => {
                 assert.equal(response.status, 400);
                 assert.equal((await response.json()).error_type, 'invalid_body');
             });
-            const uploads = path.join(ROOT, 'public/uploads');
-            const stored = fs.existsSync(uploads) ? fs.readdirSync(uploads).filter((file) => file.endsWith(name)) : [];
-            assert.deepEqual(stored, [], 'multer removed the partial files');
+            assert.deepEqual(storedFiles(), [], 'multer removed the partial files');
         });
     });
 

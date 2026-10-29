@@ -260,7 +260,7 @@ We have successfully migrated to a **LangGraph-based Multi-Agent Backend**.
   - Goal: Allow users to select Kokoro `voice_id` personalities (e.g. `jf_alpha`, `jf_tebukuro`, `af_bella`).
 
 ### How to Contribute
-1. Check the [Issues](https://github.com/t012093/learning-platform-from-gemini/issues) tab.
+1. Check the [Issues](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/issues) tab. Report security problems privately instead ([SECURITY.md](SECURITY.md)).
 2. Create a feature branch from `main` (example: `feat/your-topic`).
 3. Keep commits scoped and descriptive.
 4. Follow the project's coding style (Functional React components, TypeScript, Tailwind).

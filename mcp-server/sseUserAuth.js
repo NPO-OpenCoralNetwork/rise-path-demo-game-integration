@@ -13,8 +13,9 @@
  *   5. development only (server/middleware/authPolicy.js allowDevAuthFallback) → PHASE1
  *   otherwise null, which the caller answers with 401.
  * Each message re-checks the token, so an open SSE session of an account deleted meanwhile is
- * refused at its next call.
+ * refused at its next call. The bridge token is compared in constant time (tools/core/sameSecret.js).
  */
+import { sameSecret } from '../tools/core/sameSecret.js';
 
 /**
  * @typedef {{ headers: Record<string, string | string[] | undefined>, authMethod?: string }} SseRequest
@@ -58,14 +59,14 @@ export function createSseUserResolver({
         if (bridge) {
             const header = req.headers['x-nexloom-bridge-token'];
             const provided = typeof header === 'string' ? header.trim() : '';
-            if (provided && provided === bridge) {
+            if (sameSecret(provided, bridge)) {
                 req.authMethod = 'bridge-header';
                 return phase1UserId; // Bridge uses shared user
             }
         }
 
         // 2. Bearer token — check if it's the bridge token first
-        if (token && bridge && token === bridge) {
+        if (token && bridge && sameSecret(token, bridge)) {
             req.authMethod = 'bridge-bearer';
             return phase1UserId;
         }

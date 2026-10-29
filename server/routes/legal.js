@@ -3,7 +3,7 @@
  * Accepting the terms of use (Phase 4, owner decisions D1 and D5; design §4.4). Mounted by
  * server.js at /api/v2/user/legal behind requireAuth and requireSignedIn (the dev fallback, the
  * bridge user and an anonymous user get 401 sign_in_required; an agent's own OAuth token 401
- * oauth_client_token), with its own 4 kb JSON body parser registered before the 50 MB one
+ * oauth_client_token), with its own 4 kb JSON body parser registered before the 2 MB one
  * (server/middleware/smallBody.js: 413 body_too_large, 400 invalid_body).
  *
  * The versions are shared/legal/versions.js (one module for the browser and the server). What a

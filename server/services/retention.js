@@ -14,7 +14,7 @@
  *   account_consent_proofs    guardian consent proofs of a deleted account           5 years after the deletion
  *   ai_app_provision_records  AI apps a deleted account had used                     3 years after the deletion
  *   account_deletions         tombstones                                             5 years
- *   public/uploads            files no materials row names, older than 24 hours
+ *   uploads, public/uploads   files no materials row names, older than 24 hours
  *
  * Not here on purpose (design §6.3): ai_safety_events (own prune, server/safety/events.js),
  * billing rows (tax), legal_document_versions (append-only, not personal), live accounts'
@@ -41,6 +41,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getPool } from '../db.js';
+import { UPLOAD_LOCATIONS } from '../uploads.js';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -62,7 +63,7 @@ export const RETENTION_ENV_KEYS = Object.freeze(['RETENTION_ENABLED', ...RETENTI
 export const ORPHAN_UPLOAD_HOURS = 24;
 export const BATCH_LIMIT = 5000;
 export const MAX_BATCHES_PER_STEP = 20;
-/** Upload files looked at (lstat) per materials query; at most MAX_BATCHES_PER_STEP such chunks per run. */
+/** Upload files looked at (lstat) per materials query; at most MAX_BATCHES_PER_STEP such chunks per run, both upload directories together. */
 export const UPLOAD_CHUNK = 1000;
 export const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -126,8 +127,6 @@ export const RETENTION_STEPS = Object.freeze(/** @type {RetentionStep[]} */ ([
 
 /** Which upload files a materials row still names (storage_path as server/routes/content.js writes it). */
 export const UPLOAD_REFERENCES_SQL = 'SELECT storage_path FROM materials WHERE storage_path = ANY($1)';
-/** The upload route's names: <Date.now(), 13 digits>-<original name>. */
-const UPLOAD_NAME = /^[0-9]{13}-/;
 
 const SWITCH_ON = ['', 'true', '1', 'on', 'yes'];
 const SWITCH_OFF = ['false', '0', 'off', 'no'];
@@ -206,32 +205,72 @@ export function retentionStartupLine(config) {
 
 /**
  * Removes upload files that no materials row names any more (an unlink that failed after an
- * account deletion, a crash between the file and its row, older code): only direct entries of
- * <uploadRoot>/public/uploads named like the upload route names them, regular files (lstat: never a
- * symlink or a directory) last modified more than ORPHAN_UPLOAD_HOURS ago. Looked at in chunks of
- * UPLOAD_CHUNK, oldest name first, each chunk with one materials query; a failing query throws and
- * nothing of that chunk is removed.
+ * account deletion, a crash between the file and its row, older code): only direct entries of the
+ * upload directories (server/uploads.js UPLOAD_LOCATIONS: <uploadRoot>/uploads and, from older
+ * versions, <uploadRoot>/public/uploads) named like the upload route names them, regular files
+ * (lstat: never a symlink or a directory) last modified more than ORPHAN_UPLOAD_HOURS ago. Each
+ * directory is looked at in chunks of UPLOAD_CHUNK in name order, each chunk with one materials query
+ * (a failing query throws and nothing of that chunk is removed), at most MAX_BATCHES_PER_STEP chunks
+ * in all; a directory with more files continues where it stopped on the next run. A directory that
+ * fails does not stop the other one: the first error is thrown once both were tried.
  * @param {{ client: Pick<PoolClient, 'query'>, uploadRoot: string, now: () => number }} input
  * @returns {Promise<{ removed: number, failed: number }>}
  */
 export async function sweepOrphanUploads({ client, uploadRoot, now }) {
-    const dir = path.join(uploadRoot, 'public', 'uploads');
+    const cutoff = now() - ORPHAN_UPLOAD_HOURS * 60 * 60 * 1000;
+    let removed = 0;
+    let failed = 0;
+    let budget = MAX_BATCHES_PER_STEP;
+    /** @type {unknown} */
+    let firstError = null;
+    for (const location of UPLOAD_LOCATIONS) {
+        if (budget <= 0) break;
+        try {
+            const swept = await sweepUploadDir({ client, uploadRoot, location, cutoff, budget });
+            removed += swept.removed;
+            failed += swept.failed;
+            budget -= swept.chunks;
+        } catch (error) {
+            firstError ??= error;
+        }
+    }
+    if (firstError) throw firstError;
+    return { removed, failed };
+}
+
+/** Per upload directory: the index in name order where its next sweep starts (in memory). */
+const sweepCursor = new Map();
+
+/**
+ * sweepOrphanUploads for one directory, at most `budget` chunks.
+ * @param {{ client: Pick<PoolClient, 'query'>, uploadRoot: string, location: { dir: string, name: RegExp }, cutoff: number, budget: number }} input
+ * @returns {Promise<{ removed: number, failed: number, chunks: number }>}
+ */
+async function sweepUploadDir({ client, uploadRoot, location, cutoff, budget }) {
+    const dir = path.join(uploadRoot, ...location.dir.split('/'));
     /** @type {string[]} */
     let names;
     try {
         names = await fs.readdir(dir);
     } catch (error) {
-        if (/** @type {any} */ (error)?.code === 'ENOENT') return { removed: 0, failed: 0 };
+        if (/** @type {any} */ (error)?.code === 'ENOENT') return { removed: 0, failed: 0, chunks: 0 };
         throw error;
     }
-    const cutoff = now() - ORPHAN_UPLOAD_HOURS * 60 * 60 * 1000;
-    const candidates = names.filter((name) => UPLOAD_NAME.test(name) && !name.includes('/') && !name.includes('\\')).sort();
+    const sorted = names.filter((name) => location.name.test(name) && !name.includes('/') && !name.includes('\\')).sort();
+    // From where the last sweep of this directory stopped, then around: names past one run's budget
+    // are reached on later runs (random UUID names do not sort by age).
+    const startAt = Math.min(sweepCursor.get(dir) ?? 0, sorted.length);
+    const candidates = [...sorted.slice(startAt), ...sorted.slice(0, startAt)];
     let removed = 0;
     let failed = 0;
-    for (let start = 0, chunks = 0; start < candidates.length && chunks < MAX_BATCHES_PER_STEP; start += UPLOAD_CHUNK, chunks += 1) {
+    let chunks = 0;
+    let looked = 0;
+    for (let start = 0; start < candidates.length && chunks < budget; start += UPLOAD_CHUNK, chunks += 1) {
         /** @type {string[]} */
         const old = [];
-        for (const name of candidates.slice(start, start + UPLOAD_CHUNK)) {
+        const chunk = candidates.slice(start, start + UPLOAD_CHUNK);
+        looked += chunk.length;
+        for (const name of chunk) {
             try {
                 const stat = await fs.lstat(path.join(dir, name));
                 if (stat.isFile() && stat.mtimeMs < cutoff) old.push(name);
@@ -240,10 +279,10 @@ export async function sweepOrphanUploads({ client, uploadRoot, now }) {
             }
         }
         if (old.length === 0) continue;
-        const result = await client.query(UPLOAD_REFERENCES_SQL, [old.map((name) => `public/uploads/${name}`)]);
+        const result = await client.query(UPLOAD_REFERENCES_SQL, [old.map((name) => `${location.dir}/${name}`)]);
         const referenced = new Set((result?.rows ?? []).map((/** @type {any} */ row) => row.storage_path));
         for (const name of old) {
-            if (referenced.has(`public/uploads/${name}`)) continue;
+            if (referenced.has(`${location.dir}/${name}`)) continue;
             try {
                 await fs.unlink(path.join(dir, name));
                 removed += 1;
@@ -252,7 +291,8 @@ export async function sweepOrphanUploads({ client, uploadRoot, now }) {
             }
         }
     }
-    return { removed, failed };
+    sweepCursor.set(dir, looked >= candidates.length ? 0 : (startAt + looked) % sorted.length);
+    return { removed, failed, chunks };
 }
 
 let running = false;

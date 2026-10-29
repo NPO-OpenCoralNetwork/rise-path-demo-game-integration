@@ -2,6 +2,7 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { blockUploadRequests } from './server/uploads.js';
 
 // Model-provider keys and service-role keys must never reach the browser. VITE_* values are
 // public by design, and any whole-object `import.meta.env` read inlines all of them, so these
@@ -47,6 +48,20 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
+        // Uploads are private (server/uploads.js). The dev server (on every interface: host 0.0.0.0)
+        // serves any file of the project ("/uploads/…", "/public/uploads/…", "/@fs/…/uploads/…"),
+        // and `vite preview` the build (which copies public/, with files older versions left in
+        // public/uploads). Any request with an "uploads" segment answers 404. Added directly, so it
+        // runs before Vite's own handlers.
+        {
+          name: 'block-uploads',
+          configureServer(server) {
+            server.middlewares.use(blockUploadRequests());
+          },
+          configurePreviewServer(server) {
+            server.middlewares.use(blockUploadRequests());
+          },
+        },
         // Phase 4: a build that publishes the legal pages (VITE_FEATURE_LEGAL_PAGES=true, from a .env
         // file or the host's env, e.g. Vercel) stops while the text is a draft or not archived. The
         // problem list comes from scripts/legal/check-legal-release.mjs. Dev servers are not affected.

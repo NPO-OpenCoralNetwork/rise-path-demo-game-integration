@@ -16,7 +16,7 @@ import { parseLearningEventInput } from '../../tools/core/learningEvents.js';
 
 /**
  * Largest POST /events body (Phase 5): a type and two short texts. server.js registers this
- * mount's own parser before the 50 MB one (server/middleware/smallBody.js: 413 body_too_large).
+ * mount's own parser before the 2 MB one (server/middleware/smallBody.js: 413 body_too_large).
  * The parser counts the bytes before the texts are cut, so the limit covers every body whose texts
  * fit what is kept: 4 texts × LEARNING_EVENT_TEXT_MAX (300) code points × at most 6 bytes each in
  * JSON.stringify's output (a \u escape; an emoji is 4) plus the keys ≈ 7.3 KB.

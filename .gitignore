@@ -28,7 +28,14 @@ dist-ssr
 .env.bak
 .env.local.bak
 .env.stack
+# Every other local env file (.env.production, .env.development, …): only .env.example is committed
+.env.*
+!.env.example
+# Production secrets carried between hosts (doc/guides/env_migration_safety.md), plain or encrypted
+secrets.*.env
+*.env.gpg
 public/uploads/
+/uploads/
 public/audio/cache/*.mp3
 public/audio/cache/*.meta.json
 !public/audio/cache/.gitkeep
@@ -52,3 +59,11 @@ test_mcp_client.js
 
 # Lesson preview screenshots and metrics (npm run lessons:preview)
 .artifacts/
+
+# Data exports and database dumps: learner data never goes into the repository (SECURITY.md)
+exports/
+backups/
+*.dump
+*.sql.*
+# a plain pg_dump at the root (migrations and other SQL live in subfolders)
+/*.sql

@@ -126,6 +126,8 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 
 新しい VM の DB は空から始まります。この初回デプロイで、migration 000–020 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
+学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
+
 ### 3. Mac `.env.local`
 
 ```env
@@ -148,7 +150,7 @@ tailscale ping risepath-vm
 
 `stack.env` に `ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由の smoke を流しておきます（下の「[手動でスタック操作](#4-手動でスタック操作vm-上)」の `npm run smoke:vm -- --base …`。引数なしだと Mac の 127.0.0.1 を見ます）。
 
-API を VM 経由にする場合は Vite プロキシまたは `VITE_API_BASE_URL` を調整します。ただし `stack.env` に `ORIGIN_SECRET` があると、VM の :3006 は `x-origin-secret` の無いリクエストに 403 を返します。そのときは Mac のローカル API（`npm run dev`）を使います。
+API を VM 経由にする場合は、Vite プロキシの向き先を VM にします（`API_PROXY_TARGET=http://risepath-vm:3006 npm run dev`）。画面と同じオリジンで呼ぶので、CORS は要りません。ただし AI チューター（`/api/v2/llm` への POST）は、VM の `LLM_ALLOWED_ORIGINS` に `http://localhost:3007` がないと 403 になります。VM の API は本番モードで動くので、開発用のオリジンを自動では許可しません。`VITE_API_BASE_URL` で VM の API を直接呼ぶ場合は、CORS のためにも同じ設定が要ります。ただし `stack.env` に `ORIGIN_SECRET` があると、VM の :3006 は `x-origin-secret` の無いリクエストに 403 を返します。そのときは Mac のローカル API（`npm run dev`）を使います。
 
 ### 4. 手動でスタック操作（VM 上）
 

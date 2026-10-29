@@ -51,6 +51,7 @@ import { accountLockKey, canonicalUserId, signedInBeforeDeletion } from '../../t
 import { billingAlerts as defaultBillingAlerts } from './billingAlerts.js';
 import { invalidatePlan, TERMINAL_STATUSES } from './billingEntitlement.js';
 import { isMemantoEnabled, purgeLearnerMemories } from './learnerMemoryBridge.js';
+import { uploadLocationOf } from '../uploads.js';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -114,8 +115,6 @@ export const SQL = Object.freeze({
     deleteStub: 'DELETE FROM auth.users WHERE id = $1::uuid',
 });
 
-/** Only files the upload route wrote: public/uploads/<13-digit Date.now()>-<one path segment>. */
-const UPLOAD_PATH = /^public\/uploads\/[0-9]{13}-[^/\\]+$/;
 /** SQLSTATE lock_not_available (lock_timeout). */
 const LOCK_TIMEOUT = '55P03';
 
@@ -193,15 +192,18 @@ export async function readDeletionState({ pool, userId, billing = { config: null
 }
 
 /**
- * Removes one collected upload: only a path the upload route writes, resolved inside
- * <uploadRoot>/public/uploads, and only a regular file (never a symlink or a directory).
+ * Removes one collected upload: only a path the upload route writes (server/uploads.js
+ * UPLOAD_LOCATIONS: uploads/<random UUID>.<ext>, or public/uploads/<13 digits>-<name> from older
+ * versions), resolved inside that directory of <uploadRoot>, and only a regular file (never a
+ * symlink or a directory).
  * @param {unknown} storagePath
  * @param {string} uploadRoot
  * @returns {Promise<'removed' | 'missing' | 'refused' | 'failed'>}
  */
 export async function removeUploadFile(storagePath, uploadRoot) {
-    if (typeof storagePath !== 'string' || !UPLOAD_PATH.test(storagePath) || storagePath.includes('\0')) return 'refused';
-    const dir = path.resolve(uploadRoot, 'public/uploads') + path.sep;
+    const location = uploadLocationOf(storagePath);
+    if (!location || typeof storagePath !== 'string') return 'refused';
+    const dir = path.resolve(uploadRoot, location.dir) + path.sep;
     const file = path.resolve(uploadRoot, storagePath);
     if (!file.startsWith(dir)) return 'refused';
     try {

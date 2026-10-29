@@ -1,6 +1,6 @@
 // Deleting one's own account (Phase 4, server/routes/account.js at /api/v2/user/account) on the
 // real server.js stack: requireAuth and requireSignedIn, the 16 kb body parser registered before
-// the 50 MB one, the per-learner limit, the off switch, the password re-authentication (amr), the
+// the 2 MB one, the per-learner limit, the off switch, the password re-authentication (amr), the
 // deletion itself against helpers/deletionPool.js, and what a deleted account's sessions get
 // afterwards. The answer for every service result is checked on the router alone. Deletion starts
 // off (ACCOUNT_DELETION_ENABLED unset); the cases that test the chain past the switch turn it on.

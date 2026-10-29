@@ -2,16 +2,19 @@
  * Bridge/JWT composite authentication (Phase 7).
  * Shared by chatgptCurriculum and lifeJournal routes.
  */
-import { PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
+import { PHASE1_USER_ID } from '../db.js';
 import {
     ACCOUNT_DELETED_REFUSAL,
     AUTH_UNAVAILABLE,
     getSupabase,
+    getUserOnce,
     OAUTH_CLIENT_TOKEN_REFUSAL,
-    readSessionAccountState,
+    readSessionAccountStateOnce,
+    syncAuthUserStubOnce,
 } from './auth.js';
 import { allowDevAuthFallback } from './authPolicy.js';
 import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
+import { sameSecret } from '../../tools/core/sameSecret.js';
 import { termsGateStep } from './termsGate.js';
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -23,7 +26,7 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, 
     req.accountGeneration = accountGeneration;
     // As requireAuth, for a Supabase session only (Phase 8: the terms check never gates an anonymous user).
     if (isAnonymous !== undefined) req.isAnonymous = isAnonymous;
-    await syncAuthUserStub(userId);
+    await syncAuthUserStubOnce(req, userId);
 }
 
 /**
@@ -42,6 +45,9 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, 
  * owns, so a signed-in learner's curriculum or learner profile id answers 404. x-nexloom-user-id
  * goes to the audit log only and never selects a Rise Path user. An integration that acts for a
  * learner sends that learner's JWT (or needs a deliberate, signed user mapping, which does not exist).
+ *
+ * The bridge token is compared in constant time (tools/core/sameSecret.js). A JWT is checked once
+ * per request, also when requireAuth runs on the same request (auth.js, one check per request).
  */
 export const requireBridgeOrAuth = async (req, res, next) => {
     // Through the public edge (originGate.js) the bridge token never counts: visitors need a JWT.
@@ -49,7 +55,7 @@ export const requireBridgeOrAuth = async (req, res, next) => {
 
     if (bridgeToken) {
         const provided = cleanString(req.headers['x-nexloom-bridge-token']);
-        if (provided && provided === bridgeToken) {
+        if (sameSecret(provided, bridgeToken)) {
             await authorizeRequest(req, {
                 userId: PHASE1_USER_ID,
                 authMethod: 'bridge-token',
@@ -63,7 +69,7 @@ export const requireBridgeOrAuth = async (req, res, next) => {
     if (authHeader.toLowerCase().startsWith('bearer ')) {
         const token = authHeader.slice(7).trim();
 
-        if (bridgeToken && token === bridgeToken) {
+        if (bridgeToken && sameSecret(token, bridgeToken)) {
             await authorizeRequest(req, {
                 userId: PHASE1_USER_ID,
                 authMethod: 'bridge-bearer',
@@ -82,7 +88,7 @@ export const requireBridgeOrAuth = async (req, res, next) => {
         if (supabase) {
             let user = null;
             try {
-                const { data, error } = await supabase.auth.getUser(token);
+                const { data, error } = await getUserOnce(req, supabase, token);
                 if (!error && data?.user) user = data.user;
             } catch {
                 // fall through to dev fallback
@@ -90,7 +96,7 @@ export const requireBridgeOrAuth = async (req, res, next) => {
             if (user) {
                 let account;
                 try {
-                    account = await readSessionAccountState(token, user.id);
+                    account = await readSessionAccountStateOnce(req, token, user.id);
                 } catch (err) {
                     console.warn('[Auth] account state check failed:', err?.message || err);
                     return res.status(503).json(AUTH_UNAVAILABLE);

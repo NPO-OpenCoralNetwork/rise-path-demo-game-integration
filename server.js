@@ -34,6 +34,8 @@ import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
 import { describeError, redactUrl } from './server/utils/redactUrl.js';
+import { isDbUnavailable } from './tools/core/dbErrors.js';
+import { blockLegacyUploads } from './server/uploads.js';
 import adminSafetyRoutes from './server/routes/adminSafety.js';
 import { createLlmRouter } from './server/routes/llm.js';
 import { createGuestBudget, createOriginPolicy, originGuard } from './server/llm/guestAccess.js';
@@ -57,6 +59,11 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/** Retry-After of a 503 for a database that cannot be reached (the last error handler). */
+const DB_RETRY_AFTER_SECONDS = 10;
+/** The JSON body limit of every route without a smaller one of its own (createApp). */
+const JSON_BODY_LIMIT = '2mb';
 
 // --- Environment ---
 const loadEnvFile = async (filename) => {
@@ -119,7 +126,7 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
 
     // --- Middleware ---
     // Origin gate first: with ORIGIN_SECRET set, non-loopback requests without the edge's secret
-    // get 403 before CORS, body parsing, logging or the limiters run (and before a 50 MB body is read).
+    // get 403 before CORS, body parsing, logging or the limiters run (and before any body is read).
     // Without it, only requests that came through Cloudflare get 403.
     app.use(createOriginGate({ ...originGate }));
     // Every response: no MIME sniffing. API responses: not cached by Vercel, Cloudflare or the
@@ -130,28 +137,41 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
         next();
     });
 
-    // CORS: open for the existing API, but the LLM gateway answers only the app's own origins
-    // (server/llm/guestAccess.js), so other sites cannot use visitors' browsers as a model proxy.
-    const isAllowedLlmOrigin = createOriginPolicy();
-    const openCors = cors();
-    const llmCors = cors((req, callback) => callback(null, { origin: isAllowedLlmOrigin(req.headers.origin, req) }));
-    app.use((req, res, next) => (req.path.startsWith('/api/v2/llm') ? llmCors : openCors)(req, res, next));
-    // Lesson progress has its own, smaller body limit. Registered first: the 50 MB parser below
+    // CORS: the whole API answers only the app's own origins (server/llm/guestAccess.js
+    // createOriginPolicy: LLM_ALLOWED_ORIGINS, the same host, and outside production localhost,
+    // 127.0.0.1 and port 3007 on any host). A page on another site can then neither read the
+    // API's answers nor send it JSON or an Authorization header, which need a preflight. (CORS is
+    // not access control: a simple request still runs. The LLM gateway also refuses a POST from
+    // another origin: originGuard below.)
+    const isAllowedOrigin = createOriginPolicy();
+    const apiCors = cors((req, callback) => callback(null, { origin: isAllowedOrigin(req.headers.origin, req) }));
+    app.use((req, res, next) => {
+        // The CORS headers depend on the Origin, also when there are none.
+        res.vary('Origin');
+        // apiCors ends every OPTIONS it allows with 204; a refused one ends here, without CORS
+        // headers, before auth (a 401 in the log) and the rate limits.
+        if (req.method === 'OPTIONS' && !isAllowedOrigin(req.headers.origin, req)) return res.status(204).end();
+        return apiCors(req, res, next);
+    });
+    // Lesson progress has its own, smaller body limit. Registered first: the 2 MB parser below
     // then sees the body as already read and skips it.
     app.use('/api/v2/user/lesson-progress', express.json({ limit: LESSON_PROGRESS_BODY_LIMIT }), lessonProgressBodyErrors);
-    // Account deletion (Phase 4) takes a confirm word and the AI apps' names: 16 kb, refused before the 50 MB parser.
+    // Account deletion (Phase 4) takes a confirm word and the AI apps' names: 16 kb, refused before the 2 MB parser.
     app.use('/api/v2/user/account', express.json({ limit: ACCOUNT_BODY_LIMIT }), smallBodyErrors(ACCOUNT_BODY_LIMIT));
-    // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 50 MB parser too.
+    // Accepting the terms (Phase 4) takes two version ids: 4 kb, refused before the 2 MB parser too.
     app.use('/api/v2/user/legal', express.json({ limit: LEGAL_BODY_LIMIT }), smallBodyErrors(LEGAL_BODY_LIMIT));
-    // A learning-history event (Phase 5: history only) is a type and two short texts: 8 kb, refused before the 50 MB parser.
+    // A learning-history event (Phase 5: history only) is a type and two short texts: 8 kb, refused before the 2 MB parser.
     app.use('/api/v2/user/events', express.json({ limit: LEARNING_EVENTS_BODY_LIMIT }), smallBodyErrors(LEARNING_EVENTS_BODY_LIMIT));
-    // The review queue (Phase 6) takes three ids and a rating: 2 kb, refused before the 50 MB parser.
+    // The review queue (Phase 6) takes three ids and a rating: 2 kb, refused before the 2 MB parser.
     app.use('/api/v2/user/review', express.json({ limit: REVIEW_BODY_LIMIT }), smallBodyErrors(REVIEW_BODY_LIMIT));
-    // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 50 MB JSON
+    // Stripe's webhook needs the exact bytes it signed: only the raw parser here (the 2 MB JSON
     // parser below then skips the body); the handler is mounted with the billing routes, after the
     // logger and the global limiter.
     app.post(BILLING_WEBHOOK_PATH, express.raw({ type: 'application/json', limit: BILLING_WEBHOOK_BODY_LIMIT }));
-    app.use(express.json({ limit: '50mb' }));
+    // Every other JSON body: 2 MB (the last handler answers a refusal as JSON). The largest real
+    // one, a curriculum draft (titles and goals of at most 12 x 10 lessons), is far smaller;
+    // uploads are multipart, which no JSON parser reads.
+    app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
     // Logging Middleware (Phase 8: includes authMethod). originalUrl: req.url is cut to the mount
     // path when a scoped middleware (e.g. /api/v2/agent auth) answers. redactUrl (Phase 4): no query
@@ -246,7 +266,7 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     app.use(
         '/api/v2/llm',
         optionalAuth,
-        originGuard(isAllowedLlmOrigin),
+        originGuard(isAllowedOrigin),
         createLlmRouter({
             limiter: aiLimiter,
             guestBudget: createGuestBudget(),
@@ -325,6 +345,9 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
     app.post('/api/v2/agent/chat', aiAccessGate({ adultsOnly: true })); // adults only (see /image); before its daily cap (agent.js)
     app.use('/api/v2', agentRoutes);
     app.use('/api/v2', requireAuth, contentRoutes);          // Phase 7: JWT auth
+    // TTS: in strict mode the requireAuth just above already answered a guest with 401, the health
+    // probe too, so the app shows voice as unavailable to guests (synthesize refuses them as well).
+    // optionalAuth reuses that check of the session (auth.js: one check per request).
     app.get('/api/v2/tts/health', optionalAuth, ttsHealthHandler); // lightweight probe — no rate limit
     app.use('/api/v2', optionalAuth, aiLimiter, ttsRoutes);  // Issue #3: Kokoro TTS (+ user prefs when authed)
 
@@ -364,6 +387,9 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
 
     if (serveStatic) {
         // --- Static File Serving (Production) ---
+        // Uploads are private (server/uploads.js): files older versions left in public/uploads (and
+        // copied into dist/ by a build made next to them) answer 404, before either static server.
+        app.use(blockLegacyUploads());
         // In production, serve the built frontend from dist/
         const distPath = path.join(__dirname, 'dist');
         try {
@@ -381,18 +407,21 @@ export async function createApp({ serveStatic = true, originGate = {}, lessonPro
             console.log('[Static] No dist/ found — frontend served separately (dev mode)');
         }
 
-        // Also serve public/ for uploaded/generated assets
+        // Also serve public/ for generated assets (not uploads: see above)
         app.use(express.static(path.join(__dirname, 'public')));
     }
 
     // Last: an error no route answered (a handler that rejected, pool.connect() failing, a body the
     // JSON parser refused) gets JSON with its status's standard text. The error is logged, never
     // sent: Express's own handler sends the stack (database text included) outside production. The
-    // line has its name, code and message only: a pg error's detail holds values (Phase 4).
+    // line has its name, code and message only: a pg error's detail holds values (Phase 4). A
+    // database that cannot be reached is a 503 with Retry-After, so clients try again later.
     app.use((err, req, res, next) => {
         if (res.headersSent) return next(err);
         const code = err?.status ?? err?.statusCode;
-        const status = Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
+        const unavailable = isDbUnavailable(err);
+        if (unavailable) res.set('Retry-After', String(DB_RETRY_AFTER_SECONDS));
+        const status = unavailable ? 503 : Number.isInteger(code) && code >= 400 && code < 600 ? code : 500;
         if (status >= 500) console.error(`[Server] ${req.method} ${redactUrl(req.originalUrl)} failed: ${describeError(err)}`);
         res.status(status).json({ error: STATUS_CODES[status] ?? 'Internal Server Error' });
     });

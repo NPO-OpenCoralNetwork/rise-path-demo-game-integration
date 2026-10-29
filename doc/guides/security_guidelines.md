@@ -18,7 +18,7 @@ Vibe Coding（AI主導の高速開発）では、AIによって機密情報が�
 
 ---
 
-## 2. 🛡️ 3つのセキュリティガードレール導入手順
+## 2. 🛡️ 4つのセキュリティガードレール導入手順
 
 漏洩を水際で防ぐため、以下の自動検知・ブロック機能を導入します。
 
@@ -53,7 +53,7 @@ flowchart TD
     ```yaml
     repos:
       - repo: https://github.com/gitleaks/gitleaks
-        rev: v8.18.2 # 最新の安定バージョンを指定
+        rev: v8.30.1 # 最新の安定バージョンを指定（2026-10-28 時点）
         hooks:
           - id: gitleaks
     ```
@@ -62,23 +62,27 @@ flowchart TD
     pre-commit install
     ```
     *※これにより、次回以降の `git commit` 時に自動で Gitleaks スキャンが走り、キーが含まれているとコミットがブロックされます。*
+    *※Gitleaks の既定のルール（v8.30.1）には、Figma（`figd_`）・OpenRouter（`sk-or-v1-`）・Cloudflare Tunnel のトークンの形がありません。この 3 つは、ガードレール④の CI が確かめます。*
 
 ---
 
-### ガードレール②：GitHub Push Protection（プッシュ保護）の有効化
+### ガードレール②：GitHub Push Protection（プッシュ保護）とリポジトリの設定
 
-Gitleaksフックを回避してローカルでコミットされてしまった場合でも、GitHubへ `git push` するタイミングでGitHubのサーバーが検知し、プッシュを拒否します。
+Gitleaksフックを回避してローカルでコミットされてしまった場合でも、GitHubへ `git push` するタイミングでGitHubのサーバーが検知し、プッシュを拒否します。公開リポジトリでは、GitHub の秘密の検出（secret scanning）は無料です。
 
 #### 設定手順（リポジトリ管理者）
 
-1.  GitHub上のリポジトリを開き、**「Settings」**タブをクリック。
-2.  左メニューの **「Security」** ➔ **「Code security and analysis」** を選択。
-3.  **「Secret scanning」** を `Enabled` にする。
-4.  その下にある **「Push protection」** の右側にある **「Enable」** ボタンをクリックして有効化する。
+GitHub のリポジトリの **Settings** を開き、左のメニューの「**Security and quality**」の **Advanced Security** を選びます（画面の名前は、2026-10-28 に GitHub のドキュメントの原稿で確かめました）。
+
+1.  「**Secret Protection**」が有効でなければ、右の **Enable** を押し、確認の画面で **Enable Secret Protection** を押します（秘密の検出と、その通知）。
+2.  「Secret Protection」の中の「**Push protection**」の右の **Enable** を押します。
+3.  「**Private vulnerability reporting**」の右の **Enable** を押します。[`SECURITY.md`](../../SECURITY.md) が案内する、非公開の報告の窓口です（公開リポジトリだけで使えます）。
+4.  「**Dependabot alerts**」の右の **Enable** を押します。使っている npm のパッケージに脆弱性が見つかると知らせます（コードは変えません）。
+5.  （任意）「**Code Security**」の「**CodeQL analysis**」の **Set up** から **Default** を選び、**Enable CodeQL** を押します。コードの自動の点検で、プルリクエストにチェックが増えます（必須のチェックには入れません）。
 
 > [!IMPORTANT]
 > **Push Protection が有効な場合**:
-> 誤ってAPIキーを含んだコミットをプッシュしようとすると、ターミナル上にエラーメッセージが表示され、プッシュがブロックされます。開発者はローカルで履歴を修正（`git commit --amend` 等）するまでプッシュできません。
+> 誤ってAPIキーを含んだコミットをプッシュしようとすると、ターミナル上にエラーメッセージが表示され、プッシュがブロックされます。開発者は、鍵を消して履歴を直し（`git commit --amend` 等）、プッシュし直します。理由を選んでブロックを迂回することもできますが、迂回するとアラートが残ります。本物の鍵では迂回しません。迂回のアラートが本物の鍵なら、管理者は下の「万が一…」の手順で無効にします。
 
 ---
 
@@ -96,11 +100,23 @@ AIアシスタントにコーディングを指示する際、プロンプトの
 
 ---
 
+### ガードレール④：CI の確かめ（プルリクエストと main への push）
+
+`.github/workflows/ci.yml` が、変わったファイルを `scripts/ci/scan-secrets.mjs` で確かめ、次の鍵か、個人の絶対パスを見つけると失敗します。値は伏せて出します。
+
+- Google（`AIza`）、Anthropic（`sk-ant-`）、OpenAI（`sk-proj-` など）、OpenRouter（`sk-or-v1-`）、GitHub（`ghp_` など）、Slack（`xoxb-` など）、Figma（`figd_`）、Stripe（`sk_live_` など）、Cloudflare Tunnel のトークン、秘密鍵（PEM）、Supabase の `service_role` の JWT
+
+全部のファイルを手元で確かめるときは、`node scripts/ci/scan-secrets.mjs --all` を流します。同じ CI の `Build and key-leak scan` は、本番のビルドにサーバーの鍵が入っていないことを確かめます。
+
+CI は、GitHub に push したあとに動きます。このリポジトリは公開なので、CI が見つけた値が本物の鍵なら、もう公開されています（ブランチと、プルリクエストの参照 `refs/pull/…`）。値を消すコミットや amend の前に、下の「万が一…」の 1（無効化）から始めます。push の前に `node scripts/ci/scan-secrets.mjs --diff origin/main` を流すと、コミット前の変更と、まだ追跡していないファイルも同じように確かめられます。
+
+---
+
 ## 3. プルリクエスト（PR）コードレビュー時のチェックリスト
 
 PR統合時の人間の目によるレビューでは、以下の観点を確認してください。
 
-*   [ ] 差分コード内に `figd_` (Figma), `AIzaSy` (Gemini/GCP), `eyJ` (JWT/Supabase) などの典型的なシークレットの文字列パターンが紛れ込んでいないか。
+*   [ ] 差分コード内に `figd_` (Figma), `AIzaSy` (Gemini/GCP), `eyJ` (JWT/Supabase) などの典型的なシークレットの文字列パターンが紛れ込んでいないか。ガードレール④の種類は CI が確かめるので、それ以外の鍵と、パスワードの入った接続文字列（`postgresql://ユーザー:パスワード@…`）を目で確かめます。
 *   [ ] 新たに追加された設定用ファイル（`.env` やバックアップ用の `.bak` 等）が、誤ってコミット対象になっていないか（`.gitignore` に記述されているか）。
 *   [ ] テスト用・デバッグ用として一時的に書き込んだ検証用キーが残ったままになっていないか。
 
@@ -117,3 +133,4 @@ PR統合時の人間の目によるレビューでは、以下の観点を確認
     - 新しいキーを生成し、ローカルの `.env.local` のみを更新します。
 3.  **履歴の抹消（必要に応じて）**:
     - コミット履歴からキーの文字列を完全に消去したい場合は、`git-filter-repo` を使って履歴の書き換えを行います。
+    - *※書き換えには force push が要るので、オーナーが決めます（`AGENTS.md`）。公開リポジトリでは、書き換えても、プルリクエストの参照（`refs/pull/…`）や、だれかの複製に残ります。1 の無効化が先です。無効にした鍵は、履歴に残っても使えません。*

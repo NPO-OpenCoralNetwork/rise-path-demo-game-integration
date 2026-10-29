@@ -14,8 +14,16 @@ import {
     isImageGenerationAvailable,
 } from '../geminiBackendService.js';
 import { isEmbeddingConfigured } from '../../tools/core/ragSearch.js';
+import { LESSON_UI_TEMPLATE_ID } from '../../tools/core/lessons.js';
 import { dailyCap, reserveDailyCap } from '../middleware/dailyCaps.js';
 import { isUuid } from '../utils/ids.js';
+import {
+    MAX_UPLOAD_MB,
+    UNSUPPORTED_UPLOAD,
+    acceptedUpload,
+    privateUploadStorage,
+    uploadTitle,
+} from '../uploads.js';
 
 // ESM dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -32,15 +40,10 @@ const DEFAULT_COURSE_CARD = {
 };
 
 // --- Upload Setup ---
-const uploadDir = path.join(PROJECT_ROOT, 'public/uploads');
+// Uploads are private (server/uploads.js): <project>/uploads under a random name, never served.
 const generatedDir = path.join(PROJECT_ROOT, 'public/generated');
 const imageCache = new Map();
 (async () => {
-    try {
-        await fs.access(uploadDir);
-    } catch {
-        await fs.mkdir(uploadDir, { recursive: true });
-    }
     try {
         await fs.access(generatedDir);
     } catch {
@@ -48,18 +51,27 @@ const imageCache = new Map();
     }
 })();
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+// One file per request (and no other field), at most MAX_UPLOAD_MB: an 'embeddings' unit then
+// covers a bounded file (and ragService.js embeds at most MAX_CHUNKS_PER_MATERIAL chunks of it).
+// File names are read as UTF-8 (multer's default is latin1, which garbled Japanese titles).
+const upload = multer({
+    storage: privateUploadStorage,
+    limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1, fields: 0 },
+    defParamCharset: 'utf8',
+    fileFilter: (req, file, cb) => (acceptedUpload(file.originalname, file.mimetype)
+        ? cb(null, true)
+        : cb(Object.assign(new Error('Unsupported file type'), { code: UNSUPPORTED_UPLOAD }))),
 });
-// One file per request, at most MAX_UPLOAD_MB: an 'embeddings' unit then covers a bounded file
-// (and ragService.js embeds at most MAX_CHUNKS_PER_MATERIAL chunks of it).
-const MAX_UPLOAD_MB = 10;
-const upload = multer({ storage, limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } });
 
-/** upload.single('file') with multer's limit errors as JSON: 413 too large, 400 anything else. */
+/**
+ * upload.single('file') with its errors as JSON: 413 too large, 415 not a PDF, text or Markdown
+ * file (also a .pdf without the PDF signature), 400 anything else multer refused.
+ */
 const receiveFile = (req, res, next) => upload.single('file')(req, res, (error) => {
     if (!error) return next();
+    if (error?.code === UNSUPPORTED_UPLOAD) {
+        return res.status(415).json({ error: 'Attach a PDF, text (.txt) or Markdown (.md) file.', error_type: UNSUPPORTED_UPLOAD });
+    }
     if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
             return res.status(413).json({ error: `The file is larger than ${MAX_UPLOAD_MB} MB.`, error_type: 'file_too_large' });
@@ -83,9 +95,9 @@ const IMAGE_SIZES = new Set(['1K', '2K']);
  * - /rag/index: the job re-reads a file that is already stored (and was counted at upload), so the
  *   unit pays for embedding only. When embeddings are off (Gemini is not allowed, or no key) the
  *   job embeds nothing and the unit is given back; the per-minute AI limiter still applies.
- * Both give it back when the route ends before the work (400, 404, 413, 500, 503).
+ * Both give it back when the route ends before the work (400, 404, 413, 415, 500, 503).
  */
-const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 404, 413, 500, 503] });
+const embeddingsCap = dailyCap('embeddings', { refundOnStatus: [400, 404, 413, 415, 500, 503] });
 
 /** The /image answer when this deployment does not generate images (Gemini not allowed, or no key). */
 const sendImageUnavailable = (res) => res.status(503).json({
@@ -101,7 +113,10 @@ const geminiImageNeverRan = (error) => error?.code === 'GEMINI_NOT_CONFIGURED' |
 
 // --- Routes ---
 
-// GET /api/v2/curricula
+// GET /api/v2/curricula — the library: the learner's generated courses, newest first, with their
+// lesson count. Left out: a lesson draft (risepath.lesson/v1, previewed at /preview/), and a
+// generation still in progress (status draft_<stage>, listed by GET /api/v2/ai/drafts) until it
+// has content.
 router.get('/curricula', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
@@ -111,12 +126,14 @@ router.get('/curricula', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `select id, title, description, current_version_id, created_at, category, thumbnail, color
+            `select id, title, description, current_version_id, created_at, category, thumbnail, color, total_lessons
              from curricula
              where user_id = CAST($1 AS uuid)
+               and ui_template_id is distinct from $4
+               and (not starts_with(coalesce(status, ''), 'draft_') or current_version_id is not null)
              order by created_at desc
              limit $2 offset $3`,
-            [req.userId, limit, offset]
+            [req.userId, limit, offset, LESSON_UI_TEMPLATE_ID]
         );
         res.json({ ok: true, curricula: result.rows });
     } catch (error) {
@@ -157,28 +174,34 @@ router.get('/curricula/:id', async (req, res) => {
     }
 });
 
+/** 503 before multer stores anything when there is no database to keep the file's row in. */
+const requireDb = (req, res, next) => (getPool() ? next() : res.status(503).json({ error: 'DB not configured' }));
+
 // POST /api/v2/upload — the daily cap runs before multer, so nothing is stored when it is used up.
-router.post('/upload', embeddingsCap, receiveFile, async (req, res) => {
+router.post('/upload', embeddingsCap, requireDb, receiveFile, async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
     if (!req.file) return res.status(400).json({ error: 'No file' });
 
     try {
-        const type = req.file.mimetype.includes('pdf') ? 'pdf' : 
-                     req.file.mimetype.includes('audio') ? 'audio' : 'txt';
-        const storagePath = `public/uploads/${req.file.filename}`;
-        const absolutePath = path.join(PROJECT_ROOT, storagePath);
+        const kind = acceptedUpload(req.file.originalname, req.file.mimetype);
+        // Relative to the project like the old public/uploads rows (the job worker resolves both).
+        const storagePath = `uploads/${req.file.filename}`;
 
         const result = await pool.query(
             `insert into materials (user_id, type, title, storage_path, status)
              values (CAST($1 AS uuid), $2, $3, $4, 'uploaded') returning id, status`,
-            [req.userId, type, req.file.originalname, storagePath]
-        );
+            [req.userId, kind.type, uploadTitle(req.file.originalname), storagePath]
+        ).catch(async (error) => {
+            // No row names the file: remove it now rather than leave it to the retention sweep.
+            await fs.unlink(req.file.path).catch(() => {});
+            throw error;
+        });
         const materialId = result.rows[0].id;
 
         try {
             // With embeddings off the chunks are stored without vectors (keyword search finds them).
-            await ingestMaterial(materialId, absolutePath, req.file.mimetype, req.userId);
+            await ingestMaterial(materialId, req.file.path, kind.mimeType, req.userId);
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
             console.error('Immediate Ingestion failed:', ingestErr);

@@ -17,11 +17,13 @@ Our visual roadmap and tasks are tracked using the following:
 ## 🛠️ How to Contribute
 
 ### 1. Reporting Bugs
-If you find a bug, please open a [GitHub Issue](issues) with:
+If you find a bug, please open a [GitHub Issue](https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/issues) with:
 - Steps to reproduce
 - Expected vs. actual behavior
 - Your environment (Browser, OS, Node.js version)
 - Screenshots or logs if applicable
+
+For a security problem, do not open an issue: report it privately as described in [SECURITY.md](SECURITY.md).
 
 ### 2. Proposing Features
 Have an idea for a new feature? Open an Issue to discuss it with the community before starting work.
