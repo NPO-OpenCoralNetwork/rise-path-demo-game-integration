@@ -334,8 +334,8 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         assert.deepEqual(coverage.params, ['user-1', MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
-        assert.match(keyword.sql, /ORDER BY \(\(c\.content ILIKE \$2\)::int \+ \(c\.content ILIKE \$3\)::int\) DESC/);
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
+        assert.match(keyword.sql, /ORDER BY \(\(n\.text ILIKE \$2\)::int \* 2 \+ \(n\.text ILIKE \$3\)::int \* 2\) DESC/);
         assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
 
         assert.equal(warnings.length, 1, 'warned once per process, not per request');
@@ -363,7 +363,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         assert.ok(!/ILIKE/.test(search.sql), 'vectors are never compared with older-model rows');
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(n\.text ILIKE \$3 OR n\.text ILIKE \$4\)/);
         assert.deepEqual(keyword.params, ['user-1', MODEL_IDS.gemini.embedding, '%Blender%', '%モディファイア%', 3]);
         assert.equal(warnings.length, 1);
     });
@@ -401,7 +401,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         assert.deepEqual(coverage.params, [LEARNER, MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
         assert.deepEqual(keyword.params, [LEARNER, '%blender%', '%modifiers%', 2]);
         assert.equal(warnings.length, 1);
     });
@@ -426,7 +426,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
             ['m-krita', 0.4, undefined],
         ]);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(c\.content ILIKE \$3 OR c\.content ILIKE \$4\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(n\.text ILIKE \$3 OR n\.text ILIKE \$4\)/);
         assert.deepEqual(keyword.params, [LEARNER, MODEL_IDS.gemini.embedding, '%Blender%', '%modifier%', 3]);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.equal(search.params[0], LEARNER);
@@ -539,7 +539,7 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
         assert.ok(!pool.queries.some((q) => /AS has_current/.test(q.sql)), 'no coverage probe');
         assert.deepEqual(warnings, [], 'no "re-embedding is required" warning while embeddings are off');
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.content ILIKE \$2 OR c\.content ILIKE \$3\)/);
+        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
         assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
     });
 
