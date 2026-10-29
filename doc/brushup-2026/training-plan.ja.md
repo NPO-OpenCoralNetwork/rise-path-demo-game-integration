@@ -122,9 +122,9 @@
 ## 5. 順番
 
 1. **先に入れるもの**:
-   - Phase 8 の作業と、#49 の作り直し（#64 と #45 は、2026-10-29 に main に入りました）。
+   - Phase 8 の作業と、#49 の作り直し（#65）。#64 と #45 は、2026-10-29 に main に入りました。
    - Phase 8 は、[ai-access-plan.ja.md](ai-access-plan.ja.md) の Phase 7 に続く作業です。2026-10-28 の時点ではブランチ `claude/gracious-edison-7cl4fe` にあり、プルリクエストはまだありません（レッスンの画面などを変えています）。`doc/phases/phase8_spec.md` の Phase 8 とは別です。
-   - #49 の作り直しでは、新しい置き場所のアップロードも、退会と保存期間の処理で消えるようにし、そのテストも足します（今の処理が消すのは `public/uploads/<13 桁の時刻>-` の形のファイルだけです。`server/services/accountDeletion.js:117-118`、`server/services/retention.js:130`）。
+   - #65 は、新しい置き場所（`uploads/`）のアップロードも、退会と保存期間の処理で消すようにしています（`server/services/accountDeletion.js`・`server/services/retention.js` とそのテスト）。今の main が消すのは `public/uploads/<13 桁の時刻>-` の形のファイルだけです（`server/services/accountDeletion.js:117-118`、`server/services/retention.js:130`）。
    - #40 と #50 は、訓練のルートを足す前に、作り直すか閉じるかを決めます。
    - セキュリティの基本の設定（`SECURITY.md` など）も先に入れます。訓練の不具合を issue にせず非公開で知らせる方法（受講時間や採点をごまかせる穴は `SECURITY.md` の報告、受講者に関わる障害は学校の窓口）を、`CONTRIBUTING.ja.md` と `CONTRIBUTING.md` に書きます。
    - 訓練のコードを push する前に、D9 を決めます。
