@@ -95,7 +95,8 @@ describe(`migration ${FILE}`, () => {
         for (const key of ['trainingMarked: 1', 'trainingLive: 0', 'trainingB: 1']) assert.ok(want.includes(key), key);
         for (const table of TABLES) assert.match(verify, new RegExp(`INSERT INTO ${table} \\(`), `R6 seeds ${table}`);
         assert.match(verify, /DELETION_SQL\.markTrainingMemberships/);
-        assert.match(verify, /readded/, 'a re-opened id can be added again (the live-only unique index)');
+        assert.match(verify, /const refused = [^\n]*await addMember\(\{ cohortSlug, userId: A, role: 'learner', pool \}\)/, 'R6: the deleted account is refused by the real add');
+        assert.match(verify, /const reopened = await reopenAccount\(pool, A, [^\n]*\);\n\s*const readded = [^\n]*await addMember\(/, 'R6: re-opened by a new sign-in, then added again through the real add (the live-only unique index)');
         const checks = fs.readFileSync(new URL('../../scripts/ci/db-checks.sh', import.meta.url), 'utf8');
         for (const table of TABLES) assert.ok(checks.includes(`'${table}'`), `db-checks.sh: ${table} never granted`);
     });

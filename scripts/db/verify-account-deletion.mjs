@@ -30,7 +30,8 @@
  *   R6  a seeded learner deleted in one transaction: what goes, what stays, what is marked
  *       (with migration 019's lesson resets, XP awards and learning days, and migration 020's review
  *       cards and review log: all go; migration 021's training membership: kept, marked with the
- *       tombstone's time by the service's own statement, B's stays live, and A can be added again)
+ *       tombstone's time by the service's own statement, B's stays live; the staff add refuses A,
+ *       and adds A again once a new sign-in re-opened the account, beside the marked row)
  *   R7  version archive rows never change; a version id must match its document
  *   R8  the lock key is canonical: an upper-case id locks what the trigger locks
  *   R9  the deletion service (server/services/accountDeletion.js) on a seeded learner: a terms
@@ -528,9 +529,17 @@ async function r6(pool) {
             : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance and training membership marked with the tombstone time (B\'s live), stub 0');
     const again = (await pool.query(ACCEPT, [A, terms, privacy])).rowCount;
     check('R6', again === 1, `after the deletion the same versions can be accepted again (a new account): inserted ${again}`);
-    const readded = (await pool.query(`INSERT INTO training_memberships (cohort_id, user_id, role) VALUES ($1, $2, 'learner')
-        ON CONFLICT (cohort_id, user_id) WHERE account_deleted_at IS NULL DO NOTHING`, [TC, A])).rowCount;
-    check('R6', readded === 1, `after the deletion A can be added to the same cohort again (a new account; the marked row stays): inserted ${readded}`);
+    // Job training through the staff path (tools/core/training.js): the deleted account cannot be
+    // added (no stub); once a new sign-in re-opens it (an empty account), it can, and the marked row
+    // stays beside the new one (the live-only unique index).
+    const cohortSlug = `r6-${TC.slice(0, 8)}`;
+    const refused = /** @type {any} */ (await addMember({ cohortSlug, userId: A, role: 'learner', pool }));
+    const reopened = await reopenAccount(pool, A, Date.now() / 1000 + 60);
+    const readded = /** @type {any} */ (await addMember({ cohortSlug, userId: A, role: 'learner', pool }));
+    const rowsA = (await pool.query(`SELECT count(*) FILTER (WHERE account_deleted_at IS NULL)::int AS live, count(*) FILTER (WHERE account_deleted_at IS NOT NULL)::int AS marked
+        FROM training_memberships WHERE cohort_id = $1::uuid AND user_id = $2::uuid`, [TC, A])).rows[0];
+    check('R6', refused?.status === 'deleted_account' && Boolean(reopened) && readded?.status === 'added' && rowsA?.live === 1 && rowsA?.marked === 1,
+        `after the deletion A cannot be added (${refused?.status ?? refused?.error_type}); re-opened by a new sign-in, A is added again (${readded?.status ?? readded?.error_type}): live ${rowsA?.live}, marked ${rowsA?.marked}`);
 }
 
 /** @param {pg.Pool} pool */
