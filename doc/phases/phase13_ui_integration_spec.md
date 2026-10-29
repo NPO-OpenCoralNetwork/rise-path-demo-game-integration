@@ -239,11 +239,10 @@ ragService.js ingestMaterial(materialId, filePath, mimeType, userId)
 ```bash
 # Blender 公式チュートリアルテキストを投入
 curl -X POST http://localhost:3006/api/v2/upload \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@doc/chapter_01_unity_basics.md" \
-  -F "title=Unity Basics" \
-  -F "domain=unity"
+  -F "file=@doc/chapter_01_unity_basics.md"
 ```
+
+（2026-10-29 更新: `/upload` は `file` のほかの欄を受け付けません（400）。題名はファイル名から付きます。受け付けるのは PDF・テキスト・Markdown だけです。）
 
 または CLI で直接投入:
 

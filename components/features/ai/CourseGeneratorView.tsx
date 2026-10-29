@@ -11,15 +11,17 @@ import { aiRefusalOf, type AiRefusal } from '../../../services/safetyApi';
 import { AiNotice, AiRefusalNotice } from '../../ui/AiNotice';
 import ReactMarkdown from 'react-markdown';
 
-type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'refusal' | 'other';
+type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'upload_unsupported' | 'refusal' | 'other';
 
 /** Messages the app wrote itself (the welcome, a restored draft): no AI notice on them. */
 const APP_MESSAGE_IDS = new Set(['init', 'restored-draft']);
-/** Why the attached file was not sent: today's upload cap, uploads turned off, or too large. */
-type UploadNotice = 'limit' | 'paused' | 'too_large';
+/** Why the attached file was not sent: today's upload cap, uploads turned off, too large, or not a PDF, text or Markdown file. */
+type UploadNotice = 'limit' | 'paused' | 'too_large' | 'unsupported';
 
-/** The server's upload limit (server/routes/content.js MAX_UPLOAD_MB); checked here before sending. */
+/** The server's upload limit (server/uploads.js MAX_UPLOAD_MB); checked here before sending. */
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+/** The files the server stores (server/uploads.js acceptedUpload, 415 otherwise); checked here before sending. */
+const ACCEPTED_UPLOAD = /\.(?:pdf|txt|md)$/i;
 /** The server's limit for a topic or revision message (server/routes/ai.js MESSAGE_MAX_CHARS). */
 const MESSAGE_MAX_CHARS = 4000;
 
@@ -41,6 +43,7 @@ const classifyAiError = (err: unknown): AiFailure => {
   if (refusal) return 'refusal';
   const status = (err as { status?: unknown } | null)?.status;
   if (status === 413) return 'upload_too_large';
+  if (status === 415) return 'upload_unsupported';
   if (status === 401 || status === 403) return 'auth';
   if (status === 503 || status === 504) return 'unavailable';
   const message = err instanceof Error ? err.message : String(err ?? '');
@@ -159,6 +162,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       uploadDailyLimit: "Today's limit for file uploads has been reached. Remove the file to keep going, or attach it again after midnight Japan time.",
       uploadPaused: 'File uploads are paused for now. Remove the file to keep going.',
       uploadTooLarge: 'This file is larger than 10 MB. Remove it, or attach a smaller file.',
+      uploadUnsupported: 'Only PDF, text (.txt) and Markdown (.md) files can be attached. Remove this file, or attach another one.',
     },
     jp: {
       initialMessage: 'こんにちは！AIコンシェルジュです。学びたいテーマを教えていただくか、資料をアップロードして開始しましょう。',
@@ -214,6 +218,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       uploadDailyLimit: '今日のファイルのアップロードは上限に達しました。ファイルを外せば、このまま続けられます。日本時間の0時を過ぎたら、また添付できます。',
       uploadPaused: 'ファイルのアップロードは、今は停止しています。ファイルを外せば、このまま続けられます。',
       uploadTooLarge: 'このファイルは10MBを超えています。ファイルを外すか、小さいファイルを添付してください。',
+      uploadUnsupported: '添付できるのは、PDF、テキスト（.txt）、Markdown（.md）のファイルだけです。このファイルを外すか、別のファイルを添付してください。',
     }
   } as const;
 
@@ -339,6 +344,12 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       setUploadNotice('too_large');
       return;
     }
+    // Not a PDF, text or Markdown file (415): the same, before anything is sent or charged.
+    if (selectedFile && !ACCEPTED_UPLOAD.test(selectedFile.name)) {
+      focusAfterRef.current = 'file';
+      setUploadNotice('unsupported');
+      return;
+    }
 
     const isRevision = pendingApproval !== null && pendingApproval !== 'none';
     const fileName = selectedFile?.name ?? uploadedFile?.name;
@@ -419,9 +430,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     } else if (failure === 'other') setError(t.errorChat);
     // The upload was refused before anything was generated: selectedFile stays attached, so the
     // learner can remove it (focus goes to its remove button) and send again.
-    else if (failure === 'upload_limit' || failure === 'upload_paused' || failure === 'upload_too_large') {
+    else if (failure === 'upload_limit' || failure === 'upload_paused' || failure === 'upload_too_large' || failure === 'upload_unsupported') {
       focusAfterRef.current = 'file';
-      setUploadNotice(failure === 'upload_limit' ? 'limit' : failure === 'upload_paused' ? 'paused' : 'too_large');
+      setUploadNotice(failure === 'upload_limit' ? 'limit' : failure === 'upload_paused' ? 'paused' : failure === 'upload_too_large' ? 'too_large' : 'unsupported');
       restoreAttempt();
     } else if (failure === 'daily_limit' || failure === 'paused') {
       setBlockedUntil(failure === 'daily_limit' ? dailyLimitResetAt(err) : null);
@@ -974,10 +985,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                     {/* The attached file was not sent: a neutral note next to it, not a failure banner. */}
                     {uploadNotice && (
                         <p role="alert" className="mb-3 flex items-start gap-2 rounded-xl border border-line bg-sunken px-4 py-3 text-sm text-fg-2">
-                            {uploadNotice === 'too_large'
+                            {uploadNotice === 'too_large' || uploadNotice === 'unsupported'
                                 ? <Paperclip size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
                                 : <CalendarClock size={16} aria-hidden="true" className="mt-0.5 shrink-0" />}
-                            <span>{uploadNotice === 'limit' ? t.uploadDailyLimit : uploadNotice === 'paused' ? t.uploadPaused : t.uploadTooLarge}</span>
+                            <span>{uploadNotice === 'limit' ? t.uploadDailyLimit : uploadNotice === 'paused' ? t.uploadPaused : uploadNotice === 'too_large' ? t.uploadTooLarge : t.uploadUnsupported}</span>
                         </p>
                     )}
                     {(selectedFile || uploadedFile) && (
@@ -1011,6 +1022,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                     <div className="flex gap-3 relative items-end min-w-0">
                         <input 
                             type="file"
+                            accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
                             ref={fileInputRef}
                             className="hidden"
                             onChange={(e) => {

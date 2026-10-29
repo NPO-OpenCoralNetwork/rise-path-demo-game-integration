@@ -107,6 +107,10 @@ services:
       MEMANTO_SESSION_DURATION_HOURS: ${MEMANTO_SESSION_DURATION_HOURS:-24}
       MEMANTO_RECALL_LIMIT: ${MEMANTO_RECALL_LIMIT:-8}
       MEMANTO_MIN_CONFIDENCE_WRITE: ${MEMANTO_MIN_CONFIDENCE_WRITE:-0.7}
+    # Uploaded materials (server/uploads.js): private files in /app/uploads, kept across redeploys
+    # (they were lost with the container before). Account deletion and retention remove them.
+    volumes:
+      - uploads:/app/uploads
     # default: db, mcp, hermes, kokoro-tts. edge: cloudflared only (api.<domain> → api:3006).
     networks:
       - default
@@ -323,3 +327,4 @@ networks:
 
 volumes:
   pgdata:
+  uploads:

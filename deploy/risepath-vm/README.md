@@ -126,6 +126,8 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 
 新しい VM の DB は空から始まります。この初回デプロイで、migration 000–020 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
+学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
+
 ### 3. Mac `.env.local`
 
 ```env
