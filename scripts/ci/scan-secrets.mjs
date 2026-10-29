@@ -10,8 +10,9 @@
  *   … --allow <file>                                      # allowlist (default scripts/ci/scan-secrets.allow.json)
  *
  * Rules (ids are used in the allowlist): google-api-key, anthropic-api-key, openai-api-key,
- * github-token, slack-token, stripe-secret-key, stripe-webhook-secret, private-key,
- * service-role-jwt, absolute-personal-path. Values that
+ * openrouter-api-key, github-token, slack-token, figma-token, stripe-secret-key,
+ * stripe-webhook-secret, cloudflare-tunnel-token, private-key, service-role-jwt,
+ * absolute-personal-path. Values that
  * are obviously placeholders (a run of 8 identical characters, "example", "your_", …) are not
  * reported. Binary files (a NUL byte in the first 8000 bytes) and node_modules/ or dist/ are skipped.
  *
@@ -124,6 +125,18 @@ export const RULES = [
     /(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{50,255})(?![A-Za-z0-9_])/g, 4),
   tokenRule('slack-token', 'Slack token (xoxa-, xoxb-, xoxp-, xoxr-)', /(?<![A-Za-z0-9_-])xox[abpr]-[A-Za-z0-9-]{10,}/g, 5,
     (value) => /\d/.test(value.slice(5))),
+  // The next three rules allow a "-" before the prefix, so a key written as a compose or shell
+  // default (${OPENROUTER_API_KEY:-…}, as the VM files wire these names) is still reported.
+  // OpenRouter keys (Hermes on the VM, OPENROUTER_API_KEY). The legacy OpenAI rule above misses
+  // them: a dash follows "sk-or".
+  tokenRule('openrouter-api-key', 'OpenRouter API key (sk-or-v1-…)', /(?<![A-Za-z0-9_])sk-or-v1-[A-Za-z0-9]{32,}/g, 6),
+  // Figma personal access tokens. doc/guides/security_guidelines.md lists the prefix for reviews.
+  tokenRule('figma-token', 'Figma personal access token (figd_…)', new RegExp(`(?<![A-Za-z0-9_])figd_[${TOKEN_CHAR}]{30,}`, 'g'), 5),
+  // Cloudflare Tunnel tokens (TUNNEL_TOKEN in deploy/risepath-vm/tunnel.env): base64 of a JSON
+  // object that starts with {"a": (account, tunnel id and the tunnel secret). Either base64
+  // alphabet, padded or not; "=" may come before it (TUNNEL_TOKEN=…).
+  tokenRule('cloudflare-tunnel-token', 'Cloudflare Tunnel token (base64 JSON, eyJhIjoi…)',
+    /(?<![A-Za-z0-9+/_])eyJhIjoi[A-Za-z0-9+/_-]{60,}={0,2}/g, 3),
   // Stripe secret and restricted keys (test and live) and webhook signing secrets. Publishable
   // keys (pk_) are public. At least 20 key characters, so short test fixtures are not reported.
   tokenRule('stripe-secret-key', 'Stripe secret or restricted key (sk_test_, sk_live_, rk_test_, rk_live_)',
