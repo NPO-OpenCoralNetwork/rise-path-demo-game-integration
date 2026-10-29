@@ -64,7 +64,7 @@ describe('server.js billing mounts', () => {
 
     it('raw parser before the global JSON parser; handler and router after the logger and limiter, before the catch-all', () => {
         const raw = at("app.post(BILLING_WEBHOOK_PATH, express.raw({ type: 'application/json', limit: BILLING_WEBHOOK_BODY_LIMIT }));");
-        const json = at("app.use(express.json({ limit: '50mb' }));");
+        const json = at('app.use(express.json({ limit: JSON_BODY_LIMIT }));');
         const logger = at("res.on('finish'");
         const limiter = at("app.use('/api/', globalLimiter);");
         const handler = at('app.post(BILLING_WEBHOOK_PATH, createBillingWebhook({ config: billingConfig, stripe }));');

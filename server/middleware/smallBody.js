@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Error handler for a small JSON body parser registered on one mount before server.js's 50 MB
+ * Error handler for a small JSON body parser registered on one mount before server.js's 2 MB
  * parser (Phase 4: /api/v2/user/account; pattern of server/routes/lessonProgress.js
  * lessonProgressBodyErrors). Register it right after the parser:
  *

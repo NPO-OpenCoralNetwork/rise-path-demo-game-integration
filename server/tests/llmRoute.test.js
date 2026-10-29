@@ -244,7 +244,7 @@ describe('/api/v2/llm routes (mock provider)', () => {
             const dev = await preflight('http://localhost:3007');
             assert.equal(dev.headers.get('access-control-allow-origin'), 'http://localhost:3007');
             const otherApi = await preflight('https://evil.example', '/health');
-            assert.equal(otherApi.headers.get('access-control-allow-origin'), '*', 'the rest of the API is unchanged');
+            assert.equal(otherApi.headers.get('access-control-allow-origin'), null, 'the rest of the API follows the same policy (apiCorsBodyLimit.test.js)');
 
             const post = await postJson(`${base}/llm/tutor`, { message: 'hi', lesson: LESSON, anchor: ANCHOR }, { Origin: 'https://evil.example' });
             assert.equal(post.status, 403);

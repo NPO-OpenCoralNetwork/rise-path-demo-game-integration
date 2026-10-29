@@ -1,6 +1,6 @@
 // Accepting the terms of use (Phase 4, server/routes/legal.js at /api/v2/user/legal; design §4.4,
 // §8 legalRoutes) on the real server.js stack: requireAuth and requireSignedIn, the 4 kb body parser
-// registered before the 50 MB one, the per-learner limit, the version handshake, drafts refused in
+// registered before the 2 MB one, the per-learner limit, the version handshake, drafts refused in
 // production, and the acceptance transaction against helpers/legalPool.js: the shared account lock
 // first, the insert only while the auth.users stub exists, a deletion that committed meanwhile →
 // 401 account_deleted and ROLLBACK. Version tables of a later release (history, requiresAcceptance)

@@ -4,7 +4,7 @@
  * §5.4). Mounted by server.js at /api/v2/user/account behind requireAuth and requireSignedIn (the
  * dev fallback, the bridge user and an anonymous user get 401 sign_in_required; an agent's own
  * OAuth token 401 oauth_client_token), with its own 16 kb JSON body parser registered before the
- * 50 MB one (server/middleware/smallBody.js: 413 body_too_large, 400 invalid_body).
+ * 2 MB one (server/middleware/smallBody.js: 413 body_too_large, 400 invalid_body).
  *
  * GET  /deletion → 200 { ok, enabled, subscription: 'none' | 'renewing' | 'ending', reauthWindowSeconds }
  *      The page shows a renewing plan before asking for the password (the local copy; Stripe is

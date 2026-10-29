@@ -241,7 +241,7 @@ describe('/api/v2/user/lesson-progress', () => {
         });
     });
 
-    it('a body over 256 kb answers 413 (its own limit, not the global 50 MB one)', async () => {
+    it('a body over 256 kb answers 413 (its own limit, not the global 2 MB one)', async () => {
         await withServer(async (base) => {
             const big = { epoch: null, records: [{ courseSlug: VIBE, lessonId: CH1, progress: record({ seen: Array.from({ length: 3000 }, (_, i) => `b${i}-${'x'.repeat(80)}`) }) }] };
             assert.ok(JSON.stringify(big).length > 256 * 1024);

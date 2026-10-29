@@ -3,7 +3,7 @@
  * The learner's review queue (Phase 6, doc/brushup-2026/ai-access-plan.ja.md §10; owner decisions
  * R1-R4): a lesson's flashcards come back when the learner is about to forget them (FSRS-6,
  * shared/review/fsrs.js). Mounted by server.js at /api/v2/user/review behind its own 2 kb JSON
- * parser (REVIEW_BODY_LIMIT: 413 body_too_large, 400 invalid_body, before the 50 MB parser),
+ * parser (REVIEW_BODY_LIMIT: 413 body_too_large, 400 invalid_body, before the 2 MB parser),
  * requireAuth, requireSignedIn (the dev fallback, the bridge user and an anonymous user get 401
  * sign_in_required: the queue is an account record, never shared by dev guests) and a per-learner
  * limit on reads and grades together (REVIEW_REQUESTS_PER_MINUTE, 429 rate_limited). An agent's own

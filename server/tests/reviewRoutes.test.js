@@ -5,7 +5,7 @@
 //   lesson finished through PUT /lesson-progress), today's list with the card texts, learnerId;
 // - POST /grade: the review (source 'web'), the 200 shape (no card text), unknown fields ignored
 //   (forged times, reveal, another learner's id), no XP;
-// - the 2 kb body limit before the 50 MB parser (and before auth): 413 body_too_large, 400 invalid_body;
+// - the 2 kb body limit before the 2 MB parser (and before auth): 413 body_too_large, 400 invalid_body;
 // - the audience: requireAuth + requireSignedIn (no token, the bridge token, the dev fallback, the
 //   bridge user and an anonymous user 401; an agent's token 401 oauth_client_token; a deleted account
 //   401 account_deleted);
@@ -281,7 +281,7 @@ describe('the review queue routes (/api/v2/user/review)', () => {
         assert.deepEqual(pool.logRows(ALICE).map((r) => [r.card_id, r.review_day, r.elapsed_days]), [['card-backend', '2026-10-21', 4], ['card-frontend', '2026-10-20', 3]]);
     });
 
-    it(`the ${REVIEW_BODY_LIMIT} body limit runs before the 50 MB parser and before auth: 3 kB 413 body_too_large, not JSON 400 invalid_body; a body just under it is read`, async () => {
+    it(`the ${REVIEW_BODY_LIMIT} body limit runs before the 2 MB parser and before auth: 3 kB 413 body_too_large, not JSON 400 invalid_body; a body just under it is read`, async () => {
         assert.equal(REVIEW_BODY_LIMIT, '2kb');
         use({ reviewCards: [priorRow(VIBE, CH1, 'card-frontend')] });
         await withServer(async (base) => {

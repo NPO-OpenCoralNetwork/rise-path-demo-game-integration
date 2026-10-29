@@ -176,7 +176,7 @@ describe('/api/v2/user/events and the legacy Blender progress on the server.js s
         assert.ok(!pool.queries.some((q) => q.sql === SQL.eventsInsert));
     });
 
-    it(`POST: a body over ${LEARNING_EVENTS_BODY_LIMIT} is 413 body_too_large and one that is not JSON 400 invalid_body, before the 50 MB parser and before auth`, async () => {
+    it(`POST: a body over ${LEARNING_EVENTS_BODY_LIMIT} is 413 body_too_large and one that is not JSON 400 invalid_body, before the 2 MB parser and before auth`, async () => {
         assert.equal(LEARNING_EVENTS_BODY_LIMIT, '8kb');
         await withServer(async (base) => {
             const big = { ...lessonStart, description: { en: 'x'.repeat(9 * 1024) } };
