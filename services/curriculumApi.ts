@@ -2676,10 +2676,14 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
     });
   }
 
-  // Real DB fetch (skipped in demo mode)
+  // Real DB fetch (skipped in demo mode). A 401 (the sign-in ended) is thrown with its status, so the
+  // library asks to sign in again instead of looking empty (services/generatedCourses.ts
+  // isSignInRequired); any other failure is an empty list.
   let curricula: any[] = [];
+  let signInRequired = false;
   try {
     const response = await apiFetch('/curricula');
+    signInRequired = response.status === 401;
     if (response.ok) {
       const payload: CurriculumListResponse = await response.json();
       curricula = payload.curricula || [];
@@ -2687,6 +2691,7 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
   } catch (err) {
     console.warn("Failed to fetch curricula from DB", err);
   }
+  if (signInRequired) throw aiHttpError('Sign in to load your generated courses.', 401);
 
   return curricula.map(row => ({
     id: row.id,
@@ -2725,7 +2730,8 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
 
   const response = await apiFetch(`/curricula/${id}`);
   if (!response.ok) {
-    throw new Error('Failed to load curriculum.');
+    // The status rides along: a 401 asks to sign in again (services/generatedCourses.ts).
+    throw aiHttpError('Failed to load curriculum.', response.status);
   }
   const payload: CurriculumDetailResponse = await response.json();
   if (!payload.curriculum && !payload.course) throw new Error(payload.error || 'Curriculum not found.');

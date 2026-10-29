@@ -215,7 +215,8 @@ flowchart TB
   are not in `local_postgres_phase1.sql`; they are added by `scripts/migrate_curricula.js`.
 - `server/routes/content.js` tries a legacy fallback `SELECT content FROM curricula`,
   which depends on the `content` column added by the migration script.
-- `curricula.visibility` and `curricula.ui_template_id` exist in SQL but are not read by API routes.
+- `curricula.visibility` exists in SQL but is not read by API routes. `GET /api/v2/curricula` reads
+  `ui_template_id` to leave out lesson drafts (`risepath_lesson_v1`).
 - `curriculum_versions.content_mix`, `assessment_mix`, `ui_hints`, `created_by` are not referenced
   in runtime code.
 
