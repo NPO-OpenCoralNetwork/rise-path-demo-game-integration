@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { Course, ViewState } from '../../../../types';
 import { fetchGeneratedCourses } from '../../../../services/curriculumApi';
+import { isSignInRequired } from '../../../../services/generatedCourses';
 import { useLanguage } from '../../../../context/LanguageContext';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import GeneratedCoursesSignInNotice from '../../../common/GeneratedCoursesSignInNotice';
 
 interface ProfileGeneratedViewProps {
   onNavigate: (view: ViewState) => void;
@@ -15,6 +17,7 @@ const ProfileGeneratedView: React.FC<ProfileGeneratedViewProps> = ({ onNavigate 
   const { setTheme } = useTheme();
   const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [signInRequired, setSignInRequired] = useState(false);
 
   useEffect(() => {
     setTheme('default');
@@ -27,7 +30,11 @@ const ProfileGeneratedView: React.FC<ProfileGeneratedViewProps> = ({ onNavigate 
         if (!isMounted) return;
         setCourses(data);
       })
-      .catch(() => setCourses([]));
+      .catch((error) => {
+        if (!isMounted) return;
+        setCourses([]);
+        setSignInRequired(isSignInRequired(error));
+      });
     return () => {
       isMounted = false;
     };
@@ -62,7 +69,9 @@ const ProfileGeneratedView: React.FC<ProfileGeneratedViewProps> = ({ onNavigate 
           <p className="text-slate-500">{t.subtitle}</p>
         </header>
 
-        {courses.length === 0 ? (
+        {signInRequired ? (
+          <GeneratedCoursesSignInNotice />
+        ) : courses.length === 0 ? (
           <div className="rounded-[2.5rem] bg-white border border-slate-100 p-8 shadow-xl text-center">
             <div className="w-16 h-16 rounded-2xl bg-indigo-500 text-white flex items-center justify-center mx-auto mb-6">
               <Sparkles className="w-8 h-8" />

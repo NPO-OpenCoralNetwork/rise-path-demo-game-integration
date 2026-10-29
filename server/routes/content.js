@@ -14,6 +14,7 @@ import {
     isImageGenerationAvailable,
 } from '../geminiBackendService.js';
 import { isEmbeddingConfigured } from '../../tools/core/ragSearch.js';
+import { LESSON_UI_TEMPLATE_ID } from '../../tools/core/lessons.js';
 import { dailyCap, reserveDailyCap } from '../middleware/dailyCaps.js';
 import { isUuid } from '../utils/ids.js';
 import {
@@ -112,7 +113,10 @@ const geminiImageNeverRan = (error) => error?.code === 'GEMINI_NOT_CONFIGURED' |
 
 // --- Routes ---
 
-// GET /api/v2/curricula
+// GET /api/v2/curricula — the library: the learner's generated courses, newest first, with their
+// lesson count. Left out: a lesson draft (risepath.lesson/v1, previewed at /preview/), and a
+// generation still in progress (status draft_<stage>, listed by GET /api/v2/ai/drafts) until it
+// has content.
 router.get('/curricula', async (req, res) => {
     const pool = getPool();
     if (!pool) return res.status(503).json({ error: 'DB not configured' });
@@ -122,12 +126,14 @@ router.get('/curricula', async (req, res) => {
 
     try {
         const result = await pool.query(
-            `select id, title, description, current_version_id, created_at, category, thumbnail, color
+            `select id, title, description, current_version_id, created_at, category, thumbnail, color, total_lessons
              from curricula
              where user_id = CAST($1 AS uuid)
+               and ui_template_id is distinct from $4
+               and (not starts_with(coalesce(status, ''), 'draft_') or current_version_id is not null)
              order by created_at desc
              limit $2 offset $3`,
-            [req.userId, limit, offset]
+            [req.userId, limit, offset, LESSON_UI_TEMPLATE_ID]
         );
         res.json({ ok: true, curricula: result.rows });
     } catch (error) {

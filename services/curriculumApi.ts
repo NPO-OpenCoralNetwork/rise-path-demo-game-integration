@@ -2676,17 +2676,23 @@ export const fetchGeneratedCourses = async (): Promise<Course[]> => {
     });
   }
 
-  // Real DB fetch (skipped in demo mode)
+  // Real DB fetch (skipped in demo mode). A 401 is thrown with its status and body, so the library
+  // asks to sign in again instead of looking empty (services/generatedCourses.ts isSignInRequired);
+  // any other failure is an empty list.
   let curricula: any[] = [];
+  let refusal: Error | null = null;
   try {
     const response = await apiFetch('/curricula');
-    if (response.ok) {
+    if (response.status === 401) {
+      refusal = aiHttpError('Failed to load generated courses.', 401, await response.json().catch(() => null));
+    } else if (response.ok) {
       const payload: CurriculumListResponse = await response.json();
       curricula = payload.curricula || [];
     }
   } catch (err) {
     console.warn("Failed to fetch curricula from DB", err);
   }
+  if (refusal) throw refusal;
 
   return curricula.map(row => ({
     id: row.id,
@@ -2724,6 +2730,12 @@ export const fetchGeneratedCourseById = async (id: string): Promise<GeneratedCou
   }
 
   const response = await apiFetch(`/curricula/${id}`);
+  // Only a 401 carries its status and body: the course and lesson pages ask to sign in again
+  // (services/generatedCourses.ts). CourseGeneratorView reads statuses as AI errors, so any other
+  // failure stays a plain error.
+  if (response.status === 401) {
+    throw aiHttpError('Failed to load curriculum.', 401, await response.json().catch(() => null));
+  }
   if (!response.ok) {
     throw new Error('Failed to load curriculum.');
   }

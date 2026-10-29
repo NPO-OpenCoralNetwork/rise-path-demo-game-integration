@@ -34,6 +34,9 @@ Response:
 Notes:
 - List responses are metadata only. No `content_json`, `modules`, or `chapters`.
 - Progress and counts are derived in UI or via separate endpoints.
+- The list leaves out lesson drafts (`ui_template_id` `risepath_lesson_v1`) and generations still in
+  progress (`status` `draft_<stage>`, listed by `GET /api/v2/ai/drafts`) until they have a current version.
+- A 401 is not an empty library: the UI asks to sign in again (`services/generatedCourses.ts`).
 
 ### GET `/api/v2/curricula/:id`
 Response:
