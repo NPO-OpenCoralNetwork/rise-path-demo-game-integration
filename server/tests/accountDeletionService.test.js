@@ -44,6 +44,15 @@ const seedFor = (id = A, extra = {}) => ({
         { user_id: id, cohort_id: 'd0000000-0000-4000-8000-000000000001', role: 'learner' },
         { user_id: B, cohort_id: 'd0000000-0000-4000-8000-000000000001', role: 'learner' },
     ],
+    // Study time (migration 022): the evidence streams and the closed days, kept and marked too.
+    timeStreams: [
+        { user_id: id, chain_id: 'e0000000-0000-4000-8000-000000000001', day: '2026-11-02' },
+        { user_id: B, chain_id: 'e0000000-0000-4000-8000-000000000002', day: '2026-11-02' },
+    ],
+    timeDays: [
+        { user_id: id, day: '2026-11-02', kind: 'close' },
+        { user_id: B, day: '2026-11-02', kind: 'close' },
+    ],
     consents: [{ id: 'c0000000-0000-4000-8000-000000000001', user_id: id }, { id: 'c0000000-0000-4000-8000-000000000002', user_id: B }],
     grants: [
         { user_id: id, client_id: '11111111-0000-4000-8000-000000000001', client_name: 'used app', first_seen_at: new Date('2026-10-02T00:00:00Z'), last_used_at: new Date('2026-10-20T00:00:00Z') },
@@ -158,7 +167,8 @@ describe('deleteAccountData: the order of the pipeline', () => {
             // The stub, consents and grants are locked right after the account lock, before the copies (finding: a
             // consent or grant written between the copies and the stub DELETE was cascaded with no proof).
             'sql:begin', 'sql:lockTimeout', 'sql:statementTimeout', 'sql:lock', 'sql:lockStub', 'sql:lockConsents', 'sql:lockGrants', 'sql:tombstoneForUpdate', 'sql:renewingLocal', 'sql:uploads',
-            'sql:writeTombstone', 'sql:markAcceptances', 'sql:markTrainingMemberships', 'sql:copyConsents', 'sql:copyGrants', 'sql:deleteOldUsage', 'sql:customers', 'sql:deleteStub', 'sql:commit',
+            'sql:writeTombstone', 'sql:markAcceptances', 'sql:markTrainingMemberships', 'sql:markTrainingTimeStreams', 'sql:markTrainingTimeDays',
+            'sql:copyConsents', 'sql:copyGrants', 'sql:deleteOldUsage', 'sql:customers', 'sql:deleteStub', 'sql:commit',
         ]);
         assert.deepEqual(between(events, 'sql:begin', 'sql:commit').filter((e) => !e.startsWith('sql:')), [], 'no HTTP call while the account lock is held');
         // After COMMIT: Checkout Sessions again, the subscriptions again, Memanto again.
@@ -197,7 +207,35 @@ describe('deleteAccountData: the order of the pipeline', () => {
         assert.ok(pool.queries.every((q) => !/^delete from legal_acceptances/.test(q.sql)));
         assert.match(SERVICE_SQL.markAcceptances, /^UPDATE legal_acceptances SET account_deleted_at = \(SELECT deleted_at FROM account_deletions WHERE user_id = \$1::uuid\)/);
         const at = pool.state.tombstones.get(A).deleted_at.getTime();
-        assert.ok([pool.state.acceptances[0], pool.state.memberships[0], ...pool.state.consentProofs.values(), ...pool.state.provision].every((row) => row.account_deleted_at.getTime() === at), 'every proof carries the tombstone time');
+        assert.ok([pool.state.acceptances[0], pool.state.memberships[0], pool.state.timeStreams[0], pool.state.timeDays[0], ...pool.state.consentProofs.values(), ...pool.state.provision]
+            .every((row) => row.account_deleted_at.getTime() === at), 'every proof carries the tombstone time');
+    });
+
+    it('study time (migration 022): the evidence streams and the closed days are marked with the deletion time, never deleted; B\'s stay live; an earlier mark is kept', async () => {
+        const EARLIER = new Date('2026-09-01T00:00:00Z');
+        const pool = createDeletionPool(seedFor(A, {
+            timeStreams: [
+                { user_id: A, chain_id: 'e0000000-0000-4000-8000-000000000001', day: '2026-11-02' },
+                { user_id: A, chain_id: 'e0000000-0000-4000-8000-000000000003', day: '2026-08-30', account_deleted_at: EARLIER },
+                { user_id: B, chain_id: 'e0000000-0000-4000-8000-000000000002', day: '2026-11-02' },
+            ],
+            timeDays: [
+                { user_id: A, day: '2026-11-02', kind: 'close' },
+                { user_id: A, day: '2026-11-02', kind: 'recompute' },
+                { user_id: B, day: '2026-11-02', kind: 'close' },
+            ],
+        }));
+        assert.equal((await run(pool)).status, 'deleted');
+        const marks = (rows) => rows.map((r) => [r.user_id === A ? 'A' : 'B', r.account_deleted_at?.toISOString() ?? null]);
+        assert.deepEqual(marks(pool.state.timeStreams), [['A', NOW.toISOString()], ['A', EARLIER.toISOString()], ['B', null]]);
+        assert.deepEqual(marks(pool.state.timeDays), [['A', NOW.toISOString()], ['A', NOW.toISOString()], ['B', null]]);
+        assert.ok(pool.queries.every((q) => !/^delete from training_/.test(q.sql)));
+        for (const [name, table] of [['markTrainingTimeStreams', 'training_time_streams'], ['markTrainingTimeDays', 'training_time_days']]) {
+            assert.equal(SERVICE_SQL[name], `UPDATE ${table} SET account_deleted_at = (SELECT deleted_at FROM account_deletions WHERE user_id = $1::uuid) WHERE user_id = $1::uuid AND account_deleted_at IS NULL`);
+        }
+        // After the tombstone row, next to the membership mark.
+        const names = pool.queries.filter((q) => q.tx).map((q) => q.sql);
+        assert.deepEqual([SQL.writeTombstone, SQL.markTrainingMemberships, SQL.markTrainingTimeStreams, SQL.markTrainingTimeDays].map((s) => names.indexOf(s)).every((n, i, all) => n >= 0 && (i === 0 || n > all[i - 1])), true);
     });
 
     it('training memberships (migration 021) are marked with the deletion time, never deleted; B\'s stay live; an earlier mark is kept', async () => {
@@ -230,7 +268,7 @@ describe('deleteAccountData: the order of the pipeline', () => {
         const withId = pool.queries.filter((q) => q.params.length);
         assert.ok(withId.length >= 12);
         for (const q of withId) assert.equal(q.params[0], A, q.sql);
-        for (const name of ['markAcceptances', 'markTrainingMemberships', 'copyConsents', 'copyGrants']) {
+        for (const name of ['markAcceptances', 'markTrainingMemberships', 'markTrainingTimeStreams', 'markTrainingTimeDays', 'copyConsents', 'copyGrants']) {
             const sent = pool.queries.filter((q) => q.sql === SQL[name]);
             assert.equal(sent.length, 1, name);
             assert.deepEqual(sent[0].params, name === 'copyGrants' ? [A, [], []] : [A], `${name}: only the id is sent (copyGrants: no app names from staff)`);
@@ -254,7 +292,7 @@ describe('deleteAccountData: the order of the pipeline', () => {
         assert.match(SERVICE_SQL.writeTombstone, /clock_timestamp\(\)/);
         // The proofs take deleted_at from the tombstone row in the database (microseconds kept), never a
         // JavaScript Date passed back as a parameter (node-pg keeps milliseconds only).
-        for (const name of ['markAcceptances', 'markTrainingMemberships', 'copyConsents', 'copyGrants']) {
+        for (const name of ['markAcceptances', 'markTrainingMemberships', 'markTrainingTimeStreams', 'markTrainingTimeDays', 'copyConsents', 'copyGrants']) {
             assert.match(SERVICE_SQL[name], /, \(SELECT deleted_at FROM account_deletions WHERE user_id = \$1::uuid\)|= \(SELECT deleted_at FROM account_deletions WHERE user_id = \$1::uuid\)/, name);
             // copyGrants' $2/$3 are the page's app ids and names (unnest), never a time.
             assert.doesNotMatch(SERVICE_SQL[name].replace('unnest($2::uuid[], $3::text[])', ''), /\$[2-9]/, `${name}: no second parameter`);
@@ -528,6 +566,7 @@ describe('deleteAccountData: failures, repeats and races', () => {
         assert.ok(pool.state.stubs.has(A));
         assert.equal(pool.state.acceptances[0].account_deleted_at, null);
         assert.equal(pool.state.memberships[0].account_deleted_at, null, 'the training mark is rolled back too');
+        assert.deepEqual([pool.state.timeStreams[0].account_deleted_at, pool.state.timeDays[0].account_deleted_at], [null, null], 'and the study time marks');
         assert.equal(pool.state.consentProofs.size, 0);
         assert.ok(logs.some(([level, line]) => level === 'warn' && line === '[Account] partial: AI memories deleted, other data kept for abcdef01… (deletion_unavailable)'));
         assert.deepEqual(invalidated, []);

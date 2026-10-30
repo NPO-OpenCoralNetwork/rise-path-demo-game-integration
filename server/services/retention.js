@@ -23,8 +23,9 @@
  * live accounts' review cards and review log (Phase 6, migration 020: kept while the account
  * exists, removed by the one-lesson reset and delete-all, deleted with the account by the cascade),
  * job-training cohorts and memberships (migration 021: a deleted account's membership is marked and
- * kept until a retention period is decided, doc/brushup-2026/training-plan.ja.md D3), generated
- * images and the TTS cache.
+ * kept until a retention period is decided, doc/brushup-2026/training-plan.ja.md D3), study time
+ * (migration 022: the settings never change; a deleted account's evidence and closed days are
+ * marked and kept the same way), generated images and the TTS cache.
  *
  * Env (api only; none is a secret): RETENTION_ENABLED (false/0/off/no turn it all off; unset,
  * empty, true/1/on/yes leave it on; any other value turns it off with a warning: this job deletes;
