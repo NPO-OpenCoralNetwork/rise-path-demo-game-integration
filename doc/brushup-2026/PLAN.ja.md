@@ -469,7 +469,7 @@ Browser ──(apiFetch, JWT/guest)──► /api/v2/llm/*  (optionalAuth + aiLi
 - **プロンプトキャッシュ:** `system` の固定部分（スタイルガイド、スキーマ、お手本教材）に `cache_control:{type:'ephemeral'}` を付けます。可変の値（日時や ID）は後ろに置きます。`usage.cache_read_input_tokens` で効いているかを確認します。
 - **拒否への対応:** 応答を読む前に `stop_reason` が `refusal` / `max_tokens` かどうかを判定します。サーバー側のフォールバックとして `fallbacks:"default"` とベータ `server-side-fallback-2026-07-01` を既定で付けます（beta クライアント経由）。
 - **引用（citations）と structured outputs は同時に使えません**（400 エラー）。そのため、チューターの「根拠: §2」は citations 付きのテキスト応答で実装し、JSON 出力とは分けます。
-- **zod のバージョン:** 現在入っている `zod@3.25.76` には `zod/v4` が同梱されています。SDK（0.135）の peer 依存は `^3.25 || ^4` です。`@anthropic-ai/sdk/helpers/zod` が受け付ける import が合わない場合は、`z.toJSONSchema()` で作った JSON Schema を `output_config.format` に直接渡し、検証は自前の zod で行います。
+- **zod のバージョン:** 今は `zod@4.6.7` です（以前の 3.25.76 に同梱の `zod/v4` から上げました。import は `zod/v4` のままです）。SDK（0.135）の peer 依存は `^3.25 || ^4` です。`@anthropic-ai/sdk/helpers/zod` が受け付ける import が合わない場合は、`z.toJSONSchema()` で作った JSON Schema を `output_config.format` に直接渡し、検証は自前の zod で行います。
 
 **Gemini 側の実装要点:**
 - `systemInstruction` は `config` の中に書きます（`geminiBackendService.js:326,372,601` は外に書いていて無視されています）。
@@ -1169,8 +1169,8 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
 | パッケージ | バージョン | 用途 |
 |---|---|---|
 | `@anthropic-ai/sdk` | `^0.135.0` | サーバー側 LLM ゲートウェイの Claude プロバイダー（`server/llm/providers/anthropic.js`） |
-| `@modelcontextprotocol/sdk` | `^1.29.0` | MCP サーバー（`mcp-server/`）。以前は推移的に入っていただけ |
-| `dompurify` | `^3.4.11` | Mermaid の SVG と旧リーダーの HTML のサニタイズ |
+| `@modelcontextprotocol/sdk` | `^1.32.2` | MCP サーバー（`mcp-server/`）。以前は推移的に入っていただけ |
+| `dompurify` | `^3.4.17` | Mermaid の SVG と旧リーダーの HTML のサニタイズ |
 | `remark-gfm` | `^4.0.1` | レッスン本文の Markdown（表など）の描画（`components/lesson/Md.tsx`） |
 | `shiki` | `^4.5.0` | コードブロックのシンタックスハイライト（`components/lesson/blocks/highlighter.ts`） |
-| `zod` | `^3.25.76` | 教材スキーマ `risepath.lesson/v1`（`shared/lesson/schema.js`）。以前は推移的に入っていただけ |
+| `zod` | `^4.6.7` | 教材スキーマ `risepath.lesson/v1`（`shared/lesson/schema.js`）。以前は推移的に入っていただけ |
