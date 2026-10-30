@@ -1,7 +1,7 @@
 {
   "lessonId": "vibe-ch1",
   "file": "content/courses/vibe-coding/drafts/vibe-ch1.lesson.json",
-  "lessonHash": "sha256:0f75d3b51a941859",
+  "lessonHash": "sha256:424abcffc3b15ca6",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "full",
@@ -9,82 +9,74 @@
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Every prose string is です・ます, warm and free of pressure phrases (s4-b1 「そんなとき、前の状態に戻せると、安心して試せます。」), and options and feedback keep the §5 forms. It is 3, not 4: two prompt examples give requests that do not parse when filled with their own hints (s2-prompt-ui, s4-prompt-commit), practice hint 2 points to the learner's own, possibly wrong, q9 choice, objectives o2 and o3 break the no-space notation, and a few spots read translated (s3-defs 「ファイルを小さくした、サーバーに送れる一式」, s2-analogy 「ホールが決まった頼み方で」).",
-      "blockIds": ["s2-prompt-ui", "s4-prompt-commit", "practice-hint", "s3-defs", "s2-analogy"]
+      "evidence": "Natural, warm です・ます with no banned phrases (lint clean); the analogies and feedback read like a teacher beside you (s1-b3, s4-analogy, s4-check). Held at 3 by the plain-form checklist labels, q3's key alone ending differently, ex-split contradicting the backend's role, and stiff spots in s2-b5 and s4-tools.",
+      "blockIds": ["practice-checklist", "check-quiz", "ex-steps", "s2-b5", "s4-tools"]
     },
     {
       "id": "load",
-      "score": 4,
-      "evidence": "lessons:lint --strict reports 0 errors and 0 warnings: every paragraph has 3 sentences or fewer and every wrong-option feedback 2 or fewer. Each segment defines at most 3 terms (1-1 and 1-2: 3, 1-3 and 1-4: 2, 1-5: none), and every section breaks its text with a diagram, code, list, prompt, steps or check."
+      "score": 3,
+      "evidence": "Every lint budget passes and each segment alternates an analogy callout, definitions, a diagram, code or prompts with an inline check. 1-2 is dense (three terms, a JSON sample, a tip and two prompt blocks before s2-check), and s1-b5 adds サーバー as a fourth new word in 1-1 through an inline gloss.",
+      "blockIds": ["s1-b5", "s2-b2", "s2-b4", "s2-b5", "s2-prompt-ui", "s2-prompt-api"]
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Chapter 0 is the stated prerequisite and s1-b1 recalls it; each segment puts an everyday analogy with explicit mappings before its definitions (s1-b3, s2-analogy, s3-analogy, s4-analogy), the definitions match the glossary, UI, API and JSON are spelled out, and the katakana terms carry English (フロントエンド（frontend）, デプロイ（deploy）, コミット（commit）). It stays at 3 because the hook uses バックエンド and データベース before 1-1 defines them, without English (hook-predict, see mustFix).",
-      "blockIds": ["hook-predict", "s1-b3"]
+      "score": 4,
+      "evidence": "s1-b1 recalls Chapter 0, and every glossary term follows an everyday analogy that names what maps to what (s1-b3, s2-analogy, s3-analogy, s4-analogy), with English or the spelled-out abbreviation at first use. The definitions and glossary entries match word for word, and the 1-5 labels データ側・画面側 are glossed where they first appear (ex-lead).",
+      "blockIds": ["s1-b1", "s1-b3", "s2-analogy", "s3-analogy", "s4-analogy", "ex-lead"]
     },
     {
       "id": "a11y_l10n",
-      "score": 4,
-      "evidence": "Every learner-facing string has jp and en, including the Mermaid labels, alt, description, prompt vars, checklist and flashcards, and the English is natural and says the same as the Japanese. Cross-references match their targets (the practice-answer-data note names the s4-prompt-commit title 「AIに変更を頼む前のひとこと」 / \"One line before you ask for changes\"), and the lesson has no images or links."
+      "score": 3,
+      "evidence": "Both locales are complete, diagram labels, alt and description included (s1-b2), and the en is natural rather than a gloss of the jp. Kept at 3 by q9's en key, which drops 「まだ」 and no longer matches the words its en explanation quotes, and by en \"rebuild\" (q8, q9, q5) colliding with the defined term Build.",
+      "blockIds": ["s1-b2", "ex-check", "s4-check", "check-quiz"]
     }
   ],
   "mustFix": [
     {
-      "criterion": "prior",
-      "blockId": "hook-predict",
-      "issue": "(d) Terms defined before use, and katakana terms with English on first use (style-guide §2). The learner first meets バックエンド and データベース in the hook, before 1-1 defines them and without English: q0 option b 「データを保存する係（バックエンドとデータベース）がないから」 and the q0 explanation 「データをデータベースに保存しておき」. The English 「バックエンド（backend）」「データベース（database）」 only comes later, in s1-b3. The brief makes this lesson the exemplar that lesson-schema-get shows other authors (first section of each role), so its hook should follow the rule.",
-      "fix": "Keep the two terms out of the hook, so that s1-b3 is their first use (with English) right before the definitions. q0 option b: 「データを保存する係（バックエンドとデータベース）がないから」→「データを保存しておく係がないから」; en 「Nothing is storing the data (no backend or database)」→「Nothing is there to store the data」. q0 explanation: 「多くのWebアプリは、データをデータベースに保存しておき、必要なときに取り出します。」→「多くのWebアプリは、データを専用の保存場所にしまっておき、必要なときに取り出します。」; en 「Most web apps keep their data in a database and fetch it when they need it.」→「Most web apps keep their data in a dedicated store and fetch it when they need it.」 (If the terms should stay in the hook, give their English there instead and drop it from s1-b3 for these two terms.)"
+      "criterion": "voice",
+      "blockId": "ex-steps",
+      "issue": "(a) meaning: step ex-split says 「保存は[[データベース]]、…の仕事です」 (en \"Saving is the [[database]]'s job\"), but the lesson's own definition and q1 give saving to the backend: s1-b5 「データベースにデータを保存したり取り出したりして」, q1 feedback c 「記録をしまっておく場所は、データベースです。バックエンドは、そこへの保存と取り出しを受け持ちます。」 (en \"The backend is what saves data there and fetches it.\"). A learner who just answered q1 meets the opposite claim in the worked example, in both locales.",
+      "fix": "ex-split md, jp: 「保存は[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。」→「タスクをしまっておくのは[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。」 (50 characters). en: 「Saving is the [[database]]'s job,」→「Keeping the tasks is the [[database]]'s job,」 (rest of the sentence unchanged)."
+    },
+    {
+      "criterion": "a11y_l10n",
+      "blockId": "ex-check",
+      "issue": "(a) jp and en differ: q9 option b jp ends 「画面はまだ変えないで」 and the jp explanation quotes exactly that, but en option b reads \"Leave the screen as is.\" (「まだ」/yet dropped) while the en explanation quotes \"don't change the screen yet\", words no en option contains. An en learner cannot find the quoted phrase in the key.",
+      "fix": "q9 option b, en: 「\"Save due dates and return them in the list API. Leave the screen as is.\"」→「\"Save due dates and return them in the list API. Don't change the screen yet.\"」 (80 characters with the quotation marks, still shorter than option a at 81; the same words as ex-data and the en explanation)."
     },
     {
       "criterion": "voice",
-      "blockId": "s2-prompt-ui",
-      "issue": "(c) The jp request does not parse once the learner fills the field with the lesson's own example. 「{{完了したタスクの見せ方}}で表示してください」 needs a noun before 「で」, but the hint 「例：文字を薄い灰色にする」 is a verb phrase, so the copied request reads 「完了したタスクは、文字を薄い灰色にするで表示してください。」",
-      "fix": "In both vars entries, jp hint 「例：文字を薄い灰色にする」→「例：薄い灰色の文字」 (filled: 「完了したタスクは、薄い灰色の文字で表示してください。」). The en hint 「e.g. grey out the text」 fits 「Show finished tasks this way: …」 and stays."
+      "blockId": "check-quiz",
+      "issue": "(d) options with the same form and ending (§5): in q3 three options end in 「よ」 (「…要らないよ」「…十分だよ」「…間違えにくくなるよ」) and only the key c ends in 「戻れるから」, so the answer stands out by its ending.",
+      "fix": "q3 option c, jp: 『「頼む前に、動く状態をコミットしよう。戻れるから」』→『「頼む前に動く状態をコミットしておけば、戻れるよ」』 (25 characters, not longer than option a at 26). en unchanged; it says the same thing."
     },
     {
       "criterion": "voice",
-      "blockId": "s4-prompt-commit",
-      "issue": "(c) Same problem: 「そのあとで、{{頼みたい変更}}をしてください。」 needs a noun before 「を」, but the hint 「例：タスクに期限を付ける」 is a verb phrase, so the copied request reads 「そのあとで、タスクに期限を付けるをしてください。」",
-      "fix": "In the vars entries 頼みたい変更 and change you want, jp hint 「例：タスクに期限を付ける」→「例：タスクに期限を付ける変更」 (filled: 「そのあとで、タスクに期限を付ける変更をしてください。」). The en hint 「e.g. add due dates to tasks」 fits 「Then make this change: …」 and stays."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-hint",
-      "issue": "(a) Hint 2 tells the learner to adapt 「1-5の確認問題で選んだ依頼」 / \"the request you chose in the 1-5 check question\". A learner who picked a wrong option in q9 (for example a, display only) is sent to that wrong request, and that learner is the one most likely to open the hints.",
-      "fix": "jp 「ヒント2：1-5の確認問題で選んだ依頼の「期限」を、「読み終えた日」に置きかえてみましょう。」→「ヒント2：1-5の確認問題で正解だった依頼の「期限」を、「読み終えた日」に置きかえてみましょう。」; en 「Hint 2: take the request you chose in the 1-5 check question and replace \"due date\" with \"date finished\".」→「Hint 2: take the correct request from the 1-5 check question and replace \"due date\" with \"date finished\".」"
-    },
-    {
-      "criterion": "voice",
-      "blockId": "lesson",
-      "issue": "(d) Notation (style-guide §3): no space between Japanese and alphanumerics, and no variation within one lesson. Objectives o2 and o3 put half-width spaces around UI, API and Git (「ものが UI か API かを」「デプロイと Git のコミット」), while the rest of the lesson writes them without spaces (s2-b1 「UI（User Interface）とAPI」, the 1-4 title 「Gitのコミット」), as the objectives of vibe-ch2 do.",
-      "fix": "o2: 「変えたいものが UI か API かを見分けて、AIへの依頼を書き分けられる」→「変えたいものがUIかAPIかを見分けて、AIへの依頼を書き分けられる」; o3: 「デプロイと Git のコミットが何をしているかを説明できる」→「デプロイとGitのコミットが何をしているかを説明できる」. Only the spaces go: ids, wording and Bloom levels stay as the brief requires, and lessonSchema.test.js checks only that there are 3 objectives with text and bloom."
+      "blockId": "practice-checklist",
+      "issue": "(d) です・ます (§1): all six checklist labels end in plain form (「頼んでいる」「書いてある」「両方がある」「書いてある」「なっている」「書いてある」). §1 exempts list items only for 体言止め; the claude-code lessons write checklist labels in です・ます (「依頼文に、範囲・参照先・既存のパターン・症状が入っています」).",
+      "fix": "jp labels: pc-commit 「最初の依頼で、いまの状態のコミットを頼んでいる」→「最初の依頼で、いまの状態のコミットを頼んでいます」; pc-split 「データ側と画面側の依頼が、別々に書いてある」→「データ側と画面側の依頼が、別々に書いてあります」; pc-data 「データ側の依頼に、「保存する」と「一覧で返す」の両方がある」→「データ側の依頼に、「保存する」と「一覧で返す」の両方があります」; pc-input 「画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてある」→「画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてあります」; pc-order 「データ側を先に、画面側をあとに頼む順になっている」→「データ側を先に、画面側をあとに頼む順になっています」; pc-scope 「データ側と画面側のどちらの依頼にも、変えない範囲が書いてある」→「データ側と画面側のどちらの依頼にも、変えない範囲が書いてあります」. en unchanged."
     }
   ],
   "niceToHave": [
-    "s2-analogy: 1-1 maps the frontend to 「客席とウェイター」, but here the same side is 「ホール」, and 「ホールが決まった…」 first reads as \"the hall was decided\". Reusing ウェイター and the pattern of the UI sentence states the mapping (決まった頼み方＝API) — 「ホールが決まった頼み方で厨房に注文を通すのは、プログラム同士の窓口のAPIです。」→「ウェイターが厨房に注文を通すときの決まった頼み方は、プログラム同士の窓口で、APIにあたります。」 (en 「The agreed way the dining room passes orders to the kitchen」→「The agreed way the waiters pass orders to the kitchen」)",
-    "s1-b5: 「データベースとデータを出し入れして」 first parses as \"the database and the data\"; the same wording is in the glossary entry バックエンド and in card-backend — 「データベースとデータを出し入れして、結果を返します。」→「データベースにデータを保存したり取り出したりして、結果を返します。」 (glossary the same); card-backend back 「データベースとデータを出し入れします。」→「データベースにデータを保存したり取り出したりします。」",
-    "s3-defs: 「ファイルを小さくした、サーバーに送れる一式」 stacks two modifiers in a translated pattern (the glossary entry ビルド has the same text) — 「ファイルを小さくした、サーバーに送れる一式ができます。」→「サーバーに送れる、小さくまとめたファイル一式ができます。」",
-    "ex-check, check-quiz: in q9 and q5 only the correct option b has a second sentence with the scope (「…変えないで」), so it is also clearly the longest; §5 asks for options of the same length, and a learner can pick by shape. Giving one distractor a scope sentence too removes the cue, and its feedback still fits (keep the surrounding 「」) — q9 a 「タスク一覧の各タスクに、期限の日付を表示して」→「各タスクに期限の日付を表示して。APIとデータベースは変えないで」 (en 「Show a due date on each task in the list.」→「Show a due date on each task. Don't change the API or the database.」); q5 c 「金額を返すAPIを作り直して、一覧の表示も新しくして」→「金額を返すAPIを作り直して。データベースは変えないで」 (en 「Rebuild the API that returns the amounts, and redo the list too.」→「Rebuild the API that returns the amounts. Don't change the database.」)",
-    "card-api, s2-b2: the API definition says the frontend asks the backend for data, but 1-5 also saves through the API (ex-screen 「追加もAPIで保存して」), and the card says 「画面」 / \"The screen\" instead of the defined term — s2-b2 and glossary 「バックエンドにデータを頼みます。」→「バックエンドにデータの保存や取り出しを頼みます。」 (en 「asks the backend for data through the API」→「asks the backend to save or fetch data through the API」); card-api back 「画面はAPIを通してデータを受け取ります。」→「フロントエンドはAPIを通して、バックエンドとデータをやり取りします。」 (en 「The screen gets its data through the API.」→「The frontend exchanges data with the backend through the API.」)",
-    "practice-answer-data, practice-answer-ui: the task asks for three requests in the order commit, data side, screen side, but the model answers are numbered ① data side and ② screen side, so the learner's first request (the commit) lines up with the wrong one — 「模範解答①：データ側への依頼」→「模範解答：データ側への依頼（2つ目）」; 「模範解答②：画面側への依頼」→「模範解答：画面側への依頼（3つ目）」 (en 「Model answer 1: the data-side request」→「Model answer: the data-side request (2nd)」, 「Model answer 2: the screen-side request」→「Model answer: the screen-side request (3rd)」)",
-    "practice-checklist: the learner writes three requests, so pc-scope does not say which ones need a scope, and the en \"Each request\" includes the commit request — 「どちらの依頼にも、変えない範囲が書いてある」→「データ側と画面側のどちらの依頼にも、変えない範囲が書いてある」 (en 「Each request says what not to change」→「Both the data-side and the screen-side request say what not to change」)",
-    "s1-b2: the label says 「保存と取り出し」, the caption 「出し入れ」 and the description 「読み書き」 for the same thing; the alt's 「取り出しする」 is unnatural, and the caption has an inner 「。」 but no final one — description 「バックエンドがデータベースを読み書きして返事をします。」→「バックエンドがデータベースに保存したり取り出したりして返事をします。」; alt 「データを保存・取り出しする図」→「データを保存したり取り出したりする図」; caption 「ユーザーが触るのはフロントエンドだけ。データの出し入れは、バックエンドとデータベースがおこなう」→「ユーザーが触るのはフロントエンドだけで、データの保存と取り出しはバックエンドとデータベースがおこなう」",
-    "s1-b5: サーバー is used throughout the lesson and glossed here on first use, but without English; it is not a defined term, so this is optional (glossary entry バックエンド the same) — 「サーバー（依頼に答えるコンピューター）」→「サーバー（server：依頼に答えるコンピューター）」",
-    "cards: 「デプロイの3つの流れ」 reads as three separate flows, while the lesson calls them three steps of one flow (s3-flow 「次の3つが順に起きます」, en \"three steps\"); card-database also breaks the 「〜が受け持つのは？」 pattern of the two cards before it — 「デプロイの3つの流れは？」→「デプロイで順に起きる3つのことは？」; 「データベースは何をする？」→「データベースが受け持つのは？」",
-    "check-quiz: in q5 option d, 「表示の向き」 does not describe right-alignment, and the en says \"alignment\" — 「金額の表示の向きと大きさを、データベースに保存して」→「金額のそろえ方と大きさを、データベースに保存して」; feedback 「表示の向きや大きさは、画面の見せ方です。」→「そろえ方や大きさは、画面の見せ方です。」",
-    "practice-task: 「メモ帳などに書き、AIに送る必要はありません。」 joins an instruction to a 'no need' with a 連用形 and reads unevenly — 「メモ帳などに書き、AIに送る必要はありません。」→「AIには送らず、メモ帳などに書きます。」",
-    "ex-steps: in ex-split, 「保存と一覧の受け渡し」 makes 保存 itself the thing passed — 「保存と一覧の受け渡しは[[API]]」→「保存するタスクと一覧の受け渡しは[[API]]」",
-    "ex-check: in the q9 explanation, 「1つにしぼれます」 leaves \"one what\" open (the en says \"one side\") — 「変える範囲が1つにしぼれます。」→「変える範囲をデータ側だけにしぼれます。」",
-    "s1-b1: 「アプリの部分」 is vague, and the en \"are three parts\" is not quite natural — 「そのために、アプリの部分を知っておきましょう。」→「そのために、アプリがどんな部分でできているかを知っておきましょう。」 (en 「Most web apps are three parts that split the work.」→「Most web apps are made of three parts that split the work.」)",
-    "s4-b2: 「呼び戻せる」 reads as a direct rendering of \"recall\" (the glossary entry Git has the same text) — 「あとで前の版を呼び戻せるようにする道具です。」→「あとで前の版に戻せるようにする道具です。」",
-    "1-1: the section title lists the parts with half-width spaces and slashes, while o1 uses 「・」 — 「1-1. フロントエンド / バックエンド / データベースの関係」→「1-1. フロントエンド・バックエンド・データベースの関係」",
-    "s2-b5: Factual doubt, please check. The en says \"Some AI tools' official guides\" (plural), but the only cited source is one guide (cc-champion-kit); the jp 「公式ガイドもあります」 does not fix a number — 「Some AI tools' official guides say the AI keeps to the scope you state.」→「One AI tool's official guide says the AI keeps to the scope you state.」",
-    "s2-check: the q2 en prompt is hard to parse — 「In the task app, which change should you ask the AI for as \"change the data the API returns\"?」→「In the task app, which change calls for asking the AI to \"change the data the API returns\"?」",
-    "ex-lead: the en adds \"using what you have learned so far\", which the jp does not say — 「Let's build the requests that fix the task app from the opening, using what you have learned so far.」→「Let's build the requests that fix the task app from the opening.」 (or add 「ここまでの内容を使って、」 to the jp)",
-    "s4-prompt-commit: style-guide §6 lists \"just\" among the English words to avoid (lessons:lint does not check it) — 「For now, just remember the shape of the request.」→「For now, remember the shape of the request.」"
+    "hook-b1: say what gets fixed — 「この章の終わりには、直す依頼を書けるようになります。」→「この章の終わりには、これを直す依頼を書けるようになります。」",
+    "s2-analogy: the first two mappings end 「〜にあたります」 and the third states the analogy as a fact; keep the pattern — 「注文票の書き方が、JSON（JavaScript Object Notation）です。」→「注文票の書き方は、JSON（JavaScript Object Notation）にあたります。」",
+    "s2-b5: the long modifier before 「ガイド」 reads translated, and en says one tool's guide — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」",
+    "s2-prompt-api: the prompt adds a database field only 「保存する場所がなければ」, but expect says the database always changes — 「バックエンドの処理とデータベースが変わり、」→「バックエンドの処理が変わり（必要ならデータベースも変わり）、」; en 「The backend and the database change」→「The backend changes (and the database, if needed)」",
+    "s2-check: 「各タスクで」 is unnatural for 'with each task' — q2 option c 「各タスクで、担当者の名前も受け取る」→「タスクごとに、担当者の名前も受け取る」 (18 characters, still shorter than option b)",
+    "s3-analogy: en ends deployment at the first sale while jp ends it at opening for business, and 'built' reuses the word the lesson defines as packing — 「(the app you built on your own computer)」→「(the app you made on your own computer)」; 「The whole path to the first sale is deployment.」→「Everything up to opening for business is deployment.」 (also s3-defs and the glossary entry Deployment: 「Putting the app you built on a server」→「Putting the app you made on a server」)",
+    "s3-check: q7 calls the deployment steps 「手順」 in the prompt but 「段階」 in the hint and feedback (and 「手順⑤」 later names a worked-example step); feedback c reads as if the launch answers requests — 「足りない手順として」→「足りない段階として」; 「足りないのは、届いた依頼に答える起動の段階です。」→「足りないのは、依頼に答えられるようにする起動の段階です。」; en explanation 「A deployment goes build, transfer, launch.」→「A deployment goes through build, transfer and launch, in that order.」",
+    "s4-tools: 「ドキュメントは、この機能は」 doubles the topic marker (the same in check-quiz q3 feedback a) — 「たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、この機能はGitの代わりではないと書かれています。」; q3 a: 「たとえばClaude Codeの公式ドキュメントは、代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、代わりではないと書かれています。」",
+    "s4-check: in en \"rebuild\" means 'remake' while the lesson defines Build as packing for publishing — q8 a feedback 「Rebuilding it exactly from memory is hard.」→「Rewriting it exactly from memory is hard.」; q8 d 「Have the whole app rebuilt from scratch」→「Have the whole app remade from scratch」; its feedback 「A rebuild also changes the parts that worked.」→「Starting over also changes the parts that worked.」",
+    "ex-check: the same \"rebuild\" collision, and the explanation addresses a side as if it were a person — q9 c 「\"Rebuild the whole app so tasks can have due dates.\"」→「\"Remake the whole app so tasks can have due dates.\"」, its feedback 「Rebuilding everything」→「Remaking everything」; 「入力と表示は、そのあとで画面側に頼みます。」→「入力と表示は、そのあとで画面側の依頼として頼みます。」; en 「Ask the screen side for the input and the display after that.」→「After that, ask for the input and the display in a screen-side request.」",
+    "check-quiz: the same \"rebuild\" collision in q5 — a 「\"Rebuild the budget app so it is easier to use.\"」→「\"Remake the budget app so it is easier to use.\"」; c 「\"Rebuild the API that returns the amounts,」→「\"Rewrite the API that returns the amounts,」; c feedback 「yet it rebuilds the API as well」→「yet it rewrites the API as well」",
+    "check-quiz: q4's explanation stacks 「での…で」 and q4 d's en feedback launches the files — 「自分のパソコンでのビルドでできるのは、」→「自分のパソコンでビルドしてできるのは、」; 「after the files are sent and launched」→「after the files are sent and the app is launched」",
+    "check-quiz: q6 option d 「するだけにする」 is clumsy — 「画面で、満席の時間を選べなくするだけにする」→「画面だけを直して、満席の時間を選べなくする」 (21 characters, so the key stays shorter than the longest distractor)",
+    "ex-steps: in ex-verify's troubleshoot, 「読み込み」 right after two 「再読み込み」 can be taken for the reload itself — 「保存か読み込みのどちらかが」→「保存か一覧の読み込みのどちらかが」; en 「either saving or loading is not going through the API」→「either saving or loading the list is not going through the API」",
+    "practice-steps: en \"keeps the date finished\" can be parsed as keeping a date 'finished' — p-data 「Write the data-side request that keeps the date finished.」→「Write the data-side request that saves the date finished.」",
+    "practice-answer-ui: en word order — 「Show the date finished received from the API in the book list.」→「In the book list, show the date finished that comes from the API.」",
+    "cards: the other fronts are nominal questions; card-ui-api ends in plain 「頼む？」 — 「それぞれ何の変更としてAIに頼む？」→「それぞれ何の変更としてAIに頼みますか？」"
   ],
-  "average": 3.5,
+  "average": 3.25,
   "verdict": "revise",
-  "summary": "The Japanese reads like a patient teacher: short です・ます sentences with no pressure, an everyday analogy with explicit mappings before every set of definitions, and English that says the same thing naturally. The blocking fixes are all small: make the two prompt examples parse when filled with their own hints (s2-prompt-ui, s4-prompt-commit), keep バックエンド and データベース out of the hook so their first use carries the English (hook-predict), point practice hint 2 at the correct q9 request, and remove the spaces in objectives o2 and o3. lessons:lint --strict is clean, and voice and prior stay at 3 until these are fixed."
+  "summary": "Round 2 is a full review because review-scope.mjs requires one: the objectives and most blocks changed since round 1. The Japanese reads like a patient teacher: every term follows an everyday analogy that names what maps to what, the feedback is short and corrects the misconception, and both locales are complete. Four must-fixes remain: ex-split now gives saving to the database (contradicting s1-b5 and q1), q9's en key lost \"yet\" and no longer matches its explanation, q3's key is the only option that does not end in 「よ」, and the checklist labels are in plain form."
 }
