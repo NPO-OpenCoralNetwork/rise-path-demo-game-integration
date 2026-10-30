@@ -377,7 +377,7 @@ describe('SSE MCP resolver (mcp-server/sseUserAuth.js)', () => {
     it('index.js builds the SSE resolver from sseUserAuth.js with the real account check', async () => {
         const { readFileSync } = await import('node:fs');
         const source = readFileSync(new URL('../../mcp-server/index.js', import.meta.url), 'utf8');
-        assert.match(source, /import \{ createSseUserResolver \} from '\.\/sseUserAuth\.js';/);
+        assert.match(source, /import \{ createSseUserResolver\b[^}]*\} from '\.\/sseUserAuth\.js';/);
         assert.match(source, /const resolveUserId = createSseUserResolver\(\{[^}]*readAccountState,[^}]*sessionAuthTime,[^}]*\}\);/s);
         assert.doesNotMatch(source, /async function resolveUserId/, 'no second, unchecked resolver');
         assert.equal((source.match(/await resolveUserId\(req\)/g) || []).length, 2, '/sse and /messages both resolve');

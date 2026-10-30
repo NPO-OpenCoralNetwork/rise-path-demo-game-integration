@@ -3,7 +3,7 @@
  * Pedagogy and readability lint for risepath.lesson/v1 (PLAN §5.4 / §7.2 lesson contract).
  * Run it on a lesson that already passed validateLesson. Results are warnings; the CLI's
  * `--strict` turns them into a failing exit code, except for migrated-unreviewed lessons
- * (see lintPolicy).
+ * (see lintPolicy) and, outside drafts, KNOWN_UNCITED_STEPS (see warningPolicy).
  *
  * @typedef {import('./schema.js').Lesson} Lesson
  * @typedef {import('./schema.js').Section} Section
@@ -38,6 +38,7 @@ export const LINT_RULES = /** @type {const} */ ({
   'image-decorative': 'No decorative or stock-photo images inside a lesson.',
   'steps-length': 'A steps block has at most 8 steps.',
   'steps-expect': 'Every step states its expected result.',
+  'steps-cite': 'A steps block cites the sources that back its commands, menus and expected results.',
   'banned-phrase': 'No pressuring phrases (「簡単です」「誰でも」, "simply", "obviously").',
   'locale-plain-string': 'In a multi-locale lesson, learner-facing text is an object with every locale, not a plain string.',
 });
@@ -82,6 +83,64 @@ export function isMigratedUnreviewed(lesson) {
 export function lintPolicy(lesson, { draft = false, includeMigrated = false } = {}) {
   if (draft || includeMigrated) return 'strict';
   return isMigratedUnreviewed(lesson) ? 'advisory' : 'strict';
+}
+
+/**
+ * Published steps blocks without `cite`, as `<course id>/<lesson id>#<block id>` (keys use the
+ * lesson's `courseId`, which every published lesson sets): a known state, like
+ * migrated-unreviewed lessons. Outside drafts, `--strict` lists their steps-cite warnings as
+ * advisory; every other steps block without cite fails, also after publishing.
+ * - The first 12 were published before steps-cite existed (「出典と検索」, owner plan 2026-10-30).
+ *   A rework that cites a listed block removes it here (server/tests/lessonLintPolicy.test.js
+ *   fails while a listed block has a cite or is gone).
+ * - Publishing a lesson whose report keeps a steps-cite warning (steps that only ask the learner
+ *   to write or decide, with nothing to cite) adds that block here, in the publishing PR.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const KNOWN_UNCITED_STEPS = new Set([
+  'claude-code/cc-03-plan-first#practice-steps',
+  'claude-code/cc-03-plan-first#practice-spec-steps',
+  'claude-code/cc-04-verify#p-steps',
+  'claude-code/cc-09-parallel-automation#p1-steps-setup',
+  'claude-code/cc-09-parallel-automation#p2-steps',
+  'claude-code/cc-10-safety-cost#practice-steps',
+  'claude-code/cc-10-safety-cost#practice-steps-deny',
+  'claude-code/cc-10-safety-cost#practice-steps-bill',
+  'vibe-coding/vibe-ch2#s3-steps',
+  'vibe-coding/vibe-ch2-practice#practice-steps',
+  'vibe-coding/vibe-ch2-practice#practice-steps-sort',
+  'vibe-coding/vibe-ch2-practice#practice-steps-plan',
+]);
+
+/**
+ * The KNOWN_UNCITED_STEPS key of the block at `path` (`sections[i].blocks[j]`), or null.
+ *
+ * @param {Pick<Lesson, 'courseId' | 'id' | 'sections'>} lesson
+ * @param {string} path
+ * @returns {string | null}
+ */
+export function blockKey(lesson, path) {
+  const match = /^sections\[(\d+)\]\.blocks\[(\d+)\]$/.exec(path);
+  const block = match ? lesson.sections[Number(match[1])]?.blocks[Number(match[2])] : undefined;
+  return block && lesson.courseId ? `${lesson.courseId}/${lesson.id}#${block.id}` : null;
+}
+
+/**
+ * Whether `--strict` fails on one warning ('strict') or only reports it ('advisory'): every
+ * warning of an advisory lesson (lintPolicy) and, outside drafts, the steps-cite warning of a
+ * block in KNOWN_UNCITED_STEPS. `includeMigrated` makes every warning strict.
+ *
+ * @param {Pick<LintWarning, 'rule' | 'path'>} warning
+ * @param {Pick<Lesson, 'provenance' | 'courseId' | 'id' | 'sections'>} lesson
+ * @param {{ draft?: boolean, includeMigrated?: boolean }} [options]
+ * @returns {'strict' | 'advisory'}
+ */
+export function warningPolicy(warning, lesson, options = {}) {
+  if (lintPolicy(lesson, options) === 'advisory') return 'advisory';
+  if (options.draft || options.includeMigrated || warning.rule !== 'steps-cite') return 'strict';
+  const key = blockKey(lesson, warning.path);
+  return key !== null && KNOWN_UNCITED_STEPS.has(key) ? 'advisory' : 'strict';
 }
 
 /** Sections that are not "content" for the check-density rule. */
@@ -261,6 +320,9 @@ export function lintLesson(lesson) {
         block.items.forEach((step, i) => {
           if (step.expect === undefined) warn('steps-expect', [...path, 'items', i], 'Say what the learner should see after this step (expect).');
         });
+        if (!block.cite || block.cite.length === 0) {
+          warn('steps-cite', path, 'Add cite: the sources that back these commands, menus and expected results. Steps that only ask the learner to write or decide keep this warning, with the reason in the report.');
+        }
         break;
       default:
         break;

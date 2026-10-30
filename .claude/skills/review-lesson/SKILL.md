@@ -41,8 +41,11 @@ and one without it.
 5. Score all 13 criteria from 0 to 4 using the anchors. Evidence is one or two sentences that
    quote the lesson or name block ids. A 4 is rare. Validation errors cap `accuracy` or
    `a11y_l10n` at 2; an unassessed objective caps `align` at 2.
-6. List `mustFix` items for every criterion below 3, every factual error and every break of the
-   lesson contract, each with the block id and a fix specific enough to apply without guessing.
+6. List `mustFix` items for every criterion below 3, every factual error, every uncited
+   non-obvious claim or unverified UI step, every new term without an everyday analogy before its
+   definition in a `level: "beginner"` lesson (`.claude/agents/pedagogy-reviewer.md` step 5),
+   and every break of the lesson contract, each with the block id and a fix specific enough to
+   apply without guessing.
    Put optional ideas and pure wording preferences (rhythm, smoother phrasing, word choice) in
    `niceToHave`; the `ja-editor` owns Japanese wording and blocks only on the error classes in
    `.claude/agents/ja-editor.md`.

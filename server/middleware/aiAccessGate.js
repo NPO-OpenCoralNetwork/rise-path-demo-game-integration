@@ -17,9 +17,10 @@
  *   403 guardian_consent_required  a minor without an active guardian consent
  *   403 ai_paused_safety           too many blocked inputs today (paused_until: next 00:00 JST)
  *   503 ai_access_unavailable      production without a database, or the lookup failed (fail closed);
- *                                  also a session whose deleted-account check could not run
- *                                  (optionalAuth sets req.accountCheckUnavailable), even with
- *                                  LLM_GUEST_AI=true: a signed-in learner is never told to sign in
+ *                                  also a session that could not be checked (Supabase Auth did not
+ *                                  answer, or the deleted-account check failed: optionalAuth sets
+ *                                  req.accountCheckUnavailable), even with LLM_GUEST_AI=true: a
+ *                                  signed-in learner is never told to sign in
  */
 import { AiAccessUnavailableError, resolveAiAccess } from '../safety/access.js';
 

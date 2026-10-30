@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchGeneratedCourseById } from '../../services/curriculumApi';
-import { isSignInRequired } from '../../services/generatedCourses';
+import { isSignInRequired, isSignInUnavailable } from '../../services/generatedCourses';
 import GeneratedCoursesSignInNotice from '../common/GeneratedCoursesSignInNotice';
+import GeneratedCoursesUnavailableNotice from '../common/GeneratedCoursesUnavailableNotice';
 import GeneratedDocView from '../features/ai/GeneratedDocView';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -51,6 +52,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<LessonError | null>(null);
   const [signInRequired, setSignInRequired] = useState(false);
+  const [signInUnavailable, setSignInUnavailable] = useState(false);
   const t = copy[language];
 
   // Get lesson ID from URL params (optional)
@@ -70,6 +72,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
     setLessonIndex({ module: 0, lesson: 0 });
     setError(null);
     setSignInRequired(false);
+    setSignInUnavailable(false);
     setLoading(true);
 
     fetchGeneratedCourseById(courseId)
@@ -110,6 +113,7 @@ const GeneratedLessonViewWrapper: React.FC = () => {
       })
       .catch((err) => {
         if (isSignInRequired(err)) setSignInRequired(true);
+        else if (isSignInUnavailable(err)) setSignInUnavailable(true);
         else setError('loadFailed');
       })
       .finally(() => setLoading(false));
@@ -194,10 +198,10 @@ const GeneratedLessonViewWrapper: React.FC = () => {
     );
   }
 
-  if (signInRequired) {
+  if (signInRequired || signInUnavailable) {
     return (
       <div className="mx-auto w-full max-w-form px-4 py-12">
-        <GeneratedCoursesSignInNotice />
+        {signInRequired ? <GeneratedCoursesSignInNotice /> : <GeneratedCoursesUnavailableNotice />}
       </div>
     );
   }

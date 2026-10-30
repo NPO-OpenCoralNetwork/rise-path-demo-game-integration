@@ -205,69 +205,176 @@ export function mergeByRelevance(vectorRows, keywordRows, limit) {
 
 /** Characters that belong to Japanese words (kanji, kana, the prolonged sound mark, 々). */
 const JAPANESE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆]/u;
+/** The runs of a word: katakana (with ー), kanji and hiragana, or anything else (Latin with its symbols, digits, other scripts). */
+const RUNS = /[\p{Script=Katakana}ー]+|[\p{Script=Han}\p{Script=Hiragana}々〆]+|[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆]+/gu;
+const KATAKANA_RUN = /^[\p{Script=Katakana}ー]+$/u;
+const HIRAGANA_ONLY = /^\p{Script=Hiragana}+$/u;
+const SINGLE_KANJI = /^[\p{Script=Han}々〆]$/u;
+/** Question words and fillers, dropped: they match almost anything. */
+const STOPWORDS = new Set(['何', '誰', '事', '物', '方', '為', '等', '様', '的']);
+/** Hiragana that only carries grammar: particles, endings, and the pieces ICU cuts them into (ください → くだ, さい). */
+const FUNCTION_WORDS = new Set([
+    'とは', 'では', 'には', 'から', 'まで', 'より', 'って', 'ので', 'のに', 'けど', 'でも', 'とか', 'など', 'だけ', 'ほど', 'ずつ',
+    'です', 'ます', 'でした', 'ました', 'ません', 'ですか', 'する', 'した', 'して', 'しない', 'したい', 'ない', 'いる', 'ある', 'なる',
+    'できる', 'できない', 'られ', 'れる', 'せる', 'たい', 'くだ', 'さい', 'ください', 'ござ', 'こと', 'もの', 'よう', 'とき', 'ため',
+    'について', 'という', 'ための', 'なので', 'どうやって', 'どうすれば', 'どう', 'なぜ', 'いつ', 'どこ', 'どれ', 'これ', 'それ', 'あれ',
+    'この', 'その', 'あの', 'どの', 'ここ', 'そこ', 'うまく', 'しまう', 'みたい', 'わかる', 'わから', 'ちょっと', 'すこし', 'とても',
+    'もう', 'まだ', 'また',
+]);
+/** Words of a request rather than its subject: they rank chunks, and select one only when the query has nothing else. */
+const GENERIC_WORDS = new Set([
+    '使い方', 'やり方', '方法', '違い', '仕方', '意味', '理由', '原因', '場合', '説明', '手順', '少し', '教え', '作り', '知り',
+    '分かり', '簡単', '基本', '初心者', '入門', '必要',
+]);
+/** The part of a query that is read: a whole message at most. */
+const MAX_QUERY_CHARS = 10_000;
+/** Most keywords one query gives (each is one ILIKE over the learner's chunks). */
+const MAX_KEYWORDS = 8;
+/** ICU's dictionary word segmentation, built into Node: no dependency. */
+const segmenter = new Intl.Segmenter('ja', { granularity: 'word' });
 
 /**
- * Split a query into at most 5 ILIKE keywords of 2+ characters.
- * - Words split on spaces and Japanese punctuation; edge punctuation is trimmed, inner symbols
- *   stay, so 'C#', 'C++' and 'Node.js' survive, and any script (Latin, Hangul, Cyrillic) works.
- * - Japanese has no spaces, so a word with kana or kanji is cut into kanji runs, katakana runs and
- *   the other-script runs between them, dropping hiragana (mostly particles):
- *   「Blenderのモディファイアとは？」 gives ['Blender', 'モディファイア']. A word that leaves no
- *   run of 2+ characters (hiragana only, or 「違い」) is kept whole.
- * @param {string} query
- * @returns {string[]}
+ * A keyword. `weight` ranks the chunks it matches: 2 for a subject word, 1 for a hiragana word, a
+ * single kanji or a generic word. `selects` is false for a single kanji (面 also matches 画面) and
+ * a generic word (使い方, 方法…): they rank chunks but select one only when the query has nothing else.
+ * @typedef {{ word: string, weight: number, selects: boolean }} Keyword
  */
-export function extractKeywords(query) {
-    const trim = (word) => word.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}#+]+$/u, '');
-    const words = String(query ?? '').split(/[\s\u3000-\u3003\u3008-\u3011\u3014-\u301F\uFF01\uFF08\uFF09\uFF0C\uFF0E\uFF1A\uFF1B\uFF1F\u30FB]+/u);
-    /** @type {string[]} */
-    const candidates = [];
-    for (const raw of words) {
-        const word = trim(raw);
-        if (!JAPANESE.test(word)) {
-            candidates.push(word);
-            continue;
-        }
-        const runs = (word.match(/[\p{Script=Han}々〆]+|[\p{Script=Katakana}ー]+|[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆]+/gu) ?? [])
-            .map(trim)
-            .filter((run) => run.length >= 2);
-        candidates.push(...(runs.length > 0 ? runs : [word]));
-    }
-    /** @type {string[]} */
+
+/**
+ * A katakana run as one keyword: the dictionary does not know most loanwords, so they are not split
+ * (ボーン, リグ, ミラーモディファイア). A final long-vowel mark goes when the word is longer than
+ * 3 characters (モディファイアー also finds モディファイア; ミラー stays).
+ * @param {string} run
+ * @returns {Keyword | null}
+ */
+function katakanaKeyword(run) {
+    const word = run.length > 3 ? run.replace(/ー+$/u, '') : run;
+    return word.length >= 2 && /\p{Script=Katakana}/u.test(word) ? { word, weight: 2, selects: true } : null;
+}
+
+/**
+ * The keywords of a kanji-and-hiragana run, split into words by the dictionary: 押し出し, 選択 and
+ * だし stay, particles and endings go, and a single kanji (面) and generic words (使い方) only rank.
+ * A word the dictionary splits off before 方 (取り in 取り方) is a "how to" word too.
+ * @param {string} run
+ * @returns {Keyword[]}
+ */
+function kanjiHiraganaKeywords(run) {
+    const segments = [...segmenter.segment(run)];
+    /** @type {Keyword[]} */
     const keywords = [];
-    for (const word of candidates) {
-        if (word.length < 2) continue;
-        if (!keywords.some((k) => k.toLowerCase() === word.toLowerCase())) keywords.push(word);
-        if (keywords.length === 5) break;
+    for (const [index, { segment, isWordLike }] of segments.entries()) {
+        if (!isWordLike || STOPWORDS.has(segment) || FUNCTION_WORDS.has(segment)) continue;
+        const howTo = segment.length >= 2 && segment.endsWith('方') || segments[index + 1]?.segment === '方';
+        if (HIRAGANA_ONLY.test(segment)) {
+            if (segment.length >= 2) keywords.push({ word: segment, weight: 1, selects: true });
+        } else if (GENERIC_WORDS.has(segment) || howTo) {
+            keywords.push({ word: segment, weight: 1, selects: false });
+        } else if (SINGLE_KANJI.test(segment)) {
+            keywords.push({ word: segment, weight: 1, selects: false });
+        } else if (segment.length >= 2) {
+            keywords.push({ word: segment, weight: 2, selects: true });
+        }
     }
     return keywords;
 }
 
 /**
- * Keyword (ILIKE) search over material_chunks in scope, chunks matching more keywords first. Used
- * where vectors cannot be compared: no pgvector, no embedding key, or chunks from another model.
+ * The keywords of a query: subject words first, at most MAX_KEYWORDS.
+ * - Words split on spaces and Japanese punctuation, and each is read in NFKC (full-width Latin and
+ *   half-width katakana become the usual forms). Edge punctuation is trimmed, inner symbols stay,
+ *   so 'C#', 'C++' and 'Node.js' survive, and any script (Latin, Hangul, Cyrillic) works.
+ * - A Japanese word is cut into runs. Katakana runs stay whole (katakanaKeyword), kanji-and-hiragana
+ *   runs are split into words (kanjiHiraganaKeywords), and the other-script runs between them stay
+ *   whole: 「押し出しツールの使い方」 gives 押し出し, ツール and 使い方, and 「Prefabとは」 only
+ *   Prefab. A hiragana word the dictionary does not know (「ひらがなだけ」) is kept as written.
+ * - Subject words (weight 2) come first, then hiragana words, then single kanji and generic words,
+ *   so a long message keeps its subjects within the limit.
+ * @param {string} input
+ * @returns {Keyword[]}
+ */
+export function keywordPlan(input) {
+    const query = String(input ?? '').slice(0, MAX_QUERY_CHARS);
+    const trim = (word) => word.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}#+]+$/u, '');
+    const words = query.split(/[\s\u3000-\u3003\u3008-\u3011\u3014-\u301F\uFF01\uFF08\uFF09\uFF0C\uFF0E\uFF1A\uFF1B\uFF1F\u30FB]+/u);
+    /** @type {Keyword[]} */
+    const found = [];
+    for (const raw of words) {
+        const word = trim(raw.normalize('NFKC'));
+        if (!JAPANESE.test(word)) {
+            if (word.length >= 2) found.push({ word, weight: 2, selects: true });
+            continue;
+        }
+        const before = found.length;
+        for (const run of word.match(RUNS) ?? []) {
+            if (KATAKANA_RUN.test(run)) {
+                const keyword = katakanaKeyword(run);
+                if (keyword) found.push(keyword);
+            } else if (JAPANESE.test(run)) {
+                for (const keyword of kanjiHiraganaKeywords(run)) found.push(keyword);
+            } else {
+                const other = trim(run);
+                if (other.length >= 2) found.push({ word: other, weight: 2, selects: true });
+            }
+        }
+        if (found.length === before && HIRAGANA_ONLY.test(word) && word.length >= 2 && !FUNCTION_WORDS.has(word)) {
+            found.push({ word, weight: 1, selects: true });
+        }
+    }
+    const rank = (keyword) => (keyword.weight === 2 ? 0 : keyword.selects ? 1 : 2);
+    const ordered = found.map((keyword, index) => ({ keyword, index }))
+        .sort((a, b) => rank(a.keyword) - rank(b.keyword) || a.index - b.index);
+    /** @type {Keyword[]} */
+    const plan = [];
+    for (const { keyword } of ordered) {
+        if (!plan.some((k) => k.word.toLowerCase() === keyword.word.toLowerCase())) plan.push(keyword);
+        if (plan.length === MAX_KEYWORDS) break;
+    }
+    return plan;
+}
+
+/**
+ * The keyword strings of a query (keywordPlan), subject words first.
+ * @param {string} query
+ * @returns {string[]}
+ */
+export function extractKeywords(query) {
+    return keywordPlan(query).map(({ word }) => word);
+}
+
+/**
+ * Keyword (ILIKE) search over material_chunks in scope. Used where vectors cannot be compared: no
+ * pgvector, no embedding key, or chunks from another model.
+ * - The chunk text is matched in NFKC form, like the keywords: Postgres normalize, once per row
+ *   (OFFSET 0 keeps the planner from copying it into every match). It needs a UTF8 database, as
+ *   the VM's and CI's are.
+ * - Subject and hiragana words select chunks; a single kanji (面) and generic words (使い方, 方法…)
+ *   select only when the query has nothing else. Every keyword ranks: chunks with the larger sum
+ *   of weights first.
  * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
  * @param {{ query: string, scope: ChunkScope, limit: number }} options
  * @returns {Promise<Array<{ content: string, chunk_index: number, material_id: string }>>} [] when the query has no keywords
  */
 export async function keywordSearchChunks(pool, { query, scope, limit }) {
-    const keywords = extractKeywords(query);
-    if (keywords.length === 0) return [];
+    const plan = keywordPlan(query);
+    if (plan.length === 0) return [];
 
     const params = [...scope.params];
-    const likes = keywords.map((k) => {
-        // Escape LIKE wildcards so they match literally.
-        params.push(`%${k.replace(/[%_\\]/g, '\\$&')}%`);
-        return `c.content ILIKE $${params.length}`;
+    const matches = plan.map((keyword) => {
+        // Escape LIKE wildcards so they match literally (after NFKC, ％ and ＿ are already % and _).
+        params.push(`%${keyword.word.replace(/[%_\\]/g, '\\$&')}%`);
+        return { ...keyword, like: `n.text ILIKE $${params.length}` };
     });
     params.push(limit);
+    const selecting = matches.some(({ selects }) => selects) ? matches.filter(({ selects }) => selects) : matches;
 
     const result = await pool.query(
         `SELECT c.content, c.chunk_index, m.id as material_id
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
-         ${whereClause(scope, [`(${likes.join(' OR ')})`])}
-         ORDER BY (${likes.map((like) => `(${like})::int`).join(' + ')}) DESC, c.created_at DESC
+         CROSS JOIN LATERAL (SELECT normalize(c.content, NFKC) AS text OFFSET 0) n
+         ${whereClause(scope, [`(${selecting.map(({ like }) => like).join(' OR ')})`])}
+         ORDER BY (${matches.map(({ like, weight }) => `(${like})::int * ${weight}`).join(' + ')}) DESC, c.created_at DESC
          LIMIT $${params.length}`,
         params
     );

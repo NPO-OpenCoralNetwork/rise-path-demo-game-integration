@@ -328,6 +328,72 @@ describe('rules and instruction files', () => {
     assert.ok(fs.existsSync(path.join(ROOT, 'server/tests/fixtures/published-card-ids.json')));
   });
 
+  it('the grounded authoring rules (「出典と検索」) are stated wherever lessons are written or reviewed', () => {
+    const section = (text, heading) => {
+      const start = text.indexOf(heading);
+      assert.ok(start >= 0, heading);
+      const end = text.indexOf('\n## ', start + heading.length);
+      return text.slice(start, end < 0 ? undefined : end);
+    };
+    const contract = read('.claude/skills/author-lesson/references/lesson-contract.md');
+    const skill = read('.claude/skills/author-lesson/SKILL.md');
+
+    // Research order (this repository, then official documentation), only what the sources
+    // support, and UI steps checked in the current official docs (else the goal, not the clicks).
+    for (const [where, text] of [['lesson-contract.md §5', section(contract, '## 5.')], ['author-lesson step 2', section(skill, '## 2.')]]) {
+      assert.match(text, /repository[\s\S]*then[\s\S]*official documentation/i, `${where}: research order`);
+      assert.match(text, /only what (?:the cited |these )?sources support/i, `${where}: grounded writing`);
+      assert.match(text, /checkedAt/, `${where}: UI steps cite a checked page`);
+      assert.match(text, /describe(?:s|d)? (?:it as )?the goal/i, `${where}: unchecked UI is a goal`);
+    }
+    assert.match(section(contract, '## 5.'), /uncited non-obvious claim is a must-fix/i);
+    assert.match(section(contract, '## 5.'), /`steps-cite`/);
+    assert.match(section(contract, '## 5.'), /reports\/facts\/<lesson>\.facts\.md/, 'what each source says is recorded for the reviewer');
+    assert.match(section(contract, '## 8.'), /`steps-cite`[\s\S]*advisory/);
+    assert.doesNotMatch(skill, /If you cannot verify a claim, drop it\./);
+    assert.match(read('.claude/skills/author-lesson/templates/brief.md'), /This repository first, then the official docs/);
+
+    // A steps block with nothing to cite keeps its warning, with the reason in the report; once
+    // published it is listed in KNOWN_UNCITED_STEPS (never a cite that the source does not back).
+    for (const [where, text] of [['lesson-contract.md §5', section(contract, '## 5.')], ['author-lesson step 4', section(skill, '## 4.')]]) {
+      assert.match(text, /only asks? the learner to write or decide[\s\S]*keeps?( that)? (the )?warning[\s\S]*reason in the report/, where);
+    }
+    for (const [where, text] of [['lesson-contract.md §8', section(contract, '## 8.')], ['author-lesson step 10', section(skill, '## 10.')],
+      ['.claude/rules/content.md', read('.claude/rules/content.md')], ['AGENTS.md', read('AGENTS.md')]]) {
+      assert.match(text, /KNOWN_UNCITED_STEPS/, `${where} names the list of known uncited steps blocks`);
+    }
+
+    // Beginner lessons: an everyday analogy before each new concept, checked by the reviewer.
+    assert.match(section(contract, '## 2.'), /`level: "beginner"`[\s\S]*everyday analogy[\s\S]*reviewer/);
+    assert.match(section(contract, '## 2.'), /One analogy may cover the related terms[\s\S]*instead of a callout \(still ≤ 2 callouts per section\)/);
+    assert.match(section(skill, '## 4.'), /`level: "beginner"`[\s\S]*analogy/);
+    const style = read('.claude/skills/author-lesson/references/style-guide.ja.md');
+    assert.match(style, /`level: "beginner"`[\s\S]*日常のたとえ話/);
+    assert.match(style, /出典が裏づけることだけを書/);
+    assert.match(style, /自明でない記述に出典がなければ/, 'only non-obvious claims need a source');
+    assert.match(style, /メニュー・ボタン・画面・ショートカット/);
+    assert.match(style, /1 つのたとえで[\s\S]{0,30}関連する用語/, 'one analogy may cover related terms');
+    assert.doesNotMatch(style, /確かめられないことは書かないか、出典を付けます/, 'no "leave it out or cite it"');
+    assert.match(read('.claude/skills/author-lesson/templates/brief.md'), /what it supports/, 'the brief records what each source says');
+
+    // The reviewer blocks on all three.
+    const { body } = parseFrontmatter(read('.claude/agents/pedagogy-reviewer.md'));
+    const mustFix = body.slice(body.indexOf('5. List'), body.indexOf('6. Return'));
+    for (const item of ['uncited claim', 'unverified UI step', 'missing analogy']) assert.ok(mustFix.includes(`**${item}**`), `pedagogy-reviewer must-fix: ${item}`);
+    assert.match(mustFix, /`level: "beginner"`/);
+    assert.match(mustFix, /reports\/facts\/<lesson>\.facts\.md/, 'the reviewer checks claims against the recorded source notes');
+    assert.match(read('.claude/skills/review-lesson/SKILL.md'), /unverified UI step[\s\S]*every new term without an everyday analogy[\s\S]*`level: "beginner"`/);
+
+    // Short mentions in the rules every agent loads.
+    for (const [where, text] of [['.claude/rules/content.md', read('.claude/rules/content.md')], ['AGENTS.md', read('AGENTS.md')]]) {
+      assert.match(text, /only what (?:the )?cited sources support/i, `${where}: grounded writing`);
+      assert.match(text, /official docs/, `${where}: official docs`);
+      assert.match(text, /beginner[^\n]*analogy/, `${where}: beginner analogies`);
+      assert.match(text, /`steps-cite`/, `${where}: steps-cite`);
+    }
+    assert.ok(lintRulesFor('steps').includes('steps-cite'), 'the cookbook lists steps-cite under steps');
+  });
+
   it('AGENTS.md ≤ 80 lines; CLAUDE.md ≤ 40 lines and imports @AGENTS.md', () => {
     const agents = read('AGENTS.md');
     const claude = read('CLAUDE.md');

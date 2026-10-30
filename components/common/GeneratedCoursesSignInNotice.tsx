@@ -21,9 +21,10 @@ const copy = {
 /**
  * Shown instead of an empty library or an error page when the generated-course API answers 401
  * (services/generatedCourses.ts isSignInRequired). Only a signed-in learner reaches it: the app
- * allows no guest without demo mode, and demo mode never calls the API for these courses. The API
- * also answers 401 when it cannot reach the auth provider, so the copy says the sign-in could not
- * be confirmed (as SaveChip does for lesson records), not that it ended. The button is
+ * allows no guest without demo mode, and demo mode never calls the API for these courses. The copy
+ * says the sign-in could not be confirmed (as SaveChip does for lesson records), not that it ended.
+ * When the API cannot reach the auth provider it answers 503 auth_unavailable instead, and the views
+ * show GeneratedCoursesUnavailableNotice (try again later). The button is
  * SaveStoppedNotice's 「ログインし直す」: it signs out without asking (reason 'reauth'), and the
  * landing page offers sign-in.
  */
