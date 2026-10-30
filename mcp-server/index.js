@@ -39,7 +39,7 @@ import { activeProfile } from './profileFilter.js';
 import { clearSession } from './policy.js';
 import { createMcpServer as buildMcpServer } from './createMcpServer.js';
 import { verifyMessagesSessionAuth } from './sseMessagesAuth.js';
-import { createSseUserResolver } from './sseUserAuth.js';
+import { createSseUserResolver, sessionCheckUnavailable } from './sseUserAuth.js';
 import { loadEnv } from '../tools/core/env.js';
 import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../tools/core/oauthToken.js';
 
@@ -96,7 +96,7 @@ if (REMOTE_MODE) {
     const express = (await import('express')).default;
     const { STATUS_CODES } = await import('node:http');
     const { createMessageRateLimiter } = await import('./messageRateLimit.js');
-    const { initSupabase, getSupabase, extractBearerToken } = await import('../server/middleware/auth.js');
+    const { initSupabase, getSupabase, extractBearerToken, AUTH_UNAVAILABLE } = await import('../server/middleware/auth.js');
     const { PHASE1_USER_ID, syncAuthUserStub, getPool } = await import('../server/db.js');
     const app = express();
 
@@ -192,6 +192,8 @@ if (REMOTE_MODE) {
         }
         const userId = await resolveUserId(req);
         if (!userId) {
+            // Not 401 when the session could not be checked (Supabase Auth or the database is down).
+            if (sessionCheckUnavailable(req)) return res.status(503).json(AUTH_UNAVAILABLE);
             return res.status(401).json({ error: 'Authentication required' });
         }
         await syncAuthUserStub(userId);
@@ -245,6 +247,7 @@ if (REMOTE_MODE) {
         // X-Hermes-Session-Key is not stored on the session: one bridge session carries every
         // learner's calls. resolveMcpUserId reads an rp:turn key from each request's own headers.
         const resolvedUserId = await resolveUserId(req);
+        if (!resolvedUserId && sessionCheckUnavailable(req)) return res.status(503).json(AUTH_UNAVAILABLE);
 
         const authFailure = verifyMessagesSessionAuth(resolvedUserId, session.userId);
         if (authFailure) {

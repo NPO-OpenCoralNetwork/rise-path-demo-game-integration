@@ -23,6 +23,11 @@
  *       the dev fallbacks too, as in bridgeAuth.js).
  *       This release reads account_deletions on every signed-in request: apply migration 018
  *       (npm run db:migrate) before starting the api, also on a local dev database.
+ *     - when Supabase Auth cannot answer (no connection, 5xx, rate limited; tools/core/authUnavailable.js),
+ *       the token is not refused: requireAuth answers 503 auth_unavailable, as when the account check
+ *       cannot run, and optionalAuth treats the caller as anonymous with req.accountCheckUnavailable
+ *       set (the AI gate answers 503). Nothing is read or written for that token, and a learner is
+ *       never asked to sign in again because of an outage. A token Supabase Auth refuses stays 401.
  *     - the guards of one request (several can run: server.js mounts requireAuth twice on /image,
  *       /upload and /rag, and optionalAuth after requireAuth on the TTS routes) check the session
  *       once: getUser, the account state and the stub write are shared (oncePerRequest below).
@@ -38,6 +43,7 @@ import { getPool, PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
 import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../tools/core/oauthToken.js';
 import { readAccountState } from '../../tools/core/accountDeletions.js';
+import { isAuthUnavailable } from '../../tools/core/authUnavailable.js';
 import { termsGateStep } from './termsGate.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
@@ -127,7 +133,10 @@ export const ACCOUNT_DELETED_REFUSAL = Object.freeze({
     error_type: 'account_deleted',
 });
 
-/** The 503 body when the account check cannot run (database error): never let through. */
+/**
+ * The 503 body when the session cannot be checked: Supabase Auth does not answer, or the account
+ * check fails (database error). Never let through, and never 401 (which asks to sign in again).
+ */
 export const AUTH_UNAVAILABLE = Object.freeze({
     error: 'Sign-in cannot be checked right now. Please try again.',
     error_type: 'auth_unavailable',
@@ -226,7 +235,12 @@ export const requireAuth = async (req, res, next) => {
     try {
         const { data, error } = await getUserOnce(req, supabase, token);
         if (error || !data?.user) {
-            // The auth provider's own text stays in the server log.
+            // Supabase Auth did not answer: 503, as when the account check cannot run below. The auth
+            // provider's own text stays in the server log.
+            if (isAuthUnavailable(error)) {
+                console.warn('[Auth] Supabase Auth unavailable:', error?.message || error);
+                return res.status(503).json(AUTH_UNAVAILABLE);
+            }
             if (error) console.warn('[Auth] token rejected:', error?.message || error);
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
@@ -291,6 +305,11 @@ export const optionalAuth = async (req, res, next) => {
     try {
         const { data, error } = await getUserOnce(req, supabase, token);
         if (error || !data?.user) {
+            // Supabase Auth did not answer: flagged like an account check that cannot run (below).
+            if (isAuthUnavailable(error)) {
+                console.warn('[Auth] optionalAuth: Supabase Auth unavailable:', error?.message || error);
+                req.accountCheckUnavailable = true;
+            }
             req.userId = null;
             req.authMethod = 'anonymous';
             return next();

@@ -22,10 +22,12 @@ import {
     createClient,
 } from '@supabase/supabase-js';
 import { createApp } from '../../server.js';
-import { optionalAuth, requireAuth, setSupabaseForTests } from '../middleware/auth.js';
+import { extractBearerToken, optionalAuth, requireAuth, setSupabaseForTests } from '../middleware/auth.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
 import { aiAccessGate } from '../middleware/aiAccessGate.js';
-import { resetPoolForTests, setPoolForTests } from '../db.js';
+import { PHASE1_USER_ID, resetPoolForTests, setPoolForTests } from '../db.js';
+import { readAccountState } from '../../tools/core/accountDeletions.js';
+import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../tools/core/oauthToken.js';
 import { createAccountDeletionPool } from './helpers/accountDeletionPool.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -318,6 +320,56 @@ describe('the api while Supabase Auth is down (production)', () => {
     });
 });
 
+describe('mcp-server/sseUserAuth.js: a session that could not be checked', () => {
+    const resolverWith = async (getUser, dev) => {
+        const { createSseUserResolver } = await import('../../mcp-server/sseUserAuth.js');
+        return createSseUserResolver({
+            getSupabase: () => ({ auth: { getUser } }),
+            getPool: () => null,
+            readAccountState,
+            decodeTokenClaims,
+            sessionAuthTime,
+            isOAuthClientToken,
+            extractBearerToken,
+            bridgeToken: () => BRIDGE_TOKEN,
+            allowDevFallback: () => dev,
+            phase1UserId: PHASE1_USER_ID,
+            logger: { error: () => {} },
+        });
+    };
+    const learner = () => ({ headers: { authorization: `Bearer ${session()}` } });
+
+    it('Supabase Auth that cannot answer: null, marked so the caller answers 503, never the dev user', async () => {
+        const { sessionCheckUnavailable } = await import('../../mcp-server/sseUserAuth.js');
+        const unavailable = async () => ({ data: { user: null }, error: new AuthRetryableFetchError('fetch failed', 0) });
+        for (const dev of [false, true]) {
+            const req = learner();
+            assert.equal(await (await resolverWith(unavailable, dev))(req), null, `dev ${dev}`);
+            assert.equal(req.authMethod, 'auth-unavailable');
+            assert.equal(sessionCheckUnavailable(req), true);
+        }
+    });
+
+    it('a token Supabase Auth refuses: as before (null and 401 in production, the dev user in development)', async () => {
+        const { sessionCheckUnavailable } = await import('../../mcp-server/sseUserAuth.js');
+        const refuse = async () => ({ data: { user: null }, error: new AuthApiError('invalid JWT', 403, 'bad_jwt') });
+        const req = learner();
+        assert.equal(await (await resolverWith(refuse, false))(req), null);
+        assert.equal(sessionCheckUnavailable(req), false);
+        assert.equal(await (await resolverWith(refuse, true))(learner()), PHASE1_USER_ID);
+    });
+
+    it('sessionCheckUnavailable: only a session whose check could not run (Supabase Auth, or the account check)', async () => {
+        const { sessionCheckUnavailable } = await import('../../mcp-server/sseUserAuth.js');
+        for (const authMethod of ['auth-unavailable', 'account-check-failed']) {
+            assert.equal(sessionCheckUnavailable({ headers: {}, authMethod }), true, authMethod);
+        }
+        for (const authMethod of [undefined, 'account-deleted', 'oauth-client-refused', 'supabase-jwt', 'dev-fallback']) {
+            assert.equal(sessionCheckUnavailable({ headers: {}, authMethod }), false, String(authMethod));
+        }
+    });
+});
+
 /** Spawn the MCP server with --sse on a free port; resolves once it listens. */
 async function startSseServer(env) {
     const port = await freePort();
@@ -359,6 +411,8 @@ describe('MCP server (SSE, production) while Supabase Auth is down', () => {
             SUPABASE_URL: standIn.url,
             SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
             RISE_PATH_BRIDGE_TOKEN: BRIDGE_TOKEN,
+            // Nothing listens there: the account check of a learner Supabase Auth names fails.
+            DATABASE_URL_PHASE1: `postgresql://rp_user:rp_pass@127.0.0.1:${await freePort()}/rp_test`,
         });
     });
     after(async () => {
@@ -379,6 +433,13 @@ describe('MCP server (SSE, production) while Supabase Auth is down', () => {
         const refused = await open(session());
         assert.equal(refused.status, 401);
         assert.deepEqual(await refused.json(), { error: 'Authentication required' });
+    });
+
+    it('GET /sse with a learner token whose account check cannot reach the database: 503 auth_unavailable, as the app API answers', async () => {
+        standIn.answer = 'user';
+        const response = await open(session());
+        assert.equal(response.status, 503);
+        assert.deepEqual(await response.json(), AUTH_UNAVAILABLE);
     });
 
     it('POST /messages/:id with a learner token: 503 auth_unavailable while Supabase Auth cannot answer, 401 when it refuses the token', async () => {

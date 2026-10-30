@@ -8,19 +8,32 @@
  *      belongs to the remote endpoint (mcp-server/oauthVerifier.js) only
  *   4. a learner's Supabase session token → that learner, unless it is a session of a deleted Rise
  *      Path account (tools/core/accountDeletions.js readAccountState, mayReopen false: only the app
- *      re-opens an account) → null; a database error → null (fail closed). Neither falls back to
- *      the dev user.
+ *      re-opens an account) → null; a database error, or Supabase Auth that cannot answer
+ *      (tools/core/authUnavailable.js) → null (fail closed). None falls back to the dev user.
  *   5. development only (server/middleware/authPolicy.js allowDevAuthFallback) → PHASE1
- *   otherwise null, which the caller answers with 401.
+ *   otherwise null, which the caller answers with 401, or with 503 auth_unavailable when the session
+ *   could not be checked (sessionCheckUnavailable below), as the app API does.
  * Each message re-checks the token, so an open SSE session of an account deleted meanwhile is
  * refused at its next call. The bridge token is compared in constant time (tools/core/sameSecret.js).
  */
+import { isAuthUnavailable } from '../tools/core/authUnavailable.js';
 import { sameSecret } from '../tools/core/sameSecret.js';
 
 /**
  * @typedef {{ headers: Record<string, string | string[] | undefined>, authMethod?: string }} SseRequest
  * @typedef {{ state: 'ok', generation: number | null } | { state: 'deleted' }} AccountState
  */
+
+/** The authMethod of a null answer whose session could not be checked. */
+const UNCHECKED = new Set(['auth-unavailable', 'account-check-failed']);
+
+/**
+ * Whether resolveUserId answered null because the session could not be checked (Supabase Auth did
+ * not answer, or the account check failed): GET /sse and POST /messages then answer 503
+ * auth_unavailable instead of 401, so a client is not sent to sign in again by an outage.
+ * @param {SseRequest} req
+ */
+export const sessionCheckUnavailable = (req) => UNCHECKED.has(req.authMethod ?? '');
 
 /**
  * @param {{
@@ -86,6 +99,11 @@ export function createSseUserResolver({
                 try {
                     const { data, error } = await supabase.auth.getUser(token);
                     if (!error && data?.user) user = data.user;
+                    else if (isAuthUnavailable(error)) {
+                        logger.error('[MCP] Supabase Auth unavailable:', /** @type {any} */ (error)?.message || error);
+                        req.authMethod = 'auth-unavailable';
+                        return null;
+                    }
                 } catch { /* fall through */ }
                 if (user) {
                     try {

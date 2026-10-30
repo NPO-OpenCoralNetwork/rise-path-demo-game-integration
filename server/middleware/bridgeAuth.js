@@ -13,6 +13,7 @@ import {
     syncAuthUserStubOnce,
 } from './auth.js';
 import { allowDevAuthFallback } from './authPolicy.js';
+import { isAuthUnavailable } from '../../tools/core/authUnavailable.js';
 import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
 import { sameSecret } from '../../tools/core/sameSecret.js';
 import { termsGateStep } from './termsGate.js';
@@ -36,8 +37,9 @@ async function authorizeRequest(req, { userId, authMethod, bridgeAuthenticated, 
  *   3. Authorization: Bearer <supabase-jwt> → Supabase JWT validation; a connected agent's OAuth
  *      token (client_id, or aud other than 'authenticated') answers 401 oauth_client_token; a
  *      session of a deleted Rise Path account answers 401 account_deleted, and 503
- *      auth_unavailable when that check cannot run (server/middleware/auth.js; never the dev
- *      fallback). The bridge and dev paths are PHASE1_USER_ID, which is never deleted.
+ *      auth_unavailable when that check cannot run or Supabase Auth cannot answer
+ *      (server/middleware/auth.js; never the dev fallback). The bridge and dev paths are
+ *      PHASE1_USER_ID, which is never deleted.
  *   4. (dev only) → PHASE1_USER_ID fallback
  * Only 3 meets the terms check (server/middleware/termsGate.js, off unless LEGAL_TERMS_REQUIRED).
  *
@@ -87,12 +89,19 @@ export const requireBridgeOrAuth = async (req, res, next) => {
         const supabase = getSupabase();
         if (supabase) {
             let user = null;
+            let authUnavailable = false;
             try {
                 const { data, error } = await getUserOnce(req, supabase, token);
                 if (!error && data?.user) user = data.user;
+                else if (isAuthUnavailable(error)) {
+                    console.warn('[Auth] Supabase Auth unavailable:', error?.message || error);
+                    authUnavailable = true;
+                }
             } catch {
                 // fall through to dev fallback
             }
+            // Supabase Auth did not answer: 503, as when the account check cannot run below.
+            if (authUnavailable) return res.status(503).json(AUTH_UNAVAILABLE);
             if (user) {
                 let account;
                 try {
