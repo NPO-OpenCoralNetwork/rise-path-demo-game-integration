@@ -102,12 +102,12 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "ブラウザのバージョンが古いから",
-                    "en": "The browser is out of date"
+                    "jp": "AIが、入力したタスクを覚えていないから",
+                    "en": "The AI does not remember the tasks you typed"
                   },
                   "feedback": {
-                    "jp": "ブラウザが新しくても、保存していないデータは再読み込みで消えます。",
-                    "en": "Even in an up-to-date browser, data that is not saved is lost on reload."
+                    "jp": "タスクを覚えておくのは、AIではなくアプリの仕組みです。保存する仕組みがなければ、再読み込みで消えます。",
+                    "en": "Keeping the tasks is the app's job, not the AI's. Without a way to save them, they are lost on reload."
                   }
                 },
                 {
@@ -500,8 +500,8 @@
             }
           ],
           "expect": {
-            "jp": "バックエンドの処理とデータベースが変わり、返ってくるJSONの各タスクに項目が1つ増えます。画面の見た目は変わりません。",
-            "en": "The backend and the database change, and each task in the returned JSON gets one more field. The screen looks the same."
+            "jp": "バックエンドの処理が変わり（必要ならデータベースも）、返ってくるJSONの各タスクに項目が1つ増えます。画面の見た目は変わりません。",
+            "en": "The backend changes (and the database, if needed), and each task in the returned JSON gets one more field. The screen looks the same."
           }
         },
         {
@@ -516,8 +516,8 @@
               "id": "q2",
               "kind": "single",
               "prompt": {
-                "jp": "タスク管理アプリで、AIに「APIが返すデータを変えて」と頼むべき変更はどれでしょう？",
-                "en": "In the task app, which change calls for asking the AI to \"change the data the API returns\"?"
+                "jp": "上のJSONを返すタスク管理アプリで、AIに「APIが返すデータを変えて」と頼むべき変更はどれでしょう？",
+                "en": "In the task app whose API returns the JSON above, which change calls for asking the AI to \"change the data the API returns\"?"
               },
               "options": [
                 {
@@ -534,30 +534,30 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "タスクを消すときの動きを、もっとなめらかにする",
-                    "en": "Make the animation smoother when a task is removed"
+                    "jp": "完了したタスクの名前に、取り消し線を付ける",
+                    "en": "Strike through the names of finished tasks"
                   },
                   "feedback": {
-                    "jp": "動きは画面の見せ方なので、UIの仕事です。サーバーから届くデータとは関係ありません。",
-                    "en": "Motion is about how the screen presents things, so it belongs to the UI. It has nothing to do with the data the server sends."
+                    "jp": "完了したかどうか（done）は、もうJSONで届いています。見せ方を変えるだけなので、UIの変更です。",
+                    "en": "Whether a task is done is already in the JSON. Only the display changes, so it is a UI change."
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "各タスクで、担当者の名前も受け取る",
-                    "en": "Receive the assignee's name with each task"
+                    "jp": "各タスクの横に、担当者の名前を表示する",
+                    "en": "Show the assignee's name next to each task"
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "タスク名の文字を、ひと回り大きくする",
-                    "en": "Make the task names a size larger"
+                    "jp": "長いタスク名を、1行に収まるように省いて表示する",
+                    "en": "Shorten long task names so each fits on one line"
                   },
                   "feedback": {
-                    "jp": "文字の大きさは表示の問題なので、UIで直します。受け取るデータは同じままです。",
-                    "en": "Text size is a display question, fixed in the UI. The data you receive stays the same."
+                    "jp": "タスク名（title）は、もうJSONで届いています。表示の仕方だけを変えるので、UIの変更です。",
+                    "en": "The task name (title) is already in the JSON. Only the display changes, so it is a UI change."
                   }
                 }
               ],
@@ -565,12 +565,12 @@
                 "c"
               ],
               "explanation": {
-                "jp": "担当者の名前を受け取るには、APIが返すデータの中身を変えます。色・動き・文字の大きさは、UIの変更として頼みます。",
-                "en": "To receive the assignee's name, the content of the data the API returns has to change. Colour, motion and text size are asked for as a UI change."
+                "jp": "担当者の名前は、いまのJSONに入っていません。まずAPIが返すデータに加えてもらい、画面に出すのはそのあとUIの変更として頼みます。取り消し線や省略は、届いたデータの見せ方なのでUIの変更です。",
+                "en": "The assignee's name is not in the JSON yet. First have it added to the data the API returns, then ask for a UI change to show it. Strike-through and shortening only change how the data that arrives is shown, so they are UI changes."
               },
               "hint": {
-                "jp": "サーバーから「届くデータの中身」が変わるのはどれでしょう？",
-                "en": "Which one changes the content of the data that arrives from the server?"
+                "jp": "いまのJSONに入っていないデータが要るのは、どれでしょう？",
+                "en": "Which change needs data that is not in the JSON yet?"
               },
               "objectiveId": "o2",
               "bloom": "apply"
@@ -667,8 +667,8 @@
             "mdn-publishing"
           ],
           "md": {
-            "jp": "[[デプロイ]]では、次の3つが順に起きます。",
-            "en": "A [[deployment]] goes through three steps, in this order."
+            "jp": "[[デプロイ]]には、次の3つの段階があります。",
+            "en": "A [[deployment]] has three stages."
           }
         },
         {
@@ -710,8 +710,8 @@
               "id": "q7",
               "kind": "single",
               "prompt": {
-                "jp": "タスク管理アプリのファイルを、サーバーに送り終えました。それでも、まだだれも開けません。足りない手順として、最も考えられるのはどれでしょう？",
-                "en": "You have sent the task app's files to the server, but nobody can open the app yet. Which missing step is the most likely?"
+                "jp": "タスク管理アプリのファイルを、サーバーに送り終えました。それでも、まだだれも開けません。足りない段階として、最も考えられるのはどれでしょう？",
+                "en": "You have sent the task app's files to the server, but nobody can open the app yet. Which missing stage is the most likely?"
               },
               "options": [
                 {
@@ -739,7 +739,7 @@
                     "en": "Send the same files to the server again"
                   },
                   "feedback": {
-                    "jp": "ファイルは、もうサーバーに届いています。足りないのは、届いた依頼に答える起動の段階です。",
+                    "jp": "ファイルは、もうサーバーに届いています。足りないのは、依頼に答えられるようにする起動の段階です。",
                     "en": "The files are already on the server. What is missing is the launch, so that it answers the requests that arrive."
                   }
                 },
@@ -759,12 +759,12 @@
                 "b"
               ],
               "explanation": {
-                "jp": "デプロイは、ビルド・転送・起動の順に進みます。ファイルを送っただけでは、まだ依頼に答えられません。サーバーで起動して、はじめて開けるようになります。",
-                "en": "A deployment goes build, transfer, launch. Sending the files does not yet let the server answer requests; the app opens once it has been launched on the server."
+                "jp": "デプロイには、ビルド・転送・起動の3つの段階があります。ファイルを送っただけでは、まだ依頼に答えられません。サーバーで起動して、はじめて開けるようになります。",
+                "en": "A deployment has three stages: build, transfer and launch. Sending the files does not yet let the server answer requests; the app opens once it has been launched on the server."
               },
               "hint": {
                 "jp": "デプロイの3つの段階のうち、まだ済んでいないのはどれでしょう？",
-                "en": "Which of the three steps of a deployment has not happened yet?"
+                "en": "Which of the three stages of a deployment has not happened yet?"
               },
               "objectiveId": "o3",
               "bloom": "understand"
@@ -945,7 +945,7 @@
                   },
                   "feedback": {
                     "jp": "記憶だけで元どおりに書き直すのは、難しい作業です。コミットした状態に戻せば、動いていたところからやり直せます。",
-                    "en": "Rebuilding it exactly from memory is hard. Going back to the commit lets you start again from where it worked."
+                    "en": "Rewriting it exactly from memory is hard. Going back to the commit lets you start again from where it worked."
                   }
                 },
                 {
@@ -963,11 +963,11 @@
                   "id": "d",
                   "md": {
                     "jp": "アプリ全体を、最初から作り直してもらう",
-                    "en": "Have the whole app rebuilt from scratch"
+                    "en": "Have the whole app remade from scratch"
                   },
                   "feedback": {
                     "jp": "作り直すと、動いていた部分まで変わってしまいます。コミットした状態に戻せば、壊れる前から始められます。",
-                    "en": "A rebuild also changes the parts that worked. Going back to the commit lets you start from before it broke."
+                    "en": "Starting over also changes the parts that worked. Going back to the commit lets you start from before it broke."
                   }
                 },
                 {
@@ -1049,8 +1049,8 @@
                 "en": "2. Split them by the part that handles them"
               },
               "md": {
-                "jp": "保存は[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。分けると、依頼ごとに変える範囲を書けます。",
-                "en": "Saving is the [[database]]'s job, passing the tasks to save and the list back and forth is the [[API]]'s, and showing them is the [[UI]]'s. Once they are split, each request can say what it may change."
+                "jp": "タスクをしまっておくのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]、表示は[[UI]]の仕事です。分けると、依頼ごとに変える範囲を書けます。",
+                "en": "The [[database]] keeps the tasks, the [[backend]] saves them and passes the list back and forth through its [[API]], and the [[UI]] shows them. Once they are split, each request can say what it may change."
               },
               "expect": {
                 "jp": "依頼が、データ側と画面側の2つに分かれます。",
@@ -1068,7 +1068,7 @@
                 "en": "So that you can go back if things go wrong, ask the AI to commit the current state."
               },
               "expect": {
-                "jp": "コミットが1つ増え、戻れる場所ができます。",
+                "jp": "コミットが増え、戻れる場所ができます。",
                 "en": "There is one more commit: a place you can return to."
               }
             },
@@ -1113,12 +1113,12 @@
                 "en": "Add one task, then reload the page."
               },
               "expect": {
-                "jp": "再読み込みしても、追加したタスクが残っています。",
+                "jp": "再読み込みしても、タスクが残っています。",
                 "en": "The task you added is still there after the reload."
               },
               "troubleshoot": {
-                "jp": "消えてしまうときは、保存か読み込みのどちらかが、APIを通っていません。⑤の依頼を見直して、頼み直します。",
-                "en": "If it disappears, either saving or loading is not going through the API. Check the request in step 5 and ask again."
+                "jp": "消えてしまうときは、保存か一覧の読み込みのどこかが、APIとデータベースを通っていません。④と⑤のどちらの依頼が足りないかを見直して、頼み直します。",
+                "en": "If it disappears, saving or loading the list is somewhere not going through the API and the database. Check whether the request in step 4 or step 5 fell short, and ask again."
               }
             }
           ]
@@ -1155,18 +1155,18 @@
                   "id": "c",
                   "md": {
                     "jp": "「アプリ全体を、期限が付けられる形に作り直して」",
-                    "en": "\"Rebuild the whole app so tasks can have due dates.\""
+                    "en": "\"Remake the whole app so tasks can have due dates.\""
                   },
                   "feedback": {
                     "jp": "全体を作り直すと、動いていた部分まで変わってしまいます。変える範囲を書いて、データ側から頼みます。",
-                    "en": "Rebuilding everything also changes the parts that worked. State the scope and start with the data side."
+                    "en": "Remaking everything also changes the parts that worked. State the scope and start with the data side."
                   }
                 },
                 {
                   "id": "b",
                   "md": {
                     "jp": "「期限を保存し、一覧のAPIでも返して。画面はまだ変えないで」",
-                    "en": "\"Save due dates and return them in the list API. Leave the screen as is.\""
+                    "en": "\"Save due dates and return them in the list API. Don't change the screen yet.\""
                   }
                 },
                 {
@@ -1185,8 +1185,8 @@
                 "b"
               ],
               "explanation": {
-                "jp": "期限を残すには、まずデータ側に「保存して返す」仕組みが要ります。「画面はまだ変えないで」と書くと、変える範囲をデータ側だけにしぼれます。入力と表示は、そのあとで画面側に頼みます。",
-                "en": "To keep due dates, the data side first needs a way to save and return them. Writing \"don't change the screen yet\" keeps the change to the data side. Ask the screen side for the input and the display after that."
+                "jp": "期限を残すには、まずデータ側に「保存して返す」仕組みが要ります。「画面はまだ変えないで」と書くと、変える範囲をデータ側だけにしぼれます。入力と表示は、そのあとで画面側の依頼として頼みます。",
+                "en": "To keep due dates, the data side first needs a way to save and return them. Writing \"don't change the screen yet\" keeps the change to the data side. After that, ask for the input and the display in a screen-side request."
               },
               "hint": {
                 "jp": "再読み込みしても残すには、どこに保存しておく必要があったでしょう？",
@@ -1243,6 +1243,10 @@
               "hint": {
                 "jp": "1-4の「AIに変更を頼む前のひとこと」が使えます。",
                 "en": "You can use \"One line before you ask for changes\" from 1-4."
+              },
+              "troubleshoot": {
+                "jp": "「変更を始める前に、いま動いている状態をGitにコミットしてください」と書きます。",
+                "en": "Write: \"Before you change anything, commit the current working state to Git.\""
               }
             },
             {
@@ -1253,7 +1257,7 @@
               },
               "md": {
                 "jp": "読み終えた日を残すための、データ側への依頼を書きます。",
-                "en": "Write the data-side request that keeps the date finished."
+                "en": "Write the data-side request that saves the date finished."
               },
               "expect": {
                 "jp": "「保存する」「一覧で返す」と、変えない範囲が入っています。",
@@ -1304,42 +1308,42 @@
             {
               "id": "pc-commit",
               "label": {
-                "jp": "最初の依頼で、いまの状態のコミットを頼んでいる",
+                "jp": "最初の依頼で、いまの状態のコミットを頼んでいます",
                 "en": "Your first request asks for a commit of the current state"
               }
             },
             {
               "id": "pc-split",
               "label": {
-                "jp": "データ側と画面側の依頼が、別々に書いてある",
+                "jp": "データ側と画面側の依頼が、別々に書いてあります",
                 "en": "The data-side and screen-side requests are written separately"
               }
             },
             {
               "id": "pc-data",
               "label": {
-                "jp": "データ側の依頼に、「保存する」と「一覧で返す」の両方がある",
+                "jp": "データ側の依頼に、「保存する」と「一覧で返す」の両方があります",
                 "en": "The data-side request asks both to save the date and to return it with the list"
               }
             },
             {
               "id": "pc-input",
               "label": {
-                "jp": "画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてある",
+                "jp": "画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてあります",
                 "en": "The screen-side request lets you enter the date and save it through the API"
               }
             },
             {
               "id": "pc-order",
               "label": {
-                "jp": "データ側を先に、画面側をあとに頼む順になっている",
+                "jp": "データ側を先に、画面側をあとに頼む順になっています",
                 "en": "The data side comes first and the screen side second"
               }
             },
             {
               "id": "pc-scope",
               "label": {
-                "jp": "データ側と画面側のどちらの依頼にも、変えない範囲が書いてある",
+                "jp": "データ側と画面側のどちらの依頼にも、変えない範囲が書いてあります",
                 "en": "Both the data-side and the screen-side request say what not to change"
               }
             }
@@ -1357,8 +1361,8 @@
             "en": "Model answer: the data-side request (2nd)"
           },
           "prompt": {
-            "jp": "本ごとに「読み終えた日」を保存できるようにしてください。本の一覧を返すAPIでも、読み終えた日を返してください。画面はまだ変更しないでください。",
-            "en": "Make it possible to save the \"date finished\" for each book. Return the date finished in the API that returns the book list, too. Do not change the screen yet."
+            "jp": "本ごとの「読み終えた日」を、APIで受け取ってデータベースに保存できるようにしてください。本の一覧を返すAPIでも、読み終えた日を返してください。画面はまだ変更しないでください。",
+            "en": "Let the API receive the \"date finished\" for each book and save it in the database. Return the date finished in the API that returns the book list, too. Do not change the screen yet."
           },
           "target": "any",
           "expect": {
@@ -1366,8 +1370,8 @@
             "en": "Each book in the returned JSON gets a field for the date you finished it. The screen does not change yet."
           },
           "note": {
-            "jp": "1つ目の依頼は、1-4の「AIに変更を頼む前のひとこと」と同じ、コミットの依頼です。",
-            "en": "The first request is the commit request from 1-4, \"One line before you ask for changes\"."
+            "jp": "1つ目の依頼（コミット）の例：「変更を始める前に、いま動いている状態をGitにコミットしてください。メッセージは『本の登録と一覧が動く』にしてください。」",
+            "en": "The first request (the commit), for example: \"Before you change anything, commit the current working state to Git with the message 'adding and listing books works'.\""
           }
         },
         {
@@ -1447,7 +1451,7 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "画面で、満席の時間を選べなくするだけにする",
+                    "jp": "画面だけを直して、満席の時間を選べなくする",
                     "en": "Only stop the screen from offering full time slots"
                   },
                   "feedback": {
@@ -1492,7 +1496,7 @@
                   "id": "a",
                   "md": {
                     "jp": "「家計簿アプリを、もっと使いやすく作り直して」",
-                    "en": "\"Rebuild the budget app so it is easier to use.\""
+                    "en": "\"Remake the budget app so it is easier to use.\""
                   },
                   "feedback": {
                     "jp": "「使いやすく」では、どこを変えるのかが伝わりません。変えたい場所と、変えない範囲を書きます。",
@@ -1503,11 +1507,11 @@
                   "id": "c",
                   "md": {
                     "jp": "「金額を返すAPIを作り直して、一覧の金額も右寄せで大きく表示して」",
-                    "en": "\"Rebuild the API that returns the amounts, and show the amounts in the list right-aligned and larger.\""
+                    "en": "\"Rewrite the API that returns the amounts, and show the amounts in the list right-aligned and larger.\""
                   },
                   "feedback": {
                     "jp": "見た目の変更なのに、APIまで作り直すことになります。届くデータは同じなので、UIの変更として頼みます。",
-                    "en": "This is a change in looks, yet it rebuilds the API as well. The data stays the same, so ask for a UI change."
+                    "en": "This is a change in looks, yet it rewrites the API as well. The data stays the same, so ask for a UI change."
                   }
                 },
                 {
@@ -1577,7 +1581,7 @@
                   },
                   "feedback": {
                     "jp": "依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。",
-                    "en": "Waiting for requests comes after the files are sent and launched. A build only makes the files for publishing."
+                    "en": "Waiting for requests comes after the files are sent and the app is launched. A build only makes the files for publishing."
                   }
                 }
               ],
@@ -1585,7 +1589,7 @@
                 "b"
               ],
               "explanation": {
-                "jp": "自分のパソコンでのビルドでできるのは、サーバーに送る準備ができたファイル一式です。このあと転送と起動を経て、ほかの人が使えるようになります。",
+                "jp": "自分のパソコンでビルドしてできるのは、サーバーに送る準備ができたファイル一式です。このあと転送と起動を経て、ほかの人が使えるようになります。",
                 "en": "A build on your own computer produces a set of files ready to send to the server. After the transfer and the launch, other people can use the app."
               },
               "objectiveId": "o3",
@@ -1606,14 +1610,14 @@
                     "en": "\"Right. With a rewind feature, you don't need commits.\""
                   },
                   "feedback": {
-                    "jp": "巻き戻しが、Gitの代わりになるとは限りません。たとえばClaude Codeの公式ドキュメントは、代わりではないと書いています。",
+                    "jp": "巻き戻しが、Gitの代わりになるとは限りません。たとえばClaude Codeの公式ドキュメントには、代わりではないと書かれています。",
                     "en": "A rewind feature does not necessarily replace Git. Claude Code's official documentation, for example, says its rewind does not."
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "「頼む前に、動く状態をコミットしよう。戻れるから」",
+                    "jp": "「頼む前に動く状態をコミットしておけば、戻れるよ」",
                     "en": "\"Commit the working state first, so you can go back.\""
                   }
                 },
@@ -1756,7 +1760,7 @@
             {
               "id": "card-ui-api",
               "front": {
-                "jp": "見た目を変えたいとき、届くデータを変えたいとき、それぞれ何の変更としてAIに頼む？",
+                "jp": "見た目を変えたいとき、届くデータを変えたいとき、それぞれ何の変更としてAIに頼みますか？",
                 "en": "When you want different looks, or different data, what kind of change do you ask the AI for?"
               },
               "back": {
@@ -1767,8 +1771,8 @@
             {
               "id": "card-deploy",
               "front": {
-                "jp": "デプロイで順に起きる3つのことは？",
-                "en": "What three things happen, in order, in a deployment?"
+                "jp": "デプロイの3つの段階は？",
+                "en": "What are the three stages of a deployment?"
               },
               "back": {
                 "jp": "ビルド（公開用のファイルを作る）→転送（サーバーに送る）→起動（依頼に答えられるようにする）です。",
