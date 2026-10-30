@@ -219,6 +219,25 @@ describe('lintLesson', () => {
     assert.equal(byRule('quiz-feedback')[0].path, `sections[${si}].blocks[${bi}].questions[0].options[0]`);
     assert.equal(byRule('banned-phrase')[0].path, 'sections[1].blocks[0].md.jp');
   });
+
+  it('asks a steps block to cite its sources (steps-cite)', () => {
+    const lesson = clone(loadLesson('vibe-ch1'));
+    const steps = {
+      id: 'setup-steps',
+      type: 'steps',
+      items: [{ id: 'open', title: { jp: 'ターミナルを開く', en: 'Open a terminal' }, expect: { jp: 'ターミナルが開きます。', en: 'A terminal opens.' } }],
+    };
+    lesson.sections[2].blocks.push(steps);
+    const stepsCite = () => lintLesson(validateLesson(lesson).lesson).warnings.filter((w) => w.rule === 'steps-cite');
+    assert.deepEqual(stepsCite().map((w) => w.path), [`sections[2].blocks[${lesson.sections[2].blocks.length - 1}]`]);
+
+    steps.cite = [];
+    assert.equal(stepsCite().length, 1, 'an empty cite cites nothing');
+
+    lesson.sources = [{ id: 'vscode-terminal', title: 'Terminal Basics', url: 'https://code.visualstudio.com/docs/terminal/basics', publisher: 'Visual Studio Code', checkedAt: '2026-10-30' }];
+    steps.cite = ['vscode-terminal'];
+    assert.deepEqual(stepsCite(), []);
+  });
 });
 
 describe('legacy migration', () => {
