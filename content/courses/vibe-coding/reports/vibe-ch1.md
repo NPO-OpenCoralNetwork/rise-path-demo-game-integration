@@ -45,6 +45,60 @@ Unchanged from the published lesson (ids, text, Bloom), so `lessonSchema.test.js
 - UI steps: the lesson names no menu, button, screen or keyboard shortcut of a real tool. Reloading the page is
   described as the goal.
 
+## Review round 1 (full, 2026-10-30)
+
+Both reviewers read the draft at `sha256:0f75d3b51a941859` (commit 978c361). Reviews committed in d08408e; snapshot
+`.artifacts/review/vibe-coding/vibe-ch1/0f75d3b51a941859/round-1/`. Gate: exit 1 (REVISE), mean 3.0.
+
+| criterion | score (lowest) | by |
+|---|---|---|
+| align | 4 | pedagogy-reviewer |
+| hook | 3 | pedagogy-reviewer |
+| prior | 3 | ja-editor, pedagogy-reviewer |
+| load | 3 | ja-editor 4, pedagogy-reviewer 3 |
+| worked | 3 | pedagogy-reviewer |
+| active | **2** | pedagogy-reviewer |
+| miscon | 3 | pedagogy-reviewer |
+| visual | 4 | pedagogy-reviewer |
+| practice | 3 | pedagogy-reviewer |
+| meta | 3 | pedagogy-reviewer |
+| accuracy | **2** | pedagogy-reviewer |
+| voice | 3 | ja-editor, pedagogy-reviewer |
+| a11y_l10n | 3 | ja-editor 4, pedagogy-reviewer 3 |
+
+Must-fix items and what changed (commits 2a3741a and 3b2795f):
+
+| # | reviewer | criterion / block | issue | resolution |
+|---|---|---|---|---|
+| 1 | pedagogy | active / lesson | the key was the longest option in all 10 questions and option ② in 8 | options reordered (ids and answers kept): keys now at ③④③①④③④①②② (q0, q1, q2, q7, q8, q9, q6, q5, q4, q3); no key is longer than its longest distractor, in jp or en |
+| 2 | pedagogy | active / ex-check | q9 asked for the 「最初に送る依頼」, against the commit-first step | the stem says the commit is done and asks for the next request |
+| 3 | pedagogy | practice / practice-answer-ui | the model answers gave no way to enter the date | the screen-side model answer lets the learner enter it and save it through the API; checklist item `pc-input` |
+| 4 | pedagogy | accuracy / check-quiz | q3 stated for every AI tool what the cited page says of Claude Code | q3 feedback and explanation say a rewind "does not necessarily" replace Git and name Claude Code's documentation; option d's feedback no longer claims AI behaviour |
+| 5 | pedagogy | meta / summary-points | the o2 takeaway and `card-ui-api` said to ask the UI or the API | "ask the AI for a UI change or an API change" in the summary, the card, `s2-ask` and `summary-next` |
+| 6 | ja-editor | prior / hook-predict | バックエンド and データベース used in the hook before 1-1, without English | the hook no longer uses them (q0 b 「データを保存する仕組みがないから」, explanation 「専用の保存場所」); options a and c got feedback |
+| 7 | ja-editor | voice / s2-prompt-ui | the jp request did not parse with its own hint | hint 「例：薄い灰色の文字」 |
+| 8 | ja-editor | voice / s4-prompt-commit | same | hint 「例：タスクに期限を付ける変更」 |
+| 9 | ja-editor | voice / practice-hint | hint 2 pointed at the learner's own, possibly wrong, q9 choice | the hints moved into the cited `practice-steps` block (folded: hint, then troubleshoot); the troubleshoot names 「正解だった依頼」 |
+| 10 | ja-editor | voice / lesson | spaces around UI, API and Git in o2 and o3 | removed (wording, ids and Bloom unchanged) |
+
+niceToHave items applied: the s2 analogy keeps 1-1's mapping (ウェイター); one name for one thing (保存と取り出し in
+the definitions, diagram, q1 and cards); サーバー（server：…）; a sweets-stall analogy for deployment, so the restaurant
+stays on the browser and server sides it had in 1-1; q7 now tests the launch step and q4 says the build ran on your own
+computer; a more tempting q6 distractor (hiding full slots on the screen only); reason for step ⑤; two causes in the
+step ⑥ troubleshoot; model answers numbered as the 2nd and 3rd requests; EN fixes (s2-b5 singular guide, q2 prompt,
+ex-lead, no "just"); 1-1 title with 「・」. Not applied: crowding of section 1-2 (10 blocks) was left as is, since every
+block there serves o2 and `s2-ask` keeps a published id.
+
+## Preview and visual QA: not run
+
+`npm run lessons:preview -- vibe-coding vibe-ch1` (2026-10-30) reached a server on port 3007, but it was another app
+(the page showed "Nexloom"), not Rise Path's Vite dev server, so nothing was captured (exit 2). Without screenshots and
+`metrics.json` there was nothing for visual-qa to review, so the gate below has two reviewers. To finish this step, run
+`npm run dev` in a checkout of this branch (the `/preview` route reads `drafts/` from the checkout that serves it), then
+the preview and a visual-qa review. On this machine Playwright's own headless shell (build 1228) is not installed;
+pointing `PLAYWRIGHT_CHROMIUM_PATH` at the headless shell build 1243 already in Playwright's cache folder launched it
+without a download.
+
 ## Sources
 
 Repository first: the original chapter (`data/curricula/vibe_coding/chapter1.ts`, `chapter1_quiz.ts`), the published
