@@ -13,6 +13,11 @@ request → brief → outline (one check-in) → draft JSON in content/courses/<
 → translate (en) → report → the owner publishes
 ```
 
+- Sources first: research this repository, then the official docs of the version the lesson pins;
+  write only what the cited sources support (an uncited non-obvious claim is a must-fix); name
+  menus, buttons, screens and shortcuts only as a page you read shows them, else describe the
+  goal. Beginner lessons put an everyday analogy before each new term (reviewer-checked).
+  Details: `lesson-contract.md` §2 and §5.
 - The author never grades itself. Reviewers are separate subagents that score
   `content/schema/rubric.v1.json` (13 criteria, 0–4). Pass = every criterion ≥ 3, mean ≥ 3.3, no
   open must-fix item; `check-review.mjs` computes it. Every review records `lessonHash`, the
@@ -59,12 +64,18 @@ this as a known state on 2026-10-19; it is not part of the done criteria.
   spot fixes), and there is no `reviewedBy`.
 - **`--strict`** prints their warnings labelled advisory, with a count, and exits 0 for them.
   Validation errors always fail.
-- **Still strict**: drafts in `drafts/` and every other lesson fail on any warning.
+- **Still strict**: drafts in `drafts/` always fail on any warning; so does every other published
+  lesson, except for the known blocks below.
+- **Known uncited steps**: the steps blocks published without `cite` before `steps-cite`
+  (12 on 2026-10-30) are listed in `KNOWN_UNCITED_STEPS` (`shared/lesson/lint.js`); outside `drafts/`
+  their warnings are advisory. Any other uncited steps block fails, also after publishing. A rework
+  that cites a listed block removes it (a test fails until it does); publishing a lesson whose
+  report keeps a `steps-cite` warning (a write-or-decide task) adds the block in the same PR.
 - **Reworking flips it**: `/author-lesson` on a migrated chapter keeps `migratedFrom` and records a
   new `provenance.author` (`claude-code`, or `human+claude-code`), so the lesson is strict from then
   on, also after publishing.
 - **Everything strict**: `npm run lessons:lint -- --strict --include-migrated` gates the migrated
-  chapters too; use it to list what is left to rework.
+  chapters and the known uncited steps too; use it to list what is left to rework.
 
 ## Commands
 
@@ -76,7 +87,7 @@ claude                                              # start Claude Code at the r
 npm run lessons:catalog                             # courses, lessons, drafts, status (always exit 0)
 npm run lessons:validate -- <file>                  # schema + semantic checks
 npm run lessons:lint -- <file> --strict             # pedagogy and readability rules
-npm run lessons:lint -- --strict --include-migrated # also gate migrated, not reworked chapters
+npm run lessons:lint -- --strict --include-migrated # also gate migrated chapters and known uncited steps
 npm run lessons:preview -- <course> <lesson>        # .artifacts/preview/<course>/<lesson>/
 node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict (2 = invalid or stale)
 node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash        # lessonHash of the version a review reads
