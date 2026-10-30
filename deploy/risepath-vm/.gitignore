@@ -3,3 +3,5 @@ tunnel.env
 hermes-data/
 mcp-public.env
 billing.env
+launch-record.env
+.deploy/

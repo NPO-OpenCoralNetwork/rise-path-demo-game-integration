@@ -1319,3 +1319,92 @@ describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
     assert.match(read(path.join(ROOT, 'server/routes/training.js')), /env\.TRAINING_ENABLED === 'true'/);
   });
 });
+
+// Phase 9 (owner decision D2): the 事前チェック wrapper. The rules run in the api's base image with no
+// network, a read-only file system, every capability dropped and the caller's uid (never root: root
+// without CAP_DAC_OVERRIDE cannot open the deploy user's 0600 env files, and a root deploy would leave
+// root-owned files in the checkout). CI mode needs all four conditions of check-mode.sh. The end-to-end
+// runs with a docker shim are in preflightCli.test.js (T8); these are the static pins (T11).
+describe('preflight.sh and check-mode.sh: the wrapper pins (Phase 9, D2)', () => {
+  const script = read(path.join(STACK, 'scripts/preflight.sh'));
+  const mode = read(path.join(STACK, 'scripts/check-mode.sh'));
+  const code = (/** @type {string} */ text) => text.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+
+  it('runs under set -euo pipefail and parses with bash -n', () => {
+    assert.match(script, /^set -euo pipefail$/m);
+    for (const file of ['scripts/preflight.sh', 'scripts/check-mode.sh']) {
+      const check = spawnSync('bash', ['-n', path.join(STACK, file)], { encoding: 'utf8' });
+      assert.equal(check.status, 0, `${file}: ${check.stderr}`);
+    }
+  });
+
+  // Review round 2, finding 6: the runbook runs them as ./scripts/<name>, so a lost exec bit is 'Permission denied'.
+  it('preflight.sh and deploy-stack.sh are executable in the tree, and in git once tracked (100755)', () => {
+    for (const file of ['scripts/preflight.sh', 'scripts/deploy-stack.sh']) {
+      assert.ok(fs.statSync(path.join(STACK, file)).mode & 0o100, `${file}: owner exec bit`);
+      const staged = spawnSync('git', ['ls-files', '-s', `deploy/risepath-vm/${file}`], { cwd: ROOT, encoding: 'utf8' });
+      if (staged.status === 0 && staged.stdout.trim() !== '') assert.match(staged.stdout, /^100755 /, `${file}: git mode`);
+    }
+  });
+
+  it('refuses uid 0 before any docker call', () => {
+    const body = code(script);
+    const refusal = body.indexOf('if [[ "$(id -u)" -eq 0 ]]; then');
+    assert.ok(refusal > 0, 'the uid 0 refusal');
+    assert.match(body.slice(refusal, body.indexOf('fi', refusal)), /say_code X5 [\s\S]*exit 2/);
+    const firstDocker = body.search(/(?:^|[\s|(])docker /m);
+    assert.ok(firstDocker > refusal, 'no docker call before the refusal');
+  });
+
+  it('the container: no network, read-only, every capability dropped, no new privileges, the caller\'s uid, limits', () => {
+    const run = code(script).slice(code(script).indexOf('docker run'));
+    for (const flag of ['--rm -i', '--network none', '--read-only', '--cap-drop ALL', '--security-opt no-new-privileges', '--pids-limit 64', '--memory 256m', '--user "$(id -u):$(id -g)"']) {
+      assert.ok(run.includes(flag), flag);
+    }
+    assert.ok(!/(?:^|\s)(?:-v|--volume|--privileged|--cap-add|--network host)\b/m.test(code(script)), 'no -v, no added capability, no host network');
+  });
+
+  it('mounts only this folder and scripts/deploy, both read-only, with --mount (a missing source is an error)', () => {
+    const mounts = [...code(script).matchAll(/--mount "([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(mounts, ['type=bind,src=${STACK_DIR},dst=/stack,readonly', 'type=bind,src=${REPO_ROOT}/scripts/deploy,dst=/preflight,readonly']);
+    assert.match(code(script), /"\$\{IMAGE\}" node \/preflight\/preflight-vm\.mjs --stack \/stack --mode "\$\{MODE\}" \|\| status=\$\?$/m);
+  });
+
+  it('takes the image from the Dockerfile\'s api line (one source, as scripts/ci/stack.sh auth)', () => {
+    // `2> /dev/null … || true`: a missing Dockerfile reaches the X1 branch instead of stopping set -e (review round 2, finding 3).
+    assert.ok(script.includes(`IMAGE="$(sed -nE 's/^FROM ([^ ]+) AS api$/\\1/p' "\${STACK_DIR}/Dockerfile" 2> /dev/null | head -n 1 || true)"`));
+    assert.match(code(script), /IMAGE="[^\n]*\n\s*if \[\[ -z "\$\{IMAGE\}" \]\]; then\n\s*say_code X1 /);
+    assert.match(read(path.join(STACK, 'Dockerfile')), /^FROM node:22-slim AS api$/m);
+  });
+
+  it('selects the mode only through check-mode.sh, sourced from this folder, and never sources an env file', () => {
+    assert.match(code(script), /^source "\$\{SCRIPT_DIR\}\/check-mode\.sh"$/m);
+    assert.match(code(script), /^MODE="\$\(risepath_check_mode "\$\{FROM_DEPLOY\}" "\$\{CALLER_SKIP_PULL\}" "\$\{CALLER_PROJECT\}" "\$\{STACK_DIR\}"\)"$/m);
+    assert.equal([...code(script).matchAll(/^\s*(?:source|\.)\s/gm)].length, 1, 'check-mode.sh is the only file it sources');
+  });
+
+  it('check-mode.sh needs all four conditions in one test', () => {
+    const body = code(mode);
+    for (const part of ['"${from_deploy}" == 1', '"${skip_pull}" == 1', '"${project}" == risepath-ci', 'cmp -s "${stack_dir}/stack.env" "${stack_dir}/ci/stack.ci.env"']) {
+      assert.ok(body.includes(part), part);
+    }
+    assert.equal([...body.matchAll(/echo ci\b/g)].length, 1, 'one way to ci');
+    assert.match(body, /else\n\s+echo prod\n/);
+  });
+
+  it('no script sources launch-record.env (only the engine reads it)', () => {
+    const dirs = [path.join(STACK, 'scripts'), path.join(ROOT, 'scripts/ci')];
+    for (const dir of dirs) {
+      for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+        assert.ok(!/(?:^|[\s;&|])(?:source|\.)\s+\S*launch-record\.env/m.test(read(path.join(dir, file))), file);
+      }
+    }
+  });
+
+  it('launch-record.env and the deploy record stay out of git and the build context', () => {
+    assert.ok(lines(read(path.join(STACK, '.gitignore'))).includes('launch-record.env'));
+    assert.ok(lines(read(path.join(STACK, '.gitignore'))).includes('.deploy/'));
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/.deploy'));
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/*.env'), 'covers launch-record.env');
+  });
+});
