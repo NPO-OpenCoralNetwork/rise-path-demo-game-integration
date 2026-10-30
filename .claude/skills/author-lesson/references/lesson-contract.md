@@ -31,9 +31,11 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
    - explanation of at most 300 JP characters (150 EN words), new terms defined before use
      (`definitions` + `glossary`), at most 3 new terms per segment;
    - an analogy (callout `analogy`) only before the formal definition, and never quizzed. In a
-     `level: "beginner"` lesson every new concept gets an everyday analogy before its definition,
-     saying what maps to what (owner decision 2026-10-30: required; the reviewer checks it, lint
-     does not);
+     `level: "beginner"` lesson every new concept (each term a segment defines in `definitions` and
+     `glossary`) is introduced by an everyday analogy before its definition, saying what maps to
+     what. One analogy may cover the related terms of a segment, and it may sit in the explanation
+     text instead of a callout (still ≤ 2 callouts per section). Owner decision 2026-10-30:
+     required; the reviewer checks it, lint does not;
    - a diagram only when it shows structure, process, state change or comparison;
    - a worked example of 3–6 steps with subgoal labels and the why of each step (`steps` or `code`);
    - 1–2 inline check questions (quiz `mode: "inline"`) — **at least one inline quiz every 2 content
@@ -61,7 +63,7 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 | List items | ≤ 7 (lint `list-length`) |
 | Table columns | ≤ 6 (lint `table-columns`) |
 | Code block | ≤ 25 lines, with `lang` and `filename` (lint `code-length`, `code-filename`) |
-| Steps per block | ≤ 8, each with `expect`; the block has `cite` (lint `steps-length`, `steps-expect`, `steps-cite`) |
+| Steps per block | ≤ 8, each with `expect`; `cite` on the block, see §5 (lint `steps-length`, `steps-expect`, `steps-cite`) |
 | Diagram | ≤ 12 nodes, with `caption` and `alt` (lint `diagram-caption`) |
 | Summary points | 3–5 (lint `summary-points`) |
 | Flashcards per lesson | 4–8 (lint `flashcards-count`) |
@@ -81,20 +83,22 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 ## 5. Accuracy and sources — never fabricate
 
 - Write only what the cited sources support. Research in this order: material already in this
-  repository first (the course's lessons and briefs, `data/curricula/**`, `doc/`), then the
-  official documentation of the version the lesson pins. Record each source in `sources[]` (`id`,
-  `title`, `url`, `publisher`, `checkedAt`).
+  repository first (the course's lessons, briefs and `reports/facts/`, `data/curricula/**`,
+  `doc/`), then the official documentation of the version the lesson pins (normally the current
+  one). Record each source in `sources[]` (`id`, `title`, `url`, `publisher`, `checkedAt`), and
+  what it says that the lesson uses in the brief (or in `reports/facts/<lesson>.facts.md` for long
+  research), so that a reviewer can check the claims.
 - Every non-obvious claim (numbers, dates, behaviour of a tool, prices, limits) carries
   `cite: ["source-id"]` on its block. An uncited non-obvious claim is a must-fix in review; a
   claim no source supports is left out (or asked about), never guessed.
 - UI steps: name a menu, button, screen or keyboard shortcut only after checking it in the
-  official documentation of the current version, and cite that page (`checkedAt` is the day you
-  checked it). When you cannot check it, describe the goal ("open the permission settings")
-  instead of the clicks.
+  official documentation of that version, and cite the page (`checkedAt` is the day you read it).
+  Only a page you actually read counts as checked. When you cannot check one, describe the goal
+  ("open the permission settings") instead of the clicks.
 - Every `steps` block cites the sources of its commands, menus and expected results (lint
-  `steps-cite`; advisory in published lessons, see §8). Never cite a source that does not say it
-  just to quiet the lint: a block that only asks the learner to write or decide something keeps
-  the warning, with the reason in the report.
+  `steps-cite`; the blocks published before the rule are listed, see §8). Never cite a source that
+  does not say it just to quiet the lint: a block that only asks the learner to write or decide
+  something keeps the warning, with the reason in the report.
 - Pin tool versions where behaviour differs between versions ("Unity 6", "Node.js 22").
 - Never invent URLs, image paths, APIs, commands, keyboard shortcuts, quotes or statistics.
 - Code runs as written. Commands are safe to copy (no destructive defaults, no secrets).
@@ -121,7 +125,7 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 - `provenance`: `{author, model?, skill?, skillVersion?, generatedAt, reviewedBy?}`. Do not invent
   a reviewer; `reviewedBy` is set by the human who reviewed it.
 
-## 8. Lint gate, migrated lessons and new rules
+## 8. Lint gate, migrated lessons and known uncited steps
 
 - Done means `lessons:lint --strict` reports 0 warnings (or each one is justified in the report).
 - Exception (owner decision 2026-10-19): a **migrated-unreviewed** lesson — `provenance.migratedFrom`
@@ -130,12 +134,15 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
   chapter that nobody has reworked yet. `--strict` still prints its warnings, labelled advisory,
   and exits 0 for them. Errors always fail.
 - Drafts (`drafts/`) are always strict, whatever their provenance.
-- Rules added after lessons were published (`steps-cite`, owner plan 「出典と検索」 2026-10-30):
-  outside drafts, `--strict` prints their warnings labelled advisory and exits 0 for them. The
-  published lessons they flag are a known state until a rework, which is a draft and so strict,
-  cites the sources.
+- Known uncited steps (owner plan 「出典と検索」 2026-10-30): the steps blocks published without
+  `cite` before `steps-cite` existed are listed in `KNOWN_UNCITED_STEPS` (`shared/lesson/lint.js`).
+  Outside drafts, `--strict` prints their `steps-cite` warnings labelled advisory and exits 0 for
+  them; any other steps block without `cite` fails, also after publishing. A rework that cites a
+  listed block removes it from the list (a test fails until it does). Publishing a lesson whose
+  report keeps a `steps-cite` warning (a block that only asks the learner to write or decide) adds
+  that block to the list in the same PR.
 - Reworking a migrated chapter: keep `provenance.migratedFrom` and every id, and replace `author`
   with the new authorship (`claude-code`, or `human+claude-code` when a person co-wrote it). From
   then on the lesson is strict, also after publishing.
-- `npm run lessons:lint -- --strict --include-migrated` makes every lesson and rule strict, to see
-  what is left to rework.
+- `npm run lessons:lint -- --strict --include-migrated` makes every lesson strict, the known
+  uncited steps blocks included, to see what is left to rework.

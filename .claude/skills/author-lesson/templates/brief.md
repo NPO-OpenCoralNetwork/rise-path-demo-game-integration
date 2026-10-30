@@ -33,8 +33,9 @@
 ## 資料 / Sources
 <!-- This repository first, then the official docs of the pinned version. Each becomes an entry in
      lesson.sources (id, title, url, publisher, checkedAt); the lesson says only what these support.
-     UI pages (menus, buttons, screens) count only when checked for the current version. -->
-- 
+     After each source, note what it says that the lesson uses (long research: reports/facts/<lesson>.facts.md).
+     A page counts as checked only when you read it; UI (menus, buttons, screens, shortcuts) needs one. -->
+- id — title — url — publisher — checkedAt — what it supports: 
 
 ## Assumptions
 <!-- Filled in by the author when something above was missing (headless runs never block on questions). -->

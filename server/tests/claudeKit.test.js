@@ -348,9 +348,20 @@ describe('rules and instruction files', () => {
     }
     assert.match(section(contract, '## 5.'), /uncited non-obvious claim is a must-fix/i);
     assert.match(section(contract, '## 5.'), /`steps-cite`/);
+    assert.match(section(contract, '## 5.'), /reports\/facts\/<lesson>\.facts\.md/, 'what each source says is recorded for the reviewer');
     assert.match(section(contract, '## 8.'), /`steps-cite`[\s\S]*advisory/);
     assert.doesNotMatch(skill, /If you cannot verify a claim, drop it\./);
     assert.match(read('.claude/skills/author-lesson/templates/brief.md'), /This repository first, then the official docs/);
+
+    // A steps block with nothing to cite keeps its warning, with the reason in the report; once
+    // published it is listed in KNOWN_UNCITED_STEPS (never a cite that the source does not back).
+    for (const [where, text] of [['lesson-contract.md §5', section(contract, '## 5.')], ['author-lesson step 4', section(skill, '## 4.')]]) {
+      assert.match(text, /only asks? the learner to write or decide[\s\S]*keeps?( that)? (the )?warning[\s\S]*reason in the report/, where);
+    }
+    for (const [where, text] of [['lesson-contract.md §8', section(contract, '## 8.')], ['author-lesson step 10', section(skill, '## 10.')],
+      ['.claude/rules/content.md', read('.claude/rules/content.md')], ['AGENTS.md', read('AGENTS.md')]]) {
+      assert.match(text, /KNOWN_UNCITED_STEPS/, `${where} names the list of known uncited steps blocks`);
+    }
 
     // Beginner lessons: an everyday analogy before each new concept, checked by the reviewer.
     assert.match(section(contract, '## 2.'), /`level: "beginner"`[\s\S]*everyday analogy[\s\S]*reviewer/);
@@ -365,6 +376,7 @@ describe('rules and instruction files', () => {
     const mustFix = body.slice(body.indexOf('5. List'), body.indexOf('6. Return'));
     for (const item of ['uncited claim', 'unverified UI step', 'missing analogy']) assert.ok(mustFix.includes(`**${item}**`), `pedagogy-reviewer must-fix: ${item}`);
     assert.match(mustFix, /`level: "beginner"`/);
+    assert.match(mustFix, /reports\/facts\/<lesson>\.facts\.md/, 'the reviewer checks claims against the recorded source notes');
     assert.match(read('.claude/skills/review-lesson/SKILL.md'), /unverified UI step[\s\S]*`level: "beginner"`/);
 
     // Short mentions in the rules every agent loads.

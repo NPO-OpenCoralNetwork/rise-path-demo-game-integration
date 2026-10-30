@@ -58,10 +58,10 @@ project rules).
 - **Voice**: です・ます, warm, no 「簡単です」「誰でも」; katakana terms with English on first use.
 - **Truth**: write only what the cited sources support (`sources[]` + `cite`): this repository
   first, then official documentation. No fabricated facts, URLs, images, commands or numbers; name
-  menus, buttons and screens only as the current official docs show them. Pin tool versions, run
-  code before you show it when you can.
+  menus, buttons, screens and shortcuts only as the official docs of the pinned version show
+  them. Pin tool versions, run code before you show it when you can.
 - **Beginners**: in a `level: "beginner"` lesson, an everyday analogy before the definition of
-  each new concept.
+  each new term (one analogy may cover a segment's related terms; text or callout).
 
 ## 0. Orient
 
@@ -86,18 +86,22 @@ project rules).
 Every lesson goes through this step, in this order: this repository first, then the official
 documentation.
 
-1. **This repository**: the course's lessons and briefs, `data/curricula/**`, `doc/`.
-2. **Official documentation** of the version the brief pins (WebFetch). Delegate long research to
-   a subagent so the main thread stays clean.
-3. **UI steps**: check every menu, button, screen and shortcut you will name in the current
-   official documentation, and record that page (its `checkedAt` is the day you checked it). When
-   you cannot check one, the lesson describes the goal ("open the permission settings") instead
-   of the clicks.
+1. **This repository**: the course's lessons, briefs and `reports/facts/`, `data/curricula/**`,
+   `doc/`.
+2. **Official documentation** of the version the brief pins, normally the current one (WebFetch).
+   Delegate long research to a subagent so the main thread stays clean.
+3. **UI steps**: check every menu, button, screen and shortcut you will name in that
+   documentation, and record the page (its `checkedAt` is the day you read it). Only a page you
+   read counts as checked. WebFetch is not pre-approved: an interactive session asks for it, and a
+   headless run is denied, so there use the facts this repository already records (with their
+   dates) or describe the goal. When you cannot check one, the lesson describes the goal ("open
+   the permission settings") instead of the clicks.
 
-Record each source in the brief (id, title, url, publisher, checkedAt), with the 2–4
-misconceptions learners most likely hold. Write only what these sources support: a claim you
-cannot source stays out. The reviewer treats an uncited non-obvious claim and an unverified UI step
-as must-fix items.
+Record each source in the brief (id, title, url, publisher, checkedAt) with what it says that the
+lesson uses (long research: `content/courses/<course>/reports/facts/<lesson>.facts.md`), and the
+2–4 misconceptions learners most likely hold. Write only what these sources support: a claim you
+cannot source stays out. The reviewer checks claims against these notes and treats an uncited
+non-obvious claim and an unverified UI step as must-fix items.
 
 ## 3. Outline (checkpoint)
 
@@ -112,9 +116,12 @@ as must-fix items.
 - Use the cookbook's blocks; write Japanese natively (`locale: "jp"`, plain strings) — translation
   is step 8. Define terms in `definitions` + `glossary` before use; mark later uses `[[term]]`.
 - Cite as you write: `cite` on every block whose claims come from a step 2 source, and on every
-  `steps` block (lint `steps-cite`). Name menus, buttons and screens only as step 2 checked them.
-- In a `level: "beginner"` lesson, put an everyday analogy (callout `analogy`) before the
-  definition of each new concept and say what maps to what (contract §2).
+  `steps` block (lint `steps-cite`). Steps that only ask the learner to write or decide have
+  nothing to cite: keep that warning and give the reason in the report; never cite a source that
+  does not say it. Name menus, buttons, screens and shortcuts only as step 2 checked them.
+- In a `level: "beginner"` lesson, put an everyday analogy before the definition of each new term
+  and say what maps to what (contract §2): in the text or a callout `analogy` (≤ 2 callouts per
+  section); one analogy may cover a segment's related terms.
 - `provenance`: `{"author": "claude-code", "skill": "author-lesson", "skillVersion": "1",
   "generatedAt": "<today ISO>"}`. Leave `reviewedBy` to the human.
 
@@ -233,7 +240,10 @@ estMinutes, `next` links of the neighbours), add each of its flashcards as
 (kept sorted; `server/tests/reviewCardIds.test.js` checks it), then `npm run lessons:validate`
 (whole content) and `npm run lessons:catalog`. Never rename or remove a published lesson's card ids
 in a rework: learners' review memory is keyed by them (text edits keep it); moving a key to
-`retired` hides that memory. Never set `provenance.reviewedBy` yourself.
+`retired` hides that memory. Never set `provenance.reviewedBy` yourself. A `steps-cite` warning the
+report keeps fails `--strict` once published: add that block to `KNOWN_UNCITED_STEPS`
+(`shared/lesson/lint.js`) in the same PR, and remove the entries of blocks the rework now cites
+(lesson-contract §8).
 
 A snapshot copy exists only in the checkout that made it. Before publishing (or opening a PR to
 publish), every verification on the lesson's chain must name a committed previous round
@@ -243,8 +253,9 @@ review in full. `server/tests/reviewChainsDurable.test.js` enforces this for pub
 ## Done means
 
 - `lessons:validate` 0 errors and `lessons:lint --strict` 0 warnings (or each one justified).
-- Every non-obvious claim and every `steps` block cites a source from step 2; in a
-  `level: "beginner"` lesson every new concept has an everyday analogy before its definition.
+- Every non-obvious claim and every `steps` block cites a source from step 2 (a steps block with
+  nothing to cite keeps its warning, with the reason in the report); in a `level: "beginner"`
+  lesson every new term has an everyday analogy before its definition.
 - `check-review.mjs` exits 0 on the current reviews (every `lessonHash` is the lesson's hash):
   every criterion ≥ 3, mean ≥ 3.3, no open must-fix.
 - `metrics.json`: `overflowX: false`, `consoleErrors: 0`, `mermaidErrors: 0`; the screenshots were

@@ -44,16 +44,16 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
 - Shape: hook (problem + ungraded predict) → segments (concept → worked example → inline check)
-  → practice → check (exam over every objective) → summary + 4–8 flashcards; `level: "beginner"` adds an everyday analogy before each new concept.
+  → practice → check (exam over every objective) → summary + 4–8 flashcards; `level: "beginner"` adds an everyday analogy before each new term.
 - An inline check at least every 2 sections; feedback on every wrong option (≤ 2 sentences).
 - Budgets: sentence ≤ 60 JP chars, paragraph ≤ 160; ≤ 3 new terms per segment; no decorative images.
 - Japanese: です・ます, warm, no 「簡単です」「誰でも」; katakana terms with English on first use.
-- No fabricated facts, URLs, images or commands: write only what cited sources support (`sources` + `cite`; repo first, then official docs; UI only as the current official docs show it).
+- No fabricated facts, URLs, images or commands: write only what cited sources support (`sources` + `cite`; repo first, then official docs; UI only as the pinned version's official docs show it).
 - Done = `lessons:validate` 0 errors, `lessons:lint --strict` clean, rubric pass
   (`content/schema/rubric.v1.json`: every criterion ≥ 3, mean ≥ 3.3), screenshots checked.
-  Exception: machine-migrated lessons not yet reworked (`provenance.migratedFrom`, author `migration` or `migration+…`,
-  no `reviewedBy`) are a known state; `--strict` lists their warnings as advisory. Drafts are always strict; a rework
-  records a new author and becomes strict; `steps-cite` is advisory outside drafts (`--include-migrated` gates them all).
+  Exceptions, a known state `--strict` lists as advisory: machine-migrated lessons not yet reworked (`provenance.migratedFrom`,
+  author `migration` or `migration+…`, no `reviewedBy`), and the `steps-cite` blocks in `KNOWN_UNCITED_STEPS` (`shared/lesson/lint.js`).
+  Drafts are always strict; a rework records a new author and becomes strict (`--include-migrated` gates them all).
 - Write new lessons to `drafts/`. Moving one to `lessons/` + `course.json` is publishing: owner only.
 
 ## Code conventions

@@ -60,7 +60,7 @@ export const GUIDE = {
     job: 'たとえで直観をつかむ・つまずきを避ける / grasp by analogy, avoid a pitfall',
     role: 'concept, pitfalls',
     use: [
-      '`analogy` before the formal definition (never quiz the analogy itself). In a `level: "beginner"` lesson, one everyday analogy before the definition of each new concept, saying what maps to what.',
+      '`analogy` before the formal definition (never quiz the analogy itself). In a `level: "beginner"` lesson, an everyday analogy before the definition of each new term, saying what maps to what; one may cover a segment\'s related terms, and it may sit in the text instead.',
       '`pitfall` for one real, common error per segment, with how to notice and fix it.',
       '`warning` for data loss, security or cost; `tip`, `info`, `note`, `success` (expected result after a task).',
       'At most 2 callouts per section, at most 3 sentences each.',
@@ -211,9 +211,10 @@ export const GUIDE = {
     use: [
       'Procedures of at most 8 steps. Each step: a subgoal title, `expect` (what the learner sees), `keys` for shortcuts, `hint`, `troubleshoot`.',
       'Worked example: the same subgoal titles reused in the text; a faded version later leaves 1–2 steps for the learner.',
-      '`cite` the sources the commands, menus and expected results come from. Name a menu, button, screen or shortcut only as the current official docs show it; when you cannot check it, describe the goal instead of the clicks.',
+      '`cite` the sources the commands, menus and expected results come from. Name a menu, button, screen or shortcut only as the official docs of the pinned version show it; when you cannot check it, describe the goal instead of the clicks.',
+      'Steps that only ask the learner to write or decide have nothing to cite: keep the `steps-cite` warning and give the reason in the report.',
     ],
-    avoid: ['Steps without an expected result.', 'Ten-step marathons (split into two blocks).', 'Menus, buttons and shortcuts written from memory.'],
+    avoid: ['Steps without an expected result.', 'Ten-step marathons (split into two blocks).', 'Menus, buttons and shortcuts written from memory.', 'A cite to a source that does not say it, just to quiet the lint.'],
     good: 'practice-steps',
     bad: {
       block: { id: 'setup', type: 'steps', items: [{ id: 's1', title: 'ターミナルを開く' }, { id: 's2', title: 'npm install を実行する' }] },

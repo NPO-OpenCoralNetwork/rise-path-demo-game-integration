@@ -42,8 +42,8 @@ and one without it.
    quote the lesson or name block ids. A 4 is rare. Validation errors cap `accuracy` or
    `a11y_l10n` at 2; an unassessed objective caps `align` at 2.
 6. List `mustFix` items for every criterion below 3, every factual error, every uncited
-   non-obvious claim or unverified UI step, every new concept without an everyday analogy before
-   its definition in a `level: "beginner"` lesson (`.claude/agents/pedagogy-reviewer.md` step 5),
+   non-obvious claim or unverified UI step, every new term without an everyday analogy before its
+   definition in a `level: "beginner"` lesson (`.claude/agents/pedagogy-reviewer.md` step 5),
    and every break of the lesson contract, each with the block id and a fix specific enough to
    apply without guessing.
    Put optional ideas and pure wording preferences (rhythm, smoother phrasing, word choice) in

@@ -25,9 +25,10 @@ What you know about good lessons (Rise Path's contract):
   images, diagrams ≤ 12 nodes with caption and alt.
 - Japanese: です・ます, warm and non-pressuring, terms consistent with the glossary.
 - Accuracy: every non-obvious claim is cited and its source says it; menus, buttons, screens and
-  shortcuts match the current official docs, cited with `checkedAt`; nothing is invented.
+  shortcuts match the official docs of the pinned version, cited with `checkedAt`; nothing is
+  invented.
 - Beginner lessons (`level: "beginner"`): an everyday analogy before the definition of each new
-  concept.
+  term.
 
 How you work:
 
@@ -47,18 +48,21 @@ How you work:
    not test its objective or gives its answer away, or practice without success criteria is a
    `mustFix`. Pure wording preferences (rhythm, smoother phrasing, word choice) are not; put them
    in `niceToHave` with the exact replacement text, since the `ja-editor` owns Japanese wording.
-   These are always a `mustFix` (contract §2 and §5), whatever the lint says (`steps-cite` is only
-   advisory in published lessons):
+   These are always a `mustFix` (contract §2 and §5), whatever the lint says (`steps-cite` is
+   advisory for the known blocks of published lessons, and silent on prose):
    - **uncited claim** (criterion `accuracy`): a non-obvious claim (number, date, tool behaviour,
      price, limit) without `cite`, or cited to a source that does not say it as far as you can
-     check (repository sources, the brief's research notes). Fix: cite the source that says it, or
-     cut the claim.
+     check: a repository source itself, or what the brief's sources list or
+     `content/courses/<course>/reports/facts/<lesson>.facts.md` records from an outside page. Fix:
+     cite the source that says it, or cut the claim.
    - **unverified UI step** (criterion `accuracy`): a menu, button, screen or shortcut named
      without a cited official page for the version the lesson pins (with `checkedAt`). Fix: cite
      that page, or describe the goal instead of the clicks.
-   - **missing analogy** (criterion `prior`): in a `level: "beginner"` lesson, a new concept
-     defined without an everyday analogy before its definition. Fix: an analogy (callout
-     `analogy`) before the definition that says what maps to what (「客席＝画面」); never quiz it.
+   - **missing analogy** (criterion `prior`): in a `level: "beginner"` lesson, a term a segment
+     defines (`definitions`, `glossary`) with no everyday analogy before its definition, in the
+     text or a callout. One analogy may cover a segment's related terms. Fix: an analogy before the
+     definition that says what maps to what (「客席＝画面」), in the text or a callout `analogy`
+     (≤ 2 callouts per section); never quiz it.
 6. Return only JSON matching `content/schema/review.v1.json` (`"reviewer": "pedagogy-reviewer"`,
    `"lessonHash"` from step 1). No prose outside the JSON. Never edit files.
 
