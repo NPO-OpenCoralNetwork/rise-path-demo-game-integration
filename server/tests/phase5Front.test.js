@@ -15,6 +15,9 @@
 // reset control, its helper by reason, a dialog closed before the request ends, focus fallback),
 // LessonReader's keyed sections (G16), LeftRecordsNotice, ProgressCluster, ProfilePassport and
 // the badges page (G20, G33), the logout callers (G12, G28) and the copy and token rules.
+// Phase 8 (S2): achievementsApi's lessonXp (absent on an older server, a malformed field dropped
+// alone) and LessonEnd's XP line (the server's figure only; 「+N」 only after this page saw an
+// answer without the award; no request unless the lesson is done, synced and offered).
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -287,7 +290,7 @@ describe('achievementsClient: the XP store', () => {
   let mod = null;
   before(async () => {
     const code = await bundle(
-      "export * from './components/ui/achievementsClient'; export { AchievementsApiError, parseAchievements } from './services/achievementsApi';",
+      "export * from './components/ui/achievementsClient'; export { AchievementsApiError, parseAchievements } from './services/achievementsApi'; export { LEGAL_ACCEPTED_EVENT } from './components/legal/legalEvents';",
       [[/\/progressSyncClient$/, 'syncForAchievements'], [/^react$/, 'react'], [/supabaseClient$/, 'supabase']],
     );
     mod = await fresh(code);
@@ -504,6 +507,26 @@ describe('achievementsClient: the XP store', () => {
     assert.equal(env.loads, 1, 'once');
   });
 
+  it('Phase 8: a store made after the capabilities are known (the lesson end\'s XP item) does not read the next save-view change as their arrival', async () => {
+    const { s, env } = store();
+    s.consumerMounted();
+    await s.settled();
+    assert.equal(env.loads, 1);
+    s.syncChanged(); // the save view changes when the upload starts
+    await s.settled();
+    assert.equal(env.loads, 1, 'no second request, sent with the lesson-progress upload');
+    assert.equal(s.getSnapshot().status, 'ready');
+    // A rollback is still seen on the first change, without a request.
+    const rolled = store();
+    rolled.s.consumerMounted();
+    await rolled.s.settled();
+    rolled.env.caps = { lessonReset: true, achievements: false };
+    rolled.s.syncChanged();
+    await rolled.s.settled();
+    assert.deepEqual(rolled.s.getSnapshot(), { status: 'unsupported', learnerId: U1, data: null, at: null });
+    assert.equal(rolled.env.loads, 1);
+  });
+
   it('errors keep the same learner\'s data on screen; with nothing to show they are "unavailable"', async () => {
     let fail = false;
     const { s } = store({ load: () => {
@@ -574,6 +597,161 @@ describe('achievementsClient: the XP store', () => {
     s.consumerMounted();
     await s.settled();
     assert.equal(env.loads, 4, 'fetched within 30 s of the last');
+  });
+
+  it('Phase 8: LEGAL_ACCEPTED_EVENT reads again only when the last read was refused with terms_required (SG-5: nothing changes while the server check is off)', async () => {
+    assert.equal(mod.LEGAL_ACCEPTED_EVENT, 'rp:legal-accepted');
+    /** A store whose reads answer `outcomes` in turn ('ok', or a refusal to throw), then 'ok'. */
+    const scripted = (outcomes) => {
+      const queue = [...outcomes];
+      const made = store({ load: () => {
+        const next = queue.length > 0 ? queue.shift() : 'ok';
+        if (next !== 'ok') throw next;
+        return mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()));
+      } });
+      const handlers = new Map();
+      const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
+      mod.listenForAchievementChanges(made.s, target);
+      return { ...made, fire: (type) => (handlers.get(type) ?? []).forEach((fn) => fn({ type })) };
+    };
+    const TERMS = new mod.AchievementsApiError('Accept the current terms of use to continue.', 403, 'terms_required');
+
+    // Refused while the sign-up acceptance was still on its way: held 'unavailable' with a consumer mounted.
+    const refused = scripted([TERMS]);
+    refused.s.consumerMounted();
+    await refused.s.settled();
+    assert.deepEqual([refused.s.getSnapshot().status, refused.env.loads], ['unavailable', 1]);
+    refused.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await refused.s.settled();
+    assert.deepEqual([refused.s.getSnapshot().status, refused.env.loads], ['ready', 2], 'one read, and the cluster comes back without a reload');
+    refused.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await refused.env.advance(60_000);
+    assert.equal(refused.env.loads, 2, 'a second announcement reads nothing');
+
+    // Without a consumer: only marked out of date (data shown before, a later read refused).
+    const kept = scripted(['ok', TERMS]);
+    const unmount = kept.s.consumerMounted();
+    await kept.s.settled();
+    kept.s.stale();
+    await kept.s.settled();
+    assert.deepEqual([kept.s.getSnapshot().status, kept.env.loads], ['ready', 2], 'refused, the earlier data is kept');
+    unmount();
+    kept.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await kept.s.settled();
+    assert.equal(kept.env.loads, 2, 'no request without a consumer');
+    assert.equal(kept.s.getSnapshot().at, null, 'marked out of date');
+    kept.s.consumerMounted();
+    await kept.s.settled();
+    assert.equal(kept.env.loads, 3, 'the next consumer reads at once (within 30 s of the last)');
+
+    // SG-5: a ready store, or one refused for another reason, reads nothing on the event.
+    for (const [label, outcomes] of [
+      ['ready', []],
+      ['503', [{ status: 503 }]],
+      ['network', [{ status: 0 }]],
+      ['another 403', [new mod.AchievementsApiError('x', 403, 'ai_access_required')]],
+      ['401', [new mod.AchievementsApiError('x', 401, 'sign_in_required')]],
+    ]) {
+      const other = scripted(outcomes);
+      other.s.consumerMounted();
+      await other.s.settled();
+      other.fire(mod.LEGAL_ACCEPTED_EVENT);
+      await other.env.advance(60_000);
+      assert.equal(other.env.loads, 1, label);
+    }
+
+    // A later successful read clears the mark: an announcement after it reads nothing.
+    const cleared = scripted([TERMS]);
+    cleared.s.consumerMounted();
+    await cleared.s.settled();
+    await cleared.s.reload();
+    assert.equal(cleared.s.getSnapshot().status, 'ready');
+    cleared.fire(mod.LEGAL_ACCEPTED_EVENT);
+    await cleared.env.advance(60_000);
+    assert.equal(cleared.env.loads, 2);
+  });
+
+  it('Phase 8: LEGAL_ACCEPTED_EVENT while a read is on its way that then answers terms_required: exactly one more read (its check ran before the acceptance was stored)', async () => {
+    const TERMS = new mod.AchievementsApiError('Accept the current terms of use to continue.', 403, 'terms_required');
+    /** A store whose first read is held until settle(outcome); later reads answer `rest` in turn, then 'ok'. */
+    const held = (rest = []) => {
+      let settle = null;
+      const queue = [...rest];
+      const made = store({ load: (env) => {
+        if (env.loads > 1) {
+          const next = queue.length > 0 ? queue.shift() : 'ok';
+          if (next !== 'ok') throw next;
+          return mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()));
+        }
+        return new Promise((resolve, reject) => {
+          settle = (outcome) => (outcome === 'ok' ? resolve(mod.parseAchievements(ACHIEVEMENTS(U1.toUpperCase()))) : reject(outcome));
+        });
+      } });
+      const handlers = new Map();
+      const target = { addEventListener: (type, fn) => handlers.set(type, [...(handlers.get(type) ?? []), fn]) };
+      mod.listenForAchievementChanges(made.s, target);
+      return { ...made, settle: (outcome) => settle(outcome), fire: (type) => (handlers.get(type) ?? []).forEach((fn) => fn({ type })) };
+    };
+
+    // The race: the event comes while the read is held, then the read is refused for the terms.
+    const raced = held();
+    raced.s.consumerMounted();
+    assert.equal(raced.env.loads, 1);
+    raced.fire(mod.LEGAL_ACCEPTED_EVENT);
+    assert.equal(raced.env.loads, 1, 'nothing more while the read is on its way');
+    raced.settle(TERMS);
+    await raced.s.settled();
+    assert.deepEqual([raced.s.getSnapshot().status, raced.env.loads], ['ready', 2], 'one more read: the cluster comes back without a reload');
+    await raced.env.advance(60_000);
+    assert.equal(raced.env.loads, 2, 'exactly one');
+
+    // Without a consumer when the refusal comes back: marked out of date, read by the next consumer.
+    const gone = held();
+    const unmount = gone.s.consumerMounted();
+    gone.fire(mod.LEGAL_ACCEPTED_EVENT);
+    unmount();
+    gone.settle(TERMS);
+    await gone.s.settled();
+    await gone.env.advance(60_000);
+    assert.equal(gone.env.loads, 1, 'no request without a consumer');
+    gone.s.consumerMounted();
+    await gone.s.settled();
+    assert.deepEqual([gone.s.getSnapshot().status, gone.env.loads], ['ready', 2]);
+
+    // SG-5: the same event during a read that succeeds or is refused for another reason reads nothing more.
+    for (const [label, outcome] of [
+      ['ok', 'ok'],
+      ['503', { status: 503 }],
+      ['another 403', new mod.AchievementsApiError('x', 403, 'ai_access_required')],
+    ]) {
+      const other = held();
+      other.s.consumerMounted();
+      other.fire(mod.LEGAL_ACCEPTED_EVENT);
+      other.settle(outcome);
+      await other.s.settled();
+      await other.env.advance(60_000);
+      assert.equal(other.env.loads, 1, label);
+    }
+
+    // A refusal for the terms with no announcement on its way reads nothing more (as before).
+    const quiet = held();
+    quiet.s.consumerMounted();
+    quiet.settle(TERMS);
+    await quiet.s.settled();
+    await quiet.env.advance(60_000);
+    assert.deepEqual([quiet.s.getSnapshot().status, quiet.env.loads], ['unavailable', 1]);
+
+    // The mark belongs to that read: an event during an earlier read that succeeded does not carry
+    // over to a later read refused for the terms.
+    const later = held([TERMS]);
+    later.s.consumerMounted();
+    later.fire(mod.LEGAL_ACCEPTED_EVENT);
+    later.settle('ok');
+    await later.s.settled();
+    later.s.stale();
+    await later.s.settled();
+    await later.env.advance(60_000);
+    assert.deepEqual([later.s.getSnapshot().status, later.env.loads], ['ready', 2], 'refused, the earlier data kept, no third read');
   });
 
   it('ACHIEVEMENTS_STALE_EVENT (a Blender stage): fetched at once with a consumer; a request asked for meanwhile runs once after', async () => {
@@ -658,6 +836,34 @@ describe('achievementsApi: the answer and its refusals', () => {
     const capped = mod.parseAchievements({ ...ACHIEVEMENTS(), badges: [{ id: 'five_lessons', earned: true, current: 9, goal: 5 }] });
     assert.equal(capped.badges[0].current, 5);
   });
+
+  it('Phase 8: lessonXp absent (an older server) stays absent; {} is kept; good entries kept, bad ones dropped; a malformed field drops only lessonXp', () => {
+    const older = mod.parseAchievements(ACHIEVEMENTS());
+    assert.equal('lessonXp' in older, false, 'an older server: no field, so the lesson end shows nothing');
+    assert.deepEqual(mod.parseAchievements({ ...ACHIEVEMENTS(), lessonXp: {} }).lessonXp, {});
+    const mixed = mod.parseAchievements({
+      ...ACHIEVEMENTS(),
+      lessonXp: {
+        'vibe-coding/vibe-ch1': 40, 'claude-code/cc-01-first-session': 40,
+        'Vibe-Coding/x': 40, 'vibe-coding': 40, 'a/b/c': 40, 'vibe-coding/zero': 0, 'vibe-coding/half': 1.5,
+        'vibe-coding/text': '40', 'vibe-coding/minus': -40, 'vibe-coding/huge': 2 ** 53,
+      },
+    });
+    assert.deepEqual(mixed.lessonXp, { 'vibe-coding/vibe-ch1': 40, 'claude-code/cc-01-first-session': 40 });
+    assert.ok(Object.isFrozen(mixed.lessonXp));
+    for (const bad of [[{ 'vibe-coding/vibe-ch1': 40 }], 'vibe-coding/vibe-ch1', 40, null, true]) {
+      const parsed = mod.parseAchievements({ ...ACHIEVEMENTS(), lessonXp: bad });
+      assert.ok(parsed, `the answer stays usable: ${JSON.stringify(bad)}`);
+      assert.equal('lessonXp' in parsed, false, JSON.stringify(bad));
+      assert.equal(parsed.xp.total, 230);
+      assert.equal(parsed.badges.length, 2);
+    }
+    // A JSON key "__proto__" is an own key of the parsed body: dropped, and nothing is inherited.
+    const proto = mod.parseAchievements(JSON.parse(`{"ok":true,"learnerId":"${U1}","xp":{"total":0,"level":1,"intoLevel":0,"levelSize":100,"toNextLevel":100},"counts":{"lessonsStarted":0,"lessonsDone":0,"stagesDone":0},"streak":{"current":0,"best":0,"activeToday":false,"today":"2026-10-25","timeZone":"Asia/Tokyo"},"badges":[],"lessonXp":{"__proto__":{"polluted":1},"vibe-coding/vibe-ch1":40}}`));
+    assert.deepEqual(Object.keys(proto.lessonXp), ['vibe-coding/vibe-ch1']);
+    assert.equal(Object.getPrototypeOf(proto.lessonXp), Object.prototype);
+    assert.equal(proto.lessonXp.polluted, undefined);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -728,7 +934,15 @@ const UI_STUBS = {
     export const restoreLogoutFocus = (t) => { (globalThis.__restored ??= []).push(t); return t; };
   `,
   achievements: `
-    export const useAchievements = () => globalThis.__ach;
+    // With globalThis.__achStore (a real store), the hook reads it and leaves its mount effect in
+    // __consumerEffects for the test to run as React would (once while mounted).
+    export const useAchievements = () => {
+      globalThis.__achCalls = (globalThis.__achCalls ?? 0) + 1;
+      const store = globalThis.__achStore;
+      if (!store) return globalThis.__ach;
+      (globalThis.__consumerEffects ??= []).push(() => store.consumerMounted());
+      return store.getSnapshot();
+    };
     export const reloadAchievements = async () => { globalThis.__reloads = (globalThis.__reloads ?? 0) + 1; };
   `,
   content: "export const getCourse = (slug) => (slug === 'vibe-coding' ? { id: 'vibe-coding', locale: 'jp', title: 'バイブコーディング入門：AIと作る' } : undefined);",
@@ -828,11 +1042,11 @@ before(async () => {
   ui = await fresh(await bundleUi([
     "export { __resetHooks } from 'react';",
     "export { SaveChipView, saveLongText, saveLabel, SAVE_ICONS } from './components/lesson/SaveChip';",
-    "export { ReaderStatus, ReaderStatusView, readerStatusText, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
+    "export { ReaderStatus, ReaderStatusView, readerStatusText, shownReaderStatus, stallKeyOf, stallMessageOf } from './components/lesson/ReaderStatus';",
     "export { SaveStoppedNoticeView, default as SaveStoppedNotice } from './components/lesson/SaveStoppedNotice';",
     "export { LeftRecordsNoticeView, default as LeftRecordsNotice } from './components/lesson/LeftRecordsNotice';",
     "export { UnsavedLogoutDialogView } from './components/lesson/UnsavedLogoutDialog';",
-    "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf } from './components/lesson/LessonEnd';",
+    "export { LessonEnd, savedWhereOf, resetControlOf, resetHelpOf, lacksLessonXp, lessonXpLineOf } from './components/lesson/LessonEnd';",
     "export { ProgressClusterView } from './components/ui/ProgressCluster';",
     "export { ProfileBadgesBody, nextBadge, badgeProgressText, default as ProfileBadgesView } from './components/features/dashboard/profile/ProfileBadgesView';",
     "export { default as ProfilePassport, notReadyText } from './components/features/dashboard/ProfilePassport';",
@@ -1009,8 +1223,29 @@ describe('ReaderStatus: the reader\'s status line (finding 11)', () => {
     // .rp-reader * animations are cut to 1 ms under prefers-reduced-motion (the card is inside the reader).
     assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.rp-reader \*,/);
     const reader = readFile('components/lesson/LessonReader.tsx');
-    assert.match(reader, /<ReaderStatus message=\{statusMessage\} onDismiss=\{\(\) => setStatusMessage\(null\)\} \/>/);
+    assert.match(reader, /<ReaderStatus message=\{shownStatus\} onDismiss=\{\(\) => setStatusMessage\(null\)\} \/>/);
     assert.match(reader, /\{resumed && !statusMessage \? \(/, 'a message hides the "resumed" pill');
+  });
+
+  it('Phase 8 in-app check (S1): no "kept on this device" card while the bar\'s offline notice says the records stay here; every other message shows', () => {
+    // At 390 the two cards took about 45% of the first screen and the floating one covered the
+    // lesson title (in-app check, finding 2). The bar notice's offline text ends with 「学習の記録は、この端末に残っています。」.
+    const offline = { kind: 'stall', state: 'offline', reason: null, id: 1 };
+    assert.equal(ui.shownReaderStatus(offline, 'offline'), null);
+    for (const wait of ['none', 'checking', 'unreachable', 'back']) assert.equal(ui.shownReaderStatus(offline, wait), offline, wait);
+    for (const reason of ['network', 'server', 'auth', 'account', 'storage']) {
+      const stopped = { kind: 'stall', state: 'stopped', reason, id: 2 };
+      assert.equal(ui.shownReaderStatus(stopped, 'offline'), stopped, `stopped:${reason} still shows`);
+    }
+    const reset = { kind: 'reset', id: 3 };
+    assert.equal(ui.shownReaderStatus(reset, 'offline'), reset);
+    assert.equal(ui.shownReaderStatus(null, 'offline'), null);
+    // LessonReader passes the filtered message, from the same per-reader state the notice shows.
+    const reader = readFile('components/lesson/LessonReader.tsx');
+    assert.match(reader, /const offlineWait = useReaderOfflineWait\(\);\s*const shownStatus = shownReaderStatus\(statusMessage, offlineWait\);/);
+    assert.match(reader, /^import OfflineReloadNotice, \{ useReaderOfflineWait \} from '\.\.\/common\/OfflineReloadNotice';$/m);
+    assert.match(readFile('components/common/OfflineReloadNotice.tsx'), /export default function OfflineReloadNotice\(\) \{\s*const \{ language \} = useLanguage\(\);\s*\/\/[^\n]*\n\s*const wait = useReaderOfflineWait\(\);/);
+    assert.match(readFile('components/common/offlineReloadCopy.ts'), /partOffline:\s*'[^']*学習の記録は、この端末に残っています。',/);
   });
 });
 
@@ -1761,6 +1996,257 @@ describe('XP and badges on screen (design §3.7): server data only, nothing made
     const badges = readFile('components/features/dashboard/profile/ProfileBadgesView.tsx');
     assert.doesNotMatch(badges, /初ビルド|First Build|AI探究者|AI Explorer|学習の守護者|マスター|レジェンド|Legendary|記念|Milestone Trophy/);
     assert.match(badges, /setTheme\('default'\)/);
+  });
+});
+
+describe('Phase 8 (S2): the lesson end shows the server\'s XP for the lesson', () => {
+  const KEY = 'vibe-coding/vibe-ch1';
+  const LESSON = { id: 'vibe-ch1', objectives: [{ id: 'o1', text: 'Goal one' }], sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }] }] };
+  const reader = (state = 'read', lesson = LESSON) => ({
+    lesson,
+    courseSlug: 'vibe-coding',
+    scrollToBlock() {},
+    progress: {
+      progress: { v: 1, seen: ['b1'], answers: {}, checks: {}, ratings: {}, lastBlockId: null, updatedAt: '2026-10-25T00:00:00.000Z' },
+      pct: 100,
+      state,
+      getCheck: () => undefined,
+      setRating() {},
+      resetLesson: async () => ({ ok: true }),
+    },
+  });
+  const WITH = (xp = 40) => SNAP('ready', DATA({ lessonXp: { [KEY]: xp, 'vibe-coding/vibe-ch2': 40 } }));
+  const WITHOUT = () => SNAP('ready', DATA({ lessonXp: { 'vibe-coding/vibe-ch2': 40 } }));
+  const OLDER = () => SNAP('ready', DATA());
+  const render = (globals = {}) => {
+    globalThis.__achCalls = 0;
+    const els = elementsOf(renderUi(ui, ui.LessonEnd, { next: null, prev: null, backTo: '/c', resettable: true }, {
+      __view: VIEW(),
+      __sync: { status: 'on', userId: U1 },
+      __reader: reader(),
+      __ach: WITH(),
+      ...globals,
+    }));
+    return { els, item: byClass(els, 'rp-end-xp')[0] ?? null, calls: globalThis.__achCalls };
+  };
+  /** The useState index of LessonXpItem's sawWithout: the setter its effect calls on an answer without the award. */
+  const sawWithoutIndex = () => {
+    render({ __ach: WITHOUT() });
+    for (const effect of globalThis.__effects) effect();
+    const set = globalThis.__sets.filter(([, value]) => value === true);
+    assert.equal(set.length, 1, JSON.stringify(globalThis.__sets));
+    return set[0][0];
+  };
+
+  it('lacksLessonXp: true only for a current answer from a server that sends lessonXp, without this lesson', () => {
+    assert.equal(ui.lacksLessonXp(WITHOUT(), KEY), true);
+    assert.equal(ui.lacksLessonXp(WITH(), KEY), false);
+    assert.equal(ui.lacksLessonXp(OLDER(), KEY), false, 'an older server: never "without"');
+    assert.equal(ui.lacksLessonXp({ ...WITHOUT(), at: null }, KEY), false, 'a stale answer');
+    for (const status of NOT_READY) assert.equal(ui.lacksLessonXp(SNAP(status), KEY), false, status);
+    assert.equal(ui.lacksLessonXp({ status: 'unavailable', data: WITHOUT().data, at: 1 }, KEY), false);
+  });
+
+  it('lessonXpLineOf: the server\'s figure, total or new by what the page saw; nothing without a current figure', () => {
+    assert.deepEqual(ui.lessonXpLineOf(WITH(), KEY, false), { kind: 'total', xp: 40 });
+    assert.deepEqual(ui.lessonXpLineOf(WITH(), KEY, true), { kind: 'new', xp: 40 });
+    assert.deepEqual(ui.lessonXpLineOf(WITH(80), KEY, true), { kind: 'new', xp: 80 }, 'the server\'s number as it is');
+    assert.equal(ui.lessonXpLineOf(WITHOUT(), KEY, true), null);
+    assert.equal(ui.lessonXpLineOf(OLDER(), KEY, true), null, 'an older server');
+    assert.equal(ui.lessonXpLineOf({ ...WITH(), at: null }, KEY, false), null, 'stale');
+    for (const status of NOT_READY) assert.equal(ui.lessonXpLineOf(SNAP(status), KEY, true), null, status);
+    assert.equal(ui.lessonXpLineOf({ status: 'unavailable', data: WITH().data, at: 1 }, KEY, false), null);
+    // Object.prototype keys are not lessons.
+    assert.equal(ui.lessonXpLineOf(WITHOUT(), 'constructor', false), null);
+    assert.equal(ui.lacksLessonXp(WITHOUT(), 'constructor'), true);
+  });
+
+  it('a done lesson with the award in the ledger: the ledger fact, with no 「+」 (a revisit, another device, a redo); EN too', () => {
+    const { item, calls } = render();
+    assert.ok(item, 'the XP item');
+    assert.equal(textOfElement(item), 'このレッスンを終えたときにもらった XP：40');
+    assert.equal(item.type, 'li');
+    assert.ok(byClass([item], 'tabular').length === 1);
+    // Text only, like the progress item and ProgressCluster's XP: no icon (Sparkles is the AI tutor's glyph in the reader).
+    assert.deepEqual(walk(item.props.children).filter((t) => 'el' in t).map((t) => t.el.type), []);
+    assert.equal(item.props.role, undefined, 'not a live region');
+    assert.equal(item.props['aria-live'], undefined);
+    assert.equal(calls, 1);
+    assert.equal(textOfElement(render({ __language: 'en' }).item), 'XP for finishing this lesson: 40');
+    // Running the effect with the award already there never turns 「+」 on.
+    render();
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value === true), false);
+  });
+
+  it('「+40 XP」 only after this page saw a current answer without the award (the effect records it), then one with it', () => {
+    const index = sawWithoutIndex();
+    const { item } = render({ __state: { [index]: true } });
+    assert.equal(textOfElement(item), 'このレッスンを終えて +40 XP');
+    assert.equal(textOfElement(render({ __state: { [index]: true }, __language: 'en' }).item), '+40 XP for finishing this lesson');
+    assert.equal(render({ __ach: WITHOUT() }).item, null, 'while the award is not there: nothing yet');
+    // A stale answer without the award does not count as "seen without".
+    render({ __ach: { ...WITHOUT(), at: null } });
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value === true), false);
+  });
+
+  it('nothing on an older API (no lessonXp), or without a current answer: the browser never makes the line up from the local record', () => {
+    assert.equal(render({ __ach: OLDER() }).item, null, 'an older server');
+    assert.equal(render({ __ach: { ...WITH(), at: null } }).item, null, 'stale');
+    for (const status of NOT_READY) assert.equal(render({ __ach: SNAP(status) }).item, null, status);
+    assert.equal(render({ __ach: { status: 'unavailable', learnerId: U1, data: WITH().data, at: 1 } }).item, null);
+  });
+
+  it('D7: no achievements consumer unless the lesson is done, syncs, a learner is synced and the server offers achievements', () => {
+    assert.equal(render().calls, 1);
+    for (const state of ['read', 'checked', 'mastered']) assert.equal(render({ __reader: reader(state) }).calls, 1, state);
+    for (const [why, globals] of [
+      ['in_progress', { __reader: reader('in_progress') }],
+      ['not_started', { __reader: reader('not_started') }],
+      ['not syncable', { __syncable: false }],
+      ['capability off', { __caps: { lessonReset: true, achievements: false } }],
+      ['an older server (no capability)', { __caps: { lessonReset: true } }],
+      ['capabilities unknown', { __caps: null }],
+      ['no synced learner', { __sync: { status: 'off', userId: null } }],
+    ]) {
+      const { item, calls } = render(globals);
+      assert.equal(calls, 0, why);
+      assert.equal(item, null, why);
+    }
+  });
+
+  it('once a current answer holds the award, the line is kept and the item stops reading (no consumer; final review, finding 5)', () => {
+    render();
+    globalThis.__sets = [];
+    for (const effect of globalThis.__effects) effect();
+    const kept = globalThis.__sets.filter(([, value]) => value && typeof value === 'object' && 'kind' in value);
+    assert.deepEqual(kept.map(([, value]) => value), [{ kind: 'total', xp: 40 }], 'the reader hands its line over');
+    const keptIndex = kept[0][0];
+    for (const [line, text] of [[{ kind: 'total', xp: 40 }, 'このレッスンを終えたときにもらった XP：40'], [{ kind: 'new', xp: 40 }, 'このレッスンを終えて +40 XP']]) {
+      const { item, calls } = render({ __state: { [keptIndex]: line }, __ach: { ...WITHOUT(), at: null } });
+      assert.equal(textOfElement(item), text, 'the kept line, whatever the store holds now');
+      assert.equal(calls, 0, 'no useAchievements: no consumer, so an upload sends no read');
+    }
+    // No line yet: nothing is handed over, and the reader stays.
+    render({ __ach: WITHOUT() });
+    globalThis.__sets = [];
+    for (const effect of globalThis.__effects) effect();
+    assert.equal(globalThis.__sets.some(([, value]) => value && typeof value === 'object' && 'kind' in value), false);
+    // Keyed by the learner: another learner's page never shows a line kept for the first.
+    const source = readFile('components/lesson/LessonEnd.tsx');
+    assert.match(source, /<LessonXpItem key=\{sync\.userId \?\? ''\} lessonKey=\{`\$\{courseSlug\}\/\$\{lesson\.id\}`\} \/>/);
+  });
+
+  describe('with a real achievements store: reads per page (final review, finding 5)', () => {
+    let mod = null;
+    before(async () => {
+      mod = await fresh(await bundle(
+        "export * from './components/ui/achievementsClient';",
+        [[/\/progressSyncClient$/, 'syncForAchievements'], [/^react$/, 'react'], [/supabaseClient$/, 'supabase']],
+      ));
+    });
+
+    /**
+     * LessonEnd on a page with a real store on a fake clock. commit() renders, mounts or unmounts
+     * the store's consumer as React would (useAchievements rendered or not), runs the effects and
+     * keeps what they set for the next render.
+     * @param {(n: number) => Record<string, number>} lessonXpOfLoad the ledger the n-th read answers
+     */
+    function page(lessonXpOfLoad) {
+      let t = 0;
+      const queue = [];
+      const env = { loads: 0 };
+      const s = mod.createAchievementsStore({
+        load: async () => {
+          env.loads += 1;
+          return { ...DATA({ lessonXp: lessonXpOfLoad(env.loads) }), learnerId: U1 };
+        },
+        learnerId: () => U1,
+        capabilities: () => ({ lessonReset: true, achievements: true }),
+        now: () => t,
+        setTimeout: (fn, ms) => { const h = { at: t + ms, fn }; queue.push(h); return h; },
+        clearTimeout: (h) => { const i = queue.indexOf(h); if (i >= 0) queue.splice(i, 1); },
+      });
+      let state = {};
+      let release = null;
+      const commit = () => {
+        globalThis.__consumerEffects = [];
+        const { item, calls } = render({ __achStore: s, __state: state });
+        if (calls > 0 && !release) release = globalThis.__consumerEffects[0]();
+        if (calls === 0 && release) { release(); release = null; }
+        globalThis.__sets = [];
+        for (const effect of globalThis.__effects) effect();
+        for (const [i, v] of globalThis.__sets) state = { ...state, [i]: v };
+        delete globalThis.__achStore;
+        return item;
+      };
+      const advance = async (ms) => {
+        const end = t + ms;
+        for (;;) {
+          await s.settled();
+          queue.sort((a, b) => a.at - b.at);
+          if (!queue[0] || queue[0].at > end) break;
+          const h = queue.shift();
+          t = h.at;
+          h.fn();
+        }
+        t = end;
+        await s.settled();
+      };
+      return { s, env, commit, advance };
+    }
+
+    it('a revisit of a finished lesson: one read when it opens, none for the uploads after it', async () => {
+      const { s, env, commit, advance } = page(() => ({ [KEY]: 40 }));
+      assert.equal(commit(), null, 'loading');
+      await advance(0);
+      assert.equal(env.loads, 1);
+      assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40');
+      assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40', 'kept: the reader has unmounted');
+      for (let i = 0; i < 3; i += 1) {
+        s.serverProgress(); // PROGRESS_SAVED_EVENT: an upload of this page (a scroll position, a card)
+        await advance(20_000);
+        assert.equal(textOfElement(commit()), 'このレッスンを終えたときにもらった XP：40');
+      }
+      assert.equal(env.loads, 1, 'no read per upload (without the latch: 4)');
+    });
+
+    it('finishing the lesson: a read without the award, the upload, a read with it (「+40 XP」), then none', async () => {
+      const { s, env, commit, advance } = page((n) => (n === 1 ? {} : { [KEY]: 40 }));
+      commit();
+      await advance(0);
+      assert.equal(commit(), null, 'the award is not there yet');
+      commit(); // the effect recorded "seen without"
+      s.serverProgress(); // the upload with the done state
+      await advance(20_000);
+      assert.equal(env.loads, 2);
+      assert.equal(textOfElement(commit()), 'このレッスンを終えて +40 XP');
+      assert.equal(textOfElement(commit()), 'このレッスンを終えて +40 XP', 'kept');
+      for (let i = 0; i < 3; i += 1) {
+        s.serverProgress();
+        await advance(20_000);
+        commit();
+      }
+      assert.equal(env.loads, 2, 'the two reads design D7 counts, no more');
+    });
+  });
+
+  it('the stats list: the XP item right after the progress item, before the cards; copy in both languages', () => {
+    const withCards = { ...LESSON, sections: [{ id: 's1', blocks: [{ id: 'b1', type: 'markdown' }, { id: 'fc', type: 'flashcards', cards: [{ id: 'c1', front: 'F', back: 'B' }] }] }] };
+    const { els } = render({ __reader: reader('read', withCards) });
+    const stats = byClass(els, 'rp-end-stats')[0];
+    const items = walk(stats.props.children).filter((t) => 'el' in t && t.el.type === 'li').map((t) => t.el);
+    assert.deepEqual(items.map((li) => textOfElement(li)), ['100% 完了', 'このレッスンを終えたときにもらった XP：40', '復習カード 覚えた 0/1 · 復習カードへ移動']);
+    const source = readFile('components/lesson/LessonEnd.tsx');
+    assert.match(source, /xpNew: \(n: number\) => `\+\$\{n\} XP for finishing this lesson`,/);
+    assert.match(source, /xpTotal: \(n: number\) => `XP for finishing this lesson: \$\{n\}`,/);
+    assert.match(source, /xpNew: \(n: number\) => `このレッスンを終えて \+\$\{n\} XP`,/);
+    assert.match(source, /xpTotal: \(n: number\) => `このレッスンを終えたときにもらった XP：\$\{n\}`,/);
+    // Not 「終えてもらった」: that reads as the favour form 〜てもらう ("had someone finish it").
+    assert.doesNotMatch(source, /終えてもらった/);
+    // The lesson end has no AI control: the reader's AI glyph stays out of it.
+    assert.doesNotMatch(source, /\bSparkles\b/);
   });
 });
 

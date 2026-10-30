@@ -3,6 +3,7 @@ import { CloudAlert, CloudOff, RotateCcw } from 'lucide-react';
 import { useLanguage, type Language } from '../../context/LanguageContext';
 import { saveLongText } from './SaveChip';
 import type { SaveView, StopReason } from './progressSync.ts';
+import type { ChunkWait } from '../common/chunkReload';
 
 /**
  * The reader's status line (Phase 5, design §4.2, finding 11): one line under the LessonBar, in its
@@ -51,6 +52,18 @@ export function stallKeyOf(view: Pick<SaveView, 'state' | 'reason' | 'pending'>,
 export function stallMessageOf(key: string, id: number): ReaderStatusMessage {
   const [state, reason] = key.split(':');
   return { kind: 'stall', state: state === 'stopped' ? 'stopped' : 'offline', reason: (reason || null) as StopReason | null, id };
+}
+
+/**
+ * Phase 8 (S1): the message the status line shows, given the reader bar's offline notice
+ * (OfflineReloadNotice, `useReaderOfflineWait`). While the notice shows its offline text, it already
+ * says the records stay on this device: the "kept on this device" card would repeat it under the
+ * bar and cover the title, so it is left out (also after the notice was closed; the save chip in
+ * the bar still shows the state). "Saving stopped" and the reset message always show.
+ */
+export function shownReaderStatus(message: ReaderStatusMessage | null, offlineWait: ChunkWait): ReaderStatusMessage | null {
+  if (message?.kind === 'stall' && message.state === 'offline' && offlineWait === 'offline') return null;
+  return message;
 }
 
 /** The text of a message (exported for server/tests/phase5Front.test.js). */

@@ -24,6 +24,10 @@
  * - Errors (401, network, 5xx, a malformed answer): 'unavailable' when there is nothing to show;
  *   data of the same learner is kept and shown (status stays 'ready').
  * - The learner changes (SYNC_ACCOUNT_EVENT, the sync's state): cleared only on a real change.
+ * - Phase 8: after this page recorded an acceptance of the terms (LEGAL_ACCEPTED_EVENT), it reads
+ *   again (as ACHIEVEMENTS_STALE_EVENT) only when its last read was refused with terms_required
+ *   (the server's LEGAL_TERMS_REQUIRED check), or the read on its way then is: with that check off
+ *   nothing is ever refused that way, so the event changes nothing.
  *
  * Phase 6: the same store serves the review queue (components/review/reviewClient.ts): the data
  * type is a parameter (any answer that names its learnerId) and capabilityKey picks which
@@ -31,6 +35,7 @@
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { ACHIEVEMENTS_STALE_EVENT, getAchievements, type Achievements } from '../../services/achievementsApi';
+import { LEGAL_ACCEPTED_EVENT } from '../legal/legalEvents';
 import { PROGRESS_EVENT, type ProgressEventDetail } from '../lesson/progressStore.ts';
 import { PROGRESS_SAVED_EVENT, SYNC_ACCOUNT_EVENT, type SyncCapabilities } from '../lesson/progressSync.ts';
 import {
@@ -92,6 +97,12 @@ export type AchievementsStore<T extends { learnerId: string } = Achievements> = 
   expire(): void;
   /** The sync's learner or state changed. */
   syncChanged(): void;
+  /**
+   * This page recorded an acceptance of the terms (LEGAL_ACCEPTED_EVENT): reads again (as stale())
+   * only when the last read was refused with terms_required (Phase 8), or when the read in flight
+   * then is; otherwise nothing.
+   */
+  termsAccepted(): void;
   /** The "try again" button. */
   reload(): Promise<void>;
   /** Resolves when no request is running (tests). */
@@ -121,12 +132,20 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
   let probed = false;
   /** The route answered 200 on this page. */
   let routeSeen = false;
-  /** What the sync's capabilities said at the last syncChanged: unknown, the capability off, or on. */
-  let capsSeen: 'unknown' | 'off' | 'on' = 'unknown';
   let debounce: unknown = null;
   let lastServerFetchAt = Number.NEGATIVE_INFINITY;
   /** expire() ran while a request was in flight: its answer is stored as out of date. */
   let expiredInFlight = false;
+  /**
+   * The last read was refused with terms_required (the server's terms check, Phase 8): the only
+   * case in which termsAccepted() reads again. Cleared by any other answer.
+   */
+  let refusedForTerms = false;
+  /**
+   * termsAccepted() ran while a read was in flight: if that read then comes back terms_required
+   * (its check ran before the acceptance was stored), it is read once more. Cleared per read.
+   */
+  let acceptedDuringRead = false;
 
   const learner = () => {
     try {
@@ -142,6 +161,17 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
       return null;
     }
   };
+  /** What the sync's capabilities say now: unknown, the capability off, or on. */
+  const capsNow = (): 'unknown' | 'off' | 'on' => {
+    const offered = caps();
+    return !offered ? 'unknown' : offered[capabilityKey] === true ? 'on' : 'off';
+  };
+  /**
+   * What they said at the last syncChanged, or when the store was made: a store first made after
+   * the sync knew them (LessonEnd's XP item on a lesson page) must not read the next save-view
+   * change as "the capabilities arrived" (Phase 8: one more request, sent with the upload).
+   */
+  let capsSeen = capsNow();
 
   function set(patch: Partial<AchievementsSnapshot<T>>): void {
     const next = { ...snap, ...patch };
@@ -170,12 +200,14 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
     const id = learner();
     if (!caps()) probed = true;
     expiredInFlight = false;
+    acceptedDuringRead = false;
     if (snap.learnerId !== id) set({ status: 'loading', learnerId: id, data: null, at: null });
     else if (!snap.data) set({ status: 'loading' });
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const data = await deps.load();
         routeSeen = true;
+        refusedForTerms = false;
         const current = learner();
         if (!current) {
           set({ status: 'no_account', learnerId: null, data: null, at: null });
@@ -186,6 +218,7 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
         return;
       } catch (err) {
         const failure = (err ?? {}) as { status?: unknown; errorType?: unknown };
+        refusedForTerms = failure.errorType === 'terms_required';
         if (failure.status === 404 && !failure.errorType) {
           latched = true;
           set({ status: 'unsupported', learnerId: learner(), data: null, at: null });
@@ -195,6 +228,11 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
         if (!current) set({ status: 'no_account', learnerId: null, data: null, at: null });
         else if (snap.data && snap.learnerId === current) set({ status: 'ready' });
         else set({ status: 'unavailable', learnerId: current, data: null, at: null });
+        // The acceptance was announced while this read was on its way: what termsAccepted() does.
+        if (refusedForTerms && acceptedDuringRead && current) {
+          if (consumers > 0) again = true;
+          else if (snap.at !== null) set({ at: null });
+        }
         return;
       }
     }
@@ -278,6 +316,12 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
       if (consumers > 0) void fetchNow();
       else if (snap.at !== null) set({ at: null });
     },
+    termsAccepted() {
+      if (inFlight) acceptedDuringRead = true;
+      if (!refusedForTerms) return;
+      if (consumers > 0) void fetchNow();
+      else if (snap.at !== null) set({ at: null });
+    },
     invalidate() {
       if (inFlight) again = true;
       if (snap.at !== null) set({ at: null });
@@ -288,8 +332,7 @@ export function createAchievementsStore<T extends { learnerId: string } = Achiev
     },
     syncChanged() {
       const id = learner();
-      const offered = caps();
-      const seen = offered === null ? 'unknown' : offered[capabilityKey] === true ? 'on' : 'off';
+      const seen = capsNow();
       // The capabilities became known, or the server now offers the capability (an upgraded VM).
       const capsArrived = (seen !== 'unknown' && capsSeen === 'unknown') || (seen === 'on' && capsSeen === 'off');
       // The server stopped offering it (a rollback to an older image while this page is open).
@@ -331,6 +374,7 @@ export function listenForAchievementChanges(s: AchievementsStore<Achievements>, 
   target.addEventListener(PROGRESS_SAVED_EVENT, () => s.serverProgress());
   target.addEventListener(ACHIEVEMENTS_STALE_EVENT, () => s.stale());
   target.addEventListener(SYNC_ACCOUNT_EVENT, () => s.syncChanged());
+  target.addEventListener(LEGAL_ACCEPTED_EVENT, () => s.termsAccepted());
 }
 
 let store: AchievementsStore<Achievements> | null = null;

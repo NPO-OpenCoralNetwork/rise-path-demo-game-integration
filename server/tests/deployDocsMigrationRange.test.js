@@ -85,14 +85,15 @@ describe('the VM runbooks follow server/migrations', () => {
 });
 
 describe('the plan: Phase 6 chapter', () => {
-    it('§10 is Phase 6 and §11 Phase 7, before やらないこと (12) and まだ分からないこと (13); its owner steps start with the deploy order of 020', () => {
+    it('§10 is Phase 6, §11 Phase 7 and §12 Phase 8, before やらないこと (13) and まだ分からないこと (14); its owner steps start with the deploy order of 020', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
         const headings = plan.split('\n').filter((line) => /^## \d+\. /.test(line)).map((line) => line.replace(/^## /, '').slice(0, 12));
-        assert.deepEqual(headings.slice(-5).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.']);
+        assert.deepEqual(headings.slice(-6).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.']);
         assert.match(plan, /^## 10\. Phase 6: /m);
         assert.match(plan, /^## 11\. Phase 7: /m);
-        assert.match(plan, /^## 12\. やらないこと$/m);
-        assert.match(plan, /^## 13\. まだ分からないこと$/m);
+        assert.match(plan, /^## 12\. Phase 8: /m);
+        assert.match(plan, /^## 13\. やらないこと$/m);
+        assert.match(plan, /^## 14\. まだ分からないこと$/m);
         const order = plan.split('\n').find((line) => line.startsWith('1. **デプロイの順番**: migration 020 を'));
         assert.ok(order, '10.2 item 1');
         assert.match(order, /`api`・`mcp`・`mcp-public` を起動する前に/);
@@ -128,6 +129,170 @@ describe('the plan: Phase 6 chapter', () => {
         // 10.1 画面: a sign-out or expiry swaps the whole app for the signed-out page (AuthContext setUser(null)).
         assert.match(chapter, /ログインが切れたときは、ページごとログインの前の画面に戻り、何も記録しません（Nexloom のログインが残っているときは、その復習をそこで止めて 1 行で知らせます）/u);
         assert.doesNotMatch(chapter, /ログインが切れたときは、その復習をそこで止めて/u);
+    });
+});
+
+describe('the plan: Phase 8 chapter', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const start = plan.indexOf('## 12. Phase 8: ');
+    const end = plan.indexOf('## 13. やらないこと');
+    const chapter = plan.slice(start, end);
+
+    it('§12 holds 12.1–12.4 in order and ends where やらないこと starts', () => {
+        assert.ok(start > plan.indexOf('## 11. Phase 7: ') && end > start, 'Phase 8 after Phase 7, before やらないこと');
+        const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
+        assert.deepEqual(subsections, ['12.1', '12.2', '12.3', '12.4']);
+    });
+
+    it('the earlier chapters no longer list what Phase 8 fixed as open (§8.3/§8.4, §9.4, §10.3/§10.4, §11.4)', () => {
+        const before = plan.slice(0, start);
+        assert.doesNotMatch(before, /同意のない方を API とリモート MCP でも止めるか/u, '§8.4');
+        assert.doesNotMatch(before, /API とリモートの MCP は、同意のない方を止めません/u, '§8.3');
+        assert.doesNotMatch(before, /まだ `streak: 0` を返します/u, '§9.4');
+        assert.doesNotMatch(before, /レッスンの終わりに「\+40 XP」のように、もらった XP を見せること/u, '§9.4');
+        assert.doesNotMatch(before, /メニューのボタンに枚数を出す案は|スマートフォンのメニューのボタンの枚数、/u, '§10.3 の 17, §10.4');
+        assert.doesNotMatch(before, /前のカードの答えが 1〜2 フレームだけ見えます/u, '§10.4');
+        assert.doesNotMatch(before, /`index\.tsx` が、部品を読めなかったときに 1 回読み直すためです/u, '§11.4');
+    });
+
+    it('AGENTS.md and the chapter name the terms switch and its exempt list where the code keeps them', () => {
+        assert.match(read('tools/core/legalAcceptance.js'), /^export const TERMS_SWITCH = 'LEGAL_TERMS_REQUIRED';$/m);
+        assert.match(read('server/middleware/termsGate.js'), /^export const TERMS_EXEMPT = /m);
+        const lines = read('AGENTS.md').split('\n');
+        const at = lines.findIndex((line) => line.startsWith('- Legal texts: '));
+        assert.ok(at >= 0, 'the Legal texts bullet');
+        const next = lines.findIndex((line, i) => i > at && !line.startsWith('  '));
+        const bullet = lines.slice(at, next).join('\n');
+        for (const must of ['`LEGAL_TERMS_REQUIRED=true`', 'off by default', 'ignored in production while texts are drafts', '`terms_required`', '`TERMS_EXEMPT`', '`server/middleware/termsGate.js`']) {
+            assert.ok(bullet.includes(must), `AGENTS.md Legal texts bullet: ${must}`);
+        }
+        for (const must of ['`LEGAL_TERMS_REQUIRED`', '`terms_required`', '`TERMS_EXEMPT`', '`server/middleware/termsGate.js`', '**はじめは止まっています。**']) {
+            assert.ok(chapter.includes(must), `§12: ${must}`);
+        }
+    });
+
+    it('AGENTS.md states the exemption rule with both conditions termsGate.js gives (the UI page, the app shell)', () => {
+        const rule = /Exempt a route only when (.+?)\.$/m.exec(read('server/middleware/termsGate.js'))?.[1];
+        assert.equal(rule, 'the UI exempts its page or the app shell calls it there');
+        assert.ok(read('AGENTS.md').includes(`exempt a new route there only when ${rule}`), 'AGENTS.md Legal texts bullet: the full rule');
+    });
+
+    it('§12 points to 10.3 の 17 only for what item 17 says (Phase 6 deferred the menu count, and why)', () => {
+        const item17 = plan.slice(0, start).split('\n').find((line) => line.startsWith('17. 390 px の画面では'));
+        assert.ok(item17, '10.3 item 17');
+        assert.match(item17, /すべての画面の上の部分が変わるので Phase 6 では見送り、Phase 8 で出すようにしました（12 章）/u);
+        assert.match(chapter, /Phase 6 で見送ったものです。10\.3 の 17/u, '12.1 S3');
+        assert.match(chapter, /すべての画面の上の部分が、枚数の分だけ変わります（10\.3 の 17）/u, '12.3 item 4');
+    });
+
+    it('S1 never gives the browser\'s own error page the app screen\'s title, and 12.2 item 3 says when 「読み込み直す」 shows', () => {
+        const title = /offlineTitle: '([^']+)'/.exec(read('components/common/offlineReloadCopy.ts').split('jp: {')[1])?.[1];
+        assert.equal(title, 'インターネットにつながっていません');
+        assert.doesNotMatch(chapter, /ブラウザの「(インターネットに)?つながっていません」/u);
+        assert.ok(chapter.includes(`Rise Path の中で「${title}」の画面`), 'S1 names the app screen as Rise Path\'s');
+        assert.match(chapter, /Rise Path の外の、ブラウザ自身のエラーの画面/u);
+        const check = chapter.split('\n').find((line) => line.startsWith('3. **確かめます**: '));
+        assert.ok(check, '12.2 item 3');
+        assert.match(check, /図とコードのあるレッスン（たとえば Claude Code の「第1回｜最初のタスクを任せる」）/u);
+        assert.match(check, /図やコードを読めなかったときだけ、上のバーにお知らせが出て、つなぐと「読み込み直す」が出ること/u);
+        // Final review, findings 1 and 2: the notice belongs to the lesson where a part failed, and a
+        // 5xx from the host is not the app answering (OfflineReloadNotice.tsx, chunkReload.ts).
+        const s1 = chapter.split('\n').find((line) => line.startsWith('- **S1 '));
+        assert.ok(s1, '12.1 S1');
+        assert.match(s1, /そのレッスンで読めなかったときだけです。全部読めたレッスンに移ると、出ません/u);
+        assert.match(s1, /ホストやプロキシのエラーの画面（500 番台）が返ったときも、答えたことにはしません/u);
+        assert.match(read('components/common/chunkReload.ts'), /if \(res\.status >= 500\) throw/);
+        const lesson = JSON.parse(read('content/courses/claude-code/lessons/cc-01-first-session.lesson.json'));
+        assert.equal(lesson.title, '第1回｜最初のタスクを任せる');
+        const types = JSON.stringify(lesson);
+        assert.match(types, /"type":"diagram"/);
+        assert.match(types, /"type":"code"/);
+    });
+
+    it('S2 says when the XP is read: when a finished lesson opens, then per upload until it arrives, then never (final review, finding 5)', () => {
+        const s2 = chapter.split('\n').find((line) => line.startsWith('- **S2 '));
+        assert.ok(s2, '12.1 S2');
+        assert.doesNotMatch(s2, /終えたレッスンの終わりの画面だけ/u);
+        assert.match(s2, /終えたレッスンを開いたとき（終わりまで読まなくても）/u);
+        assert.match(s2, /記録をサーバーに送るたび（2 秒あと、15 秒に 1 回まで）/u);
+        assert.match(s2, /XP が届いたら、そのページではもう読みません（レッスンを終えるときは 2 回、開き直したときは 1 回です。10\.3 の 16 の、教室の 1 分 200 回のためです/u);
+        const item3 = chapter.slice(chapter.indexOf('### 12.3')).split('\n').find((line) => line.startsWith('3. XP の 1 行は'));
+        assert.ok(item3, '12.3 item 3');
+        assert.match(item3, /終えたレッスンを開くと、終わりまで読まなくても、XP を 1 回読みます（教室の 1 分 200 回の分を使います）/u);
+        // The code that makes "then never" true: the item keeps the line and unmounts its reader.
+        const end = read('components/lesson/LessonEnd.tsx');
+        assert.match(end, /return kept \? <LessonXpLineItem line=\{kept\} \/> : <LessonXpReader lessonKey=\{lessonKey\} onLine=\{setKept\} \/>;/);
+        // The figures the sentence names (achievementsClient.ts).
+        const client = read('components/ui/achievementsClient.ts');
+        assert.match(client, /^export const ACHIEVEMENTS_DEBOUNCE_MS = 2_000;$/m);
+        assert.match(client, /^export const ACHIEVEMENTS_MIN_INTERVAL_MS = 15_000;$/m);
+    });
+});
+
+describe('Phase 8 in-app check: chapter 12 says what the fixes changed', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const chapter = plan.slice(plan.indexOf('## 12. Phase 8: '), plan.indexOf('## 13. やらないこと'));
+    const line = (prefix) => chapter.split('\n').find((l) => l.startsWith(prefix));
+
+    it('S1: no "kept on this device" card while the bar notice shows (finding 2), as ReaderStatus.tsx does', () => {
+        const s1 = line('- **S1 ');
+        assert.ok(s1, '12.1 S1');
+        assert.match(s1, /お知らせが「インターネットにつながっていないため、…」のあいだは（閉じたあとも）、記録をこの端末に残すときのカード（「いまはサーバーにつながらないため、この端末に記録しています。…」）を出しません/u);
+        assert.ok(read('components/common/offlineReloadCopy.ts').includes("'インターネットにつながっていないため、ページの一部を読み込めませんでした。"), 'the notice text the chapter quotes');
+        assert.ok(read('components/lesson/SaveChip.tsx').includes("long: 'いまはサーバーにつながらないため、この端末に記録しています。つながると、アカウントに保存します。',"), 'the card text the chapter quotes');
+        assert.match(read('components/lesson/ReaderStatus.tsx'), /if \(message\?\.kind === 'stall' && message\.state === 'offline' && offlineWait === 'offline'\) return null;/);
+        // Self-review, findings 1 and 2: what follows the grown bar, and where focus goes.
+        assert.match(s1, /横の目次の位置、見出しに移ったときの位置、読んだブロックの数え方、続きから開く位置も、それに合わせます（高くなったバーの下に隠れたブロックは、読んだことにしません）/u);
+        assert.match(s1, /「読み込み直す」にフォーカスがあるときにまた切れて、ボタンがなくなったときは、フォーカスをページの本文に移します（ページやレッスンを読めなかったときの画面の「再読み込み」も同じで、そのときは見出しに移します）/u);
+    });
+
+    it('S5: the sign-in reads run once more after the acceptance (finding 1); 12.3 item 5 counts the refused reads', () => {
+        const s5 = line('- **S5 ');
+        assert.ok(s5, '12.1 S5');
+        assert.match(s5, /断られていた XP と復習の枚数、ログインのときに読む前の形式のコースの進み・学習の記録・お知らせを、画面が 1 回だけ読み直します（切り替えを止めているときは、何も読み直しません）/u);
+        const item5 = chapter.slice(chapter.indexOf('### 12.3')).split('\n').find((l) => l.startsWith('5. '));
+        assert.ok(item5, '12.3 item 5');
+        assert.match(item5, /ログインしたときは、同意のページが出るまでと出ているあいだに、画面が読みに行くもののうち 7 つほどが断られます。/u);
+        // Self-review, finding 4: not once per sign-in. supabase-js sends SIGNED_IN on every return to
+        // the tab and TOKEN_REFRESHED on each refresh; handleSession hydrates again on each, and the
+        // three sign-in reads are refused again while the consent page shows.
+        assert.match(item5, /同意のページが出ているあいだは、そのあとも、タブに戻るたびと、ログインの自動の更新のたびに、前の形式のコースの進み・学習の記録・お知らせの 3 つがまた断られます。どれも教室の 1 分 200 回の分を使います。/u);
+        assert.doesNotMatch(item5, /ログインするたびに 1 回/u);
+        const authContext = read('context/AuthContext.tsx');
+        assert.match(authContext, /const hydration = createTermsRetry\(hydrateUserDataOnce\);/);
+        const handleSession = authContext.slice(authContext.indexOf('const handleSession = '), authContext.indexOf('// Get initial sessions'));
+        assert.match(handleSession, /\n {16}hydrateUserData\(\);\n/, 'every primary session event with a user hydrates again');
+    });
+});
+
+describe('BYOA guide step 7 names the remote role\'s grants (final review, finding 6)', () => {
+    const guide = read('doc/guides/byoa-setup.ja.md');
+    const from = guide.indexOf('### 7. VM:');
+    const step7 = guide.slice(from, guide.indexOf('\n### ', from + 1));
+    // Covered in step 7 by a general phrase rather than by name: the auth stub, the age and consent
+    // tables (「年齢と同意の表」), and what the remote tools read or log for themselves.
+    const BY_PHRASE = new Set(['auth.users', 'user_profiles', 'user_age', 'account_consents', 'user_progress', 'learning_journal', 'curricula', 'material_chunks', 'mcp_tool_calls']);
+
+    it('every table granted to risepath_mcp_remote, except those covered by a phrase, is named in step 7', () => {
+        assert.ok(from > 0 && step7.length > 1000, 'step 7');
+        const role = read('deploy/risepath-vm/sql/mcp_remote_role.sql');
+        const tables = [...new Set([...role.matchAll(/^GRANT [^\n]* ON (\w+(?:\.\w+)?) TO risepath_mcp_remote;$/gm)].map((m) => m[1]))];
+        assert.ok(tables.includes('legal_acceptances') && tables.includes('review_cards'), tables.join(', '));
+        const missing = tables.filter((table) => !BY_PHRASE.has(table) && !step7.includes(`\`${table}\``));
+        assert.deepEqual(missing, [], 'a new grant needs its line in step 7 (or a reason to be covered by a phrase)');
+    });
+
+    it('the purpose sentence names the terms check, and a Phase 8 note says when to re-run the role SQL', () => {
+        assert.match(step7, /このロールに渡すのは、リモートのツール、年齢の確認、利用規約への同意の確かめ（Phase 8。`LEGAL_TERMS_REQUIRED=true` のときだけ使います）、1 日の上限、接続したアプリの記録に要る表と列だけです/u);
+        assert.match(step7, /利用規約への同意（`legal_acceptances`、Phase 8）は、いちばん新しい同意の版と時刻を確かめる列（`user_id`、`terms_version`、`privacy_version`、`accepted_at`、`account_deleted_at`）を読むだけです。`id` は読めず、行を書けません/u);
+        const note = step7.split('\n').find((line) => line.trim().startsWith('**Phase 8 の更新**'));
+        assert.ok(note, 'the Phase 8 note');
+        assert.ok(step7.indexOf(note) < step7.indexOf('**Phase 6 の更新**'), 'newest first, as the other notes');
+        for (const must of ['`LEGAL_TERMS_REQUIRED=true`', '`legal_unavailable`', '42501', '`deploy/risepath-vm/README.md`']) {
+            assert.ok(note.includes(must), `the Phase 8 note: ${must}`);
+        }
+        // The grant the sentence describes, column for column.
+        assert.match(read('deploy/risepath-vm/sql/mcp_remote_role.sql'), /^GRANT SELECT \(user_id, terms_version, privacy_version, accepted_at, account_deleted_at\) ON legal_acceptances TO risepath_mcp_remote;$/m);
     });
 });
 

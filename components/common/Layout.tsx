@@ -217,6 +217,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
       skipToContent: 'Skip to content',
       mainNav: 'Main',
       openMenu: 'Open menu',
+      openMenuReviews: (n: number) => `Open menu (${n} ${n === 1 ? 'review' : 'reviews'} due today)`,
       closeMenu: 'Close menu',
       collapseSidebar: 'Collapse sidebar',
       expandSidebar: 'Expand sidebar',
@@ -251,6 +252,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
       skipToContent: '本文へスキップ',
       mainNav: 'メイン',
       openMenu: 'メニューを開く',
+      openMenuReviews: (n: number) => `メニューを開く（今日の復習 ${n} 枚）`,
       closeMenu: 'メニューを閉じる',
       collapseSidebar: 'サイドバーを折りたたむ',
       expandSidebar: 'サイドバーを広げる',
@@ -464,12 +466,19 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, onLogout, noti
             ref={menuButtonRef}
             type="button"
             onClick={() => setIsMobileMenuOpen((open) => !open)}
-            aria-label={isMobileMenuOpen ? t.closeMenu : t.openMenu}
+            aria-label={isMobileMenuOpen ? t.closeMenu : reviewCount !== null ? t.openMenuReviews(reviewCount) : t.openMenu}
             aria-expanded={isMobileMenuOpen}
             aria-controls="app-sidebar"
-            className={`-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-control transition-colors ${styles.iconButton}`}
+            className={`relative -mr-2 inline-flex h-11 w-11 items-center justify-center rounded-control transition-colors ${styles.iconButton}`}
           >
             {isMobileMenuOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
+            {/* Phase 8: today's review count on the closed button (its name carries it; the open drawer shows it in the entry).
+                In the corner, 2 px above the icon's top line: it never covers the line, whatever the number of digits. */}
+            {!isMobileMenuOpen && reviewCount !== null ? (
+              <span aria-hidden="true" className="absolute -right-0.5 -top-1 min-w-4 rounded-full bg-primary px-1 text-center text-caption leading-4 text-on-primary tabular-nums">
+                {reviewCount}
+              </span>
+            ) : null}
           </button>
         </header>
       )}

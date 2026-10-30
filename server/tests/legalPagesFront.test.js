@@ -491,6 +491,33 @@ describe('the legal pages (rendered)', () => {
   });
 });
 
+describe('design tokens on every legal surface (Phase 8, S4: dark mode)', () => {
+  // Wider than the four page files above: every component of the legal pages, the consent page and
+  // its notice, and the public frame and page header around them. A palette colour (bg-white,
+  // text-slate-…) stays the same in dark; tokens switch with [data-theme]. Also in phase8Front.test.js.
+  const TOKEN_RULE = /\[#[0-9a-fA-F]{3,8}\]|rounded-\[|text-\[(9|10|11)px\]|text-slate-400/;
+  const PALETTE_RULE = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|accent|decoration)-(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-\d{2,3})?\b/;
+  const tsxIn = (dir) => fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.tsx')).map((f) => `${dir}/${f}`);
+
+  it('components/features/legal, components/legal, PublicPageShell and PageHeader: no banned class, no palette colour', () => {
+    const files = [
+      ...tsxIn('components/features/legal'),
+      ...tsxIn('components/legal'),
+      'components/ui/PublicPageShell.tsx',
+      'components/ui/PageHeader.tsx',
+    ];
+    for (const expected of ['components/features/legal/LegalDocument.tsx', 'components/features/legal/TermsPage.tsx',
+      'components/features/legal/PrivacyPage.tsx', 'components/legal/LegalConsentView.tsx', 'components/legal/LegalNoticeBar.tsx']) {
+      assert.ok(files.includes(expected), expected);
+    }
+    for (const file of files) {
+      const source = read(file);
+      assert.doesNotMatch(source, TOKEN_RULE, `${file}: design tokens only`);
+      assert.doesNotMatch(source, PALETTE_RULE, `${file}: a palette colour stays light in dark`);
+    }
+  });
+});
+
 describe('routes (App.tsx, types.ts, navigation/viewPaths.ts)', () => {
   const app = read('App.tsx');
 

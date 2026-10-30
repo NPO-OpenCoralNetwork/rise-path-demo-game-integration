@@ -24,6 +24,8 @@
  *   with import.meta.env.DEV = true unless LEGAL_DRAFT_PREVIEW_BUILD=true. Public sign-up opens only
  *   with this flag on. The legal text loads only through the conditional imports in
  *   components/routes/lazyRoutes.tsx, so with the flag off Rollup drops it from the bundle.
+ *   The server cannot see this flag: its own switch LEGAL_TERMS_REQUIRED (API and remote MCP; off by
+ *   default) is turned on after this flag and off before it (doc/legal/README.md).
  * - training: the job-training section /training (doc/brushup-2026/training-plan.ja.md, D1). Off by
  *   default; on only when VITE_FEATURE_TRAINING is exactly "true" (the school's build). The API
  *   answers only where the server's TRAINING_ENABLED is "true" (server/routes/training.js). The

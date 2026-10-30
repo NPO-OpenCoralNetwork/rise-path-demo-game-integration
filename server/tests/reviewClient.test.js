@@ -372,6 +372,37 @@ describe('reviewClient: the review store (the Phase 5 store with capabilityKey "
     assert.equal(env.loads, 3);
   });
 
+  it('Phase 8: rp:legal-accepted reads the list again only when the last read was refused with terms_required (SG-5)', async () => {
+    const outcomesStore = (outcomes) => {
+      const queue = [...outcomes];
+      return store({ load: () => {
+        const next = queue.length > 0 ? queue.shift() : 'ok';
+        if (next !== 'ok') throw next;
+        return mod.parseReviewQueue(QUEUE(U1.toUpperCase()));
+      } });
+    };
+    const refused = outcomesStore([{ status: 403, errorType: 'terms_required' }]);
+    const fire = events(refused.s);
+    refused.s.consumerMounted(); // the sidebar count, mounted before the acceptance
+    await refused.s.settled();
+    assert.equal(refused.s.getSnapshot().status, 'unavailable');
+    fire('rp:legal-accepted');
+    await refused.s.settled();
+    assert.deepEqual([refused.s.getSnapshot().status, refused.env.loads], ['ready', 2], 'the menu count comes back without a reload');
+    fire('rp:legal-accepted');
+    await refused.env.advance(60_000);
+    assert.equal(refused.env.loads, 2);
+    for (const [label, outcomes] of [['ready', []], ['503', [{ status: 503 }]], ['another 403', [{ status: 403, errorType: 'ai_access_required' }]]]) {
+      const other = outcomesStore(outcomes);
+      const fireOther = events(other.s);
+      other.s.consumerMounted();
+      await other.s.settled();
+      fireOther('rp:legal-accepted');
+      await other.env.advance(60_000);
+      assert.equal(other.env.loads, 1, label);
+    }
+  });
+
   it('a lesson page (the sidebar mounted): 30 saves 20 s apart send no review request; the dashboard card or /review mounting reads once; a server-sourced record still reads (regressions #16)', async () => {
     const { s, env } = store();
     const fire = events(s);

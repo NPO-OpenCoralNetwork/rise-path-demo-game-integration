@@ -2,6 +2,8 @@
 // card (ReviewCardView), the page's state views (ReviewStateView), the dashboard card
 // (ReviewTodayCardView), the sidebar entry and its count (Layout), the reset dialog's review
 // sentence (LessonEnd), and the copy and token rules of the new files.
+// Phase 8 (S3): today's review count on the phone header's menu button (badge and name; nothing
+// when there is no count; none while the drawer is open).
 // The components are bundled with esbuild against a React stub whose jsx() returns
 // { type, props, key } (as phase5Front.test.js does); function components are expanded into host
 // elements, so classes, attributes and text can be read without a DOM.
@@ -71,6 +73,11 @@ const STUBS = {
     export const isSyncableLesson = () => true;
     export const retryProgressSync = () => true;
   `,
+  // Phase 8: LessonEnd reads the achievements store (its XP line); the real module would pull in apiClient.
+  achievements: `
+    export const useAchievements = () => globalThis.__ach ?? { status: 'idle', learnerId: null, data: null, at: null };
+    export const reloadAchievements = async () => {};
+  `,
   reviewClient: `
     const INITIAL = { status: 'idle', learnerId: null, data: null, at: null };
     export const useReviewQueue = () => globalThis.__review ?? INITIAL;
@@ -108,6 +115,7 @@ async function bundleUi(entry) {
         stub(/\/Md$/, 'md');
         stub(/\/progressSyncClient$/, 'syncClient');
         stub(/\/reviewClient$/, 'reviewClient');
+        stub(/\/achievementsClient$/, 'achievements');
         b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: STUBS[args.path], loader: 'js' }));
       },
     }],
@@ -675,6 +683,70 @@ describe('the sidebar 「復習」 and today\'s count (design §5.4)', () => {
     const dot = parts.find((el) => classesOf(el).includes('size-1.5'));
     assert.equal(dot.props['aria-hidden'], 'true');
     assert.ok(textOfElement(a).includes('（今日 4 枚）'));
+  });
+});
+
+describe('Phase 8 (S3): today\'s review count on the phone menu button', () => {
+  const layout = (review, { language = 'jp', state } = {}) => elementsOf(render(ui, ui.Layout, { currentView: 'DASHBOARD', onNavigate() {}, children: null }, {
+    __review: review, __path: '/', __language: language, ...(state ? { __state: state } : {}),
+  }));
+  // The collapse toggle also controls #app-sidebar (Layout.tsx): pick the header's menu button by its name.
+  const menuButton = (els) => {
+    const found = els.filter((el) => el.type === 'button' && el.props['aria-controls'] === 'app-sidebar' && /^(メニュー|Open menu|Close menu)/.test(el.props['aria-label'] ?? ''));
+    assert.equal(found.length, 1, found.map((el) => el.props['aria-label']).join(' | '));
+    return found[0];
+  };
+  const badgeOf = (button) => walk(button.props.children).filter((t) => 'el' in t).map((t) => t.el).filter((el) => el.type === 'span');
+
+  it('3 due: the name carries the count and one badge hidden from screen readers shows it, on tokens; EN singular and plural', () => {
+    const button = menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 3 }))));
+    assert.equal(button.props['aria-label'], 'メニューを開く（今日の復習 3 枚）');
+    assert.equal(button.props['aria-expanded'], false);
+    assert.ok(classesOf(button).includes('relative'), 'the badge is placed on the button');
+    const spans = badgeOf(button);
+    assert.equal(spans.length, 1);
+    const [badge] = spans;
+    assert.equal(badge.props['aria-hidden'], 'true');
+    assert.equal(textOfElement(badge), '3');
+    for (const cls of ['bg-primary', 'text-on-primary', 'rounded-full', 'text-caption', 'tabular-nums', 'absolute']) assert.ok(classesOf(badge).includes(cls), cls);
+    assert.doesNotMatch(badge.props.className, TOKEN_RULE);
+    // In-app check, finding 3: at top-1 right-1 the 16 px badge covered the right end of the icon's
+    // top line (lucide's Menu, "M4 5h16", 24 px in the 44 px button: that line's stroke spans y 14–16 px).
+    // Its top is now 4 px above the button (its right edge 2 px past it): its bottom (12 px) stays
+    // 2 px above the line for any number of digits (measured at 390 px with 1, 12 and 123).
+    for (const cls of ['-top-1', '-right-0.5', 'leading-4', 'min-w-4']) assert.ok(classesOf(badge).includes(cls), cls);
+    for (const cls of ['top-1', 'right-1', 'top-0', 'right-0']) assert.ok(!classesOf(badge).includes(cls), `not ${cls}`);
+    assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 3 })), { language: 'en' })).props['aria-label'], 'Open menu (3 reviews due today)');
+    assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 1 })), { language: 'en' })).props['aria-label'], 'Open menu (1 review due today)');
+    assert.equal(menuButton(layout(SNAP('ready', QUEUE({ remainingToday: 1 })))).props['aria-label'], 'メニューを開く（今日の復習 1 枚）');
+  });
+
+  it('no count (loading, no account, unavailable, an older server, nothing left today): the name and button as before, no badge', () => {
+    for (const snap of [SNAP('idle'), SNAP('loading'), SNAP('no_account'), SNAP('unavailable'), SNAP('unsupported'), SNAP('ready', QUEUE({ remainingToday: 0, doneToday: 10 }))]) {
+      const button = menuButton(layout(snap));
+      assert.equal(button.props['aria-label'], 'メニューを開く', snap.status);
+      assert.deepEqual(badgeOf(button), [], snap.status);
+      assert.equal(menuButton(layout(snap, { language: 'en' })).props['aria-label'], 'Open menu', snap.status);
+    }
+  });
+
+  it('the drawer open: 「メニューを閉じる」 and no badge (the drawer\'s entry shows the count)', () => {
+    const els = layout(SNAP('ready', QUEUE({ remainingToday: 3 })), { state: { 0: true } });
+    const button = menuButton(els);
+    assert.equal(button.props['aria-label'], 'メニューを閉じる');
+    assert.equal(button.props['aria-expanded'], true);
+    assert.deepEqual(badgeOf(button), []);
+    const entry = els.find((el) => el.type === 'a' && el.props.href === '/review');
+    assert.ok(textOfElement(entry).includes('（今日 3 枚）'), 'the open drawer carries the count');
+  });
+
+  it('the header slice: design tokens only', () => {
+    const source = readFile('components/common/Layout.tsx');
+    const header = source.slice(source.indexOf('{/* Mobile Header'), source.indexOf('{/* Sidebar Navigation'));
+    assert.ok(header.includes('openMenuReviews'), 'the slice is the header');
+    assert.doesNotMatch(header, TOKEN_RULE);
+    assert.match(source, /openMenuReviews: \(n: number\) => `メニューを開く（今日の復習 \$\{n\} 枚）`,/);
+    assert.match(source, /openMenuReviews: \(n: number\) => `Open menu \(\$\{n\} \$\{n === 1 \? 'review' : 'reviews'\} due today\)`,/);
   });
 });
 

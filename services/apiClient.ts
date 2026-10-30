@@ -99,9 +99,42 @@ async function noteAccountDeleted(res: Response): Promise<void> {
     }
 }
 
+/**
+ * A read the API did not answer with 2xx (apiGet). Phase 8 (S5): `termsRequired` when the server's
+ * terms check (LEGAL_TERMS_REQUIRED, server/middleware/termsGate.js) refused it: 403 with error_type
+ * terms_required. The message stays `API <path>: <status>`.
+ */
+export class ApiReadError extends Error {
+    status: number;
+    termsRequired: boolean;
+    constructor(path: string, status: number, termsRequired: boolean) {
+        super(`API ${path}: ${status}`);
+        this.name = 'ApiReadError';
+        this.status = status;
+        this.termsRequired = termsRequired;
+    }
+}
+
+/** The error for a read that failed; a 403's error_type is read from a copy of the body. */
+export async function apiReadError(path: string, res: Response): Promise<ApiReadError> {
+    let termsRequired = false;
+    if (res.status === 403) {
+        try {
+            const body = await res.clone().json();
+            termsRequired = Boolean(body && typeof body === 'object' && (body as { error_type?: unknown }).error_type === 'terms_required');
+        } catch {
+            // Not JSON (a proxy page): not the server's terms check.
+        }
+    }
+    return new ApiReadError(path, res.status, termsRequired);
+}
+
+/** Whether a read failed because the server's terms check refused it (Phase 8, S5). */
+export const isTermsRefusal = (error: unknown): boolean => error instanceof ApiReadError && error.termsRequired;
+
 export const apiGet = async <T = any>(path: string): Promise<T> => {
     const res = await apiFetch(path);
-    if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
+    if (!res.ok) throw await apiReadError(path, res);
     return res.json();
 };
 

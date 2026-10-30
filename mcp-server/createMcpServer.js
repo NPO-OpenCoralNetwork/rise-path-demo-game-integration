@@ -297,7 +297,7 @@ const policyTool = (name, desc, schema, handler) => {
 // --- learner-state ---
 policyTool(
     'learner-state-get',
-    '科目（ドメイン）ごとの旧形式の進捗とマスタリーを取得する。vibe-coding と claude-code のレッスンの進み具合は course-progress-get で取得する / Legacy per-domain progress and mastery. For the lessons of vibe-coding and claude-code (domains with a course_slug in content://domains), use course-progress-get.',
+    '科目（ドメイン）ごとの旧形式の進捗とマスタリーを取得する。vibe-coding と claude-code のレッスンの進み具合は course-progress-get で取得する。連続して学んだ日数（streak）は返さない（学んだ日は AI アプリからは読めない。連続日数はアプリの画面で見られる） / Legacy per-domain progress and mastery. For the lessons of vibe-coding and claude-code (domains with a course_slug in content://domains), use course-progress-get. No streak: learning days are app-only; the app shows the streak.',
     {
         user_id: z.string().optional().describe(USER_ID_DESC),
         domain: z.string().optional().describe('学習ドメイン (例: blender-3d)。省略時は全ドメイン'),

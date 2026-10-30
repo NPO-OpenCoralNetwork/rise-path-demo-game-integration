@@ -3,7 +3,7 @@
 -- the postgres image makes a superuser; the internet-facing mcp-public must not hold that.
 --
 -- Run on the VM after the migrations (015 creates mcp_oauth_grants, 016 lesson_progress, 018
--- account_deletions, 020 review_cards and review_log), from deploy/risepath-vm:
+-- account_deletions and legal_acceptances, 020 review_cards and review_log), from deploy/risepath-vm:
 --
 --   MCP_DB_PASSWORD="$(openssl rand -hex 24)"
 --   docker compose --env-file stack.env exec -T db \
@@ -22,6 +22,12 @@
 --                         account), and the verifier (mcp-server/oauthVerifier.js) refuses a deleted
 --                         account's tokens with deleted_at too. Columns user_id, deleted_at,
 --                         reopened_at; never requested_by. 018 grants the same when this role exists.
+--   legal_acceptances     the terms check (Phase 8; only with LEGAL_TERMS_REQUIRED=true,
+--                         tools/core/legalAcceptance.js): the newest live acceptance's versions and
+--                         time (columns user_id, terms_version, privacy_version, accepted_at,
+--                         account_deleted_at); never id. Read only; the result is never returned to
+--                         the app. Re-run this file before turning the switch on for mcp-public:
+--                         without the grant every call answers legal_unavailable (42501)
 --   mcp_oauth_grants      the verifier's revocation check and the (user, client) record with
 --                         first_seen_at and last_used_at (mcp-server/remote.js): columns user_id,
 --                         client_id, revoked_at, first_seen_at, last_used_at; it never writes
@@ -121,6 +127,8 @@ GRANT INSERT (user_id, client_id), UPDATE (first_seen_at, last_used_at) ON mcp_o
 GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;
 GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;
 GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;
+-- Phase 8: the terms check (LEGAL_TERMS_REQUIRED). Read only, never id; nothing is returned to the app.
+GRANT SELECT (user_id, terms_version, privacy_version, accepted_at, account_deleted_at) ON legal_acceptances TO risepath_mcp_remote;
 GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;
 GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;
 

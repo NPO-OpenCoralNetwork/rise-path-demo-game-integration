@@ -30,7 +30,7 @@ import { nextPracticeBlockId, practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
 import { LessonHeader, lessonTitleId } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
-import { ReaderStatus, stallKeyOf, stallMessageOf, type ReaderStatusMessage } from './ReaderStatus';
+import { ReaderStatus, shownReaderStatus, stallKeyOf, stallMessageOf, type ReaderStatusMessage } from './ReaderStatus';
 import { getProgressSaveView, isSyncableLesson, subscribeProgressSaveView } from './progressSyncClient';
 import { Outline } from './Outline';
 import { MarginPanel, type MarginAnchor } from './MarginPanel';
@@ -38,6 +38,7 @@ import { ReaderSheet } from './ReaderSheet';
 import { TutorPanel, type TutorLayout } from './TutorPanel';
 import { lessonLearnerState, useTutorStream, type LiveLearnerFn } from './useTutorStream';
 import ReaderSettings, { useReaderSettings } from './ReaderSettings';
+import OfflineReloadNotice, { useReaderOfflineWait } from '../common/OfflineReloadNotice';
 import './reader.css';
 
 /**
@@ -361,6 +362,9 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     const timer = window.setTimeout(() => setStatusMessage(null), 8000);
     return () => window.clearTimeout(timer);
   }, [statusMessage]);
+  // Phase 8 (S1): no "kept on this device" card while the bar's offline notice already says so.
+  const offlineWait = useReaderOfflineWait();
+  const shownStatus = shownReaderStatus(statusMessage, offlineWait);
 
   // Once the learner reads past a #s-/#b- deep link, drop it so a reload resumes where they are.
   useEffect(() => {
@@ -664,6 +668,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
           showSaveState={syncable}
           notice={(
             <>
+              {/* Phase 8 (S1): a part failed to load offline; in the bar's flow, so always in view. */}
+              <OfflineReloadNotice />
               {resumed && !statusMessage ? (
                 <div className="rp-notice" role="status">
                   <span>{text.resumed}</span>
@@ -682,7 +688,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
                   </button>
                 </div>
               ) : null}
-              <ReaderStatus message={statusMessage} onDismiss={() => setStatusMessage(null)} />
+              <ReaderStatus message={shownStatus} onDismiss={() => setStatusMessage(null)} />
             </>
           )}
         />

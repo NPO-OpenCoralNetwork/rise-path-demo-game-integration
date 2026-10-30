@@ -27,6 +27,9 @@
  *       /upload and /rag, and optionalAuth after requireAuth on the TTS routes) check the session
  *       once: getUser, the account state and the stub write are shared (oncePerRequest below).
  *       Each guard still decides on its own; nothing is kept across requests.
+ *     - with LEGAL_TERMS_REQUIRED on, a real learner's session then passes the terms check
+ *       (server/middleware/termsGate.js: 403 terms_required until they accept, except on its
+ *       TERMS_EXEMPT routes); the dev fallbacks and anonymous callers never meet it.
  *
  * @module server/middleware/auth
  */
@@ -35,6 +38,7 @@ import { getPool, PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
 import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../tools/core/oauthToken.js';
 import { readAccountState } from '../../tools/core/accountDeletions.js';
+import { termsGateStep } from './termsGate.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -243,7 +247,8 @@ export const requireAuth = async (req, res, next) => {
         // back in after losing the session: routes that keep records for a person (billing) refuse it.
         req.isAnonymous = data.user.is_anonymous === true;
         await syncAuthUserStubOnce(req, req.userId);
-        next();
+        // Phase 8: the terms check (off unless LEGAL_TERMS_REQUIRED; server/middleware/termsGate.js).
+        return termsGateStep(req, res, next);
     } catch (err) {
         console.error('[Auth] JWT validation error:', err.message);
         return res.status(500).json({ error: 'Authentication service error' });
@@ -251,8 +256,8 @@ export const requireAuth = async (req, res, next) => {
 };
 
 /**
- * Optional auth: set req.userId and req.accountGeneration (as requireAuth) when a valid token is
- * present; otherwise anonymous (req.userId null, no generation).
+ * Optional auth: set req.userId, req.accountGeneration and req.isAnonymous (as requireAuth) when a
+ * valid token is present; otherwise anonymous (req.userId null, no generation).
  * Invalid or expired tokens do not block the request (unlike requireAuth).
  */
 export const optionalAuth = async (req, res, next) => {
@@ -309,8 +314,11 @@ export const optionalAuth = async (req, res, next) => {
         req.userId = data.user.id;
         req.authMethod = 'supabase-jwt';
         req.accountGeneration = account.generation;
+        // As requireAuth (Phase 8): the terms check never gates an anonymous Supabase user.
+        req.isAnonymous = data.user.is_anonymous === true;
         await syncAuthUserStubOnce(req, req.userId);
-        return next();
+        // Phase 8: the terms check (off unless LEGAL_TERMS_REQUIRED; server/middleware/termsGate.js).
+        return termsGateStep(req, res, next);
     } catch (err) {
         console.warn('[Auth] optionalAuth JWT validation failed:', err.message);
         req.userId = null;

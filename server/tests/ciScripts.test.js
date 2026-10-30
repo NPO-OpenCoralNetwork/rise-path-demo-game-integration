@@ -19,6 +19,7 @@ import { JST_OFFSET_S, secondsToJstMidnight, waitPastJstMidnight } from '../../s
 import { SECRET_KEY, redact, secretValues } from '../../scripts/ci/redact-log.mjs';
 import { isPlaceholder } from '../../scripts/ci/scan-secrets.mjs';
 import { DEFAULT_PORT as STANDIN_DEFAULT_PORT } from '../../e2e/support/auth-stand-in.mjs';
+import { LATEST_ACCEPTANCE_SQL } from '../../tools/core/legalAcceptance.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** @param {string} file */
@@ -414,6 +415,15 @@ describe('scripts/ci/db-checks.sh', () => {
         assert.match(code, /^if psql "\$\{REMOTE\}" -X -At -c 'SELECT count\(\*\) FROM xp_awards' > \/dev\/null 2>&1; then bad "the role read xp_awards"; else ok /m);
     });
 
+    it('Phase 8: the role reads the newest acceptance with the terms check\'s own statement, and never legal_acceptances.id', () => {
+        const role = read('deploy/risepath-vm/sql/mcp_remote_role.sql');
+        assert.match(role, /^GRANT SELECT \(user_id, terms_version, privacy_version, accepted_at, account_deleted_at\) ON legal_acceptances TO risepath_mcp_remote;$/m);
+        const statement = LATEST_ACCEPTANCE_SQL.replace('$1::uuid', "'00000000-0000-4000-8000-000000000000'::uuid");
+        assert.ok(code.includes(`expect_eq "reads the newest acceptance (terms check, Phase 8)" "$(psql "\${REMOTE}" -X -At -c "SELECT count(*) FROM (${statement}) a")" 0\n`),
+            'db-checks.sh runs exactly LATEST_ACCEPTANCE_SQL as the role');
+        assert.match(code, /^if psql "\$\{REMOTE\}" -X -At -c 'SELECT id FROM legal_acceptances LIMIT 1' > \/dev\/null 2>&1; then bad "the role read legal_acceptances\.id"; else ok "the role cannot read legal_acceptances\.id"; fi$/m);
+    });
+
     it('a failed check or a failing verify script fails the job and keeps the PostgreSQL log', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
         // Every query answers '0' (so `server major` and others fail) and verify-phase5.mjs exits 1;
         // the guard and the other scripts pass. The job is a required check: a failure must end red.
@@ -430,6 +440,7 @@ describe('scripts/ci/db-checks.sh', () => {
             "FAIL never granted: got '0', want 'learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false'",
             'FAIL a wrong password logged in',
             'FAIL the role read xp_awards',
+            'FAIL the role read legal_acceptances.id',
         ]) assert.ok(lines.includes(line), line);
         assert.match(lines.at(-1) ?? '', /^# Database checks: FAILED \(outputs in .+\)$/, 'the verdict is the last line');
         assert.doesNotMatch(out, /# Database checks: all passed/);
