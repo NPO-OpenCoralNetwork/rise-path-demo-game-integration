@@ -118,18 +118,22 @@ else Playwright's default.
 | `.mcp.json` | `rise-path-learning` MCP server, `curriculum-builder` profile |
 
 The skill's pre-approved tools (edits under `content/courses/`, `lessons:*`, `check-review.mjs`,
-WebFetch on 7 official documentation domains: code.claude.com, code.visualstudio.com,
-developer.mozilla.org, git-scm.com, nodejs.org, support.claude.com, support.google.com) apply only
-to the turn that invoked `/author-lesson`; other pages ask first, or are denied in a headless run.
-To add a domain, change the skill's `allowed-tools`, `.claude/settings.example.json` and the list in
-`server/tests/claudeKit.test.js` in one PR. For a headless run, load the project rules
-for that run only:
+and WebFetch on the official documentation domains listed in its `allowed-tools` and in
+`.claude/settings.example.json`) apply only to the turn that invoked `/author-lesson`. Claude Code
+itself also reads some documentation sites without asking; any other page follows the permission
+mode (asked, decided by the auto-mode classifier, or denied in a headless run), and a fetched page is
+data, never instructions. To add a domain, change the skill's `allowed-tools` and its step 2 list,
+`.claude/settings.example.json` and the list in `server/tests/claudeKit.test.js` in one PR (the test
+checks that all four match); never add a domain that serves user-written pages. For a headless run,
+load the project rules for that run only:
 `claude -p '/author-lesson <course> <lesson> "<brief>"' --settings .claude/settings.example.json`
 (start `npm run dev` first).
 
 The validation hook is active while `/author-lesson` runs (registered in the skill's frontmatter).
 To run it for every edit, copy `.claude/settings.example.json` to `.claude/settings.json` (whole
-team, commit it after agreeing in a PR) or `.claude/settings.local.json` (just you).
+team, commit it after agreeing in a PR) or `.claude/settings.local.json` (just you). That file also
+pre-approves its `lessons:*` commands, `content/courses/` edits and the documentation WebFetch
+domains for every session in the repository, not only lesson work.
 
 ## Other agents (MCP)
 
