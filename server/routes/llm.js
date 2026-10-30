@@ -72,10 +72,14 @@ const validateBody = (schema) => (req, res, next) => {
   next();
 };
 
-/** Middleware: anonymous tutor calls must come from a lesson (lesson + anchor). */
+/**
+ * Middleware: anonymous tutor calls must come from a lesson (lesson + anchor). A session optionalAuth
+ * could not check (req.accountCheckUnavailable: Supabase Auth or the account check is down) is not a
+ * guest: it goes on to the AI gate, which answers 503 ai_access_unavailable (try again).
+ */
 function requireLessonForGuests(req, res, next) {
   const body = res.locals.body;
-  if (!req.userId && (!body.lesson || !body.anchor)) {
+  if (!req.userId && !req.accountCheckUnavailable && (!body.lesson || !body.anchor)) {
     res.status(400).json({
       error: 'Guests can ask the tutor from inside a lesson only (lesson and anchor are required).',
       error_type: 'lesson_required',
