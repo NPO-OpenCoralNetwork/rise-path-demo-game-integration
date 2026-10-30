@@ -3,14 +3,18 @@
 // content routes, and optionalAuth in front of the TTS routes. Each guard asked Supabase, read the
 // account state and wrote the auth.users stub again. Now the guards of one request share those
 // answers, and each still decides as before. The bridge token is compared in constant time
-// (tools/core/sameSecret.js) in bridgeAuth.js and in the SSE MCP resolver.
+// (tools/core/sameSecret.js) in bridgeAuth.js and in the SSE MCP resolver. When Supabase Auth cannot
+// answer (tools/core/authUnavailable.js), a learner is not told to sign in again: requireAuth and
+// requireBridgeOrAuth answer 503 auth_unavailable, optionalAuth flags the request for the AI gate.
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
+import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
 import { createApp } from '../../server.js';
 import { optionalAuth, requireAuth, setSupabaseForTests, extractBearerToken } from '../middleware/auth.js';
 import { requireBridgeOrAuth } from '../middleware/bridgeAuth.js';
+import { aiAccessGate } from '../middleware/aiAccessGate.js';
 import { PHASE1_USER_ID, resetPoolForTests, setPoolForTests } from '../db.js';
 import { createSseUserResolver } from '../../mcp-server/sseUserAuth.js';
 import { readAccountState } from '../../tools/core/accountDeletions.js';
@@ -39,8 +43,10 @@ const session = (sub, signedIn = DELETED_S - 86_400) => `${b64({ alg: 'ES256', k
 })}.c2ln`;
 
 /**
- * Supabase as the api sees it: getUser names the token's sub. mode 'refuse' rejects every token,
- * 'throw' fails like an unreachable auth server.
+ * Supabase as the api sees it: getUser names the token's sub. mode 'refuse' rejects every token as
+ * Supabase Auth does (AuthApiError 403 bad_jwt); 'retryable' answers as auth-js 2.89 does when
+ * Supabase Auth cannot be reached: it resolves with an AuthRetryableFetchError, it does not throw.
+ * 'throw' rejects, which getUser does only for an error that is not an AuthError.
  */
 const supabase = {
     calls: 0,
@@ -49,8 +55,11 @@ const supabase = {
         getUser: async (token) => {
             supabase.calls += 1;
             if (supabase.mode === 'throw') throw new Error('fetch failed (auth server unreachable)');
+            if (supabase.mode === 'retryable') return { data: { user: null }, error: new AuthRetryableFetchError('fetch failed', 0) };
             const sub = decodeTokenClaims(token)?.sub;
-            if (supabase.mode === 'refuse' || typeof sub !== 'string') return { data: { user: null }, error: { message: 'invalid JWT' } };
+            if (supabase.mode === 'refuse' || typeof sub !== 'string') {
+                return { data: { user: null }, error: new AuthApiError('invalid JWT: unable to parse or verify signature', 403, 'bad_jwt') };
+            }
             return { data: { user: { id: sub } }, error: null };
         },
     },
@@ -303,6 +312,93 @@ describe('several guards on one request (development)', () => {
         });
     });
 });
+
+const AUTH_UNAVAILABLE = { error: 'Sign-in cannot be checked right now. Please try again.', error_type: 'auth_unavailable' };
+/** Supabase was asked, then nothing: no account read, no auth.users stub. */
+const ASKED_ONLY = { getUser: 1, accountReads: 0, stubInserts: 0 };
+
+/** optionalAuth as the LLM gateway mounts it (then the AI gate), and on an ungated route. */
+const optionalApp = () => {
+    const app = express();
+    app.get('/gated', optionalAuth, aiAccessGate(), (req, res) => res.json({ userId: req.userId ?? null }));
+    app.get('/ungated', optionalAuth, (req, res) => res.json({ userId: req.userId ?? null, authMethod: req.authMethod }));
+    return app;
+};
+
+for (const mode of ['production', 'development']) {
+    describe(`Supabase Auth cannot answer: 503, never "sign in again" (${mode})`, () => {
+        useEnv(mode);
+
+        it('requireAuth: 503 auth_unavailable, with no account read and no stub write; a refused token stays 401', async () => {
+            const pool = createAccountDeletionPool();
+            setPoolForTests(pool);
+            await listen(guardedApp(requireAuth), async (request) => {
+                supabase.mode = 'retryable';
+                const response = await request('/guarded', { token: session(LEARNER) });
+                assert.equal(response.status, 503);
+                assert.deepEqual(response.json, AUTH_UNAVAILABLE);
+                assert.deepEqual(checks(pool), ASKED_ONLY);
+                supabase.mode = 'refuse';
+                const refused = await request('/guarded', { token: session(LEARNER) });
+                assert.equal(refused.status, 401);
+                assert.deepEqual(refused.json, { error: 'Invalid or expired token' });
+            });
+        });
+
+        it('requireBridgeOrAuth: 503 auth_unavailable, never the dev fallback, with no account read and no stub write; a refused token is refused as before', async () => {
+            const pool = createAccountDeletionPool();
+            setPoolForTests(pool);
+            await listen(guardedApp(requireBridgeOrAuth), async (request) => {
+                supabase.mode = 'retryable';
+                const response = await request('/guarded', { token: session(LEARNER) });
+                assert.equal(response.status, 503);
+                assert.deepEqual(response.json, AUTH_UNAVAILABLE);
+                assert.deepEqual(checks(pool), ASKED_ONLY);
+                supabase.mode = 'refuse';
+                const refused = await request('/guarded', { token: session(LEARNER) });
+                if (mode === 'production') {
+                    assert.equal(refused.status, 401);
+                    assert.deepEqual(refused.json, { error: 'Authentication required (Bridge token or Supabase JWT)' });
+                } else {
+                    // Development falls back to the dev user for a refused token, as before.
+                    assert.equal(refused.status, 200);
+                    assert.equal(refused.json.authMethod, 'dev-fallback');
+                }
+            });
+        });
+
+        it('optionalAuth: the learner is not taken for a guest (the AI gate answers 503 ai_access_unavailable, an ungated route answers as anonymous), with no account read and no stub write; a refused token is a guest', async () => {
+            const pool = createAccountDeletionPool();
+            setPoolForTests(pool);
+            await listen(optionalApp(), async (request) => {
+                supabase.mode = 'retryable';
+                const gated = await request('/gated', { token: session(LEARNER) });
+                assert.equal(gated.status, 503);
+                assert.equal(gated.json?.error_type, 'ai_access_unavailable');
+                const ungated = await request('/ungated', { token: session(LEARNER) });
+                assert.equal(ungated.status, 200);
+                assert.deepEqual(ungated.json, { userId: null, authMethod: 'anonymous' });
+                assert.deepEqual(checks(pool), { getUser: 2, accountReads: 0, stubInserts: 0 });
+                supabase.mode = 'refuse';
+                const refused = await request('/gated', { token: session(LEARNER) });
+                assert.equal(refused.status, 401);
+                assert.equal(refused.json?.error_type, 'sign_in_required');
+            });
+        });
+
+        it('optionalAuth, then requireAuth: Supabase is asked once and requireAuth answers 503', async () => {
+            const pool = createAccountDeletionPool();
+            setPoolForTests(pool);
+            supabase.mode = 'retryable';
+            await listen(guardedApp(optionalAuth, requireAuth), async (request) => {
+                const response = await request('/guarded', { token: session(LEARNER) });
+                assert.equal(response.status, 503);
+                assert.deepEqual(response.json, AUTH_UNAVAILABLE);
+                assert.deepEqual(checks(pool), ASKED_ONLY);
+            });
+        });
+    });
+}
 
 describe('the bridge token is compared in constant time', () => {
     it('sameSecret: only the same non-empty string matches', () => {
