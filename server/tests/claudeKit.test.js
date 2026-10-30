@@ -369,7 +369,11 @@ describe('rules and instruction files', () => {
     const style = read('.claude/skills/author-lesson/references/style-guide.ja.md');
     assert.match(style, /`level: "beginner"`[\s\S]*日常のたとえ話/);
     assert.match(style, /出典が裏づけることだけを書/);
+    assert.match(style, /自明でない記述に出典がなければ/, 'only non-obvious claims need a source');
+    assert.match(style, /メニュー・ボタン・画面・ショートカット/);
+    assert.match(style, /1 つのたとえで[\s\S]{0,30}関連する用語/, 'one analogy may cover related terms');
     assert.doesNotMatch(style, /確かめられないことは書かないか、出典を付けます/, 'no "leave it out or cite it"');
+    assert.match(read('.claude/skills/author-lesson/templates/brief.md'), /what it supports/, 'the brief records what each source says');
 
     // The reviewer blocks on all three.
     const { body } = parseFrontmatter(read('.claude/agents/pedagogy-reviewer.md'));
@@ -377,7 +381,7 @@ describe('rules and instruction files', () => {
     for (const item of ['uncited claim', 'unverified UI step', 'missing analogy']) assert.ok(mustFix.includes(`**${item}**`), `pedagogy-reviewer must-fix: ${item}`);
     assert.match(mustFix, /`level: "beginner"`/);
     assert.match(mustFix, /reports\/facts\/<lesson>\.facts\.md/, 'the reviewer checks claims against the recorded source notes');
-    assert.match(read('.claude/skills/review-lesson/SKILL.md'), /unverified UI step[\s\S]*`level: "beginner"`/);
+    assert.match(read('.claude/skills/review-lesson/SKILL.md'), /unverified UI step[\s\S]*every new term without an everyday analogy[\s\S]*`level: "beginner"`/);
 
     // Short mentions in the rules every agent loads.
     for (const [where, text] of [['.claude/rules/content.md', read('.claude/rules/content.md')], ['AGENTS.md', read('AGENTS.md')]]) {
