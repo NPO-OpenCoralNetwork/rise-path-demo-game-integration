@@ -35,7 +35,7 @@
     {
       "id": "o2",
       "text": {
-        "jp": "変えたいものが UI か API かを見分けて、AIへの依頼を書き分けられる",
+        "jp": "変えたいものがUIかAPIかを見分けて、AIへの依頼を書き分けられる",
         "en": "Tell whether a change belongs to the UI or the API, and word your AI request to match"
       },
       "bloom": "apply"
@@ -43,7 +43,7 @@
     {
       "id": "o3",
       "text": {
-        "jp": "デプロイと Git のコミットが何をしているかを説明できる",
+        "jp": "デプロイとGitのコミットが何をしているかを説明できる",
         "en": "Explain what deployment and a Git commit actually do"
       },
       "bloom": "understand"
@@ -62,7 +62,7 @@
           "id": "hook-b1",
           "type": "markdown",
           "md": {
-            "jp": "AIに「タスク管理アプリを作って」と頼むと、画面はすぐにできました。ところが、ページを再読み込みすると、入力したタスクが消えてしまいます。この章の終わりには、直すための依頼を書けるようになります。\n\n何が足りないのでしょうか。まず予想してみましょう。",
+            "jp": "AIに「タスク管理アプリを作って」と頼むと、画面はすぐにできました。ところが、ページを再読み込みすると、入力したタスクが消えてしまいます。この章の終わりには、直す依頼を書けるようになります。\n\n何が足りないのでしょうか。まず予想してみましょう。",
             "en": "You ask an AI to \"build a task app\", and a working screen appears right away. But when you reload the page, every task you typed is gone. By the end of this chapter, you will be able to write the requests that fix it.\n\nWhat is missing? Make a guess first."
           },
           "style": "lead"
@@ -93,13 +93,10 @@
                   "md": {
                     "jp": "画面のデザインがまだ完成していないから",
                     "en": "The screen design isn't finished yet"
-                  }
-                },
-                {
-                  "id": "b",
-                  "md": {
-                    "jp": "データを保存する係（バックエンドとデータベース）がないから",
-                    "en": "Nothing is storing the data (no backend or database)"
+                  },
+                  "feedback": {
+                    "jp": "画面が完成していても、保存する仕組みがなければ、再読み込みでデータは消えます。",
+                    "en": "Even with a finished screen, data is lost on reload if nothing saves it."
                   }
                 },
                 {
@@ -107,6 +104,17 @@
                   "md": {
                     "jp": "ブラウザのバージョンが古いから",
                     "en": "The browser is out of date"
+                  },
+                  "feedback": {
+                    "jp": "ブラウザが新しくても、保存していないデータは再読み込みで消えます。",
+                    "en": "Even in an up-to-date browser, data that is not saved is lost on reload."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "データを保存する仕組みがないから",
+                    "en": "Nothing saves the data"
                   }
                 }
               ],
@@ -114,8 +122,8 @@
                 "b"
               ],
               "explanation": {
-                "jp": "画面の中で覚えているだけのデータは、保存しないと再読み込みで消えます。多くのWebアプリは、データをデータベースに保存しておき、必要なときに取り出します。この保存係の仕組みを、1-1で見ていきます。",
-                "en": "Data that only lives inside the page is lost on reload unless it is saved. Most web apps keep their data in a database and fetch it when they need it. Section 1-1 looks at how that works."
+                "jp": "画面の中で覚えているだけのデータは、保存しないと再読み込みで消えます。多くのWebアプリは、データを専用の保存場所にしまっておき、必要なときに取り出します。この保存の仕組みを、1-1で見ていきます。",
+                "en": "Data that only lives inside the page is lost on reload unless it is saved. Most web apps keep their data in a dedicated store and fetch it when they need it. Section 1-1 looks at how that works."
               },
               "objectiveId": "o1",
               "bloom": "understand"
@@ -127,7 +135,7 @@
     {
       "id": "1-1",
       "title": {
-        "jp": "1-1. フロントエンド / バックエンド / データベースの関係",
+        "jp": "1-1. フロントエンド・バックエンド・データベースの関係",
         "en": "1-1. How the frontend, backend and database relate"
       },
       "role": "concept",
@@ -139,8 +147,8 @@
             "mdn-server-side"
           ],
           "md": {
-            "jp": "第0章で、人間は「何を作るか」を示し、正しいかを判断する役だと確認しました。そのために、アプリの部分を知っておきましょう。Webアプリの多くは、3つの部分が分担して動いています。",
-            "en": "In Chapter 0 we agreed that your role is to say what to build and to judge whether it is right. For that, get to know the parts an app is made of. Most web apps are three parts that split the work."
+            "jp": "第0章で、人間は「何を作るか」を示し、正しいかを判断する役だと確認しました。そのために、アプリのつくりを知っておきましょう。Webアプリの多くは、3つの部分が分担して動いています。",
+            "en": "In Chapter 0 we agreed that your role is to say what to build and to judge whether it is right. For that, get to know how an app is put together. Most web apps are made of three parts that split the work."
           },
           "style": "lead"
         },
@@ -182,8 +190,8 @@
                 "en": "Backend"
               },
               "md": {
-                "jp": "サーバー（依頼に答えるコンピューター）で動く部分です。届いたデータや依頼を確かめ、データベースとデータを出し入れして、結果を返します。",
-                "en": "The part that runs on a server (a computer that answers requests). It checks the data and requests that arrive, saves and fetches data in the database, and sends back the result."
+                "jp": "サーバー（server：依頼に答えるコンピューター）で動く部分です。届いたデータや依頼を確かめ、データベースにデータを保存したり取り出したりして、結果を返します。",
+                "en": "The part that runs on a server (a computer that answers requests). It checks the data and requests that arrive, saves data to and fetches it from the database, and sends back the result."
               }
             },
             {
@@ -210,16 +218,16 @@
             "en": "flowchart TD\n  User((User)) -->|uses| Front[Frontend<br>screen in the browser]\n  Front <-->|requests and replies| Back[Backend<br>server]\n  Back <-->|save and fetch| DB[(Database)]"
           },
           "caption": {
-            "jp": "ユーザーが触るのはフロントエンドだけ。データの出し入れは、バックエンドとデータベースがおこなう",
-            "en": "Users only touch the frontend; the backend and the database handle the data behind it"
+            "jp": "ユーザーが触るのはフロントエンドだけで、データの保存と取り出しはバックエンドとデータベースがおこなう",
+            "en": "Users only touch the frontend; the backend and the database save and fetch the data behind it"
           },
           "alt": {
-            "jp": "上から下へ、ユーザーがフロントエンドを操作し、フロントエンドとバックエンドが依頼と返事をやり取りし、バックエンドとデータベースがデータを保存・取り出しする図",
+            "jp": "上から下へ、ユーザーがフロントエンドを操作し、フロントエンドとバックエンドが依頼と返事をやり取りし、バックエンドとデータベースがデータを保存したり取り出したりする図",
             "en": "Top-to-bottom diagram: the user operates the frontend, the frontend and backend exchange requests and replies, and the backend saves data to and fetches it from the database"
           },
           "description": {
-            "jp": "ユーザーが触るのはフロントエンドだけです。フロントエンドはバックエンドに依頼し、バックエンドがデータベースを読み書きして返事をします。",
-            "en": "Users only touch the frontend. The frontend sends requests to the backend, and the backend reads and writes the database and replies."
+            "jp": "ユーザーが触るのはフロントエンドだけです。フロントエンドはバックエンドに依頼し、バックエンドがデータベースに保存したり取り出したりして返事をします。",
+            "en": "Users only touch the frontend. The frontend sends requests to the backend, and the backend saves data to and fetches it from the database, then replies."
           }
         },
         {
@@ -230,8 +238,8 @@
             "mdn-client-storage"
           ],
           "md": {
-            "jp": "冒頭のタスクが消えたのは、保存を受け持つ[[バックエンド]]と[[データベース]]がなかったからでしょう。画面の見た目をいくら直しても、保存する仕組みは増えません。直す依頼の組み立て方は、1-5の例題で見ます。",
-            "en": "The tasks in the opening most likely vanished because there was no [[backend]] or [[database]] to save them. No amount of work on how the screen looks adds a way to save data. Section 1-5 shows how to build the requests that fix this."
+            "jp": "冒頭のタスクが消えたのは、保存を受け持つ[[バックエンド]]と[[データベース]]がなかったからでしょう。見た目をいくら直しても、保存の仕組みは増えません。直し方は、1-5の例題で見ます。",
+            "en": "The tasks in the opening most likely vanished because there was no [[backend]] or [[database]] to save them. No amount of work on how the screen looks adds a way to save data. Section 1-5 shows how to fix this."
           }
         },
         {
@@ -262,21 +270,14 @@
                   }
                 },
                 {
-                  "id": "b",
-                  "md": {
-                    "jp": "届いた金額を確かめて、データベースに保存を頼む",
-                    "en": "Check an amount that arrives and have the database save it"
-                  }
-                },
-                {
                   "id": "c",
                   "md": {
                     "jp": "支出の記録を、整理してしまっておく",
                     "en": "Keep the spending records organized"
                   },
                   "feedback": {
-                    "jp": "記録をしまっておく場所は、データベースです。バックエンドは、そこへの出し入れを受け持ちます。",
-                    "en": "Keeping the records is the database's job. The backend is what puts data in and takes it out."
+                    "jp": "記録をしまっておく場所は、データベースです。バックエンドは、そこへの保存と取り出しを受け持ちます。",
+                    "en": "Keeping the records is the database's job. The backend is what saves data there and fetches it."
                   }
                 },
                 {
@@ -289,13 +290,20 @@
                     "jp": "ボタンの見た目の変化は、ブラウザで動くフロントエンドの仕事です。サーバーで動くバックエンドは関わりません。",
                     "en": "How a button looks is handled by the frontend in the browser. The backend on the server is not involved."
                   }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "入力された金額を調べてから、保存させる",
+                    "en": "Check an entered amount, then have it saved"
+                  }
                 }
               ],
               "answer": [
                 "b"
               ],
               "explanation": {
-                "jp": "バックエンドは、サーバーで依頼を受け、データを確かめて、データベースとの出し入れを受け持ちます。画面の表示はフロントエンド、記録をしまうのはデータベースの仕事です。",
+                "jp": "バックエンドは、サーバーで依頼を受け、データを確かめて、データベースへの保存と取り出しを受け持ちます。画面の表示はフロントエンド、記録をしまうのはデータベースの仕事です。",
                 "en": "The backend receives requests on the server, checks the data, and handles saving to and fetching from the database. Showing the screen is the frontend's job, and keeping the records is the database's."
               },
               "hint": {
@@ -325,7 +333,7 @@
             "mdn-glossary-api"
           ],
           "md": {
-            "jp": "AIへの依頼で、よく出てくる言葉が2つあります。UI（User Interface）とAPI（Application Programming Interface）です。どちらも「窓口」ですが、だれのための窓口かが違います。",
+            "jp": "AIへの依頼でよく出る言葉が2つあります。UI（User Interface）とAPI（Application Programming Interface）です。どちらも「窓口」ですが、だれのための窓口かが違います。",
             "en": "Two words come up often when you ask an AI for changes: UI (User Interface) and API (Application Programming Interface). Both are windows into an app, but they serve different users."
           }
         },
@@ -341,8 +349,8 @@
             "en": "Back to the restaurant"
           },
           "md": {
-            "jp": "お客さんが見て選ぶメニューは、人のための窓口で、UIにあたります。ホールが決まった頼み方で厨房に注文を通すのは、プログラム同士の窓口のAPIです。注文票の書き方が、JSON（JavaScript Object Notation）です。",
-            "en": "The menu that customers read and choose from is a window for people: the UI. The agreed way the dining room passes orders to the kitchen is a window between programs: the API. The way the order slips are written is JSON (JavaScript Object Notation)."
+            "jp": "お客さんが見て選ぶメニューは、人のための窓口で、UIにあたります。ウェイターが厨房に注文を通す決まった頼み方は、プログラム同士の窓口で、APIにあたります。注文票の書き方が、JSON（JavaScript Object Notation）です。",
+            "en": "The menu that customers read and choose from is a window for people: the UI. The agreed way the waiters pass orders to the kitchen is a window between programs: the API. The way the order slips are written is JSON (JavaScript Object Notation)."
           }
         },
         {
@@ -372,8 +380,8 @@
                 "en": "API"
               },
               "md": {
-                "jp": "プログラム同士がやり取りするための窓口と決まりです。Webアプリでは、フロントエンドがAPIを通して、バックエンドにデータを頼みます。",
-                "en": "A window, with its rules, through which programs talk to each other. In a web app, the frontend asks the backend for data through the API."
+                "jp": "プログラム同士がやり取りするための窓口と決まりです。Webアプリでは、フロントエンドがAPIを通して、バックエンドにデータの保存や取り出しを頼みます。",
+                "en": "A window, with its rules, through which programs talk to each other. In a web app, the frontend asks the backend to save or fetch data through the API."
               }
             },
             {
@@ -420,8 +428,8 @@
             "en": "Tip: say which side"
           },
           "md": {
-            "jp": "見た目（色・大きさ・配置・動き）ならUIへ、届くデータの中身ならAPIへの依頼です。「画面だけ変えて」のように、変える範囲も書きましょう。範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。",
-            "en": "Looks (colour, size, layout, motion) are a UI request; the content of the data that arrives is an API request. Also say how far the change should go, as in \"change only the screen\". Some AI tools' official guides say the AI keeps to the scope you state."
+            "jp": "見た目（色・大きさ・配置・動き）ならUI、届くデータの中身ならAPIの変更です。「画面だけ変えて」のように、変える範囲も書きましょう。範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。",
+            "en": "Looks (colour, size, layout, motion) are a UI change; the content of the data that arrives is an API change. Also say how far the change should go, as in \"change only the screen\". One AI tool's official guide says the AI keeps to the scope you state."
           }
         },
         {
@@ -431,8 +439,8 @@
             "cc-champion-kit"
           ],
           "title": {
-            "jp": "UIへの依頼の例",
-            "en": "Example: a UI request"
+            "jp": "UIの変更を頼む例",
+            "en": "Example: asking for a UI change"
           },
           "prompt": {
             "jp": "タスク一覧の画面だけを変更してください。完了したタスクは、{{完了したタスクの見せ方}}で表示してください。APIとデータベースは変更しないでください。",
@@ -443,14 +451,14 @@
             {
               "name": "完了したタスクの見せ方",
               "hint": {
-                "jp": "例：文字を薄い灰色にする",
+                "jp": "例：薄い灰色の文字",
                 "en": "e.g. grey out the text"
               }
             },
             {
               "name": "how to show finished tasks",
               "hint": {
-                "jp": "例：文字を薄い灰色にする",
+                "jp": "例：薄い灰色の文字",
                 "en": "e.g. grey out the text"
               }
             }
@@ -467,8 +475,8 @@
             "cc-champion-kit"
           ],
           "title": {
-            "jp": "APIへの依頼の例",
-            "en": "Example: an API request"
+            "jp": "APIの変更を頼む例",
+            "en": "Example: asking for an API change"
           },
           "prompt": {
             "jp": "タスクの一覧を返すAPIに、「{{追加したい項目}}」を加えてください。データベースに保存する場所がなければ、追加してください。いまある項目は変えず、画面の見た目も変更しないでください。",
@@ -509,7 +517,7 @@
               "kind": "single",
               "prompt": {
                 "jp": "タスク管理アプリで、AIに「APIが返すデータを変えて」と頼むべき変更はどれでしょう？",
-                "en": "In the task app, which change should you ask the AI for as \"change the data the API returns\"?"
+                "en": "In the task app, which change calls for asking the AI to \"change the data the API returns\"?"
               },
               "options": [
                 {
@@ -519,14 +527,14 @@
                     "en": "Change the Done button from red to blue"
                   },
                   "feedback": {
-                    "jp": "ボタンの色は見た目なので、UIへの依頼です。APIが返すデータは変わりません。",
-                    "en": "A button colour is about looks, so it is a UI request. The data the API returns stays the same."
+                    "jp": "ボタンの色は見た目なので、UIの変更です。APIが返すデータは変わりません。",
+                    "en": "A button colour is about looks, so it is a UI change. The data the API returns stays the same."
                   }
                 },
                 {
                   "id": "b",
                   "md": {
-                    "jp": "タスクを消すときの動きを、なめらかにする",
+                    "jp": "タスクを消すときの動きを、もっとなめらかにする",
                     "en": "Make the animation smoother when a task is removed"
                   },
                   "feedback": {
@@ -537,8 +545,8 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "タスクごとに、担当者の名前も受け取れるようにする",
-                    "en": "Receive the name of the person in charge with each task"
+                    "jp": "各タスクで、担当者の名前も受け取る",
+                    "en": "Receive the assignee's name with each task"
                   }
                 },
                 {
@@ -557,8 +565,8 @@
                 "c"
               ],
               "explanation": {
-                "jp": "担当者の名前を受け取るには、APIが返すデータの中身を変える必要があります。色・動き・文字の大きさは、UIへの依頼で変えます。",
-                "en": "To receive the name of the person in charge, the content of the data the API returns has to change. Colour, motion and text size are changed with a UI request."
+                "jp": "担当者の名前を受け取るには、APIが返すデータの中身を変えます。色・動き・文字の大きさは、UIの変更として頼みます。",
+                "en": "To receive the assignee's name, the content of the data the API returns has to change. Colour, motion and text size are asked for as a UI change."
               },
               "hint": {
                 "jp": "サーバーから「届くデータの中身」が変わるのはどれでしょう？",
@@ -582,8 +590,8 @@
               "en": "How do I read JSON?"
             },
             {
-              "jp": "UIとAPIのどちらに頼むか迷ったら？",
-              "en": "What if I can't tell whether a change is for the UI or the API?"
+              "jp": "UIとAPIのどちらの変更か迷ったら？",
+              "en": "What if I can't tell whether a change is a UI change or an API change?"
             }
           ]
         }
@@ -604,8 +612,8 @@
             "mdn-publishing"
           ],
           "md": {
-            "jp": "自分のパソコンでアプリが動いても、そのままでは、ほかの人は使えません。使ってもらうには、インターネットにつながったサーバーに置きます。",
-            "en": "Even when an app runs on your own computer, other people cannot use it yet. For them to use it, the app goes on a server connected to the internet."
+            "jp": "自分のパソコンでアプリが動いても、そのままでは、ほかの人は使えません。使ってもらうには、インターネット上のサーバーに置きます。",
+            "en": "Even when an app runs on your own computer, other people cannot use it yet. For them to use it, the app goes on a server on the internet."
           }
         },
         {
@@ -613,12 +621,12 @@
           "type": "callout",
           "variant": "analogy",
           "title": {
-            "jp": "料理にたとえると",
-            "en": "Think of cooking"
+            "jp": "お菓子にたとえると",
+            "en": "Think of homemade sweets"
           },
           "md": {
-            "jp": "自宅の台所（自分のパソコン）で試作した料理を、お店（サーバー）で出すまでを考えます。下ごしらえがビルド（build）、お店に運ぶのが転送、店を開けて注文を待つのが起動にあたります。開店までの流れ全体が、デプロイ（deploy）です。",
-            "en": "Picture a dish you tried out in your home kitchen (your own computer) that you now want to serve at a restaurant (a server). The prep work is the build, carrying it to the restaurant is the transfer, and opening up to take orders is the launch. The whole path to opening is deployment."
+            "jp": "家で作ったお菓子（自分のパソコンで作ったアプリ）を、売り場（サーバー）で売るまでを考えます。袋に詰めるのがビルド（build）、売り場へ運ぶのが転送、売り場を開けてお客さんを待つのが起動です。売り始めるまでの全体が、デプロイ（deploy）です。",
+            "en": "Picture sweets you made at home (the app you built on your own computer) that you now want to sell at a stall (a server). Packing them is the build, carrying them to the stall is the transfer, and opening the stall to wait for customers is the launch. The whole path to the first sale is deployment."
           }
         },
         {
@@ -645,8 +653,8 @@
                 "en": "Build"
               },
               "md": {
-                "jp": "書いたコードを、公開用にまとめ直すことです。ファイルを小さくした、サーバーに送れる一式ができます。",
-                "en": "Repackaging the code you wrote for publishing. It produces a smaller set of files, ready to send to a server."
+                "jp": "書いたコードを、公開用にまとめ直すことです。サーバーに送れる、小さくまとめたファイル一式ができます。",
+                "en": "Repackaging the code you wrote for publishing. It produces a compact set of files, ready to send to a server."
               }
             }
           ]
@@ -671,8 +679,8 @@
           ],
           "items": [
             {
-              "jp": "ビルド：書いたコードから、公開用のファイル一式を作ります。",
-              "en": "Build: make a set of files for publishing from the code you wrote."
+              "jp": "ビルド：公開用のファイル一式を作ります。",
+              "en": "Build: make the set of files for publishing."
             },
             {
               "jp": "転送：できたファイルを、サーバーに送ります。",
@@ -689,56 +697,57 @@
           "type": "quiz",
           "mode": "inline",
           "cite": [
-            "mdn-publishing",
-            "mdn-deployment"
+            "mdn-server-side",
+            "mdn-express-intro",
+            "mdn-publishing"
           ],
           "questions": [
             {
               "id": "q7",
               "kind": "single",
               "prompt": {
-                "jp": "自分のパソコンで、タスク管理アプリが動くようになりました。この時点の説明として、正しいのはどれでしょう？",
-                "en": "The task app now runs on your own computer. Which statement about this point is correct?"
+                "jp": "タスク管理アプリのファイルを、サーバーに送り終えました。それでも、まだだれも開けません。足りない手順として、最も考えられるのはどれでしょう？",
+                "en": "You have sent the task app's files to the server, but nobody can open the app yet. Which missing step is the most likely?"
               },
               "options": [
                 {
-                  "id": "a",
+                  "id": "b",
                   "md": {
-                    "jp": "もう、だれでもインターネットから使える",
-                    "en": "It is already open to everyone over the internet"
-                  },
-                  "feedback": {
-                    "jp": "自分のパソコンで動いているだけでは、ほかの人は使えません。サーバーに置くデプロイが必要です。",
-                    "en": "Running on your own computer is not enough for others to use it. It still needs to be deployed to a server."
+                    "jp": "サーバーで、依頼に答えるよう起動する",
+                    "en": "Launch it so it answers requests"
                   }
                 },
                 {
-                  "id": "b",
+                  "id": "a",
                   "md": {
-                    "jp": "ほかの人が使うには、まだデプロイが要る",
-                    "en": "It still has to be deployed before others can use it"
+                    "jp": "自分のパソコンで、もう一度アプリを動かす",
+                    "en": "Run the app on your own computer again"
+                  },
+                  "feedback": {
+                    "jp": "自分のパソコンで動かしても、サーバーのアプリは開けるようになりません。サーバーで起動して、依頼に答えられる状態にします。",
+                    "en": "Running it on your own computer does not make the server's copy open. Launch it on the server so it answers requests."
                   }
                 },
                 {
                   "id": "c",
                   "md": {
-                    "jp": "ビルドさえすれば、ほかの人もすぐ使える",
-                    "en": "Once it is built, others can use it right away"
+                    "jp": "同じファイルを、もう一度サーバーに送り直す",
+                    "en": "Send the same files to the server again"
                   },
                   "feedback": {
-                    "jp": "ビルドは、公開用のファイルを作るところまでです。サーバーへの転送と起動が済んで、はじめて使えます。",
-                    "en": "A build only makes the files for publishing. Others can use the app once it has been transferred to the server and launched."
+                    "jp": "ファイルは、もうサーバーに届いています。足りないのは、届いた依頼に答える起動の段階です。",
+                    "en": "The files are already on the server. What is missing is the launch, so that it answers the requests that arrive."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "画面を完成させれば、ほかの人も使える",
-                    "en": "Once the screen is finished, others can use it"
+                    "jp": "画面のデザインを、もう一度作り直す",
+                    "en": "Redesign the screen once more"
                   },
                   "feedback": {
-                    "jp": "画面の出来とは別に、アプリをサーバーに置かないと、ほかの人は使えません。",
-                    "en": "However finished the screen is, others cannot use the app until it is on a server."
+                    "jp": "見た目を作り直しても、開けるようにはなりません。サーバーで起動して、依頼に答えられる状態にします。",
+                    "en": "A new design does not make the app open. Launch it on the server so it answers requests."
                   }
                 }
               ],
@@ -746,12 +755,12 @@
                 "b"
               ],
               "explanation": {
-                "jp": "自分のパソコンで動いても、ほかの人はまだ使えません。ビルド・転送・起動を経て、サーバーで動き始めてから使えるようになります。",
-                "en": "Running on your own computer does not let others use it yet. It becomes usable once it has been built, transferred and launched on a server."
+                "jp": "デプロイは、ビルド・転送・起動の順に進みます。ファイルを送っただけでは、まだ依頼に答えられません。サーバーで起動して、はじめて開けるようになります。",
+                "en": "A deployment goes build, transfer, launch. Sending the files does not yet let the server answer requests; the app opens once it has been launched on the server."
               },
               "hint": {
-                "jp": "ほかの人のスマホから、あなたのパソコンの中のアプリは開けるでしょうか？",
-                "en": "Could someone else's phone open an app that lives only on your computer?"
+                "jp": "デプロイの3つの段階のうち、まだ済んでいないのはどれでしょう？",
+                "en": "Which of the three steps of a deployment has not happened yet?"
               },
               "objectiveId": "o3",
               "bloom": "understand"
@@ -807,8 +816,8 @@
                 "en": "Git"
               },
               "md": {
-                "jp": "ファイルの変更を記録して、あとで前の版を呼び戻せるようにする道具です。",
-                "en": "A tool that records changes to files so you can bring back an earlier version later."
+                "jp": "ファイルの変更を記録して、あとで前の版に戻せるようにする道具です。",
+                "en": "A tool that records changes to files so you can go back to an earlier version later."
               }
             },
             {
@@ -831,8 +840,8 @@
             "git-about-vc"
           ],
           "md": {
-            "jp": "[[コミット]]した状態には、あとからほぼ必ず戻れます。反対に、一度もコミットしていない変更は、失うと取り戻せないことがほとんどです。だから、AIに頼む前に、動いている状態をコミットします。",
-            "en": "You can almost always get back to a state you have [[commit|committed]]. Changes you never committed, on the other hand, are usually gone for good once lost. So before you ask an AI for a change, commit the state that works."
+            "jp": "[[コミット]]した状態には、あとからほぼ必ず戻れます。反対に、コミットしていない変更は、失うと取り戻せないことがほとんどです。だから、AIに頼む前に、動いている状態をコミットします。",
+            "en": "You can almost always get back to a state you have [[commit|committed]]. Changes you have not committed, on the other hand, are usually gone for good once lost. So before you ask an AI for a change, commit the state that works."
           }
         },
         {
@@ -847,8 +856,8 @@
             "en": "A common trap"
           },
           "md": {
-            "jp": "「AIツールの巻き戻しがあれば、コミットは要らない」は誤解です。たとえばAIツールのClaude Codeも、公式ドキュメントで、この機能はGitの代わりではないと書いています。",
-            "en": "\"With an AI tool's rewind feature, I don't need commits\" is a misunderstanding. The official documentation of one AI tool, Claude Code, says that feature is not a replacement for Git."
+            "jp": "「AIツールの巻き戻しがあれば、コミットは要らない」とは限りません。たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。",
+            "en": "An AI tool's rewind does not necessarily make commits unnecessary. Claude Code's official documentation, for example, says that feature is not a replacement for Git."
           }
         },
         {
@@ -878,7 +887,7 @@
             {
               "name": "頼みたい変更",
               "hint": {
-                "jp": "例：タスクに期限を付ける",
+                "jp": "例：タスクに期限を付ける変更",
                 "en": "e.g. add due dates to tasks"
               }
             },
@@ -892,7 +901,7 @@
             {
               "name": "change you want",
               "hint": {
-                "jp": "例：タスクに期限を付ける",
+                "jp": "例：タスクに期限を付ける変更",
                 "en": "e.g. add due dates to tasks"
               }
             }
@@ -903,7 +912,7 @@
           },
           "note": {
             "jp": "Gitを使う準備は、第5章でおこないます。いまは、頼み方の形だけ覚えておきましょう。",
-            "en": "You will set up Git in Chapter 5. For now, just remember the shape of the request."
+            "en": "You will set up Git in Chapter 5. For now, remember the shape of the request."
           }
         },
         {
@@ -936,13 +945,6 @@
                   }
                 },
                 {
-                  "id": "b",
-                  "md": {
-                    "jp": "コミットした状態に戻してから、頼み方を見直す",
-                    "en": "Go back to the commit, then rethink how you asked"
-                  }
-                },
-                {
                   "id": "c",
                   "md": {
                     "jp": "いまの状態を、新しいコミットとして記録する",
@@ -962,6 +964,13 @@
                   "feedback": {
                     "jp": "作り直すと、動いていた部分まで変わってしまいます。コミットした状態に戻せば、壊れる前から始められます。",
                     "en": "A rebuild also changes the parts that worked. Going back to the commit lets you start from before it broke."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "コミットした状態に戻し、頼み方を見直す",
+                    "en": "Return to the commit and rethink the request"
                   }
                 }
               ],
@@ -999,7 +1008,7 @@
           ],
           "md": {
             "jp": "冒頭のタスク管理アプリを直す依頼を組み立てます。ポイントは、データ側（APIとデータベース）と画面側（UI）に分けて、1つずつ頼むことです。",
-            "en": "Let's build the requests that fix the task app from the opening, using what you have learned so far. The key is to split the work into the data side (the API and the database) and the screen side (the UI), and ask for one at a time."
+            "en": "Let's build the requests that fix the task app from the opening. The key is to split the work into the data side (the API and the database) and the screen side (the UI), and ask for one at a time."
           }
         },
         {
@@ -1036,11 +1045,11 @@
                 "en": "2. Split them by the part that handles them"
               },
               "md": {
-                "jp": "保存は[[データベース]]、保存と一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。分けると、依頼ごとに変える範囲を書けます。",
-                "en": "Saving is the [[database]]'s job, passing tasks in and out is the [[API]]'s, and showing them is the [[UI]]'s. Once they are split, each request can say what it may change."
+                "jp": "保存は[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。分けると、依頼ごとに変える範囲を書けます。",
+                "en": "Saving is the [[database]]'s job, passing the tasks to save and the list back and forth is the [[API]]'s, and showing them is the [[UI]]'s. Once they are split, each request can say what it may change."
               },
               "expect": {
-                "jp": "データ側の依頼と、画面側の依頼の2つに分かれます。",
+                "jp": "依頼が、データ側と画面側の2つに分かれます。",
                 "en": "You have two requests: one for the data side and one for the screen side."
               }
             },
@@ -1081,8 +1090,8 @@
                 "en": "5. Then ask for the screen side"
               },
               "md": {
-                "jp": "「タスク一覧を、APIから受け取ったデータで表示して。追加もAPIで保存して。APIとデータベースは変えないで」と頼みます。",
-                "en": "Ask: \"Show the task list using the data from the API. Save new tasks through the API too. Don't change the API or the database.\""
+                "jp": "APIができたので、画面はそれを使うだけです。「一覧を、APIから受け取ったデータで表示して。追加もAPIで保存して。APIとデータベースは変えないで」と頼みます。",
+                "en": "The API is ready, so the screen only has to use it. Ask: \"Show the list using the data from the API. Save new tasks through the API too. Don't change the API or the database.\""
               },
               "expect": {
                 "jp": "画面の一覧に、APIから受け取ったタスクが並びます。",
@@ -1104,8 +1113,8 @@
                 "en": "The task you added is still there after the reload."
               },
               "troubleshoot": {
-                "jp": "消えてしまうときは、追加したタスクがAPIで保存されていません。⑤の依頼で、追加をAPIで保存するよう頼み直します。",
-                "en": "If it disappears, the new task is not being saved through the API. Ask again as in step 5, so that adding a task saves it through the API."
+                "jp": "消えてしまうときは、保存か読み込みのどちらかが、APIを通っていません。⑤の依頼を見直して、頼み直します。",
+                "en": "If it disappears, either saving or loading is not going through the API. Check the request in step 5 and ask again."
               }
             }
           ]
@@ -1123,26 +1132,19 @@
               "id": "q9",
               "kind": "single",
               "prompt": {
-                "jp": "直ったタスク管理アプリに「期限」を足して、再読み込みしても残るようにしたいとします。最初に送る依頼として、最も適切なのはどれでしょう？",
-                "en": "You want to add due dates to the fixed task app and keep them after a reload. Which request should you send first?"
+                "jp": "直ったタスク管理アプリに「期限」を足して、再読み込みしても残るようにしたいとします。いまの状態のコミットは済ませました。次に送る依頼として、最も適切なのはどれでしょう？",
+                "en": "You want to add due dates to the fixed task app and keep them after a reload. You have already committed the current state. Which request should you send next?"
               },
               "options": [
                 {
                   "id": "a",
                   "md": {
-                    "jp": "「タスク一覧の各タスクに、期限の日付を表示して」",
-                    "en": "\"Show a due date on each task in the list.\""
+                    "jp": "「各タスクに期限の日付を表示して。APIとデータベースは変えないで」",
+                    "en": "\"Show a due date on each task in the list. Don't change the API or the database.\""
                   },
                   "feedback": {
                     "jp": "表示だけを頼んでも、期限を保存する場所がありません。先にデータ側で、保存して返す仕組みを作ります。",
                     "en": "Asking only for the display leaves nowhere to save the due date. First have the data side save it and return it."
-                  }
-                },
-                {
-                  "id": "b",
-                  "md": {
-                    "jp": "「期限を保存し、一覧のAPIでも返して。画面はまだ変えないで」",
-                    "en": "\"Save the due date and return it in the list API. Don't change the screen yet.\""
                   }
                 },
                 {
@@ -1157,14 +1159,21 @@
                   }
                 },
                 {
+                  "id": "b",
+                  "md": {
+                    "jp": "「期限を保存し、一覧のAPIでも返して。画面はまだ変えないで」",
+                    "en": "\"Save due dates and return them in the list API. Leave the screen as is.\""
+                  }
+                },
+                {
                   "id": "d",
                   "md": {
                     "jp": "「期限が近いタスクの文字を、赤くして目立たせて」",
                     "en": "\"Make tasks that are almost due stand out in red.\""
                   },
                   "feedback": {
-                    "jp": "文字の色は見た目なので、UIへの依頼です。期限を残すには、まずデータ側に保存を頼みます。",
-                    "en": "Text colour is about looks, so it is a UI request. To keep the due dates, first ask the data side to save them."
+                    "jp": "文字の色は見た目なので、UIの変更です。期限を残すには、まずデータ側の保存を頼みます。",
+                    "en": "Text colour is about looks, so it is a UI change. To keep the due dates, first ask for saving on the data side."
                   }
                 }
               ],
@@ -1172,8 +1181,8 @@
                 "b"
               ],
               "explanation": {
-                "jp": "期限を残すには、まずデータ側に「保存して返す」仕組みが要ります。「画面はまだ変えないで」と書くと、変える範囲が1つにしぼれます。表示は、そのあとで頼みます。",
-                "en": "To keep due dates, the data side first needs a way to save and return them. Writing \"don't change the screen yet\" narrows the change to one side. Ask for the display after that."
+                "jp": "期限を残すには、まずデータ側に「保存して返す」仕組みが要ります。「画面はまだ変えないで」と書くと、変える範囲をデータ側だけにしぼれます。入力と表示は、そのあとで画面側に頼みます。",
+                "en": "To keep due dates, the data side first needs a way to save and return them. Writing \"don't change the screen yet\" keeps the change to the data side. Ask the screen side for the input and the display after that."
               },
               "hint": {
                 "jp": "再読み込みしても残すには、どこに保存しておく必要があったでしょう？",
@@ -1198,22 +1207,87 @@
           "id": "practice-task",
           "type": "markdown",
           "md": {
-            "jp": "読書記録アプリで、本ごとに「読み終えた日」を記録し、一覧にも表示したいとします。1-5の例題にならって、AIへの依頼を3つ書いてみましょう。コミットの依頼、データ側への依頼、画面側への依頼です。\n\nメモ帳などに書き、AIに送る必要はありません。書けたら下のチェックリストで確かめ、最後に模範解答と比べます。目安は5分です。",
-            "en": "In a reading-log app, you want to record the date you finished each book and show it in the list. Following the worked example in 1-5, write three requests to an AI: one to commit, one for the data side and one for the screen side.\n\nWrite them in a notes app; you do not need to send them to an AI. When you are done, check them against the checklist below, then compare them with the model answer. Allow about 5 minutes."
+            "jp": "読書記録アプリで、本ごとに「読み終えた日」を記録し、一覧にも表示したいとします。1-5の例題にならって、AIへの依頼を3つ書いてみましょう。コミットの依頼、データ側への依頼、画面側への依頼です。\n\nAIには送らず、メモ帳などに書きます。書けたら下のチェックリストで確かめ、最後に模範解答と比べます。目安は5分です。",
+            "en": "In a reading-log app, you want to record the date you finished each book and show it in the list. Following the worked example in 1-5, write three requests to an AI: one to commit, one for the data side and one for the screen side.\n\nDo not send them to an AI; write them in a notes app. When you are done, check them against the checklist below, then compare them with the model answer. Allow about 5 minutes."
           }
         },
         {
-          "id": "practice-hint",
-          "type": "callout",
-          "variant": "tip",
-          "title": {
-            "jp": "ヒント",
-            "en": "Hints"
-          },
-          "md": {
-            "jp": "ヒント1：再読み込みしても残ってほしいものは、データ側に頼みます。\n\nヒント2：1-5の確認問題で選んだ依頼の「期限」を、「読み終えた日」に置きかえてみましょう。",
-            "en": "Hint 1: anything that should still be there after a reload goes to the data side.\n\nHint 2: take the request you chose in the 1-5 check question and replace \"due date\" with \"date finished\"."
-          }
+          "id": "practice-steps",
+          "type": "steps",
+          "cite": [
+            "git-commit",
+            "cc-quickstart",
+            "mdn-server-side",
+            "mdn-network-requests",
+            "cc-champion-kit"
+          ],
+          "items": [
+            {
+              "id": "p-commit",
+              "title": {
+                "jp": "① コミットの依頼を書く",
+                "en": "1. Write the commit request"
+              },
+              "md": {
+                "jp": "変更の前に、いまの状態をコミットしてもらう1文を書きます。",
+                "en": "Write one sentence that has the AI commit the current state before any change."
+              },
+              "expect": {
+                "jp": "最初の依頼が、コミットの依頼になっています。",
+                "en": "Your first request asks for a commit."
+              },
+              "hint": {
+                "jp": "1-4の「AIに変更を頼む前のひとこと」が使えます。",
+                "en": "You can use \"One line before you ask for changes\" from 1-4."
+              }
+            },
+            {
+              "id": "p-data",
+              "title": {
+                "jp": "② データ側の依頼を書く",
+                "en": "2. Write the data-side request"
+              },
+              "md": {
+                "jp": "読み終えた日を残すための、データ側への依頼を書きます。",
+                "en": "Write the data-side request that keeps the date finished."
+              },
+              "expect": {
+                "jp": "「保存する」「一覧で返す」と、変えない範囲が入っています。",
+                "en": "It asks to save the date and return it with the list, and says what not to change."
+              },
+              "hint": {
+                "jp": "再読み込みしても残ってほしいものは、データ側の依頼に入れます。",
+                "en": "Anything that should still be there after a reload goes into the data-side request."
+              },
+              "troubleshoot": {
+                "jp": "1-5の確認問題で正解だった依頼の「期限」を、「読み終えた日」に置きかえます。",
+                "en": "Take the correct request from the 1-5 check question and replace \"due date\" with \"date finished\"."
+              }
+            },
+            {
+              "id": "p-screen",
+              "title": {
+                "jp": "③ 画面側の依頼を書く",
+                "en": "3. Write the screen-side request"
+              },
+              "md": {
+                "jp": "読み終えた日を入力し、一覧に表示するための依頼を書きます。",
+                "en": "Write the request that lets you enter the date finished and shows it in the list."
+              },
+              "expect": {
+                "jp": "「入力してAPIで保存する」「一覧に表示する」と、変えない範囲が入っています。",
+                "en": "It asks to enter the date and save it through the API, to show it in the list, and says what not to change."
+              },
+              "hint": {
+                "jp": "画面は、APIを通してデータを保存したり受け取ったりします。",
+                "en": "The screen saves and receives data through the API."
+              },
+              "troubleshoot": {
+                "jp": "1-5の手順⑤の依頼をもとに、「読み終えた日を入力してAPIで保存し、一覧に表示して」と書きます。",
+                "en": "Start from the request in step 5 of 1-5: \"Let me enter the date finished and save it through the API, and show it in the list.\""
+              }
+            }
+          ]
         },
         {
           "id": "practice-checklist",
@@ -1245,6 +1319,13 @@
               }
             },
             {
+              "id": "pc-input",
+              "label": {
+                "jp": "画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてある",
+                "en": "The screen-side request lets you enter the date and save it through the API"
+              }
+            },
+            {
               "id": "pc-order",
               "label": {
                 "jp": "データ側を先に、画面側をあとに頼む順になっている",
@@ -1254,8 +1335,8 @@
             {
               "id": "pc-scope",
               "label": {
-                "jp": "どちらの依頼にも、変えない範囲が書いてある",
-                "en": "Each request says what not to change"
+                "jp": "データ側と画面側のどちらの依頼にも、変えない範囲が書いてある",
+                "en": "Both the data-side and the screen-side request say what not to change"
               }
             }
           ]
@@ -1268,8 +1349,8 @@
             "cc-champion-kit"
           ],
           "title": {
-            "jp": "模範解答①：データ側への依頼",
-            "en": "Model answer 1: the data-side request"
+            "jp": "模範解答：データ側への依頼（2つ目）",
+            "en": "Model answer: the data-side request (2nd)"
           },
           "prompt": {
             "jp": "本ごとに「読み終えた日」を保存できるようにしてください。本の一覧を返すAPIでも、読み終えた日を返してください。画面はまだ変更しないでください。",
@@ -1281,28 +1362,29 @@
             "en": "Each book in the returned JSON gets a field for the date you finished it. The screen does not change yet."
           },
           "note": {
-            "jp": "この依頼の前に、1-4の「AIに変更を頼む前のひとこと」でコミットを頼みます。",
-            "en": "Before this request, ask for a commit with \"One line before you ask for changes\" from 1-4."
+            "jp": "1つ目の依頼は、1-4の「AIに変更を頼む前のひとこと」と同じ、コミットの依頼です。",
+            "en": "The first request is the commit request from 1-4, \"One line before you ask for changes\"."
           }
         },
         {
           "id": "practice-answer-ui",
           "type": "prompt",
           "cite": [
-            "cc-champion-kit"
+            "cc-champion-kit",
+            "mdn-network-requests"
           ],
           "title": {
-            "jp": "模範解答②：画面側への依頼",
-            "en": "Model answer 2: the screen-side request"
+            "jp": "模範解答：画面側への依頼（3つ目）",
+            "en": "Model answer: the screen-side request (3rd)"
           },
           "prompt": {
-            "jp": "本の一覧に、APIから受け取った「読み終えた日」を表示してください。APIとデータベースは変更しないでください。",
-            "en": "Show the \"date finished\" received from the API in the book list. Do not change the API or the database."
+            "jp": "本ごとに「読み終えた日」を入力できるようにして、APIで保存してください。本の一覧には、APIから受け取った読み終えた日を表示してください。APIとデータベースは変更しないでください。",
+            "en": "Let me enter the \"date finished\" for each book and save it through the API. Show the date finished received from the API in the book list. Do not change the API or the database."
           },
           "target": "any",
           "expect": {
-            "jp": "一覧の各本に、読み終えた日が表示されます。再読み込みしても、表示は残ります。",
-            "en": "Each book in the list shows the date you finished it, and it is still there after a reload."
+            "jp": "読み終えた日を入力でき、一覧の各本に表示されます。再読み込みしても残ります。",
+            "en": "You can enter the date finished, and each book in the list shows it. It is still there after a reload."
           }
         }
       ]
@@ -1348,13 +1430,6 @@
                   }
                 },
                 {
-                  "id": "b",
-                  "md": {
-                    "jp": "予約を受け付けるバックエンドの確認を直す",
-                    "en": "Fix the check in the backend that accepts bookings"
-                  }
-                },
-                {
                   "id": "c",
                   "md": {
                     "jp": "データベースを、別の種類に入れ替える",
@@ -1368,12 +1443,19 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "利用者に、別のブラウザを使ってもらう",
-                    "en": "Ask customers to use a different browser"
+                    "jp": "画面で、満席の時間を選べなくするだけにする",
+                    "en": "Only stop the screen from offering full time slots"
                   },
                   "feedback": {
-                    "jp": "ブラウザを変えても、受け付けの判断は変わりません。直すのは、届いた予約を確かめるバックエンドです。",
-                    "en": "A different browser does not change whether a booking is accepted. The fix belongs in the backend that checks incoming bookings."
+                    "jp": "画面で選べなくしても、届いた予約を受け付けるかどうかは、バックエンドが決めます。直すのは、そこの確認です。",
+                    "en": "Even if the screen hides full slots, the backend decides whether an incoming booking is accepted. That check is what needs fixing."
+                  }
+                },
+                {
+                  "id": "b",
+                  "md": {
+                    "jp": "予約を受け付けるバックエンドの確認を直す",
+                    "en": "Fix the check in the backend that accepts bookings"
                   }
                 }
               ],
@@ -1396,6 +1478,13 @@
               },
               "options": [
                 {
+                  "id": "b",
+                  "md": {
+                    "jp": "「金額を右寄せで少し大きくして。APIとデータベースは変えないで」",
+                    "en": "\"Right-align the amounts and make them a little larger. Don't change the API or the database.\""
+                  }
+                },
+                {
                   "id": "a",
                   "md": {
                     "jp": "「家計簿アプリを、もっと使いやすく作り直して」",
@@ -1407,31 +1496,24 @@
                   }
                 },
                 {
-                  "id": "b",
-                  "md": {
-                    "jp": "「一覧の金額を右寄せにして、文字を大きくして。APIとデータベースは変えないで」",
-                    "en": "\"Right-align the amounts in the list and make them larger. Don't change the API or the database.\""
-                  }
-                },
-                {
                   "id": "c",
                   "md": {
-                    "jp": "「金額を返すAPIを作り直して、一覧の表示も新しくして」",
-                    "en": "\"Rebuild the API that returns the amounts, and redo the list too.\""
+                    "jp": "「金額を返すAPIを作り直して、一覧の金額も右寄せで大きく表示して」",
+                    "en": "\"Rebuild the API that returns the amounts, and show the amounts in the list right-aligned and larger.\""
                   },
                   "feedback": {
-                    "jp": "見た目の変更なのに、APIまで作り直すことになります。届くデータは同じなので、UIだけに頼みます。",
-                    "en": "This is a change in looks, yet it rebuilds the API as well. The data stays the same, so ask only for a UI change."
+                    "jp": "見た目の変更なのに、APIまで作り直すことになります。届くデータは同じなので、UIの変更として頼みます。",
+                    "en": "This is a change in looks, yet it rebuilds the API as well. The data stays the same, so ask for a UI change."
                   }
                 },
                 {
                   "id": "d",
                   "md": {
-                    "jp": "「金額の表示の向きと大きさを、データベースに保存して」",
-                    "en": "\"Save the alignment and size of the amounts in the database.\""
+                    "jp": "「金額のそろえ方と大きさを、データベースに保存して」",
+                    "en": "\"Save how the amounts are aligned and sized in the database.\""
                   },
                   "feedback": {
-                    "jp": "表示の向きや大きさは、画面の見せ方です。データとして保存するのではなく、UIで変えます。",
+                    "jp": "そろえ方や大きさは、画面の見せ方です。データとして保存するのではなく、UIで変えます。",
                     "en": "Alignment and size are about how the screen presents things. Change them in the UI rather than saving them as data."
                   }
                 }
@@ -1440,8 +1522,8 @@
                 "b"
               ],
               "explanation": {
-                "jp": "見た目だけの変更なので、UIへの依頼です。「APIとデータベースは変えないで」と範囲も書くと、関係のない場所を変えないよう伝えられます。",
-                "en": "This changes only the looks, so it is a UI request. Adding \"don't change the API or the database\" tells the AI to leave the other parts alone."
+                "jp": "見た目だけの変更なので、UIの変更として頼みます。「APIとデータベースは変えないで」と範囲も書くと、関係のない場所を変えないよう伝えられます。",
+                "en": "This changes only the looks, so ask for a UI change. Adding \"don't change the API or the database\" tells the AI to leave the other parts alone."
               },
               "objectiveId": "o2",
               "bloom": "apply"
@@ -1450,15 +1532,15 @@
               "id": "q4",
               "kind": "single",
               "prompt": {
-                "jp": "デプロイの途中で、ビルドが終わりました。この時点の説明として、正しいのはどれでしょう？",
-                "en": "Partway through a deployment, the build has finished. Which statement about this point is correct?"
+                "jp": "自分のパソコンで、ビルドが終わりました。この時点の説明として、正しいのはどれでしょう？",
+                "en": "The build has just finished on your own computer. Which statement about this point is correct?"
               },
               "options": [
                 {
                   "id": "a",
                   "md": {
-                    "jp": "ほかの人が、もうインターネットから使える",
-                    "en": "Other people can already use it over the internet"
+                    "jp": "ほかの人も、もうインターネットから開ける",
+                    "en": "Other people can already open it over the internet"
                   },
                   "feedback": {
                     "jp": "まだサーバーに送っていません。転送と起動が済んで、はじめて使えるようになります。",
@@ -1468,8 +1550,8 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "公開用のファイル一式ができたが、まだサーバーにはない",
-                    "en": "The files for publishing exist, but they are not on the server yet"
+                    "jp": "ファイルはできたが、まだ送っていない",
+                    "en": "The files exist but have not been sent yet"
                   }
                 },
                 {
@@ -1486,12 +1568,12 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "データベースの記録が、すべて新しくなった",
-                    "en": "Every record in the database has been replaced"
+                    "jp": "サーバーで、もう依頼を待ち受けている",
+                    "en": "It is already waiting for requests on the server"
                   },
                   "feedback": {
-                    "jp": "ビルドが作るのは、公開用のファイルです。データベースの記録を作り直す作業ではありません。",
-                    "en": "A build makes the files for publishing. It does not rebuild the records in the database."
+                    "jp": "依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。",
+                    "en": "Waiting for requests comes after the files are sent and launched. A build only makes the files for publishing."
                   }
                 }
               ],
@@ -1499,8 +1581,8 @@
                 "b"
               ],
               "explanation": {
-                "jp": "ビルドでできるのは、サーバーに送る準備ができたファイル一式です。このあと転送と起動を経て、ほかの人が使えるようになります。",
-                "en": "A build produces a set of files ready to send to the server. After the transfer and the launch, other people can use the app."
+                "jp": "自分のパソコンでのビルドでできるのは、サーバーに送る準備ができたファイル一式です。このあと転送と起動を経て、ほかの人が使えるようになります。",
+                "en": "A build on your own computer produces a set of files ready to send to the server. After the transfer and the launch, other people can use the app."
               },
               "objectiveId": "o3",
               "bloom": "understand"
@@ -1520,8 +1602,15 @@
                     "en": "\"Right. With a rewind feature, you don't need commits.\""
                   },
                   "feedback": {
-                    "jp": "巻き戻しはその場の作業を戻すためのもので、Gitの代わりではありません。長く残す記録には、コミットを使います。",
-                    "en": "Rewind is for quickly undoing work in the current session; it does not replace Git. Use commits for the record you keep."
+                    "jp": "巻き戻しが、Gitの代わりになるとは限りません。たとえばClaude Codeの公式ドキュメントは、代わりではないと書いています。",
+                    "en": "A rewind feature does not necessarily replace Git. Claude Code's official documentation, for example, says its rewind does not."
+                  }
+                },
+                {
+                  "id": "c",
+                  "md": {
+                    "jp": "「頼む前に、動く状態をコミットしよう。戻れるから」",
+                    "en": "\"Commit the working state first, so you can go back.\""
                   }
                 },
                 {
@@ -1536,21 +1625,14 @@
                   }
                 },
                 {
-                  "id": "c",
-                  "md": {
-                    "jp": "「頼む前に、動いている状態をコミットしよう。あとで戻れるよ」",
-                    "en": "\"Commit the working state before you ask. Then you can go back later.\""
-                  }
-                },
-                {
                   "id": "d",
                   "md": {
                     "jp": "「コミットしておくと、AIが間違えにくくなるよ」",
                     "en": "\"Committing first makes the AI less likely to make mistakes.\""
                   },
                   "feedback": {
-                    "jp": "コミットは状態を記録するだけで、AIの答えを変えるものではありません。間違えたときに戻る場所を作るために使います。",
-                    "en": "A commit only records a state; it does not change what the AI produces. It gives you a place to return to when something goes wrong."
+                    "jp": "コミットは状態を記録するもので、AIの間違いを防ぐ仕組みではありません。間違えたときに戻る場所を作るために使います。",
+                    "en": "A commit records a state; it is not a way to prevent AI mistakes. It gives you a place to return to when something goes wrong."
                   }
                 }
               ],
@@ -1558,8 +1640,8 @@
                 "c"
               ],
               "explanation": {
-                "jp": "コミットした状態には、あとからほぼ必ず戻れます。AIツールの巻き戻しは、Gitの代わりではありません。頼む前に、動いている状態をコミットしておきます。",
-                "en": "You can almost always get back to a committed state, and an AI tool's rewind does not replace Git. Commit the working state before you ask."
+                "jp": "コミットした状態には、あとからほぼ必ず戻れます。AIツールの巻き戻しが、Gitの代わりになるとは限りません。頼む前に、動いている状態をコミットしておきます。",
+                "en": "You can almost always get back to a committed state, and an AI tool's rewind does not necessarily replace Git. Commit the working state before you ask."
               },
               "objectiveId": "o3",
               "bloom": "apply"
@@ -1591,11 +1673,11 @@
               "en": "A web app splits the work: the frontend handles the screen, the backend answers requests, and the database keeps the data."
             },
             {
-              "jp": "見た目を変えたいならUI、届くデータを変えたいならAPIに頼みます。依頼には、変えない範囲も書きます。",
-              "en": "Ask the UI for changes in looks and the API for changes in the data that arrives. Say what should not change, too."
+              "jp": "見た目はUIの変更、届くデータはAPIの変更として、AIに頼みます。依頼には、変えない範囲も書きます。",
+              "en": "Ask the AI for a UI change when you want different looks, and for an API change when you want different data. Say what should not change, too."
             },
             {
-              "jp": "デプロイは、ビルド・転送・起動を経て、作ったアプリをほかの人が使える状態にすることです。",
+              "jp": "デプロイは、ビルド・転送・起動を経て、アプリをほかの人が使える状態にすることです。",
               "en": "Deployment makes your app usable by others, through a build, a transfer and a launch."
             },
             {
@@ -1608,8 +1690,8 @@
           "id": "summary-next",
           "type": "markdown",
           "md": {
-            "jp": "最近「アプリのここを変えたい」と思ったことを1つ選び、UIとAPIのどちらへの依頼か考えてみましょう。\n\n次の第2章では、作る前に、何を作るかをAIと一緒に決める方法を学びます。",
-            "en": "Pick one thing you recently wanted to change in an app, and decide whether you would ask for it as a UI change or an API change.\n\nIn Chapter 2, you will learn how to decide what to build together with an AI, before you build it."
+            "jp": "最近「アプリのここを変えたい」と思ったことを1つ選び、UIとAPIのどちらの変更か考えてみましょう。\n\n次の第2章では、何を作るかをAIと一緒に決める方法を学びます。",
+            "en": "Pick one thing you recently wanted to change in an app, and decide whether it is a UI change or an API change.\n\nIn Chapter 2, you will learn how to decide what to build together with an AI."
           }
         },
         {
@@ -1641,15 +1723,15 @@
                 "en": "What does the backend handle?"
               },
               "back": {
-                "jp": "サーバーで動き、届いた依頼を確かめて、データベースとデータを出し入れします。",
-                "en": "It runs on a server, checks the requests that arrive, and saves and fetches data in the database."
+                "jp": "サーバーで動き、届いた依頼を確かめて、データベースにデータを保存したり取り出したりします。",
+                "en": "It runs on a server, checks the requests that arrive, and saves data to and fetches it from the database."
               }
             },
             {
               "id": "card-database",
               "front": {
-                "jp": "データベースは何をする？",
-                "en": "What does a database do?"
+                "jp": "データベースが受け持つのは？",
+                "en": "What does the database handle?"
               },
               "back": {
                 "jp": "データを整理してしまっておき、あとから探したり取り出したりしやすくします。",
@@ -1663,26 +1745,26 @@
                 "en": "What is an API?"
               },
               "back": {
-                "jp": "プログラム同士がやり取りするための窓口と決まりです。画面はAPIを通してデータを受け取ります。",
-                "en": "A window, with rules, through which programs talk. The screen gets its data through the API."
+                "jp": "プログラム同士がやり取りするための窓口と決まりです。フロントエンドはAPIを通して、バックエンドとデータをやり取りします。",
+                "en": "A window, with rules, through which programs talk. The frontend exchanges data with the backend through the API."
               }
             },
             {
               "id": "card-ui-api",
               "front": {
-                "jp": "見た目を変えたいときと、届くデータを変えたいとき、それぞれどこに頼む？",
-                "en": "Where do you ask for a change in looks, and where for a change in the data that arrives?"
+                "jp": "見た目を変えたいとき、届くデータを変えたいとき、それぞれ何の変更としてAIに頼む？",
+                "en": "When you want different looks, or different data, what kind of change do you ask the AI for?"
               },
               "back": {
-                "jp": "見た目はUI、届くデータはAPIに頼みます。",
-                "en": "Looks go to the UI; the data that arrives goes to the API."
+                "jp": "見た目はUIの変更、届くデータはAPIの変更として頼みます。",
+                "en": "Looks: a UI change. The data that arrives: an API change."
               }
             },
             {
               "id": "card-deploy",
               "front": {
-                "jp": "デプロイの3つの流れは？",
-                "en": "What are the three steps of a deployment?"
+                "jp": "デプロイで順に起きる3つのことは？",
+                "en": "What three things happen, in order, in a deployment?"
               },
               "back": {
                 "jp": "ビルド（公開用のファイルを作る）→転送（サーバーに送る）→起動（依頼に答えられるようにする）です。",
@@ -1736,8 +1818,8 @@
         "en": "Backend"
       },
       "md": {
-        "jp": "サーバー（依頼に答えるコンピューター）で動く部分です。届いたデータや依頼を確かめ、データベースとデータを出し入れして、結果を返します。",
-        "en": "The part that runs on a server (a computer that answers requests). It checks the data and requests that arrive, saves and fetches data in the database, and sends back the result."
+        "jp": "サーバー（server：依頼に答えるコンピューター）で動く部分です。届いたデータや依頼を確かめ、データベースにデータを保存したり取り出したりして、結果を返します。",
+        "en": "The part that runs on a server (a computer that answers requests). It checks the data and requests that arrive, saves data to and fetches it from the database, and sends back the result."
       }
     },
     {
@@ -1766,8 +1848,8 @@
         "en": "API"
       },
       "md": {
-        "jp": "Application Programming Interfaceの略です。プログラム同士がやり取りするための窓口と決まりです。Webアプリでは、フロントエンドがAPIを通して、バックエンドにデータを頼みます。",
-        "en": "Short for Application Programming Interface. A window, with its rules, through which programs talk to each other. In a web app, the frontend asks the backend for data through the API."
+        "jp": "Application Programming Interfaceの略です。プログラム同士がやり取りするための窓口と決まりです。Webアプリでは、フロントエンドがAPIを通して、バックエンドにデータの保存や取り出しを頼みます。",
+        "en": "Short for Application Programming Interface. A window, with its rules, through which programs talk to each other. In a web app, the frontend asks the backend to save or fetch data through the API."
       }
     },
     {
@@ -1796,8 +1878,8 @@
         "en": "Build"
       },
       "md": {
-        "jp": "書いたコードを、公開用にまとめ直すことです。ファイルを小さくした、サーバーに送れる一式ができます。",
-        "en": "Repackaging the code you wrote for publishing. It produces a smaller set of files, ready to send to a server."
+        "jp": "書いたコードを、公開用にまとめ直すことです。サーバーに送れる、小さくまとめたファイル一式ができます。",
+        "en": "Repackaging the code you wrote for publishing. It produces a compact set of files, ready to send to a server."
       }
     },
     {
@@ -1806,8 +1888,8 @@
         "en": "Git"
       },
       "md": {
-        "jp": "ファイルの変更を記録して、あとで前の版を呼び戻せるようにする道具です。",
-        "en": "A tool that records changes to files so you can bring back an earlier version later."
+        "jp": "ファイルの変更を記録して、あとで前の版に戻せるようにする道具です。",
+        "en": "A tool that records changes to files so you can go back to an earlier version later."
       }
     },
     {

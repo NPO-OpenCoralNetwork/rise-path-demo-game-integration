@@ -39,8 +39,8 @@ https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server
 - Large sites usually pull data from a database on a server and send it to the client to display. (the introduction,
   above "In this article")
 - Used in: `hook-predict` (explanation), `s1-b1`, `s1-b5` (frontend and backend definitions), `s1-b2`, `s1-b4`,
-  `s1-check`, `s2-b5`, `s3-b2` (the server waits for requests), `ex-steps`, `q6` (checking a booking belongs to the
-  server side).
+  `s1-check`, `s2-b5`, `s3-b2` and `q7` (the server waits for requests), `ex-steps`, `practice-steps` (step p-data),
+  `q6` (checking an incoming booking belongs to the server side, whatever the screen offers).
 
 ### mdn-client-storage — Client-side storage
 https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Client-side_APIs/Client-side_storage
@@ -58,7 +58,8 @@ https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Ne
 (page last modified 2025-09-29)
 - A page can request data from the server and update part of itself without loading a new page; the data is often
   JSON, a good format for structured data. (opening section)
-- Used in: `s2-json-intro`, `s2-b2` (API and JSON definitions), `ex-steps` (the screen shows what the API returns).
+- Used in: `s2-json-intro`, `s2-b2` (API and JSON definitions), `ex-steps` (the screen shows what the API returns),
+  `practice-steps` (step p-screen), `practice-answer-ui`.
 
 ### mdn-json — Working with JSON
 https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/JSON
@@ -102,7 +103,7 @@ https://developer.mozilla.org/en-US/docs/Learn_web_development/Getting_started/Y
 - After writing a site you put it online so people can find it. Hosting is space on a hosting company's web server: you
   put the files there and the server provides them to visitors. Companies offer several ways to transfer files to their
   servers, including fetching the source from a GitHub repository, building it if needed and publishing it.
-- Used in: `s3-defs` (deploy definition), `s3-b2` (transfer), `q7`, `q4`.
+- Used in: `s3-defs` (deploy definition), `s3-b1`, `s3-b2` (transfer), `q7` (the files are on the server), `q4`.
 
 ### mdn-deployment — Deploying our app
 https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Client-side_tools/Deployment
@@ -110,15 +111,16 @@ https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Client
 - A production build makes the files smaller and ready for production; the build output goes into a new folder
   (`dist`) that holds everything needed to run the site, ready to upload to a server. The hosting service then serves
   the site at a URL, live on the web.
-- Used in: `s3-defs` (build definition), `s3-b2`, `q4` (after the build the files exist but are not on the server
-  yet; the source code is not replaced).
+- Used in: `s3-defs` (build definition), `s3-b2`, `q4` (after a build on your own computer the files exist but have
+  not been sent yet; the source code is not replaced; waiting for requests comes after the launch).
 
 ### mdn-express-intro — Express/Node introduction
 https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/Express_Nodejs/Introduction
 (page last modified 2026-09-12)
 - In the Hello World example, the last block starts the server on a port; with the server running, a browser can get
   its response. (section "Helloworld Express")
-- Used in: `s3-b2` (launch: start the program on the server so it answers requests).
+- Used in: `s3-b2` (launch: start the program on the server so it answers requests), `q7` (files on the server do not
+  answer until the app is launched).
 
 ## 3. Git (Pro Git and the reference manual, Git 2.56)
 
@@ -148,7 +150,8 @@ https://git-scm.com/book/en/v2/Git-Basics-Undoing-Things
 https://git-scm.com/docs/git-commit
 - `git commit` records changes to the repository: it creates a new commit from the current contents of the index with
   a log message that describes the changes. (NAME and DESCRIPTION)
-- Used in: `s4-b2` (a commit is recorded with a message), `s4-prompt-commit`, `ex-steps` (step ex-commit).
+- Used in: `s4-b2` (a commit is recorded with a message), `s4-prompt-commit`, `ex-steps` (step ex-commit),
+  `practice-steps` (step p-commit).
 
 ## 4. AI tool guidance (Claude Code documentation, read 2026-10-30)
 
@@ -162,8 +165,8 @@ https://code.claude.com/docs/en/quickstart
   with a descriptive message.
 - "Pro tips for beginners", "Use step-by-step instructions": break a complex task into steps; the example is a
   database table first, then an API endpoint, then a web page that uses it.
-- Used in: `s4-prompt-commit`, `ex-steps` (data side first, then the screen; commit by asking), `practice-answer-data`,
-  `practice-answer-ui`.
+- Used in: `s4-prompt-commit`, `ex-lead`, `ex-steps` (data side first, then the screen; commit by asking),
+  `practice-steps`, `practice-answer-data`.
 
 ### cc-best-practices — Best practices for Claude Code
 https://code.claude.com/docs/en/best-practices
@@ -177,7 +180,8 @@ https://code.claude.com/docs/en/best-practices
 https://code.claude.com/docs/en/champion-kit
 - Quick-reference sheet, row "Keep edits surgical": ask for a diff, or say "only change X"; Claude keeps to the scope
   when the scope is stated.
-- Used in: `s2-b5`, `s2-prompt-ui`, `s2-prompt-api`, `ex-steps` (steps ex-api, ex-ui), `q5`, `q9`.
+- Used in: `s2-b5`, `s2-prompt-ui`, `s2-prompt-api`, `ex-steps` (steps ex-data, ex-screen), `practice-steps`,
+  `practice-answer-data`, `practice-answer-ui`, `s4-check` (state the scope when you ask again), `q5`, `q9`.
 
 ### cc-checkpointing — Checkpointing
 https://code.claude.com/docs/en/checkpointing
@@ -185,7 +189,8 @@ https://code.claude.com/docs/en/checkpointing
   recovering from changes that introduced bugs or broke functionality.
 - "Not a replacement for version control": checkpoints are for quick recovery within a session; for permanent history,
   keep using version control such as Git.
-- Used in: `s4-b1` (an AI's change can break something that worked), `s4-tools`, `q3`.
+- Used in: `s4-b1` (an AI's change can break something that worked), `s4-tools` and `q3` (said of Claude Code only;
+  the lesson says other tools' rewind "does not necessarily" replace Git, and names Claude Code as the example).
 
 ## 5. Claims checked and left out
 

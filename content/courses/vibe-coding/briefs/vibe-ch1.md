@@ -73,13 +73,13 @@ was read on 2026-10-30 (WebFetch).
 | section id | role | title (jp) | the one idea | blocks | questions → objective |
 |---|---|---|---|---|---|
 | `hook` | hook | はじめに：「アプリを作って」の中身 | 画面だけのアプリは、再読み込みでデータが消える | markdown (problem, 3 sentences + ask to predict), quiz predict (cite) | `q0` → o1 (ungraded) |
-| `1-1` | concept | 1-1. フロントエンド / バックエンド / データベースの関係 | 3つの部分が分担して動く | markdown lead (ch0 recall), callout analogy (レストラン), definitions ×3, diagram (TD, 4 nodes), markdown (hook に戻る), quiz inline | `q1` → o1 (家計簿アプリ, new context) |
+| `1-1` | concept | 1-1. フロントエンド・バックエンド・データベースの関係 | 3つの部分が分担して動く | markdown lead (ch0 recall), callout analogy (レストラン), definitions ×3, diagram (TD, 4 nodes), markdown (hook に戻る), quiz inline | `q1` → o1 (家計簿アプリ, new context) |
 | `1-2` | concept | 1-2. UIとは何か、APIとは何か | 見た目は UI、届くデータは API。範囲を書いて頼む | markdown (scene), callout analogy (メニュー＝UI, 頼み方＝API, 書式＝JSON), definitions ×3, markdown + code (JSON), callout tip, prompt UI, prompt API, quiz inline, askTutor | `q2` → o2 (apply) |
-| `1-3` | concept | 1-3. デプロイで何が起きているか | デプロイ＝ビルド → 転送 → 起動 | markdown, callout analogy (店で出すまで), definitions ×2, list (3 steps), quiz inline | `q7` → o3 |
+| `1-3` | concept | 1-3. デプロイで何が起きているか | デプロイ＝ビルド → 転送 → 起動 | markdown, callout analogy (家で作ったお菓子を売り場で売るまで; round 1: the restaurant moved off the server side), definitions ×2, markdown, list (3 steps), quiz inline | `q7` → o3 (round 1: files sent but nobody can open the app → the launch step) |
 | `1-4` | concept | 1-4. Gitのコミットで、戻れる場所を残す | 頼む前に動く状態をコミットする | markdown (why), callout analogy (セーブ), definitions ×2, markdown (戻せる・AIツールの巻き戻しとの違い), prompt (commit first), quiz inline | `q8` → o3 (apply) |
 | `1-5` | example | 1-5. 例題：消えるタスクを残るようにする | 依頼をデータ側と画面側に分け、コミットしてから順に頼む | markdown, steps ×6 (cite), quiz inline (faded step) | `q9` → o2 (apply) |
-| `practice` | practice | 演習：読書記録アプリの依頼を書き分ける | 同じ手順を新しいアプリで自分で書く | markdown (task, 5 min), checklist (5), callout tip (2 hints), prompt ×2 (model answer: data side, screen side) | — |
-| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (4) | `q6` → o1 (transfer: 予約アプリ), `q5` → o2 (transfer: 家計簿), `q4` → o3 (deploy), `q3` → o3 (transfer: 友人の助言) |
+| `practice` | practice | 演習：読書記録アプリの依頼を書き分ける | 同じ手順を新しいアプリで自分で書く | markdown (task, 5 min), steps ×3 (cite; hints folded: hint, then troubleshoot), checklist (6), prompt ×2 (model answer: data side, screen side with input) | — |
+| `check` | check | 理解度チェック | 全目標、転移問題を含む | quiz exam (4) | `q6` → o1 (transfer: 予約アプリ), `q5` → o2 (transfer: 家計簿), `q4` → o3 (build on your own computer), `q3` → o3 (transfer: 友人の助言) |
 | `summary` | summary | まとめ | 持ち帰る4点、振り返り、次の一歩 | summary (4), markdown (reflection + next), flashcards (7), askTutor | — |
 
 Contract check: hook ≤ 3 sentences of problem + predict; 5 segments (4 concept + 1 example), each with an inline quiz
@@ -91,14 +91,18 @@ exam questions; summary 4 points after the exam; 7 flashcards; no images; no men
 
 Ids: every id of the published lesson is kept (sections `hook`, `1-1`–`1-4`, `check`, `summary`; all blocks; questions
 `q0`–`q5` with their option ids; cards `card-frontend`, `card-backend`, `card-api`, `card-deploy`, `card-commit`).
-New: sections `1-5`, `practice`; blocks `s2-analogy`, `s3-analogy`, `s3-defs`, `s3-check`, `s4-analogy`, `s4-tools`,
-`s4-check`, `ex-*`, `practice-*`, `summary-next`, `summary-ask`; questions `q6`–`q9`; cards `card-database`, `card-ui-api`.
-Questions rewritten because they quizzed the analogy: `q1` (レストランのどこがバックエンド？) and `q3` (なぜタイムマシン？).
+New: sections `1-5`, `practice`; blocks `s2-analogy`, `s3-analogy`, `s3-defs`, `s3-flow`, `s3-check`, `s4-analogy`,
+`s4-tools`, `s4-check`, `ex-*`, `practice-*`, `summary-next`, `summary-ask`; questions `q6`–`q9`; cards `card-database`,
+`card-ui-api`. Questions rewritten because they quizzed the analogy: `q1` (レストランのどこがバックエンド？) and `q3`
+(なぜタイムマシン？). Option order (round 1): the options of each question are in an order that puts the keys at
+different positions (① ① ② ② ③ ③ ③ ④ ④ ④ over the 10 questions), and no key is longer than its longest distractor
+in either locale; option ids and answers are unchanged.
 
 ## Assumptions
 - Session started by another Claude Code session for the owner; the outline was not shown for a check-in (the owner's
   brief for this task fixed the scope), so the outline above was used as is.
-- The three objectives stay as published (ids, text, Bloom) so `lessonSchema.test.js` keeps 3 objectives.
+- The three objectives stay as published (ids, wording, Bloom) so `lessonSchema.test.js` keeps 3 objectives. Round 1
+  removed only the spaces around UI, API and Git in o2 and o3 (notation rule, ja-editor).
 - Running example: a task app (タスク管理アプリ) as in the published hook; the practice uses a reading-log app
   (読書記録アプリ); the exam uses a reservation app and a household-budget app. All are invented teaching scenarios.
 - Claude Code docs back the prompting advice (scope, commit first, step-by-step). The course is tool-agnostic, so the
