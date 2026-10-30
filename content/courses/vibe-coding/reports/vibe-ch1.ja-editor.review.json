@@ -1,82 +1,80 @@
 {
   "lessonId": "vibe-ch1",
   "file": "content/courses/vibe-coding/drafts/vibe-ch1.lesson.json",
-  "lessonHash": "sha256:424abcffc3b15ca6",
+  "lessonHash": "sha256:1d967dfe70f0b1a4",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "aae0299",
+    "previousReview": "aae0299:content/courses/vibe-coding/reports/vibe-ch1.ja-editor.review.json",
+    "changed": ["hook-predict", "s2-prompt-api", "s2-check", "s3-flow", "s3-check", "s4-check", "ex-steps", "ex-check", "practice-steps", "practice-checklist", "practice-answer-data", "check-quiz", "cards"],
+    "changedShare": 0.14,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "ex-steps",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "ex-split now reads 「タスクをしまっておくのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]、表示は[[UI]]の仕事です。」 and en \"The [[database]] keeps the tasks, the [[backend]] saves them and passes the list back and forth through its [[API]]\". Both locales now give saving to the backend, as s1-b5 and q1's feedback c do."
+    },
+    {
+      "blockId": "ex-check",
+      "criterion": "a11y_l10n",
+      "status": "resolved",
+      "evidence": "q9 option b en is now \"Save due dates and return them in the list API. Don't change the screen yet.\": the words the en explanation quotes (\"don't change the screen yet\"), with the same meaning as jp 「画面はまだ変えないで」."
+    },
+    {
+      "blockId": "check-quiz",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "q3's key is now 「頼む前に動く状態をコミットしておけば、戻れるよ」, so all four options end in 「よ」 like 「…要らないよ」「…十分だよ」「…間違えにくくなるよ」, and at 25 characters it is not longer than option a (26)."
+    },
+    {
+      "blockId": "practice-checklist",
+      "criterion": "voice",
+      "status": "resolved",
+      "evidence": "All six labels are now in です・ます: 「…頼んでいます」「…別々に書いてあります」「…両方があります」「…保存することが書いてあります」「…順になっています」「…変えない範囲が書いてあります」."
+    }
+  ],
   "scores": [
     {
       "id": "voice",
       "score": 3,
-      "evidence": "Natural, warm です・ます with no banned phrases (lint clean); the analogies and feedback read like a teacher beside you (s1-b3, s4-analogy, s4-check). Held at 3 by the plain-form checklist labels, q3's key alone ending differently, ex-split contradicting the backend's role, and stiff spots in s2-b5 and s4-tools.",
-      "blockIds": ["practice-checklist", "check-quiz", "ex-steps", "s2-b5", "s4-tools"]
+      "evidence": "The changed prose, feedback and labels keep です・ます (the checklist labels now too), q3's options share the 「よ」 ending, ex-split agrees with s1-b5 and q1, deployment's parts are 「段階」 in s3-flow, q7 and card-deploy, and lint finds no banned phrase. It stays at 3 because a few spots still read stiff or translated: s2-b5's long modifier before 「ガイド」, s4-tools' 「ドキュメントは、この機能は」, and in changed text q9's 「依頼として頼みます」 and q2 d's 「省いて表示する」.",
+      "blockIds": ["practice-checklist", "check-quiz", "ex-steps", "s3-flow", "s3-check", "cards", "s2-b5", "s4-tools", "ex-check", "s2-check"]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "Every lint budget passes and each segment alternates an analogy callout, definitions, a diagram, code or prompts with an inline check. 1-2 is dense (three terms, a JSON sample, a tip and two prompt blocks before s2-check), and s1-b5 adds サーバー as a fourth new word in 1-1 through an inline gloss.",
-      "blockIds": ["s1-b5", "s2-b2", "s2-b4", "s2-b5", "s2-prompt-ui", "s2-prompt-api"]
+      "evidence": "Every lint budget still passes (--strict, 0 warnings), and each segment alternates an analogy callout, definitions, a diagram, code or prompts with an inline check. 1-2 is still dense (three terms, a JSON sample, a tip and two prompt blocks before s2-check, whose new q2 sends the learner back to the JSON in s2-b4), and s1-b5 adds サーバー as a fourth new word in 1-1 through an inline gloss.",
+      "blockIds": ["s1-b5", "s2-b2", "s2-b4", "s2-b5", "s2-prompt-ui", "s2-prompt-api", "s2-check"]
     },
     {
       "id": "prior",
       "score": 4,
-      "evidence": "s1-b1 recalls Chapter 0, and every glossary term follows an everyday analogy that names what maps to what (s1-b3, s2-analogy, s3-analogy, s4-analogy), with English or the spelled-out abbreviation at first use. The definitions and glossary entries match word for word, and the 1-5 labels データ側・画面側 are glossed where they first appear (ex-lead).",
-      "blockIds": ["s1-b1", "s1-b3", "s2-analogy", "s3-analogy", "s4-analogy", "ex-lead"]
+      "evidence": "s1-b1 recalls Chapter 0, and every glossary term follows an everyday analogy that names what maps to what (s1-b3, s2-analogy, s3-analogy, s4-analogy), with English or the spelled-out abbreviation at first use. The changed blocks add no new term, and ex-split now names the backend (「[[バックエンド]]の[[API]]」) in the role s1-b5 and the glossary give it, so the worked example uses 1-1's terms as defined.",
+      "blockIds": ["s1-b1", "s1-b3", "s2-analogy", "s3-analogy", "s4-analogy", "ex-steps"]
     },
     {
       "id": "a11y_l10n",
-      "score": 3,
-      "evidence": "Both locales are complete, diagram labels, alt and description included (s1-b2), and the en is natural rather than a gloss of the jp. Kept at 3 by q9's en key, which drops 「まだ」 and no longer matches the words its en explanation quotes, and by en \"rebuild\" (q8, q9, q5) colliding with the defined term Build.",
-      "blockIds": ["s1-b2", "ex-check", "s4-check", "check-quiz"]
+      "score": 4,
+      "evidence": "Both locales are complete in every changed block, as are s1-b2's diagram labels, alt and description, and the en says what the jp says in natural English: q9's en key carries \"yet\" like its explanation, and no en \"rebuild\" is left beside the defined Build (q5, q8 and q9 now say remake, rewrite, starting over). The few rough en spots left (ex-verify's \"is somewhere not going through\", \"the app you built\" in 1-3) are niceToHave.",
+      "blockIds": ["s1-b2", "ex-check", "s4-check", "check-quiz", "ex-steps", "s3-analogy"]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "voice",
-      "blockId": "ex-steps",
-      "issue": "(a) meaning: step ex-split says 「保存は[[データベース]]、…の仕事です」 (en \"Saving is the [[database]]'s job\"), but the lesson's own definition and q1 give saving to the backend: s1-b5 「データベースにデータを保存したり取り出したりして」, q1 feedback c 「記録をしまっておく場所は、データベースです。バックエンドは、そこへの保存と取り出しを受け持ちます。」 (en \"The backend is what saves data there and fetches it.\"). A learner who just answered q1 meets the opposite claim in the worked example, in both locales.",
-      "fix": "ex-split md, jp: 「保存は[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。」→「タスクをしまっておくのは[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です。」 (50 characters). en: 「Saving is the [[database]]'s job,」→「Keeping the tasks is the [[database]]'s job,」 (rest of the sentence unchanged)."
-    },
-    {
-      "criterion": "a11y_l10n",
-      "blockId": "ex-check",
-      "issue": "(a) jp and en differ: q9 option b jp ends 「画面はまだ変えないで」 and the jp explanation quotes exactly that, but en option b reads \"Leave the screen as is.\" (「まだ」/yet dropped) while the en explanation quotes \"don't change the screen yet\", words no en option contains. An en learner cannot find the quoted phrase in the key.",
-      "fix": "q9 option b, en: 「\"Save due dates and return them in the list API. Leave the screen as is.\"」→「\"Save due dates and return them in the list API. Don't change the screen yet.\"」 (80 characters with the quotation marks, still shorter than option a at 81; the same words as ex-data and the en explanation)."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "check-quiz",
-      "issue": "(d) options with the same form and ending (§5): in q3 three options end in 「よ」 (「…要らないよ」「…十分だよ」「…間違えにくくなるよ」) and only the key c ends in 「戻れるから」, so the answer stands out by its ending.",
-      "fix": "q3 option c, jp: 『「頼む前に、動く状態をコミットしよう。戻れるから」』→『「頼む前に動く状態をコミットしておけば、戻れるよ」』 (25 characters, not longer than option a at 26). en unchanged; it says the same thing."
-    },
-    {
-      "criterion": "voice",
-      "blockId": "practice-checklist",
-      "issue": "(d) です・ます (§1): all six checklist labels end in plain form (「頼んでいる」「書いてある」「両方がある」「書いてある」「なっている」「書いてある」). §1 exempts list items only for 体言止め; the claude-code lessons write checklist labels in です・ます (「依頼文に、範囲・参照先・既存のパターン・症状が入っています」).",
-      "fix": "jp labels: pc-commit 「最初の依頼で、いまの状態のコミットを頼んでいる」→「最初の依頼で、いまの状態のコミットを頼んでいます」; pc-split 「データ側と画面側の依頼が、別々に書いてある」→「データ側と画面側の依頼が、別々に書いてあります」; pc-data 「データ側の依頼に、「保存する」と「一覧で返す」の両方がある」→「データ側の依頼に、「保存する」と「一覧で返す」の両方があります」; pc-input 「画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてある」→「画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてあります」; pc-order 「データ側を先に、画面側をあとに頼む順になっている」→「データ側を先に、画面側をあとに頼む順になっています」; pc-scope 「データ側と画面側のどちらの依頼にも、変えない範囲が書いてある」→「データ側と画面側のどちらの依頼にも、変えない範囲が書いてあります」. en unchanged."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "hook-b1: say what gets fixed — 「この章の終わりには、直す依頼を書けるようになります。」→「この章の終わりには、これを直す依頼を書けるようになります。」",
-    "s2-analogy: the first two mappings end 「〜にあたります」 and the third states the analogy as a fact; keep the pattern — 「注文票の書き方が、JSON（JavaScript Object Notation）です。」→「注文票の書き方は、JSON（JavaScript Object Notation）にあたります。」",
-    "s2-b5: the long modifier before 「ガイド」 reads translated, and en says one tool's guide — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」",
-    "s2-prompt-api: the prompt adds a database field only 「保存する場所がなければ」, but expect says the database always changes — 「バックエンドの処理とデータベースが変わり、」→「バックエンドの処理が変わり（必要ならデータベースも変わり）、」; en 「The backend and the database change」→「The backend changes (and the database, if needed)」",
-    "s2-check: 「各タスクで」 is unnatural for 'with each task' — q2 option c 「各タスクで、担当者の名前も受け取る」→「タスクごとに、担当者の名前も受け取る」 (18 characters, still shorter than option b)",
-    "s3-analogy: en ends deployment at the first sale while jp ends it at opening for business, and 'built' reuses the word the lesson defines as packing — 「(the app you built on your own computer)」→「(the app you made on your own computer)」; 「The whole path to the first sale is deployment.」→「Everything up to opening for business is deployment.」 (also s3-defs and the glossary entry Deployment: 「Putting the app you built on a server」→「Putting the app you made on a server」)",
-    "s3-check: q7 calls the deployment steps 「手順」 in the prompt but 「段階」 in the hint and feedback (and 「手順⑤」 later names a worked-example step); feedback c reads as if the launch answers requests — 「足りない手順として」→「足りない段階として」; 「足りないのは、届いた依頼に答える起動の段階です。」→「足りないのは、依頼に答えられるようにする起動の段階です。」; en explanation 「A deployment goes build, transfer, launch.」→「A deployment goes through build, transfer and launch, in that order.」",
-    "s4-tools: 「ドキュメントは、この機能は」 doubles the topic marker (the same in check-quiz q3 feedback a) — 「たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、この機能はGitの代わりではないと書かれています。」; q3 a: 「たとえばClaude Codeの公式ドキュメントは、代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、代わりではないと書かれています。」",
-    "s4-check: in en \"rebuild\" means 'remake' while the lesson defines Build as packing for publishing — q8 a feedback 「Rebuilding it exactly from memory is hard.」→「Rewriting it exactly from memory is hard.」; q8 d 「Have the whole app rebuilt from scratch」→「Have the whole app remade from scratch」; its feedback 「A rebuild also changes the parts that worked.」→「Starting over also changes the parts that worked.」",
-    "ex-check: the same \"rebuild\" collision, and the explanation addresses a side as if it were a person — q9 c 「\"Rebuild the whole app so tasks can have due dates.\"」→「\"Remake the whole app so tasks can have due dates.\"」, its feedback 「Rebuilding everything」→「Remaking everything」; 「入力と表示は、そのあとで画面側に頼みます。」→「入力と表示は、そのあとで画面側の依頼として頼みます。」; en 「Ask the screen side for the input and the display after that.」→「After that, ask for the input and the display in a screen-side request.」",
-    "check-quiz: the same \"rebuild\" collision in q5 — a 「\"Rebuild the budget app so it is easier to use.\"」→「\"Remake the budget app so it is easier to use.\"」; c 「\"Rebuild the API that returns the amounts,」→「\"Rewrite the API that returns the amounts,」; c feedback 「yet it rebuilds the API as well」→「yet it rewrites the API as well」",
-    "check-quiz: q4's explanation stacks 「での…で」 and q4 d's en feedback launches the files — 「自分のパソコンでのビルドでできるのは、」→「自分のパソコンでビルドしてできるのは、」; 「after the files are sent and launched」→「after the files are sent and the app is launched」",
-    "check-quiz: q6 option d 「するだけにする」 is clumsy — 「画面で、満席の時間を選べなくするだけにする」→「画面だけを直して、満席の時間を選べなくする」 (21 characters, so the key stays shorter than the longest distractor)",
-    "ex-steps: in ex-verify's troubleshoot, 「読み込み」 right after two 「再読み込み」 can be taken for the reload itself — 「保存か読み込みのどちらかが」→「保存か一覧の読み込みのどちらかが」; en 「either saving or loading is not going through the API」→「either saving or loading the list is not going through the API」",
-    "practice-steps: en \"keeps the date finished\" can be parsed as keeping a date 'finished' — p-data 「Write the data-side request that keeps the date finished.」→「Write the data-side request that saves the date finished.」",
-    "practice-answer-ui: en word order — 「Show the date finished received from the API in the book list.」→「In the book list, show the date finished that comes from the API.」",
-    "cards: the other fronts are nominal questions; card-ui-api ends in plain 「頼む？」 — 「それぞれ何の変更としてAIに頼む？」→「それぞれ何の変更としてAIに頼みますか？」"
+    "s2-check: 「省いて」 can be read as leaving the long names out, and the explanation calls it 「省略」 — q2 d 「長いタスク名を、1行に収まるように省いて表示する」→「長いタスク名を、1行に収まるように省略して表示する」 (25 characters; the key stays shorter than the longest option)",
+    "ex-check: 「依頼として頼みます」 repeats 頼 — q9 explanation 「入力と表示は、そのあとで画面側の依頼として頼みます。」→「入力と表示は、そのあとの画面側の依頼に書きます。」 (en unchanged)",
+    "ex-steps: in ex-verify's en troubleshoot, \"is somewhere not going through\" is unidiomatic; 「どこかが」 means 'some part of' — 「saving or loading the list is somewhere not going through the API and the database」→「part of saving or loading the list is not going through the API and the database」",
+    "check-quiz: q3's jp key now has the form of the other options (a remark ending in 「よ」), but in en it is the only imperative among statements — c 「\"Commit the working state first, so you can go back.\"」→「\"If you commit the working state first, you can go back.\"」 (57 characters with the quotation marks; d stays the longest at 61)",
+    "s4-tools: q3 a now says 「公式ドキュメントには、代わりではないと書かれています」, but s4-tools, citing the same page, keeps the double topic marker — 「たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、この機能はGitの代わりではないと書かれています。」",
+    "s2-b5: the long modifier before 「ガイド」 still reads translated (unchanged since round 2) — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」",
+    "s3-analogy: this round removed en \"rebuild\" for colliding with the defined Build, but \"built\" still sits beside it in 1-3 (unchanged since round 2) — 「(the app you built on your own computer)」→「(the app you made on your own computer)」; also s3-defs and the glossary entry Deployment: 「Putting the app you built on a server」→「Putting the app you made on a server」"
   ],
-  "average": 3.25,
-  "verdict": "revise",
-  "summary": "Round 2 is a full review because review-scope.mjs requires one: the objectives and most blocks changed since round 1. The Japanese reads like a patient teacher: every term follows an everyday analogy that names what maps to what, the feedback is short and corrects the misconception, and both locales are complete. Four must-fixes remain: ex-split now gives saving to the database (contradicting s1-b5 and q1), q9's en key lost \"yet\" and no longer matches its explanation, q3's key is the only option that does not end in 「よ」, and the checklist labels are in plain form."
+  "average": 3.5,
+  "verdict": "pass",
+  "summary": "All four round-2 must-fix items are resolved in both locales: ex-split leaves saving to the backend's API, q9's en key says \"yet\" again, q3's options all end in 「よ」 and the checklist labels are in です・ます. The 13 changed blocks add no error of classes (a)–(e) and the en no longer says \"rebuild\" beside the defined Build, so a11y_l10n rises to 4; voice stays at 3 for a few stiff spots (s2-b5, s4-tools, q9's 「依頼として頼みます」, q2 d's 「省いて」), all niceToHave."
 }

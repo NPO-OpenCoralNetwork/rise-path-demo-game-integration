@@ -1,117 +1,117 @@
 {
   "lessonId": "vibe-ch1",
   "file": "content/courses/vibe-coding/drafts/vibe-ch1.lesson.json",
-  "lessonHash": "sha256:424abcffc3b15ca6",
+  "lessonHash": "sha256:1d967dfe70f0b1a4",
   "reviewer": "pedagogy-reviewer",
   "rubricVersion": "rubric.v1",
-  "mode": "full",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "aae0299",
+    "previousReview": "aae0299:content/courses/vibe-coding/reports/vibe-ch1.pedagogy-reviewer.review.json",
+    "changed": ["hook-predict", "s2-prompt-api", "s2-check", "s3-flow", "s3-check", "s4-check", "ex-steps", "ex-check", "practice-steps", "practice-checklist", "practice-answer-data", "check-quiz", "cards"],
+    "changedShare": 0.14,
+    "fullReviewRequired": false
+  },
+  "resolved": [
+    {
+      "blockId": "s2-check",
+      "criterion": "active",
+      "status": "resolved",
+      "evidence": "q2 now asks 「上のJSONを返すタスク管理アプリで、AIに「APIが返すデータを変えて」と頼むべき変更はどれでしょう？」 with the key c 「各タスクの横に、担当者の名前を表示する」, and b and d are display changes of fields already in the JSON (「完了したかどうか（done）は、もうJSONで届いています」), so the learner has to read s2-b4 instead of matching s2-b5's words. Options, feedback, explanation and hint are as specified, and the key is not the longest option in either locale."
+    },
+    {
+      "blockId": "ex-steps",
+      "criterion": "prior",
+      "status": "resolved",
+      "evidence": "ex-split now reads 「タスクをしまっておくのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]、表示は[[UI]]の仕事です。」 (en \"The [[database]] keeps the tasks, the [[backend]] saves them …\"), which matches s1-b5, the glossary and q1's explanation and names the backend inside the worked example."
+    }
+  ],
   "scores": [
     {
       "id": "align",
       "score": 4,
-      "evidence": "Three can-do objectives with matching Bloom verbs: o1 「説明できる」 (understand), o2 「見分けて、…書き分けられる」 (apply), o3 「説明できる」 (understand). Each has two or more graded questions with objectiveId and at least one at apply level: o1 q1/q6, o2 q2/q9/q5, o3 q7/q8/q4/q3 (q0 is the ungraded predict).",
+      "evidence": "Three can-do objectives with matching Bloom verbs, each assessed by two or more graded questions with objectiveId and at least one at apply level: o1 q1/q6, o2 q2/q9/q5, o3 q7/q8/q4/q3 (q0 is the ungraded predict). The rewritten q2 now tests o2's 見分ける itself: the learner decides from s2-b4's JSON which change needs data the API does not return yet.",
       "blockIds": ["s1-check", "s2-check", "s3-check", "s4-check", "ex-check", "check-quiz"]
     },
     {
       "id": "hook",
-      "score": 3,
-      "evidence": "hook-b1 poses a concrete problem in two sentences (tasks vanish on reload) and promises 「直す依頼を書けるようになります」, which s1-b4 and ex-verify pay off; q0 is an ungraded predict with feedback. But the prediction has one obvious answer: 「データを保存する仕組みがないから」 is the direct opposite of 「消えてしまいます」, and 「ブラウザのバージョンが古いから」 draws out no belief a vibe-coding beginner is likely to hold.",
+      "score": 4,
+      "evidence": "hook-b1 poses a concrete problem in two sentences (「ページを再読み込みすると、入力したタスクが消えてしまいます」) with no trivia and promises 「直す依頼を書けるようになります」, which 1-5 and the practice pay off. q0 is now a real prediction: option c 「AIが、入力したタスクを覚えていないから」 voices a belief a vibe-coding beginner may well hold, and its feedback corrects it (「タスクを覚えておくのは、AIではなくアプリの仕組みです」).",
       "blockIds": ["hook-b1", "hook-predict"]
     },
     {
       "id": "prior",
-      "score": 3,
-      "evidence": "Prerequisites list ch0 and s1-b1 recalls it; every defined term follows an analogy that maps it (s1-b3, s2-analogy, s3-analogy, s4-analogy, each before its definitions block), and the glossary matches the definitions. But ex-split says 「保存は[[データベース]]…の仕事です」, while s1-b5, the glossary and q1's explanation give saving to the backend (「データベースへの保存と取り出しを受け持ちます」).",
+      "score": 4,
+      "evidence": "Prerequisites list ch0 and s1-b1 recalls it; every defined term follows an everyday analogy that maps it (s1-b3, s2-analogy, s3-analogy, s4-analogy, each before its definitions block), and the glossary matches the definitions. ex-split now agrees with s1-b5 and q1's explanation (「タスクをしまっておくのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]」), so no term changes meaning in the worked example.",
       "blockIds": ["s1-b1", "s1-b3", "s1-b5", "s2-analogy", "s3-analogy", "s4-analogy", "ex-steps"]
     },
     {
       "id": "load",
       "score": 3,
-      "evidence": "measure.mjs gives prose 2,382 (budget 1,200–2,400) and est 17.2 min for estMinutes 17; lint is clean and no segment defines more than 3 terms. 1-2 is crowded (UI, API and JSON, an analogy, a tip, JSON code, two prompts and a quiz; about 410 explanation characters with its callouts), and 1-5 adds a third pair of names, データ側/画面側.",
-      "blockIds": ["s2-b1", "s2-analogy", "s2-b5", "s2-prompt-ui", "s2-prompt-api", "ex-lead"]
+      "evidence": "measure.mjs gives prose 2,388 (budget 1,200–2,400) and est 17.3 min for estMinutes 17; lint is clean and no segment defines more than 3 terms. 1-2 is still crowded (UI, API and JSON, an analogy, a tip, JSON code, two prompts and q2, which now sends the learner back up to s2-b4), and 1-5 adds a third pair of names, データ側/画面側.",
+      "blockIds": ["s2-b1", "s2-analogy", "s2-b5", "s2-prompt-ui", "s2-prompt-api", "s2-check", "ex-lead"]
     },
     {
       "id": "worked",
       "score": 4,
-      "evidence": "ex-steps shows six steps with subgoal labels (① 足りないものを書き出す … ⑥ 再読み込みして確かめる), each with its reason (「画面はAPIのデータを表示するので、先に…」) and an expect. q9 then fades one step onto a new feature (期限), and the practice is independent: full, faded, independent.",
+      "evidence": "ex-steps shows six steps with subgoal labels (① 足りないものを書き出す … ⑥ 再読み込みして確かめる), each with its reason and an expect, and ex-verify's troubleshoot now points back to the right steps (「④と⑤のどちらの依頼が足りないかを見直して」). q9 fades step ④ onto a new feature (期限) and the practice is independent: full, faded, independent.",
       "blockIds": ["ex-steps", "ex-check", "practice-steps"]
     },
     {
       "id": "active",
-      "score": 3,
-      "evidence": "Every content section has an inline check after the predict q0 (q1, q2, q7, q8, q9), every wrong option has feedback, and q8 and q9 ask for application in new situations. But q2's three distractors are the 色・大きさ・動き that s2-b5 lists just above, and its key is the only option about data, so it can be answered by matching words.",
-      "blockIds": ["s1-check", "s2-check", "s3-check", "s4-check", "ex-check", "s2-b5"]
+      "score": 4,
+      "evidence": "Every content section has an inline check (q1, q2, q7, q8, q9) with feedback on every wrong option, and q2, q8 and q9 ask for application. q2 can no longer be answered by matching s2-b5's words: its distractors b and d (取り消し線, 省いて表示) work on data already in the JSON, so only reading s2-b4 separates them from the key c.",
+      "blockIds": ["s1-check", "s2-check", "s3-check", "s4-check", "ex-check"]
     },
     {
       "id": "miscon",
-      "score": 3,
-      "evidence": "The brief's four misconceptions are corrected in the text (s1-b4, s2-b5, s3-b1, s4-tools) and encoded in options whose feedback names and fixes them in two sentences (q9-a display-only request, q6-d screen-only check, q7-a and q4-a, q3-a and q3-b). q2's distractors encode no misconception anyone holds (nobody expects a button colour to need new data), and q0-c is weak.",
+      "score": 4,
+      "evidence": "The brief's four misconceptions are corrected with a reason in the text (s1-b4, s2-b5, s3-b1, s4-tools) and encoded in options whose feedback fixes them in two sentences or fewer (q9-a, q6-d, q7-a, q4-a, q3-a, q3-b). The rewritten options encode real ones too: q0-c (the AI keeps the data) and q2-b/q2-d (a display change of data that already arrives taken for a data change: 「もうJSONで届いています」).",
       "blockIds": ["s1-b4", "s2-b5", "s3-b1", "s4-tools", "hook-predict", "s2-check", "ex-check", "check-quiz"]
     },
     {
       "id": "visual",
       "score": 4,
       "evidence": "s1-b2 is a 4-node flowchart whose labels match the defined terms in both locales, with a caption that states the takeaway (「ユーザーが触るのはフロントエンドだけで…」) and a full alt. The original chapter's decorative image is dropped, and the 3-step deploy flow is rightly a numbered list (s3-b2).",
-      "blockIds": ["s1-b2", "s3-b2"]
+      "blockIds": ["s1-b2", "s3-b2"],
+      "carriedOver": true
     },
     {
       "id": "practice",
       "score": 3,
-      "evidence": "practice is a transfer task (reading-log app, 読み終えた日) with an expect on every step, a 6-item checklist and two model-answer prompts. The hint ladder has two levels (hint → troubleshoot; p-commit has a hint only), and the first request's model answer is only a pointer to s4-prompt-commit, which also bundles a change.",
+      "evidence": "practice is a transfer task (reading-log app, 読み終えた日) with an expect on every step, a 6-item checklist, and now a model answer for each request: the commit in practice-answer-data's note, the data side 「APIで受け取ってデータベースに保存できるようにしてください」 (which lets practice-answer-ui keep the API unchanged) and the screen side. The hint ladder still has two levels on each step (hint → troubleshoot, which p-commit now has too), not the three of anchor 4.",
       "blockIds": ["practice-task", "practice-steps", "practice-checklist", "practice-answer-data", "practice-answer-ui"]
     },
     {
       "id": "meta",
       "score": 4,
-      "evidence": "summary-points (4) comes after the exam, summary-next asks a reflection question (「UIとAPIのどちらの変更か考えてみましょう」) and names the next step (第2章), cards has 7 retrieval cards, and summary-ask offers tutor prompts.",
+      "evidence": "summary-points (4) comes after the exam, summary-next asks a reflection question (「UIとAPIのどちらの変更か考えてみましょう」) and names the next step (第2章), and summary-ask offers tutor prompts. cards has 7 retrieval cards, and the changed fronts match the text (「デプロイの3つの段階は？」 as in s3-flow).",
       "blockIds": ["summary-points", "summary-next", "cards", "summary-ask"]
     },
     {
       "id": "accuracy",
-      "score": 3,
-      "evidence": "Non-obvious claims carry cite and match the fact record (s4-b4 「ほぼ必ず戻れます」 from git-undoing, s4-tools attributed to Claude Code's checkpointing page, s2-b5's scope claim attributed to an AI tool's guide); no menu, button or shortcut is named, and the JSON in s2-b4 is valid. Two statements go beyond the sources: s3-flow 「次の3つが順に起きます」 (mdn-publishing also describes hosts that fetch the source and build it) and ex-verify's single-cause troubleshoot.",
+      "score": 4,
+      "evidence": "Non-obvious claims carry cite and match the fact record (s4-b4 「ほぼ必ず戻れます」 from git-undoing, s4-tools from cc-checkpointing, s2-b5's scope claim attributed to an AI tool's guide), every source has checkedAt (git-commit pins Git 2.56), no menu, button or shortcut is named, and s2-b4's JSON is valid. The two statements that went beyond the sources are fixed: s3-flow now says 「[[デプロイ]]には、次の3つの段階があります。」 instead of one fixed order, and ex-verify's troubleshoot covers both requests (「④と⑤のどちらの依頼が足りないか」).",
       "blockIds": ["s4-b4", "s4-tools", "s2-b5", "s2-b4", "s3-flow", "ex-steps"]
     },
     {
       "id": "voice",
       "score": 3,
-      "evidence": "です・ます throughout, warm and non-pressuring (「まず予想してみましょう」「安心して試せます」), with no banned phrases (lint clean). Left for the ja-editor: hook-b1 mixes a general condition with past tense (「頼むと、画面はすぐにできました」), q1-b's causative 「保存させる」 leaves the actor open, and 1-5's データ側/画面側 sits beside フロントエンド and UI (style guide §2).",
-      "blockIds": ["hook-b1", "s1-check", "ex-lead"]
+      "evidence": "です・ます throughout, warm and non-pressuring, with no banned phrases (lint clean); the checklist labels and card-ui-api are now in です・ます, and the English no longer says \"rebuild\" beside the defined term Build (q5, q8, q9). Left for the ja-editor: hook-b1's 「頼むと、画面はすぐにできました」, q1-b's causative 「保存させる」, and 1-5's データ側/画面側 beside フロントエンド and UI (style guide §2).",
+      "blockIds": ["hook-b1", "s1-check", "ex-lead", "practice-checklist", "cards"]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Every learner-facing field has jp and en (lint locale-plain-string clean), including the diagram's labels, caption, alt and description and the prompt variables. The en reads as natural English rather than a literal translation (hook-b1, s3-analogy), and there are no images or bare links.",
-      "blockIds": ["s1-b2", "s2-prompt-ui", "hook-b1", "s3-analogy"]
+      "evidence": "Every learner-facing field of the changed blocks has jp and en (lint locale-plain-string clean), and the English now says what the Japanese says where it did not: q9-b's \"Don't change the screen yet.\" is the phrase its explanation quotes. The diagram keeps its labels, caption, alt and description in both locales, and there are no images or bare links.",
+      "blockIds": ["ex-check", "s1-b2", "hook-predict", "s2-check"]
     }
   ],
-  "mustFix": [
-    {
-      "criterion": "active",
-      "blockId": "s2-check",
-      "issue": "q2 gives its answer away: its three distractors (button colour, removal motion, larger text) are the 色・動き・大きさ that s2-b5 has just called UI, and the key 「各タスクで、担当者の名前も受け取る」 is the only option about data, echoing the stem's 「APIが返すデータ」. It tests word matching rather than o2's 見分ける, and its distractors encode no real misconception (contract §4).",
-      "fix": "Make the learner check the JSON in s2-b4; keep option ids and answer c. prompt.jp → 上のJSONを返すタスク管理アプリで、AIに「APIが返すデータを変えて」と頼むべき変更はどれでしょう？ (en: In the task app whose API returns the JSON above, which change calls for asking the AI to \"change the data the API returns\"?). Option c (key) → 「各タスクの横に、担当者の名前を表示する」 (en: Show the assignee's name next to each task). Option b → 「完了したタスクの名前に、取り消し線を付ける」 (en: Strike through the names of finished tasks), feedback 「完了したかどうか（done）は、もうJSONで届いています。見せ方を変えるだけなので、UIの変更です。」 (en: Whether a task is done is already in the JSON. Only the display changes, so it is a UI change.). Option d → 「長いタスク名を、1行に収まるように省いて表示する」 (en: Shorten long task names so each fits on one line), feedback 「タスク名（title）は、もうJSONで届いています。表示の仕方だけを変えるので、UIの変更です。」 (en: The task name (title) is already in the JSON. Only the display changes, so it is a UI change.). Keep option a and its feedback. explanation → 「担当者の名前は、いまのJSONに入っていません。まずAPIが返すデータに加えてもらい、画面に出すのはそのあとUIの変更として頼みます。取り消し線や省略は、届いたデータの見せ方なのでUIの変更です。」 (en: The assignee's name is not in the JSON yet. First have it added to the data the API returns, then ask for a UI change to show it. Strike-through and shortening only change how the data that arrives is shown, so they are UI changes.). hint → 「いまのJSONに入っていないデータが要るのは、どれでしょう？」 (en: Which change needs data that is not in the JSON yet?)."
-    },
-    {
-      "criterion": "prior",
-      "blockId": "ex-steps",
-      "issue": "Step ex-split says 「保存は[[データベース]]、保存するタスクと一覧の受け渡しは[[API]]、表示は[[UI]]の仕事です」 (en: \"Saving is the database's job\"). That contradicts s1-b5 and the glossary (the backend 「データベースにデータを保存したり取り出したり」) and q1's explanation (「データベースへの保存と取り出しを受け持ちます」), the very backend/database split q1 has just graded, and the worked example never names the backend, so o1's model is not carried into it.",
-      "fix": "In ex-steps item ex-split, replace md.jp with 「しまっておくのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]、表示は[[UI]]の仕事です。分けると、依頼ごとに変える範囲を書けます。」 and md.en with \"The [[database]] keeps the tasks, the [[backend]] saves them and passes the list back and forth through its [[API]], and the [[UI]] shows them. Once they are split, each request can say what it may change.\" Keep the title and expect."
-    }
-  ],
+  "mustFix": [],
   "niceToHave": [
-    "hook-predict q0: make the prediction a real choice. Replace option c's md with 「AIが、入力したタスクを覚えていないから」 (en: The AI does not remember the tasks you typed) and its feedback with 「タスクを覚えておくのは、AIではなくアプリの仕組みです。保存する仕組みがなければ、再読み込みで消えます。」 (en: Keeping the tasks is the app's job, not the AI's. Without a way to save them, they are lost on reload.); a vibe-coding beginner may well think the AI holds the data, which 「ブラウザのバージョンが古いから」 never surfaces.",
-    "s1-b3: the pantry only shows fetching, while the hook and the diagram are about 保存と取り出し. Replace the last sentence with 「お客さん（ユーザー）はウェイターに注文し、シェフは食材を食材庫にしまったり、取り出したりして作ります。」 (en: Customers (users) order through a waiter, and the chef puts ingredients into the pantry and takes them out to cook.).",
-    "s3-flow / card-deploy: 「次の3つが順に起きます」 reads as the only order, but mdn-publishing (already cited) also describes hosts that fetch the source from GitHub and build it themselves, which is how ch8 deploys (Vercel, Render). Replace s3-flow md.jp with 「[[デプロイ]]には、次の3つの段階があります。ビルドは、サーバーの側でおこなうサービスもあります。」 (en: A [[deployment]] has three stages. Some services do the build on their side.) and card-deploy front.jp with 「デプロイの3つの段階は？」 (en: What are the three stages of a deployment?).",
-    "ex-steps ex-verify: the troubleshoot names one cause and one step, but tasks also vanish when step ④'s API does not store them. Suggested troubleshoot.jp 「消えてしまうときは、保存か読み込みのどこかが、APIとデータベースを通っていません。④と⑤のどちらの依頼が足りないかを見直して、頼み直します。」 (en: If it disappears, saving or loading is somewhere not going through the API and the database. Check whether the request in step 4 or step 5 fell short, and ask again.).",
-    "practice-answer-data note: the first request has no model answer of its own, and s4-prompt-commit, which the note points to, also bundles 「そのあとで、{{頼みたい変更}}をしてください」. Replace note.jp with 「1つ目の依頼（コミット）の例：「変更を始める前に、いま動いている状態をGitにコミットしてください。メッセージは『本の登録と一覧が動く』にしてください。」」 (en: The first request (the commit), for example: \"Before you change anything, commit the current working state to Git with the message 'adding and listing books works'.\").",
-    "practice-answer-data prompt: say how the date gets saved, so that practice-answer-ui's 「APIとデータベースは変更しないでください」 can hold. Replace the first sentence of prompt.jp with 「本ごとの「読み終えた日」を、APIで受け取ってデータベースに保存できるようにしてください。」 (en: Let the API receive the \"date finished\" for each book and save it in the database.).",
-    "ex-lead: tie the two sides to 1-1's parts instead of adding a third pair of names (style guide §2 warns against mixing フロントエンド and 画面側). Replace the second sentence with 「データ側（バックエンドのAPIとデータベース）と画面側（フロントエンドのUI）に分けて、1つずつ頼むのがポイントです。」 (en: The key is to split the work into the data side (the backend's API and the database) and the screen side (the frontend's UI), and ask for one at a time.).",
-    "s2-b2 UI definition (and its glossary entry): the UI and frontend definitions both describe the screen, and the lesson never says how they relate before 1-5 calls the screen side 「画面側（UI）」. Suggested second sentence: 「Webアプリでは、フロントエンドが受け持つ、画面のボタンや入力欄、レイアウトなどです。」 (en: In a web app: the buttons, input fields and layout on the screen, which the frontend handles.); mdn-glossary-ui names an application's front end as a UI.",
-    "s1-check q1 option b: the causative 「保存させる」 leaves open who saves (a frontend could also 'have it saved'). Suggested md.jp 「入力された金額を調べてから、保存する」 (en: Check an entered amount, then save it).",
-    "s2-prompt-api expect: the prompt adds a database field only 「保存する場所がなければ」, so 「バックエンドの処理とデータベースが変わり」 overstates it. Suggested expect.jp 「バックエンドの処理が変わり（必要ならデータベースも）、返ってくるJSONの各タスクに項目が1つ増えます。画面の見た目は変わりません。」 (en: The backend changes (and the database, if needed), and each task in the returned JSON gets one more field. The screen looks the same.)."
+    "ex-split: the backend is now named, but the display side is still only 「表示は[[UI]]の仕事です」 while 1-1 gives the screen to the frontend, so the worked example carries two of o1's three parts. Suggested first sentence: 「タスクをしまうのは[[データベース]]、保存と一覧の受け渡しは[[バックエンド]]の[[API]]、表示は[[フロントエンド]]の[[UI]]の仕事です。」 (57 characters; keeping 「しまっておく」 makes it 60, the limit; prose becomes 2,393), en \"The [[database]] keeps the tasks, the [[backend]] saves them and passes the list back and forth through its [[API]], and the [[frontend]]'s [[UI]] shows them.\"; mdn-glossary-ui already names an application's front end as a UI."
   ],
-  "average": 3.38,
-  "verdict": "revise",
-  "summary": "Full review: since round 1 the objectives and most blocks changed, so review-scope.mjs requires one; validate and lint --strict are clean, and measure.mjs gives prose 2,382 and est 17.2 min. The biggest strength is the arc from the vanishing-tasks hook through a six-step worked example, a faded step (q9) and a transfer practice, with an everyday analogy before every defined term and cites throughout. Two must-fix items: q2 can be answered by matching the tip's words, and ex-split gives saving to the database, contradicting s1-b5 and q1's explanation."
+  "average": 3.77,
+  "verdict": "pass",
+  "summary": "Verification round (review-scope.mjs: 13 of 94 parts changed, 14%, sections and objectives unchanged); validate and lint --strict are clean, and measure.mjs gives prose 2,388 and est 17.3 min. Both round-2 must-fix items are resolved: q2 has to be answered from s2-b4's JSON, and ex-split gives saving to the backend as 1-1 does; with the new q0 option, the wider ex-verify troubleshoot and the commit model answer, hook, prior, active, miscon and accuracy rise to 4. No new must-fix; what is left below 4 is the two-level hint ladder in the practice, the crowded 1-2 segment and wording the ja-editor owns."
 }
