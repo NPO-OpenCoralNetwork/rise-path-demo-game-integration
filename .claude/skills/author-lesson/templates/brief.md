@@ -31,7 +31,9 @@
 - 使ってはいけないもの / avoid:
 
 ## 資料 / Sources
-<!-- Official docs and repo material first. Each becomes an entry in lesson.sources with an id. -->
+<!-- This repository first, then the official docs of the pinned version. Each becomes an entry in
+     lesson.sources (id, title, url, publisher, checkedAt); the lesson says only what these support.
+     UI pages (menus, buttons, screens) count only when checked for the current version. -->
 - 
 
 ## Assumptions

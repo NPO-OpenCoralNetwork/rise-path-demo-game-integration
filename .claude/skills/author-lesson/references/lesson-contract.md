@@ -30,7 +30,10 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 2. **3–5 segments** (`concept` / `example`), one idea each:
    - explanation of at most 300 JP characters (150 EN words), new terms defined before use
      (`definitions` + `glossary`), at most 3 new terms per segment;
-   - an analogy (callout `analogy`) only before the formal definition, and never quizzed;
+   - an analogy (callout `analogy`) only before the formal definition, and never quizzed. In a
+     `level: "beginner"` lesson every new concept gets an everyday analogy before its definition,
+     saying what maps to what (owner decision 2026-10-30: required; the reviewer checks it, lint
+     does not);
    - a diagram only when it shows structure, process, state change or comparison;
    - a worked example of 3–6 steps with subgoal labels and the why of each step (`steps` or `code`);
    - 1–2 inline check questions (quiz `mode: "inline"`) — **at least one inline quiz every 2 content
@@ -58,7 +61,7 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 | List items | ≤ 7 (lint `list-length`) |
 | Table columns | ≤ 6 (lint `table-columns`) |
 | Code block | ≤ 25 lines, with `lang` and `filename` (lint `code-length`, `code-filename`) |
-| Steps per block | ≤ 8, each with `expect` (lint `steps-length`, `steps-expect`) |
+| Steps per block | ≤ 8, each with `expect`; the block has `cite` (lint `steps-length`, `steps-expect`, `steps-cite`) |
 | Diagram | ≤ 12 nodes, with `caption` and `alt` (lint `diagram-caption`) |
 | Summary points | 3–5 (lint `summary-points`) |
 | Flashcards per lesson | 4–8 (lint `flashcards-count`) |
@@ -77,13 +80,23 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 
 ## 5. Accuracy and sources — never fabricate
 
-- Every non-obvious claim (numbers, dates, behaviour of a tool, prices, limits) is backed by a
-  source: add it to `sources[]` (`id`, `title`, `url`, `publisher`, `checkedAt`) and reference it
-  with `cite: ["source-id"]` on the block. Prefer official documentation and material already in
-  this repository.
+- Write only what the cited sources support. Research in this order: material already in this
+  repository first (the course's lessons and briefs, `data/curricula/**`, `doc/`), then the
+  official documentation of the version the lesson pins. Record each source in `sources[]` (`id`,
+  `title`, `url`, `publisher`, `checkedAt`).
+- Every non-obvious claim (numbers, dates, behaviour of a tool, prices, limits) carries
+  `cite: ["source-id"]` on its block. An uncited non-obvious claim is a must-fix in review; a
+  claim no source supports is left out (or asked about), never guessed.
+- UI steps: name a menu, button, screen or keyboard shortcut only after checking it in the
+  official documentation of the current version, and cite that page (`checkedAt` is the day you
+  checked it). When you cannot check it, describe the goal ("open the permission settings")
+  instead of the clicks.
+- Every `steps` block cites the sources of its commands, menus and expected results (lint
+  `steps-cite`; advisory in published lessons, see §8). Never cite a source that does not say it
+  just to quiet the lint: a block that only asks the learner to write or decide something keeps
+  the warning, with the reason in the report.
 - Pin tool versions where behaviour differs between versions ("Unity 6", "Node.js 22").
-- Never invent URLs, image paths, APIs, commands, keyboard shortcuts, quotes or statistics. If a
-  fact cannot be verified, leave it out or ask; do not guess.
+- Never invent URLs, image paths, APIs, commands, keyboard shortcuts, quotes or statistics.
 - Code runs as written. Commands are safe to copy (no destructive defaults, no secrets).
 
 ## 6. Language and style
@@ -108,7 +121,7 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
 - `provenance`: `{author, model?, skill?, skillVersion?, generatedAt, reviewedBy?}`. Do not invent
   a reviewer; `reviewedBy` is set by the human who reviewed it.
 
-## 8. Lint gate and migrated lessons
+## 8. Lint gate, migrated lessons and new rules
 
 - Done means `lessons:lint --strict` reports 0 warnings (or each one is justified in the report).
 - Exception (owner decision 2026-10-19): a **migrated-unreviewed** lesson — `provenance.migratedFrom`
@@ -117,8 +130,12 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
   chapter that nobody has reworked yet. `--strict` still prints its warnings, labelled advisory,
   and exits 0 for them. Errors always fail.
 - Drafts (`drafts/`) are always strict, whatever their provenance.
+- Rules added after lessons were published (`steps-cite`, owner plan 「出典と検索」 2026-10-30):
+  outside drafts, `--strict` prints their warnings labelled advisory and exits 0 for them. The
+  published lessons they flag are a known state until a rework, which is a draft and so strict,
+  cites the sources.
 - Reworking a migrated chapter: keep `provenance.migratedFrom` and every id, and replace `author`
   with the new authorship (`claude-code`, or `human+claude-code` when a person co-wrote it). From
   then on the lesson is strict, also after publishing.
-- `npm run lessons:lint -- --strict --include-migrated` makes every lesson strict, to see what is
-  left to rework.
+- `npm run lessons:lint -- --strict --include-migrated` makes every lesson and rule strict, to see
+  what is left to rework.

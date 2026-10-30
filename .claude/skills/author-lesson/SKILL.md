@@ -56,8 +56,12 @@ project rules).
 - **Chunks**: sentence ≤ 60 JP chars, paragraph ≤ 160, segment explanation ≤ 300, lesson body
   1,200–2,400; ≤ 3 new terms per segment; no decorative images.
 - **Voice**: です・ます, warm, no 「簡単です」「誰でも」; katakana terms with English on first use.
-- **Truth**: no fabricated facts, URLs, images, commands or numbers. Cite non-obvious claims
-  (`sources[]` + `cite`), pin tool versions, run code before you show it when you can.
+- **Truth**: write only what the cited sources support (`sources[]` + `cite`): this repository
+  first, then official documentation. No fabricated facts, URLs, images, commands or numbers; name
+  menus, buttons and screens only as the current official docs show them. Pin tool versions, run
+  code before you show it when you can.
+- **Beginners**: in a `level: "beginner"` lesson, an everyday analogy before the definition of
+  each new concept.
 
 ## 0. Orient
 
@@ -77,12 +81,23 @@ project rules).
 - If something required is missing, ask **one** consolidated question. When nobody can answer
   (headless run), choose sensible defaults and list them under "Assumptions".
 
-## 2. Research (when the topic needs facts you have not verified)
+## 2. Research (sources first)
 
-- Use repository material first (existing lessons, `data/curricula/**`, `doc/`), then official
-  documentation (WebFetch). Delegate long research to a subagent so the main thread stays clean.
-- Record each source you rely on (id, title, url, publisher, checkedAt) and the 2–4 misconceptions
-  learners most likely hold. If you cannot verify a claim, drop it.
+Every lesson goes through this step, in this order: this repository first, then the official
+documentation.
+
+1. **This repository**: the course's lessons and briefs, `data/curricula/**`, `doc/`.
+2. **Official documentation** of the version the brief pins (WebFetch). Delegate long research to
+   a subagent so the main thread stays clean.
+3. **UI steps**: check every menu, button, screen and shortcut you will name in the current
+   official documentation, and record that page (its `checkedAt` is the day you checked it). When
+   you cannot check one, the lesson describes the goal ("open the permission settings") instead
+   of the clicks.
+
+Record each source in the brief (id, title, url, publisher, checkedAt), with the 2–4
+misconceptions learners most likely hold. Write only what these sources support: a claim you
+cannot source stays out. The reviewer treats an uncited non-obvious claim and an unverified UI step
+as must-fix items.
 
 ## 3. Outline (checkpoint)
 
@@ -96,6 +111,10 @@ project rules).
   The PostToolUse hook validates every write; when it reports errors, fix them first.
 - Use the cookbook's blocks; write Japanese natively (`locale: "jp"`, plain strings) — translation
   is step 8. Define terms in `definitions` + `glossary` before use; mark later uses `[[term]]`.
+- Cite as you write: `cite` on every block whose claims come from a step 2 source, and on every
+  `steps` block (lint `steps-cite`). Name menus, buttons and screens only as step 2 checked them.
+- In a `level: "beginner"` lesson, put an everyday analogy (callout `analogy`) before the
+  definition of each new concept and say what maps to what (contract §2).
 - `provenance`: `{"author": "claude-code", "skill": "author-lesson", "skillVersion": "1",
   "generatedAt": "<today ISO>"}`. Leave `reviewedBy` to the human.
 
@@ -224,6 +243,8 @@ review in full. `server/tests/reviewChainsDurable.test.js` enforces this for pub
 ## Done means
 
 - `lessons:validate` 0 errors and `lessons:lint --strict` 0 warnings (or each one justified).
+- Every non-obvious claim and every `steps` block cites a source from step 2; in a
+  `level: "beginner"` lesson every new concept has an everyday analogy before its definition.
 - `check-review.mjs` exits 0 on the current reviews (every `lessonHash` is the lesson's hash):
   every criterion ≥ 3, mean ≥ 3.3, no open must-fix.
 - `metrics.json`: `overflowX: false`, `consoleErrors: 0`, `mermaidErrors: 0`; the screenshots were

@@ -89,7 +89,7 @@ Highlighted note. At most 2 per section; an analogy goes before the formal defin
 Fields: `variant` (`tip` | `warning` | `info` | `analogy` | `pitfall` | `note` | `success`); `title`?; `md`.
 
 **Use**
-- `analogy` before the formal definition (never quiz the analogy itself).
+- `analogy` before the formal definition (never quiz the analogy itself). In a `level: "beginner"` lesson, one everyday analogy before the definition of each new concept, saying what maps to what.
 - `pitfall` for one real, common error per segment, with how to notice and fix it.
 - `warning` for data loss, security or cost; `tip`, `info`, `note`, `success` (expected result after a task).
 - At most 2 callouts per section, at most 3 sentences each.
@@ -608,12 +608,14 @@ Each `items` item: `id`; `title`; `md`?; `keys`? — Keyboard keys shown as <kbd
 **Use**
 - Procedures of at most 8 steps. Each step: a subgoal title, `expect` (what the learner sees), `keys` for shortcuts, `hint`, `troubleshoot`.
 - Worked example: the same subgoal titles reused in the text; a faded version later leaves 1–2 steps for the learner.
+- `cite` the sources the commands, menus and expected results come from. Name a menu, button, screen or shortcut only as the current official docs show it; when you cannot check it, describe the goal instead of the clicks.
 
 **Avoid**
 - Steps without an expected result.
 - Ten-step marathons (split into two blocks).
+- Menus, buttons and shortcuts written from memory.
 
-**Lint**: `steps-length` (A steps block has at most 8 steps.); `steps-expect` (Every step states its expected result.)
+**Lint**: `steps-length` (A steps block has at most 8 steps.); `steps-expect` (Every step states its expected result.); `steps-cite` (A steps block cites the sources that back its commands, menus and expected results.)
 
 **Good** — gallery block `practice-steps` (section `practice`):
 
@@ -621,6 +623,7 @@ Each `items` item: `id`; `title`; `md`?; `keys`? — Keyboard keys shown as <kbd
 {
   "id": "practice-steps",
   "type": "steps",
+  "cite": ["vscode-terminal","vscode-ui","rp-readme","rp-validate","rp-dev-blocks","chrome-shortcuts"],
   "items": [
     {
       "id": "step-1",
@@ -640,8 +643,8 @@ Each `items` item: `id`; `title`; `md`?; `keys`? — Keyboard keys shown as <kbd
       "expect": {"jp":"最後の行に `no errors` と表示される。","en":"The last line says `no errors`."},
       "hint": {"jp":"プロジェクトのフォルダーで実行しているか確かめましょう。","en":"Check that you are in the project folder."},
       "troubleshoot": {
-        "jp": "`command not found` と出たら、先に `npm install` を実行します。",
-        "en": "If you see `command not found`, run `npm install` first."
+        "jp": "`Cannot find package` と出たら、先に `npm install` を実行します。",
+        "en": "If you see `Cannot find package`, run `npm install` first."
       }
     },
     {
@@ -664,7 +667,7 @@ Each `items` item: `id`; `title`; `md`?; `keys`? — Keyboard keys shown as <kbd
 {"id":"setup","type":"steps","items":[{"id":"s1","title":"ターミナルを開く"},{"id":"s2","title":"npm install を実行する"}]}
 ```
 
-Why: The learner cannot tell whether a step worked. Add `expect` to every step.
+Why: The learner cannot tell whether a step worked, and nothing says where the steps come from (`steps-cite`). Add `expect` to every step and `cite` the docs they follow.
 
 ### checklist
 

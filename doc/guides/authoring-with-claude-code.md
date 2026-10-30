@@ -59,12 +59,15 @@ this as a known state on 2026-10-19; it is not part of the done criteria.
   spot fixes), and there is no `reviewedBy`.
 - **`--strict`** prints their warnings labelled advisory, with a count, and exits 0 for them.
   Validation errors always fail.
-- **Still strict**: drafts in `drafts/` and every other lesson fail on any warning.
+- **Still strict**: drafts in `drafts/` and every other lesson fail on any warning, except the next.
+- **Rules added after publishing**: `steps-cite` (a steps block cites its sources, 2026-10-30) is
+  advisory outside `drafts/`, because published lessons still have uncited steps; drafts are
+  strict, so a rework adds the sources.
 - **Reworking flips it**: `/author-lesson` on a migrated chapter keeps `migratedFrom` and records a
   new `provenance.author` (`claude-code`, or `human+claude-code`), so the lesson is strict from then
   on, also after publishing.
 - **Everything strict**: `npm run lessons:lint -- --strict --include-migrated` gates the migrated
-  chapters too; use it to list what is left to rework.
+  chapters and `steps-cite` too; use it to list what is left to rework.
 
 ## Commands
 
@@ -76,7 +79,7 @@ claude                                              # start Claude Code at the r
 npm run lessons:catalog                             # courses, lessons, drafts, status (always exit 0)
 npm run lessons:validate -- <file>                  # schema + semantic checks
 npm run lessons:lint -- <file> --strict             # pedagogy and readability rules
-npm run lessons:lint -- --strict --include-migrated # also gate migrated, not reworked chapters
+npm run lessons:lint -- --strict --include-migrated # also gate migrated chapters and steps-cite
 npm run lessons:preview -- <course> <lesson>        # .artifacts/preview/<course>/<lesson>/
 node .claude/skills/review-lesson/scripts/check-review.mjs <review.json>…   # merged verdict (2 = invalid or stale)
 node .claude/skills/review-lesson/scripts/review-scope.mjs <file> --hash        # lessonHash of the version a review reads
