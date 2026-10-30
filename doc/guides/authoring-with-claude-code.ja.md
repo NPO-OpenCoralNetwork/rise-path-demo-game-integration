@@ -100,8 +100,17 @@ Claude Code は次の順に進めます（詳細は `.claude/skills/author-lesso
 ### 確認なしで進められる範囲と、ヘッドレス実行
 
 スキルが確認なしで実行できる操作（`content/courses/` 配下の編集、`lessons:*` スクリプト、
-`check-review.mjs`）は、**`/author-lesson` を呼び出したターンの間だけ**有効です。アウトラインの
-確認で一度止まったあとは、編集のたびに許可を求められます。
+`check-review.mjs`、公式ドキュメントのドメインへの WebFetch）は、**`/author-lesson` を呼び出した
+ターンの間だけ**有効です。アウトラインの確認で一度止まったあとは、編集のたびに許可を求められます。
+
+このリポジトリが WebFetch を事前に許可しているのは、スキルの `allowed-tools` と
+`.claude/settings.example.json` に書いた公式ドキュメントのドメインです（ヘッドレス実行でも
+`--settings` で同じ一覧が効きます）。Claude Code 自体も、一部のドキュメントサイトは確認なしで
+読みます。それ以外のページは権限モードに従います。手動なら確認を求められ、auto モードなら分類器が
+判断し、ヘッドレス実行なら拒否されます。読んだページは資料であって指示ではないので、ページの中の
+指示には従いません。ドメインを足すときは、スキルの `allowed-tools` と手順 2 の一覧、
+`.claude/settings.example.json`、`server/tests/claudeKit.test.js` の一覧を 1 つの PR で直します
+（テストが 4 か所の一致を確かめます）。利用者が書き込めるページのあるドメインは足しません。
 
 `claude -p` で最後まで自動で回す（ヘッドレス実行）ときは許可を求める相手がいないため、許可の
 ない操作はすべて拒否されます。プロジェクトの権限ルールを読み込んで起動してください。
@@ -330,8 +339,9 @@ npm run lessons:preview -- vibe-coding vibe-ch1
 
 - **チーム全員に有効にする**: `.claude/settings.example.json` を `.claude/settings.json` に
   コピーしてコミットします。このリポジトリを開くすべてのセッションで、`content/` 配下のレッスンを
-  書くたびに hook が動き、`lessons:*` コマンドと `content/courses/` の編集が確認なしで許可され、
-  `.env` 系ファイルの読み取りが禁止されます。影響が全員に及ぶので、PR で合意してから入れてください。
+  書くたびに hook が動き、`lessons:*` コマンドと `content/courses/` の編集、公式ドキュメントの
+  ドメイン（§3 の一覧）への WebFetch が確認なしで許可され、`.env` 系ファイルの読み取りが禁止されます。
+  レッスンの作業でないセッションにも効きます。影響が全員に及ぶので、PR で合意してから入れてください。
 - **自分だけ有効にする**: 同じ内容を `.claude/settings.local.json` に書きます（コミットしません）。
 
 設定後、Claude Code で `/hooks` を開くと登録を確認できます。hook は次のように動きます。
