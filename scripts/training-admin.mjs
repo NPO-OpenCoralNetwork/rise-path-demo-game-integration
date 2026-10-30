@@ -16,8 +16,9 @@
  * --add            an account to a cohort with a role (learner, instructor, examiner, staff), under
  *                  the account's shared lock and only while its Rise Path account row exists: the
  *                  person signs in to this deployment's app once first. A deleted account is
- *                  refused. An account already in the cohort keeps its role (changing a role is
- *                  not supported yet).
+ *                  refused, and so is a learner already in another cohort whose dates overlap
+ *                  (study time would count one moment in both). An account already in the cohort
+ *                  keeps its role (changing a role is not supported yet).
  * --list           the cohort and every membership it ever had, marked ones (deleted accounts) too.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
@@ -132,6 +133,9 @@ async function addOne(args, deps) {
             return EXIT.ok;
         case 'role_differs':
             deps.log(`Refused: ${id} is already in ${args.cohort} as ${result.role}; changing a role is not supported yet.`);
+            return EXIT.refused;
+        case 'overlapping':
+            deps.log(`Refused: ${id} is a learner in ${result.cohort}, whose dates overlap ${args.cohort}'s; a learner is in one cohort at a time.`);
             return EXIT.refused;
         case 'no_cohort':
             deps.log(`Refused: there is no cohort ${args.cohort} (--create-cohort first).`);

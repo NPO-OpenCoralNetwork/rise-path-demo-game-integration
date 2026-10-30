@@ -26,12 +26,12 @@ import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../middleware/auth.js';
 import { requireSignedIn } from '../middleware/signedIn.js';
 import { canonicalUserId } from '../../tools/core/accountDeletions.js';
-import { getTrainingMe } from '../../tools/core/training.js';
+import { TRAINING_REQUESTS_PER_MINUTE, getTrainingMe } from '../../tools/core/training.js';
 
 /** Largest body (the first routes take none). */
 export const TRAINING_BODY_LIMIT = '4kb';
-/** Requests per learner per minute, every training route together. */
-export const TRAINING_REQUESTS_PER_MINUTE = 60;
+/** Requests per learner per minute, every training route together (defined with the core, which checks a rules file against it). */
+export { TRAINING_REQUESTS_PER_MINUTE };
 
 /** Core error types that mean "the database cannot serve this now" (503, try again later). */
 const UNAVAILABLE = new Set(['db_connection', 'table_not_found', 'permission_denied']);
