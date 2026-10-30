@@ -286,7 +286,7 @@ describe('the installed auth-js against a stand-in Supabase Auth, through the gu
 describe('the api while Supabase Auth is down (production)', () => {
     useProduction();
 
-    it('the library, a course, its resume card, lesson records and the voice probe answer 503 auth_unavailable to a signed-in learner; the AI tutor 503 ai_access_unavailable', async () => {
+    it('the library, a course, its resume card, lesson records and the voice probe answer 503 auth_unavailable to a signed-in learner; the AI tutor 503 ai_access_unavailable, with or without an anchor', async () => {
         const pool = createAccountDeletionPool();
         setPoolForTests(pool);
         setSupabaseForTests(supabaseAt(`http://127.0.0.1:${await freePort()}`));
@@ -303,17 +303,18 @@ describe('the api while Supabase Auth is down (production)', () => {
                 assert.equal(response.status, 503, `${method} ${urlPath}: ${JSON.stringify(response.json)}`);
                 assert.deepEqual(response.json, AUTH_UNAVAILABLE, `${method} ${urlPath}`);
             }
-            const tutor = await request('/api/v2/llm/tutor', {
-                method: 'POST',
-                token: session(),
-                body: {
-                    message: 'これは何？',
-                    lesson: { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] },
-                    anchor: { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'プロンプトは「目的・制約・例」の順に書く。' },
-                },
-            });
-            assert.equal(tutor.status, 503, JSON.stringify(tutor.json));
-            assert.equal(tutor.json?.error_type, 'ai_access_unavailable');
+            const lesson = { courseId: 'vibe', lessonId: 'ch1', title: 'はじめての Vibe Coding', objectives: ['AI と一緒に作る流れを説明できる'] };
+            const anchor = { sectionId: 's2', blockId: 'b5', blockType: 'markdown', excerpt: 'プロンプトは「目的・制約・例」の順に書く。' };
+            // Without an anchor too (a term question, no active block): not the guests' 400 lesson_required.
+            for (const body of [{ message: 'これは何？', lesson, anchor }, { message: 'これは何？', lesson }]) {
+                const tutor = await request('/api/v2/llm/tutor', { method: 'POST', token: session(), body });
+                assert.equal(tutor.status, 503, JSON.stringify(tutor.json));
+                assert.equal(tutor.json?.error_type, 'ai_access_unavailable');
+            }
+            // A guest (no token) without an anchor is still refused as before.
+            const guest = await request('/api/v2/llm/tutor', { method: 'POST', body: { message: 'これは何？', lesson } });
+            assert.equal(guest.status, 400);
+            assert.equal(guest.json?.error_type, 'lesson_required');
         });
         assert.equal(accountReads(pool), 0);
         assert.equal(stubInserts(pool), 0);
@@ -321,11 +322,23 @@ describe('the api while Supabase Auth is down (production)', () => {
 });
 
 describe('mcp-server/sseUserAuth.js: a session that could not be checked', () => {
-    const resolverWith = async (getUser, dev) => {
+    /** A pool for the account check: counts its reads; `fail` makes them throw like a database outage. */
+    const accountPool = ({ fail = false } = {}) => {
+        const pool = {
+            reads: 0,
+            query: async () => {
+                pool.reads += 1;
+                if (fail) throw new Error('connect ECONNREFUSED 127.0.0.1:5432');
+                return { rowCount: 0, rows: [] };
+            },
+        };
+        return pool;
+    };
+    const resolverWith = async (getUser, dev, pool = accountPool()) => {
         const { createSseUserResolver } = await import('../../mcp-server/sseUserAuth.js');
         return createSseUserResolver({
             getSupabase: () => ({ auth: { getUser } }),
-            getPool: () => null,
+            getPool: () => pool,
             readAccountState,
             decodeTokenClaims,
             sessionAuthTime,
@@ -339,14 +352,29 @@ describe('mcp-server/sseUserAuth.js: a session that could not be checked', () =>
     };
     const learner = () => ({ headers: { authorization: `Bearer ${session()}` } });
 
-    it('Supabase Auth that cannot answer: null, marked so the caller answers 503, never the dev user', async () => {
+    it('Supabase Auth that cannot answer: null, marked so the caller answers 503, never the dev user; no account read', async () => {
         const { sessionCheckUnavailable } = await import('../../mcp-server/sseUserAuth.js');
         const unavailable = async () => ({ data: { user: null }, error: new AuthRetryableFetchError('fetch failed', 0) });
         for (const dev of [false, true]) {
+            const pool = accountPool();
             const req = learner();
-            assert.equal(await (await resolverWith(unavailable, dev))(req), null, `dev ${dev}`);
+            assert.equal(await (await resolverWith(unavailable, dev, pool))(req), null, `dev ${dev}`);
             assert.equal(req.authMethod, 'auth-unavailable');
             assert.equal(sessionCheckUnavailable(req), true);
+            assert.equal(pool.reads, 0);
+        }
+    });
+
+    it('an account check the database cannot answer: null, marked so the caller answers 503 as the app API does, never the dev user', async () => {
+        const { sessionCheckUnavailable } = await import('../../mcp-server/sseUserAuth.js');
+        const accept = async () => ({ data: { user: { id: LEARNER } }, error: null });
+        for (const dev of [false, true]) {
+            const pool = accountPool({ fail: true });
+            const req = learner();
+            assert.equal(await (await resolverWith(accept, dev, pool))(req), null, `dev ${dev}`);
+            assert.equal(req.authMethod, 'account-check-failed');
+            assert.equal(sessionCheckUnavailable(req), true);
+            assert.equal(pool.reads, 1);
         }
     });
 
@@ -411,8 +439,6 @@ describe('MCP server (SSE, production) while Supabase Auth is down', () => {
             SUPABASE_URL: standIn.url,
             SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
             RISE_PATH_BRIDGE_TOKEN: BRIDGE_TOKEN,
-            // Nothing listens there: the account check of a learner Supabase Auth names fails.
-            DATABASE_URL_PHASE1: `postgresql://rp_user:rp_pass@127.0.0.1:${await freePort()}/rp_test`,
         });
     });
     after(async () => {
@@ -433,13 +459,6 @@ describe('MCP server (SSE, production) while Supabase Auth is down', () => {
         const refused = await open(session());
         assert.equal(refused.status, 401);
         assert.deepEqual(await refused.json(), { error: 'Authentication required' });
-    });
-
-    it('GET /sse with a learner token whose account check cannot reach the database: 503 auth_unavailable, as the app API answers', async () => {
-        standIn.answer = 'user';
-        const response = await open(session());
-        assert.equal(response.status, 503);
-        assert.deepEqual(await response.json(), AUTH_UNAVAILABLE);
     });
 
     it('POST /messages/:id with a learner token: 503 auth_unavailable while Supabase Auth cannot answer, 401 when it refuses the token', async () => {

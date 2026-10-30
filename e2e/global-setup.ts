@@ -58,9 +58,11 @@ export default async function globalSetup() {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: STANDIN_PASSWORD }),
   }), (r) => r.status === 200 && typeof r.body?.access_token === 'string', 'the stand-in refused its own learner');
   const chain = await get(`${E2E.apiUrl}/api/v2/user/ai-access`, { headers: { authorization: `Bearer ${session.body.access_token}` } });
-  // The api asks SUPABASE_URL about every token, and an answer it cannot get is a refusal (401).
+  // The api asks SUPABASE_URL about every token: an answer it cannot get is 503 auth_unavailable,
+  // and a token the auth server there refuses is 401.
+  if (chain.status === 503 && chain.body?.error_type === 'auth_unavailable') throw new Error('global setup, the auth chain: 503 auth_unavailable: the api gets no answer from its SUPABASE_URL, which does not reach the stand-in (stack.sh auth, the network alias; host mode: SUPABASE_URL=http://127.0.0.1:<port>)');
   if (chain.status >= 500) throw new Error(`global setup, the auth chain: ${chain.status}: the api failed while it asked the stand-in (stack.sh auth, the network alias)`);
-  if (chain.status === 401) throw new Error('global setup, the auth chain: 401: the api refused a stand-in token: its SUPABASE_URL does not reach the stand-in (stack.sh auth, the network alias; host mode: SUPABASE_URL=http://127.0.0.1:<port>)');
+  if (chain.status === 401) throw new Error('global setup, the auth chain: 401: the api refused a stand-in token: the auth server at its SUPABASE_URL is not the stand-in that signed the learner in (stack.sh auth, the network alias)');
   if (chain.status !== 200) throw new Error(`global setup, the auth chain: GET /api/v2/user/ai-access answered ${chain.status}`);
   console.log('ok   the auth chain (stand-in token → api → stand-in)');
 
