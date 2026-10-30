@@ -763,6 +763,7 @@
             "vscode-ui",
             "rp-readme",
             "rp-validate",
+            "node-errors",
             "rp-dev-blocks",
             "chrome-shortcuts"
           ],
@@ -807,8 +808,8 @@
                 "en": "Check that you are in the project folder."
               },
               "troubleshoot": {
-                "jp": "`Cannot find package` と出たら、先に `npm install` を実行します。",
-                "en": "If you see `Cannot find package`, run `npm install` first."
+                "jp": "`ERR_MODULE_NOT_FOUND` と出たら、先に `npm install` を実行します。",
+                "en": "If you see `ERR_MODULE_NOT_FOUND`, run `npm install` first."
               }
             },
             {
@@ -1257,6 +1258,13 @@
       "title": "scripts/lessons/validate.mjs（npm run lessons:validate）",
       "url": "https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/blob/main/scripts/lessons/validate.mjs",
       "publisher": "Rise Path",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "node-errors",
+      "title": "Errors: ERR_MODULE_NOT_FOUND (Node.js v22)",
+      "url": "https://nodejs.org/docs/latest-v22.x/api/errors.html#err_module_not_found",
+      "publisher": "Node.js",
       "checkedAt": "2026-10-30"
     },
     {

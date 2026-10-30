@@ -1,7 +1,7 @@
 // Lint policy for machine-migrated lessons (owner decision 2026-10-19, option A):
 // `lessons:lint --strict` reports their warnings as advisory; drafts and authored lessons stay strict.
-// Rules added after lessons were published (ADVISORY_RULES: steps-cite, 「出典と検索」 2026-10-30)
-// are advisory outside drafts in every lesson.
+// The steps blocks published without cite before steps-cite existed (KNOWN_UNCITED_STEPS,
+// 「出典と検索」 2026-10-30) are a known state too: advisory outside drafts, every other one strict.
 // The CLI cases run on fixtures with explicit provenance (built from the lint-clean gallery lesson
 // plus one known warning), so reworking or publishing a chapter does not change what they test.
 import { describe, it, before, after } from 'node:test';
@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { ADVISORY_RULES, LINT_RULES, isMigratedUnreviewed, isMigrationAuthor, lintLesson, lintPolicy, warningPolicy } from '../../shared/lesson/lint.js';
+import { KNOWN_UNCITED_STEPS, blockKey, isMigratedUnreviewed, isMigrationAuthor, lintLesson, lintPolicy, warningPolicy } from '../../shared/lesson/lint.js';
 import { parseLintArgs, isDraftFile } from '../../scripts/lessons/lint.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -96,32 +96,45 @@ describe('lintPolicy', () => {
   });
 });
 
-describe('warningPolicy (rules added after lessons were published)', () => {
-  const migrated = { provenance: MIGRATED };
-  const authored = { provenance: AUTHORED };
-  const stepsCite = { rule: 'steps-cite' };
-  const banned = { rule: 'banned-phrase' };
+describe('warningPolicy and KNOWN_UNCITED_STEPS', () => {
+  /** A one-block lesson whose steps block has the id of a known one (claude-code/cc-03-plan-first#practice-steps). */
+  const lesson = (id, provenance = AUTHORED) => ({
+    provenance, courseId: 'claude-code', id, sections: [{ id: 's1', blocks: [{ id: 'practice-steps', type: 'steps', items: [] }] }],
+  });
+  const stepsCite = { rule: 'steps-cite', path: 'sections[0].blocks[0]' };
+  const banned = { rule: 'banned-phrase', path: 'sections[0].blocks[0].items[0].title' };
 
-  it('steps-cite is the advisory rule, and a lint rule', () => {
-    assert.deepEqual([...ADVISORY_RULES], ['steps-cite']);
-    for (const rule of ADVISORY_RULES) assert.ok(rule in LINT_RULES, rule);
+  it('makes the steps-cite warning of a known block advisory, and any other one strict', () => {
+    assert.equal(blockKey(lesson('cc-03-plan-first'), stepsCite.path), 'claude-code/cc-03-plan-first#practice-steps');
+    assert.equal(warningPolicy(stepsCite, lesson('cc-03-plan-first')), 'advisory');
+    assert.equal(warningPolicy(stepsCite, lesson('cc-12-new')), 'strict', 'a new lesson fails, also after publishing');
+    assert.equal(warningPolicy(stepsCite, { ...lesson('cc-03-plan-first'), courseId: 'vibe-coding' }), 'strict');
+    assert.equal(warningPolicy(stepsCite, { ...lesson('cc-03-plan-first'), courseId: undefined }), 'strict');
+    assert.equal(warningPolicy(banned, lesson('cc-03-plan-first')), 'strict');
   });
 
-  it('makes steps-cite advisory outside drafts; other rules stay strict', () => {
-    assert.equal(warningPolicy(stepsCite, authored), 'advisory');
-    assert.equal(warningPolicy(banned, authored), 'strict');
-  });
-
-  it('drafts and --include-migrated make it strict', () => {
-    assert.equal(warningPolicy(stepsCite, authored, { draft: true }), 'strict');
-    assert.equal(warningPolicy(stepsCite, authored, { includeMigrated: true }), 'strict');
+  it('drafts and --include-migrated make a known block strict too', () => {
+    assert.equal(warningPolicy(stepsCite, lesson('cc-03-plan-first'), { draft: true }), 'strict');
+    assert.equal(warningPolicy(stepsCite, lesson('cc-03-plan-first'), { includeMigrated: true }), 'strict');
   });
 
   it('follows lintPolicy for migrated-unreviewed lessons', () => {
-    assert.equal(warningPolicy(banned, migrated), 'advisory');
-    assert.equal(warningPolicy(stepsCite, migrated), 'advisory');
-    assert.equal(warningPolicy(banned, migrated, { draft: true }), 'strict');
-    assert.equal(warningPolicy(stepsCite, migrated, { includeMigrated: true }), 'strict');
+    assert.equal(warningPolicy(banned, lesson('cc-12-new', MIGRATED)), 'advisory');
+    assert.equal(warningPolicy(stepsCite, lesson('cc-12-new', MIGRATED)), 'advisory');
+    assert.equal(warningPolicy(banned, lesson('cc-12-new', MIGRATED), { draft: true }), 'strict');
+    assert.equal(warningPolicy(stepsCite, lesson('cc-12-new', MIGRATED), { includeMigrated: true }), 'strict');
+  });
+
+  it('lists only published steps blocks that still have no cite', () => {
+    assert.equal(KNOWN_UNCITED_STEPS.size, 12);
+    for (const key of KNOWN_UNCITED_STEPS) {
+      const [, course, id, blockId] = /^([a-z0-9-]+)\/([a-z0-9-]+)#([a-z0-9._-]+)$/.exec(key) || [];
+      const file = path.join(ROOT, 'content/courses', course || '-', 'lessons', `${id}.lesson.json`);
+      assert.ok(fs.existsSync(file), `${key}: no published lesson ${path.relative(ROOT, file)}`);
+      const block = readJson(file).sections.flatMap((s) => s.blocks).find((b) => b.id === blockId);
+      assert.equal(block?.type, 'steps', `${key}: no steps block "${blockId}"`);
+      assert.ok(!block.cite?.length, `${key} cites its sources now: remove it from KNOWN_UNCITED_STEPS (shared/lesson/lint.js)`);
+    }
   });
 });
 
@@ -202,27 +215,31 @@ describe('lessons:lint --strict (fixtures)', () => {
     assert.doesNotMatch(github, /^::error file=[^\n]*fx-old/m);
   });
 
-  it('passes an authored lesson whose only warning is steps-cite, labelled advisory; drafts and --include-migrated fail it', () => {
-    const file = write('cite-published', fixture('fx-uncited', AUTHORED, { warn: false, uncited: true }));
-    const cli = lint([file, '--strict']);
-    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
-    assert.match(cli.stdout, /fx-uncited\.lesson\.json \(1 warning, 1 advisory outside drafts\)/);
-    assert.match(cli.stdout, /steps-cite\s+sections\[\d+\]\.blocks\[\d+\]: .*\(advisory\)$/m);
-    assert.match(cli.stdout, /Advisory: 1 warning of rules added after lessons were published \(steps-cite\) in 1 lesson outside drafts\//);
+  /** The gallery as the known lesson claude-code/cc-03-plan-first, its practice-steps block uncited. */
+  const knownLesson = (options = {}) => ({ ...fixture('cc-03-plan-first', AUTHORED, { warn: false, uncited: true, ...options }), courseId: 'claude-code' });
 
-    const json = JSON.parse(lint([file, '--strict', '--format', 'json']).stdout);
+  it('lists the steps-cite warning of a known block as advisory; a new uncited steps block fails, also after publishing', () => {
+    const known = write('cite-known', knownLesson());
+    const cli = lint([known, '--strict']);
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    assert.match(cli.stdout, /cc-03-plan-first\.lesson\.json \(1 warning, 1 advisory: known uncited steps\)/);
+    assert.match(cli.stdout, /steps-cite\s+sections\[\d+\]\.blocks\[\d+\]: .*\(advisory\)$/m);
+    assert.match(cli.stdout, /Advisory: 1 steps-cite warning on known uncited steps blocks in 1 lesson /);
+
+    const json = JSON.parse(lint([known, '--strict', '--format', 'json']).stdout);
     assert.equal(json.ok, true);
     assert.equal(json.advisoryWarnings, 1);
     assert.equal(json.files[0].policy, 'strict');
     assert.deepEqual(json.files[0].warnings.map((w) => [w.rule, w.policy]), [['steps-cite', 'advisory']]);
 
-    const github = lint([file, '--strict', '--format', 'github']).stdout;
-    assert.match(github, /^::warning file=[^\n]*fx-uncited\.lesson\.json,title=lessons:lint \(advisory, outside drafts\) steps-cite::/m);
+    const github = lint([known, '--strict', '--format', 'github']).stdout;
+    assert.match(github, /^::warning file=[^\n]*cc-03-plan-first\.lesson\.json,title=lessons:lint \(advisory, known uncited steps\) steps-cite::/m);
     assert.doesNotMatch(github, /^::error/m);
 
     for (const [label, args] of [
-      ['drafts/', [write('drafts', fixture('fx-uncited', AUTHORED, { warn: false, uncited: true })), '--strict']],
-      ['--include-migrated', [file, '--strict', '--include-migrated']],
+      ['a new lesson', [write('cite-new', fixture('fx-uncited', AUTHORED, { warn: false, uncited: true })), '--strict']],
+      ['drafts/', [write('drafts', knownLesson()), '--strict']],
+      ['--include-migrated', [known, '--strict', '--include-migrated']],
     ]) {
       const strict = lint(args);
       assert.equal(strict.status, 1, `${label}: ${strict.stdout}${strict.stderr}`);
@@ -231,30 +248,45 @@ describe('lessons:lint --strict (fixtures)', () => {
     }
   });
 
-  it('a steps-cite warning does not hide another warning of the same lesson', () => {
-    const cli = lint([write('cite-mixed', fixture('fx-uncited-banned', AUTHORED, { uncited: true })), '--strict', '--format', 'json']);
+  it('a known uncited steps block does not hide another warning of the same lesson', () => {
+    const cli = lint([write('cite-mixed', knownLesson({ warn: true })), '--strict', '--format', 'json']);
     assert.equal(cli.status, 1, cli.stdout + cli.stderr);
     const json = JSON.parse(cli.stdout);
     assert.equal(json.ok, false);
     assert.equal(json.advisoryWarnings, 1);
     assert.deepEqual(json.files[0].warnings.map((w) => [w.rule, w.policy]).sort(), [['banned-phrase', 'strict'], ['steps-cite', 'advisory']]);
   });
+
+  it('a migrated-unreviewed lesson with an uncited steps block: every warning advisory, counted once', () => {
+    const file = write('cite-migrated', fixture('fx-migrated-uncited', MIGRATED, { uncited: true }));
+    const cli = lint([file, '--strict', '--format', 'json']);
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    const json = JSON.parse(cli.stdout);
+    assert.equal(json.advisoryWarnings, 2);
+    assert.equal(json.files[0].policy, 'advisory');
+    assert.deepEqual(json.files[0].warnings.map((w) => [w.rule, w.policy]).sort(), [['banned-phrase', 'advisory'], ['steps-cite', 'advisory']]);
+    assert.match(lint([file, '--strict', '--format', 'github']).stdout, /^::warning file=[^\n]*title=lessons:lint \(advisory, migrated-unreviewed\) steps-cite::/m);
+  });
 });
 
 describe('lessons:lint --strict over the repository', () => {
-  it('passes; every advisory warning is in a migrated-unreviewed lesson or of an advisory rule', () => {
+  it('passes; advisory warnings come only from migrated-unreviewed lessons and KNOWN_UNCITED_STEPS', () => {
     const cli = lint(['--strict', '--format', 'json']);
     const json = JSON.parse(cli.stdout);
     assert.equal(cli.status, 0, cli.stdout + cli.stderr);
     assert.equal(json.ok, true);
+    const flagged = new Set();
     for (const file of json.files) {
+      const lesson = readJson(path.resolve(ROOT, file.file));
       if (file.policy === 'advisory') {
-        assert.equal(isMigratedUnreviewed(readJson(path.resolve(ROOT, file.file))), true, file.file);
+        assert.equal(isMigratedUnreviewed(lesson), true, file.file);
         continue;
       }
       for (const warning of file.warnings) {
-        assert.equal(warning.policy === 'advisory' && ADVISORY_RULES.has(warning.rule), true, `${file.file}: ${warning.rule} ${warning.path}`);
+        assert.equal(warning.rule, 'steps-cite', `${file.file}: ${warning.rule} ${warning.path} is advisory`);
+        flagged.add(blockKey(lesson, warning.path));
       }
     }
+    assert.deepEqual([...flagged].sort(), [...KNOWN_UNCITED_STEPS].sort(), 'the advisory steps-cite warnings are exactly the known blocks');
   });
 });

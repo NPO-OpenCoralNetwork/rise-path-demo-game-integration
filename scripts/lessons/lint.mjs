@@ -7,13 +7,14 @@
  *   npm run lessons:lint                                            # everything under content/
  *   npm run lessons:lint -- content/courses/vibe-coding/lessons/vibe-ch1.lesson.json --strict
  *   npm run lessons:lint -- --format json|github|text
- *   npm run lessons:lint -- --strict --include-migrated            # gate migrated chapters and advisory rules too
+ *   npm run lessons:lint -- --strict --include-migrated            # gate migrated chapters and known uncited steps too
  *
  * Warnings exit 0, unless --strict (then any warning exits 1). Under --strict, warnings of
  * migrated-unreviewed lessons (machine-migrated, not reworked; see lintPolicy in
- * shared/lesson/lint.js) and, outside drafts, warnings of rules added after lessons were
- * published (ADVISORY_RULES, see warningPolicy) are printed as advisory and do not fail.
- * Drafts are always strict; --include-migrated makes every lesson and rule strict.
+ * shared/lesson/lint.js) and, outside drafts, the steps-cite warnings of the steps blocks
+ * published without cite before that rule (KNOWN_UNCITED_STEPS, see warningPolicy) are printed
+ * as advisory and do not fail. Drafts are always strict; --include-migrated makes every warning
+ * strict.
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -66,7 +67,7 @@ async function main() {
   const warningCount = results.reduce((n, r) => n + r.warnings.length, 0);
   const advisory = results.filter((r) => r.policy === 'advisory');
   const advisoryCount = advisory.reduce((n, r) => n + r.warnings.length, 0);
-  // Per strict lesson, its advisory warnings (ADVISORY_RULES outside drafts).
+  // Per strict lesson, its advisory warnings (steps-cite on KNOWN_UNCITED_STEPS, outside drafts).
   const ruleAdvisory = results.filter((r) => r.policy === 'strict').map((r) => r.warnings.filter((w) => w.policy === 'advisory')).filter((ws) => ws.length > 0);
   const ruleAdvisoryCount = ruleAdvisory.reduce((n, ws) => n + ws.length, 0);
   const gatedCount = results.reduce((n, r) => n + r.warnings.filter((w) => w.policy === 'strict').length, 0);
@@ -79,15 +80,15 @@ async function main() {
       for (const e of r.errors) console.log(`::error file=${r.file},title=lessons:validate::${ghEscape(`${e.path}: ${e.message}`)}`);
       for (const w of r.warnings) {
         const level = args.strict && w.policy === 'strict' ? 'error' : 'warning';
-        const title = w.policy === 'strict' ? 'lessons:lint' : `lessons:lint (advisory, ${r.policy === 'advisory' ? 'migrated-unreviewed' : 'outside drafts'})`;
+        const title = w.policy === 'strict' ? 'lessons:lint' : `lessons:lint (advisory, ${r.policy === 'advisory' ? 'migrated-unreviewed' : 'known uncited steps'})`;
         console.log(`::${level} file=${r.file},title=${title} ${w.rule}::${ghEscape(`${w.path}: ${w.message}`)}`);
       }
     }
   } else {
     for (const r of results) {
       const mark = !r.ok ? '✗' : r.warnings.length > 0 ? '!' : '✓';
-      const outsideDrafts = r.policy === 'strict' ? r.warnings.filter((w) => w.policy === 'advisory').length : 0;
-      const label = r.policy === 'advisory' ? ', advisory: migrated-unreviewed' : outsideDrafts > 0 ? `, ${outsideDrafts} advisory outside drafts` : '';
+      const knownSteps = r.policy === 'strict' ? r.warnings.filter((w) => w.policy === 'advisory').length : 0;
+      const label = r.policy === 'advisory' ? ', advisory: migrated-unreviewed' : knownSteps > 0 ? `, ${knownSteps} advisory: known uncited steps` : '';
       const note = r.warnings.length === 0 ? '' : ` (${plural(r.warnings.length, 'warning')}${label})`;
       console.log(`${mark} ${r.file}${note}`);
       for (const e of r.errors) console.log(`    error  ${e.path}: ${e.message}`);
@@ -105,8 +106,7 @@ async function main() {
       console.log(`Advisory: ${plural(advisoryCount, 'warning')} in ${plural(advisory.length, 'migrated-unreviewed lesson')} (machine-migrated, not reworked); --strict does not fail on them, --strict --include-migrated does.`);
     }
     if (ruleAdvisoryCount > 0) {
-      const rules = [...new Set(ruleAdvisory.flat().map((w) => w.rule))].join(', ');
-      console.log(`Advisory: ${plural(ruleAdvisoryCount, 'warning')} of rules added after lessons were published (${rules}) in ${plural(ruleAdvisory.length, 'lesson')} outside drafts/; drafts are strict, and --strict --include-migrated fails on them.`);
+      console.log(`Advisory: ${plural(ruleAdvisoryCount, 'steps-cite warning')} on known uncited steps blocks in ${plural(ruleAdvisory.length, 'lesson')} (published before the rule; KNOWN_UNCITED_STEPS in shared/lesson/lint.js); --strict does not fail on them, --strict --include-migrated does.`);
     }
     if (warningCount > 0 && !args.strict) console.log(`Rules: ${Object.keys(LINT_RULES).length} (see shared/lesson/lint.js). Use --strict to fail on warnings.`);
   }

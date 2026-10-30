@@ -230,6 +230,7 @@ describe('lintLesson', () => {
     lesson.sections[2].blocks.push(steps);
     const stepsCite = () => lintLesson(validateLesson(lesson).lesson).warnings.filter((w) => w.rule === 'steps-cite');
     assert.deepEqual(stepsCite().map((w) => w.path), [`sections[2].blocks[${lesson.sections[2].blocks.length - 1}]`]);
+    assert.match(stepsCite()[0].message, /only ask the learner to write or decide keep this warning, with the reason in the report/, 'never a made-up cite');
 
     steps.cite = [];
     assert.equal(stepsCite().length, 1, 'an empty cite cites nothing');
