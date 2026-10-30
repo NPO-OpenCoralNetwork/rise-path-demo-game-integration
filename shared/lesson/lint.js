@@ -3,7 +3,7 @@
  * Pedagogy and readability lint for risepath.lesson/v1 (PLAN §5.4 / §7.2 lesson contract).
  * Run it on a lesson that already passed validateLesson. Results are warnings; the CLI's
  * `--strict` turns them into a failing exit code, except for migrated-unreviewed lessons
- * (see lintPolicy).
+ * (see lintPolicy) and, outside drafts, ADVISORY_RULES (see warningPolicy).
  *
  * @typedef {import('./schema.js').Lesson} Lesson
  * @typedef {import('./schema.js').Section} Section
@@ -38,6 +38,7 @@ export const LINT_RULES = /** @type {const} */ ({
   'image-decorative': 'No decorative or stock-photo images inside a lesson.',
   'steps-length': 'A steps block has at most 8 steps.',
   'steps-expect': 'Every step states its expected result.',
+  'steps-cite': 'A steps block cites the sources that back its commands, menus and expected results.',
   'banned-phrase': 'No pressuring phrases (「簡単です」「誰でも」, "simply", "obviously").',
   'locale-plain-string': 'In a multi-locale lesson, learner-facing text is an object with every locale, not a plain string.',
 });
@@ -82,6 +83,30 @@ export function isMigratedUnreviewed(lesson) {
 export function lintPolicy(lesson, { draft = false, includeMigrated = false } = {}) {
   if (draft || includeMigrated) return 'strict';
   return isMigratedUnreviewed(lesson) ? 'advisory' : 'strict';
+}
+
+/**
+ * Rules added after lessons were published (「出典と検索」, owner plan 2026-10-30). Outside drafts,
+ * `--strict` lists their warnings as advisory: the published lessons they flag are a known state
+ * until a rework, which is a draft and so strict.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const ADVISORY_RULES = new Set(['steps-cite']);
+
+/**
+ * Whether `--strict` fails on one warning ('strict') or only reports it ('advisory'): every
+ * warning of an advisory lesson (lintPolicy) and, outside drafts, the warnings of ADVISORY_RULES.
+ * `includeMigrated` makes every warning strict.
+ *
+ * @param {Pick<LintWarning, 'rule'>} warning
+ * @param {Pick<Lesson, 'provenance'>} lesson
+ * @param {{ draft?: boolean, includeMigrated?: boolean }} [options]
+ * @returns {'strict' | 'advisory'}
+ */
+export function warningPolicy(warning, lesson, options = {}) {
+  if (lintPolicy(lesson, options) === 'advisory') return 'advisory';
+  return options.draft || options.includeMigrated || !ADVISORY_RULES.has(warning.rule) ? 'strict' : 'advisory';
 }
 
 /** Sections that are not "content" for the check-density rule. */
@@ -261,6 +286,7 @@ export function lintLesson(lesson) {
         block.items.forEach((step, i) => {
           if (step.expect === undefined) warn('steps-expect', [...path, 'items', i], 'Say what the learner should see after this step (expect).');
         });
+        if (!block.cite || block.cite.length === 0) warn('steps-cite', path, 'Add cite: the sources that back these commands, menus and expected results.');
         break;
       default:
         break;

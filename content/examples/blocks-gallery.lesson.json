@@ -758,6 +758,14 @@
         {
           "id": "practice-steps",
           "type": "steps",
+          "cite": [
+            "vscode-terminal",
+            "vscode-ui",
+            "rp-readme",
+            "rp-validate",
+            "rp-dev-blocks",
+            "chrome-shortcuts"
+          ],
           "items": [
             {
               "id": "step-1",
@@ -799,8 +807,8 @@
                 "en": "Check that you are in the project folder."
               },
               "troubleshoot": {
-                "jp": "`command not found` と出たら、先に `npm install` を実行します。",
-                "en": "If you see `command not found`, run `npm install` first."
+                "jp": "`Cannot find package` と出たら、先に `npm install` を実行します。",
+                "en": "If you see `Cannot find package`, run `npm install` first."
               }
             },
             {
@@ -1220,6 +1228,50 @@
           ]
         }
       ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "vscode-terminal",
+      "title": "Terminal Basics",
+      "url": "https://code.visualstudio.com/docs/terminal/basics",
+      "publisher": "Visual Studio Code (Microsoft)",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "vscode-ui",
+      "title": "User interface",
+      "url": "https://code.visualstudio.com/docs/getstarted/userinterface",
+      "publisher": "Visual Studio Code (Microsoft)",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "rp-readme",
+      "title": "README.ja.md（教材：リーダー・形式・制作／セットアップ手順）",
+      "url": "https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/blob/main/README.ja.md",
+      "publisher": "Rise Path",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "rp-validate",
+      "title": "scripts/lessons/validate.mjs（npm run lessons:validate）",
+      "url": "https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/blob/main/scripts/lessons/validate.mjs",
+      "publisher": "Rise Path",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "rp-dev-blocks",
+      "title": "components/routes/DevBlocksRoute.tsx（/dev/blocks のブロック見本帳）",
+      "url": "https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/blob/main/components/routes/DevBlocksRoute.tsx",
+      "publisher": "Rise Path",
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "chrome-shortcuts",
+      "title": "Chrome keyboard shortcuts",
+      "url": "https://support.google.com/chrome/answer/157179",
+      "publisher": "Google Chrome Help",
+      "checkedAt": "2026-10-30"
     }
   ],
   "tags": [
