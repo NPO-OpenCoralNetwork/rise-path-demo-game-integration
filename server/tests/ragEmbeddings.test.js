@@ -282,7 +282,7 @@ const captureWarnings = async (fn) => {
 };
 
 describe('legacy chunks (older or no embedding model) are never compared with current vectors', () => {
-    it('extractKeywords splits Japanese into kanji/katakana runs and keeps symbols and other scripts', () => {
+    it('extractKeywords splits Japanese into words and keeps symbols and other scripts', () => {
         assert.deepEqual(extractKeywords('Blenderのモディファイアとは何ですか？'), ['Blender', 'モディファイア']);
         assert.deepEqual(extractKeywords('what is a modifier?'), ['what', 'is', 'modifier']);
         assert.deepEqual(extractKeywords('教材 教材 AI ai ゲーム開発'), ['教材', 'AI', 'ゲーム', '開発']);
