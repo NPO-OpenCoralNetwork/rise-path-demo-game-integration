@@ -296,7 +296,7 @@ function kanjiHiraganaKeywords(run) {
 export function keywordPlan(input) {
     const query = String(input ?? '').slice(0, MAX_QUERY_CHARS);
     const trim = (word) => word.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}#+]+$/u, '');
-    const words = query.split(/[\s　-〃〈-】〔-〟！（），．：；？・]+/u);
+    const words = query.split(/[\s\u3000-\u3003\u3008-\u3011\u3014-\u301F\uFF01\uFF08\uFF09\uFF0C\uFF0E\uFF1A\uFF1B\uFF1F\u30FB]+/u);
     /** @type {Keyword[]} */
     const found = [];
     for (const raw of words) {
