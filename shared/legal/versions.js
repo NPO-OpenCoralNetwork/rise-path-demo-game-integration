@@ -144,6 +144,20 @@ export function acceptableLegalVersions(document, { documents = LEGAL_DOCUMENTS,
 }
 
 /**
+ * Whether an acceptance of these versions still counts (acceptableLegalVersions: null = any). The
+ * rule of GET /api/v2/user/legal (server/routes/legal.js) and of the terms check on the API and the
+ * remote MCP endpoint (tools/core/legalAcceptance.js, Phase 8).
+ * @param {{ terms_version: string, privacy_version: string } | undefined} row
+ * @param {(document: LegalDocumentName) => string[] | null} acceptable
+ */
+export function acceptanceCounts(row, acceptable = acceptableLegalVersions) {
+  if (!row) return false;
+  const terms = acceptable('terms');
+  const privacy = acceptable('privacy');
+  return (terms === null || terms.includes(row.terms_version)) && (privacy === null || privacy.includes(row.privacy_version));
+}
+
+/**
  * The documents whose last accepted version no longer counts (acceptableLegalVersions), in
  * LEGAL_DOCUMENT_NAMES order: what the re-consent page says changed. [] without a last acceptance
  * (a first agreement). The page may use the bundle's tables: the gate is `unavailable` whenever the

@@ -24,7 +24,8 @@
  * It also runs (each in its own transaction):
  * - getAchievements (GET /api/v2/user/achievements, server/routes/achievements.js): both
  *   reconcilers, then the ledger, the days and today are read in the same transaction;
- *   summarizeAchievements derives XP, the level, the streak and the badges from them;
+ *   summarizeAchievements derives XP, the level, the streak and the badges from them, and
+ *   lessonXpOf each lesson's done award from the same rows (Phase 8, the lesson end's XP line);
  * - noteLearning: after a REST lesson-progress save that taught something (server/routes/
  *   lessonProgress.js, after the answer was sent): the lesson awards and today as a learning day;
  * - noteBlenderProgress: after the legacy PUT /api/v2/user/progress/blender (server/routes/user.js,
@@ -64,6 +65,9 @@ import { listPublishedLessons } from './courseCatalog.js';
  * @property {{ lessonsStarted: number, lessonsDone: number, stagesDone: number }} counts
  * @property {StreakRun & { today: string, timeZone: string }} streak
  * @property {Badge[]} badges
+ *
+ * @typedef {Achievements & { lessonXp: Record<string, number> }} AchievementsRead
+ *   what getAchievements answers: the summary and, per lesson, the XP of its 'done' award (lessonXpOf)
  */
 
 /** XP per level (owner decision O1: the level formula is unchanged). The browser computes no XP. */
@@ -204,6 +208,27 @@ export async function reconcileBlenderXp(db, userId) {
 
 /** The learner's ledger, in key order. */
 export const XP_AWARDS_SQL = 'SELECT source, item_key, milestone, xp FROM xp_awards WHERE user_id = $1 ORDER BY source, item_key, milestone';
+
+/**
+ * Phase 8 (LessonEnd's XP line): the XP of each lesson's 'done' award in the ledger, keyed by
+ * '<course>/<lesson>'. Built from the rows getAchievements already reads (XP_AWARDS_SQL), no new
+ * statement. An award is earned once ever (owner decision O2), so the figure is the same on every
+ * visit and after a one-lesson reset or "delete my lesson progress". Item keys match the table's
+ * CHECK ('course/lesson' in lower-case letters, digits and hyphens), so no `__proto__` key can
+ * appear; the map is a plain object for JSON.
+ * @param {readonly AwardRow[]} awards
+ * @returns {Record<string, number>}
+ */
+export function lessonXpOf(awards) {
+    /** @type {Record<string, number>} */
+    const out = {};
+    for (const award of awards) {
+        if (award.source !== 'lesson' || award.milestone !== 'done') continue;
+        const xp = Number(award.xp) || 0;
+        if (xp > 0) out[String(award.item_key)] = xp;
+    }
+    return out;
+}
 
 /** The learner's learning days as YYYY-MM-DD, oldest first. */
 export const DAYS_SQL = "SELECT to_char(day, 'YYYY-MM-DD') AS day FROM learning_days WHERE user_id = $1 ORDER BY day";
@@ -364,11 +389,12 @@ export function badgeCourses() {
 }
 
 /**
- * The learner's XP, level, streak and badges. One transaction: both reconcilers (so what the
- * server's records earned is in the ledger, also after an AI app's writes), then the ledger, the
- * days and today. A database failure resolves to a CoreError (the route answers 503 or 500).
+ * The learner's XP, level, streak and badges, and each lesson's done award (lessonXp, Phase 8).
+ * One transaction: both reconcilers (so what the server's records earned is in the ledger, also
+ * after an AI app's writes), then the ledger, the days and today. A database failure resolves to a
+ * CoreError (the route answers 503 or 500).
  * @param {{ userId: string }} params
- * @returns {Promise<Achievements | CoreError>}
+ * @returns {Promise<AchievementsRead | CoreError>}
  */
 export async function getAchievements({ userId: rawUserId }) {
     // One spelling per learner: a lower-case learnerId (XP_LOCK_SQL canonicalizes its key itself).
@@ -384,7 +410,7 @@ export async function getAchievements({ userId: rawUserId }) {
         return { commit: true, value: { awards, days, today } };
     });
     if ('error_type' in read) return read;
-    return summarizeAchievements({ userId, ...read, courses: badgeCourses() });
+    return { ...summarizeAchievements({ userId, ...read, courses: badgeCourses() }), lessonXp: lessonXpOf(read.awards) };
 }
 
 // ─── Hooks after a save (best effort, never throw) ─────────────

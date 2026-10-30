@@ -149,6 +149,10 @@ describe('mcp-server/index.js --http (MCP_REMOTE_TEST, fake Supabase, no databas
         assert.match(output, /ignoring RISE_PATH_BRIDGE_TOKEN, RISE_PATH_ACTIVE_SESSION_KEY, AI_ACCESS_DEV_AUDIENCE/);
     });
 
+    it('Phase 8: says nothing about the terms check while LEGAL_TERMS_REQUIRED is unset (SG-6)', () => {
+        assert.doesNotMatch(output, /terms check|LEGAL_TERMS_REQUIRED/);
+    });
+
     it('/health: status only', async () => {
         const res = await raw(port, { path: '/health', headers: { host: 'anything.example' } });
         assert.equal(res.status, 200);
@@ -196,5 +200,60 @@ describe('mcp-server/index.js --http (MCP_REMOTE_TEST, fake Supabase, no databas
 
     it('logs no token', () => {
         for (const t of [...tokens, BRIDGE]) assert.ok(!output.includes(t), 'a token reached the log');
+    });
+});
+
+describe('mcp-server/index.js --http with LEGAL_TERMS_REQUIRED (Phase 8)', () => {
+    let fake;
+    const children = [];
+
+    before(async () => {
+        fake = await startFakeSupabase();
+    });
+
+    after(async () => {
+        for (const child of children) {
+            child.kill('SIGTERM');
+            await new Promise((r) => (child.exitCode !== null ? r() : child.once('exit', r)));
+        }
+        await fake?.close();
+    });
+
+    /** Start the entry with the switch set, until it listens; its output. */
+    const startWith = async (value) => {
+        const port = await freePort();
+        const child = spawn(process.execPath, [ENTRY, '--http'], {
+            cwd: ROOT,
+            env: baseEnv({
+                NODE_ENV: 'test',
+                MCP_REMOTE_TEST: '1',
+                MCP_PUBLIC_RESOURCE_URL: `http://127.0.0.1:${port}/mcp`,
+                MCP_HTTP_PORT: String(port),
+                SUPABASE_URL: fake.url,
+                SUPABASE_ANON_KEY: 'anon-key-for-tests',
+                LEGAL_TERMS_REQUIRED: value,
+            }),
+        });
+        children.push(child);
+        let output = '';
+        child.stderr.on('data', (d) => { output += d; });
+        child.stdout.on('data', (d) => { output += d; });
+        const deadline = Date.now() + 20000;
+        while (!/listening on 127\.0\.0\.1/.test(output)) {
+            if (Date.now() > deadline || child.exitCode !== null) throw new Error(`remote entry did not start:\n${output}`);
+            await new Promise((r) => setTimeout(r, 50));
+        }
+        return output;
+    };
+
+    it('one separate line when it is on or not recognised; the listening line is unchanged', async () => {
+        const on = await startWith('true');
+        assert.match(on, /^\[MCP remote\] terms check: required \(LEGAL_TERMS_REQUIRED\)/m);
+        assert.match(on, /^\[MCP remote\] listening on 127\.0\.0\.1:\d+; resource http:\/\/127\.0\.0\.1:\d+\/mcp; issuer .+; profile learner-remote \(MCP_REMOTE_TEST\)$/m);
+        const odd = await startWith('ture');
+        assert.match(odd, /^\[MCP remote\] terms check: off: LEGAL_TERMS_REQUIRED has an unrecognised value/m);
+        assert.doesNotMatch(odd, /ture/, 'the value is not logged');
+        const off = await startWith('false');
+        assert.doesNotMatch(off, /terms check/);
     });
 });

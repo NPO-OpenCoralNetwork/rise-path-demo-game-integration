@@ -1530,7 +1530,8 @@ describe('progress sync: wiring (static)', () => {
     assert.match(text, /const merged = \{ \.\.\.mergeProgress\(stored, prev\) \};\s*lastState\.current = lessonState\(lesson, merged\);\s*dirty\.current = true;\s*return merged;/);
     assert.match(text, /setServerMerges\(\(n\) => n \+ 1\);\s*return true;\s*\}\s*if \(change === 'foreign' && rewriteForeign\)/);
     // A drop replaces the record: the seen observer reads the new one (G16 keys the sections with drops).
-    assert.match(text, /\}, \[articleRef, container, lesson, update, drops\]\);/);
+    // Phase 8 (S1): it is also built again when the offline notice changes the bar's height.
+    assert.match(text, /\}, \[articleRef, container, lesson, update, drops, barExtra\]\);/);
     assert.match(text, /setDrops\(\(n\) => n \+ 1\);/);
     assert.match(text, /loadedGen\.current = readerStartGen\(raw\);/);
   });

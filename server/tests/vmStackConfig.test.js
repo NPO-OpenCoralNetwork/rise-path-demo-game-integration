@@ -259,6 +259,8 @@ describe('sql/mcp_remote_role.sql: least-privilege role for mcp-public', () => {
     'GRANT SELECT (user_id, birth_ym, declared_by) ON user_age TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, policy_version, given_at, method, relationship, revoked_at) ON account_consents TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, deleted_at, reopened_at) ON account_deletions TO risepath_mcp_remote;',
+    // Phase 8: the terms check (LEGAL_TERMS_REQUIRED, tools/core/legalAcceptance.js), never id.
+    'GRANT SELECT (user_id, terms_version, privacy_version, accepted_at, account_deleted_at) ON legal_acceptances TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, kind, category, created_at) ON ai_safety_events TO risepath_mcp_remote;',
     'GRANT SELECT (user_id, role) ON user_profiles TO risepath_mcp_remote;',
     // Phase 6: the review tools (course-review-due, course-review-grade), design §2.3.
@@ -995,6 +997,29 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
     }
   });
 
+  it('ACCOUNT_DELETION_ENABLED: both env examples name its values and case rule as the api reads them (self-review, recheck 1)', async () => {
+    const { readEnvSwitch } = await import('../../server/utils/envSwitch.js');
+    for (const file of [path.join(STACK, 'stack.env.example'), path.join(ROOT, '.env.example')]) {
+      const source = read(file);
+      const block = source.slice(source.indexOf('# --- Account deletion and retention'), source.indexOf('# ACCOUNT_DELETION_ENABLED=true'));
+      const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+      const said = text.match(/true \(or ([^;)]+); any case, surrounding spaces ignored\) turns it on; unset, empty or false \(or ([^;)]+); any case\) keeps it off; any other value keeps it off/);
+      assert.ok(said, `${file}: the comment names the values and the case rule`);
+      assert.deepEqual([said[1], said[2]], ['1, on, yes', '0, off, no'], `${file}: every value the parser knows`);
+      for (const value of ['true', ...said[1].split(', ')]) {
+        for (const spelled of [value, value.toUpperCase(), ` ${value} `]) {
+          assert.deepEqual(readEnvSwitch(spelled), { on: true, recognised: true }, `${file}: ${JSON.stringify(spelled)}`);
+        }
+      }
+      for (const value of ['false', ...said[2].split(', ')]) {
+        for (const spelled of [value, value.toUpperCase(), ` ${value} `]) {
+          assert.deepEqual(readEnvSwitch(spelled), { on: false, recognised: true }, `${file}: ${JSON.stringify(spelled)}`);
+        }
+      }
+      assert.deepEqual(readEnvSwitch('ture'), { on: false, recognised: false });
+    }
+  });
+
   it('stack.env.example documents them commented out; mcp-public.env.example never names them', () => {
     const stack = read(path.join(STACK, 'stack.env.example'));
     const values = lines(stack).filter((line) => !line.startsWith('#'));
@@ -1205,5 +1230,92 @@ describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', ()
     assert.equal(placeholder.status, 1, 'the placeholder guard still runs with the opt-out');
     assert.match(placeholder.out, /RISE_PATH_BRIDGE_TOKEN/);
     assert.deepEqual(placeholder.docker, []);
+  });
+});
+
+// Phase 8 (S5; design §5.7): the terms check's server switch reaches the api (empty default: off)
+// and mcp-public only through its own file (commented: off); the examples say how it pairs with the
+// Vercel flag VITE_FEATURE_LEGAL_PAGES, which the server cannot see.
+describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
+  const stripComments = (text) => text.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join('\n');
+  const composeFiles = {
+    'docker-compose.yml': stripComments(read(path.join(STACK, 'docker-compose.yml'))),
+    'docker-compose.memanto.yml': stripComments(read(path.join(STACK, 'docker-compose.memanto.yml'))),
+  };
+
+  it('reaches the api with an empty default, and no other service has it in its environment', () => {
+    assert.match(services.api || '', /^ {6}LEGAL_TERMS_REQUIRED: \$\{LEGAL_TERMS_REQUIRED:-\}\s*$/m);
+    for (const [file, text] of Object.entries(composeFiles)) {
+      for (const [name, block] of Object.entries(serviceBlocks(text))) {
+        if (file === 'docker-compose.yml' && name === 'api') continue;
+        assert.ok(!block.includes('LEGAL_TERMS_REQUIRED'), `${file}: ${name}`);
+      }
+    }
+    assert.ok(!read(path.join(STACK, 'ci/stack.ci.env')).includes('LEGAL_TERMS_REQUIRED'), 'the E2E stack keeps it off');
+  });
+
+  it('mcp-public.env.example and stack.env.example name it only commented out (off), with the line that turns it on', () => {
+    for (const file of ['mcp-public.env.example', 'stack.env.example']) {
+      const text = read(path.join(STACK, file));
+      assert.ok(!lines(text).some((line) => line.startsWith('LEGAL_TERMS_REQUIRED')), `${file}: not set`);
+      assert.deepEqual(lines(text).filter((line) => /^#?\s*LEGAL_TERMS_REQUIRED=/.test(line)), ['# LEGAL_TERMS_REQUIRED=true'], file);
+    }
+    assert.deepEqual(lines(read(path.join(ROOT, '.env.example'))).filter((line) => /^#?\s*LEGAL_TERMS_REQUIRED=/.test(line)), ['# LEGAL_TERMS_REQUIRED=true']);
+  });
+
+  it('stack.env.example gives the order with VITE_FEATURE_LEGAL_PAGES and the role SQL, and says what happens out of order', () => {
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Terms check (Phase 8'), stack.indexOf('# LEGAL_TERMS_REQUIRED=true'));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    assert.match(text, /\(1\) released texts \(the api ignores the switch while they are drafts, and logs it\); \(2\) VITE_FEATURE_LEGAL_PAGES=true on Vercel, redeploy, check the consent page; \(3\) with byoa, run sql\/mcp_remote_role\.sql again; \(4\) the switch on here and in mcp-public\.env, then deploy-stack\.sh\./);
+    assert.match(text, /Turn off in reverse \(this switch first\)\./);
+    assert.match(text, /On here with the Vercel flag off, learners are refused with no page to accept on\./);
+    assert.match(text, /A new version that needs acceptance: turn it off in both files before deploying the texts, on again once the consent page shows/);
+    assert.match(text, /server\/middleware\/termsGate\.js TERMS_EXEMPT/);
+    // Final review, finding 3: the list names every kind of exempt route (termsGate.js), so an owner
+    // reading it before turning the switch on sees that a guardian can still withdraw AI consent.
+    assert.match(text, /withdrawing a guardian's AI consent/);
+    assert.match(text, /reporting an AI answer/);
+    const gate = read(path.join(ROOT, 'server/middleware/termsGate.js'));
+    assert.match(gate, /\{ method: 'POST', path: '\/api\/v2\/user\/ai-access\/guardian-consent\/revoke', why: 'consent withdrawal' \}/);
+    assert.match(gate, /\{ method: 'POST', path: '\/api\/v2\/safety\/reports', why: 'safety' \}/);
+    const readme = read(path.join(STACK, 'README.md'));
+    const row = readme.split('\n').find((line) => line.startsWith('| `LEGAL_TERMS_REQUIRED` |'));
+    assert.ok(row, 'the README env table has the row');
+    assert.match(row, /`mcp-public` は同じ名前を `mcp-public\.env` から読みます/);
+    assert.match(row, /文面の公開 → Vercel の `VITE_FEATURE_LEGAL_PAGES=true` と同意の画面の確かめ → `byoa` なら `sql\/mcp_remote_role\.sql` を流し直す → `stack\.env` と `mcp-public\.env` に `true` → `deploy-stack\.sh`/);
+    assert.match(row, /同意をお願いする新しい版を出すときは、先に両方で止め、同意の画面が出てから入れ直します/);
+  });
+
+  it('stack.env.example names the values that turn the switch on and keep it off, in any case, as the api reads them (self-review, finding 3 and recheck 1)', async () => {
+    const { termsEnforcement, termsSwitchLine } = await import('../../tools/core/legalAcceptance.js');
+    const stack = read(path.join(STACK, 'stack.env.example'));
+    const block = stack.slice(stack.indexOf('# --- Terms check (Phase 8'), stack.indexOf('# LEGAL_TERMS_REQUIRED=true'));
+    const text = block.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' ');
+    const said = text.match(/Off by default: true \(or ([^;)]+); any case, surrounding spaces ignored, unlike TRAINING_ENABLED below\) turns it on; unset, empty or false \(or ([^;)]+); any case\) keeps it off; any other value keeps it off and the api logs a warning\./);
+    assert.ok(said, 'the comment names the values and the case rule');
+    // The spellings an owner may write: as listed, upper case, capitalised with spaces around.
+    const spellings = (value) => [value, value.toUpperCase(), ` ${value.charAt(0).toUpperCase()}${value.slice(1)} `];
+    // TRUE, Yes and ' on ' turn it on too (an owner who wrote them to keep it off would refuse learners).
+    for (const value of ['true', ...said[1].split(', ')].flatMap(spellings)) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: true, reason: 'on' }, JSON.stringify(value));
+    }
+    // FALSE, No and OFF keep it off with no warning, as unset does.
+    for (const value of [undefined, '', ...['false', ...said[2].split(', ')].flatMap(spellings)]) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: false, reason: 'off' }, JSON.stringify(value));
+      assert.equal(termsSwitchLine(env), null, `${JSON.stringify(value)}: off, no line`);
+    }
+    for (const value of ['ture', 'enabled', 'TRUE!']) {
+      const env = { LEGAL_TERMS_REQUIRED: value, NODE_ENV: 'development' };
+      assert.deepEqual(termsEnforcement(env), { on: false, reason: 'unrecognised' }, value);
+      assert.match(String(termsSwitchLine(env)), /unrecognised value/, value);
+    }
+    assert.deepEqual([said[1], said[2]], ['1, on, yes', '0, off, no'], 'every value the parser knows (server/utils/envSwitch.js)');
+    // The contrast it draws is real: the training switch below takes only exactly true.
+    const training = stack.slice(stack.indexOf('# --- Job training'), stack.indexOf('# TRAINING_ENABLED=true'));
+    assert.match(training.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' '), /exactly true \(TRUE, 1 or yes keep it off\)/);
+    assert.match(read(path.join(ROOT, 'server/routes/training.js')), /env\.TRAINING_ENABLED === 'true'/);
   });
 });

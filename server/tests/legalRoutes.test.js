@@ -431,6 +431,35 @@ describe('createLegalRouter with released versions (requiresAcceptance, notice)'
         assert.deepEqual([...pool.state.versions.keys()], [T1, P1]);
     });
 
+    it('Phase 8: a recorded acceptance (201, then 200) drops the terms check\'s answer for that learner; a refusal does not', async () => {
+        const invalidated = [];
+        const pool = createLegalPool({ stubs: [A] });
+        await withRouter({ getPool: () => pool, documents: RELEASE_1, invalidateAcceptance: (id) => invalidated.push(id) }, A.toUpperCase(), async (base) => {
+            const mismatch = await call(base, '/legal/acceptance', { method: 'POST', body: { termsVersion: 'terms-2026-11-01', privacyVersion: P1 } });
+            assert.equal(mismatch.status, 409);
+            assert.equal((await call(base, '/legal/acceptance', { method: 'POST', body: {} })).status, 400);
+            assert.deepEqual(invalidated, [], 'nothing recorded, nothing dropped');
+            assert.equal((await call(base, '/legal/acceptance', { method: 'POST', body: { termsVersion: T1, privacyVersion: P1 } })).status, 201);
+            assert.deepEqual(invalidated, [A], 'after the commit, with the canonical id');
+            assert.equal((await call(base, '/legal/acceptance', { method: 'POST', body: { termsVersion: T1, privacyVersion: P1 } })).status, 200);
+            assert.deepEqual(invalidated, [A, A], 'an acceptance that already existed counts too');
+        });
+        const failing = createLegalPool({ stubs: [A] });
+        failing.failOn(/^insert into legal_acceptances/, Object.assign(new Error('boom'), { code: '57P01' }));
+        await withRouter({ getPool: () => failing, documents: RELEASE_1, invalidateAcceptance: (id) => invalidated.push(id) }, A, async (base) => {
+            assert.equal((await call(base, '/legal/acceptance', { method: 'POST', body: { termsVersion: T1, privacyVersion: P1 } })).status, 503);
+        });
+        assert.equal(invalidated.length, 2, 'a 503 drops nothing');
+    });
+
+    it('Phase 8: acceptanceCounts is the shared rule (shared/legal/versions.js), still exported here; the status read is the terms check\'s statement', async () => {
+        const shared = await import('../../shared/legal/versions.js');
+        const { LATEST_ACCEPTANCE_SQL } = await import('../../tools/core/legalAcceptance.js');
+        assert.equal(acceptanceCounts, shared.acceptanceCounts);
+        assert.equal(LEGAL_SQL.latest, LATEST_ACCEPTANCE_SQL);
+        assert.equal(norm(LATEST_ACCEPTANCE_SQL), 'select terms_version, privacy_version, accepted_at from legal_acceptances where user_id = $1::uuid and account_deleted_at is null order by accepted_at desc limit 1');
+    });
+
     it('acceptanceCounts / legalStatus / readAcceptanceBody (pure)', () => {
         const acceptable = (d) => (d === 'terms' ? [T1, 'terms-2027-04-01'] : null);
         assert.equal(acceptanceCounts(undefined, acceptable), false, 'no row never counts');

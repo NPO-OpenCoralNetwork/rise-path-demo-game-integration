@@ -11,12 +11,16 @@
  *               xp: { total, level, intoLevel, levelSize, toNextLevel },
  *               counts: { lessonsStarted, lessonsDone, stagesDone },
  *               streak: { current, best, activeToday, today, timeZone: 'Asia/Tokyo' },
- *               badges: [{ id, earned, current, goal, course? }] }
+ *               badges: [{ id, earned, current, goal, course? }],
+ *               lessonXp: { '<course>/<lesson>': xp } }
  *        XP is earned once per learned item from the server's own records (lesson start 10, lesson
  *        done 40, Blender stage done 80); diagnosis, course generation and learning events earn
  *        nothing. The read reconciles the ledger first, so it also counts what an AI app's writes
  *        earned. Logic and SQL: tools/core/achievements.js (getAchievements, summarizeAchievements).
  *        learnerId lets the browser drop an answer that arrived after another learner signed in.
+ *        lessonXp (Phase 8): the XP of each lesson's done award in the ledger (40 today), for the
+ *        lesson end's line; a lesson without that award is absent. It stays after a reset (O2).
+ *        An older server sends no lessonXp, and the browser then shows no line.
  *
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
  * 503 achievements_unavailable without a database, when it is down, or before migration 019;

@@ -22,7 +22,7 @@
  * once the server took the result.
  */
 
-import { apiFetchAs, apiGet, apiPut, apiPost, currentAuthUserId, isApiAvailable } from './apiClient';
+import { apiFetchAs, apiGet, apiPut, apiPost, apiReadError, currentAuthUserId, isApiAvailable, isTermsRefusal } from './apiClient';
 import { ACHIEVEMENTS_STALE_EVENT } from './achievementsApi';
 import { SYNC_ACCOUNT_KEY, parseSyncAccount } from '../components/lesson/progressSync.ts';
 
@@ -218,7 +218,7 @@ const syncEventToApi = (event: Omit<LearningEvent, 'id' | 'timestamp'>, owner: s
 const getAs = async <T>(learnerId: string, path: string): Promise<T | null> => {
     const res = await apiFetchAs(learnerId, path);
     if (!res) return null;
-    if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
+    if (!res.ok) throw await apiReadError(path, res);
     return res.json();
 };
 
@@ -242,13 +242,16 @@ type EventsResponse = { ok: boolean; events: LearningEvent[] };
  * over), also when the progress GET fails (the learner's own entries then stay as they are, an
  * added one as their unmerged changes). Their unmerged changes go on top of their server entry.
  * Without a learnerId (dev guests, mock users) nothing is pushed and local entries stay.
+ *
+ * Phase 8 (S5): answers true when the server's terms check refused a GET (terms_required), so
+ * AuthContext reads again after this page recorded an acceptance (services/termsRetry.ts).
  */
 export const hydrateFromApi = async ({ pushLocal = true, learnerId = null, adoptUnowned = false }: {
     pushLocal?: boolean;
     learnerId?: string | null;
     adoptUnowned?: boolean;
-} = {}): Promise<void> => {
-    if (!isApiAvailable()) return;
+} = {}): Promise<boolean> => {
+    if (!isApiAvailable()) return false;
     // Each part stands on its own: a failed events GET must not keep the progress part (and its
     // clean-up of entries that are not this learner's) from running.
     const [progressGot, eventsGot] = await Promise.allSettled([
@@ -258,9 +261,10 @@ export const hydrateFromApi = async ({ pushLocal = true, learnerId = null, adopt
     for (const got of [progressGot, eventsGot]) {
         if (got.status === 'rejected') console.warn('[progressService] Hydrate failed, using local cache:', (got.reason as Error | null)?.message);
     }
+    const refusedForTerms = [progressGot, eventsGot].some((got) => got.status === 'rejected' && isTermsRefusal(got.reason));
     try {
         // The browser switched to another learner (or they left) while the GETs ran: not theirs to write.
-        if (learnerId && syncedOwner() !== learnerId) return;
+        if (learnerId && syncedOwner() !== learnerId) return false;
 
         const progressRes = progressGot.status === 'fulfilled' ? progressGot.value : null;
         if (progressRes?.ok && progressRes.progress) {
@@ -321,6 +325,7 @@ export const hydrateFromApi = async ({ pushLocal = true, learnerId = null, adopt
     } catch (e) {
         console.warn('[progressService] Hydrate failed, using local cache:', (e as Error).message);
     }
+    return refusedForTerms;
 };
 
 /**

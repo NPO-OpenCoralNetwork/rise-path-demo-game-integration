@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Brain, ChevronRight, Download, Shield, Trash2 } from 'lucide-react';
+import { ArrowLeft, Brain, ChevronRight, CircleAlert, CircleCheck, Download, Info, Shield, Trash2 } from 'lucide-react';
 import { ViewState } from '../../../types';
 import { features } from '../../../config/features';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -42,6 +42,12 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
     const [memoryDeleteConfirm, setMemoryDeleteConfirm] = useState('');
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // The two DELETE inputs are named by their headings (a placeholder is not a name).
+    const memoryPurgeTitleId = useId();
+    const deleteTitleId = useId();
+    // ...and described by the paragraph that says to type DELETE (not every screen reader reads a placeholder).
+    const memoryPurgeBodyId = useId();
+    const deleteBodyId = useId();
 
     useEffect(() => { setTheme('default'); }, [setTheme]);
 
@@ -249,19 +255,19 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
     }, [deleteConfirm, t.deleteDone, t.errorGeneric]);
 
     return (
-        <div className="min-h-screen bg-slate-50/50 px-6 pt-12 pb-20">
+        <div className="min-h-screen px-6 pt-12 pb-20">
             <div className="max-w-2xl mx-auto space-y-8">
                 <button
                     type="button"
                     onClick={() => onNavigate(ViewState.SETTINGS)}
-                    className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors"
+                    className="flex items-center gap-2 text-sm text-fg-2 hover:text-fg transition-colors"
                 >
-                    <ArrowLeft size={16} /> {t.back}
+                    <ArrowLeft size={16} aria-hidden="true" /> {t.back}
                 </button>
 
                 <header className="space-y-2">
-                    <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
-                    <p className="text-slate-500">{t.subtitle}</p>
+                    <h1 className="text-3xl font-bold text-fg">{t.title}</h1>
+                    <p className="text-fg-2">{t.subtitle}</p>
                 </header>
 
                 {/* Phase 4: the policy, once published (VITE_FEATURE_LEGAL_PAGES=true). */}
@@ -284,20 +290,21 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                     {t.deleteAccountTail}
                 </p>
 
-                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                    {t.disclaimer}
+                <p className="flex items-start gap-2 text-sm text-fg bg-sunken border border-line rounded-xl px-4 py-3">
+                    <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-info" />
+                    <span>{t.disclaimer}</span>
                 </p>
 
                 {loading ? (
-                    <p className="text-sm text-slate-400">{t.loading}</p>
+                    <p className="text-sm text-fg-3">{t.loading}</p>
                 ) : (
                     <div className="space-y-6">
-                        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                        <section className="bg-surface rounded-2xl border border-line shadow-1 p-5 space-y-4">
                             <div className="flex items-start gap-3">
-                                <Shield size={20} className="text-indigo-600 mt-0.5 shrink-0" />
+                                <Shield size={20} aria-hidden="true" className="text-primary-text mt-0.5 shrink-0" />
                                 <div className="space-y-1">
-                                    <h2 className="font-semibold text-slate-900">{t.diaryTitle}</h2>
-                                    <p className="text-sm text-slate-500">{features.agentChat ? t.diaryBody : t.diaryNotOffered}</p>
+                                    <h2 className="font-semibold text-fg">{t.diaryTitle}</h2>
+                                    <p className="text-sm text-fg-2">{features.agentChat ? t.diaryBody : t.diaryNotOffered}</p>
                                 </div>
                             </div>
                             {(features.agentChat || keptDiaryOptIn) && (
@@ -315,23 +322,23 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                         onChange={(e) => {
                                             if (features.agentChat || !e.target.checked) void handleDiaryToggle(e.target.checked);
                                         }}
-                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 aria-disabled:opacity-50"
+                                        className="w-4 h-4 rounded accent-primary aria-disabled:opacity-50"
                                     />
-                                    <span className="text-sm text-slate-700">{t.diaryEnabled}</span>
+                                    <span className="text-sm text-fg">{t.diaryEnabled}</span>
                                 </label>
                             )}
                             {!features.agentChat && allowDiaryExcerpts && (
-                                <p id="diary-kept-opt-in" className="text-sm text-slate-500">{t.aiMemoryKeptOptIn}</p>
+                                <p id="diary-kept-opt-in" className="text-sm text-fg-2">{t.aiMemoryKeptOptIn}</p>
                             )}
                         </section>
 
-                        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                        <section className="bg-surface rounded-2xl border border-line shadow-1 p-5 space-y-4">
                             <div className="flex items-start gap-3">
-                                <Brain size={20} className="text-indigo-600 mt-0.5 shrink-0" />
+                                <Brain size={20} aria-hidden="true" className="text-primary-text mt-0.5 shrink-0" />
                                 <div className="space-y-1">
-                                    <h2 className="font-semibold text-slate-900">{t.aiMemoryTitle}</h2>
+                                    <h2 className="font-semibold text-fg">{t.aiMemoryTitle}</h2>
                                     {/* role="status": if a save is refused with 409, the toggle goes away and this text changes. */}
-                                    <p role="status" className="text-sm text-slate-500">
+                                    <p role="status" className="text-sm text-fg-2">
                                         {aiMemoryAvailable ? t.aiMemoryBody : t.aiMemoryNotOffered}
                                     </p>
                                 </div>
@@ -352,13 +359,13 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                         onChange={(e) => {
                                             if (aiMemoryAvailable || !e.target.checked) void handleAiMemoryToggle(e.target.checked);
                                         }}
-                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 aria-disabled:opacity-50"
+                                        className="w-4 h-4 rounded accent-primary aria-disabled:opacity-50"
                                     />
-                                    <span className="text-sm text-slate-700">{t.aiMemoryEnabled}</span>
+                                    <span className="text-sm text-fg">{t.aiMemoryEnabled}</span>
                                 </label>
                             )}
                             {!aiMemoryAvailable && aiMemoryEnabled && (
-                                <p id="ai-memory-kept-opt-in" className="text-sm text-slate-500">{t.aiMemoryKeptOptIn}</p>
+                                <p id="ai-memory-kept-opt-in" className="text-sm text-fg-2">{t.aiMemoryKeptOptIn}</p>
                             )}
                             {aiMemoryAvailable && (aiMemoryEnabled ? (
                                 <>
@@ -367,79 +374,83 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                                             type="checkbox"
                                             checked={allowConversationCapture}
                                             onChange={(e) => void handleCaptureToggle(e.target.checked)}
-                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            className="w-4 h-4 rounded accent-primary"
                                         />
-                                        <span className="text-sm text-slate-700">{t.aiCaptureEnabled}</span>
+                                        <span className="text-sm text-fg">{t.aiCaptureEnabled}</span>
                                     </label>
-                                    <p className="text-xs text-slate-400 ml-7">{t.aiCaptureHint}</p>
+                                    <p className="text-xs text-fg-3 ml-7">{t.aiCaptureHint}</p>
                                     <button
                                         type="button"
                                         onClick={() => onNavigate(ViewState.SETTINGS_AI_MEMORY)}
-                                        className="flex items-center justify-between w-full rounded-xl border border-slate-100 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"
+                                        className="flex items-center justify-between w-full rounded-xl border border-line px-4 py-3 text-sm text-fg hover:bg-sunken"
                                     >
                                         <span>{t.aiMemoryList}</span>
-                                        <ChevronRight size={16} className="text-slate-400" />
+                                        <ChevronRight size={16} aria-hidden="true" className="text-fg-3" />
                                     </button>
                                 </>
                             ) : (
-                                <p className="text-sm text-slate-500">{t.aiMemoryExplain}</p>
+                                <p className="text-sm text-fg-2">{t.aiMemoryExplain}</p>
                             ))}
                             {/* Purge stays for an earlier opt-in even when AI memory is not offered. */}
                             {(aiMemoryAvailable ? aiMemoryEnabled : keptOptIn) && (
-                                <div className="pt-2 space-y-3 border-t border-slate-100">
-                                    <h3 className="text-sm font-semibold text-rose-800">{t.aiMemoryPurgeTitle}</h3>
-                                    <p className="text-sm text-slate-500">{t.aiMemoryPurgeBody}</p>
+                                <div className="pt-2 space-y-3 border-t border-line">
+                                    <h3 id={memoryPurgeTitleId} className="text-sm font-semibold text-danger">{t.aiMemoryPurgeTitle}</h3>
+                                    <p id={memoryPurgeBodyId} className="text-sm text-fg-2">{t.aiMemoryPurgeBody}</p>
                                     <input
                                         type="text"
                                         value={memoryDeleteConfirm}
                                         onChange={(e) => setMemoryDeleteConfirm(e.target.value)}
                                         placeholder="DELETE"
-                                        className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:ring-2 focus:ring-rose-300 outline-none"
+                                        aria-labelledby={memoryPurgeTitleId}
+                                        aria-describedby={memoryPurgeBodyId}
+                                        className="w-full rounded-xl border border-line-strong bg-surface px-4 py-2 text-sm text-fg placeholder:text-fg-3 focus:ring-2 focus:ring-danger outline-none"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => void handleMemoryPurge()}
                                         disabled={busy !== null || memoryDeleteConfirm !== 'DELETE'}
-                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-danger text-on-primary text-sm font-semibold hover:opacity-90 disabled:opacity-50"
                                     >
-                                        <Trash2 size={16} />
+                                        <Trash2 size={16} aria-hidden="true" />
                                         {busy === 'memory-purge' ? '…' : t.aiMemoryPurgeTitle}
                                     </button>
                                 </div>
                             )}
                         </section>
 
-                        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-                            <h2 className="font-semibold text-slate-900">{t.exportTitle}</h2>
-                            <p className="text-sm text-slate-500">{t.exportBody}</p>
+                        <section className="bg-surface rounded-2xl border border-line shadow-1 p-5 space-y-4">
+                            <h2 className="font-semibold text-fg">{t.exportTitle}</h2>
+                            <p className="text-sm text-fg-2">{t.exportBody}</p>
                             <button
                                 type="button"
                                 onClick={() => void handleExport()}
                                 disabled={busy !== null}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:bg-primary-hover disabled:opacity-50"
                             >
-                                <Download size={16} />
+                                <Download size={16} aria-hidden="true" />
                                 {busy === 'export' ? '…' : t.exportButton}
                             </button>
                         </section>
 
-                        <section className="bg-white rounded-2xl border border-rose-100 shadow-sm p-5 space-y-4">
-                            <h2 className="font-semibold text-rose-800">{t.deleteTitle}</h2>
-                            <p className="text-sm text-slate-500">{t.deleteBody}</p>
+                        <section className="bg-surface rounded-2xl border border-line shadow-1 p-5 space-y-4">
+                            <h2 id={deleteTitleId} className="font-semibold text-danger">{t.deleteTitle}</h2>
+                            <p id={deleteBodyId} className="text-sm text-fg-2">{t.deleteBody}</p>
                             <input
                                 type="text"
                                 value={deleteConfirm}
                                 onChange={(e) => setDeleteConfirm(e.target.value)}
                                 placeholder={t.deletePlaceholder}
-                                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:ring-2 focus:ring-rose-300 outline-none"
+                                aria-labelledby={deleteTitleId}
+                                aria-describedby={deleteBodyId}
+                                className="w-full rounded-xl border border-line-strong bg-surface px-4 py-2 text-sm text-fg placeholder:text-fg-3 focus:ring-2 focus:ring-danger outline-none"
                             />
                             <button
                                 type="button"
                                 onClick={() => void handleDelete()}
                                 disabled={busy !== null || deleteConfirm !== 'DELETE'}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-danger text-on-primary text-sm font-semibold hover:opacity-90 disabled:opacity-50"
                             >
-                                <Trash2 size={16} />
+                                <Trash2 size={16} aria-hidden="true" />
                                 {busy === 'delete' ? '…' : t.deleteButton}
                             </button>
                         </section>
@@ -450,13 +461,15 @@ const SettingsPrivacyView: React.FC<SettingsPrivacyViewProps> = ({ onNavigate })
                 <LessonProgressDeleteSection />
 
                 {message && (
-                    <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-                        {message}
+                    <p className="flex items-start gap-2 text-sm text-fg bg-sunken border border-line rounded-xl px-4 py-3">
+                        <CircleCheck size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-success" />
+                        <span>{message}</span>
                     </p>
                 )}
                 {error && (
-                    <p className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
-                        {error}
+                    <p className="flex items-start gap-2 text-sm text-fg bg-surface border border-line rounded-xl px-4 py-3">
+                        <CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />
+                        <span>{error}</span>
                     </p>
                 )}
             </div>

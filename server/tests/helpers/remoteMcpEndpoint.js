@@ -26,9 +26,13 @@ export const ALLOWED_ORIGIN = 'https://inspector.example.org';
  *   env?: Record<string, string>,
  *   limits?: { userPerMinute: number, unauthenticatedPerMinute: number },
  *   capsEnv?: Record<string, string>,
- * }} options  capsEnv: AI_CAP_* values for the in-memory daily caps
+ *   policyEnv?: Record<string, string>,
+ *   reserveCap?: Function,
+ * }} options  capsEnv: AI_CAP_* values for the in-memory daily caps; policyEnv: more of the policy's
+ *   environment (Phase 8: LEGAL_TERMS_REQUIRED turns the terms check on); reserveCap: in place of
+ *   the in-memory caps' reserveFor (to count what is charged)
  */
-export async function startRemoteEndpoint({ fake, logger, env = {}, limits, capsEnv = {} }) {
+export async function startRemoteEndpoint({ fake, logger, env = {}, limits, capsEnv = {}, policyEnv = {}, reserveCap }) {
     const server = http.createServer();
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const port = server.address().port;
@@ -43,7 +47,7 @@ export async function startRemoteEndpoint({ fake, logger, env = {}, limits, caps
     const supabase = createClient(fake.url, 'anon-key-for-tests', { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     const verifier = createOAuthVerifier({ issuer: config.issuer, resource: config.resource, supabase, logger });
     const caps = createDailyCaps({ env: capsEnv, getPool: () => null, logger });
-    const policy = createRemotePolicy({ env: { APP_PUBLIC_URL: 'https://app.example.org' }, reserveCap: caps.reserveFor });
+    const policy = createRemotePolicy({ env: { APP_PUBLIC_URL: 'https://app.example.org', ...policyEnv }, reserveCap: reserveCap ?? caps.reserveFor });
     const app = createRemoteApp({
         config,
         verifier,

@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, isApiAvailable } from './apiClient';
+import { apiGet, apiPost, apiPut, isApiAvailable, isTermsRefusal } from './apiClient';
 
 export interface AppNotification {
   id: string;
@@ -71,15 +71,19 @@ export const clearNotifications = () => {
 };
 
 // Hydrate from API
-export const hydrateNotifications = async (): Promise<void> => {
-  if (!isApiAvailable()) return;
+// Phase 8 (S5): answers true when the server's terms check refused the read (terms_required), so
+// AuthContext reads again after this page recorded an acceptance (services/termsRetry.ts).
+export const hydrateNotifications = async (): Promise<boolean> => {
+  if (!isApiAvailable()) return false;
   try {
     const res = await apiGet<{ ok: boolean; notifications: AppNotification[] }>('/user/notifications');
     if (res.ok && res.notifications?.length > 0) {
       saveLocal(res.notifications);
     }
-  } catch {
+    return false;
+  } catch (error) {
     // Use local cache
+    return isTermsRefusal(error);
   }
 };
 

@@ -37,11 +37,15 @@ import {
   type ReaderGen,
 } from './progressSync.ts';
 import { resetLessonProgress } from './progressSyncClient';
+import { useBarExtraOf } from './useScrollContainer';
 
 /** A block counts as seen after ≥60% of it (or of the viewport) is visible for this long. */
 const SEEN_DWELL_MS = 1500;
 const SEEN_RATIO = 0.6;
-/** Sticky LessonBar height (56px + 3px progress line). */
+/**
+ * Sticky LessonBar height (56px + 3px progress line). The offline notice makes the bar taller while
+ * it shows (Phase 8, S1): its height (`useBarExtraOf`) is added wherever this is used.
+ */
 const BAR_HEIGHT = 59;
 /** Above this scrollTop the reader resumes at a block; below it, at the top. */
 const TOP_ZONE = 120;
@@ -149,6 +153,8 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
   const [topBlockId, setTopBlockId] = useState<string | null>(null);
   const [serverMerges, setServerMerges] = useState(0);
   const [drops, setDrops] = useState(0);
+  // What the offline notice adds to the bar (0 without it): a block under the grown bar is not in view.
+  const barExtra = useBarExtraOf(container);
   const loadedKey = useRef(`${courseSlug}/${lesson.id}`);
   const dirty = useRef(false);
   // Whose progress the in-memory record belongs to (rp:progressSync:account when it was read).
@@ -373,7 +379,7 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
           timers.delete(id);
         }
       }
-    }, { root: container, rootMargin: `-${BAR_HEIGHT}px 0px 0px 0px`, threshold: thresholds });
+    }, { root: container, rootMargin: `-${BAR_HEIGHT + barExtra}px 0px 0px 0px`, threshold: thresholds });
 
     for (const el of blockElements(article)) {
       if (!already.has(el.dataset.rpBlock ?? '')) observer.observe(el);
@@ -382,10 +388,11 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
       observer.disconnect();
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-    // progress.seen is read once per lesson (and once per drop: the record was replaced) on
-    // purpose: re-observing on every mark would reset timers.
+    // progress.seen is read once per lesson, once per drop (the record was replaced) and once per
+    // change of the bar's height (what is in view changed), on purpose: re-observing on every mark
+    // would reset timers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [articleRef, container, lesson, update, drops]);
+  }, [articleRef, container, lesson, update, drops, barExtra]);
 
   // --- active block (reading line) and top block (resume point) ---
   useEffect(() => {
@@ -397,8 +404,9 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
       const elements = blockElements(article);
       if (!elements.length) return;
       const top = container === document.documentElement ? 0 : container.getBoundingClientRect().top;
-      const line = top + BAR_HEIGHT + Math.min(240, container.clientHeight * 0.3);
-      const topLine = top + BAR_HEIGHT + TOP_SLACK;
+      const barBottom = top + BAR_HEIGHT + barExtra;
+      const line = barBottom + Math.min(240, container.clientHeight * 0.3);
+      const topLine = barBottom + TOP_SLACK;
       let active: HTMLElement | null = null;
       let first: HTMLElement | null = null;
       for (const el of elements) {
@@ -426,7 +434,7 @@ export function useLessonProgress({ courseSlug, lesson, title, articleRef, conta
       window.removeEventListener('resize', onScroll);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [articleRef, container, lesson]);
+  }, [articleRef, container, lesson, barExtra]);
 
   // --- resume position (debounced; only after the reader restored the previous one) ---
   useEffect(() => {

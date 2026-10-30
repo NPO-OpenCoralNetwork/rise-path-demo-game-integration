@@ -14,6 +14,8 @@ import { clearSharedDeviceAiData } from '../services/sharedDeviceData';
 import { forgetDeletedAccountOnDevice, signOutThisBrowser } from '../services/accountDeviceData';
 import { ACCOUNT_DELETED_EVENT, ACCOUNT_DELETED_PATH, accountDeletedUrl, markDeletionInFlight, type DeletedBy } from '../services/accountDeletionState';
 import { forgetSignupAcceptance, rememberSignupAcceptance, signUpMadeNoAccount } from '../services/legalConsentApi';
+import { createTermsRetry } from '../services/termsRetry';
+import { LEGAL_ACCEPTED_EVENT } from '../components/legal/legalEvents';
 import { features } from '../config/features';
 import {
     forgetProgressAccount,
@@ -78,13 +80,20 @@ const GUEST_USER: AuthUser = {
 // load's lesson-progress GET (Phase 4, design §5.10): on a re-opened account that GET's epoch rule
 // clears the deleted account's legacy progress first; when the GET failed, nothing local is pushed.
 // Phase 5: only the synced learner's own legacy entries are kept and pushed, through their own session.
-const hydrateUserData = async () => {
+// Phase 8 (S5): with the server's terms check on (LEGAL_TERMS_REQUIRED), these reads are refused
+// (terms_required) while the consent page shows; after this page recorded the acceptance
+// (LEGAL_ACCEPTED_EVENT) they run once more, only when they were refused that way.
+const hydrateUserDataOnce = async (): Promise<boolean> => {
     try {
-        await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId() })), hydrateNotifications()]);
+        const refused = await Promise.all([progressChoicePending() ? Promise.resolve() : whenAccountKnown().then((s) => hydrateFromApi({ pushLocal: s === 'known', learnerId: syncedLearnerId() })), hydrateNotifications()]);
+        return refused.some((value) => value === true);
     } catch (e) {
         console.warn('[Auth] Hydration partial failure:', e);
+        return false;
     }
 };
+const hydration = createTermsRetry(hydrateUserDataOnce);
+const hydrateUserData = () => hydration.run();
 
 /**
  * What a deleted account leaves on this page and in this browser (design §5.11 steps 2–3): lesson
@@ -366,6 +375,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.addEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
         return () => window.removeEventListener(ACCOUNT_DELETED_EVENT, onDeleted);
     }, [endDeletedAccountSession]);
+
+    // Phase 8 (S5): this page recorded an acceptance of the terms: the sign-in reads run again when
+    // the server's terms check refused them (services/termsRetry.ts; otherwise nothing).
+    useEffect(() => {
+        const onAccepted = () => hydration.accepted();
+        window.addEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+        return () => window.removeEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+    }, []);
 
     const logout = useCallback(async (options?: { reason?: 'reauth' }): Promise<boolean> => {
         // Phase 5 (owner O4): upload first (≤ 3 s); a learner whose lesson records are still unsaved

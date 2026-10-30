@@ -12,6 +12,9 @@
  *   MCP_ALLOWED_ORIGINS      comma list of browser origins allowed (CORS); any other Origin: 403
  *   SUPABASE_URL, SUPABASE_ANON_KEY   the issuer is SUPABASE_URL + '/auth/v1'
  *   APP_PUBLIC_URL           optional: the app origin, for the settings links in refusals
+ *   LEGAL_TERMS_REQUIRED     optional (Phase 8, off by default): refuse learners who have not
+ *                            accepted the current terms (terms_required); ignored while the texts
+ *                            are drafts. Needs the role's grant on legal_acceptances (re-run the SQL)
  *   DATABASE_URL_PHASE1      the least-privilege role (deploy/risepath-vm/sql/mcp_remote_role.sql)
  *   NODE_ENV=production      required; MCP_REMOTE_TEST=1 (tests only) allows any NODE_ENV but binds
  *                            127.0.0.1 and accepts http:// on loopback hosts
@@ -29,7 +32,7 @@
  * requests that are not authenticated (30/min, cf-connecting-ip), the per-user-and-client limit
  * (60/min), the connected-apps record (mcp_oauth_grants.last_used_at, at most once a minute), then
  * a new McpServer and transport for this request (createMcpServer, profile learner-remote, with
- * mcp-server/remotePolicy.js: adults only and the daily caps on every call).
+ * mcp-server/remotePolicy.js: the terms check when it is on, adults only and the daily caps on every call).
  *
  * The access token is never logged and never passed to a tool.
  */
@@ -44,6 +47,7 @@ import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middlewar
 import { getPool, ensureAuthUser } from '../server/db.js';
 import { AuthUnavailableError, createOAuthVerifier } from './oauthVerifier.js';
 import { REMOTE_PROFILE, requestedProfile } from './profileFilter.js';
+import { termsSwitchLine } from '../tools/core/legalAcceptance.js';
 
 export const DEFAULT_PORT = 3200;
 /** Requests per minute per user and OAuth client. */
@@ -406,6 +410,9 @@ export async function startRemoteServer({ env = process.env, logger = console } 
         logger.warn(`[MCP remote] signing keys not fetched yet (${error?.message ?? error}); requests answer 503 until they are.`);
     }
     const policy = createRemotePolicy({ env });
+    // The terms check (Phase 8): one line, only when LEGAL_TERMS_REQUIRED is set to something else than off.
+    const termsLine = termsSwitchLine(env, { label: '[MCP remote]' });
+    if (termsLine) logger.warn(termsLine);
     const app = createRemoteApp({
         config,
         verifier,

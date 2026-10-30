@@ -32,9 +32,10 @@ export async function openLesson(page: Page, course: string, lesson: string, blo
  * point), every diagram rendered and every code block highlighted (their lazy mermaid and shiki
  * chunks) and the web fonts loaded. Until then the reader re-aligns the block it resumes at on each
  * size change (components/lesson/LessonReader.tsx), which can move a button between the press and
- * the release of a click, and the click is lost. A chunk that fails to load
- * reloads the page once (index.tsx, vite:preloadError), and offline that reload ends on the
- * browser's offline page, so a flow that goes offline waits for this first.
+ * the release of a click, and the click is lost. A chunk that fails to load offline no longer
+ * reloads the page (Phase 8: the page says so and reloads only after the app answers again, and
+ * only where nothing usable is on screen), but the reader still moves while parts arrive, so a
+ * flow waits for this first.
  */
 export async function lessonSettled(page: Page) {
   await expect(page.locator('.rp-save'), 'the page load\'s progress read is done').not.toHaveAttribute('data-state', 'loading');

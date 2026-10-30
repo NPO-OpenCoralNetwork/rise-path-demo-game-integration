@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CircleAlert, CircleCheck, FileWarning, TriangleAlert } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -19,6 +19,9 @@ import LessonReader from '../lesson/LessonReader';
 import type { LessonLinkInfo } from '../lesson/LessonEnd';
 import { getLastLesson } from '../lesson/progressStore';
 import { resolveLText, type ContentLocale } from '../lesson/model';
+import { pageOfflineReload } from '../common/chunkReload';
+import { offlinePageBody, offlinePageTitle, offlineReloadCopy } from '../common/offlineReloadCopy';
+import { useFocusAfterRemoval, useOfflineReloadState, useRequireReload } from '../common/OfflineReloadNotice';
 
 /**
  * /learn/:courseSlug/:lessonId — the lesson reader for risepath.lesson/v1 content.
@@ -105,25 +108,33 @@ function ReaderSkeleton({ label }: { label: string }) {
   );
 }
 
-function Problem({ title, body, backTo, backLabel, onRetry, retryLabel }: {
+function Problem({ title, body, backTo, backLabel, onRetry, retryLabel, live }: {
   title: string;
   body: string;
   backTo: string;
   backLabel: string;
   onRetry?: () => void;
   retryLabel?: string;
+  /** The body changes while the page waits for the connection: announce it. */
+  live?: boolean;
 }) {
+  // While the page waits, 「再読み込み」 shows only when unreachable: when it goes from under focus
+  // (offline or checking again), the heading takes focus.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const focusTitle = useCallback(() => titleRef.current?.focus(), []);
+  const onRetryFocus = useFocusAfterRemoval(Boolean(onRetry), focusTitle);
   return (
     <div className="flex min-h-dvh items-start justify-center bg-canvas px-4 py-16">
       <div className="w-full max-w-form rounded-card border border-line bg-surface p-6 shadow-1">
         <FileWarning size={28} aria-hidden="true" className="text-fg-3" />
-        <h1 className="mt-3 text-h2 text-fg">{title}</h1>
-        <p className="mt-2 text-body text-fg-2">{body}</p>
+        <h1 ref={titleRef} tabIndex={-1} className="mt-3 text-h2 text-fg focus:outline-none">{title}</h1>
+        <p role={live ? 'status' : undefined} className="mt-2 text-body text-fg-2">{body}</p>
         <div className="mt-5 flex flex-wrap gap-3">
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
+              onFocus={onRetryFocus}
               className="inline-flex h-10 items-center rounded-control bg-primary px-4 text-small font-semibold text-on-primary hover:bg-primary-hover"
             >
               {retryLabel}
@@ -212,6 +223,13 @@ function LessonPage({ course, courseSlug, lessonId, mode }: { course: Course; co
   const [report, setReport] = useState<DevLessonReport | null | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
   const backTo = courseHome(courseSlug);
+  // Phase 8 (S1): the lesson failed to load while the page waits for the connection (its chunk
+  // failed offline). Re-importing a failed module URL fails again even online, so there is no
+  // 「もう一度読み込む」: nothing usable is on screen, so the page reloads by itself once Rise Path
+  // answers (unreachable: the learner may reload). Learning records stay on this device.
+  const wait = useOfflineReloadState();
+  const offlineError = state.status === 'error' && wait !== 'none';
+  useRequireReload(offlineError);
 
   useEffect(() => {
     let cancelled = false;
@@ -267,6 +285,20 @@ function LessonPage({ course, courseSlug, lessonId, mode }: { course: Course; co
   if (state.status === 'loading') return <ReaderSkeleton label={text.loading} />;
   if (state.status === 'missing') {
     return <Problem title={text.notFoundTitle} body={text.notFoundBody} backTo={backTo} backLabel={text.back} />;
+  }
+  if (state.status === 'error' && wait !== 'none') {
+    return (
+      <Problem
+        title={offlinePageTitle(language, wait)}
+        body={offlinePageBody(language, wait)}
+        backTo={backTo}
+        backLabel={text.back}
+        live
+        {...(wait === 'unreachable'
+          ? { onRetry: () => pageOfflineReload()?.reloadNow(), retryLabel: offlineReloadCopy[language].reloadPage }
+          : {})}
+      />
+    );
   }
   if (state.status === 'error') {
     return (

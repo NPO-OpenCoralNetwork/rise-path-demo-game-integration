@@ -5,19 +5,32 @@ import './index.css';
 import App from './App';
 import {
   buildId,
-  claimReloadForPreloadError,
+  handlePreloadError,
   markChunkReloadStarted,
+  navigatorOnline,
+  pageOfflineReload,
   sessionStorageOrNull,
 } from './components/common/chunkReload';
 
-// After a redeploy, a tab on the old build asks for chunk files that no longer exist. Reload once
-// per build to pick up the new one; a repeat on the same build, or a lazy module that throws while
-// it evaluates, falls through to ErrorBoundary.
+// After a redeploy, a tab on the old build asks for chunk files that no longer exist: reload once
+// per build to pick up the new one (chunkReload.ts); a repeat on the same build, or a lazy module
+// that throws while it evaluates, falls through to ErrorBoundary. Offline, or while the page already
+// waits for the connection (Phase 8), a failed chunk never reloads here: the page says so, and the
+// offline controller reloads only once the app answers again and only where nothing usable is on
+// screen. Learning records stay on this device.
+const offlineReload = pageOfflineReload();
 window.addEventListener('vite:preloadError', (event) => {
-  if (!claimReloadForPreloadError(event.payload, sessionStorageOrNull(), buildId(document))) return;
-  event.preventDefault();
-  markChunkReloadStarted();
-  window.location.reload();
+  handlePreloadError(event, {
+    storage: sessionStorageOrNull(),
+    build: buildId(document),
+    online: navigatorOnline(),
+    waiting: (offlineReload?.state() ?? 'none') !== 'none',
+    reload: () => {
+      markChunkReloadStarted();
+      window.location.reload();
+    },
+    awaitOnline: () => offlineReload?.chunkFailed(),
+  });
 });
 
 const rootElement = document.getElementById('root');

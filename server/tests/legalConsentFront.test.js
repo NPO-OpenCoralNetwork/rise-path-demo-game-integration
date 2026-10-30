@@ -107,6 +107,7 @@ const STUBS = {
 
 const ENTRY = [
   "export * from './components/legal/legalGateClient';",
+  "export { LEGAL_ACCEPTED_EVENT } from './components/legal/legalEvents';",
   "export { hashEmail, rememberSignupAcceptance, readSignupAcceptance, forgetSignupAcceptance, signUpMadeNoAccount, readLegalStatus, readAcceptanceAnswer, getLegalStatus, postLegalAcceptance, SIGNUP_ACCEPTANCE_KEY } from './services/legalConsentApi';",
   "export { LegalConsentBody, CONSENT_PAGE_LINKS } from './components/legal/LegalConsentView';",
   "export { LegalNoticeBarBody, focusMainContent, default as LegalNoticeBar } from './components/legal/LegalNoticeBar';",
@@ -546,9 +547,15 @@ function fakeGate(over = {}) {
       if (timers[id - 1]) timers[id - 1].live = false;
     },
     warn: (message) => calls.push(['warn', message]),
+    announceAccepted: () => calls.push('announce'),
   };
   const gate = on.createLegalGate(deps);
-  return { gate, calls, storage, timers, posts: () => calls.filter((c) => Array.isArray(c) && c[0] === 'post'), warns: () => calls.filter((c) => Array.isArray(c) && c[0] === 'warn') };
+  return {
+    gate, calls, storage, timers,
+    posts: () => calls.filter((c) => Array.isArray(c) && c[0] === 'post'),
+    warns: () => calls.filter((c) => Array.isArray(c) && c[0] === 'warn'),
+    announces: () => calls.filter((c) => c === 'announce').length,
+  };
 }
 
 /** Waits until the gate's status satisfies `predicate` (or 2 s). */
@@ -716,6 +723,57 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
     }
   });
 
+  it('Phase 8: an acceptance this page recorded is announced once (accept(), the sign-up marker); a status read that answers accepted never is', async () => {
+    const t = fakeGate({ statuses: [okStatus()], posts: [{ kind: 'accepted', acceptedAt: null }] });
+    t.gate.setUser(USER);
+    assert.equal((await until(t.gate)).status, 'needed');
+    assert.equal(t.announces(), 0);
+    assert.equal(await t.gate.accept(), 'accepted');
+    assert.equal(t.announces(), 1);
+    assert.ok(t.calls.indexOf('announce') > t.calls.findIndex((c) => Array.isArray(c) && c[0] === 'post'), 'after the server answered');
+
+    const marker = fakeGate();
+    await on.rememberSignupAcceptance(EMAIL, { storage: marker.storage, now: NOW });
+    marker.gate.setUser(USER);
+    assert.equal((await until(marker.gate)).status, 'accepted');
+    assert.equal(marker.announces(), 1, 'the sign-up marker\'s POST');
+
+    const read = fakeGate({ statuses: [okStatus({ accepted: true })] });
+    read.gate.setUser(USER);
+    assert.equal((await until(read.gate)).status, 'accepted');
+    await read.gate.refresh();
+    assert.equal(read.announces(), 0, 'already accepted: nothing recorded, nothing announced');
+
+    for (const kind of ['version_mismatch', 'failed', 'account_deleted']) {
+      const other = fakeGate({ statuses: [okStatus()], posts: [{ kind }] });
+      other.gate.setUser(USER);
+      await until(other.gate);
+      await other.gate.accept();
+      assert.equal(other.announces(), 0, kind);
+    }
+    const late = fakeGate({ posts: [{ kind: 'failed' }, { kind: 'accepted', acceptedAt: null }] });
+    await on.rememberSignupAcceptance(EMAIL, { storage: late.storage, now: NOW });
+    late.gate.setUser(USER);
+    assert.equal((await until(late.gate)).status, 'unavailable');
+    assert.equal(late.announces(), 0, 'a marker POST that failed');
+    late.timers.find((x) => x.live).fn();
+    assert.equal((await until(late.gate, (st) => st.status === 'accepted')).status, 'accepted');
+    assert.equal(late.announces(), 1, 'the retry that recorded it');
+  });
+
+  it('Phase 8: an announcement that throws never breaks the acceptance', async () => {
+    const storage = memoryStorage();
+    const gate = on.createLegalGate({
+      enabled: true, current: CURRENT, getStatus: async () => okStatus(), postAcceptance: async () => ({ kind: 'accepted', acceptedAt: null }),
+      primarySession: async () => ({ userId: U1, email: EMAIL }), storage: () => storage, hashEmail: async () => null, readMarker: () => null, forgetMarker: () => {},
+      now: () => NOW, setTimer: () => 0, clearTimer: () => {}, warn: () => {}, announceAccepted: () => { throw new Error('no window'); },
+    });
+    gate.setUser(USER);
+    await until(gate);
+    assert.equal(await gate.accept(), 'accepted');
+    assert.equal(gate.getState().status, 'accepted');
+  });
+
   it('a change of user while a status read runs: the old answer is dropped', async () => {
     let release;
     const t = fakeGate();
@@ -835,6 +893,38 @@ describe('the legal gate (components/legal/legalGateClient.ts)', () => {
         delete globalThis.window;
         delete globalThis.__main;
       }
+    }
+  });
+
+  it('Phase 8: the page\'s gate sends LEGAL_ACCEPTED_EVENT (rp:legal-accepted) on window once after "Agree and continue"', async () => {
+    const mod = await load(onText);
+    assert.equal(mod.LEGAL_ACCEPTED_EVENT, 'rp:legal-accepted');
+    const answers = {
+      '/user/legal': () => new Response(JSON.stringify({ ok: true, published: false, current: CURRENT, accepted: false, acceptedAt: null, lastAccepted: null, notice: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      '/user/legal/acceptance': () => new Response(JSON.stringify({ ok: true, accepted: true, acceptedAt: '2026-10-28T00:00:00.000Z' }), { status: 201, headers: { 'Content-Type': 'application/json' } }),
+    };
+    const target = new EventTarget();
+    let fired = 0;
+    target.addEventListener(mod.LEGAL_ACCEPTED_EVENT, () => { fired += 1; });
+    globalThis.window = target;
+    globalThis.__main = { auth: { getSession: async () => ({ data: { session: { user: { id: U1, email: EMAIL }, access_token: 'tok' } } }) } };
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const p = String(url).replace(/^\/api\/v2/, '');
+      return answers[p] ? answers[p]() : new Response('{}', { status: 500 });
+    };
+    try {
+      mod.syncLegalGate(true, USER);
+      const gate = mod.legalGate(true);
+      assert.equal((await until(gate)).status, 'needed');
+      assert.equal(fired, 0, 'a status read announces nothing');
+      assert.equal(await gate.accept(), 'accepted');
+      assert.equal(fired, 1);
+    } finally {
+      mod.syncLegalGate(true, null);
+      globalThis.fetch = savedFetch;
+      delete globalThis.window;
+      delete globalThis.__main;
     }
   });
 

@@ -1,8 +1,10 @@
 /**
  * Shared Business Logic — Learner State
  *
- * Used by both Express routes and MCP Server.
+ * Used by the MCP server (learner-state-get, learner-state-update).
  * Pure data access functions, no HTTP/MCP concerns.
+ * No streak: the learning days (learning_days) are app-only; the remote role has no grant on them
+ * (deploy/risepath-vm/sql/mcp_remote_role.sql). The app shows the streak (GET /api/v2/user/achievements).
  */
 import { getPool, PHASE1_USER_ID } from '../../server/db.js';
 import { calculateMastery } from './domains.js';
@@ -29,13 +31,12 @@ export async function getProgress({ userId, domain }) {
 
         if (domain) {
             const row = result.rows[0];
-            if (!row) return { stage: 0, mastery: 0, streak: 0, last_lesson: null, domain };
+            if (!row) return { stage: 0, mastery: 0, last_lesson: null, domain };
             const stages = row.completed_stages || [];
             return {
                 domain,
                 stage: stages.length,
                 mastery: calculateMastery(stages.length, domain),
-                streak: 0, // TODO: calculate from learning_events
                 last_lesson: null,
                 completed_stages: stages,
                 completed_steps: row.completed_steps || {},

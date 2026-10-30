@@ -30,16 +30,23 @@
  *        idempotent: 201 inserted, 200 it already existed), and when nothing was inserted and
  *        nothing existed: a deleted account → 401 account_deleted, anything else → 503.
  *      503 legal_unavailable on a database error, never the driver's text.
+ *      After a 201 or 200 the terms check's answer for this learner is dropped
+ *      (invalidateTermsAcceptance, Phase 8), so their next call passes at once.
+ *
+ * Both routes are exempt from the terms check (server/middleware/termsGate.js TERMS_EXEMPT).
  */
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { getPool } from '../db.js';
 import { ACCOUNT_DELETED_REFUSAL } from '../middleware/auth.js';
 import { accountLockKey, canonicalUserId } from '../../tools/core/accountDeletions.js';
+import { LATEST_ACCEPTANCE_SQL } from '../../tools/core/legalAcceptance.js';
+import { invalidateTermsAcceptance } from '../middleware/termsGate.js';
 import {
     LEGAL_DOCUMENTS,
     LEGAL_DOCUMENT_NAMES,
     LEGAL_HISTORY,
+    acceptanceCounts,
     acceptableLegalVersions,
     currentLegalVersions,
     isDraftLegalVersion,
@@ -55,7 +62,8 @@ export const LEGAL_LOCK_TIMEOUT = '10s';
 
 /** The statements, exactly as sent ($1 is the canonical account id, except for the two version statements). */
 export const LEGAL_SQL = Object.freeze({
-    latest: 'SELECT terms_version, privacy_version, accepted_at FROM legal_acceptances WHERE user_id = $1::uuid AND account_deleted_at IS NULL ORDER BY accepted_at DESC LIMIT 1',
+    // The newest live acceptance: the same statement as the terms check (tools/core/legalAcceptance.js).
+    latest: LATEST_ACCEPTANCE_SQL,
     lockTimeout: `SET LOCAL lock_timeout = '${LEGAL_LOCK_TIMEOUT}'`,
     // Waits for a deletion in progress: the deletion holds the exclusive lock on the same key.
     lock: `SELECT pg_advisory_xact_lock_shared(${accountLockKey(1)})`,
@@ -83,17 +91,8 @@ const iso = (value) => {
     return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 };
 
-/**
- * Whether an acceptance of these versions still counts (acceptableLegalVersions: null = any).
- * @param {{ terms_version: string, privacy_version: string } | undefined} row
- * @param {(document: 'terms' | 'privacy') => string[] | null} acceptable
- */
-export function acceptanceCounts(row, acceptable = acceptableLegalVersions) {
-    if (!row) return false;
-    const terms = acceptable('terms');
-    const privacy = acceptable('privacy');
-    return (terms === null || terms.includes(row.terms_version)) && (privacy === null || privacy.includes(row.privacy_version));
-}
+/** Whether an acceptance still counts: the shared rule (shared/legal/versions.js), kept exported here. */
+export { acceptanceCounts };
 
 /**
  * The GET answer for the newest live acceptance row (or none).
@@ -145,11 +144,21 @@ const userIdOf = (req) => String(/** @type {any} */ (req).userId ?? '');
  *   history?: typeof LEGAL_HISTORY,
  *   env?: Record<string, string | undefined>,
  *   logger?: Pick<Console, 'warn'>,
+ *   invalidateAcceptance?: (userId: string) => void,
  * }} [options]
  *   documents, history: the version tables (tests pass released or changed ones; the app uses
  *   shared/legal/versions.js)
+ *   invalidateAcceptance: called after a recorded acceptance (201 or 200), so the terms check
+ *   (server/middleware/termsGate.js) reads it again on the learner's next call
  */
-export function createLegalRouter({ getPool: poolFn = getPool, documents = LEGAL_DOCUMENTS, history = LEGAL_HISTORY, env = process.env, logger = console } = {}) {
+export function createLegalRouter({
+    getPool: poolFn = getPool,
+    documents = LEGAL_DOCUMENTS,
+    history = LEGAL_HISTORY,
+    env = process.env,
+    logger = console,
+    invalidateAcceptance = invalidateTermsAcceptance,
+} = {}) {
     const router = express.Router();
     const current = () => (documents === LEGAL_DOCUMENTS ? currentLegalVersions() : { terms: documents.terms.version, privacy: documents.privacy.version });
     /** @param {'terms' | 'privacy'} document */
@@ -238,12 +247,14 @@ export function createLegalRouter({ getPool: poolFn = getPool, documents = LEGAL
             if (inserted) {
                 await client.query('COMMIT');
                 open = false;
+                invalidateAcceptance(userId);
                 return res.status(201).json({ ok: true, accepted: true, acceptedAt: iso(inserted.accepted_at) });
             }
             const existing = (await client.query(LEGAL_SQL.existingAcceptance, params)).rows?.[0];
             if (existing) {
                 await client.query('COMMIT');
                 open = false;
+                invalidateAcceptance(userId);
                 return res.status(200).json({ ok: true, accepted: true, acceptedAt: iso(existing.accepted_at) });
             }
             // Nothing inserted and nothing there: the stub is gone. A deletion committed while this

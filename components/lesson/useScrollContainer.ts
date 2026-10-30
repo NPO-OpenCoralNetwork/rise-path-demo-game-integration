@@ -27,14 +27,43 @@ export function findScrollContainer(from?: Element | null): HTMLElement {
 export const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-/** Scrolls `container` so `target` sits `offset` px below its top edge. */
+/** The height the reader's offline notice adds to the sticky bar while it shows (Phase 8, S1; reader.css). */
+export const BAR_EXTRA_PROPERTY = '--rp-bar-extra';
+
+/**
+ * That height in px: set inline on the scroll container by OfflineReloadNotice, 0 otherwise. Read
+ * from the container's own inline style, so a panel that only inherits it (a sticky column) adds nothing.
+ */
+export function barExtra(container: HTMLElement): number {
+  const value = Number.parseFloat(container.style?.getPropertyValue(BAR_EXTRA_PROPERTY) ?? '');
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * `barExtra(container)`, kept current: read again whenever the container's inline style changes
+ * (the notice shows, grows or goes). useLessonProgress measures its lines below the grown bar.
+ */
+export function useBarExtraOf(container: HTMLElement | null): number {
+  const [extra, setExtra] = useState(() => (container ? barExtra(container) : 0));
+  useEffect(() => {
+    const read = () => setExtra(container ? barExtra(container) : 0);
+    read();
+    if (!container || typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(read);
+    observer.observe(container, { attributes: true, attributeFilter: ['style'] });
+    return () => observer.disconnect();
+  }, [container]);
+  return extra;
+}
+
+/** Scrolls `container` so `target` sits `offset` px (plus the notice's `barExtra`) below its top edge. */
 export function scrollElementIntoContainer(
   container: HTMLElement,
   target: Element,
   { offset = READER_SCROLL_OFFSET, smooth = true }: { offset?: number; smooth?: boolean } = {},
 ): void {
   const containerTop = container === document.documentElement ? 0 : container.getBoundingClientRect().top;
-  const top = target.getBoundingClientRect().top - containerTop + container.scrollTop - offset;
+  const top = target.getBoundingClientRect().top - containerTop + container.scrollTop - offset - barExtra(container);
   container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
 }
 
