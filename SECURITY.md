@@ -27,7 +27,8 @@ Only the latest `main` is maintained. There are no release branches.
 
 - In scope: all code in this repository, for example the web app, the API (`server.js`,
   `server/`), the MCP server (`mcp-server/`), the code both of them use (`tools/`) and the deploy
-  and staff scripts (`deploy/`, `scripts/`).
+  and staff scripts (`deploy/`, `scripts/`). This includes the job-training section: a way to make it
+  record study time, test results or attendance that did not happen is a vulnerability.
 - Out of scope: problems in third-party services (Supabase, Vercel, Cloudflare, Stripe, model
   providers). Report those to the service.
 
@@ -71,7 +72,8 @@ GitHub で、非公開で報告してください。このリポジトリの **S
 
 - 対象: このリポジトリのすべてのコード（たとえば Web アプリ、API の `server.js` と `server/`、
   MCP サーバーの `mcp-server/`、その 2 つが使う `tools/`、デプロイと運用のスクリプトの `deploy/` と
-  `scripts/`）
+  `scripts/`）。職業訓練の機能で、受講時間・確認テストの結果・出欠などを、実際と違う値で記録させられる
+  問題も対象です
 - 対象外: 外部のサービス（Supabase、Vercel、Cloudflare、Stripe、AI のモデルの提供元）の問題。
   それぞれのサービスに報告してください。
 
