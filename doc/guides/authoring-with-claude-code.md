@@ -66,8 +66,8 @@ this as a known state on 2026-10-19; it is not part of the done criteria.
   Validation errors always fail.
 - **Still strict**: drafts in `drafts/` always fail on any warning; so does every other published
   lesson, except for the known blocks below.
-- **Known uncited steps**: the 12 steps blocks published without `cite` before `steps-cite`
-  (2026-10-30) are listed in `KNOWN_UNCITED_STEPS` (`shared/lesson/lint.js`); outside `drafts/`
+- **Known uncited steps**: the steps blocks published without `cite` before `steps-cite`
+  (12 on 2026-10-30) are listed in `KNOWN_UNCITED_STEPS` (`shared/lesson/lint.js`); outside `drafts/`
   their warnings are advisory. Any other uncited steps block fails, also after publishing. A rework
   that cites a listed block removes it (a test fails until it does); publishing a lesson whose
   report keeps a `steps-cite` warning (a write-or-decide task) adds the block in the same PR.

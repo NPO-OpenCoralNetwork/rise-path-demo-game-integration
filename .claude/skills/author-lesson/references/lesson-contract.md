@@ -96,7 +96,7 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
   Only a page you actually read counts as checked. When you cannot check one, describe the goal
   ("open the permission settings") instead of the clicks.
 - Every `steps` block cites the sources of its commands, menus and expected results (lint
-  `steps-cite`; the blocks published before the rule are listed, see §8). Never cite a source that
+  `steps-cite`; the published exceptions are listed, see §8). Never cite a source that
   does not say it just to quiet the lint: a block that only asks the learner to write or decide
   something keeps the warning, with the reason in the report.
 - Pin tool versions where behaviour differs between versions ("Unity 6", "Node.js 22").

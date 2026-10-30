@@ -126,7 +126,6 @@ describe('warningPolicy and KNOWN_UNCITED_STEPS', () => {
   });
 
   it('lists only published steps blocks that still have no cite', () => {
-    assert.equal(KNOWN_UNCITED_STEPS.size, 12);
     for (const key of KNOWN_UNCITED_STEPS) {
       const [, course, id, blockId] = /^([a-z0-9-]+)\/([a-z0-9-]+)#([a-z0-9._-]+)$/.exec(key) || [];
       const file = path.join(ROOT, 'content/courses', course || '-', 'lessons', `${id}.lesson.json`);

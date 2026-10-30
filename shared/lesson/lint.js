@@ -86,11 +86,12 @@ export function lintPolicy(lesson, { draft = false, includeMigrated = false } = 
 }
 
 /**
- * The steps blocks that were published without `cite` before steps-cite existed (「出典と検索」,
- * owner plan 2026-10-30), as `<course id>/<lesson id>#<block id>`: a known state, like
+ * Published steps blocks without `cite`, as `<course id>/<lesson id>#<block id>` (keys use the
+ * lesson's `courseId`, which every published lesson sets): a known state, like
  * migrated-unreviewed lessons. Outside drafts, `--strict` lists their steps-cite warnings as
  * advisory; every other steps block without cite fails, also after publishing.
- * - A rework that cites a listed block removes it here (server/tests/lessonLintPolicy.test.js
+ * - The first 12 were published before steps-cite existed (「出典と検索」, owner plan 2026-10-30).
+ *   A rework that cites a listed block removes it here (server/tests/lessonLintPolicy.test.js
  *   fails while a listed block has a cite or is gone).
  * - Publishing a lesson whose report keeps a steps-cite warning (steps that only ask the learner
  *   to write or decide, with nothing to cite) adds that block here, in the publishing PR.

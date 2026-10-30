@@ -11,10 +11,9 @@
  *
  * Warnings exit 0, unless --strict (then any warning exits 1). Under --strict, warnings of
  * migrated-unreviewed lessons (machine-migrated, not reworked; see lintPolicy in
- * shared/lesson/lint.js) and, outside drafts, the steps-cite warnings of the steps blocks
- * published without cite before that rule (KNOWN_UNCITED_STEPS, see warningPolicy) are printed
- * as advisory and do not fail. Drafts are always strict; --include-migrated makes every warning
- * strict.
+ * shared/lesson/lint.js) and, outside drafts, the steps-cite warnings of the known uncited steps
+ * blocks of published lessons (KNOWN_UNCITED_STEPS, see warningPolicy) are printed as advisory
+ * and do not fail. Drafts are always strict; --include-migrated makes every warning strict.
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -106,7 +105,7 @@ async function main() {
       console.log(`Advisory: ${plural(advisoryCount, 'warning')} in ${plural(advisory.length, 'migrated-unreviewed lesson')} (machine-migrated, not reworked); --strict does not fail on them, --strict --include-migrated does.`);
     }
     if (ruleAdvisoryCount > 0) {
-      console.log(`Advisory: ${plural(ruleAdvisoryCount, 'steps-cite warning')} on known uncited steps blocks in ${plural(ruleAdvisory.length, 'lesson')} (published before the rule; KNOWN_UNCITED_STEPS in shared/lesson/lint.js); --strict does not fail on them, --strict --include-migrated does.`);
+      console.log(`Advisory: ${plural(ruleAdvisoryCount, 'steps-cite warning')} on known uncited steps blocks in ${plural(ruleAdvisory.length, 'lesson')} (KNOWN_UNCITED_STEPS in shared/lesson/lint.js); --strict does not fail on them, --strict --include-migrated does.`);
     }
     if (warningCount > 0 && !args.strict) console.log(`Rules: ${Object.keys(LINT_RULES).length} (see shared/lesson/lint.js). Use --strict to fail on warnings.`);
   }

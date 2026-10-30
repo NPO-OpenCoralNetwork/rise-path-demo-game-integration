@@ -365,6 +365,7 @@ describe('rules and instruction files', () => {
 
     // Beginner lessons: an everyday analogy before each new concept, checked by the reviewer.
     assert.match(section(contract, '## 2.'), /`level: "beginner"`[\s\S]*everyday analogy[\s\S]*reviewer/);
+    assert.match(section(contract, '## 2.'), /One analogy may cover the related terms[\s\S]*instead of a callout \(still ≤ 2 callouts per section\)/);
     assert.match(section(skill, '## 4.'), /`level: "beginner"`[\s\S]*analogy/);
     const style = read('.claude/skills/author-lesson/references/style-guide.ja.md');
     assert.match(style, /`level: "beginner"`[\s\S]*日常のたとえ話/);

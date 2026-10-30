@@ -37,7 +37,8 @@ paths:
   image paths or URLs.
 - Write only what the cited sources support: `sources[]` on the lesson (this repository first, then
   official docs), `cite: ["source-id"]` on the block and on every `steps` block (lint `steps-cite`;
-  `KNOWN_UNCITED_STEPS` in `shared/lesson/lint.js` lists the published exceptions). Name menus,
+  steps that only ask the learner to write or decide keep the warning, with the reason in the
+  report; `KNOWN_UNCITED_STEPS` in `shared/lesson/lint.js` lists the published exceptions). Name menus,
   buttons, screens and shortcuts only as the official docs of the pinned version show them
   (`checkedAt`); otherwise describe the goal.
 - `level: "beginner"`: an everyday analogy before each new term's definition, in the text or a callout
