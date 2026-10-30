@@ -662,6 +662,10 @@
         {
           "id": "s3-flow",
           "type": "markdown",
+          "cite": [
+            "mdn-deployment",
+            "mdn-publishing"
+          ],
           "md": {
             "jp": "[[デプロイ]]では、次の3つが順に起きます。",
             "en": "A [[deployment]] goes through three steps, in this order."
