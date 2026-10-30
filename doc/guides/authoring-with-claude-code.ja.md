@@ -100,8 +100,14 @@ Claude Code は次の順に進めます（詳細は `.claude/skills/author-lesso
 ### 確認なしで進められる範囲と、ヘッドレス実行
 
 スキルが確認なしで実行できる操作（`content/courses/` 配下の編集、`lessons:*` スクリプト、
-`check-review.mjs`）は、**`/author-lesson` を呼び出したターンの間だけ**有効です。アウトラインの
-確認で一度止まったあとは、編集のたびに許可を求められます。
+`check-review.mjs`、公式ドキュメントのドメインへの WebFetch）は、**`/author-lesson` を呼び出した
+ターンの間だけ**有効です。アウトラインの確認で一度止まったあとは、編集のたびに許可を求められます。
+
+WebFetch で確認なしに読めるのは、code.claude.com、code.visualstudio.com、developer.mozilla.org、
+git-scm.com、nodejs.org、support.claude.com、support.google.com の 7 つだけです（スキルの
+`allowed-tools` と `.claude/settings.example.json` に同じ一覧があります）。ほかのページは、対話では
+確認を求められ、ヘッドレス実行では拒否されます。ドメインを足すときは、両方のファイルと
+`server/tests/claudeKit.test.js` の一覧を PR で直します。
 
 `claude -p` で最後まで自動で回す（ヘッドレス実行）ときは許可を求める相手がいないため、許可の
 ない操作はすべて拒否されます。プロジェクトの権限ルールを読み込んで起動してください。

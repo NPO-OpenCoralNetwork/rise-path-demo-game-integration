@@ -117,8 +117,12 @@ else Playwright's default.
 | `.claude/settings.example.json` | Always-on hook and permissions — the owner decides whether to copy it to `.claude/settings.json` |
 | `.mcp.json` | `rise-path-learning` MCP server, `curriculum-builder` profile |
 
-The skill's pre-approved tools (edits under `content/courses/`, `lessons:*`, `check-review.mjs`)
-apply only to the turn that invoked `/author-lesson`. For a headless run, load the project rules
+The skill's pre-approved tools (edits under `content/courses/`, `lessons:*`, `check-review.mjs`,
+WebFetch on 7 official documentation domains: code.claude.com, code.visualstudio.com,
+developer.mozilla.org, git-scm.com, nodejs.org, support.claude.com, support.google.com) apply only
+to the turn that invoked `/author-lesson`; other pages ask first, or are denied in a headless run.
+To add a domain, change the skill's `allowed-tools`, `.claude/settings.example.json` and the list in
+`server/tests/claudeKit.test.js` in one PR. For a headless run, load the project rules
 for that run only:
 `claude -p '/author-lesson <course> <lesson> "<brief>"' --settings .claude/settings.example.json`
 (start `npm run dev` first).

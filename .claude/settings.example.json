@@ -11,7 +11,14 @@
       "Bash(npm run lessons:mcp-smoke *)",
       "Bash(node .claude/skills/review-lesson/scripts/check-review.mjs *)",
       "Skill(review-lesson *)",
-      "Edit(/content/courses/**)"
+      "Edit(/content/courses/**)",
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:developer.mozilla.org)",
+      "WebFetch(domain:git-scm.com)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:support.google.com)"
     ],
     "deny": [
       "Read(./.env)",
