@@ -60,6 +60,15 @@ https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Ne
   JSON, a good format for structured data. (opening section)
 - Used in: `s2-json-intro`, `s2-b2` (API and JSON definitions), `ex-steps` (the screen shows what the API returns).
 
+### mdn-json — Working with JSON
+https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/JSON
+(page last modified 2026-08-27)
+- JSON is commonly used to send data from a server to a client so it can be shown on a web page (introduction). It is
+  a text-based format for structured data; each object property is written as `"key": value`, and JSON can also hold
+  arrays (section "No, really, what is JSON?", subsections "JSON structure", "JSON syntax restrictions" and "Arrays as
+  JSON").
+- Used in: `s2-b2` (JSON definition: items as pairs of a name and a value), `s2-json-intro`, the array shape of `s2-b4`.
+
 ### mdn-glossary-ui — UI (Glossary)
 https://developer.mozilla.org/en-US/docs/Glossary/UI (last modified 2025-07-11)
 - A user interface is whatever lets a user interact with a machine; for software, examples include a web page, an
