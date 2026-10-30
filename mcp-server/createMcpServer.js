@@ -585,7 +585,7 @@ policyTool(
         course_slug: lessonSlug().describe(`コースのスラッグ（例: vibe-coding） / Course slug, e.g. vibe-coding (${LESSON_SLUG_DESC})`),
         lesson_id: lessonSlug().describe('レッスンID（例: vibe-ch1） / Lesson id, e.g. vibe-ch1'),
         source: z.enum(['auto', 'draft', 'published']).optional().describe('auto（既定: 下書き → 公開版）/ draft / published'),
-        curriculum_id: z.string().uuid().optional().describe('DB に保存した下書きを読むときのカリキュラムID / Read this database draft instead of files'),
+        curriculum_id: z.guid().optional().describe('DB に保存した下書きを読むときのカリキュラムID / Read this database draft instead of files'),
         user_id: z.string().optional().describe(USER_ID_DESC),
     },
     async ({ course_slug, lesson_id, source, curriculum_id, user_id }, extra) => {
@@ -615,7 +615,7 @@ policyTool(
         course_slug: lessonSlug().describe(`コースのスラッグ / Course slug (${LESSON_SLUG_DESC})`),
         lesson: z.record(z.string(), z.unknown()).describe('risepath.lesson/v1 の教材 JSON。lesson.id がファイル名になる / The lesson JSON; lesson.id becomes the draft file name'),
         base_hash: z.string().max(64).optional().describe('lesson-get の hash。新規作成では省略 / hash from lesson-get; omit when creating a new lesson'),
-        curriculum_id: z.string().uuid().optional().describe('DB の下書きに新しい版を追加するときのカリキュラムID / Add a version to this database draft'),
+        curriculum_id: z.guid().optional().describe('DB の下書きに新しい版を追加するときのカリキュラムID / Add a version to this database draft'),
         user_id: z.string().optional().describe(USER_ID_DESC),
     },
     async ({ course_slug, lesson, base_hash, curriculum_id, user_id }, extra) => {
