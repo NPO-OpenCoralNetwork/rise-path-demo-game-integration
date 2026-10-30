@@ -4,14 +4,16 @@
 //   GET /api/v2/ai/drafts) unless they already have content.
 // - services/curriculumApi.ts: fetchGeneratedCourses throws a 401 with its status and body instead of
 //   answering an empty list; fetchGeneratedCourseById does the same for a 401 only (CourseGeneratorView
-//   reads other statuses as AI errors).
+//   reads other statuses as AI errors). Both do it for a 503 auth_unavailable too (the api could not
+//   reach Supabase Auth).
 // - services/generatedCourses.ts: the resume card the server builds sits at the top level of the
 //   resume answer (checked against server/services/resumeService.js and the route itself), the
-//   dashboard keeps only a generated course's id (a UUID), and isSignInRequired (not for a deleted
-//   account, which apiClient already handles).
+//   dashboard keeps only a generated course's id (a UUID), isSignInRequired (not for a deleted
+//   account, which apiClient already handles) and isSignInUnavailable (503 auth_unavailable).
 // - components/common/GeneratedCoursesSignInNotice.tsx: the sign-in could not be confirmed; its
 //   button signs in again without asking (logout reason 'reauth'). The four views that load generated
-//   courses show it on a 401 (source checks).
+//   courses show it on a 401 (source checks). GeneratedCoursesUnavailableNotice.tsx: try again later,
+//   no sign-in; the four views show it on a 503 auth_unavailable.
 // The front-end modules are bundled with esbuild (a Vite dependency) with their imports stubbed.
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +28,8 @@ import { LESSON_UI_TEMPLATE_ID } from '../../tools/core/lessons.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const COURSE = 'aaaaaaaa-0000-4000-8000-000000000001';
+/** The api's 503 when it could not reach Supabase Auth (server/middleware/auth.js AUTH_UNAVAILABLE). */
+const AUTH_UNAVAILABLE = { error: 'Sign-in cannot be checked right now. Please try again.', error_type: 'auth_unavailable' };
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 // Loaded inside the tests, so the other tests still run where the module does not exist yet.
 const loadHelpers = () => import('../../services/generatedCourses.ts');
@@ -162,6 +166,17 @@ describe('services/curriculumApi.ts', () => {
     }
   });
 
+  it('fetchGeneratedCourses throws a 503 auth_unavailable with its status and body; any other 503 is an empty list', async () => {
+    const api = await loadCurriculumApi();
+    const { isSignInRequired, isSignInUnavailable } = await loadHelpers();
+    globalThis.__apiFetch = answer(503, AUTH_UNAVAILABLE);
+    await assert.rejects(api.fetchGeneratedCourses(), (error) => error.status === 503 && isSignInUnavailable(error) && !isSignInRequired(error));
+    for (const body of [{ error: 'DB not configured' }, { error: 'x', error_type: 'db_connection' }]) {
+      globalThis.__apiFetch = answer(503, body);
+      assert.deepEqual(await api.fetchGeneratedCourses(), [], JSON.stringify(body));
+    }
+  });
+
   it('fetchGeneratedCourses reads the lesson count from total_lessons', async () => {
     const api = await loadCurriculumApi();
     globalThis.__apiFetch = answer(200, { ok: true, curricula: [{ id: COURSE, title: 'Course', total_lessons: 7 }] });
@@ -179,6 +194,13 @@ describe('services/curriculumApi.ts', () => {
       globalThis.__apiFetch = answer(status, { error: 'x' });
       await assert.rejects(api.fetchGeneratedCourseById(COURSE), (error) => error.status === undefined, String(status));
     }
+  });
+
+  it('fetchGeneratedCourseById: a 503 auth_unavailable carries its status and body (try again later)', async () => {
+    const api = await loadCurriculumApi();
+    const { isSignInUnavailable } = await loadHelpers();
+    globalThis.__apiFetch = answer(503, AUTH_UNAVAILABLE);
+    await assert.rejects(api.fetchGeneratedCourseById(COURSE), (error) => error.status === 503 && isSignInUnavailable(error));
   });
 });
 
@@ -221,9 +243,17 @@ describe('services/generatedCourses.ts', () => {
       assert.equal(isSignInRequired(error), false, JSON.stringify(error));
     }
   });
+
+  it('isSignInUnavailable is true for a 503 auth_unavailable only', async () => {
+    const { isSignInUnavailable } = await loadHelpers();
+    assert.equal(isSignInUnavailable(Object.assign(new Error('x'), { status: 503, body: AUTH_UNAVAILABLE })), true);
+    for (const error of [null, undefined, new Error('x'), { status: 503 }, { status: 503, body: { error_type: 'db_connection' } }, { status: '503', body: AUTH_UNAVAILABLE }, { status: 401, body: AUTH_UNAVAILABLE }]) {
+      assert.equal(isSignInUnavailable(error), false, JSON.stringify(error));
+    }
+  });
 });
 
-describe('components/common/GeneratedCoursesSignInNotice.tsx', () => {
+describe('components/common/GeneratedCoursesSignInNotice.tsx and GeneratedCoursesUnavailableNotice.tsx', () => {
   const REACT_STUB = `
     export const useState = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}];
     export const useEffect = () => {};
@@ -232,10 +262,10 @@ describe('components/common/GeneratedCoursesSignInNotice.tsx', () => {
     export const forwardRef = (fn) => fn;
     export default { useState, useEffect, useMemo, useCallback, forwardRef };
   `;
-  const loadNotice = () => bundle("export { default } from './components/common/GeneratedCoursesSignInNotice';", {
+  const loadNotice = (name = 'GeneratedCoursesSignInNotice') => bundle(`export { default } from './components/common/${name}';`, {
     react: { filter: /^react$/, contents: REACT_STUB },
     jsx: { filter: /^react\/jsx-runtime$/, contents: "export const jsx = (type, props) => ({ type, props }); export const jsxs = jsx; export const Fragment = 'Fragment';" },
-    icons: { filter: /^lucide-react$/, contents: "export const LogIn = 'LogIn';" },
+    icons: { filter: /^lucide-react$/, contents: "export const LogIn = 'LogIn'; export const CloudOff = 'CloudOff';" },
     language: { filter: /context\/LanguageContext$/, contents: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp' });" },
     auth: {
       filter: /context\/AuthContext$/,
@@ -287,19 +317,49 @@ describe('components/common/GeneratedCoursesSignInNotice.tsx', () => {
       }
     }
   });
+
+  it('the unavailable notice says the sign-in cannot be checked right now and to try again later, with no sign-in button', async () => {
+    const { default: Notice } = await loadNotice('GeneratedCoursesUnavailableNotice');
+    const cases = [
+      ['jp', '生成したコースを読み込めませんでした', 'いまはログインの確認ができません。しばらくしてから、もう一度開いてください。'],
+      ['en', 'Your generated courses could not be loaded', "Your sign-in can't be checked right now. Please try again in a little while."],
+    ];
+    for (const [language, title, body] of cases) {
+      globalThis.__language = language;
+      try {
+        const { text, elements } = collect(expand(Notice({})));
+        assert.equal(elements[0].props.role, 'alert', language);
+        assert.ok(text.includes(title), `${language}: ${text.join(' | ')}`);
+        assert.ok(text.includes(body), `${language}: ${text.join(' | ')}`);
+        assert.ok(!elements.some((element) => element.type === 'Button' || element.type === 'button'), `${language}: no button`);
+      } finally {
+        delete globalThis.__language;
+      }
+    }
+  });
 });
 
 describe('the views that load generated courses', () => {
+  const VIEWS = [
+    'components/features/dashboard/CourseList.tsx',
+    'components/features/dashboard/profile/ProfileGeneratedView.tsx',
+    'components/wrappers/GeneratedCourseViewWrapper.tsx',
+    'components/wrappers/GeneratedLessonViewWrapper.tsx',
+  ];
+
   it('show the sign-in notice on a 401', () => {
-    for (const file of [
-      'components/features/dashboard/CourseList.tsx',
-      'components/features/dashboard/profile/ProfileGeneratedView.tsx',
-      'components/wrappers/GeneratedCourseViewWrapper.tsx',
-      'components/wrappers/GeneratedLessonViewWrapper.tsx',
-    ]) {
+    for (const file of VIEWS) {
       const text = read(file);
       assert.match(text, /isSignInRequired\((error|err)\)/, file);
       assert.match(text, /<GeneratedCoursesSignInNotice\b/, file);
+    }
+  });
+
+  it('show the try-again-later notice, not the sign-in one, on a 503 auth_unavailable', () => {
+    for (const file of VIEWS) {
+      const text = read(file);
+      assert.match(text, /isSignInUnavailable\((error|err)\)/, file);
+      assert.match(text, /<GeneratedCoursesUnavailableNotice\b/, file);
     }
   });
 

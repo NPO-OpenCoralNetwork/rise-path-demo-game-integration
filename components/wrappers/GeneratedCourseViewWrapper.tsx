@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchGeneratedCourseById } from '../../services/curriculumApi';
 import { apiFetch } from '../../services/apiClient';
-import { isSignInRequired, parseResumeCard } from '../../services/generatedCourses';
+import { isSignInRequired, isSignInUnavailable, parseResumeCard } from '../../services/generatedCourses';
 import GeneratedCoursesSignInNotice from '../common/GeneratedCoursesSignInNotice';
+import GeneratedCoursesUnavailableNotice from '../common/GeneratedCoursesUnavailableNotice';
 import GeneratedCourseView from '../features/ai/GeneratedCourseView';
 import type { ResumeCardData } from '../features/ai/GeneratedCourseView';
 import { GeneratedCourse } from '../../types';
@@ -38,6 +39,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'noCourseId' | 'loadFailed' | null>(null);
   const [signInRequired, setSignInRequired] = useState(false);
+  const [signInUnavailable, setSignInUnavailable] = useState(false);
 
   useEffect(() => {
     if (!courseId) {
@@ -51,6 +53,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
     setResumeCard(null);
     setError(null);
     setSignInRequired(false);
+    setSignInUnavailable(false);
     setLoading(true);
 
     // Track active curriculum for dashboard widget
@@ -60,6 +63,7 @@ const GeneratedCourseViewWrapper: React.FC = () => {
       .then((data) => setCourse(data))
       .catch((err) => {
         if (isSignInRequired(err)) setSignInRequired(true);
+        else if (isSignInUnavailable(err)) setSignInUnavailable(true);
         else setError('loadFailed');
       })
       .finally(() => setLoading(false));
@@ -86,10 +90,10 @@ const GeneratedCourseViewWrapper: React.FC = () => {
     );
   }
 
-  if (signInRequired) {
+  if (signInRequired || signInUnavailable) {
     return (
       <div className="mx-auto w-full max-w-form px-4 py-12">
-        <GeneratedCoursesSignInNotice />
+        {signInRequired ? <GeneratedCoursesSignInNotice /> : <GeneratedCoursesUnavailableNotice />}
       </div>
     );
   }
