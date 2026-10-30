@@ -6,10 +6,10 @@
  *
  * Run it in the school deployment's api container (DATABASE_URL_PHASE1 and TRAINING_ENABLED are
  * already there). The unit list and the rules file are private (D2, D9): they live outside the
- * checkout and are read from stdin, so `-T` matters:
+ * checkout, readable by root only, and are piped to stdin, so `-T` matters:
  *
- *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-catalog --by <who> --note <text> < course.json
- *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-rules --by <who> --note <text> < time-rules.json
+ *   sudo cat <private folder>/course.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-catalog --by <who> --note <text>
+ *   sudo cat <private folder>/time-rules.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-rules --by <who> --note <text>
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --set 2026-11-web --catalog <sha256> --rules <sha256> --from YYYY-MM-DD --by <who> --reason <text>
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --show 2026-11-web [--learner <account uuid>]
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web [--learner <account uuid>]
@@ -19,8 +19,9 @@
  *                 its sha256; the same content again is the version already there.
  * --load-rules    the counting rules the same way. A value is never printed: an error names fields only.
  * --set           a cohort uses a unit list and rules (by sha256) from a Japan-time day: today at the
- *                 earliest, tomorrow once a setting is in effect; never after the cohort's last day.
- *                 Settings are only added.
+ *                 earliest, tomorrow once a setting is in effect; never after the cohort's last day;
+ *                 once the cohort has study time, only the course in effect today. Settings are only
+ *                 added.
  * --show          the cohort's settings (versions by sha256), or one learner's closed days and units.
  * --close         closes the final days of every learner of the cohort (or one), each in its own
  *                 transaction; the api closes them too once the signals arrive (part 2b).
@@ -63,6 +64,9 @@ export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3 
 /** The largest file read from stdin (a unit list of 500 units is far below it). */
 export const STDIN_LIMIT = 1024 * 1024;
 
+/** How long the script waits for the first bytes of the piped file before it says none was piped. */
+export const STDIN_WAIT_MS = 5000;
+
 /** Who closes in a staff run (training_time_days.computed_by). */
 export const STAFF_CLOSER = 'staff';
 
@@ -74,7 +78,7 @@ export const STAFF_CLOSER = 'staff';
  *   readStdin: () => Promise<string | null>,
  *   now?: () => number,
  * }} Deps
- *   readStdin: the whole of stdin, or null when it is a terminal (nothing piped)
+ *   readStdin: the whole of stdin, or null when nothing was piped (a terminal, or no bytes within STDIN_WAIT_MS)
  */
 
 const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats']);
@@ -172,7 +176,7 @@ function failed(result, deps) {
 async function readFile(deps) {
     const text = await deps.readStdin();
     if (text === null) {
-        deps.log('Refused: pipe the file to stdin (… < course.json), with `exec -T` in docker compose.');
+        deps.log(`Refused: pipe the file to stdin (sudo cat <file> | docker compose … exec -T api node scripts/training-time.mjs …); nothing arrived within ${STDIN_WAIT_MS / 1000} s.`);
         return { code: EXIT.usage };
     }
     if (Buffer.byteLength(text, 'utf8') > STDIN_LIMIT) {
@@ -237,7 +241,7 @@ async function setOne(args, deps) {
             deps.log(`Refused: ${from} is after the cohort's last day.`);
             return EXIT.refused;
         default:
-            deps.log(`Refused: ${slug} already has study time for another course; its unit list cannot change course.`);
+            deps.log(`Refused: ${slug} already has study time under the course ${result.courseKey}; a new setting keeps that course.`);
             return EXIT.refused;
     }
 }
@@ -349,18 +353,40 @@ export async function run(argv, deps) {
     }
 }
 
-/** stdin as text, or null when it is a terminal. Reads at most STDIN_LIMIT + 1 bytes. */
-async function readStdin() {
-    if (process.stdin.isTTY) return null;
-    /** @type {Buffer[]} */
-    const chunks = [];
-    let size = 0;
-    for await (const chunk of process.stdin) {
-        chunks.push(/** @type {Buffer} */ (chunk));
-        size += chunk.length;
-        if (size > STDIN_LIMIT) break;
+/**
+ * A stream's text (stdin), reading a little past STDIN_LIMIT at most; null when it is a terminal or
+ * when nothing arrives within waitMs. Under `docker compose exec -T` stdin is a pipe even when no
+ * file was given, so without the wait a forgotten file would keep the script waiting on the terminal.
+ * @param {NodeJS.ReadableStream & { isTTY?: boolean, destroy?: () => void }} stream
+ * @param {{ waitMs?: number }} [options]
+ * @returns {Promise<string | null>}
+ */
+export async function readStdinFrom(stream, { waitMs = STDIN_WAIT_MS } = {}) {
+    if (stream.isTTY) return null;
+    const chunks = /** @type {AsyncIterator<Buffer | string>} */ (stream[Symbol.asyncIterator]());
+    const pending = chunks.next();
+    pending.catch(() => {});
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+    const first = await Promise.race([pending, new Promise((resolve) => { timer = setTimeout(() => resolve(null), waitMs); })]);
+    clearTimeout(timer);
+    if (first === null) {
+        stream.destroy?.();
+        return null;
     }
-    return Buffer.concat(chunks).toString('utf8');
+    /** @type {Buffer[]} */
+    const parts = [];
+    let size = 0;
+    for (let step = /** @type {IteratorResult<Buffer | string>} */ (first); !step.done; step = await chunks.next()) {
+        const part = Buffer.from(step.value);
+        parts.push(part);
+        size += part.length;
+        if (size > STDIN_LIMIT) {
+            stream.destroy?.();
+            break;
+        }
+    }
+    return Buffer.concat(parts).toString('utf8');
 }
 
 /** The real dependencies: the api's pool, environment and stdin. */
@@ -369,7 +395,7 @@ export function defaultDeps() {
         getPool,
         env: process.env,
         log: (line) => console.log(line),
-        readStdin,
+        readStdin: () => readStdinFrom(process.stdin),
         close: async () => {
             await getPool()?.end?.().catch(() => {});
         },

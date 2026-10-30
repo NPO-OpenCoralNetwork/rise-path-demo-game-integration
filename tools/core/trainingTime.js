@@ -8,19 +8,22 @@
  * Configuration (staff, scripts/training-time.mjs): a unit list or a rules file is loaded once, as
  * an immutable version named by the sha256 of its canonical JSON (the same content again changes
  * nothing). A cohort's settings say which versions it uses from which Japan-time day: append only,
- * never from a day before today, and once one is in effect, from tomorrow at the earliest (a day
- * is counted with one setting). Nothing has a default: a day without a setting counts nothing
- * (D9). Nothing here returns or prints a rule value; the values go only to the counting.
+ * never from a day before today, and once one is in effect, from tomorrow at the earliest; once
+ * the cohort has evidence, only for the course in effect today. A new setting holds the cohort's
+ * settings lock (TRAINING_TIME_SQL.settingsLock) exclusively and decides with one clock reading;
+ * a close (and a signal, part 2b) holds it shared before it reads the clock and the day's setting,
+ * so a day is counted with one setting. Nothing has a default: a day without a setting counts
+ * nothing (D9). Nothing here returns or prints a rule value; the values go only to the counting.
  *
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
  * stored signals and appended as day rows (zero days too) with the versions they were counted with
  * and the sha256 of the evidence each read. A day is closed once; a recount appends (PR 4/4). Under
  * the account's shared lock (a deletion waits for the close, then marks its rows; a deletion that
- * ran first left no stub, so nothing is written) and the learner's training lock
+ * ran first left no stub, so nothing is written), the learner's training lock
  * (TRAINING_SQL.learnerLock: a signal reads the clock only under it, so none earlier than the
- * close's clock commits after the close read the evidence), each its own statement, and only while
- * the auth.users stub exists.
+ * close's clock commits after the close read the evidence) and the cohort's settings lock shared,
+ * in that order, each its own statement, and only while the auth.users stub exists.
  *
  * Callers: scripts/training-time.mjs. Failures return { error, error_type } (tools/core/dbErrors.js),
  * never the driver's text.
@@ -59,18 +62,30 @@ export const TRAINING_TIME_SQL = Object.freeze({
     catalogBySha: 'SELECT id, course_key FROM training_catalog_versions WHERE sha256 = $1',
     insertRules: 'INSERT INTO training_time_rule_sets (algorithm, sha256, params, loaded_by, note) VALUES ($1, $2, $3::jsonb, $4, $5) ON CONFLICT (sha256) DO NOTHING RETURNING id',
     rulesBySha: 'SELECT id FROM training_time_rule_sets WHERE sha256 = $1',
-    // The cohort row locked against a second setting at the same time (FOR NO KEY UPDATE: the foreign
-    // key checks of memberships and streams take FOR KEY SHARE and do not wait), with today in Japan.
-    cohortForSetting: `SELECT id, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on,
-       to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today
-  FROM training_cohorts WHERE slug = $1 FOR NO KEY UPDATE`,
+    // Cohorts are never deleted and their dates never change, so these are read before the lock.
+    cohortForSetting: "SELECT id, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on FROM training_cohorts WHERE slug = $1",
+    // A cohort's settings lock ($1 the cohort id): a new setting takes it exclusively before it reads
+    // the clock; a close (and a signal, part 2b) takes it shared before reading the clock and the day's
+    // setting. So a reader never misses a setting whose clock reading came before its own, and one
+    // day is counted with one setting. Taken after the learner's locks, never before them.
+    settingsLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
+    settingsLockShared: "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
+    jstToday: "SELECT to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today",
     settingCourses: `SELECT to_char(s.effective_from, 'YYYY-MM-DD') AS effective_from, k.course_key
   FROM training_cohort_time_settings s JOIN training_catalog_versions k ON k.id = s.catalog_version_id
  WHERE s.cohort_id = $1::uuid ORDER BY s.effective_from, s.id`,
     cohortHasEvidence: 'SELECT EXISTS (SELECT 1 FROM training_time_streams WHERE cohort_id = $1::uuid) AS evidence',
-    // set_at is the default, the insert's own clock: the CHECK refuses a day before it.
-    insertSetting: `INSERT INTO training_cohort_time_settings (cohort_id, catalog_version_id, rule_set_id, effective_from, set_by, reason)
-VALUES ($1::uuid, $2, $3, $4::date, $5, $6) RETURNING id, to_char(effective_from, 'YYYY-MM-DD') AS effective_from`,
+    // One clock reading decides it, is the row's set_at (so the CHECK holds) and is returned as today:
+    // not before today, and from tomorrow once a setting is in effect today. No id: refused.
+    insertSetting: `WITH t AS (SELECT clock_timestamp() AS at),
+d AS (SELECT at, (at AT TIME ZONE 'Asia/Tokyo')::date AS today FROM t),
+ins AS (
+  INSERT INTO training_cohort_time_settings (cohort_id, catalog_version_id, rule_set_id, effective_from, set_at, set_by, reason)
+  SELECT $1::uuid, $2, $3, $4::date, d.at, $5, $6 FROM d
+   WHERE $4::date > d.today
+      OR ($4::date = d.today AND NOT EXISTS (SELECT 1 FROM training_cohort_time_settings s WHERE s.cohort_id = $1::uuid AND s.effective_from <= d.today))
+  RETURNING id, to_char(effective_from, 'YYYY-MM-DD') AS effective_from)
+SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM d LEFT JOIN ins ON true`,
     // Staff: the settings as a list (versions by sha256, never a rule value).
     settingsList: `SELECT s.id, to_char(s.effective_from, 'YYYY-MM-DD') AS effective_from, s.set_at, s.set_by, s.reason,
        k.sha256 AS catalog_sha256, k.course_key, jsonb_array_length(k.manifest->'units') AS units, r.sha256 AS rules_sha256, r.algorithm
@@ -388,11 +403,12 @@ const SHA256 = /^[0-9a-f]{64}$/;
 /**
  * Staff: a cohort uses a unit list and rules (by sha256) from a Japan-time day. Refused: a cohort
  * without both dates (it counts nothing), a day before today or after the cohort's last day, today
- * when a setting is already in effect (from tomorrow then), and a unit list of another course once
- * the cohort has evidence.
+ * when a setting is already in effect (from tomorrow then), and, once the cohort has evidence, a
+ * unit list of another course than the one in effect today.
  * @param {{ cohortSlug: string, catalogSha256: string, rulesSha256: string, effectiveFrom: string, setBy: unknown, reason: unknown, pool?: TrainingPool | null }} params
  * @returns {Promise<{ status: 'set', id: string, effectiveFrom: string }
- *   | { status: 'no_cohort' | 'no_dates' | 'no_catalog' | 'no_rules' | 'after_end' | 'course_differs' }
+ *   | { status: 'no_cohort' | 'no_dates' | 'no_catalog' | 'no_rules' | 'after_end' }
+ *   | { status: 'course_differs', courseKey: string }
  *   | { status: 'past' | 'in_effect_today', today: string }
  *   | CoreError>}
  */
@@ -413,27 +429,32 @@ export async function setCohortTime({ cohortSlug, catalogSha256, rulesSha256, ef
         const refuse = (value) => ({ commit: false, value });
         if (!cohort) return refuse({ status: 'no_cohort' });
         if (!cohort.starts_on || !cohort.ends_on) return refuse({ status: 'no_dates' });
+        await db.query(TRAINING_TIME_SQL.settingsLock, [cohort.id]);
         const catalog = (await db.query(TRAINING_TIME_SQL.catalogBySha, [catalogSha256])).rows?.[0];
         if (!catalog) return refuse({ status: 'no_catalog' });
         const rules = (await db.query(TRAINING_TIME_SQL.rulesBySha, [rulesSha256])).rows?.[0];
         if (!rules) return refuse({ status: 'no_rules' });
-        const today = String(cohort.today);
+        // Early refusals with today read after the lock; the insert decides again with its own clock.
+        const today = String((await db.query(TRAINING_TIME_SQL.jstToday)).rows?.[0]?.today);
         if (effectiveFrom < today) return refuse({ status: 'past', today });
         if (effectiveFrom > cohort.ends_on) return refuse({ status: 'after_end' });
         const earlier = (await db.query(TRAINING_TIME_SQL.settingCourses, [cohort.id])).rows ?? [];
-        if (effectiveFrom <= today && earlier.some((s) => String(s.effective_from) <= today)) return refuse({ status: 'in_effect_today', today });
-        if (earlier.some((s) => String(s.course_key) !== String(catalog.course_key))
+        // The setting in effect today (the rows are in the order effective_from, id).
+        const current = earlier.filter((s) => String(s.effective_from) <= today).at(-1);
+        if (effectiveFrom <= today && current) return refuse({ status: 'in_effect_today', today });
+        // Once there is evidence, the course stays the one in effect today: new rules or units for it,
+        // or undoing a switch scheduled before the evidence, are fine; another course is not.
+        if (current && String(current.course_key) !== String(catalog.course_key)
             && (await db.query(TRAINING_TIME_SQL.cohortHasEvidence, [cohort.id])).rows?.[0]?.evidence) {
-            return refuse({ status: 'course_differs' });
+            return refuse({ status: 'course_differs', courseKey: String(current.course_key) });
         }
-        try {
-            const row = (await db.query(TRAINING_TIME_SQL.insertSetting, [cohort.id, catalog.id, rules.id, effectiveFrom, by, why])).rows?.[0];
-            return { commit: true, value: { status: 'set', id: String(row?.id), effectiveFrom: String(row?.effective_from) } };
-        } catch (err) {
-            // 23514: midnight passed between the reads above and the insert (the CHECK uses the insert's clock).
-            if (/** @type {any} */ (err)?.code === '23514') return refuse({ status: 'past', today });
-            throw err;
+        const row = (await db.query(TRAINING_TIME_SQL.insertSetting, [cohort.id, catalog.id, rules.id, effectiveFrom, by, why])).rows?.[0];
+        if (!row?.id) {
+            // Midnight passed after the early checks: the insert's own day refused it.
+            const day = String(row?.today);
+            return refuse({ status: effectiveFrom < day ? 'past' : 'in_effect_today', today: day });
         }
+        return { commit: true, value: { status: 'set', id: String(row.id), effectiveFrom: String(row.effective_from) } };
     });
 }
 
@@ -454,6 +475,7 @@ export async function closeDays({ userId: rawUserId, cohortId: rawCohortId, comp
     return transaction(pool, 'closeDays', async (db) => {
         await db.query(TRAINING_SQL.lock, [userId]);
         await db.query(TRAINING_SQL.learnerLock, [userId]);
+        await db.query(TRAINING_TIME_SQL.settingsLockShared, [cohortId]);
         /** @param {any} reason */
         const nothing = (reason) => ({ commit: false, value: /** @type {any} */ ({ status: 'nothing', reason }) });
         const state = (await db.query(TRAINING_TIME_SQL.closeState, [userId, cohortId])).rows?.[0];

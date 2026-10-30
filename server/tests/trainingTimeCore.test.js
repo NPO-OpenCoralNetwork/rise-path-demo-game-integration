@@ -146,14 +146,20 @@ describe('tools/core/trainingTime.js: a cohort\'s settings', () => {
         return { pool, catalog, rules, set };
     }
 
-    it('a first setting from today: the cohort row locked, the versions by sha256, then the insert; COMMIT', async () => {
+    it('a first setting from today: the cohort\'s settings lock, the versions by sha256, today, then the insert deciding with one clock reading; COMMIT', async () => {
         const { pool, set } = await bare();
         const result = /** @type {any} */ (await set());
         assert.deepEqual([result.status, result.effectiveFrom], ['set', '2026-11-04']);
-        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_TIME_SQL.cohortForSetting, TRAINING_TIME_SQL.catalogBySha, TRAINING_TIME_SQL.rulesBySha,
-            TRAINING_TIME_SQL.settingCourses, TRAINING_TIME_SQL.insertSetting, 'COMMIT']);
-        assert.match(TRAINING_TIME_SQL.cohortForSetting, /FOR NO KEY UPDATE$/, 'does not wait for (or block) the foreign key checks of memberships and streams');
-        assert.doesNotMatch(TRAINING_TIME_SQL.insertSetting, /set_at/, 'set_at is the default, the insert\'s own clock (the CHECK)');
+        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_TIME_SQL.cohortForSetting, TRAINING_TIME_SQL.settingsLock, TRAINING_TIME_SQL.catalogBySha,
+            TRAINING_TIME_SQL.rulesBySha, TRAINING_TIME_SQL.jstToday, TRAINING_TIME_SQL.settingCourses, TRAINING_TIME_SQL.insertSetting, 'COMMIT']);
+        assert.deepEqual(pool.queries.find((q) => q.sql === TRAINING_TIME_SQL.settingsLock)?.params, [COHORT]);
+        assert.equal(TRAINING_TIME_SQL.settingsLock, "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))");
+        assert.equal(TRAINING_TIME_SQL.settingsLockShared, "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))");
+        // One clock reading decides the day, is the row's set_at (the CHECK) and is the today it answers.
+        assert.equal((TRAINING_TIME_SQL.insertSetting.match(/clock_timestamp\(\)/g) ?? []).length, 1);
+        assert.match(TRAINING_TIME_SQL.insertSetting, /SELECT \$1::uuid, \$2, \$3, \$4::date, d\.at, \$5, \$6 FROM d/);
+        assert.match(TRAINING_TIME_SQL.insertSetting, /WHERE \$4::date > d\.today\n\s+OR \(\$4::date = d\.today AND NOT EXISTS \(SELECT 1 FROM training_cohort_time_settings s WHERE s\.cohort_id = \$1::uuid AND s\.effective_from <= d\.today\)\)/);
+        assert.doesNotMatch(TRAINING_TIME_SQL.cohortForSetting, /clock_timestamp|FOR /, 'today is read after the lock, not before a wait');
         assert.equal(pool.state.settings.length, 1);
     });
 
@@ -171,6 +177,7 @@ describe('tools/core/trainingTime.js: a cohort\'s settings', () => {
         assert.equal(pool.state.settings.length, 0);
         assert.equal(pool.tx().filter((s) => s === 'COMMIT').length, 0);
         assert.equal(pool.tx().filter((s) => s === 'ROLLBACK').length, 6);
+        assert.equal(pool.tx().filter((s) => s === TRAINING_TIME_SQL.settingsLock).length, 4, 'no cohort and no dates refuse before the lock');
     });
 
     it('once a setting is in effect, a new one starts tomorrow at the earliest; a setting that is not in effect yet can be followed by one from today', async () => {
@@ -183,37 +190,63 @@ describe('tools/core/trainingTime.js: a cohort\'s settings', () => {
         assert.deepEqual(pool.state.settings.map((s) => s.effective_from), ['2026-11-10', '2026-11-04', '2026-11-05']);
     });
 
-    it('another course\'s unit list: allowed while the cohort has no evidence, refused once it has', async () => {
-        const { pool, set } = await bare();
-        assert.equal((/** @type {any} */ (await set({ effectiveFrom: '2026-11-05' }))).status, 'set');
+    it('the course: any while there is no evidence; once there is, the course in effect today (new rules for it, undoing a switch scheduled before the evidence), never another', async () => {
+        const { pool, rules, set } = await bare();
         const other = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, courseKey: 'other-course' }, loadedBy: 'a', note: 'b', pool }));
-        assert.equal((/** @type {any} */ (await set({ catalogSha256: other.sha256, effectiveFrom: '2026-11-06' }))).status, 'set', 'no evidence yet');
-        pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: at('2026-11-04T01:00:00Z'), seq: 0, at: at('2026-11-04T01:00:00Z'), input: true });
-        assert.equal((/** @type {any} */ (await set({ catalogSha256: other.sha256, effectiveFrom: '2026-11-07' }))).status, 'course_differs');
-        assert.equal(pool.state.settings.length, 2);
+        const newer = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 11 * S } }, loadedBy: 'a', note: 'b', pool }));
+        // A mistake corrected before any evidence: two courses in the history, other-course in effect.
+        assert.equal((/** @type {any} */ (await set())).status, 'set');
+        assert.equal((/** @type {any} */ (await set({ catalogSha256: other.sha256, effectiveFrom: '2026-11-05' }))).status, 'set', 'no evidence yet');
+        pool.setClock(at('2026-11-05T03:00:00Z'));
+        pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: at('2026-11-05T01:00:00Z'), seq: 0, at: at('2026-11-05T01:00:00Z'), input: true });
+        const sameNewRules = /** @type {any} */ (await set({ catalogSha256: other.sha256, rulesSha256: newer.sha256, effectiveFrom: '2026-11-06' }));
+        const back = /** @type {any} */ (await set({ effectiveFrom: '2026-11-07' }));
+        assert.equal(sameNewRules.status, 'set', 'the course in effect today, new rules');
+        assert.deepEqual(back, { status: 'course_differs', courseKey: 'other-course' });
+        // A switch scheduled before the evidence can be undone with the course in effect today.
+        const switchy = await bare();
+        await loadCatalog({ input: { ...COURSE, courseKey: 'other-course' }, loadedBy: 'a', note: 'b', pool: switchy.pool });
+        assert.equal((/** @type {any} */ (await switchy.set())).status, 'set');
+        assert.equal((/** @type {any} */ (await switchy.set({ catalogSha256: other.sha256, effectiveFrom: '2026-11-10' }))).status, 'set', 'scheduled before the evidence');
+        switchy.pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(2), born: at('2026-11-04T01:00:00Z'), seq: 0, at: at('2026-11-04T01:00:00Z'), input: true });
+        assert.equal((/** @type {any} */ (await switchy.set({ effectiveFrom: '2026-11-10', reason: 'undo the switch' }))).status, 'set');
+        assert.equal((/** @type {any} */ (await switchy.set({ catalogSha256: other.sha256, effectiveFrom: '2026-11-12' }))).status, 'course_differs');
+        assert.equal(rules.status, 'loaded');
     });
 
-    it('validation before any statement: the sha256 form, the day, who and why; midnight passing before the insert (23514) is a past day', async () => {
+    it('midnight passing between the early checks and the insert: the insert\'s own day refuses (in effect today, or a past day), rolled back', async () => {
+        const { pool, set } = await bare();
+        assert.equal((/** @type {any} */ (await set())).status, 'set');
+        const midnight = jstDayRange('2026-11-05').start;
+        pool.before(TRAINING_TIME_SQL.insertSetting, () => pool.setClock(midnight + 3 * S));
+        const tomorrow = /** @type {any} */ (await set({ effectiveFrom: '2026-11-05', reason: 'tomorrow, as read before midnight' }));
+        assert.deepEqual(tomorrow, { status: 'in_effect_today', today: '2026-11-05' });
+        assert.equal(pool.tx().at(-1), 'ROLLBACK');
+        const fresh = await bare();
+        fresh.pool.before(TRAINING_TIME_SQL.insertSetting, () => fresh.pool.setClock(midnight + 3 * S));
+        assert.deepEqual(await fresh.set(), { status: 'past', today: '2026-11-05' });
+        assert.deepEqual([pool.state.settings.length, fresh.pool.state.settings.length], [1, 0]);
+    });
+
+    it('validation before any statement: the sha256 form, the day, who and why', async () => {
         const { pool, set } = await bare();
         const before = pool.queries.length;
         for (const patch of [{ catalogSha256: 'ABC' }, { rulesSha256: 'F'.repeat(64) }, { effectiveFrom: '2026-02-30' }, { effectiveFrom: '20261104' }, { setBy: ' ' }, { reason: '' }]) {
             assert.equal((/** @type {any} */ (await set(patch))).error_type, 'validation', JSON.stringify(patch));
         }
         assert.equal(pool.queries.length, before);
-        pool.failOn(TRAINING_TIME_SQL.insertSetting, Object.assign(new Error('violates check constraint'), { code: '23514' }));
-        assert.deepEqual(await set(), { status: 'past', today: '2026-11-04' });
-        assert.equal(pool.tx().at(-1), 'ROLLBACK');
     });
 });
 
 describe('tools/core/trainingTime.js: closing days', () => {
-    it('the account\'s shared lock, then the learner\'s lock (each its own statement), one clock reading, then the reads and the writes; COMMIT', async () => {
+    it('the account\'s shared lock, the learner\'s lock, the cohort\'s settings lock shared (each its own statement), one clock reading, then the reads and the writes; COMMIT', async () => {
         const { pool } = await seeded();
         chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 20 });
         const result = await closeDays({ userId: A.toUpperCase(), cohortId: COHORT.toUpperCase(), computedBy: 'staff', pool });
         assert.deepEqual(result, { status: 'closed', days: 3, fromDay: '2026-11-01', toDay: '2026-11-03' });
-        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.closeState, TRAINING_TIME_SQL.closeSettings,
-            TRAINING_TIME_SQL.unitTotals, TRAINING_TIME_SQL.evidence, TRAINING_TIME_SQL.insertDays, TRAINING_TIME_SQL.insertUnitDays, 'COMMIT']);
+        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.closeState,
+            TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.unitTotals, TRAINING_TIME_SQL.evidence, TRAINING_TIME_SQL.insertDays, TRAINING_TIME_SQL.insertUnitDays, 'COMMIT']);
+        assert.deepEqual(pool.queries.find((q) => q.sql === TRAINING_TIME_SQL.settingsLockShared)?.params, [COHORT]);
         for (const q of pool.queries.filter((x) => x.tx && x.params.length && x.sql !== TRAINING_TIME_SQL.insertUnitDays)) {
             assert.ok(q.params[0] === A || q.params[0] === COHORT, `${q.sql.slice(0, 40)}: canonical ids`);
         }
@@ -280,16 +313,49 @@ describe('tools/core/trainingTime.js: closing days', () => {
         assert.deepEqual([day3.counted_ms, day3.over_cap_ms], [43 * S, 34 * S]);
     });
 
-    it('each day with its own setting: the version ids and the set times change on the setting\'s day', async () => {
-        const { pool, rules } = await seeded();
+    it('each day with its own setting: the rules, the set times and both version ids change on the setting\'s day', async () => {
+        const { pool, rules, catalog } = await seeded();
         const wider = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: COURSE.units.map((u) => ({ ...u, setMinutes: 600 })) }, loadedBy: 'a', note: 'b', pool }));
-        pool.addSetting({ cohortId: COHORT, catalogId: wider.id, ruleSetId: rules.id, effectiveFrom: '2026-11-03' });
-        chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 20 });
-        chain(pool, { id: chainId(2), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 20 });
+        // Smaller pieces from day 3: each pair of signals 7 s apart counts 5 s instead of 7 s.
+        const RULES_IN_2 = { ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 5 * S } };
+        const rules2 = /** @type {any} */ (await loadRules({ input: RULES_IN_2, loadedBy: 'a', note: 'b', pool }));
+        pool.addSetting({ cohortId: COHORT, catalogId: wider.id, ruleSetId: rules2.id, effectiveFrom: '2026-11-03' });
+        const signals = [
+            ...chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 20 }),
+            ...chain(pool, { id: chainId(2), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 20 }),
+        ];
         await close(pool);
         const [, d2, d3] = pool.state.days;
-        assert.deepEqual([d2.catalog_version_id === wider.id, d2.counted_ms, d2.over_cap_ms], [false, 120 * S, 13 * S]);
-        assert.deepEqual([d3.catalog_version_id, d3.counted_ms, d3.over_cap_ms], [wider.id, 133 * S, 0], 'the new set time applies from its day; nothing counted before is taken back');
+        const later = (/** @type {string} */ day) => day >= '2026-11-03';
+        const want = countDays({
+            fromDay: '2026-11-01', toDay: '2026-11-03', signals, carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30'),
+            rulesOf: (day) => (later(day) ? /** @type {any} */ (parseTimeRules(RULES_IN_2)).rules : RULES),
+            setMsOf: (day) => setMsOf(later(day) ? { ...COURSE, units: COURSE.units.map((u) => ({ ...u, setMinutes: 600 })) } : COURSE),
+        }).days;
+        assert.deepEqual([d2.rule_set_id, d2.catalog_version_id, d2.counted_ms, d2.over_cap_ms], [rules.id, catalog.id, 120 * S, 13 * S]);
+        assert.deepEqual([d3.rule_set_id, d3.catalog_version_id, d3.counted_ms, d3.over_cap_ms], [rules2.id, wider.id, 95 * S, 0],
+            'day 3 with its own rules (19 × 5 s) and set time; nothing counted before is taken back');
+        assert.deepEqual([d2.counted_ms, d3.counted_ms], [want[1].countedMs, want[2].countedMs]);
+    });
+
+    it('a close after an earlier close: the unit\'s time carried from the closed day and the evidence of the day before (a chain across 00:00 JST) give the numbers of one continuous count', async () => {
+        // Day 2 is closed first; a chain starts 100 s before 00:00 JST of day 3, after unit 1 already reached its set time on day 2.
+        const { pool } = await seeded({ clock: at('2026-11-03T03:00:00Z') });
+        const signals = [
+            ...chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 20 }),
+            ...chain(pool, { id: chainId(2), unit: U1, from: jstDayRange('2026-11-03').start - 100 * S, n: 25 }),
+        ];
+        assert.deepEqual(await close(pool), { status: 'closed', days: 2, fromDay: '2026-11-01', toDay: '2026-11-02' });
+        pool.setClock(at('2026-11-04T03:00:00Z'));
+        assert.deepEqual(await close(pool), { status: 'closed', days: 1, fromDay: '2026-11-03', toDay: '2026-11-03' });
+        const want = countDays({ fromDay: '2026-11-01', toDay: '2026-11-03', signals, rulesOf: () => RULES, setMsOf: () => setMsOf(COURSE), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') }).days;
+        const d3 = pool.state.days.find((d) => d.day === '2026-11-03');
+        const units = pool.state.unitDays.filter((u) => u.day_id === d3.id).map((u) => ({ unit: u.unit_key, countedMs: u.counted_ms, overCapMs: u.over_cap_ms }));
+        assert.deepEqual({ counted: d3.counted_ms, over: d3.over_cap_ms, units }, { counted: want[2].countedMs, over: want[2].units.reduce((n, u) => n + u.overCapMs, 0), units: want[2].units });
+        assert.equal(d3.counted_ms, 0, 'the set time was reached on day 2: day 3 counts nothing more for unit 1');
+        assert.ok(d3.over_cap_ms > 0);
+        const evidence = pool.queries.filter((q) => q.sql === TRAINING_TIME_SQL.evidence).at(-1);
+        assert.ok(Date.parse(String(evidence?.params[4])) < jstDayRange('2026-11-03').start, 'the second close reads evidence from before its first day');
     });
 
     it('nothing to close, each rolled back with nothing written: no cohort, no account (deleted), not a learner, no dates, no setting, nothing final', async () => {

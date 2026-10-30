@@ -82,7 +82,9 @@ describe(`migration ${FILE}`, () => {
         assert.match(settings, /cohort_id uuid not null references training_cohorts\(id\), catalog_version_id bigint not null references training_catalog_versions\(id\), rule_set_id bigint not null references training_time_rule_sets\(id\), effective_from date not null,/);
         assert.match(settings, /set_at timestamptz not null default clock_timestamp\(\),/);
         assert.match(settings, /check \(effective_from >= \(set_at at time zone 'asia\/tokyo'\)::date\) $/);
-        assert.doesNotMatch(TRAINING_TIME_SQL.insertSetting, /set_at/, 'the core never sends set_at');
+        // The core's insert gives set_at its own single clock reading, the one its rule used: the CHECK and the rule agree.
+        assert.match(TRAINING_TIME_SQL.insertSetting, /^WITH t AS \(SELECT clock_timestamp\(\) AS at\),/);
+        assert.match(TRAINING_TIME_SQL.insertSetting, /\(cohort_id, catalog_version_id, rule_set_id, effective_from, set_at, set_by, reason\)\n {2}SELECT \$1::uuid, \$2, \$3, \$4::date, d\.at, \$5, \$6 FROM d/);
         assert.ok(lower.includes('create index if not exists training_cohort_time_settings_cohort_idx on training_cohort_time_settings (cohort_id, effective_from, id)'));
     });
 

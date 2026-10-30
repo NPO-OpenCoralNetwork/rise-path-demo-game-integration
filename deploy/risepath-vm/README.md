@@ -456,12 +456,12 @@ docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs 
 
 **受講時間の職員のスクリプト**（`api` コンテナの中で。`TRAINING_ENABLED=true` のときだけ動きます）
 
-単元表（単元と、それぞれの設定時間）と数え方の規則は、リポジトリに入れない非公開のファイルです。VM では checkout（`/opt/risepath`）の外の、root だけが読めるフォルダ（下の例では `/opt/risepath-private`）に置き、stdin で渡します（`exec -T` が要ります）。規則の値は画面に出ません。読み込んだ版は sha256 で示されるので、学校の記録に残します。
+単元表（単元と、それぞれの設定時間）と数え方の規則は、リポジトリに入れない非公開のファイルです。VM では checkout（`/opt/risepath`）の外の、root だけが読めるフォルダ（下の例では `/opt/risepath-private`。`sudo install -d -m 700 /opt/risepath-private` で作ります）に置き、`sudo cat` で読んで stdin に流します（`exec -T` が要ります。`<` で渡すと、root でないシェルが開くので読めません）。規則の値は画面に出ません。読み込んだ版は sha256 で示されるので、学校の記録に残します。
 
 ```bash
 cd /opt/risepath/deploy/risepath-vm
-docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-catalog --by <who> --note <text> < /opt/risepath-private/course.json
-docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-rules --by <who> --note <text> < /opt/risepath-private/time-rules.json
+sudo cat /opt/risepath-private/course.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-catalog --by <who> --note <text>
+sudo cat /opt/risepath-private/time-rules.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-rules --by <who> --note <text>
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --set 2026-11-web --catalog <sha256> --rules <sha256> --from 2026-11-01 --by <who> --reason <text>
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --show 2026-11-web
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web
@@ -469,13 +469,13 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 ```
 
 - `--load-catalog`・`--load-rules`: 変えない版として読み込みます。同じ内容をもう一度読み込んでも、前の版のままです。形がちがうときは、どの項目かだけを出して断ります。
-- `--set`: 期が、どの単元表と規則を何日から使うかを足します（足すだけで、変えたり消したりはしません）。今日より前の日と、期の最後の日より後は断ります。今日すでに設定が効いている期では、新しい設定は明日からです。始まりと終わりの日付がない期では、受講時間を数えないので断ります。
+- `--set`: 期が、どの単元表と規則を何日から使うかを足します（足すだけで、変えたり消したりはしません）。今日より前の日と、期の最後の日より後は断ります。今日すでに設定が効いている期では、新しい設定は明日からです。受講時間の記録が始まった期では、今日効いている設定と同じコースの単元表だけを使えます（規則や単元表の新しい版、記録の前に予定したコースの切り替えの取り消しはできます）。始まりと終わりの日付がない期では、受講時間を数えないので断ります。
 - `--show`: 期の設定（版は sha256 で）。`--learner <account uuid>` を付けると、その人の確定した日と、単元ごとの時間です。
 - `--close`: 期の受講者ごとに、確定できる日（その日の終わりから、規則の途切れの長さが過ぎた日）を閉じます。0 分の日も行を作り、閉じた日は変えません。`--learner <account uuid>` で 1 人だけにもできます。合図を受け取る API は次の版で入るので、それまでは 0 分の日だけです。
 - `--stats`: 行の数（削除したアカウントの分も）と、最後に閉じた日です。
 - 設定のない日は、受講時間を数えません。デプロイ、期と割り当ての操作は、設定がなくても動きます。
 
-終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを渡していないときも）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、ほかのコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）。
+終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを流していないときも。5 秒待っても何も届かなければ止まります）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、今日効いている設定とちがうコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）。
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
 

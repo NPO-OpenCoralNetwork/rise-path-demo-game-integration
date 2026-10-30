@@ -52,6 +52,8 @@ export function createTrainingTimePool(seed = {}) {
     const failures = [];
     /** @type {unknown[]} */
     const releases = [];
+    /** @type {{ sql: string, run: () => void }[]} */
+    const hooks = [];
 
     const id = () => String(state.next++);
     /** The current value of each day: its newest live row. @param {string} user @param {string} cohort */
@@ -69,6 +71,7 @@ export function createTrainingTimePool(seed = {}) {
     /** @param {boolean} tx */
     const runner = (tx) => async (/** @type {string} */ sql, /** @type {any[]} */ params = []) => {
         queries.push({ sql, params, tx });
+        for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
         const failure = failures.find((f) => f.sql === sql);
         if (failure) throw failure.error;
         const [p1, p2] = params;
@@ -86,7 +89,11 @@ export function createTrainingTimePool(seed = {}) {
             case TRAINING_SQL.lockTimeout:
             case TRAINING_SQL.lock:
             case TRAINING_SQL.learnerLock:
+            case TRAINING_TIME_SQL.settingsLock:
+            case TRAINING_TIME_SQL.settingsLockShared:
                 return result([]);
+            case TRAINING_TIME_SQL.jstToday:
+                return result([{ today: jstDayOf(state.clock) }]);
             case TRAINING_SQL.cohortBySlug:
                 return result(state.cohorts.filter((c) => c.slug === p1).map((c) => ({ ...c })));
             case TRAINING_TIME_SQL.insertCatalog: {
@@ -106,17 +113,21 @@ export function createTrainingTimePool(seed = {}) {
             case TRAINING_TIME_SQL.rulesBySha:
                 return result(state.rules.filter((r) => r.sha256 === p1).map((r) => ({ id: r.id })));
             case TRAINING_TIME_SQL.cohortForSetting:
-                return result(state.cohorts.filter((c) => c.slug === p1).map((c) => ({ id: c.id, starts_on: c.starts_on, ends_on: c.ends_on, today: jstDayOf(state.clock) })));
+                return result(state.cohorts.filter((c) => c.slug === p1).map((c) => ({ id: c.id, starts_on: c.starts_on, ends_on: c.ends_on })));
             case TRAINING_TIME_SQL.settingCourses:
                 return result(settingsOf(p1).map((s) => ({ effective_from: s.effective_from, course_key: catalogOf(s).course_key })));
             case TRAINING_TIME_SQL.cohortHasEvidence:
                 return result([{ evidence: state.streams.some((s) => s.cohort_id === p1) }]);
             case TRAINING_TIME_SQL.insertSetting: {
+                // One clock reading: the day, set_at and the rule (not before today; from tomorrow once a setting is in effect).
                 const [cohortId, catalogId, ruleSetId, effectiveFrom, setBy, reason] = params;
-                if (String(effectiveFrom) < jstDayOf(state.clock)) throw pgError('23514', 'new row for relation "training_cohort_time_settings" violates check constraint');
-                const row = { id: id(), cohort_id: cohortId, catalog_version_id: catalogId, rule_set_id: ruleSetId, effective_from: effectiveFrom, set_at: new Date(state.clock), set_by: setBy, reason };
+                const today = jstDayOf(state.clock);
+                const inEffect = state.settings.some((x) => x.cohort_id === cohortId && x.effective_from <= today);
+                const from = String(effectiveFrom);
+                if (!(from > today || (from === today && !inEffect))) return result([{ today, id: null, effective_from: null }]);
+                const row = { id: id(), cohort_id: cohortId, catalog_version_id: catalogId, rule_set_id: ruleSetId, effective_from: from, set_at: new Date(state.clock), set_by: setBy, reason };
                 state.settings.push(row);
-                return result([{ id: row.id, effective_from: row.effective_from }]);
+                return result([{ today, id: row.id, effective_from: row.effective_from }]);
             }
             case TRAINING_TIME_SQL.settingsList:
                 return result(settingsOf(p1).map((s) => {
@@ -247,6 +258,8 @@ export function createTrainingTimePool(seed = {}) {
         setClock: (ms) => { state.clock = ms; },
         /** Make a statement throw (an Error with a SQLSTATE). @param {string} sql @param {any} error */
         failOn: (sql, error) => failures.push({ sql, error }),
+        /** Run `run` (move the clock, add a row) just before each matching statement. @param {string} sql @param {() => void} run */
+        before: (sql, run) => hooks.push({ sql, run }),
         /**
          * A setting as a row (bypassing the script's checks; set_at is given, so a past day is possible).
          * @param {{ cohortId: string, catalogId: string, ruleSetId: string, effectiveFrom: string }} s

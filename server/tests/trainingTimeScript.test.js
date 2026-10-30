@@ -8,7 +8,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { EXIT, STDIN_LIMIT, hms, parseArgs, run } from '../../scripts/training-time.mjs';
+import { PassThrough } from 'node:stream';
+import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, hms, parseArgs, readStdinFrom, run } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
 import { createTrainingTimePool } from './helpers/trainingTimePool.js';
@@ -109,6 +110,32 @@ describe('scripts/training-time.mjs: loading', () => {
         assert.equal(pool.state.catalogs.length, 1);
     });
 
+    it('stdin: a piped file is read whole; nothing within the wait (under `exec -T` a forgotten file is a pipe from the terminal, not a TTY) or a TTY is "nothing piped"; reading stops just past the limit', async () => {
+        assert.equal(STDIN_WAIT_MS, 5000);
+        const piped = new PassThrough();
+        piped.end(JSON.stringify(COURSE));
+        assert.deepEqual(JSON.parse(String(await readStdinFrom(piped, { waitMs: 50 }))), COURSE);
+        const silent = new PassThrough();
+        const t0 = Date.now();
+        assert.equal(await readStdinFrom(silent, { waitMs: 50 }), null);
+        assert.ok(Date.now() - t0 < 2000, 'it does not wait for the terminal');
+        assert.equal(silent.destroyed, true, 'the terminal pipe is let go, so the script can exit');
+        const empty = new PassThrough();
+        empty.end();
+        assert.equal(await readStdinFrom(empty, { waitMs: 50 }), '', 'an empty pipe (< /dev/null) is read as empty: "not JSON"');
+        const tty = Object.assign(new PassThrough(), { isTTY: true });
+        assert.equal(await readStdinFrom(tty, { waitMs: 50 }), null);
+        const big = new PassThrough();
+        big.write('x'.repeat(STDIN_LIMIT));
+        big.write('y'.repeat(10));
+        const text = String(await readStdinFrom(big, { waitMs: 50 }));
+        assert.ok(text.length > STDIN_LIMIT && text.length <= STDIN_LIMIT + 10, 'past the limit, then it stops: the caller refuses');
+        assert.equal(big.destroyed, true);
+        // The script's message when nothing arrived.
+        const { code, out } = await runWith(['--load-catalog', '--by', 'a', '--note', 'b'], { stdin: null });
+        assert.deepEqual([code, out], [EXIT.usage, 'Refused: pipe the file to stdin (sudo cat <file> | docker compose … exec -T api node scripts/training-time.mjs …); nothing arrived within 5 s.']);
+    });
+
     it('--load-rules: the output never carries a value, whether the file is loaded, loaded again or refused', async () => {
         const pool = freshPool();
         const outputs = [];
@@ -149,6 +176,11 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         for (const value of VALUES) assert.ok(!show.out.includes(value), value);
         const empty = await runWith(['--show', 'nope'], { pool });
         assert.deepEqual([empty.code, empty.out], [EXIT.refused, 'Refused: there is no cohort nope.']);
+        // Once there is evidence, another course than the one in effect today is refused.
+        pool.addSignal({ userId: A, cohortId: COHORT, unit: 'sample-u1', chain: 'cccccccc-0000-4000-8000-000000000009', born: pool.state.clock, seq: 0, at: pool.state.clock, input: true });
+        const other = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, courseKey: 'other-course' }, loadedBy: 'a', note: 'b', pool }));
+        const switched = await runWith(['--set', SLUG, '--catalog', other.sha256, '--rules', rules.sha256, '--from', '2026-11-08', '--by', 'a', '--reason', 'r'], { pool });
+        assert.deepEqual([switched.code, switched.out], [EXIT.refused, `Refused: ${SLUG} already has study time under the course sample-course; a new setting keeps that course.`]);
     });
 
     it('--close: every live learner of the cohort, each in its own transaction; --show --learner the closed days and units; --stats the counts', async () => {

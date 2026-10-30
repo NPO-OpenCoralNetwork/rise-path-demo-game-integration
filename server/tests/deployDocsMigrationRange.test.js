@@ -94,7 +94,12 @@ describe('the VM runbooks follow server/migrations', () => {
             assert.match(section, new RegExp(`exec -T api node scripts/training-time\\.mjs ${mode} `), mode);
             assert.ok(usage.includes(`node scripts/training-time.mjs ${mode} `), `${mode}: the script's own usage`);
         }
-        for (const file of ['course.json', 'time-rules.json']) assert.match(section, new RegExp(`< /opt/risepath-private/${file.replace('.', '\\.')}$`, 'm'), `${file} over stdin, from outside the checkout`);
+        // Root reads the root-only file and pipes it in: a `<` redirect is opened by the operator's non-root shell.
+        for (const [file, mode] of [['course.json', '--load-catalog'], ['time-rules.json', '--load-rules']]) {
+            assert.match(section, new RegExp(`^sudo cat /opt/risepath-private/${file.replace('.', '\\.')} \\| docker compose --env-file stack\\.env exec -T api node scripts/training-time\\.mjs ${mode} `, 'm'), `${file} piped in, from outside the checkout`);
+        }
+        assert.doesNotMatch(section, /< \/opt\/risepath-private\//);
+        assert.match(section, /`sudo install -d -m 700 \/opt\/risepath-private`/);
         assert.match(section, /`scripts\/db\/verify-training\.mjs` が 022 と/);
         const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **022（職業訓練の受講時間）**'));
         assert.ok(guide, 'the 022 bullet in doc/guides/risepath_vm_deployment.md');
