@@ -11,17 +11,21 @@
  *   at:    server time the signal was received (strictly increasing within a chain, see admitSignal);
  *   stop:  the page hid or left (nothing of the chain counts after it);
  *   focus: the page had the window focus since its previous signal;
- *   input: the learner acted on the page (key, pointer, scroll, touch) since its previous signal.
+ *   input: the learner acted on the page since its previous signal (key, pointer, scroll, touch;
+ *          the page also reports one on the first signal of a chain it starts because the learner
+ *          opened or showed the page or changed unit, and not on a restart of its own).
  *
  * Counting a span [a, b) inside one Japan-time day, with the rule values of the school's private
  * rules file (timeRules.js; tests use artificial values):
  *   1. pieces: two consecutive signals (prev, s) of one chain, prev not a stop, with
  *      0 < s.at - prev.at <= gapMs give (prev.at, prev.at + min(s.at - prev.at, creditCapMs)] for
  *      the chain's unit. A longer pair is a break and counts nothing.
- *   2. presence, per page: from the chain's first signal and from each signal that reports an
- *      input, until idleMs after it. A piece counts only inside its own chain's presence.
+ *   2. presence, per page: from each signal that reports an input, until idleMs after it. A
+ *      piece counts only inside its own chain's presence. A chain ends at its first stop: nothing of
+ *      it counts after that, whatever was stored.
  *   3. requireFocus: pieces without focus do not count.
- *   4. the cohort's dates and the span.
+ *   4. the cohort's dates (cohortRange; null, a cohort without both dates, counts nothing) and
+ *      the span.
  *   5. overlap: an instant counts once. Same unit: once. Different units: 'prefer_focus_latest'
  *      (the focused page, then the page whose chain began last, then the smaller chain id) or
  *      'drop_conflicts' (neither).
@@ -54,6 +58,7 @@ export function jstDayRange(day) {
   const m = DAY_RE.exec(day);
   if (!m) throw new TypeError('jstDayRange: not a YYYY-MM-DD day');
   const start = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - JST_OFFSET_MS;
+  if (jstDayOf(start) !== day) throw new TypeError('jstDayRange: not a YYYY-MM-DD day');
   return { start, end: start + DAY_MS };
 }
 
@@ -127,13 +132,14 @@ function piecesOf(signals, counting) {
     /** @type {Signal | null} */
     let prev = null;
     for (const s of list) {
-      if (prev && !prev.stop) {
+      if (prev?.stop) break;
+      if (prev) {
         const delta = s.at - prev.at;
         if (delta > 0 && delta <= gapMs) {
           pieces.push({ start: prev.at, end: prev.at + Math.min(delta, creditCapMs), unit: s.unit, chain: s.chain, born: s.born, focus: s.focus, key: `${s.chain}#${s.seq}` });
         }
       }
-      if (s.input || s.seq === 0) presence.push([s.at, s.at + idleMs]);
+      if (s.input) presence.push([s.at, s.at + idleMs]);
       prev = s;
     }
     present.set(list[0].chain, mergeSpans(presence));
@@ -178,18 +184,22 @@ function winners(pieces, present, a, b, counting, cohort) {
   return out;
 }
 
+/** No cohort dates given (tests and references): nothing is clipped. */
 const NO_COHORT = Object.freeze({ from: -Infinity, to: Infinity });
+/** A cohort without both dates (cohortRange returned null): nothing counts. */
+const EMPTY = Object.freeze({ from: Infinity, to: -Infinity });
 
 /**
  * Counted time of [a, b) (inside one Japan-time day); each unit's set time applies after carriedMs.
- * @param {{ a: number, b: number, signals: Signal[], rules: Pick<TimeRules, 'counting'>, setMs: Map<string, number>, carriedMs: Map<string, number>, cohort?: Range }} input
+ * cohort: the cohort's range (cohortRange); null counts nothing; left out, nothing is clipped.
+ * @param {{ a: number, b: number, signals: Signal[], rules: Pick<TimeRules, 'counting'>, setMs: Map<string, number>, carriedMs: Map<string, number>, cohort?: Range | null }} input
  * @returns {{ countedMs: number, units: UnitTime[], carriedAfterMs: Map<string, number>, signals: number }}
  */
 export function countSpan({ a, b, signals, rules, setMs, carriedMs, cohort = NO_COHORT }) {
   const w = evidenceWindow(a, b, rules.counting);
   const inWindow = signals.filter((s) => s.at >= w.from && s.at <= w.to);
   const { pieces, present } = piecesOf(inWindow, rules.counting);
-  const segs = winners(pieces, present, a, b, rules.counting, cohort);
+  const segs = winners(pieces, present, a, b, rules.counting, cohort ?? EMPTY);
   /** @type {Map<string, number>} */
   const counted = new Map();
   /** @type {Map<string, number>} */
@@ -219,7 +229,7 @@ export function countDay({ day, ...rest }) {
 /**
  * Consecutive days, each unit's set time carried from one day to the next (closing days, and the
  * reference for today's live total). Rules and units may change by day (the cohort's settings).
- * @param {{ fromDay: string, toDay: string, signals: Signal[], rulesOf: (day: string) => Pick<TimeRules, 'counting'>, setMsOf: (day: string) => Map<string, number>, carriedMs: Map<string, number>, cohort?: Range }} input
+ * @param {{ fromDay: string, toDay: string, signals: Signal[], rulesOf: (day: string) => Pick<TimeRules, 'counting'>, setMsOf: (day: string) => Map<string, number>, carriedMs: Map<string, number>, cohort?: Range | null }} input
  */
 export function countDays({ fromDay, toDay, signals, rulesOf, setMsOf, carriedMs, cohort }) {
   const days = [];
@@ -235,12 +245,12 @@ export function countDays({ fromDay, toDay, signals, rulesOf, setMsOf, carriedMs
 /**
  * The reference: every signal at once, no window, cut at 00:00 Japan time at the end. The tests
  * check that the day-by-day fold gives the same numbers.
- * @param {{ signals: Signal[], rules: Pick<TimeRules, 'counting'>, setMs: Map<string, number>, cohort?: Range }} input
+ * @param {{ signals: Signal[], rules: Pick<TimeRules, 'counting'>, setMs: Map<string, number>, cohort?: Range | null }} input
  * @returns {Map<string, Map<string, number>>} day → unit → counted ms
  */
 export function countWhole({ signals, rules, setMs, cohort = NO_COHORT }) {
   const { pieces, present } = piecesOf(signals, rules.counting);
-  const segs = winners(pieces, present, -Infinity, Infinity, rules.counting, cohort);
+  const segs = winners(pieces, present, -Infinity, Infinity, rules.counting, cohort ?? EMPTY);
   /** @type {Map<string, Map<string, number>>} */
   const byDay = new Map();
   /** @type {Map<string, number>} */
@@ -263,8 +273,9 @@ export function countWhole({ signals, rules, setMs, cohort = NO_COHORT }) {
 /**
  * Whether the server stores a signal, decided under the learner's lock with the database clock.
  *   refuse (409, nothing stored): no rules or units for today ('time_not_configured'); outside
- *     the cohort's dates, or a date missing ('not_in_session'; a signal up to gapMs after the
- *     last day is still stored so the last pair can count); a unit not in today's units
+ *     the cohort's dates, or a date missing ('not_in_session'; a signal of a chain already open is
+ *     still stored up to gapMs after the last day so its last pair can count, a new chain is not);
+ *     a unit not in today's units
  *     ('unit_unknown'); a chain id already used for another cohort or unit ('chain_mismatch').
  *   ignore (200, accepted: false, nothing stored; the page reacts to the reason):
  *     'duplicate'   seq not after the chain's last stored seq;
@@ -289,7 +300,7 @@ export function countWhole({ signals, rules, setMs, cohort = NO_COHORT }) {
  */
 export function admitSignal({ now, cohortId, signal, configured, session, unitKnown, chain, places, rules }) {
   if (!configured) return { verdict: 'refuse', reason: 'time_not_configured' };
-  if (!session || now < session.from || now >= session.to + rules.counting.gapMs) return { verdict: 'refuse', reason: 'not_in_session' };
+  if (!session || now < session.from || now >= (chain ? session.to + rules.counting.gapMs : session.to)) return { verdict: 'refuse', reason: 'not_in_session' };
   if (!unitKnown) return { verdict: 'refuse', reason: 'unit_unknown' };
   if (chain && (chain.cohortId !== cohortId || chain.unitKey !== signal.unitKey)) return { verdict: 'refuse', reason: 'chain_mismatch' };
   if (chain) {

@@ -1,7 +1,7 @@
 // Study time for job training, rule "study-time/v1" (shared/training/studyTime.js), the rules file
 // (shared/training/timeRules.js) and the course manifest (shared/training/courseManifest.js);
-// doc/brushup-2026/training-plan.ja.md §4.9. Every value here is artificial (primes of seconds) and
-// says nothing about the school's rules, which live outside this repository (D9).
+// doc/brushup-2026/training-plan.ja.md §4.9. Every value here is artificial (primes: seconds and
+// counts) and says nothing about the school's rules, which live outside this repository (D9).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -15,7 +15,7 @@ import { COURSE_MANIFEST_SCHEMA, manifestCanonical, parseCourseManifest, setMsOf
 const S = 1000;
 const RULES_IN = {
   algorithm: STUDY_TIME_ALGORITHM,
-  collection: { beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 2 },
+  collection: { beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 7 },
   counting: { gapMs: 23 * S, creditCapMs: 13 * S, idleMs: 101 * S, requireFocus: false, overlap: 'prefer_focus_latest' },
 };
 const parsed = parseTimeRules(RULES_IN);
@@ -61,13 +61,20 @@ describe('the rules file (shared/training/timeRules.js)', () => {
       [{ collection: { ...RULES_IN.collection, minSpacingMs: 11 * S } }, 'collection.minSpacingMs > collection.beatMs'],
     ]) assert.deepEqual(parseTimeRules({ ...RULES_IN, ...patch }).errors, [error]);
     assert.deepEqual(parseTimeRules({ ...RULES_IN, collection: { ...RULES_IN.collection, maxPlaces: 11 } }).errors, ['collection.maxPlaces']);
+    for (const [group, fields] of Object.entries({ collection: RULES_IN.collection, counting: RULES_IN.counting })) {
+      for (const field of Object.keys(fields)) {
+        const without = { ...RULES_IN, [group]: { ...RULES_IN[group], [field]: undefined } };
+        assert.deepEqual(parseTimeRules(without).errors, [`${group}.${field}`], `${group}.${field} missing`);
+      }
+    }
+    assert.deepEqual(parseTimeRules({ algorithm: STUDY_TIME_ALGORITHM, counting: RULES_IN.counting }).errors, ['collection.beatMs', 'collection.minSpacingMs', 'collection.maxPlaces']);
     assert.deepEqual(parseTimeRules({ ...RULES_IN, counting: { ...RULES_IN.counting, gapMs: 999 } }).errors, ['counting.gapMs'], 'at least a second');
   });
 
   it('the signals of maxPlaces pages use at most half of the per-learner request limit, when the limit is given', () => {
-    assert.equal(parseTimeRules(RULES_IN, { requestsPerMinute: 60 }).ok, true, '2 pages × 60 / 7 s ≈ 17.1 per minute ≤ 30');
-    const busy = parseTimeRules({ ...RULES_IN, collection: { beatMs: 3 * S, minSpacingMs: 2 * S, maxPlaces: 2 }, counting: { ...RULES_IN.counting, gapMs: 5 * S, creditCapMs: 5 * S } }, { requestsPerMinute: 60 });
-    assert.deepEqual(busy.errors, ['collection.maxPlaces and collection.beatMs use more than half of the per-learner request limit']);
+    assert.equal(parseTimeRules(RULES_IN, { requestsPerMinute: 120 }).ok, true, '7 pages × 60 / 7 s = 60 per minute ≤ 120 / 2');
+    assert.deepEqual(parseTimeRules(RULES_IN, { requestsPerMinute: 119 }).errors, ['collection.maxPlaces and collection.beatMs use more than half of the per-learner request limit']);
+    assert.equal(parseTimeRules(RULES_IN).ok, true, 'no limit given: not checked');
   });
 
   it('a valid file comes back as exactly the known fields', () => {
@@ -84,12 +91,21 @@ describe('Japan-time days, the cohort range and the evidence window', () => {
     assert.equal(jstDayOf(start), DAY);
     assert.equal(nextDay('2026-12-31'), '2027-01-01');
     assert.throws(() => jstDayRange('2026-11-5'), /not a YYYY-MM-DD day/);
+    for (const missing of ['2026-02-29', '2026-11-31', '2026-13-01', '2026-00-10']) assert.throws(() => jstDayRange(missing), /not a YYYY-MM-DD day/, missing);
+    assert.equal(jstDayRange('2028-02-29').end - jstDayRange('2028-02-29').start, 86_400_000, 'a leap day exists'); 
     assert.deepEqual(evidenceWindow(start, end, RULES.counting), { from: start - 101 * S, to: end + 23 * S });
   });
 
-  it('a cohort counts from 00:00 of its first day to 00:00 after its last; a missing date counts nothing', () => {
+  it('a cohort counts from 00:00 of its first day to 00:00 after its last (one day too); a missing date counts nothing', () => {
     assert.deepEqual(cohortRange('2026-11-01', '2026-11-30'), { from: jstDayRange('2026-11-01').start, to: jstDayRange('2026-11-30').end });
+    assert.deepEqual(cohortRange(DAY, DAY), { from: jstDayRange(DAY).start, to: jstDayRange(DAY).end });
     for (const [a, b] of [[null, '2026-11-30'], ['2026-11-01', null], [undefined, undefined], ['2026-11-30', '2026-11-01']]) assert.equal(cohortRange(a, b), null);
+    assert.throws(() => cohortRange('2026-11-01', '2026-11-31'), /not a YYYY-MM-DD day/);
+    const signals = chain('a', 'u1', every(0, 21, 7), { input: always });
+    assert.equal(day(signals, RULES, BIG, NONE, DAY, cohortRange(null, '2026-11-30')).countedMs, 0, 'null: nothing counts');
+    assert.equal(countDays({ fromDay: DAY, toDay: nextDay(DAY), signals, rulesOf: () => RULES, setMsOf: () => BIG, carriedMs: NONE, cohort: null }).carriedAfterMs.size, 0);
+    assert.equal(countWhole({ signals, rules: RULES, setMs: BIG, cohort: null }).size, 0);
+    assert.equal(day(signals, RULES, BIG, NONE, DAY, cohortRange(DAY, DAY)).countedMs, 21 * S);
   });
 });
 
@@ -100,8 +116,10 @@ describe('one page', () => {
   it('a pair longer than the gap is a break: it counts nothing, and counting goes on with the next pair', () => {
     assert.equal(day(chain('a', 'u1', [0, 7, 14, 60, 67], { input: always })).countedMs, (14 + 7) * S);
   });
-  it('a late pair inside the gap earns at most creditCapMs', () => {
+  it('a late pair inside the gap earns at most creditCapMs; a pair of exactly gapMs still counts, one millisecond more does not', () => {
     assert.equal(day(chain('a', 'u1', [0, 20], { input: always })).countedMs, 13 * S);
+    assert.equal(day(chain('a', 'u1', [0, 23], { input: always })).countedMs, 13 * S);
+    assert.equal(day(chain('a', 'u1', [0, 23.001], { input: always })).countedMs, 0);
   });
   it('hidden with the stop received: counts up to the stop; the next visible stretch is a new chain', () => {
     const r = day([...chain('a', 'u1', [0, 7], { input: always, stopAt: 10 }), ...chain('b', 'u1', [30, 37], { input: always })]);
@@ -116,8 +134,9 @@ describe('one page', () => {
     const r = day(chain('a', 'u1', every(0, 301, 7), { input: (i) => i === 0 || i === 30 }));
     assert.equal(r.countedMs, (101 + (301 - 210)) * S);
   });
-  it('opening or showing the page (the chain start) counts as an action', () => {
-    assert.equal(day(chain('a', 'u1', every(0, 301, 7))).countedMs, 101 * S);
+  it('presence comes only from signals that report an input (the page reports one when the learner opens or shows it)', () => {
+    assert.equal(day(chain('a', 'u1', every(0, 301, 7), { input: (i) => i === 0 })).countedMs, 101 * S);
+    assert.equal(day(chain('a', 'u1', every(0, 301, 7))).countedMs, 0, 'a chain without any input counts nothing');
   });
   it('requireFocus: a pair without focus does not count; without it, focus only decides between pages', () => {
     const signals = chain('a', 'u1', every(0, 63, 7), { input: always }).map((s, i) => ({ ...s, focus: i % 2 === 0 }));
@@ -126,15 +145,21 @@ describe('one page', () => {
   });
   it('a chain that only stops counts nothing; nothing after a stop counts', () => {
     assert.equal(day([{ chain: 'a', seq: 0, unit: 'u1', born: T0, at: T0, stop: true, focus: true, input: true }]).countedMs, 0);
-    const r = day([...chain('a', 'u1', [0, 7], { input: always, stopAt: 9 }), { chain: 'a', seq: 3, unit: 'u1', born: T0, at: T0 + 15 * S, stop: false, focus: true, input: true }]);
-    assert.equal(r.countedMs, 9 * S);
+    const after = (seq, t) => ({ chain: 'a', seq, unit: 'u1', born: T0, at: T0 + t * S, stop: false, focus: true, input: true });
+    const r = day([...chain('a', 'u1', [0, 7], { input: always, stopAt: 9 }), after(3, 15), after(4, 22)]);
+    assert.equal(r.countedMs, 9 * S, 'a chain ends at its first stop, whatever was stored after it');
   });
 });
 
 describe('several pages', () => {
-  it('two pages on the same unit: each instant once', () => {
-    const r = day([...chain('a', 'u1', every(0, 70, 7), { input: always }), ...chain('b', 'u1', every(3, 73, 7), { input: always })]);
-    assert.equal(r.countedMs, 73 * S);
+  it('two pages on the same unit: each instant once, under either overlap rule', () => {
+    const pages = [...chain('a', 'u1', every(0, 70, 7), { input: always }), ...chain('b', 'u1', every(3, 73, 7), { input: always })];
+    assert.equal(day(pages).countedMs, 73 * S);
+    assert.equal(day(pages, rulesWith({ overlap: 'drop_conflicts' })).countedMs, 73 * S);
+  });
+  it('two pages of different units that began at the same instant: the smaller chain id wins', () => {
+    const r = day([...chain('k2', 'u2', every(0, 70, 7), { input: always }), ...chain('k1', 'u1', every(0, 70, 7), { input: always })]);
+    assert.deepEqual(r.units.map((u) => [u.unit, u.countedMs / S]), [['u1', 70]]);
   });
   it('two pages on different units: the page that began last wins each shared instant (focus first)', () => {
     const r = day([...chain('a', 'u1', every(0, 70, 7), { input: always }), ...chain('b', 'u2', every(5, 75, 7), { input: always })]);
@@ -144,8 +169,8 @@ describe('several pages', () => {
     assert.deepEqual(focused.units.map((u) => [u.unit, u.countedMs / S]), [['u1', 70], ['u2', 5]], 'the focused page wins over a newer page without focus');
   });
   it('a page without input never takes time from a page with input', () => {
-    const r = day([...chain('a', 'u1', every(0, 301, 7), { input: always }), ...chain('b', 'u2', every(5, 306, 7))]);
-    // b (newer) wins from its start until idle after it (5 s to 106 s), then a again
+    const r = day([...chain('a', 'u1', every(0, 301, 7), { input: always }), ...chain('b', 'u2', every(5, 306, 7), { input: (i) => i === 0 })]);
+    // b (newer, opened by the learner, then no input) wins from its start until idle after it (5 s to 106 s), then a again
     assert.deepEqual(r.units.map((u) => [u.unit, u.countedMs / S]), [['u1', 301 - 101], ['u2', 101]]);
   });
   it('drop_conflicts: shared instants of different units count for neither', () => {
@@ -197,12 +222,15 @@ describe('admitSignal: what the server stores, under the learner\'s lock and the
     assert.deepEqual(admit({ chain: known, signal: seqIs(10) }), { verdict: 'accept', bornAt: NOW - 70 * S });
   });
 
-  it('refused, nothing stored (409): not configured, outside the dates (up to gapMs after the last day is in), unknown unit, a chain id reused elsewhere', () => {
+  it('refused, nothing stored (409): not configured, outside the dates (an open chain may finish within gapMs after the last day, a new one may not), unknown unit, a chain id reused elsewhere', () => {
     assert.deepEqual(admit({ configured: false }), { verdict: 'refuse', reason: 'time_not_configured' });
     assert.deepEqual(admit({ session: null }), { verdict: 'refuse', reason: 'not_in_session' });
     assert.deepEqual(admit({ now: session.from - 1 }), { verdict: 'refuse', reason: 'not_in_session' });
-    assert.equal(admit({ now: session.to + 23 * S - 1 }).verdict, 'accept');
-    assert.deepEqual(admit({ now: session.to + 23 * S }), { verdict: 'refuse', reason: 'not_in_session' });
+    assert.equal(admit({ now: session.to - 1 }).verdict, 'accept');
+    assert.deepEqual(admit({ now: session.to }), { verdict: 'refuse', reason: 'not_in_session' }, 'no new chain after the last day');
+    const open = { ...known, lastAt: session.to - 5 * S };
+    assert.equal(admit({ now: session.to + 23 * S - 1, chain: open, signal: seqIs(10) }).verdict, 'accept', 'the open chain finishes its last pair');
+    assert.deepEqual(admit({ now: session.to + 23 * S, chain: open, signal: seqIs(10) }), { verdict: 'refuse', reason: 'not_in_session' });
     assert.deepEqual(admit({ unitKnown: false }), { verdict: 'refuse', reason: 'unit_unknown' });
     assert.deepEqual(admit({ chain: { ...known, unitKey: 'u2' }, signal: seqIs(10) }), { verdict: 'refuse', reason: 'chain_mismatch' });
     assert.deepEqual(admit({ chain: { ...known, cohortId: 'c2' }, signal: seqIs(10) }), { verdict: 'refuse', reason: 'chain_mismatch' });
@@ -210,6 +238,7 @@ describe('admitSignal: what the server stores, under the learner\'s lock and the
 
   it('ignored (200, accepted false): duplicate, after a stop, an unknown chain not at its start, a clock not past the last signal, too soon', () => {
     assert.deepEqual(admit({ chain: known, signal: seqIs(9) }), { verdict: 'ignore', reason: 'duplicate' });
+    assert.deepEqual(admit({ chain: known, signal: seqIs(4) }), { verdict: 'ignore', reason: 'duplicate' }, 'a late lower seq too');
     assert.deepEqual(admit({ chain: { ...known, lastStop: true }, signal: seqIs(10) }), { verdict: 'ignore', reason: 'chain_ended' });
     assert.deepEqual(admit({ signal: seqIs(3) }), { verdict: 'ignore', reason: 'not_open' });
     assert.deepEqual(admit({ signal: seqIs(0, { stop: true }) }), { verdict: 'ignore', reason: 'not_open' });
@@ -221,15 +250,18 @@ describe('admitSignal: what the server stores, under the learner\'s lock and the
 
   it('more open pages than maxPlaces: the newest win; a stop, a stopped page and a page silent for more than the gap free a place', () => {
     const other = (chainId, bornAt, extra = {}) => ({ chainId, bornAt, lastAt: NOW - 5 * S, lastStop: false, ...extra });
-    assert.equal(admit({ places: [other('p1', NOW - 900 * S), other('p2', NOW - 800 * S)] }).verdict, 'accept', 'the new page is the newest of three');
-    assert.deepEqual(admit({ chain: known, signal: seqIs(10), places: [other('p1', NOW - 60 * S), other('p2', NOW - 50 * S)] }), { verdict: 'ignore', reason: 'other_place' });
-    assert.equal(admit({ chain: known, signal: seqIs(10), places: [other('p1', NOW - 900 * S), other('p2', NOW - 50 * S)] }).verdict, 'accept', 'second newest of three');
-    assert.equal(admit({ chain: known, signal: seqIs(10, { stop: true }), places: [other('p1', NOW - 60 * S), other('p2', NOW - 50 * S)] }).verdict, 'accept');
-    assert.equal(admit({ chain: known, signal: seqIs(10), places: [other('p1', NOW - 60 * S, { lastStop: true }), other('p2', NOW - 50 * S)] }).verdict, 'accept');
-    assert.equal(admit({ chain: known, signal: seqIs(10), places: [other('p1', NOW - 60 * S, { lastAt: NOW - 24 * S }), other('p2', NOW - 50 * S)] }).verdict, 'accept');
-    assert.equal(admit({ chain: known, signal: seqIs(10), places: [other('k1', NOW), other('p2', NOW - 50 * S)] }).verdict, 'accept', 'its own row is not another place');
-    const tie = admit({ signal: { ...base.signal, chainId: 'k9' }, places: [other('k1', NOW), other('k2', NOW)], rules: { ...RULES, collection: { ...RULES.collection, maxPlaces: 2 } } });
-    assert.deepEqual(tie, { verdict: 'ignore', reason: 'other_place' }, 'born at the same instant: the smaller chain ids win');
+    /** n other open pages born at -60 s, -59 s, ... (all newer than the known chain, born at -70 s) */
+    const newer = (n, extra = () => ({})) => Array.from({ length: n }, (_, i) => other(`p${i}`, NOW - (60 - i) * S, extra(i)));
+    assert.equal(admit({ places: newer(9) }).verdict, 'accept', 'a new page is the newest');
+    assert.equal(admit({ chain: known, signal: seqIs(10), places: newer(6) }).verdict, 'accept', '7th newest of 7');
+    assert.deepEqual(admit({ chain: known, signal: seqIs(10), places: newer(7) }), { verdict: 'ignore', reason: 'other_place' }, '8th newest of 8');
+    assert.equal(admit({ chain: known, signal: seqIs(10, { stop: true }), places: newer(7) }).verdict, 'accept', 'a stop passes');
+    assert.equal(admit({ chain: known, signal: seqIs(10), places: newer(7, (i) => (i === 0 ? { lastStop: true } : {})) }).verdict, 'accept', 'a stopped page frees a place');
+    assert.equal(admit({ chain: known, signal: seqIs(10), places: newer(7, (i) => (i === 0 ? { lastAt: NOW - 24 * S } : {})) }).verdict, 'accept', 'silent for more than the gap');
+    assert.equal(admit({ chain: known, signal: seqIs(10), places: [other('k1', NOW), ...newer(6)] }).verdict, 'accept', 'its own row is not another place');
+    const born = (ids) => ids.map((id) => other(id, NOW));
+    assert.deepEqual(admit({ signal: { ...base.signal, chainId: 'k9' }, places: born(['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7']) }), { verdict: 'ignore', reason: 'other_place' }, 'born at the same instant: the smaller chain ids win');
+    assert.equal(admit({ signal: { ...base.signal, chainId: 'k0' }, places: born(['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7']) }).verdict, 'accept', 'and the smaller id wins over larger ones');
   });
 });
 
@@ -270,6 +302,13 @@ describe('the course manifest (shared/training/courseManifest.js)', () => {
     assert.deepEqual(errors({ notes: 'x' }), ['unknown notes']);
     assert.deepEqual(errors({ title: 'Practice' }), ['title is not { jp, en }']);
     assert.deepEqual(parseCourseManifest([]), { ok: false, errors: ['not an object'] });
+    assert.deepEqual(errors({ title: { jp: 'あ'.repeat(201), en: 'x' } }), ['title.jp'], 'at most 200 characters');
+    assert.deepEqual(errors({ title: { jp: '講座', en: 'Course', fr: 'Cours' } }), ['unknown title.fr']);
+    assert.deepEqual(errors({ units: [{ ...MANIFEST.units[0], key: 'Unit_1' }] }), ['units[0].key']);
+    assert.deepEqual(errors({ units: [{ ...MANIFEST.units[0], setMinutes: 37.5 }] }), ['units[0].setMinutes']);
+    const many = Array.from({ length: 501 }, (_, i) => ({ ...MANIFEST.units[0], key: `unit-${i}` }));
+    assert.deepEqual(errors({ units: many }), ['units']);
+    assert.equal(parseCourseManifest({ ...MANIFEST, units: many.slice(0, 500) }).ok, true, '500 units are fine');
   });
 });
 
@@ -289,7 +328,8 @@ describe('purity and the module boundaries', () => {
 describe('golden: study-time/v1 on fixed evidence', () => {
   const base = jstDayRange(nextDay(DAY)).start;
   // Around midnight (seconds from 00:00 of the second day): a (u1) from -600 s to 394 s with an input
-  // every third signal; b (u2, newer) from -120 s with no input, so present until -19 s; d (u2, the
+  // every third signal; b (u2, newer) from -120 s, opened by the learner then no input, so present
+  // until -19 s; d (u2, the
   // newest, another device) without focus from -30 s to 80 s; c (u1) at 500-556 s, a break, then
   // 600-663 s and a stop at 670 s. Set times: u1 780 s, u2 180 s.
   //   prefer_focus_latest, day 1: a alone 480 s; b over a 90 s + 11 s (d has no focus); a again 19 s
@@ -299,7 +339,7 @@ describe('golden: study-time/v1 on fixed evidence', () => {
   //     neither -> day 1 u1 499 s only; day 2 as above.
   const evidence = [
     ...chain('a', 'u1', every(-600, 400, 7), { input: (i) => i % 3 === 0, base }),
-    ...chain('b', 'u2', every(-120, 180, 7), { base }),
+    ...chain('b', 'u2', every(-120, 180, 7), { input: (i) => i === 0, base }),
     ...chain('c', 'u1', [...every(500, 556, 7), ...every(600, 663, 7)], { input: always, stopAt: 670, base }),
     ...chain('d', 'u2', every(-30, 90, 11), { input: always, focus: false, base }),
   ];
@@ -325,9 +365,12 @@ describe('golden: study-time/v1 on fixed evidence', () => {
 // ---- properties on random evidence (seeded) ----
 
 function rng(seed) {
-  let x = seed >>> 0;
+  // the seed mixed first (murmur3's fmix32), so that neighbouring seeds start far apart
+  let x = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
   return () => {
-    x = (x * 1664525 + 1013904223) >>> 0;
+    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
     return x / 2 ** 32;
   };
 }
@@ -397,12 +440,12 @@ describe('properties on random evidence', () => {
       }
       assert.ok(total <= pairUnionMs(signals, rules.counting), 'never more than the union of the pairs');
       for (const unit of ['u1', 'u2']) assert.ok((folded.carriedAfterMs.get(unit) ?? 0) <= setMs.get(unit), `set time ${unit}`);
-      // final: signals after the first day's end + gap change nothing in it
-      const { end } = jstDayRange(days[0]);
-      const later = signals.map((s) => ({ ...s, at: s.at > end + rules.counting.gapMs ? s.at + 3 * S : s.at }));
-      const extra = [...later, { chain: 'late', seq: 0, unit: 'u1', born: end + rules.counting.gapMs + S, at: end + rules.counting.gapMs + S, stop: false, focus: true, input: true }];
+      // final: the reference (which reads every signal it is given) gives the first day the same
+      // numbers from the evidence up to that day's end + gap as from all of it
+      const cutoff = jstDayRange(days[0]).end + rules.counting.gapMs;
+      const upToCutoff = countWhole({ signals: signals.filter((s) => s.at <= cutoff), rules, setMs });
+      assert.deepEqual(upToCutoff.get(days[0]) ?? new Map(), whole.get(days[0]) ?? new Map(), 'later evidence never changes a final day');
       const first = countDay({ day: days[0], signals, rules, setMs, carriedMs: new Map() });
-      assert.deepEqual(countDay({ day: days[0], signals: extra, rules, setMs, carriedMs: new Map() }).units, first.units);
       // a split anywhere in the second day, the set time carried: the two halves = the whole day
       const r = rng(seed * 31);
       const { start: s2, end: e2 } = jstDayRange(days[1]);
