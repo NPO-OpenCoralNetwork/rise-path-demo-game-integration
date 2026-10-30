@@ -443,6 +443,23 @@ describe('agent configuration files', () => {
     assert.ok(settings.permissions.deny.some((d) => d.includes('.env')));
   });
 
+  it('WebFetch is pre-approved only for the official documentation domains, the same in the skill and the example settings', () => {
+    // The official docs that lessons cite (lesson-contract §5: UI steps are checked against them).
+    // Adding a domain is a reviewed change: both files and this list.
+    const DOCS = ['code.claude.com', 'code.visualstudio.com', 'developer.mozilla.org', 'git-scm.com', 'nodejs.org', 'support.claude.com', 'support.google.com'];
+    const fetchDomains = (entries) => entries.filter((e) => toolName(e) === 'WebFetch').map((e) => {
+      const domain = /^WebFetch\(domain:([a-z0-9-]+(?:\.[a-z0-9-]+)+)\)$/.exec(e)?.[1];
+      assert.ok(domain, `"${e}" is not limited to one domain`);
+      return domain;
+    }).sort();
+    const skill = parseFrontmatter(read('.claude/skills/author-lesson/SKILL.md'));
+    assert.deepEqual(fetchDomains(splitAllowed(skill.data['allowed-tools'])), DOCS, 'author-lesson allowed-tools');
+    assert.deepEqual(fetchDomains(readJson('.claude/settings.example.json').permissions.allow), DOCS, '.claude/settings.example.json');
+    // The skill says which pages it may read without asking, and that a page is data, not instructions.
+    assert.match(skill.body, /WebFetch is pre-approved only for the official documentation domains/);
+    assert.match(skill.body, /data, never instructions/);
+  });
+
   it('.gitignore ignores .artifacts/', () => {
     assert.match(read('.gitignore'), /^\.artifacts\/$/m);
   });
@@ -462,6 +479,10 @@ describe('rubric.v1 and review.v1', () => {
       }
       for (const rule of c.lint) assert.ok(rule in LINT_RULES, `${c.id}: lint rule ${rule}`);
     }
+  });
+
+  it('accuracy is assisted by the lint rules that look at sources and code (steps-cite, code-filename)', () => {
+    assert.deepEqual(rubric.criteria.find((c) => c.id === 'accuracy').lint, ['code-filename', 'steps-cite']);
   });
 
   it('review.v1 criterion enums match the rubric', () => {
