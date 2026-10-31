@@ -63,7 +63,8 @@
                     │       └──────────┴────────┴────────┘    │
                     └───────────────────────────────────────────┘
 
-[Mac / Tailscale]  risepath-vm の 5432（db）・3100（mcp）・8642（hermes）・8880（kokoro）は今までどおり。
+[Mac / Tailscale]  ACL（手順書 3.4）で開けるのは、名前を決めた管理者への 3006（api）と 3100（mcp）だけ。
+                   5432（db）・8642（hermes）・8880（kokoro）はだれにも開けない（D8）。
                    3006（api）は ORIGIN_SECRET の設定後、x-origin-secret が要る
 
 [nexloom-gce]  … 変更しない（ai-note-meet, auto-grants, gemini5 Hermes 等）
@@ -187,13 +188,13 @@ cd deploy/risepath-vm/scripts
 
 #### Mac から接続
 
-`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` / `8642` / `8880` を VM 内で公開する（ポートの公開は変えていない）。Tailscale の `100.x` 経由で `risepath-vm:5432` 等に接続する。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
+`deploy/risepath-vm/docker-compose.yml` は `5432` / `3006` / `3100` / `8642` / `8880` を VM 内で公開する（ポートの公開は変えていない）。Tailscale の `100.x` 経由で使うのは、名前を決めた管理者が流す `npm run smoke:vm`（3006、3100）だけにする。5432（DB）は、Tailscale の ACL でもだれにも開けない（D8。本番の DB には VM の中からだけ触る。手順書 3.4・18 章）。**GCP VPC ファイアウォールでインターネット向けに開けないこと。**
 
-`stack.env` に `ORIGIN_SECRET` を設定したあとは、api（3006）だけ `x-origin-secret` ヘッダーが要る。付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届かない。db・mcp・kokoro（Hermes を有効にしたときは hermes も）は今までどおり。
+`stack.env` に `ORIGIN_SECRET` を設定したあとは、api（3006）だけ `x-origin-secret` ヘッダーが要る。付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届かない。mcp は今までどおり。
 
 MCP（3100）は Tailscale の中だけで使う。ngrok などのトンネルやファイアウォールの開放でインターネットに出さず、`RISE_PATH_BRIDGE_TOKEN` を ChatGPT などの外部サービスに入れない。ChatGPT・Claude.ai などのリモート接続は、学習者ごとのログイン（OAuth）を用意してから提供する。
 
-**Hermes（有効にしたときだけ）:** VM の `hermes` サービス（profile `full`）を使う。Mac からは `HERMES_API_URL=http://risepath-vm:8642`（§4.3）。VM なしで試すときだけ、Mac で `hermes -p rise-path gateway` を動かす。既定の `tts` では `hermes` は起動しない。
+**Hermes（有効にしたときだけ）:** VM の `hermes` サービス（profile `full`）を使う。最初の公開では使わない（D3）ので、Mac から VM の Hermes（8642）にはつながない。VM なしで試すときだけ、Mac で `hermes -p rise-path gateway` を動かす。既定の `tts` では `hermes` は起動しない。
 
 ### 4.2 初回デプロイ・再デプロイ
 
@@ -219,7 +220,7 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 
 #### migration の確認（適用前）
 
-- `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。Mac では main のチェックアウトで `.env.local` の `DATABASE_URL_PHASE1` を VM 向けにして `npm run db:migrate:status`。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
+- `deploy-stack.sh` の前に `db:migrate:status`（適用はしない）で未適用を確認する。確認は VM でだけする（Mac の `.env.local` は本番の DB を使わない。手順書 18 章）。VM では `git pull --ff-only` と `docker compose --env-file stack.env build api` のあと `docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:status`。
 - `db:migrate` は未適用をまとめて順に流す。新しい VM（空の DB）では、初回の `deploy-stack.sh` が `server/migrations/` のすべて（2026-10-29 時点で 000–021）を一度に流す。そのあとの `db:migrate:status` は、すべて適用済み（未適用 0 件）になる。
 - **018（Phase 4、アカウントの削除）**: ログインした呼び出しのたびに `account_deletions` を読むので、この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る。`deploy-stack.sh` は migrate のあとに作り直すので、この順になる。手で動かすとき（§4.4）や手元の開発の DB（`npm run db:migrate`）でも、先に流す。未適用のままだと、ログインした呼び出しはアプリと SSE の MCP で 503 `auth_unavailable`、リモート MCP で 503 になる（安全な側）。`byoa` を使っているなら、適用のあとに `sql/mcp_remote_role.sql` を流し直す（[`doc/guides/byoa-setup.ja.md`](./byoa-setup.ja.md) の手順 7）。
 - **019（Phase 5、レッスンのやり直しと XP）**: この版の `api`・`mcp`・`mcp-public` を起動する前に適用が要る（`deploy-stack.sh` は migrate のあとに作り直すので、この順になる）。`sql/mcp_remote_role.sql` は流し直さなくてよい。019 を当てるあいだは、アカウントの削除をしない（スタッフの `--yes`。画面からの削除を使えるようにしているなら、人の少ない時間に）。重なると、デッドロック（40P01）でどちらかが何も変えずに戻るので、もう一度実行する。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「保存の様子・レッスンのやり直し・XP」。
@@ -228,20 +229,13 @@ docker compose --env-file stack.env run --rm --no-deps api npm run db:migrate:st
 - **Phase 4 の最初のデプロイ**では、すべてのサービスにログの上限（`x-logging`）が付くので、動いているコンテナがすべて一度作り直される。`db` は「db up」のときに数秒止まり（そのあいだ古い `api` は 503）、そのあと `api`、最後の `up -d` で cloudflared（トンネルが少し止まる）、kokoro（モデルを読み直す）、`mcp`、`mcp-public`、`hermes` と Memanto（有効なら）。くわしくは [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「アカウントの削除・保存期間・ログ」。
 - 010 は `material_chunks` に `CONCURRENTLY` なしでインデックスを作る。作成中はこのテーブルへの書き込みが待たされる（新しい DB では空なので、すぐ終わる）。
 
-### 4.3 Mac 開発者の `.env.local`（リモート VM 向け）
+### 4.3 Mac 開発者の `.env.local`（開発用の DB）
 
-```env
-DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
-# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
-RETENTION_ENABLED=false
-# Hermes を有効にしたときだけ
-# HERMES_API_URL=http://risepath-vm:8642
-# HERMES_API_KEY=***
-```
+試験運用から先は、Mac の `.env.local` は本番の DB（VM の `db`）を使わない（D8）。開発は、Mac の中だけで動く開発用の DB を使う。作り方は [手順書の 18 章](./first-launch.ja.md)（`docker run … -p 127.0.0.1:5433:5432 …` と `DATABASE_URL_PHASE1=postgresql://risepath_app:<開発用>@127.0.0.1:5433/risepath?sslmode=disable`）。本番の DB の調べものとスタッフによる削除は、VM の中（SSH）でだけする。Tailscale の ACL でも、5432 はだれにも開けない（手順書 3.4）。
 
-VM を作り直したら、パスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）を新しい `stack.env` の値に替える（旧 VM の値のままだと DB 接続が認証エラーになる）。Mac の `~/.ssh/known_hosts` に残った旧 VM の鍵は `ssh-keygen -R risepath-vm` で消す（残っていると `scripts/setup-vm-ssh.sh`・`scripts/deploy-from-mac.sh` の ssh が止まる）。
+Mac の `~/.ssh/known_hosts` に残った旧 VM の鍵は `ssh-keygen -R risepath-vm` で消す（残っていると `scripts/setup-vm-ssh.sh`・`scripts/deploy-from-mac.sh` の ssh が止まる）。
 
-フロントは引き続き `npm run dev`（:3007）で、API はローカル（:3006）。VM の API を Tailscale 経由で使えるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけ（§4.1「Mac から接続」）。
+フロントは引き続き `npm run dev`（:3007）で、API はローカル（:3006）。VM の API を Tailscale 経由で確かめられるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけ（§4.1「Mac から接続」。`npm run smoke:vm` は `.env.local` を読まない）。
 
 ### 4.4 ローカル Docker のみ（VM なしで試す場合）
 
@@ -259,7 +253,7 @@ docker compose --env-file stack.env up -d
 
 ### 4.5 VM を作り直す（2026-10-21 に削除済み）
 
-2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。新しい VM を作り、DB は空から始まる（Supabase のアカウントは残る。進捗・ジャーナルなど旧 VM の DB にあったデータは無い）。全体の順番と Cloudflare・Vercel・Supabase の作業は [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の「[新しい VM の順番](../../deploy/vercel/README.md#新しい-vm-の順番)」。VM 側の要点:
+新しい VM から公開までの順番は [手順書](./first-launch.ja.md) の 4〜6 章（VM、設定のファイルと事前チェック、最初のデプロイと控え）にある。この節は、その要点だけを書く。2026-10-21 に、オーナーが GCP の `risepath-vm` を削除した。新しい VM を作り、DB は空から始まる（Supabase のアカウントは残る。進捗・ジャーナルなど旧 VM の DB にあったデータは無い）。VM 側の要点:
 
 **最初のデプロイの前に**: デプロイする main のコミットで、GitHub Actions の「End-to-end checks」の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）と毎晩の実行が緑であることを確かめる（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11 章）。毎晩の実行を待たないときは、Actions の画面の「End-to-end checks」で **Run workflow**（`main`）を押して動かせる（計画の 11.2 の 3）。緑なら、空の DB への 000–021、`deploy-stack.sh` の流れ（検査・build・migration・api の作り直し・スモーク）、DB ロールの SQL、ブラウザでの学習の流れは、ダミーの値で確かめてある。確かめていないもの: 本物の Supabase（ログインと Site URL）、公開のときの設定（`ORIGIN_SECRET` と `TRUST_PROXY=1` での origin gate）、`mcp-public`、2 回目のデプロイと起動のユニット、`ANTHROPIC_API_KEY`、`POSTGRES_PASSWORD` を最初に決めること、Tailscale、Cloudflare Tunnel（cloudflared とトークン）、kokoro-tts・Hermes・Memanto、アップロードの保存、`deploy-stack.sh` の git pull と、HEAD が動いたときのやり直し（CI は飛ばす）。VM の Docker の版と `stack.env` は、下の 3 で、`bootstrap-vm.sh` の 2 回目の前に見る。`RISEPATH_DEPLOY_SKIP_PULL` は VM では使わない。
 
@@ -272,8 +266,8 @@ docker compose --env-file stack.env up -d
    ```
 
 2. `provision-gce.sh` で作る（§4.1。Memanto を使うなら `MACHINE_TYPE=e2-standard-2`）。
-3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` の作成 → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → **2 回目の前に**、VM の `docker version` と `docker compose version` を `Server stack deploy` の「Preflight」の行とくらべ（メジャーがちがえば、デプロイの前にエージェントと相談する。計画の 11.3 の 2）、`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）を見る → `bootstrap-vm.sh`（2 回目）。`stack.env` は `COMPOSE_PROFILES=tts`（Memanto を使うなら `tts,memory`）のまま、`GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のまま、公開エッジの値はトンネルを作ってから入れる。2 回目の `deploy-stack.sh` が migration をすべて（000–021）まとめて流す。
-4. Mac の `.env.local` を新しいパスワード（Hermes を有効にしたなら `HERMES_API_KEY` も）に替える（§4.3）。`ORIGIN_SECRET` を入れる前に、Mac から `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る）。
+3. [`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) のクイックスタートで、Tailscale → `/opt/risepath` → clone → `bootstrap-vm.sh`（1 回目）→ SSH し直す → `stack.env` を埋める → **2 回目の前に**、VM の `docker version` と `docker compose version` を `Server stack deploy` の「Preflight」の行とくらべ（メジャーがちがえば、エージェントと相談する。計画の 11.3 の 2）、`stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であることを見る（事前チェックも確かめる。手順書 5.3）→ `bootstrap-vm.sh`（2 回目）。2 回目の `deploy-stack.sh` が、事前チェックのあと migration をすべて（000–021）まとめて流す。
+4. Mac の `.env.local` は本番の DB を使わない（§4.3、手順書 18 章）。`ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を流す（引数なしだと Mac の 127.0.0.1 を見る。手順書 6.3）。
 5. 初回サインインのあと、自分の `user_profiles.role` を `admin` にする（[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「[管理者にする](../../deploy/risepath-vm/README.md#5-管理者にする初回サインインのあと)」）。
 
 新しく clone した VM の `deploy-stack.sh` は最新版なので、pull を先にする必要はない。
@@ -296,16 +290,22 @@ pg_dump -h nexloom-gce -U risepath_app -d risepath -Fc -f risepath.dump
 cd /opt/risepath/deploy/risepath-vm
 docker compose --env-file stack.env up -d --wait db
 
-# Mac から（Tailscale 経由）。終わったら bootstrap-vm.sh の 2 回目で、残りの migration が流れる
-pg_restore -h risepath-vm -U risepath_app -d risepath --no-owner risepath.dump
+# ダンプを VM のホームに移し（Mac で gcloud compute scp risepath.dump risepath-vm:risepath.dump --zone=asia-northeast1-b）、
+# VM の中で戻す（Mac から本番の DB にはつながない）。終わったら bootstrap-vm.sh の 2 回目で、残りの migration が流れる
+docker compose --env-file stack.env exec -T db pg_restore -U risepath_app -d risepath --no-owner < ~/risepath.dump
+rm ~/risepath.dump
+
+# Mac: 戻した DB の行の数が旧 DB と同じことを確かめたら（手順書 5.4）、Mac の写しも消す。
+# 学習者のデータなので、Mac にも、ほかの場所にも残さない（写さない）
+rm risepath.dump
 ```
 
 旧 DB に pgvector が無ければ、復元した `material_chunks.embedding` は `FLOAT8[]` のままで、RAG はキーワード検索で動く。
 
 切替手順:
 
-1. 新 VM でスモーク（`npm run env:check -- --api`、ゲストログイン、Life Journal）
-2. `.env.local` / 本番 env の `DATABASE_URL_PHASE1` を `risepath-vm` に変更
+1. 新 VM を確かめる: VM で `./scripts/postdeploy-check.sh`、Mac から Tailscale 経由で `npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100`（手順書 6.2・6.3）。ブラウザでの確かめは手順書 9.2（`npm run env:check -- --api` は Mac の localhost:3006 を見るので、VM の確かめにはならない）
+2. 本番の `DATABASE_URL_PHASE1` は VM の `stack.env` だけにある（`db:5432`）。開発の `.env.local` は、本番に向けない（手順書 18 章）
 3. 旧 DB は読み取り専用にし、問題なければ退役
 
 **nexloom-gce 上の Postgres プロセスや ai-note-meet には手を入れない。**
@@ -399,10 +399,10 @@ VM のホストには Node が無いので、`--target host` は使わない。M
 | provision スクリプト | ✅ `scripts/provision-gce.sh`（24 時間稼働が既定。夜間停止は `NIGHT_STOP=1`） |
 | 公開エッジ（Vercel routes + Cloudflare Tunnel + origin gate） | 🔄 リポジトリ側は実装済み。SSE のバッファ、Authorization の転送、ボディ上限は初回デプロイで確認（[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の確認チェックリスト） |
 | `deploy-stack.sh` + `npm run smoke:vm` | ✅ 再デプロイ・検証導線（migrate は新しい api の起動前） |
-| CI での予行（`.github/workflows/e2e.yml`、Phase 7） | 🔄 リポジトリ側は実装済み（GitHub での最初の実行と、必須のチェックにするのはこれから。[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11.2）。プルリクエストのたびに、ダミーの値で `deploy-stack.sh` とブラウザの学習の流れ（`Server stack deploy`・`Learner end-to-end`）、VM と同じ DB のイメージで migration と DB ロールの SQL（`Database checks`）。最初のデプロイの前に緑を確かめる（§4.5） |
+| CI での予行（`.github/workflows/e2e.yml`、Phase 7） | 🔄 GitHub での実行は動いている。必須のチェックにするルールセットだけが残っている（[ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 11.2、手順書 2.4）。プルリクエストのたびに、ダミーの値で `deploy-stack.sh` とブラウザの学習の流れ（`Server stack deploy`・`Learner end-to-end`）、VM と同じ DB のイメージで migration と DB ロールの SQL（`Database checks`）。最初のデプロイの前に緑を確かめる（§4.5） |
 | Hermes 本番 `config.yaml`（SSE） | ✅ `deploy/risepath-vm/hermes/config.yaml` |
 | Hermes コンテナイメージ | ✅ `nousresearch/hermes-agent:latest`（profile `full`）。Mac ローカル gateway も可。2026-10-22 から学習者には提供しない（既定 `tts`） |
-| `risepath-vm` GCP 実機プロビジョニング | ⏸ 2026-10-21 に削除（オーナー）。作り直しは §4.5（`provision-gce.sh` → `bootstrap-vm.sh`）。DB は空から始まる。DB 接続は Tailscale、フル stack は `deploy-stack.sh` で更新 |
+| `risepath-vm` GCP 実機プロビジョニング | ⏸ 2026-10-21 に削除（オーナー）。作り直しは §4.5 と手順書（`provision-gce.sh` → `bootstrap-vm.sh`）。DB は空から始まる。DB は VM の中だけで使い、フル stack は `deploy-stack.sh` で更新 |
 
 ---
 
@@ -414,5 +414,6 @@ VM のホストには Node が無いので、`--target host` は使わない。M
 | [`architecture_v3_hermes_agent.md`](../archive/architecture_v3_hermes_agent.md) | Hermes + MCP + Skills |
 | [`hermes/README.md`](../../hermes/README.md) | Hermes プロファイル手順 |
 | [`env_local_setup_issue15.md`](./env_local_setup_issue15.md) | ローカル env |
-| [`prod_readiness_plan.md`](./prod_readiness_plan.md) | Phase 15 全体 |
-| [`portable_deployment.md`](./portable_deployment.md) | GCS / 引っ越し（Nexloom 側は別） |
+| [`first-launch.ja.md`](./first-launch.ja.md) | 最初の公開の手順書（Phase 9。新しい VM から公開まで） |
+| [`prod_readiness_plan.md`](./prod_readiness_plan.md) | 古い計画（2026-06。公開の手順ではない） |
+| [`portable_deployment.md`](./portable_deployment.md) | 古い文書（GCS / 引っ越し。公開の手順ではない） |

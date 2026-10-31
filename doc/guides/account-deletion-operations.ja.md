@@ -2,7 +2,7 @@
 
 - 作成日: 2026-10-24（Phase 4）
 - 対象: Rise Path のオーナーと、削除の求めを受けるスタッフ
-- 関連: 決定の記録 [../brushup-2026/ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 8 章、データの一覧 [../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)、安全の運用 [safety-operations.ja.md](./safety-operations.ja.md)
+- 関連: 公開の手順書 [./first-launch.ja.md](./first-launch.ja.md)（画面からの削除を有効にするのは手順書 11.2、控えから戻したあとの削除の当て直しは手順書 16.2）、決定の記録 [../brushup-2026/ai-access-plan.ja.md](../brushup-2026/ai-access-plan.ja.md) の 8 章、データの一覧 [../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)、安全の運用 [safety-operations.ja.md](./safety-operations.ja.md)
 
 Rise Path のアカウントの削除は、オーナーの決定 D1〜D5 に沿っています。
 
@@ -127,4 +127,4 @@ API のログは消えやすいので、決まった時に読みます。
 - スタッフが消したとき、AI アプリの許可は Supabase に残ります（2 章の「AI アプリについて」）。
 - ほかのサービスで消されたログインの Rise Path のデータは、次の定期の確認（4 章）まで残ります。
 - Stripe の記録には、アカウント ID が残ります（顧客、支払いの画面、契約の情報）。
-- 運営者が手でとった DB の控えには、削除の前のデータが残ります。控えを残す期間は【要記入: 保存する期間】です。
+- 毎日の控え（バックアップ。Phase 9）には、削除の前のデータが、控えを残す日数（弁護士に確かめるまで 30 日。Google が残す期間を入れて最大 37 日）のあいだ残ります。控えから戻したときは、控えのあとの削除（アカウントの削除、学習の記録の消去、1 つのレッスンのやり直し）を、学習者に出す前に当て直します（手順書 16.2）。運営者が手でとった DB の控えがあれば、それにも削除の前のデータが残ります。

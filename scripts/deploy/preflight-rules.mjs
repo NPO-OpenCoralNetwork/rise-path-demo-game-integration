@@ -144,7 +144,7 @@ export const ATTESTATIONS = Object.freeze([
   { key: 'DECIDED_BYOA', kind: 'date', step: '12.3', rules: ['S2', 'V4'] },
   { key: 'DECIDED_MEMORY', kind: 'date', step: '12.3', rules: ['S3'] },
   { key: 'DECIDED_BILLING', kind: 'date', step: '12.3', rules: ['S4'] },
-  { key: 'MINORS_POLICY_DECIDED', kind: 'date', step: null, rules: ['G5'] },
+  { key: 'MINORS_POLICY_DECIDED', kind: 'date', step: '11.1', rules: ['G5'] },
 ]);
 const ATTESTATION_KEYS = new Set(ATTESTATIONS.map((a) => a.key));
 
@@ -261,7 +261,7 @@ export const RULES = Object.freeze([
   { code: 'G1', group: 'G', level: 'E', ci: 'skip', title: 'アカウントの削除を有効にする前の確かめが、記録にないか、順番がちがいます（{names}）', fix: 'Supabase の設定 → パスワードの変更の確かめ → 本番の amr の確かめ、の順に済ませて日付を書きます（手順書 11.2）。' },
   { code: 'G2', group: 'G', level: 'E', ci: 'skip', title: '同意の確かめ（`LEGAL_TERMS_REQUIRED`）を入れる前の記録がありません（{names}）', fix: '先に Vercel のフラグを入れて同意のページを確かめ、日付を書きます（手順書 12.3）。' },
   // G3: E at public, and at any stage once VERCEL_LEGAL_PAGES_ON is dated.
-  { code: 'G3', group: 'G', level: 'dyn', ci: 'skip', title: '規約を公開するのに、ご本人の削除が止まっています。', fix: '手順書 11.2 を済ませ、`ACCOUNT_DELETION_ENABLED=true` にします。' },
+  { code: 'G3', group: 'G', level: 'dyn', ci: 'skip', title: '規約を公開するのに、ご本人の削除が止まっています。', fix: '手順書 11.2 を済ませ、`ACCOUNT_DELETION_ENABLED=true` にします。VM を作り直しているとき（手順書 16.3）は、11.2 はしなおしません。16.3 の 7 より前なら、launch-record.env の `VERCEL_LEGAL_PAGES_ON` を 7 まで空にします。7 のあとなら、16.3 の 6 のとおりに、stack.env に `ACCOUNT_DELETION_ENABLED=true` を書きます。' },
   // G5: per key and stage (STAGE_REQUIRED).
   { code: 'G5', group: 'G', level: 'dyn', ci: 'skip', title: 'この段階に入る前の確かめが、記録にありません（{names}）', fix: '手順書 14 章の表でその確かめをして、日付を書きます。' },
   { code: 'K1', group: 'K', level: '–/W/E/E', ci: 'skip', title: '安全の知らせの受け口がありません。', fix: 'Slack の受け口の URL を stack.env の `AI_CAP_ALERT_WEBHOOK_URL` に書きます（手順書 3.6）。' },
@@ -273,7 +273,7 @@ export const RULES = Object.freeze([
   { code: 'R2', group: 'R', level: '–/W/W/W', ci: 'skip', title: '最後の控えが 36 時間より前か、失敗しています。', fix: '`sudo journalctl -u risepath-backup` を見て、エージェントに相談します（手順書 17 章）。' },
   // R3: setup not checked; pilot and minors E if never, W if older than 35 days; public E for both.
   { code: 'R3', group: 'R', level: 'dyn', ci: 'skip', title: '控えから戻す練習の記録がないか、35 日より前です。', fix: '`sudo ./scripts/restore-drill.sh` を実行します（手順書 16.1）。' },
-  { code: 'R4', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えの鍵を VM の外にしまったことが、記録にないか、いまの鍵とちがいます（鍵がないと戻せません）', fix: '手順書 6.4 の鍵の手順をして、launch-record.env の `BACKUP_KEY_COPY` に日付を、`BACKUP_KEY_ID` に key id を書きます。' },
+  { code: 'R4', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えの鍵を VM の外にしまったことが、記録にないか、いまの鍵とちがいます（鍵がないと戻せません）', fix: '手順書 6.4 の鍵の手順をして、launch-record.env の `BACKUP_KEY_COPY` に日付を、`BACKUP_KEY_ID` に key id を書きます。VM を作り直したとき（手順書 16.3）は、`--new-key` はしません。16.3 の 2 のとおりに、`sudo ./scripts/install-backup.sh key-id` で出た 16 文字を `BACKUP_KEY_ID` に書きます（`BACKUP_KEY_COPY` は 6.4 の日付のままです）。' },
   { code: 'R5', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えを消す日数（バケットのライフサイクル）が、記録にありません。', fix: '手順書 3.8 のとおりに設定し、launch-record.env の `BACKUP_LIFECYCLE` に日付を書きます。' },
   { code: 'R6', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えが失敗したときの知らせの受け口がありません。', fix: 'stack.env の `AI_CAP_ALERT_WEBHOOK_URL` を書いてから、`sudo ./scripts/install-backup.sh` をもう一度実行します（手順書 6.4）。' },
   // R7 (the quarterly check-copy) was removed by the Scope guard (TR9b); its number stays unused. R8 (review round 1 of
@@ -285,7 +285,7 @@ export const RULES = Object.freeze([
   { code: 'R9', group: 'R', level: 'dyn', ci: 'skip', title: '本番の DB を戻している途中です（restore-db.sh が途中で止まっています）。', fix: 'デプロイはしません。エージェントと、同じ restore-db.sh のコマンドで続きをします（手順書 16.2）。' },
   // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3). Passes with (a) a valid
   // pilot list in stack.env or (b) Vercel's protection still on (VERCEL_PROTECTION_ON dated, VERCEL_PROTECTION_OFF empty).
-  { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。' },
+  { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。保護を外したあと（`VERCEL_PROTECTION_OFF` に日付があるとき）は、名簿を戻します（VM を作り直したときは手順書 16.3）。日付を消すのは、Vercel で保護を本当にかけ直したときだけです。' },
   // V2: an entry of the list that is not a UUID (the api ignores it; with no valid id it refuses everyone). {n}: its position.
   { code: 'V2', group: 'V', level: 'E', ci: 'skip', title: '試験運用の名簿 `PILOT_ACCOUNT_IDS` に、ID の形でないものがあります（{n} 個目）。', fix: 'Supabase の Authentication → Users の User UID（8-4-4-4-12 の形）だけを、空白を入れずにカンマで区切って書きます（手順書 10.1）。' },
   // V3 also holds the order rule VERCEL_PROTECTION_ON ≤ VERCEL_PROTECTION_OFF (design §2.4; below public, V1 refuses a dated OFF

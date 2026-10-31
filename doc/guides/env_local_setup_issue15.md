@@ -4,7 +4,7 @@
 
 ## 0. 前提
 
-- リポジトリ: `~/Works/personal/rise-path-demo-game-integration`
+- リポジトリ: リポジトリを clone したフォルダ（以下、そのフォルダで実行します）
 - API: `http://localhost:3006`（`server.js`）
 - フロント: `http://localhost:3007`（Vite、`/api` は 3006 にプロキシ）
 - `.env.local` は **git に含めない**（`.gitignore` 済み）
@@ -12,8 +12,8 @@
 ## 1. テンプレートをコピー
 
 ```bash
-cd ~/Works/personal/rise-path-demo-game-integration
-cp env.local.template .env.local
+cd <リポジトリのフォルダ>
+cp .env.example .env.local
 ```
 
 ## 2. Supabase の値を入れる
@@ -30,51 +30,38 @@ Supabase ダッシュボード → **Project Settings**:
 
 ## 3. PostgreSQL（`risepath` 専用）
 
-**推奨トポロジ:** [`doc/system_design/database_topology.md`](../system_design/database_topology.md) / デプロイ正本 [`doc/guides/risepath_vm_deployment.md`](./risepath_vm_deployment.md)
+**推奨トポロジ:** [`doc/system_design/database_topology.md`](../system_design/database_topology.md) / デプロイ正本 [`doc/guides/risepath_vm_deployment.md`](./risepath_vm_deployment.md) / 公開の手順書 [`doc/guides/first-launch.ja.md`](./first-launch.ja.md)
 
-- **データ（本番・推奨）** → 専用 VM **`risepath-vm`** 上の Docker Postgres、DB 名 **`risepath`**
-- **データ（移行期間の暫定）** → `nexloom-gce` 上の `risepath`（新規環境では使わない）
+- **開発のデータ（推奨）** → Mac の中だけで動く開発用の Postgres（Docker、`127.0.0.1:5433`）、DB 名 **`risepath`**。作り方は [手順書の 18 章](./first-launch.ja.md)。
+- **本番のデータ** → 専用 VM **`risepath-vm`** の中の Docker Postgres（`db:5432`。VM の中からだけ使います）。試験運用から先は、開発の `.env.local` では使いません（D8）。本番の DB の調べものとスタッフによる削除は、VM の中（SSH）でだけします。
+- **古いデータ** → `nexloom-gce` 上の `risepath`（新規環境では使いません。移すときは [`risepath_vm_deployment.md`](./risepath_vm_deployment.md) の 5 章）。
 - **認証** → Supabase Auth のみ（Supabase の Postgres URI は **使わない**）
 - **禁止** → `autogrants` など他プロダクト DB（`npm run env:check` が `autogrants` を検出すると失敗）
 
-### A. 本番向け: `risepath-vm`（推奨）
-
-VM 上で Docker スタックを起動（詳細は [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)）:
+### A. 開発用の DB（Mac の中だけ）
 
 ```bash
-cd deploy/risepath-vm
-cp stack.env.example stack.env   # 実値を入れる。git に含めない
-./scripts/deploy-stack.sh        # ビルド → db 起動 → migration → api 起動
+docker run -d --name risepath-dev-db -p 127.0.0.1:5433:5432 \
+  -e POSTGRES_USER=risepath_app -e POSTGRES_PASSWORD=<開発用のパスワード> -e POSTGRES_DB=risepath \
+  -v risepath-dev-pgdata:/var/lib/postgresql/data \
+  pgvector/pgvector:0.8.7-pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
 ```
-
-未適用の migration があると新しい api のヘルスチェックが失敗するので、migration は api の起動前に流します（`deploy-stack.sh` がこの順番です）。
 
 Mac の `.env.local`:
 
 ```env
-DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
-HERMES_API_URL=http://risepath-vm:8642
-HERMES_API_KEY=***
+DATABASE_URL_PHASE1=postgresql://risepath_app:<開発用のパスワード>@127.0.0.1:5433/risepath?sslmode=disable
 ```
 
-### B. 暫定: `nexloom-gce`（レガシー・移行のみ）
+そのあと `npm run db:migrate` を実行します（開発用の DB に当たります）。
 
-```bash
-scp scripts/vm/postgres_risepath_bootstrap.sql nexloom-gce:/tmp/
-ssh nexloom-gce
-sudo -u postgres psql -f /tmp/postgres_risepath_bootstrap.sql
-```
+### B. 本番の VM（`risepath-vm`）
 
-```env
-DATABASE_URL_PHASE1=postgresql://risepath_app:***@nexloom-gce:5432/risepath?sslmode=disable
-```
-
-ホストは `tailscale status` の Tailscale 名または 100.x IP。
+VM 上で Docker スタックを起動します（新しい VM は [手順書](./first-launch.ja.md) の 4〜6 章、詳細は [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)）。本番の `DATABASE_URL_PHASE1` は VM の `stack.env` だけにあり（`db:5432`）、Mac には写しません。
 
 注意:
 
-- VM 上の Postgres は Tailscale 内前提なら `sslmode=disable` が多い（公開する場合は TLS + `pg_hba` 必須）。
-- `pg_hba.conf` で Tailscale サブネット（例: 100.64.0.0/10）からの接続を許可する。
+- `npm run env:check` は、`.env.local` のホストが `risepath-vm` か `nexloom-gce`（`risepath-vm.<tailnet>.ts.net` のような長い名前もふくむ）だと、本番の DB だという注意（英語で `this is the production database`）を出します。Tailscale のアドレス（`100.64.0.0/10`）にも注意（`a Tailscale address`）を出します（どちらも開発では使いません）。
 - スキーマ未適用だと API が `relation "curricula" does not exist` で 500 → **Issue #16（migration）**。
 
 ## 4. 本番に近いフロント設定
@@ -148,7 +135,7 @@ curl -s http://localhost:3006/api/v2/curricula
 | Supabase Bearer JWT | Supabase ログイン後、リクエストに `Authorization: Bearer ...`（`apiClient`） |
 | `GET /api/v2/curricula` 200 | `curl` または `env:check --api` |
 | 欠落 env の明示 | `npm run env:check` |
-| ドキュメント同期 | 本ファイル + `doc/prod_readiness_plan.md` |
+| ドキュメント同期 | 本ファイル（`doc/guides/prod_readiness_plan.md` は古い計画です） |
 
 ## 9. よくある詰まり
 
@@ -167,15 +154,14 @@ curl -s http://localhost:3006/api/v2/curricula
 5. **新規登録 / メール確認**（Phase 18）  
    Supabase ダッシュボード → **Authentication** → **URL Configuration**:
 
-   | 項目 | ローカル | 本番 |
-   |------|----------|------|
-   | Site URL | `http://localhost:3007` | Vercel 本番 URL |
-   | Redirect URLs | `http://localhost:3007/auth/callback` | `https://<prod>/auth/callback` |
+   開発はステージングのプロジェクトだけで設定を変えます。共有のプロジェクト（本番。Nexloom・P-School と共有）の設定は変えません（手順書 18 章）。ステージングのプロジェクトがないときは、共有のプロジェクトを今の設定のまま使い、手元でもアプリの登録は閉じたままです（`VITE_FEATURE_LEGAL_PAGES` が `true` になるまで）。
 
-   | 設定 | 開発 | 本番 |
-   |------|------|------|
+   | 項目 | ステージング（開発） | 共有のプロジェクト（本番） |
+   |------|----------|------|
+   | Site URL | `http://localhost:3007` | 変えません（担当と決めたときだけ。手順書 11.5） |
+   | Redirect URLs | `http://localhost:3007/auth/callback` | `https://app.<domain>/auth/callback` を足すだけ（手順書 11.5） |
    | Email プロバイダ | ON | ON |
-   | Confirm email | OFF 推奨（即ログイン） | ON 推奨 |
+   | Confirm email | OFF でもよい（即ログイン） | 一般の登録を開く前に ON（手順書 11.4） |
 
    仕様: [`phase18_user_registration_spec.md`](../phases/phase18_user_registration_spec.md)
 
@@ -183,7 +169,7 @@ curl -s http://localhost:3006/api/v2/curricula
 
 ```bash
 npm run db:migrate:status   # 未適用一覧
-npm run db:migrate          # risepath-vm（または暫定 nexloom-gce）/ risepath に適用
+npm run db:migrate          # .env.local の開発用の DB に適用（本番には VM の deploy-stack.sh が当てます）
 npm run env:check -- --db
 ```
 

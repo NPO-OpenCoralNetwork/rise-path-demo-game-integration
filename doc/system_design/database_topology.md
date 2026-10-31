@@ -28,7 +28,7 @@
                     └── hermes (API :8642, rise-path profile)
 ```
 
-Mac 開発時は Vite :3007 が API にプロキシ。DB / Hermes は Tailscale 経由で `risepath-vm`、またはローカル Docker / 暫定ホストを向ける。
+Mac 開発時は Vite :3007 が API にプロキシ。DB は Mac の中だけで動く開発用の Docker Postgres を使う（本番の `risepath-vm` の DB は、開発では使いません。D8、[手順書の 18 章](../guides/first-launch.ja.md)）。
 
 ## ホスト名
 
@@ -43,13 +43,11 @@ tailscale status | grep risepath
 tailscale ping risepath-vm
 ```
 
-接続文字列例:
+本番の接続文字列は VM の中だけ（`stack.env` の `DATABASE_URL_PHASE1`、ホストは Compose の `db:5432`）。5432 は Tailscale の ACL でもだれにも開けない（[手順書 3.4](../guides/first-launch.ja.md)）。開発の接続文字列例（Mac の中だけの開発用の DB）:
 
 ```text
-postgresql://risepath_app:PASSWORD@risepath-vm:5432/risepath?sslmode=disable
+postgresql://risepath_app:<開発用のパスワード>@127.0.0.1:5433/risepath?sslmode=disable
 ```
-
-Tailscale 内前提なら `sslmode=disable` が多い。インターネット公開時は TLS + `pg_hba` 必須。
 
 ## VM 上での初回セットアップ（推奨: Docker）
 
@@ -65,21 +63,15 @@ migration は新しい api の起動前に流します（未適用があると a
 
 ### レガシー: nexloom-gce 上の bare Postgres bootstrap
 
-移行完了前のみ。新規環境では **使わない**。
-
-```bash
-scp scripts/vm/postgres_risepath_bootstrap.sql nexloom-gce:/tmp/
-ssh nexloom-gce
-sudo -u postgres psql -f /tmp/postgres_risepath_bootstrap.sql
-```
+古い手順です。新規環境では **使わない**（`scripts/vm/postgres_risepath_bootstrap.sql` の先頭にも書いてあります）。Docker のスタックは、自分でロールを作ります。
 
 ## `.env.local` のルール
 
 | 変数 | 入れてよいもの |
 |------|----------------|
 | `VITE_SUPABASE_*`, `SUPABASE_*` | Supabase **Auth** 用のみ |
-| `DATABASE_URL_PHASE1` | **`risepath-vm`（推奨）** または移行期間の `nexloom-gce` / ローカル Docker |
-| `HERMES_API_URL` | 同 VM 内 `http://hermes:8642`（Compose）または `http://risepath-vm:8642`（Mac から） |
+| `DATABASE_URL_PHASE1` | **Mac の中だけの開発用の DB（推奨。`127.0.0.1:5433`、[手順書の 18 章](../guides/first-launch.ja.md)）**。本番の `risepath-vm` と古い `nexloom-gce` は使いません |
+| `HERMES_API_URL` | 同 VM 内 `http://hermes:8642`（Compose）。最初の公開では Hermes を使いません（Mac から VM の Hermes にはつながない） |
 | 入れてはいけない | `autogrants` URL、Supabase Postgres pooler（データ用）、他プロダクトの DB URL |
 
 検証:

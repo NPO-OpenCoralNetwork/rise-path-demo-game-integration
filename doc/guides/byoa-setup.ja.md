@@ -84,19 +84,19 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
 
 - **P-School の表**: AI アプリのトークンも `role` は `authenticated` です。P-School がブラウザから使う表（`profiles`、`battle_records`）の RLS に `(auth.jwt() ->> 'client_id') is null` を足すかを決めます（[`deploy/supabase/README.md`](../../deploy/supabase/README.md)）。P-School のコードは変えません。
 - **パスワードとメールアドレスの変更（Supabase Auth の `/user`）**: supabase/auth のソースコード（`internal/api/user.go`、2026-10-21 時点）を読んだかぎりでは、AI アプリのトークンでも `/user` を呼べます【本番の Supabase では未検証】。何もしないと、AI アプリはアカウントのパスワードを設定するか置き換え、そのパスワードでふつうにログインできます。そのログインは学習者自身のログインと同じ形（`client_id` なし）なので、アプリの API の守り（`oauth_client_token`）では止められず、アプリの API もすべて使えます。次の 3 つを on にします。場所は Authentication → Sign In / Providers → Email です（Supabase の文書のリンク先は `https://supabase.com/dashboard/project/_/auth/providers?provider=Email`）。
-  - **Require current password when changing password**: パスワードを変えるとき、今のパスワードを確かめます。ダッシュボードでは「Require current password when updating」と出ることがあります【要確認: 今の表示名】。
+  - **Require current password when updating**: パスワードを変えるとき、今のパスワードを確かめます（画面の表示名は【要確認】。Supabase の文書では「Require current password when changing password」です）。
   - **Require reauthentication when changing password**: ログインから 24 時間をこえたセッションでは、メールで届く確認のコード（nonce）がないとパスワードを変えられません。ダッシュボードでは「Secure password change」と出ることがあります【要確認: 今の表示名】。
   - **Secure email change**: メールアドレスの変更を、前と後の両方のアドレスで確かめます【要確認: 今の表示名】。
 
   出典: パスワードの 2 つは <https://supabase.com/docs/guides/auth/password-security>（「Require reauthentication when changing password」「Require current password when changing password」）、メールアドレスは <https://supabase.com/docs/guides/self-hosting/auth/config>（`GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED`）。
 
   **残るリスク**: 今のパスワードの確認は、パスワードのないアカウントでは働きません（ソースコードでは、初めてパスワードを設定するときは確かめません）。Rise Path の登録画面はパスワードを作りますが、同じ Supabase プロジェクトのほかの入口で作ったアカウントには、パスワードがないことがあります。また、AI アプリのセッションは許可した時刻に作られるので、許可から 24 時間は確認のコードも求められません。つまり、**パスワードのないアカウントでは、許可から 24 時間のあいだ、AI アプリがパスワードを設定できます**。許可の画面は「許可する」の上に、このアプリがアカウントのサービスであなた自身と同じ力を持つこと、信頼できるアプリだけを許可することを出します。DCR をどうするか（手順 4）とあわせて、オーナーがこのリスクを受け入れるかを決めます（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 5.3）。
-- **アカウントの削除（Phase 4）**: ご本人の削除は、はじめ止まっています（`stack.env` の `ACCOUNT_DELETION_ENABLED` が未設定）。この 3 つが on になり、手順 10 のパスワードの確かめ（`current_password_required`）が通るまで、`ACCOUNT_DELETION_ENABLED=true` にしません。本番の `amr` の確かめ（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 8.2 の 3）も先に済ませます。AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」で、その方の Rise Path のデータを消せてしまうためです（パスワードを入れ直す確認も、そのパスワードで通ってしまいます）。「Require current password when changing password」は、`byoa` を使わないときも、削除を on にする前に必ず on にします。ログインしたままの端末を持っている人も、同じ方法でパスワードを設定できるためです（[account-deletion-operations.ja.md](./account-deletion-operations.ja.md) の 7 章）。3 つを on にしても、上の「残るリスク」（パスワードのないアカウント、許可から 24 時間）は削除にも同じです（[account-deletion-operations.ja.md](./account-deletion-operations.ja.md) の 7 章）。
+- **アカウントの削除（Phase 4）**: ご本人の削除は、はじめ止まっています（`stack.env` の `ACCOUNT_DELETION_ENABLED` が未設定）。この 3 つが on になり、手順 10 のパスワードの確かめ（`current_password_required`）が通るまで、`ACCOUNT_DELETION_ENABLED=true` にしません。本番の `amr` の確かめ（[`../brushup-2026/ai-access-plan.ja.md`](../brushup-2026/ai-access-plan.ja.md) の 8.2 の 3）も先に済ませます。AI アプリがパスワードを設定してログインすると、設定の「アカウントを削除する」で、その方の Rise Path のデータを消せてしまうためです（パスワードを入れ直す確認も、そのパスワードで通ってしまいます）。「Require current password when updating」は、`byoa` を使わないときも、削除を on にする前に必ず on にします。ログインしたままの端末を持っている人も、同じ方法でパスワードを設定できるためです（[account-deletion-operations.ja.md](./account-deletion-operations.ja.md) の 7 章）。3 つを on にしても、上の「残るリスク」（パスワードのないアカウント、許可から 24 時間）は削除にも同じです（[account-deletion-operations.ja.md](./account-deletion-operations.ja.md) の 7 章）。
 - **セッション**: Authentication → Sessions のアクセストークンの有効期間は 1 時間（既定）のままにし、リフレッシュトークンのローテーションと再利用の検出も既定のままにします。
 
 ### 7. VM: migration と最小権限の DB ロール
 
-1. `main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）と 016（`lesson_progress`、Phase 2）を当てます（まだ `byoa` は足しません）。
+1. （すでに動いている VM を更新するときだけ）`main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）と 016（`lesson_progress`、Phase 2）を当てます（まだ `byoa` は足しません）。新しい VM では最初のデプロイで 000–021 が当たっています。
 2. VM でリモート MCP 用のロールを作ります。`risepath_app` はスーパーユーザーなので、インターネットに出す `mcp-public` には渡しません。
 
    ```bash
@@ -155,7 +155,7 @@ Cloudflare Zero Trust → **Networking → Tunnels** → 今のトンネル → 
   - Bot Fight Mode（無料プラン）は off のままにします（[`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 6 と同じ）。Bot Fight Mode は、ホスト名やパスごとに外せず、WAF のスキップのルールも効きません（<https://developers.cloudflare.com/bots/get-started/bot-fight-mode/>）。on にすると `mcp.<domain>` にも効きます。
   - Super Bot Fight Mode（有料プラン）とマネージドルールは、WAF のカスタムルールの「Skip」で、ホスト名 `mcp.<domain>` だけを外せます（<https://developers.cloudflare.com/waf/custom-rules/skip/>）。
   - Browser Integrity Check とセキュリティレベルのチャレンジも、このホストでは出さないようにします【要確認: 今の設定と外し方】。
-- 1 回のツールの呼び出しは数秒で終わる作りです。Cloudflare の待ち時間の上限（約 100 秒と言われています【未検証】）には近づきません。
+- 1 回のツールの呼び出しは数秒で終わる作りです。Cloudflare の読み取りの時間切れは 100〜125 秒ほどです（未確認）。そこには近づきません。
 
 既存のルート `api.<domain>` → `http://api:3006` はそのままです。ルートが VM のホストやゲートウェイの IP を指さないようにします（ほかのポートにも届いてしまうため）。
 

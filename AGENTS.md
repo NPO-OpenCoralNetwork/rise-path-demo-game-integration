@@ -9,12 +9,12 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - Build check: `npx vite build --outDir <tmp dir>` (not `dist/` while others work in the tree)
 - Lessons: `npm run lessons:validate|lint|catalog|schema` · `npm run lessons:preview -- <course> <lesson>` (needs the dev server) · `npm run lessons:mcp-smoke`
 - MCP: `npm run mcp` (stdio; profile via `--profile` or `RISE_PATH_MCP_PROFILE`) — see `.mcp.json`
-- CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests (`lint:arch` included),
-  `lessons:validate`, `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references `--check`,
-  change guards (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for `check-assets.mjs`: credits
-  in `assets/credits.json` for assets over 1 MiB), and `build:prod` with dummy keys that must not appear in
-  the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES` unset). Run them before opening a PR.
-- `e2e.yml` (Docker; PRs, main, nightly): checks `Database checks`, `Server stack deploy`, `Learner end-to-end`, required on main once the owner sets the branch rule (ai-access-plan §11). Locally: `npm run ci:stack|e2e:local` need Docker; `npm run ci:db` also runs with `-- --existing-url <url>` on a throwaway local PG16+pgvector cluster (§11.1); otherwise the PR run is the proof.
+- VM checks: `deploy/risepath-vm/scripts/preflight.sh` (事前チェック; `deploy-stack.sh` runs it before sourcing `stack.env`; never as root; rules `scripts/deploy/preflight-rules.mjs`, built-ins only) and `postdeploy-check.sh`; backups `backup.sh` + systemd timers; runbook `doc/guides/first-launch.ja.md`. On the VM, deploy from a plain login shell: never export the CI's `COMPOSE_PROJECT_NAME=risepath-ci` there (F12).
+- CI (`.github/workflows/ci.yml`, PRs and pushes to main): typecheck, tests (`lint:arch` included), `lessons:validate`,
+  `lessons:lint -- --strict`, `lessons:schema -- --check`, skill references `--check`, change guards
+  (`node scripts/ci/scan-secrets.mjs --diff origin/main`, same for `check-assets.mjs`: credits in `assets/credits.json` for assets over
+  1 MiB), and `build:prod` with dummy keys that must not appear in the bundle, nor any legal text (`VITE_FEATURE_LEGAL_PAGES` unset). Run them before opening a PR.
+- `e2e.yml` (Docker; PRs, main, nightly): checks `Database checks`, `Server stack deploy`, `Learner end-to-end`, required on main once the owner sets the branch rule (ai-access-plan §11). Locally: `npm run ci:stack|e2e:local` need Docker; `npm run ci:db` also runs with `-- --existing-url <url>` on a throwaway local PG16+pgvector cluster (§11.1); otherwise the PR run is the proof. Run `ci:stack`/`e2e:local` as a non-root user in the docker group (the preflight refuses root, X5).
 
 ## Where things live
 - Learning material (教材): `content/courses/<slug>/course.json` + `lessons/<id>.lesson.json`
@@ -37,9 +37,9 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
   `lesson_progress_lesson_resets`, kept until the account is deleted, and in each local record's `lessonGen`;
   never move `lesson_progress_resets` for one lesson); XP, badges and streak `GET /api/v2/user/achievements`
   (`tools/core/achievements.js`, tables `xp_awards`, `learning_days`, migration 019, none granted to the MCP role).
-- Phase 6: flashcard reviews: FSRS-6 `shared/review/fsrs.js`, queue `tools/core/reviewQueue.js` (`review_cards`, `review_log`,
-  migration 020), `/api/v2/user/review`, page `/review`. Cards enter only from server lesson records; lesson resets and
-  delete-all delete them; no XP; MCP reviews write no learning day. Card ids: `server/tests/fixtures/published-card-ids.json`.
+- Phase 6: flashcard reviews: FSRS-6 `shared/review/fsrs.js`, queue `tools/core/reviewQueue.js` (`review_cards`, `review_log`, migration 020),
+  `/api/v2/user/review`, page `/review`. Cards enter only from server lesson records; lesson resets and delete-all delete them; no XP; MCP reviews write no learning day. Card ids: `server/tests/fixtures/published-card-ids.json`.
+- Phase 9: sign-up is closed in the app until `VITE_FEATURE_LEGAL_PAGES=true` (`ExperienceLoginView`, `AuthContext.signUp`); pilot list `PILOT_ACCOUNT_IDS` (`server/middleware/pilotGate.js`, before the stub write, fail closed); launch record `deploy/risepath-vm/launch-record.env` (git-ignored, owner attestations); TTS text ≤ 1,000 characters and a self-pruning cache (`tools/core/kokoroTts.js`); a restore replays account deletions, progress resets and one-lesson resets and stops on consent or grant rows (`scripts/replay-deletions.mjs`).
 
 ## Lesson rules (details: `.claude/skills/author-lesson/references/lesson-contract.md`)
 - 2–4 objectives with ids and a Bloom level; every objective is assessed by a question (`objectiveId`).
@@ -68,13 +68,13 @@ AI learning platform. React 19 + Vite 6 + TypeScript + Tailwind v4 (front, :3007
 - No API keys in browser code or `VITE_*` variables; model keys live on the server only.
 - Model IDs appear only in `server/llm/models.config.js`; never hard-code them elsewhere.
 - Don't publish to the database or mark lessons published from an authoring flow; drafts + PR.
-- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`,
-  `content/legal/*.ja.md`, `content/legal/archive/`) by hand.
+- Don't edit generated files (`content/schema/lesson*.schema.json`, `course.schema.json`, `content/legal/*.ja.md`, `content/legal/archive/`) by hand.
 - Don't touch P-School (`components/features/PSchool`, `data/curricula/p_school`, `public/p_school`).
 - No secrets, `.env` contents or absolute personal paths (macOS home folders under `/Users`, volumes under `/Volumes`, a local checkout path) in commits.
 - No new dependencies without the owner's approval; never hand-merge `package-lock.json`.
 - No `git push --force`, and no rewriting shared history.
-- Don't compute XP or badges in the browser, award XP or learning days from `POST /user/events`, or write
-  XP inside a lesson-progress save transaction (reconcile from server records instead).
+- Don't compute XP or badges in the browser, award XP or learning days from `POST /user/events`, or write XP inside a lesson-progress save transaction (reconcile from server records instead).
+- Don't point a development `.env.local` at the production database or change the shared Supabase project's settings from development; production look-ups and deletions run on the VM (runbook 18 章).
+- Don't print an env value from a deploy or check script; names and codes only.
 - Don't merge, cherry-pick or patch in anything from the private personal repository; rebuild a
   feature as new commits on `main`. What not to port and why: `doc/brushup-2026/integration/do-not-port.ja.md`.

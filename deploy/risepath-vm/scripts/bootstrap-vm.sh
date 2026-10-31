@@ -74,4 +74,4 @@ echo "Public path (Vercel app.<domain> → Cloudflare Tunnel api.<domain>), from
 echo "    PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge"
 echo "From the Mac over Tailscale (while stack.env has no ORIGIN_SECRET; then :3006 needs the x-origin-secret header):"
 echo "    npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100"
-echo "Mac .env.local → DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable"
+echo "Mac の .env.local は、開発用の DB を使います（doc/guides/first-launch.ja.md 18 章。本番の DB には VM の中からだけ触ります）"

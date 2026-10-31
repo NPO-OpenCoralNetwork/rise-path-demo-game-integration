@@ -13,7 +13,8 @@ import { LESSON_PRIORS } from '../../shared/review/queue.js';
 const read = (rel) => fs.readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 const migrations = fs.readdirSync(new URL('../migrations/', import.meta.url)).filter((name) => /^\d{3}_.+\.sql$/.test(name)).sort();
 const latest = migrations.at(-1).slice(0, 3);
-const RUNBOOKS = ['deploy/risepath-vm/README.md', 'doc/guides/risepath_vm_deployment.md', 'deploy/vercel/README.md'];
+// Phase 9 (design §9.2 #10): the plan and the first-launch runbook name the range too (map D1).
+const RUNBOOKS = ['deploy/risepath-vm/README.md', 'doc/guides/risepath_vm_deployment.md', 'deploy/vercel/README.md', 'doc/brushup-2026/ai-access-plan.ja.md', 'doc/guides/first-launch.ja.md'];
 
 describe('the VM runbooks follow server/migrations', () => {
     it(`every "000–NNN" range names the latest migration (${latest})`, () => {
@@ -85,15 +86,16 @@ describe('the VM runbooks follow server/migrations', () => {
 });
 
 describe('the plan: Phase 6 chapter', () => {
-    it('§10 is Phase 6, §11 Phase 7 and §12 Phase 8, before やらないこと (13) and まだ分からないこと (14); its owner steps start with the deploy order of 020', () => {
+    it('§10 is Phase 6, §11 Phase 7, §12 Phase 8 and §13 Phase 9, before やらないこと (14) and まだ分からないこと (15); its owner steps start with the deploy order of 020', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
         const headings = plan.split('\n').filter((line) => /^## \d+\. /.test(line)).map((line) => line.replace(/^## /, '').slice(0, 12));
-        assert.deepEqual(headings.slice(-6).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.']);
+        assert.deepEqual(headings.slice(-7).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.', '15.']);
         assert.match(plan, /^## 10\. Phase 6: /m);
         assert.match(plan, /^## 11\. Phase 7: /m);
         assert.match(plan, /^## 12\. Phase 8: /m);
-        assert.match(plan, /^## 13\. やらないこと$/m);
-        assert.match(plan, /^## 14\. まだ分からないこと$/m);
+        assert.match(plan, /^## 13\. Phase 9: /m);
+        assert.match(plan, /^## 14\. やらないこと$/m);
+        assert.match(plan, /^## 15\. まだ分からないこと$/m);
         const order = plan.split('\n').find((line) => line.startsWith('1. **デプロイの順番**: migration 020 を'));
         assert.ok(order, '10.2 item 1');
         assert.match(order, /`api`・`mcp`・`mcp-public` を起動する前に/);
@@ -135,11 +137,11 @@ describe('the plan: Phase 6 chapter', () => {
 describe('the plan: Phase 8 chapter', () => {
     const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
     const start = plan.indexOf('## 12. Phase 8: ');
-    const end = plan.indexOf('## 13. やらないこと');
+    const end = plan.indexOf('## 13. Phase 9: ');
     const chapter = plan.slice(start, end);
 
-    it('§12 holds 12.1–12.4 in order and ends where やらないこと starts', () => {
-        assert.ok(start > plan.indexOf('## 11. Phase 7: ') && end > start, 'Phase 8 after Phase 7, before やらないこと');
+    it('§12 holds 12.1–12.4 in order and ends where the Phase 9 chapter starts', () => {
+        assert.ok(start > plan.indexOf('## 11. Phase 7: ') && end > start, 'Phase 8 after Phase 7, before Phase 9');
         const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
         assert.deepEqual(subsections, ['12.1', '12.2', '12.3', '12.4']);
     });
@@ -231,7 +233,7 @@ describe('the plan: Phase 8 chapter', () => {
 
 describe('Phase 8 in-app check: chapter 12 says what the fixes changed', () => {
     const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
-    const chapter = plan.slice(plan.indexOf('## 12. Phase 8: '), plan.indexOf('## 13. やらないこと'));
+    const chapter = plan.slice(plan.indexOf('## 12. Phase 8: '), plan.indexOf('## 13. Phase 9: '));
     const line = (prefix) => chapter.split('\n').find((l) => l.startsWith(prefix));
 
     it('S1: no "kept on this device" card while the bar notice shows (finding 2), as ReaderStatus.tsx does', () => {
@@ -332,5 +334,36 @@ describe('the plan: Phase 5 deploy order and R12', () => {
         const r12 = plan.split('\n').find((line) => line.startsWith('- **R12**:'));
         assert.doesNotMatch(r12, /9\.2 の 1 の順番で、この間を短くします/);
         assert.match(r12, /Vercel を先に出せば、そのタブは Vercel の更新より前に開いたものだけになります/);
+    });
+});
+
+describe('the plan: Phase 9 chapter (design §8.5)', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const start = plan.indexOf('## 13. Phase 9: ');
+    const end = plan.indexOf('## 14. やらないこと');
+    const chapter = plan.slice(start, end);
+
+    it('§13 holds 13.1–13.5 in order, after Phase 8 and before やらないこと, and sends the owner to the runbook', () => {
+        assert.ok(start > plan.indexOf('## 12. Phase 8: ') && end > start);
+        assert.match(plan, /^## 13\. Phase 9: 最初の公開の準備（事前チェック、登録の閉じ方、控え、公開の手順書）$/m);
+        const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
+        assert.deepEqual(subsections, ['13.1', '13.2', '13.3', '13.4', '13.5']);
+        assert.match(chapter, /^1\. 手順書 \[doc\/guides\/first-launch\.ja\.md\]\(\.\.\/guides\/first-launch\.ja\.md\) を、2 章から順に進めます。/m);
+        for (const d of ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8']) assert.match(chapter, new RegExp(`^- \\*\\*${d}\\*\\* `, 'm'), `13.1 ${d}`);
+    });
+
+    it('13.2 names only what Phase 9 built (Scope guard: no auth-check.mjs, no bypass, no what-if mode) and the replay\'s stop', () => {
+        const built = chapter.slice(chapter.indexOf('### 13.2 '), chapter.indexOf('### 13.3 '));
+        assert.doesNotMatch(built, /auth-check\.mjs|SMOKE_VERCEL_BYPASS|--stage/u);
+        assert.match(built, /保護者の同意の取り消しと AI アプリの切断の記録があるときは、何も変えずに止まります/u);
+        assert.match(built, /`scripts\/sync-db-url-from-vm\.py` は消しました（D8）/u);
+    });
+
+    it('13.4 holds the one-sitting rule of 11.8 and 12.1 (TR1); 13.5 the list the Scope guard deferred', () => {
+        assert.match(chapter, /手順書 11\.8 と 12\.1 は、同じ日に続けてします。/u);
+        const left = chapter.slice(chapter.indexOf('### 13.5 '));
+        for (const must of ['`scripts/auth-check.mjs` と `smoke:edge --sign-in`', '保護者の同意の取り消しと AI アプリの切断の記録の当て直し', 'C16、D8、E1〜E4', '`byoa` の DB ロールの確かめ', '`pg_dump`', '書面で同意', '匿名のセッションを断るコード', '`mcp-server/sseUserAuth.js`', 'VB2 と事前チェックの C6']) {
+            assert.ok(left.includes(must), `13.5: ${must}`);
+        }
     });
 });

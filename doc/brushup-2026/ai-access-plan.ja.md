@@ -119,7 +119,7 @@
 
 ### 3.3 オーナーの作業
 
-- 本番の環境変数から `GEMINI_API_KEY` を消すか、`GEMINI_ALLOWED` を設定しないままにします。
+- 本番の環境変数では、`GEMINI_API_KEY` と `GEMINI_ALLOWED` を両方とも空にします（`GOOGLE_API_KEY` も入れません）。Phase 9 から、事前チェックの C1・C2 が確かめます（手順書 13 章。手順書は [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。
 - Vercel に `VITE_FEATURE_AGENT_CHAT` を設定しないままにします。
 - いくつかのレッスンで、Haiku のチューターと作文フィードバックの質を確かめます。
 - [../legal/README.md](../legal/README.md) の【要記入】を埋め、専門家に確認を頼みます。
@@ -203,10 +203,10 @@
 - **確認の精度を測ること**: 学習の質問を止めすぎていないか、すり抜けがないか。試験用の文章で、止めた割合と見逃した割合を測ります。Anthropic が提供すると書いている子ども向けのシステムプロンプトは、まだ手に入れていません（`MINOR_SAFETY` は自分たちで書いたものです）。
 - **AI コーチ（共有 Hermes）と画像生成**: どちらも既定で止まっていて、18 歳以上だけにしてあります（18 歳未満向けの確認と子ども向けの指示がないため。Hermes は AI の窓口を通らず、設定例は OpenRouter 経由の Gemini です。`hermes/config.example.yaml:8`、`:13-16`）。18 歳未満にも使えるようにするなら、先に確認と子ども向けの指示を足します。ブリッジ（Nexloom）からの Hermes の呼び出しも同じ関門を通るので、本番で使うなら `PHASE1_USER_ID` の利用者に 18 歳以上の年月を登録します。
 - **Phase 0.5 より前に保存したもの**: すでに保存されている生成コース（`curricula`）や、ブラウザに残っている AI の答えは、確認していません。
-- **ほかのデータの保存期間**: AI の利用回数の記録（IP アドレスをふくむ）は 30 日で消し、アカウントの削除もできるようになりました（Phase 4、8 章）。アップロードした教材と生成コースは、ご本人が消すかアカウントを削除するまで残ります。読み上げ音声のキャッシュと生成した画像には、消す仕組みがありません。
+- **ほかのデータの保存期間**: AI の利用回数の記録（IP アドレスをふくむ）は 30 日で消し、アカウントの削除もできるようになりました（Phase 4、8 章）。アップロードした教材と生成コースは、ご本人が消すかアカウントを削除するまで残ります。生成した画像には、消す仕組みがありません。読み上げ音声のキャッシュは、Phase 9 から、30 日を過ぎた音声を返さず、1 時間ほどで消します（デプロイのたびにすべて消えます。13 章）。
 - **P-School と Nexloom のアカウント**: P-School は同じ Supabase に別の登録画面を持ち、Nexloom のアカウントは Rise Path の登録画面を通りません。どちらも AI を使うときに年齢の登録を求められるので AI は守られますが、AI 以外の利用には年齢の確認がありません。
 - **Claude Code のコース**: 有料の Claude のプランか Console のアカウントが要ると教えています。Claude の個人向けプランは 18 歳以上です。未成年への案内（保護者のアカウントを使う、など）は未定です。
-- **読み上げ（TTS）**: ログインなしでも使え、1 日の上限がありません（外部には送りません。`server.js` の `/api/v2/tts`）。
+- **読み上げ（TTS）**: 本番（strict）ではログインが要ります（`server.js` の `/api/v2` の `requireAuth`）。1 日の上限はありません。1 回の文は 1,000 文字までです（Phase 9。外部には送りません。`server.js` の `/api/v2/tts`）。
 - **複数のサーバーで動かす場合**: 判定の結果は各サーバーが 60 秒覚えるので、同意の取り消しやお休みが、ほかのサーバーに届くまで最大 60 秒かかります。今の VM は API のコンテナが 1 つです。
 - 工数: 見積もりはまだです【要確認】。
 
@@ -283,7 +283,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 - **宛先（aud）の結びつけは、自分たちのフックに頼っています。** Supabase は RFC 8707 の `resource` を確かめるだけで、`aud` には入れません（2026-10-21 時点の supabase/auth のソースコードと文書で確認。本番の Supabase の版とちがう可能性があります）。フックがないか止まっていると、AI アプリのトークンの `aud` は学習者のログインと同じ `authenticated` になります。そのとき MCP サーバーはすべて 401 にし（安全な側）、アプリの API は `client_id` で断ります。
 - **AI アプリのトークンは、Supabase Auth では学習者本人のログインと同じ力を持ちます。** supabase/auth のソースコード（`internal/api/user.go`、2026-10-21 時点）を読んだかぎりでは、Supabase Auth の `/user` や許可の API は、AI アプリのトークンも受け付けます【本番の Supabase では未検証】。Supabase の設定で、トークンの届く範囲は狭められません。
   - **パスワードを設定・置き換えて、アプリの API に入れます。** AI アプリは `/user` でアカウントのパスワードを設定するか置き換え、そのパスワードでふつうにログインできます。そのログインは学習者自身のものと同じ形（`client_id` なし、`aud` は `authenticated`）なので、アプリの API の守り（`isOAuthClientToken`）を通り、アプリの API と VM のデータをすべて使えます。メールアドレスの変更も同じ経路です。
-  - **対策（オーナーの設定）**: Authentication → Sign In / Providers → Email で、「Require current password when changing password」（今のパスワードを確かめる）、「Require reauthentication when changing password」（ダッシュボードでは「Secure password change」。ログインから 24 時間をこえたら、メールで届くコードを求める）、「Secure email change」（前と後の両方のアドレスで確かめる）を on にします（<https://supabase.com/docs/guides/auth/password-security>、<https://supabase.com/docs/guides/self-hosting/auth/config>。手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の 6）。
+  - **対策（オーナーの設定）**: Authentication → Sign In / Providers → Email で、「Require current password when updating」（今のパスワードを確かめる。画面の表示名は【要確認】。Supabase の文書では「Require current password when changing password」）、「Require reauthentication when changing password」（ダッシュボードでは「Secure password change」。ログインから 24 時間をこえたら、メールで届くコードを求める）、「Secure email change」（前と後の両方のアドレスで確かめる）を on にします（<https://supabase.com/docs/guides/auth/password-security>、<https://supabase.com/docs/guides/self-hosting/auth/config>。手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の 6）。
   - **それでも残るもの**: 今のパスワードの確認は、パスワードのないアカウントでは働きません。AI アプリのセッションは許可した時刻に作られるので、許可から 24 時間はコードも求められません。つまり、パスワードのないアカウントでは、許可から 24 時間のあいだ、AI アプリがパスワードを設定できます。Rise Path の登録画面はパスワードを作りますが、同じ Supabase プロジェクトのほかの入口で作ったアカウントにはないことがあります。
   - **アカウントの削除にも届きます（Phase 4）**: パスワードを設定してログインした AI アプリは、設定の「アカウントを削除する」のパスワードの確認も通るので、その方の Rise Path のデータを削除できます。なので、削除ははじめ止まっています。上の 3 つの設定を入れて確かめるまで、`ACCOUNT_DELETION_ENABLED=true` にしません（8.2 の 2）。設定のあとも、パスワードのないアカウントの 24 時間は残ります（8.3）。
   - **減らし方**: 許可の画面は「許可する」の上に、アプリが自分と同じ力を持つので信頼できるアプリだけを許可するよう出します。DCR を on にして毎週 OAuth Apps を見るか、DCR を off にして知っているクライアントだけを登録します（下の「DCR の乱用」）。どちらにするかと、このリスクを受け入れるかは、オーナーが決めます（5.4）。
@@ -390,7 +390,7 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 
 ### 6.2 オーナーの作業
 
-1. **プルリクエストを `main` にマージしたら、すぐに VM を更新します。** Vercel は `main` へのマージで、新しい画面を自動で出します（Production Branch が `main` のため。`deploy/vercel/README.md`）。VM は、`./scripts/deploy-stack.sh` を実行するまで古いままです。このスクリプトが migration 016 を当てます（`server/migrations/README.md`）。VM が古いあいだは、ログインした学習者の進み具合をサーバーに保存できません。記録は「送れていない記録」としてその端末に残ります（6.3 の共有の端末の場合を除く）。VM を更新したあとは、タブに戻ったときやログアウトのときに読み込みからやり直し、残っていた記録を送ります。【要確認: VM を先に更新するため、マージのあいだだけ Vercel の自動デプロイを止めるか】
+1. **プルリクエストを `main` にマージしたら、すぐに VM を更新します。** Vercel は `main` へのマージで、新しい画面を自動で出します（Production Branch が `main` のため。`deploy/vercel/README.md`）。VM は、`./scripts/deploy-stack.sh` を実行するまで古いままです。このスクリプトが migration 016 を当てます（`server/migrations/README.md`）。VM が古いあいだは、ログインした学習者の進み具合をサーバーに保存できません。記録は「送れていない記録」としてその端末に残ります（6.3 の共有の端末の場合を除く）。VM を更新したあとは、タブに戻ったときやログアウトのときに読み込みからやり直し、残っていた記録を送ります。デプロイの順番の決まりは、手順書 11.3 です（マージしたら、すぐに VM で `deploy-stack.sh` を実行します。Vercel の自動デプロイは止めません。手順書は [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。
 2. **自分の AI をつなぐ機能（5 章、プロファイル `byoa`）をもう動かしているなら、更新のあとに DB ロールの SQL を流し直します。** 手順は [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の 7 です。今のパスワード（`mcp-public.env` の値）をそのまま渡します。流し直すまで、リモートの AI アプリでは `course-quiz-check`、`course-progress-get`、`course-progress-update` が `permission_denied`（`server setup incomplete`）になります。`course-list` と `course-lesson-get` は動きます。
 3. **確かめます。**
    - 同じ学習者で 2 つの端末（または 2 つのブラウザ）にログインします。片方で読んだレッスンが、もう片方の「続きから」に出ること。
@@ -685,13 +685,13 @@ BYOA は「Bring Your Own Agent（自分の AI を持ち込む）」の略です
 1. **公開の関門**: 一般の登録は、`VITE_FEATURE_LEGAL_PAGES=true` にするまで受け付けません（拠点とテスターだけ）。`true` にするのは、弁護士の確認のあとです。止めているあいだは、利用目的のお知らせも同意もありません（個人情報保護法 第 21 条第 2 項、利用規約 第 1 条）。アプリの登録は、そのあいだコードで閉じています（Phase 9。Nexloom や P-School のアカウントのログインは、Vercel の保護と試験運用の名簿で断ります）。手順は [../legal/README.md](../legal/README.md) の「ページを公開する手順」です。
 2. **パスワードの設定と削除（どの環境でも）**: ご本人の削除は、はじめ止まっています（`ACCOUNT_DELETION_ENABLED` が未設定）。Supabase の「Require current password when updating」を入れ、ステージングで確かめます。確かめ方: ふつうの学習者のセッションのトークンで、`current_password` を付けずに `PUT /auth/v1/user {"password":"…"}` を送り、400 `current_password_required` が返ること。設定がないと、ログインしたままの端末を持っている人が、新しいパスワードを設定してログインし直し、パスワードの確認を通って、アカウントを削除できます（「Secure password change」だけでは、ログインから 24 時間以内のセッションを防げません）。`byoa`（`mcp-public`）を動かす、または動かす予定のあいだは、さらに [../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 6 の 3 つの設定をすべて入れ、手順 10 のパスワードの確かめが通るまで止めたままにします。設定がないと、つないだ AI アプリもパスワードを設定してログインし、アカウントを削除できます。確かめが通り、3 も済んだら、VM の `stack.env` に `ACCOUNT_DELETION_ENABLED=true` を書いて、`deploy-stack.sh` を実行し直します。
 3. **本番の `amr` の確かめ**: 本番で新しくログインしたアクセストークンを読み、`amr: [{"method":"password","timestamp":…}]` があることを確かめます。ないと、削除は `reauth_required` になり、削除したアカウントのログインは、ずっと断られます（安全な側）。削除を使い始める前の関門です。2 とこれが済んだら、`ACCOUNT_DELETION_ENABLED=true` にします（2 の終わりの手順）。
-4. **デプロイの順番**: マージすると、Vercel がすぐに画面を作り直します。API は `deploy-stack.sh` を実行するまで古いままです。**同じ日に** `deploy-stack.sh` を実行します（migration 018 を当てます）。そのあと `sql/mcp_remote_role.sql` を流し直します。ログの設定が変わるので、最初のデプロイでは、動いているコンテナがすべて一度作り直されます（`db` は「db up」のときに数秒止まり、古い API が 503 を返します。そのあと API、最後に「docker compose up」で cloudflared、読み上げ、mcp、mcp-public、hermes と memanto。トンネルが少し止まり、読み上げのモデルを読み直します）。018 を当てる前に、この版の API、mcp、mcp-public を動かさないでください（手元の開発の DB も `npm run db:migrate`）。
+4. **デプロイの順番**: マージすると、Vercel がすぐに画面を作り直します。API は `deploy-stack.sh` を実行するまで古いままです。マージしたら**すぐに** `deploy-stack.sh` を実行します（migration 018 を当てます。順番の決まりは手順書 11.3、[doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。そのあと `sql/mcp_remote_role.sql` を流し直します。ログの設定が変わるので、最初のデプロイでは、動いているコンテナがすべて一度作り直されます（`db` は「db up」のときに数秒止まり、古い API が 503 を返します。そのあと API、最後に「docker compose up」で cloudflared、読み上げ、mcp、mcp-public、hermes と memanto。トンネルが少し止まり、読み上げのモデルを読み直します）。018 を当てる前に、この版の API、mcp、mcp-public を動かさないでください（手元の開発の DB も `npm run db:migrate`）。
 5. **お問い合わせ**: `VITE_SUPPORT_CONTACT`（Vercel）を設定し、下書きの【要記入: 連絡先】に同じ窓口を書きます。だれが読むかを [../guides/account-deletion-operations.ja.md](../guides/account-deletion-operations.ja.md) に書きます。
 6. **Supabase のダッシュボードで確かめること**: JWT の有効期間、メールの確認（Confirm email）が on か off か、本番で `VITE_NEXLOOM_SUPABASE_*` を設定しているか（Nexloom だけのセッションは、削除も同意もサーバーに届きません）、セッションの期限の設定があるか（5 年より古いセッションは、また入れてしまいます）。
 7. **ログインを手で消す前に**: P-School の外部キーの確かめ（運用ガイドの 3 章）。Nexloom と P-School の担当に、共有のログインを消したら知らせてもらうよう書面で頼み、`--orphans` を月に 1 回実行します。公開の前に 1 回、一覧だけ（`--orphans --limit 20`）をステージングか本番で実行します。
 8. **Memanto**: 既定で止まっています。一度でも動かしたなら、止めたままにする前に、そのボリュームを消します。止めているあいだは、アカウントの削除で Memanto の記憶を消せず、同じ ID でまた使い始めたアカウントに、Memanto をまた動かしたときに見えてしまいます。
 9. **Hermes**: AI チャットや `full` のプロフィールを学習者に出す前に、削除したアカウントの会話（`./hermes-data`）を消すか、残すことを受け入れます（世代の印で、また使い始めたアカウントには見えません）。
-10. **手でとった DB の控え**（`pg_dump`）は、消すまで削除の前のデータを持ちます。何日残すかを決めます（プライバシーポリシー 8 の【要記入】）。
+10. **手でとった DB の控え**（`pg_dump`）は、消すまで削除の前のデータを持ちます。何日残すかを決めます（プライバシーポリシー 8 の【要記入】）。Phase 9 から、毎日の控えは自動で、30 日で消えます（13 章、[../legal/README.md](../legal/README.md) の「弁護士に確かめること（Phase 9）」）。
 
 ### 8.3 受け入れているリスク
 
@@ -767,7 +767,7 @@ Phase 2 で、レッスンの進み具合をサーバーに保存するように
 
 ### 9.2 オーナーの作業
 
-1. **デプロイの順番**: migration 019 は、この版の API、mcp、mcp-public を動かす前に当てます（`deploy-stack.sh` が当てます。手元の開発の DB は `npm run db:migrate`）。おすすめは、マージで Vercel が新しい画面を出したあと、すぐに VM で `deploy-stack.sh` → `/api/v2/health` が 200、の順です【要確認】（新しい画面は、古いサーバーではやり直しと XP を出しません）。Vercel の自動デプロイを止めて VM を先にしても壊れませんが、そのあいだに開いた画面はすべて古い画面になり、9.3 の R12 が広がります。どちらの順でも、2 つの更新のあいだは数分にしてください。
+1. **デプロイの順番**: migration 019 は、この版の API、mcp、mcp-public を動かす前に当てます（`deploy-stack.sh` が当てます。手元の開発の DB は `npm run db:migrate`）。マージで Vercel が新しい画面を出したあと、すぐに VM で `deploy-stack.sh` → `/api/v2/health` が 200、の順にします（新しい画面は、古いサーバーではやり直しと XP を出しません。順番の決まりは手順書 11.3、[doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。Vercel の自動デプロイを止めて VM を先にしても壊れませんが、そのあいだに開いた画面はすべて古い画面になり、9.3 の R12 が広がります。どちらの順でも、2 つの更新のあいだは数分にしてください。
 2. **DB ロールの SQL は、流し直さなくてかまいません。** 3 つの表は、どれも MCP のロールに渡しません。
 3. **019 を当てるあいだは、アカウントの削除をしないでください。** スタッフの削除（`--yes`）は待ちます。画面からの削除を使えるようにしているとき（`ACCOUNT_DELETION_ENABLED=true`）は、人の少ない時間にデプロイします。重なると、Postgres がデッドロック（40P01）でどちらかを止めます。止まったほうは何も変えずに戻るので、もう一度実行します（019 が止まったら `deploy-stack.sh` をもう一度。`server/migrations/README.md`、[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「保存の様子・レッスンのやり直し・XP」）。
 4. **お知らせ**（O3）: リリースのお知らせで、レベルと連続日数が変わることがあると伝えます。XP は、サーバーに保存した進み具合から数え直すため、診断、コース生成、端末の中だけの記録で増えていた分は数えません。連続日数も、サーバーに届いた日から数えます。
@@ -843,7 +843,7 @@ Phase 6 では、レッスンの暗記カード（復習カード）が、忘れ
 
 ### 10.2 オーナーの作業
 
-1. **デプロイの順番**: migration 020 を、この版の `api`・`mcp`・`mcp-public` を起動する前に当てます（`deploy-stack.sh` が当てます。手元の開発の DB は `npm run db:migrate`）。020 は終わるまで `auth.users` をロックするので、人の少ない時間にします。アカウントの削除が重なってもデッドロックにはなりませんが、削除は 020 を待ち、10 秒を超えると `account_busy` で終わります（あとでもう一度実行します）。画面（Vercel）と VM は、どちらを先にしても壊れません（新しい画面は、古い API では復習を出しません。10.3 の 6）。2 つの更新のあいだは、Phase 5 と同じく数分にしてください。
+1. **デプロイの順番**: migration 020 を、この版の `api`・`mcp`・`mcp-public` を起動する前に当てます（`deploy-stack.sh` が当てます。手元の開発の DB は `npm run db:migrate`）。020 は終わるまで `auth.users` をロックするので、人の少ない時間にします。アカウントの削除が重なってもデッドロックにはなりませんが、削除は 020 を待ち、10 秒を超えると `account_busy` で終わります（あとでもう一度実行します）。画面（Vercel）と VM は、どちらを先にしても壊れません（新しい画面は、古い API では復習を出しません。10.3 の 6）。2 つの更新のあいだは、Phase 5 と同じく数分にしてください（ふだんの順番は、マージしたらすぐに VM、の 1 つです。手順書 11.3、[doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。
 2. **`byoa` を動かしているときは、020 のあとに DB ロールの SQL を流し直します**（[../guides/byoa-setup.ja.md](../guides/byoa-setup.ja.md) の手順 7。パスワードは今の値）。流すまで、AI アプリの復習の 2 つのツールは `review_unavailable` を返します。ほかのツールは動きます。
 3. **AI アプリの許可の数を確かめます**: `SELECT count(*) FROM mcp_oauth_grants WHERE revoked_at IS NULL`。今の許可は、あらためて同意をもらわずに 2 つのツールを使えます（Phase 2 と同じ扱い。10.3 の 7）。
 4. **前の版に戻したあと、この版に戻すとき**は、この版のサービスを起動する前に、[`deploy/risepath-vm/README.md`](../../deploy/risepath-vm/README.md) の「復習（Phase 6）」の確認と削除を流します。前の版のやり直しと「学習の進み具合を消す」は、復習のカードを消さないためです。
@@ -894,7 +894,7 @@ Phase 6 では、レッスンの暗記カード（復習カード）が、忘れ
 
 ## 11. Phase 7: 公開の前に、通しで確かめる（CI の 3 つのチェック）
 
-Phase 1〜6 のコードは、まだ本番で動いたことがありません（2026-10-21 に VM を削除したためです）。作り直した VM では、最初の `deploy-stack.sh` が、空の DB に migration 000–020 をまとめて流します。Phase 7 では、それと同じことを GitHub Actions で、プルリクエストのたびに確かめるようにしました（2026-10-28 の作業ツリー）。オーナーの決定は次の 5 つです。
+Phase 1〜6 のコードは、まだ本番で動いたことがありません（2026-10-21 に VM を削除したためです）。作り直した VM では、最初の `deploy-stack.sh` が、空の DB に migration 000–021 をまとめて流します。Phase 7 では、それと同じことを GitHub Actions で、プルリクエストのたびに確かめるようにしました（2026-10-28 の作業ツリー）。オーナーの決定は次の 5 つです。
 
 - **P1**: 新しい確かめを 3 つ足します。(A) VM と同じ pgvector の PostgreSQL 16（`docker-compose.yml` と同じダイジェスト）に migration を 2 回流し、確かめのスクリプト 3 つと DB ロールの SQL を動かします。(B) 本物の `deploy-stack.sh` で、秘密を含まないダミーの値のスタックを Docker で作り、ヘルスチェックとスモークを通します。(C) ブラウザで、ログイン → レッスン → 復習の流れを、そのスタックに対して最後まで動かします。
 - **P2**: (B) と (C) は、すべてのプルリクエスト、main への push、毎晩、手動で動かします。(A) も、すべてのプルリクエストと push で動かします。
@@ -992,11 +992,11 @@ Phase 1〜6 のコードは、まだ本番で動いたことがありません�
       今ある CI の 2 つ（`Typecheck, tests and lessons` と `Build and key-leak scan`）も、一緒に足すことをおすすめします。
    5. **Require branches to be up to date before merging** には、今は印を付けません。付けると、main が進むたびに、開いているプルリクエストを main に合わせて動かし直すことになります（1 回 10 分ほど）。main への push と毎晩の実行で、マージのあとの状態も確かめます。
    6. **Create** で保存します。このルールは、main への直接の push にも効きます（チェックが通っていないコミットは push できなくなります）。急ぎで直接 push する必要があるときのために、**Bypass list** に自分（Repository admin）を入れるかどうかを決めます。
-   7. **ほかの開いているプルリクエスト**（2026-10-28 には 10 件）。main に向けた 5 件（#39〜#41、#45、#50）は、main を取り込むか push し直すまで、3 つのチェックが出ず、マージできません（「Expected — Waiting for status to be reported」）。プルリクエストの画面の **Update branch** を押すと、main を取り込んで、3 つが動きます。main と競合しているプルリクエストでは、競合を解くまで、チェックは動きません。ほかのブランチに重ねた 5 件（#43、#44、#48、#49、#51）は、このルールの外です。もとのプルリクエストがマージされ、そのブランチが消えると、GitHub が向け先を main に変えます（消さないときは、プルリクエストの画面の **Edit** で向け先を `main` にします）。そのあとで **Update branch** を押します。
+   7. **ほかの開いているプルリクエスト**: 2026-10-30 に見たとき、ここに書いていた 10 件は、すべて閉じていました。ルールセットはすぐ作れます。そのあと開いたプルリクエストは、作ったあとに **Update branch** を押すと、3 つのチェックが動きます。以下は、2026-10-28 の記録です（10 件）。main に向けた 5 件（#39〜#41、#45、#50）は、main を取り込むか push し直すまで、3 つのチェックが出ず、マージできません（「Expected — Waiting for status to be reported」）。プルリクエストの画面の **Update branch** を押すと、main を取り込んで、3 つが動きます。main と競合しているプルリクエストでは、競合を解くまで、チェックは動きません。ほかのブランチに重ねた 5 件（#43、#44、#48、#49、#51）は、このルールの外です。もとのプルリクエストがマージされ、そのブランチが消えると、GitHub が向け先を main に変えます（消さないときは、プルリクエストの画面の **Edit** で向け先を `main` にします）。そのあとで **Update branch** を押します。
    8. 試しのプルリクエストで、3 つが「Required」と出ることを確かめます。
    9. チェックの名前は、`e2e.yml` の `name:` と同じでなければなりません（ルールに足した `ci.yml` の 2 つは、`ci.yml` の `name:` と同じ）。名前を変えると、ルールが待つチェックが来なくなり、どのプルリクエストもマージできなくなります（「Expected — Waiting for status to be reported」）。名前は `server/tests/e2eWorkflow.test.js` で固定しています。変えるときは、ルールも同じ日に直します。
 2. **最初の数回の結果を見ます**。各チェックの時間と、`Server stack deploy` と `Learner end-to-end` の「Disk use」のディスクの空き（少ないのは `Learner end-to-end` です）を見て、11.1 の見込みの時間を、測った値に直します（エージェントに頼めます）。
-3. **作り直した VM の最初のデプロイの前に**（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 0）、デプロイする main のコミットで 3 つのチェックが緑であること、毎晩の実行も緑であることを確かめます。毎晩の実行を待たないときは、Actions の画面の左で `End-to-end checks` を選び、**Run workflow** を開いて、ブランチを `main` のまま **Run workflow** を押します（毎晩の実行と同じ 3 つが動きます）。CI が確かめないもの（11.3 の 1）は、VM で確かめます。VM で、`bootstrap-vm.sh` の 1 回目のあと（Docker が入り、`stack.env` を埋めたあと）、2 回目の前に、次のことも見ます。
+3. **作り直した VM の最初のデプロイの前に**（[`doc/guides/risepath_vm_deployment.md`](../guides/risepath_vm_deployment.md) §4.5 と [`deploy/vercel/README.md`](../../deploy/vercel/README.md) の手順 0）、デプロイする main のコミットで 3 つのチェックが緑であること、毎晩の実行も緑であることを確かめます。毎晩の実行を待たないときは、Actions の画面の左で `End-to-end checks` を選び、**Run workflow** を開いて、ブランチを `main` のまま **Run workflow** を押します（毎晩の実行と同じ 3 つが動きます）。CI が確かめないもの（11.3 の 1）は、VM で確かめます。VM で、`bootstrap-vm.sh` の 1 回目のあと（Docker が入り、`stack.env` を埋めたあと）、2 回目の前に、次のことも見ます（手順書 2.8 と 5.3。手順書は [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)）。
    - `stack.env` の `SUPABASE_URL` が `https://<project>.supabase.co` であること（CI だけの `http://auth-stand-in:…` でないこと）。
    - VM の `docker version` と `docker compose version` を、`Server stack deploy` の「Preflight」の行（Docker・Compose・Storage driver）とくらべます。メジャー（29 と 5）がちがうときは、デプロイの前にエージェントと相談します（11.3 の 2）。
 4. **VM では `RISEPATH_DEPLOY_SKIP_PULL` を設定しません。** `deploy/risepath-vm/ci/` のファイルも、VM の設定には使いません。
@@ -1085,7 +1085,60 @@ Phase 7 までに見つけて残していた、公開の前に直したい小さ
 - `learner-state-get` の `last_lesson`（いつも null）。
 - 工数（見積もり・未検証）: 実際にかかった日数は測っていません【要確認】。
 
-## 13. やらないこと
+## 13. Phase 9: 最初の公開の準備（事前チェック、登録の閉じ方、控え、公開の手順書）
+
+Phase 1〜8 で作ったものを、作り直した VM で、スタッフと大人のテスターに安全に出すための準備です（2026-10-31 の作業ツリー）。オーナーの手順は、すべて新しい手順書 [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md) にまとめました（この章では「手順書」と呼びます）。部品の弱点を直すこと（D6）は、別のプルリクエスト（#77）です。
+
+### 13.1 決めたこと（D1–D8、2026-10-30）
+
+- **D1** 最初の公開は、スタッフと大人のテスターだけの試験運用です（18 歳未満はまだ使いません）。アプリの登録は、法務の文が確定して `VITE_FEATURE_LEGAL_PAGES=true` にするまで、コードで閉じます。テスト用のアカウントはオーナーが作ります。Supabase は Nexloom・P-School と共有なので、試験運用の名簿で、名簿にない人を断ります（D1 と D5 から決まります）。
+- **D2** デプロイのたびに事前チェックをします。エラーはデプロイを止め、日本語で直し方を出します。注意は出すだけです。値は出しません。確かめた日の記録（`launch-record.env`）を VM に置き、順番の決まりを確かめます。
+- **D3** 最初の公開で動かすのは、読み上げ（kokoro-tts）だけです。BYOA、Memanto、Hermes、有料プランは止め、事前チェックが確かめます。読み上げの文の長さに上限を付け、音声のキャッシュを片付けます。
+- **D4** DB とアップロードの控えを、毎日自動で暗号化して VM の外（Google Cloud）に置きます。残す日数を決め、毎月、戻す練習をします。
+- **D5** Vercel の保護（Deployment Protection）を、本番にもかけたままにします（名簿を確かめるまで）。
+- **D6** 部品の弱点は、Phase 9 とは別のプルリクエストで直します。
+- **D7** 安全の知らせは Slack の受け口に送ります。見る人と頻度はオーナーが決めます。
+- **D8** 公開のあと、開発は本番とは別の DB を使います。本番の DB には、決まった作業のときだけ、VM の中から触ります。
+- 既定: 手順書は 1 つにまとめます。ドメインは決まるまで `<domain>` と書きます。古い VM（nexloom-gce）にデータが残っているかを先に見ます。
+
+### 13.2 作ったもの
+
+- **事前チェック（`deploy/risepath-vm/scripts/preflight.sh`）**: `deploy-stack.sh` が `stack.env` を読む前に動きます。5 つの設定のファイルと VM の事実を、`node:22-slim` のコンテナの中で、ネットワークなし、読み取りだけで確かめ、名前とコードと日本語の直し方だけを出します（ルールは `scripts/deploy/preflight-rules.mjs`。node の組み込みだけ）。root では動きません。CI では、テンプレの値と呼び出しの値がそろったときだけ CI の形になり、`Server stack deploy` を緑のままにします。オーナーが確かめた日を書く記録 `launch-record.env`（18 の名前、git に入れません）と、公開の段階（setup → pilot → minors → public）の順番の決まりも確かめます。コードの一覧と直し方は手順書 13 章、記録は 14 章です。
+- **デプロイへの組み込みと、事後の確かめ**: `deploy-stack.sh` は、デプロイするコミットの 7 文字を出し、DB の文字コード（DB1）を確かめ、トンネルがあれば cloudflared を待ち、最後に事後の確かめ（`postdeploy-check.sh`、P1〜P6・P8・P13）をします。外からの確かめ `npm run smoke:edge` に、0 と 10〜14 の確かめを足しました。試しの知らせ（`scripts/send-test-alert.mjs`）と、`scripts/deploy-from-mac.sh` が VM の設定のファイルを消さないようにする直しもあります。
+- **登録を閉じる（D1）**: `VITE_FEATURE_LEGAL_PAGES` が `true` でないあいだ、ログインの画面に「新規登録」はなく、`AuthContext.signUp` も断ります。サーバーには試験運用の名簿 `PILOT_ACCOUNT_IDS`（`server/middleware/pilotGate.js`）を足しました。3 つのログインの入口で、アカウントの行を作る前に確かめ、匿名のセッションも断り、名簿の形がまちがっていれば全員を断ります。名簿にない方には「このアカウントは、いまの試験運用の対象ではありません」のページを出します。
+- **読み上げ（D3）**: 学習者の読み上げは 1 回 1,000 文字までです（`tools/core/kokoroTts.js` の `requestTts()`。スタッフのスライドの読み上げには上限を付けません）。音声のキャッシュは、30 日を過ぎたものを返さず、1 時間ほどで消します（デプロイのたびにすべて消えます）。
+- **Vercel のビルドの確かめ（D5）**: Vercel の中のビルドだけで、env の名前と形を確かめます（`vite.config.ts` の `vercel-env-guard`、`scripts/deploy/vercel-env-rules.mjs`。VB で始まるコード）。CI と手元のビルドでは何もしません。
+- **控え（D4）**: `backup.sh`（毎日 3 時 23 分ごろの DB とアップロード、1 時間ごとの削除の記録。VM の鍵で暗号化した形式 `rpbk1`、`scripts/deploy/backup-crypt.mjs`）、`install-backup.sh`（鍵とタイマー。鍵の写しを VM の外にしまう手順まで）、`restore-drill.sh`（毎月の戻す練習。本番の DB は変えません）、`restore-db.sh`（本当に戻すとき。控えのあとの削除を、学習者に出す前に当て直します。`scripts/replay-deletions.mjs`）、失敗の知らせ（Slack）。`provision-gce.sh` に、控え用のサービスアカウント `BACKUP_SA_EMAIL` を足しました。当て直すのは、アカウントの削除、学習の記録の消去、1 つのレッスンのやり直しです。保護者の同意の取り消しと AI アプリの切断の記録があるときは、何も変えずに止まります（手で当て直します）。
+- **手順書**: [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md)。はじめに、決めたこと、2〜12 章の手順（どの手順にも、だれが・どこで、先に済ませること、やること、うまくいったとき、うまくいかないとき）、13 章のコード、14 章の記録、15 章の秘密の値と取り替え方、16 章の戻し方、17 章の困ったとき、18 章の本番の DB に触るとき。ほかの文書は、手順書へのリンクにしました。古い文書には「古い」と書きました。本番の DB の URL を Mac に書く古い道具 `scripts/sync-db-url-from-vm.py` は消しました（D8）。
+
+### 13.3 オーナーの作業
+
+1. 手順書 [doc/guides/first-launch.ja.md](../guides/first-launch.ja.md) を、2 章から順に進めます。どの手順も、済んだら日付を書きます。
+2. 弁護士に、[../legal/README.md](../legal/README.md) の「弁護士に確かめること（Phase 9）」の 5 つを聞きます（控えの日数など）。答えが出るまで、控えは 30 日で進めます。
+
+### 13.4 受け入れているリスク
+
+1. `launch-record.env` は、オーナーの記録です。証明ではありません。事前チェックは、書いた日付を信じます。
+2. Vercel のビルドの確かめは、Vercel のビルドが `VERCEL` などの値を見せないと、何もしません（安全な側には倒れません）。正しい env なら、どちらでも何も出ません。
+3. 控えから戻したとき、教材、ジャーナル、AI の記憶の削除は当て直せません（記録がありません）。削除の記録は 1 時間ごとなので、VM ごとなくしたときは、最後の 1 時間ほどの削除が当て直せないことがあります。保護者の同意の取り消しと AI アプリの切断の記録があると、戻しは止まり、手で当て直します。
+4. デプロイの最初の事前チェックは、VM にある今のコミットの決まりで確かめます。直しが新しいコミットにあるときは、一度 pull してからデプロイします（手順書 17 章）。
+5. ディスクの空きの線（5 GB でエラー、10 GB で注意）は見込みです。
+6. 毎日の控えが、控えを残す日数（30 日）より長く止まると、VM の外の控えがなくなります（36 時間で Slack に知らせます）。
+7. 手順書 11.8 と 12.1 は、同じ日に続けてします。あいだで VM を再起動すると、名簿のない `stack.env` で api が動き出します。
+
+### 13.5 残っていること
+
+- `scripts/auth-check.mjs` と `smoke:edge --sign-in`（オーナーがトークンを扱わずに 11.2 の確かめをする道具）。ご本人の削除を入れる前に作ると楽になります。今はエージェントと一緒にします。
+- 保護者の同意の取り消しと AI アプリの切断の記録の当て直し（18 歳未満の段階と BYOA の前に）。
+- `mcp-public.env` と `billing.env` の事前チェックのルール（C16、D8、E1〜E4）と、`byoa` の DB ロールの確かめ（BYOA か有料プランを使い始めるときに）。
+- 控えの形式を CI で本物の `pg_dump` で通す確かめ（任意）。
+- 弁護士とオーナー: 安全の知らせ（Slack）に学習者の文を入れないこと、試験運用に参加する方から書面で同意をもらうか、18 歳未満の方の決まり（年齢の線、紙の同意、緊急の連絡先）、事故のときの手順。
+- 共有の Supabase で匿名のログインを止められないとき（手順書 1 章の P9-Q5）、一般公開の前に、Rise Path のサーバーが匿名のセッションを断るコードを足します。
+- 管理用の SSE の MCP（:3100、`mcp-server/sseUserAuth.js`）は、学習者の Supabase のトークンを、試験運用の名簿を見ずに受け付けます。閉じているのは Tailscale の ACL（手順書 3.4）と GCP のファイアウォール（4.3）だけで、`mcp` のサービスはすべての口で 3100 を公開しています。名簿を見るか、口を絞るかを、あとで決めます。
+- 学校のビルド（職業訓練）を Vercel で作るときは、VB2 と事前チェックの C6 を、学校の版でだけ通す切り替えが要ります（[training-plan.ja.md](./training-plan.ja.md) の 4.7）。
+- エラーの知らせのサービス（Sentry など）、CSP・HSTS、ポートを 127.0.0.1 だけにすること、デプロイのときに動いている処理を待って止めること、イメージの版の固定、ログの中の個人の情報の見直し。
+
+## 14. やらないこと
 
 - 学習者の Claude や ChatGPT のログイン情報（パスワード、セッション、API キー）を集めたり預かったりすること。
 - AI のモデルそのものを、そのまま売ること（転売）。
@@ -1094,7 +1147,7 @@ Phase 7 までに見つけて残していた、公開の前に直したい小さ
 - 共有のブリッジトークン（`RISE_PATH_BRIDGE_TOKEN`）を外部のサービスに渡すこと。
 - 18 歳未満の方に、有料プランを売ること。保護者が代わりに払う形も、作っていません（7 章）。
 
-## 14. まだ分からないこと
+## 15. まだ分からないこと
 
 - Haiku のチューターと作文フィードバックの質が十分か（試して確かめます）。
 - Anthropic の利用ポリシーのページの「Effective Nov 12, 2026」が、これから有効になる版かどうか。2026-10-22 の調べでは、ページは 2026-11-12 から有効の版を最新として出し、2025-09-15 の版は「新しい版に置き換えられた」として保管されています（<https://www.anthropic.com/legal/aup>、<https://www.anthropic.com/legal/archive/22742366-2ef0-4c7a-a833-6523f10d3944>）。前もって公開された版で、2026-11-12 までは 2025-09-15 の版が効いている、と読めますが、推測です【要確認】。
@@ -1103,3 +1156,4 @@ Phase 7 までに見つけて残していた、公開の前に直したい小さ
 - 工数と費用の数字（どれも見積もりと試算です）。
 - 法律の確認（[../legal/README.md](../legal/README.md) の【要確認】）。
 - 有料プランの法律と税の扱い（NPO が特定商取引法の事業者にあたるか、最終確認の画面、収益事業と消費税。7.2 の 5）。
+- Phase 9（13 章）で、オーナーが画面で確かめられること【要確認】: GCE の既定のサービスアカウントの権限（控えは、手順書 3.8 の専用のアカウントにします）。Supabase のダッシュボードの表示名（「Add user」「Auto Confirm User」「Allow new users to sign up」「Require current password when updating」）。Vercel のビルドが `VERCEL` と `VERCEL_ENV` を見せるか（見せないと、Vercel のビルドの確かめは何もしません）。Slack の Incoming Webhook の画面。Cloud Storage の削除のあとに残る期間（7 日と見込んでいます）。古い VM（nexloom-gce）に Rise Path のデータが残っているか（手順書 2.7）。e2-medium での読み上げの速さ（1,000 文字の上限は 1 つの数で変えられます）。

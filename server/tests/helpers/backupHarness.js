@@ -353,7 +353,10 @@ export function makeHarness({ stackEnv, backupEnv = `BACKUP_BUCKET=${BUCKET}\nBA
     '  is-active) if [[ ",${STUB_TIMERS_ACTIVE-}," == *",$2,"* ]]; then echo active; else echo inactive; exit 3; fi ;;',
     // A unit that is not installed (STUB_UNITS_LOADED, default both timers) cannot be stopped: systemctl exits 5.
     '  stop) for u in "${@:2}"; do if [[ ",${STUB_UNITS_LOADED-risepath-backup.timer,risepath-backup-journal.timer}," != *",$u,"* ]]; then echo "Failed to stop $u: Unit $u not loaded." >&2; exit 5; fi; done ;;',
-    '  start) if [[ "$2" == risepath-backup.service && "$STUB_SERVICE_RUNS" == 1 ]]; then bash "$STUB_REPO/deploy/risepath-vm/scripts/backup.sh" daily >> "$STUB_DIR/service.out" 2>&1; exit $?; fi ;;',
+    // Nor started (a VM rebuilt by 手順書 16.3 has none until install-backup.sh runs; a service is loaded with its timer).
+    '  start) for u in "${@:2}"; do case "$u" in risepath-backup.timer|risepath-backup-journal.timer|risepath-backup.service|risepath-backup-journal.service)',
+    '      t="${u%.service}"; t="${t%.timer}.timer"; if [[ ",${STUB_UNITS_LOADED-risepath-backup.timer,risepath-backup-journal.timer}," != *",$t,"* ]]; then echo "Failed to start $u: Unit $u not found." >&2; exit 5; fi ;; esac; done',
+    '    if [[ "$2" == risepath-backup.service && "$STUB_SERVICE_RUNS" == 1 ]]; then bash "$STUB_REPO/deploy/risepath-vm/scripts/backup.sh" daily >> "$STUB_DIR/service.out" 2>&1; exit $?; fi ;;',
     'esac',
     'exit "${STUB_SYSTEMCTL_STATUS:-0}"',
   ].join('\n'));
