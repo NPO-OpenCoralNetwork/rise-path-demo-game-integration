@@ -116,6 +116,7 @@
 - 規約のページのフラグ（`VITE_FEATURE_LEGAL_PAGES`）は、学校の規約を書面で知らせるあいだ（D4）は既定のままにします。アプリに学校の文を出すときは、学校のビルドでだけ `true` にし、ビルドの確かめ（`vite.config.ts:58` の `legal-release-guard`）が学校の文を見るようにします。
 - 学校の Supabase で、パスワードの条件と、続けて失敗したときの制限をどう設定できるかを確かめます（ログインはブラウザから Supabase に直接届くので、API では失敗を数えられません）。無料枠で使うなら、一時停止を防ぐ毎日の keepalive を置きます。
 - コードが要るもの: 教材の API とサーバーでの採点、訓練の画面、教材を api だけに届ける設定、学校用の CI、P-School などを隠すフラグ、毎日のバックアップ、学校用の規約の切り替え。
+- 公開の前の確かめ（Phase 9）は、一般向けの版のためのものです。Vercel のビルドの確かめ（`scripts/deploy/vercel-env-rules.mjs` の VB2）は `VITE_FEATURE_TRAINING=true` のビルドを止め、VM の事前チェック（`scripts/deploy/preflight-rules.mjs` の C6）は `TRAINING_ENABLED` のある `stack.env` を止めます。このコードが `release` に入る前に、学校の版でだけ通す切り替えを作ります（設定だけでは済みません）。
 
 ### 4.8 CI
 

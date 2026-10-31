@@ -75,6 +75,186 @@ export function buildPublicAudioUrl(relativePath) {
     return `/${relativePath}`;
 }
 
+// Phase 9 (owner decision D3): a learner's request (requestTts: POST /api/v2/tts/synthesize and the MCP
+// request-tts tool) sends at most TTS_MAX_CHARS characters to the sidecar, and the audio cache prunes itself
+// (pruneTtsCache, at most once per TTS_CACHE_PRUNE_INTERVAL_MS per process) after a new file is written and on
+// the api's hourly timer (server.js main()); a cached file older than the age limit is never served.
+// Retention does not touch the cache (server/services/retention.js). Kept below the module header so the
+// line numbers doc/legal/ai-data-inventory.ja.md cites (KOKORO_TTS_URL, getCacheDir) stay where they were.
+
+/**
+ * The most text one learner request may send to the sidecar: Unicode code points after normalizeText
+ * (design §4.1; today's longest real text is a 20-40 character voice preview). Checked in requestTts
+ * only, never in synthesize(): the staff script scripts/regenerate_slides_audio.js reaches synthesize()
+ * through generateAudioContent with whole slide narrations.
+ */
+export const TTS_MAX_CHARS = 1000;
+
+/** What requestTts answers for a longer text: a validation result (400 on the REST route, the MCP tool result). */
+export const TTS_TEXT_TOO_LONG = Object.freeze({
+    error: 'text is too long',
+    error_type: 'validation',
+    code: 'text_too_long',
+    max_chars: TTS_MAX_CHARS,
+});
+
+/** True when `text` has more than `max` Unicode code points (stops counting at max + 1). */
+function longerThan(text, max) {
+    let count = 0;
+    for (const _ of text) {
+        count += 1;
+        if (count > max) return true;
+    }
+    return false;
+}
+
+/**
+ * The audio cache's limits (design §4.1). The cache lives in the api container's writable layer and
+ * every deploy empties it; between deploys these keep it bounded. Age is the file's mtime (a cache hit
+ * does not refresh it, and a file older than maxAgeDays is a cache miss, written again); size and count
+ * are of audio files; a prune over either limit goes down to TTS_CACHE_PRUNE_TARGET of both, oldest first.
+ */
+export const TTS_CACHE_LIMITS = Object.freeze({ maxAgeDays: 30, maxBytes: 256 * 1024 * 1024, maxFiles: 4000 });
+export const TTS_CACHE_PRUNE_TARGET = 0.9;
+export const TTS_CACHE_PRUNE_INTERVAL_MS = 10 * 60 * 1000;
+/**
+ * How often the api's timer (server.js main()) calls maybePruneTtsCache, so audio past maxAgeDays goes
+ * within about an hour even when nothing new is written (design §4.2: kept at most 30 days).
+ */
+export const TTS_CACHE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+/** The only names the cache writes (writeCachedAudio): `<sha256>.<mp3|wav>` and its `.meta.json`. */
+const CACHE_FILE_RE = /^[a-f0-9]{64}\.(?:mp3|wav)(?:\.meta\.json)?$/;
+const META_SUFFIX = '.meta.json';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** True when a cache file's mtime is more than maxAgeDays before now. */
+function tooOld(mtimeMs, now, maxAgeDays) {
+    return now - mtimeMs > maxAgeDays * DAY_MS;
+}
+
+/**
+ * Deletes cache files older than limits.maxAgeDays, then, when the audio files left are over
+ * limits.maxBytes or limits.maxFiles, the oldest until both are at TTS_CACHE_PRUNE_TARGET of their
+ * limit. Only regular files (lstat) whose names the cache writes; an audio file and its .meta.json go
+ * together (a .meta.json without audio counts as its own, empty entry). Never throws; logs counts or
+ * an error code only, never a name or a path.
+ * @param {{ dir?: string, now?: number, limits?: { maxAgeDays: number, maxBytes: number, maxFiles: number } }} [options]
+ * @returns {Promise<{ removed: number, failed: number }>} files removed, files that could not be removed
+ */
+export async function pruneTtsCache({ dir = getCacheDir(), now = Date.now(), limits = TTS_CACHE_LIMITS } = {}) {
+    let removed = 0;
+    let failed = 0;
+    try {
+        let names;
+        try {
+            names = await fs.readdir(dir);
+        } catch (err) {
+            if (err?.code === 'ENOENT') return { removed, failed };
+            throw err;
+        }
+        /** @type {Map<string, { files: string[], audio: boolean, bytes: number, mtimeMs: number }>} */
+        const entries = new Map();
+        for (const name of names) {
+            if (!CACHE_FILE_RE.test(name)) continue;
+            let stat;
+            try {
+                stat = await fs.lstat(path.join(dir, name));
+            } catch {
+                continue;
+            }
+            if (!stat.isFile()) continue;
+            const isMeta = name.endsWith(META_SUFFIX);
+            const key = isMeta ? name.slice(0, -META_SUFFIX.length) : name;
+            const entry = entries.get(key) ?? { files: [], audio: false, bytes: 0, mtimeMs: stat.mtimeMs };
+            if (isMeta) {
+                entry.files.push(name);
+            } else {
+                // The audio file goes first, so a failed unlink keeps its .meta.json too.
+                entry.files.unshift(name);
+                entry.audio = true;
+                entry.bytes = stat.size;
+                entry.mtimeMs = stat.mtimeMs;
+            }
+            entries.set(key, entry);
+        }
+
+        const remove = async (entry) => {
+            for (const name of entry.files) {
+                try {
+                    await fs.unlink(path.join(dir, name));
+                    removed += 1;
+                } catch (err) {
+                    if (err?.code === 'ENOENT') continue;
+                    failed += 1;
+                    return;
+                }
+            }
+        };
+
+        const oldest = [...entries.entries()]
+            .sort(([a, x], [b, y]) => x.mtimeMs - y.mtimeMs || (a < b ? -1 : a > b ? 1 : 0))
+            .map(([, entry]) => entry);
+        const kept = [];
+        for (const entry of oldest) {
+            if (tooOld(entry.mtimeMs, now, limits.maxAgeDays)) await remove(entry);
+            else kept.push(entry);
+        }
+
+        let bytes = kept.reduce((sum, entry) => sum + entry.bytes, 0);
+        let files = kept.filter((entry) => entry.audio).length;
+        if (bytes > limits.maxBytes || files > limits.maxFiles) {
+            const targetBytes = Math.floor(limits.maxBytes * TTS_CACHE_PRUNE_TARGET);
+            const targetFiles = Math.floor(limits.maxFiles * TTS_CACHE_PRUNE_TARGET);
+            for (const entry of kept) {
+                if (bytes <= targetBytes && files <= targetFiles) break;
+                await remove(entry);
+                // Counted as gone even when the unlink failed, so a read-only file never makes
+                // the prune take everything newer with it.
+                bytes -= entry.bytes;
+                if (entry.audio) files -= 1;
+            }
+        }
+    } catch (err) {
+        console.warn('[kokoroTts] cache prune failed:', typeof err?.code === 'string' ? err.code : 'error');
+        return { removed, failed };
+    }
+    if (removed > 0) console.log(`[kokoroTts] cache prune: ${removed} removed`);
+    if (failed > 0) console.warn(`[kokoroTts] cache prune: ${failed} could not be removed`);
+    return { removed, failed };
+}
+
+let pruneClock = () => Date.now();
+/** @type {number | null} */
+let lastPruneAt = null;
+/** @type {Promise<{ removed: number, failed: number }> | null} */
+let lastPrune = null;
+
+/**
+ * Starts pruneTtsCache unless this process started one less than TTS_CACHE_PRUNE_INTERVAL_MS ago.
+ * writeCachedAudio calls it without waiting, and so does the api's timer (server.js main(), every
+ * TTS_CACHE_SWEEP_INTERVAL_MS). Returns the prune's promise, or null when skipped.
+ */
+export function maybePruneTtsCache() {
+    const now = pruneClock();
+    if (lastPruneAt !== null && now - lastPruneAt < TTS_CACHE_PRUNE_INTERVAL_MS) return null;
+    lastPruneAt = now;
+    lastPrune = pruneTtsCache({ now });
+    return lastPrune;
+}
+
+/** Tests only: the clock maybePruneTtsCache and the cache read's age check use (none: Date.now), and no prune started yet. */
+export function setTtsCachePruneClockForTests(clock) {
+    pruneClock = typeof clock === 'function' ? clock : () => Date.now();
+    lastPruneAt = null;
+    lastPrune = null;
+}
+
+/** Tests only: settles when the prune maybePruneTtsCache started last has finished. */
+export function lastTtsCachePruneForTests() {
+    return lastPrune ?? Promise.resolve(null);
+}
+
 async function ensureCacheDir() {
     await fs.mkdir(getCacheDir(), { recursive: true });
 }
@@ -83,6 +263,11 @@ async function readCachedAudio(cacheKey, outputFormat) {
     const ext = outputFormat === 'wav' ? 'wav' : 'mp3';
     const filePath = path.join(getCacheDir(), `${cacheKey}.${ext}`);
     try {
+        // Older than the age limit: a miss, so the audio is made and written again (a new mtime). No
+        // learner gets audio kept longer than that, even before a prune removes the file (the write's
+        // prune or the api's hourly timer; no prune starts here, so none runs while the new file is made).
+        const stat = await fs.stat(filePath);
+        if (tooOld(stat.mtimeMs, pruneClock(), TTS_CACHE_LIMITS.maxAgeDays)) return null;
         const [buffer, metaRaw] = await Promise.all([
             fs.readFile(filePath),
             fs.readFile(`${filePath}.meta.json`, 'utf8').catch(() => null),
@@ -111,6 +296,8 @@ async function writeCachedAudio(cacheKey, outputFormat, buffer, durationSeconds)
         `${filePath}.meta.json`,
         JSON.stringify({ duration_seconds: durationSeconds, engine: 'kokoro-82m-onnx' }, null, 2),
     );
+    // Not awaited: the learner's answer never waits for the prune (it never rejects).
+    void maybePruneTtsCache();
     const relativePath = `audio/cache/${cacheKey}.${ext}`;
     return {
         audio_url: buildPublicAudioUrl(relativePath),
@@ -309,10 +496,11 @@ export async function loadUserTtsPreferences(userId) {
 export const TTS_UNAVAILABLE = Object.freeze({ error: 'Voice service is unavailable', error_type: 'tts_unavailable' });
 
 /**
- * Synthesize for a learner (the MCP request-tts tool and POST /api/v2/tts/synthesize). Validation
- * errors are returned as they are. Any other failure is logged here with the sidecar's own error
- * and response body, and answered with TTS_UNAVAILABLE only: an MCP tool result reaches the LLM
- * and can be quoted to the learner.
+ * Synthesize for a learner (the MCP request-tts tool and POST /api/v2/tts/synthesize). A text longer
+ * than TTS_MAX_CHARS is answered with TTS_TEXT_TOO_LONG first: no preference read, no cache, no
+ * sidecar. Validation errors are returned as they are. Any other failure is logged here with the
+ * sidecar's own error and response body, and answered with TTS_UNAVAILABLE only: an MCP tool result
+ * reaches the LLM and can be quoted to the learner.
  */
 export async function requestTts({
     userId,
@@ -324,6 +512,7 @@ export async function requestTts({
     output_format = 'mp3',
     lesson_id,
 }) {
+    if (longerThan(normalizeText(text), TTS_MAX_CHARS)) return { ...TTS_TEXT_TOO_LONG };
     const ttsPrefs = userId ? await loadUserTtsPreferences(userId) : null;
     const opts = applyTtsRequestOptions({
         text,

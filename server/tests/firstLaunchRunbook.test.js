@@ -17,6 +17,7 @@ import { ALL_CODES, ATTESTATIONS, INTERNAL_CODES, RULES, STAGES, checkStack } fr
 import { ALL_CODES as AFTER_CODES, DEPLOY_CODES, POSTDEPLOY_CODES } from '../../scripts/deploy/postdeploy-probe.mjs';
 import { baseFacts, buildInput } from './helpers/preflightFixtures.js';
 import { pilotStartupLines } from '../middleware/pilotGate.js';
+import { VERCEL_RULES } from '../../scripts/deploy/vercel-env-rules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RUNBOOK = 'doc/guides/first-launch.ja.md';
@@ -82,8 +83,34 @@ describe('first-launch.ja.md: chapters and steps (design §9.2 #1)', () => {
 
 describe('first-launch.ja.md 13 章: every code the preflight, the deploy and the 事後の確かめ print (design §9.2 #2)', () => {
   const table = rows(chapter('13')).filter((r) => r[0] !== 'コード' && !/^-+$/.test(r[0]));
-  it('has one row per code, in the catalog order (the preflight\'s, then DB1 and the P codes), and no other', () => {
-    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES, ...AFTER_CODES]);
+  it('has one row per code, in the catalog order (the preflight\'s, then DB1 and the P codes, then the Vercel build\'s VB codes), and no other', () => {
+    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES, ...AFTER_CODES, ...VERCEL_RULES.map((r) => r.code)]);
+  });
+  it('shows each VB code\'s message exactly as the Vercel build prints it, with the kind of its level (Phase 9 stage 4, D5)', () => {
+    const byCode = new Map(table.map((r) => [r[0], r]));
+    for (const rule of VERCEL_RULES) {
+      const row = /** @type {string[]} */ (byCode.get(rule.code));
+      assert.equal(row.length, 5, `${rule.code}: コード | 種類 | 表示 | 説明 | 直し方`);
+      assert.equal(row[1], rule.level === 'E' ? 'エラー（Vercel のビルドが止まります）' : '注意（Vercel のビルド）', `${rule.code}: 種類`);
+      assert.equal(row[2], rule.message, `${rule.code}: 表示`);
+      assert.ok(row[3] && row[4], `${rule.code}: 説明 and 直し方`);
+    }
+    assert.match(chapter('13'), /^- VB で始まるコードは、VM ではなく、Vercel のビルドが出します/m);
+  });
+  it('VB rows say what success looks like and leave the owner no open choice (stage 4 review round 1)', () => {
+    const byCode = new Map(table.map((r) => [r[0], r]));
+    const intro = /** @type {string} */ (chapter('13').split('\n').find((line) => line.startsWith('- VB で始まるコードは')));
+    assert.match(intro, /Redeploy のビルドが最後まで進み.*ログにその VB の行が出なければ、直っています。また出るときは、出た行をそのままエージェントに見せます/u, 'success sign and failure path');
+    assert.match(intro, /一般向けのアプリの Vercel のプロジェクトのためのもの/u);
+    const vb2 = /** @type {string[]} */ (byCode.get('VB2'));
+    assert.match(vb2[3], /一般向けのアプリの Vercel のプロジェクトのためのもの.*学校の版でだけ通す切り替えが要ります/u, 'VB2: the school build (training plan D8)');
+    const vb8 = /** @type {string[]} */ (byCode.get('VB8'));
+    assert.match(vb8[4], /^最初の公開では、Nexloom のログインを使いません。/u, 'VB8: the default is stated');
+    assert.doesNotMatch(vb8[4], /決めていなければ/u);
+    const vb11 = /** @type {string[]} */ (byCode.get('VB11'));
+    assert.match(vb11[3], /VM の値と同じではありません.*403/u, 'VB11: a short value means the two differ');
+    assert.match(vb11[4], /VM の stack\.env の `ORIGIN_SECRET` と同じ値を、Vercel の Production の `ORIGIN_SECRET` に入れ直し/u);
+    assert.match(vb11[4], /値が漏れたかもしれないときだけ/u, 'rotation only for a possible leak');
   });
   it('shows each code\'s title and fix exactly as the scripts print them', () => {
     const byCode = new Map(table.map((r) => [r[0], r]));

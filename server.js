@@ -34,6 +34,7 @@ import { TRAINING_BODY_LIMIT, createTrainingRouter } from './server/routes/train
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
+import { maybePruneTtsCache, TTS_CACHE_SWEEP_INTERVAL_MS } from './tools/core/kokoroTts.js';
 import { describeError, redactUrl } from './server/utils/redactUrl.js';
 import { isDbUnavailable } from './tools/core/dbErrors.js';
 import { blockLegacyUploads } from './server/uploads.js';
@@ -478,6 +479,10 @@ async function main() {
         void runRetention({ config: retention });
         setInterval(() => void runRetention({ config: retention }), RETENTION_INTERVAL_MS).unref();
     }
+    // The TTS audio cache (tools/core/kokoroTts.js, Phase 9 D3) also prunes on a timer, so audio older
+    // than 30 days goes within about an hour even when no new audio is written. Local files only.
+    void maybePruneTtsCache();
+    setInterval(() => void maybePruneTtsCache(), TTS_CACHE_SWEEP_INTERVAL_MS).unref();
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);
