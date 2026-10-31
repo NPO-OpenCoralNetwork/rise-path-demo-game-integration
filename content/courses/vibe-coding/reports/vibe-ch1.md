@@ -1,8 +1,8 @@
 # Report: vibe-coding/vibe-ch1 (draft rework)
 
 **Status: DRAFT in `content/courses/vibe-coding/drafts/vibe-ch1.lesson.json`. Gate: PASS (`check-review.mjs` exit 0
-over pedagogy-reviewer, ja-editor and visual-qa, round 4 verification, mean 3.77, every criterion ≥ 3, no open
-must-fix) at lesson hash `sha256:0bc11122003d247c`. Preview: no overflow, console errors or diagram errors.
+over pedagogy-reviewer, ja-editor and visual-qa, round 5 verification, mean 3.77, every criterion ≥ 3, no open
+must-fix) at lesson hash `sha256:a166f07604cf5f17`. Preview: no overflow, console errors or diagram errors.
 Not published: moving it to `lessons/` is the owner's call (see "Publishing: what changes" at the end).**
 
 - Lesson: 第1章｜人間が理解すべき最低ライン / Chapter 1 | Minimum Viable Knowledge. Rework of the published
@@ -173,7 +173,7 @@ All three reviewers verified against their reviews in 8471358 and passed with no
 pedagogy-reviewer with unchanged scores (mean 3.77); ja-editor voice 3, load 3, prior 4, a11y_l10n 4; visual-qa
 visual 4, load 4, a11y_l10n 4, confirming on the screenshots that both items are fixed.
 
-New niceToHave items from this round, left open:
+New niceToHave items from this round (round 5 fixed the first two):
 - `s3-b2`: 「まず、」 restates build-first, which round 2 softened in `s3-flow` because some hosts build on their side,
   and only step 1 has it (pedagogy-reviewer, ja-editor). Suggested: 「ビルド：公開するためのファイル一式を作ります。」
 - `q4` d: 「サーバーが起動して」 names the server, not the app, as what starts (ja-editor). Suggested:
@@ -184,22 +184,45 @@ New niceToHave items from this round, left open:
 - Three new breaks inside a word on mobile JP: 「画／面」 in `s2-prompt-api`, 「し／まっておく」 in `q1` c and
   「表／示」 in `q5` c (visual-qa).
 
-## Final gate (2026-10-31)
+## Review round 5 (verification, 2026-11-01)
+
+The owner asked to fix the first two niceToHave items of round 4 and to run another verification round (commit
+17fd9ca, `sha256:a166f07604cf5f17`):
+- `s3-b2` step 1: 「ビルド：まず、公開用のファイル一式を作ります。」 → 「ビルド：公開するためのファイル一式を作ります。」 The
+  three steps are parallel again and no longer assert build-first. The length is the same, so the line still does not
+  end with one or two characters.
+- `q4` d: 「サーバーが起動して、もう依頼を待ち受けている」 → 「アプリがサーバーで起動して、もう依頼を待ち受けている」
+  (en "The app has been launched on the server and is already waiting for requests"). The key b (20 characters) is
+  still not the longest; d is now 26.
+
+Both new texts were measured first: no line of one or two characters at 390, 375 or 1440 px. `review-scope.mjs
+--since 72c9e87` allowed a verification (2 of 44 blocks, 3%). A new preview ran (exit 0, no hard failures). All three
+reviewers verified against their reviews in 72c9e87 and passed with no must-fix (reviews in d6a1131); no score changed.
+
+New niceToHave items, left open:
+- `q4` d en wraps on desktop and leaves "requests" alone on the second line (visual-qa). Suggested: "The app is running
+  on the server and already waiting for requests".
+- `s3-b2` step 1 says 「公開するための」 where the ビルド definition, the glossary, the feedback and the card say 「公開用」
+  (pedagogy-reviewer).
+- A break inside a verb on mobile JP: 「作／ります。」 in `s3-b2` (visual-qa).
+- Still open from round 4: the English quotation marks around the `s2-prompt-api` blank.
+
+## Final gate (2026-11-01)
 
 `node .claude/skills/review-lesson/scripts/check-review.mjs --lesson content/courses/vibe-coding/drafts/vibe-ch1.lesson.json content/courses/vibe-coding/reports/vibe-ch1.*.review.json`
-→ PASS, exit 0, mean 3.77, after round 4. Round 4 changed no score.
+→ PASS, exit 0, mean 3.77, after round 5. Rounds 4 and 5 changed no score.
 
 | criterion | pedagogy-reviewer | ja-editor | visual-qa | gate (lowest) |
 |---|---|---|---|---|
 | align | 4 | — | — | 4 |
-| hook | 4 | — | — | 4 |
-| prior | 4 | 4 | — | 4 |
-| load | 3 | 3 | 4 (carried over) | 3 |
-| worked | 4 | — | — | 4 |
+| hook | 4 (carried over) | — | — | 4 |
+| prior | 4 (carried over) | 4 (carried over) | — | 4 |
+| load | 3 | 3 (carried over) | 4 (carried over) | 3 |
+| worked | 4 (carried over) | — | — | 4 |
 | active | 4 | — | — | 4 |
 | miscon | 4 | — | — | 4 |
 | visual | 4 | — | 4 | 4 |
-| practice | 3 | — | — | 3 |
+| practice | 3 (carried over) | — | — | 3 |
 | meta | 4 (carried over) | — | — | 4 |
 | accuracy | 4 | — | — | 4 |
 | voice | 3 | 3 | — | 3 |
@@ -229,14 +252,14 @@ without the causative 「保存させる」; practice-answer-ui en word order.
 ## Preview and visual QA (2026-10-31)
 
 `npm run lessons:preview -- vibe-coding vibe-ch1` ran against a dev server started from a checkout of this branch
-(`npm run dev`: Vite on 3007, API on 3006, no database), exit 0. The latest run (round 4) records the draft's hash
-`sha256:0bc11122003d247c` in `metrics.json`. (On 2026-10-30 port 3007 served another app, so nothing was captured then.)
+(`npm run dev`: Vite on 3007, API on 3006, no database), exit 0. The latest run (round 5) records the draft's hash
+`sha256:a166f07604cf5f17` in `metrics.json`. (On 2026-10-30 port 3007 served another app, so nothing was captured then.)
 
 | shot | page | overflowX | console errors | diagram errors | chars/line (median) | text-only screens |
 |---|---|---|---|---|---|---|
 | desktop-jp 1440×900 | 15,931 px, 19 screens | no | 0 | 0 | 40 (target 30–40) | none |
 | mobile-jp 390×844 | 21,126 px, 30 screens | no | 0 | 0 | 21 | none |
-| desktop-en 1440×900 | 16,529 px, 20 screens | no | 0 | 0 | 74 (target 60–75) | none |
+| desktop-en 1440×900 | 16,554 px, 20 screens | no | 0 | 0 | 74 (target 60–75) | none |
 
 Unknown blocks 0, broken images 0. The preview ignored 23 failed `/api/` requests (503 on notifications, progress and
 events, because no database was configured). Screenshots: `.artifacts/preview/vibe-coding/vibe-ch1/`
@@ -246,13 +269,13 @@ Playwright's own headless shell (build 1228) is not installed on this machine; `
 build 1243 from Playwright's cache folder.
 
 visual-qa opened all 70 screens of the first preview (full check at `sha256:1d967dfe70f0b1a4`), then the screens of
-the changed blocks in round 4: pass both times, visual 4, load 4, a11y_l10n 4, no must-fix
+the changed blocks in rounds 4 and 5: pass each time, visual 4, load 4, a11y_l10n 4, no must-fix
 (`reports/vibe-ch1.visual-qa.review.json`). Round 4 fixed its bracket and line-end items. Still open:
 - The step titles of `ex-steps` and `practice-steps` start with ①–⑥ (EN "1."–"6."), and the reader also numbers each
   step, so every number shows twice. 53 step titles in 6 published Claude Code lessons (cc-01, cc-04, cc-06, cc-07,
   cc-08, cc-11) do the same, so this is a choice for all courses. The practice hint 「1-5の手順⑤」 uses the numbers.
-- Breaks inside a word on mobile JP: 「フロントエン／ド」 in the first summary point, and the three that round 4
-  added (see "Review round 4").
+- Breaks inside a word on mobile JP: 「フロントエン／ド」 in the first summary point, the three that round 4 added
+  and 「作／ります。」 from round 5 (see "Review round 4" and "Review round 5").
 - Reader, not lesson content: a comma can start a line after an inline term link (line-start rule); the eyebrow
   differs between locales (「第1章・はじめに：前提と最低ライン」 / "Chapter 1 · Foundations"); the flashcard flip hint
   has low contrast.
@@ -301,9 +324,9 @@ most of the review-queue changes, at the cost of no card for データベース 
 - `KNOWN_UNCITED_STEPS` needs no change: both steps blocks of the draft (`ex-steps`, `practice-steps`) cite their
   sources.
 - Review chains: `server/tests/reviewChainsDurable.test.js` requires every verification of a published lesson to name a
-  committed round; the round-4 verifications name `8471358:…`, the round-3 ones `aae0299:…`, and rounds 1 and 2 are
-  full reviews.
-- Visual QA: done at `sha256:0bc11122003d247c` (see "Preview and visual QA"). If the lesson changes before
+  committed round; the round-5 verifications name `72c9e87:…`, round 4 `8471358:…`, round 3 `aae0299:…`, and rounds
+  1 and 2 are full reviews.
+- Visual QA: done at `sha256:a166f07604cf5f17` (see "Preview and visual QA"). If the lesson changes before
   publishing, re-run the preview and visual-qa.
 
 ## Assumptions
@@ -320,6 +343,6 @@ how to write a request, and the lesson names Claude Code only where a statement 
 2. Keep the 2 new cards? They enter the review queue of learners who already finished vibe-ch1.
 3. Step numbers: keep ①–⑥ in step titles, although the reader numbers steps too (6 Claude Code lessons do the same),
    or drop them in every course in a separate change?
-4. Review rounds: this rework used 4 rounds (2 full, 2 verification), two more than the author-lesson skill allows; the
-   user approved the third and asked for the fourth. Should the skill allow a verification round after a forced full
-   round 2, and polish rounds after the gate passes?
+4. Review rounds: this rework used 5 rounds (2 full, 3 verification), three more than the author-lesson skill allows;
+   the user approved the third and asked for the fourth and fifth. Should the skill allow a verification round after a
+   forced full round 2, and polish rounds after the gate passes?
