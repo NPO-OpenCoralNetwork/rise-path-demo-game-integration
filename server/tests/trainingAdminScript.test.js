@@ -2,8 +2,9 @@
 // (tools/core/training.js createCohort, addMember, listMembers), with a fake database that answers
 // only the module's statements:
 // - nothing happens unless TRAINING_ENABLED is exactly "true" (the public stack leaves it unset);
-// - a member is added under the account's shared lock (its own statement), only while the
-//   auth.users stub exists, with the default added_at; one live row per cohort and account;
+// - a member is added under the account's shared lock and then the learner's training lock (each
+//   its own statement), only while the auth.users stub exists, with the default added_at; one live
+//   row per cohort and account; a learner already in a cohort whose dates overlap is refused;
 // - every other outcome (already, another role, no cohort, a deleted account, no account yet, a
 //   busy lock, a database error) rolls back and has its exit code;
 // - the list shows marked rows too (deleted accounts, training-plan D3).
@@ -42,8 +43,21 @@ function fakePool(seed = {}) {
         state.queries.push({ sql, params, tx });
         if (state.failure && sql === state.failure.match) throw state.failure.error;
         switch (sql) {
-            case 'BEGIN': case 'COMMIT': case 'ROLLBACK': case TRAINING_SQL.lockTimeout: case TRAINING_SQL.lock:
+            case 'BEGIN': case 'COMMIT': case 'ROLLBACK': case TRAINING_SQL.lockTimeout: case TRAINING_SQL.lock: case TRAINING_SQL.learnerLock:
                 return { rowCount: 0, rows: [] };
+            case TRAINING_SQL.overlapping: {
+                // As the SQL: live learner rows in another cohort; a cohort without both dates overlaps nothing.
+                const [userId, cohortId] = params;
+                const target = state.cohorts.find((c) => c.id === cohortId);
+                const rows = state.memberships
+                    .filter((m) => m.user_id === userId && m.role === 'learner' && m.account_deleted_at === null && m.cohort_id !== cohortId)
+                    .map((m) => state.cohorts.find((c) => c.id === m.cohort_id))
+                    .filter((o) => o && target && o.starts_on && o.ends_on && target.starts_on && target.ends_on && o.starts_on <= target.ends_on && target.starts_on <= o.ends_on)
+                    .sort((x, y) => (x.starts_on + x.slug).localeCompare(y.starts_on + y.slug))
+                    .slice(0, 1)
+                    .map((o) => ({ slug: o.slug }));
+                return { rowCount: rows.length, rows };
+            }
             case TRAINING_SQL.cohortBySlug: {
                 const rows = state.cohorts.filter((c) => c.slug === params[0]);
                 return { rowCount: rows.length, rows };
@@ -160,15 +174,48 @@ describe('scripts/training-admin.mjs: cohorts', () => {
 });
 
 describe('scripts/training-admin.mjs: adding a member', () => {
-    it('added under the shared account lock, its own statement, then the INSERT; the id in canonical form; COMMIT', async () => {
+    it('added under the shared account lock, then the learner lock (each its own statement), the overlap check, then the INSERT; the id in canonical form; COMMIT', async () => {
         const { code, out, pool } = await runWith(['--add', A.toUpperCase(), '--cohort', 'web-2026-11', '--role', 'learner']);
         assert.equal(code, EXIT.ok);
         assert.equal(out, `Added ${A} to web-2026-11 as learner.`);
-        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.addMember, 'COMMIT']);
+        assert.deepEqual(pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_SQL.overlapping, TRAINING_SQL.addMember, 'COMMIT']);
         const insert = pool.state.queries.find((q) => q.sql === TRAINING_SQL.addMember);
         assert.deepEqual(insert?.params, [A, COHORT, 'learner']);
         assert.deepEqual(pool.state.queries.find((q) => q.sql === TRAINING_SQL.lock)?.params, [A]);
+        assert.deepEqual(pool.state.queries.find((q) => q.sql === TRAINING_SQL.learnerLock)?.params, [A]);
+        assert.deepEqual(pool.state.queries.find((q) => q.sql === TRAINING_SQL.overlapping)?.params, [A, COHORT]);
         assert.deepEqual(pool.state.releases, [false]);
+        // Another role: no overlap check (one moment counts twice only for a learner).
+        const staff = await runWith(['--add', B, '--cohort', 'web-2026-11', '--role', 'instructor']);
+        assert.deepEqual(staff.pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_SQL.addMember, 'COMMIT']);
+    });
+
+    it('a learner in another cohort whose dates overlap is refused (exit 2, rolled back); a cohort after it, another role, a cohort without dates and the same cohort again are fine', async () => {
+        const OVERLAP = 'c0000000-0000-4000-8000-000000000002';
+        const LATER = 'c0000000-0000-4000-8000-000000000003';
+        const UNDATED = 'c0000000-0000-4000-8000-000000000004';
+        const pool = fakePool({
+            cohorts: [
+                { id: COHORT, slug: 'web-2026-11', name: 'Web', starts_on: '2026-11-01', ends_on: '2027-01-31' },
+                { id: OVERLAP, slug: 'web-2027-01', name: 'Web 2', starts_on: '2027-01-31', ends_on: '2027-04-30' },
+                { id: LATER, slug: 'web-2027-02', name: 'Web 3', starts_on: '2027-02-01', ends_on: '2027-04-30' },
+                { id: UNDATED, slug: 'draft', name: 'Draft', starts_on: null, ends_on: null },
+            ],
+            memberships: [{ user_id: A, cohort_id: COHORT, role: 'learner' }],
+        });
+        const refused = await runWith(['--add', A, '--cohort', 'web-2027-01', '--role', 'learner'], { pool });
+        assert.equal(refused.code, EXIT.refused);
+        assert.equal(refused.out, `Refused: ${A} is a learner in web-2026-11, whose dates overlap web-2027-01's; a learner is in one cohort at a time.`);
+        assert.deepEqual(pool.tx().slice(-4), [TRAINING_SQL.learnerLock, TRAINING_SQL.overlapping, TRAINING_SQL.liveMember, 'ROLLBACK'], 'no INSERT');
+        assert.equal((await runWith(['--add', A, '--cohort', 'web-2027-02', '--role', 'learner'], { pool })).code, EXIT.ok, 'the day after the last day');
+        assert.equal((await runWith(['--add', A, '--cohort', 'draft', '--role', 'learner'], { pool })).code, EXIT.ok, 'a cohort without dates counts nothing');
+        assert.equal((await runWith(['--add', A, '--cohort', 'web-2027-01', '--role', 'examiner'], { pool })).code, EXIT.ok, 'another role');
+        const again = await runWith(['--add', A, '--cohort', 'web-2026-11', '--role', 'learner'], { pool });
+        assert.deepEqual([again.code, again.out], [EXIT.ok, `${A} is already in web-2026-11 as learner.`], 'its own cohort is not an overlap');
+        // A marked (deleted account's) membership overlaps nothing.
+        const marked = fakePool({ memberships: [{ user_id: B, cohort_id: COHORT, role: 'learner', account_deleted_at: new Date('2026-10-20T00:00:00Z') }] });
+        marked.state.cohorts.push({ id: OVERLAP, slug: 'web-2027-01', name: 'Web 2', starts_on: '2027-01-31', ends_on: '2027-04-30' });
+        assert.equal((await runWith(['--add', B, '--cohort', 'web-2027-01', '--role', 'learner'], { pool: marked })).code, EXIT.ok);
     });
 
     it('already in the cohort: the same role is fine (exit 0), another role is refused (exit 2); both roll back', async () => {
@@ -191,7 +238,7 @@ describe('scripts/training-admin.mjs: adding a member', () => {
         const gone = await runWith(['--add', GONE, '--cohort', 'web-2026-11', '--role', 'learner']);
         assert.equal(gone.code, EXIT.refused);
         assert.match(gone.out, /was deleted/);
-        assert.deepEqual(gone.pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.addMember, TRAINING_SQL.liveMember, TRAINING_SQL.deletedAccount, 'ROLLBACK']);
+        assert.deepEqual(gone.pool.tx(), ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_SQL.overlapping, TRAINING_SQL.addMember, TRAINING_SQL.liveMember, TRAINING_SQL.deletedAccount, 'ROLLBACK']);
         const never = await runWith(['--add', NEVER, '--cohort', 'web-2026-11', '--role', 'learner']);
         assert.equal(never.code, EXIT.refused);
         assert.match(never.out, /no Rise Path account .* signs in to this school's app once/);
@@ -223,8 +270,11 @@ describe('tools/core/training.js: the staff statements', () => {
         assert.deepEqual(pool.state.queries, []);
     });
 
-    it('the lock is the shared account lock; the INSERT needs the stub, uses the live-only conflict target and the default added_at', () => {
+    it('the lock is the shared account lock; the learner lock is exclusive and per account; the INSERT needs the stub, uses the live-only conflict target and the default added_at', () => {
         assert.equal(TRAINING_SQL.lock, `SELECT pg_advisory_xact_lock_shared(${accountLockKey(1)})`);
+        assert.equal(TRAINING_SQL.learnerLock, "SELECT pg_advisory_xact_lock(hashtextextended('rp:training:' || $1::uuid::text, 0))");
+        assert.match(TRAINING_SQL.overlapping, /m\.role = 'learner' AND m\.account_deleted_at IS NULL AND o\.id <> c\.id/);
+        assert.match(TRAINING_SQL.overlapping, /o\.starts_on <= c\.ends_on AND c\.starts_on <= o\.ends_on/, 'NULL dates compare to NULL: no overlap');
         assert.match(TRAINING_SQL.addMember, /WHERE EXISTS \(SELECT 1 FROM auth\.users WHERE id = \$1::uuid\)/);
         assert.match(TRAINING_SQL.addMember, /ON CONFLICT \(cohort_id, user_id\) WHERE account_deleted_at IS NULL DO NOTHING/);
         assert.doesNotMatch(TRAINING_SQL.addMember, /added_at/, 'added_at is the default, never sent (the deletion mark must not be earlier)');

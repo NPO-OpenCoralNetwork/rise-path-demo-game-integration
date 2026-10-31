@@ -1,0 +1,9 @@
+{
+  "schema": "risepath.training-course/v1",
+  "courseKey": "sample-course",
+  "title": { "jp": "見本のコース（テスト用。実在しない）", "en": "Sample course (tests only, not real)" },
+  "units": [
+    { "key": "sample-u1", "title": { "jp": "見本の単元 1", "en": "Sample unit 1" }, "setMinutes": 2 },
+    { "key": "sample-u2", "title": { "jp": "見本の単元 2", "en": "Sample unit 2" }, "setMinutes": 30 }
+  ]
+}

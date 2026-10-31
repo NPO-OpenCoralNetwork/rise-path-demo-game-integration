@@ -29,7 +29,8 @@
  *      tombstone row (clock_timestamp: after the lock wait), the proofs kept by D5 (legal
  *      acceptances marked, guardian consents and used AI-app grants copied, each with the
  *      tombstone's exact deleted_at; an app's name from the page when the grant row has none),
- *      the job-training memberships marked the same way (training-plan D3, migration 021),
+ *      the job-training memberships marked the same way (training-plan D3, migration 021), and so
+ *      are the study time evidence and closed days (migration 022),
  *      older AI usage counts, the Stripe Customers again, then the stub. A lock wait over 10 s is
  *      account_busy; any other error rolls back.
  *   4. after COMMIT, best effort (a failure is logged and never undoes the deletion): upload files,
@@ -41,7 +42,8 @@
  *
  * Kept on purpose (design §5.7): today's ai_daily_usage row (abuse prevention, 30 days by
  * retention), legal_acceptances / account_consent_proofs / ai_app_provision_records (D5),
- * training_memberships (marked, no retention step until a period is decided: training-plan D3),
+ * training_memberships, training_time_streams and training_time_days (marked, with the signals and
+ * unit rows they hide; no retention step until a period is decided: training-plan D3),
  * billing rows with user_id NULL (tax), safety events with user_id NULL, the tombstone itself.
  */
 import fs from 'node:fs/promises';
@@ -106,6 +108,10 @@ export const SQL = Object.freeze({
     // Job training (migration 021, training-plan D3): kept and marked like the acceptances, after the
     // tombstone row (before it, TOMBSTONE_TIME is NULL and the mark would silently stay empty).
     markTrainingMemberships: `UPDATE training_memberships SET account_deleted_at = ${TOMBSTONE_TIME} WHERE user_id = $1::uuid AND account_deleted_at IS NULL`,
+    // Study time (migration 022): the evidence and the closed days, marked the same way; the signals
+    // and the unit rows have no account id and are hidden by these marks.
+    markTrainingTimeStreams: `UPDATE training_time_streams SET account_deleted_at = ${TOMBSTONE_TIME} WHERE user_id = $1::uuid AND account_deleted_at IS NULL`,
+    markTrainingTimeDays: `UPDATE training_time_days SET account_deleted_at = ${TOMBSTONE_TIME} WHERE user_id = $1::uuid AND account_deleted_at IS NULL`,
     copyConsents: `INSERT INTO account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
      SELECT id, user_id, kind, policy_version, method, given_at, revoked_at, ${TOMBSTONE_TIME} FROM account_consents WHERE user_id = $1::uuid
      ON CONFLICT (consent_id) DO NOTHING`,
@@ -529,6 +535,8 @@ export async function deleteAccountData({
         // The proofs take deleted_at from the tombstone row itself (TOMBSTONE_TIME), not from JavaScript.
         await client.query(SQL.markAcceptances, [id]);
         await client.query(SQL.markTrainingMemberships, [id]);
+        await client.query(SQL.markTrainingTimeStreams, [id]);
+        await client.query(SQL.markTrainingTimeDays, [id]);
         await client.query(SQL.copyConsents, [id]);
         const apps = appNameParams(appNames);
         await client.query(SQL.copyGrants, [id, apps.ids, apps.names]);

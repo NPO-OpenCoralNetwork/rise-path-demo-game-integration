@@ -119,12 +119,12 @@ nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋�
 # CI の Server stack deploy の「Preflight」の行とくらべ、stack.env の SUPABASE_URL が https://<project>.supabase.co であることを見ます。
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–021 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–022 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–021 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–022 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
 
@@ -428,12 +428,13 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 
 ## 職業訓練（骨組み）
 
-職業訓練の期と割り当て、`/api/v2/training` の入口です。学校のデプロイだけで使い、公開版の Rise Path では使いません。決定と理由は [`doc/brushup-2026/training-plan.ja.md`](../../doc/brushup-2026/training-plan.ja.md) です。
+職業訓練の期と割り当て、受講時間の設定と記録、`/api/v2/training` の入口です。学校のデプロイだけで使い、公開版の Rise Path では使いません。決定と理由は [`doc/brushup-2026/training-plan.ja.md`](../../doc/brushup-2026/training-plan.ja.md) です。
 
 **この版の最初のデプロイ**
 
 - migration 021 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。021 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が 021 の表に印を付けるため）。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
 - 021 は新しい表を 2 つ作るだけです。`auth.users` はロックせず、ログインした呼び出しもアカウントの削除も待ちません。`sql/mcp_remote_role.sql` は流し直さなくてかまいません（どちらの表も、リモート MCP のロールに渡しません）。
+- migration 022（受講時間）も同じです。022 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が受講時間の記録にも印を付けるため）。022 も新しい表（7 つ）を作るだけで、`auth.users` はロックせず、`sql/mcp_remote_role.sql` も流し直さなくてかまいません。
 - 公開版では `TRAINING_ENABLED` を設定しません。表は空のままで、`/api/v2/training` は 404 を返し、職員のスクリプトも動きません。
 
 **設定（`stack.env`。秘密の値ではありません。`api` だけが読みます）**
@@ -451,9 +452,32 @@ docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs 
 docker compose --env-file stack.env exec -T api node scripts/training-admin.mjs --list 2026-11-web
 ```
 
-割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（`TRAINING_ENABLED` が `true` でない、期がない、ほかの役割で割り当てずみ、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
+割り当てる人には、先にこのデプロイの画面に一度ログインしてもらいます（アカウントの行ができるまで、割り当ては断られます）。役割は `learner`（受講者）・`instructor`（講師）・`examiner`（確認用）・`staff`（職員）です。終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい、2 = 断った（`TRAINING_ENABLED` が `true` でない、期がない、ほかの役割で割り当てずみ、期間の重なるほかの期の受講者、削除したアカウント、まだログインしていない）、3 = いまは使えない（DB。アカウントの削除の途中なら、10 秒待って止まります。あとでもう一度実行します）。
 
-- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 の行）。VM の DB には決して向けないでください。
+**受講時間の職員のスクリプト**（`api` コンテナの中で。`TRAINING_ENABLED=true` のときだけ動きます）
+
+単元表（単元と、それぞれの設定時間）と数え方の規則は、リポジトリに入れない非公開のファイルです。VM では checkout（`/opt/risepath`）の外の、root だけが読めるフォルダ（下の例では `/opt/risepath-private`。`sudo install -d -m 700 /opt/risepath-private` で作ります）に置き、`sudo cat` で読んで stdin に流します（`exec -T` が要ります。`<` で渡すと、root でないシェルが開くので読めません）。規則の値は画面に出ません。読み込んだ版は sha256 で示されるので、学校の記録に残します。
+
+```bash
+cd /opt/risepath/deploy/risepath-vm
+sudo cat /opt/risepath-private/course.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-catalog --by <who> --note <text>
+sudo cat /opt/risepath-private/time-rules.json | docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --load-rules --by <who> --note <text>
+docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --set 2026-11-web --catalog <sha256> --rules <sha256> --from 2026-11-01 --by <who> --reason <text>
+docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --show 2026-11-web
+docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web
+docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --stats 2026-11-web
+```
+
+- `--load-catalog`・`--load-rules`: 変えない版として読み込みます。同じ内容をもう一度読み込んでも、前の版のままです。形がちがうときは、どの項目かだけを出して断ります。
+- `--set`: 期が、どの単元表と規則を何日から使うかを足します（足すだけで、変えたり消したりはしません）。今日より前の日と、期の最後の日より後は断ります。今日すでに設定が効いている期では、新しい設定は明日からです。受講時間の記録が始まった期では、今日効いている設定と同じコースの単元表だけを使えます（規則や単元表の新しい版、記録の前に予定したコースの切り替えの取り消しはできます）。始まりと終わりの日付がない期では、受講時間を数えないので断ります。
+- `--show`: 期の設定（版は sha256 で）。`--learner <account uuid>` を付けると、その人の確定した日と、単元ごとの時間です。
+- `--close`: 期の受講者ごとに、確定できる日（その日の終わりから、規則の途切れの長さが過ぎた日）を閉じます。0 分の日も行を作り、閉じた日は変えません。`--learner <account uuid>` で 1 人だけにもできます。合図を受け取る API は次の版で入るので、それまでは 0 分の日だけです。
+- `--stats`: 行の数（削除したアカウントの分も）と、最後に閉じた日です。
+- 設定のない日は、受講時間を数えません。デプロイ、期と割り当ての操作は、設定がなくても動きます。
+
+終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを流していないときも。5 秒待っても何も届かなければ止まります）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、今日効いている設定とちがうコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）。
+
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
 
 ## CI での予行（Phase 7）
 
@@ -462,7 +486,7 @@ GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プ
 - `ci/stack.ci.env` は、CI だけのダミーの値です。VM では使いません。`scripts/ci/stack.sh` が 1 回の実行のあいだだけ `stack.env` にコピーし、終わると消します。1 行目に `# risepath-ci-env:` の印があり、印のない `stack.env`（自分で作ったもの）があると、書き換えずに止まります。`billing.env`・`tunnel.env`・`mcp-public.env` があるときも止まります。
 - Compose のプロジェクト名は `risepath-ci` なので、`risepath` のスタックには触れません。
 - `deploy-stack.sh` は、環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` のときだけ git pull を飛ばします。**VM では設定しません。** `stack.env` に書いても効きません。
-- CI が確かめること: 空の DB への migration 000–021、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
+- CI が確かめること: 空の DB への migration 000–022、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
 - 作り直した VM の最初のデプロイの前に、main の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）が緑であることを確かめます。
 - 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
 

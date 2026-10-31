@@ -10,6 +10,11 @@
  * account's shared lock and only while the auth.users stub exists (the rule of
  * server/routes/legal.js): a deletion holds the same lock exclusively, so no row outlives it unmarked.
  *
+ * A membership add also takes the learner's training lock (TRAINING_SQL.learnerLock, after the
+ * account lock), which study time takes too (tools/core/trainingTime.js): two adds of one account
+ * run one after the other, so a learner is never in two cohorts whose dates overlap (one moment
+ * would count in both).
+ *
  * Callers: GET /api/v2/training/me (server/routes/training.js) and the staff script
  * scripts/training-admin.mjs. Failures return { error, error_type } (tools/core/dbErrors.js), never
  * the driver's text.
@@ -33,6 +38,12 @@ export const COHORT_SLUG = /^[a-z0-9][a-z0-9-]{0,79}$/;
 /** How long adding a member waits for the account lock (a deletion in progress) before giving up. */
 export const TRAINING_LOCK_TIMEOUT = '10s';
 
+/**
+ * Requests per learner per minute, every /api/v2/training route together (the limiter of
+ * server/routes/training.js). A rules file's signals must fit in half of it (shared/training/timeRules.js).
+ */
+export const TRAINING_REQUESTS_PER_MINUTE = 60;
+
 /** The statements, exactly as sent ($1 is the canonical account id where a statement takes one). */
 export const TRAINING_SQL = Object.freeze({
     me: `SELECT c.id AS cohort_id, c.name, m.role
@@ -48,6 +59,19 @@ export const TRAINING_SQL = Object.freeze({
     lockTimeout: `SET LOCAL lock_timeout = '${TRAINING_LOCK_TIMEOUT}'`,
     // Its own statement, so the INSERT below reads a snapshot taken after a deletion it waited for.
     lock: `SELECT pg_advisory_xact_lock_shared(${accountLockKey(1)})`,
+    // The learner's training lock, exclusive, always after the account lock (no deadlock with a
+    // deletion, which takes only the account lock): membership adds and study time take it.
+    learnerLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training:' || $1::uuid::text, 0))",
+    // A live learner membership in another cohort whose dates overlap $2's ($1 the account). A
+    // cohort without both dates counts nothing (shared/training/studyTime.js cohortRange), so it
+    // overlaps nothing.
+    overlapping: `SELECT o.slug FROM training_memberships m
+  JOIN training_cohorts o ON o.id = m.cohort_id
+  JOIN training_cohorts c ON c.id = $2::uuid
+ WHERE m.user_id = $1::uuid AND m.role = 'learner' AND m.account_deleted_at IS NULL AND o.id <> c.id
+   AND o.starts_on <= c.ends_on AND c.starts_on <= o.ends_on
+ ORDER BY o.starts_on, o.slug
+ LIMIT 1`,
     // Only while the stub exists: a deleted account has none (migration 018's trigger keeps it away).
     // added_at is always the default, so the deletion's mark is never earlier than it (the CHECK).
     addMember: 'INSERT INTO training_memberships (cohort_id, user_id, role) SELECT $2::uuid, $1::uuid, $3 WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid) ON CONFLICT (cohort_id, user_id) WHERE account_deleted_at IS NULL DO NOTHING RETURNING id',
@@ -123,13 +147,15 @@ export async function createCohort({ slug, name, startsOn = null, endsOn = null,
 }
 
 /**
- * Staff: add an account to a cohort with a role, under the account's shared lock and only while its
- * auth.users stub exists (a person who has never signed in to this deployment has none yet).
+ * Staff: add an account to a cohort with a role, under the account's shared lock and the learner's
+ * training lock, and only while its auth.users stub exists (a person who has never signed in to
+ * this deployment has none yet). A learner already in another cohort whose dates overlap is refused.
  * @param {{ cohortSlug: string, userId: unknown, role: string, pool?: TrainingPool | null }} params
  * @returns {Promise<{ status: 'added' | 'already', role: string }
  *   | { status: 'role_differs', role: string }
+ *   | { status: 'overlapping', cohort: string }
  *   | { status: 'no_cohort' | 'deleted_account' | 'no_account' }
- *   | CoreError>} CoreError 'account_busy' when the lock wait passed TRAINING_LOCK_TIMEOUT
+ *   | CoreError>} CoreError 'account_busy' when a lock wait passed TRAINING_LOCK_TIMEOUT
  */
 export async function addMember({ cohortSlug, userId: rawUserId, role, pool = getPool() }) {
     const userId = canonicalUserId(rawUserId);
@@ -157,12 +183,15 @@ export async function addMember({ cohortSlug, userId: rawUserId, role, pool = ge
         await client.query('BEGIN');
         await client.query(TRAINING_SQL.lockTimeout);
         await client.query(TRAINING_SQL.lock, [userId]);
-        /** @type {{ status: any, role?: string }} */
+        await client.query(TRAINING_SQL.learnerLock, [userId]);
+        /** @type {{ status: any, role?: string, cohort?: string }} */
         let outcome;
-        if ((await client.query(TRAINING_SQL.addMember, [userId, cohortId, role])).rows?.[0]) outcome = { status: 'added', role };
+        const overlap = role === 'learner' ? (await client.query(TRAINING_SQL.overlapping, [userId, cohortId])).rows?.[0] : undefined;
+        if (!overlap && (await client.query(TRAINING_SQL.addMember, [userId, cohortId, role])).rows?.[0]) outcome = { status: 'added', role };
         else {
             const live = (await client.query(TRAINING_SQL.liveMember, [userId, cohortId])).rows?.[0];
             if (live) outcome = { status: String(live.role) === role ? 'already' : 'role_differs', role: String(live.role) };
+            else if (overlap) outcome = { status: 'overlapping', cohort: String(overlap.slug) };
             else if (((await client.query(TRAINING_SQL.deletedAccount, [userId])).rowCount ?? 0) > 0) outcome = { status: 'deleted_account' };
             else outcome = { status: 'no_account' };
         }
@@ -174,7 +203,8 @@ export async function addMember({ cohortSlug, userId: rawUserId, role, pool = ge
         } catch {
             broken = true;
         }
-        // lock_timeout (55P03): an account deletion held the lock longer than TRAINING_LOCK_TIMEOUT.
+        // lock_timeout (55P03): an account deletion (or the learner's study time) held a lock longer
+        // than TRAINING_LOCK_TIMEOUT.
         if (/** @type {any} */ (err)?.code === '55P03') return { error: 'The account is busy. Try again.', error_type: 'account_busy' };
         return classifyDbError(/** @type {any} */ (err), 'addMember');
     } finally {

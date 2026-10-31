@@ -34,7 +34,7 @@ Judgement criteria for one risepath.lesson/v1 lesson. Used by the pedagogy-revie
 | `visual` | 図の質 / Visuals | `diagram-caption`, `image-decorative` |
 | `practice` | 演習 / Practice | `steps-expect`, `code-should-be-prompt` |
 | `meta` | 振り返り・まとめ / Metacognition | `summary-missing`, `summary-points`, `flashcards-count` |
-| `accuracy` | 正確さ / Accuracy | `code-filename` |
+| `accuracy` | 正確さ / Accuracy | `code-filename`, `steps-cite` |
 | `voice` | 日本語の文体 / Voice | `banned-phrase`, `sentence-length` |
 | `a11y_l10n` | アクセシビリティと多言語 / Accessibility and localization | `locale-plain-string` |
 

@@ -160,7 +160,7 @@ describe('scripts/ci/db-checks.sh', () => {
         assert.match(code, /expect_eq "server major" "\$\(sql postgres 'SHOW server_version_num' \| cut -c1-2\)" 16$/m);
     });
 
-    it('runs verify-account-deletion, verify-phase5 and verify-phase6 in migration order, never with --allow-skip, after the 00:00 JST guard and before the role SQL', () => {
+    it('runs verify-account-deletion, verify-phase5, verify-phase6 and verify-training in migration order, never with --allow-skip, after the 00:00 JST guard and before the role SQL', () => {
         assert.doesNotMatch(commands, /--allow-skip/, 'a skipped check is not a pass');
         const at = (/** @type {RegExp} */ re) => {
             const m = re.exec(code);
@@ -172,10 +172,11 @@ describe('scripts/ci/db-checks.sh', () => {
             at(/^run_verify verify-account-deletion scripts\/db\/verify-account-deletion\.mjs verify_del$/m),
             at(/^run_verify verify-phase5 scripts\/db\/verify-phase5\.mjs verify_p5$/m),
             at(/^run_verify verify-phase6 scripts\/db\/verify-phase6\.mjs verify_p6$/m),
+            at(/^run_verify verify-training scripts\/db\/verify-training\.mjs verify_tr$/m),
             at(/^status=0; role_sql > /m),
         ];
-        assert.deepEqual(order, [...order].sort((a, b) => a - b), 'guard, 018, 019, 020, then the role SQL (the verify scripts refuse while the role exists)');
-        assert.equal(code.match(/^run_verify /gm)?.length, 3);
+        assert.deepEqual(order, [...order].sort((a, b) => a - b), 'guard, 018, 019, 020, 022, then the role SQL (the verify scripts refuse while the role exists)');
+        assert.equal(code.match(/^run_verify /gm)?.length, 4);
         assert.match(code, /timeout "\$\{VERIFY_TIMEOUT_S\}" node "\$2" --url "\$\{SU\}\/\$3" > "\$\{OUT\}\/\$1\.txt" 2>&1 \|\| status=\$\?/);
         assert.match(code, /if \[\[ "\$\(sql postgres "SELECT count\(\*\) FROM pg_roles WHERE rolname = 'risepath_mcp_remote'"\)" != 0 \]\]; then\n\s+bad /,
             'a role left over from an earlier script is reported before the next one refuses');
@@ -202,8 +203,9 @@ describe('scripts/ci/db-checks.sh', () => {
         // The guard waits at most budget + 5 s. The step outlasts every bound plus a minute for the rest
         // (createdb, db-migrate, the role SQL: seconds), so a hang ends with the script's own message, and
         // the step's timeout (a failed step, which keeps the outputs) comes before the job's (a cancel).
-        const bounded = 3 * verify + guard + 5 + boot + pulls;
-        assert.ok(bounded + 60 <= 60 * step, `3 × ${verify} + ${guard + 5} + ${boot} + ${pulls} = ${bounded} s, plus 60 s, must fit in the step's ${step} min`);
+        const scripts = code.match(/^run_verify /gm)?.length ?? 0;
+        const bounded = scripts * verify + guard + 5 + boot + pulls;
+        assert.ok(bounded + 60 <= 60 * step, `${scripts} × ${verify} + ${guard + 5} + ${boot} + ${pulls} = ${bounded} s, plus 60 s, must fit in the step's ${step} min`);
     });
 
     it('when both registries keep failing, stops after three attempts with the re-run message, bounded, before docker run', { skip: HAS_TIMEOUT ? false : 'needs timeout (coreutils)' }, () => {
@@ -413,6 +415,10 @@ describe('scripts/ci/db-checks.sh', () => {
         assert.match(code, /^REMOTE="postgresql:\/\/risepath_mcp_remote:\$\{ROLE_PASSWORD\}@\$\{HOSTPORT\}\/risepath"$/m);
         assert.match(code, /^if \[\[ -z "\$\{EXISTING\}" \]\]; then\n {2}if psql "postgresql:\/\/risepath_mcp_remote:ci-dummy-wrong-password-0+@\$\{HOSTPORT\}\/risepath" -X -At -c 'SELECT 1' > \/dev\/null 2>&1; then\n {4}bad "a wrong password logged in"\n {2}else\n {4}ok /m);
         assert.match(code, /^if psql "\$\{REMOTE\}" -X -At -c 'SELECT count\(\*\) FROM xp_awards' > \/dev\/null 2>&1; then bad "the role read xp_awards"; else ok /m);
+        // Every training_ table (021, 022 and later), by its name, not a list that a new table would miss
+        // (server/tests/migration022.test.js counts them in the migrations).
+        assert.match(code, /^expect_eq "no training_ table for the role" "\$\(psql "\$\{REMOTE\}" -X -At -c "SELECT count\(\*\) FILTER \(WHERE has_any_column_privilege\(c\.oid, 'SELECT, INSERT, UPDATE, REFERENCES'\) OR has_table_privilege\(c\.oid, 'DELETE, TRUNCATE'\)\) \|\| ' of ' \|\| count\(\*\) FROM pg_class c JOIN pg_namespace n ON n\.oid = c\.relnamespace WHERE n\.nspname = 'public' AND c\.relkind = 'r' AND c\.relname LIKE 'training\\_%'"\)" \\\n {2}"0 of \d+"$/m);
+        assert.doesNotMatch(role, /training_/, 'the role SQL names no training_ table');
     });
 
     it('Phase 8: the role reads the newest acceptance with the terms check\'s own statement, and never legal_acceptances.id', () => {
@@ -438,6 +444,7 @@ describe('scripts/ci/db-checks.sh', () => {
             "FAIL the role logs in with its password: got '0', want 'risepath_mcp_remote'",
             "FAIL limits: got '0', want '20 idle_in_transaction_session_timeout=30s,statement_timeout=10s'",
             "FAIL never granted: got '0', want 'learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false'",
+            "FAIL no training_ table for the role: got '0', want '0 of 9'",
             'FAIL a wrong password logged in',
             'FAIL the role read xp_awards',
             'FAIL the role read legal_acceptances.id',

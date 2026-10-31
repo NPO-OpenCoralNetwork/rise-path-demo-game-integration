@@ -176,7 +176,7 @@
         "3": { "jp": "誤りがなく、重要な主張に出典がある", "en": "No errors; key claims are cited" },
         "2": { "jp": "誤り、根拠のない数字、架空の URL や機能がある", "en": "An error, an unsupported number, or an invented URL or feature" }
       },
-      "lint": ["code-filename"]
+      "lint": ["code-filename", "steps-cite"]
     },
     {
       "id": "voice",
