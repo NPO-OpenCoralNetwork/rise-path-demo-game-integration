@@ -1,8 +1,8 @@
 # Report: vibe-coding/vibe-ch1 (draft rework)
 
 **Status: DRAFT in `content/courses/vibe-coding/drafts/vibe-ch1.lesson.json`. Gate: PASS (`check-review.mjs` exit 0
-over pedagogy-reviewer and ja-editor, round 3 verification, mean 3.77, every criterion ≥ 3, no open must-fix) at
-lesson hash `sha256:1d967dfe70f0b1a4`. Preview and visual QA were not run: Rise Path's dev server was not on port 3007.
+over pedagogy-reviewer and ja-editor (round 3 verification) and visual-qa (full check), mean 3.77, every criterion ≥ 3,
+no open must-fix) at lesson hash `sha256:1d967dfe70f0b1a4`. Preview: no overflow, console errors or diagram errors.
 Not published: moving it to `lessons/` is the owner's call (see "Publishing: what changes" at the end).**
 
 - Lesson: 第1章｜人間が理解すべき最低ライン / Chapter 1 | Minimum Viable Knowledge. Rework of the published
@@ -154,23 +154,23 @@ verdicts: pass. All 6 must-fix items resolved, 0 unresolved, no new must-fix.
 ## Final gate (2026-10-31)
 
 `node .claude/skills/review-lesson/scripts/check-review.mjs --lesson content/courses/vibe-coding/drafts/vibe-ch1.lesson.json content/courses/vibe-coding/reports/vibe-ch1.*.review.json`
-→ PASS, exit 0, mean 3.77.
+→ PASS, exit 0, mean 3.77. The visual-qa review (full check, after the preview below) changes no gate score.
 
-| criterion | pedagogy-reviewer | ja-editor | gate (lowest) |
-|---|---|---|---|
-| align | 4 | — | 4 |
-| hook | 4 | — | 4 |
-| prior | 4 | 4 | 4 |
-| load | 3 | 3 | 3 |
-| worked | 4 | — | 4 |
-| active | 4 | — | 4 |
-| miscon | 4 | — | 4 |
-| visual | 4 (carried over) | — | 4 |
-| practice | 3 | — | 3 |
-| meta | 4 | — | 4 |
-| accuracy | 4 | — | 4 |
-| voice | 3 | 3 | 3 |
-| a11y_l10n | 4 | 4 | 4 |
+| criterion | pedagogy-reviewer | ja-editor | visual-qa | gate (lowest) |
+|---|---|---|---|---|
+| align | 4 | — | — | 4 |
+| hook | 4 | — | — | 4 |
+| prior | 4 | 4 | — | 4 |
+| load | 3 | 3 | 4 | 3 |
+| worked | 4 | — | — | 4 |
+| active | 4 | — | — | 4 |
+| miscon | 4 | — | — | 4 |
+| visual | 4 (carried over) | — | 4 | 4 |
+| practice | 3 | — | — | 3 |
+| meta | 4 | — | — | 4 |
+| accuracy | 4 | — | — | 4 |
+| voice | 3 | 3 | — | 3 |
+| a11y_l10n | 4 | 4 | 4 | 4 |
 
 What keeps three criteria at 3, for a later rework:
 - load: section 1-2 holds UI, API and JSON, a tip, a JSON sample and two prompt examples; 1-5 adds データ側/画面側
@@ -193,15 +193,36 @@ without the causative 「保存させる」; practice-answer-ui en word order.
 - `node scripts/lessons/measure.mjs`: prose 2,388 (budget 1,200–2,400), read 3,158, practice reading 734, 10
   questions, 1 practice section, estimate 17.3 minutes; `estMinutes` is 17 (`course.json` lists 20).
 
-## Preview and visual QA: not run
+## Preview and visual QA (2026-10-31)
 
-`npm run lessons:preview -- vibe-coding vibe-ch1` (2026-10-30) reached a server on port 3007, but it was another app
-(the page showed "Nexloom"), not Rise Path's Vite dev server, so nothing was captured (exit 2). Without screenshots and
-`metrics.json` there was nothing for visual-qa to review, so the gate above has two reviewers. To finish this step, run
-`npm run dev` in a checkout of this branch (the `/preview` route reads `drafts/` from the checkout that serves it), then
-the preview and a visual-qa review. On this machine Playwright's own headless shell (build 1228) is not installed;
-pointing `PLAYWRIGHT_CHROMIUM_PATH` at the headless shell build 1243 already in Playwright's cache folder launched it
-without a download.
+`npm run lessons:preview -- vibe-coding vibe-ch1` ran against a dev server started from a checkout of this branch
+(`npm run dev`: Vite on 3007, API on 3006, no database), exit 0. `metrics.json` records the draft's hash
+`sha256:1d967dfe70f0b1a4`. (On 2026-10-30 port 3007 served another app, so nothing was captured then.)
+
+| shot | page | overflowX | console errors | diagram errors | chars/line (median) | text-only screens |
+|---|---|---|---|---|---|---|
+| desktop-jp 1440×900 | 15,963 px, 20 screens | no | 0 | 0 | 40 (target 30–40) | none |
+| mobile-jp 390×844 | 21,162 px, 30 screens | no | 0 | 0 | 21 | none |
+| desktop-en 1440×900 | 16,529 px, 20 screens | no | 0 | 0 | 74 (target 60–75) | none |
+
+Unknown blocks 0, broken images 0. The preview ignored 23 failed `/api/` requests (503 on notifications, progress and
+events, because no database was configured). Screenshots: `.artifacts/preview/vibe-coding/vibe-ch1/`
+(`desktop-jp.png`, `mobile-jp.png`, `desktop-en.png`; the last two stop at 16,000 px, so see the 70 screen PNGs in
+`pages/`). They are not committed (`.artifacts/` is ignored) and show only the seeded guest, no personal data.
+Playwright's own headless shell (build 1228) is not installed on this machine; `PLAYWRIGHT_CHROMIUM_PATH` pointed at
+build 1243 from Playwright's cache folder.
+
+visual-qa opened all 70 screens: pass, visual 4, load 4, a11y_l10n 4, no must-fix
+(`reports/vibe-ch1.visual-qa.review.json`). Its niceToHave items are left open, because each would change a block and
+need another review round:
+- The step titles of `ex-steps` and `practice-steps` start with ①–⑥ (EN "1."–"6."), and the reader also numbers each
+  step, so every number shows twice. 53 step titles in 6 published Claude Code lessons (cc-01, cc-04, cc-06, cc-07,
+  cc-08, cc-11) do the same, so this is a choice for all courses. The practice hint 「1-5の手順⑤」 uses the numbers.
+- Mobile JP line breaks that leave a fragment alone on a line: `q0` option a (「…していな／いから」), `q1` option c,
+  `q2` option a, the first summary point (「フロントエン／ド」); on desktop JP, checklist item `pc-input` (「…ありま／す」).
+- Reader, not lesson content: a comma can start a line after an inline term link (line-start rule); the eyebrow
+  differs between locales (「第1章・はじめに：前提と最低ライン」 / "Chapter 1 · Foundations"); the flashcard flip hint
+  has low contrast.
 
 ## Sources
 
@@ -248,7 +269,8 @@ most of the review-queue changes, at the cost of no card for データベース 
   sources.
 - Review chains: `server/tests/reviewChainsDurable.test.js` requires every verification of a published lesson to name a
   committed round; the round-3 verifications name `aae0299:…`, and rounds 1 and 2 are full reviews.
-- Visual QA: run the preview and visual-qa before publishing (see "Preview and visual QA: not run").
+- Visual QA: done at `sha256:1d967dfe70f0b1a4` (see "Preview and visual QA"). If the lesson changes before
+  publishing, re-run the preview and visual-qa.
 
 ## Assumptions
 
@@ -262,6 +284,7 @@ how to write a request, and the lesson names Claude Code only where a statement 
 1. Publishing: when and how. Update the 23 pinned tests and `course.json`, or first move the tests that only need "a
    published lesson" to a frozen copy of today's vibe-ch1 (see "Publishing: what changes")?
 2. Keep the 2 new cards? They enter the review queue of learners who already finished vibe-ch1.
-3. The preview and visual-qa review still have to run, on a dev server started from this branch.
+3. Step numbers: keep ①–⑥ in step titles, although the reader numbers steps too (6 Claude Code lessons do the same),
+   or drop them in every course in a separate change?
 4. Review rounds: this rework used 3 rounds (2 full, 1 verification), one more than the author-lesson skill allows; the
    user approved the third. Should the skill allow a verification round after a forced full round 2?
