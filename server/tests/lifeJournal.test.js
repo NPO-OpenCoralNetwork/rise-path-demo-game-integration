@@ -171,12 +171,12 @@ describe('moodToScore', () => {
 describe('validateWritableEntryDate', () => {
     it('rejects future dates relative to timezone', () => {
         const today = getTodayInTimezone('UTC');
-        const future = today.replace(/-(\d{2})$/, (_, d) => `-${String(Number(d) + 1).padStart(2, '0')}`);
+        // Real date arithmetic: adding 1 to the day digits breaks on a month's last day (2026-10-31 -> 2026-10-32).
+        const [year, month, day] = today.split('-').map(Number);
+        const future = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
         const result = validateWritableEntryDate(future, 'UTC');
-        if (future > today) {
-            assert.equal(result.valid, false);
-            assert.ok(result.errors.some((e) => e.includes('future')));
-        }
+        assert.equal(result.valid, false);
+        assert.ok(result.errors.some((e) => e.includes('future')));
     });
 
     it('accepts today in the given timezone', () => {
@@ -185,6 +185,25 @@ describe('validateWritableEntryDate', () => {
         assert.equal(result.valid, true);
         assert.equal(result.normalized, today);
     });
+
+    // Pinned clock: the end of a month, of a year and a leap day are checked on every run,
+    // not only on the day CI happens to hit one.
+    for (const [today, tomorrow] of [
+        ['2026-11-15', '2026-11-16'],
+        ['2026-10-31', '2026-11-01'],
+        ['2026-11-30', '2026-12-01'],
+        ['2027-02-28', '2027-03-01'],
+        ['2028-02-29', '2028-03-01'],
+        ['2026-12-31', '2027-01-01'],
+    ]) {
+        it(`on ${today} accepts today and rejects ${tomorrow} as future`, (t) => {
+            t.mock.timers.enable({ apis: ['Date'], now: Date.parse(`${today}T12:00:00Z`) });
+            assert.equal(validateWritableEntryDate(today, 'UTC').valid, true);
+            const result = validateWritableEntryDate(tomorrow, 'UTC');
+            assert.equal(result.valid, false);
+            assert.ok(result.errors.some((e) => e.includes('future')));
+        });
+    }
 });
 
 describe('buildLearningQuery', () => {
