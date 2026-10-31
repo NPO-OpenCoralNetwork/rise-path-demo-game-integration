@@ -1,15 +1,15 @@
 {
   "lessonId": "vibe-ch1",
   "file": "content/courses/vibe-coding/drafts/vibe-ch1.lesson.json",
-  "lessonHash": "sha256:0bc11122003d247c",
+  "lessonHash": "sha256:a166f07604cf5f17",
   "reviewer": "ja-editor",
   "rubricVersion": "rubric.v1",
   "mode": "verify",
   "verifies": {
-    "reviewedRevision": "8471358",
-    "previousReview": "8471358:content/courses/vibe-coding/reports/vibe-ch1.ja-editor.review.json",
-    "changed": ["hook-predict", "s1-check", "s2-prompt-api", "s2-check", "s3-b2", "s3-check", "s4-b2", "ex-check", "practice-checklist", "check-quiz", "lesson.glossary"],
-    "changedShare": 0.12,
+    "reviewedRevision": "72c9e87",
+    "previousReview": "72c9e87:content/courses/vibe-coding/reports/vibe-ch1.ja-editor.review.json",
+    "changed": ["s3-b2", "check-quiz"],
+    "changedShare": 0.03,
     "fullReviewRequired": false
   },
   "resolved": [],
@@ -17,41 +17,41 @@
     {
       "id": "voice",
       "score": 3,
-      "evidence": "The 15 reworded strings keep the form of their sibling options (q0's 「…から」, q1's and q2's 「…する」, q7's 「…起動する／送り直す／作り直す」, q4's plain-form statements). The checklist label pc-input stays in です・ます (「…入力とAPIでの保存が書いてあります」), and q7 b now uses the same wording as its feedback (「依頼に答えられる」). s2-prompt-api no longer leaves 「「」 alone before the blank. Lint finds no banned phrase. Voice stays at 3 because of a few stiff or uneven spots, all niceToHave: q2 d's 「省いて」 (unchanged), 「まず、」 on the first step of s3-b2 only, q4 d's new subject 「サーバーが起動して」, s2-b5 and s4-tools (unchanged).",
-      "blockIds": ["hook-predict", "s1-check", "s2-check", "s3-b2", "s3-check", "ex-check", "practice-checklist", "check-quiz", "s2-prompt-api"]
+      "evidence": "Both changed strings read naturally and keep their siblings' form. s3-b2 step 1 「ビルド：公開するためのファイル一式を作ります。」 now has the same 「名詞：…ます。」 shape as 「転送：できたファイルを、サーバーに送ります。」 and 「起動：サーバーで、…状態にします。」, without the lone 「まず、」. q4 d 「アプリがサーバーで起動して、もう依頼を待ち受けている」 is a plain-form statement like a 「ほかの人も、もうインターネットから開ける」, b 「ファイルはできたが、サーバーにはまだない」 and c 「書いたコードが消えて、もう元に戻せない」. It now names the app as what is launched, which matches 起動 in s3-b2 and q7 b. Its feedback 「依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。」 is two sentences in です・ます. Voice stays at 3 because of unchanged stiff spots, all niceToHave: q2 d 「省いて」, s2-b5, s4-tools and the q9 explanation.",
+      "blockIds": ["s3-b2", "check-quiz", "s2-check", "s2-b5", "s4-tools", "ex-check"]
     },
     {
       "id": "load",
       "score": 3,
+      "carriedOver": true,
       "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings after the rewording. The added words (「きちんと」「ほんの少しだけ」「いまの」「最初から」「別の種類のもの」) lengthen options without adding ideas. 1-2 is still dense: three terms, a JSON sample, a tip and two prompt blocks come before s2-check, and s1-b5 still adds サーバー as a fourth new word in 1-1.",
       "blockIds": ["s1-b5", "s2-b2", "s2-b4", "s2-prompt-ui", "s2-prompt-api", "s2-check"]
     },
     {
       "id": "prior",
       "score": 4,
+      "carriedOver": true,
       "evidence": "The コミット definition in s4-b2 now names Git (「…一緒に、Gitに記録することです。」 / \"…in Git…\"). Git is defined in the item just before it, and the glossary entry was changed to the same text in both locales, so the text and the glossary still match. No changed block adds a new term. s1-b1, s1-b3, s2-analogy, s3-analogy and s4-analogy still build each term from an everyday analogy.",
       "blockIds": ["s4-b2", "s1-b1", "s1-b3", "s2-analogy", "s3-analogy", "s4-analogy"]
     },
     {
       "id": "a11y_l10n",
       "score": 4,
-      "evidence": "Both locales are present in every changed block. Where the Japanese meaning moved, the en follows it: q7 d \"Redesign the screen again from scratch\", q4 b \"The files exist but are not on the server yet\", q4 d \"The server has started and is already waiting for requests\", and \"in Git\" in the コミット definition and its glossary entry. Elsewhere the jp only gained words the en already carried, for example q9 a 「一覧の」 for \"in the list\" and q7 b 「答えられる」. The remaining differences are punctuation and parallelism only, all niceToHave: the quotation marks around the s2-prompt-api blank in en only, and 「まず」 in the jp of s3-b2 only.",
-      "blockIds": ["s3-check", "check-quiz", "s4-b2", "ex-check", "hook-predict", "s2-prompt-api", "s3-b2"]
+      "evidence": "Both locales are present in both changed blocks and now say the same thing. s3-b2 step 1 jp 「ビルド：公開するためのファイル一式を作ります。」 matches the en \"Build: make the set of files for publishing.\", so the jp-only 「まず」 is gone. q4 d jp 「アプリがサーバーで起動して、もう依頼を待ち受けている」 matches \"The app has been launched on the server and is already waiting for requests\", and its feedback matches \"Waiting for requests comes after the files are sent and the app is launched. A build only makes the files for publishing.\" The one remaining difference between locales is the quotation marks around the s2-prompt-api blank in en only (unchanged, niceToHave).",
+      "blockIds": ["s3-b2", "check-quiz", "s2-prompt-api", "hook-predict"]
     }
   ],
   "mustFix": [],
   "niceToHave": [
-    "check-quiz: q4 d now names the server, not the app, as what started: 「サーバーが起動して」. In 1-3, 起動 is launching the app on the server (s3-b2, q7 b 「サーバーで…起動する」), and a server machine can be up already, so a careful learner may hesitate. The shop analogy in s3-analogy and the feedback still point to the launch stage, so it is not blocking — 「サーバーが起動して、もう依頼を待ち受けている」→「アプリがサーバーで起動して、依頼を待ち受けている」, en 「The server has started and is already waiting for requests」→「The app has been launched on the server and is waiting for requests」",
-    "s3-b2: 「まず、」 is now on step 1 only, and the en has no \"first\", so the three numbered steps are no longer parallel. Either drop it or match it in en — 「Build: make the set of files for publishing.」→「Build: first, make the set of files for publishing.」",
-    "s2-prompt-api: this round removed 「」 around the jp blank, but the en keeps quotation marks. The other prompts (s2-prompt-ui) have none around such a blank in either locale — 「Add \\\"{{field to add}}\\\" to the API」→「Add {{field to add}} to the API」",
-    "hook-predict: the jp key now names the app (「データを保存する仕組みが、アプリにないから」) and the en does not. The meaning is the same — 「Nothing saves the data」→「The app has nothing that saves the data」",
-    "s2-check: 「省いて」 can be read as leaving the long names out, and the explanation calls it 「省略」 (carried over, still open) — q2 d 「長いタスク名を、1行に収まるように省いて表示する」→「長いタスク名を、1行に収まるように省略して表示する」",
+    "s2-prompt-api: the en keeps quotation marks around the blank and the jp has none. s2-prompt-ui has none in either locale (carried over) — 「Add \\\"{{field to add}}\\\" to the API」→「Add {{field to add}} to the API」",
+    "hook-predict: the jp key names the app (「データを保存する仕組みが、アプリにないから」) and the en does not. The meaning is the same (carried over) — 「Nothing saves the data」→「The app has nothing that saves the data」",
+    "s2-check: 「省いて」 can be read as leaving the long names out, and the explanation calls it 「省略」 (carried over) — q2 d 「長いタスク名を、1行に収まるように省いて表示する」→「長いタスク名を、1行に収まるように省略して表示する」",
     "ex-check: 「依頼として頼みます」 repeats 頼 (carried over) — q9 explanation 「入力と表示は、そのあとで画面側の依頼として頼みます。」→「入力と表示は、そのあとの画面側の依頼に書きます。」",
-    "check-quiz: q5 c now chains three 「て」 clauses. It still reads, but it is heavy for a phone — 「「金額を返すAPIを作り直して、一覧の金額も右寄せにして、大きく表示して」」→「「金額を返すAPIを作り直して。一覧の金額も、右寄せで大きく表示して」」",
+    "check-quiz: q5 c chains three 「て」 clauses. It still reads, but it is heavy on a phone (carried over) — 「「金額を返すAPIを作り直して、一覧の金額も右寄せにして、大きく表示して」」→「「金額を返すAPIを作り直して。一覧の金額も、右寄せで大きく表示して」」",
     "s4-tools: the double topic marker remains (carried over) — 「たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、この機能はGitの代わりではないと書かれています。」",
-    "s2-b5: the long modifier before 「ガイド」 still reads translated (carried over) — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」"
+    "s2-b5: the long modifier before 「ガイド」 still reads like a translation (carried over) — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」"
   ],
   "average": 3.5,
   "verdict": "pass",
-  "summary": "The previous round had no open must-fix items, so nothing needed verifying. All 11 changed parts were judged in full: the 15 reworded strings, the s2-prompt-api blank without its brackets, and the コミット definition and glossary entry now saying 「Gitに」/\"in Git\". None has an error of classes (a) to (e). Options keep their parallel form, the keys do not stand out by length, the en follows each change in meaning, and validate and lint --strict are clean. Scores are unchanged: voice 3, load 3, prior 4, a11y_l10n 4. The notes are niceToHave: q4 d's new subject 「サーバーが起動して」, 「まず」 on one step of s3-b2, and the quotation marks around the s2-prompt-api blank in en only."
+  "summary": "The previous round had no open must-fix items, so the resolved list is empty. Both changed blocks were judged in full. In s3-b2, 「まず、」 is gone and the three numbered steps are parallel again, in line with the en. In check-quiz, q4 d now says the app is launched on the server, which matches 起動 in s3-b2 and q7 b. Its en and its feedback follow the change, and it keeps the plain form of the other options. Neither change has an error of classes (a) to (e), and nothing else in the lesson changed. Validate and lint --strict are clean. Voice and a11y_l10n were re-scored and are unchanged at 3 and 4. Load (3) and prior (4) are carried over, so the average is 3.5. The two niceToHave items fixed this round were dropped. The rest are carried over and are not blocking."
 }
