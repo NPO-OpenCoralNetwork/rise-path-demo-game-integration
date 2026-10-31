@@ -683,7 +683,7 @@
           ],
           "items": [
             {
-              "jp": "ビルド：まず、公開用のファイル一式を作ります。",
+              "jp": "ビルド：公開するためのファイル一式を作ります。",
               "en": "Build: make the set of files for publishing."
             },
             {
@@ -1576,8 +1576,8 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "サーバーが起動して、もう依頼を待ち受けている",
-                    "en": "The server has started and is already waiting for requests"
+                    "jp": "アプリがサーバーで起動して、もう依頼を待ち受けている",
+                    "en": "The app has been launched on the server and is already waiting for requests"
                   },
                   "feedback": {
                     "jp": "依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。",
