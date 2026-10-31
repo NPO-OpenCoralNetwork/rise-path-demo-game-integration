@@ -80,6 +80,8 @@ export function baseFacts() {
     diskFreeKb: 50 * 1024 * 1024,
     unitStack: 'enabled',
     unitBackupTimer: 'enabled',
+    backupTimersActive: true,
+    restoreInProgress: false,
     pgdataVolume: true,
     runningServices: ['db', 'api', 'mcp', 'kokoro-tts', 'cloudflared'],
     callerProfiles: '',
@@ -249,6 +251,10 @@ export const FIXTURES = [
   { code: 'R4', levels: '-EEE', ci: 'skip', hit: (s) => ({ record: { BACKUP_KEY_ID: 'fedcba9876543210' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { record: { BACKUP_KEY_ID: 'fedcba9876543210' }, facts: { backupKeyId: 'fedcba9876543210' } } },
   { code: 'R5', levels: '-EEE', ci: 'skip', hit: (s) => ({ record: { BACKUP_LIFECYCLE: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
   { code: 'R6', levels: '-EEE', ci: 'skip', hit: (s) => ({ facts: { backupAlert: 'false' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { backupAlert: '' } } },
+  // R8: enabled but stopped (a restore that stopped before RS10); a timer that is not installed is R1's.
+  { code: 'R8', levels: 'WWWW', ci: 'skip', hit: (s) => ({ facts: { backupTimersActive: false }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { unitBackupTimer: 'not-found', backupTimersActive: false } } },
+  // R9: restore-db.sh's marker on the disk; an error for a deploy (a warning when the 事前チェック runs alone: deployPreflight.test.js).
+  { code: 'R9', levels: 'EEEE', ci: 'skip', hit: (s) => ({ facts: { restoreInProgress: true, from: 'deploy' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { restoreInProgress: false, from: 'deploy' } } },
   { code: 'V1', levels: 'EEE-', ci: 'skip', hit: (s) => ({ record: { VERCEL_PROTECTION_ON: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { record: { VERCEL_PROTECTION_ON: '' }, stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${PILOT_ID_2}` } } },
   { code: 'V2', levels: 'EEEE', ci: 'skip', hit: (s) => ({ stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${s}` } }), miss: { stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${PILOT_ID_2.toUpperCase()}` } } },
   { code: 'V3', levels: '---E', ci: 'skip', hit: (s) => ({ record: { VERCEL_PROTECTION_OFF: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },

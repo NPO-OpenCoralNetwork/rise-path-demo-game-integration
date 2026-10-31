@@ -1,0 +1,12 @@
+# Every day at 03:23 Japan time, up to 10 minutes later; a run missed while the VM was off runs at the next boot.
+# Deploys avoid 03:00-04:00 JST (a db recreate during the dump fails that night's backup, which then alerts).
+[Unit]
+Description=Rise Path daily backup timer
+
+[Timer]
+OnCalendar=*-*-* 03:23:00 Asia/Tokyo
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

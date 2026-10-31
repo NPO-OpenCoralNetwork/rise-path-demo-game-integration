@@ -272,10 +272,17 @@ export const RULES = Object.freeze([
   { code: 'R1', group: 'R', level: 'W/E/E/E', ci: 'skip', title: '毎日の控え（バックアップ）が動いていません。', fix: '最初のデプロイのあとで、手順書 6.4 のとおりに入れます（最初のデプロイの前は、これで正しい状態です）。' },
   { code: 'R2', group: 'R', level: '–/W/W/W', ci: 'skip', title: '最後の控えが 36 時間より前か、失敗しています。', fix: '`sudo journalctl -u risepath-backup` を見て、エージェントに相談します（手順書 17 章）。' },
   // R3: setup not checked; pilot and minors E if never, W if older than 35 days; public E for both.
-  { code: 'R3', group: 'R', level: 'dyn', ci: 'skip', title: '控えから戻す練習の記録がないか、35 日より前です。', fix: '控えから戻す練習をします（手順書 16.1）。' },
+  { code: 'R3', group: 'R', level: 'dyn', ci: 'skip', title: '控えから戻す練習の記録がないか、35 日より前です。', fix: '`sudo ./scripts/restore-drill.sh` を実行します（手順書 16.1）。' },
   { code: 'R4', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えの鍵を VM の外にしまったことが、記録にないか、いまの鍵とちがいます（鍵がないと戻せません）', fix: '手順書 6.4 の鍵の手順をして、launch-record.env の `BACKUP_KEY_COPY` に日付を、`BACKUP_KEY_ID` に key id を書きます。' },
   { code: 'R5', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えを消す日数（バケットのライフサイクル）が、記録にありません。', fix: '手順書 3.8 のとおりに設定し、launch-record.env の `BACKUP_LIFECYCLE` に日付を書きます。' },
-  { code: 'R6', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えが失敗したときの知らせの受け口がありません。', fix: 'stack.env の `AI_CAP_ALERT_WEBHOOK_URL` を書いてから、控えの設定をもう一度入れます（手順書 6.4）。' },
+  { code: 'R6', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えが失敗したときの知らせの受け口がありません。', fix: 'stack.env の `AI_CAP_ALERT_WEBHOOK_URL` を書いてから、`sudo ./scripts/install-backup.sh` をもう一度実行します（手順書 6.4）。' },
+  // R7 (the quarterly check-copy) was removed by the Scope guard (TR9b); its number stays unused. R8 (review round 1 of
+  // Stage 5, finding 4): a restore that stopped before RS10 leaves both timers stopped but enabled, which R1 cannot see.
+  { code: 'R8', group: 'R', level: 'W', ci: 'skip', title: '控えのタイマーが止まっています（入れてありますが、いまは動いていません）。', fix: '戻し（restore-db.sh）の途中でなければ、`sudo systemctl start risepath-backup.timer risepath-backup-journal.timer` で動かします。戻しの途中なら、エージェントと続きをします（手順書 16.2）。' },
+  // R9 (review round 2 of Stage 5, finding 2): restore-db.sh's marker (/var/lib/risepath-backup/restore-in-progress) is
+  // there: the database may be restored but not yet replayed, so a deploy must not serve it (E); the same restore command
+  // run again calls the 事前チェック on its own at RS0, where it is only a warning.
+  { code: 'R9', group: 'R', level: 'dyn', ci: 'skip', title: '本番の DB を戻している途中です（restore-db.sh が途中で止まっています）。', fix: 'デプロイはしません。エージェントと、同じ restore-db.sh のコマンドで続きをします（手順書 16.2）。' },
   // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3). Passes with (a) a valid
   // pilot list in stack.env or (b) Vercel's protection still on (VERCEL_PROTECTION_ON dated, VERCEL_PROTECTION_OFF empty).
   { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。' },
@@ -311,7 +318,7 @@ const TEXT_BY_CODE = new Map([...RULES, ...INTERNAL_CODES].map((r) => [r.code, r
  * The host facts preflight.sh collects (bash, outside the container; never an env value).
  * @typedef {{
  *   uid: number, gid: number, diskFreeKb: number, unitStack: string, unitBackupTimer: string,
- *   pgdataVolume: boolean, runningServices: string[], callerProfiles: string, callerExports: string[],
+ *   backupTimersActive: boolean, restoreInProgress: boolean, pgdataVolume: boolean, runningServices: string[], callerProfiles: string, callerExports: string[],
  *   backupKey: boolean, backupEnv: boolean, backupLastOk: string, backupLastFail: string, drillLastOk: string,
  *   backupKeyId: string, backupAlert: string, from: string
  * }} Facts
@@ -324,6 +331,8 @@ const FACT_CHECKS = {
   diskFreeKb: (v) => Number.isSafeInteger(v) && /** @type {number} */ (v) >= 0,
   unitStack: (v) => typeof v === 'string' && /^[a-z-]{0,32}$/.test(v),
   unitBackupTimer: (v) => typeof v === 'string' && /^[a-z-]{0,32}$/.test(v),
+  backupTimersActive: (v) => typeof v === 'boolean',
+  restoreInProgress: (v) => typeof v === 'boolean',
   pgdataVolume: (v) => typeof v === 'boolean',
   runningServices: (v) => Array.isArray(v) && v.length <= 64 && v.every((s) => typeof s === 'string' && /^[a-z0-9][a-z0-9_.-]{0,63}$/.test(s)),
   callerProfiles: (v) => typeof v === 'string' && /^[A-Za-z0-9._:+/ ,_-]{0,512}$/.test(v),
@@ -1054,6 +1063,12 @@ export function checkStack(input) {
   });
   rule('R6', (level) => {
     if (facts.backupAlert === 'false') add({ code: 'R6', level: level ?? 'E' });
+  });
+  rule('R8', (level) => {
+    if (facts.unitBackupTimer === 'enabled' && !facts.backupTimersActive) add({ code: 'R8', level: level ?? 'W' });
+  });
+  rule('R9', () => {
+    if (facts.restoreInProgress) add({ code: 'R9', level: facts.from === 'deploy' ? 'E' : 'W' });
   });
   // The pilot list as the api reads it: stack.env only (the api's env_file; A8 keeps it out of billing.env).
   const pilot = readPilotEntries(env.get('PILOT_ACCOUNT_IDS'));

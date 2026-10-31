@@ -9,6 +9,14 @@
 #   ./provision-gce.sh
 #   MACHINE_TYPE=e2-standard-2 ./provision-gce.sh   # with the Memanto overlay (8 GB)
 #   NIGHT_STOP=1 ./provision-gce.sh   # dev only: stop the VM at night
+#   BACKUP_SA_EMAIL=risepath-backup@your-project.iam.gserviceaccount.com ./provision-gce.sh
+#     the backups' least-privilege service account (doc/guides/first-launch.ja.md 3.8, 4.1; Phase 9, D4): the VM
+#     runs as it with scope cloud-platform, and IAM (two roles on the backup bucket only) is what limits it. Unset:
+#     the VM gets GCE's default account, whose default scopes allow Cloud Storage read-only (the backups cannot
+#     upload); the script prints how to attach the account later. Set for a VM that already exists: the script
+#     changes nothing and prints the same commands with that account. For a VM that exists, the commands are printed
+#     only when it does not run as that account already (unset: as GCE's default account), as read from the VM.
+#     The commands are 手順書 4.1's, where the owner runs this script. Owner-facing lines are Japanese first.
 set -euo pipefail
 
 : "${GCP_PROJECT:?Set GCP_PROJECT}"
@@ -19,10 +27,32 @@ MACHINE_TYPE="${MACHINE_TYPE:-e2-medium}"
 DISK_SIZE="${DISK_SIZE:-50GB}"
 SCHEDULE_NAME="${SCHEDULE_NAME:-risepath-dev-schedule}"
 NIGHT_STOP="${NIGHT_STOP:-0}"
+BACKUP_SA_EMAIL="${BACKUP_SA_EMAIL:-}"
+
+SA_FLAGS=()
+if [[ -n "${BACKUP_SA_EMAIL}" ]]; then
+  if [[ ! "${BACKUP_SA_EMAIL}" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$ ]]; then
+    echo "❌ BACKUP_SA_EMAIL が、サービスアカウントの形（名前@プロジェクト.iam.gserviceaccount.com）ではありません。手順書 3.8 で作った名前を書きます（まだ何も作っていません）。"
+    echo "   BACKUP_SA_EMAIL is not a service account address (name@project.iam.gserviceaccount.com)"
+    exit 1
+  fi
+  SA_FLAGS=(--service-account="${BACKUP_SA_EMAIL}" --scopes=cloud-platform)
+fi
+
+# sa_commands <service account>: the three commands that attach it to the VM (which must be stopped for it).
+sa_commands() {
+  echo "      gcloud compute instances stop ${VM_NAME} --zone=${GCP_ZONE}"
+  echo "      gcloud compute instances set-service-account ${VM_NAME} --zone=${GCP_ZONE} \\"
+  echo "        --service-account=$1 --scopes=cloud-platform"
+  echo "      gcloud compute instances start ${VM_NAME} --zone=${GCP_ZONE}"
+}
 
 gcloud config set project "${GCP_PROJECT}"
 
+CREATED=0
+CURRENT_SA=''
 if ! gcloud compute instances describe "${VM_NAME}" --zone="${GCP_ZONE}" >/dev/null 2>&1; then
+  CREATED=1
   echo "==> Creating VM ${VM_NAME} (${MACHINE_TYPE}, ${DISK_SIZE})"
   gcloud compute instances create "${VM_NAME}" \
     --zone="${GCP_ZONE}" \
@@ -32,9 +62,43 @@ if ! gcloud compute instances describe "${VM_NAME}" --zone="${GCP_ZONE}" >/dev/n
     --image-family=ubuntu-2404-lts-amd64 \
     --image-project=ubuntu-os-cloud \
     --tags=risepath-vm \
-    --metadata=enable-oslogin=TRUE
+    --metadata=enable-oslogin=TRUE \
+    ${SA_FLAGS[@]+"${SA_FLAGS[@]}"}
 else
-  echo "==> VM ${VM_NAME} already exists"
+  echo "==> VM ${VM_NAME} already exists (its service account is not changed here)"
+  # The account the VM runs as now (an address, not a secret), so the commands are printed only when they are needed:
+  # stopping a VM that already runs as the backup account would stop Rise Path for nothing (review round 3, finding 9).
+  CURRENT_SA="$(gcloud compute instances describe "${VM_NAME}" --zone="${GCP_ZONE}" --format='value(serviceAccounts[0].email)' 2>/dev/null || true)"
+  if [[ -n "${BACKUP_SA_EMAIL}" ]]; then
+    if [[ "${CURRENT_SA}" == "${BACKUP_SA_EMAIL}" ]]; then
+      echo "ℹ️  VM はもう BACKUP_SA_EMAIL のアカウントで動いています（何も変えていません）。"
+      echo "    (The VM already runs as BACKUP_SA_EMAIL; nothing changed.)"
+    else
+      echo "ℹ️  VM はもうあるので、サービスアカウントはここでは変えていません。BACKUP_SA_EMAIL のアカウントにするときは、"
+      echo "    次の 3 つを順に実行します（VM が止まるので、Rise Path も止まります。手順書 4.1）:"
+      echo "    (The VM exists; to run it as BACKUP_SA_EMAIL, stop it, set the account, start it:)"
+      sa_commands "${BACKUP_SA_EMAIL}"
+    fi
+  fi
+fi
+
+# The backups (deploy/risepath-vm/scripts/backup.sh) upload with the VM's service account.
+if [[ -z "${BACKUP_SA_EMAIL}" ]]; then
+  if [[ "${CREATED}" == 1 || "${CURRENT_SA}" =~ -compute@developer\.gserviceaccount\.com$ ]]; then
+    echo "⚠️  BACKUP_SA_EMAIL がないので、VM は GCE のふつうのサービスアカウントで動きます。これでは控えを送れません。"
+    echo "    あとで控えのアカウントを付けます。次の 3 つを順に実行します（VM が止まります。手順書 4.1）:"
+    echo "    (BACKUP_SA_EMAIL is unset: the VM runs as GCE's default service account, which cannot upload backups."
+    echo "    Attach the backup account later; the VM must be stopped:)"
+    sa_commands "risepath-backup@${GCP_PROJECT}.iam.gserviceaccount.com"
+  elif [[ -n "${CURRENT_SA}" ]]; then
+    echo "ℹ️  VM はもうあり、GCE のふつうのサービスアカウントではないアカウント（${CURRENT_SA}）で動いています。何も変えていません。"
+    echo "    (The VM exists and runs as ${CURRENT_SA}, not as GCE's default account; nothing changed.)"
+  else
+    echo "ℹ️  VM はもうあるので、サービスアカウントは変えていません（VM のアカウントを読めませんでした）。"
+    echo "    控えのアカウントが付いていないときだけ、次の 3 つを順に実行します（VM が止まります。手順書 4.1）:"
+    echo "    (The VM exists; its account could not be read. Only if it does not run as the backup account:)"
+    sa_commands "risepath-backup@${GCP_PROJECT}.iam.gserviceaccount.com"
+  fi
 fi
 
 if [[ "${NIGHT_STOP}" == "1" ]]; then

@@ -1,0 +1,16 @@
+# The hourly deletion records for the replay after a restore, and the 36-hour staleness alert (JO2) (Phase 9,
+# owner decision D4; design §5.4, §5.6). Installed by deploy/risepath-vm/scripts/install-backup.sh.
+[Unit]
+Description=Rise Path hourly deletion journal (encrypted, to Cloud Storage)
+After=docker.service risepath-stack.service
+Requires=docker.service
+OnFailure=risepath-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/risepath/deploy/risepath-vm
+ExecStart=/opt/risepath/deploy/risepath-vm/scripts/backup.sh journal
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=300

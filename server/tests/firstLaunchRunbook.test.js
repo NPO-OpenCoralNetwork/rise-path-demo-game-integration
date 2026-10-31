@@ -18,6 +18,7 @@ import { ALL_CODES as AFTER_CODES, DEPLOY_CODES, POSTDEPLOY_CODES } from '../../
 import { baseFacts, buildInput } from './helpers/preflightFixtures.js';
 import { pilotStartupLines } from '../middleware/pilotGate.js';
 import { VERCEL_RULES } from '../../scripts/deploy/vercel-env-rules.mjs';
+import { ALL_CODES as BACKUP_ALL_CODES, BACKUP_CODES } from '../../scripts/deploy/backup-codes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RUNBOOK = 'doc/guides/first-launch.ja.md';
@@ -83,8 +84,36 @@ describe('first-launch.ja.md: chapters and steps (design §9.2 #1)', () => {
 
 describe('first-launch.ja.md 13 章: every code the preflight, the deploy and the 事後の確かめ print (design §9.2 #2)', () => {
   const table = rows(chapter('13')).filter((r) => r[0] !== 'コード' && !/^-+$/.test(r[0]));
-  it('has one row per code, in the catalog order (the preflight\'s, then DB1 and the P codes, then the Vercel build\'s VB codes), and no other', () => {
-    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES, ...AFTER_CODES, ...VERCEL_RULES.map((r) => r.code)]);
+  it('has one row per code, in the catalog order (the preflight\'s, then DB1 and the P codes, then the Vercel build\'s VB codes, then the backup tools\' BK/JO/IB/DR/RS codes), and no other', () => {
+    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES, ...AFTER_CODES, ...VERCEL_RULES.map((r) => r.code), ...BACKUP_ALL_CODES]);
+  });
+  it('shows each backup code\'s title and fix exactly as the backup scripts print them, its kind starting with its level (Phase 9 stage 5, D4)', () => {
+    const byCode = new Map(table.map((r) => [r[0], r]));
+    const WORD = { E: 'エラー', W: '注意' };
+    for (const entry of BACKUP_CODES) {
+      const row = /** @type {string[]} */ (byCode.get(entry.code));
+      assert.equal(row.length, 5, `${entry.code}: コード | 種類 | 表示 | 説明 | 直し方`);
+      assert.ok(row[1].startsWith(WORD[entry.level]), `${entry.code} (${entry.level}): ${row[1]}`);
+      assert.equal(row[2], entry.title, `${entry.code}: 表示`);
+      assert.ok(row[3], `${entry.code}: 説明`);
+      assert.equal(row[4], entry.fix, `${entry.code}: 直し方`);
+    }
+    // Review round 2, finding 13: restore-drill.sh reports another key's set as DR4, so DR4's 説明 names the key id, DR1's not.
+    assert.doesNotMatch(/** @type {string[]} */ (byCode.get('DR1'))[3], /key id/u);
+    assert.match(/** @type {string[]} */ (byCode.get('DR4'))[3], /key id/u);
+    assert.match(read('deploy/risepath-vm/scripts/restore-drill.sh'), /\[\[ "\$\{SET_KEY\}" == "\$\{KEY_ID\}" \]\] \|\| bk_fail DR4 /);
+    const intro = /** @type {string} */ (chapter('13').split('\n').find((line) => line.startsWith('- BK・JO・IB・DR・RS で始まるコードは')));
+    assert.ok(intro, 'the intro bullet for the backup codes');
+    assert.match(intro, /IB・DR・RS は、直したら、同じコマンドをもう一度実行し、✅ の行が出れば直っています。/u, 'success sign of the commands the owner runs');
+    // Review round 1 of Stage 5, finding 16: BK's check is `systemctl start`, which prints nothing when it works. Round 2,
+    // finding 10: most BK fixes do not contain that command, so the sign says to run it after any fix, and that it takes minutes.
+    assert.match(intro, /BK は、直したら `sudo systemctl start risepath-backup\.service` を実行します（数分かかり、そのあいだ何も出ません）。何も出さずに終われば直っています（`sudo journalctl -u risepath-backup -n 5` に「✅ 毎日の控えができました」の行が出ます。/u, 'BK\'s success sign');
+    assert.doesNotMatch(intro, /直し方の `sudo systemctl start risepath-backup\.service`/u);
+    assert.match(intro, /JO は、次の 1 時間のあとに `sudo journalctl -u risepath-backup-journal -n 5` に「✅ 削除の記録を控えました」の行が出れば直っています。/u, 'JO\'s success sign');
+    assert.match(intro, /また出るときは、出た行をそのままエージェントに見せます/u, 'failure path');
+    // Finding 19: the folder the relative commands run in is said once.
+    assert.match(intro, /`cd \/opt\/risepath\/deploy\/risepath-vm` のあとで実行します/u);
+    assert.match(intro, /「わけ」の行は、そのとき足りなかったものを、値を出さずに書いています/u);
   });
   it('shows each VB code\'s message exactly as the Vercel build prints it, with the kind of its level (Phase 9 stage 4, D5)', () => {
     const byCode = new Map(table.map((r) => [r[0], r]));
@@ -410,15 +439,25 @@ describe('every 「手順書 X.Y」 and 「手順書 N 章」 resolves to a runb
     assert.ok(check([...RULES, ...INTERNAL_CODES].map((r) => `${r.title}\n${r.fix}`).join('\n'), 'catalog') > 0);
     for (const a of ATTESTATIONS) if (a.step) check(`手順書 ${a.step}`, a.key);
   });
-  it('in the scripts\' messages (deploy/risepath-vm/scripts/*.sh, scripts/deploy/*.mjs, scripts/smoke-public-edge.mjs, scripts/send-test-alert.mjs)', () => {
+  it('in the scripts\' messages (deploy/risepath-vm/scripts/*.sh, scripts/deploy/*.mjs, scripts/smoke-public-edge.mjs, scripts/send-test-alert.mjs, scripts/replay-deletions.mjs)', () => {
     const files = [
       ...fs.readdirSync(path.join(ROOT, 'deploy/risepath-vm/scripts')).filter((f) => f.endsWith('.sh')).map((f) => `deploy/risepath-vm/scripts/${f}`),
       ...fs.readdirSync(path.join(ROOT, 'scripts/deploy')).filter((f) => f.endsWith('.mjs')).map((f) => `scripts/deploy/${f}`),
       'scripts/smoke-public-edge.mjs',
       'scripts/send-test-alert.mjs',
+      // Phase 9 stage 5: the replay's stop line (consent/grant rows) names 手順書 16.2.
+      'scripts/replay-deletions.mjs',
     ];
     let n = 0;
     for (const f of files) if (fs.existsSync(path.join(ROOT, f))) n += check(read(f), f);
+    assert.ok(n > 0);
+    assert.ok(check(read('scripts/replay-deletions.mjs'), 'scripts/replay-deletions.mjs') > 0, 'the replay\'s messages are scanned');
+  });
+  it('in the files the owner edits on the VM (deploy/risepath-vm/*.env.example: the comments above each line)', () => {
+    const files = fs.readdirSync(path.join(ROOT, 'deploy/risepath-vm')).filter((f) => f.endsWith('.env.example')).map((f) => `deploy/risepath-vm/${f}`);
+    assert.ok(files.includes('deploy/risepath-vm/backup.env.example') && files.includes('deploy/risepath-vm/launch-record.env.example'), files.join(', '));
+    let n = 0;
+    for (const f of files) n += check(read(f), f);
     assert.ok(n > 0);
   });
 });

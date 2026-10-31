@@ -812,7 +812,8 @@ describe('T6: the catalog against the repository', () => {
   });
   it('levels use the notation; dynamic rules are exactly the ones the engine computes', () => {
     for (const r of RULES) assert.match(r.level, /^(?:[EWI]|dyn|[EWI–]\/[EWI–]\/[EWI–]\/[EWI–])$/, r.code);
-    assert.deepEqual(RULES.filter((r) => r.level === 'dyn').map((r) => r.code), ['A4', 'A7', 'A10', 'A13', 'C11', 'D1', 'F5', 'F6', 'G3', 'G5', 'R3', 'V1']);
+    // R9 (Phase 9 stage 5, review round 2): E for a deploy, W when the 事前チェック runs alone.
+    assert.deepEqual(RULES.filter((r) => r.level === 'dyn').map((r) => r.code), ['A4', 'A7', 'A10', 'A13', 'C11', 'D1', 'F5', 'F6', 'G3', 'G5', 'R3', 'R9', 'V1']);
   });
   it('leaves out what the Scope guard removed or deferred; the pilot-list parts are in, in the same change (Phase 9 stage 3, finding 25)', () => {
     const codes = new Set(RULES.map((r) => r.code));

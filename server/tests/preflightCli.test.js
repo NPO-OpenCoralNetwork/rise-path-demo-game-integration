@@ -341,7 +341,8 @@ describe('T9: scripts/deploy imports only node: built-ins and its siblings (the 
   for (const file of files) {
     it(`${file}`, () => {
       const { importedFiles } = ts.preProcessFile(read(path.join(dir, file)), true, true);
-      assert.ok(importedFiles.length > 0 || file === 'env-parse.mjs');
+      // env-parse.mjs and backup-codes.mjs (a catalog the bash scripts print; Phase 9 stage 5) import nothing.
+      assert.ok(importedFiles.length > 0 || file === 'env-parse.mjs' || file === 'backup-codes.mjs');
       for (const { fileName } of importedFiles) {
         const sibling = /^\.\/([\w.-]+\.mjs)$/.exec(fileName);
         assert.ok(fileName.startsWith('node:') || (sibling && files.includes(sibling[1])), `${file} imports ${fileName}`);
@@ -384,7 +385,7 @@ describe('T8: preflight.sh end to end without Docker (a docker shim runs the CLI
    * docker and id are shims; `run` maps each --mount src→dst onto the CLI's arguments and runs it here.
    * @param {{ files?: Record<string, string>, args?: string[], env?: Record<string, string>, uid?: string,
    *   dockerfile?: string | null, imageMissing?: boolean, pullFails?: boolean, runStatus?: number, status?: string,
-   *   backupFiles?: boolean, units?: Record<string, string>, cwd?: string }} [opts]
+   *   backupFiles?: boolean, units?: Record<string, string>, active?: string[], restoreMark?: boolean, cwd?: string }} [opts]
    */
   function runWrapper(opts = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-sh-'));
@@ -399,6 +400,8 @@ describe('T8: preflight.sh end to end without Docker (a docker shim runs the CLI
       fs.mkdirSync(etc);
       if (opts.backupFiles) for (const f of ['backup.key', 'backup.env']) fs.writeFileSync(path.join(etc, f), 'x', { mode: 0o600 });
       if (opts.status !== undefined) fs.writeFileSync(status, opts.status);
+      // restore-db.sh's marker sits beside the status file (preflight.sh BACKUP_RESTORE).
+      if (opts.restoreMark) fs.writeFileSync(path.join(dir, 'restore-in-progress'), 'started=2026-11-20T01:02:03Z\nstack=enabled\ndbChanged=1\n');
       const script = read(path.join(STACK, 'scripts/preflight.sh'))
         .replace(/^BACKUP_ETC=.*$/m, `BACKUP_ETC=${etc}`)
         .replace(/^BACKUP_STATUS=.*$/m, `BACKUP_STATUS=${status}`);
@@ -414,9 +417,11 @@ describe('T8: preflight.sh end to end without Docker (a docker shim runs the CLI
       const factsFile = path.join(dir, 'facts.json');
       fs.writeFileSync(log, '');
       fs.writeFileSync(path.join(bin, 'id'), `#!/usr/bin/env bash\necho "id $*" >> "${log}"\necho ${opts.uid ?? '1000'}\n`, { mode: 0o755 });
-      // systemctl is-enabled <unit>: the state of opts.units, else nothing and exit 1 (no such unit).
+      // systemctl is-enabled <unit>: the state of opts.units, else nothing and exit 1 (no such unit). systemctl
+      // is-active <unit>: active for the units in opts.active, else inactive and exit 3.
       const units = Object.entries(opts.units ?? {}).map(([unit, state]) => `  ${unit}) echo ${state} ;;`).join('\n');
-      fs.writeFileSync(path.join(bin, 'systemctl'), `#!/usr/bin/env bash\ncase "$2" in\n${units}\n  *) exit 1 ;;\nesac\n`, { mode: 0o755 });
+      const active = (opts.active ?? []).map((unit) => `  ${unit}) echo active; exit 0 ;;`).join('\n');
+      fs.writeFileSync(path.join(bin, 'systemctl'), `#!/usr/bin/env bash\nif [[ "$1" == is-active ]]; then\n  case "$2" in\n${active}\n  *) echo inactive; exit 3 ;;\n  esac\nfi\ncase "$2" in\n${units}\n  *) exit 1 ;;\nesac\n`, { mode: 0o755 });
       fs.writeFileSync(path.join(bin, 'docker'), `#!${process.execPath}
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
@@ -606,6 +611,7 @@ switch (args[0]) {
     const ok = runWrapper({
       backupFiles: true,
       units: { 'risepath-stack.service': 'enabled', 'risepath-backup.timer': 'enabled' },
+      active: ['risepath-backup.timer', 'risepath-backup-journal.timer'],
       status: '{"lastOk":"2026-11-20T01:02:03Z","lastFail":"2026-11-19T01:02:03.5Z","lastFailStep":"BK7","keyId":"0123456789abcdef","alert":true,"lastDrillOk":"2026-11-10T00:00:00Z"}\n',
     });
     assert.deepEqual([ok.facts.backupKey, ok.facts.backupEnv, ok.facts.backupLastOk, ok.facts.backupLastFail, ok.facts.drillLastOk, ok.facts.backupKeyId, ok.facts.backupAlert],
@@ -614,6 +620,15 @@ switch (args[0]) {
     assert.deepEqual([bad.facts.backupKey, bad.facts.backupLastOk, bad.facts.backupKeyId, bad.facts.backupAlert], [false, '', '', '']);
     assert.ok(validateFacts(bad.facts));
     assert.deepEqual([ok.facts.unitStack, ok.facts.unitBackupTimer, bad.facts.unitStack], ['enabled', 'enabled', 'not-found']);
+    // R8's fact (review round 1 of Stage 5, finding 4): true only while both backup timers are active.
+    assert.deepEqual([ok.facts.backupTimersActive, bad.facts.backupTimersActive], [true, false]);
+    const one = runWrapper({ units: { 'risepath-backup.timer': 'enabled' }, active: ['risepath-backup.timer'] });
+    assert.equal(one.facts.backupTimersActive, false, 'the journal timer stopped');
+    // R9's fact (review round 2 of Stage 5, finding 2): restore-db.sh's marker beside the status file.
+    assert.equal(ok.facts.restoreInProgress, false);
+    const held = runWrapper({ restoreMark: true });
+    assert.equal(held.facts.restoreInProgress, true);
+    assert.ok(validateFacts(held.facts));
   });
 
   it('finding 1 at the wrapper: a bare value line in stack.env is A9 and is never printed', () => {

@@ -19,6 +19,8 @@ REPO_ROOT="$(cd "${STACK_DIR}/../.." && pwd)"
 # What the backup scripts leave (owner decision D4): only whether files exist, and fixed patterns.
 BACKUP_ETC=/etc/risepath-backup
 BACKUP_STATUS=/var/lib/risepath-backup/status.json
+# restore-db.sh's marker, beside the status file (backup-common.sh BK_RESTORE_MARK; R9).
+BACKUP_RESTORE="${BACKUP_STATUS%/*}/restore-in-progress"
 
 say_code() { # <code> <title> <fix>: the three lines preflight-vm.mjs prints for a code
   echo "❌ [$1] $2"
@@ -115,6 +117,12 @@ unit_state() { # systemctl is-enabled's word, or not-found
   state="$(systemctl is-enabled "$1" 2> /dev/null | head -n 1 || true)"
   if [[ "${state}" =~ ^[a-z-]{1,32}$ ]]; then printf '%s' "${state}"; else printf 'not-found'; fi
 }
+timers_active() { # both backup timers are waiting (systemctl is-active): a restore that stopped early leaves them stopped
+  local timer
+  for timer in risepath-backup.timer risepath-backup-journal.timer; do
+    [[ "$(systemctl is-active "${timer}" 2> /dev/null | head -n 1 || true)" == active ]] || return 1
+  done
+}
 status_field() { # <key> <value pattern>: a quoted field of the backup status file, or empty
   if [[ -r "${BACKUP_STATUS}" ]]; then
     sed -nE "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"($2)\".*/\\1/p" "${BACKUP_STATUS}" | head -n 1
@@ -135,9 +143,10 @@ collect_facts() {
     alert="$(sed -nE 's/.*"alert"[[:space:]]*:[[:space:]]*(true|false).*/\1/p' "${BACKUP_STATUS}" | head -n 1)"
   fi
   read -r -a exports <<< "${CALLER_EXPORTS}"   # names separated by spaces; no glob expansion
-  printf '{"uid":%s,"gid":%s,"diskFreeKb":%s,"unitStack":"%s","unitBackupTimer":"%s","pgdataVolume":%s,"runningServices":%s,"callerProfiles":"%s","callerExports":%s,"backupKey":%s,"backupEnv":%s,"backupLastOk":"%s","backupLastFail":"%s","drillLastOk":"%s","backupKeyId":"%s","backupAlert":"%s","from":"%s"}' \
+  printf '{"uid":%s,"gid":%s,"diskFreeKb":%s,"unitStack":"%s","unitBackupTimer":"%s","backupTimersActive":%s,"restoreInProgress":%s,"pgdataVolume":%s,"runningServices":%s,"callerProfiles":"%s","callerExports":%s,"backupKey":%s,"backupEnv":%s,"backupLastOk":"%s","backupLastFail":"%s","drillLastOk":"%s","backupKeyId":"%s","backupAlert":"%s","from":"%s"}' \
     "$(digits "$(id -u)")" "$(digits "$(id -g)")" "$(digits "${disk}")" \
-    "$(unit_state risepath-stack.service)" "$(unit_state risepath-backup.timer)" \
+    "$(unit_state risepath-stack.service)" "$(unit_state risepath-backup.timer)" "$(yes_no timers_active)" \
+    "$(yes_no test -e "${BACKUP_RESTORE}")" \
     "$(yes_no test -n "$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJECT}" --filter label=com.docker.compose.volume=pgdata 2> /dev/null || true)")" \
     "$(json_list '^[a-z0-9][a-z0-9_.-]{0,63}$' ${services[@]+"${services[@]}"})" \
     "$(caller_profiles_fact)" \
