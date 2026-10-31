@@ -91,7 +91,7 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "画面のデザインがまだ完成していないから",
+                    "jp": "画面のデザインが、まだ完成していないから",
                     "en": "The screen design isn't finished yet"
                   },
                   "feedback": {
@@ -102,7 +102,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "AIが、入力したタスクを覚えていないから",
+                    "jp": "AIが、入力されたタスクを覚えていないから",
                     "en": "The AI does not remember the tasks you typed"
                   },
                   "feedback": {
@@ -113,7 +113,7 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "データを保存する仕組みがないから",
+                    "jp": "データを保存する仕組みが、アプリにないから",
                     "en": "Nothing saves the data"
                   }
                 }
@@ -272,7 +272,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "支出の記録を、整理してしまっておく",
+                    "jp": "支出の記録を、きちんと整理してしまっておく",
                     "en": "Keep the spending records organized"
                   },
                   "feedback": {
@@ -283,7 +283,7 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "押されたボタンの色を、少し濃くする",
+                    "jp": "押されたボタンの色を、ほんの少しだけ濃くする",
                     "en": "Darken a button slightly when it is pressed"
                   },
                   "feedback": {
@@ -479,7 +479,7 @@
             "en": "Example: asking for an API change"
           },
           "prompt": {
-            "jp": "タスクの一覧を返すAPIに、「{{追加したい項目}}」を加えてください。データベースに保存する場所がなければ、追加してください。いまある項目は変えず、画面の見た目も変更しないでください。",
+            "jp": "タスクの一覧を返すAPIに、{{追加したい項目}}を加えてください。データベースに保存する場所がなければ、追加してください。いまある項目は変えず、画面の見た目も変更しないでください。",
             "en": "Add \"{{field to add}}\" to the API that returns the task list. If the database has nowhere to store it, add that too. Keep the existing fields as they are, and do not change how the screen looks."
           },
           "target": "any",
@@ -523,7 +523,7 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "完了ボタンの色を、赤から青に変える",
+                    "jp": "完了ボタンの色を、いまの赤から青に変える",
                     "en": "Change the Done button from red to blue"
                   },
                   "feedback": {
@@ -683,7 +683,7 @@
           ],
           "items": [
             {
-              "jp": "ビルド：公開用のファイル一式を作ります。",
+              "jp": "ビルド：まず、公開用のファイル一式を作ります。",
               "en": "Build: make the set of files for publishing."
             },
             {
@@ -717,7 +717,7 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "サーバーで、依頼に答えるよう起動する",
+                    "jp": "サーバーで、依頼に答えられるよう起動する",
                     "en": "Launch it so it answers requests"
                   }
                 },
@@ -746,8 +746,8 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "画面のデザインを、もう一度作り直す",
-                    "en": "Redesign the screen once more"
+                    "jp": "画面のデザインを、もう一度最初から作り直す",
+                    "en": "Redesign the screen again from scratch"
                   },
                   "feedback": {
                     "jp": "見た目を作り直しても、開けるようにはなりません。サーバーで起動して、依頼に答えられる状態にします。",
@@ -830,8 +830,8 @@
                 "en": "Commit"
               },
               "md": {
-                "jp": "その時点のファイル全体の状態を、変更の説明（メッセージ）と一緒に記録することです。",
-                "en": "Recording the state of all your files at that moment, together with a description of the change (a message)."
+                "jp": "その時点のファイル全体の状態を、変更の説明（メッセージ）と一緒に、Gitに記録することです。",
+                "en": "Recording the state of all your files at that moment in Git, together with a description of the change (a message)."
               }
             }
           ]
@@ -1143,7 +1143,7 @@
                 {
                   "id": "a",
                   "md": {
-                    "jp": "「各タスクに期限の日付を表示して。APIとデータベースは変えないで」",
+                    "jp": "「一覧の各タスクに期限の日付を表示して。APIとデータベースは変えないで」",
                     "en": "\"Show a due date on each task in the list. Don't change the API or the database.\""
                   },
                   "feedback": {
@@ -1329,7 +1329,7 @@
             {
               "id": "pc-input",
               "label": {
-                "jp": "画面側の依頼に、読み終えた日を入力してAPIで保存することが書いてあります",
+                "jp": "画面側の依頼に、読み終えた日の入力とAPIでの保存が書いてあります",
                 "en": "The screen-side request lets you enter the date and save it through the API"
               }
             },
@@ -1440,7 +1440,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "データベースを、別の種類に入れ替える",
+                    "jp": "データベースを、別の種類のものに入れ替える",
                     "en": "Switch to a different kind of database"
                   },
                   "feedback": {
@@ -1506,7 +1506,7 @@
                 {
                   "id": "c",
                   "md": {
-                    "jp": "「金額を返すAPIを作り直して、一覧の金額も右寄せで大きく表示して」",
+                    "jp": "「金額を返すAPIを作り直して、一覧の金額も右寄せにして、大きく表示して」",
                     "en": "\"Rewrite the API that returns the amounts, and show the amounts in the list right-aligned and larger.\""
                   },
                   "feedback": {
@@ -1558,8 +1558,8 @@
                 {
                   "id": "b",
                   "md": {
-                    "jp": "ファイルはできたが、まだ送っていない",
-                    "en": "The files exist but have not been sent yet"
+                    "jp": "ファイルはできたが、サーバーにはまだない",
+                    "en": "The files exist but are not on the server yet"
                   }
                 },
                 {
@@ -1576,8 +1576,8 @@
                 {
                   "id": "d",
                   "md": {
-                    "jp": "サーバーで、もう依頼を待ち受けている",
-                    "en": "It is already waiting for requests on the server"
+                    "jp": "サーバーが起動して、もう依頼を待ち受けている",
+                    "en": "The server has started and is already waiting for requests"
                   },
                   "feedback": {
                     "jp": "依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。",
@@ -1906,8 +1906,8 @@
         "en": "Commit"
       },
       "md": {
-        "jp": "その時点のファイル全体の状態を、変更の説明（メッセージ）と一緒に記録することです。",
-        "en": "Recording the state of all your files at that moment, together with a description of the change (a message)."
+        "jp": "その時点のファイル全体の状態を、変更の説明（メッセージ）と一緒に、Gitに記録することです。",
+        "en": "Recording the state of all your files at that moment in Git, together with a description of the change (a message)."
       }
     }
   ],
