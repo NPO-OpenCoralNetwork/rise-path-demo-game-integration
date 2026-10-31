@@ -1,0 +1,57 @@
+{
+  "lessonId": "vibe-ch1",
+  "file": "content/courses/vibe-coding/drafts/vibe-ch1.lesson.json",
+  "lessonHash": "sha256:a166f07604cf5f17",
+  "reviewer": "ja-editor",
+  "rubricVersion": "rubric.v1",
+  "mode": "verify",
+  "verifies": {
+    "reviewedRevision": "72c9e87",
+    "previousReview": "72c9e87:content/courses/vibe-coding/reports/vibe-ch1.ja-editor.review.json",
+    "changed": ["s3-b2", "check-quiz"],
+    "changedShare": 0.03,
+    "fullReviewRequired": false
+  },
+  "resolved": [],
+  "scores": [
+    {
+      "id": "voice",
+      "score": 3,
+      "evidence": "Both changed strings read naturally and keep their siblings' form. s3-b2 step 1 「ビルド：公開するためのファイル一式を作ります。」 now has the same 「名詞：…ます。」 shape as 「転送：できたファイルを、サーバーに送ります。」 and 「起動：サーバーで、…状態にします。」, without the lone 「まず、」. q4 d 「アプリがサーバーで起動して、もう依頼を待ち受けている」 is a plain-form statement like a 「ほかの人も、もうインターネットから開ける」, b 「ファイルはできたが、サーバーにはまだない」 and c 「書いたコードが消えて、もう元に戻せない」. It now names the app as what is launched, which matches 起動 in s3-b2 and q7 b. Its feedback 「依頼を待ち受けるのは、サーバーに送って起動したあとです。ビルドでできるのは、公開用のファイルです。」 is two sentences in です・ます. Voice stays at 3 because of unchanged stiff spots, all niceToHave: q2 d 「省いて」, s2-b5, s4-tools and the q9 explanation.",
+      "blockIds": ["s3-b2", "check-quiz", "s2-check", "s2-b5", "s4-tools", "ex-check"]
+    },
+    {
+      "id": "load",
+      "score": 3,
+      "carriedOver": true,
+      "evidence": "`lessons:lint --strict` reports 0 errors and 0 warnings after the rewording. The added words (「きちんと」「ほんの少しだけ」「いまの」「最初から」「別の種類のもの」) lengthen options without adding ideas. 1-2 is still dense: three terms, a JSON sample, a tip and two prompt blocks come before s2-check, and s1-b5 still adds サーバー as a fourth new word in 1-1.",
+      "blockIds": ["s1-b5", "s2-b2", "s2-b4", "s2-prompt-ui", "s2-prompt-api", "s2-check"]
+    },
+    {
+      "id": "prior",
+      "score": 4,
+      "carriedOver": true,
+      "evidence": "The コミット definition in s4-b2 now names Git (「…一緒に、Gitに記録することです。」 / \"…in Git…\"). Git is defined in the item just before it, and the glossary entry was changed to the same text in both locales, so the text and the glossary still match. No changed block adds a new term. s1-b1, s1-b3, s2-analogy, s3-analogy and s4-analogy still build each term from an everyday analogy.",
+      "blockIds": ["s4-b2", "s1-b1", "s1-b3", "s2-analogy", "s3-analogy", "s4-analogy"]
+    },
+    {
+      "id": "a11y_l10n",
+      "score": 4,
+      "evidence": "Both locales are present in both changed blocks and now say the same thing. s3-b2 step 1 jp 「ビルド：公開するためのファイル一式を作ります。」 matches the en \"Build: make the set of files for publishing.\", so the jp-only 「まず」 is gone. q4 d jp 「アプリがサーバーで起動して、もう依頼を待ち受けている」 matches \"The app has been launched on the server and is already waiting for requests\", and its feedback matches \"Waiting for requests comes after the files are sent and the app is launched. A build only makes the files for publishing.\" The one remaining difference between locales is the quotation marks around the s2-prompt-api blank in en only (unchanged, niceToHave).",
+      "blockIds": ["s3-b2", "check-quiz", "s2-prompt-api", "hook-predict"]
+    }
+  ],
+  "mustFix": [],
+  "niceToHave": [
+    "s2-prompt-api: the en keeps quotation marks around the blank and the jp has none. s2-prompt-ui has none in either locale (carried over) — 「Add \\\"{{field to add}}\\\" to the API」→「Add {{field to add}} to the API」",
+    "hook-predict: the jp key names the app (「データを保存する仕組みが、アプリにないから」) and the en does not. The meaning is the same (carried over) — 「Nothing saves the data」→「The app has nothing that saves the data」",
+    "s2-check: 「省いて」 can be read as leaving the long names out, and the explanation calls it 「省略」 (carried over) — q2 d 「長いタスク名を、1行に収まるように省いて表示する」→「長いタスク名を、1行に収まるように省略して表示する」",
+    "ex-check: 「依頼として頼みます」 repeats 頼 (carried over) — q9 explanation 「入力と表示は、そのあとで画面側の依頼として頼みます。」→「入力と表示は、そのあとの画面側の依頼に書きます。」",
+    "check-quiz: q5 c chains three 「て」 clauses. It still reads, but it is heavy on a phone (carried over) — 「「金額を返すAPIを作り直して、一覧の金額も右寄せにして、大きく表示して」」→「「金額を返すAPIを作り直して。一覧の金額も、右寄せで大きく表示して」」",
+    "s4-tools: the double topic marker remains (carried over) — 「たとえばClaude Codeの公式ドキュメントは、この機能はGitの代わりではないと書いています。」→「たとえばClaude Codeの公式ドキュメントには、この機能はGitの代わりではないと書かれています。」",
+    "s2-b5: the long modifier before 「ガイド」 still reads like a translation (carried over) — 「範囲を書けばAIはそれを守る、と説明するAIツールの公式ガイドもあります。」→「あるAIツールの公式ガイドにも、範囲を書けばAIはそれを守る、と書かれています。」"
+  ],
+  "average": 3.5,
+  "verdict": "pass",
+  "summary": "The previous round had no open must-fix items, so the resolved list is empty. Both changed blocks were judged in full. In s3-b2, 「まず、」 is gone and the three numbered steps are parallel again, in line with the en. In check-quiz, q4 d now says the app is launched on the server, which matches 起動 in s3-b2 and q7 b. Its en and its feedback follow the change, and it keeps the plain form of the other options. Neither change has an error of classes (a) to (e), and nothing else in the lesson changed. Validate and lint --strict are clean. Voice and a11y_l10n were re-scored and are unchanged at 3 and 4. Load (3) and prior (4) are carried over, so the average is 3.5. The two niceToHave items fixed this round were dropped. The rest are carried over and are not blocking."
+}
