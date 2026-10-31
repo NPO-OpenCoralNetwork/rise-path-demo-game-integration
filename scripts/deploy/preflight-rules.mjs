@@ -221,6 +221,7 @@ export const RULES = Object.freeze([
   { code: 'F6', group: 'F', level: 'dyn', ci: 'run', title: 'ディスクの空きが少なくなっています（あと {gb} GB）', fix: '`docker system df` で大きいものを見て、エージェントに相談します。' },
   { code: 'F9', group: 'F', level: 'I', ci: 'run', title: '新しい DB です。`POSTGRES_PASSWORD` は、この最初の起動で固定されます。', fix: 'あとで `POSTGRES_PASSWORD` を変えないでください（変えるときは、エージェントに相談します）。' },
   { code: 'F11', group: 'F', level: 'E', ci: 'skip', title: 'このシェルの値が、デプロイに入ってしまいます（{names}）', fix: '表示された名前を `unset` で消してから（例: `unset LLM_GUEST_AI`）、もう一度デプロイします（使う値なら stack.env に書きます）。' },
+  { code: 'F12', group: 'F', level: 'E', ci: 'skip', title: 'このシェルに、デプロイの道具（Compose、Docker）の動きを変える値があります（{names}。空の DB で動き出すか、ちがう Docker に入るおそれがあります）', fix: '表示された名前を `unset` で消してから（例: `unset COMPOSE_PROJECT_NAME`）、もう一度デプロイします（stack.env にも書きません）。' },
   // S. Optional services at the first launch (D3)
   { code: 'S1', group: 'S', level: 'E', ci: 'run', title: '`COMPOSE_PROFILES` に full（Hermes）があります（学習者には出さない決まりです）', fix: 'full を外します。' },
   { code: 'S2', group: 'S', level: 'E', ci: 'skip', title: 'AI アプリの接続（byoa）は、最初の公開では使いません。', fix: 'byoa を外します。使うと決めたら、`DECIDED_BYOA` に決めた日を書きます（手順書 12.3）。' },
@@ -359,6 +360,16 @@ const DEPLOY_TOOL_NAMES = new Set([
 const DEPLOY_TOOL_PREFIX = /^(?:DOCKER_|COMPOSE_(?!PROFILES$)|BASH_|LD_|GIT_)/;
 /** A name C8 refuses in stack.env. @param {string} name */
 export const isDeployToolName = (name) => DEPLOY_TOOL_NAMES.has(name) || DEPLOY_TOOL_PREFIX.test(name);
+/**
+ * F12: the names among the deploy shell's exports that choose Compose's project and files or Docker's daemon
+ * (review round 1 of Stage 2, finding 4). A stray `COMPOSE_PROJECT_NAME` deploys onto a new, empty pgdata
+ * volume, `DOCKER_HOST` or `DOCKER_CONTEXT` onto another daemon; the host facts and F9 describe project
+ * risepath on this daemon, so nothing else would notice. COMPOSE_PROFILES is the caller's list (F1, B7, the
+ * effective profiles). GIT_* stays the caller's own: it can only change how the pull reaches the repository
+ * (GIT_SSH_COMMAND), not where the stack runs, and C8 still refuses it in stack.env. PATH, HOME and the
+ * other names of C8 are in every shell.
+ */
+const CALLER_TOOL_PREFIX = /^(?:DOCKER_|COMPOSE_(?!PROFILES$))/;
 
 /** Names billing.env may hold (billing.env.example): the api reads it after stack.env, so any other name would override stack.env there (A8). */
 const BILLING_FILE_KEY = /^(?:STRIPE_|BILLING_|AI_CAP_SUPPORTER_GLOBAL_[A-Z0-9_]+$)/;
@@ -911,6 +922,10 @@ export function checkStack(input) {
   rule('F11', (level) => {
     const names = facts.callerExports.filter((k) => COMPOSE_INTERPOLATED.includes(k) && !env.has(k));
     if (names.length) add({ code: 'F11', level: level ?? 'E', names: uniq(names) });
+  });
+  rule('F12', (level) => {
+    const names = facts.callerExports.filter((k) => CALLER_TOOL_PREFIX.test(k));
+    if (names.length) add({ code: 'F12', level: level ?? 'E', names: uniq(names) });
   });
 
   // S. Optional services at the first launch (D3) -------------------------------------------------

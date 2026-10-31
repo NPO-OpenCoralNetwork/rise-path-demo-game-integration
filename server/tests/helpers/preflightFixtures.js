@@ -221,6 +221,8 @@ export const FIXTURES = [
   { code: 'F6', levels: 'EEEE', ci: 'run', hit: (s) => ({ facts: { diskFreeKb: 4 * 1024 * 1024 }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { diskFreeKb: 10 * 1024 * 1024 } } },
   { code: 'F9', levels: 'IIII', ci: 'run', hit: (s) => ({ facts: { pgdataVolume: false }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
   { code: 'F11', levels: 'EEEE', ci: 'skip', hit: (s) => ({ facts: { callerExports: ['HOME', 'LLM_GUEST_AI'] }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { callerExports: ['HOME', 'NODE_ENV', 'COMPOSE_PROFILES'] } } },
+  // F12 (review round 1 of Stage 2, finding 4): COMPOSE_PROFILES, GIT_* and look-alikes without the underscore are the caller's own.
+  { code: 'F12', levels: 'EEEE', ci: 'skip', hit: (s) => ({ facts: { callerExports: ['HOME', 'PATH', 'COMPOSE_PROJECT_NAME'] }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { callerExports: ['HOME', 'PATH', 'COMPOSE_PROFILES', 'GIT_SSH_COMMAND', 'DOCKERFILE', 'COMPOSER_HOME'] } } },
   // S. Optional services
   { code: 'S1', levels: 'EEEE', ci: 'run', hit: (s) => ({ stack: { COMPOSE_PROFILES: 'tts,tunnel,full', KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
   { code: 'S2', levels: 'EEEE', ci: 'skip', hit: (s) => ({ stack: { COMPOSE_PROFILES: 'tts,tunnel,byoa' }, mcp: { ...GOOD_MCP, SUPABASE_ANON_KEY: twice(s) } }), miss: { stack: { COMPOSE_PROFILES: 'tts,tunnel,byoa' }, mcp: GOOD_MCP, record: { DECIDED_BYOA: DAY } } },

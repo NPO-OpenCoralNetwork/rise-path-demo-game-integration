@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CODES, ATTESTATIONS, INTERNAL_CODES, RULES, STAGES, checkStack } from '../../scripts/deploy/preflight-rules.mjs';
+import { ALL_CODES as AFTER_CODES, DEPLOY_CODES, POSTDEPLOY_CODES } from '../../scripts/deploy/postdeploy-probe.mjs';
 import { baseFacts, buildInput } from './helpers/preflightFixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -78,14 +79,14 @@ describe('first-launch.ja.md: chapters and steps (design §9.2 #1)', () => {
   });
 });
 
-describe('first-launch.ja.md 13 章: every code the preflight prints (design §9.2 #2)', () => {
+describe('first-launch.ja.md 13 章: every code the preflight, the deploy and the 事後の確かめ print (design §9.2 #2)', () => {
   const table = rows(chapter('13')).filter((r) => r[0] !== 'コード' && !/^-+$/.test(r[0]));
-  it('has one row per code, in the catalog order, and no other', () => {
-    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES]);
+  it('has one row per code, in the catalog order (the preflight\'s, then DB1 and the P codes), and no other', () => {
+    assert.deepEqual(table.map((r) => r[0]), [...ALL_CODES, ...AFTER_CODES]);
   });
   it('shows each code\'s title and fix exactly as the scripts print them', () => {
     const byCode = new Map(table.map((r) => [r[0], r]));
-    for (const entry of [...RULES, ...INTERNAL_CODES]) {
+    for (const entry of [...RULES, ...INTERNAL_CODES, ...DEPLOY_CODES, ...POSTDEPLOY_CODES]) {
       const row = /** @type {string[]} */ (byCode.get(entry.code));
       assert.equal(row.length, 5, `${entry.code}: コード | 種類 | 表示 | 説明 | 直し方`);
       assert.equal(row[2], entry.title, `${entry.code}: 表示`);
@@ -114,6 +115,12 @@ describe('first-launch.ja.md 13 章: every code the preflight prints (design §9
       assert.equal(/** @type {string[]} */ (byCode.get(rule.code))[1], kind(rule.level), `${rule.code} (${rule.level})`);
     }
     for (const x of INTERNAL_CODES) assert.equal(/** @type {string[]} */ (byCode.get(x.code))[1], '実行できません（デプロイは止まります）', x.code);
+    // DB1 and the P codes: the kind starts with the level the scripts print it at; P0 says the check could not run.
+    for (const c of [...DEPLOY_CODES, ...POSTDEPLOY_CODES]) {
+      const cell = /** @type {string[]} */ (byCode.get(c.code))[1];
+      if (c.code === 'P0') assert.equal(cell, '実行できません（事後の確かめ）');
+      else assert.ok(cell.startsWith(WORD[c.level]), `${c.code} (${c.level}): ${cell}`);
+    }
   });
 });
 
@@ -192,11 +199,12 @@ describe('every 「手順書 X.Y」 and 「手順書 N 章」 resolves to a runb
     assert.ok(check([...RULES, ...INTERNAL_CODES].map((r) => `${r.title}\n${r.fix}`).join('\n'), 'catalog') > 0);
     for (const a of ATTESTATIONS) if (a.step) check(`手順書 ${a.step}`, a.key);
   });
-  it('in the scripts\' messages (deploy/risepath-vm/scripts/*.sh, scripts/deploy/*.mjs, scripts/smoke-public-edge.mjs)', () => {
+  it('in the scripts\' messages (deploy/risepath-vm/scripts/*.sh, scripts/deploy/*.mjs, scripts/smoke-public-edge.mjs, scripts/send-test-alert.mjs)', () => {
     const files = [
       ...fs.readdirSync(path.join(ROOT, 'deploy/risepath-vm/scripts')).filter((f) => f.endsWith('.sh')).map((f) => `deploy/risepath-vm/scripts/${f}`),
       ...fs.readdirSync(path.join(ROOT, 'scripts/deploy')).filter((f) => f.endsWith('.mjs')).map((f) => `scripts/deploy/${f}`),
       'scripts/smoke-public-edge.mjs',
+      'scripts/send-test-alert.mjs',
     ];
     let n = 0;
     for (const f of files) if (fs.existsSync(path.join(ROOT, f))) n += check(read(f), f);

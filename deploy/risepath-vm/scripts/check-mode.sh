@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Which rules a VM check runs: ci (the CI template's dummy stack) or prod (everything else). Phase 9,
-# owner decision D2; doc/guides/first-launch.ja.md 13 章. Sourced by preflight.sh (and, from Phase 9
-# stage 2, postdeploy-check.sh); never run, and it is code from the checkout, never a config file.
+# owner decision D2; doc/guides/first-launch.ja.md 13 章. Sourced by preflight.sh and postdeploy-check.sh,
+# with the values deploy-stack.sh passes both; never run, and it is code from the checkout, never a config file.
 #
 # CI mode needs all four at once, so the VM can never select it:
 #   1. --from-deploy: only deploy-stack.sh passes it;

@@ -5,8 +5,8 @@
 # with no network, a read-only file system, every capability dropped and the caller's uid: the VM host
 # has no node. It changes nothing.
 #   ./scripts/preflight.sh    the owner, any time, without sudo (production rules, the recorded stage)
-#   with --from-deploy and the caller's values: deploy-stack.sh, before it sources stack.env (from
-#   Phase 9 stage 2; until then nothing calls it)
+#   with --from-deploy and the caller's values: deploy-stack.sh, before it sources stack.env and before
+#   the pull (a moved HEAD re-runs the pulled deploy-stack.sh, which runs the pulled check first)
 # Flags, each at most once: --from-deploy --caller-skip-pull <v> --caller-project <v> --caller-profiles <v>
 #   --caller-exports <names separated by spaces>
 # Exit: 0 no error (warnings allowed), 1 errors, 2 could not check (X1-X5, or docker run failed), 3 an
@@ -72,6 +72,11 @@ source "${SCRIPT_DIR}/check-mode.sh"
 MODE="$(risepath_check_mode "${FROM_DEPLOY}" "${CALLER_SKIP_PULL}" "${CALLER_PROJECT}" "${STACK_DIR}")"
 PROJECT=risepath
 if [[ "${MODE}" == ci ]]; then PROJECT=risepath-ci; fi
+# In production the host facts below describe project risepath, and Compose would use the caller's project:
+# a caller project counts as an exported COMPOSE_PROJECT_NAME (F12), also when only --caller-project names it.
+if [[ "${MODE}" == prod && -n "${CALLER_PROJECT}" && " ${CALLER_EXPORTS} " != *" COMPOSE_PROJECT_NAME "* ]]; then
+  CALLER_EXPORTS+=" COMPOSE_PROJECT_NAME"
+fi
 
 # The api's base image, from the one line that names it (as scripts/ci/stack.sh auth does). A missing or
 # unreadable Dockerfile is X1 too: the line cannot fail under set -e before the X1 branch.

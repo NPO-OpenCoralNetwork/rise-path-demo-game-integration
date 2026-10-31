@@ -170,13 +170,15 @@ describe('moodToScore', () => {
 
 describe('validateWritableEntryDate', () => {
     it('rejects future dates relative to timezone', () => {
+        // A real calendar date two days ahead (adding 1 to the day gave "2026-10-32" on a month's last
+        // day, which is "invalid", not "future"); two days, so midnight between the two reads still leaves it ahead.
         const today = getTodayInTimezone('UTC');
-        const future = today.replace(/-(\d{2})$/, (_, d) => `-${String(Number(d) + 1).padStart(2, '0')}`);
+        const ahead = new Date(`${today}T12:00:00Z`);
+        ahead.setUTCDate(ahead.getUTCDate() + 2);
+        const future = ahead.toISOString().slice(0, 10);
         const result = validateWritableEntryDate(future, 'UTC');
-        if (future > today) {
-            assert.equal(result.valid, false);
-            assert.ok(result.errors.some((e) => e.includes('future')));
-        }
+        assert.equal(result.valid, false);
+        assert.ok(result.errors.some((e) => e.includes('future')));
     });
 
     it('accepts today in the given timezone', () => {

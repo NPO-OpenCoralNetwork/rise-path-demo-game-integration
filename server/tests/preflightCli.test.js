@@ -335,8 +335,8 @@ describe('T2c: the CLI never prints a value (every T2a fixture, both modes, ever
 describe('T9: scripts/deploy imports only node: built-ins and its siblings (the container mounts that folder alone)', () => {
   const dir = path.join(ROOT, 'scripts/deploy');
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs'));
-  it('has the three preflight modules', () => {
-    for (const f of ['env-parse.mjs', 'preflight-rules.mjs', 'preflight-vm.mjs']) assert.ok(files.includes(f), f);
+  it('has the three preflight modules and the 事後の確かめ\'s probe', () => {
+    for (const f of ['env-parse.mjs', 'preflight-rules.mjs', 'preflight-vm.mjs', 'postdeploy-probe.mjs']) assert.ok(files.includes(f), f);
   });
   for (const file of files) {
     it(`${file}`, () => {
@@ -495,6 +495,22 @@ switch (args[0]) {
     // F11 from the shell's export, F3 from the running hermes.
     assert.match(r.out, /^❌ \[F11\] このシェルの値が、デプロイに入ってしまいます（LLM_GUEST_AI）$/m);
     assert.match(r.out, /^⚠️ \[F3\] 使っていない機能のコンテナが動いたままです（hermes）$/m);
+  });
+
+  // Review round 1 of Stage 2, finding 4: the caller's shell can point Compose at another project (a new, empty
+  // pgdata volume) or Docker at another daemon. F12 names them from the exports; a --caller-project the deploy
+  // passes counts as an exported COMPOSE_PROJECT_NAME even when the export list leaves it out.
+  it('F12: the caller\'s COMPOSE_* (not COMPOSE_PROFILES) and DOCKER_* exports stop a production check; GIT_* stays the caller\'s own', () => {
+    const r = runWrapper({ env: { COMPOSE_PROJECT_NAME: 'risepath-old', DOCKER_HOST: 'tcp://10.0.0.9:2375', COMPOSE_PROFILES: 'tts', GIT_SSH_COMMAND: 'ssh -i k' } });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^❌ \[F12\] このシェルに、デプロイの道具（Compose、Docker）の動きを変える値があります（COMPOSE_PROJECT_NAME、DOCKER_HOST。/m);
+    assert.ok(!r.out.includes('risepath-old') && !r.out.includes('10.0.0.9'), 'names only');
+    const forwarded = runWrapper({ args: ['--from-deploy', '--caller-skip-pull', '', '--caller-project', 'risepath-old', '--caller-profiles', '', '--caller-exports', 'HOME PATH'] });
+    assert.ok(forwarded.facts.callerExports.includes('COMPOSE_PROJECT_NAME'), JSON.stringify(forwarded.facts.callerExports));
+    assert.match(forwarded.out, /^❌ \[F12\] [^\n]*（COMPOSE_PROJECT_NAME。/m);
+    const own = runWrapper({ args: ['--from-deploy', '--caller-skip-pull', '', '--caller-project', '', '--caller-profiles', '', '--caller-exports', 'HOME PATH GIT_SSH_COMMAND COMPOSE_PROFILES'] });
+    assert.doesNotMatch(own.out, /\[F12\]/);
+    assert.deepEqual(own.facts.callerExports, ['HOME', 'PATH', 'GIT_SSH_COMMAND', 'COMPOSE_PROFILES']);
   });
 
   // Review round 2, finding 4: an unsafe caller value is never dropped to '' (no profile, S2 and B5 silent).

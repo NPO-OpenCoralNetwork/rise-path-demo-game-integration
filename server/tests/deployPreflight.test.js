@@ -667,7 +667,7 @@ describe('T5: the launch record', () => {
   });
 });
 
-describe('T5b: the profiles the deploy passes to Compose (fixed table; the deploy harness compares in Phase 9 stage 2)', () => {
+describe('T5b: the profiles the deploy passes to Compose (fixed table; vmStackConfig.test.js T5b compares the engine with the real deploy-stack.sh)', () => {
   const table = [
     { stack: { COMPOSE_PROFILES: 'tts' }, caller: 'tts,tunnel', want: ['tts'] },
     { stack: {}, caller: 'tts,tunnel', want: ['tts', 'tunnel'] },
