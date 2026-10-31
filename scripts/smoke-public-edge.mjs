@@ -175,12 +175,16 @@ export async function runEdgeSmoke({ app, api, mcp = null, bearer = '', fetchImp
   log('   On the VM (deploy/risepath-vm), this should print one line:');
   log(`   docker compose --env-file stack.env logs api | grep smoke=${smokeId}`);
 
-  // 9. Authorization survives the route (optional).
+  // 9. Authorization survives the route (optional). With the pilot list on (server/middleware/pilotGate.js), a token
+  // whose account is off the list (the dummy, the under-18 test account) gets 403 pilot_only: say so (only the
+  // fixed error_type is read; the body is never printed).
   if (bearer) {
     const profile = await request(`${app}/api/v2/user/profile`, { headers: { authorization: `Bearer ${bearer}` } });
+    const offList = profile.res?.status === 403 && parseJson(profile.body)?.error_type === 'pilot_only';
     check(
       profile.res?.status === 200,
       `9. GET app /api/v2/user/profile with Authorization → ${statusOf(profile, { redact: true })} (want 200)`,
+      offList ? 'error_type pilot_only: this token\'s account is not on PILOT_ACCOUNT_IDS; use the adult test account that is on the list (手順書 10.1)' : undefined,
     );
   }
 

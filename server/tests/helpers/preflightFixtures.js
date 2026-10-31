@@ -15,6 +15,9 @@ export const DAY = '2026-11-01';
 const hoursAgo = (/** @type {number} */ h) => new Date(NOW.getTime() - h * 3600_000).toISOString();
 
 export const PG_PASSWORD = 'pg0123456789abcdef0123456789abcdef';
+/** Two pilot-list ids (Supabase User UIDs). */
+export const PILOT_ID = '0f1e2d3c-4b5a-4697-8877-665544332211';
+export const PILOT_ID_2 = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 
 /** @type {Record<string, string>} */
 export const BASE_STACK = {
@@ -246,8 +249,10 @@ export const FIXTURES = [
   { code: 'R4', levels: '-EEE', ci: 'skip', hit: (s) => ({ record: { BACKUP_KEY_ID: 'fedcba9876543210' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { record: { BACKUP_KEY_ID: 'fedcba9876543210' }, facts: { backupKeyId: 'fedcba9876543210' } } },
   { code: 'R5', levels: '-EEE', ci: 'skip', hit: (s) => ({ record: { BACKUP_LIFECYCLE: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
   { code: 'R6', levels: '-EEE', ci: 'skip', hit: (s) => ({ facts: { backupAlert: 'false' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { facts: { backupAlert: '' } } },
-  { code: 'V1', levels: 'EEE-', ci: 'skip', hit: (s) => ({ record: { VERCEL_PROTECTION_ON: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
+  { code: 'V1', levels: 'EEE-', ci: 'skip', hit: (s) => ({ record: { VERCEL_PROTECTION_ON: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: { record: { VERCEL_PROTECTION_ON: '' }, stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${PILOT_ID_2}` } } },
+  { code: 'V2', levels: 'EEEE', ci: 'skip', hit: (s) => ({ stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${s}` } }), miss: { stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},${PILOT_ID_2.toUpperCase()}` } } },
   { code: 'V3', levels: '---E', ci: 'skip', hit: (s) => ({ record: { VERCEL_PROTECTION_OFF: '' }, stack: { KOKORO_TTS_DEFAULT_VOICE_EN: s } }), miss: {} },
+  { code: 'V4', levels: 'EEEE', ci: 'skip', hit: (s) => ({ stack: { PILOT_ACCOUNT_IDS: PILOT_ID, KOKORO_TTS_DEFAULT_VOICE_EN: s }, record: { DECIDED_BYOA: DAY } }), miss: { stack: { PILOT_ACCOUNT_IDS: PILOT_ID } } },
 ];
 
 /** A name-shaped sentinel (passes the formatter's name filter): SENTINELX9F3 + 16 upper-case hex. */

@@ -20,7 +20,7 @@ import {
 } from '../../scripts/deploy/preflight-rules.mjs';
 import { readEnvSwitch } from '../utils/envSwitch.js';
 import { RETENTION_RULES } from '../services/retention.js';
-import { BASE_STACK, FIXTURES, NOW, PG_PASSWORD, baseFacts, buildInput, envText, sentinel } from './helpers/preflightFixtures.js';
+import { BASE_STACK, FIXTURES, GOOD_MCP, NOW, PG_PASSWORD, PILOT_ID, PILOT_ID_2, baseFacts, buildInput, envText, sentinel } from './helpers/preflightFixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const STACK = path.join(ROOT, 'deploy/risepath-vm');
@@ -599,7 +599,7 @@ describe('T5: the launch record', () => {
     assert.equal(codeAt('pilot', { record: { BACKUP_KEY_ID: '\t0123456789abcdef', BACKUP_KEY_COPY: ' 2026-11-01' } }, 'R4').length, 0);
     assert.deepEqual(codeAt('public', { record: { VERCEL_PROTECTION_ON: ' 2026-11-03', VERCEL_PROTECTION_OFF: '\t2026-11-02' } }, 'V3')[0].names, ['VERCEL_PROTECTION_ON', 'VERCEL_PROTECTION_OFF']);
   });
-  it('invariant: below public, a VERCEL_PROTECTION_OFF line with anything in it stops the deploy (V1, or A11 naming it)', () => {
+  it('invariant: below public and without a pilot list, a VERCEL_PROTECTION_OFF line with anything in it stops the deploy (V1, or A11 naming it)', () => {
     const spellings = ['2026-11-05', ' 2026-11-05', '\t2026-11-05', '2026-11-05 ', '"2026-11-05"', "' 2026-11-05'", '\u30002026-11-05', '2026-11-05\u3000',
       '2026-11-05 # 外した', '2026/11/05', '２０２６-１１-０５', '2026−11−05', '2026-11-05 2026-11-06', '"2026-11-05', '$DATE', 'yes', '2026-11-05;', 'x 2026-11-05'];
     for (const value of spellings) {
@@ -657,6 +657,73 @@ describe('T5: the launch record', () => {
     assert.deepEqual(codeAt('public', { record: { VERCEL_PROTECTION_ON: '2026-11-03', VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V3')[0].names, ['VERCEL_PROTECTION_ON', 'VERCEL_PROTECTION_OFF']);
     assert.equal(codeAt('public', { record: { VERCEL_PROTECTION_ON: '2026-11-02', VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V3').length, 0);
     assert.deepEqual(codeAt('public', { record: { VERCEL_PROTECTION_OFF: '' } }, 'V3')[0].names, ['VERCEL_PROTECTION_OFF']);
+  });
+
+  // Phase 9 stage 3 (D1; design §3.5, §2.5 V1-V4): the pilot list, read from stack.env as the api reads it.
+  const LIST = `${PILOT_ID},${PILOT_ID_2}`;
+  it('V1 branch (a): a valid pilot list lets the edge open below public, protection on or off', () => {
+    for (const stage of ['setup', 'pilot', 'minors']) {
+      for (const record of [{ VERCEL_PROTECTION_OFF: '2026-11-02' }, { VERCEL_PROTECTION_ON: '' }, { VERCEL_PROTECTION_ON: '', VERCEL_PROTECTION_OFF: '' }]) {
+        assert.equal(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: LIST }, record }, 'V1').length, 0, `${stage} ${JSON.stringify(record)}`);
+      }
+      // One upper-case id is still an id (the api compares in lower case); quoted as bash and Compose read it.
+      assert.equal(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: PILOT_ID.toUpperCase() }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V1').length, 0);
+      assert.equal(codeAt(stage, { stackExtra: `PILOT_ACCOUNT_IDS="${LIST}"\n`, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V1').length, 0, `${stage} quoted`);
+    }
+  });
+  it('V1: an empty, blank or partly invalid list is no list (protection off → V1 E below public; V2 names the bad entries)', () => {
+    for (const value of ['', `${PILOT_ID},nope`, `${PILOT_ID},`, ',', 'nope', `${PILOT_ID};${PILOT_ID_2}`, `{${PILOT_ID}}`, PILOT_ID.replace(/-/g, '')]) {
+      for (const stage of ['pilot', 'minors']) {
+        const found = checkStack(buildInput(stage, { stack: { PILOT_ACCOUNT_IDS: value }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
+        assert.deepEqual(of(found, 'V1').map((f) => f.level), ['E'], `${stage} ${JSON.stringify(value)}`);
+      }
+    }
+    // The list in another file is not the api's list (A8 refuses it in billing.env; tunnel.env never reaches the api).
+    const found = checkStack(buildInput('pilot', { tunnel: { TUNNEL_TOKEN: 'eyJhIjoiYiJ9', PILOT_ACCOUNT_IDS: LIST }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
+    assert.deepEqual(of(found, 'V1').map((f) => f.level), ['E']);
+  });
+  it('V2: one finding per entry that is not a UUID, by position (never the entry), at most 10; an empty value is no list', () => {
+    assert.deepEqual(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},abc,${PILOT_ID_2},,x` } }, 'V2'), [{ code: 'V2', level: 'E', n: 2 }, { code: 'V2', level: 'E', n: 4 }, { code: 'V2', level: 'E', n: 5 }]);
+    assert.deepEqual(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: ',' } }, 'V2').map((f) => f.n), [1, 2], 'set with no valid id (the api refuses everyone)');
+    assert.equal(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: Array.from({ length: 15 }, () => 'x').join(',') } }, 'V2').length, 10);
+    for (const value of ['', null]) assert.equal(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: value } }, 'V2').length, 0, String(value));
+    assert.equal(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID.toUpperCase()},${PILOT_ID_2}` } }, 'V2').length, 0);
+  });
+  it('V3 at public: the list still set (any value) is an error naming PILOT_ACCOUNT_IDS; an empty line is no list', () => {
+    assert.deepEqual(codeAt('public', { stack: { PILOT_ACCOUNT_IDS: LIST } }, 'V3').map((f) => [f.level, f.names]), [['E', ['PILOT_ACCOUNT_IDS']]]);
+    assert.deepEqual(codeAt('public', { stack: { PILOT_ACCOUNT_IDS: 'nope' } }, 'V3')[0].names, ['PILOT_ACCOUNT_IDS']);
+    assert.deepEqual(codeAt('public', { stack: { PILOT_ACCOUNT_IDS: LIST }, record: { VERCEL_PROTECTION_OFF: '' } }, 'V3')[0].names, ['PILOT_ACCOUNT_IDS', 'VERCEL_PROTECTION_OFF']);
+    assert.equal(codeAt('public', { stack: { PILOT_ACCOUNT_IDS: '' } }, 'V3').length, 0);
+    for (const stage of ['setup', 'pilot', 'minors']) assert.equal(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: LIST } }, 'V3').length, 0, stage);
+  });
+  it('V4: byoa (listed or decided) with the list is an error at every stage; either alone is not V4', () => {
+    for (const stage of STAGES) {
+      assert.deepEqual(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: LIST }, record: { DECIDED_BYOA: '2026-11-02' } }, 'V4').map((f) => [f.level, f.names]), [['E', ['DECIDED_BYOA', 'PILOT_ACCOUNT_IDS']]], stage);
+      assert.deepEqual(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: LIST, COMPOSE_PROFILES: 'tts,tunnel,byoa' }, mcp: GOOD_MCP }, 'V4')[0].names, ['COMPOSE_PROFILES', 'PILOT_ACCOUNT_IDS'], stage);
+      assert.equal(codeAt(stage, { record: { DECIDED_BYOA: '2026-11-02' } }, 'V4').length, 0);
+      assert.equal(codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: LIST } }, 'V4').length, 0);
+    }
+  });
+  // Review round 1, finding 9: a space after a comma stops the preflight with A5, whose fix is printed before the owner
+  // reads 手順書 10.1; it must not send them to `openssl rand` (random hex: V2 on every entry) or only to quoting.
+  it('A5 on the list (a space after a comma): the printed fix says to remove the spaces and points to 手順書 10.1; no id printed', () => {
+    for (const line of [`PILOT_ACCOUNT_IDS=${PILOT_ID}, ${PILOT_ID_2}`, `PILOT_ACCOUNT_IDS=${PILOT_ID} ,${PILOT_ID_2}`]) {
+      const found = checkStack(buildInput('pilot', { stackExtra: `${line}\n`, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
+      assert.deepEqual(of(found, 'A5').map((f) => [f.level, f.names]), [['E', ['PILOT_ACCOUNT_IDS']]], line);
+      const out = formatFindings(of(found, 'A5'), { mode: 'prod', stage: 'pilot' });
+      const fix = out.find((l) => l.startsWith('   直し方: ')) ?? '';
+      assert.ok(fix.includes('stack.env の `PILOT_ACCOUNT_IDS` のときは、空白を消し、User UID をカンマだけで区切ります（手順書 10.1）'), fix);
+      for (const secret of [PILOT_ID, PILOT_ID_2]) assert.ok(!out.join('\n').includes(secret), 'no id');
+    }
+  });
+  it('the pilot list never reaches a finding: names only, positions only', () => {
+    const value = `${PILOT_ID},SENTINELX9F3ABCDEF0123456789,${PILOT_ID_2}`;
+    for (const stage of STAGES) {
+      const found = checkStack(buildInput(stage, { stack: { PILOT_ACCOUNT_IDS: value, COMPOSE_PROFILES: 'tts,tunnel,byoa' }, mcp: GOOD_MCP, record: { DECIDED_BYOA: '2026-11-02', VERCEL_PROTECTION_OFF: '2026-11-02' } }));
+      const text = JSON.stringify(found) + formatFindings(found, { mode: 'prod', stage }).join('\n');
+      for (const secret of [PILOT_ID, PILOT_ID_2, 'SENTINELX9F3']) assert.ok(!text.includes(secret), `${stage}: ${secret}`);
+      assert.ok(found.some((f) => f.code === 'V2' && f.n === 2), stage);
+    }
   });
   it('R2: a failure after the last success', () => {
     assert.equal(codeAt('pilot', { facts: { backupLastFail: new Date(NOW.getTime() - 3600_000).toISOString() } }, 'R2').length, 1);
@@ -747,10 +814,11 @@ describe('T6: the catalog against the repository', () => {
     for (const r of RULES) assert.match(r.level, /^(?:[EWI]|dyn|[EWI–]\/[EWI–]\/[EWI–]\/[EWI–])$/, r.code);
     assert.deepEqual(RULES.filter((r) => r.level === 'dyn').map((r) => r.code), ['A4', 'A7', 'A10', 'A13', 'C11', 'D1', 'F5', 'F6', 'G3', 'G5', 'R3', 'V1']);
   });
-  it('Stage 1 leaves out what the Scope guard removed or deferred, and the pilot-list parts (Phase 9 stage 3)', () => {
+  it('leaves out what the Scope guard removed or deferred; the pilot-list parts are in, in the same change (Phase 9 stage 3, finding 25)', () => {
     const codes = new Set(RULES.map((r) => r.code));
-    for (const code of ['C16', 'D5', 'D7', 'D8', 'E1', 'E2', 'E3', 'E4', 'F4', 'F7', 'F8', 'F10', 'G4', 'G6', 'G7', 'G8', 'R7', 'V2', 'V4']) assert.ok(!codes.has(code), code);
-    assert.ok(!KNOWN_KEYS.has('PILOT_ACCOUNT_IDS'));
+    for (const code of ['C16', 'D5', 'D7', 'D8', 'E1', 'E2', 'E3', 'E4', 'F4', 'F7', 'F8', 'F10', 'G4', 'G6', 'G7', 'G8', 'R7']) assert.ok(!codes.has(code), code);
+    for (const code of ['V1', 'V2', 'V3', 'V4']) assert.ok(codes.has(code), code);
+    assert.ok(KNOWN_KEYS.has('PILOT_ACCOUNT_IDS'));
   });
   it('ATTESTATIONS are the 18 keys of TR3, each with a known kind', () => {
     assert.deepEqual(ATTESTATIONS.map((a) => a.key).sort(), [

@@ -6,7 +6,7 @@ import {
     isStoredAuthUserAllowed,
 } from '../services/authPolicy';
 import { apiPut, setAuthProvider } from '../services/apiClient';
-import { deriveDisplayName, normalizeAuthEmail } from '../services/authFormValidation.ts';
+import { SIGNUP_CLOSED, deriveDisplayName, normalizeAuthEmail } from '../services/authFormValidation.ts';
 import { hydrateFromApi } from '../services/progressService';
 import { hydrateNotifications } from '../services/notificationService';
 import { clearUserProfileCache } from '../services/userProfileService';
@@ -265,6 +265,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: string,
         options?: SignUpOptions,
     ): Promise<SignUpResult> => {
+        // Phase 9 (D1): the app's sign-up is closed until VITE_FEATURE_LEGAL_PAGES=true (public sign-up
+        // with the final legal texts). Before anything else: no marker, no Supabase call, mock included.
+        if (!features.legalPages) throw new Error(SIGNUP_CLOSED);
         const normalizedEmail = normalizeAuthEmail(email);
         const displayName = deriveDisplayName(normalizedEmail, options?.displayName);
         const supabase = getSupabaseClient();

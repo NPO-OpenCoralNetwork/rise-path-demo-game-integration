@@ -11,8 +11,8 @@
  * count. Rules read values but never copy one into a finding; formatFindings prints only catalog
  * text and fields that pass its filters (server/tests/deployPreflight.test.js T2a, T2b).
  *
- * Stage 1 of Phase 9: V1 has only its protection branch (b); the pilot list (V1 branch (a), V2, V3's
- * list half, V4, PILOT_ACCOUNT_IDS in KNOWN_KEYS) lands with server/middleware/pilotGate.js.
+ * The pilot list (V1 branch (a), V2, V3's list half, V4; PILOT_ACCOUNT_IDS in KNOWN_KEYS) reads
+ * stack.env's PILOT_ACCOUNT_IDS the way server/middleware/pilotGate.js does (Phase 9 stage 3, D1).
  */
 import { ERROR_KINDS, KEY_RE, entryMap, parseEnvText } from './env-parse.mjs';
 
@@ -86,7 +86,35 @@ export const KNOWN_KEYS = Object.freeze(new Set([
   // names a rule refuses or reads (B4, C2, C5, C7, C8, C17)
   'RISE_PATH_PUBLIC_URL', 'GOOGLE_API_KEY', 'ANTHROPIC_BASE_URL', 'RISE_PATH_ACTIVE_SESSION_KEY',
   'HERMES_ACTIVE_SESSION_KEY', 'X_HERMES_SESSION_KEY', 'COMPOSE_PROJECT_NAME', 'COMPOSE_FILE', 'RP_LESSON_FS_WRITE',
+  // the pilot list (stack.env.example, commented; V1-V4; server/middleware/pilotGate.js)
+  'PILOT_ACCOUNT_IDS',
 ]));
+
+/**
+ * A pilot-list entry: the UUID pattern of server/utils/ids.js UUID_RE, repeated here because the
+ * container mounts scripts/deploy alone (server/tests/pilotGate.test.js pins the two equal and runs
+ * both over server/tests/fixtures/pilot-ids.json).
+ */
+export const PILOT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * PILOT_ACCOUNT_IDS as the api reads it (server/middleware/pilotGate.js readPilotList): unset or
+ * blank = off; else comma-separated, each entry trimmed. `invalid` holds the 1-based positions of the
+ * entries that are not UUIDs (the api ignores them; set with no valid id refuses everyone).
+ * @param {string | undefined} raw
+ * @returns {{ set: boolean, valid: number, invalid: number[] }}
+ */
+export function readPilotEntries(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') return { set: false, valid: 0, invalid: [] };
+  let valid = 0;
+  /** @type {number[]} */
+  const invalid = [];
+  raw.split(',').forEach((entry, index) => {
+    if (PILOT_ID_RE.test(entry.trim())) valid += 1;
+    else invalid.push(index + 1);
+  });
+  return { set: true, valid, invalid };
+}
 /** Families of names the examples document with a pattern (LLM_TASK_<TASK>, the daily caps). */
 const KNOWN_KEY_PATTERNS = Object.freeze([/^LLM_TASK_[A-Z0-9_]+$/, /^AI_CAP_(?:USER|IP|GLOBAL|SUPPORTER_GLOBAL)_[A-Z0-9_]+$/]);
 /** A name the env files may hold (A6). @param {string} name */
@@ -113,7 +141,7 @@ export const ATTESTATIONS = Object.freeze([
   { key: 'PASSWORD_CHANGE_CHECK', kind: 'date', step: '11.2', rules: ['G1'] },
   { key: 'PROD_AMR_CHECK', kind: 'date', step: '11.2', rules: ['G1'] },
   { key: 'VERCEL_LEGAL_PAGES_ON', kind: 'date', step: '12.1', rules: ['G2', 'G3'] },
-  { key: 'DECIDED_BYOA', kind: 'date', step: '12.3', rules: ['S2'] },
+  { key: 'DECIDED_BYOA', kind: 'date', step: '12.3', rules: ['S2', 'V4'] },
   { key: 'DECIDED_MEMORY', kind: 'date', step: '12.3', rules: ['S3'] },
   { key: 'DECIDED_BILLING', kind: 'date', step: '12.3', rules: ['S4'] },
   { key: 'MINORS_POLICY_DECIDED', kind: 'date', step: null, rules: ['G5'] },
@@ -160,7 +188,7 @@ export const RULES = Object.freeze([
   // A4: W; E in launch-record.env for one of the 18 record keys (the last line wins, so a template's empty line under a
   // dated one would turn a gate off: review round 3, finding 1).
   { code: 'A4', group: 'A', level: 'dyn', ci: 'run', title: '{file} に同じ名前が 2 回あります（{names}）', fix: '1 つだけ残します（launch-record.env では、いまの状態に合う行を残し、テンプレの空の行や古い行を消します）。' },
-  { code: 'A5', group: 'A', level: 'E', ci: 'run', title: '{file} の {names} の値に、記号（$、空白、引用符など）があります（シェルが値を書きかえるか、命令として実行します）', fix: "`openssl rand -hex 32` のような英数字だけの値にします。どうしても記号が要るときは、値を ' ' で囲みます。" },
+  { code: 'A5', group: 'A', level: 'E', ci: 'run', title: '{file} の {names} の値に、記号（$、空白、引用符など）があります（シェルが値を書きかえるか、命令として実行します）', fix: "`openssl rand -hex 32` のような英数字だけの値にします。どうしても記号が要るときは、値を ' ' で囲みます。stack.env の `PILOT_ACCOUNT_IDS` のときは、空白を消し、User UID をカンマだけで区切ります（手順書 10.1）。" },
   { code: 'A6', group: 'A', level: 'W', ci: 'run', title: '知らない名前があります（打ちまちがいかもしれません）: {names}（{file}）', fix: '`{file}.example` とくらべて直すか、要らない行なら消します。' },
   // A7: W for a mode other than 600 or another owner; E when the file cannot be read at all (root-owned after `sudo cp`).
   { code: 'A7', group: 'A', level: 'dyn', ci: 'run', title: '{file} の権限が 600 でないか、持ち主がちがいます。', fix: '`chmod 600 {file}` を実行します。`Operation not permitted` と出たとき（sudo で作ったファイル）は、エージェントに相談します。' },
@@ -248,10 +276,16 @@ export const RULES = Object.freeze([
   { code: 'R4', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えの鍵を VM の外にしまったことが、記録にないか、いまの鍵とちがいます（鍵がないと戻せません）', fix: '手順書 6.4 の鍵の手順をして、launch-record.env の `BACKUP_KEY_COPY` に日付を、`BACKUP_KEY_ID` に key id を書きます。' },
   { code: 'R5', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えを消す日数（バケットのライフサイクル）が、記録にありません。', fix: '手順書 3.8 のとおりに設定し、launch-record.env の `BACKUP_LIFECYCLE` に日付を書きます。' },
   { code: 'R6', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えが失敗したときの知らせの受け口がありません。', fix: 'stack.env の `AI_CAP_ALERT_WEBHOOK_URL` を書いてから、控えの設定をもう一度入れます（手順書 6.4）。' },
-  // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3).
-  { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけて、launch-record.env の `VERCEL_PROTECTION_ON` に日付を書きます（手順書 2.6）。保護は手順書 10.3 まで外さず、`VERCEL_PROTECTION_OFF` は空のままにします。' },
-  // V3 also holds the order rule VERCEL_PROTECTION_ON ≤ VERCEL_PROTECTION_OFF (design §2.4; below public, V1 refuses a dated OFF).
-  { code: 'V3', group: 'V', level: '–/–/–/E', ci: 'skip', title: '一般公開なのに、Vercel の保護を外した記録がないか、日付の順番がちがいます（{names}）', fix: '手順書 10.3 で保護を外した日を、`VERCEL_PROTECTION_OFF` に書きます（保護をかけた日と同じ日か、そのあとの日です）。' },
+  // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3). Passes with (a) a valid
+  // pilot list in stack.env or (b) Vercel's protection still on (VERCEL_PROTECTION_ON dated, VERCEL_PROTECTION_OFF empty).
+  { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。' },
+  // V2: an entry of the list that is not a UUID (the api ignores it; with no valid id it refuses everyone). {n}: its position.
+  { code: 'V2', group: 'V', level: 'E', ci: 'skip', title: '試験運用の名簿 `PILOT_ACCOUNT_IDS` に、ID の形でないものがあります（{n} 個目）。', fix: 'Supabase の Authentication → Users の User UID（8-4-4-4-12 の形）だけを、空白を入れずにカンマで区切って書きます（手順書 10.1）。' },
+  // V3 also holds the order rule VERCEL_PROTECTION_ON ≤ VERCEL_PROTECTION_OFF (design §2.4; below public, V1 refuses a dated OFF
+  // unless the pilot list is valid).
+  { code: 'V3', group: 'V', level: '–/–/–/E', ci: 'skip', title: '一般公開なのに、試験運用の名簿が残っているか、Vercel の保護を外した記録がないか、日付の順番がちがいます（{names}）', fix: '`PILOT_ACCOUNT_IDS` が出たときは、stack.env のその行を消します（手順書 11.8）。`VERCEL_PROTECTION_OFF` には、手順書 10.3 で保護を外した日を書きます（保護をかけた日と同じ日か、そのあとの日です）。' },
+  // V4: the remote MCP (byoa) does not read the pilot list.
+  { code: 'V4', group: 'V', level: 'E', ci: 'skip', title: 'AI アプリの接続（byoa）は、試験運用の名簿を確かめません（{names}）', fix: '名簿を使っているあいだは byoa を使いません。stack.env の `COMPOSE_PROFILES` から byoa を外し、launch-record.env の `DECIDED_BYOA` を空にします（手順書 12.3）。' },
 ]);
 
 /**
@@ -1021,16 +1055,36 @@ export function checkStack(input) {
   rule('R6', (level) => {
     if (facts.backupAlert === 'false') add({ code: 'R6', level: level ?? 'E' });
   });
+  // The pilot list as the api reads it: stack.env only (the api's env_file; A8 keeps it out of billing.env).
+  const pilot = readPilotEntries(env.get('PILOT_ACCOUNT_IDS'));
   rule('V1', () => {
     if (stage === 'public') return;
-    // Stage 1: branch (b) only, Vercel protection still on. The pilot list (branch (a)) comes with pilotGate.js.
+    // (a) a valid pilot list: set, and every entry a UUID (V2 names the others).
+    const validList = pilot.set && pilot.invalid.length === 0;
+    // (b) Vercel's protection still on.
     const protectedEdge = dated('VERCEL_PROTECTION_ON') && rec('VERCEL_PROTECTION_OFF') === '';
-    if (protectedEdge) return;
+    if (validList || protectedEdge) return;
     add({ code: 'V1', level: stageIndex === 0 && !listed('tunnel') ? 'W' : 'E' });
   });
+  rule('V2', (level) => {
+    // One finding per entry that is not a UUID, by position (never the entry), at most 10.
+    for (const n of pilot.invalid.slice(0, 10)) add({ code: 'V2', level: level ?? 'E', n });
+  });
   rule('V3', (level) => {
-    if (!dated('VERCEL_PROTECTION_OFF')) add({ code: 'V3', level: level ?? 'E', names: ['VERCEL_PROTECTION_OFF'] });
-    else if (dated('VERCEL_PROTECTION_ON') && rec('VERCEL_PROTECTION_ON') > rec('VERCEL_PROTECTION_OFF')) add({ code: 'V3', level: level ?? 'E', names: ['VERCEL_PROTECTION_ON', 'VERCEL_PROTECTION_OFF'] });
+    /** @type {string[]} */
+    const names = [];
+    if (pilot.set) names.push('PILOT_ACCOUNT_IDS');
+    if (!dated('VERCEL_PROTECTION_OFF')) names.push('VERCEL_PROTECTION_OFF');
+    else if (dated('VERCEL_PROTECTION_ON') && rec('VERCEL_PROTECTION_ON') > rec('VERCEL_PROTECTION_OFF')) names.push('VERCEL_PROTECTION_ON', 'VERCEL_PROTECTION_OFF');
+    if (names.length) add({ code: 'V3', level: level ?? 'E', names });
+  });
+  rule('V4', (level) => {
+    if (!pilot.set) return;
+    /** @type {string[]} */
+    const names = [];
+    if (listed('byoa')) names.push('COMPOSE_PROFILES');
+    if (dated('DECIDED_BYOA')) names.push('DECIDED_BYOA');
+    if (names.length) add({ code: 'V4', level: level ?? 'E', names: [...names, 'PILOT_ACCOUNT_IDS'] });
   });
 
   // A6 last: a name another finding already names in that file is not also "unknown".

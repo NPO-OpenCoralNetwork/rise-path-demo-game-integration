@@ -53,6 +53,7 @@ import { requireSignedIn } from './server/middleware/signedIn.js';
 import { smallBodyErrors } from './server/middleware/smallBody.js';
 import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
 import { legalStartupWarnings } from './server/middleware/termsGate.js';
+import { pilotStartupLines } from './server/middleware/pilotGate.js';
 import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
@@ -444,6 +445,8 @@ async function main() {
     for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
     // The terms check (Phase 8, LEGAL_TERMS_REQUIRED): one line only when the switch is set.
     for (const warning of legalStartupWarnings(process.env)) console.warn(warning);
+    // The pilot list (Phase 9, D1; PILOT_ACCOUNT_IDS): '[Pilot] off' or the count, never an id.
+    for (const line of pilotStartupLines(process.env)) console.log(line);
     // One line, names only; an owner alert when subscribers exist but billing cannot serve them.
     const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
     console.log(billingStartupLine(billingConfig));

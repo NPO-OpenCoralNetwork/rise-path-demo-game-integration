@@ -32,6 +32,10 @@
  *       /upload and /rag, and optionalAuth after requireAuth on the TTS routes) check the session
  *       once: getUser, the account state and the stub write are shared (oncePerRequest below).
  *       Each guard still decides on its own; nothing is kept across requests.
+ *     - with PILOT_ACCOUNT_IDS set (Phase 9, D1; server/middleware/pilotGate.js), a Supabase session
+ *       whose user is not on the list (an anonymous user included) answers 403 pilot_only from
+ *       requireAuth and optionalAuth alike, before the account check: nothing is read or written for
+ *       it (no re-open, no stub). Unset: off.
  *     - with LEGAL_TERMS_REQUIRED on, a real learner's session then passes the terms check
  *       (server/middleware/termsGate.js: 403 terms_required until they accept, except on its
  *       TERMS_EXEMPT routes); the dev fallbacks and anonymous callers never meet it.
@@ -45,6 +49,7 @@ import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../to
 import { readAccountState } from '../../tools/core/accountDeletions.js';
 import { isAuthUnavailable } from '../../tools/core/authUnavailable.js';
 import { termsGateStep } from './termsGate.js';
+import { PILOT_ONLY_REFUSAL, pilotRefuses } from './pilotGate.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -244,6 +249,8 @@ export const requireAuth = async (req, res, next) => {
             if (error) console.warn('[Auth] token rejected:', error?.message || error);
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
+        // Phase 9 (D1): the pilot list, before anything is read or written for this account.
+        if (pilotRefuses({ id: data.user.id, isAnonymous: data.user.is_anonymous === true })) return res.status(403).json(PILOT_ONLY_REFUSAL);
         // A session of a deleted account is refused before anything is written (no stub). Its own
         // try: a database error is 503 auth_unavailable, not the generic 500 below.
         let account;
@@ -314,6 +321,8 @@ export const optionalAuth = async (req, res, next) => {
             req.authMethod = 'anonymous';
             return next();
         }
+        // Phase 9 (D1): the pilot list, as requireAuth (the same 403, not the guest path).
+        if (pilotRefuses({ id: data.user.id, isAnonymous: data.user.is_anonymous === true })) return res.status(403).json(PILOT_ONLY_REFUSAL);
         // A deleted account's session, or a check that cannot run, is anonymous (no stub). A check
         // that could not run is flagged: the AI gate answers 503 ai_access_unavailable to it (try
         // again), never 401 sign_in_required or the guest path to a signed-in learner.

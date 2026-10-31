@@ -6,12 +6,14 @@
 // api (server.js createApp, production) so the probe body and the CORS answers are the server's own.
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { FOREIGN_ORIGIN, TUTOR_GUEST_PROBE, runEdgeSmoke } from '../../scripts/smoke-public-edge.mjs';
+import { PILOT_ONLY_REFUSAL } from '../middleware/pilotGate.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLI = path.join(ROOT, 'scripts/smoke-public-edge.mjs');
@@ -80,7 +82,13 @@ before(async () => {
     if (url.pathname === '/api/v2/health') return send(res, 200, json, JSON.stringify({ ok: true, status: 'ok' }));
     if (url.pathname === '/api/v2/llm/status') return send(res, 200, { ...json, ...cors() }, JSON.stringify(goodLlm()));
     if (url.pathname === '/api/generate-audio') return send(res, 404, json, '{"error":"not_found"}');
-    if (url.pathname === '/api/v2/user/profile') return send(res, req.headers.authorization ? 200 : 401, json, JSON.stringify({ id: state.bodySentinel }));
+    if (url.pathname === '/api/v2/user/profile') {
+      if (!req.headers.authorization) return send(res, 401, json, '{"error_type":"unauthorized"}');
+      // The api with the pilot list on, for a token whose account is not on it (server/middleware/pilotGate.js).
+      if (breaks.has('profile-pilot')) return send(res, 403, json, JSON.stringify({ ...PILOT_ONLY_REFUSAL, detail: state.bodySentinel }));
+      if (breaks.has('profile-terms')) return send(res, 403, json, JSON.stringify({ error_type: 'terms_required', detail: state.bodySentinel }));
+      return send(res, 200, json, JSON.stringify({ id: state.bodySentinel }));
+    }
     if (url.pathname === '/api/v2/llm/tutor' && req.method === 'POST') {
       const body = await readBody(req);
       let parsed = null;
@@ -204,6 +212,27 @@ describe('smoke:edge: the checks against fake servers', () => {
     const bad = await smoke({ bearer: `${S}.token` });
     assert.ok(bad.failures > 0);
     for (const r of [ok, bad]) assert.ok(!r.out.includes(S), r.out);
+  });
+
+  // Review round 1, finding 3: with the pilot list on, a token of an account off the list (the dummy, the under-18
+  // test account) gets 403 pilot_only; check 9 says so instead of a bare "403 (want 200)".
+  it('9: a 403 pilot_only names the pilot list (手順書 10.1); another 403 gets no such hint; the bearer and the body are never printed', async () => {
+    const S = `SENTINELX9F3${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    state.bodySentinel = S;
+    breaks.add('profile-pilot');
+    const pilot = await smoke({ bearer: `${S}.token` });
+    assert.deepEqual(pilot.failed, ['9'], pilot.out);
+    const line = pilot.out.split('\n').find((l) => l.startsWith('❌ 9. ')) ?? '';
+    assert.match(line, /→ 403 \(want 200\) — error_type pilot_only: this token's account is not on PILOT_ACCOUNT_IDS; use the adult test account that is on the list \(手順書 10\.1\)$/);
+    breaks.clear();
+    breaks.add('profile-terms');
+    const terms = await smoke({ bearer: `${S}.token` });
+    assert.deepEqual(terms.failed, ['9'], terms.out);
+    assert.doesNotMatch(terms.out, /PILOT_ACCOUNT_IDS|pilot_only/);
+    for (const r of [pilot, terms]) assert.ok(!r.out.includes(S), r.out);
+    // The checklist names whose token to use.
+    const readme = fs.readFileSync(path.join(ROOT, 'deploy/vercel/README.md'), 'utf8');
+    assert.match(readme, /# 任意: 18 歳以上のテスト用アカウント（試験運用の名簿 PILOT_ACCOUNT_IDS に入っているもの。手順書 10\.1）の\n\s*# Supabase アクセストークン。名簿にないアカウント（ダミー、18 歳未満のテスト用）だと 9 番が 403 pilot_only で落ちる。/);
   });
 });
 

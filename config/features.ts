@@ -22,7 +22,9 @@
  *   draft banner) for the owner and the lawyer; the production build refuses "true" while the text
  *   is a draft (scripts/legal/check-legal-release.mjs, run by vite.config.ts), and refuses a client
  *   with import.meta.env.DEV = true unless LEGAL_DRAFT_PREVIEW_BUILD=true. Public sign-up opens only
- *   with this flag on. The legal text loads only through the conditional imports in
+ *   with this flag on: the app's sign-up (the login view's tab and form, AuthContext.signUp, the
+ *   consent page's sign-up button) is closed while this is off, the dev server included (Phase 9,
+ *   D1; doc/guides/first-launch.ja.md 8.1). The legal text loads only through the conditional imports in
  *   components/routes/lazyRoutes.tsx, so with the flag off Rollup drops it from the bundle.
  *   The server cannot see this flag: its own switch LEGAL_TERMS_REQUIRED (API and remote MCP; off by
  *   default) is turned on after this flag and off before it (doc/legal/README.md).
