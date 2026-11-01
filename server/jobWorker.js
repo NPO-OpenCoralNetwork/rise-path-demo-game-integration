@@ -1,6 +1,6 @@
 import path from 'path';
 import { getPool } from './db.js';
-import { ingestMaterial } from './ragService.js';
+import { ingestMaterial, unreadableReason } from './ragService.js';
 import { uploadLocationOf, uploadRoot } from './uploads.js';
 import { describeError } from './utils/redactUrl.js';
 import { isDbUnavailable } from '../tools/core/dbErrors.js';
@@ -25,6 +25,9 @@ export function pollDelay(failures) {
 export function jobErrorCode(error) {
     if (error?.jobErrorCode) return error.jobErrorCode;
     if (error?.code === 'ENOENT') return 'file_missing';
+    // No text to index (no_text) or a PDF that could not be read (extract_failed).
+    const unreadable = unreadableReason(error);
+    if (unreadable) return unreadable;
     if (error?.ingestStage === 'extract') return 'extract_failed';
     if (error?.ingestStage === 'embed') return 'embed_failed';
     return 'job_failed';

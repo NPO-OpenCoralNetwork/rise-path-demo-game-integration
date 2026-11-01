@@ -262,8 +262,9 @@ describe('server/ragService ingest + retrieve', () => {
         }
         assert.deepEqual(chunks, ['chunk A']);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
-        assert.match(search.sql, /c\.embedding_model = \$3/);
-        assert.deepEqual(search.params.slice(1), ['user-1', MODEL_IDS.gemini.embedding, 3]);
+        assert.match(search.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$3/);
+        assert.equal(search.params[0], 'user-1');
+        assert.deepEqual(search.params.slice(2), [MODEL_IDS.gemini.embedding, 3]);
     });
 });
 
@@ -329,12 +330,12 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
 
         const coverage = pool.queries.find((q) => /AS has_current/.test(q.sql));
         assert.doesNotMatch(coverage.sql, /COUNT/, 'existence probes, not a full count');
-        assert.match(coverage.sql, /EXISTS \(SELECT 1 FROM material_chunks c JOIN materials m ON c\.material_id = m\.id WHERE m\.user_id = \$1 AND c\.embedding_model = \$2\)/);
-        assert.match(coverage.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\)/, 'NULL models (seeded rows) count as legacy');
+        assert.match(coverage.sql, /EXISTS \(SELECT 1 FROM material_chunks c JOIN materials m ON c\.material_id = m\.id WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$2\)/);
+        assert.match(coverage.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\)/, 'NULL models (seeded rows) count as legacy');
         assert.deepEqual(coverage.params, ['user-1', MODEL_IDS.gemini.embedding]);
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
         assert.match(keyword.sql, /ORDER BY \(\(n\.text ILIKE \$2\)::int \* 2 \+ \(n\.text ILIKE \$3\)::int \* 2\) DESC/);
         assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
 
@@ -363,7 +364,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         assert.ok(!/ILIKE/.test(search.sql), 'vectors are never compared with older-model rows');
 
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(n\.text ILIKE \$3 OR n\.text ILIKE \$4\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(c\.embedding_model IS NULL OR c\.embedding_model < \$2 OR c\.embedding_model > \$2\) AND \(n\.text ILIKE \$3 OR n\.text ILIKE \$4\)/);
         assert.deepEqual(keyword.params, ['user-1', MODEL_IDS.gemini.embedding, '%Blender%', '%モディファイア%', 3]);
         assert.equal(warnings.length, 1);
     });
@@ -501,7 +502,7 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
             assert.equal(insert.params.length, 4);
         }
         const ready = pool.queries.find((q) => /UPDATE materials SET status/.test(q.sql));
-        assert.deepEqual(ready.params, ['ready', 'mat-off']);
+        assert.deepEqual(ready.params, ['ready', 'mat-off', '{}']);
         assert.ok(pool.queries.some((q) => q.sql === 'COMMIT'));
     });
 
@@ -539,7 +540,7 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
         assert.ok(!pool.queries.some((q) => /AS has_current/.test(q.sql)), 'no coverage probe');
         assert.deepEqual(warnings, [], 'no "re-embedding is required" warning while embeddings are off');
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /WHERE m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
+        assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(n\.text ILIKE \$2 OR n\.text ILIKE \$3\)/);
         assert.deepEqual(keyword.params, ['user-1', '%Blender%', '%モディファイア%', 3]);
     });
 
@@ -550,7 +551,7 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
         setPoolForTests(pool);
         const result = await searchContent({ query: 'blender modifiers', maxResults: 2, userId: LEARNER });
         assert.equal(result.search_type, 'keyword');
-        assert.equal(result.fallback_reason, undefined);
+        assert.equal(result.fallback_reason, 'embeddings_off');
         assert.equal(result.results[0].source, 'm9');
         assert.ok(!pool.queries.some((q) => /<=>|AS has_current/.test(q.sql)));
     });

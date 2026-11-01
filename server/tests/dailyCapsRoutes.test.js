@@ -473,7 +473,9 @@ describe('daily caps on the API routes', () => {
             await withServer(async (base) => {
                 const first = await upload(base);
                 assert.equal(first.status, 200);
-                assert.equal((await first.json()).status, 'uploaded', 'the text could not be read');
+                const stored = await first.json();
+                assert.equal(stored.status, 'error', 'the text could not be read');
+                assert.equal(stored.error_type, 'extract_failed');
                 const second = await upload(base);
                 const json = await second.json();
                 assertDailyLimit({ status: second.status, json, text: JSON.stringify(json), headers: second.headers }, 'embeddings', 'user');
@@ -616,6 +618,8 @@ describe('daily caps on the API routes', () => {
                     { message: 'x'.repeat(4001) },
                     { decision: 'revise', stage: 'requirements', message: 'y'.repeat(4001), curriculum_id: DRAFT_ID },
                     { message: { text: 'Teach me SQL' } },
+                    { message: 'Teach me SQL', attachments: [{ material_id: 'API key' }] },
+                    { message: 'Teach me SQL', attachments: 'notes.pdf' },
                 ]) {
                     const result = await send(`${base}/ai/generate`, body);
                     assert.equal(result.status, 400, JSON.stringify(body).slice(0, 80));
@@ -624,6 +628,36 @@ describe('daily caps on the API routes', () => {
                 assert.deepEqual(pool.usage(), [], 'nothing was charged');
                 assert.equal(gateway.calls.length, 0, 'the model was not called');
             });
+        });
+
+        it('reads the attached material first for the requirements stage, within the learner\'s own ready materials', async () => {
+            const pool = createMockPool();
+            setPoolForTests(pool);
+            setGatewayForTests(fakeCourseGateway());
+            await withServer(async (base) => {
+                const result = await send(`${base}/ai/generate`, { message: 'Teach me SQL', curriculum_id: DRAFT_ID, attachments: [{ material_id: DRAFT_ID }] });
+                assert.equal(result.status, 200, result.text);
+            });
+            const attached = pool.queries.find((q) => /m\.id = any\(\$2::uuid\[\]\)/.test(q.sql));
+            assert.ok(attached, 'the attached material was read');
+            assert.match(attached.sql, /where m\.status = 'ready' and m\.user_id = \$1 and m\.id = any/);
+            assert.deepEqual(attached.params.slice(0, 2), [DEV_USER, [DRAFT_ID]]);
+        });
+
+        it('reads the attached material first for a requirements revision too', async () => {
+            const pool = createMockPool();
+            setPoolForTests(pool);
+            setGatewayForTests(fakeCourseGateway());
+            await withServer(async (base) => {
+                const result = await send(`${base}/ai/generate`, {
+                    decision: 'revise', stage: 'requirements', message: 'Use my notes', curriculum_id: DRAFT_ID, attachments: [{ material_id: DRAFT_ID }],
+                });
+                assert.equal(result.status, 200, result.text);
+                assert.equal(result.json.status, 'revised');
+            });
+            const attached = pool.queries.find((q) => /m\.id = any\(\$2::uuid\[\]\)/.test(q.sql));
+            assert.ok(attached, 'the attached material was read');
+            assert.deepEqual(attached.params.slice(0, 2), [DEV_USER, [DRAFT_ID]]);
         });
 
         it("runs a stage as one 'course.generate' gateway call and reads its JSON reply", async () => {

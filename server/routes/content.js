@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ingestMaterial } from '../ragService.js';
+import { ingestMaterial, unreadableReason } from '../ragService.js';
 import { getPool } from '../db.js';
 // Phase 7: req.userId is set by server/middleware/auth.js
 // ensurePhase1User() removed — JWT-authenticated users already exist in auth.users
@@ -200,14 +200,19 @@ router.post('/upload', embeddingsCap, requireDb, receiveFile, async (req, res) =
         const materialId = result.rows[0].id;
 
         try {
-            // With embeddings off the chunks are stored without vectors (keyword search finds them).
+            // With embeddings off, or when embedding fails, the chunks are stored without vectors
+            // (keyword search finds them).
             await ingestMaterial(materialId, req.file.path, kind.mimeType, req.userId);
             res.json({ ok: true, material_id: materialId, status: 'ready' });
         } catch (ingestErr) {
-            console.error('Immediate Ingestion failed:', ingestErr);
-            // The unit stays charged even when nothing was embedded: the file and its material row
-            // are kept, and the daily cap is what bounds how many files an account can store.
-            res.json({ ok: true, material_id: materialId, status: 'uploaded' });
+            // ingestMaterial logged it. The unit stays charged even when nothing was embedded: the
+            // file and its material row are kept, and the daily cap is what bounds how many files
+            // an account can store. No readable text: status 'error' with the reason
+            // (ragService.js UnreadableReason), which the course generator tells the learner.
+            const reason = unreadableReason(ingestErr);
+            res.json(reason
+                ? { ok: true, material_id: materialId, status: 'error', error_type: reason }
+                : { ok: true, material_id: materialId, status: 'uploaded' });
         }
     } catch (error) {
         console.error('Upload Error:', error);
