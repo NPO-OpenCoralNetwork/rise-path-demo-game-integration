@@ -7,8 +7,9 @@
 #   ./scripts/preflight.sh    the owner, any time, without sudo (production rules, the recorded stage)
 #   with --from-deploy and the caller's values: deploy-stack.sh, before it sources stack.env and before
 #   the pull (a moved HEAD re-runs the pulled deploy-stack.sh, which runs the pulled check first)
-# Flags, each at most once: --from-deploy --caller-skip-pull <v> --caller-project <v> --caller-profiles <v>
-#   --caller-exports <names separated by spaces>
+#   with --for-restore: restore-db.sh's RS0 (R3 is a warning there: the drill cannot pass while backups have stopped)
+# Flags, each at most once: --from-deploy --for-restore (not both) --caller-skip-pull <v> --caller-project <v>
+#   --caller-profiles <v> --caller-exports <names separated by spaces>
 # Exit: 0 no error (warnings allowed), 1 errors, 2 could not check (X1-X5, or docker run failed), 3 an
 # internal error (X0).
 set -euo pipefail
@@ -41,6 +42,7 @@ bad_args() {
 }
 
 FROM_DEPLOY=0
+FOR_RESTORE=0
 CALLER_SKIP_PULL=''
 CALLER_PROJECT=''
 CALLER_PROFILES="${COMPOSE_PROFILES:-}"
@@ -49,13 +51,18 @@ SEEN=' '
 while [[ $# -gt 0 ]]; do
   flag="$1"
   case "${flag}" in
-    --from-deploy | --caller-skip-pull | --caller-project | --caller-profiles | --caller-exports) ;;
+    --from-deploy | --for-restore | --caller-skip-pull | --caller-project | --caller-profiles | --caller-exports) ;;
     *) bad_args ;;
   esac
   if [[ "${SEEN}" == *" ${flag} "* ]]; then bad_args; fi
   SEEN+="${flag} "
   if [[ "${flag}" == --from-deploy ]]; then
     FROM_DEPLOY=1
+    shift
+    continue
+  fi
+  if [[ "${flag}" == --for-restore ]]; then
+    FOR_RESTORE=1
     shift
     continue
   fi
@@ -68,6 +75,7 @@ while [[ $# -gt 0 ]]; do
   esac
   shift 2
 done
+if [[ "${FROM_DEPLOY}" == 1 && "${FOR_RESTORE}" == 1 ]]; then bad_args; fi
 
 # shellcheck source=check-mode.sh
 source "${SCRIPT_DIR}/check-mode.sh"
@@ -154,7 +162,7 @@ collect_facts() {
     "$(yes_no test -f "${BACKUP_ETC}/backup.key")" "$(yes_no test -f "${BACKUP_ETC}/backup.env")" \
     "$(status_field lastOk "${iso}")" "$(status_field lastFail "${iso}")" "$(status_field lastDrillOk "${iso}")" \
     "$(status_field keyId '[0-9a-f]{16}')" "${alert}" \
-    "$(if [[ "${FROM_DEPLOY}" == 1 ]]; then printf deploy; else printf standalone; fi)"
+    "$(if [[ "${FROM_DEPLOY}" == 1 ]]; then printf deploy; elif [[ "${FOR_RESTORE}" == 1 ]]; then printf restore; else printf standalone; fi)"
 }
 FACTS="$(collect_facts)"
 

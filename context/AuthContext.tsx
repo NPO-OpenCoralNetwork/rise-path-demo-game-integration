@@ -56,9 +56,10 @@ interface AuthContextType {
     /**
      * Phase 5 (O4): resolves false when the learner chose to stay signed in (lesson records still
      * unsaved: 「ログアウトしない」), true once logged out. reason 'reauth' (a "sign in again" button)
-     * never asks.
+     * never asks. scope 'local' signs out only this browser (the pilot page); without it the sign-out
+     * is global (every session of the account in the shared project).
      */
-    logout: (options?: { reason?: 'reauth' }) => Promise<boolean>;
+    logout: (options?: { reason?: 'reauth'; scope?: 'local' }) => Promise<boolean>;
     updateProfile: (updates: Partial<Pick<AuthUser, 'name' | 'avatar'>>) => void;
     /** Phase 4: this account's Rise Path data is gone (here: by 'self'; elsewhere: 'other'). Never resolves into the app again. */
     endDeletedAccountSession: (outcome: { by: DeletedBy; at?: string | null }) => Promise<void>;
@@ -387,7 +388,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => window.removeEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
     }, []);
 
-    const logout = useCallback(async (options?: { reason?: 'reauth' }): Promise<boolean> => {
+    /**
+     * The app's logout. Its sign-out is global by default (auth-js scope 'global': every session of the
+     * account in the shared project, Nexloom's and P-School's included). `scope: 'local'` signs out only
+     * this browser: the pilot page uses it (Phase 9 final review, finding 2), because everyone it refuses
+     * is, by construction, an account of another app on the shared project.
+     */
+    const logout = useCallback(async (options?: { reason?: 'reauth'; scope?: 'local' }): Promise<boolean> => {
         // Phase 5 (owner O4): upload first (≤ 3 s); a learner whose lesson records are still unsaved
         // chooses. Nothing is cleared before this line, so "stay signed in" keeps everything.
         if (!(await confirmUnsavedLearning(options))) return false;
@@ -400,9 +407,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signOutProgressSync();
         const supabase = getSupabaseClient();
         const nexloomSupabase = getNexloomSupabaseClient();
+        const signOutOptions = options?.scope === 'local' ? { scope: 'local' as const } : undefined;
         await Promise.all([
-            supabase ? supabase.auth.signOut() : Promise.resolve(),
-            nexloomSupabase ? nexloomSupabase.auth.signOut() : Promise.resolve(),
+            supabase ? supabase.auth.signOut(signOutOptions) : Promise.resolve(),
+            nexloomSupabase ? nexloomSupabase.auth.signOut(signOutOptions) : Promise.resolve(),
         ]);
         setUser(null);
         localStorage.removeItem('rp_auth_user');

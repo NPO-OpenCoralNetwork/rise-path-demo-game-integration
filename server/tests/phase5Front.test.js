@@ -2272,7 +2272,7 @@ describe('logout callers and copy rules (static)', () => {
     const logout = auth.slice(auth.indexOf('const logout = useCallback'));
     const gate = logout.indexOf('if (!(await confirmUnsavedLearning(options))) return false;');
     assert.ok(gate > 0 && gate < logout.indexOf('clearSharedDeviceAiData('), 'G12');
-    assert.match(auth, /logout: \(options\?: \{ reason\?: 'reauth' \}\) => Promise<boolean>;/);
+    assert.match(auth, /logout: \(options\?: \{ reason\?: 'reauth'; scope\?: 'local' \}\) => Promise<boolean>;/);
     const deletion = auth.slice(auth.indexOf('const endDeletedAccountSession'), auth.indexOf('const logout = useCallback'));
     assert.doesNotMatch(deletion, /confirmUnsavedLearning/);
     // The primary session ending elsewhere closes an open question (it would no longer be true).

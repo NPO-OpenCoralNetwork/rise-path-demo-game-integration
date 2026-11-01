@@ -23,22 +23,26 @@
 #        reads it
 #   RS4  the set picked; its manifest checked (fixed forms, this VM's key id); the files downloaded and checked
 #        against the manifest, the manifest against its sealed copy, and both files decrypted to the end (every
-#        chunk authenticated): only then its time, commit and counts shown, and a yes
+#        chunk authenticated); then RS8's input collected and decrypted (below; final review, finding 5: a bucket that
+#        cannot be read stops here, with the database unchanged): only then its time, commit, counts and the number of
+#        journals read shown, and a yes
 #   RS5  the database dropped, made again and restored (pg_restore, one transaction)
 #   RS6  --with-uploads (the volume was lost): the uploads restored
 #   RS7  the migrations newer than the dump (no service started)
-#   RS8  the deletions after the dump re-applied (scripts/replay-deletions.mjs) from every pre-restore export and
-#        every bucket journal made since the dump started (less 15 minutes; none at all is 0 rows, with a warning):
-#        the counts first, a yes, then --yes;
+#   RS8  the deletions after the dump re-applied (scripts/replay-deletions.mjs) from what RS4 collected: every
+#        pre-restore export, every bucket journal and every hourly journal copy left on the VM that the bucket does not
+#        have (an upload that failed; final review, finding 7), each made since the dump started (less 15 minutes; none
+#        at all is 0 rows, with a warning): the counts first, a yes, then --yes;
 #        still with every learner-facing service stopped, so no deleted account is ever served again. The joined
 #        plaintext CSV lives only in the 0700 temp folder in /run (tmpfs: gone after a reboot)
 #   RS10 the marker removed, the boot unit enabled again (when it was), the lock released, the timers that were on
 #        started again, one backup of the restored database
 #   RS11 deploy-stack.sh (事前チェック, build, up, smoke, 事後の確かめ): learners come back
-# RS9 (the byoa role SQL) is not in Phase 9 (byoa is off at the first launch). A stop from RS5 on keeps the marker, the
-# boot unit disabled and the timers stopped, also after a reboot: a half-restored database must never become the newest
-# backup nor be served. A stop before any run reached RS5 (the database unchanged) puts the three back as they were; the
-# services stay stopped.
+# RS9 (the byoa role SQL) is not in Phase 9 (byoa is off at the first launch). A stop from RS5 on keeps the marker and the
+# boot unit disabled (also after a reboot), and the timers stopped until a reboot starts them again, when the marker makes
+# them do nothing but JO2's check: a half-restored database must never become the newest backup nor be served. Until
+# then no backup and no Slack line come (runbook 13 章 R8; preflight R8 and R9 show it). A stop before any run reached RS5
+# (the database unchanged) puts the three back as they were; the services stay stopped.
 set -Eeuo pipefail
 umask 077
 
@@ -137,11 +141,14 @@ IMAGE="$(bk_node_image)"
 
 # RS0: the 事前チェック, before anything is touched.
 echo '==> 事前チェック（RS0）'
-if ! as_owner "${SCRIPT_DIR}/preflight.sh"; then
+# --for-restore: R3 (the drill) is only a warning here. A restore often follows days without a backup, when no drill can
+# pass (DR1); RS11's deploy checks R3 again after RS10's fresh backup (final review, finding 6).
+if ! as_owner "${SCRIPT_DIR}/preflight.sh" --for-restore; then
   # A rebuilt VM (手順書 16.3) has no backup unit yet (`--import-key` installs none), so at pilot the 事前チェック stops
-  # on R1 and R3. Installing the backup first (R1's own fix) would back up the empty database as the newest set.
+  # on R1 (R3 is a warning here, --for-restore; RS11's deploy would stop on it). Installing the backup first (R1's own
+  # fix) would back up the empty database as the newest set.
   if [[ ! -e "${BK_UNITS}/risepath-backup.timer" && ! -e "${BK_UNITS}/risepath-backup-journal.timer" ]]; then
-    bk_fail RS0 '事前チェックにエラーがあります（上の行）。この VM には控えのタイマーがまだありません。新しい VM（手順書 16.3）で、エラーが R1 と R3 だけなら、戻し終わるまで launch-record.env の LAUNCH_STAGE を setup にします（install-backup.sh は、戻したあとに実行します）。'
+    bk_fail RS0 '事前チェックにエラーがあります（上の行）。この VM には控えのタイマーがまだありません。新しい VM（手順書 16.3）で、エラーが R1 だけなら、戻し終わるまで launch-record.env の LAUNCH_STAGE を setup にします（最後のデプロイで止まる R3 も、setup では出ません。install-backup.sh は、戻したあとに実行します）。'
   fi
   bk_fail RS0 '事前チェックにエラーがあります（上の行）。先にそれを直します。'
 fi
@@ -272,6 +279,60 @@ COMMIT="$(bk_manifest_field "${SET_DIR}/manifest.json" commit)"
 count_of() { local n; n="$(bk_manifest_count "${SET_DIR}/manifest.json" countsAfter "$1")"; printf '%s' "${n:-不明}"; }
 echo "この控え: $(bk_jst "${SINCE}") に作り始めたもの（コミット ${COMMIT:0:7}）"
 echo "  アカウント $(count_of auth.users)、レッスンの記録 $(count_of lesson_progress)、アカウントの削除の記録 $(count_of account_deletions)"
+echo '==> 控えのあとの削除の記録を集めます（RS4。DB はまだ変えません）'
+# Every input of RS8, collected and decrypted before RS5 drops the database (final review, finding 5): a bucket that
+# cannot be read, or a journal that does not decrypt, stops here with the database unchanged (the trap puts the timers
+# and the boot unit back), never after it. The joined plaintext CSV stays in the 0700 temp folder in /run until RS8;
+# RS5-RS7 do not touch it, and a stop or a reboot removes it (the same command again collects it again).
+FROM_STAMP="$(date -u -d "${SINCE} - 15 minutes" +%Y-%m-%dT%H%M%SZ)"
+CSV="${BK_TMP}/journal.csv"
+# The header first: with no journal at all (the database lost before the first hourly journal after the dump, or the
+# hourly journals failing since) the replay reads 0 rows instead of an empty file (review round 3, finding 1).
+printf '%s\n' "${BK_JOURNAL_HEADER}" > "${CSV}"
+pre=0
+# Every export made before a restore and not older than the window: this run's (RS3), and an earlier run's when this
+# is the same command again (its export may never have reached the bucket). Rows already applied are skipped.
+shopt -s nullglob
+for file in "${BK_LOCAL}"/pre-restore-*/*.csv.rpbk; do
+  [[ "${file##*/}" =~ ^(20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z)(-[0-9a-f]{6})?\.csv\.rpbk$ ]] || continue
+  [[ ! "${BASH_REMATCH[1]}" < "${FROM_STAMP}" ]] || continue
+  pre=$((pre + 1))
+  bk_crypt decrypt < "${file}" >> "${CSV}" || bk_fail RS4 '戻す前に書き出した削除の記録を読めません。'
+done
+shopt -u nullglob
+# A fresh token: the one from the set's download may be minutes old.
+bk_gcs_token || bk_fail RS4 'VM のサービスアカウントのトークンをもらえません（メタデータのサーバー）。'
+listing="$(bk_gcs_list "${BUCKET}" journal/)" || bk_fail RS4 'バケットの削除の記録の一覧を読めません。'
+n=0
+declare -A IN_BUCKET=()
+while IFS=' ' read -r name _; do
+  [[ "${name}" =~ ^journal/[0-9-]+/(20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z)(-[0-9a-f]{6})?\.csv\.rpbk$ ]] || continue
+  [[ ! "${BASH_REMATCH[1]}" < "${FROM_STAMP}" ]] || continue
+  n=$((n + 1))
+  IN_BUCKET["${name##*/}"]=1
+  # A fresh token for each journal: a set several days old has many, and the metadata server may hand out a token with
+  # only minutes left (review round 2, finding 3).
+  bk_gcs_token || bk_fail RS4 'VM のサービスアカウントのトークンをもらえません（メタデータのサーバー）。'
+  bk_gcs_get "${BUCKET}" "${name}" "${WORK}/journal-${n}.rpbk" || bk_fail RS4 'バケットの削除の記録を読み出せません。'
+  bk_crypt decrypt < "${WORK}/journal-${n}.rpbk" >> "${CSV}" || bk_fail RS4 'バケットの削除の記録を読めません（鍵か、ファイル）。'
+done <<< "${listing}"
+# The hourly journal's copies on this VM (backup.sh keeps each for 48 hours, also when its upload failed: JO1) that
+# the bucket does not have: the deletions of hours whose upload failed (final review, finding 7). The same file in the
+# bucket was read above.
+loc=0
+shopt -s nullglob
+for file in "${BK_LOCAL}"/journal/*.csv.rpbk; do
+  [[ "${file##*/}" =~ ^(20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z)(-[0-9a-f]{6})?\.csv\.rpbk$ ]] || continue
+  [[ ! "${BASH_REMATCH[1]}" < "${FROM_STAMP}" ]] || continue
+  [[ -z "${IN_BUCKET["${file##*/}"]+x}" ]] || continue
+  loc=$((loc + 1))
+  bk_crypt decrypt < "${file}" >> "${CSV}" || bk_fail RS4 'この VM に残っている 1 時間ごとの削除の記録を読めません。'
+done
+shopt -u nullglob
+echo "   読んだ記録: 戻す前の書き出しから ${pre}、VM の 1 時間ごとの記録から ${loc}、バケットから ${n}"
+if ((pre + loc + n == 0)); then
+  echo '⚠️  控えのあとの削除の記録が、VM にもバケットにもありません（0 行として確かめます）。控えのあとに受けた削除があっても、当て直せません。事故の記録に書きます（手順書 16.2）。'
+fi
 [[ "$(bk_ask 'この控えで戻しますか（yes と打って Enter）: ')" == yes ]] || bk_fail RS4 'yes と答えなかったので、やめました。'
 
 # RS5: the database replaced by the set.
@@ -310,43 +371,9 @@ STEP=RS7
 echo '==> migration（RS7）'
 owner_compose run --rm --no-deps -T api npm run db:migrate || bk_fail RS7
 
-# RS8: the deletions after the dump, while every learner-facing service is still stopped.
+# RS8: the deletions after the dump re-applied (collected at RS4), while every learner-facing service is still stopped.
 STEP=RS8
-echo '==> 控えのあとの削除の記録を集めます（RS8）'
-FROM_STAMP="$(date -u -d "${SINCE} - 15 minutes" +%Y-%m-%dT%H%M%SZ)"
-CSV="${BK_TMP}/journal.csv"
-# The header first: with no journal at all (the database lost before the first hourly journal after the dump, or the
-# hourly journals failing since) the replay reads 0 rows instead of an empty file (review round 3, finding 1).
-printf '%s\n' "${BK_JOURNAL_HEADER}" > "${CSV}"
-pre=0
-# Every export made before a restore and not older than the window: this run's (RS3), and an earlier run's when this
-# is the same command again (its export may never have reached the bucket). Rows already applied are skipped.
-shopt -s nullglob
-for file in "${BK_LOCAL}"/pre-restore-*/*.csv.rpbk; do
-  [[ "${file##*/}" =~ ^(20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z)(-[0-9a-f]{6})?\.csv\.rpbk$ ]] || continue
-  [[ ! "${BASH_REMATCH[1]}" < "${FROM_STAMP}" ]] || continue
-  pre=$((pre + 1))
-  bk_crypt decrypt < "${file}" >> "${CSV}" || bk_fail RS8 '戻す前に書き出した削除の記録を読めません。'
-done
-shopt -u nullglob
-# A fresh token: the one from RS4 may have expired during the question, the restore or the migrations.
-bk_gcs_token || bk_fail RS8 'VM のサービスアカウントのトークンをもらえません（メタデータのサーバー）。'
-listing="$(bk_gcs_list "${BUCKET}" journal/)" || bk_fail RS8 'バケットの削除の記録の一覧を読めません。'
-n=0
-while IFS=' ' read -r name _; do
-  [[ "${name}" =~ ^journal/[0-9-]+/(20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z)(-[0-9a-f]{6})?\.csv\.rpbk$ ]] || continue
-  [[ ! "${BASH_REMATCH[1]}" < "${FROM_STAMP}" ]] || continue
-  n=$((n + 1))
-  # A fresh token for each journal: a set several days old has many, and the metadata server may hand out a token with
-  # only minutes left (review round 2, finding 3).
-  bk_gcs_token || bk_fail RS8 'VM のサービスアカウントのトークンをもらえません（メタデータのサーバー）。'
-  bk_gcs_get "${BUCKET}" "${name}" "${WORK}/journal-${n}.rpbk" || bk_fail RS8 'バケットの削除の記録を読み出せません。'
-  bk_crypt decrypt < "${WORK}/journal-${n}.rpbk" >> "${CSV}" || bk_fail RS8 'バケットの削除の記録を読めません（鍵か、ファイル）。'
-done <<< "${listing}"
-echo "   読んだ記録: 戻す前の書き出しから ${pre}、バケットから ${n}"
-if ((pre + n == 0)); then
-  echo '⚠️  控えのあとの削除の記録が、VM にもバケットにもありません（0 行として確かめます）。控えのあとに受けた削除があっても、当て直せません。事故の記録に書きます（手順書 16.2）。'
-fi
+echo '==> 控えのあとの削除の記録を当て直します（RS8）'
 rc=0
 owner_compose run --rm --no-deps -T api node scripts/replay-deletions.mjs --since "${SINCE}" < "${CSV}" || rc=$?
 [[ "${rc}" == 0 ]] || bk_fail RS8 "確かめで止まりました（終わりの番号 ${rc}）。"

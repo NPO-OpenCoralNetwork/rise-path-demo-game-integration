@@ -21,11 +21,14 @@
  * read 401 as sign-in trouble); the app shows a full-page notice (components/common/PilotOnlyView.tsx).
  *
  * Where: the three auth middlewares (requireAuth and optionalAuth in auth.js, requireBridgeOrAuth in
- * bridgeAuth.js) ask pilotRefuses() as soon as Supabase named the user, before anything is read or
- * written for that account: no account-state read, so no re-open of a deleted account (which writes
- * the auth.users stub and a progress epoch, tools/core/accountDeletions.js reopenAccount: a former
- * tester whose data was deleted signs in again), and no stub (server/db.js syncAuthUserStub). They
- * answer 403 PILOT_ONLY_REFUSAL; optionalAuth too (never a silent downgrade to guest).
+ * bridgeAuth.js) ask pilotRefuses() as soon as Supabase named the user, before anything is written
+ * for that account: no account check that may re-open a deleted account (which writes the auth.users
+ * stub and a progress epoch, tools/core/accountDeletions.js reopenAccount: a former tester whose data
+ * was deleted signs in again), and no stub (server/db.js syncAuthUserStub). They answer 403
+ * PILOT_ONLY_REFUSAL; optionalAuth too (never a silent downgrade to guest). requireAuth and
+ * requireBridgeOrAuth first make one read-only lookup (auth.js refusePilotSession): a session that
+ * signed in before its account's deletion still gets 401 account_deleted, as without the list, so a
+ * former tester's old device forgets the deleted account (Phase 4 §5.11; final review, finding 19).
  *
  * Not checked here: the SSE MCP on :3100 (mcp-server/sseUserAuth.js; Tailscale only, never behind
  * the tunnel) and the remote MCP (byoa, off at the first launch; preflight V4 refuses byoa with the

@@ -10,7 +10,8 @@ import { SupportContact } from '../ui/SupportContact';
  * Rise Path is open only to the staff and adult testers of the closed pilot; the Supabase project is
  * shared with Nexloom and P-School, so their logins can sign in but get this page.
  * A page, not a dialog: Esc does not close it (nothing behind it would work). The heading takes
- * focus on mount; "Sign out" is the app's own logout (App.tsx handleLogout).
+ * focus on mount; "Sign out" is the app's logout with scope 'local' (App.tsx handlePilotSignOut): it ends
+ * only this browser's session, never the account's Nexloom or P-School sessions on other devices.
  */
 
 const copy = {

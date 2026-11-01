@@ -275,6 +275,15 @@ const AppContent: React.FC = () => {
       .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
   };
 
+  // Phase 9 final review, finding 2: the pilot page signs out this browser only (scope 'local'). Everyone it
+  // refuses is an account of Nexloom or P-School on the shared project; a global sign-out would end their
+  // sessions there too, on every device.
+  const handlePilotSignOut = () => {
+    logout({ scope: 'local' })
+      .then((done) => { if (done !== false) navigate('/', { replace: true }); })
+      .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
+  };
+
   const handleCourseSelect = async (course: Course) => {
     if (course.id === 'vibe-coding') { navigate('/vibe'); return; }
     if (course.id === 'claude-code') { navigate('/claude-code'); return; }
@@ -337,7 +346,7 @@ const AppContent: React.FC = () => {
           Loading…
         </div>
       ) : pilotOnly ? (
-        <PilotOnlyView onSignOut={handleLogout} />
+        <PilotOnlyView onSignOut={handlePilotSignOut} />
       ) : isLoggedIn && legal.status === 'needed' && !LEGAL_GATE_EXEMPT.has(normalizePath(location.pathname)) ? (
         <Suspense fallback={<RouteLoading />}>
           <LegalConsentView />

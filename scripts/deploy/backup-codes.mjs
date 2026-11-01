@@ -57,13 +57,13 @@ export const BACKUP_CODES = Object.freeze(/** @type {readonly BackupCode[]} */ (
   { code: 'RS1', level: 'E', title: '戻しの途中の印を書くか、控えのタイマーを止めるか、動いている控えが終わるのを待つところで止まりました（DB はまだ変えていません）。', fix: '「わけ」の行と、`systemctl status risepath-backup.service` で出た行をエージェントに見せます（手順書 16.2）。' },
   { code: 'RS2', level: 'E', title: 'Rise Path の部品（api、mcp など）を止められませんでした（DB はまだ変えていません）。', fix: '`cd /opt/risepath/deploy/risepath-vm && docker compose --env-file stack.env ps` で出た行をエージェントに見せます（手順書 16.2）。' },
   { code: 'RS3', level: 'E', title: '戻す前の、削除の記録の書き出しができませんでした（DB はまだ変えていません）。', fix: 'DB が答えるのに書き出せないときは、戻しを続けません。出た行をエージェントに見せます（手順書 16.2）。' },
-  { code: 'RS4', level: 'E', title: '戻す控えを選べないか、読み出した控えが目録か鍵と合いません（DB はまだ変えていません）。', fix: '「わけ」の行をエージェントに見せ、`--from` で使う控えを決め直します（手順書 16.2）。' },
+  { code: 'RS4', level: 'E', title: '戻す控えを選べないか、読み出した控えか削除の記録が、読めないか目録か鍵と合いません（DB はまだ変えていません）。', fix: '「わけ」の行をエージェントに見せ、`--from` で使う控えを決め直します。バケットの削除の記録が読めないとき（一覧かトークン）は、VM のサービスアカウントとバケットの権限をエージェントと直してから、同じコマンドでもう一度します（手順書 16.2）。' },
   { code: 'RS5', level: 'E', title: 'DB を控えから戻せませんでした（DB は空か、途中です）。', fix: 'ここから先はエージェントと進めます。DB は空か途中なので、同じコマンドに `--current-db-lost` を付けて、もう一度はじめから戻します（最初に書き出した削除の記録も使います。手順書 16.2）。' },
   { code: 'RS6', level: 'E', title: 'アップロードされたファイルを控えから戻せませんでした。', fix: '出た行をエージェントに見せます。同じコマンドで、もう一度はじめから戻せます（手順書 16.2）。' },
   { code: 'RS7', level: 'E', title: '戻した DB の migration が失敗しました。', fix: '出た行をエージェントに見せます。同じコマンドで、もう一度はじめから戻せます（手順書 16.2）。' },
   { code: 'RS8', level: 'E', title: '削除の記録をもう一度当てるところで止まりました（Rise Path は止めたままです）。', fix: '出た数と行をエージェントに見せます。DB が答えなかったとき（終わりの番号が 3）は、少し待って、同じコマンドで、もう一度はじめから戻します。削除の記録の行が読めなかったとき（終わりの番号が 1。何行目かが出ます）は、その行をエージェントと調べてから、同じコマンドで、もう一度はじめから戻します（手順書 16.2）。' },
   { code: 'RS10', level: 'E', title: '控えのタイマーと、再起動のときの起動を元に戻すか、戻したあとの控えを作るところで失敗しました（戻しは済んでいます）。', fix: '`sudo systemctl enable risepath-stack.service` と `sudo systemctl start risepath-backup.timer risepath-backup-journal.timer` を実行し、出た行をエージェントに見せます（手順書 16.2）。' },
-  { code: 'RS11', level: 'E', title: '戻したあとのデプロイ（deploy-stack.sh）が失敗しました（戻しと、削除の記録の当て直しは済んでいます）。', fix: '上に出たデプロイのコードを手順書 13 章で見て、エージェントとデプロイを直します（手順書 16.2）。' },
+  { code: 'RS11', level: 'E', title: '戻したあとのデプロイ（deploy-stack.sh）が失敗しました（戻しと、削除の記録の当て直しは済んでいます）。', fix: '上に出たデプロイのコードを手順書 13 章で見て、エージェントとデプロイを直します。public で「[R3]」で止まったときは、`sudo ./scripts/restore-drill.sh` を実行し（RS10 で作った新しい控えで練習します）、それから `./scripts/deploy-stack.sh` を実行します（手順書 16.2）。' },
 ]));
 
 export const ALL_CODES = Object.freeze(BACKUP_CODES.map((c) => c.code));

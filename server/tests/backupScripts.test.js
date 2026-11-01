@@ -224,6 +224,8 @@ describe('backup scripts: static pins (design §5.10)', () => {
     assert.ok(calls.length >= 2);
     for (const line of calls) assert.match(line, /^\s*(?:if ! )?as_owner "\$\{SCRIPT_DIR\}\/(?:deploy-stack|preflight)\.sh"/, line.trim());
     assert.match(SCRIPT.restore, /"\$\{OWNER\}" != root/, 'a root-owned checkout is refused');
+    // Final review, finding 6: RS0's check is the restore's own (R3 a warning: no drill can pass while backups stopped).
+    assert.match(SCRIPT.restore, /^if ! as_owner "\$\{SCRIPT_DIR\}\/preflight\.sh" --for-restore; then$/m);
     assert.doesNotMatch(SCRIPT.restore, /mcp_remote_role\.sql/, 'RS9 is not in Phase 9 (TR9d)');
   });
   it('the bash code table equals scripts/deploy/backup-codes.mjs (code, level, title, fix)', async () => {
@@ -502,6 +504,19 @@ describe('backup.sh daily: review round 1 of Stage 5 (findings 5, 6, 7, 11)', { 
       const files = fs.readdirSync(local).flatMap((d) => fs.readdirSync(path.join(local, d)));
       assert.deepEqual(files.filter((f) => f.endsWith('.part') || f.startsWith('uploads')), [], 'no partial archive');
     }
+  });
+  // Final review, finding 8: the uploads volume is live; a file that changes or goes while tar reads it (tar exit 1) must not
+  // cost the night's off-VM set. Exit 2 (fatal) still stops BK5 (the test above).
+  it('BK5: tar exiting 1 (a file changed while it was read) still uploads the whole set, with a warning; the listing holds archived entries only', async () => {
+    const h = harness();
+    const r = await h.run('backup.sh', ['daily'], { env: { STUB_TAR_CHANGED: '1' } });
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.stdout, /^⚠️  控えの最中に変わったファイルがありました（アップロードか削除）。そのファイルは、変わる前か後のどちらかで控えています（BK5）。$/m);
+    const puts = h.calls().filter((c) => c.startsWith('curl put'));
+    for (const name of ['db.dump.rpbk', 'uploads.tar.rpbk', 'manifest.json.rpbk', 'manifest.json']) assert.ok(puts.some((c) => c.endsWith(`/${name}`)), `${name} uploaded: ${puts.join(' | ')}`);
+    const manifest = JSON.parse(fs.readFileSync(path.join(h.bucket, h.objects('daily/').find((n) => n.endsWith('/manifest.json')) ?? ''), 'utf8'));
+    assert.equal(manifest.uploadsFileCount, 3, 'TAR_LIST\'s regular files; no warning line counted');
+    assert.match(SCRIPT.backup, /tar --warning=no-file-changed --warning=no-file-removed --warning=no-file-shrank -C \/data -cvf - \./);
   });
   it('BK8 also removes old work folders of a drill or a restore, and pre-restore exports after BACKUP_RETENTION_DAYS; young ones stay (finding 7)', async () => {
     const h = harness();
@@ -1087,7 +1102,8 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     const pre = fs.readdirSync(path.join(h.root, 'var/backups/risepath')).filter((d) => d.startsWith('pre-restore-'));
     assert.equal(pre.length, 1);
     assert.equal(fs.readdirSync(path.join(h.root, 'var/backups/risepath', pre[0])).filter((f) => f.endsWith('.csv.rpbk')).length, 1, 'the export file on the VM');
-    assert.match(r.stdout, /^ {3}読んだ記録: 戻す前の書き出しから 1、バケットから 2$/m);
+    // Final review, finding 7: the hourly journal's copy on the VM is in the bucket too, so it is read once (from the bucket).
+    assert.match(r.stdout, /^ {3}読んだ記録: 戻す前の書き出しから 1、VM の 1 時間ごとの記録から 0、バケットから 2$/m);
     assert.doesNotMatch(r.out, /ほかの控えの処理が動いているので/);
     assert.deepEqual(fs.readdirSync(path.join(h.root, 'var/backups/risepath')).filter((d) => d.startsWith('restore-')), [], 'the plaintext journal removed');
     // Review round 1, finding 7: the plaintext CSV lives only in the 0700 temp folder in /run, never under /var/backups.
@@ -1095,9 +1111,13 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     assert.equal(stdin.length, 2);
     for (const c of stdin) assert.ok(c.startsWith(`replay stdin ${path.join(h.root, 'run')}/risepath-backup.`) && c.endsWith('/journal.csv'), c);
     assert.deepEqual(fs.readdirSync(path.join(h.root, 'run')).filter((f) => /^risepath-backup\.(?!lock$)/.test(f)), [], 'the temp folder removed');
-    // Finding 3: a fresh token right before RS8's bucket listing (the first one may have expired at the question).
+    // Finding 3: a fresh token right before the journal listing. Final review, finding 5: the listing, every download and
+    // every decrypt of RS8's input come before dropdb (a bucket that cannot be read stops with the database unchanged).
     const list = at(calls, 'curl list journal/');
-    assert.ok(list > at(calls, 'db:migrate') && calls[list - 1] === 'curl token', calls.slice(list - 3, list + 1).join(' | '));
+    assert.ok(list > at(calls, 'curl get daily/') && calls[list - 1] === 'curl token', calls.slice(list - 3, list + 1).join(' | '));
+    assert.ok(list < at(calls, 'dropdb'), 'the journal listing before dropdb');
+    const lastJournal = calls.map((c, i) => (c.startsWith('curl get journal/') ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
+    assert.ok(lastJournal > list && lastJournal < at(calls, 'dropdb'), 'every journal downloaded before dropdb');
     // Finding 2: both files decrypted to the end before the question; finding 21: the time in Japan time.
     inOrder(calls, ['curl get daily/', 'crypt decrypt', 'dropdb']);
     assert.match(r.stdout, /^この控え: 日本時間 \d{4}-\d\d-\d\d \d\d:\d\d に作り始めたもの（コミット ccccccc）$/m);
@@ -1108,7 +1128,8 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     const h = await vm();
     assert.equal((await h.run('restore-db.sh', ARGS, { input: 'yes\nyes\n' })).status, 0);
     const calls = h.calls();
-    assert.ok(calls.includes(`runuser -u deploy -- ${path.join(h.stack, 'scripts/preflight.sh')}`));
+    assert.ok(calls.includes(`runuser -u deploy -- ${path.join(h.stack, 'scripts/preflight.sh')} --for-restore`));
+    assert.ok(calls.some((c) => c.startsWith('preflight as=deploy ') && c.endsWith(' args=--for-restore')), 'RS0: the restore\'s own check (final review, finding 6)');
     assert.ok(calls.includes(`runuser -u deploy -- ${path.join(h.stack, 'scripts/deploy-stack.sh')}`));
     for (const c of calls.filter((c) => /^(preflight|deploy-stack) /.test(c))) assert.match(c, / as=deploy /);
     const root = await vm();
@@ -1166,13 +1187,38 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     const lost = await h.run('restore-db.sh', [...ARGS, '--current-db-lost'], { input: 'yes\nyes\n', env: { STUB_JOURNAL_FAIL: '1' } });
     assert.equal(lost.status, 0, lost.out);
     assert.match(lost.stdout, /⚠️  DB は答えますが、削除の記録を書き出せません（--current-db-lost）。前の戻しで書き出した記録が VM にあれば、それを使います。/);
-    assert.match(lost.stdout, /読んだ記録: 戻す前の書き出しから 1、バケットから 1/);
+    assert.match(lost.stdout, /読んだ記録: 戻す前の書き出しから 1、VM の 1 時間ごとの記録から 0、バケットから 1/);
     const csv = fs.readFileSync(path.join(h.stubDir, 'replay-yes.csv'), 'utf8');
     assert.match(csv, /bbbbbbbb-2222/, 'the first run\'s export');
     assert.match(csv, /aaaaaaaa-1111/, 'the hourly journal');
     assert.doesNotMatch(csv, /cccccccc-3333/, 'an export older than the dump');
     inOrder(h.calls(), ['COPY', 'dropdb', 'exec db pg_restore', 'run replay --since', '--yes as=deploy', 'systemctl enable risepath-stack.service', 'deploy-stack as=deploy']);
     assert.ok(!fs.existsSync(markOf(h)), 'the marker removed once the replay is done');
+  });
+  // Final review, finding 7: an hourly journal whose upload failed (JO1) leaves its encrypted copy on the VM; a restore with
+  // --current-db-lost (no RS3 export) reads it, so the deletions of those hours come back.
+  it('--current-db-lost: the hourly journal copies on the VM that the bucket lacks are replayed; ones older than the dump are not', async () => {
+    const h = await vm();
+    fs.writeFileSync(path.join(h.stubDir, 'journal.csv'), `${JOURNAL_HEADER}\naccount,bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb,2099-01-01T00:00:00.000000Z,self,,,,\n`);
+    const failed = await h.run('backup.sh', ['journal'], { env: { STUB_UPLOAD_FAIL: 'journal/' } });
+    assert.notEqual(failed.status, 0, failed.out);
+    assert.match(failed.stdout, /^❌ \[JO1\] /m);
+    const localDir = path.join(h.root, 'var/backups/risepath/journal');
+    assert.equal(fs.readdirSync(localDir).filter((f) => f.endsWith('.csv.rpbk')).length, 2, 'the uploaded hour and the failed one');
+    const keyFile = path.join(h.dir, 'enc-local.key');
+    fs.writeFileSync(keyFile, KEY_HEX);
+    fs.writeFileSync(path.join(localDir, '2020-01-01T000000Z-abcdef.csv.rpbk'), spawnSync(process.execPath, [path.join(ROOT, 'scripts/deploy/backup-crypt.mjs'), 'encrypt', '--key', keyFile],
+      { input: `${JOURNAL_HEADER}\naccount,cccccccc-3333-4333-8333-cccccccccccc,2099-01-01T00:00:00.000000Z,self,,,,\n` }).stdout);
+    h.reset();
+    const r = await h.run('restore-db.sh', [...ARGS, '--current-db-lost'], { input: 'yes\nyes\n', env: { STUB_PG_READY: '1' } });
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.stdout, /^ {3}読んだ記録: 戻す前の書き出しから 0、VM の 1 時間ごとの記録から 1、バケットから 1$/m);
+    const csv = fs.readFileSync(path.join(h.stubDir, 'replay-yes.csv'), 'utf8');
+    assert.match(csv, /bbbbbbbb-2222/, 'the hour whose upload failed (only on the VM)');
+    assert.match(csv, /aaaaaaaa-1111/, 'the bucket journal');
+    assert.doesNotMatch(csv, /cccccccc-3333/, 'a copy older than the dump');
+    assert.equal((csv.match(/aaaaaaaa-1111/g) ?? []).length, 1, 'the uploaded hour\'s copy on the VM is not read twice');
+    inOrder(h.calls(), ['crypt decrypt', 'dropdb', 'run replay --since', '--yes as=deploy']);
   });
   it('a rebuilt VM without the backup units (手順書 16.3, after --import-key): no timer is stopped or started, and the restore runs to the end', async () => {
     const h = await vm();
@@ -1298,7 +1344,7 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     assert.ok(!h.calls().some((c) => c.includes('run replay') || c.startsWith('systemctl start') || c.includes('deploy-stack') || c.includes('pg_dump')), h.calls().join('\n'));
     held(r, h);
   });
-  it('RS8: the replay list answering 2 (consent or grant rows) stops before the question, the timers stopped; a journal listing that fails stops too (finding 13)', async () => {
+  it('RS8: the replay list answering 2 (consent or grant rows) stops before the question, the timers stopped (the by-hand path starts from the restored database)', async () => {
     const h = await vm();
     const r = await h.run('restore-db.sh', ARGS, { input: 'yes\nyes\n', env: { STUB_REPLAY_LIST_STATUS: '2' } });
     assert.equal(r.status, 1);
@@ -1306,11 +1352,27 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     assert.doesNotMatch(r.stderr, /この数で合っていますか/);
     assert.ok(!h.calls().some((c) => c.includes('--yes as=') || c.startsWith('systemctl start') || c.includes('deploy-stack')));
     held(r, h);
-    const l = await vm();
-    const lr = await l.run('restore-db.sh', ARGS, { input: 'yes\nyes\n', env: { STUB_LIST_FAIL: 'journal/' } });
-    assert.equal(lr.status, 1);
-    assert.match(lr.stdout, /^❌ \[RS8\] [\s\S]*わけ: バケットの削除の記録の一覧を読めません。/m);
-    assert.ok(!l.calls().some((c) => c.includes('run replay') || c.startsWith('systemctl start')));
+  });
+  // Final review, finding 5: RS8's input (the journal listing, each download, each decrypt) is collected at RS4, so a bucket
+  // that cannot be read stops with the database unchanged and everything put back, never with production dropped.
+  it('RS4: the journal listing failing, the token failing or a journal that does not decrypt stops before dropdb (released), with --from newest and --from <folder>', async () => {
+    /** @param {ReturnType<typeof makeHarness>} h */
+    const localSet = (h) => path.join(h.root, 'var/backups/risepath', fs.readdirSync(path.join(h.root, 'var/backups/risepath')).find((d) => /^20/.test(d)) ?? '');
+    for (const from of ['newest', 'folder']) {
+      const h = await vm();
+      const args = ['--from', from === 'newest' ? 'newest' : localSet(h), '--yes-replace-production-database'];
+      stoppedAtRs4(await h.run('restore-db.sh', args, { input: 'yes\nyes\n', env: { STUB_LIST_FAIL: 'journal/' } }), h, 'バケットの削除の記録の一覧を読めません。');
+      assert.ok(!h.calls().some((c) => c.includes('pg_restore') || c.includes('run replay')), from);
+    }
+    const t = await vm();
+    stoppedAtRs4(await t.run('restore-db.sh', ['--from', localSet(t), '--yes-replace-production-database'], { input: 'yes\nyes\n', env: { STUB_TOKEN_FAIL: '1' } }), t,
+      'VM のサービスアカウントのトークンをもらえません（メタデータのサーバー）。');
+    // A planted object that is no rpbk file, under a journal name after the dump (any container on the VM can upload one).
+    const p = await vm();
+    const day = p.objects('journal/')[0].split('/')[1];
+    fs.mkdirSync(path.join(p.bucket, 'journal', day), { recursive: true });
+    fs.writeFileSync(path.join(p.bucket, 'journal', day, '2099-01-01T000000Z-abcdef.csv.rpbk'), 'not an rpbk file\n');
+    stoppedAtRs4(await p.run('restore-db.sh', ARGS, { input: 'yes\nyes\n' }), p, 'バケットの削除の記録を読めません（鍵か、ファイル）。');
   });
   it('RS1, RS2 and RS5 failures stop the restore with their codes (finding 13)', async () => {
     for (const [code, env, after] of [['RS1', { STUB_SYSTEMCTL_STATUS: '1' }, 'flock -w 900 9'], ['RS2', { STUB_STOP_FAIL: '1' }, 'COPY'], ['RS5', { STUB_DROPDB_FAIL: '1' }, 'exec db pg_restore']]) {
@@ -1334,7 +1396,7 @@ describe('restore-db.sh: the order of a restore (stub harness; findings 2, 3, 26
     const rebuilt = await vm();
     const r = await rebuilt.run('restore-db.sh', ARGS, { input: 'yes\nyes\n', env: { STUB_PREFLIGHT_STATUS: '1' } });
     assert.equal(r.status, 1);
-    assert.match(r.stdout, /^❌ \[RS0\] [\s\S]*わけ: 事前チェックにエラーがあります（上の行）。この VM には控えのタイマーがまだありません。新しい VM（手順書 16\.3）で、エラーが R1 と R3 だけなら、戻し終わるまで launch-record\.env の LAUNCH_STAGE を setup にします（install-backup\.sh は、戻したあとに実行します）。/m);
+    assert.match(r.stdout, /^❌ \[RS0\] [\s\S]*わけ: 事前チェックにエラーがあります（上の行）。この VM には控えのタイマーがまだありません。新しい VM（手順書 16\.3）で、エラーが R1 だけなら、戻し終わるまで launch-record\.env の LAUNCH_STAGE を setup にします（最後のデプロイで止まる R3 も、setup では出ません。install-backup\.sh は、戻したあとに実行します）。/m);
     const installed = await vm();
     fs.mkdirSync(path.join(installed.root, 'etc/systemd/system'), { recursive: true });
     for (const u of UNITS) fs.writeFileSync(path.join(installed.root, 'etc/systemd/system', u), '');
@@ -1403,7 +1465,8 @@ describe('review round 2 of Stage 5: a restore held across a reboot, tokens, the
     assert.match(daily.stdout, /^ℹ️  本番の DB を戻している途中です（restore-db\.sh。\/var\/lib\/risepath-backup\/restore-in-progress があります）。戻し終わるまで、控えは作りません（手順書 16\.2）。$/m);
     assert.ok(!h.calls().some((c) => c.includes('pg_dump') || c.startsWith('curl put') || c.includes('flock -n 9')), h.calls().join('\n'));
     assert.equal(h.status().lastFail, undefined);
-    // The journal makes no export either, but still says (JO2) that no daily backup was made: a marker left behind is never silent.
+    // The journal makes no export either, but still says (JO2) that no daily backup was made: after a reboot, a marker left
+    // behind is never silent (before one, a held restore keeps both timers stopped: runbook 13 章 R8).
     const journal = await h.run('backup.sh', ['journal']);
     assert.equal(journal.status, 0, journal.out);
     assert.ok(!h.calls().some((c) => c.includes('COPY')));
@@ -1592,7 +1655,7 @@ describe('review round 3 of Stage 5: empty journals, a reboot with db stopped, t
     h.reset();
     const r = await h.run('restore-db.sh', [...ARGS, '--current-db-lost'], { input: 'yes\nyes\n', env: { STUB_PG_READY: '1' } });
     assert.equal(r.status, 0, r.out);
-    assert.match(r.stdout, /^ {3}読んだ記録: 戻す前の書き出しから 0、バケットから 0$/m);
+    assert.match(r.stdout, /^ {3}読んだ記録: 戻す前の書き出しから 0、VM の 1 時間ごとの記録から 0、バケットから 0$/m);
     assert.match(r.stdout, /^⚠️  控えのあとの削除の記録が、VM にもバケットにもありません（0 行として確かめます）。控えのあとに受けた削除があっても、当て直せません。事故の記録に書きます（手順書 16\.2）。$/m);
     for (const f of ['replay-list.csv', 'replay-yes.csv']) assert.equal(fs.readFileSync(path.join(h.stubDir, f), 'utf8'), `${JOURNAL_HEADER}\n`, f);
     inOrder(h.calls(), ['dropdb', 'run replay --since', '--yes as=deploy', 'deploy-stack as=deploy']);
@@ -1670,7 +1733,7 @@ describe('review round 3 of Stage 5: empty journals, a reboot with db stopped, t
     const l = await lost.run('restore-db.sh', [...ARGS, '--current-db-lost'], { input: 'yes\nyes\n' });
     assert.equal(l.status, 0, l.out);
     assert.match(l.stdout, /^⚠️  書き出しは 0 で終わりましたが、書き出したファイルが VM にありません（--current-db-lost）。/m);
-    assert.match(l.stdout, /読んだ記録: 戻す前の書き出しから 0、バケットから 1/);
+    assert.match(l.stdout, /読んだ記録: 戻す前の書き出しから 0、VM の 1 時間ごとの記録から 0、バケットから 1/);
   });
   it('finding 4: bk_env_value takes the last assignment; when that line is not a safe value it gives nothing, never an earlier line\'s value', async () => {
     const h = harness();

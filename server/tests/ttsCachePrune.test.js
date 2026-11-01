@@ -380,6 +380,56 @@ describe('the 30-day bound holds without a new write (review round 1, finding 1)
   });
 });
 
+describe('a prune already running keeps a file written again meanwhile (final review, finding 10)', () => {
+  afterEach(() => {
+    mock.restoreAll();
+    setTtsCachePruneClockForTests(undefined);
+    delete process.env.KOKORO_TTS_CACHE_DIR;
+  });
+
+  it('a stale entry made again by a request while the prune is held stays (audio and .meta.json); the other stale entry goes', async () => {
+    const dir = tempDir('race');
+    process.env.KOKORO_TTS_CACHE_DIR = dir;
+    setTtsCachePruneClockForTests(() => NOW);
+    const sidecar = fakeSidecar();
+    mock.method(console, 'log', () => {});
+    // The older entry sorts first, so the prune is held on its unlink, after it listed both.
+    const other = put(dir, 7, { ageMs: 50 * DAY });
+    const asked = putPhrase(dir, 'race phrase', 40 * DAY);
+    /** @type {() => void} */
+    let release = () => {};
+    const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+    /** @type {() => void} */
+    let held = () => {};
+    const heldNow = new Promise((resolve) => { held = () => resolve(undefined); });
+    const unlink = fsp.unlink;
+    let calls = 0;
+    mock.method(fsp, 'unlink', async (/** @type {any[]} */ ...args) => {
+      calls += 1;
+      if (calls === 1) {
+        held();
+        await gate;
+      }
+      return /** @type {any} */ (unlink)(...args);
+    });
+    const started = maybePruneTtsCache();
+    assert.ok(started, 'the sweep started a prune');
+    try {
+      await heldNow;
+      const result = await say('race phrase');
+      assert.equal(result.cached, false, 'the stale file was a miss');
+      assert.equal(sidecar.mock.callCount(), 1);
+    } finally {
+      release();
+    }
+    await lastTtsCachePruneForTests();
+    assert.deepEqual(list(dir), [asked, `${asked}.meta.json`], 'the entry written again stays; the other stale one went');
+    assert.equal(fs.readFileSync(path.join(dir, asked), 'utf8'), 'new audio');
+    assert.ok(Date.now() - fs.statSync(path.join(dir, asked)).mtimeMs < DAY, 'with its new mtime');
+    assert.ok(!list(dir).includes(other));
+  });
+});
+
 describe('the learner\'s answer never waits for the prune (review round 1, finding 4)', () => {
   afterEach(() => {
     mock.restoreAll();

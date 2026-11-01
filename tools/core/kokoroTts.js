@@ -137,8 +137,9 @@ function tooOld(mtimeMs, now, maxAgeDays) {
  * Deletes cache files older than limits.maxAgeDays, then, when the audio files left are over
  * limits.maxBytes or limits.maxFiles, the oldest until both are at TTS_CACHE_PRUNE_TARGET of their
  * limit. Only regular files (lstat) whose names the cache writes; an audio file and its .meta.json go
- * together (a .meta.json without audio counts as its own, empty entry). Never throws; logs counts or
- * an error code only, never a name or a path.
+ * together (a .meta.json without audio counts as its own, empty entry); an entry whose first file
+ * changed since the listing (written again meanwhile) stays. Never throws; logs counts or an error
+ * code only, never a name or a path.
  * @param {{ dir?: string, now?: number, limits?: { maxAgeDays: number, maxBytes: number, maxFiles: number } }} [options]
  * @returns {Promise<{ removed: number, failed: number }>} files removed, files that could not be removed
  */
@@ -180,6 +181,16 @@ export async function pruneTtsCache({ dir = getCacheDir(), now = Date.now(), lim
         }
 
         const remove = async (entry) => {
+            // Right before the first unlink, its first file (the audio, or a lone .meta.json) again: a
+            // learner's request may have written the entry again while this prune ran (a stale file is
+            // a miss and writeCachedAudio keeps the path, with a new mtime). Then the whole entry stays
+            // (final review, finding 10). Gone or no longer a regular file: nothing to remove either.
+            try {
+                const current = await fs.lstat(path.join(dir, entry.files[0]));
+                if (!current.isFile() || current.mtimeMs !== entry.mtimeMs) return;
+            } catch {
+                return;
+            }
             for (const name of entry.files) {
                 try {
                     await fs.unlink(path.join(dir, name));
@@ -265,7 +276,8 @@ async function readCachedAudio(cacheKey, outputFormat) {
     try {
         // Older than the age limit: a miss, so the audio is made and written again (a new mtime). No
         // learner gets audio kept longer than that, even before a prune removes the file (the write's
-        // prune or the api's hourly timer; no prune starts here, so none runs while the new file is made).
+        // prune or the api's hourly timer). No prune starts here; one already running checks each
+        // file's mtime again right before removing it, so a file written again meanwhile is kept.
         const stat = await fs.stat(filePath);
         if (tooOld(stat.mtimeMs, pruneClock(), TTS_CACHE_LIMITS.maxAgeDays)) return null;
         const [buffer, metaRaw] = await Promise.all([

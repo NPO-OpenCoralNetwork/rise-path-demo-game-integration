@@ -96,8 +96,10 @@ parse_local_flags() { # --local-only --out <dir> [--keep-local <name> for journa
 start_run() {
   [[ "$(id -u)" == 0 ]] || bk_fail "${STEP}" 'root で動かします（systemd のユニットか、sudo）。'
   # A restore in progress (restore-db.sh's marker, review round 2 finding 2): no backup of a half-restored database, even
-  # when a reboot started the timers again. restore-db.sh's own export (RS3, --keep-local) still runs. The journal still
-  # checks JO2, so a marker left behind cannot stop the backups without a word.
+  # when a reboot started the timers again. restore-db.sh's own export (RS3, --keep-local) still runs. Whenever the
+  # journal timer runs (after a reboot, or a manual start), the journal still checks JO2, so a marker left behind is not
+  # silent then. While restore-db.sh holds a stopped restore (RS5 on) both timers stay stopped on purpose (design §5.4;
+  # runbook 13 章 R8: no backup and no Slack line meanwhile; preflight R8 and R9 show it).
   if [[ -e "${BK_RESTORE_MARK}" && -z "${KEEP_LOCAL}" && "${LOCAL_ONLY}" == 0 ]]; then
     echo 'ℹ️  本番の DB を戻している途中です（restore-db.sh。/var/lib/risepath-backup/restore-in-progress があります）。戻し終わるまで、控えは作りません（手順書 16.2）。'
     if [[ "${MODE}" == journal ]]; then stale_check; fi
@@ -193,12 +195,19 @@ daily() {
   set +e
   # GNU tar writes its -v listing to stderr when the archive goes to stdout: the file count of this very archive.
   # --log-driver none: the json-file driver would copy the plaintext archive to the boot disk (bk_crypt's comment).
+  # The volume is live (an upload, an account deletion or the retention sweep may change it meanwhile): the --warning
+  # flags keep tar's "file changed / removed / shrank" lines out of the listing, so it holds archived entries only
+  # (bk_tar_count and the drill's DR6 agree; final review, finding 8).
   docker run --rm --log-driver none --network none --read-only --security-opt no-new-privileges --pids-limit 64 \
-    --mount "type=volume,src=${vol},dst=/data,readonly" "$(bk_node_image)" tar -C /data -cvf - . \
+    --mount "type=volume,src=${vol},dst=/data,readonly" "$(bk_node_image)" \
+    tar --warning=no-file-changed --warning=no-file-removed --warning=no-file-shrank -C /data -cvf - . \
     2> "${BK_TMP}/uploads.list" < /dev/null | bk_crypt encrypt > "${dir}/uploads.tar.rpbk.part"
   st=("${PIPESTATUS[@]}")
   set -e
-  [[ "${st[0]}" == 0 && "${st[1]}" == 0 ]] || bk_fail BK5 "tar（${st[0]}）か暗号化（${st[1]}）が 0 で終わりませんでした。"
+  # GNU tar --create: 1 = a file changed or disappeared while it was read (the archive is complete otherwise), 2 = fatal.
+  # A file that changed is archived as it was read; one removed before tar read it is not in the archive.
+  [[ ( "${st[0]}" == 0 || "${st[0]}" == 1 ) && "${st[1]}" == 0 ]] || bk_fail BK5 "tar（${st[0]}）か暗号化（${st[1]}）が 0 で終わりませんでした。"
+  [[ "${st[0]}" == 0 ]] || echo '⚠️  控えの最中に変わったファイルがありました（アップロードか削除）。そのファイルは、変わる前か後のどちらかで控えています（BK5）。'
   mv "${dir}/uploads.tar.rpbk.part" "${dir}/uploads.tar.rpbk"
   files="$(bk_tar_count < "${BK_TMP}/uploads.list")"
 

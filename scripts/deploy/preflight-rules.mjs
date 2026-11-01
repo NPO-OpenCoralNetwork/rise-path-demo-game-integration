@@ -188,7 +188,7 @@ export const RULES = Object.freeze([
   // A4: W; E in launch-record.env for one of the 18 record keys (the last line wins, so a template's empty line under a
   // dated one would turn a gate off: review round 3, finding 1).
   { code: 'A4', group: 'A', level: 'dyn', ci: 'run', title: '{file} に同じ名前が 2 回あります（{names}）', fix: '1 つだけ残します（launch-record.env では、いまの状態に合う行を残し、テンプレの空の行や古い行を消します）。' },
-  { code: 'A5', group: 'A', level: 'E', ci: 'run', title: '{file} の {names} の値に、記号（$、空白、引用符など）があります（シェルが値を書きかえるか、命令として実行します）', fix: "`openssl rand -hex 32` のような英数字だけの値にします。どうしても記号が要るときは、値を ' ' で囲みます。stack.env の `PILOT_ACCOUNT_IDS` のときは、空白を消し、User UID をカンマだけで区切ります（手順書 10.1）。" },
+  { code: 'A5', group: 'A', level: 'E', ci: 'run', title: '{file} の {names} の値に、記号（$、空白、引用符など）があります（シェルが値を書きかえるか、命令として実行します）', fix: "`openssl rand -hex 32` のような英数字だけの値にします。どうしても記号が要るときは、値を ' ' で囲みます（囲んだ値の最後の文字を `\\` にはしません）。stack.env の `PILOT_ACCOUNT_IDS` のときは、空白を消し、User UID をカンマだけで区切ります（手順書 10.1）。" },
   { code: 'A6', group: 'A', level: 'W', ci: 'run', title: '知らない名前があります（打ちまちがいかもしれません）: {names}（{file}）', fix: '`{file}.example` とくらべて直すか、要らない行なら消します。' },
   // A7: W for a mode other than 600 or another owner; E when the file cannot be read at all (root-owned after `sudo cp`).
   { code: 'A7', group: 'A', level: 'dyn', ci: 'run', title: '{file} の権限が 600 でないか、持ち主がちがいます。', fix: '`chmod 600 {file}` を実行します。`Operation not permitted` と出たとき（sudo で作ったファイル）は、エージェントに相談します。' },
@@ -200,7 +200,7 @@ export const RULES = Object.freeze([
   { code: 'A11', group: 'A', level: 'E', ci: 'skip', title: 'launch-record.env の {names} が読めません（日付は 2026-11-02 の形、段階は setup・pilot・minors・public）', fix: '手順書 14 章の書き方に直します。' },
   { code: 'A12', group: 'A', level: 'E', ci: 'skip', title: 'launch-record.env の {names} の日付が、今日より先です。', fix: '確かめをした日を書きます。' },
   // A13: W before the first green deploy and without tunnel; else E (finding 7).
-  { code: 'A13', group: 'A', level: 'dyn', ci: 'skip', title: 'launch-record.env がありません。', fix: '`cp launch-record.env.example launch-record.env` を実行し、手順書のチェックの横に書いた日付を写します（手順書 14 章）。' },
+  { code: 'A13', group: 'A', level: 'dyn', ci: 'skip', title: 'launch-record.env がありません。', fix: '`cp launch-record.env.example launch-record.env` を実行し、手順書の写し（はじめに）のチェックの横に書いた日付を写します（手順書 14 章）。' },
   { code: 'A14', group: 'A', level: 'W', ci: 'run', title: '{file} の {names} の値に # があります（前に空白があると、そこから先が消えます）', fix: '英数字だけの値にします。' },
   // A15: the deploy record exists but the deploy user cannot read it (review round 3, finding 3); it still counts for A13.
   { code: 'A15', group: 'A', level: 'E', ci: 'skip', title: '最後に通ったデプロイの記録（.deploy/last-green.json）が読めません。', fix: '`ls -ld .deploy .deploy/last-green.json` を実行し、出た行をエージェントに見せます（sudo でデプロイしたあとなどに起こります）。' },
@@ -271,7 +271,8 @@ export const RULES = Object.freeze([
   { code: 'M1', group: 'M', level: 'W/E/E/E', ci: 'skip', title: '開発用の Mac が本番の DB を使っていないことが、記録にありません。', fix: 'Mac の `.env.local` を開発用の DB にして、launch-record.env の `MAC_DEV_DB_SEPARATE` に日付を書きます（手順書 9.5）。' },
   { code: 'R1', group: 'R', level: 'W/E/E/E', ci: 'skip', title: '毎日の控え（バックアップ）が動いていません。', fix: '最初のデプロイのあとで、手順書 6.4 のとおりに入れます（最初のデプロイの前は、これで正しい状態です）。' },
   { code: 'R2', group: 'R', level: '–/W/W/W', ci: 'skip', title: '最後の控えが 36 時間より前か、失敗しています。', fix: '`sudo journalctl -u risepath-backup` を見て、エージェントに相談します（手順書 17 章）。' },
-  // R3: setup not checked; pilot and minors E if never, W if older than 35 days; public E for both.
+  // R3: setup not checked; pilot and minors E if never, W if older than 35 days; public E for both. A W at every stage
+  // for restore-db.sh's own check (preflight.sh --for-restore, RS0).
   { code: 'R3', group: 'R', level: 'dyn', ci: 'skip', title: '控えから戻す練習の記録がないか、35 日より前です。', fix: '`sudo ./scripts/restore-drill.sh` を実行します（手順書 16.1）。' },
   { code: 'R4', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えの鍵を VM の外にしまったことが、記録にないか、いまの鍵とちがいます（鍵がないと戻せません）', fix: '手順書 6.4 の鍵の手順をして、launch-record.env の `BACKUP_KEY_COPY` に日付を、`BACKUP_KEY_ID` に key id を書きます。VM を作り直したとき（手順書 16.3）は、`--new-key` はしません。16.3 の 2 のとおりに、`sudo ./scripts/install-backup.sh key-id` で出た 16 文字を `BACKUP_KEY_ID` に書きます（`BACKUP_KEY_COPY` は 6.4 の日付のままです）。' },
   { code: 'R5', group: 'R', level: '–/E/E/E', ci: 'skip', title: '控えを消す日数（バケットのライフサイクル）が、記録にありません。', fix: '手順書 3.8 のとおりに設定し、launch-record.env の `BACKUP_LIFECYCLE` に日付を書きます。' },
@@ -344,7 +345,7 @@ const FACT_CHECKS = {
   drillLastOk: (v) => typeof v === 'string' && (v === '' || ISO_TIME.test(v)),
   backupKeyId: (v) => typeof v === 'string' && /^(?:[0-9a-f]{16})?$/.test(v),
   backupAlert: (v) => v === '' || v === 'true' || v === 'false',
-  from: (v) => v === 'deploy' || v === 'standalone',
+  from: (v) => v === 'deploy' || v === 'standalone' || v === 'restore',
 };
 /** The facts' names, in the order preflight.sh writes them. */
 export const FACT_KEYS = Object.freeze(/** @type {(keyof Facts)[]} */ (Object.keys(FACT_CHECKS)));
@@ -1049,9 +1050,13 @@ export function checkStack(input) {
   });
   rule('R3', () => {
     if (stage === 'setup') return;
+    // restore-db.sh's RS0 (preflight.sh --for-restore): a warning only. A restore runs when the database is broken,
+    // often after the backups stopped, and then no drill can pass (DR1 needs a set under 36 hours); RS11's deploy checks
+    // R3 again, after RS10's fresh backup (final review, finding 6).
+    const restore = facts.from === 'restore';
     const drill = facts.drillLastOk ? Date.parse(facts.drillLastOk) : Number.NaN;
-    if (Number.isNaN(drill)) add({ code: 'R3', level: 'E' });
-    else if (now.getTime() - drill > 35 * DAY) add({ code: 'R3', level: stage === 'public' ? 'E' : 'W' });
+    if (Number.isNaN(drill)) add({ code: 'R3', level: restore ? 'W' : 'E' });
+    else if (now.getTime() - drill > 35 * DAY) add({ code: 'R3', level: restore ? 'W' : stage === 'public' ? 'E' : 'W' });
   });
   rule('R4', (level) => {
     const names = ['BACKUP_KEY_COPY', 'BACKUP_KEY_ID'].filter((k) => (k === 'BACKUP_KEY_ID' ? !/^[0-9a-f]{16}$/.test(rec(k)) : !dated(k)));

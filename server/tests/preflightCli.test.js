@@ -570,8 +570,15 @@ switch (args[0]) {
     assert.deepEqual(r.docker, []);
   });
 
+  // Final review, finding 6: restore-db.sh's RS0 runs `preflight.sh --for-restore`; the rules read R3 as a warning then.
+  it('--for-restore sends "from":"restore" (without it: standalone; with --from-deploy: deploy)', () => {
+    assert.equal(runWrapper({ args: ['--for-restore'] }).facts.from, 'restore');
+    assert.equal(runWrapper({}).facts.from, 'standalone');
+    assert.equal(runWrapper({ args: ['--from-deploy', '--caller-skip-pull', '', '--caller-project', '', '--caller-profiles', '', '--caller-exports', 'HOME PATH'] }).facts.from, 'deploy');
+  });
+
   it('X4 for an unknown, repeated or incomplete flag (no docker call); X1 without the api line; X2 when the image or docker run fails', () => {
-    for (const args of [['--stage', 'public'], ['--from-deploy', '--from-deploy'], ['--caller-project'], ['extra']]) {
+    for (const args of [['--stage', 'public'], ['--from-deploy', '--from-deploy'], ['--caller-project'], ['extra'], ['--for-restore', '--for-restore'], ['--from-deploy', '--for-restore'], ['--for-restore', '--from-deploy']]) {
       const r = runWrapper({ args });
       assert.equal(r.status, 2, JSON.stringify(args));
       assert.match(r.out, /^❌ \[X4\] /m);

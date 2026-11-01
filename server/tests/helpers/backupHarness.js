@@ -97,6 +97,11 @@ if (args[0] === 'run') {
     if (env.STUB_TAR_FAIL === '1') fail(2);
     process.stdout.write(Buffer.concat([Buffer.from('FAKETAR'), Buffer.alloc(4000, 7)]));
     process.stderr.write(${JSON.stringify(TAR_LIST)});
+    // STUB_TAR_CHANGED=1: a file changed while tar read it (GNU tar exits 1; its warning line only without the flag).
+    if (env.STUB_TAR_CHANGED === '1') {
+      if (!cmd.includes('--warning=no-file-changed')) process.stderr.write('tar: ./c.png: file changed as we read it\\n');
+      fail(1);
+    }
     fail(0);
   }
   if (cmd[0] === 'tar' && cmd.includes('-tf')) {
@@ -332,7 +337,7 @@ export function makeHarness({ stackEnv, backupEnv = `BACKUP_BUCKET=${BUCKET}\nBA
   for (const name of ['preflight', 'deploy-stack']) {
     fs.writeFileSync(path.join(stack, 'scripts', `${name}.sh`), [
       '#!/usr/bin/env bash',
-      `echo "${name} as=\${STUB_AS_USER:-none} uid=$(id -u)" >> "$STUB_LOG"`,
+      `echo "${name} as=\${STUB_AS_USER:-none} uid=$(id -u) args=$*" >> "$STUB_LOG"`,
       name === 'deploy-stack' ? 'cd "$(dirname "$0")/.." && docker compose --env-file stack.env -f docker-compose.yml up -d' : ':',
       `exit "\${STUB_${name === 'preflight' ? 'PREFLIGHT' : 'DEPLOY'}_STATUS:-0}"`,
     ].join('\n'), { mode: 0o755 });

@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { ALL_CODES, ATTESTATIONS, INTERNAL_CODES, RULES, STAGES, checkStack } from '../../scripts/deploy/preflight-rules.mjs';
 import { ALL_CODES as AFTER_CODES, DEPLOY_CODES, POSTDEPLOY_CODES } from '../../scripts/deploy/postdeploy-probe.mjs';
 import { BASE_STACK, NOW, PILOT_ID, PILOT_ID_2, baseFacts, baseRecord, buildInput } from './helpers/preflightFixtures.js';
-import { spawnSync } from 'node:child_process';
-import { pilotStartupLines } from '../middleware/pilotGate.js';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { pilotStartupLines, readPilotList } from '../middleware/pilotGate.js';
 import { VERCEL_RULES } from '../../scripts/deploy/vercel-env-rules.mjs';
 import { ALL_CODES as BACKUP_ALL_CODES, BACKUP_CODES } from '../../scripts/deploy/backup-codes.mjs';
 
@@ -271,6 +271,22 @@ describe('first-launch.ja.md 10.1〜10.4: the pilot-list steps (Phase 9 stage 3;
   /** The VM folder every stack command runs in (10.1's step 2 starts there). */
   const CD = 'cd /opt/risepath/deploy/risepath-vm && ';
   const LOG_CMD = `\`${CD}${LOG_LINE.slice(1)}`;
+  /** 10.4 step 2's count of the list in stack.env (final review, finding 4): a number only, folded as the api folds it. */
+  const COUNT_CMD = "grep '^PILOT_ACCOUNT_IDS=' stack.env | cut -d= -f2- | tr ',' '\\n' | tr 'A-F' 'a-f' | sort -u | grep -c .";
+  it('10.4 step 2\'s count gives what the api counts (readPilotList: case folded, each id once), and prints no id', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pilot-count-'));
+    try {
+      const [a, b] = ['abcdef01-2345-4678-9abc-def012345678', 'bcdef012-3456-4789-8bcd-ef0123456789'];
+      for (const value of [`${a},${b},${a.toUpperCase()},${b}`, a, `${a},${b}`]) {
+        fs.writeFileSync(path.join(dir, 'stack.env'), `NODE_ENV=production\nPILOT_ACCOUNT_IDS=${value}\nOTHER=1\n`);
+        const out = execFileSync('bash', ['-c', COUNT_CMD], { cwd: dir, encoding: 'utf8' });
+        assert.equal(out, `${readPilotList({ PILOT_ACCOUNT_IDS: value }).ids.size}\n`, value);
+        assert.match(out, /^\d+\n$/, 'a number only');
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   /** The landing page's sign-in button (jp), the first thing a signed-out visitor sees at `/`. */
   const landing = /jp: \{[\s\S]*?\n\s*signIn: '([^']+)'/.exec(read('components/common/ExperienceLandingView.tsx'));
   assert.ok(landing, 'the landing sign-in label (jp)');
@@ -380,8 +396,11 @@ describe('first-launch.ja.md 10.1〜10.4: the pilot-list steps (Phase 9 stage 3;
     assert.match(todo, /パスワードは、会って、または電話で伝えます（メールアドレスと同じメッセージでは送りません）/);
     assert.match(todo, /授業や学習の時間を避けます/);
     const items = todo.split('\n').filter((line) => /^ {2}\d+\. /.test(line));
-    assert.ok(items[1].includes(LOG_CMD) && /N（いま名簿にある人数）を書き留めます/.test(items[1]), 'step 2: the count before the change');
-    assert.match(items[4], /^ {2}5\. デプロイが済んだら、2 のコマンドをもう一度実行し、N を見ます。$/);
+    // Final review, finding 4: the api prints its count once, at start, and log rotation drops it during a long pilot; the
+    // count before the change comes from stack.env (a number only), the one after it from the fresh api's log.
+    assert.ok(items[1].includes(`\`${CD}${COUNT_CMD}\``) && /出た数を N（いま名簿にある人数）として書き留めます/.test(items[1]), 'step 2: the count before the change');
+    assert.ok(!items[1].includes(LOG_LINE), 'step 2 does not read the startup line');
+    assert.ok(items[4].startsWith(`  5. デプロイが済んだら、${LOG_LINE} を実行し、最後の「[Pilot] on: N accounts」の N を見ます`), items[4]);
     // Review round 1, findings 1 and 10: the deletion waits for the api's own count to go down by one.
     const leaving = todo.slice(todo.indexOf('テスターが抜けるとき'));
     const order = ['消すかどうかを聞きます', '2 のとおりに N を書き留め', 'その User UID と、そのとなりのカンマを 1 つ消し', '4 のとおりにデプロイします', 'N が 1 つ減ったことを見ます', '減っていないときは、ここで止めて、記録は消さずに、エージェントに聞きます', 'N が減ったのを見てから', 'scripts/delete-account-data.mjs', '手順書 18 章'].map((s) => leaving.indexOf(s));
@@ -873,7 +892,7 @@ function record163(lost) {
   if (/鍵が戻ったら、`sudo \.\/scripts\/install-backup\.sh key-id` を実行し、出た 16 文字を、`nano launch-record\.env` で `BACKUP_KEY_ID` に書きます/u.test(step(2))) keyed.BACKUP_KEY_ID = baseFacts().backupKeyId;
   /** Step 7: the stage written back (and the legal pages' date, when 12.1 was done). @type {Record<string, string>} */
   const restored = { ...keyed, LAUNCH_STAGE: lost.LAUNCH_STAGE };
-  if (step(7).includes('12.1 まで済んでいたときは、`VERCEL_LEGAL_PAGES_ON` にも、12.1 のチェックの横の日付を書き戻します')) restored.VERCEL_LEGAL_PAGES_ON = lost.VERCEL_LEGAL_PAGES_ON;
+  if (step(7).includes('12.1 まで済んでいたときは、`VERCEL_LEGAL_PAGES_ON` にも、手順書の写し（はじめに）の 12.1 のチェックの横の日付を書き戻します')) restored.VERCEL_LEGAL_PAGES_ON = lost.VERCEL_LEGAL_PAGES_ON;
   return { rebuild, keyed, restored };
 }
 /** The record of a VM lost during the pilot (after 10.3, before 11.2) and of one lost after 12.1 (public). */
@@ -1462,5 +1481,121 @@ describe('review round 3 of Stage 6: the pilot keeps the routine work, and each 
     const intro = text.slice(text.indexOf('## はじめに'), text.indexOf('## 1. '));
     assert.match(intro, /^- コマンドの中の `<…>`（例: `<プロジェクトの ID>`、`<開発用のパスワード>`）は、自分の値に置きかえます。`<` と `>` も消します/mu);
     assert.ok(text.includes('`<プロジェクトの ID>`') && text.includes('<開発用のパスワード>'), 'the examples are placeholders the runbook uses');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Final review of Phase 9: the owner can observe each success sign at its step, and every pointer has a home.
+
+describe('final review of Phase 9: runbook steps the owner can complete as written', () => {
+  // Findings 3 and 14: 11.4 runs while the app's sign-up is closed and 8.1's accounts are confirmed already, so no
+  // confirmation mail can come then; the mail is checked once sign-up opens (12.2).
+  it('the confirmation mail is checked only after sign-up opens (11.4 → 12.2)', () => {
+    const s114 = stepBody('11.4');
+    assert.doesNotMatch(stepPart(s114, 'うまくいったとき: '), /届きます/u, '11.4 runs while sign-up is closed in code');
+    assert.doesNotMatch(stepPart(s114, 'うまくいったとき: '), /ダミー[^。]*確認のメール[^。]*届きます/u);
+    assert.match(stepPart(s114, 'うまくいったとき: '), /12\.2/u);
+    const s122 = stepBody('12.2');
+    assert.match(stepPart(s122, 'やること:'), /プライベートウィンドウ[\s\S]*新規登録[\s\S]*確認のメール/u);
+    assert.match(stepPart(s122, 'うまくいったとき: '), /日本語の確認のメールが届き/u);
+    assert.match(stepPart(s122, 'うまくいかないとき: '), /11\.4[\s\S]*11\.5/u);
+  });
+
+  // Finding 11: the dated copy lives outside git and outside the VM; every recovery path points at it.
+  it('はじめに says where the owner\'s dated copy lives (outside the VM and the repository); the recovery paths point at it', () => {
+    const intro = text.slice(text.indexOf('## はじめに'), text.indexOf('## 1. '));
+    const bullet = intro.split('\n').find((line) => line.includes('この手順書の写し（オーナー用）')) ?? '';
+    assert.match(bullet, /印刷した紙|共有ドライブ|パスワード管理/u, 'a place outside the VM');
+    assert.match(bullet, /VM の中と、Mac・VM のリポジトリのフォルダの `doc\/guides\/first-launch\.ja\.md` には書きません/u);
+    const ch14 = chapter('14').split('\n').find((line) => line.startsWith('- 同じ日付を')) ?? '';
+    assert.match(ch14, /手順書の写し（はじめに）/u);
+    const s163 = stepPart(stepBody('16.3'), 'やること:');
+    assert.match(s163.split('\n').find((l) => l.startsWith('  1. ')) ?? '', /手順書の写し（はじめに）から写し直します/u);
+    assert.match(s163.split('\n').find((l) => l.startsWith('  7. ')) ?? '', /手順書の写し（はじめに）の 12\.1 のチェックの横の日付/u);
+    assert.match(chapter('17').split('\n').find((l) => l.includes('launch-record.env をなくした')) ?? '', /手順書の写し（はじめに）/u);
+    const example = read('deploy/risepath-vm/launch-record.env.example');
+    assert.match(example, /手順書の写し/u);
+    assert.doesNotMatch(example, /手順書（doc\/guides\/first-launch\.ja\.md）のチェックの横/u);
+    // The tracked copy stays blank (the STEP_LINES pin): that is why the dates live in the copy.
+    assert.ok(STEP_LINES[0] === '[ ] 済んだ日: ＿＿＿＿');
+  });
+
+  // Finding 12: the query-string item needs smoke:edge's id, which only exists after 10.3 removes the protection.
+  it('9.2 leaves the two smoke items to 10.3, and 10.3 runs the VM grep and marks them', () => {
+    const s92 = stepPart(stepBody('9.2'), 'やること:');
+    assert.match(s92, /`npm run smoke:edge` の行と「クエリ文字列が API に届く」の行（どちらも smoke の結果を使うので、10\.3 でします）のほか/u);
+    const s103 = stepBody('10.3');
+    const todo = stepPart(s103, 'やること:');
+    assert.ok(todo.indexOf('grep smoke=') > todo.indexOf('npm run smoke:edge'), 'the grep after the smoke');
+    assert.match(stepPart(s103, 'うまくいったとき: '), /4 の grep で 1 行出ます/u);
+    assert.match(stepPart(s103, 'うまくいかないとき: '), /17 章の表の 8 番/u);
+    // Every checklist line of the Vercel README that needs the smoke's output is left to 10.3 by 9.2 or says 手順書 10.3.
+    const readme = read('deploy/vercel/README.md');
+    const list = readme.slice(readme.indexOf('## 確認チェックリスト'));
+    const needs = list.split('\n').filter((line) => /^\s*- \[ \]/.test(line) && /smoke:edge|smoke が表示した/u.test(line));
+    assert.ok(needs.length >= 2, needs.join('\n'));
+    for (const line of needs) {
+      const named = (/smoke:edge/u.test(line) && s92.includes('`npm run smoke:edge` の行')) || (/クエリ文字列/u.test(line) && s92.includes('「クエリ文字列が API に届く」の行'));
+      assert.ok(named || line.includes('手順書 10.3'), line);
+      assert.ok(line.includes('手順書 10.3'), `${line}: says when it can be done`);
+    }
+  });
+
+  // Finding 13: 2.7 lists the project that holds nexloom-gce, not whatever project gcloud last pointed at.
+  it('2.7 names the project and the signed-in gcloud, and an error or an empty list is never 「空で始める」', () => {
+    const s27 = text.slice(text.indexOf('### 2.7 '), text.indexOf('### 2.8 '));
+    assert.match(s27, /`gcloud compute instances list[^`]*--project=/u);
+    assert.ok(s27.includes('`gcloud auth login`'));
+    const fail = stepPart(stepBody('2.7'), 'うまくいかないとき: ');
+    assert.match(fail, /gcloud がエラー[^。]*`gcloud auth login` をして、出た行をエージェントに見せます（「空で始める」とは書きません）/u);
+    assert.match(fail, /「Listed 0 items」と出たときは、プロジェクトの ID をエージェントと見直します/u);
+  });
+
+  // Finding 15: the plan says runbook 2.8 and 5.3 cover the VM's checks before the second bootstrap; each cited step names them.
+  it('5.3 compares the VM\'s Docker and Compose with CI before the preflight; every step the plan cites names its checks', () => {
+    const s53 = text.slice(text.indexOf('### 5.3 '), text.indexOf('### 5.4 '));
+    for (const must of ['docker version', 'docker compose version', 'Server stack deploy', 'エージェント', 'preflight.sh']) assert.ok(s53.includes(must), must);
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+    const item = plan.slice(plan.indexOf('3. **作り直した VM の最初のデプロイの前に**'), plan.indexOf('4. **VM では `RISEPATH_DEPLOY_SKIP_PULL` を設定しません。**'));
+    const cited = /（手順書 ([\d. と]+)。/u.exec(item)?.[1].split('と').map((x) => x.trim()) ?? [];
+    assert.deepEqual(cited, ['2.8', '5.3']);
+    const steps = cited.map((id) => text.slice(text.indexOf(`### ${id} `), text.indexOf('\n### ', text.indexOf(`### ${id} `) + 4))).join('\n');
+    for (const must of ['docker version', 'docker compose version', 'preflight.sh']) assert.ok(steps.includes(must), `the cited steps name ${must}`);
+  });
+
+  // Finding 16: the two checks of plan 8.2 without a token in the chat (TR7 keeps auth-check.mjs deferred).
+  it('11.2 step 2: where the check runs, the password asked unseen, what the owner shows, what amr is and the pass signs', () => {
+    const body = stepBody('11.2');
+    assert.match(stepPart(body, 'だれが・どこで: '), /Mac/u);
+    const todo = stepPart(body, 'やること:');
+    const step2 = todo.slice(todo.indexOf('\n  2. '), todo.indexOf('\n  3. '));
+    assert.ok(step2.length > 0, '11.2 has a step 2');
+    assert.match(step2, /Mac のターミナルに貼るコマンド[^\n]*`read -rs`/u);
+    assert.match(step2, /オーナーは、出た 2 行だけをエージェントに見せます。/u);
+    assert.match(step2, /amr は、ログインのトークンに入っている「ログインのしかたの記録」です。/u);
+    assert.match(step2, /`password`[^\n]*`400 current_password_required`/u);
+    assert.match(step2, /3 は本番でします/u);
+    assert.ok(!fs.existsSync(path.join(ROOT, 'scripts/auth-check.mjs')) || /auth-check\.mjs/.test(step2), 'when auth-check.mjs is built (plan 13.5), step 2 names it');
+  });
+
+  // Finding 17: the plan's header names Phase 9 like every earlier phase.
+  it('the plan\'s header names Phase 9\'s decisions (13 章) and its state, with a link to the runbook', () => {
+    const plan = read('doc/brushup-2026/ai-access-plan.ja.md').split('\n');
+    const decided = plan.find((line) => line.startsWith('- 決めた人:')) ?? '';
+    const state = plan.find((line) => line.startsWith('- 状態:')) ?? '';
+    assert.match(decided, /Phase 9 の D1〜D8（2026-10-30）は 13 章/u);
+    assert.match(state, /Phase 9（[^）]*）もコードを作りました（2026-10-31）/u);
+    assert.ok(state.includes('(../guides/first-launch.ja.md)') && state.includes('13 章'));
+  });
+
+  // Finding 18: in 13 章, D1-D9 are preflight codes; the owner's decisions are written 「1 章の Dn」.
+  it('13 章 never uses a bare D-number in prose: decisions are 「1 章の Dn」, codes are 「コード Dn」 or the first cell', () => {
+    const body = chapter('13');
+    const note = body.split('\n').find((line) => line.includes('1 章の決めたこと（D1〜D8）とは別')) ?? '';
+    assert.ok(note, 'the note that the two numberings differ');
+    const prose = body.split('\n').filter((line) => line !== note)
+      .map((line) => (/^\| /.test(line) ? line.slice(1).split(' | ').slice(1).join(' | ') : line)).join('\n');
+    const bare = [...prose.matchAll(/(?<!1 章の |コード )\bD\d+\b/g)].map((m) => m[0]);
+    assert.deepEqual(bare, [], 'bare D-numbers in 13 章 prose');
   });
 });

@@ -26,7 +26,8 @@ export const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
  * - `expands`: `$` or a backtick outside single quotes, or a leading `~` (bash and Compose expand them);
  *   on an `export` line also an unquoted `{`: bash brace-expands the argument of `export`
  *   (`export K={a,b}` runs `export K=a K=b`, so K=b), which a plain `K={a,b}` assignment never does
- * - `backslash`: a backslash outside single quotes
+ * - `backslash`: a backslash outside single quotes, or an odd run of backslashes right before a closing
+ *   single quote (Compose reads `\'` as an escaped quote and runs past it; bash ends the value there)
  * - `unbalanced-quote`: a quote that is not closed on the line
  * - `stray-quote`: a quote inside an unquoted value, or text right after a closing quote
  * - `space`: a white-space character other than space and tab in an unquoted value (U+3000 from a
@@ -69,7 +70,15 @@ function readValue(raw, exported) {
     let value = '';
     if (first === "'") {
       end = raw.indexOf("'", 1);
-      if (end > 0) value = raw.slice(1, end);
+      if (end > 0) {
+        value = raw.slice(1, end);
+        // Compose (compose-go) reads `\'` inside single quotes as an escaped quote and keeps every other
+        // backslash as written; bash ends the value at the first `'`. So an odd run of backslashes right
+        // before the closing quote makes Compose run past it (`unterminated quoted value`, printed with the
+        // value), while bash reads the value fine (final review, finding 1).
+        const trailing = /\\*$/.exec(value);
+        if (trailing && trailing[0].length % 2 === 1) kinds.add('backslash');
+      }
     } else {
       for (let i = 1; i < raw.length; i += 1) {
         const ch = raw[i];

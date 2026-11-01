@@ -409,6 +409,16 @@ describe('T4: the parser reads what bash would, and flags what bash would run, e
     assert.deepEqual(of(found, 'A5').map((f) => [f.level, f.file, f.names]), [['E', 'stack.env', ['LLM_MOCK_FALLBACK']]]);
   });
 
+  // Final review, finding 1: Compose reads `\'` inside single quotes as an escaped quote, so an odd run
+  // of backslashes before the closing quote runs past it (and prints the value); bash ends the value there.
+  it('an odd run of backslashes right before a closing single quote is backslash (Compose runs past the quote); an even run or one inside is not', () => {
+    for (const line of ["K='a\\'", "K='\\'", "K='a\\\\\\'", "K='a\\' # c"]) assert.deepEqual(kinds(`${line}\n`), ['backslash'], JSON.stringify(line));
+    for (const line of ["K='a\\\\'", "K='a\\b'", "K='\\\\'"]) assert.deepEqual(kinds(`${line}\n`), [], JSON.stringify(line));
+    assert.ok(ERROR_KINDS.includes('backslash'));
+    const found = checkStack(buildInput('pilot', { stack: { ORIGIN_SECRET: `'${'o'.repeat(40)}\\'` } }));
+    assert.deepEqual(of(found, 'A5').map((f) => [f.level, f.file, f.names]), [['E', 'stack.env', ['ORIGIN_SECRET']]]);
+  });
+
   // What Compose (v5.6.0, `docker compose config` with this file as env_file; review round 1) gives the
   // container for each unquoted or quoted value: trailing Unicode White_Space trimmed from unquoted
   // values only. Either the parser reports an error kind, or it reads exactly Compose's value.
@@ -423,11 +433,20 @@ describe('T4: the parser reads what bash would, and flags what bash would run, e
       [' #x', '#x'], ['\t#x', '#x'], [' # c', '# c'], ['  #', '#'], ['v\t#x', 'v\t#x'], ['v \t#x', 'v \t#x'], ['v\t#x #y', 'v\t#x'],
       ['true\t# c', 'true\t# c'], ['false\t#x', 'false\t#x'], ['v\t#', 'v\t#'], ['v #x', 'v'], ['v\t #x', 'v'], ['v  #x', 'v'],
       ['v #x #y', 'v'], ['v #', 'v'], ['#x', '#x'], ['v#x', 'v#x'], ['"a"\t#x', 'a'], ['"a" #x', 'a'], ["'a'\t#x", 'a'], [' ', ''], ['\t', ''],
+      // Final review, finding 1: an even run of backslashes before the closing single quote, or one inside it.
+      ["'a\\\\'", 'a\\\\'], ["'a\\b'", 'a\\b'],
     ];
     for (const [value, compose] of table) {
       const parsed = parseEnvText(`K=${value}\n`);
       const flagged = parsed.problems.some((p) => ERROR_KINDS.includes(p.kind));
       assert.ok(flagged || entryMap(parsed.entries).get('K') === compose, JSON.stringify(value));
+    }
+    // Files Compose v5.6.0 refuses (`unterminated quoted value …` or `unexpected character "'" in variable
+    // name …`, each printing a value; final review, finding 1): the parser must report an error kind.
+    const rejected = ["K='a\\'\nB=x\n", "K='\\'\n", "K='a\\'\nB='xyz'\n", "K='a\\\\\\'\n", "K='a\\' # c\n"];
+    for (const text of rejected) {
+      const parsed = parseEnvText(text);
+      assert.ok(parsed.problems.some((p) => ERROR_KINDS.includes(p.kind)), `Compose fails on ${JSON.stringify(text)}, the parser must report an error`);
     }
   });
 
@@ -444,6 +463,8 @@ describe('T4: the parser reads what bash would, and flags what bash would run, e
       'export K={a,b}', 'export K=x{1..2}', 'export K={a}', 'K={a,b}', "export K='{a,b}'", 'export K=*', 'K=*',
       // Review round 3, finding 2: a comment after white space.
       'K= #x', 'K=\t#x', 'K=v\t#x', 'K=v\t #x', 'K=v #x #y', 'K="a"\t#x',
+      // Final review, finding 1: bash reads these; the parser flags the first two (Compose runs past the quote).
+      "K='a\\'", "K='\\'", "K='a\\\\'",
     ];
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-parity-'));
     try {
@@ -652,6 +673,19 @@ describe('T5: the launch record', () => {
     assert.deepEqual(codeAt('pilot', { facts: { backupKeyId: 'fedcba9876543210' } }, 'R4')[0].names, ['BACKUP_KEY_ID']);
     assert.equal(codeAt('pilot', { facts: { backupKeyId: '' } }, 'R4').length, 0, 'no backup yet: nothing to compare (R1 speaks)');
     assert.deepEqual(codeAt('pilot', { record: { BACKUP_KEY_COPY: '', BACKUP_KEY_ID: '' } }, 'R4')[0].names, ['BACKUP_KEY_COPY', 'BACKUP_KEY_ID']);
+  });
+  // Final review, finding 6: restore-db.sh's RS0 (preflight.sh --for-restore) must pass at public with an old drill or none
+  // (a drill cannot pass while backups have stopped); a deploy or a standalone check still stops at public.
+  it('R3 for a restore (from: restore) is a warning at every stage but setup, old or missing; otherwise unchanged; the facts accept only the three froms', () => {
+    const old = new Date(NOW.getTime() - 36 * 24 * 3600_000).toISOString();
+    const levels = (/** @type {Record<string, unknown>} */ facts) => STAGES.map((stage) => codeAt(stage, { facts }, 'R3').map((f) => f.level).join(''));
+    assert.deepEqual(levels({ drillLastOk: old, from: 'restore' }), ['', 'W', 'W', 'W']);
+    assert.deepEqual(levels({ drillLastOk: '', from: 'restore' }), ['', 'W', 'W', 'W']);
+    assert.deepEqual(levels({ drillLastOk: old, from: 'standalone' }), ['', 'W', 'W', 'E']);
+    assert.deepEqual(levels({ drillLastOk: old, from: 'deploy' }), ['', 'W', 'W', 'E']);
+    assert.deepEqual(levels({ drillLastOk: '', from: 'deploy' }), ['', 'E', 'E', 'E']);
+    for (const from of ['deploy', 'standalone', 'restore']) assert.ok(validateFacts({ ...baseFacts(), from }), from);
+    for (const from of ['', 'Restore', 'other']) assert.ok(!validateFacts({ ...baseFacts(), from }), from);
   });
   it('V3: protection off at public, on or after the day it went on (the order rule ON ≤ OFF), both ways', () => {
     assert.deepEqual(codeAt('public', { record: { VERCEL_PROTECTION_ON: '2026-11-03', VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V3')[0].names, ['VERCEL_PROTECTION_ON', 'VERCEL_PROTECTION_OFF']);

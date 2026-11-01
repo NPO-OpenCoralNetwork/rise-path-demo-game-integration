@@ -10,6 +10,7 @@ import {
     getUserOnce,
     OAUTH_CLIENT_TOKEN_REFUSAL,
     readSessionAccountStateOnce,
+    refusePilotSession,
     syncAuthUserStubOnce,
 } from './auth.js';
 import { allowDevAuthFallback } from './authPolicy.js';
@@ -17,7 +18,7 @@ import { isAuthUnavailable } from '../../tools/core/authUnavailable.js';
 import { isOAuthClientToken } from '../../tools/core/oauthToken.js';
 import { sameSecret } from '../../tools/core/sameSecret.js';
 import { termsGateStep } from './termsGate.js';
-import { PILOT_ONLY_REFUSAL, pilotRefuses } from './pilotGate.js';
+import { pilotRefuses } from './pilotGate.js';
 
 const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -106,8 +107,9 @@ export const requireBridgeOrAuth = async (req, res, next) => {
             // Supabase Auth did not answer: 503, as when the account check cannot run below.
             if (authUnavailable) return res.status(503).json(AUTH_UNAVAILABLE);
             if (user) {
-                // Phase 9 (D1): the pilot list, before anything is read or written for this account.
-                if (pilotRefuses({ id: user.id, isAnonymous: user.is_anonymous === true })) return res.status(403).json(PILOT_ONLY_REFUSAL);
+                // Phase 9 (D1): the pilot list, before anything is written for this account (a session older
+                // than its account's deletion still hears 401 account_deleted: refusePilotSession).
+                if (pilotRefuses({ id: user.id, isAnonymous: user.is_anonymous === true })) return refusePilotSession(res, token, user.id);
                 let account;
                 try {
                     account = await readSessionAccountStateOnce(req, token, user.id);

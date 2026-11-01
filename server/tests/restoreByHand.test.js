@@ -23,7 +23,7 @@ const step = (n) => SECTION.slice(SECTION.indexOf(`\n${n}. **`), n < 5 ? SECTION
 /** The `code` spans of a text, in order. @param {string} text */
 const spans = (text) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
 
-/** The RS8 lines the README points at: from `FROM_STAMP=` to the `読んだ記録:` echo, as restore-db.sh has them. */
+/** The lines the README points at (RS8's input, collected at the end of RS4): from `FROM_STAMP=` to the `読んだ記録:` echo, as restore-db.sh has them. */
 function rs8Lines(/** @type {string} */ script) {
   const lines = script.split('\n');
   const from = lines.findIndex((l) => l.startsWith('FROM_STAMP='));
@@ -113,7 +113,7 @@ describe('step 1: the README\'s commands rebuild RS8\'s journal (stub harness)',
     fs.writeFileSync(path.join(h.stack, 'scripts/byhand.sh'), script, { mode: 0o755 });
     const r = await h.run('byhand.sh');
     assert.equal(r.status, 0, r.out);
-    assert.match(r.out, /読んだ記録: 戻す前の書き出しから 1、バケットから 1/u);
+    assert.match(r.out, /読んだ記録: 戻す前の書き出しから 1、VM の 1 時間ごとの記録から 0、バケットから 1/u);
     const tmp = r.stdout.trim().split('\n').at(-1) ?? '';
     assert.ok(tmp.startsWith(path.join(h.root, 'run/risepath-backup.')), tmp);
     const all = fs.readFileSync(path.join(tmp, 'journal.csv'), 'utf8');

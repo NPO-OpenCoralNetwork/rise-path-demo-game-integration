@@ -218,7 +218,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 - [ ] TTS の音声が再生できる（`/audio/cache/...` が routes を通る）
 - [ ] AI の画像生成は止まっている（`GEMINI_ALLOWED` を設定しない既定。`/api/v2/image` は 503 `image_generation_unavailable` を返す）。`GEMINI_ALLOWED=true` にした環境でだけ、生成した画像が表示されるか（`/generated/img_...`）を見る
 - [ ] 画面に浮かぶ AI コーチ（共有の Hermes）が出ない（`VITE_FEATURE_AGENT_CHAT` を設定しない既定）。レッスンの AI チューターは使える
-- [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す
+- [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す（保護（All Deployments）をかけているあいだはできない。手順書 10.3 で smoke のあとにする）
 - [ ] 未成年の安全対策（Phase 0.5。手順は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md)）。テスト用のアカウントを 2 つ（18 歳以上と 18 歳未満）使う。本物の子どもの情報は使わない:
   - [ ] VM で migration 014 が当たっている（`deploy-stack.sh` の `db:migrate`）。`docker compose --env-file stack.env exec db psql -U risepath_app -d risepath -c '\d user_age'` で表が出る
   - [ ] ログインしていない状態で AI を呼ぶと 401 `sign_in_required` になる（`LLM_GUEST_AI` を設定しない既定）。`/api/v2/llm/status` は 200 のまま

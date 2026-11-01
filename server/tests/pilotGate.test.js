@@ -9,8 +9,10 @@
 //   - Checked: every Supabase session, an anonymous one included; never the bridge, the dev fallback or
 //     a guest. No exempt route (PUT /user/lesson-progress included). optionalAuth refuses with the same
 //     403, not the guest path.
-//   - A refused session leaves nothing in the database: no account-state read (so no re-open of a
-//     deleted account) and no auth.users stub.
+//   - A refused session leaves nothing in the database: no re-open of a deleted account, no auth.users
+//     stub, no transaction. requireAuth and requireBridgeOrAuth make one read-only tombstone lookup: a
+//     session that signed in before its account's deletion gets 401 account_deleted, as without the list
+//     (final review, finding 19); optionalAuth reads nothing.
 import { describe, it, before, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,6 +37,7 @@ const A = 'abcdef01-2345-4678-9abc-def012345678'; // on the list
 const B = 'bcdef012-3456-4789-8bcd-ef0123456789'; // not on the list
 const ANON = 'cdef0123-4567-489a-9bcd-ef0123456789'; // an anonymous Supabase user, listed
 const FORMER = 'def01234-5678-49ab-8cde-f01234567890'; // a former tester whose data was deleted, not on the list
+const FORMER_OLD = 'ef012345-6789-4abc-9def-012345678901'; // the same, a device still holding a session from before the deletion
 const ID = '11111111-2222-4000-8000-000000000001';
 
 // ---------------------------------------------------------------------------------------------
@@ -142,6 +145,10 @@ const token = (sub) => `${b64({ alg: 'ES256', kid: 'k1' })}.${b64({
 })}.c2ln`;
 /** @param {string} sub */
 const auth = (sub) => ({ Authorization: `Bearer ${token(sub)}` });
+/** A session token that signed in at signedInAt (epoch seconds). @param {string} sub @param {number} signedInAt */
+const authSignedInAt = (sub, signedInAt) => ({ Authorization: `Bearer ${b64({ alg: 'ES256', kid: 'k1' })}.${b64({
+  sub, aud: 'authenticated', role: 'authenticated', iat: nowS(), exp: 4_000_000_000, amr: [{ method: 'password', timestamp: signedInAt }],
+})}.c2ln` });
 const supabase = {
   auth: {
     getUser: async (/** @type {string} */ t) => {
@@ -231,6 +238,8 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
   const quiet = { log: console.log, warn: console.warn, error: console.error };
   /** Statements that name an account id (any parameter, any case). @param {string} id */
   const statementsFor = (id) => pool.queries.filter((q) => q.params.some((p) => typeof p === 'string' && p.toLowerCase() === id));
+  /** The same, without the read-only tombstone lookup of refusePilotSession (final review, finding 19). @param {string} id */
+  const writesFor = (id) => statementsFor(id).filter((q) => q.sql !== LEGAL_POOL_SQL.tombstone);
 
   beforeEach(() => {
     for (const key of ENV_KEYS) saved[key] = process.env[key];
@@ -240,10 +249,13 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
     process.env.KOKORO_TTS_URL = 'http://127.0.0.1:9';
     process.env[PILOT_ENV] = `${A},${ANON}`;
     // FORMER deleted their account (data deleted with scripts/delete-account-data.mjs) and signs in again.
-    pool = createLegalPool({ tombstones: { [FORMER]: { deletedAt: new Date(Date.now() - 86_400_000) } } });
+    pool = createLegalPool({ tombstones: {
+      [FORMER]: { deletedAt: new Date(Date.now() - 86_400_000) },
+      [FORMER_OLD]: { deletedAt: new Date(Date.now() - 86_400_000) },
+    } });
     setPoolForTests(pool);
     setSupabaseForTests(supabase);
-    for (const id of [A, B, ANON, FORMER]) invalidateTermsAcceptance(id);
+    for (const id of [A, B, ANON, FORMER, FORMER_OLD]) invalidateTermsAcceptance(id);
     console.log = () => {};
     console.warn = () => {};
     console.error = () => {};
@@ -259,14 +271,15 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
     resetPoolForTests();
   });
 
-  it('a session not on the list: 403 pilot_only on one route per kind of auth, and nothing read or written for it (no stub)', async () => {
+  it('a session not on the list: 403 pilot_only on one route per kind of auth, and nothing written for it (no stub)', async () => {
     await withServer(async (base) => {
       for (const [kind, method, url, body] of ROUTES) {
         const res = await call(base, /** @type {string} */ (method), /** @type {string} */ (url), { headers: auth(B), body });
         assert.deepEqual([res.status, res.json], [403, { ...PILOT_ONLY_REFUSAL }], `${kind}: ${method} ${url}`);
       }
     });
-    assert.deepEqual(statementsFor(B), [], 'no account-state read and no auth.users stub for a refused id');
+    assert.deepEqual(writesFor(B), [], 'no account-state write (re-open) and no auth.users stub for a refused id');
+    assert.equal(pool.connects, 0, 'no transaction was started');
     assert.equal(pool.state.stubs.has(B), false);
   });
 
@@ -282,7 +295,7 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
         assert.deepEqual([res.status, res.json?.error_type], [403, 'pilot_only'], `${method} ${url}`);
       }
     });
-    assert.deepEqual(statementsFor(B), []);
+    assert.deepEqual(writesFor(B), []);
   });
 
   it('a member passes every route (any other answer is fine) and gets its stub as before; an upper-case listing matches', async () => {
@@ -303,7 +316,7 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
         assert.deepEqual([res.status, res.json?.error_type], [403, 'pilot_only'], `anonymous ${kind}: ${method} ${url}`);
       }
     });
-    assert.deepEqual(statementsFor(ANON), []);
+    assert.deepEqual(writesFor(ANON), []);
   });
 
   it('a former tester whose data was deleted, off the list, signs in again: refused before the account check (no re-open, no stub)', async () => {
@@ -313,9 +326,44 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
         assert.deepEqual([res.status, res.json?.error_type], [403, 'pilot_only'], `${method} ${url}`);
       }
     });
-    assert.deepEqual(statementsFor(FORMER), [], 'no tombstone read, no re-open, no stub');
+    // Only the read-only tombstone lookup of requireAuth and requireBridgeOrAuth (refusePilotSession).
+    assert.deepEqual([...new Set(statementsFor(FORMER).map((q) => q.sql))], [LEGAL_POOL_SQL.tombstone], 'no write, no re-open, no stub');
     assert.equal(pool.state.tombstones.get(FORMER)?.reopened_at, null);
     assert.equal(pool.connects, 0, 'no transaction was started');
+  });
+
+  // Final review, finding 19: the owner takes a tester off the list, deploys, then staff delete their data
+  // (runbook 10.4 step 6). A device still holding the tester's old session must hear 401 account_deleted,
+  // as without the list, so the app forgets the account there and signs out (Phase 4 §5.11).
+  it('a former tester\'s session from before the deletion, off the list: 401 account_deleted (requireAuth, requireBridgeOrAuth), read only', async () => {
+    const before = nowS() - 2 * 86_400;
+    await withServer(async (base) => {
+      for (const [, method, url, body] of [ROUTES[0], ROUTES[3], ROUTES[9], ROUTES[10]]) {
+        const res = await call(base, /** @type {string} */ (method), /** @type {string} */ (url), { headers: authSignedInAt(FORMER_OLD, before), body });
+        assert.deepEqual([res.status, res.json?.error_type], [401, 'account_deleted'], `${method} ${url}`);
+      }
+      // optionalAuth keeps the plain 403 (it never answered 401 account_deleted).
+      const [, method, url, body] = ROUTES[8];
+      const res = await call(base, /** @type {string} */ (method), /** @type {string} */ (url), { headers: authSignedInAt(FORMER_OLD, before), body });
+      assert.deepEqual([res.status, res.json?.error_type], [403, 'pilot_only']);
+      // The same account, signed in after the deletion: still 403 pilot_only (never the deleted page in a loop).
+      const fresh = await call(base, 'GET', '/api/v2/user/achievements', { headers: auth(FORMER_OLD) });
+      assert.deepEqual([fresh.status, fresh.json?.error_type], [403, 'pilot_only']);
+    });
+    assert.deepEqual([...new Set(statementsFor(FORMER_OLD).map((q) => q.sql))], [LEGAL_POOL_SQL.tombstone], 'only the tombstone read: no write, no re-open, no stub');
+    assert.equal(pool.state.tombstones.get(FORMER_OLD)?.reopened_at, null);
+    assert.equal(pool.connects, 0, 'no transaction was started');
+  });
+
+  it('a database error during that lookup answers 403 pilot_only (fail closed, nothing written)', async () => {
+    const failing = createLegalPool({ tombstones: { [FORMER_OLD]: { deletedAt: new Date(Date.now() - 86_400_000) } } });
+    failing.onStatement('tombstone', () => { throw new Error('db down'); });
+    setPoolForTests(failing);
+    await withServer(async (base) => {
+      const res = await call(base, 'GET', '/api/v2/user/achievements', { headers: authSignedInAt(FORMER_OLD, nowS() - 2 * 86_400) });
+      assert.deepEqual([res.status, res.json?.error_type], [403, 'pilot_only']);
+    });
+    assert.equal(failing.connects, 0);
   });
 
   it('fail closed: a list with no valid id refuses every session', async () => {
@@ -328,7 +376,7 @@ describe('the pilot list on the server.js stack (requireAuth, optionalAuth, requ
         }
       });
     }
-    assert.deepEqual(statementsFor(A), []);
+    assert.deepEqual(writesFor(A), []);
   });
 
   it('never checked: the bridge token, the dev fallback and guests, while the list is on', async () => {
@@ -376,14 +424,18 @@ describe('where the three middlewares ask the list (static)', () => {
   it('right after Supabase named the user and before the account check, in requireAuth, optionalAuth and requireBridgeOrAuth', () => {
     const authCode = read('server/middleware/auth.js');
     const bridgeCode = read('server/middleware/bridgeAuth.js');
-    const check = /if \(pilotRefuses\(\{ id: (?:data\.user|user)\.id, isAnonymous: (?:data\.user|user)\.is_anonymous === true \}\)\) return res\.status\(403\)\.json\(PILOT_ONLY_REFUSAL\);/g;
+    // requireAuth and requireBridgeOrAuth answer through refusePilotSession (read only: 401 account_deleted for
+    // a session older than the deletion, else 403); optionalAuth with the plain 403 (final review, finding 19).
+    const check = /if \(pilotRefuses\(\{ id: (?:data\.user|user)\.id, isAnonymous: (?:data\.user|user)\.is_anonymous === true \}\)\) return (?:res\.status\(403\)\.json\(PILOT_ONLY_REFUSAL\)|refusePilotSession\(res, token, (?:data\.user|user)\.id\));/g;
     for (const [name, body] of [
       ['requireAuth', authCode.slice(authCode.indexOf('export const requireAuth'), authCode.indexOf('export const optionalAuth'))],
       ['optionalAuth', authCode.slice(authCode.indexOf('export const optionalAuth'))],
       ['requireBridgeOrAuth', bridgeCode.slice(bridgeCode.indexOf('export const requireBridgeOrAuth'))],
     ]) {
-      const at = [...body.matchAll(check)].map((m) => m.index);
+      const found = [...body.matchAll(check)];
+      const at = found.map((m) => m.index);
       assert.equal(at.length, 1, `${name}: one pilot check`);
+      assert.equal(found[0][0].includes('refusePilotSession('), name !== 'optionalAuth', `${name}: the answer`);
       const pilot = /** @type {number} */ (at[0]);
       assert.ok(pilot > body.indexOf('getUserOnce('), `${name}: after Supabase named the user`);
       assert.ok(pilot < body.indexOf('readSessionAccountStateOnce('), `${name}: before the account check (no re-open)`);
@@ -573,10 +625,114 @@ describe('the app: the pilot_only notice', () => {
     assert.match(code, /const pilotRefused = useSyncExternalStore\(subscribePilotRefusal, pilotRefusedUserId, \(\) => null\);/);
     assert.match(code, /const pilotOnly = isLoggedIn && !user\?\.isGuest && pilotRefused !== null && pilotRefused === user\?\.id;/);
     const ret = code.slice(code.indexOf('{authLoading ? ('));
-    const notice = ret.indexOf(') : pilotOnly ? (\n        <PilotOnlyView onSignOut={handleLogout} />');
+    const notice = ret.indexOf(') : pilotOnly ? (\n        <PilotOnlyView onSignOut={handlePilotSignOut} />');
     assert.ok(notice > 0, 'the branch');
     assert.ok(notice < ret.indexOf("legal.status === 'needed'"), 'before the consent page');
     assert.ok(notice < ret.indexOf('consentPath ?'), 'before the AI-app consent page');
+  });
+
+  // Final review, finding 2: everyone the page refuses is an account of Nexloom or P-School on the shared
+  // project; its sign-out must end only this browser's session (auth-js scope 'local'), never theirs elsewhere.
+  it('App.tsx: the page\'s sign-out is the logout with scope \'local\' (handlePilotSignOut), not the app-wide handleLogout', () => {
+    const code = read('App.tsx');
+    const fn = code.slice(code.indexOf('const handlePilotSignOut = () => {'));
+    assert.ok(code.includes('const handlePilotSignOut = () => {'), 'the handler');
+    assert.match(fn.slice(0, fn.indexOf('\n  };')), /^const handlePilotSignOut = \(\) => \{\s*\n\s*logout\(\{ scope: 'local' \}\)\s*\.then\(\(done\) => \{ if \(done !== false\) navigate\('\/', \{ replace: true \}\); \}\)/);
+    assert.doesNotMatch(code, /<PilotOnlyView onSignOut=\{handleLogout\}/);
+  });
+});
+
+describe('AuthContext.logout: the sign-out scope (bundled; final review, finding 2)', () => {
+  /** @type {any} */
+  let authMod;
+  const STUBS = {
+    react: `
+      export const useState = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}];
+      export const useEffect = () => {};
+      export const useCallback = (fn) => fn;
+      export const createContext = () => ({ Provider: 'Provider' });
+      export const useContext = () => null;
+      export default { useState, useEffect, useCallback, createContext, useContext };
+    `,
+    'react/jsx-runtime': "export const jsx = (type, props) => ({ type, props }); export const jsxs = jsx; export const Fragment = 'Fragment';",
+    supabase: `
+      export const getSupabaseClient = () => globalThis.__main ?? null;
+      export const getNexloomSupabaseClient = () => globalThis.__nexloom ?? null;
+      export const isSupabaseConfigured = () => true;
+      export const createReauthClient = () => null;
+    `,
+    quiet: `
+      export const hydrateFromApi = async () => {}; export const hydrateNotifications = async () => {};
+      export const clearUserProfileCache = () => {}; export const clearSharedDeviceAiData = () => {};
+      export const forgetDeletedAccountOnDevice = () => {}; export const signOutThisBrowser = async () => {};
+      export const apiPut = async () => ({}); export const setAuthProvider = () => {};
+      export const forgetProgressAccount = () => {}; export const progressChoicePending = () => false;
+      export const signInProgressSync = () => {}; export const signOutProgressSync = async () => {};
+      export const stopProgressSync = () => {}; export const whenAccountKnown = async () => 'known';
+      export const syncedLearnerId = () => null;
+      export const confirmUnsavedLearning = async () => true; export const endUnsavedLearningQuestion = () => {};
+    `,
+  };
+  before(async () => {
+    const result = await build({
+      stdin: { contents: "export { AuthProvider } from './context/AuthContext';", resolveDir: ROOT, loader: 'tsx' },
+      bundle: true,
+      write: false,
+      format: 'esm',
+      platform: 'browser',
+      jsx: 'automatic',
+      define: { 'import.meta.env': JSON.stringify({ PROD: true }) },
+      plugins: [{
+        name: 'stubs',
+        setup(b) {
+          const stub = (/** @type {RegExp} */ filter, /** @type {string} */ name) => b.onResolve({ filter }, () => ({ path: name, namespace: 'stub' }));
+          stub(/^react$/, 'react');
+          stub(/^react\/jsx-runtime$/, 'react/jsx-runtime');
+          stub(/supabaseClient$/, 'supabase');
+          stub(/services\/(progressService|notificationService|userProfileService|sharedDeviceData|accountDeviceData|apiClient)$/, 'quiet');
+          stub(/lesson\/progressSyncClient$/, 'quiet');
+          stub(/lesson\/logoutGuard$/, 'quiet');
+          b.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({ contents: /** @type {Record<string, string>} */ (STUBS)[args.path], loader: 'js', resolveDir: ROOT }));
+        },
+      }],
+      logLevel: 'silent',
+    });
+    authMod = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+  });
+
+  /** @param {(logout: (options?: object) => Promise<boolean>) => Promise<void>} run */
+  async function withClients(run) {
+    /** @type {{ client: string, args: unknown[] }[]} */
+    const calls = [];
+    const client = (/** @type {string} */ name) => ({ auth: { signOut: async (/** @type {unknown[]} */ ...args) => { calls.push({ client: name, args }); return { error: null }; } } });
+    const g = /** @type {any} */ (globalThis);
+    g.__main = client('primary');
+    g.__nexloom = client('nexloom');
+    g.localStorage = { removeItem() {}, getItem: () => null, setItem() {} };
+    try {
+      const { logout } = authMod.AuthProvider({ children: null }).props.value;
+      await run(logout);
+    } finally {
+      delete g.__main;
+      delete g.__nexloom;
+      delete g.localStorage;
+    }
+    return calls;
+  }
+
+  it('scope \'local\': both clients sign out with { scope: \'local\' } (never the global default)', async () => {
+    const calls = await withClients(async (logout) => { assert.equal(await logout({ scope: 'local' }), true); });
+    assert.deepEqual(calls.map((c) => c.client).sort(), ['nexloom', 'primary']);
+    for (const call of calls) assert.deepEqual(call.args, [{ scope: 'local' }], call.client);
+  });
+
+  it('no options (the app-wide logout): unchanged, auth-js\'s own default', async () => {
+    const calls = await withClients(async (logout) => { assert.equal(await logout(), true); });
+    assert.equal(calls.length, 2);
+    for (const call of calls) assert.equal(call.args[0], undefined, call.client);
+    const reauth = await withClients(async (logout) => { assert.equal(await logout({ reason: 'reauth' }), true); });
+    assert.equal(reauth.length, 2);
+    for (const call of reauth) assert.equal(call.args[0], undefined, call.client);
   });
 });
 
