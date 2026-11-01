@@ -319,3 +319,62 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
   }
   return { verdict: 'accept', bornAt };
 }
+
+/**
+ * @typedef {'not_in_session' | 'cap_reached' | 'starting' | 'gap' | 'focus' | 'idle' | 'other_tab'} StudyReason
+ */
+
+/**
+ * Why a page's time is not counting, judged right after its signal at `now` was stored (the answer
+ * to that signal; the counting above is unchanged and decides the numbers). It judges the last
+ * counted millisecond of the page's last pair, x = prevAt + min(now - prevAt, creditCapMs) - 1, as
+ * countSpan counts it, with each other open page's time since its last signal (not stored yet, but
+ * it will be) as a pending signal at `now` without input. First match:
+ *   'not_in_session' now is outside the cohort's dates (a known chain's signal after the last day):
+ *                    nothing counts;
+ *   'cap_reached'    the unit's counted time reached its set time: nothing more of it counts;
+ *   'starting'       the chain's first signal: no pair yet;
+ *   'gap'            the last pair is a break (longer than gapMs);
+ *   null             counting: the unit gets x (from this page, or another page of the same unit);
+ *   'focus'          requireFocus, and the page had no focus;
+ *   'starting'       no input of this page covers x, and this signal brings one (it counts from now);
+ *   'idle'           no input of this page covers x (the learner did not act within idleMs);
+ *   'other_tab'      another page of another unit wins x (overlap), or both lose (drop_conflicts).
+ * @param {{
+ *   now: number,
+ *   chain: { id: string, unit: string, prevAt: number | null },
+ *   signal: { focus: boolean, input: boolean },
+ *   signals: Signal[],
+ *   counting: CountingRules,
+ *   setMs: number,
+ *   unitMs: number,
+ *   cohort: Range | null,
+ * }} input chain: this page's chain, prevAt its previous stored signal (null for seq 0); signals: the
+ *   learner's stored evidence in the cohort up to now (this signal included); setMs: the unit's set
+ *   time today; unitMs: its counted time through now (closed days and the live ones)
+ * @returns {StudyReason | null}
+ */
+export function studyReason({ now, chain, signal, signals, counting, setMs, unitMs, cohort }) {
+  if (!cohort || now < cohort.from || now >= cohort.to) return 'not_in_session';
+  if (unitMs >= setMs) return 'cap_reached';
+  if (chain.prevAt === null) return 'starting';
+  const delta = now - chain.prevAt;
+  if (delta > counting.gapMs) return 'gap';
+  const x = chain.prevAt + Math.min(delta, counting.creditCapMs) - 1;
+  /** @type {Map<string, Signal>} */
+  const last = new Map();
+  for (const s of signals) {
+    const seen = last.get(s.chain);
+    if (!seen || s.seq > seen.seq) last.set(s.chain, s);
+  }
+  const pending = [...last.values()]
+    .filter((l) => l.chain !== chain.id && !l.stop && l.at < now && now - l.at <= counting.gapMs)
+    .map((l) => ({ ...l, seq: l.seq + 1, at: now, stop: false, input: false }));
+  const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting }, setMs: new Map(), carriedMs: new Map(), cohort });
+  const mine = at.units.find((u) => u.unit === chain.unit);
+  if (mine && mine.countedMs + mine.overCapMs === 1) return null;
+  if (counting.requireFocus && !signal.focus) return 'focus';
+  const present = signals.some((s) => s.chain === chain.id && s.input && s.at <= x && x < s.at + counting.idleMs);
+  if (!present) return signal.input ? 'starting' : 'idle';
+  return 'other_tab';
+}

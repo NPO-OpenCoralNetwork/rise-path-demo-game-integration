@@ -24,7 +24,8 @@
  *                 added.
  * --show          the cohort's settings (versions by sha256), or one learner's closed days and units.
  * --close         closes the final days of every learner of the cohort (or one), each in its own
- *                 transaction; the api closes them too once the signals arrive (part 2b).
+ *                 transaction. The api closes a learner's final days too, when the learner's page
+ *                 sends a signal or reads its study time; this closes those of pages that stopped.
  * --stats         the cohort's row counts (marked rows of deleted accounts too) and its last closed day.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack

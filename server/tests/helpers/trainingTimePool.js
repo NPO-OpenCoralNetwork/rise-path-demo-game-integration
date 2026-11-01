@@ -1,12 +1,15 @@
 // @ts-check
 /**
  * An in-memory stand-in for the study time tables (server/migrations/022_training_study_time.sql)
- * and what tools/core/trainingTime.js reads of 018 and 021 (auth.users stubs, cohorts,
+ * and what tools/core/trainingTime.js reads of 018 and 021 (auth.users stubs, tombstones, cohorts,
  * memberships). It answers the module's own statements (TRAINING_TIME_SQL, and TRAINING_SQL's
- * locks and cohort read) the way PostgreSQL would, with a clock the test sets (now() and
+ * locks, cohort and membership reads and tombstone read) and the two requireAuth sends for a session
+ * (AUTH_SQL: the tombstone read, and the stub insert with migration 018's rule: no stub for a deleted
+ * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN snapshots,
- * ROLLBACK restores). Any other statement throws, so a changed query fails loudly; the SQL itself
- * runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file (npm test runs *.test.js).
+ * ROLLBACK restores; beginRead also refuses writes, 25006). Any other statement throws, so a changed
+ * query fails loudly; the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a
+ * test file (npm test runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
@@ -20,18 +23,34 @@ const result = (rows) => ({ rowCount: rows.length, rows });
 /** A PostgreSQL error with its SQLSTATE. @param {string} code @param {string} message */
 const pgError = (code, message) => Object.assign(new Error(message), { code });
 
+/** What requireAuth sends for a session, exactly (tools/core/accountDeletions.js readAccountState, server/db.js ensureAuthUser). */
+export const AUTH_SQL = Object.freeze({
+    tombstone: 'SELECT deleted_at, reopened_at FROM account_deletions WHERE user_id = $1::uuid',
+    stubInsert: 'INSERT INTO auth.users (id) VALUES ($1::uuid) ON CONFLICT (id) DO NOTHING',
+});
+
+/** Statements that write (refused, 25006, inside beginRead). @type {Set<string>} */
+const WRITES = new Set([
+    TRAINING_TIME_SQL.insertCatalog, TRAINING_TIME_SQL.insertRules, TRAINING_TIME_SQL.insertSetting, TRAINING_TIME_SQL.insertDays,
+    TRAINING_TIME_SQL.insertUnitDays, TRAINING_TIME_SQL.insertStream, TRAINING_TIME_SQL.insertSignal, AUTH_SQL.stubInsert,
+]);
+
 /**
  * @typedef {{ id: string, slug: string, name: string, starts_on: string | null, ends_on: string | null }} Cohort
  * @typedef {{ user_id: string, cohort_id: string, role: string, added_at: number, account_deleted_at: number | null }} Membership
  */
 
 /**
- * @param {{ clock?: number, stubs?: string[], cohorts?: Cohort[], memberships?: Array<Partial<Membership> & { user_id: string, cohort_id: string }> }} [seed]
+ * @param {{ clock?: number, stubs?: string[], cohorts?: Cohort[], memberships?: Array<Partial<Membership> & { user_id: string, cohort_id: string }>,
+ *   tombstones?: Record<string, { deletedAt: number, reopenedAt?: number | null }> }} [seed]
+ *   tombstones: account_deletions rows by account id (times in epoch ms)
  */
 export function createTrainingTimePool(seed = {}) {
     let state = {
         clock: seed.clock ?? Date.UTC(2026, 10, 10, 3, 0, 0),
         stubs: [...(seed.stubs ?? [])],
+        /** @type {Map<string, { deleted_at: number, reopened_at: number | null }>} */
+        tombstones: new Map(Object.entries(seed.tombstones ?? {}).map(([user, t]) => [user, { deleted_at: t.deletedAt, reopened_at: t.reopenedAt ?? null }])),
         cohorts: (seed.cohorts ?? []).map((c) => ({ ...c })),
         /** @type {Membership[]} */
         memberships: (seed.memberships ?? []).map((m) => ({ role: 'learner', added_at: Date.UTC(2026, 9, 1), account_deleted_at: null, ...m })),
@@ -46,6 +65,7 @@ export function createTrainingTimePool(seed = {}) {
     };
     /** @type {typeof state | null} */
     let snapshot = null;
+    let readOnly = false;
     /** @type {{ sql: string, params: unknown[], tx: boolean }[]} */
     const queries = [];
     /** @type {{ sql: string, error: any }[]} */
@@ -74,18 +94,67 @@ export function createTrainingTimePool(seed = {}) {
         for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
         const failure = failures.find((f) => f.sql === sql);
         if (failure) throw failure.error;
+        if (readOnly && WRITES.has(sql)) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
         const [p1, p2] = params;
         switch (sql) {
             case 'BEGIN':
+            case TRAINING_TIME_SQL.beginRead:
                 snapshot = structuredClone(state);
+                readOnly = sql === TRAINING_TIME_SQL.beginRead;
                 return result([]);
             case 'COMMIT':
                 snapshot = null;
+                readOnly = false;
                 return result([]);
             case 'ROLLBACK':
                 if (snapshot) state = snapshot;
                 snapshot = null;
+                readOnly = false;
                 return result([]);
+            case AUTH_SQL.tombstone: {
+                const t = state.tombstones.get(String(p1).toLowerCase());
+                return result(t ? [{ deleted_at: new Date(t.deleted_at), reopened_at: t.reopened_at === null ? null : new Date(t.reopened_at) }] : []);
+            }
+            case AUTH_SQL.stubInsert: {
+                // $1::uuid: stored lower case. Migration 018's trigger: no stub for a deleted id until it is re-opened.
+                const user = String(p1).toLowerCase();
+                const t = state.tombstones.get(user);
+                if ((t && t.reopened_at === null) || state.stubs.includes(user)) return result([]);
+                state.stubs.push(user);
+                return { rowCount: 1, rows: [] };
+            }
+            case TRAINING_SQL.deletedAccount: {
+                const t = state.tombstones.get(String(p1));
+                return result(t && t.reopened_at === null ? [{ '?column?': 1 }] : []);
+            }
+            case TRAINING_SQL.liveMember:
+                return result(state.memberships.filter((m) => m.user_id === p1 && m.cohort_id === p2 && m.account_deleted_at === null).map((m) => ({ role: m.role })));
+            case TRAINING_TIME_SQL.signalState:
+                return result([signalStateOf(String(p1), String(p2), String(params[2]), String(params[3]))]);
+            case TRAINING_TIME_SQL.insertStream: {
+                const [user, cohort, unit, chain, bornIso, atIso] = params;
+                if (!state.stubs.includes(String(user))) return result([]);
+                const startedAt = Date.parse(String(atIso));
+                const born = Date.parse(String(bornIso));
+                const day = jstDayOf(startedAt);
+                // ON CONFLICT (user_id, chain_id, day) WHERE account_deleted_at IS NULL DO NOTHING
+                if (state.streams.some((s) => s.user_id === user && s.chain_id === chain && s.day === day && s.account_deleted_at === null)) return result([]);
+                if (!(born <= startedAt) || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(String(unit))) throw pgError('23514', 'new row for relation "training_time_streams" violates check constraint');
+                if (!state.cohorts.some((c) => c.id === cohort)) throw pgError('23503', 'training_time_streams_cohort_id_fkey');
+                state.streams.push({ id: id(), user_id: user, cohort_id: cohort, unit_key: unit, chain_id: chain, chain_started_at: born, day, started_at: startedAt, account_deleted_at: null });
+                return { rowCount: 1, rows: [] };
+            }
+            case TRAINING_TIME_SQL.insertSignal: {
+                const [user, chain, atIso, seq, flags] = params;
+                if (!state.stubs.includes(String(user))) return result([]);
+                const at = Date.parse(String(atIso));
+                const stream = state.streams.find((s) => s.user_id === user && s.chain_id === chain && s.day === jstDayOf(at) && s.account_deleted_at === null);
+                // ON CONFLICT (stream_id, seq) DO NOTHING
+                if (!stream || state.signals.some((g) => g.stream_id === stream.id && g.seq === seq)) return result([]);
+                if (!(Number.isInteger(seq) && seq >= 0) || !(Number.isInteger(flags) && flags >= 0 && flags <= 7)) throw pgError('23514', 'new row for relation "training_time_signals" violates check constraint');
+                state.signals.push({ stream_id: stream.id, received_at: at, seq, flags });
+                return result([{ seq }]);
+            }
             case TRAINING_SQL.lockTimeout:
             case TRAINING_SQL.lock:
             case TRAINING_SQL.learnerLock:
@@ -241,6 +310,65 @@ export function createTrainingTimePool(seed = {}) {
     function settingsOf(cohort) {
         return state.settings.filter((s) => s.cohort_id === cohort).sort((x, y) => x.effective_from.localeCompare(y.effective_from) || Number(x.id) - Number(y.id));
     }
+    /** A live stream's last signal (the largest seq). @param {any} stream */
+    function lastSignalOf(stream) {
+        return state.signals.filter((g) => g.stream_id === stream.id).sort((x, y) => y.seq - x.seq)[0];
+    }
+    /**
+     * TRAINING_TIME_SQL.signalState: one row, with or without a cohort, from one clock reading
+     * (whole milliseconds). bigint columns as strings, as node-pg returns them.
+     * @param {string} user @param {string} cohortId @param {string} chainId @param {string} unit
+     */
+    function signalStateOf(user, cohortId, chainId, unit) {
+        const now = Math.floor(state.clock);
+        const today = jstDayOf(now);
+        const cohort = state.cohorts.find((c) => c.id === cohortId);
+        const member = cohort && state.memberships.find((m) => m.user_id === user && m.cohort_id === cohortId && m.account_deleted_at === null);
+        const settings = cohort ? settingsOf(cohortId) : [];
+        const current = settings.filter((s) => s.effective_from <= today).at(-1);
+        const live = state.streams.filter((s) => s.user_id === user && s.account_deleted_at === null);
+        /** The last signal of a chain over its live streams. @param {any[]} streams */
+        const lastOf = (streams) => {
+            /** @type {{ s: any, g: any } | null} */
+            let found = null;
+            for (const s of streams) {
+                const g = lastSignalOf(s);
+                if (g && (!found || g.seq > found.g.seq)) found = { s, g };
+            }
+            return found;
+        };
+        const ch = lastOf(live.filter((s) => s.chain_id === chainId));
+        const recent = live.filter((s) => cohort && s.cohort_id === cohortId && s.day >= previousDay(today));
+        const places = [...new Set(recent.map((s) => s.chain_id))].sort()
+            .map((chain) => lastOf(recent.filter((s) => s.chain_id === chain)))
+            .filter((p) => p !== null)
+            .map((p) => ({ chain_id: p.s.chain_id, born: p.s.chain_started_at, at: p.g.received_at, flags: p.g.flags }));
+        const closed = cohort && state.days
+            .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.kind === 'close' && d.account_deleted_at === null)
+            .sort((x, y) => y.day.localeCompare(x.day))[0];
+        const closedGap = closed ? state.rules.find((r) => r.id === closed.rule_set_id).params.counting.gapMs : null;
+        return {
+            now_ms: String(now),
+            stub: state.stubs.includes(user),
+            cohort_id: cohort?.id ?? null,
+            role: member?.role ?? null,
+            added_on: member ? jstDayOf(member.added_at) : null,
+            starts_on: cohort?.starts_on ?? null,
+            ends_on: cohort?.ends_on ?? null,
+            first_setting: settings[0]?.effective_from ?? null,
+            params: current ? structuredClone(state.rules.find((r) => r.id === current.rule_set_id).params) : null,
+            unit_known: current ? catalogOf(current).manifest.units.some((/** @type {any} */ u) => u.key === unit) : null,
+            chain_cohort_id: ch?.s.cohort_id ?? null,
+            chain_unit_key: ch?.s.unit_key ?? null,
+            chain_born: ch ? String(ch.s.chain_started_at) : null,
+            chain_seq: ch?.g.seq ?? null,
+            chain_at: ch ? String(ch.g.received_at) : null,
+            chain_flags: ch?.g.flags ?? null,
+            places,
+            last_closed: closed?.day ?? null,
+            closed_until_ms: closed ? String(jstDayRange(closed.day).end + closedGap) : null,
+        };
+    }
     /** @param {any} setting */
     function catalogOf(setting) {
         return state.catalogs.find((c) => c.id === setting.catalog_version_id);
@@ -261,6 +389,18 @@ export function createTrainingTimePool(seed = {}) {
         /** Run `run` (move the clock, add a row) just before each matching statement. @param {string} sql @param {() => void} run */
         before: (sql, run) => hooks.push({ sql, run }),
         /**
+         * An account deletion as the service commits it (server/services/accountDeletion.js): the
+         * tombstone, the marks on the account's memberships, streams and days, and no stub.
+         * @param {string} user @param {number} at
+         */
+        deleteAccount: (user, at) => {
+            state.tombstones.set(user, { deleted_at: at, reopened_at: null });
+            for (const rows of [state.memberships, state.streams, state.days]) {
+                for (const row of /** @type {any[]} */ (rows)) if (row.user_id === user && row.account_deleted_at === null) row.account_deleted_at = at;
+            }
+            state.stubs = state.stubs.filter((s) => s !== user);
+        },
+        /**
          * A setting as a row (bypassing the script's checks; set_at is given, so a past day is possible).
          * @param {{ cohortId: string, catalogId: string, ruleSetId: string, effectiveFrom: string }} s
          */
@@ -268,8 +408,10 @@ export function createTrainingTimePool(seed = {}) {
             state.settings.push({ id: id(), cohort_id: s.cohortId, catalog_version_id: s.catalogId, rule_set_id: s.ruleSetId, effective_from: s.effectiveFrom, set_at: new Date(Date.UTC(2026, 0, 1)), set_by: 'test', reason: 'test' });
         },
         /**
-         * A stored signal, as the write path of part 2b stores it: the stream row of the signal's
-         * Japan-time day (created by its first signal that day), then the narrow row.
+         * A stored signal at any instant (no lock, no admission: evidence for the tests), in the rows
+         * recordSignal writes (TRAINING_TIME_SQL.insertStream and insertSignal; a test compares them):
+         * the stream row of the signal's Japan-time day (created by its first signal that day), then
+         * the narrow row.
          * @param {{ userId: string, cohortId: string, unit: string, chain: string, born: number, seq: number, at: number, stop?: boolean, focus?: boolean, input?: boolean }} g
          */
         addSignal: (g) => {

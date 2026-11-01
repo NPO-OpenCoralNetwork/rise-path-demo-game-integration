@@ -11,9 +11,24 @@
  * never from a day before today, and once one is in effect, from tomorrow at the earliest; once
  * the cohort has evidence, only for the course in effect today. A new setting holds the cohort's
  * settings lock (TRAINING_TIME_SQL.settingsLock) exclusively and decides with one clock reading;
- * a close (and a signal, part 2b) holds it shared before it reads the clock and the day's setting,
- * so a day is counted with one setting. Nothing has a default: a day without a setting counts
- * nothing (D9). Nothing here returns or prints a rule value; the values go only to the counting.
+ * a close and a signal hold it shared before they read the clock and the day's setting, so a day
+ * is counted with one setting. Nothing has a default: a day without a setting counts nothing (D9).
+ * The rule values go only to the counting and to admitSignal; the one that leaves this module is
+ * the collection's beatMs: GET .../time names it while the cohort is in session, and a signal's
+ * answer gives it as nextInMs (or null: the page sends no more signals of that chain).
+ *
+ * A signal (recordSignal, POST .../time/signals): one short transaction under the account's shared
+ * lock, the learner's training lock and the cohort's settings lock shared (as a close, below), then
+ * one statement that reads the database clock once (whole milliseconds) and what admitSignal
+ * (shared/training/studyTime.js) decides with. An accepted signal is stored with that clock, only
+ * while the stub exists, in the stream row of its Japan-time day (a chain across 00:00 gets one row
+ * per day: closing reads a day's evidence from the streams of the days around it); a clock that
+ * went back into a closed day's evidence window stores nothing. Then, when a day may have become
+ * final, closeDays in its own transaction (if it fails, the signal stays stored), and the live
+ * values in one read-only snapshot.
+ *
+ * Live values (liveTime: GET .../time, and a signal's answer): the closed days' current rows, and
+ * the days not closed yet counted from the evidence with the function a close uses, never stored.
  *
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
@@ -25,14 +40,15 @@
  * close's clock commits after the close read the evidence) and the cohort's settings lock shared,
  * in that order, each its own statement, and only while the auth.users stub exists.
  *
- * Callers: scripts/training-time.mjs. Failures return { error, error_type } (tools/core/dbErrors.js),
- * never the driver's text.
+ * Callers: scripts/training-time.mjs and server/routes/trainingTime.js (used by
+ * server/routes/training.js). Failures return { error, error_type } (tools/core/dbErrors.js), never
+ * the driver's text.
  */
 import crypto from 'node:crypto';
 import { getPool } from '../../server/db.js';
 import { canonicalJson } from '../../shared/lesson/canonical.js';
-import { manifestCanonical, parseCourseManifest, setMsOf } from '../../shared/training/courseManifest.js';
-import { cohortRange, countDays, evidenceWindow, jstDayOf, jstDayRange, nextDay } from '../../shared/training/studyTime.js';
+import { TRAINING_KEY, manifestCanonical, parseCourseManifest, setMsOf } from '../../shared/training/courseManifest.js';
+import { admitSignal, cohortRange, countDays, evidenceWindow, jstDayOf, jstDayRange, nextDay, studyReason } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { canonicalUserId } from './accountDeletions.js';
 import { classifyDbError } from './dbErrors.js';
@@ -44,9 +60,16 @@ import { TRAINING_REQUESTS_PER_MINUTE, TRAINING_SQL } from './training.js';
 /** @typedef {import('./training.js').Queryable} Queryable */
 /** @typedef {import('../../shared/training/studyTime.js').Signal} Signal */
 /** @typedef {import('../../shared/training/studyTime.js').TimeRules} TimeRules */
+/** @typedef {import('../../shared/training/studyTime.js').StudyReason} StudyReason */
+/** @typedef {import('../../shared/training/courseManifest.js').CourseUnit} CourseUnit */
 /**
- * A cohort's setting, parsed: from which day it applies, its versions, the rules and each unit's set time.
- * @typedef {{ id: string, effectiveFrom: string, ruleSetId: string, catalogVersionId: string, rules: TimeRules, setMs: Map<string, number> }} Setting
+ * A cohort's setting, parsed: from which day it applies, its versions, the rules, its units (in the
+ * unit list's order, with their titles) and each unit's set time.
+ * @typedef {{ id: string, effectiveFrom: string, ruleSetId: string, catalogVersionId: string, rules: TimeRules, units: CourseUnit[], setMs: Map<string, number> }} Setting
+ */
+/**
+ * A signal as the page sends it (POST .../time/signals): exactly these keys, no time or duration.
+ * @typedef {{ unitKey: string, chainId: string, seq: number, stop: boolean, focus: boolean, input: boolean }} SignalBody
  */
 
 /** The flags of a stored signal (training_time_signals.flags). */
@@ -65,9 +88,9 @@ export const TRAINING_TIME_SQL = Object.freeze({
     // Cohorts are never deleted and their dates never change, so these are read before the lock.
     cohortForSetting: "SELECT id, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on FROM training_cohorts WHERE slug = $1",
     // A cohort's settings lock ($1 the cohort id): a new setting takes it exclusively before it reads
-    // the clock; a close (and a signal, part 2b) takes it shared before reading the clock and the day's
-    // setting. So a reader never misses a setting whose clock reading came before its own, and one
-    // day is counted with one setting. Taken after the learner's locks, never before them.
+    // the clock; a close and a signal take it shared before reading the clock and the day's setting.
+    // So a reader never misses a setting whose clock reading came before its own, and one day is
+    // counted with one setting. Taken after the learner's locks, never before them.
     settingsLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     settingsLockShared: "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     jstToday: "SELECT to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today",
@@ -93,7 +116,74 @@ SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM 
   JOIN training_catalog_versions k ON k.id = s.catalog_version_id
   JOIN training_time_rule_sets r ON r.id = s.rule_set_id
  WHERE s.cohort_id = $1::uuid ORDER BY s.effective_from, s.id`,
-    // Closing, under the two locks. $2 is the cohort id. The clock is read here, once.
+    // A signal, under the account's shared lock, the learner's lock and the settings lock shared. $2
+    // the cohort id, $3 the chain id, $4 the unit key. The clock is read here, once, in whole
+    // milliseconds (the inserts take it as a parameter). One row, with or without a cohort: the stub;
+    // the live membership (any role) and its day; the cohort's dates and first setting day; today's
+    // setting (its rules; whether its unit list has the unit); the chain's last signal over every live
+    // stream of the account (a chain of another cohort or unit is refused); the last signal of each
+    // chain of the cohort seen today or yesterday (an open chain's is at most gapMs, 6 hours, old);
+    // the last closed day and the end of its evidence window (its end + the gapMs it was counted with).
+    signalState: `WITH t AS (SELECT date_trunc('milliseconds', clock_timestamp()) AS at),
+d AS (SELECT at, (at AT TIME ZONE 'Asia/Tokyo')::date AS today FROM t)
+SELECT ${ms('d.at')} AS now_ms,
+       EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid) AS stub,
+       c.id AS cohort_id, mb.role, mb.added_on,
+       to_char(c.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(c.ends_on, 'YYYY-MM-DD') AS ends_on,
+       (SELECT to_char(min(f.effective_from), 'YYYY-MM-DD') FROM training_cohort_time_settings f WHERE f.cohort_id = c.id) AS first_setting,
+       st.params, st.unit_known,
+       ch.cohort_id AS chain_cohort_id, ch.unit_key AS chain_unit_key, ch.born AS chain_born, ch.seq AS chain_seq, ch.at AS chain_at, ch.flags AS chain_flags,
+       (SELECT coalesce(json_agg(json_build_object('chain_id', p.chain_id, 'born', p.born, 'at', p.at, 'flags', p.flags) ORDER BY p.chain_id), '[]'::json)
+          FROM (SELECT DISTINCT ON (s.chain_id) s.chain_id, ${ms('s.chain_started_at')} AS born, ${ms('l.received_at')} AS at, l.flags
+                  FROM training_time_streams s
+                  CROSS JOIN LATERAL (SELECT g.received_at, g.seq, g.flags FROM training_time_signals g
+                                       WHERE g.stream_id = s.id ORDER BY g.seq DESC LIMIT 1) l
+                 WHERE s.user_id = $1::uuid AND s.cohort_id = c.id AND s.account_deleted_at IS NULL AND s.day >= d.today - 1
+                 ORDER BY s.chain_id, l.seq DESC) p) AS places,
+       lc.last_closed, lc.closed_until_ms
+  FROM d
+  LEFT JOIN training_cohorts c ON c.id = $2::uuid
+  LEFT JOIN LATERAL (SELECT m.role, to_char((m.added_at AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS added_on
+                       FROM training_memberships m
+                      WHERE m.user_id = $1::uuid AND m.cohort_id = c.id AND m.account_deleted_at IS NULL) mb ON true
+  LEFT JOIN LATERAL (SELECT r.params, k.manifest->'units' @> jsonb_build_array(jsonb_build_object('key', $4::text)) AS unit_known
+                       FROM training_cohort_time_settings s
+                       JOIN training_time_rule_sets r ON r.id = s.rule_set_id
+                       JOIN training_catalog_versions k ON k.id = s.catalog_version_id
+                      WHERE s.cohort_id = c.id AND s.effective_from <= d.today
+                      ORDER BY s.effective_from DESC, s.id DESC LIMIT 1) st ON true
+  LEFT JOIN LATERAL (SELECT s.cohort_id, s.unit_key, ${ms('s.chain_started_at')} AS born, l.seq, ${ms('l.received_at')} AS at, l.flags
+                       FROM training_time_streams s
+                       CROSS JOIN LATERAL (SELECT g.seq, g.received_at, g.flags FROM training_time_signals g
+                                            WHERE g.stream_id = s.id ORDER BY g.seq DESC LIMIT 1) l
+                      WHERE s.user_id = $1::uuid AND s.chain_id = $3::uuid AND s.account_deleted_at IS NULL
+                      ORDER BY l.seq DESC LIMIT 1) ch ON true
+  LEFT JOIN LATERAL (SELECT to_char(x.day, 'YYYY-MM-DD') AS last_closed,
+                            ${ms("((x.day + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')")} + (r.params #>> '{counting,gapMs}')::bigint AS closed_until_ms
+                       FROM training_time_days x JOIN training_time_rule_sets r ON r.id = x.rule_set_id
+                      WHERE x.user_id = $1::uuid AND x.cohort_id = c.id AND x.kind = 'close' AND x.account_deleted_at IS NULL
+                      ORDER BY x.day DESC LIMIT 1) lc ON true`,
+    // Only while the stub exists. The stream of the signal's Japan-time day, from the same clock
+    // reading as its signal ($6; the CHECK), once per chain and day (the live-only unique index): a
+    // chain's first signal of a day makes it. $5 is the chain's first signal's time (the same on
+    // every day's row).
+    insertStream: `INSERT INTO training_time_streams (user_id, cohort_id, unit_key, chain_id, chain_started_at, day, started_at)
+SELECT $1::uuid, $2::uuid, $3, $4::uuid, $5::timestamptz, ($6::timestamptz AT TIME ZONE 'Asia/Tokyo')::date, $6::timestamptz
+ WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid)
+ON CONFLICT (user_id, chain_id, day) WHERE account_deleted_at IS NULL DO NOTHING`,
+    // Into the live stream of the signal's day ($3); only while the stub exists. $2 the chain id.
+    insertSignal: `INSERT INTO training_time_signals (stream_id, received_at, seq, flags)
+SELECT s.id, $3::timestamptz, $4::integer, $5::smallint FROM training_time_streams s
+ WHERE s.user_id = $1::uuid AND s.chain_id = $2::uuid AND s.account_deleted_at IS NULL
+   AND s.day = ($3::timestamptz AT TIME ZONE 'Asia/Tokyo')::date
+   AND EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid)
+ON CONFLICT (stream_id, seq) DO NOTHING
+RETURNING seq`,
+    // The live values read in one snapshot (closeState, closeSettings, unitTotals, currentDays,
+    // evidence): a close committing between two reads would count a day twice or not at all.
+    beginRead: 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
+    // Closing, under the three locks; the live values, in one snapshot. $2 is the cohort id. The
+    // clock is read here, once.
     closeState: `SELECT ${ms('clock_timestamp()')} AS now_ms,
        EXISTS (SELECT 1 FROM auth.users WHERE id = $1::uuid) AS stub,
        to_char(c.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(c.ends_on, 'YYYY-MM-DD') AS ends_on,
@@ -114,8 +204,8 @@ SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM 
          ORDER BY day, id DESC) d
   JOIN training_time_unit_days u ON u.day_id = d.id
  GROUP BY u.unit_key ORDER BY u.unit_key`,
-    // The live evidence of the days $3..$4 with received_at in [$5, $6] (a stream's signals all fall
-    // on its day, and the window reaches at most 6 hours into the days around).
+    // The live evidence of the days $3..$4 with received_at in [$5, $6] (recordSignal stores every
+    // signal in the stream of its own day, and the window reaches at most 6 hours into the days around).
     evidence: `SELECT s.chain_id, s.unit_key, ${ms('s.chain_started_at')} AS born, g.seq, ${ms('g.received_at')} AS at, g.flags
   FROM training_time_streams s
   JOIN training_time_signals g ON g.stream_id = s.id
@@ -229,10 +319,21 @@ export function parseSettings(rows) {
             ruleSetId: String(row.rule_set_id),
             catalogVersionId: String(row.catalog_version_id),
             rules: rules.rules,
+            units: manifest.manifest.units,
             setMs: setMsOf(manifest.manifest),
         });
     }
     return out;
+}
+
+/**
+ * The first day a learner's time counts (the latest of the day the learner was added, the first
+ * setting's day and the cohort's first day), and the first day not closed yet.
+ * @param {{ addedOn: string, firstSetting: string, startsOn: string, lastClosed: string | null }} input
+ */
+function openFrom({ addedOn, firstSetting, startsOn, lastClosed }) {
+    const first = [addedOn, firstSetting, startsOn].sort().at(-1) ?? startsOn;
+    return { first, fromDay: lastClosed && nextDay(lastClosed) > first ? nextDay(lastClosed) : first };
 }
 
 /**
@@ -247,8 +348,7 @@ export function closeRange({ nowMs, startsOn, endsOn, addedOn, lastClosed, setti
     if (!addedOn) return { reason: 'not_a_learner' };
     if (!startsOn || !endsOn || !cohortRange(startsOn, endsOn)) return { reason: 'no_dates' };
     if (!settings.length) return { reason: 'not_configured' };
-    const first = [addedOn, settings[0].effectiveFrom, startsOn].sort().at(-1) ?? startsOn;
-    const fromDay = lastClosed && nextDay(lastClosed) > first ? nextDay(lastClosed) : first;
+    const { fromDay } = openFrom({ addedOn, firstSetting: settings[0].effectiveFrom, startsOn, lastClosed });
     const yesterday = previousDay(jstDayOf(nowMs));
     const setting = settingOf(settings, yesterday);
     const final = !setting || nowMs > jstDayRange(yesterday).end + setting.rules.counting.gapMs ? yesterday : previousDay(yesterday);
@@ -309,15 +409,155 @@ export function countClose({ fromDay, toDay, signals, settings, carriedMs, start
     });
 }
 
+const SIGNAL_KEYS = Object.freeze(['chainId', 'focus', 'input', 'seq', 'stop', 'unitKey']);
+const MAX_SEQ = 2_147_483_647;
+
+/**
+ * A signal's body (POST .../time/signals), or null: a plain object with exactly the keys unitKey,
+ * chainId, seq, stop, focus and input (a time, a duration or any other key refuses it): a unit key,
+ * a UUID (lower-cased: chain ids are compared as text), an integer 0..2^31-1 and three booleans.
+ * @param {unknown} body
+ * @returns {SignalBody | null}
+ */
+export function readSignalBody(body) {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+    const keys = Object.keys(body);
+    if (keys.length !== SIGNAL_KEYS.length || !SIGNAL_KEYS.every((key) => Object.hasOwn(body, key))) return null;
+    const { unitKey, chainId, seq, stop, focus, input } = /** @type {Record<string, unknown>} */ (body);
+    const chain = canonicalUserId(chainId);
+    if (typeof unitKey !== 'string' || !TRAINING_KEY.test(unitKey) || !chain) return null;
+    if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0 || seq > MAX_SEQ) return null;
+    if (typeof stop !== 'boolean' || typeof focus !== 'boolean' || typeof input !== 'boolean') return null;
+    return { unitKey, chainId: chain, seq, stop, focus, input };
+}
+
+/**
+ * Whether a close after a signal at nowMs may find a final day (transaction 2): the first day not
+ * closed yet is at or before the last final one (closeRange's days, with today's gapMs; on the day
+ * a setting with another gapMs starts, the call comes at most the difference early, when closeDays
+ * finds nothing, or late). closeDays decides again under its locks.
+ * @param {{ nowMs: number, startsOn: string | null, endsOn: string | null, addedOn: string | null, firstSetting: string | null, lastClosed: string | null, gapMs: number }} input
+ */
+export function closeDue({ nowMs, startsOn, endsOn, addedOn, firstSetting, lastClosed, gapMs }) {
+    if (!addedOn || !firstSetting || !startsOn || !endsOn || !cohortRange(startsOn, endsOn)) return false;
+    const { fromDay } = openFrom({ addedOn, firstSetting, startsOn, lastClosed });
+    const yesterday = previousDay(jstDayOf(nowMs));
+    const final = nowMs > jstDayRange(yesterday).end + gapMs ? yesterday : previousDay(yesterday);
+    return fromDay <= (final < endsOn ? final : endsOn);
+}
+
+/** How many days GET .../time lists, the newest first. */
+export const LIVE_DAYS = 14;
+
+/**
+ * The days of a learner's live values at nowMs: from the first day that counts to today (at most the
+ * cohort's last day), and the days among them not closed yet (live; null when none). null when
+ * nothing counts: not a learner, a cohort without both dates, no setting.
+ * @param {{ nowMs: number, startsOn: string | null, endsOn: string | null, addedOn: string | null, lastClosed: string | null, settings: Setting[] }} input
+ * @returns {{ first: string, toDay: string, live: { fromDay: string, toDay: string } | null } | null}
+ */
+export function liveRange({ nowMs, startsOn, endsOn, addedOn, lastClosed, settings }) {
+    if (!addedOn || !startsOn || !endsOn || !cohortRange(startsOn, endsOn) || !settings.length) return null;
+    const { first, fromDay } = openFrom({ addedOn, firstSetting: settings[0].effectiveFrom, startsOn, lastClosed });
+    const today = jstDayOf(nowMs);
+    const toDay = today < endsOn ? today : endsOn;
+    return { first, toDay, live: fromDay <= toDay ? { fromDay, toDay } : null };
+}
+
+/**
+ * @typedef {{ unitKey: string, title: { jp: string, en: string }, setMs: number, countedMs: number, capReached: boolean }} LiveUnit
+ * @typedef {{ day: string, countedMs: number, final: boolean }} LiveDay
+ * @typedef {{ nowMs: number, startsOn: string | null, endsOn: string | null, addedOn: string | null, lastClosed: string | null, settings: Setting[],
+ *   closedDays: { day: string, countedMs: number }[], unitTotals: Map<string, number>, signals: Signal[] }} LiveInput
+ */
+
+/**
+ * A learner's study time in a cohort at nowMs: each closed day's current value, and the days not
+ * closed yet counted from `signals` with each unit's time carried from the closed days, exactly as
+ * the close will count them (never stored). status: 'not_configured' (no setting today, so nothing
+ * was ever counted), 'not_in_session' (outside the cohort's dates, or a date missing) or 'ready'.
+ * units: today's unit list in its order, each with its time over every day (closed and live).
+ * days: the newest LIVE_DAYS days from today (at most the cohort's last day), not before the first
+ * day that counts; final: closed. totalMs: every day, units no longer listed too.
+ * @param {LiveInput} input closedDays: currentDays; unitTotals: each unit's time on the closed days
+ */
+export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, settings, closedDays, unitTotals, signals }) {
+    const today = jstDayOf(nowMs);
+    const setting = settingOf(settings, today);
+    const cohort = cohortRange(startsOn, endsOn);
+    const range = liveRange({ nowMs, startsOn, endsOn, addedOn, lastClosed, settings });
+    const of = (/** @type {string} */ day) => {
+        const found = settingOf(settings, day);
+        if (!found) throw new RangeError(`liveTime: no setting for ${day}`);
+        return found;
+    };
+    const counted = range?.live
+        ? countDays({ ...range.live, signals, rulesOf: (day) => of(day).rules, setMsOf: (day) => of(day).setMs, carriedMs: unitTotals, cohort })
+        : { days: [], carriedAfterMs: new Map(unitTotals) };
+    /** @type {Map<string, LiveDay>} */
+    const byDay = new Map(closedDays.map((d) => [d.day, { day: d.day, countedMs: d.countedMs, final: true }]));
+    for (const d of counted.days) if (!byDay.has(d.day)) byDay.set(d.day, { day: d.day, countedMs: d.countedMs, final: false });
+    // Every day from the first one is closed (a close covers the days from the first not closed) or live.
+    /** @type {LiveDay[]} */
+    const days = [];
+    for (let day = range?.toDay ?? ''; range && day >= range.first && days.length < LIVE_DAYS; day = previousDay(day)) {
+        const found = byDay.get(day);
+        if (found) days.push(found);
+    }
+    /** @type {LiveUnit[]} */
+    const units = (setting?.units ?? []).map((u) => {
+        const setMs = /** @type {number} */ (setting?.setMs.get(u.key));
+        const countedMs = counted.carriedAfterMs.get(u.key) ?? 0;
+        return { unitKey: u.key, title: { jp: u.title.jp, en: u.title.en }, setMs, countedMs, capReached: countedMs >= setMs };
+    });
+    /** @type {'not_configured' | 'not_in_session' | 'ready'} */
+    const status = !setting ? 'not_configured' : !cohort || nowMs < cohort.from || nowMs >= cohort.to ? 'not_in_session' : 'ready';
+    return {
+        today,
+        status,
+        setting,
+        cohort,
+        units,
+        days,
+        totalMs: closedDays.reduce((n, d) => n + d.countedMs, 0) + counted.days.reduce((n, d) => n + d.countedMs, 0),
+        todayMs: byDay.get(today)?.countedMs ?? 0,
+        unitMs: counted.carriedAfterMs,
+    };
+}
+
+/**
+ * @typedef {{ counting: boolean, reason: StudyReason | null, todayMs: number, unit: { unitKey: string, countedMs: number, setMs: number, capReached: boolean } }} SignalState
+ */
+
+/**
+ * The state in a signal's answer (an accepted signal that is not a stop): today's counted time, the
+ * unit's, and why it is not counting (studyReason, null while it counts). null without today's setting.
+ * @param {{ nowMs: number, signal: SignalBody, prevAt: number | null, time: ReturnType<typeof liveTime>, signals: Signal[] }} input
+ *   prevAt: the chain's previous stored signal (null for its first); signals: the live evidence up to nowMs
+ * @returns {SignalState | null}
+ */
+export function stateAfterSignal({ nowMs, signal, prevAt, time, signals }) {
+    const setMs = time.setting?.setMs.get(signal.unitKey);
+    if (!time.setting || setMs === undefined) return null;
+    const countedMs = time.unitMs.get(signal.unitKey) ?? 0;
+    const reason = studyReason({
+        now: nowMs, chain: { id: signal.chainId, unit: signal.unitKey, prevAt }, signal, signals,
+        counting: time.setting.rules.counting, setMs, unitMs: countedMs, cohort: time.cohort,
+    });
+    return { counting: reason === null, reason, todayMs: time.todayMs, unit: { unitKey: signal.unitKey, countedMs, setMs, capReached: countedMs >= setMs } };
+}
+
 /**
  * One transaction on its own connection. `work` decides whether to commit. A lock wait over
- * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'.
+ * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. `begin`: the live values' read-only snapshot
+ * (TRAINING_TIME_SQL.beginRead); a plain BEGIN otherwise.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work
+ * @param {string} [begin]
  * @returns {Promise<T | CoreError>}
  */
-async function transaction(pool, operation, work) {
+async function transaction(pool, operation, work, begin = 'BEGIN') {
     if (!pool?.connect) return noDatabase();
     /** @type {any} */
     let client;
@@ -328,7 +568,7 @@ async function transaction(pool, operation, work) {
     }
     let broken = false;
     try {
-        await client.query('BEGIN');
+        await client.query(begin);
         await client.query(TRAINING_SQL.lockTimeout);
         const { commit, value } = await work(client);
         await client.query(commit ? 'COMMIT' : 'ROLLBACK');
@@ -458,6 +698,9 @@ export async function setCohortTime({ cohortSlug, catalogSha256, rulesSha256, ef
     });
 }
 
+/** A stored version that no longer parses with this code stops the counting (no guess). */
+const INVALID_SETTING = Object.freeze({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
+
 /**
  * Close a learner's final days in a cohort (the header). One short transaction.
  * @param {{ userId: unknown, cohortId: unknown, computedBy: string, pool?: TrainingPool | null }} params
@@ -482,7 +725,7 @@ export async function closeDays({ userId: rawUserId, cohortId: rawCohortId, comp
         if (!state) return nothing('no_cohort');
         if (!state.stub) return nothing('no_account');
         const settings = parseSettings((await db.query(TRAINING_TIME_SQL.closeSettings, [cohortId])).rows ?? []);
-        if (!settings) return { commit: false, value: /** @type {any} */ ({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' }) };
+        if (!settings) return { commit: false, value: /** @type {any} */ ({ ...INVALID_SETTING }) };
         const range = closeRange({ nowMs: Number(state.now_ms), startsOn: state.starts_on, endsOn: state.ends_on, addedOn: state.added_on, lastClosed: state.last_closed, settings });
         if ('reason' in range) return nothing(range.reason);
         const carriedMs = new Map(((await db.query(TRAINING_TIME_SQL.unitTotals, [userId, cohortId])).rows ?? []).map((r) => [String(r.unit_key), Number(r.counted_ms)]));
@@ -504,6 +747,188 @@ export async function closeDays({ userId: rawUserId, cohortId: rawCohortId, comp
         }
         return { commit: true, value: { status: 'closed', days: days.length, fromDay: range.fromDay, toDay: range.toDay } };
     });
+}
+
+/** Who closes days from the API (training_time_days.computed_by; the staff script is 'staff'). */
+export const API_CLOSER = 'api';
+/** Ignored signals after which the page keeps its chain and sends the next one beatMs later. */
+const KEEP_CHAIN = new Set(['duplicate', 'too_soon']);
+
+/** @param {number} ms */
+const iso = (ms) => new Date(ms).toISOString();
+
+/**
+ * The stub is gone: a deletion committed while the request waited on the account lock (its
+ * tombstone), or the stub could not be written at sign-in.
+ * @param {Queryable} db @param {string} userId
+ * @returns {Promise<{ status: 'deleted_account' | 'no_account' }>}
+ */
+async function noStub(db, userId) {
+    const deleted = ((await db.query(TRAINING_SQL.deletedAccount, [userId])).rowCount ?? 0) > 0;
+    return { status: deleted ? 'deleted_account' : 'no_account' };
+}
+
+/**
+ * The live values' reads, in one read-only snapshot (TRAINING_TIME_SQL.beginRead). asOfMs: count
+ * the evidence up to this instant (a signal's clock); null: up to the read's own clock.
+ * @param {TrainingPool | null | undefined} pool @param {string} operation @param {string} userId @param {string} cohortId
+ * @param {number | null} asOfMs
+ * @returns {Promise<LiveInput | { gone: 'no_cohort' | 'no_account' | 'not_a_learner' } | CoreError>}
+ */
+function readLive(pool, operation, userId, cohortId, asOfMs) {
+    return transaction(pool, operation, async (db) => {
+        /** @param {any} value */
+        const done = (value) => ({ commit: true, value });
+        const state = (await db.query(TRAINING_TIME_SQL.closeState, [userId, cohortId])).rows?.[0];
+        if (!state) return done({ gone: 'no_cohort' });
+        if (!state.stub) return done({ gone: 'no_account' });
+        if (!state.added_on) return done({ gone: 'not_a_learner' });
+        const settings = parseSettings((await db.query(TRAINING_TIME_SQL.closeSettings, [cohortId])).rows ?? []);
+        if (!settings) return done({ ...INVALID_SETTING });
+        const nowMs = asOfMs ?? Number(state.now_ms);
+        const at = { nowMs, startsOn: state.starts_on, endsOn: state.ends_on, addedOn: state.added_on, lastClosed: state.last_closed, settings };
+        const unitTotals = new Map(((await db.query(TRAINING_TIME_SQL.unitTotals, [userId, cohortId])).rows ?? []).map((r) => [String(r.unit_key), Number(r.counted_ms)]));
+        const closedDays = ((await db.query(TRAINING_TIME_SQL.currentDays, [userId, cohortId])).rows ?? []).map((r) => ({ day: String(r.day), countedMs: Number(r.counted_ms) }));
+        const live = liveRange(at)?.live;
+        /** @type {Signal[]} */
+        let signals = [];
+        if (live) {
+            const window = closeWindow({ ...live, settings });
+            signals = ((await db.query(TRAINING_TIME_SQL.evidence, [userId, cohortId, live.fromDay, live.toDay, iso(window.from), iso(Math.min(window.to, nowMs))])).rows ?? []).map(signalOf);
+        }
+        return done({ ...at, closedDays, unitTotals, signals });
+    }, TRAINING_TIME_SQL.beginRead);
+}
+
+/**
+ * Store a learner's signal in a cohort (POST .../time/signals; the header): transaction 1 decides
+ * with admitSignal and stores an accepted signal; a close follows when a day may have become final;
+ * then the state as of the signal's clock (none for a stop, which ends the chain). A failed close or
+ * state keeps the signal: closeError or stateError names it (the caller logs it), and state is null.
+ * nextInMs: beatMs while the page keeps the chain (accepted, duplicate, too_soon); null otherwise:
+ * the page ends it (a stop) or reacts to the reason (a new chain, or it stops).
+ * @param {{ userId: unknown, cohortId: unknown, signal: unknown, pool?: TrainingPool | null }} params
+ * @returns {Promise<{ status: 'accepted', nextInMs: number | null, state: SignalState | null, closeError?: string, stateError?: string }
+ *   | { status: 'ignored', reason: string, nextInMs: number | null }
+ *   | { status: 'refused', reason: string }
+ *   | { status: 'not_found' | 'not_a_learner' | 'deleted_account' | 'no_account' | 'clock_behind' }
+ *   | CoreError>} refused: admitSignal's 409 reasons; not_found: no such cohort, or no live
+ *   membership in it; clock_behind: the database clock is not past the last closed day's evidence window
+ */
+export async function recordSignal({ userId: rawUserId, cohortId: rawCohortId, signal: rawSignal, pool = getPool() }) {
+    const userId = canonicalUserId(rawUserId);
+    const cohortId = canonicalUserId(rawCohortId);
+    const signal = readSignalBody(rawSignal);
+    if (!userId || !cohortId || !signal) return { error: 'An account id, a cohort id (UUIDs) and a signal are required.', error_type: 'validation' };
+    /** @type {any} */
+    const stored = await transaction(pool, 'recordSignal', async (db) => {
+        await db.query(TRAINING_SQL.lock, [userId]);
+        await db.query(TRAINING_SQL.learnerLock, [userId]);
+        await db.query(TRAINING_TIME_SQL.settingsLockShared, [cohortId]);
+        /** @param {any} value */
+        const nothing = (value) => ({ commit: false, value });
+        const row = (await db.query(TRAINING_TIME_SQL.signalState, [userId, cohortId, signal.chainId, signal.unitKey])).rows?.[0];
+        if (!row) return nothing({ error: 'The signal state could not be read.', error_type: 'unknown' });
+        // The stub first: a deletion that committed while this waited also marked the membership.
+        if (!row.stub) return nothing(await noStub(db, userId));
+        if (!row.cohort_id || !row.role) return nothing({ status: 'not_found' });
+        if (row.role !== 'learner') return nothing({ status: 'not_a_learner' });
+        if (row.params === null || row.params === undefined) return nothing({ status: 'refused', reason: 'time_not_configured' });
+        const parsed = parseTimeRules(row.params);
+        if ('errors' in parsed) return nothing({ ...INVALID_SETTING });
+        const { rules } = parsed;
+        const nowMs = Number(row.now_ms);
+        const chain = row.chain_seq === null || row.chain_seq === undefined ? null : {
+            cohortId: String(row.chain_cohort_id), unitKey: String(row.chain_unit_key), bornAt: Number(row.chain_born),
+            lastSeq: Number(row.chain_seq), lastAt: Number(row.chain_at), lastStop: (Number(row.chain_flags) & SIGNAL_FLAGS.stop) !== 0,
+        };
+        const places = (Array.isArray(row.places) ? row.places : []).map((/** @type {any} */ p) => ({
+            chainId: String(p.chain_id), bornAt: Number(p.born), lastAt: Number(p.at), lastStop: (Number(p.flags) & SIGNAL_FLAGS.stop) !== 0,
+        }));
+        const verdict = admitSignal({ now: nowMs, cohortId, signal, configured: true, session: cohortRange(row.starts_on, row.ends_on), unitKnown: row.unit_known === true, chain, places, rules });
+        if (verdict.verdict !== 'accept') {
+            if (verdict.verdict === 'refuse') return nothing({ status: 'refused', reason: verdict.reason });
+            return nothing({ status: 'ignored', reason: verdict.reason, nextInMs: KEEP_CHAIN.has(verdict.reason) ? rules.collection.beatMs : null });
+        }
+        // A clock that went back into a closed day's evidence window would change that day's evidence.
+        if (row.closed_until_ms !== null && row.closed_until_ms !== undefined && nowMs <= Number(row.closed_until_ms)) return nothing({ status: 'clock_behind' });
+        const at = iso(nowMs);
+        await db.query(TRAINING_TIME_SQL.insertStream, [userId, cohortId, signal.unitKey, signal.chainId, iso(verdict.bornAt), at]);
+        const inserted = (await db.query(TRAINING_TIME_SQL.insertSignal, [userId, signal.chainId, at, signal.seq, flagsOf(signal)])).rows ?? [];
+        // Under the learner's lock no other signal of the account is written (admitSignal saw the
+        // chain's last seq), and under the account lock the stub stays: anything else is a fault.
+        if (inserted.length !== 1) return nothing({ error: 'The signal could not be written.', error_type: 'unknown' });
+        const due = closeDue({ nowMs, startsOn: row.starts_on, endsOn: row.ends_on, addedOn: row.added_on, firstSetting: row.first_setting, lastClosed: row.last_closed, gapMs: rules.counting.gapMs });
+        return { commit: true, value: { status: 'accepted', nowMs, beatMs: rules.collection.beatMs, prevAt: chain ? chain.lastAt : null, due } };
+    });
+    if ('error_type' in stored || stored.status !== 'accepted') return stored;
+    /** @type {{ status: 'accepted', nextInMs: number | null, state: SignalState | null, closeError?: string, stateError?: string }} */
+    const answer = { status: 'accepted', nextInMs: signal.stop ? null : stored.beatMs, state: null };
+    if (stored.due) {
+        const closed = await closeDays({ userId, cohortId, computedBy: API_CLOSER, pool });
+        if ('error_type' in closed) answer.closeError = closed.error_type;
+    }
+    if (signal.stop) return answer;
+    const read = await readLive(pool, 'studyTimeState', userId, cohortId, stored.nowMs);
+    if ('error_type' in read) return { ...answer, stateError: read.error_type };
+    // A deletion that committed after the signal: no state.
+    if ('gone' in read) return answer;
+    try {
+        answer.state = stateAfterSignal({ nowMs: stored.nowMs, signal, prevAt: stored.prevAt, time: liveTime(read), signals: read.signals });
+    } catch (err) {
+        return { ...answer, stateError: classifyDbError(/** @type {any} */ (err), 'studyTimeState').error_type };
+    }
+    return answer;
+}
+
+/**
+ * @typedef {{ learnerId: string, cohortId: string, today: string, timeZone: 'Asia/Tokyo', status: 'ready' | 'not_configured' | 'not_in_session',
+ *   beatMs?: number, units: LiveUnit[], days: LiveDay[], totalMs: number, asOf: string }} StudyTime
+ */
+
+/**
+ * A learner's study time in a cohort (GET .../time), only for a live learner membership: the final
+ * days are closed first (closeDays), then the live values are read in one read-only snapshot.
+ * beatMs only while the cohort is in session (the page's beat; no other rule value).
+ * @param {{ userId: unknown, cohortId: unknown, pool?: TrainingPool | null }} params
+ * @returns {Promise<{ status: 'read', time: StudyTime } | { status: 'not_found' | 'not_a_learner' | 'deleted_account' | 'no_account' } | CoreError>}
+ *   not_found: no such cohort, or no live membership in it (the two are not told apart)
+ */
+export async function readStudyTime({ userId: rawUserId, cohortId: rawCohortId, pool = getPool() }) {
+    const userId = canonicalUserId(rawUserId);
+    const cohortId = canonicalUserId(rawCohortId);
+    if (!userId || !cohortId) return { error: 'An account id and a cohort id (UUIDs) are required.', error_type: 'validation' };
+    if (!pool) return noDatabase();
+    try {
+        // The role first: closing reads every setting under the learner's lock, for learners only.
+        const role = (await pool.query(TRAINING_SQL.liveMember, [userId, cohortId])).rows?.[0]?.role;
+        if (!role) return { status: 'not_found' };
+        if (role !== 'learner') return { status: 'not_a_learner' };
+        const closed = await closeDays({ userId, cohortId, computedBy: API_CLOSER, pool });
+        if ('error_type' in closed) return closed;
+        if (closed.status === 'nothing' && closed.reason === 'no_account') return await noStub(pool, userId);
+        const read = await readLive(pool, 'readStudyTime', userId, cohortId, null);
+        if ('error_type' in read) return read;
+        if ('gone' in read) return read.gone === 'no_account' ? await noStub(pool, userId) : { status: 'not_found' };
+        const time = liveTime(read);
+        return {
+            status: 'read',
+            time: {
+                learnerId: userId,
+                cohortId,
+                today: time.today,
+                timeZone: 'Asia/Tokyo',
+                status: time.status,
+                ...(time.status === 'ready' && time.setting ? { beatMs: time.setting.rules.collection.beatMs } : {}),
+                units: time.units,
+                days: time.days,
+                totalMs: time.totalMs,
+                asOf: iso(read.nowMs),
+            },
+        };
+    } catch (err) {
+        return classifyDbError(/** @type {any} */ (err), 'readStudyTime');
+    }
 }
 
 /**
