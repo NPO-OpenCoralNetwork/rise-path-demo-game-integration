@@ -96,7 +96,7 @@ DCR では、誰でも AI アプリを登録できます。Supabase も「どの
 
 ### 7. VM: migration と最小権限の DB ロール
 
-1. （すでに動いている VM を更新するときだけ）`main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）と 016（`lesson_progress`、Phase 2）を当てます（まだ `byoa` は足しません）。新しい VM では最初のデプロイで 000–021 が当たっています。
+1. （すでに動いている VM を更新するときだけ）`main` の新しいコードで `./scripts/deploy-stack.sh` を一度実行し、migration 015（`mcp_oauth_grants`）と 016（`lesson_progress`、Phase 2）を当てます（まだ `byoa` は足しません）。新しい VM では最初のデプロイで 000–022 が当たっています。
 2. VM でリモート MCP 用のロールを作ります。`risepath_app` はスーパーユーザーなので、インターネットに出す `mcp-public` には渡しません。
 
    ```bash

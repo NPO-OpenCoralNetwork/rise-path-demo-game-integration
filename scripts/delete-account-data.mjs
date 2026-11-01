@@ -74,7 +74,7 @@ export const DRY_RUN_TABLES = Object.freeze([
     'notifications', 'learner_profiles', 'daily_reflections', 'lifestyle_logs', 'analysis_snapshots',
     'ai_sessions', 'agent_chat_consent', 'agent_session_binding', 'learner_memory_meta', 'learning_portal_admins',
     'mcp_oauth_grants', 'mcp_sessions', 'billing_customers', 'billing_subscriptions', 'legal_acceptances',
-    'training_memberships',
+    'training_memberships', 'training_time_streams', 'training_time_days',
 ]);
 
 /** @param {string} id */

@@ -83,6 +83,29 @@ describe('the VM runbooks follow server/migrations', () => {
         const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **021（職業訓練の期と割り当て）**'));
         assert.match(guide, /\[`deploy\/risepath-vm\/README\.md`\]\(\.\.\/\.\.\/deploy\/risepath-vm\/README\.md\) の「職業訓練（骨組み）」/, 'the guide links the block');
     });
+
+    it('the job-training block covers 022 (study time): before the services, no role re-run, every staff command over stdin as the script\'s usage shows it, the PostgreSQL proof', () => {
+        const readme = read('deploy/risepath-vm/README.md');
+        const start = readme.indexOf('## 職業訓練（骨組み）');
+        const section = readme.slice(start, readme.indexOf('\n## ', start + 1));
+        assert.match(section, /migration 022（受講時間）も同じです。022 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります/);
+        assert.match(section, /022 も新しい表（7 つ）を作るだけで、`auth\.users` はロックせず、`sql\/mcp_remote_role\.sql` も流し直さなくてかまいません/);
+        const usage = read('scripts/training-time.mjs');
+        for (const mode of ['--load-catalog', '--load-rules', '--set', '--show', '--close', '--stats']) {
+            assert.match(section, new RegExp(`exec -T api node scripts/training-time\\.mjs ${mode} `), mode);
+            assert.ok(usage.includes(`node scripts/training-time.mjs ${mode} `), `${mode}: the script's own usage`);
+        }
+        // Root reads the root-only file and pipes it in: a `<` redirect is opened by the operator's non-root shell.
+        for (const [file, mode] of [['course.json', '--load-catalog'], ['time-rules.json', '--load-rules']]) {
+            assert.match(section, new RegExp(`^sudo cat /opt/risepath-private/${file.replace('.', '\\.')} \\| docker compose --env-file stack\\.env exec -T api node scripts/training-time\\.mjs ${mode} `, 'm'), `${file} piped in, from outside the checkout`);
+        }
+        assert.doesNotMatch(section, /< \/opt\/risepath-private\//);
+        assert.match(section, /`sudo install -d -m 700 \/opt\/risepath-private`/);
+        assert.match(section, /`scripts\/db\/verify-training\.mjs` が 022 と/);
+        const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **022（職業訓練の受講時間）**'));
+        assert.ok(guide, 'the 022 bullet in doc/guides/risepath_vm_deployment.md');
+        for (const want of ['起動する前に', '`deletion_unavailable`', '`sql/mcp_remote_role.sql` は流し直さなくてよい', '`scripts/training-time.mjs`', 'の「職業訓練（骨組み）」']) assert.ok(guide.includes(want), want);
+    });
 });
 
 describe('the plan: Phase 6 chapter', () => {

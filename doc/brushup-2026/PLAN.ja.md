@@ -1169,8 +1169,10 @@ Wave 4（並行）: WP-05 rich blocks ◄─ WP-04 │ WP-06 Claude Code kit ◄
 | パッケージ | バージョン | 用途 |
 |---|---|---|
 | `@anthropic-ai/sdk` | `^0.135.0` | サーバー側 LLM ゲートウェイの Claude プロバイダー（`server/llm/providers/anthropic.js`） |
-| `@modelcontextprotocol/sdk` | `^1.32.2` | MCP サーバー（`mcp-server/`）。以前は推移的に入っていただけ |
-| `dompurify` | `^3.4.17` | Mermaid の SVG と旧リーダーの HTML のサニタイズ |
+| `@modelcontextprotocol/sdk` | `^1.29.0` | MCP サーバー（`mcp-server/`）。以前は推移的に入っていただけ |
+| `dompurify` | `^3.4.11` | Mermaid の SVG と旧リーダーの HTML のサニタイズ |
 | `remark-gfm` | `^4.0.1` | レッスン本文の Markdown（表など）の描画（`components/lesson/Md.tsx`） |
 | `shiki` | `^4.5.0` | コードブロックのシンタックスハイライト（`components/lesson/blocks/highlighter.ts`） |
-| `zod` | `^4.6.7` | 教材スキーマ `risepath.lesson/v1`（`shared/lesson/schema.js`）。以前は推移的に入っていただけ |
+| `zod` | `^3.25.76` | 教材スキーマ `risepath.lesson/v1`（`shared/lesson/schema.js`）。以前は推移的に入っていただけ |
+
+2026-10-30（#77）、既知の advisory に対応するため、`@modelcontextprotocol/sdk` を `^1.32.2` に、`dompurify` を `^3.4.17` に、`zod` を `^4.6.7`（メジャー更新）に上げました。使われていない `compression` は外しました。新しい依存の追加はありません。

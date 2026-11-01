@@ -43,6 +43,9 @@ export const SQL = Object.freeze({
     markAcceptances: 'update legal_acceptances set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
     // Job training (migration 021): memberships are kept and marked the same way.
     markTrainingMemberships: 'update training_memberships set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
+    // Study time (migration 022): the evidence streams and the closed days, marked the same way.
+    markTrainingTimeStreams: 'update training_time_streams set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
+    markTrainingTimeDays: 'update training_time_days set account_deleted_at = (select deleted_at from account_deletions where user_id = $1::uuid) where user_id = $1::uuid and account_deleted_at is null',
     copyConsents: norm(`insert into account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
         select id, user_id, kind, policy_version, method, given_at, revoked_at, (select deleted_at from account_deletions where user_id = $1::uuid) from account_consents where user_id = $1::uuid
         on conflict (consent_id) do nothing`),
@@ -80,6 +83,8 @@ export const shiftDay = (day, delta) => new Date(Date.parse(`${day}T00:00:00Z`) 
  *   materials?: Array<{ user_id: string, storage_path: string | null }>,
  *   acceptances?: Array<{ user_id: string, terms_version: string, privacy_version: string, account_deleted_at?: Date | null }>,
  *   memberships?: Array<{ user_id: string, cohort_id: string, role: string, account_deleted_at?: Date | null }>,
+ *   timeStreams?: Array<{ user_id: string, chain_id: string, day: string, account_deleted_at?: Date | null }>,
+ *   timeDays?: Array<{ user_id: string, day: string, kind: string, account_deleted_at?: Date | null }>,
  *   consents?: Array<{ id: string, user_id: string, kind?: string, policy_version?: string, method?: string, given_at?: Date, revoked_at?: Date | null }>,
  *   grants?: Array<{ user_id: string, client_id: string, client_name?: string | null, first_seen_at?: Date | null, last_used_at?: Date | null, revoked_at?: Date | null }>,
  *   usage?: Array<{ usage_day: string, kind: string, subject: string, count: number }>,
@@ -106,6 +111,8 @@ export function createDeletionPool(seed = {}) {
         materials: (seed.materials ?? []).map((m) => ({ ...m })),
         acceptances: (seed.acceptances ?? []).map((a) => ({ account_deleted_at: null, ...a })),
         memberships: (seed.memberships ?? []).map((m) => ({ account_deleted_at: null, ...m })),
+        timeStreams: (seed.timeStreams ?? []).map((s) => ({ account_deleted_at: null, ...s })),
+        timeDays: (seed.timeDays ?? []).map((d) => ({ account_deleted_at: null, ...d })),
         consents: (seed.consents ?? []).map((c) => ({ kind: 'guardian_ai', policy_version: 'guardian-ai-2026-10', method: 'guardian_on_device', given_at: new Date('2026-10-01T00:00:00Z'), revoked_at: null, ...c })),
         /** @type {Map<string, any>} */
         consentProofs: new Map(),
@@ -228,10 +235,13 @@ export function createDeletionPool(seed = {}) {
                 }
                 return { rowCount: n, rows: [] };
             }
-            case SQL.markTrainingMemberships: {
+            case SQL.markTrainingMemberships:
+            case SQL.markTrainingTimeStreams:
+            case SQL.markTrainingTimeDays: {
                 const at = tombstoneTime(id);
+                const rows = text === SQL.markTrainingMemberships ? state.memberships : text === SQL.markTrainingTimeStreams ? state.timeStreams : state.timeDays;
                 let n = 0;
-                for (const m of state.memberships) {
+                for (const m of rows) {
                     if (m.user_id === id && m.account_deleted_at === null) {
                         m.account_deleted_at = at;
                         n += 1;

@@ -170,12 +170,10 @@ describe('moodToScore', () => {
 
 describe('validateWritableEntryDate', () => {
     it('rejects future dates relative to timezone', () => {
-        // A real calendar date two days ahead (adding 1 to the day gave "2026-10-32" on a month's last
-        // day, which is "invalid", not "future"); two days, so midnight between the two reads still leaves it ahead.
         const today = getTodayInTimezone('UTC');
-        const ahead = new Date(`${today}T12:00:00Z`);
-        ahead.setUTCDate(ahead.getUTCDate() + 2);
-        const future = ahead.toISOString().slice(0, 10);
+        // Real date arithmetic: adding 1 to the day digits breaks on a month's last day (2026-10-31 -> 2026-10-32).
+        const [year, month, day] = today.split('-').map(Number);
+        const future = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
         const result = validateWritableEntryDate(future, 'UTC');
         assert.equal(result.valid, false);
         assert.ok(result.errors.some((e) => e.includes('future')));
@@ -187,6 +185,25 @@ describe('validateWritableEntryDate', () => {
         assert.equal(result.valid, true);
         assert.equal(result.normalized, today);
     });
+
+    // Pinned clock: the end of a month, of a year and a leap day are checked on every run,
+    // not only on the day CI happens to hit one.
+    for (const [today, tomorrow] of [
+        ['2026-11-15', '2026-11-16'],
+        ['2026-10-31', '2026-11-01'],
+        ['2026-11-30', '2026-12-01'],
+        ['2027-02-28', '2027-03-01'],
+        ['2028-02-29', '2028-03-01'],
+        ['2026-12-31', '2027-01-01'],
+    ]) {
+        it(`on ${today} accepts today and rejects ${tomorrow} as future`, (t) => {
+            t.mock.timers.enable({ apis: ['Date'], now: Date.parse(`${today}T12:00:00Z`) });
+            assert.equal(validateWritableEntryDate(today, 'UTC').valid, true);
+            const result = validateWritableEntryDate(tomorrow, 'UTC');
+            assert.equal(result.valid, false);
+            assert.ok(result.errors.some((e) => e.includes('future')));
+        });
+    }
 });
 
 describe('buildLearningQuery', () => {

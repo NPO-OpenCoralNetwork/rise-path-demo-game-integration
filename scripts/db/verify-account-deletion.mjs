@@ -29,9 +29,10 @@
  *   R5  as risepath_mcp_remote: the trigger needs the 018 grant; the verifier's query
  *   R6  a seeded learner deleted in one transaction: what goes, what stays, what is marked
  *       (with migration 019's lesson resets, XP awards and learning days, and migration 020's review
- *       cards and review log: all go; migration 021's training membership: kept, marked with the
- *       tombstone's time by the service's own statement, B's stays live; the staff add refuses A,
- *       and adds A again once a new sign-in re-opened the account, beside the marked row)
+ *       cards and review log: all go; migration 021's training membership and migration 022's study
+ *       time stream and closed day: kept, marked with the tombstone's time by the service's own
+ *       statements, their signal and unit rows kept, B's stay live; the staff add refuses A, and
+ *       adds A again once a new sign-in re-opened the account, beside the marked row)
  *   R7  version archive rows never change; a version id must match its document
  *   R8  the lock key is canonical: an upper-case id locks what the trigger locks
  *   R9  the deletion service (server/services/accountDeletion.js) on a seeded learner: a terms
@@ -409,7 +410,7 @@ async function r5(pool) {
 async function r6(pool) {
     const A = uid('r6a');
     const B = uid('r6b');
-    const [CA, CB, VA, VB, VBA, SA, G1, G2, TC] = ['ca', 'cb', 'va', 'vb', 'vx', 'sa', 'g1', 'g2', 'tc'].map(uid);
+    const [CA, CB, VA, VB, VBA, SA, G1, G2, TC, HA, HB] = ['ca', 'cb', 'va', 'vb', 'vx', 'sa', 'g1', 'g2', 'tc', 'ha', 'hb'].map(uid);
     const terms = 'terms-draft-2026-10-01';
     const privacy = 'privacy-draft-2026-10-01';
     const today = "(now() AT TIME ZONE 'Asia/Tokyo')::date";
@@ -446,6 +447,19 @@ async function r6(pool) {
         // Job training (migration 021): a cohort with A and B in it.
         ['INSERT INTO training_cohorts (id, slug, name) VALUES ($1, $2, $3)', [TC, `r6-${TC.slice(0, 8)}`, 'R6 cohort']],
         ["INSERT INTO training_memberships (cohort_id, user_id, role) VALUES ($1, $2, 'learner'), ($1, $3, 'learner')", [TC, A, B]],
+        // Study time (migration 022): for A and B, a stream with one signal and a closed day with one unit row.
+        ["INSERT INTO training_catalog_versions (course_key, sha256, manifest, loaded_by, note) VALUES ('r6-course', md5($1::uuid::text) || md5($1::uuid::text || 'k'), '{}', 'r6', 'r6')", [TC]],
+        ["INSERT INTO training_time_rule_sets (algorithm, sha256, params, loaded_by, note) VALUES ('study-time/v1', md5($1::uuid::text) || md5($1::uuid::text || 'r'), '{}', 'r6', 'r6')", [TC]],
+        // Yesterday's: the deletion's mark (its clock) is never before a stream's first signal (the CHECK).
+        [`INSERT INTO training_time_streams (user_id, cohort_id, unit_key, chain_id, chain_started_at, day, started_at)
+          SELECT v.u, $3::uuid, 'r6-unit', v.c, x.t, (x.t AT TIME ZONE 'Asia/Tokyo')::date, x.t
+            FROM (VALUES ($1::uuid, $4::uuid), ($2::uuid, $5::uuid)) AS v(u, c), (SELECT date_trunc('milliseconds', now() - interval '1 day') AS t) AS x`, [A, B, TC, HA, HB]],
+        ['INSERT INTO training_time_signals (stream_id, received_at, seq, flags) SELECT id, started_at, 0, 6 FROM training_time_streams WHERE user_id IN ($1, $2)', [A, B]],
+        [`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by)
+          SELECT u, $3::uuid, (now() AT TIME ZONE 'Asia/Tokyo')::date - 1, 'close', 'study-time/v1', (SELECT id FROM training_time_rule_sets WHERE sha256 = md5($3::uuid::text) || md5($3::uuid::text || 'r')),
+                 (SELECT id FROM training_catalog_versions WHERE sha256 = md5($3::uuid::text) || md5($3::uuid::text || 'k')), 7000, 0, 1, repeat('a', 64), 'staff'
+            FROM unnest(ARRAY[$1::uuid, $2::uuid]) AS u`, [A, B, TC]],
+        ["INSERT INTO training_time_unit_days (day_id, unit_key, counted_ms, over_cap_ms) SELECT id, 'r6-unit', 7000, 0 FROM training_time_days WHERE user_id IN ($1, $2)", [A, B]],
     ];
     for (const [sql, params] of seed) await pool.query(/** @type {string} */ (sql), /** @type {unknown[]} */ (params));
     const ACCEPT = `INSERT INTO legal_acceptances (user_id, terms_version, privacy_version) VALUES ($1::uuid, $2, $3)
@@ -466,8 +480,10 @@ async function r6(pool) {
         paths = (await client.query('SELECT storage_path FROM materials WHERE user_id = $1::uuid AND storage_path IS NOT NULL', [id])).rows;
         const deletedAt = (await client.query(DELETION.tombstone, [id, 'staff'])).rows[0].deleted_at;
         await client.query('UPDATE legal_acceptances SET account_deleted_at = $2 WHERE user_id = $1::uuid AND account_deleted_at IS NULL', [id, deletedAt]);
-        // The service's own statement (it reads the time from the tombstone row written above).
+        // The service's own statements (they read the time from the tombstone row written above).
         await client.query(DELETION_SQL.markTrainingMemberships, [id]);
+        await client.query(DELETION_SQL.markTrainingTimeStreams, [id]);
+        await client.query(DELETION_SQL.markTrainingTimeDays, [id]);
         await client.query(`INSERT INTO account_consent_proofs (consent_id, user_id, kind, policy_version, method, given_at, revoked_at, account_deleted_at)
             SELECT id, user_id, kind, policy_version, method, given_at, revoked_at, $2 FROM account_consents WHERE user_id = $1::uuid
             ON CONFLICT (consent_id) DO NOTHING`, [id, deletedAt]);
@@ -512,6 +528,12 @@ async function r6(pool) {
         trainingMarked: await n('SELECT count(*) AS n FROM training_memberships m JOIN account_deletions d ON d.user_id = m.user_id WHERE m.user_id = $1 AND m.account_deleted_at = d.deleted_at'),
         trainingLive: await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1 AND account_deleted_at IS NULL'),
         trainingB: await n('SELECT count(*) AS n FROM training_memberships WHERE user_id = $1 AND account_deleted_at IS NULL', [B]),
+        timeStreamsMarked: await n('SELECT count(*) AS n FROM training_time_streams s JOIN account_deletions d ON d.user_id = s.user_id WHERE s.user_id = $1 AND s.account_deleted_at = d.deleted_at'),
+        timeDaysMarked: await n('SELECT count(*) AS n FROM training_time_days t JOIN account_deletions d ON d.user_id = t.user_id WHERE t.user_id = $1 AND t.account_deleted_at = d.deleted_at'),
+        timeLive: await n('SELECT (SELECT count(*) FROM training_time_streams WHERE user_id = $1 AND account_deleted_at IS NULL) + (SELECT count(*) FROM training_time_days WHERE user_id = $1 AND account_deleted_at IS NULL) AS n'),
+        timeB: await n('SELECT (SELECT count(*) FROM training_time_streams WHERE user_id = $1 AND account_deleted_at IS NULL) + (SELECT count(*) FROM training_time_days WHERE user_id = $1 AND account_deleted_at IS NULL) AS n', [B]),
+        timeKept: await n(`SELECT (SELECT count(*) FROM training_time_signals g JOIN training_time_streams s ON s.id = g.stream_id WHERE s.user_id = $1)
+            + (SELECT count(*) FROM training_time_unit_days u JOIN training_time_days t ON t.id = u.day_id WHERE t.user_id = $1) AS n`),
         consents: await n('SELECT count(*) AS n FROM account_consents WHERE user_id = $1'),
         consentProofs: await n("SELECT count(*) AS n FROM account_consent_proofs WHERE user_id = $1 AND policy_version = 'guardian-ai-2026-10'"),
         provision: (await pool.query('SELECT client_id FROM ai_app_provision_records WHERE user_id = $1', [A])).rows.map((r) => (r.client_id === G1 ? 'used' : r.client_id)).join(),
@@ -520,13 +542,14 @@ async function r6(pool) {
     const want = {
         stub: 0, curriculaA: 0, versionInB: 'NULL', approvalAuthor: 'NULL', jobsA: 0, jobsB: 1, mcp: 0, materials: 0, journal: 0, resets: 0,
         lessonProgress: 0, lessonResets: 0, xpAwards: 0, learningDays: 0, reviewCards: 0, reviewLog: 0,
-        safetyKept: 1, billingKept: 1, usageA: 'true', ipKept: 1, acceptanceMarked: 1, acceptanceLive: 0, trainingMarked: 1, trainingLive: 0, trainingB: 1, consents: 0, consentProofs: 1,
+        safetyKept: 1, billingKept: 1, usageA: 'true', ipKept: 1, acceptanceMarked: 1, acceptanceLive: 0, trainingMarked: 1, trainingLive: 0, trainingB: 1,
+        timeStreamsMarked: 1, timeDaysMarked: 1, timeLive: 0, timeB: 2, timeKept: 2, consents: 0, consentProofs: 1,
         provision: 'used', tombstone: 'staff/null',
     };
     const wrong = Object.keys(want).filter((k) => got[k] !== want[k]);
     check('R6', wrong.length === 0 && paths.length === 1,
         wrong.length ? `after the deletion, unexpected: ${wrong.map((k) => `${k}=${got[k]} (want ${want[k]})`).join(', ')}`
-            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance and training membership marked with the tombstone time (B\'s live), stub 0');
+            : 'a seeded learner deleted in one transaction (upper-case id): own rows gone (lesson progress, reset rows, XP awards, learning days, review cards and the review log too), B\'s version kept with created_by NULL, jobs A 0 / B 1, today\'s usage row kept, proofs copied (1 consent, the used grant only), acceptance, training membership, study time stream and closed day marked with the tombstone time (their signal and unit rows kept; B\'s live), stub 0');
     const again = (await pool.query(ACCEPT, [A, terms, privacy])).rowCount;
     check('R6', again === 1, `after the deletion the same versions can be accepted again (a new account): inserted ${again}`);
     // Job training through the staff path (tools/core/training.js): the deleted account cannot be

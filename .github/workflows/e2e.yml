@@ -2,7 +2,7 @@
 # job name is a required check on main. The ruleset lists them by name, so renaming one blocks every
 # pull request until the ruleset changes too (server/tests/e2eWorkflow.test.js pins them).
 # - Database checks: the VM's pinned pgvector image with production's terse error log; every migration
-#   twice, the three verify scripts and the role SQL (scripts/ci/db-checks.sh). ubuntu-24.04: psql 16.
+#   twice, the four verify scripts and the role SQL (scripts/ci/db-checks.sh). ubuntu-24.04: psql 16.
 # - Server stack deploy: the real deploy-stack.sh with dummy values (deploy/risepath-vm/ci/), its health
 #   and smoke, then the admin MCP's database and /api/v2/health from the host. ubuntu-26.04: Docker 29
 #   and Compose 5, the majors the VM installs.
@@ -50,7 +50,7 @@ jobs:
   db:
     name: Database checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 42
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         timeout-minutes: 5
@@ -69,7 +69,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Migrations, verify scripts and role SQL on the VM's PostgreSQL image
-        timeout-minutes: 20
+        timeout-minutes: 23
         env:
           RISEPATH_CI_OUT: ${{ runner.temp }}/db-checks
         run: bash scripts/ci/db-checks.sh

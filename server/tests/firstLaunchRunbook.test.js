@@ -643,7 +643,7 @@ describe('first-launch.ja.md: the deploy order (D11) and the documents that link
     assert.match(vercel, /Vercel のプロジェクト `rise-path` はもうあり、`main` への push ごとにデプロイしている（Git 連携。Production Branch は `main`）。手順書 2\.6 で/u, 'D4');
     assert.doesNotMatch(vercel, /ゾーンを待つあいだに import 済みなら/u, 'D4');
     assert.match(read('doc/guides/risepath_vm_deployment.md'), /GitHub での実行は動いている。必須のチェックにするルールセットだけが残っている/u, 'D5');
-    assert.match(byoa, /（すでに動いている VM を更新するときだけ）.*新しい VM では最初のデプロイで 000–021 が当たっています。/u, 'D7');
+    assert.match(byoa, /（すでに動いている VM を更新するときだけ）.*新しい VM では最初のデプロイで 000–022 が当たっています。/u, 'D7');
     assert.match(vercel, /Cloudflare の読み取りの時間切れは 100〜125 秒ほど（未確認。/u, 'D8');
     assert.match(byoa, /Cloudflare の読み取りの時間切れは 100〜125 秒ほどです（未確認）。/u, 'D8');
     assert.doesNotMatch(byoa, /約 100 秒と言われています/u, 'D8');
