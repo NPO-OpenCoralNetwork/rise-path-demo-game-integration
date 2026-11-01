@@ -479,25 +479,27 @@ export function liveRange({ nowMs, startsOn, endsOn, addedOn, lastClosed, settin
  */
 
 /**
- * The instant up to which the stored evidence settles the count at nowMs: no later signal can change
- * an earlier instant (a chain's next pair starts at its last signal; a new chain's pairs and a new
- * input start at nowMs or later). The earliest last signal of the chains still open (not stopped, at
- * most the gapMs of its day or the next day old), else nowMs.
- * @param {{ nowMs: number, signals: Signal[], settings: Setting[] }} input signals: the evidence up to nowMs
+ * The instant up to which the stored evidence settles a day's count at nowMs: no later signal can
+ * change an earlier instant of that day. A chain's next pair starts at its last signal, and the day
+ * credits it only within the day's gapMs and up to its creditCapMs (the rules of a day that has
+ * begun no longer change); a new chain's pairs and a new input start at nowMs or later. The earliest
+ * of the day's end, nowMs, and the last signal (not before the day's start) of each chain the day
+ * may still credit: not stopped, at most the day's gapMs old, its next pair able to reach the day.
+ * @param {{ day: string, nowMs: number, signals: Signal[], counting: { gapMs: number, creditCapMs: number } }} input
+ *   signals: the evidence up to nowMs; counting: the day's rules
  */
-export function settledUntil({ nowMs, signals, settings }) {
+export function settledUntil({ day, nowMs, signals, counting }) {
+    const { start, end } = jstDayRange(day);
     /** @type {Map<string, Signal>} */
     const last = new Map();
     for (const s of signals) {
         const seen = last.get(s.chain);
         if (!seen || s.seq > seen.seq) last.set(s.chain, s);
     }
-    const gapOf = (/** @type {string} */ day) => settingOf(settings, day)?.rules.counting.gapMs ?? 0;
-    let until = nowMs;
+    let until = Math.max(start, Math.min(end, nowMs));
     for (const l of last.values()) {
-        if (l.stop || l.at >= until) continue;
-        const day = jstDayOf(l.at);
-        if (nowMs - l.at <= Math.max(gapOf(day), gapOf(nextDay(day)))) until = l.at;
+        if (l.stop || l.at >= until || nowMs - l.at > counting.gapMs || l.at + counting.creditCapMs <= start) continue;
+        until = Math.max(start, l.at);
     }
     return until;
 }
@@ -505,8 +507,10 @@ export function settledUntil({ nowMs, signals, settings }) {
 /**
  * A learner's study time in a cohort at nowMs: each closed day's current value, and the days not
  * closed yet counted from `signals` with each unit's time carried from the closed days, as the close
- * will count them, up to settledUntil (never stored). So no number goes down from one answer to the
- * next (a recount aside): what another open page's next signal can still change is not counted yet.
+ * will count them, each up to its settledUntil and a day only once the days before it are settled to
+ * their end (its set times carry their time); never stored. So no number goes down from one answer
+ * to the next (a recount aside): what another open page's next signal can still change is not
+ * counted yet.
  * status: 'not_configured' (no setting today, so nothing was ever counted), 'not_in_session'
  * (outside the cohort's dates, or a date missing) or 'ready'. units: today's unit list in its order,
  * each with its time over every day (closed and live). days: the newest LIVE_DAYS days from today
@@ -524,15 +528,17 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         if (!found) throw new RangeError(`liveTime: no setting for ${day}`);
         return found;
     };
-    const until = settledUntil({ nowMs, signals, settings });
     /** @type {{ days: Array<{ day: string, countedMs: number }>, carriedAfterMs: Map<string, number> }} */
     const counted = { days: [], carriedAfterMs: new Map(unitTotals) };
+    let settled = true;
     for (let day = range?.live?.fromDay ?? ''; range?.live && day <= range.live.toDay; day = nextDay(day)) {
         const { start, end } = jstDayRange(day);
         const daySetting = of(day);
-        const span = countSpan({ a: start, b: Math.min(end, Math.max(start, until)), signals, rules: daySetting.rules, setMs: daySetting.setMs, carriedMs: counted.carriedAfterMs, cohort });
+        const until = settled ? settledUntil({ day, nowMs, signals, counting: daySetting.rules.counting }) : start;
+        const span = countSpan({ a: start, b: until, signals, rules: daySetting.rules, setMs: daySetting.setMs, carriedMs: counted.carriedAfterMs, cohort });
         counted.days.push({ day, countedMs: span.countedMs });
         counted.carriedAfterMs = span.carriedAfterMs;
+        settled = until >= end;
     }
     /** @type {Map<string, LiveDay>} */
     const byDay = new Map(closedDays.map((d) => [d.day, { day: d.day, countedMs: d.countedMs, final: true }]));

@@ -51,17 +51,28 @@
  *       signal waits for the account lock and writes nothing (account_deleted, 401); signal first,
  *       the deletion service waits, then marks the new stream with the tombstone's time; control:
  *       the write without the account lock leaves a live stream for a deleted account
- *   T10 a close against a signal in progress (a chain's late signal on a final day): the close waits
- *       for the learner's lock and counts it; control: without the learner's lock the close misses it
+ *   T10 a close against a signal in progress, for each learner lock. closeDays': the write's
+ *       statements sent by this script on its own connection, not recordSignal (a chain's late signal
+ *       on a final day, uncommitted): the close waits and counts it; control: without the learner's
+ *       lock there, the close (awaited before their COMMIT) misses it. recordSignal's: the real write
+ *       held after its insert; a close started LEAD_MS later waits for its COMMIT, then closes the
+ *       final days as the pure function counts every stored signal (the new one in a closed day's
+ *       evidence only when the instants put it there); control: the write without its learner lock,
+ *       held until a close ends: the close does not wait
  *   T11 a signal against a setting in progress: it waits for the settings lock and is stored with
  *       the setting; control: without the lock it is refused (time_not_configured) although the
  *       setting's clock reading came before its own
  *   T12 a chain across 00:00 JST through the write's statements: one stream per day with the chain's
- *       start on both, and closing both days equals the pure function
+ *       start on both; the write's state (signalState) finds the chain's last signal (seq 3) over
+ *       both days' streams, with its time and the chain's start; closing both days equals the pure
+ *       function
  *   T13 the real write on the database clock: a first signal, a beat (its pair counted in the
  *       answer), too soon, a stop, after the stop; one stream and the flags; the GET's live values
- *   T14 a clock behind a closed day stores nothing; the live values read in one snapshot while a
- *       close commits between their statements (control: read committed counts the day twice)
+ *   T14 a clock behind a closed day stores nothing; the GET (readStudyTime) reads the live values in
+ *       one snapshot: its own close rolled back (the days stay open), a real close that commits on
+ *       another connection right after the read's closeState is not seen (the total is the pure
+ *       function's); control: the read's begin sent as a plain BEGIN (read committed) counts the
+ *       closed days twice
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -81,8 +92,7 @@ import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { accountLockKey, reopenAccount } from '../../tools/core/accountDeletions.js';
 import { TRAINING_SQL, addMember } from '../../tools/core/training.js';
 import {
-    TRAINING_TIME_SQL, closeDays, closeWindow, evidenceDigest, learnerDays, liveRange, liveTime, loadCatalog, loadRules, parseSettings,
-    readStudyTime, recordSignal, setCohortTime, signalOf,
+    TRAINING_TIME_SQL, closeDays, evidenceDigest, learnerDays, loadCatalog, loadRules, readStudyTime, recordSignal, setCohortTime, signalOf,
 } from '../../tools/core/trainingTime.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -219,30 +229,61 @@ async function deletionUpToStub(c, id) {
 }
 
 /**
- * A pool for the core whose FIRST connection (a signal's transaction) sends its statements with a
- * change; later ones (a close, the live values' read) are plain. `skip`: exact statements not sent
- * (a control without a lock); `holdAfter`: sleep holdMs after that exact statement, before COMMIT.
- * @param {pg.Pool} pool @param {{ skip?: string[], holdAfter?: string, holdMs?: number }} change
+ * A change to one connection's statements, each named exactly: `skip`, not sent (a control without a
+ * lock); `send`, sent as another text (COMMIT as ROLLBACK, a begin as a plain BEGIN); `holdAfter`,
+ * once it returned and before going on, sleep holdMs in the database or, with `until`, wait for the
+ * promise it returns (called then: the script sees the hold begin); `after`, then `run` (another
+ * connection's transaction between two statements of this one).
+ * @typedef {{ skip?: string[], send?: Map<string, string>, holdAfter?: string, holdMs?: number, until?: () => Promise<unknown>,
+ *   after?: string, run?: () => Promise<unknown> }} ConnectionChange
  */
-function firstConnection(pool, { skip = [], holdAfter = '', holdMs = 0 }) {
-    let used = false;
+
+/**
+ * A pool for the core whose n-th connection (in the order the core asks for them) sends its
+ * statements with changes[n - 1]; later ones are plain.
+ * @param {pg.Pool} pool @param {ConnectionChange[]} changes
+ * @returns {any} the core's pool
+ */
+function changedConnections(pool, changes) {
+    let asked = 0;
     return {
         query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => pool.query(sql, params),
         connect: async () => {
+            const change = changes[asked];
+            asked += 1;
             const client = await pool.connect();
-            if (used) return client;
-            used = true;
+            if (!change) return client;
+            const { skip = [], send = new Map(), holdAfter = '', holdMs = 0, until = null, after = '', run = null } = change;
             return {
                 query: async (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
                     if (skip.includes(sql)) return { rows: [], rowCount: 0 };
-                    const result = await client.query(sql, params);
-                    if (sql === holdAfter && holdMs) await client.query('SELECT pg_sleep($1)', [holdMs / 1000]);
+                    const result = await client.query(send.get(sql) ?? sql, params);
+                    if (sql === holdAfter && until) await until();
+                    else if (sql === holdAfter && holdMs) await client.query('SELECT pg_sleep($1)', [holdMs / 1000]);
+                    if (sql === after && run) await run();
                     return result;
                 },
                 release: (/** @type {any} */ error) => client.release(error),
             };
         },
     };
+}
+
+/**
+ * A pool for the core whose FIRST connection (a signal's transaction) sends its statements with a
+ * change; later ones (a close, the live values' read) are plain.
+ * @param {pg.Pool} pool @param {ConnectionChange} change
+ */
+const firstConnection = (pool, change) => changedConnections(pool, [change]);
+
+/** A promise the script settles: shut resolves once open() is called. */
+function gate() {
+    let open = () => {};
+    /** @type {Promise<void>} */
+    const shut = new Promise((resolve) => {
+        open = () => resolve();
+    });
+    return { shut, open: () => open() };
 }
 
 /**
@@ -276,6 +317,11 @@ const sendSignal = (pool, user, cohort, s = {}) => recordSignal({ userId: user, 
     signal: { unitKey: 'unit-a', chainId: uid('chn'), seq: 0, stop: false, focus: true, input: true, ...s } });
 /** @param {pg.Pool} pool @param {string} user @param {boolean} liveOnly */
 const streamsOf = (pool, user, liveOnly) => count(pool, `SELECT count(*) AS n FROM training_time_streams WHERE user_id = $1${liveOnly ? ' AND account_deleted_at IS NULL' : ''}`, [user]);
+/** Every live stored signal of a learner in a cohort, as the counting reads them. @param {pg.Pool} pool @param {string} user @param {string} cohort */
+const storedSignals = async (pool, user, cohort) => (await pool.query(`SELECT s.chain_id, s.unit_key, floor(extract(epoch FROM s.chain_started_at) * 1000)::bigint AS born, g.seq,
+    floor(extract(epoch FROM g.received_at) * 1000)::bigint AS at, g.flags
+    FROM training_time_streams s JOIN training_time_signals g ON g.stream_id = s.id
+    WHERE s.user_id = $1 AND s.cohort_id = $2 AND s.account_deleted_at IS NULL ORDER BY s.chain_id, g.seq`, [user, cohort])).rows.map(signalOf);
 
 /** @param {pg.Pool} pool */
 async function t1(pool, { catalogId, ruleSetId }) {
@@ -657,7 +703,8 @@ async function t9(pool, { catalogId, ruleSetId }) {
         await c1.query('COMMIT');
         const { r, ms } = await sending;
         const streams = await streamsOf(pool, first, false);
-        check('T9', ms >= BLOCKED_MS && r.status === 'deleted_account' && streams === 0, `deletion first: the signal waited ${ms} ms and answered ${r.status ?? r.error_type} (401); streams ${streams}`);
+        check('T9', ms >= BLOCKED_MS && r.status === 'deleted_account' && streams === 0,
+            `deletion first: the signal waited ${ms} ms and answered ${r.status ?? r.error_type}${r.status === 'deleted_account' ? ' (401 at the route)' : ''}; streams ${streams}`);
     } finally {
         c1.release();
     }
@@ -678,7 +725,7 @@ async function t9(pool, { catalogId, ruleSetId }) {
         const marked = await count(pool, 'SELECT count(*) AS n FROM training_time_streams s JOIN account_deletions d USING (user_id) WHERE s.user_id = $1 AND s.account_deleted_at = d.deleted_at', [writer]);
         const live = await streamsOf(pool, writer, true);
         check('T9', written.status === 'accepted' && deleted?.status === 'deleted' && waited >= BLOCKED_MS && marked === 1 && live === 0,
-            `signal first: stored (${written.status}); the deletion service (${deleted?.status}) waited ${waited} ms, then marked the new stream with the tombstone time (${marked}); live ${live}`);
+            `signal first: the write ${written.status ?? written.error_type}; the deletion service (${deleted?.status}) waited ${waited} ms; streams marked with the tombstone time ${marked}, live ${live}`);
     } finally {
         await fs.rm(uploadRoot, { recursive: true, force: true }).catch(() => {});
     }
@@ -698,9 +745,13 @@ async function t9(pool, { catalogId, ruleSetId }) {
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
 async function t10(pool, { catalogId, ruleSetId }) {
-    // Day 2 is final (two days ago). A late signal of a chain, with a clock reading before the close's,
-    // is held uncommitted while the close runs: under the learner's lock the close waits for it.
-    const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
+    // closeDays' learner lock, against the write's statements sent by this script on its own
+    // connection (not through recordSignal): day 2 is final (two days ago), and a late signal of a
+    // chain, with a clock reading before the close's, is held uncommitted while the close runs. With
+    // the learner's lock there, the close waits for it and counts it; control: without it, the close
+    // (awaited before their COMMIT: none of their locks is in its way, so on any runner) misses it.
+    const d1 = await dayFromToday(pool, -3);
+    const d2 = nextDay(d1);
     const [locked, unlocked] = [uid('t10l'), uid('t10u')];
     const cohort = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [locked, unlocked] });
     for (const [user, learnerLock] of /** @type {const} */ ([[locked, true], [unlocked, false]])) {
@@ -716,23 +767,86 @@ async function t10(pool, { catalogId, ruleSetId }) {
             await c.query(TRAINING_TIME_SQL.insertStream, [user, cohort, late.unit, late.chain, iso(late.born), iso(late.at)]);
             const inserted = (await c.query(TRAINING_TIME_SQL.insertSignal, [user, late.chain, iso(late.at), late.seq, 6])).rowCount;
             const closing = close(pool, user, cohort);
-            await sleep(LEAD_MS);
-            await c.query('COMMIT');
-            const closed = /** @type {any} */ (await closing);
+            /** @type {any} */
+            let closed;
+            if (learnerLock) {
+                await sleep(LEAD_MS);
+                await c.query('COMMIT');
+                closed = await closing;
+            } else {
+                closed = await closing;
+                await c.query('COMMIT');
+            }
             const row = (await dayRows(pool, user, cohort)).find((r) => r.day === d2);
             const w = evidenceWindow(jstDayRange(d2).start, jstDayRange(d2).end, RULES.counting);
             const all = [...signals, late].filter((s) => s.at >= w.from && s.at <= w.to);
+            const lateOne = row?.evidence_sha256 === evidenceDigest(all) ? 'included' : row?.evidence_sha256 === evidenceDigest(all.filter((s) => s !== late)) ? 'missed' : 'neither';
             if (learnerLock) {
-                check('T10', inserted === 1 && closed.status === 'closed' && row?.signals === 11 && row.evidence_sha256 === evidenceDigest(all),
-                    `a close waits for a signal in progress (the learner's lock): day 2 closed with ${row?.signals} signals, the late one included`);
+                check('T10', inserted === 1 && closed.status === 'closed' && row?.signals === 11 && lateOne === 'included',
+                    `closeDays' learner lock, against the write's statements sent by this script (uncommitted for ${LEAD_MS} ms after the close began): the close ${closed.status ?? closed.error_type}, day 2 with ${row?.signals} signals, the late one ${lateOne}`);
             } else {
-                check('T10', inserted === 1 && closed.status === 'closed' && row?.signals === 10 && row.evidence_sha256 !== evidenceDigest(all),
-                    `control, the signal without the learner's lock: the close missed it (day 2 closed with ${row?.signals} of the 11 signals in its window)`);
+                check('T10', inserted === 1 && closed.status === 'closed' && row?.signals === 10 && lateOne === 'missed',
+                    `control, those statements without the learner's lock (the close awaited before their COMMIT): the close ${closed.status ?? closed.error_type}, day 2 with ${row?.signals} of the ${all.length} signals in its window, the late one ${lateOne}`);
             }
         } finally {
             c.release();
         }
     }
+
+    // recordSignal's learner lock, through the real write: learners of a cohort in session from d1,
+    // each with a chain stored on d2, so a close finds final days. The write (a new chain's first
+    // signal) is held HOLD_MS after its insert; a close started LEAD_MS later waits for its COMMIT,
+    // then closes the final days as the pure function counts every stored signal (the new one is in a
+    // closed day's evidence only when the instants put it there; recordSignal's own close, after its
+    // COMMIT, queues behind this one). Control: the write without its learner lock, held after its
+    // insert until a close started then has ended (a close that waited for the write would end only
+    // at the lock timeout, account_busy).
+    const ends = await dayFromToday(pool, 30);
+    const [writer, ctrl] = [uid('t10w'), uid('t10x')];
+    const open = await cohortWith(pool, { startsOn: d1, endsOn: ends, catalogId, ruleSetId, from: d1, learners: [writer, ctrl] });
+    for (const user of [writer, ctrl]) await storeChain(pool, { user, cohort: open, unit: 'unit-b', from: jstDayRange(d2).start + 3_600_000, n: 10 });
+    const chainId = uid('chn');
+    const writing = sendSignal(firstConnection(pool, { holdAfter: TRAINING_TIME_SQL.insertSignal, holdMs: HOLD_MS }), writer, open, { chainId });
+    await sleep(LEAD_MS);
+    const t0 = Date.now();
+    const closed = /** @type {any} */ (await close(pool, writer, open));
+    const waited = Date.now() - t0;
+    const written = await writing;
+    const stored = await storedSignals(pool, writer, open);
+    const mine = stored.find((s) => s.chain === chainId);
+    const rows = closed.status === 'closed' ? (await dayRows(pool, writer, open)).filter((r) => r.day <= closed.toDay) : [];
+    const want = closed.status === 'closed'
+        ? countDays({ fromDay: d1, toDay: closed.toDay, signals: stored, rulesOf: () => RULES, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, ends) }).days
+        : [];
+    let asPure = rows.length > 0 && rows.length === want.length;
+    let mineIn = false;
+    for (const [i, row] of rows.entries()) {
+        const w = evidenceWindow(jstDayRange(row.day).start, jstDayRange(row.day).end, RULES.counting);
+        const evidence = stored.filter((s) => s.at >= w.from && s.at <= w.to);
+        mineIn ||= mine !== undefined && evidence.includes(mine);
+        asPure &&= row.day === want[i]?.day && row.counted_ms === want[i].countedMs && row.signals === evidence.length && row.evidence_sha256 === evidenceDigest(evidence);
+    }
+    check('T10', written.status === 'accepted' && mine !== undefined && closed.status === 'closed' && waited >= BLOCKED_MS && asPure,
+        `recordSignal's learner lock, the real write held ${HOLD_MS} ms after its insert (then ${written.status ?? written.error_type}): a close started ${LEAD_MS} ms later waited ${waited} ms, then ${closed.status ?? closed.error_type} ${rows.length} days ${asPure ? 'as' : 'unlike'} the pure function on every stored signal (the new one in a closed day's evidence: ${mineIn ? 'yes' : 'no'})`);
+
+    const held = gate();
+    const ended = gate();
+    const sending = sendSignal(firstConnection(pool, {
+        skip: [TRAINING_SQL.learnerLock], holdAfter: TRAINING_TIME_SQL.insertSignal, until: () => { held.open(); return ended.shut; },
+    }), ctrl, open);
+    const reached = await Promise.race([held.shut.then(() => true), sending.then(() => false)]);
+    const t1 = Date.now();
+    /** @type {any} */
+    let free;
+    try {
+        free = await close(pool, ctrl, open);
+    } finally {
+        ended.open();
+    }
+    const freeMs = Date.now() - t1;
+    const sent = await sending;
+    check('T10', reached && free.status === 'closed' && sent.status === 'accepted',
+        `control, the real write without its learner lock: ${reached ? 'held after its insert' : 'never held'}, a close started then ${free.status ?? free.error_type} in ${freeMs} ms before the write's COMMIT (the write then ${sent.status ?? sent.error_type})`);
 }
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
@@ -759,7 +873,9 @@ async function t11(pool, { catalogId, ruleSetId }) {
         await c1.query('COMMIT');
         const { r, ms } = await sending;
         const after = await count(pool, 'SELECT count(*) AS n FROM training_time_signals g JOIN training_time_streams s ON s.id = g.stream_id WHERE s.user_id = $1 AND g.received_at > (SELECT set_at FROM training_cohort_time_settings WHERE cohort_id = $2)', [waiter, a.cohort]);
-        check('T11', set !== null && ms >= BLOCKED_MS && r.status === 'accepted' && after === 1, `a signal waited ${ms} ms for a setting in progress, then was ${r.status ?? r.error_type} with it (received after its set_at: ${after})`);
+        const outcome = r.status === 'accepted' ? 'was stored with it' : `answered ${r.status ?? r.error_type}${r.reason ? ` (${r.reason})` : ''}`;
+        check('T11', set !== null && ms >= BLOCKED_MS && r.status === 'accepted' && after === 1,
+            `a signal waited ${ms} ms for a setting in progress, then ${outcome} (signals received after its set_at: ${after})`);
     } finally {
         c1.release();
     }
@@ -796,6 +912,12 @@ async function t12(pool, { catalogId, ruleSetId }) {
     check('T12', streams.length === 2 && streams[0].day === d1 && streams[1].day === d2 && streams.every((s) => Number(s.born) === born)
         && Number(streams[0].started) === born && Number(streams[1].started) === born + 14 * S && shape === `${d1.slice(5)} [0,1], ${d2.slice(5)} [2,3]`,
         `a chain across 00:00 JST has one stream per day with the chain's start on both: ${shape}`);
+    // The write's state of that chain (as recordSignal reads it before admitSignal): its last signal
+    // over every live stream of the account, here the second day's.
+    const state = (await pool.query(TRAINING_TIME_SQL.signalState, [user, cohort, signals[0].chain, 'unit-b'])).rows[0];
+    const fromMidnight = (/** @type {unknown} */ ms) => `${(Number(ms) - jstDayRange(d2).start) / S} s`;
+    check('T12', Number(state?.chain_seq) === 3 && Number(state?.chain_at) === signals[3].at && Number(state?.chain_born) === born,
+        `the write's state (signalState) of the chain: last seq ${state?.chain_seq} at ${fromMidnight(state?.chain_at)} from 00:00 JST, born at ${fromMidnight(state?.chain_born)}`);
     const closed = /** @type {any} */ (await close(pool, user, cohort));
     const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days;
     const rows = await dayRows(pool, user, cohort);
@@ -805,8 +927,9 @@ async function t12(pool, { catalogId, ruleSetId }) {
 
 /** @param {pg.Pool} pool @param {{ catalogId: string }} ids */
 async function t13(pool, { catalogId }) {
-    // The real write on the real clock: rules with a short minimum spacing (1 s), one chain: a first
-    // signal, a beat, a stop, then nothing more of it; the rows, the answers and the GET.
+    // The real write on the real clock: rules whose minimum spacing is the least the rules schema
+    // accepts (1 s, shared/training/timeRules.js; artificial), one chain: a first signal, a beat, a
+    // stop, then nothing more of it; the rows, the answers and the GET.
     const fast = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, collection: { ...RULES_IN.collection, minSpacingMs: 1 * S } }, loadedBy: 'verify', note: 'T13', pool }));
     const user = uid('t13u');
     const { cohort } = await learnerToday(pool, { catalogId, ruleSetId: String(fast.id), learners: [user] });
@@ -843,37 +966,32 @@ async function t14(pool, { catalogId, ruleSetId }) {
     const r = await sendSignal(pool, user, cohort);
     check('T14', r.status === 'clock_behind' && await streamsOf(pool, user, false) === 0, `a clock not past a closed day's evidence window stores nothing: ${r.status ?? r.error_type}`);
 
-    // The live values read in one snapshot: a close that commits between the read's statements
-    // (readLive's order: closeState, closeSettings, unitTotals, currentDays, evidence) is not seen
-    // half; read committed (control) counts the closed day twice.
-    const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
-    const totals = [];
+    // The live values read in one snapshot, through the GET (readStudyTime) on a pool whose 1st
+    // connection (its own close) sends ROLLBACK in place of COMMIT, so the days stay open, and whose
+    // 2nd (readLive) has a real close commit both days on another connection right after closeState
+    // returns, before the other reads (closeSettings, unitTotals, currentDays, evidence). Control: the
+    // read's begin sent as a plain BEGIN (read committed) counts the closed days twice.
+    const d1 = await dayFromToday(pool, -3);
+    const d2 = nextDay(d1);
+    const reads = [];
     for (const begin of [TRAINING_TIME_SQL.beginRead, 'BEGIN']) {
         const learner = uid('t14r');
         const c14 = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [learner] });
         const signals = await storeChain(pool, { user: learner, cohort: c14, unit: 'unit-b', from: jstDayRange(d2).start + 3_600_000, n: 10 });
-        const c = await pool.connect();
-        try {
-            await c.query(begin);
-            const state = (await c.query(TRAINING_TIME_SQL.closeState, [learner, c14])).rows[0];
-            await close(pool, learner, c14);
-            const settings = /** @type {any[]} */ (parseSettings((await c.query(TRAINING_TIME_SQL.closeSettings, [c14])).rows));
-            const at = { nowMs: Number(state.now_ms), startsOn: state.starts_on, endsOn: state.ends_on, addedOn: state.added_on, lastClosed: state.last_closed, settings };
-            const unitTotals = new Map((await c.query(TRAINING_TIME_SQL.unitTotals, [learner, c14])).rows.map((row) => [String(row.unit_key), Number(row.counted_ms)]));
-            const closedDays = (await c.query(TRAINING_TIME_SQL.currentDays, [learner, c14])).rows.map((row) => ({ day: String(row.day), countedMs: Number(row.counted_ms) }));
-            const live = liveRange(at)?.live;
-            const window = live ? closeWindow({ ...live, settings }) : null;
-            const evidence = live && window ? (await c.query(TRAINING_TIME_SQL.evidence, [learner, c14, live.fromDay, live.toDay, iso(window.from), iso(Math.min(window.to, at.nowMs))])).rows.map(signalOf) : [];
-            await c.query('COMMIT');
-            const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days.reduce((n, d) => n + d.countedMs, 0);
-            totals.push({ got: liveTime({ ...at, closedDays, unitTotals, signals: evidence }).totalMs, want });
-        } finally {
-            c.release();
-        }
+        /** @type {any} */
+        let between = null;
+        const changed = changedConnections(pool, [
+            { send: new Map([['COMMIT', 'ROLLBACK']]) },
+            { send: new Map([[TRAINING_TIME_SQL.beginRead, begin]]), after: TRAINING_TIME_SQL.closeState, run: async () => { between = await close(pool, learner, c14); } },
+        ]);
+        const read = /** @type {any} */ (await readStudyTime({ userId: learner, cohortId: c14, pool: changed }));
+        const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days.reduce((n, d) => n + d.countedMs, 0);
+        reads.push({ status: read.status ?? read.error_type, got: Number(read.time?.totalMs), want, between: between?.status === 'closed' ? between.days : 0 });
     }
-    const [snap, control] = totals;
-    check('T14', snap.got === snap.want && snap.want > 0 && control.got === 2 * control.want,
-        `the live values in one snapshot while a close commits: ${snap.got / S} s (= ${snap.want / S} s); control, read committed: ${control.got / S} s, the closed day counted twice`);
+    const [snap, control] = reads;
+    const twice = control.got === 2 * control.want;
+    check('T14', snap.status === 'read' && snap.between === 2 && snap.got === snap.want && snap.want > 0 && control.status === 'read' && control.between === 2 && twice,
+        `the GET while a close commits ${snap.between} days between its statements: ${snap.got / S} s (the pure function ${snap.want / S} s); control, its begin as a plain BEGIN, with ${control.between} days closed between: ${control.got / S} s${twice ? ', the closed days counted twice' : ''}`);
 }
 
 export async function main(argv = process.argv.slice(2)) {

@@ -388,12 +388,13 @@ export function studyReason({ now, chain, signal, signals, counting, countingOf 
     const seen = last.get(s.chain);
     if (!seen || s.seq > seen.seq) last.set(s.chain, s);
   }
+  // admitSignal decides a page's next signal with today's rules: its open places are today's.
+  const places = [...last.values()].filter((l) => !l.stop && now - l.at <= counting.gapMs);
+  /** How many open places are newer than `p` (admitSignal's other_place rule for p's next signal). @param {Signal} p */
+  const newer = (p) => places.filter((q) => q.chain !== p.chain && (q.born > p.born || (q.born === p.born && q.chain < p.chain))).length;
   const gapMs = rules.gapMs;
-  const open = [...last.values()].filter((l) => !l.stop && now - l.at <= gapMs);
-  /** How many open chains are newer than `p` (admitSignal's other_place rule for p's next signal). @param {Signal} p */
-  const newer = (p) => open.filter((q) => q.chain !== p.chain && (q.born > p.born || (q.born === p.born && q.chain < p.chain))).length;
-  const pending = open
-    .filter((l) => l.chain !== chain.id && l.at < now && newer(l) < maxPlaces)
+  const pending = [...last.values()]
+    .filter((l) => l.chain !== chain.id && !l.stop && l.at < now && now - l.at <= gapMs && newer(l) < maxPlaces)
     .map((l) => ({ ...l, seq: l.seq + 1, at: now, stop: false, input: false }));
   const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting: rules }, setMs: new Map(), carriedMs: new Map(), cohort });
   const mine = at.units.find((u) => u.unit === chain.unit);

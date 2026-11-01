@@ -13,15 +13,22 @@
 //   clock reading in whole milliseconds that the inserts take as a parameter, stored only while the
 //   stub exists, in the stream row of its Japan-time day (the rows pool.addSignal seeds); each
 //   refusal (409) and each ignore rolled back right after the decision with nothing stored, the
-//   page's next beat (nextInMs) only while it keeps its chain; who may send one (the stub first: a
+//   page's next beat (nextInMs) only while it keeps its chain in session (null for an ignored stop,
+//   after the chain's stop, after the cohort's last day); who may send one (the stub first: a
 //   deletion that committed during the wait); the clock guard after a close (the closed day's end +
-//   the gapMs it was counted with); then a close (computed by 'api') only once a day may be final,
-//   whose failure keeps the signal, and the state as of the signal's clock in one read-only
-//   snapshot (none for a stop), with the pure function's numbers;
+//   the gapMs it was counted with); then a close (computed by 'api') only once a day is final (with
+//   yesterday's gapMs, as closeRange), whose failure keeps the signal, and the state as of the
+//   signal's clock in one read-only snapshot (none for a stop), with the pure function's numbers and
+//   reason (each day's rules for a pair across 00:00; no look-ahead for a page maxPlaces pushes out);
 // - reading study time (readStudyTime): learners only (the membership read decides before any
 //   transaction), the close, then one read-only snapshot; the answer's keys in order, its statuses
 //   (beatMs only in session), the newest LIVE_DAYS days, the pure function's numbers;
-// - the pure parts behind them: the signal's body (exactly six keys), closeDue, liveRange, liveTime.
+// - the live values up to the settled instant (settledUntil: the earliest last signal of a chain
+//   still open), the full count with one page; no number goes down from one answer or read to the
+//   next (a seeded property over random pages, which also checks countDays and the closed rows
+//   once every page stopped or went quiet);
+// - the pure parts behind them: the signal's body (exactly six keys), closeDue, liveRange, liveTime,
+//   settledUntil.
 // The values are artificial, not the school's (training-plan D9).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +36,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { canonicalJson } from '../../shared/lesson/canonical.js';
 import { manifestCanonical, setMsOf } from '../../shared/training/courseManifest.js';
-import { cohortRange, countDays, evidenceWindow, jstDayRange } from '../../shared/training/studyTime.js';
+import { cohortRange, countDays, countSpan, evidenceWindow, jstDayOf, jstDayRange, studyReason } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import {
@@ -52,6 +59,7 @@ import {
     recordSignal,
     setCohortTime,
     settingOf,
+    settledUntil,
     signalOf,
     stateAfterSignal,
 } from '../../tools/core/trainingTime.js';
@@ -522,6 +530,13 @@ function pureState({ signals, today, toDay = today, endsOn = '2026-11-30', unit 
 const beats = ({ id, unit, from, n, every = 7 * S }) => Array.from({ length: n }, (_, seq) => ({ chain: id, seq, unit, born: from, at: from + seq * every, stop: false, focus: true, input: true }));
 /** A closeSettings row (the parsed versions as parseSettings reads them). */
 const settingRow = (id, effectiveFrom, { rules = RULES_IN, manifest = COURSE } = {}) => ({ id, effective_from: effectiveFrom, rule_set_id: `r${id}`, catalog_version_id: `k${id}`, params: rules, manifest });
+/** Artificial rules with other counting values. */
+const countingWith = (patch) => ({ ...RULES_IN, counting: { ...RULES_IN.counting, ...patch } });
+/** Every signal the pool stores, as the counting reads it. */
+const storedSignals = (pool) => pool.state.signals.map((g) => {
+    const s = pool.state.streams.find((x) => x.id === g.stream_id);
+    return signalOf({ chain_id: s.chain_id, seq: g.seq, unit_key: s.unit_key, born: s.chain_started_at, at: g.received_at, flags: g.flags });
+});
 
 describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
     it('a new chain\'s seq 0, then its later seqs: decided and stored in one transaction under the three locks with lower-case ids (COMMIT), then the state in one read-only snapshot with the pure function\'s numbers; no close while no day is final', async () => {
@@ -741,6 +756,55 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), not stored', () =
         pool.setClock(end + 23 * S);
         assert.deepEqual(await unstored(pool, { seq: 2 }), { status: 'refused', reason: 'not_in_session' });
     });
+
+    it('nextInMs: null for an ignored stop (a duplicate one), for any signal after the chain\'s stop (chain_ended, a duplicate of a seq at or below the stop) and after the cohort\'s last day (a signal stored in the grace: the page stops); beatMs while the chain goes on in session', async () => {
+        const t0 = at('2026-11-01T03:00:00Z');
+        const { pool } = await seeded({ clock: t0 });
+        const next = (result) => [result.status, result.reason ?? null, result.nextInMs];
+        const answers = [next(await send(pool))];
+        pool.setClock(t0 + 7 * S);
+        answers.push(next(await send(pool, { seq: 1 })));
+        pool.setClock(t0 + 8 * S);
+        for (const patch of [{ seq: 2 }, { seq: 1 }, { seq: 1, stop: true }, { seq: 0, stop: true }]) answers.push(next(await unstored(pool, patch)));
+        answers.push(next(await send(pool, { seq: 2, stop: true }))); // a stop passes too_soon
+        pool.setClock(t0 + 15 * S);
+        for (const patch of [{ seq: 2, stop: true }, { seq: 2 }, { seq: 1 }, { seq: 3 }, { seq: 3, stop: true }]) answers.push(next(await unstored(pool, patch)));
+        assert.deepEqual(answers, [
+            ['accepted', null, 7 * S],
+            ['accepted', null, 7 * S],
+            ['ignored', 'too_soon', 7 * S],
+            ['ignored', 'duplicate', 7 * S],
+            ['ignored', 'duplicate', null], // a stop that is not stored: the page ends the chain anyway
+            ['ignored', 'duplicate', null],
+            ['accepted', null, null], // the stop
+            ['ignored', 'duplicate', null], // the stop again
+            ['ignored', 'duplicate', null], // the stop's seq without the stop
+            ['ignored', 'duplicate', null], // a seq below the stop
+            ['ignored', 'chain_ended', null],
+            ['ignored', 'chain_ended', null],
+        ]);
+        assert.deepEqual(pool.state.signals.map((g) => [g.seq, g.flags]), [[0, 6], [1, 6], [2, 7]]);
+        // After the last day a known chain's signal is stored only to close its last pair: the page sends no more (null), whatever the answer.
+        const end = jstDayRange('2026-11-03').end;
+        const { pool: ended } = await seeded({ endsOn: '2026-11-03', clock: end - 10 * S });
+        const graced = [next(await send(ended))];
+        ended.setClock(end - 1);
+        graced.push(next(await send(ended, { seq: 1 })));
+        ended.setClock(end + 4 * S);
+        graced.push(next(await send(ended, { seq: 2 })));
+        ended.setClock(end + 5 * S);
+        for (const patch of [{ seq: 2 }, { seq: 3 }]) graced.push(next(await unstored(ended, patch)));
+        graced.push(next(await send(ended, { seq: 3, stop: true })));
+        assert.deepEqual(graced, [
+            ['accepted', null, 7 * S],
+            ['accepted', null, 7 * S], // 1 ms before the end: in session
+            ['accepted', null, null], // in the grace (state: not_in_session)
+            ['ignored', 'duplicate', null],
+            ['ignored', 'too_soon', null],
+            ['accepted', null, null], // its stop
+        ]);
+        assert.deepEqual(ended.state.signals.map((g) => [g.seq, g.flags]), [[0, 6], [1, 6], [2, 6], [3, 7]]);
+    });
 });
 
 describe('tools/core/trainingTime.js: who may send a signal', () => {
@@ -876,6 +940,89 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
         due.pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: at('2026-11-04T02:59:53Z'), seq: 0, at: at('2026-11-04T02:59:53Z'), input: true });
         assert.deepEqual(await send(due.pool, { seq: 1, stop: true }), { status: 'accepted', nextInMs: null, state: null });
         assert.deepEqual(due.pool.tx(), [...STORED, ...CLOSING, 'COMMIT']);
+    });
+
+    it('a close after a signal decides with yesterday\'s gapMs (closeRange\'s rule): on the first day of a setting with a smaller gapMs none runs from the end of yesterday + today\'s gapMs to the end + yesterday\'s, one runs 1 ms later; with a larger one, 1 ms after the end + yesterday\'s too', async () => {
+        const end = jstDayRange('2026-11-03').end;
+        for (const todayGapMs of [17 * S, 29 * S]) {
+            const { pool, catalog } = await seeded({ clock: at('2026-11-03T03:00:00Z') });
+            const rules = /** @type {any} */ (await loadRules({ input: countingWith({ gapMs: todayGapMs }), loadedBy: 'staff-a', note: 'another gap', pool }));
+            pool.addSetting({ cohortId: COHORT, catalogId: catalog.id, ruleSetId: rules.id, effectiveFrom: '2026-11-04' });
+            assert.deepEqual(await close(pool), { status: 'closed', days: 2, fromDay: '2026-11-01', toDay: '2026-11-02' });
+            let n = 0;
+            /** A new chain's first signal at `clock`: the statements its request sent. */
+            const sentAt = async (clock) => {
+                pool.setClock(clock);
+                const mark = pool.tx().length;
+                n += 1;
+                const result = /** @type {any} */ (await send(pool, { chainId: chainId(n) }));
+                assert.deepEqual([result.status, result.closeError], ['accepted', undefined], JSON.stringify(result));
+                return pool.tx().slice(mark);
+            };
+            const early = todayGapMs < 23 * S ? [end + todayGapMs + 1, end + 20 * S, end + 23 * S] : [end + 23 * S];
+            for (const clock of early) {
+                assert.deepEqual(await sentAt(clock), [...STORED, ...LIVE_READ], `today's gapMs ${todayGapMs / S} s: no close at the end + ${clock - end} ms`);
+            }
+            assert.deepEqual(pool.state.days.map((d) => d.day), ['2026-11-01', '2026-11-02']);
+            assert.deepEqual(await sentAt(end + 23 * S + 1), [...STORED, ...CLOSING, 'COMMIT', ...LIVE_READ], `today's gapMs ${todayGapMs / S} s`);
+            assert.deepEqual(pool.state.days.map((d) => [d.day, d.computed_by]), [['2026-11-01', 'staff'], ['2026-11-02', 'staff'], ['2026-11-03', API_CLOSER]]);
+        }
+    });
+
+    it('the reason: a pair across 00:00 on the first day of a setting with another gapMs is judged with each day\'s rules, as the pure studyReason with countingOf (not with today\'s rules for both days); the numbers as each day counts them', async () => {
+        const end = jstDayRange('2026-11-03').end;
+        const cohort = cohortRange('2026-11-01', '2026-11-30');
+        const WIDE = countingWith({ gapMs: 29 * S });
+        // A pair of 26 s across 00:00 JST of 11-04 (the second signal without input); creditCapMs 13 s. todays: the
+        // answer with today's rules for both days.
+        const cases = [
+            // 23 s, then 29 s from 11-04: a break on 11-03; 11-04 credits it from its first signal, but those 13 s end before 00:00.
+            { label: 'a larger gapMs, credited before 00:00 only', yesterday: RULES_IN, today: WIDE, from: end - 20 * S, reason: 'gap', todays: null, days: [0, 0] },
+            { label: 'a larger gapMs, credited after 00:00', yesterday: RULES_IN, today: WIDE, from: end - 5 * S, reason: null, todays: null, days: [0, 8 * S] },
+            // 29 s, then 23 s from 11-04: 11-03 credits it up to 00:00; a break on 11-04.
+            { label: 'a smaller gapMs, credited on yesterday', yesterday: WIDE, today: RULES_IN, from: end - 5 * S, reason: null, todays: 'gap', days: [5 * S, 0] },
+        ];
+        for (const { label, yesterday, today, from, reason, todays, days } of cases) {
+            const { pool, catalog } = await seeded({ clock: from, rulesIn: yesterday });
+            const rules = /** @type {any} */ (await loadRules({ input: today, loadedBy: 'staff-a', note: 'another gap', pool }));
+            pool.addSetting({ cohortId: COHORT, catalogId: catalog.id, ruleSetId: rules.id, effectiveFrom: '2026-11-04' });
+            assert.equal((/** @type {any} */ (await send(pool))).status, 'accepted', label);
+            pool.setClock(from + 26 * S);
+            const answer = /** @type {any} */ (await send(pool, { seq: 1, input: false }));
+            const settings = /** @type {any[]} */ (parseSettings([settingRow('1', '2026-11-01', { rules: yesterday }), settingRow('2', '2026-11-04', { rules: today })]));
+            const signals = storedSignals(pool);
+            const pure = (countingOf) => studyReason({
+                now: from + 26 * S, chain: { id: chainId(1), unit: U1, prevAt: from }, signal: { focus: true, input: false }, signals,
+                counting: settings[1].rules.counting, ...countingOf, maxPlaces: 3, setMs: 120 * S, unitMs: days[0] + days[1], cohort,
+            });
+            assert.equal(pure({ countingOf: (day) => settingOf(settings, day)?.rules.counting ?? null }), reason, `${label}: the pure function`);
+            assert.equal(pure({}), todays, `${label}: today's rules for both days`);
+            const counted = countDays({ fromDay: '2026-11-03', toDay: '2026-11-04', signals, rulesOf: (day) => /** @type {any} */ (settingOf(settings, day)).rules, setMsOf: () => setMsOf(COURSE), carriedMs: new Map(), cohort });
+            assert.deepEqual(counted.days.map((d) => d.countedMs), days, `${label}: each day with its own rules`);
+            assert.deepEqual(answer, { status: 'accepted', nextInMs: 7 * S, state: { counting: reason === null, reason, todayMs: days[1], unit: { unitKey: U1, countedMs: days[0] + days[1], setMs: 120 * S, capReached: false } } }, label);
+        }
+    });
+
+    it('the reason: a page that maxPlaces newer open pages push out (it got other_place) is not in the look-ahead: under drop_conflicts the newest page counts (null), not other_tab; its numbers still wait for that page (a stop passes)', async () => {
+        const t0 = at('2026-11-01T03:00:00Z');
+        const DROP = countingWith({ overlap: 'drop_conflicts' }); // maxPlaces 3
+        const { pool } = await seeded({ clock: t0, rulesIn: DROP });
+        // Page 1 of unit 2, then three pages of unit 1.
+        for (const [n, unitKey] of [[1, U2], [2, U1], [3, U1], [4, U1]]) {
+            pool.setClock(t0 + (n - 1) * S);
+            assert.equal((/** @type {any} */ (await send(pool, { chainId: chainId(n), unitKey }))).status, 'accepted', `page ${n}`);
+        }
+        pool.setClock(t0 + 7 * S);
+        assert.deepEqual(await unstored(pool, { chainId: chainId(1), unitKey: U2, seq: 1 }), { status: 'ignored', reason: 'other_place', nextInMs: null });
+        pool.setClock(t0 + 10 * S);
+        const answer = /** @type {any} */ (await send(pool, { chainId: chainId(4), seq: 1 }));
+        // Counting: pages 2 and 3 (unit 1) are pending, page 1 is not. Nothing is settled yet: page 1's last signal (t0) is still open.
+        assert.deepEqual(answer, { status: 'accepted', nextInMs: 7 * S, state: { counting: true, reason: null, todayMs: 0, unit: { unitKey: U1, countedMs: 0, setMs: 120 * S, capReached: false } } });
+        const pure = (maxPlaces) => studyReason({
+            now: t0 + 10 * S, chain: { id: chainId(4), unit: U1, prevAt: t0 + 3 * S }, signal: { focus: true, input: true }, signals: storedSignals(pool),
+            counting: /** @type {any} */ (parseTimeRules(DROP)).rules.counting, maxPlaces, setMs: 120 * S, unitMs: 0, cohort: cohortRange('2026-11-01', '2026-11-30'),
+        });
+        assert.deepEqual([pure(3), pure(Infinity)], [null, 'other_tab'], 'with page 1 pending, its pair of unit 2 up to now conflicts with x');
     });
 });
 
@@ -1212,5 +1359,286 @@ describe('tools/core/trainingTime.js: the pure parts of a signal and of the live
         const time = liveTime(base);
         assert.equal(stateAfterSignal({ nowMs: LIVE.nowMs, signal: { ...signal, unitKey: 'sample-u3' }, prevAt: null, time, signals: [] }), null);
         assert.deepEqual(stateAfterSignal({ nowMs: LIVE.nowMs, signal, prevAt: null, time, signals: [] }), { counting: false, reason: 'starting', todayMs: 0, unit: { unitKey: U1, countedMs: 0, setMs: 120 * S, capReached: false } });
+    });
+});
+
+describe('tools/core/trainingTime.js: the live values up to the settled instant (settledUntil)', () => {
+    const settings = parseSettings([settingRow('1', '2026-11-01')]); // gapMs 23 s
+    const base = { startsOn: '2026-11-01', endsOn: '2026-11-30', addedOn: '2026-10-31', lastClosed: null, settings, closedDays: [], unitTotals: new Map() };
+    const t = at('2026-11-04T01:00:00Z'); // 10:00 JST
+    const page1 = beats({ id: chainId(1), unit: U1, from: t, n: 5 }); // its last signal at t + 28 s
+    const page2 = beats({ id: chainId(2), unit: U2, from: t + 10 * S, n: 6 }); // t + 10 s to t + 45 s
+    const stop1 = { ...page1[4], seq: 5, at: t + 30 * S, stop: true }; // page 1 hides at t + 30 s
+    const until = (nowMs, signals, counting = RULES.counting, day = '2026-11-04') => settledUntil({ day, nowMs, signals, counting });
+    /** A live answer's numbers: today's, each unit's (in the unit list's order), each day's (newest first), the total. */
+    const numbers = (time) => ({ todayMs: time.todayMs, units: time.units.map((u) => [u.unitKey, u.countedMs]), days: time.days.map((d) => [d.day, d.countedMs]), totalMs: time.totalMs });
+    /** The same numbers when the evidence counts up to b on 11-04 (11-01 to 11-03 have none). */
+    const upTo = (signals, b) => {
+        const span = countSpan({ a: jstDayRange('2026-11-04').start, b, signals, rules: RULES, setMs: setMsOf(COURSE), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') });
+        return {
+            todayMs: span.countedMs, units: [U1, U2].map((u) => [u, span.carriedAfterMs.get(u) ?? 0]),
+            days: [['2026-11-04', span.countedMs], ['2026-11-03', 0], ['2026-11-02', 0], ['2026-11-01', 0]], totalMs: span.countedMs,
+        };
+    };
+
+    it('settledUntil: the earliest last signal of the chains still open (not stopped, at most gapMs old), else nowMs; a stopped or quiet page does not hold it back', () => {
+        assert.equal(until(t + 47 * S, []), t + 47 * S, 'no evidence');
+        assert.equal(until(t + 30 * S, page1), t + 28 * S, 'one open page: its last signal, not its first');
+        assert.equal(until(t + 47 * S, [...page2, ...page1].reverse()), t + 28 * S, 'two open pages: the older last signal, in any order');
+        assert.equal(until(t + 45 * S, page2), t + 45 * S, 'a last signal at nowMs (the signal just stored)');
+        assert.equal(until(t + 47 * S, [...page1, stop1, ...page2]), t + 45 * S, 'a stopped page');
+        assert.equal(until(t + 51 * S, [...page1, ...page2]), t + 28 * S, 'exactly gapMs after its last signal: still open');
+        assert.equal(until(t + 51 * S + 1, [...page1, ...page2]), t + 45 * S, '1 ms later: quiet');
+        assert.equal(until(t + 68 * S + 1, [...page1, ...page2]), t + 68 * S + 1, 'every page quiet');
+    });
+
+    it('settledUntil: each day with its own rules (a day that has begun keeps them): its gapMs, and whether a pair from before it can reach it within its creditCapMs; at most the day\'s end and nowMs', () => {
+        const midnight = jstDayRange('2026-11-05').start;
+        const late = beats({ id: chainId(3), unit: U1, from: midnight - 24 * S, n: 2 }); // its last signal 17 s before 00:00 JST of 11-05
+        const last = midnight - 17 * S;
+        const narrow = { gapMs: 23 * S, creditCapMs: 13 * S };
+        const reaching = { gapMs: 29 * S, creditCapMs: 20 * S }; // from 17 s before 00:00, a pair can credit 3 s of the next day
+        // 11-04 with its own 23 s: held at the last signal while it may still credit 11-04, then settled to its end.
+        assert.deepEqual([23 * S, 23 * S + 1].map((ms) => until(last + ms, late, narrow, '2026-11-04')), [last, midnight]);
+        // 11-05 with rules that reach it: nothing of 11-05 settles while the pair may come (29 s); then nowMs.
+        assert.deepEqual([23 * S + 1, 29 * S, 29 * S + 1].map((ms) => until(last + ms, late, reaching, '2026-11-05')), [midnight, midnight, last + 29 * S + 1]);
+        // 11-05 with a creditCapMs that cannot reach it from 17 s before: the page does not hold 11-05 back.
+        assert.equal(until(last + 20 * S, late, narrow, '2026-11-05'), last + 20 * S);
+        // Only the day's own rules decide: a wider gapMs of a later day (a setting from tomorrow added later)
+        // does not hold back an earlier day (liveTime's test of that setting checks the numbers too).
+        assert.equal(until(last + 24 * S, late, narrow, '2026-11-04'), midnight);
+        const early = beats({ id: chainId(4), unit: U1, from: midnight + 3 * S, n: 1 }); // on 11-05
+        assert.deepEqual([23 * S + 3 * S, 26 * S + 1].map((ms) => until(midnight + ms, early, narrow, '2026-11-05')), [midnight + 3 * S, midnight + 26 * S + 1]);
+        assert.equal(until(midnight + 10 * S, early, narrow, '2026-11-04'), midnight, 'a page on a later day does not hold back an earlier one');
+    });
+
+    it('liveTime: with two open pages the days not closed yet count up to the older page\'s last signal (its next pair starts there); once it stops or goes quiet, up to the other page\'s', () => {
+        const both = [...page1, ...page2];
+        const open = numbers(liveTime({ ...base, nowMs: t + 47 * S, signals: both }));
+        assert.deepEqual(open, upTo(both, t + 28 * S));
+        // Page 2 began later and wins the overlap from t + 10 s: unit 1 has 10 s, unit 2 18 s of its 35 s so far.
+        assert.deepEqual(open.units, [[U1, 10 * S], [U2, 18 * S]]);
+        assert.deepEqual(numbers(liveTime({ ...base, nowMs: t + 51 * S, signals: both })), open, 'page 1 exactly gapMs quiet: still open');
+        const full = upTo(both, t + 45 * S);
+        assert.deepEqual(full.units, [[U1, 10 * S], [U2, 35 * S]]);
+        assert.deepEqual(numbers(liveTime({ ...base, nowMs: t + 51 * S + 1, signals: both })), full, 'page 1 quiet');
+        assert.deepEqual(numbers(liveTime({ ...base, nowMs: t + 47 * S, signals: [...both, stop1] })), upTo([...both, stop1], t + 45 * S), 'page 1 stopped');
+        assert.deepEqual(upTo([...both, stop1], t + 45 * S), full, 'the pair its stop closes is under page 2');
+    });
+
+    it('liveTime: with one page the days count in full, as before settledUntil (a page\'s pairs end at its last signal)', () => {
+        const midnight = jstDayRange('2026-11-04').start;
+        const across = beats({ id: chainId(5), unit: U2, from: midnight - 20 * S, n: 4 }); // 23:59:40 to 00:00:01 JST
+        for (const [label, signals, nowMs] of [['open', page1, t + 30 * S], ['open across 00:00', across, midnight + 5 * S], ['stopped', [...page1, stop1], t + 40 * S]]) {
+            const time = liveTime({ ...base, nowMs, signals });
+            const want = countDays({ fromDay: '2026-11-01', toDay: '2026-11-04', signals, rulesOf: () => RULES, setMsOf: () => setMsOf(COURSE), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') });
+            assert.deepEqual(time.days, [...want.days].reverse().map((d) => ({ day: d.day, countedMs: d.countedMs, final: false })), label);
+            assert.deepEqual([time.unitMs, time.totalMs], [want.carriedAfterMs, want.days.reduce((n, d) => n + d.countedMs, 0)], label);
+        }
+        assert.deepEqual(liveTime({ ...base, nowMs: midnight + 5 * S, signals: across }).days.slice(0, 2).map((d) => d.countedMs), [1 * S, 20 * S]);
+    });
+
+    it('liveTime: an open page whose last signal is before 00:00 JST holds back yesterday (not closed yet) and today alike', () => {
+        const midnight = jstDayRange('2026-11-04').start;
+        const late = beats({ id: chainId(6), unit: U1, from: midnight - 17 * S, n: 2 }); // its last signal at 23:59:50 JST
+        const other = beats({ id: chainId(7), unit: U2, from: midnight - 20 * S, n: 6, every: 6 * S }); // 23:59:40 to 00:00:10 JST
+        const daysAt = (nowMs) => liveTime({ ...base, nowMs, signals: [...late, ...other] }).days.slice(0, 2).map((d) => [d.day, d.countedMs]);
+        // Up to 23:59:50: unit 2 to 23:59:43, then unit 1 (the newer page); nothing of 11-04 yet.
+        assert.deepEqual(daysAt(midnight + 12 * S), [['2026-11-04', 0], ['2026-11-03', 10 * S]]);
+        // Page 6 quiet (gapMs after 23:59:50): up to page 7's last signal, 00:00:10.
+        assert.deepEqual(daysAt(midnight + 13 * S + 1), [['2026-11-04', 10 * S], ['2026-11-03', 20 * S]]);
+    });
+
+    it('liveTime: a setting from tomorrow with a larger gapMs, set while a page is quiet, makes no number go down (that page\'s next pair could not reach tomorrow)', async () => {
+        const noon = at('2026-11-04T03:00:00Z'); // 12:00 JST
+        const { pool, catalog } = await seeded({ clock: noon });
+        chain(pool, { id: chainId(1), unit: U1, from: noon - 7 * S, n: 2 }); // page 1: its last signal at 12:00:00, then quiet
+        chain(pool, { id: chainId(2), unit: U2, from: noon + 2 * S, n: 5 }); // page 2: 12:00:02 to 12:00:30
+        const numbersAt = async (clock) => {
+            pool.setClock(clock);
+            const { time } = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+            return [time.totalMs, ...time.units.map((u) => u.countedMs), ...time.days.map((d) => d.countedMs)];
+        };
+        const before = await numbersAt(noon + 31 * S);
+        assert.deepEqual(before, [35 * S, 7 * S, 28 * S, 35 * S, 0, 0, 0], 'the total, units 1 and 2, 11-04 to 11-01');
+        const wider = /** @type {any} */ (await loadRules({ input: countingWith({ gapMs: 35 * S }), loadedBy: 'staff-a', note: 'a wider gap', pool }));
+        const set = /** @type {any} */ (await setCohortTime({ cohortSlug: SLUG, catalogSha256: catalog.sha256, rulesSha256: wider.sha256, effectiveFrom: '2026-11-05', setBy: 'staff-a', reason: 'a wider gap from tomorrow', pool }));
+        assert.equal(set.status, 'set');
+        const after = await numbersAt(noon + 32 * S);
+        assert.ok(after.every((value, i) => value >= before[i]), `a number went down: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+    });
+});
+
+// A property: two or three pages send signals in time order and read their time now and then (seeded).
+
+/** A seeded generator in [0, 1) (the one of server/tests/trainingStudyTime.test.js). */
+function rng(seed) {
+    // the seed mixed first (murmur3's fmix32), so that neighbouring seeds start far apart
+    let x = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+    x = (x ^ (x >>> 16)) >>> 0;
+    return () => {
+        x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
+        return x / 2 ** 32;
+    };
+}
+
+/** The rules of a run, by seed (each a valid rules file). */
+const RUN_RULES = [
+    RULES_IN,
+    countingWith({ overlap: 'drop_conflicts' }),
+    { ...countingWith({ requireFocus: true, idleMs: 29 * S }), collection: { ...RULES_IN.collection, maxPlaces: 2 } },
+];
+const RUNS = 200;
+
+/**
+ * One run: two or three pages, each of either unit, send signals in time order (pool.setClock) as a
+ * page does: a new chain with an input when it opens (sometimes of the other unit), beats about
+ * beatMs apart, sometimes too soon or after a break longer than gapMs, focus and input at random; a
+ * chain ends with a stop, or the page goes quiet without one; after other_place the page stops that
+ * chain or drops it. After about one signal in five, a read (readStudyTime, which closes the final
+ * days first). Every second run starts at most 2 minutes before 00:00 JST of 11-03 and mostly goes
+ * past it (11-02 closes during the run); every fourth has another gapMs from 11-03, wider or
+ * narrower, set before it starts. Each answer and read is checked as it comes: no number goes down,
+ * a closed day keeps its value. Once every page has stopped or gone quiet, a read gives countDays
+ * over every stored signal, and the closed rows have its numbers.
+ * @returns {Promise<Record<string, number>>} what the run went through
+ */
+async function runPages(seed) {
+    const r = rng(seed);
+    const rulesIn = RUN_RULES[seed % RUN_RULES.length];
+    const midnight = jstDayRange('2026-11-03').start;
+    const start = seed % 2 ? midnight - Math.floor(r() * 120 * S) : at('2026-11-02T03:00:00Z') + Math.floor(r() * 60 * S);
+    const { pool, catalog } = await seeded({ clock: start, rulesIn });
+    const later = seed % 4 === 3 ? { ...rulesIn, counting: { ...rulesIn.counting, gapMs: (seed % 8 === 3 ? 29 : 17) * S } } : null;
+    if (later) {
+        const loaded = /** @type {any} */ (await loadRules({ input: later, loadedBy: 'staff-a', note: 'another gap', pool }));
+        pool.addSetting({ cohortId: COHORT, catalogId: catalog.id, ruleSetId: loaded.id, effectiveFrom: '2026-11-03' });
+    }
+    const rulesOf = (day) => /** @type {any} */ (parseTimeRules(later && day >= '2026-11-03' ? later : rulesIn)).rules;
+    const tally = { signals: 0, stops: 0, quiet: 0, too_soon: 0, other_place: 0, reads: 0, closedDuring: 0, unit1AtSetTime: 0, intoAnotherGap: 0 };
+    /** The highest value seen of each number (day:<day>, unit:<key>, total), and each closed day's value. */
+    const seen = new Map();
+    const closedValue = new Map();
+    const notDown = (key, value, where) => {
+        assert.ok(value >= (seen.get(key) ?? 0), `seed ${seed}, ${where}: ${key} went down from ${seen.get(key)} to ${value}`);
+        seen.set(key, value);
+    };
+    const read = async (where) => {
+        const result = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.equal(result.status, 'read', `seed ${seed}, ${where}: ${JSON.stringify(result)}`);
+        tally.reads += 1;
+        const { time } = result;
+        notDown('total', time.totalMs, where);
+        for (const u of time.units) notDown(`unit:${u.unitKey}`, u.countedMs, where);
+        for (const d of time.days) {
+            notDown(`day:${d.day}`, d.countedMs, where);
+            if (d.final && closedValue.has(d.day)) assert.equal(d.countedMs, closedValue.get(d.day), `seed ${seed}, ${where}: closed ${d.day} changed`);
+            if (d.final) closedValue.set(d.day, d.countedMs);
+        }
+        return time;
+    };
+    const pages = Array.from({ length: r() < 0.5 ? 2 : 3 }, () => ({
+        unit: r() < 0.5 ? U1 : U2, chain: '', seq: 0, left: 0, chains: 1 + Math.floor(r() * 3), at: start + Math.floor(r() * 30 * S), stopNext: false,
+    }));
+    let opened = 0;
+    let clock = start - 1;
+    for (let step = 0; ; step += 1) {
+        assert.ok(step < 1000, `seed ${seed}: the pages never stop`);
+        const page = pages.filter((p) => p.chains > 0 || p.chain).sort((p, q) => p.at - q.at)[0];
+        if (!page) break;
+        clock = Math.max(clock + 1, page.at);
+        pool.setClock(clock);
+        if (!page.chain) {
+            opened += 1;
+            Object.assign(page, { chain: chainId(opened), seq: 0, left: 2 + Math.floor(r() * 10), chains: page.chains - 1 });
+            if (r() < 0.3) page.unit = page.unit === U1 ? U2 : U1;
+        }
+        let stop = page.stopNext;
+        page.stopNext = false;
+        if (!stop && page.left <= 1) {
+            if (r() < 0.5) {
+                stop = true;
+            } else {
+                // The page goes quiet without a stop: its chain looks open until gapMs passes.
+                tally.quiet += 1;
+                page.chain = '';
+                page.at = clock + Math.floor((5 + r() * 120) * S);
+                continue;
+            }
+        }
+        const signal = { unitKey: page.unit, chainId: page.chain, seq: page.seq, stop, focus: r() < 0.85, input: page.seq === 0 || r() < 0.4 };
+        const where = `chain ${opened} seq ${page.seq}${stop ? ' (stop)' : ''} at start + ${clock - start} ms`;
+        const result = /** @type {any} */ (await recordSignal({ userId: A, cohortId: COHORT, signal, pool }));
+        if (result.status === 'accepted') {
+            assert.deepEqual([result.closeError, result.stateError], [undefined, undefined], `seed ${seed}, ${where}`);
+            tally.signals += 1;
+            if (stop) {
+                tally.stops += 1;
+                assert.equal(result.state, null, `seed ${seed}, ${where}`);
+                page.chain = '';
+            } else {
+                assert.ok(result.state, `seed ${seed}, ${where}: a state`);
+                notDown(`day:${jstDayOf(clock)}`, result.state.todayMs, where);
+                notDown(`unit:${page.unit}`, result.state.unit.countedMs, where);
+                page.seq += 1;
+                page.left -= 1;
+            }
+        } else {
+            assert.ok(result.status === 'ignored' && ['too_soon', 'other_place'].includes(result.reason), `seed ${seed}, ${where}: ${JSON.stringify(result)}`);
+            tally[result.reason] += 1;
+            // too_soon: the same seq at the next beat. other_place: the page stops that chain, or drops it.
+            if (result.reason === 'other_place') {
+                if (r() < 0.5) page.stopNext = true;
+                else page.chain = '';
+            }
+        }
+        if (r() < 0.2) await read(where);
+        const p = r();
+        page.at = clock + (page.stopNext ? 1 : p < 0.08 ? 1 + Math.floor(r() * 3 * S) : p < 0.16 ? Math.floor((24 + r() * 40) * S) : Math.floor((5 + r() * 4) * S));
+    }
+    tally.closedDuring = pool.state.days.length;
+    tally.intoAnotherGap = later && clock > midnight + 29 * S ? 1 : 0;
+    // Past the last signal + the widest gapMs, every page has stopped or gone quiet: nothing is held back.
+    pool.setClock(clock + 29 * S + 1);
+    const time = await read('once every page stopped or went quiet');
+    const signals = storedSignals(pool);
+    assert.equal(signals.length, tally.signals, `seed ${seed}: every accepted signal is stored`);
+    const want = countDays({ fromDay: '2026-11-01', toDay: time.today, signals, rulesOf, setMsOf: () => setMsOf(COURSE), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') });
+    const closed = new Set(pool.state.days.map((d) => d.day));
+    assert.deepEqual(time.days, [...want.days].reverse().map((d) => ({ day: d.day, countedMs: d.countedMs, final: closed.has(d.day) })), `seed ${seed}: the days`);
+    assert.deepEqual(time.units.map((u) => [u.unitKey, u.countedMs]), [U1, U2].map((u) => [u, want.carriedAfterMs.get(u) ?? 0]), `seed ${seed}: the units`);
+    assert.equal(time.totalMs, want.days.reduce((n, d) => n + d.countedMs, 0), `seed ${seed}: the total`);
+    for (const row of pool.state.days) {
+        const day = /** @type {any} */ (want.days.find((d) => d.day === row.day));
+        const units = pool.state.unitDays.filter((u) => u.day_id === row.id).map((u) => ({ unit: u.unit_key, countedMs: u.counted_ms, overCapMs: u.over_cap_ms }));
+        assert.deepEqual({ counted: row.counted_ms, units }, { counted: day.countedMs, units: day.units }, `seed ${seed}: the closed row of ${row.day}`);
+    }
+    tally.unit1AtSetTime = (want.carriedAfterMs.get(U1) ?? 0) >= 120 * S ? 1 : 0;
+    return tally;
+}
+
+describe('tools/core/trainingTime.js: the live numbers never go down (random pages in time order, seeded)', () => {
+    /** seed → what its run went through (null: its test failed), for the coverage check */
+    const tallies = new Map();
+
+    for (let seed = 1; seed <= RUNS; seed += 1) {
+        it(`seed ${seed}: every answer's todayMs and unit time and every read's total, units and days never go down (a closed day keeps its value); once every page stopped or went quiet, a read gives countDays over the stored signals, as the closed rows do`, async () => {
+            tallies.set(seed, null);
+            tallies.set(seed, await runPages(seed));
+        });
+    }
+
+    it('the runs go through stops, quiet pages, too_soon, other_place, reads, days closed during a run, unit 1 at its set time, and 00:00 into another gapMs', async () => {
+        /** @type {Record<string, number>} */
+        const total = {};
+        for (let seed = 1; seed <= RUNS; seed += 1) {
+            // A seed whose test did not run (a name filter) runs here; one whose test failed is reported there.
+            const tally = tallies.has(seed) ? tallies.get(seed) : await runPages(seed);
+            for (const [key, value] of Object.entries(tally ?? {})) total[key] = (total[key] ?? 0) + value;
+        }
+        for (const key of ['signals', 'stops', 'quiet', 'too_soon', 'other_place', 'reads', 'closedDuring', 'unit1AtSetTime', 'intoAnotherGap']) {
+            assert.ok(total[key] > 0, `${key} never occurred: ${JSON.stringify(total)}`);
+        }
     });
 });

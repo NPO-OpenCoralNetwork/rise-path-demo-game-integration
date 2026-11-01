@@ -8,22 +8,33 @@
 //   statements only; JSON that is not an object or an array is the training parser's 400 invalid_body;
 // - the cohort: an id that is not a UUID (before any training statement), a missing cohort and one
 //   without the caller's live membership answer one 404 cohort_not_found; an instructor 403;
-// - the answers: accepted, a stop, ignored (nextInMs beatMs or null); the GET's keys in order, beatMs
-//   only while ready; no-store; beatMs is the only rule value any answer carries;
-// - 409 refusals and 401 account_deleted (a deletion committed during the lock wait) store nothing;
-//   503 training_unavailable (Retry-After: 60) and 500 training_failed carry no driver text, operation
-//   name or SQL; the per-learner limit counts these routes together with GET /me.
+// - the answers: accepted, a stop, ignored; nextInMs beatMs while the page keeps its chain, null for a
+//   stop that is not stored (a duplicate stop), for any signal after the chain's stop and in the grace
+//   after the cohort's last day (a known chain's signal, stored, whose state says not_in_session); the
+//   GET's keys in order, beatMs only while ready; no-store; beatMs is the only rule value any answer
+//   carries;
+// - two open pages: no number goes down from one answer or GET to the next (the page that loses an
+//   overlap never sees its time rise then fall), also when a setting from tomorrow with a larger gapMs
+//   is set during the day while one page is quiet; once both stopped, the numbers are what the close stores;
+// - 409 refusals and 401 account_deleted (a deletion committed during the lock wait: the sign-in's 401
+//   body exactly) store nothing; 503 training_unavailable (Retry-After: 60) and 500 training_failed
+//   carry no driver text, operation name or SQL; the per-learner limit counts these routes together
+//   with GET /me;
+// - the log lines, on the router alone (its logger and clock): each kind at most once a minute, a 500
+//   by its type only; a 503 for a database that cannot serve now is not logged by the route.
 // The values are artificial, not the school's (training-plan D9).
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import express from 'express';
 import { createApp } from '../../server.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 import { ACCOUNT_DELETED_REFUSAL, setSupabaseForTests } from '../middleware/auth.js';
 import { TRAINING_REQUESTS_PER_MINUTE } from '../routes/training.js';
+import { createTrainingTimeRouter } from '../routes/trainingTime.js';
 import { jstDayRange } from '../../shared/training/studyTime.js';
 import { TRAINING_SQL } from '../../tools/core/training.js';
-import { TRAINING_TIME_SQL, loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
+import { TRAINING_TIME_SQL, loadCatalog, loadRules, setCohortTime } from '../../tools/core/trainingTime.js';
 import { decodeTokenClaims } from '../../tools/core/oauthToken.js';
 import { createTrainingPool } from './helpers/trainingPool.js';
 import { AUTH_SQL, createTrainingTimePool } from './helpers/trainingTimePool.js';
@@ -90,6 +101,16 @@ const NOT_STORED = [AUTH_SQL.tombstone, AUTH_SQL.stubInsert, 'BEGIN', TRAINING_S
     TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.signalState, 'ROLLBACK'];
 /** The driver's text, SQL, the core's operation names and error types: never in an answer. */
 const DRIVER = 'relation "training_time_signals" (host db.internal:5432, password=hunter2)';
+/** A driver error with its SQLSTATE (or a network code) and the driver's text. */
+const dbError = (code) => Object.assign(new Error(`${code === '55P03' ? 'canceling statement due to lock timeout' : code} ${DRIVER}`), { code });
+/** Database faults: [code, the status both routes answer, the statement the GET fails on, the POST's]. */
+const DB_FAULTS = [
+    ['55P03', 503, TRAINING_SQL.learnerLock, TRAINING_SQL.learnerLock],
+    ['ECONNREFUSED', 503, TRAINING_SQL.liveMember, TRAINING_TIME_SQL.signalState],
+    ['42P01', 503, TRAINING_TIME_SQL.closeState, TRAINING_TIME_SQL.signalState],
+    ['42501', 503, TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.insertStream],
+    ['23505', 500, TRAINING_TIME_SQL.insertDays, TRAINING_TIME_SQL.insertSignal],
+];
 const LEAK = /relation|db\.internal|hunter2|training_time_|training_memberships|account_deletions|auth\.users|SELECT|INSERT|pg_advisory|recordSignal|readStudyTime|closeDays|studyTimeState|lock timeout|does not parse|Duplicate|conflict|db_connection|table_not_found|permission_denied|account_busy|invalid_setting|ECONNREFUSED|55P03|42P01|42501|23505/;
 
 const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -111,8 +132,7 @@ const supabase = {
 
 const ENV_KEYS = ['NODE_ENV', 'RISEPATH_STRICT_AUTH', 'VITE_DEMO_MODE', 'DATABASE_URL_PHASE1', 'RISE_PATH_BRIDGE_TOKEN', 'ORIGIN_SECRET', 'ORIGIN_SECRET_PREVIOUS', 'TRUST_PROXY', 'TRAINING_ENABLED', 'LEGAL_TERMS_REQUIRED'];
 
-const withServer = async (handler) => {
-    const app = await createApp({ serveStatic: false });
+const listen = async (app, handler) => {
     const server = await new Promise((resolve) => {
         const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });
@@ -121,6 +141,24 @@ const withServer = async (handler) => {
     } finally {
         await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }
+};
+const withServer = async (handler) => listen(await createApp({ serveStatic: false }), handler);
+
+/**
+ * The study time router alone on a bare app (as accountRoutes.test.js's withRouter), at the path the
+ * training router gives it, with its logger and clock: a fake sign-in names the token's sub (no
+ * Supabase, no statement, no stub write, no limit); the core uses the pool of setPoolForTests.
+ */
+const withTimeRouter = async ({ logger, now }, handler) => {
+    const app = express();
+    app.use(express.json());
+    app.use((req, res, next) => {
+        req.userId = decodeTokenClaims(String(req.headers.authorization).slice('Bearer '.length))?.sub;
+        req.authMethod = 'supabase-jwt';
+        next();
+    });
+    app.use('/api/v2/training', createTrainingTimeRouter({ logger, now }));
+    await listen(app, handler);
 };
 
 const call = async (url, { method = 'GET', headers = {}, body, rawBody, type = 'application/json' } = {}) => {
@@ -187,6 +225,23 @@ async function seeded({ endsOn = '2026-11-30', effectiveFrom = '2026-11-01', set
     setPoolForTests(pool);
     return { pool, catalog, rules };
 }
+
+/** A GET's numbers by what they count: each unit's time, each day's, the total. */
+const readNumbers = (json) => [
+    ...json.units.map((u) => [`unit ${u.unitKey}`, u.countedMs]), ...json.days.map((d) => [`day ${d.day}`, d.countedMs]), ['total', json.totalMs],
+];
+/** A signal's state's numbers by what they count: its unit's time and the day's (`today`). */
+const stateNumbers = (state, today) => [[`unit ${state.unit.unitKey}`, state.unit.countedMs], [`day ${today}`, state.todayMs]];
+/** A check that no number goes down from one answer to the next: the last value seen of each. */
+const neverDown = () => {
+    const last = new Map();
+    return (when, pairs) => {
+        for (const [key, value] of pairs) {
+            assert.ok(value >= (last.get(key) ?? 0), `${when}: ${key} went down from ${last.get(key)} to ${value}`);
+            last.set(key, value);
+        }
+    };
+};
 
 /** Every number in an answer, with the key it is under. @returns {Array<[string, number]>} */
 const numbersOf = (value, key = '') => {
@@ -367,6 +422,62 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
         ]);
     });
 
+    it('nextInMs: beatMs while the page keeps its chain (accepted, duplicate, too_soon in session); null for a duplicate stop, for any signal after the chain\'s stop, and in the grace after the cohort\'s last day (a known chain\'s signal is stored to close its last pair, its state says not_in_session; a new chain, or the same one past the grace, is 409)', async () => {
+        const accepted = (nextInMs, state) => ({ ok: true, accepted: true, nextInMs, state });
+        const ignored = (reason, nextInMs) => ({ ok: true, accepted: false, reason, nextInMs });
+        const refused = (reason) => ({ ok: false, error: REFUSED[reason], error_type: reason });
+        /** A signal's state for unit 1 (counting while reason is null). */
+        const stateOfU1 = (reason, todayMs, countedMs) => ({ counting: reason === null, reason, todayMs, unit: { unitKey: U1, countedMs, setMs: 120 * S, capReached: false } });
+        /** Each [instant, body, status, answer] in turn. */
+        const run = async (base, pool, steps) => {
+            for (const [ms, body, status, answer] of steps) {
+                pool.setClock(ms);
+                const res = await post(base, body);
+                const what = `${(ms - T0) / S} s ${JSON.stringify(body)}`;
+                assert.deepEqual([res.status, res.json], [status, answer], `${what}: ${res.text}`);
+            }
+        };
+        await withServer(async (base) => {
+            // In session (the cohort ends 11-30).
+            const { pool } = await seeded();
+            await run(base, pool, [
+                [T0, signal(), 200, accepted(BEAT, stateOfU1('starting', 0, 0))],
+                [T0 + 8 * S, signal({ seq: 1 }), 200, accepted(BEAT, stateOfU1(null, 8 * S, 8 * S))],
+                [T0 + 9 * S, signal({ seq: 1 }), 200, ignored('duplicate', BEAT)],
+                [T0 + 10 * S, signal({ seq: 2 }), 200, ignored('too_soon', BEAT)],
+                // A stop with a seq already stored: not stored, and the page stops.
+                [T0 + 11 * S, signal({ seq: 1, stop: true }), 200, ignored('duplicate', null)],
+                [T0 + 16 * S, signal({ seq: 2, stop: true }), 200, accepted(null, null)],
+                // After the stop: the stop again, a beat with an earlier seq, a later one.
+                [T0 + 17 * S, signal({ seq: 2, stop: true }), 200, ignored('duplicate', null)],
+                [T0 + 18 * S, signal({ seq: 1 }), 200, ignored('duplicate', null)],
+                [T0 + 24 * S, signal({ seq: 3 }), 200, ignored('chain_ended', null)],
+            ]);
+            assert.deepEqual(pool.state.signals.map((g) => [g.seq, g.flags]), [[0, 6], [1, 6], [2, 7]], 'the beats and the one stop');
+
+            // The cohort's last day is 11-04: a chain open at its end.
+            const graced = (await seeded({ endsOn: '2026-11-04' })).pool;
+            const end = jstDayRange('2026-11-04').end;
+            await run(base, graced, [
+                [end - 10 * S, signal(), 200, accepted(BEAT, stateOfU1('starting', 0, 0))],
+                [end - 9 * S, signal(), 200, ignored('duplicate', BEAT)],
+                // 4 s after the end (within gapMs): stored; the 10 s of its pair before the end count
+                // (all on 11-04; today, 11-05, is not a day of the cohort: todayMs 0).
+                [end + 4 * S, signal({ seq: 1 }), 200, accepted(null, stateOfU1('not_in_session', 0, 10 * S))],
+                [end + 5 * S, signal({ seq: 1 }), 200, ignored('duplicate', null)],
+                [end + 6 * S, signal({ seq: 2 }), 200, ignored('too_soon', null)],
+                [end + 6 * S, signal({ chainId: chainId(2) }), 409, refused('not_in_session')],
+                [end + 13 * S, signal({ seq: 2, stop: true }), 200, accepted(null, null)],
+                [end + 14 * S, signal({ seq: 2, stop: true }), 200, ignored('duplicate', null)],
+                [end + 30 * S, signal({ seq: 3 }), 409, refused('not_in_session')],
+            ]);
+            assert.deepEqual(graced.state.streams.map((s) => s.day), ['2026-11-04', '2026-11-05'], 'stored in the stream of its own day');
+            // Past the grace the GET closes the last day with that pair's part before the end.
+            const read = await get(base);
+            assert.deepEqual([read.json.status, 'beatMs' in read.json, read.json.days[0], read.json.totalMs], ['not_in_session', false, { day: '2026-11-04', countedMs: 10 * S, final: true }, 10 * S]);
+        });
+    });
+
     it('beatMs is the only rule value an answer carries: every 200 answer of a study session (GETs, accepted, duplicate, too_soon) has it as beatMs or nextInMs, and none has minSpacingMs, gapMs, creditCapMs, idleMs or the overlap', async () => {
         const { pool } = await seeded();
         const answers = [];
@@ -401,6 +512,106 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
             }
             for (const value of HIDDEN) assert.ok(!res.text.includes(value), `${value} in ${res.text}`);
         }
+    });
+
+    it('two open pages of two units: no number goes down from one answer or GET to the next (what the other open page\'s next signal can still change is not counted yet, so the page that loses the overlap never sees its time rise then fall); once both stopped, the numbers are what the close stores', async () => {
+        const { pool } = await seeded();
+        const page1 = (patch) => signal(patch); // unit 1, chain 1, from 0 s
+        const page2 = (patch) => signal({ unitKey: U2, chainId: chainId(2), ...patch }); // unit 2, chain 2, from 10 s
+        // Their pairs overlap from 10 s to 26 s, where drop_conflicts counts neither; page 2 stops at
+        // 26 s, page 1 at 40 s: unit 1 gets 0–10 s and 26–40 s, unit 2 nothing. Counted up to the
+        // answer's clock, page 1's answer at 16 s would say 16 s and fall back to 10 s after page 2's
+        // signal at 18 s; settled, it says 10 s.
+        // [seconds after T0, a signal's body or 'GET', expected in seconds: a signal's [reason, todayMs,
+        // its unit's countedMs] (null: a stop, no state); a GET's [unit 1, unit 2, totalMs]]
+        const steps = [
+            [0, page1({ seq: 0 }), ['starting', 0, 0]],
+            [8, page1({ seq: 1 }), [null, 8, 8]],
+            [10, page2({ seq: 0 }), ['starting', 8, 0]],
+            [11, 'GET', [8, 0, 8]],
+            [16, page1({ seq: 2 }), ['other_tab', 10, 10]],
+            [18, page2({ seq: 1 }), ['other_tab', 10, 0]],
+            [19, 'GET', [10, 0, 10]],
+            [24, page1({ seq: 3 }), ['other_tab', 10, 10]],
+            [26, page2({ seq: 2, stop: true }), null],
+            [27, 'GET', [10, 0, 10]],
+            [32, page1({ seq: 4 }), [null, 16, 16]],
+            [33, 'GET', [16, 0, 16]],
+            [40, page1({ seq: 5, stop: true }), null],
+            [41, 'GET', [24, 0, 24]],
+        ];
+        const noneDown = neverDown();
+        await withServer(async (base) => {
+            for (const [t, body, expected] of steps) {
+                pool.setClock(T0 + t * S);
+                const when = `${t} s ${body === 'GET' ? 'GET' : JSON.stringify(body)}`;
+                if (body === 'GET') {
+                    const res = await get(base);
+                    assert.equal(res.status, 200, `${when}: ${res.text}`);
+                    const unit = (key) => res.json.units.find((u) => u.unitKey === key).countedMs;
+                    assert.deepEqual([unit(U1), unit(U2), res.json.totalMs].map((ms) => ms / S), expected, when);
+                    noneDown(when, readNumbers(res.json));
+                    continue;
+                }
+                const res = await post(base, body);
+                assert.equal(res.status, 200, `${when}: ${res.text}`);
+                if (expected === null) {
+                    assert.deepEqual(res.json, { ok: true, accepted: true, nextInMs: null, state: null }, when);
+                    continue;
+                }
+                const { state } = res.json;
+                assert.deepEqual([res.json.accepted, res.json.nextInMs, state.reason, state.todayMs / S, state.unit.countedMs / S], [true, BEAT, ...expected], when);
+                noneDown(when, stateNumbers(state, '2026-11-04'));
+            }
+            // The next day, past 11-04's end + gapMs: the GET closes 11-04 with the value the last GET showed.
+            pool.setClock(jstDayRange('2026-11-05').start + 24 * S);
+            const next = await get(base);
+            assert.deepEqual(next.json.days.slice(0, 2), [{ day: '2026-11-05', countedMs: 0, final: false }, { day: '2026-11-04', countedMs: 24 * S, final: true }]);
+            noneDown('the next day', readNumbers(next.json));
+        });
+        const closed = pool.state.days.filter((d) => d.day === '2026-11-04');
+        assert.deepEqual(closed.map((d) => d.counted_ms), [24 * S], 'closeDays stored what the live numbers settled on');
+        assert.deepEqual(pool.state.unitDays.filter((u) => u.day_id === closed[0].id).map((u) => [u.unit_key, u.counted_ms]), [[U1, 24 * S]]);
+    });
+
+    it('two open pages, one gone quiet without a stop: a setting from tomorrow with a larger gapMs, set during the day, takes back none of today\'s settled time (no number goes down; a pair is credited to a day only with that day\'s gapMs)', async () => {
+        const { pool, catalog } = await seeded();
+        // The same artificial rules with a larger gapMs, from tomorrow (allowed while today's setting is in effect).
+        const wider = await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, gapMs: 61_789 } }, loadedBy: 'staff-a', note: 'sample, a larger gap', pool });
+        assert.equal(wider.status, 'loaded');
+        const page1 = (patch) => signal(patch); // unit 1, chain 1: at 0 s and 8 s, then quiet (no stop)
+        const page2 = (patch) => signal({ chainId: chainId(2), ...patch }); // unit 1, chain 2: from 10 s every 8 s
+        const noneDown = neverDown();
+        await withServer(async (base) => {
+            const answer = async (t, body) => {
+                pool.setClock(T0 + t * S);
+                const res = await post(base, body);
+                assert.deepEqual([res.status, res.json?.accepted], [200, true], `${t} s: ${res.text}`);
+                noneDown(`${t} s ${JSON.stringify(body)}`, stateNumbers(res.json.state, '2026-11-04'));
+            };
+            const read = async (t) => {
+                pool.setClock(T0 + t * S);
+                const res = await get(base);
+                assert.equal(res.status, 200, `${t} s: ${res.text}`);
+                noneDown(`${t} s GET`, readNumbers(res.json));
+                return res.json;
+            };
+            await answer(0, page1({ seq: 0 }));
+            await answer(8, page1({ seq: 1 }));
+            for (const [seq, t] of [10, 18, 26, 34].entries()) await answer(t, page2({ seq }));
+            // Page 1's last signal is older than today's gapMs: page 2's pairs up to its last signal are settled.
+            assert.equal((await read(35)).totalMs, 32 * S);
+            pool.setClock(T0 + 35_500);
+            const set = await setCohortTime({ cohortSlug: 'web-2026-11', catalogSha256: catalog.sha256, rulesSha256: wider.sha256, effectiveFrom: '2026-11-05', setBy: 'staff-a', reason: 'sample, a larger gap', pool });
+            assert.equal(set.status, 'set', JSON.stringify(set));
+            // Page 1's next pair, longer than today's gapMs, could count only on tomorrow with tomorrow's
+            // gapMs, and it starts at 8 s (12:00:08 JST): nothing settled today can change.
+            await read(36);
+            await answer(42, page2({ seq: 4 }));
+            await read(43);
+            // Once page 1 is older than either gapMs, everything is settled.
+            assert.equal((await read(71)).totalMs, 40 * S);
+        });
     });
 
     it('409 time_not_configured, not_in_session, unit_unknown, chain_mismatch: { ok: false, error, error_type: <reason> } after the locks and one clock reading, rolled back, nothing stored', async () => {
@@ -457,6 +668,31 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
         assert.deepEqual(stored(pool), [0, 0, 0]);
     });
 
+    it('401 account_deleted during the wait is the sign-in\'s 401 exactly: the same session\'s next request, refused by requireAuth (it signed in before the deletion) before any training statement, gets the same body, for both routes', async () => {
+        // A session that signed in an hour before the deletion (its newest amr time), so requireAuth
+        // refuses it once the tombstone is there.
+        const session = { Authorization: `Bearer ${jwt({ sub: A, aud: 'authenticated', amr: [{ method: 'password', timestamp: (T0 - 3600 * S) / 1000 }] })}` };
+        const routes = [
+            ['GET', (base) => call(`${base}${TIME()}`, { headers: session })],
+            ['POST', (base) => call(`${base}${SIGNALS()}`, { method: 'POST', headers: session, body: signal() })],
+        ];
+        for (const [what, send] of routes) {
+            const { pool } = await seeded();
+            pool.before(TRAINING_SQL.lock, () => pool.deleteAccount(A, T0 - 60 * S));
+            await withServer(async (base) => {
+                const during = await send(base);
+                const from = pool.queries.length;
+                const signIn = await send(base);
+                assert.deepEqual(sentSince(pool, from), [AUTH_SQL.tombstone], `${what}: the sign-in refused the next request (no stub write, no training statement)`);
+                assert.deepEqual([during.status, signIn.status], [401, 401], `${what}: ${during.text} / ${signIn.text}`);
+                assert.equal(during.text, signIn.text, `${what}: the same body, byte for byte`);
+                assert.equal(during.headers.get('content-type'), signIn.headers.get('content-type'), what);
+                assert.deepEqual(signIn.json, ACCOUNT_DELETED_REFUSAL, `${what}: { error, error_type }, no ok`);
+            });
+            assert.deepEqual(stored(pool), [0, 0, 0], what);
+        }
+    });
+
     it('503 training_unavailable with Retry-After: 60 without a database (the sign-in then needs none)', async () => {
         setPoolForTests(null);
         await withServer(async (base) => {
@@ -468,19 +704,10 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
     });
 
     it('503 training_unavailable with Retry-After: 60 for a lock wait (55P03), a refused connection, a migration not applied (42P01) or a missing grant (42501); 500 training_failed for 23505; never the driver\'s text, an operation name or SQL', async () => {
-        // [code, status, the statement the GET fails on, the POST's]
-        const cases = [
-            ['55P03', 503, TRAINING_SQL.learnerLock, TRAINING_SQL.learnerLock],
-            ['ECONNREFUSED', 503, TRAINING_SQL.liveMember, TRAINING_TIME_SQL.signalState],
-            ['42P01', 503, TRAINING_TIME_SQL.closeState, TRAINING_TIME_SQL.signalState],
-            ['42501', 503, TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.insertStream],
-            ['23505', 500, TRAINING_TIME_SQL.insertDays, TRAINING_TIME_SQL.insertSignal],
-        ];
         await logged(() => withServer(async (base) => {
-            for (const [code, status, getSql, postSql] of cases) {
+            for (const [code, status, getSql, postSql] of DB_FAULTS) {
                 const { pool } = await seeded();
-                const error = Object.assign(new Error(`${code === '55P03' ? 'canceling statement due to lock timeout' : code} ${DRIVER}`), { code });
-                for (const sql of new Set([getSql, postSql])) pool.failOn(sql, error);
+                for (const sql of new Set([getSql, postSql])) pool.failOn(sql, dbError(code));
                 const answers = [['GET', await get(base), READ_FAILED], ['POST', await post(base, signal()), SIGNAL_FAILED]];
                 for (const [what, res, failed] of answers) {
                     assert.deepEqual([res.status, res.json], [status, status === 503 ? UNAVAILABLE : failed], `${code} ${what}`);
@@ -631,5 +858,98 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
             assert.ok(sentSince(pool, from).every((sql) => SIGN_IN.has(sql)), 'refused before any training statement');
             assert.equal((await me(base, B)).status, 200, 'another learner');
         });
+    });
+});
+
+describe('createTrainingTimeRouter alone: its log lines (createTrainingTimeRouter({ logger, now }))', () => {
+    beforeEach(() => resetPoolForTests());
+    afterEach(() => resetPoolForTests());
+
+    const failed = (type) => `[Training] study time failed (${type})`;
+    const noRow = (id) => `[Training] no account row for ${id.slice(0, 8)}… (study time not served)`;
+    const BEHIND = '[Training] the database clock is behind a closed day (signal not stored)';
+    /** Another account without an account row, in no cohort. */
+    const STRANGER = 'dddddddd-2424-4000-8000-0000000000d4';
+    /** The driver's text, SQL and the core's operation names: never in a line. */
+    const LINE_LEAK = /relation|db\.internal|hunter2|SELECT|INSERT|does not parse|Duplicate|23505|42P01|recordSignal|readStudyTime|closeDays|studyTimeState/;
+
+    /** seeded() with A's account row (auth.users stub): the bare app has no sign-in to write it. */
+    const withRow = async (options) => {
+        const { pool } = await seeded(options);
+        pool.state.stubs.push(A);
+        return pool;
+    };
+
+    it('each kind at most once a minute (a fault repeats on every signal of every page): the same fault again within the minute adds no line, from either route; another kind, or another account without a row, its own line; a minute after its line the same kind one more, each kind on its own minute; a 500 by its type only, never the driver\'s text', async () => {
+        const lines = [];
+        let wall = T0; // the router's clock (its now), not the database's
+        const invalid = await withRow();
+        invalid.state.rules[0].params.counting.gapMs = 1; // a stored rules version that no longer parses
+        const conflict = await withRow();
+        conflict.failOn(TRAINING_TIME_SQL.insertSignal, dbError('23505'));
+        const after = await withRow(); // the signal is stored, then the close and the state fail
+        after.failOn(TRAINING_TIME_SQL.insertDays, dbError('23505'));
+        after.failOn(TRAINING_TIME_SQL.currentDays, dbError('42P01'));
+        const noAccountRow = (await seeded()).pool;
+        const behind = await withRow();
+        const printed = await logged(() => withTimeRouter({ logger: { warn: (line) => lines.push(line) }, now: () => wall }, async (base) => {
+            /** `send` at `ms` after T0 on the router's clock, with `pool`: [status, body, the lines it added]. */
+            const at = async (ms, pool, send) => {
+                wall = T0 + ms;
+                setPoolForTests(pool);
+                const from = lines.length;
+                const res = await send();
+                return [res.status, res.json, lines.slice(from)];
+            };
+            const stateless = { ok: true, accepted: true, nextInMs: BEAT, state: null };
+            assert.deepEqual(await at(0, invalid, () => get(base)), [500, READ_FAILED, [failed('invalid_setting')]]);
+            assert.deepEqual(await at(1 * S, invalid, () => post(base, signal())), [500, SIGNAL_FAILED, []], 'the same kind from the other route');
+            assert.deepEqual(await at(2 * S, conflict, () => post(base, signal())), [500, SIGNAL_FAILED, [failed('conflict')]], 'another kind (the error carries the driver\'s text)');
+            assert.deepEqual(await at(3 * S, conflict, () => post(base, signal())), [500, SIGNAL_FAILED, []]);
+            assert.deepEqual(await at(4 * S, after, () => post(base, signal())), [200, stateless, [
+                '[Training] closing days after a signal failed (conflict)',
+                '[Training] study time state failed (table_not_found)',
+            ]], 'a close\'s conflict is another kind than a 500\'s');
+            after.setClock(T0 + 8 * S);
+            assert.deepEqual(await at(5 * S, after, () => post(base, signal({ seq: 1 }))), [200, stateless, []], 'the next signal fails the same way');
+            assert.deepEqual(await at(6 * S, noAccountRow, () => post(base, signal())), [503, UNAVAILABLE, [noRow(A)]]);
+            assert.deepEqual(await at(7 * S, noAccountRow, () => get(base)), [503, UNAVAILABLE, []], 'the same account');
+            assert.deepEqual(await at(8 * S, noAccountRow, () => post(base, signal(), { user: STRANGER })), [503, UNAVAILABLE, [noRow(STRANGER)]], 'another account');
+            const read = await at(9 * S, behind, () => get(base)); // closes 11-01 … 11-03 at 12:00 JST on 11-04
+            assert.deepEqual([read[0], read[2]], [200, []]);
+            behind.setClock(jstDayRange('2026-11-04').start + 5 * S); // inside 11-03's evidence window
+            assert.deepEqual(await at(9 * S, behind, () => post(base, signal())), [503, UNAVAILABLE, [BEHIND]]);
+            assert.deepEqual(await at(10 * S, behind, () => post(base, signal())), [503, UNAVAILABLE, []]);
+            // The first kind's minute runs from its line (0 s), though the fault came again in between.
+            assert.deepEqual(await at(59_999, invalid, () => get(base)), [500, READ_FAILED, []]);
+            assert.deepEqual(await at(60 * S, invalid, () => post(base, signal())), [500, SIGNAL_FAILED, [failed('invalid_setting')]]);
+            assert.deepEqual(await at(61 * S, conflict, () => post(base, signal())), [500, SIGNAL_FAILED, []], 'its own minute, from 2 s');
+            assert.deepEqual(await at(62 * S, conflict, () => post(base, signal())), [500, SIGNAL_FAILED, [failed('conflict')]]);
+        }));
+        assert.equal(lines.length, 9, lines.join('\n'));
+        for (const line of lines) assert.doesNotMatch(line, LINE_LEAK);
+        assert.ok(lines.every((line) => !line.includes(A) && !line.includes(STRANGER)), 'a whole id is never logged');
+        assert.deepEqual(printed.filter((line) => line.includes('[Training]')), [], 'the router writes to its logger only');
+    });
+
+    it('a 503 for a database that cannot serve now is not logged by the route (no database, a lock wait, a refused connection, a migration not applied, a missing grant), from either route; a 500 on the same router is', async () => {
+        const lines = [];
+        const printed = await logged(() => withTimeRouter({ logger: { warn: (line) => lines.push(line) }, now: () => T0 }, async (base) => {
+            setPoolForTests(null);
+            for (const res of [await get(base), await post(base, signal())]) {
+                assert.deepEqual([res.status, res.json, res.headers.get('retry-after')], [503, UNAVAILABLE, '60'], 'no database');
+            }
+            for (const [code, status, getSql, postSql] of DB_FAULTS) {
+                const pool = await withRow();
+                for (const sql of new Set([getSql, postSql])) pool.failOn(sql, dbError(code));
+                const from = lines.length;
+                for (const res of [await get(base), await post(base, signal())]) assert.equal(res.status, status, `${code}: ${res.text}`);
+                const sent = sentSince(pool, 0);
+                assert.ok(sent.includes(getSql) && sent.includes(postSql), `${code}: the failing statements were reached`);
+                if (status === 503) assert.deepEqual(lines.slice(from), [], `${code}: not logged by the route`);
+            }
+        }));
+        assert.deepEqual(lines, [failed('conflict')], 'the 500 (23505), once for both routes');
+        assert.deepEqual(printed.filter((line) => line.includes('[Training]')), []);
     });
 });
