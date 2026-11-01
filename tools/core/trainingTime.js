@@ -421,8 +421,9 @@ const MAX_SEQ = 2_147_483_647;
  */
 export function readSignalBody(body) {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
-    const keys = Object.keys(body);
-    if (keys.length !== SIGNAL_KEYS.length || !SIGNAL_KEYS.every((key) => Object.hasOwn(body, key))) return null;
+    // Every own key (non-enumerable and symbol keys too), so nothing beside the six slips through.
+    const keys = Reflect.ownKeys(body);
+    if (keys.length !== SIGNAL_KEYS.length || !SIGNAL_KEYS.every((key) => keys.includes(key))) return null;
     const { unitKey, chainId, seq, stop, focus, input } = /** @type {Record<string, unknown>} */ (body);
     const chain = canonicalUserId(chainId);
     if (typeof unitKey !== 'string' || !TRAINING_KEY.test(unitKey) || !chain) return null;
@@ -804,7 +805,10 @@ function readLive(pool, operation, userId, cohortId, asOfMs) {
  * Store a learner's signal in a cohort (POST .../time/signals; the header): transaction 1 decides
  * with admitSignal and stores an accepted signal; a close follows when a day may have become final;
  * then the state as of the signal's clock (none for a stop, which ends the chain). A failed close or
- * state keeps the signal: closeError or stateError names it (the caller logs it), and state is null.
+ * a failed state keeps the signal: closeError or stateError names it (the caller logs it); after a
+ * failed state, state is null. The unit is checked in today's stored unit list as stored, so a
+ * stored unit list that no longer parses with this code keeps signals (the evidence) while the
+ * close and the state fail with invalid_setting; rules that no longer parse refuse the signal.
  * nextInMs: beatMs while the page keeps the chain (accepted, duplicate, too_soon); null otherwise:
  * the page ends it (a stop) or reacts to the reason (a new chain, or it stops).
  * @param {{ userId: unknown, cohortId: unknown, signal: unknown, pool?: TrainingPool | null }} params
