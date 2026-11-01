@@ -17,9 +17,10 @@
  *   a stop, or when it could not be computed (logged)),
  *   or 200 { ok, accepted: false, reason, nextInMs } when the signal is not stored (duplicate,
  *   chain_ended, not_open, restart, too_soon, other_place). nextInMs is beatMs while the page keeps
- *   its chain (in session, not a stop), else null (the page sends no more signals of that chain, not
- *   even a stop). The numbers never go down from one answer to the next while the database clock
- *   does not go back (tools/core/trainingTime.js liveTime).
+ *   its chain (a stored signal, a duplicate or too_soon, none of them a stop or after one, before the
+ *   cohort's end), else null (the page sends no more signals of that chain, not even a stop). The
+ *   numbers never go down from one answer to the next while the database clock does not go back
+ *   (tools/core/trainingTime.js liveTime).
  * beatMs is the only rule value an answer carries (as beatMs or nextInMs).
  *
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:

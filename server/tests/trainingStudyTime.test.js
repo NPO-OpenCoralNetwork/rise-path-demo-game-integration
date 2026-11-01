@@ -41,6 +41,8 @@ const every = (from, to, step) => {
   return out;
 };
 const always = () => true;
+/** AdmitRules for every day (pendingSignals' admitOf): today's gapMs, maxPlaces and unit list; beatMs 0, every next beat now. */
+const admitWith = ({ gapMs, maxPlaces = Infinity, unitKnown = () => true, beatMs = 0 }) => () => ({ beatMs, maxPlaces, gapMs, unitKnown });
 
 describe('the rules file (shared/training/timeRules.js)', () => {
   it('no defaults: empty, partial or unknown keys refuse the whole file; errors name fields, never values', () => {
@@ -477,15 +479,20 @@ describe('studyReason: why a page\'s time is not counting', () => {
   const COHORT = cohortRange('2026-11-01', '2026-11-30');
   const SET_MS = 100 * 3600 * S;
   const first = (i) => i === 0;
-  /** The answer right after the last signal of chain `id` was stored, with the evidence up to it (countingOf, maxPlaces and unitKnown only when given: else the defaults). */
-  const reasonAfter = (signals, id, { counting = RULES.counting, countingOf, maxPlaces, unitKnown, setMs = SET_MS, unitMs = 0, cohort = COHORT } = {}) => {
+  /**
+   * The answer right after the last signal of chain `id` was stored, with the evidence up to it.
+   * countingOf, and admitOf (or maxPlaces and unitKnown: today's for every day, every beat now), only
+   * when given: else the defaults.
+   */
+  const reasonAfter = (signals, id, { counting = RULES.counting, countingOf, admitOf, maxPlaces, unitKnown, setMs = SET_MS, unitMs = 0, cohort = COHORT } = {}) => {
     const own = signals.filter((s) => s.chain === id).sort((x, y) => x.seq - y.seq);
     const s = own[own.length - 1];
     const prev = own.length > 1 ? own[own.length - 2] : null;
+    const admit = admitOf ?? (maxPlaces === undefined && unitKnown === undefined ? undefined : admitWith({ gapMs: counting.gapMs, maxPlaces, unitKnown }));
     return studyReason({
       now: s.at, chain: { id, unit: s.unit, prevAt: prev ? prev.at : null }, signal: { focus: s.focus, input: s.input },
       signals: signals.filter((g) => g.at <= s.at), counting, setMs, unitMs, cohort,
-      ...(countingOf === undefined ? {} : { countingOf }), ...(maxPlaces === undefined ? {} : { maxPlaces }), ...(unitKnown === undefined ? {} : { unitKnown }),
+      ...(countingOf === undefined ? {} : { countingOf }), ...(admit === undefined ? {} : { admitOf: admit }),
     });
   };
 
@@ -552,20 +559,20 @@ describe('studyReason: why a page\'s time is not counting', () => {
       ...chain('d', 'u2', [5, 30], { input: always }), // its last signal is now
       ...chain('e', 'u1', [1, 6], { input: always }), // quiet: 24 s since its last signal, more than gapMs
     ];
-    const pending = pendingSignals({ now, signals, gapMs: 23 * S, except: 'a' });
+    const pending = pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S }), except: 'a' });
     assert.deepEqual(pending, [
       { chain: 'b', seq: 2, unit: 'u2', born: T0 + 2 * S, at: now, stop: false, focus: false, input: false },
       { chain: 'e', seq: 2, unit: 'u1', born: T0 + 1 * S, at: now, stop: false, focus: true, input: false },
     ]);
     // Newer open chains (born later, open by gapMs): b has one (d), e has two (b and d).
-    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 1, except: 'a' }), []);
-    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 2, except: 'a' }).map((s) => s.chain), ['b']);
-    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S }).map((s) => s.chain), ['a', 'b', 'e'], 'no chain left out: the asking one too');
+    assert.deepEqual(pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S, maxPlaces: 1 }), except: 'a' }), []);
+    assert.deepEqual(pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S, maxPlaces: 2 }), except: 'a' }).map((s) => s.chain), ['b']);
+    assert.deepEqual(pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S }) }).map((s) => s.chain), ['a', 'b', 'e'], 'no chain left out: the asking one too');
     // Unit u2 no longer listed today: b is not pending, yet it still holds an open place (admitSignal
     // counts it), so with maxPlaces 2 e stays pushed out by b and d.
     const listed = (unit) => unit !== 'u2';
-    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, unitKnown: listed, except: 'a' }).map((s) => s.chain), ['e']);
-    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 2, unitKnown: listed, except: 'a' }), []);
+    assert.deepEqual(pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S, unitKnown: listed }), except: 'a' }).map((s) => s.chain), ['e']);
+    assert.deepEqual(pendingSignals({ now, signals, admitOf: admitWith({ gapMs: 23 * S, maxPlaces: 2, unitKnown: listed }), except: 'a' }), []);
   });
 
   it('another page of the same unit counts the instant: this idle page reads counting', () => {
@@ -787,6 +794,34 @@ describe('studyReason: why a page\'s time is not counting', () => {
     }
   });
 
+  it('pendingSignals with beatMs: each page\'s next beat comes beatMs (of its last signal\'s day) after its last signal, or now when that is past (a late beat); a beat that was due by now is judged as at that instant: pushed out then, it is left out even once a pusher stopped', () => {
+    const at = (s) => T0 + s * S;
+    const page = (id, unit, secs, opts) => chain(id, unit, secs, { input: first, ...opts });
+    const beats = admitWith({ gapMs: 23 * S, beatMs: 7 * S, maxPlaces: 2 });
+    const pend = (signals, now, except) => pendingSignals({ now: at(now), signals: signals.filter((g) => g.at <= at(now)), admitOf: beats, except }).map((g) => [g.chain, (g.at - T0) / S]);
+    // Due later: at its due instant. Due by now and not stored: at now.
+    const open = [...page('b', 'u2', [2, 9]), ...page('c', 'u1', [3, 10]), ...page('a', 'u1', [0, 14])];
+    assert.deepEqual(pend(open, 14, 'a'), [['b', 16], ['c', 17]]);
+    assert.deepEqual(pend(open, 20, 'a'), [['b', 20], ['c', 20]]);
+    // p's beat was due at 14 s while q1 and q (newer) were open: other_place, and p sends nothing more.
+    const p = page('p', 'u2', [0, 7]);
+    const q = page('q', 'u1', [9, 16]);
+    assert.deepEqual(pend([...p, ...page('q1', 'u3', [8], { stopAt: 15 }), ...q], 16, 'q'), [], 'pushed out at its due beat');
+    assert.deepEqual(pend([...p, ...page('q1', 'u3', [8], { stopAt: 13 }), ...q], 16, 'q'), [['p', 16]], 'q1 stopped before p\'s beat: a late beat, judged now');
+    assert.deepEqual(pend([...p, ...page('q1', 'u3', [15]), ...q], 16, 'q'), [['q1', 22]], 'p: not pushed out at its beat (q1 opened later), pushed out now');
+  });
+
+  it('pendingSignals with a day\'s rules: a beat due after 00:00 is judged with the next day\'s setting (its unit list, maxPlaces), and with none that day it is left out', () => {
+    const p = chain('p', 'u2', [-14, -7], { input: first, base: MIDNIGHT }); // its beat is due at 00:00
+    const c = chain('c', 'u1', [-12, -5], { input: first, base: MIDNIGHT });
+    const today = { beatMs: 7 * S, maxPlaces: 3, gapMs: 23 * S, unitKnown: () => true };
+    const pend = (tomorrow) => pendingSignals({ now: MIDNIGHT - 5 * S, signals: [...p, ...c], admitOf: (d) => (d < nextDay(DAY) ? today : tomorrow), except: 'c' }).map((g) => [g.chain, g.at - MIDNIGHT]);
+    assert.deepEqual(pend(today), [['p', 0]]);
+    assert.deepEqual(pend({ ...today, unitKnown: (unit) => unit !== 'u2' }), [], 'unit 2 not listed from 00:00');
+    assert.deepEqual(pend({ ...today, maxPlaces: 1 }), [], 'maxPlaces 1 from 00:00: c is newer');
+    assert.deepEqual(pend(null), [], 'no setting from 00:00');
+  });
+
   it('maxPlaces across 00:00: a page is pushed out as admitSignal decides its next signal, with today\'s gapMs, also when x is in yesterday (another gapMs)', () => {
     // Yesterday gapMs 29 s, today 17 s; maxPlaces 2. a (u1, no focus): last pair -4 s to 16 s, credited by
     // yesterday only (x = -1 ms). b5 (u2, older than a, focused): its pending pair -6 s to 16 s (22 s) is
@@ -941,9 +976,9 @@ describe('studyReason: why a page\'s time is not counting', () => {
       };
       return {
         s, ev, prev, unitMs, setMs: setMs.get(s.unit), counting, countingOf, maxPlaces, cohort,
-        reason: studyReason({ ...input, countingOf, maxPlaces }),
-        withoutCountingOf: studyReason({ ...input, maxPlaces }),
-        todaysEveryDay: studyReason({ ...input, countingOf: () => counting, maxPlaces }),
+        reason: studyReason({ ...input, countingOf, admitOf: admitWith({ gapMs: counting.gapMs, maxPlaces }) }),
+        withoutCountingOf: studyReason({ ...input, admitOf: admitWith({ gapMs: counting.gapMs, maxPlaces }) }),
+        todaysEveryDay: studyReason({ ...input, countingOf: () => counting, admitOf: admitWith({ gapMs: counting.gapMs, maxPlaces }) }),
         withoutMaxPlaces: studyReason({ ...input, countingOf }),
       };
     });

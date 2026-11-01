@@ -314,6 +314,25 @@ export function settingOf(settings, day) {
 }
 
 /**
+ * What admitSignal decides a signal with under a setting (pendingSignals' AdmitRules): its beatMs,
+ * maxPlaces and gapMs, and its unit list (as signalState's unit_known reads it).
+ * @param {Setting} setting
+ * @returns {import('../../shared/training/studyTime.js').AdmitRules}
+ */
+export function admitRules(setting) {
+    return {
+        beatMs: setting.rules.collection.beatMs, maxPlaces: setting.rules.collection.maxPlaces, gapMs: setting.rules.counting.gapMs,
+        unitKnown: (unit) => setting.setMs.has(unit),
+    };
+}
+
+/** A day's AdmitRules from the cohort's settings (null: no setting that day). @param {Setting[]} settings @param {string} day */
+export function admitRulesOf(settings, day) {
+    const setting = settingOf(settings, day);
+    return setting ? admitRules(setting) : null;
+}
+
+/**
  * The stored settings rows, parsed again (the rows were checked when loaded; a version that no
  * longer parses with this code stops the counting instead of guessing). null when one fails.
  * @param {any[]} rows
@@ -551,19 +570,20 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         heldBack ||= until < Math.min(end, nowMs);
     }
     // Each unit's time through nowMs, every live day counted from all its evidence up to nowMs and the
-    // other open pages' pending signals (open pages go on, but not one whose next signal admitSignal
-    // would not store: pendingSignals, as studyReason judges x): what the reason's cap check reads.
-    // The same as the settled count unless another open page held it back (only such a page has a
-    // pending pair a day can credit).
-    const unitNowMs = heldBack && range?.live && setting
-        ? countDays({
-            ...range.live,
-            signals: [...signals, ...pendingSignals({
-                now: nowMs, signals, gapMs: setting.rules.counting.gapMs, maxPlaces: setting.rules.collection.maxPlaces, unitKnown: (unit) => setting.setMs.has(unit),
-            })],
-            rulesOf: (day) => of(day).rules, setMsOf: (day) => of(day).setMs, carriedMs: unitTotals, cohort,
-        }).carriedAfterMs
-        : counted.carriedAfterMs;
+    // other open pages' next beats (open pages go on, unless admitSignal will not store the beat:
+    // pendingSignals, as studyReason judges x), cut at nowMs (a beat still to come ends its pair
+    // later): what the reason's cap check reads. The same as the settled count unless another open
+    // page held it back (only such a page has a pending pair a day can credit).
+    let unitNowMs = counted.carriedAfterMs;
+    if (heldBack && range?.live && setting) {
+        const withPending = [...signals, ...pendingSignals({ now: nowMs, signals, admitOf: (day) => admitRulesOf(settings, day) })];
+        unitNowMs = new Map(unitTotals);
+        for (let day = range.live.fromDay; day <= range.live.toDay; day = nextDay(day)) {
+            const { start, end } = jstDayRange(day);
+            const daySetting = of(day);
+            unitNowMs = countSpan({ a: start, b: Math.min(end, nowMs), signals: withPending, rules: daySetting.rules, setMs: daySetting.setMs, carriedMs: unitNowMs, cohort }).carriedAfterMs;
+        }
+    }
     /** @type {Map<string, LiveDay>} */
     const byDay = new Map(closedDays.map((d) => [d.day, { day: d.day, countedMs: d.countedMs, final: true }]));
     for (const d of counted.days) if (!byDay.has(d.day)) byDay.set(d.day, { day: d.day, countedMs: d.countedMs, final: false });
@@ -620,8 +640,7 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
         now: nowMs, chain: { id: signal.chainId, unit: signal.unitKey, prevAt }, signal, signals,
         counting: today,
         countingOf: (day) => (settings ? settingOf(settings, day)?.rules.counting ?? null : today),
-        maxPlaces: setting.rules.collection.maxPlaces,
-        unitKnown: (unit) => setting.setMs.has(unit),
+        admitOf: (day) => (settings ? admitRulesOf(settings, day) : admitRules(setting)),
         setMs, unitMs: time.unitNowMs.get(signal.unitKey) ?? 0, cohort: time.cohort,
     });
     return { counting: reason === null, reason, todayMs: time.todayMs, unit: { unitKey: signal.unitKey, countedMs, setMs, capReached: countedMs >= setMs } };
