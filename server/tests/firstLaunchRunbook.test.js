@@ -24,6 +24,7 @@ import { BASE_STACK, NOW, PILOT_ID, PILOT_ID_2, baseFacts, baseRecord, buildInpu
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pilotStartupLines, readPilotList } from '../middleware/pilotGate.js';
 import { VERCEL_RULES } from '../../scripts/deploy/vercel-env-rules.mjs';
+import { runEdgeSmoke } from '../../scripts/smoke-public-edge.mjs';
 import { ALL_CODES as BACKUP_ALL_CODES, BACKUP_CODES } from '../../scripts/deploy/backup-codes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -1539,6 +1540,36 @@ describe('final review of Phase 9: runbook steps the owner can complete as writt
       assert.ok(named || line.includes('手順書 10.3'), line);
       assert.ok(line.includes('手順書 10.3'), `${line}: says when it can be done`);
     }
+  });
+
+  // Recheck 1, finding 1: smoke:edge prints the grep line right after check 8, in the middle of its output; 10.3 step 4
+  // says so and quotes the lines around it as the script prints them (not 「終わりに出る」, where only the summary is).
+  it('10.3 step 4 finds the grep line where smoke:edge prints it: under check 8, not at the end', async () => {
+    /** @type {string[]} */
+    const lines = [];
+    await runEdgeSmoke({
+      app: 'https://app.example',
+      api: 'https://api.example',
+      fetchImpl: async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }),
+      log: (line) => { lines.push(line); },
+    });
+    const at = lines.findIndex((line) => /grep smoke=[0-9a-f]{12}$/.test(line));
+    assert.ok(at >= 2, lines.join('\n'));
+    const id = /smoke=([0-9a-f]{12})$/.exec(lines[at])?.[1] ?? '';
+    const step4 = stepPart(stepBody('10.3'), 'やること:').split('\n').find((line) => line.startsWith('  4. ')) ?? '';
+    // What step 4 quotes, with 「…」 standing for the id, is what the script prints, in that order.
+    const eight = /8 番の行（`(8\. GET app [^`]*smoke=…)`）/u.exec(step4)?.[1] ?? '';
+    const onVm = /「(On the VM[^」]*)」/u.exec(step4)?.[1] ?? '';
+    const grep = /`(docker compose [^`]*grep smoke=…)`/u.exec(step4)?.[1] ?? '';
+    assert.ok(eight && onVm && grep, step4);
+    assert.ok(lines[at - 2].replace(/^[✅❌] /u, '').startsWith(eight.replace('…', id)), `${lines[at - 2]} / ${eight}`);
+    assert.equal(lines[at - 1].trim(), onVm);
+    assert.equal(lines[at].trim(), grep.replace('…', id));
+    // The line is in the middle: checks follow it, and the last line is the summary the CLI adds.
+    assert.ok(lines.slice(at + 1).some((line) => /^[✅❌] (9|1\d)[ab]?\. /u.test(line)), 'checks after the grep line');
+    assert.match(step4, /途中（最後ではありません）/u);
+    assert.doesNotMatch(step4, /(終わり|最後)に出る `docker compose/u);
+    assert.match(step4, /`smoke=` のうしろまでそのまま写して/u);
   });
 
   // Finding 13: 2.7 lists the project that holds nexloom-gce, not whatever project gcloud last pointed at.
