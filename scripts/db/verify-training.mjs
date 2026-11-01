@@ -76,6 +76,9 @@
  *   T15 signalState's other columns: the clock guard's window end (the last closed day with the
  *       gapMs it was counted with; a marked row and a recompute row are not read), yesterday's gapMs,
  *       today's unit list, the places (each chain's last signal, yesterday's and today's streams)
+ *   T16 a signal's state read that fails (a statement on a missing table) rolls back to its
+ *       savepoint: the signal is stored, the answer names the error; control: without the savepoint
+ *       the COMMIT of the aborted transaction stores nothing, and the write answers an error
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -1009,6 +1012,26 @@ async function t14(pool, { catalogId, ruleSetId }) {
 }
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
+async function t16(pool, { catalogId, ruleSetId }) {
+    // A signal's state read that fails behind its savepoint: the real write on a connection that sends
+    // the state's currentDays as a statement on a table that does not exist (42P01). The write rolls
+    // back to the savepoint and commits: the signal is stored and the answer names the error. Control:
+    // without the savepoint statements the failed statement aborts the transaction, its COMMIT ends it
+    // as a rollback (no error from the driver), nothing is stored, and the write answers an error.
+    const [kept, lost] = [uid('t16k'), uid('t16l')];
+    const { cohort } = await learnerToday(pool, { catalogId, ruleSetId, learners: [kept, lost] });
+    const broken = new Map([[TRAINING_TIME_SQL.currentDays, 'SELECT * FROM training_time_no_such_table']]);
+    const r = await sendSignal(firstConnection(pool, { send: broken }), kept, cohort);
+    const stored = await streamsOf(pool, kept, false);
+    check('T16', r.status === 'accepted' && r.state === null && r.stateError === 'table_not_found' && stored === 1,
+        `a state read that fails behind the savepoint: ${r.status ?? r.error_type} (stateError ${r.stateError}), streams stored ${stored}`);
+    const c = await sendSignal(firstConnection(pool, { send: broken, skip: [TRAINING_TIME_SQL.savepointState, TRAINING_TIME_SQL.rollbackState] }), lost, cohort);
+    const none = await streamsOf(pool, lost, false);
+    check('T16', c.error_type === 'unknown' && none === 0,
+        `control, without the savepoint: the COMMIT of the aborted transaction rolled it back (streams stored ${none}), and the write answered ${c.status ?? c.error_type}`);
+}
+
+/** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
 async function t15(pool, { catalogId, ruleSetId }) {
     // signalState's other columns on PostgreSQL (npm runs the signal on the in-memory fake, which
     // computes them in JavaScript): the clock guard's end of the last closed day's evidence window
@@ -1102,6 +1125,7 @@ export async function main(argv = process.argv.slice(2)) {
         await t13(pool, ids);
         await t14(pool, ids);
         await t15(pool, ids);
+        await t16(pool, ids);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {

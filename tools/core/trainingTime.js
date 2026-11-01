@@ -623,7 +623,9 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
 
 /**
  * One transaction on its own connection. `work` decides whether to commit. A lock wait over
- * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'.
+ * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. PostgreSQL ends the COMMIT of a transaction that
+ * a failed statement aborted as a rollback, without an error: that is an error here, never the
+ * work's result.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work
@@ -643,7 +645,8 @@ async function transaction(pool, operation, work) {
         await client.query('BEGIN');
         await client.query(TRAINING_SQL.lockTimeout);
         const { commit, value } = await work(client);
-        await client.query(commit ? 'COMMIT' : 'ROLLBACK');
+        const ended = await client.query(commit ? 'COMMIT' : 'ROLLBACK');
+        if (commit && ended?.command === 'ROLLBACK') return { error: 'The transaction was rolled back.', error_type: 'unknown' };
         return value;
     } catch (err) {
         try {

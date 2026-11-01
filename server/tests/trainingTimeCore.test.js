@@ -958,6 +958,20 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
         assert.equal(broken.pool.state.signals.length, 1);
     });
 
+    it('a COMMIT that the database ends as a rollback (PostgreSQL does so, without an error, for a transaction a failed statement aborted) is an error, never the work\'s result', async () => {
+        const { pool } = await seeded({ clock: at('2026-11-01T03:00:00Z') });
+        const rolledBack = {
+            ...pool,
+            connect: async () => {
+                const client = await pool.connect();
+                return { ...client, query: async (sql, params) => (sql === 'COMMIT' ? { ...(await client.query('ROLLBACK')), command: 'ROLLBACK' } : client.query(sql, params)) };
+            },
+        };
+        assert.deepEqual(await send(rolledBack), { error: 'The transaction was rolled back.', error_type: 'unknown' });
+        assert.deepEqual(await closeDays({ userId: A, cohortId: COHORT, computedBy: 'staff', pool: rolledBack }), { status: 'nothing', reason: 'nothing_final' }, 'a ROLLBACK the work asked for is its result');
+        assert.equal(pool.state.signals.length, 0);
+    });
+
     it('a stop: accepted, nextInMs null, no state and nothing read; a close that is due still runs', async () => {
         const t0 = at('2026-11-01T03:00:00Z');
         const { pool } = await seeded({ clock: t0 });
