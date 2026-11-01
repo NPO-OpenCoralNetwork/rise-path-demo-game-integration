@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
-  admitSignal, cohortRange, countDay, countDays, countSpan, countWhole, evidenceWindow, jstDayOf, jstDayRange, nextDay, STUDY_TIME_ALGORITHM, studyReason,
+  admitSignal, cohortRange, countDay, countDays, countSpan, countWhole, evidenceWindow, jstDayOf, jstDayRange, nextDay, pendingSignals, STUDY_TIME_ALGORITHM, studyReason,
 } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { COURSE_MANIFEST_SCHEMA, manifestCanonical, parseCourseManifest, setMsOf } from '../../shared/training/courseManifest.js';
@@ -541,6 +541,26 @@ describe('studyReason: why a page\'s time is not counting', () => {
     const quiet = (base) => chain('b', 'u2', [3, 7], { input: first, base });
     assert.equal(reasonAfter([...exact, ...quiet(T0)], 'a'), 'other_tab', 'b\'s last signal exactly gapMs old: still open, its pending pair credits 7 s to 20 s');
     assert.equal(reasonAfter([...exact, ...quiet(T0 - 1)], 'a'), null, 'one millisecond older: b is not open');
+  });
+
+  it('pendingSignals: each other chain\'s last signal (not a stop, before now) again at now, with its last flags and no input; not the asking chain, a stopped one, one whose last signal is now, or one maxPlaces newer open chains push out (open by today\'s gapMs); a quiet one stays (its pair is the counting\'s to judge)', () => {
+    const now = T0 + 30 * S;
+    const signals = [
+      ...chain('a', 'u1', [0, 7, 14], { input: first }), // the asking page
+      ...chain('b', 'u2', [2, 9], { input: first, focus: false }), // open: its last at 9 s, no focus
+      ...chain('c', 'u1', [3], { input: first, stopAt: 10 }), // stopped
+      ...chain('d', 'u2', [5, 30], { input: always }), // its last signal is now
+      ...chain('e', 'u1', [1, 6], { input: always }), // quiet: 24 s since its last signal, more than gapMs
+    ];
+    const pending = pendingSignals({ now, signals, gapMs: 23 * S, except: 'a' });
+    assert.deepEqual(pending, [
+      { chain: 'b', seq: 2, unit: 'u2', born: T0 + 2 * S, at: now, stop: false, focus: false, input: false },
+      { chain: 'e', seq: 2, unit: 'u1', born: T0 + 1 * S, at: now, stop: false, focus: true, input: false },
+    ]);
+    // Newer open chains (born later, open by gapMs): b has one (d), e has two (b and d).
+    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 1, except: 'a' }), []);
+    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 2, except: 'a' }).map((s) => s.chain), ['b']);
+    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S }).map((s) => s.chain), ['a', 'b', 'e'], 'no chain left out: the asking one too');
   });
 
   it('another page of the same unit counts the instant: this idle page reads counting', () => {

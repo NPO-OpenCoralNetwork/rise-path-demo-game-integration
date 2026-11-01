@@ -16,13 +16,16 @@
 //   page's next beat (nextInMs) only while it keeps its chain in session (null for an ignored stop,
 //   after the chain's stop, after the cohort's last day); who may send one (the stub first: a
 //   deletion that committed during the wait); the clock guard after a close (the closed day's end +
-//   the gapMs it was counted with); then a close (computed by 'api') only once a day is final (with
-//   yesterday's gapMs, as closeRange), whose failure keeps the signal, and the state as of the
-//   signal's clock in one read-only snapshot (none for a stop), with the pure function's numbers and
-//   reason (each day's rules for a pair across 00:00; no look-ahead for a page maxPlaces pushes out);
+//   the gapMs it was counted with); the state as of the signal's clock, read in its transaction under
+//   its locks behind a savepoint whose failure keeps the signal (none for a stop), with the pure
+//   function's numbers and reason (each day's rules for a pair across 00:00; no look-ahead for a page
+//   maxPlaces pushes out; the cap with the other open pages going on); then a close (computed by
+//   'api') only once a day is final (with yesterday's gapMs, as closeRange), whose failure keeps the
+//   signal;
 // - reading study time (readStudyTime): learners only (the membership read decides before any
-//   transaction), the close, then one read-only snapshot; the answer's keys in order, its statuses
-//   (beatMs only in session), the newest LIVE_DAYS days, the pure function's numbers;
+//   transaction), the close and the read in one transaction under the three locks, as of its clock;
+//   the answer's keys in order, its statuses (beatMs only in session), the newest LIVE_DAYS days, the
+//   pure function's numbers;
 // - the live values up to the settled instant (settledUntil: the earliest last signal of a chain
 //   still open), the full count with one page; no number goes down from one answer or read to the
 //   next (a seeded property over random pages, which also checks countDays and the closed rows
@@ -488,14 +491,17 @@ const iso = (ms) => new Date(ms).toISOString();
 const signalBody = (patch = {}) => ({ unitKey: U1, chainId: chainId(1), seq: 0, stop: false, focus: true, input: true, ...patch });
 /** recordSignal for A in the cohort at the pool's clock. */
 const send = (pool, patch = {}, ids = {}) => recordSignal({ userId: A, cohortId: COHORT, ...ids, signal: signalBody(patch), pool });
-// A signal's transaction up to its decision, the same transaction storing it, a close up to its
-// writes (closeDays), and the live values' read-only snapshot.
+// A signal's transaction up to its decision; the same transaction storing it and, unless it is a
+// stop, reading its state under the same locks (behind a savepoint) before its COMMIT; a close up to
+// its writes (closeDays); the GET's live values, read after its close in the close's transaction.
 const DECIDED = ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.signalState];
-const STORED = [...DECIDED, TRAINING_TIME_SQL.insertStream, TRAINING_TIME_SQL.insertSignal, 'COMMIT'];
+const INSERTED = [...DECIDED, TRAINING_TIME_SQL.insertStream, TRAINING_TIME_SQL.insertSignal];
+const STATE_READ = [TRAINING_TIME_SQL.savepointState, TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.unitTotals, TRAINING_TIME_SQL.currentDays, TRAINING_TIME_SQL.evidence];
+const STORED = [...INSERTED, ...STATE_READ, 'COMMIT'];
+const STOPPED = [...INSERTED, 'COMMIT'];
 const CLOSING = ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.closeState,
     TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.unitTotals, TRAINING_TIME_SQL.evidence, TRAINING_TIME_SQL.insertDays];
-const LIVE_READ = [TRAINING_TIME_SQL.beginRead, TRAINING_SQL.lockTimeout, TRAINING_TIME_SQL.closeState, TRAINING_TIME_SQL.closeSettings, TRAINING_TIME_SQL.unitTotals,
-    TRAINING_TIME_SQL.currentDays, TRAINING_TIME_SQL.evidence, 'COMMIT'];
+const GET_READ = [TRAINING_TIME_SQL.unitTotals, TRAINING_TIME_SQL.currentDays, TRAINING_TIME_SQL.evidence];
 const rowsOf = (pool) => structuredClone({ streams: pool.state.streams, signals: pool.state.signals, days: pool.state.days, unitDays: pool.state.unitDays });
 const lockBusy = () => Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' });
 const connectionLost = () => Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
@@ -537,9 +543,23 @@ const storedSignals = (pool) => pool.state.signals.map((g) => {
     const s = pool.state.streams.find((x) => x.id === g.stream_id);
     return signalOf({ chain_id: s.chain_id, seq: g.seq, unit_key: s.unit_key, born: s.chain_started_at, at: g.received_at, flags: g.flags });
 });
+/**
+ * Signals sent through recordSignal in time order: each event is [clock, the body's patch]. Returns
+ * each answer by `${chainId}#${seq}`.
+ * @param {any} pool @param {Array<[number, Record<string, unknown>]>} events
+ */
+async function play(pool, events) {
+    /** @type {Map<string, any>} */
+    const answers = new Map();
+    for (const [clock, patch] of [...events].sort((x, y) => x[0] - y[0])) {
+        pool.setClock(clock);
+        answers.set(`${patch.chainId}#${patch.seq}`, await send(pool, patch));
+    }
+    return answers;
+}
 
 describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
-    it('a new chain\'s seq 0, then its later seqs: decided and stored in one transaction under the three locks with lower-case ids (COMMIT), then the state in one read-only snapshot with the pure function\'s numbers; no close while no day is final', async () => {
+    it('a new chain\'s seq 0, then its later seqs: decided, stored and its state read in one transaction under the three locks with lower-case ids (COMMIT), the state with the pure function\'s numbers; no close while no day is final', async () => {
         const t0 = at('2026-11-01T03:00:00Z'); // 12:00 JST on the cohort's first day: no day is final yet
         const { pool } = await seeded({ clock: t0 });
         const id = chainId(1);
@@ -556,7 +576,7 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
             status: 'accepted', nextInMs: 7 * S, state: pureState({ signals: sent.slice(0, i + 1), today: '2026-11-01', reason: i === 0 ? 'starting' : null }),
         })));
         assert.deepEqual(results.map((r) => /** @type {any} */ (r).state.todayMs), [0, 7 * S, 14 * S, 21 * S]);
-        assert.deepEqual(pool.tx(), Array.from({ length: 4 }, () => [...STORED, ...LIVE_READ]).flat());
+        assert.deepEqual(pool.tx(), Array.from({ length: 4 }, () => STORED).flat());
         // Every statement got the canonical (lower-case) ids; the inserts take the clock reading as a parameter.
         const uuids = new Set(pool.queries.filter((q) => q.tx).flatMap((q) => q.params).filter((p) => typeof p === 'string' && UUID.test(p)));
         assert.deepEqual([...uuids].sort(), [A, COHORT, id].sort());
@@ -568,7 +588,7 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         assert.deepEqual(paramsOf(TRAINING_TIME_SQL.evidence), sent.map((s) => [A, COHORT, '2026-11-01', '2026-11-01', iso(jstDayRange('2026-11-01').start - 101 * S), iso(s.at)]));
         assert.deepEqual(pool.state.signals.map((g) => [g.seq, g.flags]), [[0, 6], [1, 2], [2, 4], [3, 0]]);
         assert.deepEqual([pool.state.streams.length, pool.state.days.length], [1, 0]);
-        assert.deepEqual(pool.releases, Array(8).fill(false));
+        assert.deepEqual(pool.releases, Array(4).fill(false), 'one connection per signal');
     });
 
     it('a chain the seed stored goes on: the state carries its unit\'s time to the set time (capReached, cap_reached), the pure function\'s numbers', async () => {
@@ -592,24 +612,27 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         assert.equal(pool.state.streams.length, 1, 'the seeded stream of the day');
     });
 
-    it('the state is as of the signal\'s clock: a pair another page stores between the signal\'s COMMIT and the read is not in this answer (the next read counts it)', async () => {
+    it('the state is read in the signal\'s own transaction, before its COMMIT, as of its clock: the evidence up to the signal\'s clock even when the clock moves on during the read; another page\'s later pair counts in a later read', async () => {
         const t0 = at('2026-11-01T03:00:00Z');
         const { pool } = await seeded({ clock: t0 });
         await send(pool);
         pool.setClock(t0 + 7 * S);
         let done = false;
-        pool.before(TRAINING_TIME_SQL.beginRead, () => {
+        pool.before(TRAINING_TIME_SQL.currentDays, () => {
             if (done) return;
             done = true;
-            chain(pool, { id: chainId(2), unit: U1, from: t0 + 8 * S, n: 2, every: 4 * S }); // 4 s of unit 1 after the signal
             pool.setClock(t0 + 13 * S);
         });
+        const mark = pool.tx().length;
         const result = /** @type {any} */ (await send(pool, { seq: 1 }));
+        assert.deepEqual(pool.tx().slice(mark), STORED);
         assert.deepEqual(result.state, { counting: true, reason: null, todayMs: 7 * S, unit: { unitKey: U1, countedMs: 7 * S, setMs: 120 * S, capReached: false } });
         assert.equal(pool.queries.filter((q) => q.sql === TRAINING_TIME_SQL.evidence).at(-1)?.params[5], iso(t0 + 7 * S));
-        // At 13 s page 1 is still open (its next signal could still change the time from 7 s on): the
-        // read counts what is settled; once page 1 is no longer open (gapMs after its last signal) the
-        // other page's 4 s are settled too. A number never goes down.
+        // Another page (a chain stored after the signal) has 4 s of unit 1 after it. At 13 s page 1 is
+        // still open (its next signal could still change the time from 7 s on): the read counts what
+        // is settled; once page 1 is no longer open (gapMs after its last signal) the other page's 4 s
+        // are settled too. A number never goes down.
+        chain(pool, { id: chainId(2), unit: U1, from: t0 + 8 * S, n: 2, every: 4 * S });
         const later = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
         assert.deepEqual(later.time.days, [{ day: '2026-11-01', countedMs: 7 * S, final: false }]);
         pool.setClock(t0 + 7 * S + 23 * S + 1);
@@ -617,7 +640,7 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         assert.deepEqual(settled.time.days, [{ day: '2026-11-01', countedMs: 11 * S, final: false }]);
     });
 
-    it('the statements: signalState reads the clock once, in whole milliseconds; the inserts take it as a parameter, only while the stub exists, once per chain and day (live rows) and once per seq; the chain and the open places are read from live streams only; the read-only snapshot', () => {
+    it('the statements: signalState reads the clock once, in whole milliseconds; the inserts take it as a parameter, only while the stub exists, once per chain and day (live rows) and once per seq; the chain and the open places are read from live streams only; the state\'s savepoint', () => {
         assert.equal((TRAINING_TIME_SQL.signalState.match(/clock_timestamp/g) ?? []).length, 1);
         assert.match(TRAINING_TIME_SQL.signalState, /date_trunc\('milliseconds', clock_timestamp\(\)\)/);
         assert.doesNotMatch(TRAINING_TIME_SQL.signalState, /now\(\)/);
@@ -636,7 +659,7 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE s\.user_id = \$1::uuid AND s\.chain_id = \$3::uuid AND s\.account_deleted_at IS NULL/);
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE s\.user_id = \$1::uuid AND s\.cohort_id = c\.id AND s\.account_deleted_at IS NULL AND s\.day >= d\.today - 1/);
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE m\.user_id = \$1::uuid AND m\.cohort_id = c\.id AND m\.account_deleted_at IS NULL/);
-        assert.equal(TRAINING_TIME_SQL.beginRead, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+        assert.deepEqual([TRAINING_TIME_SQL.savepointState, TRAINING_TIME_SQL.rollbackState], ['SAVEPOINT live_state', 'ROLLBACK TO SAVEPOINT live_state']);
     });
 
     it('the stored rows are, field by field, the rows pool.addSignal seeds for the same signals; a chain across 00:00 JST has one stream row per day with the same chain_started_at, each started_at its day\'s first signal', async () => {
@@ -881,29 +904,29 @@ describe('tools/core/trainingTime.js: a signal\'s failures and the clock guard',
             pool.setClock(edge + 1);
             const mark = pool.tx().length;
             assert.deepEqual(await send(pool), { status: 'accepted', nextInMs: 7 * S, state: { counting: false, reason: 'starting', todayMs: 0, unit: { unitKey: U1, countedMs: 0, setMs: 120 * S, capReached: false } } });
-            assert.deepEqual(pool.tx().slice(mark), [...STORED, ...LIVE_READ], 'nothing more is final: no close');
+            assert.deepEqual(pool.tx().slice(mark), STORED, 'nothing more is final: no close');
             assert.deepEqual(pool.state.signals.map((g) => g.received_at), [edge + 1]);
         }
     });
 });
 
 describe('tools/core/trainingTime.js: after a stored signal, the close and the state', () => {
-    it('a close follows only once a day may be final (its end + gapMs passed, strictly), in its own transaction between the signal\'s and the read, computed by the API', async () => {
+    it('a close follows only once a day may be final (its end + gapMs passed, strictly), in its own transaction after the signal\'s (which read the state), computed by the API', async () => {
         const edge = jstDayRange('2026-11-01').end + 23 * S;
         const { pool } = await seeded({ clock: edge });
         assert.equal((/** @type {any} */ (await send(pool))).status, 'accepted');
-        assert.deepEqual(pool.tx(), [...STORED, ...LIVE_READ], 'at the end of 11-01 + gapMs, 11-01 is not final yet');
+        assert.deepEqual(pool.tx(), STORED, 'at the end of 11-01 + gapMs, 11-01 is not final yet');
         pool.setClock(edge + 1);
         const mark = pool.tx().length;
         assert.deepEqual(await send(pool, { chainId: chainId(2) }), { status: 'accepted', nextInMs: 7 * S, state: { counting: false, reason: 'starting', todayMs: 0, unit: { unitKey: U1, countedMs: 0, setMs: 120 * S, capReached: false } } });
-        assert.deepEqual(pool.tx().slice(mark), [...STORED, ...CLOSING, 'COMMIT', ...LIVE_READ]);
+        assert.deepEqual(pool.tx().slice(mark), [...STORED, ...CLOSING, 'COMMIT']);
         assert.equal(API_CLOSER, 'api');
         assert.deepEqual(pool.state.days.map((d) => ({ day: d.day, by: d.computed_by, counted: d.counted_ms, signals: d.signals })), [{ day: '2026-11-01', by: API_CLOSER, counted: 0, signals: 1 }],
             'the signal at the end + gapMs is in 11-01\'s evidence, the next one is not');
         assert.equal(pool.state.signals.length, 2);
     });
 
-    it('a failed close keeps the signal: accepted with closeError, and the state counting the days the close left open', async () => {
+    it('a failed close keeps the signal: accepted with closeError, and the state (read before it) counting the final days as the close would', async () => {
         const { pool } = await seeded(); // 11-04 12:00 JST: 11-01 to 11-03 are final
         const now = at('2026-11-04T03:00:00Z');
         const earlier = chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 5 }); // 28 s on 11-02
@@ -914,32 +937,40 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
             state: pureState({ signals: [...earlier, { chain: chainId(1), seq: 0, unit: U1, born: now, at: now, stop: false, focus: true, input: true }], today: '2026-11-04', reason: 'starting' }),
         });
         assert.equal(result.state.unit.countedMs, 28 * S);
-        assert.deepEqual(pool.tx(), [...STORED, ...CLOSING, 'ROLLBACK', ...LIVE_READ]);
+        assert.deepEqual(pool.tx(), [...STORED, ...CLOSING, 'ROLLBACK']);
         assert.deepEqual(pool.state.days, []);
         assert.equal(pool.state.signals.length, 6, 'the signal stays stored');
     });
 
-    it('a failed live read keeps the signal: accepted, state null, stateError', async () => {
+    it('a failed state read keeps the signal: rolled back to the savepoint, the signal committed; accepted, state null, stateError; a stored version that no longer parses there: invalid_setting', async () => {
         const { pool } = await seeded({ clock: at('2026-11-01T03:00:00Z') });
-        pool.failOn(TRAINING_TIME_SQL.currentDays, connectionLost()); // only the live read sends it here
-        assert.deepEqual(await send(pool), { status: 'accepted', nextInMs: 7 * S, state: null, stateError: 'db_connection' });
-        assert.deepEqual(pool.tx(), [...STORED, ...LIVE_READ.slice(0, 6), 'ROLLBACK']);
-        assert.equal(pool.state.signals.length, 1);
+        pool.failOn(TRAINING_TIME_SQL.currentDays, Object.assign(new Error('relation "training_time_days" does not exist'), { code: '42P01' }));
+        assert.deepEqual(await send(pool), { status: 'accepted', nextInMs: 7 * S, state: null, stateError: 'table_not_found' });
+        assert.deepEqual(pool.tx(), [...INSERTED, ...STATE_READ.slice(0, 4), TRAINING_TIME_SQL.rollbackState, 'COMMIT']);
+        assert.deepEqual(pool.state.signals.map((g) => g.seq), [0]);
+        // Today's rules parse (the signal is decided with them) but another stored version does not.
+        const broken = await seeded({ clock: at('2026-11-01T03:00:00Z') });
+        const mark = broken.pool.tx().length;
+        broken.pool.state.catalogs.push({ id: 'k9', course_key: 'sample-course', sha256: 'f'.repeat(64), manifest: { schema: 'x' }, loaded_by: 'a', note: 'b' });
+        broken.pool.addSetting({ cohortId: COHORT, catalogId: 'k9', ruleSetId: broken.rules.id, effectiveFrom: '2026-11-20' });
+        assert.deepEqual(await send(broken.pool), { status: 'accepted', nextInMs: 7 * S, state: null, stateError: 'invalid_setting' });
+        assert.deepEqual(broken.pool.tx().slice(mark), [...INSERTED, TRAINING_TIME_SQL.savepointState, TRAINING_TIME_SQL.closeSettings, 'COMMIT']);
+        assert.equal(broken.pool.state.signals.length, 1);
     });
 
-    it('a stop: accepted, nextInMs null, no state and nothing read after its COMMIT; a close that is due still runs', async () => {
+    it('a stop: accepted, nextInMs null, no state and nothing read; a close that is due still runs', async () => {
         const t0 = at('2026-11-01T03:00:00Z');
         const { pool } = await seeded({ clock: t0 });
         await send(pool);
         pool.setClock(t0 + 7 * S);
         const mark = pool.tx().length;
         assert.deepEqual(await send(pool, { seq: 1, stop: true, focus: false, input: false }), { status: 'accepted', nextInMs: null, state: null });
-        assert.deepEqual(pool.tx().slice(mark), STORED);
+        assert.deepEqual(pool.tx().slice(mark), STOPPED);
         assert.deepEqual(pool.state.signals.map((g) => [g.seq, g.flags]), [[0, 6], [1, 1]]);
         const due = await seeded(); // 11-04 12:00 JST
         due.pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: at('2026-11-04T02:59:53Z'), seq: 0, at: at('2026-11-04T02:59:53Z'), input: true });
         assert.deepEqual(await send(due.pool, { seq: 1, stop: true }), { status: 'accepted', nextInMs: null, state: null });
-        assert.deepEqual(due.pool.tx(), [...STORED, ...CLOSING, 'COMMIT']);
+        assert.deepEqual(due.pool.tx(), [...STOPPED, ...CLOSING, 'COMMIT']);
     });
 
     it('a close after a signal decides with yesterday\'s gapMs (closeRange\'s rule): on the first day of a setting with a smaller gapMs none runs from the end of yesterday + today\'s gapMs to the end + yesterday\'s, one runs 1 ms later; with a larger one, 1 ms after the end + yesterday\'s too', async () => {
@@ -961,10 +992,10 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
             };
             const early = todayGapMs < 23 * S ? [end + todayGapMs + 1, end + 20 * S, end + 23 * S] : [end + 23 * S];
             for (const clock of early) {
-                assert.deepEqual(await sentAt(clock), [...STORED, ...LIVE_READ], `today's gapMs ${todayGapMs / S} s: no close at the end + ${clock - end} ms`);
+                assert.deepEqual(await sentAt(clock), STORED, `today's gapMs ${todayGapMs / S} s: no close at the end + ${clock - end} ms`);
             }
             assert.deepEqual(pool.state.days.map((d) => d.day), ['2026-11-01', '2026-11-02']);
-            assert.deepEqual(await sentAt(end + 23 * S + 1), [...STORED, ...CLOSING, 'COMMIT', ...LIVE_READ], `today's gapMs ${todayGapMs / S} s`);
+            assert.deepEqual(await sentAt(end + 23 * S + 1), [...STORED, ...CLOSING, 'COMMIT'], `today's gapMs ${todayGapMs / S} s`);
             assert.deepEqual(pool.state.days.map((d) => [d.day, d.computed_by]), [['2026-11-01', 'staff'], ['2026-11-02', 'staff'], ['2026-11-03', API_CLOSER]]);
         }
     });
@@ -1042,7 +1073,7 @@ describe('tools/core/trainingTime.js: reading study time (readStudyTime)', () =>
         assert.deepEqual(await read(pool, B.toUpperCase(), COHORT.toUpperCase()), { status: 'not_a_learner' });
         assert.deepEqual(pool.queries.slice(mark).map((q) => [q.sql, q.params, q.tx]), [[TRAINING_SQL.liveMember, [B, COHORT], false]]);
         assert.deepEqual(await read(pool), { error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
-        assert.ok(!pool.tx().includes(TRAINING_TIME_SQL.beginRead));
+        assert.deepEqual(pool.tx().slice(-2), [TRAINING_TIME_SQL.closeSettings, 'ROLLBACK'], 'nothing read after the settings');
         mark = pool.queries.length;
         for (const [userId, cohortId] of [['x', COHORT], [A, SLUG], [undefined, COHORT], [A, null]]) {
             assert.deepEqual(await readStudyTime({ userId, cohortId, pool }), { error: 'An account id and a cohort id (UUIDs) are required.', error_type: 'validation' }, `${userId} ${cohortId}`);
@@ -1051,7 +1082,7 @@ describe('tools/core/trainingTime.js: reading study time (readStudyTime)', () =>
         assert.deepEqual(await readStudyTime({ userId: A, cohortId: COHORT, pool: null }), { error: 'DB not configured', error_type: 'db_connection' });
     });
 
-    it('a learner: the membership read, the close (computed by the API), then the live values in one read-only snapshot; the answer\'s keys in order, lower-case ids, the pure function\'s numbers over every day', async () => {
+    it('a learner: the membership read, then one transaction under the three locks: the close (computed by the API) and the live values as of its clock; the answer\'s keys in order, lower-case ids, the pure function\'s numbers over every day', async () => {
         const { pool } = await seeded(); // 11-04 12:00 JST
         const signals = [
             ...chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 20 }), // 133 s: the set time (120 s) counted, 13 s over
@@ -1061,7 +1092,7 @@ describe('tools/core/trainingTime.js: reading study time (readStudyTime)', () =>
         const mark = pool.queries.length;
         const result = /** @type {any} */ (await readStudyTime({ userId: A.toUpperCase(), cohortId: COHORT.toUpperCase(), pool }));
         const sent = pool.queries.slice(mark);
-        assert.deepEqual(sent.map((q) => q.sql), [TRAINING_SQL.liveMember, ...CLOSING, TRAINING_TIME_SQL.insertUnitDays, 'COMMIT', ...LIVE_READ]);
+        assert.deepEqual(sent.map((q) => q.sql), [TRAINING_SQL.liveMember, ...CLOSING, TRAINING_TIME_SQL.insertUnitDays, ...GET_READ, 'COMMIT']);
         assert.deepEqual(sent.map((q) => q.tx), [false, ...Array(sent.length - 1).fill(true)]);
         assert.deepEqual(sent.at(-2)?.params, [A, COHORT, '2026-11-04', '2026-11-04', iso(jstDayRange('2026-11-04').start - 101 * S), iso(at('2026-11-04T03:00:00Z'))], 'the live evidence up to the read\'s clock');
         assert.deepEqual(pool.state.days.map((d) => [d.day, d.computed_by]), [['2026-11-01', API_CLOSER], ['2026-11-02', API_CLOSER], ['2026-11-03', API_CLOSER]]);
@@ -1128,38 +1159,32 @@ describe('tools/core/trainingTime.js: reading study time (readStudyTime)', () =>
         assert.deepEqual(Object.keys(after), keys);
     });
 
-    it('a deletion that committed while it waited (on the close\'s account lock, or between the close and the read): deleted_account, the deletion kept; no stub and no tombstone: no_account; a busy close (55P03) fails the read', async () => {
+    it('a deletion that committed while it waited on the account lock: deleted_account (nothing written, rolled back), the deletion kept; none can commit between the close and the read (one transaction under the account lock); no stub and no tombstone: no_account; a busy lock (55P03) fails the read', async () => {
         const deletedAt = at('2026-11-04T02:59:00Z');
-        for (const [hook, statements, days] of [
-            // The close finds no stub: nothing written, rolled back.
-            [TRAINING_SQL.lock, ['BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.closeState, 'ROLLBACK'], 0],
-            // The close committed; the snapshot finds no stub.
-            [TRAINING_TIME_SQL.beginRead, [...CLOSING, TRAINING_TIME_SQL.insertUnitDays, 'COMMIT', TRAINING_TIME_SQL.beginRead, TRAINING_SQL.lockTimeout, TRAINING_TIME_SQL.closeState, 'COMMIT'], 3],
-        ]) {
-            const { pool } = await seeded();
-            chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 3 });
-            let done = false;
-            pool.before(hook, () => {
-                if (done) return;
-                done = true;
-                pool.deleteAccount(A, deletedAt);
-            });
-            const mark = pool.queries.length;
-            assert.deepEqual(await read(pool), { status: 'deleted_account' }, hook);
-            assert.deepEqual(pool.queries.slice(mark).map((q) => q.sql), [TRAINING_SQL.liveMember, ...statements, TRAINING_SQL.deletedAccount]);
-            assert.deepEqual(pool.queries.at(-1), { sql: TRAINING_SQL.deletedAccount, params: [A], tx: false });
-            assert.deepEqual(pool.state.tombstones.get(A), { deleted_at: deletedAt, reopened_at: null });
-            assert.ok(!pool.state.stubs.includes(A));
-            assert.equal(pool.state.days.length, days);
-            assert.ok([...pool.state.memberships, ...pool.state.streams, ...pool.state.days].every((r) => r.account_deleted_at === deletedAt), 'every row of the account marked');
-        }
         const { pool } = await seeded();
-        pool.state.memberships.push({ user_id: NOBODY, cohort_id: COHORT, role: 'learner', added_at: at('2026-10-31T01:00:00Z'), account_deleted_at: null });
-        assert.deepEqual(await read(pool, NOBODY), { status: 'no_account' });
+        chain(pool, { id: chainId(1), unit: U1, from: at('2026-11-02T01:00:00Z'), n: 3 });
+        let done = false;
+        pool.before(TRAINING_SQL.lock, () => {
+            if (done) return;
+            done = true;
+            pool.deleteAccount(A, deletedAt);
+        });
+        const mark = pool.queries.length;
+        assert.deepEqual(await read(pool), { status: 'deleted_account' });
+        assert.deepEqual(pool.queries.slice(mark).map((q) => q.sql), [TRAINING_SQL.liveMember,
+            'BEGIN', TRAINING_SQL.lockTimeout, TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, TRAINING_TIME_SQL.closeState, 'ROLLBACK', TRAINING_SQL.deletedAccount]);
+        assert.deepEqual(pool.queries.at(-1), { sql: TRAINING_SQL.deletedAccount, params: [A], tx: false });
+        assert.deepEqual(pool.state.tombstones.get(A), { deleted_at: deletedAt, reopened_at: null });
+        assert.ok(!pool.state.stubs.includes(A));
+        assert.equal(pool.state.days.length, 0);
+        assert.ok([...pool.state.memberships, ...pool.state.streams].every((r) => r.account_deleted_at === deletedAt), 'every row of the account marked');
+        const none = await seeded();
+        none.pool.state.memberships.push({ user_id: NOBODY, cohort_id: COHORT, role: 'learner', added_at: at('2026-10-31T01:00:00Z'), account_deleted_at: null });
+        assert.deepEqual(await read(none.pool, NOBODY), { status: 'no_account' });
         const busy = await seeded();
         busy.pool.failOn(TRAINING_SQL.learnerLock, lockBusy());
         assert.deepEqual(await read(busy.pool), { error: 'The account is busy. Try again.', error_type: 'account_busy' });
-        assert.ok(!busy.pool.tx().includes(TRAINING_TIME_SQL.beginRead));
+        assert.deepEqual(busy.pool.tx().slice(-2), [TRAINING_SQL.learnerLock, 'ROLLBACK']);
     });
 });
 
@@ -1469,18 +1494,18 @@ describe('tools/core/trainingTime.js: the live values up to the settled instant 
         assert.ok(after.every((value, i) => value >= before[i]), `a number went down: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
     });
 
-    it('the GET counts as of its close\'s clock (read under the learner\'s lock): a signal whose clock came later but that commits after the read cannot make the next read go down', async () => {
+    it('the GET counts as of its one clock reading (closeState, under the learner\'s lock), not a later clock during its reads: a signal whose clock came later cannot make the next read go down', async () => {
         const T0 = at('2026-11-04T03:00:00Z');
         const { pool } = await seeded({ clock: T0 });
         chain(pool, { id: chainId(2), unit: U2, from: T0 - 28 * S, n: 9 }); // page 2 (older): unit 2 every 7 s up to T0 + 28 s
         chain(pool, { id: chainId(1), unit: U1, from: T0, n: 2 }); // page 1 (newer, wins the overlap): its last signal at T0 + 7 s
         const L = T0 + 7 * S;
-        // The close reads its clock at L + 20 s (page 1 still open); the read's own transaction starts at
-        // L + 25 s, when page 1 would look quiet; page 1's next signal read its clock at L + 22 s, after
-        // the close, and commits after the read.
+        // The GET reads its clock at L + 20 s (page 1 still open); the clock is at L + 25 s during its
+        // reads, when page 1 would look quiet; page 1's next signal waited for the GET's locks and read
+        // its clock at L + 22 s.
         pool.setClock(L + 20 * S);
         let once = false;
-        pool.before(TRAINING_TIME_SQL.beginRead, () => { if (!once) { once = true; pool.setClock(L + 25 * S); } });
+        pool.before(TRAINING_TIME_SQL.currentDays, () => { if (!once) { once = true; pool.setClock(L + 25 * S); } });
         const first = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
         assert.equal(first.time.asOf, iso(L + 20 * S), 'as of the close\'s clock');
         pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: T0, seq: 2, at: L + 22 * S, focus: true, input: true });
@@ -1514,6 +1539,114 @@ describe('tools/core/trainingTime.js: the live values up to the settled instant 
         assert.deepEqual(at129.state, { counting: false, reason: 'cap_reached', todayMs: 105 * S, unit: { unitKey: U1, countedMs: 105 * S, setMs: 120 * S, capReached: false } });
         const at136 = answers.get(`${chainId(3)}#4`);
         assert.deepEqual(at136.state, { counting: false, reason: 'cap_reached', todayMs: 120 * S, unit: { unitKey: U1, countedMs: 120 * S, setMs: 120 * S, capReached: true } });
+    });
+
+    it('the reason\'s cap check counts the other open pages going on: another unit\'s focused page that will win the time is not the unit reaching its set time (other_tab, not cap_reached); the unit stays below it', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const { pool } = await seeded({ clock: T0 });
+        chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 14, every: 9 * S }); // 117 s of unit 1 on 11-03, closed by the first signal's close
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 9; k += 1) events.push([T0 + 7 * k * S, { unitKey: U2, chainId: chainId(2), seq: k }]); // page Q: unit 2, focus, every 7 s
+        for (let k = 0; k <= 8; k += 1) events.push([T0 + (4 + 7 * k) * S, { chainId: chainId(1), seq: k, focus: false }]); // page P: unit 1, no focus
+        const answers = await play(pool, events);
+        // Q's pair after its last signal is pending at each of P's signals: Q (focused) wins it and every
+        // instant P covers, so unit 1 never passes its 117 s.
+        for (let k = 1; k <= 8; k += 1) {
+            const state = answers.get(`${chainId(1)}#${k}`)?.state;
+            assert.deepEqual([state?.reason, state?.unit.countedMs, state?.unit.capReached], ['other_tab', 117 * S, false], `P#${k}`);
+        }
+        pool.setClock(at('2026-11-05T03:00:00Z'));
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(read.time.units.find((u) => u.unitKey === U1), { unitKey: U1, title: COURSE.units[0].title, setMs: 120 * S, countedMs: 117 * S, capReached: false });
+    });
+
+    it('the reason\'s cap check counts the other open pages going on: another page of the same unit whose pending pair takes the unit past its set time gives cap_reached at once (not counting for one more beat)', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const { pool } = await seeded({ clock: T0 });
+        chain(pool, { id: chainId(8), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 8, every: 13 * S }); // 91 s
+        chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-03T02:00:00Z'), n: 2, every: 10 * S }); // 10 s: 101 s of unit 1 on 11-03
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 3; k += 1) events.push([T0 + 7 * k * S, { chainId: chainId(2), seq: k }]); // page Q: unit 1 with input, every 7 s
+        for (let k = 0; k <= 3; k += 1) events.push([T0 + (7 * k - 1) * S, { chainId: chainId(1), seq: k, input: false }]); // page P: unit 1, never an input
+        const answers = await play(pool, events);
+        // At T0 + 13 s Q's pending pair (T0 + 7, T0 + 13] covers P's x: the unit counts (114 s through now).
+        assert.equal(answers.get(`${chainId(1)}#2`)?.state.reason, null);
+        // At T0 + 20 s the unit has 101 + 14 s stored and Q's pending 6 s: past 120 s before x.
+        assert.deepEqual(answers.get(`${chainId(1)}#3`)?.state, { counting: false, reason: 'cap_reached', todayMs: 14 * S, unit: { unitKey: U1, countedMs: 115 * S, setMs: 120 * S, capReached: false } });
+        assert.deepEqual(answers.get(`${chainId(2)}#3`)?.state, { counting: false, reason: 'cap_reached', todayMs: 19 * S, unit: { unitKey: U1, countedMs: 120 * S, setMs: 120 * S, capReached: true } });
+    });
+
+    it('the reason\'s cap check counts the closed days and every live day: a unit past its set time over a closed day, yesterday (still live after 00:00) and today is cap_reached', async () => {
+        const midnight = jstDayRange('2026-11-05').start;
+        const { pool } = await seeded({ clock: midnight });
+        chain(pool, { id: chainId(8), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 10 }); // 63 s on 11-03 (closed by the first signal's close)
+        chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-04T01:00:00Z'), n: 8 }); // 49 s on 11-04 (live until 00:00:23)
+        const answers = await play(pool, [
+            [midnight, { unitKey: U2, chainId: chainId(2), seq: 0 }], // page P (unit 2): 00:00:00, :07, then quiet
+            [midnight + 7 * S, { unitKey: U2, chainId: chainId(2), seq: 1 }],
+            [midnight + 1 * S, { chainId: chainId(1), seq: 0 }], // page A (unit 1, newer): 00:00:01, :08, :15
+            [midnight + 8 * S, { chainId: chainId(1), seq: 1 }],
+            [midnight + 15 * S, { chainId: chainId(1), seq: 2 }],
+        ]);
+        assert.deepEqual(pool.state.days.map((d) => d.day), ['2026-11-01', '2026-11-02', '2026-11-03']);
+        // 63 + 49 + 7 s through now at 00:00:08: counting; 63 + 49 + 14 s at 00:00:15: over 120 s.
+        assert.equal(answers.get(`${chainId(1)}#1`)?.state.reason, null);
+        assert.deepEqual(answers.get(`${chainId(1)}#2`)?.state, { counting: false, reason: 'cap_reached', todayMs: 7 * S, unit: { unitKey: U1, countedMs: 118 * S, setMs: 120 * S, capReached: false } });
+    });
+
+    it('liveTime: a live day counts only once the days before it are settled to their end: a page that holds yesterday back (its next pair cannot reach today) keeps today at 0 while a unit\'s set time carries across 00:00, so no number goes down', async () => {
+        const midnight = jstDayRange('2026-11-05').start;
+        const { pool } = await seeded({ clock: midnight - 29 * S });
+        chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 15 }); // 98 s of unit 1 on 11-03, closed by the first signal's close
+        const answers = await play(pool, [
+            [midnight - 29 * S, { chainId: chainId(1), seq: 0 }], // page A (unit 1): 23:59:31, :38, :45, then 00:00:07
+            [midnight - 22 * S, { chainId: chainId(1), seq: 1 }],
+            [midnight - 15 * S, { chainId: chainId(1), seq: 2 }],
+            [midnight, { chainId: chainId(2), seq: 0 }], // page B (unit 1): 00:00:00, :03
+            [midnight + 3 * S, { chainId: chainId(2), seq: 1 }],
+            [midnight + 7 * S, { chainId: chainId(1), seq: 3 }],
+        ]);
+        // A's last signal (23:59:45) holds 11-04 back; its next pair (13 s at most) cannot reach 11-05,
+        // yet 11-05 waits for 11-04: A's pair then takes unit 1 to its set time on 11-04.
+        const numbers = (key) => [answers.get(key)?.state.todayMs, answers.get(key)?.state.unit.countedMs];
+        assert.deepEqual([numbers(`${chainId(2)}#0`), numbers(`${chainId(2)}#1`), numbers(`${chainId(1)}#3`)], [[0, 112 * S], [0, 112 * S], [0, 120 * S]]);
+        pool.setClock(midnight + 8 * S);
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(read.time.days.slice(0, 2), [{ day: '2026-11-05', countedMs: 0, final: false }, { day: '2026-11-04', countedMs: 22 * S, final: false }]);
+    });
+
+    it('liveTime: each live day settles with its own rules: after 00:00 into a setting with a smaller gapMs, yesterday\'s open page is judged with yesterday\'s gapMs, so no number goes down', async () => {
+        const midnight = jstDayRange('2026-11-05').start;
+        const { pool, catalog } = await seeded({ clock: at('2026-11-04T03:00:00Z') });
+        const narrow = /** @type {any} */ (await loadRules({ input: countingWith({ gapMs: 17 * S }), loadedBy: 'staff-a', note: 'a smaller gap', pool }));
+        const set = /** @type {any} */ (await setCohortTime({ cohortSlug: SLUG, catalogSha256: catalog.sha256, rulesSha256: narrow.sha256, effectiveFrom: '2026-11-05', setBy: 'staff-a', reason: 'a smaller gap from tomorrow', pool }));
+        assert.equal(set.status, 'set');
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 4; k += 1) events.push([midnight - (29 - 7 * k) * S, { unitKey: U2, chainId: chainId(2), seq: k }]); // page B (unit 2): 23:59:31 to :59
+        events.push([midnight + 8 * S, { unitKey: U2, chainId: chainId(2), seq: 5 }], [midnight + 15 * S, { unitKey: U2, chainId: chainId(2), seq: 6 }]);
+        for (let k = 0; k <= 2; k += 1) events.push([midnight - (24 - 7 * k) * S, { chainId: chainId(1), seq: k }]); // page A (unit 1, newer): 23:59:36, :43, :50
+        events.push([midnight + 12 * S, { chainId: chainId(1), seq: 3 }]); // 22 s later: within 11-04's 23 s, a break for 11-05's 17 s
+        const answers = await play(pool, events);
+        // At 00:00:08 page A is 18 s quiet: open by 11-04's 23 s (it holds 11-04 at 23:59:50), quiet by 11-05's 17 s.
+        assert.deepEqual([answers.get(`${chainId(2)}#5`)?.state.unit.countedMs, answers.get(`${chainId(2)}#6`)?.state.unit.countedMs], [5 * S, 17 * S]);
+    });
+
+    it('the boundary instants: a pair that ends exactly at 00:00 cannot reach the next day (settledUntil); a known chain\'s signal exactly at the cohort\'s end is past it (nextInMs null)', async () => {
+        const midnight = jstDayRange('2026-11-05').start;
+        const counting = { gapMs: 23 * S, creditCapMs: 13 * S };
+        const lastAt = (ms) => beats({ id: chainId(1), unit: U1, from: ms, n: 1 });
+        assert.equal(settledUntil({ day: '2026-11-05', nowMs: midnight + 5 * S, signals: lastAt(midnight - 13 * S), counting }), midnight + 5 * S, 'its pair ends at 00:00');
+        assert.equal(settledUntil({ day: '2026-11-05', nowMs: midnight + 5 * S, signals: lastAt(midnight - 13 * S + 1), counting }), midnight, '1 ms later it reaches 11-05');
+        const end = jstDayRange('2026-11-03').end;
+        const { pool } = await seeded({ endsOn: '2026-11-03', clock: end - 10 * S });
+        assert.equal((/** @type {any} */ (await send(pool))).nextInMs, 7 * S);
+        pool.setClock(end);
+        const graced = /** @type {any} */ (await send(pool, { seq: 1 }));
+        assert.deepEqual([graced.status, graced.nextInMs, graced.state.reason], ['accepted', null, 'not_in_session']);
+        assert.deepEqual(await unstored(pool, { seq: 1 }), { status: 'ignored', reason: 'duplicate', nextInMs: null });
     });
 });
 

@@ -7,9 +7,9 @@
  * (AUTH_SQL: the tombstone read, and the stub insert with migration 018's rule: no stub for a deleted
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN snapshots,
- * ROLLBACK restores; beginRead also refuses writes, 25006). Any other statement throws, so a changed
- * query fails loudly; the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a
- * test file (npm test runs *.test.js).
+ * ROLLBACK restores; the state's savepoint too). Any other statement throws, so a changed query fails
+ * loudly; the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file
+ * (npm test runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
@@ -28,12 +28,6 @@ export const AUTH_SQL = Object.freeze({
     tombstone: 'SELECT deleted_at, reopened_at FROM account_deletions WHERE user_id = $1::uuid',
     stubInsert: 'INSERT INTO auth.users (id) VALUES ($1::uuid) ON CONFLICT (id) DO NOTHING',
 });
-
-/** Statements that write (refused, 25006, inside beginRead). @type {Set<string>} */
-const WRITES = new Set([
-    TRAINING_TIME_SQL.insertCatalog, TRAINING_TIME_SQL.insertRules, TRAINING_TIME_SQL.insertSetting, TRAINING_TIME_SQL.insertDays,
-    TRAINING_TIME_SQL.insertUnitDays, TRAINING_TIME_SQL.insertStream, TRAINING_TIME_SQL.insertSignal, AUTH_SQL.stubInsert,
-]);
 
 /**
  * @typedef {{ id: string, slug: string, name: string, starts_on: string | null, ends_on: string | null }} Cohort
@@ -65,7 +59,8 @@ export function createTrainingTimePool(seed = {}) {
     };
     /** @type {typeof state | null} */
     let snapshot = null;
-    let readOnly = false;
+    /** The state at TRAINING_TIME_SQL.savepointState (ROLLBACK TO keeps the savepoint). @type {typeof state | null} */
+    let savepoint = null;
     /** @type {{ sql: string, params: unknown[], tx: boolean }[]} */
     const queries = [];
     /** @type {{ sql: string, error: any }[]} */
@@ -94,22 +89,28 @@ export function createTrainingTimePool(seed = {}) {
         for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
         const failure = failures.find((f) => f.sql === sql);
         if (failure) throw failure.error;
-        if (readOnly && WRITES.has(sql)) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
         const [p1, p2] = params;
         switch (sql) {
             case 'BEGIN':
-            case TRAINING_TIME_SQL.beginRead:
                 snapshot = structuredClone(state);
-                readOnly = sql === TRAINING_TIME_SQL.beginRead;
+                savepoint = null;
                 return result([]);
             case 'COMMIT':
                 snapshot = null;
-                readOnly = false;
+                savepoint = null;
                 return result([]);
             case 'ROLLBACK':
                 if (snapshot) state = snapshot;
                 snapshot = null;
-                readOnly = false;
+                savepoint = null;
+                return result([]);
+            case TRAINING_TIME_SQL.savepointState:
+                if (!snapshot) throw pgError('25P01', 'SAVEPOINT can only be used in transaction blocks');
+                savepoint = structuredClone(state);
+                return result([]);
+            case TRAINING_TIME_SQL.rollbackState:
+                if (!savepoint) throw pgError('3B001', 'savepoint "live_state" does not exist');
+                state = structuredClone(savepoint);
                 return result([]);
             case AUTH_SQL.tombstone: {
                 const t = state.tombstones.get(String(p1).toLowerCase());
@@ -394,11 +395,15 @@ export function createTrainingTimePool(seed = {}) {
          * An account deletion as the service commits it (server/services/accountDeletion.js): the
          * tombstone, the marks on the account's memberships, streams and days, and no stub. Another
          * session's commit: an open transaction's ROLLBACK keeps it (it is applied to the snapshot
-         * that ROLLBACK restores too), so it can run in a `before` hook, during a lock wait.
+         * and the savepoint that a rollback restores too), so it can run in a `before` hook, during a
+         * lock wait.
          * @param {string} user @param {number} at
          */
         deleteAccount: (user, at) => {
-            for (const db of snapshot ? [state, snapshot] : [state]) {
+            const copies = [state];
+            if (snapshot) copies.push(snapshot);
+            if (savepoint) copies.push(savepoint);
+            for (const db of copies) {
                 db.tombstones.set(user, { deleted_at: at, reopened_at: null });
                 for (const rows of [db.memberships, db.streams, db.days]) {
                     for (const row of /** @type {any[]} */ (rows)) if (row.user_id === user && row.account_deleted_at === null) row.account_deleted_at = at;

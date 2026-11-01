@@ -9,11 +9,12 @@
  * GET /cohorts/:cohortId/time → 200 { ok, learnerId, cohortId, today, timeZone: 'Asia/Tokyo',
  *   status: 'ready' | 'not_configured' | 'not_in_session', beatMs (ready only), units: [{ unitKey,
  *   title: { jp, en }, setMs, countedMs, capReached }], days: [{ day, countedMs, final }] (the newest
- *   14), totalMs, asOf }. The learner's final days are closed first.
+ *   14), totalMs, asOf }. The learner's final days are closed first, in the read's transaction (asOf:
+ *   its one clock reading).
  * POST /cohorts/:cohortId/time/signals, a body of exactly { unitKey, chainId, seq, stop, focus, input }
  *   (no time, no duration: the database clock decides) → 200 { ok, accepted: true, nextInMs, state:
  *   { counting, reason, todayMs, unit: { unitKey, countedMs, setMs, capReached } } | null } (null for
- *   a stop, when it could not be computed (logged), or when a deletion committed after the signal),
+ *   a stop, or when it could not be computed (logged)),
  *   or 200 { ok, accepted: false, reason, nextInMs } when the signal is not stored (duplicate,
  *   chain_ended, not_open, restart, too_soon, other_place). nextInMs is beatMs while the page keeps
  *   its chain (in session, not a stop), else null. The numbers never go down from one answer to the
