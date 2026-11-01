@@ -212,13 +212,17 @@ export function isStageReply(stage, value) {
 
 // --- Stage Handlers ---
 
-/** @param {string} message @param {string} userId @param {any} kit @param {StageOptions} [options] */
+/**
+ * @param {string} message @param {string} userId @param {any} kit
+ * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: files attached to the
+ *   message, read before the learner's other materials
+ */
 export async function generateRequirements(message, userId, kit, options = {}) {
-  const { signal, audience = 'adult' } = options;
-  // RAG: search for relevant educational content
+  const { signal, audience = 'adult', materialIds = [] } = options;
+  // RAG: the learner's own uploaded materials, the attached ones first
   let ragContext = '';
   try {
-    const chunks = await retrieveContext(message, 3, userId);
+    const chunks = await retrieveContext(message, 3, userId, { materialIds });
     if (chunks.length > 0) {
       ragContext = chunks.join('\n---\n');
     }

@@ -2,12 +2,14 @@
 /**
  * Re-embed material_chunks whose embedding_model is not the current EMBEDDING_MODEL
  * (server/llm/models.config.js via tools/core/ragSearch.js): rows from a retired embedding model,
- * or rows stored without an embedding (scripts/seed_rag.js).
+ * or rows stored without an embedding (scripts/seed_rag.js; uploads while embeddings were off; and
+ * uploads whose embedding failed, which server/ragService.js marks meta.embedding 'failed').
  *
  * Retrieval never compares vectors from different models. Until chunks are re-embedded, vector
  * search skips them and they are matched by keyword only, merged with the vector results (the
  * server logs a "[RAG] ... Re-embedding is required" warning once per process). Run this after
- * deploying a change of EMBEDDING_MODEL.
+ * deploying a change of EMBEDDING_MODEL, or after "embedding failed" warnings in the server log.
+ * A material's meta.embedding mark goes in the same transaction as its last stale chunk.
  *
  * Usage (no npm script needed; reads DATABASE_URL_PHASE1 and GEMINI_API_KEY from the environment
  * or .env.local):
@@ -76,11 +78,11 @@ export async function countStaleChunks(pool) {
  * a row could not be updated, e.g. because its material was re-ingested meanwhile).
  * @param {{ query: Function }} pool
  * @param {{ afterId: string | null, batchSize: number }} options
- * @returns {Promise<Array<{ id: string, content: string }>>}
+ * @returns {Promise<Array<{ id: string, content: string, material_id: string }>>}
  */
 export async function selectStaleChunks(pool, { afterId, batchSize }) {
     const { rows } = await pool.query(
-        `SELECT id, content
+        `SELECT id, content, material_id
          FROM material_chunks
          WHERE embedding_model IS DISTINCT FROM $1
            AND ($2::uuid IS NULL OR id > $2::uuid)
@@ -93,8 +95,10 @@ export async function selectStaleChunks(pool, { afterId, batchSize }) {
 
 /**
  * Store one batch of vectors in a transaction. Rows already on EMBEDDING_MODEL are left alone.
+ * The batch's materials lose their meta.embedding mark ('failed': server/ragService.js
+ * ingestMaterial) once none of their chunks is stale, in the same transaction.
  * @param {{ connect: Function }} pool
- * @param {Array<{ id: string }>} rows
+ * @param {Array<{ id: string, material_id?: string }>} rows
  * @param {number[][]} vectors one per row, same order
  * @param {boolean} hasVector pgvector column (vector) vs FLOAT8[] fallback, as in ingestMaterial
  * @returns {Promise<number>} rows updated
@@ -112,6 +116,15 @@ export async function writeEmbeddings(pool, rows, vectors, hasVector) {
                 [hasVector ? JSON.stringify(vectors[i]) : vectors[i], EMBEDDING_MODEL, EMBEDDING_DIM, rows[i].id]
             );
             updated += result.rowCount ?? 0;
+        }
+        const materialIds = [...new Set(rows.map((row) => row.material_id).filter(Boolean))];
+        if (materialIds.length > 0) {
+            await client.query(
+                `UPDATE materials m SET meta = m.meta - 'embedding'
+                 WHERE m.id = ANY($1::uuid[]) AND m.meta ? 'embedding'
+                   AND NOT EXISTS (SELECT 1 FROM material_chunks c WHERE c.material_id = m.id AND c.embedding_model IS DISTINCT FROM $2)`,
+                [materialIds, EMBEDDING_MODEL]
+            );
         }
         await client.query('COMMIT');
     } catch (error) {

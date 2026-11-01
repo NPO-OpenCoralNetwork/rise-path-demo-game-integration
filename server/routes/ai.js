@@ -15,7 +15,8 @@
  * Cost: every /ai/generate call that can run a model stage takes one 'course_generation' unit of
  * the daily caps (server/middleware/dailyCaps.js; one course is at least 3 calls). Approving the
  * final 'curriculum' stage runs no model and is free. Before the unit is taken, the body is
- * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID: 400 invalid_body)
+ * checked (message a string of at most MESSAGE_MAX_CHARS, curriculum_id a UUID, attachments at
+ * most MAX_ATTACHED_MATERIALS { material_id: UUID }: 400 invalid_body)
  * and a gateway that cannot serve the task (no provider, and no mock fallback in production)
  * answers 503 ai_unavailable, so neither is charged. After it, the 400 and 404 answers that every
  * stage sends before calling the model give it back. A gateway failure (LlmError,
@@ -46,6 +47,7 @@ import {
   isCourseGenerationAvailable,
 } from '../services/aiGenerator.js';
 import { reserveDailyCap } from '../middleware/dailyCaps.js';
+import { MAX_ATTACHED_MATERIALS } from '../ragService.js';
 import { isLlmError, modelMayHaveRun, toClientError } from '../llm/errors.js';
 import { isUuid } from '../utils/ids.js';
 import { isSafetyError, safetyErrorResponse } from '../safety/moderation.js';
@@ -263,13 +265,18 @@ export const MESSAGE_MAX_CHARS = 4000;
  * @param {Record<string, unknown>} body
  */
 export function invalidGenerateBody(body) {
-  const { message, curriculum_id: curriculumId } = body;
+  const { message, curriculum_id: curriculumId, attachments } = body;
   if (message != null && typeof message !== 'string') return 'message must be a string';
   if (typeof message === 'string' && message.length > MESSAGE_MAX_CHARS) {
     return `message must be at most ${MESSAGE_MAX_CHARS} characters`;
   }
   if (curriculumId != null && curriculumId !== '' && !isUuid(curriculumId)) {
     return 'curriculum_id must be a UUID';
+  }
+  // Uploaded files sent with the topic (CourseGeneratorView): the requirements stage reads them first.
+  if (attachments != null && (!Array.isArray(attachments) || attachments.length > MAX_ATTACHED_MATERIALS
+    || !attachments.every((item) => isUuid(item?.material_id)))) {
+    return `attachments must be at most ${MAX_ATTACHED_MATERIALS} items of { material_id: UUID }`;
   }
   return null;
 }
@@ -335,6 +342,8 @@ router.post('/generate', async (req, res) => {
     const kit = await getCachedKit(userId, getKit);
     // Who the stages are for (the access gate decided); minors' stages are screened.
     const stageOptions = { audience: res.locals?.aiAudience === 'minor' ? 'minor' : 'adult', ip: req.ip ?? null };
+    // Files sent with a topic or a requirements revision: the requirements stage reads them first.
+    const materialIds = asArray(attachments).map((item) => item.material_id);
 
     // --- Stage Router ---
 
@@ -342,7 +351,7 @@ router.post('/generate', async (req, res) => {
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
-      const result = await generateRequirements(message, userId, kit, stageOptions);
+      const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
       const title = result.intake?.goal || message.slice(0, 100);
 
       let draftId = curriculum_id;
@@ -469,7 +478,7 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
-        const result = await generateRequirements(message, userId, kit, stageOptions);
+        const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()

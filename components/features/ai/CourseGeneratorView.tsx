@@ -11,12 +11,36 @@ import { aiRefusalOf, type AiRefusal } from '../../../services/safetyApi';
 import { AiNotice, AiRefusalNotice } from '../../ui/AiNotice';
 import ReactMarkdown from 'react-markdown';
 
-type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'upload_unsupported' | 'refusal' | 'other';
+type UploadFailure = 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'upload_unsupported' | 'upload_unreadable' | 'upload_not_indexed';
+type AiFailure = 'auth' | 'unavailable' | 'daily_limit' | 'paused' | UploadFailure | 'refusal' | 'other';
 
 /** Messages the app wrote itself (the welcome, a restored draft): no AI notice on them. */
 const APP_MESSAGE_IDS = new Set(['init', 'restored-draft']);
-/** Why the attached file was not sent: today's upload cap, uploads turned off, too large, or not a PDF, text or Markdown file. */
-type UploadNotice = 'limit' | 'paused' | 'too_large' | 'unsupported';
+/**
+ * Why the attached file was not sent: today's upload cap, uploads turned off, too large, not a
+ * PDF, text or Markdown file, stored with no text that could be read (a scanned PDF), stored but
+ * not made ready for some other reason, or a step that reads no files (roadmap, curriculum).
+ */
+type UploadNotice = 'limit' | 'paused' | 'too_large' | 'unsupported' | 'unreadable' | 'not_indexed' | 'requirements_only';
+/** The notice for each refused upload (handleAiFailure). */
+const UPLOAD_NOTICES: Record<UploadFailure, UploadNotice> = {
+  upload_limit: 'limit',
+  upload_paused: 'paused',
+  upload_too_large: 'too_large',
+  upload_unsupported: 'unsupported',
+  upload_unreadable: 'unreadable',
+  upload_not_indexed: 'not_indexed',
+};
+const isUploadFailure = (failure: AiFailure): failure is UploadFailure => failure in UPLOAD_NOTICES;
+/**
+ * The upload answered a status other than 'ready' (server/routes/content.js): the file was stored
+ * but cannot be read for the course. 'error': no text could be read from it (error_type no_text
+ * or extract_failed); 'uploaded': indexing failed for another reason. The message is not sent.
+ */
+const unusableUpload = (status: unknown) => Object.assign(
+  new Error('The attached file cannot be used.'),
+  { unusableUpload: status === 'error' ? 'upload_unreadable' : 'upload_not_indexed' },
+);
 
 /** The server's upload limit (server/uploads.js MAX_UPLOAD_MB); checked here before sending. */
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -31,6 +55,8 @@ const MESSAGE_MAX_CHARS = 4000;
 // the messages produced today for 401 (requireAuth on the server) and 503/504 (curriculumApi's
 // own wording).
 const classifyAiError = (err: unknown): AiFailure => {
+  const unusable = (err as { unusableUpload?: unknown } | null)?.unusableUpload;
+  if (unusable === 'upload_unreadable' || unusable === 'upload_not_indexed') return unusable;
   const limitScope = dailyLimitScope(err);
   if (limitScope) {
     if (dailyLimitKind(err) === 'embeddings') return limitScope === 'off' ? 'upload_paused' : 'upload_limit';
@@ -106,6 +132,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   // A file already uploaded for a message that was then refused (a daily cap): it stays attached
   // and goes with that message when it is sent again, without a second upload.
   const [uploadedFile, setUploadedFile] = useState<{ name: string; materialId: string } | null>(null);
+  // The requirements step reads attached files first (server/routes/ai.js); the roadmap and
+  // curriculum steps read none, so no file is attached there.
+  const filesRead = pendingApproval !== 'roadmap' && pendingApproval !== 'curriculum';
 
   const copy = {
     en: {
@@ -163,6 +192,11 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       uploadPaused: 'File uploads are paused for now. Remove the file to keep going.',
       uploadTooLarge: 'This file is larger than 10 MB. Remove it, or attach a smaller file.',
       uploadUnsupported: 'Only PDF, text (.txt) and Markdown (.md) files can be attached. Remove this file, or attach another one.',
+      uploadUnreadable: 'No text could be read from this file, so it was removed. A scanned PDF (text as images) or a PDF that needs a password to open cannot be read. Attach a PDF whose text can be selected, or a text (.txt) or Markdown (.md) file.',
+      uploadNotIndexed: 'This file could not be processed, so it was removed. Attach it again in a moment.',
+      uploadRequirementsOnly: 'Files can be attached only while the requirements are being defined.',
+      fileOnlyTopic: 'Make a course from the attached file.',
+      fileOnlyRevision: 'Revise it based on the attached file.',
     },
     jp: {
       initialMessage: 'こんにちは！AIコンシェルジュです。学びたいテーマを教えていただくか、資料をアップロードして開始しましょう。',
@@ -219,6 +253,11 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       uploadPaused: 'ファイルのアップロードは、今は停止しています。ファイルを外せば、このまま続けられます。',
       uploadTooLarge: 'このファイルは10MBを超えています。ファイルを外すか、小さいファイルを添付してください。',
       uploadUnsupported: '添付できるのは、PDF、テキスト（.txt）、Markdown（.md）のファイルだけです。このファイルを外すか、別のファイルを添付してください。',
+      uploadUnreadable: 'このファイルからは文字を読み取れなかったため、添付を外しました。スキャンした PDF（文字が画像のもの）や、開くのにパスワードが要る PDF は読めません。文字を選択できる PDF か、テキスト（.txt）・Markdown（.md）のファイルを添付してください。',
+      uploadNotIndexed: 'このファイルを取り込めなかったため、添付を外しました。少し待ってから、もう一度添付してください。',
+      uploadRequirementsOnly: 'ファイルを添付できるのは、要件を決める段階だけです。',
+      fileOnlyTopic: '添付した資料でコースを作りたいです。',
+      fileOnlyRevision: '添付した資料をもとに直してください。',
     }
   } as const;
 
@@ -350,14 +389,24 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       setUploadNotice('unsupported');
       return;
     }
+    // A file still attached from the requirements step: this step would not read it.
+    if (!filesRead && (selectedFile || uploadedFile)) {
+      setSelectedFile(null);
+      setUploadedFile(null);
+      focusAfterRef.current = 'input';
+      setUploadNotice('requirements_only');
+      return;
+    }
 
     const isRevision = pendingApproval !== null && pendingApproval !== 'none';
     const fileName = selectedFile?.name ?? uploadedFile?.name;
-    
+    // A file sent without words: the server needs a message, so it says what the file is for.
+    const sentText = msgText.trim() ? msgText : isRevision ? t.fileOnlyRevision : t.fileOnlyTopic;
+
     const userMsg: Message = {
         id: Date.now().toString(),
         role: 'user',
-        text: fileName ? `${msgText} (Attached: ${fileName})`.trim() : msgText,
+        text: fileName ? `${sentText} (Attached: ${fileName})`.trim() : sentText,
         timestamp: new Date()
     };
     setMessages(prev => [...prev, userMsg]);
@@ -377,6 +426,12 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         let uploaded = uploadedFile;
         if (selectedFile) {
             const uploadRes = await uploadFile(selectedFile);
+            if (uploadRes?.status !== 'ready') {
+                // Stored, but the course cannot read it: it comes off, and the message waits in the
+                // composer, to send without a file or with another one.
+                setSelectedFile(null);
+                throw unusableUpload(uploadRes?.status);
+            }
             uploaded = { name: selectedFile.name, materialId: uploadRes.material_id };
             // Kept until the message is sent: a refused send keeps the file without a new upload.
             setUploadedFile(uploaded);
@@ -386,9 +441,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
 
         let response;
         if (isRevision && curriculumId && sessionId && pendingApproval) {
-            response = await sendAiDecision(curriculumId, sessionId, pendingApproval, 'revise', msgText);
+            response = await sendAiDecision(curriculumId, sessionId, pendingApproval, 'revise', sentText, attachments);
         } else {
-            response = await sendAiChat(msgText, sessionId || undefined, attachments);
+            response = await sendAiChat(sentText, sessionId || undefined, attachments);
         }
         setUploadedFile(null);
 
@@ -429,10 +484,11 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       } else restoreAttempt();
     } else if (failure === 'other') setError(t.errorChat);
     // The upload was refused before anything was generated: selectedFile stays attached, so the
-    // learner can remove it (focus goes to its remove button) and send again.
-    else if (failure === 'upload_limit' || failure === 'upload_paused' || failure === 'upload_too_large' || failure === 'upload_unsupported') {
+    // learner can remove it (focus goes to its remove button) and send again. A stored file the
+    // course cannot read was already taken off: focus goes to the composer.
+    else if (isUploadFailure(failure)) {
       focusAfterRef.current = 'file';
-      setUploadNotice(failure === 'upload_limit' ? 'limit' : failure === 'upload_paused' ? 'paused' : failure === 'upload_too_large' ? 'too_large' : 'unsupported');
+      setUploadNotice(UPLOAD_NOTICES[failure]);
       restoreAttempt();
     } else if (failure === 'daily_limit' || failure === 'paused') {
       setBlockedUntil(failure === 'daily_limit' ? dailyLimitResetAt(err) : null);
@@ -985,10 +1041,18 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                     {/* The attached file was not sent: a neutral note next to it, not a failure banner. */}
                     {uploadNotice && (
                         <p role="alert" className="mb-3 flex items-start gap-2 rounded-xl border border-line bg-sunken px-4 py-3 text-sm text-fg-2">
-                            {uploadNotice === 'too_large' || uploadNotice === 'unsupported'
-                                ? <Paperclip size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-                                : <CalendarClock size={16} aria-hidden="true" className="mt-0.5 shrink-0" />}
-                            <span>{uploadNotice === 'limit' ? t.uploadDailyLimit : uploadNotice === 'paused' ? t.uploadPaused : uploadNotice === 'too_large' ? t.uploadTooLarge : t.uploadUnsupported}</span>
+                            {uploadNotice === 'limit' || uploadNotice === 'paused'
+                                ? <CalendarClock size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                : <Paperclip size={16} aria-hidden="true" className="mt-0.5 shrink-0" />}
+                            <span>{{
+                                limit: t.uploadDailyLimit,
+                                paused: t.uploadPaused,
+                                too_large: t.uploadTooLarge,
+                                unsupported: t.uploadUnsupported,
+                                unreadable: t.uploadUnreadable,
+                                not_indexed: t.uploadNotIndexed,
+                                requirements_only: t.uploadRequirementsOnly,
+                            }[uploadNotice]}</span>
                         </p>
                     )}
                     {(selectedFile || uploadedFile) && (
@@ -1036,7 +1100,14 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                         <button 
                             type="button"
                             aria-label={t.attachFile}
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => {
+                                // The roadmap and curriculum steps read no file: say so instead of offering one.
+                                if (!filesRead) {
+                                    setUploadNotice('requirements_only');
+                                    return;
+                                }
+                                fileInputRef.current?.click();
+                            }}
                             disabled={isGenerating || composerLocked}
                             className="p-3 sm:p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all disabled:opacity-50"
                         >

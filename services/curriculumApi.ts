@@ -2841,7 +2841,8 @@ export const sendAiChat = async (message: string, sessionId?: string, attachment
   }
 };
 
-export const sendAiDecision = async (curriculumId: string, sessionId: string, stage: string, decision: 'approved' | 'revise', feedbackText?: string) => {
+/** `attachments`: files sent with a revision; the requirements stage reads them first (server/routes/ai.js). */
+export const sendAiDecision = async (curriculumId: string, sessionId: string, stage: string, decision: 'approved' | 'revise', feedbackText?: string, attachments: { material_id: string }[] = []) => {
   if (USE_DEMO_MODE) {
     await new Promise(resolve => setTimeout(resolve, 3000));
     
@@ -2927,6 +2928,7 @@ export const sendAiDecision = async (curriculumId: string, sessionId: string, st
         stage,
         decision,
         message: feedbackText,
+        ...(attachments.length > 0 ? { attachments } : {}),
       }),
       signal: controller.signal,
     });
