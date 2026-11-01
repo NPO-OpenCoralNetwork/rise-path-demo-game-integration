@@ -390,15 +390,19 @@ export function createTrainingTimePool(seed = {}) {
         before: (sql, run) => hooks.push({ sql, run }),
         /**
          * An account deletion as the service commits it (server/services/accountDeletion.js): the
-         * tombstone, the marks on the account's memberships, streams and days, and no stub.
+         * tombstone, the marks on the account's memberships, streams and days, and no stub. Another
+         * session's commit: an open transaction's ROLLBACK keeps it (it is applied to the snapshot
+         * that ROLLBACK restores too), so it can run in a `before` hook, during a lock wait.
          * @param {string} user @param {number} at
          */
         deleteAccount: (user, at) => {
-            state.tombstones.set(user, { deleted_at: at, reopened_at: null });
-            for (const rows of [state.memberships, state.streams, state.days]) {
-                for (const row of /** @type {any[]} */ (rows)) if (row.user_id === user && row.account_deleted_at === null) row.account_deleted_at = at;
+            for (const db of snapshot ? [state, snapshot] : [state]) {
+                db.tombstones.set(user, { deleted_at: at, reopened_at: null });
+                for (const rows of [db.memberships, db.streams, db.days]) {
+                    for (const row of /** @type {any[]} */ (rows)) if (row.user_id === user && row.account_deleted_at === null) row.account_deleted_at = at;
+                }
+                db.stubs = db.stubs.filter((s) => s !== user);
             }
-            state.stubs = state.stubs.filter((s) => s !== user);
         },
         /**
          * A setting as a row (bypassing the script's checks; set_at is given, so a past day is possible).
