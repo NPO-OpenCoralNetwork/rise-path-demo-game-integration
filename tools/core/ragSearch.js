@@ -5,7 +5,8 @@
  * Every search is scoped to one learner's own ready materials (materials.user_id is NOT NULL and
  * there is no shared or public material), like ragService.retrieveContext: without a learner id
  * nothing is searched.
- * Falls back to basic keyword retrieval if pgvector or embeddings are not available.
+ * Falls back to keyword search when pgvector or embeddings are not available, or when embedding the
+ * query fails, and says why (searchChunks `fallback_reason`).
  * Vectors from different models are never compared: chunks embedded with an older model (or none)
  * are matched by keyword and merged with the vector results until scripts/rag/reembed.mjs
  * re-embeds them.
@@ -20,6 +21,7 @@
  */
 import { getPool } from '../../server/db.js';
 import { MODEL_IDS, isGeminiAllowed } from '../../server/llm/models.config.js';
+import { describeError } from '../../server/utils/redactUrl.js';
 import { classifyDbError } from './dbErrors.js';
 
 /** Embedding model for material_chunks; each row records it in `embedding_model`. */
@@ -402,76 +404,79 @@ export function learnerChunkScope(userId) {
 }
 
 /**
- * Search the learner's own uploaded materials (material_chunks) with pgvector cosine distance
- * when available, else by keyword.
- *
- * @param {Object} params
- * @param {string} params.query - Search query text
- * @param {string} [params.domain] - Echoed in each result; not a filter (materials have no domain)
- * @param {number} [params.maxResults=3] - Maximum results to return (1-10)
- * @param {string} params.userId - The learner whose materials are searched. Required: a missing
- *   or non-UUID id returns no results without querying.
+ * Why a search matched by keyword instead of by vector (searchChunks):
+ * - 'no_pgvector': the database has no vector type;
+ * - 'embeddings_off': Gemini is not allowed on this server, or it has no key (isEmbeddingConfigured);
+ * - 'reembed_required': the scope's chunks are all embedded with another model, or with none;
+ * - 'embedding_error': embedding the query failed (logged).
+ * @typedef {'no_pgvector' | 'embeddings_off' | 'reembed_required' | 'embedding_error'} FallbackReason
  */
-export async function searchContent({ query, domain, maxResults = 3, userId }) {
-    if (typeof userId !== 'string' || !UUID.test(userId)) {
-        return { results: [], search_type: 'none', message: 'No learner in scope' };
-    }
-    const pool = getPool();
-    if (!pool) return { results: [], error: 'DB not configured', error_type: 'db_connection' };
 
-    const scope = learnerChunkScope(userId);
-    const limit = clampResults(maxResults);
-    try {
-        // First check if pgvector extension is available
-        const typeCheck = await pool.query(
-            "SELECT 1 FROM pg_type WHERE typname = 'vector'"
-        );
-        const hasVector = typeCheck.rowCount > 0;
-
-        if (hasVector) {
-            return await vectorSearch({ pool, query, domain, maxResults: limit, scope });
-        } else {
-            return await keywordFallback({ pool, query, domain, maxResults: limit, scope });
-        }
-    } catch (err) {
-        const classified = classifyDbError(err, 'ragSearch');
-        return { results: [], ...classified };
-    }
+/**
+ * The query's vector, embedded at most once however many scopes are searched with it. A failure is
+ * logged once, by name, code and message only (never the query), and thrown to every caller.
+ * @param {string} query
+ * @returns {() => Promise<number[]>}
+ */
+export function queryEmbedder(query) {
+    /** @type {Promise<number[]> | undefined} */
+    let vector;
+    return () => (vector ??= embedTexts([query]).then(([first]) => first, (error) => {
+        console.warn(`[RAG] Embedding the search query failed (${describeError(error)}); matching by keyword.`);
+        throw error;
+    }));
 }
 
 /**
- * Vector search using pgvector cosine distance.
- * Generates embedding for query via Gemini (when allowed), then searches material_chunks.
+ * A chunk found by searchChunks: `relevance` is 1 - cosine distance for a vector hit and
+ * KEYWORD_RELEVANCE for a keyword hit (`match`).
+ * @typedef {{ content: string, chunk_index: number, material_id: string, relevance: number,
+ *   match: 'vector' | 'keyword' }} FoundChunk
  */
-async function vectorSearch({ pool, query, domain, maxResults, scope }) {
-    if (!isEmbeddingConfigured()) {
-        // Embeddings off (Gemini not allowed, or no key): keyword search over every chunk.
-        return await keywordFallback({ pool, query, domain, maxResults, scope });
-    }
+
+/**
+ * The chunks in `scope` that best match `query`, at most `limit`: by pgvector cosine distance when
+ * embeddings are on and the scope holds chunks embedded with EMBEDDING_MODEL (the scope's other
+ * chunks, from an older model or none, are matched by keyword and merged in by relevance), else by
+ * keyword with the reason. A scope with no chunk at all finds nothing ('none'), without embedding
+ * the query. Shared by MCP rag-search (searchContent) and the course generator
+ * (server/ragService.js retrieveContext).
+ * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
+ * @param {{ query: string, scope: ChunkScope, limit: number,
+ *   embedQuery?: () => Promise<number[]> }} options embedQuery: a queryEmbedder, for a caller that
+ *   searches several scopes with one embedding (default: a new one)
+ * @returns {Promise<{ rows: FoundChunk[], search_type: 'vector' | 'vector+keyword' | 'keyword' | 'none',
+ *   fallback_reason?: FallbackReason, reembed_required?: true }>}
+ */
+export async function searchChunks(pool, { query, scope, limit, embedQuery = queryEmbedder(query) }) {
+    const typeCheck = await pool.query(
+        "SELECT 1 FROM pg_type WHERE typname = 'vector'"
+    );
+    if (typeCheck.rowCount === 0) return keywordMatches(pool, { query, scope, limit }, 'no_pgvector');
+    if (!isEmbeddingConfigured()) return keywordMatches(pool, { query, scope, limit }, 'embeddings_off');
 
     // Vectors from different models are never compared. With no EMBEDDING_MODEL chunks in scope
     // (everything still from an older model), match those chunks by keyword instead.
     const coverage = await embeddingCoverage(pool, scope);
     warnLegacyEmbeddingsOnce(coverage.legacy);
-    if (!coverage.current) {
-        return await keywordFallback({ pool, query, domain, maxResults, scope, reason: 'reembed_required' });
-    }
+    if (!coverage.current && !coverage.legacy) return { rows: [], search_type: 'none' };
+    if (!coverage.current) return keywordMatches(pool, { query, scope, limit }, 'reembed_required');
 
     let queryVector;
     try {
-        [queryVector] = await embedTexts([query]);
+        queryVector = await embedQuery();
     } catch {
-        // Embedding generation failed — fall back to keyword
-        return await keywordFallback({ pool, query, domain, maxResults, scope });
+        // queryEmbedder logged it.
+        return keywordMatches(pool, { query, scope, limit }, 'embedding_error');
     }
 
     // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older
-    // rows), inside the learner scope. materials has no domain column: `domain` is echoed only.
+    // rows), inside the scope.
     const params = [...scope.params, JSON.stringify(queryVector)];
     const vectorParam = `$${params.length}`;
     params.push(EMBEDDING_MODEL);
     const modelCondition = `c.embedding_model = $${params.length}`;
-    params.push(maxResults);
+    params.push(limit);
 
     const result = await pool.query(
         `SELECT c.content, c.chunk_index,
@@ -488,49 +493,71 @@ async function vectorSearch({ pool, query, domain, maxResults, scope }) {
     // Older-model chunks in the same scope are matched by keyword and merged in by relevance,
     // so they do not disappear once some chunks use the current model.
     const legacyRows = coverage.legacy
-        ? await keywordSearchChunks(pool, { query, scope: legacyChunkScope(scope), limit: maxResults })
+        ? await keywordSearchChunks(pool, { query, scope: legacyChunkScope(scope), limit })
         : [];
-    const rows = mergeByRelevance(result.rows, legacyRows, maxResults);
-
     return {
-        results: rows.map(row => ({
-            title: `Chunk ${row.chunk_index}`,
-            content: row.content?.substring(0, 500) || '',
-            relevance_score: row.relevance,
-            source: row.material_id,
-            domain: domain,
-            ...(row.match === 'keyword' ? { match: 'keyword' } : {}),
-        })),
+        rows: mergeByRelevance(result.rows, legacyRows, limit),
         search_type: legacyRows.length > 0 ? 'vector+keyword' : 'vector',
         ...(coverage.legacy ? { reembed_required: true } : {}),
-        query_used: query.substring(0, 100),
     };
 }
 
 /**
- * Keyword-based fallback when pgvector or embeddings are unavailable, or when no chunk in `scope`
- * is embedded with EMBEDDING_MODEL (`reason: 'reembed_required'`).
- * Uses PostgreSQL ILIKE for basic text matching.
- * @param {{ pool: any, query: string, domain?: string, maxResults: number,
- *   scope: ChunkScope, reason?: string }} params scope: the learner scope (learnerChunkScope)
+ * Keyword (ILIKE) matches in `scope`, as searchChunks rows, with the reason vectors were not used.
+ * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
+ * @param {{ query: string, scope: ChunkScope, limit: number }} options
+ * @param {FallbackReason} reason
  */
-async function keywordFallback({ pool, query, domain, maxResults, scope, reason }) {
-    if (extractKeywords(query).length === 0) {
-        return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...(reason ? { fallback_reason: reason } : {}) };
-    }
-
-    const rows = await keywordSearchChunks(pool, { query, scope, limit: maxResults });
-
+async function keywordMatches(pool, { query, scope, limit }, reason) {
+    const rows = await keywordSearchChunks(pool, { query, scope, limit });
     return {
-        ...(reason ? { fallback_reason: reason } : {}),
-        results: rows.map(row => ({
-            title: `Chunk ${row.chunk_index}`,
-            content: row.content?.substring(0, 500) || '',
-            relevance_score: KEYWORD_RELEVANCE, // keyword match = moderate relevance
-            source: row.material_id,
-            domain: domain,
-        })),
-        search_type: 'keyword',
-        query_used: query.substring(0, 100),
+        rows: rows.map((row) => ({ ...row, relevance: KEYWORD_RELEVANCE, match: /** @type {const} */ ('keyword') })),
+        search_type: /** @type {const} */ ('keyword'),
+        fallback_reason: reason,
     };
+}
+
+/**
+ * Search the learner's own uploaded materials (material_chunks): searchChunks over
+ * learnerChunkScope, as the MCP rag-search result.
+ *
+ * @param {Object} params
+ * @param {string} params.query - Search query text
+ * @param {string} [params.domain] - Echoed in each result; not a filter (materials have no domain)
+ * @param {number} [params.maxResults=3] - Maximum results to return (1-10)
+ * @param {string} params.userId - The learner whose materials are searched. Required: a missing
+ *   or non-UUID id returns no results without querying.
+ */
+export async function searchContent({ query, domain, maxResults = 3, userId }) {
+    if (typeof userId !== 'string' || !UUID.test(userId)) {
+        return { results: [], search_type: 'none', message: 'No learner in scope' };
+    }
+    const pool = getPool();
+    if (!pool) return { results: [], error: 'DB not configured', error_type: 'db_connection' };
+
+    try {
+        const found = await searchChunks(pool, { query, scope: learnerChunkScope(userId), limit: clampResults(maxResults) });
+        const reason = found.fallback_reason ? { fallback_reason: found.fallback_reason } : {};
+        if (found.search_type === 'keyword' && extractKeywords(query).length === 0) {
+            return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...reason };
+        }
+        return {
+            ...reason,
+            results: found.rows.map(row => ({
+                title: `Chunk ${row.chunk_index}`,
+                content: row.content?.substring(0, 500) || '',
+                relevance_score: row.relevance,
+                source: row.material_id,
+                domain: domain,
+                // Marked only where vector and keyword hits are mixed.
+                ...(found.search_type !== 'keyword' && row.match === 'keyword' ? { match: 'keyword' } : {}),
+            })),
+            search_type: found.search_type,
+            ...(found.reembed_required ? { reembed_required: true } : {}),
+            query_used: query.substring(0, 100),
+        };
+    } catch (err) {
+        const classified = classifyDbError(err, 'ragSearch');
+        return { results: [], ...classified };
+    }
 }
