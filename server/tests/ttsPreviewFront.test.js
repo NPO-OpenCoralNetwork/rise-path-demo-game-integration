@@ -95,3 +95,17 @@ describe('previewVoice: the TTS text cap (text_too_long)', () => {
     assert.equal(service.isTtsUnavailableError(unavailable), true);
   });
 });
+
+// Phase 9 rehearsal, item 28: the preview's error (the cap's message included) is announced when it appears and uses the
+// design token for errors (text-red-600 was 4.48:1 on the voice page's background, under WCAG AA's 4.5:1).
+describe('VoiceOptionRow: the preview error line', () => {
+  it('is a live alert in the error token', async () => {
+    const fs = await import('node:fs');
+    const code = fs.readFileSync(path.join(ROOT, 'components/features/settings/VoiceOptionRow.tsx'), 'utf8');
+    const line = /\{previewError && \([\s\S]*?(<p [^>]*>)\{previewError\}<\/p>\s*\)\}/.exec(code);
+    assert.ok(line, 'the error line');
+    assert.match(line[1], /role="alert"/);
+    assert.match(line[1], /\btext-danger\b/);
+    assert.doesNotMatch(line[1], /text-red-|\[#/);
+  });
+});

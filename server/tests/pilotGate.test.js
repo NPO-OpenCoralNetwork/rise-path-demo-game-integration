@@ -534,11 +534,25 @@ describe('the app: the pilot_only notice', () => {
       assert.equal(h1.props.id, 't1');
       assert.ok(els.some((el) => el.type === 'section' && el.props['aria-labelledby'] === 't1'));
       assert.ok(textOf(tokens).includes(body), language);
-      assert.ok(els.some((el) => el.type === 'SupportContact'), 'the contact line');
+      // Rehearsal item 26: no VITE_SUPPORT_CONTACT (this bundle has none) → no contact line, so no second contact
+      // (SupportContact's fallback names the learning site's staff, which does not fit Nexloom and P-School accounts).
+      assert.ok(!els.some((el) => el.type === 'SupportContact'), 'no contact line while VITE_SUPPORT_CONTACT is unset');
       const button = els.find((el) => el.type === 'Button');
       assert.equal(textOf(walk(button.props.children)), signOut);
       button.props.onClick();
       assert.equal(signedOut, 1);
+    }
+  });
+
+  it('shows the contact line with the channel set as VITE_SUPPORT_CONTACT, and only then (rehearsal item 26)', () => {
+    const contact = { href: 'mailto:help@example.org', label: 'help@example.org', kind: 'mail' };
+    const els = walk(mod.PilotOnlyBody({ language: 'jp', onSignOut() {}, contact })).filter((t) => 'el' in t).map((t) => t.el);
+    const line = els.filter((el) => el.type === 'SupportContact');
+    assert.equal(line.length, 1);
+    assert.deepEqual(line[0].props.contact, contact);
+    for (const none of [null, undefined]) {
+      const without = walk(mod.PilotOnlyBody({ language: 'en', onSignOut() {}, contact: none })).filter((t) => 'el' in t);
+      assert.ok(!without.some((t) => t.el.type === 'SupportContact'), String(none));
     }
   });
 

@@ -129,8 +129,8 @@ VM provisioned. Next steps:
 1. SSH:  gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE}
 2. Tailscale: first remove the old risepath-vm in the admin console (Machines), or the new
    machine becomes risepath-vm-1. Then, on the VM:
-     curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --hostname=risepath-vm
-     tailscale status   # this machine must be listed as risepath-vm
+     curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath
+     tailscale status   # this machine must be listed as risepath-vm (the tag is the ACL's, runbook 3.4)
 3. On the VM: clone into /opt/risepath and run bootstrap (run 1 installs Docker and swap, then
    stops at stack.env):
      sudo install -d -o "\$(id -un)" -g "\$(id -gn)" /opt/risepath

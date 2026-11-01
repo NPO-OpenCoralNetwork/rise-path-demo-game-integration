@@ -79,7 +79,7 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 
 # Tailscale（先に管理画面の Machines で旧 risepath-vm を Remove しておく）
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --hostname=risepath-vm   # 表示された URL をブラウザで開いて認証する
+sudo tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath   # 表示された URL をブラウザで開いて認証する（タグは手順書 3.4 の ACL のもの）
 tailscale status                           # この VM が risepath-vm と表示されること
 
 # リポジトリ（/opt は root 所有なので、先に自分のディレクトリとして作る）
@@ -91,7 +91,7 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 exit
 ```
 
-旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧 `risepath-vm` をあとで消しても、名前は戻りません。すでに `-1` になったら、旧 `risepath-vm` を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。Tailscale ACL に旧 VM の 100.x アドレスを書いていたら、新しいアドレスに直します。
+旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧 `risepath-vm` をあとで消しても、名前は戻りません。すでに `-1` になったら、旧 `risepath-vm` を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。ACL はタグ `tag:risepath` で書くので（手順書 3.4。下の「セキュリティ」）、VM のアドレスが変わっても直す必要はありません。旧 VM の 100.x アドレスを書いた古い ACL が残っていたら、タグの形に書きかえます。
 
 1 回目のあとは、いったん `exit` して SSH し直します。`docker` グループへの追加は、新しいログインから効くためです。同じセッションのまま 2 回目を実行すると、`bootstrap-vm.sh` は `docker group not active yet` と表示して止まります。
 
@@ -522,7 +522,18 @@ GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プ
 - GCP VPC ファイアウォールで **5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。アプリ用の受信ルールは要りません（公開は Cloudflare Tunnel の外向き接続）
 - `ORIGIN_SECRET` を設定すると、API は `api` コンテナ内の loopback 以外から来て `x-origin-secret` が無いリクエストに 403 を返します。Tailscale から :3006 を呼ぶ場合も同じです
 - 正しいヘッダーを持つリクエストは edge 扱いです。Bridge Token は使えず、Supabase JWT が要ります。届くのは `/api/*`・`/audio/cache/`・`/generated/img_*` だけで、`/uploads` はインターネットから読めません
-- Tailscale ACL で `risepath-vm` へのアクセスを限定
+- Tailscale ACL で `risepath-vm` へのアクセスを限定する（手順書 3.4）。VM には `tailscale up` の `--advertise-tags=tag:risepath` でタグを付け、決まりはタグで書く（VM は ACL を書くときにはまだ tailnet にいないため）。3006 と 3100 は、名前を決めた管理者だけに開け、5432・8642・8880 はだれにも開けない。新しい tailnet にはじめからある `"src": ["*"], "dst": ["*:*"]` の行は、`tag:risepath` に届かない形に書きかえる。例（`<管理者のメールアドレス>` は置きかえる）:
+
+  ```json
+  {
+    "tagOwners": { "tag:risepath": ["autogroup:admin"] },
+    "acls": [
+      { "action": "accept", "src": ["<管理者のメールアドレス>"], "dst": ["tag:risepath:3006,3100"] }
+    ]
+  }
+  ```
+
+  確かめ方: Mac で `nc -z -w 3 risepath-vm 5432 && echo OPEN || echo closed` が `closed` を出す（8880 も同じ。手順書 6.3）
 - `stack.env`・`tunnel.env`・`mcp-public.env`・`billing.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
 - Stripe の鍵（`sk_`・`rk_`・`whsec_`）は `billing.env` だけに入れる。`stack.env`・`mcp-public.env`・Vercel・`VITE_*` には入れない（ブラウザは Stripe の値を何も使わない）
 - `stack.env` にテンプレの値（`change-me` など）を残さない。DB・Bridge Token・Hermes の値は上の表のとおりに作る

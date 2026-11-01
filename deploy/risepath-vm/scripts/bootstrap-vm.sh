@@ -30,7 +30,7 @@ fi
 if ! command -v tailscale >/dev/null 2>&1; then
   echo "==> Install Tailscale, then re-run:"
   echo "    curl -fsSL https://tailscale.com/install.sh | sh"
-  echo "    sudo tailscale up --hostname=risepath-vm"
+  echo "    sudo tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath"
   exit 1
 fi
 

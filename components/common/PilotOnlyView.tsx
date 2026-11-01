@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/Button';
 import { PublicPageShell } from '../ui/PublicPageShell';
 import { SupportContact } from '../ui/SupportContact';
+import { SUPPORT_CONTACT, type SupportContactInfo } from '../../config/support';
 
 /**
  * Phase 9 (D1): shown by App.tsx instead of the app when the server's pilot list refused the
@@ -12,6 +13,9 @@ import { SupportContact } from '../ui/SupportContact';
  * A page, not a dialog: Esc does not close it (nothing behind it would work). The heading takes
  * focus on mount; "Sign out" is the app's logout with scope 'local' (App.tsx handlePilotSignOut): it ends
  * only this browser's session, never the account's Nexloom or P-School sessions on other devices.
+ * The contact line shows only a channel set as VITE_SUPPORT_CONTACT: SupportContact's fallback (tell the
+ * staff at your learning site) does not fit the Nexloom and P-School accounts this page refuses, and the
+ * body already says to contact the Rise Path team (Phase 9 rehearsal, item 26).
  */
 
 const copy = {
@@ -35,7 +39,9 @@ export const PilotOnlyBody: React.FC<{
   onSignOut: () => void;
   titleId?: string;
   titleRef?: React.Ref<HTMLHeadingElement>;
-}> = ({ language, onSignOut, titleId, titleRef }) => {
+  /** For tests; the app uses VITE_SUPPORT_CONTACT (config/support.ts). */
+  contact?: SupportContactInfo | null;
+}> = ({ language, onSignOut, titleId, titleRef, contact = SUPPORT_CONTACT }) => {
   const t = copy[language];
   return (
     <div className="mx-auto max-w-read px-4 pb-20 pt-8 sm:px-6">
@@ -44,7 +50,7 @@ export const PilotOnlyBody: React.FC<{
           {t.title}
         </h1>
         <p className="text-body-lg text-fg">{t.body}</p>
-        <SupportContact />
+        {contact ? <SupportContact contact={contact} /> : null}
         <div className="flex flex-wrap gap-3">
           <Button type="button" onClick={onSignOut}>
             {t.signOut}

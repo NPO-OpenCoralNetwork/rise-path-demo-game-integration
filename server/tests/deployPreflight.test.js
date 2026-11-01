@@ -16,9 +16,10 @@ import { ERROR_KINDS, entryMap, parseEnvText } from '../../scripts/deploy/env-pa
 import {
   ATTESTATIONS, COMPOSE_INTERPOLATED, FACT_KEYS, INTERNAL_CODES, KNOWN_KEYS, NAME_UNSHOWN, PROFILE_NAMES, RETENTION_RANGES,
   RULES, SERVICE_PROFILES, STAGES, checkStack, effectiveProfiles, formatFindings, isCiDummyStack, isDeployToolName, isKnownKey, levelAt, readSwitch,
-  recordValuesAsWritten, resolveStage, validateFacts,
+  readPilotEntries, recordValuesAsWritten, resolveStage, validateFacts,
 } from '../../scripts/deploy/preflight-rules.mjs';
 import { readEnvSwitch } from '../utils/envSwitch.js';
+import { readPilotList } from '../middleware/pilotGate.js';
 import { RETENTION_RULES } from '../services/retention.js';
 import { BASE_STACK, FIXTURES, GOOD_MCP, NOW, PG_PASSWORD, PILOT_ID, PILOT_ID_2, baseFacts, buildInput, envText, sentinel } from './helpers/preflightFixtures.js';
 
@@ -705,8 +706,8 @@ describe('T5: the launch record', () => {
       assert.equal(codeAt(stage, { stackExtra: `PILOT_ACCOUNT_IDS="${LIST}"\n`, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }, 'V1').length, 0, `${stage} quoted`);
     }
   });
-  it('V1: an empty, blank or partly invalid list is no list (protection off → V1 E below public; V2 names the bad entries)', () => {
-    for (const value of ['', `${PILOT_ID},nope`, `${PILOT_ID},`, ',', 'nope', `${PILOT_ID};${PILOT_ID_2}`, `{${PILOT_ID}}`, PILOT_ID.replace(/-/g, '')]) {
+  it('V1: an empty or blank list is no list (protection off → V1 E below public)', () => {
+    for (const value of ['', ' ', '\t']) {
       for (const stage of ['pilot', 'minors']) {
         const found = checkStack(buildInput(stage, { stack: { PILOT_ACCOUNT_IDS: value }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
         assert.deepEqual(of(found, 'V1').map((f) => f.level), ['E'], `${stage} ${JSON.stringify(value)}`);
@@ -715,6 +716,22 @@ describe('T5: the launch record', () => {
     // The list in another file is not the api's list (A8 refuses it in billing.env; tunnel.env never reaches the api).
     const found = checkStack(buildInput('pilot', { tunnel: { TUNNEL_TOKEN: 'eyJhIjoiYiJ9', PILOT_ACCOUNT_IDS: LIST }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
     assert.deepEqual(of(found, 'V1').map((f) => f.level), ['E']);
+  });
+  // Phase 9 rehearsal, item 2: a list that is set refuses everyone not on it (pilotGate.js readPilotList: on, fail closed;
+  // a bad entry is ignored). A bad entry is V2's error alone: V1 beside it said outsiders could get in.
+  it('V1: a set list with bad entries is still a list (the api is on and fails closed); V2 alone stops the deploy', () => {
+    for (const value of [`${PILOT_ID},nope`, `${PILOT_ID},`, ',', 'nope', `${PILOT_ID};${PILOT_ID_2}`, `{${PILOT_ID}}`, PILOT_ID.replace(/-/g, '')]) {
+      assert.equal(readPilotList({ PILOT_ACCOUNT_IDS: value }).on, true, `the api reads ${JSON.stringify(value)} as on`);
+      for (const stage of ['setup', 'pilot', 'minors']) {
+        const found = checkStack(buildInput(stage, { stack: { PILOT_ACCOUNT_IDS: value }, record: { VERCEL_PROTECTION_OFF: '2026-11-02' } }));
+        assert.deepEqual(of(found, 'V1'), [], `${stage} ${JSON.stringify(value)}`);
+        assert.ok(of(found, 'V2').length > 0 && of(found, 'V2').every((f) => f.level === 'E'), `${stage} ${JSON.stringify(value)}: V2`);
+      }
+    }
+    // The preflight's "set" is the api's "on", value for value (blank and empty included).
+    for (const value of ['', ' ', ',', 'nope', PILOT_ID, `${PILOT_ID},${PILOT_ID_2}`]) {
+      assert.equal(readPilotEntries(value).set, readPilotList({ PILOT_ACCOUNT_IDS: value }).on, JSON.stringify(value));
+    }
   });
   it('V2: one finding per entry that is not a UUID, by position (never the entry), at most 10; an empty value is no list', () => {
     assert.deepEqual(codeAt('pilot', { stack: { PILOT_ACCOUNT_IDS: `${PILOT_ID},abc,${PILOT_ID_2},,x` } }, 'V2'), [{ code: 'V2', level: 'E', n: 2 }, { code: 'V2', level: 'E', n: 4 }, { code: 'V2', level: 'E', n: 5 }]);
@@ -761,6 +778,22 @@ describe('T5: the launch record', () => {
   });
   it('R2: a failure after the last success', () => {
     assert.equal(codeAt('pilot', { facts: { backupLastFail: new Date(NOW.getTime() - 3600_000).toISOString() } }, 'R2').length, 1);
+  });
+  // Phase 9 rehearsal, item 10: between runbook 11.8 (public written, the list removed) and 12.1 (the legal pages on in
+  // Vercel, then dated), a deploy would start the api with no list while sign-up and the consent page are still closed.
+  it('G5: at public, VERCEL_LEGAL_PAGES_ON is an error from a deploy and a warning when the check runs alone; below public it is not asked', () => {
+    const at = (/** @type {string} */ stage, /** @type {any} */ from, /** @type {string} */ date) => codeAt(stage, { stack: { PILOT_ACCOUNT_IDS: null }, record: { VERCEL_LEGAL_PAGES_ON: date }, facts: { from } }, 'G5');
+    assert.deepEqual(at('public', 'deploy', '').map((f) => [f.level, f.names]), [['E', ['VERCEL_LEGAL_PAGES_ON']]]);
+    for (const from of ['standalone', 'restore']) assert.deepEqual(at('public', from, '').map((f) => [f.level, f.names]), [['W', ['VERCEL_LEGAL_PAGES_ON']]], from);
+    for (const from of ['deploy', 'standalone', 'restore']) assert.deepEqual(at('public', from, '2026-11-02'), [], `${from} dated`);
+    for (const stage of ['setup', 'pilot', 'minors']) {
+      for (const from of ['deploy', 'standalone']) assert.ok(!at(stage, from, '').some((f) => f.names?.includes('VERCEL_LEGAL_PAGES_ON')), `${stage} ${from}`);
+    }
+    // A date that is not a calendar date is no date (the gate stays closed); MINORS_POLICY_DECIDED keeps its own finding.
+    assert.deepEqual(at('public', 'deploy', '2026-13-01').map((f) => f.level), ['E']);
+    const both = codeAt('public', { stack: { PILOT_ACCOUNT_IDS: null }, record: { VERCEL_LEGAL_PAGES_ON: '', MINORS_POLICY_DECIDED: '' }, facts: { from: 'standalone' } }, 'G5');
+    assert.deepEqual(both.map((f) => [f.level, f.names]), [['E', ['MINORS_POLICY_DECIDED']], ['W', ['VERCEL_LEGAL_PAGES_ON']]]);
+    assert.ok(ATTESTATIONS.find((a) => a.key === 'VERCEL_LEGAL_PAGES_ON')?.rules.includes('G5'));
   });
   it('the stage tables of G5, K, M, R and V are in the catalog (T1 checks each column)', () => {
     assert.deepEqual(['K1', 'K4', 'K5', 'M1', 'R1', 'R2', 'R4', 'R5', 'R6', 'V3'].map((c) => STAGES.map((s) => levelAt(c, s) ?? '-').join('')),

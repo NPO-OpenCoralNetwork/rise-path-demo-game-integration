@@ -17,7 +17,7 @@
 **手順の読み方**
 
 - どの手順にも、同じ行があります。「済んだ日」（済んだら日付を書きます）、「だれが・どこで」、「先に済ませること」、「やること」、「うまくいったとき」、「うまくいかないとき」、「くわしく」です。
-- 済んだ日と、1 章の答え（P9-Q）や 1 章の表の下に書くことは、この手順書の写し（オーナー用）に書きます。写しは、印刷した紙か、事務所の共有ドライブか、パスワード管理（2 人が開けるもの）に置きます。VM の中と、Mac・VM のリポジトリのフォルダの `doc/guides/first-launch.ja.md` には書きません（VM をなくすと消え、`git pull` とデプロイが止まります）。launch-record.env をなくしたときは、この写しから日付を写します。
+- 済んだ日と、1 章の答え（P9-Q）や 1 章の表の下に書くことは、この手順書の写し（オーナー用）に書きます（写しの作り方は 2.0 の 2）。写しは、印刷した紙か、事務所の共有ドライブか、パスワード管理（2 人が開けるもの）に置きます。VM の中と、Mac・VM のリポジトリのフォルダの `doc/guides/first-launch.ja.md` には書きません（VM をなくすと消え、`git pull` とデプロイが止まります）。launch-record.env をなくしたときは、この写しから日付を写します。
 - チェックの横の日付と同じ日付を、VM の launch-record.env（14 章）にも書く手順があります。その手順には「（launch-record.env: 名前）」と書いてあります。launch-record.env を作るのは 5.2 です。それより前の手順の日付は、5.2 でまとめて写します。
 - 公開の段階（`LAUNCH_STAGE`）は、setup → pilot → minors → public の順に進みます。minors は、18 歳未満が使うと決めたときだけ書きます（ふつうは pilot の次が public です）。pilot の次が public でも、public の前に、18 歳未満が使うときの決まりを決めます（14 章の `MINORS_POLICY_DECIDED`）。いまの段階は、VM の `deploy/risepath-vm/launch-record.env` に書きます（14 章）。
 - launch-record.env は、オーナーの記録です。証明ではありません。確かめをした日を書きます。
@@ -66,11 +66,29 @@
 
 ## 2. 始める前に
 
+### 2.0 そろえるもの（アカウントと、Mac の道具）
+
+- [ ] 済んだ日: ＿＿＿＿
+- だれが・どこで: オーナー（とエージェント）、それぞれのサービスの画面と、Mac のターミナル
+- 先に済ませること: ありません
+- やること:
+  1. 次のアカウントに、自分が入れることを確かめます。ないものは作るか、持っている人に頼みます: GitHub（このリポジトリの管理者）、Google Cloud（使うプロジェクトと、お支払いの請求先アカウント。3.3 で使います）、Vercel（プロジェクト `rise-path`）、Cloudflare、Supabase（Nexloom・P-School と共有のプロジェクトのダッシュボード）、Tailscale、Anthropic のコンソール（クレジットが入っているもの）、Slack（アプリを作れるワークスペース。作れないときは、Slack の管理者に手伝いを頼みます）、パスワード管理（2 人が開けるもの）。
+  2. 手順書の写しを作ります。GitHub でこの手順書（`doc/guides/first-launch.ja.md`）を開き、印刷するか PDF にします。この手順から先の済んだ日と答えは、この写しに書きます（はじめにの「手順の読み方」）。
+  3. Mac のターミナル（アプリケーション → ユーティリティ → ターミナル）を開き、`git --version` を実行します。git が入っていないときは、Mac が「コマンドライン・デベロッパ・ツール」を入れるかを聞くので、「インストール」を押し、終わったらもう一度実行します。うまくいくと、`git version` で始まる行が出ます。
+  4. Node.js の 22 を入れます。https://nodejs.org/ の Download のページで、版を v22 にして、macOS の Installer（.pkg）を入れます。ターミナルを閉じて開き直し、`node --version` を実行します。うまくいくと、`v22.` で始まる行が出ます。
+  5. Google Cloud の道具（gcloud）を入れます。https://cloud.google.com/sdk/docs/install の macOS の手順のとおりに入れます。ターミナルを開き直し、`gcloud --version` を実行します。うまくいくと、`Google Cloud SDK` で始まる行が出ます。続けて `gcloud auth login` を実行し、開いたブラウザで 1 の Google Cloud のアカウントを選びます。うまくいくと、ターミナルに `You are now logged in as` の行が出ます。
+  6. リポジトリを Mac に置きます。`git clone https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration.git` を実行し、`cd rise-path-demo-game-integration` で移って、`npm ci` を実行します（数分かかります）。うまくいくと、`added` で始まる行が出ます（`npm warn` の行は出てもかまいません）。この手順書の「Mac のリポジトリのいちばん上のフォルダ」は、このフォルダです。
+  7. Tailscale のアプリを入れ（https://tailscale.com/download の macOS）、1 の Tailscale のアカウントでログインします。うまくいくと、Tailscale の管理画面の Machines に、この Mac が出ます（ターミナルで `tailscale status` が使えるときは、この Mac の行が出ます）。
+  8. この Mac で開発もするとき（エージェントや開発者が、この Mac でコードを動かすとき）だけ: Docker Desktop を入れて起動します（https://www.docker.com/products/docker-desktop/ ）。`docker version` を実行し、`Server:` の行が出ることを見ます（18 章の開発用の DB で使います）。
+- うまくいったとき: 1 のアカウントのすべてに入れます。2 の写しがあります。3〜7 で、それぞれに書いた行が出ます（8 は、したときだけ）。
+- うまくいかないとき: Mac ではなく Windows の PC を使うときは、WSL（Windows の中で動く Linux）を使うか、エージェントに相談します。3〜8 で、書いた行が出ないときは、出た行をエージェントに見せます（秘密の値は出ません）。`npm ci` が止まったときは、4 の `node --version` が `v22.` で始まるかを見ます。1 のアカウントが用意できないとき（Slack のアプリを作れない、Anthropic のクレジットがない、など）は、それを使う手順（3.5・3.6 など）の前に、持っている人に頼みます。
+- くわしく: はじめにの「手順の読み方」、[../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) のクイックスタート
+
 ### 2.1 決めたことを読む
 
 - [ ] 済んだ日: ＿＿＿＿
 - だれが・どこで: オーナー
-- 先に済ませること: ありません
+- 先に済ませること: 2.0
 - やること:
   1. 1 章の表を、上から読みます。
   2. わからないところに印を付けます。
@@ -84,7 +102,7 @@
 - だれが・どこで: オーナー、GitHub
 - 先に済ませること: 2.1
 - やること:
-  1. GitHub のリポジトリで Pull requests を開き、#77（Upgrade packages with known advisories before launch）を開きます。
+  1. ブラウザで https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/pull/77 （#77、Upgrade packages with known advisories before launch）を開きます（Pull requests の一覧から探すときは、マージ済みなので「Closed」のタブにあります）。
 - うまくいったとき: 紫の「Merged」が出ています。
 - うまくいかないとき: 「Open」のままなら、ここで止めて、エージェントに状況を聞きます（マージされるまで、先に進みません）。
 - くわしく: 1 章の D6
@@ -119,8 +137,9 @@
 - やること:
   1. 「Private vulnerability reporting」（脆弱性の非公開の報告）を Enable にします。
   2. 「Secret scanning」と「Push protection」を Enable にします。
-  3. 「Dependabot security updates」を Enable にします。
-- うまくいったとき: 4 つが Enabled と出ています。
+  3. 「Dependabot alerts」を Enable にします。
+  4. 「Dependabot security updates」を Enable にします（3 のあとでないと選べません）。
+- うまくいったとき: 5 つ（Private vulnerability reporting、Secret scanning、Push protection、Dependabot alerts、Dependabot security updates）が Enabled と出ています。
 - うまくいかないとき: 画面の名前がちがうときは、エージェントに聞きます。プランのために選べないものがあれば、選べないことを書き留めて、先に進みます。
 - くわしく: [../../SECURITY.md](../../SECURITY.md)
 
@@ -130,20 +149,20 @@
 - だれが・どこで: オーナー、Vercel の画面とブラウザ
 - 先に済ませること: 2.2
 - やること:
-  1. Vercel のプロジェクト `rise-path` を開きます。Settings → Git で、Production Branch が `main` であることを見ます。
+  1. Vercel のプロジェクト `rise-path` を開きます。Settings → Environments で Production を開き、Branch Tracking のブランチが `main` であることを見ます。
   2. Settings → Environment Variables で、Preview に何も入っていないこと、`VITE_API_BASE_URL` がないことを見ます。
   3. Settings → Deployment Protection で、Vercel Authentication を入れ、範囲を **「All Deployments」** にして保存します（「Standard Protection」は、本番のドメインを守りません）。
   4. Vercel にログインしていないブラウザ（プライベートウィンドウ）で、本番の URL（`…vercel.app` と、もしあれば本番のドメイン）を開きます。
   5. プランの名前と、プロジェクトの持ち主を書き留めます。
 - うまくいったとき: 4 で、Rise Path ではなく、Vercel のログインの画面が出ます。
-- うまくいかないとき: 4 で Rise Path が出たら、3 の範囲が「All Deployments」かを見直します。画面がちがうときは、エージェントに相談します。保護をかけられるまで、7 章（公開の入り口）には進みません。
+- うまくいかないとき: 2 で Preview に値があれば、その名前だけをエージェントに見せ（値は見せません）、その変数の編集で Preview の印を外して保存します。4 で Rise Path が出たら、3 の範囲が「All Deployments」かを見直します。画面がちがうときは、エージェントに相談します。保護をかけられるまで、7 章（公開の入り口）には進みません。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 13
 
 ### 2.7 古い VM（nexloom-gce）に Rise Path の DB が残っているかを見る
 
 - [ ] 済んだ日: ＿＿＿＿
 - だれが・どこで: オーナーとエージェント、Mac のターミナル（gcloud を入れ、`gcloud auth login` 済み。読むだけです）
-- 先に済ませること: ありません
+- 先に済ませること: 2.0
 - やること:
   1. Mac のターミナルで `gcloud compute instances list --project=<nexloom-gce があるプロジェクトの ID> --filter=name=nexloom-gce` を実行し、古い VM があるかを見ます。nexloom-gce はほかのサービス（ai-note-meet など）も動かしているので、ふつうは 1 行出ます。
   2. あれば、エージェントと一緒に、その VM の Postgres に `risepath` という DB と、学習者の行があるかを読むだけで見ます（何も変えません。DB の URL を Mac の `.env.local` に書くことはしません）。
@@ -190,16 +209,19 @@
 - うまくいかないとき: 28 日のうちに Active にならないと、ゾーンは消えます。登録業者の画面を、エージェントと一緒に見ます。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 4
 
-### 3.3 GCP の予算アラートを入れる
+### 3.3 GCP のプロジェクトを決め、予算アラートを入れる
 
 - [ ] 済んだ日: ＿＿＿＿
-- だれが・どこで: オーナー、GCP のコンソール
+- だれが・どこで: オーナー、GCP のコンソール（https://console.cloud.google.com/ ）
 - 先に済ませること: 2.1
 - やること:
-  1. Billing → Budgets & alerts で、月の予算としきい値を作ります。
-  2. 残っていれば、夜間停止のスケジュール `risepath-dev-schedule` を消します。
-- うまくいったとき: 予算が一覧に出ます。
-- うまくいかないとき: `risepath-dev-schedule` が消せないときは、出た行をエージェントに見せます。
+  1. コンソールのいちばん上の、プロジェクトを選ぶところで、Rise Path に使うプロジェクトを選びます。そのプロジェクトの ID（プロジェクト ID）を、手順書の写しのこの手順の横に書きます。3.8 の `<プロジェクト>` と、4.1・4.3 の `<プロジェクトの ID>` は、この ID です。
+  2. Billing（お支払い）を開き、このプロジェクトに請求先アカウント（billing account）をリンクします。画面に「Link a billing account」が出ていれば、それを押して請求先アカウントを選びます。出ていないときは、Billing の My projects のタブで、このプロジェクトの ⋮ → Change billing から選びます。
+  3. APIs & Services → Library で「Compute Engine API」を開き、Enable を押します（数分かかります）。
+  4. Billing → Budgets & alerts で、月の予算としきい値を作ります。
+  5. 残っていれば、夜間停止のスケジュール `risepath-dev-schedule` を消します。
+- うまくいったとき: 1 の ID を写しに書きました。2 のあと、Billing の画面に、このプロジェクトの請求先アカウントの名前が出ます。3 のあと、Compute Engine → VM instances の画面が開きます（API を有効にするように言われません）。4 の予算が一覧に出ます。
+- うまくいかないとき: 2 でリンクできないとき（請求先アカウントがない、権限がない）は、請求先アカウントを持っている人に頼みます。リンクできるまで、3.8 と 4.1 には進みません（バケットも VM も作れません）。3 で Enable が押せないときは、2 を見直します。`risepath-dev-schedule` が消せないときは、出た行をエージェントに見せます。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 1
 
 ### 3.4 Tailscale の古い機械を消し、ACL を決める
@@ -209,12 +231,12 @@
 - 先に済ませること: 2.1
 - やること:
   1. Machines で、古い `risepath-vm` を Remove します。
-  2. ACL を、エージェントに作ってもらい、貼ります。5432（DB）は、だれにも開けません（DB は VM の中だけが使います）。
-  3. 3006（API）と 3100（管理用の MCP）は、名前を決めた管理者だけにします。3100 は、学習者のログインも受け付け、試験運用の名簿（`PILOT_ACCOUNT_IDS`）を確かめないので、ほかの人には開けません。
-  4. 8642（Hermes）と 8880（読み上げ）は開けません。
-- うまくいったとき: Machines に古いものがなく、ACL に `risepath-vm` の行があります。
-- うまくいかないとき: ACL の書き方がわからないときや、保存でエラーが出たときは、出た行をエージェントに見せます。
-- くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「セキュリティ」
+  2. Access controls（ACL）を、エージェントに作ってもらい、貼って保存します。新しい VM は 4.5 で Tailscale に入るので、いまは一覧にありません。そこで、VM の名前やアドレスではなく、タグ `tag:risepath` で決まりを書きます（4.5 で、VM にこのタグを付けます）。タグを付けられるのは管理者だけにします（`"tagOwners": {"tag:risepath": ["autogroup:admin"]}`）。
+  3. 3006（API）と 3100（管理用の MCP）は、名前を決めた管理者だけに開けます（`"dst": ["tag:risepath:3006,3100"]`）。3100 は、学習者のログインも受け付け、試験運用の名簿（`PILOT_ACCOUNT_IDS`）を確かめないので、ほかの人には開けません。
+  4. 5432（DB）は、だれにも開けません（DB は VM の中だけが使います）。8642（Hermes）と 8880（読み上げ）は開けません。新しい tailnet にはじめからある、だれでもどこにでも届く行（`"dst": ["*:*"]`）は、`tag:risepath` に届かないように、エージェントが書きかえます。
+- うまくいったとき: Machines に古い `risepath-vm` がありません。ACL に `tag:risepath` の tagOwners の行と、名前を決めた管理者に `tag:risepath:3006,3100` を開ける行があり、`tag:risepath` に届く `*:*` の行がなく、保存できました（5432 と 8880 が閉じていることは、6.3 で確かめます）。
+- うまくいかないとき: ACL の書き方がわからないときや、保存でエラーが出たときは、出た行をエージェントに見せます。ほかの機械のために `*:*` の行が要るときも、エージェントと書きかえ方を決めます。
+- くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「セキュリティ」（ACL の例）
 
 ### 3.5 Anthropic の鍵を作り、使う上限を決める
 
@@ -235,10 +257,10 @@
 - 先に済ませること: 2.1
 - やること:
   1. 知らせ用の非公開のチャンネル（例: `#risepath-alerts`）を作ります。
-  2. そのチャンネルに Incoming Webhook を作り、URL をパスワード管理に「Rise Path 知らせの受け口」としてしまいます（5.1 で stack.env の `AI_CAP_ALERT_WEBHOOK_URL` に書きます。これ 1 つで、安全の知らせ、AI の上限、控えの失敗が届きます）。
+  2. そのチャンネルに、知らせの受け口（Incoming Webhook）を作ります。ブラウザで https://api.slack.com/apps を開き、Create New App → From scratch を選び、App Name に「Rise Path alerts」と書き、ワークスペースを選んで、Create App を押します。左の Incoming Webhooks を開き、Activate Incoming Webhooks を On にします。下の Add New Webhook（to Workspace）を押し、1 のチャンネルを選んで、Allow（または Authorize）を押します。戻った画面の Webhook URL の Copy を押し、パスワード管理に「Rise Path 知らせの受け口」としてしまいます（5.1 で stack.env の `AI_CAP_ALERT_WEBHOOK_URL` に書きます。これ 1 つで、安全の知らせ、AI の上限、控えの失敗が届きます）。この画面は写しません（スクリーンショットを撮りません）。
   3. 知らせを見る人と、見る頻度を決めます（例: 試験運用のあいだは平日に毎日）。決めたことを、手順書の写し（はじめに）の 1 章の P9-Q3 の「答え」に書きます（launch-record.env をなくしたときは、ここから写します）。5.2 で launch-record.env の `ALERT_WATCHER` と `ALERT_CHECK` に書きます。
-- うまくいったとき: URL をパスワード管理にしまいました（チャットには貼りません）。見る人と頻度を決め、P9-Q3 に書きました。
-- うまくいかないとき: Slack の画面の名前がちがうときは、エージェントに聞きます（URL は見せません）。
+- うまくいったとき: パスワード管理に、`https://hooks.slack.com/services/` で始まる URL をしまいました（チャットには貼りません）。見る人と頻度を決め、P9-Q3 に書きました。
+- うまくいかないとき: アプリを作るときに、管理者の承認が要る（requires admin approval など）と出たら、Slack の管理者に、このアプリを許可してもらいます。Slack の画面の名前がちがうときは、エージェントに聞きます（URL は見せません）。
 - くわしく: [./safety-operations.ja.md](./safety-operations.ja.md)
 
 ### 3.7 Supabase の今の設定を書き写す
@@ -247,12 +269,13 @@
 - だれが・どこで: オーナー、Supabase のダッシュボード（Nexloom・P-School と共有のプロジェクト）
 - 先に済ませること: 2.1
 - やること:
-  1. Authentication の設定（Site URL、Redirect URLs、Confirm email、Allow new users to sign up、Anonymous sign-ins、パスワードの設定）を書き写します（変えません）。
-  2. 11 章で変える予定のもの（Confirm email、Redirect URLs に足す 1 行、「現在のパスワード」を求める設定）を、Nexloom と P-School の担当に伝え、了解をもらいます。
+  1. Authentication の設定（Site URL、Redirect URLs、Confirm email、Allow new users to sign up、Anonymous sign-ins、パスワードの設定、送る人（SMTP）の設定、確認のメールの文（Email Templates の Confirm signup））と、ログインの期限の設定（JWT の有効期間と、セッションの期限（Sessions の Time-box user sessions など））を書き写します（変えません。JWT とセッションの期限は、[計画の 8.2](../brushup-2026/ai-access-plan.ja.md) の 6 で、ご本人の削除を入れる前に見るものです）。
+  2. 11 章で変える予定のもの（Confirm email、Redirect URLs に足す 1 行、「現在のパスワード」を求める設定、送る人（SMTP）の設定、確認のメールの文（Email Templates の Confirm signup））を、Nexloom と P-School の担当に伝え、了解をもらいます（送る人と確認のメールの文は、Nexloom と P-School のメールにも使われます）。
   3. 匿名のログイン（Anonymous sign-ins）を止めてよいかを聞きます。答えを 1 章の P9-Q5 に書きます。
   4. ステージング用のプロジェクトを作るかを決め、1 章の P9-Q6 に書きます。作らないときは、11.2 の確かめを、8.1 のダミーのアカウントで本番のプロジェクトで行うことも書きます。
-- うまくいったとき: 書き写しました。担当の了解をもらいました。
-- うまくいかないとき: 匿名のログインを使うアプリがあれば、止めずに P9-Q5 にそう書きます（試験運用のあいだは、名簿が匿名のログインも断ります）。担当と連絡がつかないときは、11 章の設定を変える前に、もう一度聞きます。
+  5. Rise Path が使う値を、パスワード管理にしまいます。プロジェクトの上の Connect か、Project Settings → Data API で Project URL を、Project Settings → API Keys で publishable の鍵（Legacy API Keys のタブなら anon public の鍵）を写し、2 つを「Rise Path Supabase の公開の鍵」としてしまいます（8.3 で使います）。次に、担当の了解をもらってから、同じ API Keys の画面で secret の鍵（Legacy API Keys のタブなら service_role の鍵）を、表示（Reveal）かコピーのボタンで写し、「Rise Path Supabase の秘密の鍵」としてしまいます（5.1 で使います）。秘密の鍵は、Nexloom・P-School と共有の、DB をなんでも読み書きできる鍵です。この画面は写さず（スクリーンショットを撮らず）、チャットにも貼りません。
+- うまくいったとき: 書き写しました。担当の了解をもらいました。パスワード管理に「Rise Path Supabase の公開の鍵」（Project URL と公開の鍵）と「Rise Path Supabase の秘密の鍵」があります。
+- うまくいかないとき: 匿名のログインを使うアプリがあれば、止めずに P9-Q5 にそう書きます（試験運用のあいだは、名簿が匿名のログインも断ります）。担当と連絡がつかないときは、11 章の設定を変える前に、もう一度聞きます。担当が秘密の鍵を出すことに了解しないときは、5.1 に進まずに、エージェントと相談します。画面の名前がちがうときは、エージェントに聞きます（鍵の値は見せません）。
 - くわしく: [./byoa-setup.ja.md](./byoa-setup.ja.md)、[./account-deletion-operations.ja.md](./account-deletion-operations.ja.md)
 
 ### 3.8 控え用のバケットとサービスアカウントを作る
@@ -278,11 +301,11 @@
 - 先に済ませること: 2.8、3.3、3.8
 - やること:
   1. Mac のリポジトリのいちばん上のフォルダで `git pull` をしてから、`cd deploy/risepath-vm/scripts` に移ります。
-  2. `export GCP_PROJECT=<プロジェクトの ID>` を実行します。
-  3. `BACKUP_SA_EMAIL=<3.8 のアドレス> ./provision-gce.sh` を実行します。
+  2. `export GCP_PROJECT=<プロジェクトの ID>` を実行します（3.3 の 1 で写しに書いた ID です）。
+  3. `BACKUP_SA_EMAIL=<3.8 のアドレス> ./provision-gce.sh` を実行します。途中で、英語で `(y/N)?` と聞かれたら（例: `API [compute.googleapis.com] not enabled on project … (y/N)?`）、`y` を押して Enter を押します。
   4. すでに VM があって、控えのアカウントで動いていないとき（`deploy/risepath-vm/scripts/provision-gce.sh` が「次の 3 つを順に実行します」と出したとき）は、出た 3 つのコマンド（`gcloud compute instances stop …`、`gcloud compute instances set-service-account … --scopes=cloud-platform`、`gcloud compute instances start …`）を、その順に実行します。VM が止まるあいだ、Rise Path も止まります。
 - うまくいったとき: 「VM provisioned. Next steps:」が出ます（4 をしたときは、3 つのコマンドがエラーなしで終わります）。
-- うまくいかないとき: 「BACKUP_SA_EMAIL が、サービスアカウントの形…ではありません」なら、3.8 で書き留めたアドレスを見直します。gcloud のエラーが出たら、その行をエージェントに見せます。
+- うまくいかないとき: 「BACKUP_SA_EMAIL が、サービスアカウントの形…ではありません」なら、3.8 で書き留めたアドレスを見直します。お支払い（billing）が有効でないという行が出たら、3.3 の 2 に戻ります。gcloud のエラーが出たら、その行をエージェントに見せます。
 - くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) のクイックスタートの 1
 
 ### 4.2 削除の保護を入れる
@@ -303,7 +326,7 @@
 - だれが・どこで: オーナー、Mac のターミナル（gcloud）
 - 先に済ませること: 4.1
 - やること:
-  1. [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 3 のコマンドで、ファイアウォールのルールの一覧を出します。
+  1. 新しいターミナルでは `GCP_PROJECT` が消えているので、先に `export GCP_PROJECT=<プロジェクトの ID>` をもう一度実行します。それから、[../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 3 のコマンドで、ファイアウォールのルールの一覧を出します。
   2. 3006・5432・3100・8642・8880 を `0.0.0.0/0` に開く受信のルールがないことを見ます。3100（管理用の MCP）は、学習者のログインも受け付け、試験運用の名簿を確かめないので、インターネットには決して開けません。
 - うまくいったとき: そのような受信のルールがありません。
 - うまくいかないとき: 古い `risepath-vm` のタグに付いたルールが残っていたら、エージェントと一緒に消します。
@@ -326,10 +349,10 @@
 - だれが・どこで: オーナー、VM（SSH）
 - 先に済ませること: 3.4、4.4
 - やること:
-  1. [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) のクイックスタートの 2 のとおりに、SSH → Tailscale → `/opt/risepath` → clone → `bootstrap-vm.sh` の 1 回目と進めます。
+  1. [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) のクイックスタートの 2 のとおりに、SSH → Tailscale → `/opt/risepath` → clone → `bootstrap-vm.sh` の 1 回目と進めます。はじめての `gcloud compute ssh` で、SSH の鍵を作るための passphrase（`Enter passphrase`）を聞かれたら、何も打たずに Enter を 2 回押します。Tailscale は、`sudo tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath` で入れます（3.4 のタグを付けます）。
   2. `exit` で抜けて、SSH し直します（docker のグループが、新しいログインから効くためです）。
-- うまくいったとき: 1 回目は「==> Creating stack.env from template」と出て止まります（正しい動きです）。
-- うまくいかないとき: 「Install Tailscale」で止まったら、Tailscale を入れてからもう一度実行します。ほかの行で止まったら、その行を 17 章で探し、なければエージェントに見せます。
+- うまくいったとき: Tailscale の管理画面の Machines で、`risepath-vm` に `tag:risepath` が付いています。1 回目は「==> Creating stack.env from template」と出て止まります（正しい動きです）。
+- うまくいかないとき: `tailscale up` で、タグが許されていない（not permitted など）と出たら、3.4 の tagOwners を見直します。「Install Tailscale」で止まったら、Tailscale を入れてからもう一度実行します。ほかの行で止まったら、その行を 17 章で探し、なければエージェントに見せます。
 - くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) のクイックスタートの 2
 
 ## 5. 設定のファイルと事前チェック
@@ -342,8 +365,8 @@
 - やること:
   1. 先に 2 つの値を作ります（nano を開く前にします）。VM で `openssl rand -hex 24` を実行し、出た値を、パスワード管理（2 人が開けるもの）に「Rise Path POSTGRES_PASSWORD」としてしまいます。続けて `openssl rand -hex 32` を実行し、出た値を「Rise Path RISE_PATH_BRIDGE_TOKEN」としてしまいます（`POSTGRES_PASSWORD` は DB の最初の起動で固定されるので、いま決めます）。
   2. `cd /opt/risepath/deploy/risepath-vm && nano stack.env` を実行します。
-  3. [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「`stack.env` に入れる値」の表のとおりに書きます。`POSTGRES_PASSWORD=` のうしろと、`DATABASE_URL_PHASE1` の中のパスワードの場所（`risepath_app:` と `@db` のあいだ）には、1 の「Rise Path POSTGRES_PASSWORD」を、`RISE_PATH_BRIDGE_TOKEN=` のうしろには「Rise Path RISE_PATH_BRIDGE_TOKEN」を、パスワード管理から貼ります。
-  4. `COMPOSE_PROFILES=tts` にします。`AI_CAP_ALERT_WEBHOOK_URL` に、3.6 でしまった URL を書きます。`ANTHROPIC_API_KEY` に、3.5 の鍵を書きます。
+  3. [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「`stack.env` に入れる値」の表のとおりに書きます。`POSTGRES_PASSWORD=` のうしろと、`DATABASE_URL_PHASE1` の中のパスワードの場所（`risepath_app:` と `@db` のあいだ）には、1 の「Rise Path POSTGRES_PASSWORD」を、`RISE_PATH_BRIDGE_TOKEN=` のうしろには「Rise Path RISE_PATH_BRIDGE_TOKEN」を、パスワード管理から貼ります。`SUPABASE_URL=` のうしろには「Rise Path Supabase の公開の鍵」の Project URL を、`SUPABASE_SERVICE_ROLE_KEY=` のうしろには「Rise Path Supabase の秘密の鍵」を貼ります（どちらも 3.7 の 5 でしまったものです。テンプレの `https://your-project.supabase.co` と `change-me` は消します）。
+  4. すでにある `COMPOSE_PROFILES=tts` の行は、そのままにします。`# AI_CAP_ALERT_WEBHOOK_URL=` の行は、頭の `# ` を消して、= のうしろに 3.6 でしまった URL を貼ります（`#` が残っていると、書いていないのと同じです）。`ANTHROPIC_API_KEY=` の = のうしろに、3.5 の鍵を貼ります。
   5. `GEMINI_API_KEY` と `GEMINI_ALLOWED` は空のままにします。`HERMES_API_KEY` と `OPENROUTER_API_KEY` も空にします（Hermes は使いません。`change-me` のままだと、事前チェックの C13 が出ます）。
   6. 公開の入り口の値（`ORIGIN_SECRET`、`TRUST_PROXY`、`LLM_ALLOWED_ORIGINS`）は、まだ書きません（7.4 で書きます）。
   7. 値は 1 行に `名前=値` の形で書きます。値に空白、引用符（`'` や `"`）、`$`、`#` は入れません（入っていると、5.3 で A5 か A14 が出ます）。URL や鍵は、そのまま貼ります（`:`、`/`、`-`、`_` は、そのままでかまいません）。保存は Ctrl+O と Enter、終わるのは Ctrl+X です。
@@ -422,8 +445,9 @@
 - 先に済ませること: 6.1
 - やること:
   1. Mac のリポジトリのいちばん上のフォルダで、`npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100` を実行します（Mac の `.env.local` は使いません）。
-- うまくいったとき: 最後に「✅ VM stack smoke passed」が出ます。Kokoro・Hermes・Memanto の ⚠️ の行と、Front end の ℹ️ の行は、出てよい行です（Mac からは確かめない部品です。読み上げ（Kokoro）は、6.1 のデプロイの中で、VM が確かめています）。
-- うまくいかないとき: 最後が「❌ VM stack smoke failed」のときは、❌ の行をエージェントに見せます（17 章も見ます）。つながらないときは、3.4 の ACL で、自分に 3006 と 3100 が開いているかを見ます。最後が ✅ でも、ほかの ⚠️ の行（`strict_auth_mode` や `claude-code` の行など）が出たときは、その行をエージェントに見せます。
+  2. 続けて、`nc -z -w 3 risepath-vm 5432 && echo OPEN || echo closed` と `nc -z -w 3 risepath-vm 8880 && echo OPEN || echo closed` を実行します（DB と読み上げに、Mac から入れないことを見ます。それぞれ 3 秒ほどかかります）。
+- うまくいったとき: 最後に「✅ VM stack smoke passed」が出ます。Kokoro・Hermes・Memanto の ⚠️ の行と、Front end の ℹ️ の行は、出てよい行です（Mac からは確かめない部品です。読み上げ（Kokoro）は、6.1 のデプロイの中で、VM が確かめています）。そのあとの 2 で、2 つとも `closed` と出ます。
+- うまくいかないとき: 最後が「❌ VM stack smoke failed」のときは、❌ の行をエージェントに見せます（17 章も見ます）。つながらないときは、3.4 の ACL で、自分に 3006 と 3100 が開いているかを見ます。最後が ✅ でも、ほかの ⚠️ の行（`strict_auth_mode` や `claude-code` の行など）が出たときは、その行をエージェントに見せます。2 で `OPEN` が出たら、ここで止めて、3.4 の ACL をエージェントと直します（`tag:risepath` に届く `*:*` の行がないか、4.5 のタグが付いているかを見ます）。直したら、もう一度 2 をします。
 - くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「手動でスタック操作」
 
 ### 6.4 毎日の控え（バックアップ）を動かす
@@ -439,7 +463,7 @@
   5. SSH し直し、`cd /opt/risepath/deploy/risepath-vm && sudo ./scripts/install-backup.sh check-copy` を実行して、パスワード管理の鍵を貼ります（画面には出ません）。
   6. `sudo ./scripts/install-backup.sh key-id` で出た 16 文字を、launch-record.env の `BACKUP_KEY_ID` に、今日の日付を `BACKUP_KEY_COPY` に書きます（`nano launch-record.env`）。
 - うまくいったとき: 3 で「✅ 最初の控えができました（…）。key id: …」、5 で「✅ 控えの鍵は合っています（key id …）。」が出ます。
-- うまくいかないとき: 「[IB4]」なら、3.8 のサービスアカウントの役割を見直します。VM がそのアカウントで動いていないときは、4.1 の 4 の 3 つのコマンドをします。「[IB3]」なら、5.1 の `AI_CAP_ALERT_WEBHOOK_URL` を見ます。ほかのコードは 13 章で見ます。**この VM が 2 台目で、前の控えがバケットにあるときは、`--new-key` ではなく 16.3 をします。** 控えは毎日 3 時 23 分ごろ（日本時間）に動くので、デプロイは 3 時から 4 時を避けます。
+- うまくいかないとき: 「[IB4]」なら、3.8 のサービスアカウントの役割を見直します。VM がそのアカウントで動いていないときは、4.1 の 4 の 3 つのコマンドをします。「[IB3]」なら、5.1 の `AI_CAP_ALERT_WEBHOOK_URL` を見ます（行の頭に `#` がないかも見ます）。ほかのコードは 13 章で見ます。**この VM が 2 台目で、前の控えがバケットにあるときは、`--new-key` ではなく 16.3 をします。** 控えは毎日 3 時 23 分ごろ（日本時間）に動くので、デプロイは 3 時から 4 時を避けます。
 - くわしく: [../../deploy/risepath-vm/README.md](../../deploy/risepath-vm/README.md) の「控え（バックアップ）」、13 章の IB
 
 ### 6.5 最初の戻す練習をする
@@ -461,7 +485,7 @@
 - だれが・どこで: オーナー、Cloudflare Zero Trust
 - 先に済ませること: 3.2（ゾーンが Active）
 - やること:
-  1. [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 5 のとおりに、トンネルを作り、`api.<domain>` → `http://api:3006` だけを向けます。
+  1. [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 5 のとおりに、トンネルを作り、`api.<domain>` → `http://api:3006` だけを向けます。はじめて Zero Trust を開くと、チームの名前とプランを聞かれることがあります。チームの名前は自由に決め（例: `risepath`）、プランは Free を選びます（支払いの方法を聞かれたときは、入れる前にエージェントに相談します）。経路（Published application）の画面で、Service URL の欄が 1 つなら `http://api:3006` を、Type と URL の 2 つの欄なら、Type に `HTTP`、URL に `api:3006` を入れます。画面に出るインストール用のコマンドは実行しません（VM のコンテナの `cloudflared` がつなぎます）。
   2. 画面に出たコマンドの中の、`eyJ` で始まる文字列（トークン）を、パスワード管理に「Rise Path トンネルのトークン」としてしまいます。
 - うまくいったとき: トンネルの経路（Published application）が 1 つだけです。
 - うまくいかないとき: ゾーンがまだ Active でないときは、3.2 を待ちます。画面がちがうときは、エージェントに聞きます。
@@ -498,10 +522,10 @@
 - 先に済ませること: 6.3、7.3
 - やること:
   1. VM で `openssl rand -hex 32` を実行し、出た値をパスワード管理に「Rise Path ORIGIN_SECRET」としてしまいます（8.3 で Vercel にも入れます）。
-  2. `cd /opt/risepath/deploy/risepath-vm && nano stack.env` を実行し、`ORIGIN_SECRET=`（1 の値）、`TRUST_PROXY=1`、`LLM_ALLOWED_ORIGINS=https://app.<domain>`、`COMPOSE_PROFILES=tts,tunnel` を書いて保存します。
+  2. `cd /opt/risepath/deploy/risepath-vm && nano stack.env` を実行し、すでにある行を書きかえます（新しい行は足しません）。`ORIGIN_SECRET=` の = のうしろに 1 の値を貼ります。`LLM_ALLOWED_ORIGINS=` の行を `LLM_ALLOWED_ORIGINS=https://app.<domain>` に、`COMPOSE_PROFILES=tts` の行を `COMPOSE_PROFILES=tts,tunnel` にします。`# TRUST_PROXY=1` の行は、頭の `# ` を消して `TRUST_PROXY=1` にします。保存します。
   3. `clear` を実行します。
 - うまくいったとき: 書けました。
-- うまくいかないとき: 7.5 で C や D のコードが出たら、13 章の直し方のとおりに、ここに戻って直します。
+- うまくいかないとき: 7.5 で C や D のコードが出たら、13 章の直し方のとおりに、ここに戻って直します。7.5 で A4（同じ名前が 2 回）が出たら、足してしまった行を消して、すでにあった行に値を書きます。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 9〜10
 
 ### 7.5 トンネルを入れてデプロイする
@@ -554,11 +578,11 @@
 - だれが・どこで: オーナー、Vercel の画面
 - 先に済ませること: 7.6
 - やること:
-  1. Settings → Environment Variables の Production に、`API_ORIGIN`（`https://api.<domain>`）、`ORIGIN_SECRET`（7.4 の値）、`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`VITE_DEMO_MODE=false`、`VITE_API_ENABLED=true` を入れます。
+  1. Settings → Environment Variables の Production に、`API_ORIGIN`（`https://api.<domain>`）、`ORIGIN_SECRET`（7.4 の値。パスワード管理の「Rise Path ORIGIN_SECRET」）、`VITE_SUPABASE_URL`（パスワード管理の「Rise Path Supabase の公開の鍵」の Project URL）、`VITE_SUPABASE_ANON_KEY`（同じところの公開の鍵。秘密の鍵は入れません）、`VITE_DEMO_MODE=false`、`VITE_API_ENABLED=true` を入れます。Type は、`ORIGIN_SECRET` だけを Secret にします（保存したあとは、だれも値を読めません）。ほかの 5 つは Config にします。
   2. `VITE_API_BASE_URL` があれば消します。Preview には何も入れません。
   3. 法務（`VITE_FEATURE_LEGAL_PAGES`）、有料プラン、職業訓練、エージェントのチャットのフラグは入れません。
-- うまくいったとき: 6 つが Production だけに入っています。
-- うまくいかないとき: 8.4 のビルドが止まったら、Vercel のビルドのログの `[vercel-env-guard]` の行のコード（VB で始まります）を 13 章で見ます。
+- うまくいったとき: 6 つが Production だけに入っていて、`ORIGIN_SECRET` には Secret の印があります。
+- うまくいかないとき: 8.4 のビルドが止まったら、Vercel のビルドのログの `[vercel-env-guard]` の行のコード（VB で始まります）を 13 章で見ます。8.5 で設定が開けないときや、10.3 の `npm run smoke:edge` で 1 番が ❌ のときは、Secret にした `ORIGIN_SECRET` が API に届いていないかもしれません。エージェントに見せます（値は見せません）。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 13、13 章の VB
 
 ### 8.4 Redeploy して、app のアドレスの保護を確かめる
@@ -570,8 +594,9 @@
   1. Deployments で、いちばん新しい Production のデプロイを、ビルドキャッシュを使わずに Redeploy します。
   2. プロジェクトに `app.<domain>` を足し、Cloudflare の DNS に、Vercel が出すレコードを **DNS only（灰色の雲）** で作ります。
   3. Vercel にログインしていないブラウザ（プライベートウィンドウ）で `https://app.<domain>` を開きます。
-- うまくいったとき: 1 のビルドが Ready になります。3 で、Vercel のログインの画面が出ます（Rise Path は出ません）。
-- うまくいかないとき: 3 で Rise Path が出たら、すぐに 2.6 の範囲（All Deployments）を見直します。ビルドが止まったら、13 章の VB を見ます。
+  4. 1 のビルドが Ready になっても、そのデプロイのビルドのログを開き、`vercel-env-guard` で検索します（注意はビルドを止めないので、ログにだけ出ます）。
+- うまくいったとき: 1 のビルドが Ready になります。3 で、Vercel のログインの画面が出ます（Rise Path は出ません）。4 で、`vercel-env-guard` の行が出ません。
+- うまくいかないとき: 3 で Rise Path が出たら、すぐに 2.6 の範囲（All Deployments）を見直します。ビルドが止まったら、13 章の VB を見ます。4 で行が出たら、その行（名前とコードだけで、値は出ません）をエージェントに見せ、13 章の VB で直し方を見ます。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の手順 14〜15
 
 ### 8.5 最初のサインインと、管理者にする
@@ -599,10 +624,10 @@
 - だれが・どこで: オーナー、Vercel にログインしている自分のブラウザ
 - 先に済ませること: 8.5
 - やること:
-  1. [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の「確認チェックリスト」の、`npm run smoke:edge` の行と「クエリ文字列が API に届く」の行（どちらも smoke の結果を使うので、10.3 でします）のほかを、上から順にします。チューターの答えが少しずつ届くこと、4.5 MB をこえるファイルのアップロード、読み上げ、`/ai-safety`、P-School の画像、18 歳以上と 18 歳未満のテスト用のアカウントでの確かめです。
+  1. [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の「確認チェックリスト」の、`npm run smoke:edge` の行と「クエリ文字列が API に届く」の行（どちらも smoke の結果を使うので、10.3 でします）のほかを、上から順にします。チューターの答えが少しずつ届くこと（画面で、答えが一度にではなく、少しずつ出てくることを見ます。DevTools は使わなくてかまいません）、4.5 MB をこえるファイルのアップロード（左のメニューの「AIカリキュラム生成」の、クリップのボタン）、読み上げ（設定の「音声とナレーション」の「試聴」）、`/ai-safety`、P-School の画像、18 歳以上と 18 歳未満のテスト用のアカウントでの確かめです。
   2. ログインの画面に「新規登録」がないことも見ます。
 - うまくいったとき: チェックリストの全部に印が付きました。
-- うまくいかないとき: 印の付かない項目があれば、ここで止めて、その項目と出た画面をエージェントに見せます（17 章も見ます）。
+- うまくいかないとき: 印の付かない項目があれば、ここで止めて、その項目と出た画面をエージェントに見せます（17 章も見ます）。DevTools を開いたときも、Headers の画面は写さず、見せません（ログインの鍵 `Authorization: Bearer …` が出るためです）。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の「確認チェックリスト」
 
 ### 9.3 AI の質を確かめる
@@ -634,11 +659,11 @@
 - だれが・どこで: オーナー（とエージェント）、開発に使う Mac と、VM（SSH。4 だけ）
 - 先に済ませること: 6.1
 - やること:
-  1. 18 章の「Mac の開発用の DB」のとおりに、Mac に開発用の DB を作り、`.env.local` の `DATABASE_URL_PHASE1` をそれにします。
+  1. はじめに、Mac のリポジトリのいちばん上のフォルダで `ls .env.local` を実行します。`No such file or directory` と出たら、この Mac は開発に使っていません。2 と 3 もとばして 4 に進みます（開発に使うほかの Mac（エージェントや開発者のもの）があれば、その Mac で 1〜3 をします）。`.env.local` と出たら、18 章の「Mac の開発用の DB」のとおりに、Mac に開発用の DB を作り、`.env.local` の `DATABASE_URL_PHASE1` をそれにします。
   2. 開発に使うどの Mac でも、`.env.local` には `risepath-vm` も `nexloom-gce` も、Tailscale のアドレス（`100.` で始まるもの）も使いません。Mac のリポジトリのいちばん上のフォルダ（`.env.local` があるフォルダ）で、`grep -n -E 'risepath-vm|nexloom-gce|@100\.' .env.local | grep -o -E '^[0-9]+:[A-Z0-9_]*'` が何も出さないことを見ます（出るのは、行の番号と名前だけです。値は出ません）。
   3. 同じフォルダで `npm run env:check` を実行し、「## Database target (no secrets)」の下の `host:` が `127.0.0.1` であることを見ます（値は出ません）。
   4. VM で `cd /opt/risepath/deploy/risepath-vm && nano launch-record.env` を実行し、`MAC_DEV_DB_SEPARATE` に今日の日付を書きます。
-- うまくいったとき: 2 で何も出ません。3 で `host: 127.0.0.1` が出て、「this is the production database」と「Tailscale address」の行が出ません。
+- うまくいったとき: 2 で何も出ません。3 で `host: 127.0.0.1` が出て、「this is the production database」と「Tailscale address」の行が出ません（1 で `No such file or directory` と出た Mac では、2 と 3 はしません）。
 - うまくいかないとき: 2 で `12:DATABASE_URL_PHASE1` のような行が出たときは、`.env.local` のその名前の行（名前が出ないときは、その番号の行）を直してから、もう一度 2 からします。`DATABASE_URL_PHASE1` の行は、開発用の DB（18 章）に直します。ほかの名前の行（`HERMES_API_URL`、`MEMANTO_URL`、`KOKORO_TTS_URL` など、前の手順で書いた VM の部品のアドレス）は、その行を消すか、エージェントと一緒に `127.0.0.1` の値にします。名前の出ない行は、その番号の行を開いて見ます（コメントの行なら消します。ほかは、上と同じように直します）。3 で `host:` が `127.0.0.1` でないときは、`DATABASE_URL_PHASE1` の行を開発用の DB に直します。`.env.local` の行の中身は、チャットに貼りません（本番のパスワードが入っていることがあります）。わからないときは、2 と 3 で出た行だけをエージェントに見せて、18 章を見ます。
 - くわしく: 18 章
 
@@ -693,12 +718,12 @@
 - だれが・どこで: オーナー、Vercel の画面、VM（SSH）、Mac のターミナル
 - 先に済ませること: 10.2
 - やること:
-  1. Vercel の `rise-path` の Settings → Deployment Protection で、範囲を「Standard Protection」に戻します（プレビューは守られたまま、本番のドメインが開きます）。
-  2. Vercel にログインしていないブラウザ（プライベートウィンドウ）で `https://app.<domain>` を開きます。
-  3. VM で `cd /opt/risepath/deploy/risepath-vm && nano launch-record.env` を実行し、`VERCEL_PROTECTION_OFF=` の = のうしろに今日の日付を書きます（例: `VERCEL_PROTECTION_OFF=2026-11-20`）。保存して、sudo を付けずに `./scripts/preflight.sh` を実行します。
+  1. 先に、名簿を確かめます（Vercel の保護は、まだかけたままです）。VM で `cd /opt/risepath/deploy/risepath-vm && nano launch-record.env` を実行し、`VERCEL_PROTECTION_OFF=` の = のうしろに今日の日付を書きます（例: `VERCEL_PROTECTION_OFF=2026-11-20`）。保存して、sudo を付けずに `./scripts/preflight.sh` を実行します。「エラー 0 件」が出たときだけ、2 に進みます。
+  2. Vercel の `rise-path` の Settings → Deployment Protection で、範囲を「Standard Protection」に戻します（プレビューは守られたまま、本番のドメインが開きます）。
+  3. Vercel にログインしていないブラウザ（プライベートウィンドウ）で `https://app.<domain>` を開きます。
   4. Mac のターミナルで、Rise Path のリポジトリのフォルダ（`package.json` があるいちばん上のフォルダ）に `cd` で移り、`PUBLIC_APP_URL=https://app.<domain> PUBLIC_API_URL=https://api.<domain> npm run smoke:edge` を実行します（`<domain>` は 3.1 で決めたドメインに置きかえます）。出てきた行の途中（最後ではありません）、8 番の行（`8. GET app /api/v2/llm/status?smoke=…`）のすぐ下に「On the VM (deploy/risepath-vm), this should print one line:」の行があり、その次の行が `docker compose --env-file stack.env logs api | grep smoke=…` です。この行を `smoke=` のうしろまでそのまま写して、VM で `cd /opt/risepath/deploy/risepath-vm` のあとに実行し、1 行出たら、[確認チェックリスト](../../deploy/vercel/README.md)の「クエリ文字列が API に届く」と `npm run smoke:edge` の 2 つの項目に印を付けます（9.2 で残した 2 つです）。
-- うまくいったとき: 2 で Rise Path のはじめのページ（右上に「ログイン」のボタンがあるページ）が出ます。Vercel のログインの画面ではありません。「ログイン」を押しても、「新規登録」はありません。3 で「エラー 0 件」が出ます。出てよい注意はありません。4 で「0 failed」が出て、4 の grep で 1 行出ます。
-- うまくいかないとき: 2 で Vercel のログインの画面が出たら、1 の範囲をもう一度見ます。3 で「[V1]」が出たら、名簿が読めていません。Vercel の保護を 2.6 のとおりにかけ直し、`VERCEL_PROTECTION_OFF` を空に戻してから、10.1 を見直します。4 で「Missing script」や「package.json」の行が出たら、フォルダがちがいます。4 のフォルダに移って、もう一度します。4 で ❌ が出たら、番号を 17 章の表で見て、わからないときは番号と出た行をエージェントに見せます。4 の grep で何も出ないときは、17 章の表の 8 番を見ます。テスターは、ここまで済むまで足しません。
+- うまくいったとき: 1 で「エラー 0 件」が出ます。出てよい注意はありません。3 で Rise Path のはじめのページ（右上に「ログイン」のボタンがあるページ）が出ます。Vercel のログインの画面ではありません。「ログイン」を押しても、「新規登録」はありません。4 で「0 failed」が出て、4 の grep で 1 行出ます。
+- うまくいかないとき: 1 で「[V1]」が出たら、名簿が読めていません。`VERCEL_PROTECTION_OFF` を空に戻して保存し（保護はかけたままなので、2 には進みません）、10.1 を見直します。3 で Vercel のログインの画面が出たら、2 の範囲をもう一度見ます。4 で「Missing script」や「package.json」の行が出たら、フォルダがちがいます。4 のフォルダに移って、もう一度します。4 で ❌ が出たら、番号を 17 章の表で見て、わからないときは番号と出た行をエージェントに見せます。4 の grep で何も出ないときは、17 章の表の 8 番を見ます。テスターは、ここまで済むまで足しません。
 - くわしく: 13 章の V1・V3、`deploy/vercel/README.md`
 
 ### 10.4 テスターを足す
@@ -792,7 +817,7 @@
      - トークンとパスワードは、画面にも出ず、チャットにも貼りません。オーナーは、出た 2 行だけをエージェントに見せます。
      - amr は、ログインのトークンに入っている「ログインのしかたの記録」です。パスワードでログインしたときは、`password` と書かれます。
      - 通ったときの 2 行は、amr に `password` があることと、パスワードの変更が `400 current_password_required` で断られたことです。通った日を `PASSWORD_CHANGE_CHECK` と `PROD_AMR_CHECK` に書きます。
-  3. `cd /opt/risepath/deploy/risepath-vm && nano stack.env` で、`ACCOUNT_DELETION_ENABLED=true` を書きます。
+  3. `cd /opt/risepath/deploy/risepath-vm && nano stack.env` で、いちばん下に `ACCOUNT_DELETION_ENABLED=true` の 1 行を足します（テンプレの `# ACCOUNT_DELETION_ENABLED=true` の行は、そのままでかまいません）。
   4. はじめにの 2 つの確かめの 1 をしてから、`./scripts/deploy-stack.sh` を実行します。
 - うまくいったとき: 「==> Done」と、事後の確かめの「エラー 0 件」が出ます。出てよい注意はありません。設定の「アカウントを削除する」を開くと、「いまはこの画面から削除できません」が出ません。
 - うまくいかないとき: 事前チェックで「[G1]」が出たら、出た名前の日付を 14 章のとおりに書きます（1 の日付が、2 の日付より前か同じ日です）。2 の確かめが通らないときは、`ACCOUNT_DELETION_ENABLED` を書かずに、エージェントと 1 の設定を見直します（パスワードの変更が断られなかったときは、ダミーのパスワードが変わっているので、8.1 のとおりに作り直します）。
@@ -819,7 +844,7 @@
   1. Authentication の Email で、「Confirm email」（メールアドレスの確認）を入れます。
   2. 送る人（SMTP）を設定し、確認のメールの文（Email Templates の「Confirm signup」。画面の表示名は【要確認】）を日本語にして、保存します。
 - うまくいったとき: Authentication の Email で「Confirm email」が入り、SMTP の設定が保存されています。確認のメールの文が日本語です。メールが本当に届くかは、登録を開いたあと（12.2 の 4）に確かめます（いまはアプリの登録が閉じていて、8.1 のアカウントは確認済みなので、確認のメールは送られません）。
-- うまくいかないとき: 設定が保存できないときは、出た画面をエージェントに見せます。ほかのアプリの担当が困るときは、入れる日を一緒に決め直します。
+- うまくいかないとき: 設定が保存できないときは、出た画面をエージェントに見せます。ほかのアプリの担当が困るときは、入れる日を一緒に決め直します。送る人（SMTP）と確認のメールの文は、Nexloom・P-School のメールにも使われます。担当が文を変えることに了解しないときは、文はいまのまま（ほかのアプリの文）にして、12.2 の 4 では、その文のメールが届くことを見ます。
 - くわしく: [../../deploy/vercel/README.md](../../deploy/vercel/README.md) の「G. 運用」
 
 ### 11.5 Supabase の Redirect URL を足す
@@ -866,7 +891,7 @@
   1. `cd /opt/risepath/deploy/risepath-vm && nano launch-record.env` で `LAUNCH_STAGE=public` に書きかえます。
   2. `nano stack.env` で、`PILOT_ACCOUNT_IDS` の行を消します（名簿は、パスワード管理の「Rise Path 試験運用の名簿」に残しておきます）。
   3. sudo を付けずに `./scripts/preflight.sh` を実行します。
-- うまくいったとき: 「エラー 0 件」が出ます。出てよい注意: F5（2 で stack.env を変えたため。12.1 のデプロイで消えます）。いまは直しません。続けて 12.1 をします。
+- うまくいったとき: 「エラー 0 件」が出ます。出てよい注意: F5・G5。F5 は 2 で stack.env を変えたため（12.1 のデプロイで消えます）、G5 は `VERCEL_LEGAL_PAGES_ON` がまだ空のためです（12.1 の 3 で書きます。空のままデプロイすると、事前チェックが G5 のエラーで止めます。名簿のない api が、登録と同意のページが開く前に動き出さないようにするためです）。いまは直しません。続けて 12.1 をします。
 - うまくいかないとき: エラーが出たら、`LAUNCH_STAGE=pilot` と `PILOT_ACCOUNT_IDS` の行を元に戻してから直します。R3 なら 16.1 の戻す練習をします（public では、前の練習から 35 日をこえるとエラーです）。launch-record.env の名前が出たら、14 章で済ませます。ほかのコードは 13 章で見ます。直したら、もう一度 1 からします。
 - くわしく: 14 章、16.1
 
@@ -1003,7 +1028,7 @@
 | G1 | エラー | アカウントの削除を有効にする前の確かめが、記録にないか、順番がちがいます（{names}） | 削除を有効にする前に、パスワードの確かめが正しく動くことを確かめます。 | Supabase の設定 → パスワードの変更の確かめ → 本番の amr の確かめ、の順に済ませて日付を書きます（手順書 11.2）。 |
 | G2 | エラー | 同意の確かめ（`LEGAL_TERMS_REQUIRED`）を入れる前の記録がありません（{names}） | 同意のページが出る前に同意を求めると、学習者が何もできなくなります。 | 先に Vercel のフラグを入れて同意のページを確かめ、日付を書きます（手順書 12.3）。 |
 | G3 | public か、`VERCEL_LEGAL_PAGES_ON` があるときエラー | 規約を公開するのに、ご本人の削除が止まっています。 | 規約で約束しているので、ご本人が自分で削除できるようにします。 | 手順書 11.2 を済ませ、`ACCOUNT_DELETION_ENABLED=true` にします。VM を作り直しているとき（手順書 16.3）は、11.2 はしなおしません。16.3 の 7 より前なら、launch-record.env の `VERCEL_LEGAL_PAGES_ON` を 7 まで空にします。7 のあとなら、16.3 の 6 のとおりに、stack.env に `ACCOUNT_DELETION_ENABLED=true` を書きます。 |
-| G5 | minors と public でエラー | この段階に入る前の確かめが、記録にありません（{names}） | 18 歳未満も使える段階（minors と public）に入る前に、18 歳未満が使うときの決まりを決めます（pilot の次が public でも要ります）。 | 手順書 14 章の表でその確かめをして、日付を書きます。 |
+| G5 | minors と public でエラー（public の `VERCEL_LEGAL_PAGES_ON` は、事前チェックだけを実行したときは注意） | この段階に入る前の確かめが、記録にありません（{names}） | 18 歳未満も使える段階（minors と public）に入る前に、18 歳未満が使うときの決まりを決めます（pilot の次が public でも要ります）。public では、Vercel で法務のページと登録を開いた日（`VERCEL_LEGAL_PAGES_ON`）も要ります。名簿を消したあと、登録と同意のページが開く前にデプロイすると、共有の Supabase のログイン（P-School の子どものものも）で使えてしまうためです。手順書 11.8 は、その日付を書く前に事前チェックだけを実行するので、そこでは注意です（12.1 の 3 で書き、4 でデプロイします）。 | 手順書 14 章の表でその確かめをして、日付を書きます。 |
 | K1 | pilot は注意、minors からエラー | 安全の知らせの受け口がありません。 | 安全の知らせが届かないと、だれも気づけません。 | Slack の受け口の URL を stack.env の `AI_CAP_ALERT_WEBHOOK_URL` に書きます（手順書 3.6）。 |
 | K3 | 注意 | 知らせの受け口が Slack ではありません（{names}） | Slack 以外の受け口は、この手順書では確かめていません。 | Slack のチャンネルの Incoming Webhook にします。 |
 | K4 | pilot は注意、minors からエラー | 知らせを見る人と頻度が、記録にありません（{names}） | 知らせを見る人と頻度を決めておかないと、届いても見逃します。 | launch-record.env に書きます（手順書 3.6）。 |
@@ -1017,7 +1042,7 @@
 | R6 | pilot からエラー | 控えが失敗したときの知らせの受け口がありません。 | 控えが失敗しても、知らせが届きません。 | stack.env の `AI_CAP_ALERT_WEBHOOK_URL` を書いてから、`sudo ./scripts/install-backup.sh` をもう一度実行します（手順書 6.4）。 |
 | R8 | 注意 | 控えのタイマーが止まっています（入れてありますが、いまは動いていません）。 | 控えのタイマーは入れてあるのに、止まっています。本番の DB を戻すコマンドが DB を変えたあとで止まると、こうなります（そのあいだは、R9 も出ます）。このままでは、毎日の控えも、1 時間ごとの削除の記録も作られず、知らせも届きません。 | 戻し（restore-db.sh）の途中でなければ、`sudo systemctl start risepath-backup.timer risepath-backup-journal.timer` で動かします。戻しの途中なら、エージェントと続きをします（手順書 16.2）。 |
 | R9 | デプロイのときはエラー、事前チェックだけを実行したときは注意 | 本番の DB を戻している途中です（restore-db.sh が途中で止まっています）。 | 本番の DB を戻すコマンド（restore-db.sh）が、DB を戻しかけたところで止まっています（/var/lib/risepath-backup/restore-in-progress があります）。削除の記録をまだ当て直していない DB を学習者に見せないように、デプロイを止めます。そのあいだは、毎日の控えも作りません。同じ戻しのコマンドの最初の確かめでは、注意として出ます（止まりません）。 | デプロイはしません。エージェントと、同じ restore-db.sh のコマンドで続きをします（手順書 16.2）。 |
-| V1 | setup は注意（tunnel があるとエラー）、pilot・minors はエラー | 外から入れるのに、試験運用の参加者だけに絞れていません。 | 試験運用のあいだは、スタッフと大人のテスターだけが使えるようにします（1 章の D1）。Supabase は Nexloom・P-School と共有なので、そのアカウントでもログインできます。外から入れるようにする前に、Vercel の保護か、試験運用の名簿（`PILOT_ACCOUNT_IDS`）のどちらかで守ります。名簿は、すべての項目が ID の形のときだけ数えます。 | Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。保護を外したあと（`VERCEL_PROTECTION_OFF` に日付があるとき）は、名簿を戻します（VM を作り直したときは手順書 16.3）。日付を消すのは、Vercel で保護を本当にかけ直したときだけです。 |
+| V1 | setup は注意（tunnel があるとエラー）、pilot・minors はエラー | 外から入れるのに、試験運用の参加者だけに絞れていません。 | 試験運用のあいだは、スタッフと大人のテスターだけが使えるようにします（1 章の D1）。Supabase は Nexloom・P-School と共有なので、そのアカウントでもログインできます。外から入れるようにする前に、Vercel の保護か、試験運用の名簿（`PILOT_ACCOUNT_IDS`）のどちらかで守ります。名簿に ID の形でない項目があるときは、V1 ではなく V2 が出ます（api は、その項目を使わずに、名簿にない人を断ります）。 | Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。保護を外したあと（`VERCEL_PROTECTION_OFF` に日付があるとき）は、名簿を戻します（VM を作り直したときは手順書 16.3）。日付を消すのは、Vercel で保護を本当にかけ直したときだけです。 |
 | V2 | エラー | 試験運用の名簿 `PILOT_ACCOUNT_IDS` に、ID の形でないものがあります（{n} 個目）。 | 名簿の項目は、Supabase の User UID です。ID の形でない項目は、サーバーが使いません（ID がひとつもないと、だれもログインして使えません）。何個目かだけを出し、値は出しません。 | Supabase の Authentication → Users の User UID（8-4-4-4-12 の形）だけを、空白を入れずにカンマで区切って書きます（手順書 10.1）。 |
 | V3 | public でエラー | 一般公開なのに、試験運用の名簿が残っているか、Vercel の保護を外した記録がないか、日付の順番がちがいます（{names}） | 一般公開では、だれでも開けるようにします。名簿が残っていると、名簿にない人が使えません。 | `PILOT_ACCOUNT_IDS` が出たときは、stack.env のその行を消します（手順書 11.8）。`VERCEL_PROTECTION_OFF` には、手順書 10.3 で保護を外した日を書きます（保護をかけた日と同じ日か、そのあとの日です）。 |
 | V4 | エラー | AI アプリの接続（byoa）は、試験運用の名簿を確かめません（{names}） | AI アプリの接続（リモートの MCP）は、試験運用の名簿を読みません。名簿を使っているあいだに入れると、名簿にない人がそこから使えてしまいます。 | 名簿を使っているあいだは byoa を使いません。stack.env の `COMPOSE_PROFILES` から byoa を外し、launch-record.env の `DECIDED_BYOA` を空にします（手順書 12.3）。 |
@@ -1110,7 +1135,7 @@ VM の `deploy/risepath-vm/launch-record.env` は、オーナーが確かめを�
 | `SUPABASE_CURRENT_PASSWORD_ON` | 「Require current password when updating」を入れた日 | 手順書 11.2 | `ACCOUNT_DELETION_ENABLED` を入れる前（G1） | `SUPABASE_CURRENT_PASSWORD_ON=2026-12-01` |
 | `PASSWORD_CHANGE_CHECK` | パスワードの変更の確かめが通った日 | 手順書 11.2 | `ACCOUNT_DELETION_ENABLED` を入れる前（G1。`SUPABASE_CURRENT_PASSWORD_ON` と同じ日か、そのあとの日） | `PASSWORD_CHANGE_CHECK=2026-12-01` |
 | `PROD_AMR_CHECK` | 本番の amr の確かめが通った日 | 手順書 11.2 | `ACCOUNT_DELETION_ENABLED` を入れる前（G1。`SUPABASE_CURRENT_PASSWORD_ON` と同じ日か、そのあとの日） | `PROD_AMR_CHECK=2026-12-01` |
-| `VERCEL_LEGAL_PAGES_ON` | 法務のページを出した日 | 手順書 12.1 | `LEGAL_TERMS_REQUIRED` を入れる前（G2）。書くと、ご本人の削除も必要です（G3） | `VERCEL_LEGAL_PAGES_ON=2027-01-10` |
+| `VERCEL_LEGAL_PAGES_ON` | 法務のページを出した日 | 手順書 12.1 | public でデプロイする前（G5。事前チェックだけを実行したときは注意）と、`LEGAL_TERMS_REQUIRED` を入れる前（G2）。書くと、ご本人の削除も必要です（G3） | `VERCEL_LEGAL_PAGES_ON=2027-01-10` |
 | `DECIDED_BYOA` | AI アプリの接続を使うと決めた日 | 手順書 12.3 | byoa を入れる前（S2）。試験運用の名簿があるあいだは書きません（V4） | `DECIDED_BYOA=` |
 | `DECIDED_MEMORY` | 学習の記憶を使うと決めた日 | 手順書 12.3 | memory を入れる前（S3） | `DECIDED_MEMORY=` |
 | `DECIDED_BILLING` | 有料プランを使うと決めた日 | 手順書 12.3 | `BILLING_ENABLED=true` の前（S4） | `DECIDED_BILLING=` |
@@ -1178,9 +1203,9 @@ VM の `deploy/risepath-vm/launch-record.env` は、オーナーが確かめを�
   4. `sudo ./scripts/install-backup.sh` を何も付けずに実行します（タイマーを動かし、戻した DB の控えを 1 つ作ります）。最後に出る「次にすること」の 1〜5 は、ここではしません（1〜3: 鍵は、パスワード管理から戻したものです。鍵を画面に出さず、`BACKUP_KEY_COPY` は 6.4 の日付のままにします。4: バケットのライフサイクルは、3.8 のままです。5: 戻す練習は、この手順の 5 でします）。
   5. `sudo ./scripts/restore-drill.sh` を実行します。
   6. 控えには、設定のファイル（stack.env、tunnel.env）は入っていません。なくした VM で済んでいた手順の値を、パスワード管理から書き直します。
-     - 7.4 まで済んでいたとき: 7.3 の 1〜2 のとおりに tunnel.env を作り、「Rise Path トンネルのトークン」を貼ります。次に `nano stack.env` で、`ORIGIN_SECRET=`（新しく作らずに、「Rise Path ORIGIN_SECRET」の値を貼ります。Vercel にあるものと同じ値です）、`TRUST_PROXY=1`、`LLM_ALLOWED_ORIGINS=https://app.<domain>`、`COMPOSE_PROFILES=tts,tunnel` を書きます。
+     - 7.4 まで済んでいたとき: 7.3 の 1〜2 のとおりに tunnel.env を作り、「Rise Path トンネルのトークン」を貼ります。次に `nano stack.env` で、7.4 の 2 と同じように、すでにある行を書きかえます（新しい行は足しません）: `ORIGIN_SECRET=`（新しく作らずに、「Rise Path ORIGIN_SECRET」の値を貼ります。Vercel にあるものと同じ値です）、`TRUST_PROXY=1`（`# TRUST_PROXY=1` の行の頭の `# ` を消します）、`LLM_ALLOWED_ORIGINS=https://app.<domain>`、`COMPOSE_PROFILES=tts,tunnel`。
      - 10.1 まで済んでいて、11.8 より前だったとき: stack.env のいちばん下に、パスワード管理の「Rise Path 試験運用の名簿」の `PILOT_ACCOUNT_IDS=` の 1 行を貼ります。
-     - 11.2 まで済んでいたとき: stack.env に `ACCOUNT_DELETION_ENABLED=true` を書きます。
+     - 11.2 まで済んでいたとき: stack.env のいちばん下に `ACCOUNT_DELETION_ENABLED=true` の 1 行を足します。
      - 12.3 で入れたものがあるときは、エージェントと、その手順書のとおりに入れ直します。
      - 保存したら、`clear` を実行します。
   7. `nano launch-record.env` で、`LAUNCH_STAGE` を、なくす前の段階に書き戻します（setup のままだったときは、そのままにします）。12.1 まで済んでいたときは、`VERCEL_LEGAL_PAGES_ON` にも、手順書の写し（はじめに）の 12.1 のチェックの横の日付を書き戻します。
@@ -1242,7 +1267,7 @@ VM の `deploy/risepath-vm/launch-record.env` は、オーナーが確かめを�
 
 **Mac の開発用の DB**（手順書 9.5）:
 
-1. Mac の Docker で、VM と同じイメージの DB を、Mac の中だけで動かします（パスワードは開発用の別の値にします）:
+1. Mac の Docker Desktop（手順書 2.0 の 8 で入れ、起動しておきます）で、VM と同じイメージの DB を、Mac の中だけで動かします（パスワードは開発用の別の値にします）:
 
    ```bash
    docker run -d --name risepath-dev-db -p 127.0.0.1:5433:5432 \

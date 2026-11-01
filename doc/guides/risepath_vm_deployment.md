@@ -182,7 +182,7 @@ cd deploy/risepath-vm/scripts
 
 1. GCP で VM 作成（`risepath-vm`）
 2. インスタンススケジュールは付けない（夜間停止が要るときだけ `NIGHT_STOP=1` でスクリプトを使う）
-3. Tailscale に参加（`--hostname=risepath-vm`。旧 `risepath-vm` が管理画面に残っていれば先に Remove する。残っていると新しい VM は `risepath-vm-1` になる）
+3. Tailscale に参加（`--hostname=risepath-vm --advertise-tags=tag:risepath`。タグは手順書 3.4 の ACL のもの。旧 `risepath-vm` が管理画面に残っていれば先に Remove する。残っていると新しい VM は `risepath-vm-1` になる）
 4. `scripts/bootstrap-vm.sh` で Docker + compose + 4 GB の swap + 初回デプロイ + systemd（起動ユニットは初回デプロイが通ってから登録する）
 5. ファイアウォール: アプリ用の受信ルールは作らない。**5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。Cloudflare Tunnel 用に外向きの TCP/UDP 7844 を許可したままにする
 

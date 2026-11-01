@@ -68,6 +68,8 @@ const CHAPTERS = [
 ];
 /** Steps per chapter (design §8.1, numbering fixed: 8.2 and 9.1 stay as pointers, TR12). */
 const STEPS = { 2: 8, 3: 8, 4: 5, 5: 4, 6: 5, 7: 6, 8: 5, 9: 6, 10: 8, 11: 8, 12: 4, 16: 3 };
+/** Chapters whose steps start at 0 (2.0 「そろえるもの」 came before 2.1 in the Phase 9 rehearsal, item 5; the numbers after it stay). */
+const FIRST_STEP = /** @type {Record<string, number>} */ ({ 2: 0 });
 
 describe('first-launch.ja.md: chapters and steps (design §9.2 #1)', () => {
   it('has no in-progress banner: every step is written (stage 6; design §9.2 #5)', () => {
@@ -79,7 +81,10 @@ describe('first-launch.ja.md: chapters and steps (design §9.2 #1)', () => {
   });
   it('has every step heading, numbered in order, under its own chapter and nowhere else', () => {
     const found = [...text.matchAll(/^### (\d+)\.(\d+) (.+)$/gm)].map((m) => [Number(m[1]), Number(m[2]), m[3].trim()]);
-    const want = Object.entries(STEPS).flatMap(([c, n]) => Array.from({ length: n }, (_, i) => [Number(c), i + 1]));
+    const want = Object.entries(STEPS).flatMap(([c, n]) => {
+      const first = FIRST_STEP[c] ?? 1;
+      return Array.from({ length: n + 1 - first }, (_, i) => [Number(c), first + i]);
+    });
     assert.deepEqual(found.map(([c, s]) => [c, s]), want);
     for (const [c, s, title] of found) {
       assert.ok(String(title).length > 0, `${c}.${s} has a title`);
@@ -372,10 +377,12 @@ describe('first-launch.ja.md 10.1〜10.4: the pilot-list steps (Phase 9 stage 3;
     assert.match(step('10.1'), /^ {2}2\. VM で `cd \/opt\/risepath\/deploy\/risepath-vm && nano stack\.env`/m, '10.1 step 2 is the stack.env edit');
     assert.match(step('10.1'), /^ {2}3\. GitHub の main/m, '10.1 step 3 is the ✓ check');
   });
-  it('10.3: protection off, a private window, VERCEL_PROTECTION_OFF dated, the standalone preflight, then smoke:edge last (TR8, TR12); no tester before it', () => {
+  // Phase 9 rehearsal, item 20: the record and the standalone preflight come first, so V1 and V2 confirm the list while
+  // the protection is still on; only then the protection comes off.
+  it('10.3: VERCEL_PROTECTION_OFF dated and the standalone preflight first, then protection off, a private window, and smoke:edge last (TR8, TR12); no tester before it', () => {
     const body = step('10.3');
     const todo = part(body, 'やること:');
-    const order = ['「Standard Protection」', 'プライベートウィンドウ', 'VERCEL_PROTECTION_OFF=', './scripts/preflight.sh', 'npm run smoke:edge'].map((s) => todo.indexOf(s));
+    const order = ['VERCEL_PROTECTION_OFF=', './scripts/preflight.sh', 'エラー 0 件」が出たときだけ、2 に進みます', '「Standard Protection」', 'プライベートウィンドウ', 'npm run smoke:edge'].map((s) => todo.indexOf(s));
     assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])), `order ${order}`);
     const last = todo.split('\n').filter((line) => /^ {2}\d+\. /.test(line)).at(-1) ?? '';
     assert.match(last, /npm run smoke:edge/, 'smoke:edge is the last thing');
@@ -384,11 +391,13 @@ describe('first-launch.ja.md 10.1〜10.4: the pilot-list steps (Phase 9 stage 3;
     assert.match(last, /`<domain>` は 3\.1 で決めたドメインに置きかえます/);
     // Review round 1, finding 8: a signed-out visitor at / gets the landing page; the sign-in form is behind its button.
     const ok = part(body, 'うまくいったとき:');
-    assert.ok(ok.includes(`2 で Rise Path のはじめのページ（右上に「${LANDING_SIGN_IN}」のボタンがあるページ）が出ます`), ok);
+    assert.ok(ok.includes(`3 で Rise Path のはじめのページ（右上に「${LANDING_SIGN_IN}」のボタンがあるページ）が出ます`), ok);
+    assert.ok(ok.startsWith('- うまくいったとき: 1 で「エラー 0 件」が出ます。出てよい注意はありません。'), ok);
     assert.ok(ok.includes(`「${LANDING_SIGN_IN}」を押しても、「新規登録」はありません`), ok);
     assert.doesNotMatch(ok, /Rise Path のログインの画面が出ます/);
     const fail = part(body, 'うまくいかないとき:');
     assert.match(fail, /4 で「Missing script」/);
+    assert.match(fail, /1 で「\[V1\]」が出たら、名簿が読めていません。`VERCEL_PROTECTION_OFF` を空に戻して保存し（保護はかけたままなので、2 には進みません）、10\.1 を見直します。/u);
     assert.match(fail, /テスターは、ここまで済むまで足しません。/);
   });
   it('10.4: a tester\'s password in person or by phone; a deploy outside lesson time; N before and after; a leaving tester is asked first, taken off the list and deployed, N checked to go down, then the deletion (TR6)', () => {
@@ -1628,5 +1637,191 @@ describe('final review of Phase 9: runbook steps the owner can complete as writt
       .map((line) => (/^\| /.test(line) ? line.slice(1).split(' | ').slice(1).join(' | ') : line)).join('\n');
     const bare = [...prose.matchAll(/(?<!1 章の |コード )\bD\d+\b/g)].map((m) => m[0]);
     assert.deepEqual(bare, [], 'bare D-numbers in 13 章 prose');
+  });
+});
+
+// Phase 9 rehearsal (2026-11-01): an owner with an empty Google Cloud project and no prepared Mac followed the runbook
+// as written. Items 5-9 and 11-25 of that walkthrough, pinned here (items 2 and 10 are engine rules: deployPreflight.test.js
+// and AT_STEP above; item 20 is the 10.3 test above).
+describe('Phase 9 rehearsal: an owner starting from empty accounts can follow the runbook', () => {
+  const todo = (/** @type {string} */ id) => stepPart(stepBody(id), 'やること:');
+  const ok = (/** @type {string} */ id) => stepPart(stepBody(id), 'うまくいったとき: ');
+  const bad = (/** @type {string} */ id) => stepPart(stepBody(id), 'うまくいかないとき: ');
+  /** Item n of a step's やること list. @param {string} id @param {number} n */
+  const item = (id, n) => {
+    const t = todo(id);
+    const from = t.indexOf(`\n  ${n}. `);
+    assert.ok(from >= 0, `${id} item ${n}`);
+    const next = t.indexOf(`\n  ${n + 1}. `, from);
+    return t.slice(from, next < 0 ? undefined : next);
+  };
+  const example = read('deploy/risepath-vm/stack.env.example');
+
+  it('item 5/23: 2.0 lists the accounts, makes the owner\'s copy, and sets the Mac up one tool at a time, each with its own sign', () => {
+    const t = todo('2.0');
+    for (const account of ['GitHub', 'Google Cloud', '請求先アカウント', 'Vercel', 'Cloudflare', 'Supabase', 'Tailscale', 'Anthropic', 'クレジット', 'Slack', 'パスワード管理（2 人が開けるもの）']) assert.ok(item('2.0', 1).includes(account), account);
+    assert.match(item('2.0', 2), /手順書の写しを作ります。GitHub でこの手順書（`doc\/guides\/first-launch\.ja\.md`）を開き、印刷するか PDF にします/u);
+    /** One tool per item, each with the command and the line it prints. */
+    for (const [n, command, sign] of /** @type {[number, string, string][]} */ ([
+      [3, '`git --version`', '`git version` で始まる行'],
+      [4, '`node --version`', '`v22.` で始まる行'],
+      [5, '`gcloud --version`', '`Google Cloud SDK` で始まる行'],
+      [5, '`gcloud auth login`', '`You are now logged in as` の行'],
+      [6, '`npm ci`', '`added` で始まる行'],
+      [7, '`tailscale status`', 'Machines に、この Mac が出ます'],
+      [8, '`docker version`', '`Server:` の行'],
+    ])) {
+      assert.ok(item('2.0', n).includes(command) && item('2.0', n).includes(sign), `2.0 item ${n}: ${command} → ${sign}`);
+    }
+    // The clone is the repository the VM clones too.
+    const clone = /`git clone (https:\/\/github\.com\/[^`\s]+\.git)`/.exec(item('2.0', 6))?.[1];
+    assert.ok(clone && read('deploy/risepath-vm/README.md').includes(`git clone ${clone} /opt/risepath`), String(clone));
+    assert.match(item('2.0', 8), /Docker Desktop/u);
+    assert.match(bad('2.0'), /Windows の PC を使うときは、WSL[^。]*を使うか、エージェントに相談します/u);
+    // The steps that need the Mac's tools or the copy come after it.
+    for (const id of ['2.1', '2.7']) assert.match(stepPart(stepBody(id), '先に済ませること: '), /2\.0/u, id);
+    assert.ok(t.indexOf('写し') > 0);
+  });
+
+  it('item 6/21: 3.3 picks the project, links billing and enables Compute Engine before 3.8 and 4.1; 4.1 answers (y/N); 4.3 exports the project again; 4.5 answers the passphrase', () => {
+    assert.match(item('3.3', 1), /ID（プロジェクト ID）を、手順書の写しのこの手順の横に書きます。3\.8 の `<プロジェクト>` と、4\.1・4\.3 の `<プロジェクトの ID>` は、この ID です/u);
+    assert.match(item('3.3', 2), /請求先アカウント（billing account）をリンクします/u);
+    assert.match(item('3.3', 3), /「Compute Engine API」を開き、Enable を押します/u);
+    assert.match(ok('3.3'), /Billing の画面に、このプロジェクトの請求先アカウントの名前が出ます。3 のあと、Compute Engine → VM instances の画面が開きます/u);
+    assert.match(bad('3.3'), /リンクできるまで、3\.8 と 4\.1 には進みません/u);
+    for (const id of ['3.8', '4.1']) assert.match(stepPart(stepBody(id), '先に済ませること: '), /3\.3/u, id);
+    assert.match(item('4.1', 3), /`\(y\/N\)\?` と聞かれたら[^。]*`y` を押して Enter を押します/u);
+    assert.match(bad('4.1'), /お支払い（billing）が有効でないという行が出たら、3\.3 の 2 に戻ります/u);
+    assert.match(item('4.3', 1), /先に `export GCP_PROJECT=<プロジェクトの ID>` をもう一度実行します/u);
+    assert.ok(read('deploy/vercel/README.md').includes('--project="$GCP_PROJECT"'), 'the command 4.3 runs reads GCP_PROJECT');
+    assert.match(item('4.5', 1), /passphrase（`Enter passphrase`）を聞かれたら、何も打たずに Enter を 2 回押します/u);
+  });
+
+  it('item 7: the ACL is written by tag (the VM joins only at 4.5), every `tailscale up` gives the tag, and 6.3 checks 5432 and 8880 are closed', () => {
+    const t34 = todo('3.4');
+    assert.ok(t34.includes('`"tagOwners": {"tag:risepath": ["autogroup:admin"]}`'));
+    assert.ok(t34.includes('`"dst": ["tag:risepath:3006,3100"]`'));
+    assert.match(ok('3.4'), /ACL に `tag:risepath` の tagOwners の行と、名前を決めた管理者に `tag:risepath:3006,3100` を開ける行があり/u);
+    assert.doesNotMatch(ok('3.4'), /ACL に `risepath-vm` の行/u, 'not reachable before 4.5');
+    // Every place that tells the owner to join the VM to the tailnet tags it.
+    const UP = 'tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath';
+    for (const file of ['deploy/risepath-vm/README.md', 'deploy/risepath-vm/scripts/provision-gce.sh', 'deploy/risepath-vm/scripts/bootstrap-vm.sh']) {
+      const body = read(file);
+      const ups = body.split('\n').filter((line) => /sudo tailscale up\b/.test(line));
+      assert.ok(ups.length > 0 && ups.every((line) => line.includes(UP)), `${file}: ${ups.join(' | ')}`);
+    }
+    assert.ok(read('doc/guides/risepath_vm_deployment.md').includes('`--hostname=risepath-vm --advertise-tags=tag:risepath`'));
+    assert.ok(item('4.5', 1).includes(`\`sudo ${UP}\``));
+    assert.match(ok('4.5'), /`risepath-vm` に `tag:risepath` が付いています/u);
+    // The VM README's example policy is the shape 3.4 describes.
+    const vm = read('deploy/risepath-vm/README.md');
+    const policy = /```json\n([\s\S]*?)```/.exec(vm.slice(vm.indexOf('## セキュリティ')))?.[1] ?? '';
+    const parsed = JSON.parse(policy.replace('<管理者のメールアドレス>', 'admin@example.org'));
+    assert.deepEqual(parsed.tagOwners, { 'tag:risepath': ['autogroup:admin'] });
+    assert.deepEqual(parsed.acls.map((/** @type {any} */ a) => a.dst), [['tag:risepath:3006,3100']]);
+    // 6.3: the ports the ACL keeps closed are checked from the Mac.
+    for (const port of ['5432', '8880']) assert.ok(item('6.3', 2).includes(`\`nc -z -w 3 risepath-vm ${port} && echo OPEN || echo closed\``), port);
+    assert.match(ok('6.3'), /2 で、2 つとも `closed` と出ます/u);
+    assert.match(bad('6.3'), /2 で `OPEN` が出たら、ここで止めて、3\.4 の ACL をエージェントと直します/u);
+  });
+
+  it('item 8/14/25: 3.7 records the login limits and the shared mail settings, clears SMTP and the template with the other apps, and keeps the Supabase values where 5.1 and 8.3 take them', () => {
+    for (const setting of ['送る人（SMTP）の設定', '確認のメールの文（Email Templates の Confirm signup）', 'JWT の有効期間', 'Time-box user sessions']) assert.ok(item('3.7', 1).includes(setting), setting);
+    for (const change of ['送る人（SMTP）の設定', '確認のメールの文（Email Templates の Confirm signup）']) assert.ok(item('3.7', 2).includes(change), change);
+    const five = item('3.7', 5);
+    assert.match(five, /Project URL を、Project Settings → API Keys で publishable の鍵（Legacy API Keys のタブなら anon public の鍵）/u);
+    assert.match(five, /担当の了解をもらってから[^。]*secret の鍵（Legacy API Keys のタブなら service_role の鍵）/u);
+    assert.match(five, /この画面は写さず（スクリーンショットを撮らず）、チャットにも貼りません/u);
+    for (const [id, entry] of [['5.1', '「Rise Path Supabase の公開の鍵」の Project URL'], ['5.1', '「Rise Path Supabase の秘密の鍵」'], ['8.3', '「Rise Path Supabase の公開の鍵」の Project URL']]) {
+      assert.ok(todo(id).includes(entry), `${id}: ${entry}`);
+      assert.ok(five.includes(entry.replace(/の Project URL$/u, '')), `3.7 makes ${entry}`);
+    }
+    // The names 5.1 fills are the template's (the placeholders it says to replace are the template's values).
+    for (const line of ['SUPABASE_URL=https://your-project.supabase.co', 'SUPABASE_SERVICE_ROLE_KEY=change-me']) assert.match(example, new RegExp(`^${line.replace(/[.]/g, '\\.')}$`, 'm'), line);
+    assert.match(bad('11.4'), /担当が文を変えることに了解しないときは、文はいまのまま（ほかのアプリの文）にして/u);
+  });
+
+  it('item 9: 5.1, 7.4, 11.2 and 16.3 say how to write each template line (uncomment, edit in place, or add one), and done that way the engine finds no duplicate', () => {
+    // How the template has each name the steps fill in.
+    for (const line of ['# AI_CAP_ALERT_WEBHOOK_URL=', '# TRUST_PROXY=1', '# ACCOUNT_DELETION_ENABLED=true', 'ORIGIN_SECRET=', 'LLM_ALLOWED_ORIGINS=', 'COMPOSE_PROFILES=tts']) {
+      assert.equal(example.split('\n').filter((l) => l === line).length, 1, `the template has ${line} once`);
+    }
+    assert.match(item('5.1', 4), /すでにある `COMPOSE_PROFILES=tts` の行は、そのままにします。`# AI_CAP_ALERT_WEBHOOK_URL=` の行は、頭の `# ` を消して、= のうしろに 3\.6 でしまった URL を貼ります/u);
+    assert.match(item('7.4', 2), /すでにある行を書きかえます（新しい行は足しません）/u);
+    assert.match(item('7.4', 2), /`# TRUST_PROXY=1` の行は、頭の `# ` を消して `TRUST_PROXY=1` にします/u);
+    assert.match(item('11.2', 3), /いちばん下に `ACCOUNT_DELETION_ENABLED=true` の 1 行を足します/u);
+    assert.match(item('16.3', 6), /7\.4 の 2 と同じように、すでにある行を書きかえます（新しい行は足しません）/u);
+    assert.match(item('16.3', 6), /いちばん下に `ACCOUNT_DELETION_ENABLED=true` の 1 行を足します/u);
+    assert.match(bad('6.4'), /「\[IB3\]」なら、5\.1 の `AI_CAP_ALERT_WEBHOOK_URL` を見ます（行の頭に `#` がないかも見ます）/u);
+    // The template edited as the steps say: no A4 (a name twice) and no C11 (TRUST_PROXY left commented with the tunnel).
+    const inPlace = example
+      .replace(/^# AI_CAP_ALERT_WEBHOOK_URL=$/m, 'AI_CAP_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/T0/B0/x')
+      .replace(/^ORIGIN_SECRET=$/m, `ORIGIN_SECRET=${BASE_STACK.ORIGIN_SECRET}`)
+      .replace(/^LLM_ALLOWED_ORIGINS=$/m, 'LLM_ALLOWED_ORIGINS=https://app.example.org')
+      .replace(/^COMPOSE_PROFILES=tts$/m, 'COMPOSE_PROFILES=tts,tunnel')
+      .replace(/^# TRUST_PROXY=1$/m, 'TRUST_PROXY=1') + 'ACCOUNT_DELETION_ENABLED=true\n';
+    const run = (/** @type {string} */ stack) => checkStack({ mode: 'prod', files: { 'stack.env': stack, 'tunnel.env': 'TUNNEL_TOKEN=tunnel0123456789\n', 'launch-record.env': Object.entries(baseRecord('pilot')).map(([k, v]) => `${k}=${v}`).join('\n') + '\n' }, facts: baseFacts(), lastGreen: null, now: NOW });
+    const edited = run(inPlace);
+    assert.deepEqual(edited.filter((f) => ['A4', 'C11', 'K1'].includes(f.code)), []);
+    // What the rehearsal saw when the values were added as new lines instead: A4 on the three names the template has.
+    const appended = run(`${example}ORIGIN_SECRET=${BASE_STACK.ORIGIN_SECRET}\nLLM_ALLOWED_ORIGINS=https://app.example.org\nCOMPOSE_PROFILES=tts,tunnel\nTRUST_PROXY=1\n`);
+    const a4 = appended.filter((f) => f.code === 'A4').flatMap((f) => f.names ?? []);
+    for (const name of ['ORIGIN_SECRET', 'LLM_ALLOWED_ORIGINS', 'COMPOSE_PROFILES']) assert.ok(a4.includes(name), `appended: A4 names ${name}`);
+  });
+
+  it('item 11/16/24/22: Vercel\'s current screens (Branch Tracking, Config or Secret), a Preview value has a way back, and the build log is read on a Ready build', () => {
+    assert.match(item('2.6', 1), /Settings → Environments で Production を開き、Branch Tracking のブランチが `main` であることを見ます/u);
+    assert.doesNotMatch(todo('2.6'), /Settings → Git/u);
+    assert.match(bad('2.6'), /2 で Preview に値があれば、その名前だけをエージェントに見せ（値は見せません）、その変数の編集で Preview の印を外して保存します/u);
+    assert.match(item('8.3', 1), /Type は、`ORIGIN_SECRET` だけを Secret にします（保存したあとは、だれも値を読めません）。ほかの 5 つは Config にします/u);
+    assert.match(bad('8.3'), /10\.3 の `npm run smoke:edge` で 1 番が ❌ のときは/u);
+    const row = read('deploy/vercel/README.md').split('\n').find((line) => line.startsWith('| `ORIGIN_SECRET` |')) ?? '';
+    assert.match(row, /Type は \*\*Secret\*\*/u);
+    assert.doesNotMatch(row, /未確認/u);
+    assert.match(item('8.4', 4), /ビルドのログを開き、`vercel-env-guard` で検索します/u);
+    assert.match(bad('8.4'), /4 で行が出たら、その行（名前とコードだけで、値は出ません）をエージェントに見せ/u);
+  });
+
+  it('item 12: 3.6 gives the Slack app steps; the URL it saves is one K3 accepts', () => {
+    const two = item('3.6', 2);
+    for (const words of ['https://api.slack.com/apps', 'Create New App → From scratch', '「Rise Path alerts」', 'Activate Incoming Webhooks を On', 'Add New Webhook', 'Allow（または Authorize）', 'この画面は写しません']) assert.ok(two.includes(words), words);
+    assert.match(ok('3.6'), /`https:\/\/hooks\.slack\.com\/services\/` で始まる URL/u);
+    assert.match(bad('3.6'), /管理者の承認が要る[^。]*Slack の管理者に、このアプリを許可してもらいます/u);
+    assert.ok(!checkStack(buildInput('pilot', { stack: { AI_CAP_ALERT_WEBHOOK_URL: 'https://hooks.slack.com/services/T0/B0/x' } })).some((f) => f.code === 'K3'));
+  });
+
+  it('item 13: 9.5 has a way for a Mac without .env.local, and the development database names Docker Desktop', () => {
+    assert.match(item('9.5', 1), /`ls \.env\.local` を実行します。`No such file or directory` と出たら、この Mac は開発に使っていません。2 と 3 もとばして 4 に進みます/u);
+    assert.match(ok('9.5'), /1 で `No such file or directory` と出た Mac では、2 と 3 はしません/u);
+    assert.match(chapter('18'), /1\. Mac の Docker Desktop（手順書 2\.0 の 8 で入れ、起動しておきます）で/u);
+  });
+
+  it('item 15: 9.2 uses the visual sign and keeps the Headers off screen; the checklist names its screens, and every psql in it reads only', () => {
+    assert.match(todo('9.2'), /画面で、答えが一度にではなく、少しずつ出てくることを見ます。DevTools は使わなくてかまいません/u);
+    assert.match(bad('9.2'), /Headers の画面は写さず、見せません（ログインの鍵 `Authorization: Bearer …` が出るためです）/u);
+    const readme = read('deploy/vercel/README.md');
+    const list = readme.slice(readme.indexOf('## 確認チェックリスト'), readme.indexOf('## 既知の制限'));
+    assert.match(list, /4\.5 MB を超えるファイルのアップロード[^\n]*「AIカリキュラム生成」（`\/course-generator`）[^\n]*クリップのボタン（「ファイルを添付」）/u);
+    assert.match(list, /TTS の音声が再生できる[^\n]*「音声とナレーション」（`\/settings\/voice`）[^\n]*「試聴」ボタン/u);
+    assert.match(list, /Headers の画面には `Authorization: Bearer …`（ログインの鍵）が出るので、写さず/u);
+    // The labels it names are the app's (jp copy).
+    assert.match(read('components/common/Layout.tsx'), /courseGenerator: 'AIカリキュラム生成'/);
+    assert.match(read('components/features/ai/CourseGeneratorView.tsx'), /attachFile: 'ファイルを添付'/);
+    assert.match(read('components/features/settings/SettingsVoiceView.tsx'), /title: '音声とナレーション'/);
+    assert.match(read('components/features/settings/VoiceOptionRow.tsx'), /'試聴'/);
+    for (const [where, body] of [['Vercel checklist', list], ['runbook', text]]) {
+      for (const line of body.split('\n').filter((l) => /db psql/.test(l))) assert.match(line, /PGOPTIONS='-c default_transaction_read_only=on'/, `${where}: ${line.slice(0, 80)}`);
+    }
+  });
+
+  it('items 17, 18, 19: 2.2 links #77 directly, 2.5 turns Dependabot alerts on first, 7.1 covers the Zero Trust first visit, both route forms and the install command', () => {
+    assert.ok(item('2.2', 1).includes('https://github.com/NPO-OpenCoralNetwork/rise-path-demo-game-integration/pull/77'));
+    assert.match(item('2.2', 1), /「Closed」のタブ/u);
+    assert.ok(todo('2.5').indexOf('「Dependabot alerts」を Enable') < todo('2.5').indexOf('「Dependabot security updates」を Enable'));
+    assert.match(ok('2.5'), /5 つ（[^）]*Dependabot alerts[^）]*）が Enabled/u);
+    const one = item('7.1', 1);
+    assert.match(one, /プランは Free を選びます/u);
+    assert.match(one, /Service URL の欄が 1 つなら `http:\/\/api:3006` を、Type と URL の 2 つの欄なら、Type に `HTTP`、URL に `api:3006` を入れます/u);
+    assert.match(one, /インストール用のコマンドは実行しません/u);
   });
 });

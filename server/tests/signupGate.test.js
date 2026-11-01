@@ -28,7 +28,7 @@ const CLOSED = {
   en: 'New accounts are not open yet. If you are taking part in the trial, sign in with the account the Rise Path team told you to use.',
 };
 const CONSENT_CLOSED = {
-  jp: 'まだ新しいアカウントの登録は受け付けていません。お持ちのアカウントでログインしてください。',
+  jp: 'まだ新しいアカウントの登録は受け付けていません。お持ちのアカウントでサインインしてください。',
   en: 'New accounts are not open yet. Sign in with an account you already have.',
 };
 const SIGNUP_WORDS = /新規登録|アカウントを作成|アカウントを作る|Create Account|Create an account|Create one/;

@@ -140,7 +140,7 @@ export const ATTESTATIONS = Object.freeze([
   { key: 'SUPABASE_CURRENT_PASSWORD_ON', kind: 'date', step: '11.2', rules: ['G1'] },
   { key: 'PASSWORD_CHANGE_CHECK', kind: 'date', step: '11.2', rules: ['G1'] },
   { key: 'PROD_AMR_CHECK', kind: 'date', step: '11.2', rules: ['G1'] },
-  { key: 'VERCEL_LEGAL_PAGES_ON', kind: 'date', step: '12.1', rules: ['G2', 'G3'] },
+  { key: 'VERCEL_LEGAL_PAGES_ON', kind: 'date', step: '12.1', rules: ['G2', 'G3', 'G5'] },
   { key: 'DECIDED_BYOA', kind: 'date', step: '12.3', rules: ['S2', 'V4'] },
   { key: 'DECIDED_MEMORY', kind: 'date', step: '12.3', rules: ['S3'] },
   { key: 'DECIDED_BILLING', kind: 'date', step: '12.3', rules: ['S4'] },
@@ -169,8 +169,15 @@ function editDistanceAtMost(a, b, max) {
  */
 export const isRecordKeyTypo = (name) => !ATTESTATION_KEYS.has(name) && ATTESTATIONS.some((a) => editDistanceAtMost(name.toUpperCase(), a.key, 2));
 
-/** G5: keys required from a stage on that no other rule reads (TR3). @type {Record<string, Partial<Record<Stage, Level>>>} */
-const STAGE_REQUIRED = { MINORS_POLICY_DECIDED: { minors: 'E', public: 'E' } };
+/**
+ * G5: keys required from a stage on (TR3), with the level at that stage. 'deploy': an error when deploy-stack.sh runs the
+ * check, a warning when it runs alone. VERCEL_LEGAL_PAGES_ON at public (Phase 9 rehearsal, item 10): runbook 11.8 checks
+ * `public` alone before 12.1 dates it (a warning there), but a deploy at public before 12.1 would start the api without
+ * the pilot list while Vercel still has the sign-up and the consent page closed, so every login of the shared Supabase
+ * project, P-School's children included, could use Rise Path.
+ * @type {Record<string, Partial<Record<Stage, Level | 'deploy'>>>}
+ */
+const STAGE_REQUIRED = { MINORS_POLICY_DECIDED: { minors: 'E', public: 'E' }, VERCEL_LEGAL_PAGES_ON: { public: 'deploy' } };
 
 /**
  * One rule of the catalog. `level` uses the design's notation: one letter for every stage, or
@@ -284,8 +291,9 @@ export const RULES = Object.freeze([
   // there: the database may be restored but not yet replayed, so a deploy must not serve it (E); the same restore command
   // run again calls the 事前チェック on its own at RS0, where it is only a warning.
   { code: 'R9', group: 'R', level: 'dyn', ci: 'skip', title: '本番の DB を戻している途中です（restore-db.sh が途中で止まっています）。', fix: 'デプロイはしません。エージェントと、同じ restore-db.sh のコマンドで続きをします（手順書 16.2）。' },
-  // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3). Passes with (a) a valid
-  // pilot list in stack.env or (b) Vercel's protection still on (VERCEL_PROTECTION_ON dated, VERCEL_PROTECTION_OFF empty).
+  // V1: setup W without tunnel, E with it; pilot and minors E; public not checked (V3). Passes with (a) a pilot list in
+  // stack.env (set: the api then refuses everyone not on it, a bad entry included; V2 names bad entries) or (b) Vercel's
+  // protection still on (VERCEL_PROTECTION_ON dated, VERCEL_PROTECTION_OFF empty).
   { code: 'V1', group: 'V', level: 'dyn', ci: 'skip', title: '外から入れるのに、試験運用の参加者だけに絞れていません。', fix: 'Vercel の保護（All Deployments）をかけたままにする（launch-record.env の `VERCEL_PROTECTION_ON` に日付、`VERCEL_PROTECTION_OFF` は空。手順書 2.6）か、stack.env に試験運用の名簿 `PILOT_ACCOUNT_IDS` を入れます（手順書 10.1）。保護は、名簿を確かめてから外します（手順書 10.3）。保護を外したあと（`VERCEL_PROTECTION_OFF` に日付があるとき）は、名簿を戻します（VM を作り直したときは手順書 16.3）。日付を消すのは、Vercel で保護を本当にかけ直したときだけです。' },
   // V2: an entry of the list that is not a UUID (the api ignores it; with no valid id it refuses everyone). {n}: its position.
   { code: 'V2', group: 'V', level: 'E', ci: 'skip', title: '試験運用の名簿 `PILOT_ACCOUNT_IDS` に、ID の形でないものがあります（{n} 個目）。', fix: 'Supabase の Authentication → Users の User UID（8-4-4-4-12 の形）だけを、空白を入れずにカンマで区切って書きます（手順書 10.1）。' },
@@ -1016,7 +1024,8 @@ export function checkStack(input) {
   });
   rule('G5', () => {
     for (const [key, levels] of Object.entries(STAGE_REQUIRED)) {
-      const level = levels[stage];
+      const at = levels[stage];
+      const level = at === 'deploy' ? (facts.from === 'deploy' ? 'E' : 'W') : at;
       if (level && !dated(key)) add({ code: 'G5', level, names: [key] });
     }
   });
@@ -1079,11 +1088,13 @@ export function checkStack(input) {
   const pilot = readPilotEntries(env.get('PILOT_ACCOUNT_IDS'));
   rule('V1', () => {
     if (stage === 'public') return;
-    // (a) a valid pilot list: set, and every entry a UUID (V2 names the others).
-    const validList = pilot.set && pilot.invalid.length === 0;
+    // (a) a pilot list: set, as the api reads it (server/middleware/pilotGate.js readPilotList `on`). The api ignores an
+    // entry that is not a UUID and still refuses everyone not on the list, so a bad entry is V2's error alone (Phase 9
+    // rehearsal, item 2: V1 beside it said outsiders could get in).
+    const listOn = pilot.set;
     // (b) Vercel's protection still on.
     const protectedEdge = dated('VERCEL_PROTECTION_ON') && rec('VERCEL_PROTECTION_OFF') === '';
-    if (validList || protectedEdge) return;
+    if (listOn || protectedEdge) return;
     add({ code: 'V1', level: stageIndex === 0 && !listed('tunnel') ? 'W' : 'E' });
   });
   rule('V2', (level) => {

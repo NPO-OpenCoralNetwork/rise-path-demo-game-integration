@@ -34,7 +34,7 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
 | 変数 | 値 | 備考 |
 |------|-----|------|
 | `API_ORIGIN` | `https://api.<domain>` | routes の転送先。サーバー側だけで使う。スキームとホストだけ（末尾の `/` やパスを付けない） |
-| `ORIGIN_SECRET` | VM の `stack.env` と同じ値 | VM で `openssl rand -hex 32`。Sensitive を選べるなら選ぶ（選択肢があるかは未確認） |
+| `ORIGIN_SECRET` | VM の `stack.env` と同じ値 | VM で `openssl rand -hex 32`。Type は **Secret**（保存したあとは値を読めない。ほかの 5 つは Config）。値はパスワード管理の「Rise Path ORIGIN_SECRET」から貼る（手順書 8.3）。Secret でも `vercel.json` の `$ORIGIN_SECRET` が効いていることは、手順書 8.5 のサインインと、手順書 10.3 の `npm run smoke:edge` の 1 番で確かめる |
 | `VITE_SUPABASE_URL` | Supabase プロジェクト URL | 公開してよい値 |
 | `VITE_SUPABASE_ANON_KEY` | anon key | service role key は入れない |
 | `VITE_DEMO_MODE` | `false` | `build:prod` も demo を切る |
@@ -113,7 +113,8 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
    - レジストラでネームサーバーを Cloudflare の指定に切り替える
    - ゾーンが Active になるまで待つ（24〜48 時間かかることがある）
 5. Cloudflare Zero Trust で、ゾーンと同じアカウントに remotely-managed のトンネルを作る。
-   - Published application: `api.<domain>` → Service URL `http://api:3006`
+   - はじめて Zero Trust を開くと、チームの名前とプランを聞かれることがある。プランは Free（支払いの方法を聞かれたら、入れる前にオーナーとエージェントで相談する。未確認）
+   - Published application: `api.<domain>` → Service URL `http://api:3006`（画面が Type と URL の 2 つの欄なら、Type は `HTTP`、URL は `api:3006`）
    - ルートはこの 1 つだけにする（例外: 大人が自分の AI をつなぐリモート MCP を有効にするときだけ、2 つ目の `mcp.<domain>` → `http://mcp-public:3200` を足す。手順は `doc/guides/byoa-setup.ja.md`）。Service URL に IP アドレス、`host.docker.internal`、`tcp://` のサービスを使わない。`cloudflared` からは、ホストに公開されたほかのポート（db・mcp・hermes・kokoro）や GCE のメタデータサーバーにも届くため
    - HTTP Host Header は空のまま
    - 画面のインストール用コマンドは実行しない（コンテナの `cloudflared` が接続する）。コマンドの中の `eyJ` で始まる文字列だけがトークン。手順 8 で VM の `tunnel.env` にだけ入れる
@@ -213,14 +214,14 @@ risepath-vm: cloudflared ──► api:3006（Express。最初に origin gate �
   ```
 
 - [ ] Authorization ヘッダーが routes を通って API に届く（`SMOKE_BEARER` を付けた smoke、またはログイン後のプロフィール表示）
-- [ ] 18 歳以上のテスト用アカウントで、チューターの応答が少しずつ表示される。DevTools の Network で `text/event-stream` になり、本文が分割して届く（Vercel の routes と Cloudflare Free が SSE をバッファしないか）
-- [ ] 4.5 MB を超えるファイルのアップロードが成功する（外部転送のボディ上限）
-- [ ] TTS の音声が再生できる（`/audio/cache/...` が routes を通る）
+- [ ] 18 歳以上のテスト用アカウントで、チューターの応答が少しずつ表示される（画面で、答えが一度にではなく少しずつ出てくる。Vercel の routes と Cloudflare Free が SSE をバッファしないか）。開発者が DevTools で見るときは、Network で `text/event-stream` になり、本文が分割して届く。Headers の画面には `Authorization: Bearer …`（ログインの鍵）が出るので、写さず、チャットにも貼らない
+- [ ] 4.5 MB を超えるファイルのアップロードが成功する（外部転送のボディ上限）。左のメニューの「AIカリキュラム生成」（`/course-generator`）で、入力欄の左のクリップのボタン（「ファイルを添付」）から、4.5 MB を超えて 10 MB までの PDF を選び、学びたいテーマを書いて送る。大きすぎるという案内（413）が出ない
+- [ ] TTS の音声が再生できる（`/audio/cache/...` が routes を通る）。設定 → 「音声とナレーション」（`/settings/voice`）で、声の「試聴」ボタンを押すと、声が聞こえる
 - [ ] AI の画像生成は止まっている（`GEMINI_ALLOWED` を設定しない既定。`/api/v2/image` は 503 `image_generation_unavailable` を返す）。`GEMINI_ALLOWED=true` にした環境でだけ、生成した画像が表示されるか（`/generated/img_...`）を見る
 - [ ] 画面に浮かぶ AI コーチ（共有の Hermes）が出ない（`VITE_FEATURE_AGENT_CHAT` を設定しない既定）。レッスンの AI チューターは使える
 - [ ] クエリ文字列が API に届く。smoke が表示した id を、VM の `deploy/risepath-vm` で `docker compose --env-file stack.env logs api | grep smoke=` で探す（保護（All Deployments）をかけているあいだはできない。手順書 10.3 で smoke のあとにする）
 - [ ] 未成年の安全対策（Phase 0.5。手順は [`doc/guides/safety-operations.ja.md`](../../doc/guides/safety-operations.ja.md)）。テスト用のアカウントを 2 つ（18 歳以上と 18 歳未満）使う。本物の子どもの情報は使わない:
-  - [ ] VM で migration 014 が当たっている（`deploy-stack.sh` の `db:migrate`）。`docker compose --env-file stack.env exec db psql -U risepath_app -d risepath -c '\d user_age'` で表が出る
+  - [ ] VM で migration 014 が当たっている（`deploy-stack.sh` の `db:migrate`）。`docker compose --env-file stack.env exec -T -e PGOPTIONS='-c default_transaction_read_only=on' db psql -U risepath_app -d risepath -c '\d user_age'` で表が出る（読むだけ。`PGOPTIONS` は省かない。手順書 18 章）
   - [ ] ログインしていない状態で AI を呼ぶと 401 `sign_in_required` になる（`LLM_GUEST_AI` を設定しない既定）。`/api/v2/llm/status` は 200 のまま
   - [ ] 生まれた年と月を登録していないアカウントで、チューターを使おうとすると「AI を使う前に、ひとつだけ設定してください」の案内が出て、「AI の利用設定へ」ボタンで `/settings/ai-access` に進める（API は 403 `age_required`）。AI を使わないレッスンは読める
   - [ ] 18 歳未満のアカウントで年月を登録すると、保護者の同意の画面になる。同意する前は AI を使えない（403 `guardian_consent_required`）
